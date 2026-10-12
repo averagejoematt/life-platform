@@ -29,7 +29,7 @@ Parse the rest of `$ARGUMENTS` for a mode. Default to `capture` if empty.
 
 ## Mode: `capture` (default)
 
-1. Run `python3 tests/site_review.py` (add `--door <home|cockpit|story|evidence>` or
+1. Run `python3 qa/site_review.py` (add `--door <home|cockpit|story|evidence>` or
    `--page <path>` to scope; the default is one door). Needs `playwright install chromium`.
 2. Report the run folder (`qa-screenshots/<date>/`), the page/PNG/endpoint counts, and **any
    cross-page consistency disagreements** — these are HIGH data-integrity findings before any
@@ -75,15 +75,15 @@ first.
 
 ## Mode: a page path (e.g. `/cockpit/`, `/data/sleep/`)
 
-Single-page deep dive: run `python3 tests/site_review.py --page <path>`, then do the per-page review
+Single-page deep dive: run `python3 qa/site_review.py --page <path>`, then do the per-page review
 (step 3 above) for just that page and report findings inline (no full doc unless asked).
 
 ## Notes
 
 - **The capture phase is $0** — no Bedrock; the session reads the PNGs itself.
-- The binding map (`tests/site_review_bindings.py`) defines which endpoints back which page and
+- The binding map (`qa/site_review_bindings.py`) defines which endpoints back which page and
   which metrics are cross-checked; if a page looks un-corroborated, check that it has a binding
-  entry (the self-check `python3 tests/site_review_bindings.py` asserts coverage).
+  entry (the self-check `python3 qa/site_review_bindings.py` asserts coverage).
 - **Site shells are generator output.** If a page has a matching `scripts/v4_build_*.py`, a finding
   whose fix is an HTML-only edit is mis-scoped — name the generator.
 

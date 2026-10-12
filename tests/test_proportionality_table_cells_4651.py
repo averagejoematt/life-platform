@@ -11,15 +11,6 @@ from pathlib import Path
 
 DOC = Path(__file__).resolve().parent.parent / "docs" / "PROPORTIONALITY.md"
 
-# Pre-existing 5-cell rows in a 4-column table (GFM silently drops the 5th cell), found when this
-# test first parsed the table. Keyed by the row's opening text so a line shift does not matter; a
-# ratchet: fix the row and delete its entry, never add one.
-KNOWN_RAGGED_PREFIXES = (
-    "| Deploy dead-man (#4256",
-    "| Reject-only production-gate lease steward",
-    "| Budget governor + budget_guard |",
-)
-
 
 def _cells(line: str) -> int:
     body = line.strip()
@@ -45,8 +36,7 @@ def ragged_rows(text: str):
 
 
 def test_every_table_row_matches_its_header_cell_count():
-    lines = DOC.read_text(encoding="utf-8").splitlines()
-    bad = [r for r in ragged_rows("\n".join(lines)) if not lines[r[0] - 1].startswith(KNOWN_RAGGED_PREFIXES)]
+    bad = ragged_rows(DOC.read_text(encoding="utf-8"))
     assert not bad, f"rows (line, cells, header cells) with an unescaped pipe or missing cell: {bad}"
 
 

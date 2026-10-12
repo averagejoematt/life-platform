@@ -65,9 +65,6 @@ import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(
-    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tests")
-)  # a11y_audit / truth_baseline_audit / site_review (#4270)
 import truth_baseline_audit  # the reader-truth debt ledger (#2956) — same dir
 
 # Haiku cross-region profile (vision-capable, cheap). bedrock_client maps the short name.
@@ -1022,7 +1019,7 @@ def assess_reader_truth(results, today_iso=None):
 
     # The debt ledger (#2956): a high finding on a baselined (page, category)
     # is standing, triaged debt — surfaced every run with its issue ref, never
-    # gating. Only NEW high findings FAIL. See tests/truth_baseline_audit.py
+    # gating. Only NEW high findings FAIL. See qa/truth_baseline_audit.py
     # for why (the #2941 aftermath: 16 pre-existing content findings blocked
     # every site deploy regardless of its diff).
     truth_baseline = truth_baseline_audit.load_baseline()

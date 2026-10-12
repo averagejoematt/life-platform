@@ -8236,7 +8236,7 @@
       "category": "Wearables",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "OAuth API pull, hourly",
+      "method": "OAuth API pull, hourly, 18 hours a day",
       "privacy_tier": "owner_only",
       "stale_hours": null
     },
@@ -8326,7 +8326,7 @@
       "category": "Wearables",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "OAuth API pull, 5x daily",
+      "method": "OAuth API pull, 5x daily plus a recovery refresh",
       "owner_only_fields": [
         "skin_temp_celsius",
         "sleep_consistency_percentage",
@@ -8340,7 +8340,7 @@
       "category": "Wearables",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "OAuth API pull, about 8x daily",
+      "method": "OAuth API pull, 4x daily",
       "owner_only_fields": [
         "afib_result",
         "bmr_kcal",

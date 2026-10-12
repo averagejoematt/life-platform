@@ -1271,6 +1271,24 @@ STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-20",
     },
+    "structural::test_deploy_does_not_import_tests_4270.py": {
+        "gate_name": "test_deploy_does_not_import_tests_4270.py",
+        "command": "python3 -B -m pytest tests/test_deploy_does_not_import_tests_4270.py -q -p no:cacheprovider   # baseline 6 passed",
+        "mutation": (
+            "in _tracked(), the `git ls-files -z` enumeration replaced by a filesystem walk "
+            "(`root.rglob('*')`) - the pre-#4846 shape that read gitignored cdk/cdk.out build output."
+        ),
+        "observed": (
+            "MUTATED: 1 failed, 5 passed - test_guard_judges_tracked_tree_only_4846 reds (the planted "
+            "cdk/cdk.out/bedrock_client.py naming the tests/visual_qa.py shim is reported as a hit). "
+            "RESTORED: 6 passed."
+        ),
+        "scope": (
+            "which files the #4270 import guard judges: tracked files only, so a local cdk synth/bundle "
+            "cannot turn the guard red (#4846); the old glob and the new filter enumerate the same 692 files."
+        ),
+        "proved_on": "2026-10-12",
+    },
     "qa::lambdas/operational/qa_smoke_lambda.py::check_orphan_routine_drafts": {
         "gate_name": "check_orphan_routine_drafts",
         "command": "python3 -B -m pytest tests/test_orphan_routine_drafts_3772.py -q -p no:cacheprovider",

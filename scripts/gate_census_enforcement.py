@@ -123,7 +123,7 @@ it. Two homes, two different questions, and the code only ever reads the dict:
   tests/conformance_guard_lib.py        Q1 yes, Q2 COVERED — `test_conformance_guard_2844.py`
                                         is already a structural-test row and its failure
                                         IS this library's verdict.
-  tests/truth_baseline_audit.py         Q1 yes, Q2 COVERED — `gate_finding` decides what
+  qa/truth_baseline_audit.py            Q1 yes, Q2 COVERED — `gate_finding` decides what
                                         the reader-truth sweep fails on, and that sweep
                                         is the census row `visual-qa / Run visual +
                                         AI-vision QA sweep`, which is PROVEN can-fail.
@@ -252,7 +252,7 @@ NOT_APPLICABLE_REASONS: dict[str, str] = {
         "`structural::test_conformance_guard_2844.py` asserts both directions against the shrink-only ledger, and "
         "its failure IS this library's verdict, so proving both would count one verdict twice."
     ),
-    "tests/truth_baseline_audit.py": (
+    "qa/truth_baseline_audit.py": (
         "`gate_finding()` returns a STRING classification ('new' / 'baselined' / 'advisory') and nothing here "
         "raises or exits; the reader-truth sweep is what turns a 'new' into a red. Q2 COVERED — that sweep is the "
         "census row `visual-qa / Run visual + AI-vision QA sweep`, which is itself PROVEN can-fail, so this "

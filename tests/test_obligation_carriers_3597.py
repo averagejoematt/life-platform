@@ -293,7 +293,7 @@ def test_the_residual_leg_ignores_working_notes_posted_before_the_close():
 
 
 def test_a_serious_axe_entry_with_no_issue_is_red_and_with_one_is_green():
-    a11y = _load("_a11y_audit_3597", ROOT / "tests" / "a11y_audit.py")
+    a11y = _load("_a11y_audit_3597", ROOT / "qa" / "a11y_audit.py")
     row = {"id": "svg-img-alt", "impact": "serious", "help": "svg needs a name", "nodes": 1}
     missing = {"pages": {"/method/build/": [dict(row)]}}
     assert a11y.untriaged_serious_entries(missing), "a serious row with no `issue` must red"

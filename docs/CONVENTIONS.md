@@ -1093,6 +1093,8 @@ those same functions' full definition. That split bites in **both** directions:
 ```bash
 bash deploy/cdk_deploy.sh <StackName> [<StackName> ...] [-- <extra cdk args>]
 ```
+The wrapper passes `--exclusively` (#4849): stack dependencies (Monitoring depends on the stacks owning a filtered Lambda log group) order a deploy but never widen it, because the drift guard only checks the stacks you name. Name every stack you mean to deploy (a paired first apply names both).
+
 This runs `deploy/check_deploy_drift.py` first — a git-only checkout-freshness check
 (mirrors `sync_site_to_s3.sh`'s clobber guard exactly: `git rev-list --count
 HEAD..origin/main -- lambdas/ cdk/ mcp/`) plus, when stack names are given, a

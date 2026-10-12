@@ -67,6 +67,14 @@ def _freeze_module_clock(monkeypatch):
     monkeypatch.setattr(qco, "datetime", _FrozenDatetime)
 
 
+@pytest.fixture(autouse=True)
+def _no_sick_days(monkeypatch):
+    """#4847: a dashboard behind D-1 consults the sick_days partition. These tests
+    pin the unflagged behaviour, so the lookup is the empty set — and never reaches
+    DynamoDB (the sick-day arm is pinned in test_qa_score_sanity_sick_day_4847.py)."""
+    monkeypatch.setattr(qco, "_sick_days_between", lambda start, end: set())
+
+
 def _by_name(checks):
     return {c.name: c for c in checks}
 

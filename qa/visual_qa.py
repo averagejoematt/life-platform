@@ -26,7 +26,7 @@ read-only engine:
      GATES on NEW serious/critical violations vs the committed baseline
      (tests/a11y_baseline.json); baselined + minor/moderate findings are
      recorded honestly as warnings, never hidden, never gating. Baseline
-     shrinks/updates DELIBERATELY via --update-baseline (see tests/a11y_audit.py
+     shrinks/updates DELIBERATELY via --update-baseline (see qa/a11y_audit.py
      for the full semantics + review discipline). Runs at BOTH viewports (#3277):
      once post-reveal at the desktop context, once again at 390×844 after the
      mobile reveal pass, each against its own ledger — a violation that only
@@ -129,9 +129,6 @@ try {
 # Derivation verified identical to the pre-#1426 hand list (36 entries, same
 # paths + checks); tests/test_qa_manifest.py gates the derivation from drifting.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(
-    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tests")
-)  # a11y_audit / truth_baseline_audit / site_review (#4270)
 import a11y_audit  # noqa: E402  (#1433 — pure module, no Playwright import)
 import leak_token_sweep  # noqa: E402  (#1448 — pure module, no Playwright import)
 from qa_manifest import leak_scan_paths, text_floor_paths, visual_pages  # noqa: E402
@@ -1330,7 +1327,7 @@ def capture_page(
     qa/pr_render_gate.py, which drives this same function; False is the escape
     hatch for a harness that cannot afford the extra navigation.
 
-    Extracted from run_sweep's per-page loop (2026-06-20) so tests/site_review.py
+    Extracted from run_sweep's per-page loop (2026-06-20) so qa/site_review.py
     can reuse identical capture without forking the gating visual-qa harness.
     """
     page = context.new_page()

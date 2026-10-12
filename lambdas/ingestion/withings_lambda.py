@@ -205,6 +205,19 @@ def _token_fresh(secret: dict, now: float | None = None) -> bool:
     return (now if now is not None else time.time()) < expires_at - REFRESH_MARGIN_SECONDS
 
 
+def _persist_rotated_secret(secret: dict) -> bool:
+    """Persist a rotation done AFTER authenticate() (the 401-in-body retry, #4821).
+
+    The framework writes credentials back once, right after authenticate(); a rotation
+    inside _withings_get happens later and the old refresh token is already dead, so
+    without this the new one is stranded. Same writer as the authenticate-time path."""
+    import boto3
+
+    from ingestion.ingestion_framework import _writeback_credentials
+
+    return _writeback_credentials(_config, boto3.client("secretsmanager", region_name=REGION), {}, secret, logger)
+
+
 def _withings_get(secret: dict, url: str, params: dict) -> tuple[dict, dict]:
     """Bearer-token POST; refresh on 401-in-body. Returns (body, possibly-updated secret)."""
     params["action"] = params.get("action", "")
@@ -220,6 +233,7 @@ def _withings_get(secret: dict, url: str, params: dict) -> tuple[dict, dict]:
     if result.get("status") == 401:
         logger.info("Withings access token expired, refreshing...")
         secret = _refresh_access_token(secret)
+        _persist_rotated_secret(secret)  # #4821: the framework's writeback already ran
         req2 = urllib.request.Request(url, data=data, method="POST", headers={"Authorization": f"Bearer {secret['access_token']}"})
         req2.add_header("Content-Type", "application/x-www-form-urlencoded")
         with urlopen_with_retry(req2, timeout=30) as resp2:

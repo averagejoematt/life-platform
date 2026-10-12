@@ -7,6 +7,9 @@
   (this run also made a 1-byte ranged GetObject on each affected object).
 - **2026-10-11, the whole bucket, every month:** `python3 scripts/raw_kms_readability_inventory.py --prefix "" --check-backup --check-against-record --markdown`
   — 47,127 objects under 26 top-level prefixes, list + head only (the 109 objects under `config/` are listed past, never read).
+- **2026-10-12, `config/` (owner run, 02:40Z):** `python3 scripts/raw_kms_readability_inventory.py --prefix config/ --include-config --markdown`.
+- **2026-10-12, every other top-level prefix, one run each (03:25–03:35Z):** `python3 scripts/raw_kms_readability_inventory.py --prefix <p>/ --include-config --markdown`
+  for each of the 25 prefixes other than `raw/` and `config/`. Table: **Whole bucket, one run per prefix (2026-10-12)** below.
 
 **No key identifiers are recorded here, by rule** — the script reports keys only as opaque labels.
 
@@ -23,9 +26,9 @@ scheduled for deletion until those objects are re-encrypted).
 
 | Scope | Covered | Result |
 |---|---|---|
-| `raw/` — every object, every month (2026-02 → 2026-10), 39,309 objects | yes (2026-10-09, re-run 2026-10-11) | 25 undecryptable, all last-modified 2026-05; 0 HeadObject errors |
-| Every other top-level prefix — 25 prefixes, 7,818 objects (table below) | yes (2026-10-11) | 0 undecryptable; every object SSE-S3; 0 HeadObject errors |
-| `config/` — 109 objects | **pending — owner run** (out of bounds for unattended runs; `--include-config` is owner-only) | not inventoried |
+| `raw/` — every object, every month (2026-02 → 2026-10), 39,315 objects | yes (2026-10-09, re-run 2026-10-11; scheduled check run 38166655589) | 25 undecryptable, all last-modified 2026-05; 0 HeadObject errors |
+| Every other top-level prefix — 25 prefixes, 7,894 objects (tables below) | yes (2026-10-11, re-run per prefix 2026-10-12) | 0 undecryptable; every object SSE-S3; 0 HeadObject errors |
+| `config/` — 110 objects | yes (2026-10-12, owner run with `--include-config`) | 0 undecryptable; every object SSE-S3; 0 HeadObject errors |
 | Root-level objects (no prefix) | yes (2026-10-11) | none exist |
 
 KMS keys seen across the whole bucket: one (`cmk-1`), state **Missing** (DescribeKey → NotFound).
@@ -61,10 +64,53 @@ Every other object in every scanned prefix is SSE-S3.
 | `site/` | 2855 | 2026-03 → 2026-10 (7) | 2855 | 0 | 0 |
 | `story-desk/` | 17 | 2026-10 | 17 | 0 | 0 |
 | `uploads/` | 31 | 2026-09 → 2026-10 (2) | 31 | 0 | 0 |
-| `config/` | 109 | — | — | — | **pending (owner run)** |
+| `config/` | 109 | — | — | — | not read on 2026-10-11 — see the 2026-10-12 table below |
 
 The months are the objects' CURRENT last-modified months; the bucket is versioned, and a
 version-level census was not run (see "Not done here").
+
+### Whole bucket, one run per prefix (2026-10-12)
+
+Run 2026-10-12, read-only: `config/` at 02:40Z (owner run, `--include-config`), the other 25 prefixes
+at 03:25–03:35Z (one run each), and `raw/` from the scheduled check's run 38166655589 (2026-10-11T19:07Z).
+Every run: HeadObject errors 0. The counts differ slightly from the 2026-10-11 table because objects
+were written in between.
+
+| Top-level prefix | Objects | Last-modified months | SSE-KMS | Undecryptable |
+|---|---|---|---|---|
+| `ai-canary-log/` | 40 | 2026-07 → 2026-10 | 0 | 0 |
+| `assets/` | 5 | 2026-03 | 0 | 0 |
+| `blog/` | 8 | 2026-05 → 2026-09 | 0 | 0 |
+| `buddy/` | 3 | 2026-03 → 2026-10 | 0 | 0 |
+| `claude-memory-backup/` | 558 | 2026-07 → 2026-10 | 0 | 0 |
+| `coherence-log/` | 107 | 2026-06 → 2026-10 | 0 | 0 |
+| `config/` | 110 | 2026-03 → 2026-10 | 0 | 0 |
+| `dashboard/` | 276 | 2026-03 → 2026-10 | 0 | 0 |
+| `datadrops-archive/` | 167 | 2026-07 | 0 | 0 |
+| `dead-letter-archive/` | 81 | 2026-03 → 2026-10 | 0 | 0 |
+| `deploys/` | 656 | 2026-09 → 2026-10 | 0 | 0 |
+| `design-sketches/` | 7 | 2026-07 | 0 | 0 |
+| `drift-log/` | 24 | 2026-07 → 2026-10 | 0 | 0 |
+| `exports/` | 24 | 2026-03 | 0 | 0 |
+| `generated/` | 2230 | 2026-04 → 2026-10 | 0 | 0 |
+| `imports/` | 94 | 2026-02 → 2026-09 | 0 | 0 |
+| `mcp-audit/` | 366 | 2026-08 → 2026-10 | 0 | 0 |
+| `panelcast-holds/` | 1 | 2026-10 | 0 | 0 |
+| `pip-audit/` | 3 | 2026-09 → 2026-10 | 0 | 0 |
+| `raw/` | 39315 | 2026-02 → 2026-10 | 25 | 25 |
+| `recap/` | 76 | 2026-09 → 2026-10 | 0 | 0 |
+| `reconciliation/` | 28 | 2026-04 → 2026-10 | 0 | 0 |
+| `remediation-log/` | 192 | 2026-05 → 2026-10 | 0 | 0 |
+| `session-artifacts/` | 34 | 2026-07 | 0 | 0 |
+| `site/` | 2867 | 2026-03 → 2026-10 | 0 | 0 |
+| `story-desk/` | 17 | 2026-10 | 0 | 0 |
+| `uploads/` | 30 | 2026-09 → 2026-10 | 0 | 0 |
+| **All 27 top-level prefixes** | **47319** | 2026-02 → 2026-10 | **25** | **25** |
+
+The 25 prefixes other than `raw/` and `config/` hold 7,894 objects, 0 of them undecryptable.
+
+**Conclusion (2026-10-12):** the only dead objects in the bucket are the 25 under `raw/` already
+recorded in **The affected objects** below; every other object in all 27 top-level prefixes is SSE-S3 and readable.
 
 ## Undecryptable objects, by prefix and month
 
@@ -182,7 +228,7 @@ The scheduled check `raw-kms-readability.yml` ran green on 2026-10-11T19:07Z (ru
 
 ## Not done here (owner boxes on #4634)
 
-- `config/`: `python3 scripts/raw_kms_readability_inventory.py --prefix config/ --include-config --markdown` — owner-run, then add its row above.
+- ~~`config/`~~ — done 2026-10-12 (owner run, 110 objects, 0 undecryptable; the whole-bucket table above).
 - The count above is CURRENT versions. Noncurrent versions of other `raw/` keys written in the
   window are dead too but are not a loss of their own (their current version decides readability);
   a version-level census was not run.

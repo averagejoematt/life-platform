@@ -19,6 +19,7 @@ Two ledgers, both shrink-only (a NEW offender fails; a ledger row that no longer
 """
 
 import re
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -49,6 +50,13 @@ SHIMS = {
     "tests/comprehension_qa.py",
     "tests/perf_trend.py",
     "tests/pr_render_gate.py",
+    "tests/site_review.py",
+    "tests/site_review_bindings.py",
+    "tests/a11y_audit.py",
+    "tests/truth_baseline_audit.py",
+    "tests/premerge_derivation.py",
+    "tests/golden_surface_eval.py",
+    "tests/eval_credential_stub.py",
     "tests/mypy_clean_set.py",  # also the CLI path .claude/settings.json's permission entry names (owner edit)
 }
 
@@ -58,31 +66,17 @@ EXEMPT = {
     "deploy/sentinel_producer_census.py": "reads scheduled_lambda_cadences() out of tests/test_heartbeat_completeness.py",
     "scripts/diligence_verify.py": "imports the canonical PRIVATE-marker predicate from tests/test_no_private_markers_3043.py",
     "scripts/generate_platform_model.py": "AST-reads tests/pair_contract_registry.py (the pair-seam test registry)",
-    "scripts/qa_audit.py": "reads the TEXT of tests/site_review_bindings.py to prove it derives from the manifest (CONSUMER_CONTRACT)",
     "scripts/capture_kit_page_fixtures.py": "writes tests/fixtures/kit_pages_4586 and imports tests/kit_page_gate.py",
 }
 
-# Shrink-only: tooling still in tests/ that a follow-up slice of #4270 moves out.
-LEGACY = {
-    "scripts/gate_census_structural.py",  # tests/premerge_derivation.py (the pr-checks premerge-lane story)
-    "scripts/harvest_eval_fixtures.py",  # tests/golden_surface_eval.py (the golden-brief eval-harness slice -> qa/eval)
-}
+# Shrink-only: tooling still in tests/ that a follow-up slice of #4270 moves out. Empty: the last two reachers moved (#4270).
+LEGACY: set = set()
 
-# qa/ modules that still put tests/ on sys.path (they import tests-owned site_review / a11y_audit / truth_baseline_audit).
-# Shrink-only. Anything that imports one of these loads tests/ one step removed, so it is NOT "moved clean".
-QA_TESTS_PATH_LEGACY = {
-    "qa/accuracy_audit.py",
-    "qa/comprehension_qa.py",
-    "qa/visual_ai_qa.py",
-    "qa/visual_qa.py",
-}
+# qa/ modules that still put tests/ on sys.path. Empty since the last support modules moved into qa/ (#4270). Shrink-only.
+QA_TESTS_PATH_LEGACY: set = set()
 
-# deploy/ or scripts/ modules with no tests/ path line of their own that reach tests/ transitively via a qa/ module above.
-TRANSITIVE = {
-    "deploy/capture_api_schemas.py": "from qa import accuracy_audit -> qa/accuracy_audit.py appends tests/ and imports site_review*",
-    "scripts/design_sync_capture.py": "lazy `from qa import visual_qa` -> qa/visual_qa.py appends tests/",
-    "scripts/fresh_eyes_discovery.py": "lazy `from qa import visual_qa / visual_ai_qa` -> both append tests/",
-}
+# deploy/ or scripts/ modules that reach tests/ transitively via a qa/ module. Empty: qa/ no longer puts tests/ on sys.path.
+TRANSITIVE: dict = {}
 
 _PATTERNS = [
     re.compile(r"sys\.path\.(insert|append)\(.*[\"']tests[\"']"),
@@ -134,26 +128,36 @@ _TESTS_NONTEST = re.compile(r"\btests/(?!test_)(?!fixtures/)(?!js/)(?!api_schema
 _FROM_TESTS = re.compile(r"^\s*(from tests[. ]|import tests\b)", re.M)
 
 
-def _invocations_outside_tests() -> list:
+def _tracked(root: Path) -> list:
+    """Tracked files under root (git ls-files) - never the filesystem, so gitignored build output (cdk/cdk.out,
+    cdk/_bundle_staging, cdk/_mcp_staging) is invisible by construction (#4846, the #2372 rule)."""
+    out = subprocess.run(["git", "ls-files", "-z"], cwd=root, capture_output=True, text=True, check=True).stdout
+    return sorted(f for f in out.split("\0") if f and (root / f).is_file())
+
+
+def _invocations_outside_tests(root: Path = ROOT) -> list:
     """Workflow run-lines, lambdas, qa/ and cdk code that name a tests/<non-test>.py module or import `tests`."""
     hits = []
-    roots = [(ROOT / ".github" / "workflows", "*.yml"), (ROOT / "lambdas", "**/*.py"), (ROOT / "qa", "*.py"), (ROOT / "cdk", "**/*.py")]
-    for base, pat in roots:
-        for p in sorted(base.glob(pat)):
-            rel = p.relative_to(ROOT).as_posix()
-            text = p.read_text(encoding="utf-8", errors="replace")
-            if _FROM_TESTS.search(text):
-                hits.append(f"{rel}: imports from tests")
-            for line in text.splitlines():
-                s = line.strip()
-                if s.startswith("#"):
-                    continue
-                if rel.endswith(".yml") and not re.search(r"\b(python3?|pytest|bash|sh|run:)\b", s):
-                    continue
-                m = _TESTS_NONTEST.search(s)
-                if m and f"tests/{m.group(1)}" in SHIMS:
-                    hits.append(f"{rel}: names the shim tests/{m.group(1)}")
-                    break
+    for rel in _tracked(root):
+        in_wf = rel.startswith(".github/workflows/") and rel.endswith(".yml") and rel.count("/") == 2
+        in_py = (rel.startswith(("lambdas/", "cdk/")) and rel.endswith(".py")) or (
+            rel.startswith("qa/") and rel.endswith(".py") and rel.count("/") == 1
+        )
+        if not (in_wf or in_py):
+            continue
+        text = (root / rel).read_text(encoding="utf-8", errors="replace")
+        if _FROM_TESTS.search(text):
+            hits.append(f"{rel}: imports from tests")
+        for line in text.splitlines():
+            s = line.strip()
+            if s.startswith("#"):
+                continue
+            if rel.endswith(".yml") and not re.search(r"\b(python3?|pytest|bash|sh|run:)\b", s):
+                continue
+            m = _TESTS_NONTEST.search(s)
+            if m and f"tests/{m.group(1)}" in SHIMS:
+                hits.append(f"{rel}: names the shim tests/{m.group(1)}")
+                break
     return hits
 
 
@@ -199,3 +203,22 @@ def test_moved_clean_files_do_not_import_a_qa_module_that_reaches_tests():
         assert any(
             imp.search(ln) and any(n in ln for n in bad_mods) for ln in (ROOT / rel).read_text().splitlines()
         ), f"{rel} no longer transitive - drop it"
+
+
+def test_guard_judges_tracked_tree_only_4846(tmp_path):
+    """A gitignored copy of an offending module (cdk.out / staging) is invisible; a tracked one fires."""
+
+    def git(*a):
+        subprocess.run(["git", *a], cwd=tmp_path, check=True, capture_output=True)
+
+    git("init", "-q")
+    (tmp_path / ".gitignore").write_text("cdk/cdk.out/\n")
+    (tmp_path / "cdk" / "cdk.out").mkdir(parents=True)
+    bad = "path = 'tests/visual_qa.py'\n"
+    (tmp_path / "cdk" / "cdk.out" / "bedrock_client.py").write_text(bad)
+    (tmp_path / "cdk" / "app.py").write_text("x = 1\n")
+    git("add", "-A")
+    assert _invocations_outside_tests(tmp_path) == []
+    (tmp_path / "cdk" / "bad.py").write_text(bad)
+    git("add", "-A")
+    assert _invocations_outside_tests(tmp_path) == ["cdk/bad.py: names the shim tests/visual_qa.py"]

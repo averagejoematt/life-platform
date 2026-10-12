@@ -111,6 +111,55 @@ def _before_compute_window() -> bool:
     return (now.hour, now.minute) < (cutoff.hour, cutoff.minute)
 
 
+# ── #4847: a flagged sick day holds the dashboard at the last GRADED day ──────
+# The dashboard's `date` has exactly ONE writer: daily-brief (cron 17:00 UTC,
+# email_stack.py) via output_writers.write_dashboard_json. dashboard-refresh
+# (21:00Z / 01:00Z) merges intraday values into the existing JSON and never
+# moves `date`. On a day flagged in the sick_days partition the brief takes its
+# recovery path ("no grades, no scores") and returns BEFORE that write, so the
+# dashboard honestly keeps the last graded day — by design, not by lag. The live
+# case: 2026-10-10 flagged sick (logged 2026-10-11T02:22Z), the 10-11 17:00Z
+# brief sent the recovery brief, and the 18:31Z sweep (request 51bc0c11) read
+# `expected 2026-10-10, got 2026-10-09` as staleness. The expectation therefore
+# walks back past flagged sick days to the latest day the brief would grade;
+# the walk is bounded, and an unflagged gap stays a hard FAIL.
+_SICK_WALKBACK_DAYS = 14
+
+
+def _sick_days_between(start: str, end: str) -> set[str]:
+    """Flagged (not cleared, #4378) sick days in [start, end] — empty on any error.
+
+    Fail-soft toward STRICT: a lookup error yields no sick days, so the date check
+    keeps its D-1 expectation and a real staleness still reds.
+    """
+    try:
+        from health.sick_day_checker import get_sick_days_range
+
+        table = boto3.resource("dynamodb", region_name=REGION).Table(os.environ.get("TABLE_NAME", "life-platform"))
+        rows = get_sick_days_range(table, os.environ.get("USER_ID", "matthew"), start, end)
+        return {str(r.get("date") or (r.get("sk") or "").replace("DATE#", "")) for r in rows}
+    except Exception as e:  # noqa: BLE001 — the sick-day lookup must never break the sweep
+        print(f"[WARN] qa sick-day lookup failed ({start}..{end}): {e}")
+        return set()
+
+
+def _last_graded_day(day_str: str) -> tuple[str, list[str]]:
+    """(latest day <= day_str that is NOT a flagged sick day, the sick days skipped).
+
+    Only consulted when the dashboard is BEHIND the expectation, so a healthy
+    sweep never reads DynamoDB for this.
+    """
+    day = date.fromisoformat(day_str)
+    sick = _sick_days_between((day - timedelta(days=_SICK_WALKBACK_DAYS)).isoformat(), day_str)
+    skipped = []
+    for _ in range(_SICK_WALKBACK_DAYS):
+        if day.isoformat() not in sick:
+            break
+        skipped.append(day.isoformat())
+        day -= timedelta(days=1)
+    return day.isoformat(), skipped
+
+
 # ---------------------------------------------------------------------------
 # CHECK 2 — S3 output freshness
 # ---------------------------------------------------------------------------
@@ -191,6 +240,8 @@ def check_score_sanity():
     expected_date = _yesterday_str()
     actual_date = data.get("date", "")
     c = Check("dashboard:date", "Score Sanity", CONTENT_TRUTH)
+    # #4847: only a dashboard BEHIND D-1 consults the sick-day partition (one Query).
+    _graded_date, _sick_skipped = _last_graded_day(expected_date) if actual_date and actual_date < expected_date else (expected_date, [])
     if actual_date == expected_date:
         c.ok(f"Date = {actual_date}")
     elif actual_date and actual_date > expected_date and _genesis_grace:
@@ -208,6 +259,13 @@ def check_score_sanity():
         # the same day it breaks.
         _fire_pt = _compute_cutoff_pt() - timedelta(minutes=_COMPUTE_SLACK_MINUTES)
         c.ok(f"Date = {actual_date} (D-2, pre-compute morning window — compute stamps {expected_date} at {_fire_pt.strftime('%H:%M')} PT)")
+    elif _sick_skipped and actual_date == _graded_date:
+        # #4847: every day between the dashboard's date and D-1 is a flagged sick
+        # day — the brief's recovery path skips the dashboard write, so the last
+        # graded day IS the honest latest date (see _last_graded_day above).
+        c.ok(
+            f"Date = {actual_date} (last graded day — {', '.join(sorted(_sick_skipped))} flagged sick, the brief writes no dashboard on a sick day)"
+        )
     elif actual_date:
         c.fail(f"Stale date — expected {expected_date}, got {actual_date}")
     else:

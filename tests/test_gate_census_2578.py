@@ -1096,7 +1096,11 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # STRUCTURAL_PROOFS in scripts/gate_census_mutations.py (baseline 11 passed | mutated 2 failed | reverted 11 passed).
         # Id-set diff vs a `git archive origin/main` export at the merge base: 782 {258, 512, 7, 5} -> 783 {259, 512, 7, 5};
         # enters exactly that id, leaves {}, unproven does NOT move. #4633 used the slack this lane's first measure relied on.
-        <= 259
+        # Upper bound 259 -> 260 (2026-10-12, #4846): structural::test_deploy_does_not_import_tests_4270.py — the #4270 sweep of
+        # workflows/lambdas/qa/cdk for tests/ shim imports, now judging tracked files only — arrives PROVEN via
+        # STRUCTURAL_HAND_PROOFS in scripts/gate_census_proofs.py (the tracked-file enumeration swapped for a filesystem walk: baseline 6 passed |
+        # mutated 1 failed, 5 passed | restored 6 passed; re-watched 2026-10-12). CI's pre-merge lane measured n=260 on ec39d82f2.
+        <= 260
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
