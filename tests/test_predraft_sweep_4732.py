@@ -410,3 +410,40 @@ def test_mutation_check_the_rule_is_what_archives_them():
     with patch.object(npd, "_last_touched_day", lambda ir: str(ir.created_at or "")[:10]):
         out, _ = _sweep(table)
     assert OLD_BUT_RETOUCHED.routine_id in {a["routine_id"] for a in out["archived"]}
+
+
+# ── #4732 (2026-10-12 18:31Z read): the sweep and the qa-smoke leg share ONE age ──
+def test_the_sweep_and_the_orphan_leg_read_one_constant():
+    """The leg warned at 7 days while the sweep archived at 14, so every 7-14 day draft sat in the gap each
+    night and `data:orphan_routine_drafts` could not reach <= 2. Both now read `routine_repo.ORPHAN_DRAFT_DAYS`."""
+    import inspect
+
+    from operational import qa_smoke_lambda as q
+
+    assert npd.STALE_DRAFT_DAYS is routine_repo.ORPHAN_DRAFT_DAYS == 14
+    assert routine_repo.stale_draft_census.__defaults__[0] == routine_repo.ORPHAN_DRAFT_DAYS
+    src = inspect.getsource(q.check_orphan_routine_drafts)
+    assert "older_than_days=ORPHAN_DRAFT_DAYS" in src and "older_than_days=7" not in src
+
+
+def test_a_draft_at_the_shared_age_is_archived_and_no_longer_counted_one_day_younger_is_neither():
+    """On the real routine-repo shape: a draft at the threshold age is counted by the leg's census, archived by
+    the sweep, and then counted by nothing; one day younger is untouched by the sweep AND never counted."""
+    at_age = _chat("age00014", "2026-09-27", "lower", "2026-09-27T12:00:00Z")  # 14 days before STALE_TODAY
+    younger = _chat("age00013", "2026-09-28", "lower", "2026-09-28T12:00:00Z")  # 13 days
+    table = _Table()
+    with patch.object(routine_repo, "_table", table):
+        for ir in (at_age, younger):
+            routine_repo.put_versioned(RoutineSpec(**{**ir.__dict__, "inputs_snapshot": dict(ir.inputs_snapshot)}))
+
+        def counted():
+            census = routine_repo.stale_draft_census(today=STALE_TODAY, genesis=GENESIS)
+            return {ir.routine_id for ir in census["live"]}
+
+        assert counted() == {"age00014"}, "before the sweep the leg counts the draft at the shared age"
+        out = npd.sweep_expired(STALE_TODAY, "2026-10-11T02:00:01Z", genesis=GENESIS)
+        assert [a["routine_id"] for a in out["archived"]] == ["age00014"] and out["errors"] == []
+        assert routine_repo.get_current("age00014").status == "archived"
+        assert routine_repo.get_current("age00013").status == "draft"
+        assert counted() == set(), "after the sweep neither draft is counted: archived, and too young"
+    assert table.deletes == 0

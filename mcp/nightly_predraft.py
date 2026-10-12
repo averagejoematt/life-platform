@@ -13,7 +13,7 @@ WHAT A RUN DOES — nothing a chat turn could not already do, in the same order
      Routines the pre-draft did not author are left alone EXCEPT by the one owner-ruled rule
      (2026-10-11): a live-cycle draft the pre-draft did not author (chat-built, or an unmarked cron
      draft), never pushed to Hevy, whose day has passed and which nobody has touched for
-     `STALE_DRAFT_DAYS` (14) days is archived the same way (reason `stale_untouched`).
+     `STALE_DRAFT_DAYS` (14 = `routine_repo.ORPHAN_DRAFT_DAYS`) days is archived the same way (reason `stale_untouched`).
      Fail-soft and reported as `sweep`.
   1. `scheduled_session(tomorrow)` — THE seam (below). No lifting session → the first-class
      `no_session` outcome, never a guessed one. Archetype-agnostic (full / upper / lower).
@@ -77,6 +77,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
+from training.routine_repo import ORPHAN_DRAFT_DAYS
+
 logger = logging.getLogger("nightly_predraft")
 
 MARKER = "nightly_predraft"
@@ -119,8 +121,9 @@ FAILED = "failed"  # NOT honest-terminal: emits PredraftOutcome = 0, so the dead
 SWEEP_LOOKBACK_DAYS = 120
 """#4732: how far back the expired-draft sweep looks (the orphan census's own lookback), floored at the genesis."""
 SWEEP_LIMIT = 500
-STALE_DRAFT_DAYS = 14
-"""#4732 owner ruling 2026-10-11: a non-pre-draft draft untouched this many days is auto-archived."""
+STALE_DRAFT_DAYS = ORPHAN_DRAFT_DAYS
+"""#4732 owner ruling 2026-10-11: a non-pre-draft draft untouched this many days is auto-archived. Not a
+local number: `routine_repo.ORPHAN_DRAFT_DAYS`, the same one the qa-smoke orphan-draft leg warns at."""
 STALE_REASON = "stale_untouched"
 AUTO_ARCHIVE_KEY = "auto_archived"
 """Where a non-pre-draft archive is stamped — NEVER `MARKER`, which would make the row read as ours."""

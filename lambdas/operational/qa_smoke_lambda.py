@@ -1062,7 +1062,7 @@ def _blog_links_retired():
 
 
 def check_orphan_routine_drafts():
-    """#3772: routines still `draft` more than 7 days after creation. The #3765 soft-timeout
+    """#3772: routines still `draft` more than `ORPHAN_DRAFT_DAYS` (14, #4732: the sweep's own age) days after creation. The #3765 soft-timeout
     lands the draft and tells the client it timed out, so nothing ever lists it — one sat
     from 2026-09-08 with nobody knowing. A count here is a WARN naming them (the owner
     archives or commits); zero is the ok line. Read-only: one bounded index Query.
@@ -1075,11 +1075,11 @@ def check_orphan_routine_drafts():
     never tombstones a prescription), so the check reads the genesis itself. Both verdict
     lines NAME the window and the excluded count, so a widened census is visible, never
     silent (acceptance box 2)."""
-    from training.routine_repo import stale_draft_census
+    from training.routine_repo import ORPHAN_DRAFT_DAYS, stale_draft_census
 
     c = Check("data:orphan_routine_drafts", "Orphaned routine drafts", CONTENT_TRUTH)
     try:
-        census = stale_draft_census(older_than_days=7)
+        census = stale_draft_census(older_than_days=ORPHAN_DRAFT_DAYS)
     except Exception as e:  # noqa: BLE001
         return [c.warn(f"orphan-draft census errored (no verdict was reached): {e}")]
     live, history, w = census["live"], census["pre_genesis"], census["window"]
@@ -1092,12 +1092,12 @@ def check_orphan_routine_drafts():
         more = f" (+{len(live) - 5} more)" if len(live) > 5 else ""
         return [
             c.warn(
-                f"{len(live)} live-cycle routine draft(s) older than 7 days never committed or archived: {names}{more} — "
-                f"`manage_hevy_routine list start_date={w['genesis'] or w['start']} end_date={w['end']} status=draft older_than_days=7` "
+                f"{len(live)} live-cycle routine draft(s) older than {ORPHAN_DRAFT_DAYS} days never committed or archived: {names}{more} — "
+                f"`manage_hevy_routine list start_date={w['genesis'] or w['start']} end_date={w['end']} status=draft older_than_days={ORPHAN_DRAFT_DAYS}` "
                 f"lists them (#3772); {window} (#4183)"
             )
         ]
-    return [c.ok(f"no live-cycle routine draft older than 7 days is left uncommitted (#3772); {window} (#4183).")]
+    return [c.ok(f"no live-cycle routine draft older than {ORPHAN_DRAFT_DAYS} days is left uncommitted (#3772); {window} (#4183).")]
 
 
 def check_pk_family_census():
