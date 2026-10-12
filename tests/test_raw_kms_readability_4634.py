@@ -229,12 +229,17 @@ def test_the_prefix_rollup_covers_every_top_level_prefix():
     assert roll["generated/"]["sse_s3"] == 1
 
 
-def test_the_inventory_record_covers_every_prefix_and_names_config_as_pending():
+def test_the_inventory_record_covers_every_prefix_including_config():
     text = RECORD.read_text()
     for p in ("raw/", "generated/", "site/", "exports/", "imports/", "uploads/"):
         assert f"| `{p}` |" in text, p
-    assert "| `config/` |" in text and "pending" in text.split("| `config/` |")[1].split("\n")[0]
     assert "--include-config" in text
+    # The owner's config/ run (2026-10-12) is recorded in the whole-bucket table, not left pending.
+    section = text.split("### Whole bucket, one run per prefix (2026-10-12)", 1)[1].split("\n## ", 1)[0]
+    config_row = next(ln for ln in section.splitlines() if ln.startswith("| `config/` |"))
+    assert config_row.rstrip().endswith("| 0 |"), config_row
+    assert "**All 27 top-level prefixes**" in section
+    assert "the only dead objects in the bucket are the 25 under `raw/`" in section
 
 
 def test_the_scheduled_workflow_runs_the_check_unpiped_under_a_role_that_can_read_raw():
