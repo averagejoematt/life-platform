@@ -59,7 +59,12 @@ KIT_PAGES = {
     "/next/v8/story/": 4,
     # #4808/#4809 (ruling 2026-10-11): four screens stand — the bet's reasons are the front
     # card's, and this page's bet card carries a door to them instead of printing both.
-    "/next/v8/coaches/": 4,
+    # #4839: 4.25. The live record block now serves #4617's `counted_text` (what the big count
+    # counts: sealed, bets, commentary, conditional - one four-line sentence under the number),
+    # which the fixtures lacked until the recapture. That is +0.17 screens (3.83 -> 4.0 locally,
+    # 4.06 on the Linux CI renderer). The sentence is the point of #4617, so the budget gives
+    # it a quarter screen rather than the sentence being cut.
+    "/next/v8/coaches/": 4.25,
     "/next/v8/day/": 4,
     # The longest a day page gets: eight lifts, three coach lines (the most a day holds) and two
     # settled calls (#4648). What was said and settled is a fifth part of the day, so this one

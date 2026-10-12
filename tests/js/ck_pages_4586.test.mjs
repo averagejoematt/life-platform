@@ -25,6 +25,16 @@ const POD = { state: "ok", as_of: "2026-10-01", source: "/panelcast/episodes.jso
 const WITH_POD = { ...B.chapter, data: { ...B.chapter.data, podcast: POD } };
 const WEIGHT = B.today.data.weight_lbs;
 const fmt1 = (n) => n.toFixed(1);
+// Dates and names the tests print are read from the capture they test, so a recapture that
+// moves the open bet on never fails them (#4839).
+const longDay = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+const shortDayOf = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
+const BET = B.next.data.bet.data;
+const BET_DAY = longDay(BET.settle_date);
+const [SIDE_A, SIDE_B] = BET.sides.map((x) => x.coach);
+const SAYS = (x) => `${x.coach} says ${x.says}.`;
+const SIDES_LINE = BET.sides.map(SAYS).join(" ");
+const OTHER_BET = load("coach_docket").open.map((d) => d.resolution_date).filter((d) => d && d !== BET.settle_date).sort()[0];
 const UNAVAILABLE = { state: "unavailable", as_of: null, source: null, absent_text: "The latest chapter is not served right now.", data: null };
 
 test("the header carries the edition's one day and day number, in words", () => {
@@ -103,7 +113,7 @@ test("no percentage picture on fewer than 20 checked calls", () => {
 
 test("his words are quoted only when fresh; silence prints the block's sentence", () => {
   assert.equal(P.hisWordsFresh(B.his_words), false);
-  assert.match(P.hisWordsHTML(B.his_words), /Nothing new in his own words since Wednesday, September 23\./);
+  assert.match(P.hisWordsHTML(B.his_words), new RegExp(`Nothing new in his own words since ${B.his_words.data.date_text}\\.`));
   assert.doesNotMatch(P.hisWordsHTML(B.his_words), /ck-quote/);
   const fresh = { state: "ok", as_of: "2026-10-01", data: { text: "Right now I still feel good.", date: "2026-10-01" } };
   assert.equal(P.hisWordsFresh(fresh), true);
@@ -115,15 +125,15 @@ test("his words are quoted only when fresh; silence prints the block's sentence"
 test("the bet card states the question, the date and both sides", () => {
   const html = P.betHTML(B.next);
   // the question names its day, so the card says it once (#4809); a question that does not gets the line
-  assert.match(html, /^<div class="ck-bet"><p><b>Will [^<]+ on Monday, October 12\?<\/b><\/p>/);
-  assert.doesNotMatch(html, /Settles Monday, October 12/);
+  assert.match(html, new RegExp(`^<div class="ck-bet"><p><b>Will [^<]+ on ${BET_DAY}\\?</b></p>`));
+  assert.doesNotMatch(html, new RegExp(`Settles ${BET_DAY}`));
   const undated = { ...B.next, data: { ...B.next.data, bet: { ...B.next.data.bet, data: { ...B.next.data.bet.data, question: "Will protein stay high?" } } } };
-  assert.match(P.betHTML(undated), /<p class="ck-small">Settles Monday, October 12<\/p>/);
+  assert.match(P.betHTML(undated), new RegExp(`<p class="ck-small">Settles ${BET_DAY}</p>`));
   // ruling 2026-10-11: off the front card the sides stand alone on one line; the reasons are the front card's
-  assert.match(html, /<p class="ck-soft">Nathan Reeves says no\. Marcus Webb says yes\.<\/p>/);
+  assert.match(html, new RegExp(`<p class="ck-soft">${SIDES_LINE.replace(/\./g, "\\.")}</p>`));
   assert.doesNotMatch(html, /Fuel-cognition link|Protein intake gap/);
-  assert.equal(P.betLine(B.next), "A bet between Nathan Reeves and Marcus Webb settles Monday, October 12.");
-  assert.equal(P.moreBetsLine(load("coach_docket"), "2026-10-12"), "One more bet settles on October 16.");
+  assert.equal(P.betLine(B.next), `A bet between ${SIDE_A} and ${SIDE_B} settles ${BET_DAY}.`);
+  assert.equal(P.moreBetsLine(load("coach_docket"), BET.settle_date), `One more bet settles on ${shortDayOf(OTHER_BET)}.`);
   assert.equal(P.moreBetsLine({ open: [{ resolution_date: "2026-10-12" }, { resolution_date: "2026-10-14" }, { resolution_date: "2026-10-16" }] }, "2026-10-12"), "Two more bets settle on October 14 and 16.");
   assert.equal(P.moreBetsLine({ open: [{ resolution_date: "2026-10-05" }] }, "2026-10-05"), "");
 });
