@@ -69,5 +69,10 @@ python3 -m venv "$ROOT/cdk/.venv"
 "$ROOT/cdk/.venv/bin/pip" install -q -r "$ROOT/cdk/requirements.txt"
 APP_OVERRIDE=(--app "$ROOT/cdk/.venv/bin/python3 app.py")
 
-echo "→ guard passed. Deploying: ${STACKS[*]}"
-(cd "$ROOT/cdk" && npx cdk deploy "${STACKS[@]}" "${APP_OVERRIDE[@]}" "${EXTRA[@]+"${EXTRA[@]}"}")
+# --exclusively (#4849): stack dependencies (e.g. Monitoring -> the Lambda-owning stacks) order a
+# deploy but must not WIDEN it. Without this, `cdk deploy LifePlatformMonitoring` also deploys every
+# dependency, and those stacks skip the drift guard above (it checks only the named stacks) and could
+# overwrite Lambda code pushed with deploy_lambda.sh. Name every stack you mean to deploy; cdk still
+# orders the named ones by dependency.
+echo "→ guard passed. Deploying (exclusively): ${STACKS[*]}"
+(cd "$ROOT/cdk" && npx cdk deploy --exclusively "${STACKS[@]}" "${APP_OVERRIDE[@]}" "${EXTRA[@]+"${EXTRA[@]}"}")

@@ -39,11 +39,15 @@ def _declared_deps():
     return deps
 
 
+# mentioned in a monitoring file but not owned by any listed stack (a comment, not a filter target)
+NON_FILTER_MENTIONS = {"site-api"}
+
+
 def _watched_functions():
     names = set()
     for path in glob.glob(os.path.join(STACKS, "monitoring*.py")):
         names |= set(re.findall(r"/aws/lambda/([A-Za-z0-9_-]+)", _read(path)))
-    return names
+    return names - NON_FILTER_MENTIONS
 
 
 def _owner_of(fn):
@@ -58,7 +62,10 @@ def test_monitoring_depends_on_every_stack_owning_a_filtered_log_group():
     deps = _declared_deps()
     assert deps, "cdk/app.py declares no monitoring.add_dependency"
     offenders = []
-    for fn in sorted(_watched_functions()):
+    watched = _watched_functions()
+    assert watched, "no from_log_group_name('/aws/lambda/...') filter targets found; the regex matched nothing"
+    for fn in sorted(watched):
+        assert len(_owner_of(fn)) == 1, f"{fn}: expected exactly one owning stack in OWNER_VAR, got {_owner_of(fn)}"
         for mod in _owner_of(fn):
             if OWNER_VAR[mod] not in deps:
                 offenders.append(f"{fn} (owned by {mod}) -> add monitoring.add_dependency({OWNER_VAR[mod]})")
@@ -69,3 +76,10 @@ def test_inbound_auth_gate_owner_is_found_and_ordered():
     # the specimen: guard against the owner lookup silently matching nothing
     assert _owner_of("inbound-auth-gate") == {"operational_stack"}
     assert "operational" in _declared_deps()
+
+
+def test_deploy_wrapper_is_exclusive_so_the_dependency_does_not_widen_the_deploy():
+    src = _read(os.path.join(ROOT, "deploy", "cdk_deploy.sh"))
+    assert re.search(
+        r"npx cdk deploy --exclusively ", src
+    ), "cdk_deploy.sh must pass --exclusively (dependency ride-along skips the drift guard)"
