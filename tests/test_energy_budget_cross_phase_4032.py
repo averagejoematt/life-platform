@@ -42,6 +42,7 @@ from __future__ import annotations
 import os
 import pathlib
 import sys
+from datetime import datetime
 
 import pytest
 
@@ -54,12 +55,27 @@ os.environ.setdefault("TABLE_NAME", "test-table")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
+from health import tdee as _tdee_core  # noqa: E402
+
 import mcp.core as core  # noqa: E402
 import mcp.tools_health as th  # noqa: E402
 import mcp.tools_nutrition as tn  # noqa: E402
 
+_REAL_RESOLVE_AGE = _tdee_core.resolve_age  # captured once, so a re-pin never wraps a pin
+
 END = "2026-09-20"  # the tool's end_date; d7_start = 2026-09-14, d30_start = 2026-08-22
 GENESIS = "2026-09-17"  # the fixture's cycle boundary — inside BOTH windows
+
+# THE AGE CLOCK IS PINNED (#4540). `health.tdee.resolve_age` measures age against the WALL
+# clock by design — `mcp/tools_health.py` passes `datetime.now(timezone.utc)` and
+# `mcp/tools_nutrition.py` takes its own default ("an AGE is not a window boundary") — and the
+# age is FRACTIONAL (days / 365.25), so Mifflin-St Jeor's `-5 * age` term drifts ~5 kcal a year
+# and the rounded BMR steps by 1 kcal every ~73 days. Unpinned, this file's literal TDEEs were
+# true only between two of those steps: for this PROFILE at 315 lb the BMR moves 2341 -> 2340 at
+# 2026-10-12T00:00Z, which is exactly when main went red with `2425 == 2426` (no code change —
+# not #4838's 170 g floor, not #4820's training channel; both bisected clean). The literals are
+# the numbers the tool publishes when it runs on its own END date, so that is the clock.
+AGE_CLOCK = datetime(2026, 9, 20, 12, 0, 0)
 
 PROFILE = {
     "pk": "USER#matthew",
@@ -243,11 +259,23 @@ class _FakeTable:
         return {"Items": rows}
 
 
+def _pin_age_clock(monkeypatch, at: datetime = AGE_CLOCK) -> None:
+    """Run the REAL `resolve_age` (parse, fractional age, basis marker) against a fixed clock.
+
+    Patched on the `health.tdee` module, the one attribute both callers reach through
+    (`tdee_core.resolve_age`), so neither caller's own `now=` choice is re-implemented here.
+    """
+    from health import tdee as tdee_core
+
+    monkeypatch.setattr(tdee_core, "resolve_age", lambda dob_str, now=None: _REAL_RESOLVE_AGE(dob_str, now=at))
+
+
 @pytest.fixture
 def wired(monkeypatch):
     fake = _FakeTable(_ROWS)
     monkeypatch.setattr(core, "table", fake)
     monkeypatch.setattr(core, "_PROFILE_CACHE", None)
+    _pin_age_clock(monkeypatch)
     yield fake
     core._PROFILE_CACHE = None
 
@@ -537,3 +565,20 @@ def test_the_one_hevy_read_path_is_shared_not_duplicated():
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+# ── CLOCK CONTROL (#4540) ─────────────────────────────────────────────────────
+def test_the_age_clock_is_an_input_and_the_pin_is_what_holds_the_literals(wired, monkeypatch):
+    """Move only the age clock across the 2026-10-12 BMR step and the TDEE moves by exactly 1.
+
+    This is the failure main showed at 2026-10-12T00:05Z, reproduced on purpose: same rows,
+    same code, one day later on the clock. If this ever stops moving, the pin above is no
+    longer load-bearing and the comment on AGE_CLOCK is wrong.
+    """
+    assert tn._energy_budget(END)["tdee"] == 2426
+    assert th._get_energy_expenditure({"end_date": END})["tdee_7d_avg"] == 2426
+
+    _pin_age_clock(monkeypatch, datetime(2026, 10, 12, 0, 5, 0))
+    monkeypatch.setattr(core, "_PROFILE_CACHE", None)
+    assert tn._energy_budget(END)["tdee"] == 2425
+    assert th._get_energy_expenditure({"end_date": END})["tdee_7d_avg"] == 2425
