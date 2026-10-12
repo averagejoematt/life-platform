@@ -46,8 +46,8 @@ GUARDS (all of which still red on a genuinely wrong count):
 DISCOVERED_COUNTS = {
     "data_sources": 20,
     "mcp_tools": 88,
-    "lambdas": 109,
-    "alarms": 136,
+    "lambdas": 108,
+    "alarms": 135,
     "cdk_stacks": 10,
     "adrs": 159,
 }
