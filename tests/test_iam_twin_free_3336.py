@@ -264,6 +264,73 @@ def test_no_governed_role_trusts_the_any_ref_wildcard(role):
         assert not sub.endswith(":*"), f"{role}: {sub!r} is the any-ref subject the 2026-08-30 twin put live"
 
 
+# ── #4257: each role trusts EXACTLY its declared subjects, and each job presents one ──
+_DEPLOY_ROLE = "github-actions-deploy-role"
+_PRE_4257_MAIN_SUBJECT = "repo:averagejoematt/life-platform:ref:refs/heads/main"
+
+
+def test_every_verified_role_trust_has_its_declared_shape():
+    """The verifier's own rule (`trust_shape_findings`), run over every checked-in trust
+    file it owns — one test that names every offender, not one gate per role."""
+    offenders = []
+    for role, spec in sorted(verify_oidc_iam.ROLES.items()):
+        doc = json.loads((IAM_DIR / spec["trust_file"]).read_text(encoding="utf-8"))
+        offenders += verify_oidc_iam.trust_shape_findings(role, doc, "checked-in")
+    assert not offenders, json.dumps(offenders, indent=2)
+
+
+def test_trust_shape_names_the_pre_4257_bare_main_subject():
+    """Negative control: put the pre-#4257 subject back on a COPY of the deploy trust and
+    the rule must name it. Without this, a vacuous `trust_shape_findings` passes above."""
+    doc = json.loads((IAM_DIR / f"{_DEPLOY_ROLE}.trust.json").read_text(encoding="utf-8"))
+    assert _PRE_4257_MAIN_SUBJECT not in _trust_subjects(doc), "the deploy role trusts a bare main ref again (#4257)"
+    doc["Statement"][0]["Condition"]["StringLike"]["token.actions.githubusercontent.com:sub"].append(_PRE_4257_MAIN_SUBJECT)
+    found = verify_oidc_iam.trust_shape_findings(_DEPLOY_ROLE, doc, "mutated")
+    assert len(found) == 1 and found[0]["status"] == "TRUST-SHAPE", found
+    assert found[0]["live"]["unexpected"] == [_PRE_4257_MAIN_SUBJECT], found
+
+
+def _job_environment_name(job: dict) -> str | None:
+    env = job.get("environment")
+    return env.get("name") if isinstance(env, dict) else env
+
+
+def test_every_oidc_job_presents_a_subject_its_role_trusts():
+    """A job's OIDC `sub` is `environment:<name>` when it binds an environment and
+    `ref:refs/heads/main` when it does not, so the two halves have to agree or the
+    AssumeRoleWithWebIdentity is refused at runtime:
+      * a job on the deploy role must bind one of the deploy role's trusted environments;
+      * a job on a main-ref role must bind NO environment (it would present the wrong sub).
+    Derived from every workflow, so a new job joins on the day it lands."""
+    import yaml
+
+    role_re = re.compile(r"role/(github-actions-[a-z-]+-role)")
+    offenders = []
+    seen_deploy = 0
+    for path in sorted((ROOT / ".github" / "workflows").glob("*.yml")):
+        doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        for name, job in (doc.get("jobs") or {}).items():
+            roles = {
+                m.group(1)
+                for step in job.get("steps") or []
+                for key in ("aws-role", "role-to-assume")
+                for m in [role_re.search(str((step.get("with") or {}).get(key, "")))]
+                if m
+            }
+            for role in sorted(roles):
+                spec = verify_oidc_iam.ROLES.get(role)
+                if spec is None:
+                    offenders.append(f"{path.name}::{name} assumes {role}, which verify_oidc_iam.ROLES does not own")
+                    continue
+                env = _job_environment_name(job)
+                sub = f"repo:averagejoematt/life-platform:environment:{env}" if env else verify_oidc_iam.MAIN_REF_SUBJECT
+                if sub not in spec.get("trusted_subjects", (verify_oidc_iam.MAIN_REF_SUBJECT,)):
+                    offenders.append(f"{path.name}::{name} presents {sub!r}, which {role} does not trust")
+                seen_deploy += role == _DEPLOY_ROLE
+    assert seen_deploy >= 5, f"only {seen_deploy} deploy-role jobs found — the workflow scan broke, not the workflows"
+    assert not offenders, "\n  ".join(["OIDC subject / trust mismatch (#4257):"] + offenders)
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # E. Resource:"*" only where AWS gives no narrower handle (#3562)
 # ═════════════════════════════════════════════════════════════════════════════

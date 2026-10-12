@@ -21,7 +21,7 @@ e.g. ACM certificates — you never authenticate "to" a region differently).
 |---|---|---|
 | **Humans** (Matthew + any successor engineer) | **IAM Identity Center (SSO)** — short-lived sessions via `aws sso login` | Primary path. **LIVE since 2026-07-12** — instance ACTIVE in us-west-2, user `awsdev` assigned the `AdministratorAccess` permission set (8h sessions). See §2. |
 | Humans — break-glass | Long-lived access keys on IAM user `matthew-admin` | Legacy path. Acceptable only for SSO outage or initial bootstrap (§3). Rotate every 90 days (`docs/SECURITY.md`). |
-| **CI** (GitHub Actions) | **OIDC federation** — `aws-actions/configure-aws-credentials` with `role-to-assume`; no stored keys anywhere | Four roles, inventoried in §4. |
+| **CI** (GitHub Actions) | **OIDC federation** — `aws-actions/configure-aws-credentials` with `role-to-assume`; no stored keys anywhere | Five roles, inventoried in §4. |
 | **Remediation agent** (ADR-064/065) | OIDC → `github-actions-remediation-role` | Bedrock + read-only diagnosis + scoped audit-log writes; NO deploy, NO IAM mutate. |
 | Lambdas (runtime) | Per-function execution roles, least-privilege (`cdk/stacks/role_policies.py`) | Not a human path — listed for completeness. |
 
@@ -164,7 +164,7 @@ is public; a committed key is a full account compromise (threat #3 in
 ## 4. CI / OIDC roles inventory
 
 GitHub Actions authenticates via OIDC federation — no stored AWS keys anywhere in
-GitHub. Four roles are assumed across the workflows (verified 2026-07-10 by
+GitHub. Five roles are assumed across the workflows (verified 2026-10-01 by
 grepping `role-to-assume`; re-derive with the command below, never from memory):
 
 ```bash
@@ -173,13 +173,17 @@ grep -h "role-to-assume" .github/workflows/*.yml | sort -u
 
 | Role | Assumed by | Scope (one line) |
 |---|---|---|
-| `github-actions-deploy-role` | `ci-cd.yml` (plan/deploy/smoke/rollback/fleet), `site-deploy.yml` (site sync + rollback) | The deploy path — Lambda code updates, CDK deploys, S3 site sync; slimmed 2026-07-10 (#903/#906: shed `IAMReadOnly` + Bedrock vision-QA perms). |
+| `github-actions-deploy-role` | `ci-cd.yml` (`deploy-iam`, `deploy`, `rollback-on-smoke-failure`), `site-deploy.yml` (`deploy-site`, `rollback-site-on-failure`) — only jobs bound to the `production` or `ungated-deploy` environment (#4257) | The deploy path — Lambda code updates, CDK deploys, S3 site sync; slimmed 2026-07-10 (#903/#906: shed `IAMReadOnly` + Bedrock vision-QA perms). Its trust accepts the two environment subjects only — no bare main ref. |
+| `github-actions-readonly-role` | `ci-cd.yml` (`plan`, `smoke-test`, `post-deploy-checks`, `notify-failure`), `site-deploy.yml` (`notify-deploy-failure`), `config-drift.yml`, `pii-endpoint-sweep.yml` | Observe-only (#4257): describe/list/get, `config/` reads, the qa-smoke + canary invokes, the failure-digest publish, the CDK lookup role. No Lambda update, no S3 write, no secret value. |
 | `github-actions-diagnosis-role` | `ci-cd.yml`, `site-deploy.yml`, `visual-qa.yml` (diagnosis/QA steps) | Read-only diagnosis: logs, metrics, alarm state — no mutation. |
 | `github-actions-remediation-role` | `remediation-agent.yml`, `fresh-eyes.yml` | Self-healing agent (ADR-064/065): Bedrock invoke + read-only diagnosis + scoped audit-log S3 writes; NO deploy, NO IAM mutate. |
 | `github-actions-golden-eval-role` | `golden-brief-eval.yml`, `eval-harvest.yml` | Golden-output eval harness (judge): read fixtures + Bedrock invoke for grading. |
 
-CI's production deploy additionally requires manual approval via the GitHub
-Environment `production` — the role alone doesn't deploy unattended.
+Since ADR-158 only the additive-IAM CDK deploy (`deploy-iam`) waits on the GitHub
+Environment `production` approval; code and site ship on green through the
+`ungated-deploy` environment (no reviewers, main-only branch policy). Both
+environments are the deploy role's ONLY trusted subjects (#4257), so a job that binds
+neither cannot assume it.
 
 ---
 
