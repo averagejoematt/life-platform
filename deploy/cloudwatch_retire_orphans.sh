@@ -10,7 +10,7 @@
 #
 #     bash deploy/cloudwatch_retire_orphans.sh            # dry-run (default): prints, deletes nothing
 #     bash deploy/cloudwatch_retire_orphans.sh --apply    # actually delete
-#     cd cdk && npx cdk deploy LifePlatformMonitoring     # recreate the 2 adopted alarms (compute-pipeline-stale, hae-webhook-no-invocations-24h)
+#     bash deploy/cdk_deploy.sh LifePlatformMonitoring     # recreate the 2 adopted alarms (compute-pipeline-stale, hae-webhook-no-invocations-24h)
 #
 # Order does not matter for collisions (the adopted alarms use NEW names), but
 # running this first avoids a brief double-bill on the 2 adopted alarms.
@@ -65,7 +65,7 @@ if [ "$APPLY" = "--apply" ]; then
   # delete-alarms accepts up to 100 names per call; we have ~20.
   aws cloudwatch delete-alarms --region "$REGION" --alarm-names "${ALL[@]}"
   echo "Deleted ${#ALL[@]} orphan alarms."
-  echo "NEXT: cd cdk && npx cdk deploy LifePlatformMonitoring  (recreates the 2 adopted alarms under IaC names)"
+  echo "NEXT: bash deploy/cdk_deploy.sh LifePlatformMonitoring  (recreates the 2 adopted alarms under IaC names)"
 else
   printf '  would delete: %s\n' "${ALL[@]}"
   echo

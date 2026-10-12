@@ -128,6 +128,16 @@ web = WebStack(app, "LifePlatformWeb", env=cdk.Environment(account=account, regi
 monitoring = MonitoringStack(app, "LifePlatformMonitoring", env=env, alerts_topic=core.alerts_topic, digest_topic=core.digest_topic)
 # monitoring stack wired ✅
 #
+# #4849: Monitoring's metric filters name log groups ("/aws/lambda/<fn>") that the OWNING
+# stack's Lambda creates (LogRetention). `from_log_group_name` emits no CFN reference, so
+# nothing ordered the stacks and a paired first apply deployed Monitoring first and failed
+# "log group does not exist". These explicit dependencies order every Lambda-owning stack
+# before Monitoring (only stacks owning a FILTERED group; ingestion/mcp own none);
+# tests/test_monitoring_log_group_deps_4849.py pins the set. Ordering is not scope: deploy/cdk_deploy.sh
+# passes --exclusively, so a deploy touches only the stacks you name (name both for a paired first apply).
+for _owner in (compute, email, operational, serve):
+    monitoring.add_dependency(_owner)
+#
 # ── Backup stack (DIL-027, #3042): the cross-region replica of raw/ ──
 # Standalone by construction — it must NOT take a cross-stack reference on Core's
 # imported bucket, because the whole point is that it survives the primary's
