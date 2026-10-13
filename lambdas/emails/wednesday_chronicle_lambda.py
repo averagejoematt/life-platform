@@ -87,6 +87,10 @@ try:
 except ImportError:
     _HAS_INSIGHT_WRITER = False
 
+# #4865: AI-3's chronicle length ceilings, per writer (validate_ai_output's own default is 5,000).
+AI3_LEGACY_MAX_CHARS = 5_000
+AI3_DESK_MAX_CHARS = 9_000  # 1,200 words ≈ 7,200 chars + the dek + the footer, with headroom
+
 # AI-3: Output validation
 try:
     from ai.ai_output_validator import AIOutputType, validate_ai_output
@@ -894,7 +898,11 @@ def _handler_core(event: dict, context) -> dict:
 
     # AI-3: Validate output before rendering
     if _HAS_AI_VALIDATOR and raw_installment:
-        _val = validate_ai_output(raw_installment, AIOutputType.CHRONICLE, min_length=200)
+        # #4865: the 5,000-char default is the legacy writer's ceiling; the Story Desk's post (900-1,200 words, then
+        # the dek) runs ~6,500 chars by design, so measuring it against 5,000 warned on every desk week.
+        _ai3_writer = "story_desk" if _desk else "legacy"
+        _ai3_max = AI3_DESK_MAX_CHARS if _desk else AI3_LEGACY_MAX_CHARS
+        _val = validate_ai_output(raw_installment, AIOutputType.CHRONICLE, min_length=200, max_length=_ai3_max)
         if _val.blocked:
             logger.error(f"[AI-3] Chronicle BLOCKED: {_val.block_reason}")
             return _held_week(
@@ -907,7 +915,7 @@ def _handler_core(event: dict, context) -> dict:
                 dry_run=_dry,
             )
         elif _val.warnings:
-            logger.warning(f"[AI-3] Chronicle warnings: {_val.warnings}")
+            logger.warning(f"[AI-3] Chronicle warnings (writer={_ai3_writer}, max_length={_ai3_max}): {_val.warnings}")
 
     # Parse the installment
     title, stats_line, body_md = parse_installment(raw_installment)
@@ -921,8 +929,13 @@ def _handler_core(event: dict, context) -> dict:
     try:
         from content import chronicle_schema
 
-        _envelope = chronicle_schema.installment_from_stats(title, chronicle_schema.parse_stats_line(stats_line), body_md)
-        _schema_errs = chronicle_schema.validate_installment(_envelope)
+        if _desk:
+            # #4865: the desk's header is its own (weight only); validate it against the desk's envelope.
+            _envelope = chronicle_schema.desk_installment_from_stats(title, chronicle_schema.stats_fields(stats_line), body_md)
+            _schema_errs = chronicle_schema.validate_installment(_envelope, chronicle_schema.DESK_INSTALLMENT_SCHEMA)
+        else:
+            _envelope = chronicle_schema.installment_from_stats(title, chronicle_schema.parse_stats_line(stats_line), body_md)
+            _schema_errs = chronicle_schema.validate_installment(_envelope)
         if _schema_errs:
             logger.warning(f"[#1385] installment envelope failed schema validation (non-blocking): {_schema_errs}")
     except Exception as _sc_e:  # noqa: BLE001 — validation is a safety net, never load-bearing
