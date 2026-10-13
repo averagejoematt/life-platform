@@ -292,6 +292,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_predictions_sourcing_hold_4701.py",  # #4701: glob sweep — every lambdas/web claim_natural reader applies claim_sourcing or names its exemption
         "test_coach_count_comparison_guard_4585.py",  # #4585: glob/rglob sweep — every site/ module + inline script that shows a coach count renders its comparison
         "test_built_page_facts_4586.py",  # #4586: every static fact on the "How it's built" page against its source (model, governor, workflows, incident log) — repo tree only
+        "test_reader_surface_sweep_4604.py",  # #4604: rglob sweep of every served site/**/*.html + sitemap + committed feed titles for a start count; held-page noindex/sitemap ledger
         "test_coach_baseline_4585.py",  # #4585: glob sweep — every lambdas/web record producer serves `comparison` beside the record
         "test_no_private_markers_3043.py",  # #3043: git ls-files sweep — no tracked file may carry the PRIVATE marker
         "test_ci_dark_flag_sweep_3315.py",  # #3315: workflow sweep — no CI step may reach a dependency its job never installs

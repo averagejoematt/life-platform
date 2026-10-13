@@ -110,7 +110,7 @@ PAGE = """<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>{title} — averagejoematt</title>
   <meta name="description" content="{meta_desc}">
-  <link rel="canonical" href="https://averagejoematt.com{url}">
+{robots}  <link rel="canonical" href="https://averagejoematt.com{url}">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="averagejoematt">
   <meta property="og:url" content="https://averagejoematt.com{url}">
@@ -375,6 +375,7 @@ def render(post: dict) -> str:
     return PAGE.format(
         title=_esc(title),
         meta_desc=_esc(meta_desc),
+        robots=v4_chrome.robots_meta(url),  # #4604: "" unless the essay is held until ruled
         url=url,
         og_title=_esc(og_title),
         og_desc=_esc(og_desc),
