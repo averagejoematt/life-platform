@@ -615,7 +615,8 @@
        "when_text": null
       }
      ],
-     "mixed_days": false
+     "mixed_days": false,
+     "absent": []
     },
     "voice": "move"
    },

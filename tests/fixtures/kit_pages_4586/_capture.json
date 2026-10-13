@@ -35,5 +35,6 @@
   "transcript_wk4.json": "/panelcast/wk4.transcript.json",
   "weekly_priority.json": "/api/weekly_priority",
   "workouts.json": "/api/workouts"
- }
+ },
+ "ahead_of_live": "coach_moves_*.json carry the top-level `absent: []` key PR #4872 added, hand-added before the fleet deploy (the script only fetches live, which did not serve it yet); the scheduled recapture replaces them with the served value"
 }

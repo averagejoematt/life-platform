@@ -9,5 +9,6 @@
  "date": "2026-09-24",
  "source": "/api/coach_moves",
  "absent_text": "No coach line is recorded for Thursday, September 24.",
- "lines": []
+ "lines": [],
+ "absent": []
 }
