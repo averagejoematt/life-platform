@@ -31,6 +31,9 @@ THE ORDER (cost first, then honesty)
      precedent), with each line's move tag and date, the absent coaches and their reasons,
      the silent ones, the held ones with their reasons, the sheet itself, and the measured
      token usage and cost. Served by `latest_served` as `/api/coaching-dashboard` `moves`.
+     Box 5: the row also carries `sidelined` — every coach who did not speak, as
+     {coach, state: "absent", reason} with the reason drawn from SIDELINE_REASONS — which
+     `/api/coach_moves` and the edition's `coach_lines` serve as `absent` beside the lines.
 """
 
 from __future__ import annotations
@@ -65,6 +68,17 @@ MOVE_LABELS = {
     "reply": "A reply",
     "question": "A question for Matthew",
     "change_of_mind": "A change of mind",
+}
+# #4583 box 5 — who sat the day out, and why, in words a reader can be shown. A sidelined
+# coach is carried beside the lines as {"coach": <id>, "state": "absent", "reason": <one of
+# these sentences>}. The reason is drawn ONLY from this table: the engine's own reasons
+# ("no sensor since 2026-08-27", a held line's check names) stay on the row's internal
+# `absent`/`held` fields and never reach a reader. Precedence is the table order — a coach
+# whose instrument is dark is `no_data` even if the cast also named her.
+SIDELINE_REASONS = {
+    "no_data": "No new readings have reached this coach's area, so there is nothing new to read.",
+    "held": "This coach's line did not pass the day's checks, so it was held back.",
+    "quiet": "This coach had nothing new to add.",
 }
 _CONDITION_WORDS = {"gt": "above", "gte": "at or above", "lt": "below", "lte": "at or below", "eq": "exactly"}
 
@@ -473,6 +487,7 @@ def build_row(today: str, lines: list, sheet: dict, eligible: list, held: list, 
         "absent": sheet.get("absent") or [],
         "silent": [c for c in eligible if c not in speaking],
         "held": held,
+        "sidelined": sidelined(sheet.get("absent"), [c for c in eligible if c not in speaking], held, dropped),
         "dropped": dropped,
         "bet": bet,
         "fact_sheet": sheet_mod.stored_sheet(sheet),
@@ -485,6 +500,70 @@ def build_row(today: str, lines: list, sheet: dict, eligible: list, held: list, 
     row["cost_usd"] = Decimal(str(cost.get("cost_usd", 0)))
     row.update(experiment_stamp_for(PK, sk))
     return row
+
+
+def sidelined(absent: Any, silent: Any, held: Any, dropped: Any) -> list:
+    """Every coach who did not speak, once, as {coach, state: "absent", reason} — pure.
+
+    `absent` is the sheet's dark-instrument list ({coach_id, ...}), `silent` the eligible
+    coaches with no line, `held`/`dropped` the lines and cast picks code refused. A coach
+    on none of `absent`/`silent` (she spoke) is never here."""
+    refused = {str(x.get("coach_id")) for x in list(held or []) + list(dropped or []) if isinstance(x, dict) and x.get("coach_id")}
+    out: list = []
+    seen: set = set()
+
+    def _add(cid: Any, code: str) -> None:
+        cid = str(cid or "")
+        if cid and cid not in seen:
+            seen.add(cid)
+            out.append({"coach": cid, "state": "absent", "reason": SIDELINE_REASONS[code]})
+
+    for a in absent or []:
+        if isinstance(a, dict):
+            _add(a.get("coach_id"), "no_data")
+    for cid in silent or []:
+        _add(cid, "held" if str(cid) in refused else "quiet")
+    return out
+
+
+def sideline_findings(entries: Any) -> list:
+    """What is wrong with a `sidelined` list, as plain strings ([] when it is servable) — pure.
+
+    Each entry must name a coach, say `absent`, and carry a reason that is exactly one of
+    SIDELINE_REASONS' sentences (so never a raw number, a date or a check name)."""
+    if not isinstance(entries, list):
+        return ["not_a_list"]
+    vocab = set(SIDELINE_REASONS.values())
+    out: list = []
+    for i, e in enumerate(entries):
+        if not isinstance(e, dict):
+            out.append(f"{i}:not_an_object")
+            continue
+        if not str(e.get("coach") or "").strip():
+            out.append(f"{i}:no_coach")
+        if e.get("state") != "absent":
+            out.append(f"{i}:state_not_absent")
+        if not str(e.get("reason") or "").strip():
+            out.append(f"{i}:no_reason")
+        elif e["reason"] not in vocab:
+            out.append(f"{i}:reason_off_vocabulary")
+    return out
+
+
+def _served_sidelined(item: dict) -> list:
+    """The row's `sidelined` list, or — for a row written before #4583 box 5 — the same list
+    derived from its `absent`/`silent`/`held`/`dropped` fields. An entry that fails
+    `sideline_findings` is not served (a reader never sees a reason off the vocabulary)."""
+    stored = item.get("sidelined")
+    if not isinstance(stored, list):
+        stored = sidelined(item.get("absent"), item.get("silent"), item.get("held"), item.get("dropped"))
+    out = []
+    for e in stored:
+        if sideline_findings([e]):
+            logger.warning("[coach_moves] sidelined entry not served: %s", sideline_findings([e]))
+            continue
+        out.append({"coach": str(e["coach"]), "state": "absent", "reason": str(e["reason"])})
+    return out
 
 
 def _row(table: Any, day: str) -> Optional[dict]:
@@ -533,6 +612,7 @@ def served(item: Optional[dict]) -> Optional[dict]:
             if isinstance(a, dict)
         ],
         "silent": [str(c) for c in item.get("silent") or []],
+        "sidelined": _served_sidelined(item),
     }
 
 
