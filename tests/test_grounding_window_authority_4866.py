@@ -61,11 +61,40 @@ def test_day_figure_still_checked_against_the_day():
     assert hits and hits[0]["window"] == "day"
 
 
-def test_basis_names_window_and_source():
-    hits = gg.hard_canonical_contradictions("This week HRV ~137 ms.", _facts(THREE, 47.42))
-    basis = gg.comparison_basis(hits)
-    assert "week window" in basis and "whoop" in basis
-    assert "no windowed" in gg.comparison_basis([])
+def test_phrase_forms_this_week_and_past_week():
+    f = _facts(THREE, 47.42)
+    hits = gg.hard_canonical_contradictions("Your HRV this week 137 ms.", f)
+    assert len(hits) == 1 and hits[0]["window"] == "week" and hits[0]["source"].startswith("whoop week median")
+    hits = gg.hard_canonical_contradictions("Your HRV the past week was 20 ms.", f)
+    assert len(hits) == 1 and hits[0]["window"] == "week" and hits[0]["canonical"] == 50.0
+
+
+def test_week_and_month_slice_a_30_day_series_differently():
+    series = [{"date": f"2026-09-{d:02d}", "hrv": 40.0 + (d % 3)} for d in range(13, 31)]
+    series += [{"date": f"2026-10-{d:02d}", "hrv": 80.0 + (d % 3)} for d in range(1, 13)]
+    series = series[-30:]
+    f = _facts(series, 81.0)
+    wk = gg.resolve_hrv_authority(f, "week")[0]
+    mo = gg.resolve_hrv_authority(f, "month")[0]
+    assert wk > 75 and mo < 50 and abs(wk - mo) > 30
+    assert gg.hard_canonical_contradictions("This week your HRV averaged ~80 ms.", f) == []
+    assert gg.hard_canonical_contradictions("Over the month your HRV averaged ~41 ms.", f) == []
+    hits = gg.hard_canonical_contradictions("This week your HRV averaged ~41 ms.", f)
+    assert len(hits) == 1 and hits[0]["window"] == "week"
+    hits = gg.hard_canonical_contradictions("Over the month your HRV averaged ~80 ms.", f)
+    assert len(hits) == 1 and hits[0]["window"] == "month"
+
+
+def test_sustained_seven_days_at_2_6x_is_not_an_outlier_after_day_one():
+    base = [{"date": f"2026-09-{d:02d}", "hrv": 50.0 + (d % 3)} for d in range(8, 31)]  # 23 days ~51
+    run = [{"date": f"2026-10-{d:02d}", "hrv": 130.0 + d} for d in range(1, 8)]  # 7 days ~2.6x
+    series = base + run
+    flagged = []
+    for k, row in enumerate(run):
+        f = _facts(series[: len(base) + k + 1], row["hrv"])
+        hits = gg.hard_canonical_contradictions(f"Today your HRV is {row['hrv']:g} ms.", f)
+        flagged.append(bool(hits))
+    assert flagged[1:] == [False] * 6, flagged  # days 2-7: a sustained change stands as its own authority
 
 
 def test_no_series_keeps_the_legacy_day_behaviour():

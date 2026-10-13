@@ -296,14 +296,3 @@ def hard_canonical_contradictions(text, facts):
                     }
                 )
     return out
-
-
-def comparison_basis(findings):
-    """One short string naming the window + source each windowed finding compared against (#4866)."""
-    seen = []
-    for f in findings:
-        if f.get("window"):
-            b = f"{f.get('metric', f.get('type', '?'))}: {f['window']} window vs {f.get('source', '?')}"
-            if b not in seen:
-                seen.append(b)
-    return "; ".join(seen) or "allow-list / canonical facts (no windowed comparison)"

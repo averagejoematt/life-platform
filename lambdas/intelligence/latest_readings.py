@@ -120,10 +120,12 @@ def hrv_series_facts(query_fn, today, log=None):
     """Stored Whoop HRV rows, 30 days to ``today`` -> {"hrv_series", "hrv_series_source"}; {} on failure (#4866)."""
     try:
         start = (datetime.fromisoformat(today) - timedelta(days=30)).date().isoformat()
+        from common.digest_utils import filter_day_rows
+
         rows = [
             {"date": r["sk"][5:15], "hrv": float(r["hrv"])}
-            for r in query_fn("whoop", start, today)
-            if r.get("hrv") is not None and "#" not in r["sk"][5:]
+            for r in filter_day_rows(query_fn("whoop", start, today))
+            if r.get("hrv") is not None
         ]
         return {"hrv_series": rows, "hrv_series_source": "whoop"}
     except Exception as e:
