@@ -121,6 +121,101 @@ _RECOVERY_RE = _re.compile(
 # HRV + the value (1-dp allowed: canonical is e.g. 25.2). ms allowed.
 _HRV_RE = _re.compile(r"\bhrv\b[^.\d]{0,20}" + _NUM_VALUE + _NOT_A_COUNT + _NOT_A_PERCENT)
 
+# ── #4866: the HRV authority is resolved over the window the narrative names ─────────────
+# 2026-10-12 14:00Z (request 90f7c52f): one stored Whoop reading (136.92 ms on 10-11, every
+# other reading this cycle 33-50) was taken as "the authoritative HRV" against narratives
+# about weeks 2 and 5-6, so experiment_arc and integrator_month were HELD. A week/month figure
+# is now compared with that window's MEDIAN (robust to exactly this outlier), a day figure
+# with the day.
+# N = 2.5: ordinary day-to-day HRV swings in this series stay under ~1.6x the trailing median
+# (62 -> 73 -> 52 -> 50), while the 10-11 reading was 2.7x; 2.5 separates the two with margin.
+HRV_OUTLIER_MULTIPLE = 2.5
+HRV_OUTLIER_MIN_PRIOR = 3  # fewer trailing readings than this is no baseline to call anything an outlier
+_WINDOW_DAYS = {"day": 1, "week": 7, "month": 30}
+_WEEK_RE = _re.compile(r"\b(?:week|weeks|weekly|this week|7-day|seven days|seven-day)\b")
+_MONTH_RE = _re.compile(r"\b(?:month|months|monthly|30-day|thirty days)\b")
+
+
+def _median(vals):
+    v = sorted(vals)
+    n = len(v)
+    if not n:
+        return None
+    return v[n // 2] if n % 2 else (v[n // 2 - 1] + v[n // 2]) / 2
+
+
+# A numbered week is "Week 2" / "weeks 5-6" (1-52, not a unit): "this week 137 ms", "the past week 20 ms" are not.
+_NUMBERED_WEEK_RE = _re.compile(
+    r"(?<!\bthis )(?<!\bpast )(?<!\blast )(?<!\bnext )(?<!\bper )(?<!\beach )(?<!\bevery )"
+    r"\bweeks?\s+(?:[1-9]|[1-4]\d|5[0-2])\b(?!\s*(?:ms|milliseconds?)\b)"
+)
+
+
+def narrative_window(low, start, end):
+    """The window the sentence around ``low[start:end]`` names: named_week > month > week > day.
+
+    "named_week" is a specific numbered week ("Week 2 ... HRV tanked to 33.9"): a historic window
+    the trailing series cannot speak for, so it has NO authority here (see resolve_hrv_authority).
+    """
+    a = max(low.rfind(".", 0, start), low.rfind("\n", 0, start)) + 1
+    b = [i for i in (low.find(".", end), low.find("\n", end)) if i != -1]
+    sent = low[a : min(b) if b else len(low)]
+    if _NUMBERED_WEEK_RE.search(sent):
+        return "named_week"
+    if _MONTH_RE.search(sent):
+        return "month"
+    if _WEEK_RE.search(sent):
+        return "week"
+    return "day"
+
+
+def is_vendor_outlier(value, others):
+    """True when ``value`` exceeds HRV_OUTLIER_MULTIPLE x the median of ``others`` (needs a baseline)."""
+    others = [o for o in others if o is not None]
+    if len(others) < HRV_OUTLIER_MIN_PRIOR:
+        return False
+    med = _median(others)
+    return bool(med) and value > HRV_OUTLIER_MULTIPLE * med
+
+
+def resolve_hrv_authority(facts, window):
+    """-> (value, source_text, outlier_note|None) for the HRV figure over ``window``.
+
+    day   : facts["hrv_ms"], unless it is a vendor outlier vs the trailing series, then the
+            trailing median stands in and the note names the outlier.
+    week / month : median of the last 7 / 30 stored days (hrv_series), falling back to the day
+            value when no series is supplied (the pre-#4866 behaviour, named as such).
+    """
+    day_val = facts.get("hrv_ms")
+    if window == "named_week":
+        # A specific numbered week is not in the trailing series; comparing it with today's reading
+        # (or the current week's median) is the cross-window error #4866 fixes. The allow-list gate
+        # still catches an invented figure; nothing here can verify or refute this one.
+        return None, "no stored series for that numbered week", None
+    series = [(r.get("date"), r.get("hrv")) for r in (facts.get("hrv_series") or []) if r.get("hrv") is not None]
+    src = facts.get("hrv_series_source") or "canonical facts"
+    if not series:
+        return day_val, f"{src} latest reading (no series supplied)", None
+    series.sort()
+    vals = [v for _, v in series]
+    if window == "day":
+        if day_val is None:
+            return None, src, None
+        trailing = [v for v in vals if abs(v - day_val) > 0.005]
+        # Isolated only: another reading in the last 7 days above the same bar means a sustained
+        # change, not a single-day glitch, and the day value stands as its own authority.
+        recent_high = [v for v in trailing[-6:] if is_vendor_outlier(v, [o for o in trailing if o != v])]
+        if not recent_high and is_vendor_outlier(day_val, trailing):
+            med = _median(trailing)
+            note = (
+                f"the stored {day_val:g} ms reading is a single-day vendor outlier "
+                f"(>{HRV_OUTLIER_MULTIPLE:g}x the trailing median {med:g} ms) and is not used as authority"
+            )
+            return med, f"{src} trailing median ({len(trailing)} readings)", note
+        return day_val, f"{src} latest reading", None
+    win = vals[-_WINDOW_DAYS[window] :]
+    return _median(win), f"{src} {window} median ({len(win)} readings)", None
+
 
 def hard_canonical_contradictions(text, facts):
     """Pure: does the narrative state an RHR, recovery, or HRV number that hard-
@@ -178,19 +273,26 @@ def hard_canonical_contradictions(text, facts):
                     }
                 )
     hrv = facts.get("hrv_ms")
-    if hrv is not None and not _mentions(hrv):
+    if hrv is not None:
         # #3327: whole token, duration/percent rejected — "HRV over the 120 days" binds nothing.
         m = _HRV_RE.search(low)
         if m:
+            window = narrative_window(low, m.start(), m.end())  # #4866: the window the narrative names
+            auth, source, outlier_note = resolve_hrv_authority(facts, window)
             claimed = float(m.group(1))
             # HRV swings day-to-day — only flag a gross (>40% AND >8 ms) miss, e.g. 50 vs 25.2.
-            if abs(claimed - hrv) > 8 and abs(claimed - hrv) / max(hrv, 1) > 0.40:
+            if auth is not None and not _mentions(auth) and abs(claimed - auth) > 8 and abs(claimed - auth) / max(auth, 1) > 0.40:
+                detail = f"narrative says HRV ~{claimed:g}, but the authoritative HRV is {auth:g} ms [{window} window vs {source}]"
+                if outlier_note:
+                    detail += f"; {outlier_note}"
                 out.append(
                     {
                         "metric": "HRV",
                         "claimed": claimed,
-                        "canonical": hrv,
-                        "detail": f"narrative says HRV ~{claimed:g}, but the authoritative HRV is {hrv:g} ms",
+                        "canonical": auth,
+                        "window": window,
+                        "source": source,
+                        "detail": detail,
                     }
                 )
     return out
