@@ -1165,6 +1165,60 @@ def is_publish_day_beside_chapter_end(finding, start_date):
     return 0 <= gap <= 7
 
 
+# ── #4834: a correlation sample size n beside a young day counter ─────────────
+#
+# /protocols/discoveries/ and /method/intelligence/ render the weekly correlation
+# engine's output (n = paired days). That engine reads the STORED HISTORY, not the
+# cycle: ADR-077 resets only experiment_scoped partitions at genesis, raw
+# timeseries are cross-phase, so a sample of n=89 days beside a Day-37 clock is the
+# design (the same substance as #2959's day-counter-is-not-a-bound, spelled as a
+# stated sample size instead of "only N days"). Run 38339302560 gated on it in one
+# wording ("n=89.0 days ... even the oldest finding cannot have accumulated 89
+# days") while a second wording on /method/intelligence/ ("a single ISO week cannot
+# produce 89 paired observations") rode the non-reproduction path; neither says
+# only/at most/maximum nor cites "Day N" as a bound, so is_day_counter_bound_inference
+# missed both. STRUCTURAL: category + a correlation-engine surface + a stated
+# sample size n=N with N greater than today's day number + no payload date field
+# named. A sample-size claim on any other page, or a note that names a payload date
+# field (a data-staleness claim), keeps gating. Demoted to low, not dropped.
+CORRELATION_SURFACES = ("/protocols/discoveries/", "/method/intelligence/")
+_SAMPLE_SIZE_RE = re.compile(r"\bn\s*=\s*(\d{1,4})(?:\.0+)?\b", re.I)
+_ISO_WEEK_RE = re.compile(r"\b(\d{4})-W(\d{2})\b")
+# weekly_correlation_compute_lambda.LOOKBACK_DAYS: the longest history the engine reads,
+# so an n above it is a real defect, not the stored-history design.
+CORRELATION_LOOKBACK_DAYS = 90
+
+
+def is_stored_history_sample_size(finding, start_date, today):
+    """True when a correlation-surface temporal_contradiction objects to a stated
+    n=N (days) exceeding the current day number (#4834)."""
+    if finding.get("category") != "temporal_contradiction" or finding.get("page") not in CORRELATION_SURFACES:
+        return False
+    try:
+        day = (date.fromisoformat(str(today)) - date.fromisoformat(str(start_date))).days + 1
+    except ValueError:
+        return False
+    note = str(finding.get("note") or "")
+    if not note.strip() or cites_payload_date_field(note):
+        return False
+    # Narrow: a note that also cites a date after today, or a future ISO week, is a
+    # genuine contradiction that merely quotes n=N; and an N beyond the engine's
+    # lookback cannot be the stored-history design.
+    today_d = date.fromisoformat(str(today))
+    if any(d > today_d.isoformat() for d in _note_dates(note)):
+        return False
+    for y, w in _ISO_WEEK_RE.findall(note):
+        try:
+            if date.fromisocalendar(int(y), int(w), 1) > today_d:
+                return False
+        except ValueError:
+            return False
+    ns = [int(m) for m in _SAMPLE_SIZE_RE.findall(note)]
+    if any(n > CORRELATION_LOOKBACK_DAYS for n in ns):
+        return False
+    return any(n > day for n in ns)
+
+
 RULINGS_FIELD = "rulings"
 
 
@@ -1231,6 +1285,12 @@ def advisory_rulings(start_date, today=None):
             "a publish-day dateline beside the chapter's last day",
             lambda f: is_publish_day_beside_chapter_end(f, start_date),
             "a Thursday publish dateline 0-7 days after the cited Day N is the panel's convention, #4845",
+        ),
+        (
+            "stored_history_sample_size",
+            "a stored-history sample size beside the day counter",
+            lambda f: is_stored_history_sample_size(f, start_date, today),
+            "the correlation engine reads stored history, so n may exceed the day counter, #4834",
         ),
     )
 
