@@ -1135,6 +1135,7 @@ def is_uncited_temporal_objection(finding):
 # stays gating. Demoted to low, not dropped.
 PANEL_PAGE = "/story/panel/"
 _PUBLISH_WEEKDAY = 3  # Thursday
+_DATED_RE = re.compile(r"\bdated\s+(?:[A-Za-z]+,?\s+)?([A-Za-z]{3,9}\.?\s+\d{1,2}(?:,\s*\d{4})?|\d{4}-\d{2}-\d{2})", re.I)
 
 
 def is_publish_day_beside_chapter_end(finding, start_date):
@@ -1168,6 +1169,13 @@ def is_publish_day_beside_chapter_end(finding, start_date):
     dateline = thursdays[0]
     if any(d < start or d > dateline for d in parsed):
         return False
+    # The dateline is the date the note says the episode is "dated". A Thursday the
+    # judge computed itself (Day N restated as a date) is not the page's dateline: if
+    # the stated dateline is some other date, the episode is not on the publish day.
+    for m in _DATED_RE.finditer(note):
+        stated = note_dates(m.group(1), default_year=start.year)
+        if stated and date.fromisoformat(stated[0]) != dateline:
+            return False
     gap = (dateline - start).days - (next(iter(days)) - 1)
     return 0 <= gap <= 7
 
@@ -1314,6 +1322,12 @@ def is_trailing_window_beside_day_counter(finding, start_date, today):
     if any(n > CORRELATION_LOOKBACK_DAYS for n in lengths):
         return False
     horizon = today_d + timedelta(days=1)  # PT/UTC boundary slack
+    # A day counter running AHEAD of the clock is a real defect, not a window question
+    # (vagueness_objection: a day beyond today can never be talked out of gating).
+    if max(day_numbers(note)) > (today_d - start_d).days + 2:
+        return False
+    # Yearless dates take today's year; across a year rollover a since-date lands in the
+    # future and the ruling stops firing, which fails closed (the finding keeps gating).
     if any(d > today_d or d < start_d for d in since):  # a since-date before genesis is a pre-cycle claim
         return False
     try:

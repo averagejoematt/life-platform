@@ -872,3 +872,19 @@ def test_trailing_window_controls_a_genuine_contradiction_still_gates():
     assert not R.is_trailing_window_beside_day_counter(_any(ok), _EP_START, None)
     # a window stated only in the judge's own words (nothing quoted off the page)
     assert not R.is_trailing_window_beside_day_counter(_any("The judge assumes a trailing 30 days beside Day 37."), _EP_START, d)
+
+
+def test_trailing_window_day_counter_ahead_of_the_clock_still_gates():
+    d = "2026-10-12"
+    ahead = "The page says 'TRAILING 30 DAYS' beside 'Day 45'. Today is Day 37 (2026-10-12), so the day counter is eight days ahead."
+    assert not R.is_trailing_window_beside_day_counter(_any(ahead), _EP_START, d)
+    span = "The page says 'last 7 days (Day 35 to Day 41)'. Today is Day 37."
+    assert not R.is_trailing_window_beside_day_counter(_any(span), _EP_START, d)
+
+
+def test_publish_day_a_non_thursday_stated_dateline_still_gates():
+    note = (
+        "EP5 is dated WEDNESDAY, OCTOBER 7, and the narrative states 'Day 33. Thirty-two straight days.' "
+        "Day 1 = 2026-09-06. Day 33 = 2026-10-08 (a Thursday). October 7 is Day 32, so the episode is dated before its own last day."
+    )
+    assert not R.is_publish_day_beside_chapter_end(_panel(note), _EP_START)
