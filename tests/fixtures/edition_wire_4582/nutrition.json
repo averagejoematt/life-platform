@@ -1,1 +1,862 @@
-{"_meta": {"generated_at": "2026-10-04T02:29:00+00:00"}, "nutrition": {"protein_floor_g": 170.0, "protein_floor_hit_days": 9, "days_logged": 28, "latest_date": "2026-10-02"}, "nutrition_trend": [{"date": "2026-10-01", "calories": 1690, "protein_g": 186.0}, {"date": "2026-10-02", "calories": 1568, "protein_g": 172.0}, {"date": "2026-10-03", "calories": 1732, "protein_g": 153.0}]}
+{
+ "_meta": {
+  "generated_at": "2026-10-13T01:33:16.745114+00:00",
+  "served_at": "2026-10-13T01:33:16.745114+00:00",
+  "cache_seconds": 3600,
+  "request_id": "88e0f1c5ea95435f"
+ },
+ "nutrition": {
+  "avg_calories": 1543,
+  "avg_protein_g": 150.6,
+  "avg_carbs_g": 113.2,
+  "avg_fat_g": 57.7,
+  "avg_fiber_g": 27.1,
+  "protein_target_g": 170.0,
+  "protein_hit_pct": 33,
+  "protein_hit_days": 9,
+  "protein_floor_g": 170.0,
+  "protein_floor_hit_pct": 33,
+  "protein_floor_hit_days": 9,
+  "days_logged": 27,
+  "tdee": 3098,
+  "tdee_source": "estimate_mifflin",
+  "tdee_method": "mifflin_bmr_plus_worked_set_exercise",
+  "basis": "refused: deficit_exceeds_50pct_of_tdee \u2014 model says 1555 kcal/day (50.2% of a 3098 kcal TDEE) against a measured intake of 1543 kcal/day",
+  "avg_deficit": null,
+  "avg_deficit_published": false,
+  "cal_7d_avg": 1570,
+  "pro_7d_avg": 161.2,
+  "cal_avg_recent": 1570,
+  "cal_avg_recent_window_days": 7,
+  "pro_avg_recent_g": 161.2,
+  "pro_avg_recent_g_window_days": 7,
+  "latest_date": "2026-10-09",
+  "as_of": "2026-10-09",
+  "today_pending": true,
+  "lag_days": 3,
+  "stalled": false,
+  "latest_calories": 1911,
+  "latest_protein_g": 158.0
+ },
+ "nutrition_trend": [
+  {
+   "date": "2026-09-13",
+   "calories": 2011,
+   "protein_g": 245.0,
+   "carbs_g": 84.0,
+   "fat_g": 94.0
+  },
+  {
+   "date": "2026-09-14",
+   "calories": 1276,
+   "protein_g": 105.0,
+   "carbs_g": 110.0,
+   "fat_g": 53.0
+  },
+  {
+   "date": "2026-09-15",
+   "calories": 1116,
+   "protein_g": 90.0,
+   "carbs_g": 148.0,
+   "fat_g": 40.0
+  },
+  {
+   "date": "2026-09-16",
+   "calories": 1573,
+   "protein_g": 215.0,
+   "carbs_g": 102.0,
+   "fat_g": 46.0
+  },
+  {
+   "date": "2026-09-17",
+   "calories": 1293,
+   "protein_g": 139.0,
+   "carbs_g": 49.0,
+   "fat_g": 56.0
+  },
+  {
+   "date": "2026-09-18",
+   "calories": 1804,
+   "protein_g": 179.0,
+   "carbs_g": 114.0,
+   "fat_g": 80.0
+  },
+  {
+   "date": "2026-09-19",
+   "calories": 1656,
+   "protein_g": 147.0,
+   "carbs_g": 161.0,
+   "fat_g": 53.0
+  },
+  {
+   "date": "2026-09-20",
+   "calories": 1229,
+   "protein_g": 139.0,
+   "carbs_g": 77.0,
+   "fat_g": 48.0
+  },
+  {
+   "date": "2026-09-21",
+   "calories": 1829,
+   "protein_g": 146.0,
+   "carbs_g": 125.0,
+   "fat_g": 78.0
+  },
+  {
+   "date": "2026-09-22",
+   "calories": 1358,
+   "protein_g": 164.0,
+   "carbs_g": 45.0,
+   "fat_g": 63.0
+  },
+  {
+   "date": "2026-09-23",
+   "calories": 1925,
+   "protein_g": 186.0,
+   "carbs_g": 178.0,
+   "fat_g": 78.0
+  },
+  {
+   "date": "2026-09-24",
+   "calories": 1661,
+   "protein_g": 142.0,
+   "carbs_g": 115.0,
+   "fat_g": 77.0
+  },
+  {
+   "date": "2026-09-25",
+   "calories": 1761,
+   "protein_g": 182.0,
+   "carbs_g": 86.0,
+   "fat_g": 71.0
+  },
+  {
+   "date": "2026-09-26",
+   "calories": 1673,
+   "protein_g": 156.0,
+   "carbs_g": 143.0,
+   "fat_g": 56.0
+  },
+  {
+   "date": "2026-09-27",
+   "calories": 1170,
+   "protein_g": 92.0,
+   "carbs_g": 128.0,
+   "fat_g": 32.0
+  },
+  {
+   "date": "2026-09-28",
+   "calories": 1257,
+   "protein_g": 99.0,
+   "carbs_g": 127.0,
+   "fat_g": 41.0
+  },
+  {
+   "date": "2026-09-29",
+   "calories": 1021,
+   "protein_g": 89.0,
+   "carbs_g": 122.0,
+   "fat_g": 23.0
+  },
+  {
+   "date": "2026-09-30",
+   "calories": 1736,
+   "protein_g": 141.0,
+   "carbs_g": 170.0,
+   "fat_g": 59.0
+  },
+  {
+   "date": "2026-10-01",
+   "calories": 1690,
+   "protein_g": 186.0,
+   "carbs_g": 51.0,
+   "fat_g": 84.0
+  },
+  {
+   "date": "2026-10-02",
+   "calories": 1568,
+   "protein_g": 172.0,
+   "carbs_g": 118.0,
+   "fat_g": 48.0
+  },
+  {
+   "date": "2026-10-03",
+   "calories": 1732,
+   "protein_g": 153.0,
+   "carbs_g": 107.0,
+   "fat_g": 75.0
+  },
+  {
+   "date": "2026-10-04",
+   "calories": 1407,
+   "protein_g": 109.0,
+   "carbs_g": 150.0,
+   "fat_g": 34.0
+  },
+  {
+   "date": "2026-10-05",
+   "calories": 1632,
+   "protein_g": 146.0,
+   "carbs_g": 146.0,
+   "fat_g": 47.0
+  },
+  {
+   "date": "2026-10-06",
+   "calories": 1622,
+   "protein_g": 182.0,
+   "carbs_g": 54.0,
+   "fat_g": 70.0
+  },
+  {
+   "date": "2026-10-07",
+   "calories": 1512,
+   "protein_g": 185.0,
+   "carbs_g": 44.0,
+   "fat_g": 58.0
+  },
+  {
+   "date": "2026-10-08",
+   "calories": 1235,
+   "protein_g": 120.0,
+   "carbs_g": 106.0,
+   "fat_g": 47.0
+  },
+  {
+   "date": "2026-10-09",
+   "calories": 1911,
+   "protein_g": 158.0,
+   "carbs_g": 197.0,
+   "fat_g": 46.0
+  }
+ ],
+ "loss_rate": {
+  "target_rate_lb_wk": 3,
+  "required_deficit_kcal": 1500,
+  "actual_deficit_kcal": null,
+  "gap_kcal": null,
+  "implied_rate_lb_wk": null,
+  "deficit_pct": null,
+  "deficit_label": null,
+  "tdee_method": "mifflin_bmr_plus_worked_set_exercise",
+  "basis": "refused: deficit_exceeds_50pct_of_tdee \u2014 model says 1555 kcal/day (50.2% of a 3098 kcal TDEE) against a measured intake of 1543 kcal/day",
+  "deficit_published": false,
+  "trend_check": {
+   "method": "implied_deficit_vs_measured_weight_trend",
+   "tolerance_fraction": 0.4,
+   "tolerance_floor_kcal_per_day": 400.0,
+   "max_deficit_fraction_of_tdee": 0.5,
+   "min_trend_days": 7,
+   "trend_days": 27,
+   "tdee": 3098,
+   "intake_avg_kcal": 1543,
+   "weight_trend_lb_per_wk": -2.75,
+   "implied_deficit_kcal_per_day": 1555,
+   "trend_implied_deficit_kcal_per_day": null,
+   "gap_kcal_per_day": null,
+   "deficit_fraction_of_tdee": 0.502,
+   "tolerance_kcal_per_day": null,
+   "publish": false,
+   "basis": "refused: deficit_exceeds_50pct_of_tdee \u2014 model says 1555 kcal/day (50.2% of a 3098 kcal TDEE) against a measured intake of 1543 kcal/day"
+  },
+  "protein_hit_pct": 33,
+  "protein_floor_hit_pct": 33,
+  "protein_floor_g": 170.0
+ },
+ "meal_rhythm": {
+  "avg_protein_per_meal": 96.8,
+  "protein_distribution_score": 100,
+  "per_day_window": [
+   {
+    "date": "2026-09-26",
+    "first_min": 540,
+    "last_min": 1140
+   },
+   {
+    "date": "2026-09-27",
+    "first_min": 540,
+    "last_min": 1086
+   },
+   {
+    "date": "2026-09-28",
+    "first_min": 540,
+    "last_min": 1126
+   },
+   {
+    "date": "2026-09-29",
+    "first_min": 540,
+    "last_min": 1173
+   },
+   {
+    "date": "2026-09-30",
+    "first_min": 540,
+    "last_min": 1171
+   },
+   {
+    "date": "2026-10-01",
+    "first_min": 540,
+    "last_min": 1125
+   },
+   {
+    "date": "2026-10-02",
+    "first_min": 540,
+    "last_min": 1200
+   },
+   {
+    "date": "2026-10-03",
+    "first_min": 540,
+    "last_min": 1140
+   },
+   {
+    "date": "2026-10-04",
+    "first_min": 540,
+    "last_min": 1156
+   },
+   {
+    "date": "2026-10-05",
+    "first_min": 540,
+    "last_min": 1080
+   },
+   {
+    "date": "2026-10-06",
+    "first_min": 540,
+    "last_min": 1140
+   },
+   {
+    "date": "2026-10-07",
+    "first_min": 540,
+    "last_min": 1333
+   },
+   {
+    "date": "2026-10-08",
+    "first_min": 540,
+    "last_min": 1080
+   },
+   {
+    "date": "2026-10-09",
+    "first_min": 540,
+    "last_min": 1080
+   }
+  ],
+  "time_distribution": [
+   {
+    "hour": 8,
+    "protein_g": 375.0,
+    "calories": 2000
+   },
+   {
+    "hour": 10,
+    "protein_g": 36.0,
+    "calories": 490
+   },
+   {
+    "hour": 12,
+    "protein_g": 982.0,
+    "calories": 10595
+   },
+   {
+    "hour": 14,
+    "protein_g": 214.0,
+    "calories": 1849
+   },
+   {
+    "hour": 16,
+    "protein_g": 341.0,
+    "calories": 3805
+   },
+   {
+    "hour": 18,
+    "protein_g": 2089.0,
+    "calories": 22306
+   },
+   {
+    "hour": 20,
+    "protein_g": 29.0,
+    "calories": 593
+   },
+   {
+    "hour": 22,
+    "protein_g": 1.0,
+    "calories": 20
+   }
+  ],
+  "reference_window_hrs": 8,
+  "days_with_meal_times": 27
+ },
+ "electrolytes": {
+  "avg_sodium_mg": 3040,
+  "sodium_ref_low": 1500,
+  "sodium_ref_high": 2300,
+  "potassium_pct": 58.0,
+  "days_logged": 27
+ },
+ "lean_mass": {
+  "lean_mass_lb": 200.9,
+  "lean_mass_kg": 91.1,
+  "target_g_per_kg_lean": 1.87,
+  "floor_g_per_kg_lean": 2.3,
+  "floor_protein_g": 210
+ },
+ "projection": null,
+ "reconciliation": {
+  "days": [
+   {
+    "date": "2026-09-13",
+    "projected_loss_lbs": null,
+    "actual_loss_lbs": null
+   },
+   {
+    "date": "2026-09-14",
+    "projected_loss_lbs": null,
+    "actual_loss_lbs": null
+   },
+   {
+    "date": "2026-09-15",
+    "projected_loss_lbs": 0.57,
+    "actual_loss_lbs": 0.0
+   },
+   {
+    "date": "2026-09-16",
+    "projected_loss_lbs": 1.0,
+    "actual_loss_lbs": null
+   },
+   {
+    "date": "2026-09-17",
+    "projected_loss_lbs": 1.52,
+    "actual_loss_lbs": 1.6
+   },
+   {
+    "date": "2026-09-18",
+    "projected_loss_lbs": 1.89,
+    "actual_loss_lbs": 3.78
+   },
+   {
+    "date": "2026-09-19",
+    "projected_loss_lbs": 2.3,
+    "actual_loss_lbs": 3.28
+   },
+   {
+    "date": "2026-09-20",
+    "projected_loss_lbs": 2.83,
+    "actual_loss_lbs": 1.99
+   },
+   {
+    "date": "2026-09-21",
+    "projected_loss_lbs": 3.2,
+    "actual_loss_lbs": 3.07
+   },
+   {
+    "date": "2026-09-22",
+    "projected_loss_lbs": 3.69,
+    "actual_loss_lbs": 3.94
+   },
+   {
+    "date": "2026-09-23",
+    "projected_loss_lbs": 4.03,
+    "actual_loss_lbs": 3.48
+   },
+   {
+    "date": "2026-09-24",
+    "projected_loss_lbs": 4.44,
+    "actual_loss_lbs": 5.21
+   },
+   {
+    "date": "2026-09-25",
+    "projected_loss_lbs": 4.82,
+    "actual_loss_lbs": 5.77
+   },
+   {
+    "date": "2026-09-26",
+    "projected_loss_lbs": 5.23,
+    "actual_loss_lbs": 5.08
+   },
+   {
+    "date": "2026-09-27",
+    "projected_loss_lbs": 5.78,
+    "actual_loss_lbs": 4.41
+   },
+   {
+    "date": "2026-09-28",
+    "projected_loss_lbs": 6.3,
+    "actual_loss_lbs": 5.73
+   },
+   {
+    "date": "2026-09-29",
+    "projected_loss_lbs": 6.9,
+    "actual_loss_lbs": 6.58
+   },
+   {
+    "date": "2026-09-30",
+    "projected_loss_lbs": 7.29,
+    "actual_loss_lbs": 7.55
+   },
+   {
+    "date": "2026-10-01",
+    "projected_loss_lbs": 7.69,
+    "actual_loss_lbs": 7.18
+   },
+   {
+    "date": "2026-10-02",
+    "projected_loss_lbs": 8.13,
+    "actual_loss_lbs": 7.9
+   },
+   {
+    "date": "2026-10-03",
+    "projected_loss_lbs": 8.52,
+    "actual_loss_lbs": 7.94
+   },
+   {
+    "date": "2026-10-04",
+    "projected_loss_lbs": 9.0,
+    "actual_loss_lbs": 6.8
+   },
+   {
+    "date": "2026-10-05",
+    "projected_loss_lbs": 9.42,
+    "actual_loss_lbs": 7.82
+   },
+   {
+    "date": "2026-10-06",
+    "projected_loss_lbs": 9.84,
+    "actual_loss_lbs": 10.04
+   },
+   {
+    "date": "2026-10-07",
+    "projected_loss_lbs": 10.29,
+    "actual_loss_lbs": 10.6
+   },
+   {
+    "date": "2026-10-08",
+    "projected_loss_lbs": 10.83,
+    "actual_loss_lbs": 11.73
+   },
+   {
+    "date": "2026-10-09",
+    "projected_loss_lbs": 11.17,
+    "actual_loss_lbs": 12.78
+   }
+  ],
+  "overlap_days": 24,
+  "min_days": 14,
+  "ready": true,
+  "projected_loss_lbs": 11.17,
+  "actual_loss_lbs": 12.78,
+  "gap_lbs": -1.61
+ },
+ "recovery_deficit_overlay": {
+  "days": [
+   {
+    "date": "2026-09-13",
+    "recovery": 73.0,
+    "prior_deficit_kcal": null
+   },
+   {
+    "date": "2026-09-14",
+    "recovery": 63.0,
+    "prior_deficit_kcal": 1087
+   },
+   {
+    "date": "2026-09-15",
+    "recovery": 82.0,
+    "prior_deficit_kcal": 1822
+   },
+   {
+    "date": "2026-09-16",
+    "recovery": 92.0,
+    "prior_deficit_kcal": 1982
+   },
+   {
+    "date": "2026-09-17",
+    "recovery": 94.0,
+    "prior_deficit_kcal": 1525
+   },
+   {
+    "date": "2026-09-18",
+    "recovery": 84.0,
+    "prior_deficit_kcal": 1805
+   },
+   {
+    "date": "2026-09-19",
+    "recovery": 98.0,
+    "prior_deficit_kcal": 1294
+   },
+   {
+    "date": "2026-09-20",
+    "recovery": 97.0,
+    "prior_deficit_kcal": 1442
+   },
+   {
+    "date": "2026-09-21",
+    "recovery": 90.0,
+    "prior_deficit_kcal": 1869
+   },
+   {
+    "date": "2026-09-22",
+    "recovery": 78.0,
+    "prior_deficit_kcal": 1269
+   },
+   {
+    "date": "2026-09-23",
+    "recovery": 80.0,
+    "prior_deficit_kcal": 1740
+   },
+   {
+    "date": "2026-09-24",
+    "recovery": 86.0,
+    "prior_deficit_kcal": 1173
+   },
+   {
+    "date": "2026-09-25",
+    "recovery": 99.0,
+    "prior_deficit_kcal": 1437
+   },
+   {
+    "date": "2026-09-26",
+    "recovery": 77.0,
+    "prior_deficit_kcal": 1337
+   },
+   {
+    "date": "2026-09-27",
+    "recovery": 89.0,
+    "prior_deficit_kcal": 1425
+   },
+   {
+    "date": "2026-09-28",
+    "recovery": 64.0,
+    "prior_deficit_kcal": 1928
+   },
+   {
+    "date": "2026-09-29",
+    "recovery": 54.0,
+    "prior_deficit_kcal": 1841
+   },
+   {
+    "date": "2026-09-30",
+    "recovery": 59.0,
+    "prior_deficit_kcal": 2077
+   },
+   {
+    "date": "2026-10-01",
+    "recovery": 62.0,
+    "prior_deficit_kcal": 1362
+   },
+   {
+    "date": "2026-10-02",
+    "recovery": 98.0,
+    "prior_deficit_kcal": 1408
+   },
+   {
+    "date": "2026-10-03",
+    "recovery": 98.0,
+    "prior_deficit_kcal": 1530
+   },
+   {
+    "date": "2026-10-04",
+    "recovery": 98.0,
+    "prior_deficit_kcal": 1366
+   },
+   {
+    "date": "2026-10-05",
+    "recovery": 98.0,
+    "prior_deficit_kcal": 1691
+   },
+   {
+    "date": "2026-10-06",
+    "recovery": 82.0,
+    "prior_deficit_kcal": 1466
+   },
+   {
+    "date": "2026-10-07",
+    "recovery": 78.0,
+    "prior_deficit_kcal": 1476
+   },
+   {
+    "date": "2026-10-08",
+    "recovery": 97.0,
+    "prior_deficit_kcal": 1586
+   },
+   {
+    "date": "2026-10-09",
+    "recovery": 59.0,
+    "prior_deficit_kcal": 1863
+   },
+   {
+    "date": "2026-10-10",
+    "recovery": 56.0,
+    "prior_deficit_kcal": 1187
+   },
+   {
+    "date": "2026-10-11",
+    "recovery": 88.0,
+    "prior_deficit_kcal": null
+   },
+   {
+    "date": "2026-10-12",
+    "recovery": 67.0,
+    "prior_deficit_kcal": null
+   }
+  ],
+  "overlap_days": 27,
+  "min_days": 14,
+  "ready": true,
+  "confidence": "LOW",
+  "caption": "Both lines are drawing in, but it's still too early to tell whether recovery and the prior day's deficit move together \u2014 check back as more days land."
+ },
+ "food_delivery": null,
+ "blueprint_benchmark": null,
+ "weekday_vs_weekend": {
+  "weekday": {
+   "avg_calories": 1539.0,
+   "avg_protein_g": 151.3,
+   "avg_carbs_g": 110.3,
+   "avg_fat_g": 58.2,
+   "avg_fiber_g": 27.6,
+   "days": 20,
+   "protein_hit_pct": 40
+  },
+  "weekend": {
+   "avg_calories": 1554.0,
+   "avg_protein_g": 148.7,
+   "avg_carbs_g": 121.4,
+   "avg_fat_g": 56.0,
+   "avg_fiber_g": 25.8,
+   "days": 7,
+   "protein_hit_pct": 14
+  }
+ },
+ "eating_window": {
+  "avg_hours": 10.0,
+  "avg_first_meal": "9:12",
+  "avg_last_meal": "19:11",
+  "days_with_data": 27
+ },
+ "periodization": {
+  "training_day": {
+   "avg_calories": 1542.9,
+   "avg_protein_g": 150.6,
+   "count": 27,
+   "avg_deficit": 1555
+  },
+  "rest_day": {
+   "avg_calories": null,
+   "avg_protein_g": null,
+   "count": 0,
+   "avg_deficit": null
+  }
+ },
+ "micronutrients": {
+  "sufficiency": {
+   "fiber_g": {
+    "label": "Fiber",
+    "total": 18.4,
+    "actual": 18.4,
+    "target": 38,
+    "pct": 48.4,
+    "from_food": 18.4,
+    "from_supplements": 0.0,
+    "channels_counted": [
+     "food",
+     "supplements"
+    ]
+   },
+   "potassium_mg": {
+    "label": "Potassium",
+    "total": 1971.4,
+    "actual": 1971.4,
+    "target": 3400,
+    "pct": 58.0,
+    "from_food": 1971.4,
+    "from_supplements": null,
+    "channels_counted": [
+     "food"
+    ],
+    "uncounted_supplements": [
+     "Electrolytes",
+     "Multivitamin"
+    ]
+   },
+   "magnesium_mg": {
+    "label": "Magnesium",
+    "total": 354.8,
+    "actual": 354.8,
+    "target": 420,
+    "pct": 84.5,
+    "from_food": 210.8,
+    "from_supplements": 144.0,
+    "channels_counted": [
+     "food",
+     "supplements"
+    ],
+    "uncounted_supplements": [
+     "Electrolytes",
+     "Multivitamin"
+    ]
+   },
+   "vitamin_d_mcg": {
+    "label": "Vitamin D",
+    "total": 125.0,
+    "actual": 125.0,
+    "target": 100,
+    "pct": 100.0,
+    "from_food": null,
+    "from_supplements": 125.0,
+    "channels_counted": [
+     "supplements"
+    ],
+    "uncounted_supplements": [
+     "Multivitamin"
+    ]
+   },
+   "omega3_epa_dha_g": {
+    "label": "Omega-3 EPA+DHA",
+    "total": 2.0,
+    "actual": 2.0,
+    "target": 0.5,
+    "pct": 100.0,
+    "from_food": 0.0,
+    "from_supplements": 2.0,
+    "channels_counted": [
+     "food",
+     "supplements"
+    ]
+   },
+   "omega3_ala_g": {
+    "label": "Omega-3 ALA",
+    "total": 0.0,
+    "actual": 0.0,
+    "target": 1.6,
+    "pct": 0.0,
+    "from_food": 0.0,
+    "from_supplements": 0.0,
+    "channels_counted": [
+     "food",
+     "supplements"
+    ]
+   }
+  },
+  "avg_pct": 65.1,
+  "avg_pct_basis": "average of per-nutrient TOTALS (food + supplements), each capped at 100%",
+  "intake_channels": [
+   "food",
+   "supplements"
+  ],
+  "supplements_state": "recorded",
+  "unconverted": [
+   {
+    "name": "Electrolytes",
+    "reason": "'1 packet' \u2014 potassium/magnesium content is not on any record the platform holds"
+   },
+   {
+    "name": "Multivitamin",
+    "reason": "multi-ingredient capsule; per-nutrient content is not on any record the platform holds"
+   },
+   {
+    "name": "Basic B Complex",
+    "reason": "B-vitamin complex; per-nutrient content is not on any record the platform holds (no tracked target)"
+   }
+  ],
+  "not_taken": [],
+  "food_only_avg_pct": 31.3,
+  "protein_distribution_score": 100.0,
+  "as_of": "2026-10-09"
+ }
+}

@@ -22,7 +22,18 @@ The day pages' coach lines are captured for every day the gate opens (each ``?d=
 ``KIT_PAGES``) and for the newest day the captured pulse and workouts carry (the day page with
 no ``?d=``), one ``coach_moves_<day>.json`` each; the gate routes each file to its own day.
 
-Last recaptured: 2026-10-12 (#4839). tests/test_kit_fixtures_fresh_4839.py reds when
+The edition's own wire (tests/fixtures/edition_wire_4582/, the bodies GET /api/edition composes
+from — one file per ``SOURCES`` key of lambdas/web/site_api_edition.py, and the seven days of
+``/api/coach_moves``) is captured in the SAME pass, with its own ``_capture.json`` carrying the same
+instant (#4864), so every committed capture carries one date. The frozen clocks of the tests that compose
+that wire (``CAPTURE_DAY`` / ``CAPTURE_INSTANT`` in tests/test_edition_page_contract_4582.py,
+tests/test_site_api_routes.py, tests/test_edition_scorecard_4595.py, tests/test_edition_latency_4607.py) must
+be re-dated to that manifest in the same change — tests/test_kit_fixtures_fresh_4839.py reds when one is not
+— and the two derived files regenerated: ``python3 tests/test_edition_page_contract_4582.py >
+tests/fixtures/edition_contract_4582/editions.json`` and the scorecard fixture the JS test reads.
+The next recapture is dated on docs/OPERATING_CALENDAR.md (ritual ``preview-fixture-recapture``).
+
+Last recaptured: 2026-10-13 (#4839, #4864). tests/test_kit_fixtures_fresh_4839.py reds when
 ``_capture.json`` is more than ``MAX_AGE_DAYS`` (30) days old, and when this line and the
 manifest name different days — re-run the script, then change the date here.
 
@@ -44,6 +55,7 @@ from datetime import datetime, timezone
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES_DIR = os.path.join(REPO, "tests", "fixtures", "kit_pages_4586")
 MANIFEST = "_capture.json"
+WIRE_DIR = os.path.join(REPO, "tests", "fixtures", "edition_wire_4582")
 BASE = "https://averagejoematt.com"
 #: #4839: the committed captures describe the site; a month on, they describe a site that is gone.
 MAX_AGE_DAYS = 30
@@ -214,6 +226,48 @@ def capture(base: str = BASE) -> tuple:
     return bodies, sources
 
 
+def wire_capture(base: str = BASE, now: datetime | None = None) -> tuple:
+    """Fetch the edition's wire -> ({source key: body}, {source key: address}). Writes nothing.
+
+    One body per ``site_api_edition.SOURCES`` key, fetched the way the route reads it (its
+    ``_ROUTE_QS`` query string; the two manifests as the public files; ``moves`` as the seven
+    days ``edition_page_reads.moves_days`` names, newest first, ending on today in Pacific time)."""
+    from zoneinfo import ZoneInfo
+
+    sys.path.insert(0, os.path.join(REPO, "lambdas"))
+    from web import site_api_edition as ed
+    from web.edition_page_reads import moves_days
+
+    now = now or datetime.now(timezone.utc)
+    today = now.astimezone(ZoneInfo("America/Los_Angeles")).strftime("%Y-%m-%d")
+    bodies, sources = {}, {}
+    for key, path in ed.SOURCES.items():
+        if key == "moves":
+            days = moves_days(today)
+            bodies[key] = {"days": [fetch(f"{path}?date={d}", base) for d in days]}
+            sources[key] = f"{path}?date=<each of the seven days ending {today}>"
+            continue
+        qs = "&".join(f"{k}={v}" for k, v in ed._ROUTE_QS.get(key, {}).items())
+        sources[key] = f"{path}?{qs}" if qs else path
+        bodies[key] = fetch(sources[key], base)
+    return bodies, sources
+
+
+def write_wire(bodies: dict, sources: dict, captured_at: str, base: str, out_dir: str = WIRE_DIR) -> None:
+    os.makedirs(out_dir, exist_ok=True)
+    for key, body in bodies.items():
+        with open(os.path.join(out_dir, f"{key}.json"), "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(body, indent=1, ensure_ascii=True) + "\n")
+    manifest = {
+        "captured_at": captured_at,
+        "base": base,
+        "by": "scripts/capture_kit_page_fixtures.py (#4864) — the same pass as kit_pages_4586; read-only GETs; re-run it, never hand-edit a file",
+        "files": dict(sorted(sources.items())),
+    }
+    with open(os.path.join(out_dir, MANIFEST), "w", encoding="utf-8") as fh:
+        fh.write(json.dumps(manifest, indent=1, ensure_ascii=True) + "\n")
+
+
 def write(bodies: dict, sources: dict, captured_at: str, base: str, out_dir: str = FIXTURES_DIR) -> list:
     os.makedirs(out_dir, exist_ok=True)
     stale = sorted(n for n in os.listdir(out_dir) if n.endswith(".json") and n != MANIFEST and n not in bodies)
@@ -240,21 +294,25 @@ def main(argv=None) -> int:
     ap.add_argument("--check", action="store_true", help="capture and report; write nothing")
     args = ap.parse_args(argv)
 
-    captured_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = datetime.now(timezone.utc)
+    captured_at = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     bodies, sources = capture(args.base)
+    wire_bodies, wire_sources = wire_capture(args.base, now)
     problems = record_disagreements(bodies) + bet_disagreements(bodies)
     for p in problems:
         print(f"DISAGREES: {p}")
     if problems:
         print("capture_kit_page_fixtures: the live set disagrees with itself — nothing written (a cache window? run again)")
         return 1
-    print(f"capture_kit_page_fixtures: {len(bodies)} files agree, captured {captured_at}")
+    print(f"capture_kit_page_fixtures: {len(bodies)} files agree, {len(wire_bodies)} wire files fetched, captured {captured_at}")
     if args.check:
         return 0
+    write_wire(wire_bodies, wire_sources, captured_at, args.base)
     stale = write(bodies, sources, captured_at, args.base, args.out)
     for name in stale:
         print(f"removed {name}: no capture writes it")
     print(f"wrote {len(bodies)} files + {MANIFEST} to {os.path.relpath(args.out, REPO)}")
+    print(f"wrote {len(wire_bodies)} wire files + {MANIFEST} to {os.path.relpath(WIRE_DIR, REPO)}")
     return 0
 
 

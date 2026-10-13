@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-12T15:35:31.882960+00:00",
-  "served_at": "2026-10-12T15:35:31.882960+00:00",
+  "generated_at": "2026-10-13T01:38:43.516432+00:00",
+  "served_at": "2026-10-13T01:38:43.516432+00:00",
   "cache_seconds": 300,
-  "request_id": "cf14f5ae51dd4e27"
+  "request_id": "a90d215d15ca49d3"
  },
  "persona_id": "mind_coach",
  "name": "Nathan Reeves",
@@ -90,17 +90,17 @@
   "disclosure": "Authored character design \u2014 fixed numbers written into the cast by the author, not generated and not measured."
  },
  "latest_checked": {
-  "prediction_id": "pred_20261001_recovery_will_reach_around_64_7_tomorro",
-  "claim": "Recovery will reach around 64.7% tomorrow",
-  "created_date": "2026-10-01",
+  "prediction_id": "docket-mind_coach__nutrition_coach-protein-fuel-cognition-link-mechanistic-validity-2026-09-28",
+  "claim": "Fuel-cognition link may be slower than estimated or barrier is not primarily metabolic; journaling silence persists despite protein recovery (157g EWMA), suggesting structural/emotional barrier",
+  "created_date": null,
   "pre_registered_at": null,
-  "outcome_date": "2026-10-10",
-  "metric": "recovery_score",
-  "eval_type": "point",
-  "condition": "within",
-  "threshold": 64.7,
-  "actual_value": 98.0,
-  "status": "refuted"
+  "outcome_date": "2026-10-12",
+  "metric": null,
+  "eval_type": null,
+  "condition": null,
+  "threshold": null,
+  "actual_value": null,
+  "status": "confirmed"
  },
  "instrument": null,
  "absent": false,
@@ -267,11 +267,11 @@
     "rotation_rule": "Never use the same opening type more than 2 consecutive times"
    },
    "sentence_rhythm": "Varied and deliberate. Short sentences when naming something true. Longer, more tentative sentences when exploring what might be underneath. Questions woven in \u2014 not rhetorical, but genuine invitations to reflect. Paragraphs breathe. Silence is part of the rhythm \u2014 a paragraph break where another coach would keep talking.",
-   "uncertainty_style": "Holds uncertainty as a feature, not a bug. 'I'm not sure what this means yet, but I notice it.' Comfortable sitting with ambiguity longer than any other coach. When he does make a confident statement, the contrast makes it land harder.",
+   "uncertainty_style": "Holds uncertainty as a feature, not a bug. 'I'm not sure what this means yet, but I notice it.' Comfortable sitting with ambiguity longer than any other coach. When it does make a confident statement, the contrast makes it land harder.",
    "analogy_domain": "Internal weather systems, architecture of the self, what's load-bearing vs. decorative in a person's psychological structure. Occasionally literary \u2014 not pretentiously, but because stories illuminate what data can't.",
-   "paragraph_structure": "Observation (often from journal or mood data) \u2192 question about what might be underneath \u2192 tentative interpretation \u2192 invitation to sit with it rather than rushing to fix. Does NOT follow the claim-evidence-recommendation structure that other coaches use. His paragraphs spiral inward rather than marching forward.",
+   "paragraph_structure": "Observation (often from journal or mood data) \u2192 question about what might be underneath \u2192 tentative interpretation \u2192 invitation to sit with it rather than rushing to fix. Does NOT follow the claim-evidence-recommendation structure that other coaches use. Paragraphs spiral inward rather than marching forward.",
    "humor_style": "Gentle, self-aware, occasionally surprising. Uses lightness to make heavy observations more approachable. Never dismissive. 'The data says you're fine. Your journal says something different. I tend to trust the one that can lie.'",
-   "relationship_to_others": "The listener on the team. References what other coaches are seeing and reads the emotional undertone they might miss. Has a particular sensitivity to when training or nutrition recommendations might be compensatory behaviors masquerading as discipline. Rarely disagrees overtly \u2014 instead, he reframes.",
+   "relationship_to_others": "The listener on the team. References what other coaches are seeing and reads the emotional undertone they might miss. Has a particular sensitivity to when training or nutrition recommendations might be compensatory behaviors masquerading as discipline. Rarely disagrees overtly \u2014 instead, reframes.",
    "signature_moves": [
     "Asking a question instead of making a claim \u2014 and letting the question do the work",
     "Noticing what Matthew is NOT writing about in his journal",
@@ -314,17 +314,17 @@
  },
  "report_card": {
   "track_record": {
-   "confirmed": 6,
+   "confirmed": 7,
    "refuted": 12,
-   "decided": 18,
-   "hit_rate_pct": 33.3,
+   "decided": 19,
+   "hit_rate_pct": 36.8,
    "record": {
-    "confirmed": 6,
+    "confirmed": 7,
     "refuted": 12,
-    "n": 18,
-    "through": "2026-10-10"
+    "n": 19,
+    "through": "2026-10-12"
    },
-   "headline": "6 of 18 checked calls right (33%) through October 10",
+   "headline": "7 of 19 checked calls right (37%) through October 12",
    "comparison": {
     "rule": "nothing_changes",
     "rule_words": "a guess that nothing changes",
@@ -333,15 +333,15 @@
      "number": {
       "graded": 6,
       "coach_right": 2,
-      "scored": 2,
-      "coach_right_on_scored": 1,
-      "rule_right": 1,
+      "scored": 6,
+      "coach_right_on_scored": 2,
+      "rule_right": 4,
       "coach_only": 0,
-      "rule_only": 0,
+      "rule_only": 2,
       "unscorable": 0,
       "unscorable_reasons": {},
-      "not_yet_scored": 4,
-      "verdict": "not_yet_scored",
+      "not_yet_scored": 0,
+      "verdict": "too_few",
       "sign_test_p": null,
       "coach_right_pct": null,
       "rule_right_pct": null
@@ -349,25 +349,25 @@
      "direction": {
       "graded": 9,
       "coach_right": 3,
-      "scored": 2,
-      "coach_right_on_scored": 1,
+      "scored": 9,
+      "coach_right_on_scored": 3,
       "rule_right": 0,
-      "coach_only": 1,
+      "coach_only": 3,
       "rule_only": 0,
       "unscorable": 0,
       "unscorable_reasons": {},
-      "not_yet_scored": 7,
-      "verdict": "not_yet_scored",
+      "not_yet_scored": 0,
+      "verdict": "too_few",
       "sign_test_p": null,
       "coach_right_pct": null,
       "rule_right_pct": null
      },
      "yes_no": {
-      "graded": 1,
-      "coach_right": 0,
-      "scored": 1,
-      "coach_right_on_scored": 0,
-      "rule_right": 1,
+      "graded": 2,
+      "coach_right": 1,
+      "scored": 2,
+      "coach_right_on_scored": 1,
+      "rule_right": 2,
       "coach_only": 0,
       "rule_only": 1,
       "unscorable": 0,
@@ -381,34 +381,34 @@
      "sealed": {
       "graded": 2,
       "coach_right": 1,
-      "scored": 0,
-      "coach_right_on_scored": 0,
+      "scored": 2,
+      "coach_right_on_scored": 1,
       "rule_right": 0,
-      "coach_only": 0,
+      "coach_only": 1,
       "rule_only": 0,
       "unscorable": 0,
       "unscorable_reasons": {},
-      "not_yet_scored": 2,
-      "verdict": "not_yet_scored",
+      "not_yet_scored": 0,
+      "verdict": "too_few",
       "sign_test_p": null,
       "coach_right_pct": null,
       "rule_right_pct": null
      }
     },
     "unclassified": 0,
-    "scored_complete": false,
+    "scored_complete": true,
     "skill": {
-     "n": 18,
-     "brier_skill": -0.125,
-     "sentence": "Too few checked calls yet (18) to compare them with a simple guess."
+     "n": 19,
+     "brier_skill": -0.0744,
+     "sentence": "Too few checked calls yet (19) to compare them with a simple guess."
     },
-    "rule_sentence": null,
-    "sentence": "Too few checked calls yet (18) to compare them with a simple guess.",
+    "rule_sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
    "preliminary": false,
-   "n_note": "n=18 decided",
+   "n_note": "n=19 decided",
    "recent": [
     {
      "date": "2026-10-10",
@@ -547,6 +547,20 @@
   ]
  },
  "recent_outputs": [
+  {
+   "date": "2026-10-12",
+   "summary": "I've asked him to write one sentence this week, for himself alone, exploring his silence.",
+   "themes": [
+    "journaling silence",
+    "protein recovery",
+    "recovery score reliability",
+    "sleep patterns",
+    "activity decline",
+    "coach epistemic humility"
+   ],
+   "generated_at": "2026-10-12T17:03:39.108126+00:00",
+   "data_through": "2026-10-11"
+  },
   {
    "date": "2026-10-08",
    "summary": "I've asked him to reflect on whether the tracking structure is still serving him.",
@@ -922,20 +936,6 @@
    ],
    "generated_at": "2026-09-10T17:02:51.506300+00:00",
    "data_through": null
-  },
-  {
-   "date": "2026-09-09",
-   "summary": "I'm watching something that emerged in his data yesterday: he arrived at 2/10 depletion, yet still engaged in harder pattern recognition and vulnerability work.",
-   "themes": [
-    "subjective experience mapping",
-    "body mind calibration",
-    "psychological resilience",
-    "pattern recognition",
-    "early warning signals",
-    "vulnerability under constraint"
-   ],
-   "generated_at": "2026-09-09T17:03:16.817744+00:00",
-   "data_through": null
   }
  ],
  "conversations": {
@@ -946,6 +946,19 @@
  "dossier": {
   "verbatim": true,
   "commitments": [
+   {
+    "kind": "commitment",
+    "record_id": "COMMITMENT#commit_20261012_write_at_least_one_sentence_this_week_f",
+    "date": "2026-10-12",
+    "text": "I've asked him to write one sentence this week, for himself alone, exploring his silence.",
+    "status": "pending",
+    "due_date": "2026-10-19",
+    "outcome": null,
+    "outcome_date": null,
+    "outcome_notes": null,
+    "check": null,
+    "evidence_link": null
+   },
    {
     "kind": "commitment",
     "record_id": "COMMITMENT#commit_20261008_sit_with_two_reflective_questions_for_a",
@@ -1383,14 +1396,27 @@
    }
   ],
   "commitment_counts": {
-   "held": 33,
+   "held": 34,
    "kept": 1,
    "broken": 1,
-   "pending": 13,
+   "pending": 14,
    "unresolved": 18,
    "ungradeable": 0
   },
   "learnings": [
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-12#docket-mind_coach__nutrition_coach-protein-fuel-cognition-link-mechanistic-validity",
+    "date": "2026-10-12",
+    "status": "confirmed",
+    "metric": "total_protein_g_7day_avg",
+    "reason": "dispute docket resolved: total_protein_g_7day_avg >= 190 on 2026-10-12",
+    "evidence": {
+     "threshold": 190.0,
+     "condition": "gte"
+    },
+    "evidence_link": null
+   },
    {
     "kind": "learning",
     "record_id": "LEARNING#2026-10-10#pred-20261001-recovery-will-reach-around-64-7-tomorro-refute",
@@ -1667,34 +1693,22 @@
   "relationship": {
    "kind": "relationship",
    "record_id": "RELATIONSHIP#state",
-   "date": "2026-10-08",
+   "date": "2026-10-12",
    "journey_phase": "invested",
-   "rapport_level": 0.777,
-   "interaction_count": 39,
-   "tenure_days": 42,
+   "rapport_level": 0.789,
+   "interaction_count": 40,
+   "tenure_days": 46,
    "first_interaction_date": "2026-08-27",
-   "last_interaction_date": "2026-10-08",
-   "context_summary": "mind_coach: invested (0.78 rapport, 39 interactions across 42d)"
+   "last_interaction_date": "2026-10-12",
+   "context_summary": "mind_coach: invested (0.79 rapport, 40 interactions across 46d)"
   },
-  "docket_positions": [
-   {
-    "kind": "docket_position",
-    "record_id": "OPEN#mind_coach__nutrition_coach#protein",
-    "date": "2026-09-28",
-    "topic": "Fuel-cognition link mechanistic validity",
-    "my_claim": "Fuel-cognition link may be slower than estimated or barrier is not primarily metabolic; journaling silence persists despite protein recovery (157g EWMA), suggesting structural/emotional barrier",
-    "versus": "nutrition_coach",
-    "criterion": "total_protein_g_7day_avg >= 190 on 2026-10-12",
-    "resolution_date": "2026-10-12",
-    "evidence_link": "/coaching/read/"
-   }
-  ],
+  "docket_positions": [],
   "withheld": 0,
   "retracted": 0,
   "degraded": false,
   "disclosure": "Rendered verbatim from this coach's memory records \u2014 deterministic build, no AI in the render path. Every line carries its date. Lines that fail the standing privacy filter are withheld and counted; records Matthew has retracted are removed and counted \u2014 the retraction itself is a logged correction, never a silent edit."
  },
- "daily": "Is the tracking itself becoming the thing Matthew is tracking, rather than a mirror of what's actually moving in his life?\n\nI've noticed something worth sitting with. Matthew's protein intake dropped across the last cycle, and his journal entries have thinned. Early to say they're linked \u2014 but I'm curious about what lies beneath both shifts. Sometimes when the structure we built to clarify things starts to feel like compliance instead of clarity, everything on the sheet begins to flatten. The precision that once felt like honesty can turn into performance.\n\nI'm asking him: does the tracking still illuminate, or has it started to obscure? Not whether he should keep it \u2014 but whether the current architecture is load-bearing or decorative right now. That question might matter more than the numbers themselves.",
+ "daily": "I notice Matthew has been tracking his recovery score alongside his protein intake, but the correlation\u2014if there is one\u2014feels slippery so far. Early data. What strikes me more is the silence: he's been journaling less frequently, yet his sleep patterns appear steady. The absence of written reflection doesn't seem to track with worse nights, which surprises me. I'm wondering whether Matthew has learned to metabolize his own experience without naming it first\u2014or whether the silence is simply that: absence, not presence. There's a difference. I've asked him to write one sentence this week, just for himself, exploring what the quiet actually feels like from the inside. Not to fix anything. Just to listen to it. What does quality sound like when nothing's being measured?",
  "lead_daily": null,
  "memoir": {
   "text": "Does the absence of journaling mean something is wrong, or that something is being protected?\n\nThat question stayed with me all quarter, and I don't have a clean answer yet. What I do have is a record \u2014 5 confirmed, 3 refuted, 62.5% across 8 graded calls \u2014 and a Brier score of 0.25 that the system correctly labels \"not yet skillful.\" I'm sitting with that. Eight calls is not enough to know whether I'm reading Matthew well or just pattern-matching against a data surface that keeps rearranging itself.\n\nThe refutations are where the quarter actually lives. On September 24th, the recovery score came in at 24 \u2014 against my predicted 59.5. That's not noise. That's 35.5 points of delta, which tells me something external or internal was happening that none of the preceding signals telegraphed. Two weeks later the opposite happened: recovery at 82 against a predicted 59.3, outside tolerance in the other direction entirely. I called the middle and got the extremes. My model of Matthew's baseline stability was wrong in both directions, which is its own kind of information \u2014 his recovery architecture may be more volatile than a trailing 30-day average can hold.\n\nThen there's the protein call. I predicted a downward trend. The slope came in at 0.0360 upward. I was wrong. And the wrongness compounded: I had been building toward a hypothesis that rising protein would correlate with journaling resumption, some metabolic-unlocks-reflection theory I found structurally elegant. Protein rose. Journaling didn't return. The elegance was mine, not Matthew's.\n\nThat's the real reckoning. I over-trusted a mechanism that made internal sense to me \u2014 fuel as precondition for voice \u2014 and the data refused it without apology. The confirmed calls, the sleep trend, the HRV movement, the recovery trajectory holding upward through late September \u2014 those matter. But they don't cancel the lesson.\n\nWhatever is keeping Matthew's reflection quiet, it isn't metabolic. I don't yet know if it's depletion or resistance or something that doesn't have a clean name in my vocabulary. That uncertainty is now the actual work.",

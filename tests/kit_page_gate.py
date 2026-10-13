@@ -79,7 +79,11 @@ KIT_PAGES = {
     "/next/v8/built/": 7,  # how it's built: eight sections, the incident list closed
     # One page per AI coach, one template: the record first, then what settles next, the
     # bets, the watch list, the longer view, the character and the terms — six screens at most.
-    "/next/v8/coach/?c=sleep_coach": 6,  # the stage's watch list, a read that changed, one open bet and two settled
+    # #4864: 6.25. The recapture's record sentence is now one clause per kind of call (number, direction,
+    # yes/no, sealed - "on the 23 a guess could also be checked against, the coaches were right 13 times ..."),
+    # not the one-line "Across N checked calls" it was: +0.07 screens here (6.0 -> 6.07 locally). The owner may
+    # rule the sentence shorter on a coach's own page instead; until then the budget carries it.
+    "/next/v8/coach/?c=sleep_coach": 6.25,  # the stage's watch list, a read that changed, one open bet and two settled
     "/next/v8/coach/?c=physical_coach": 6,  # a stage ladder: the coach has a longer view
     "/next/v8/coach/?c=glucose_coach": 6,  # sitting out, and the loser of the settled bet
     "/next/v8/coach/?c=eli_marsh": 6,  # the lead: no calls, no record, no bets
@@ -88,7 +92,11 @@ KIT_PAGES = {
     # is off the usual path (69 rows, 9.3 screens on 2026-10-04). Its budget is that list plus
     # room for a few more rows, so a list that doubles still fails here.
     "/next/v8/appendix/": 11,
-    "/next/v8/call/": 4,  # the newest settled call above the list of all of them
+    # #4864: 5.5. The newest settled call is now a bet (two coaches), and its "The record" block prints each
+    # coach's per-kind comparison sentence in full (four clauses each, see the coach page above): 5.33 screens
+    # locally against 4 when the newest call was a single number call. The same owner question as the coach
+    # page - a shorter record sentence on a page that lists calls - is open; the budget carries it until then.
+    "/next/v8/call/": 5.5,  # the newest settled call above the list of all of them
     "/next/v8/call/?id=sleep-20260907-8436f03290": 4,  # one number call
     "/next/v8/call/?id=bet-20260930-994b3d89f6": 4,  # a bet: both sides' words, the longest a call page gets
     "/next/v8/call/?id=sleep-20260907-0000000000": 4,  # an address that names no call: one sentence and the list

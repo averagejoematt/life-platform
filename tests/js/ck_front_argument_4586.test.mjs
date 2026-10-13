@@ -30,6 +30,8 @@ const B = edition.blocks;
 const BASE = "/next/v8/";
 const inWords = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
 const esc0 = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// The protein floor is the plan's, as the captured nutrition route serves it (#4540) — never a literal here.
+const FLOOR = load(KIT, "nutrition_overview").nutrition.protein_floor_g;
 const BETD = B.next.data.bet.data;
 const [SA, SB] = BETD.sides;
 const OTHER = load(KIT, "coach_docket").open.map((d) => d.resolution_date).filter((d) => d && d !== BETD.settle_date).sort()[0];
@@ -42,8 +44,13 @@ test("the fixtures are the wire: five days, one absent, eight lines, three of th
   assert.equal(DAYS.length, 5);
   assert.deepEqual(DAYS.map((d) => d.state).sort(), ["absent", "ok", "ok", "ok", "ok"]);
   const lines = F.argumentLines(DAYS);
-  assert.equal(lines.length, 8);
-  assert.deepEqual(lines.filter(F.namesSelf).map((l) => `${l.date} ${l.coach}`), ["2026-10-09 Henning Brandt", "2026-10-07 Lisa Park", "2026-10-05 Marcus Webb"]);
+  assert.equal(lines.length, DAYS.reduce((n, d) => n + (d.lines || []).length, 0), "every served line of every day");
+  // The self-naming lines are read from the captured lines: each names its own coach (first or last name, whole word),
+  // and no line that does not is counted.
+  const names = (l) => l.coach.split(" ").some((part) => new RegExp(`\\b${esc0(part)}\\b`).test(l.text));
+  const selfNaming = lines.filter(F.namesSelf);
+  assert.ok(selfNaming.length > 0 && selfNaming.every(names), "each self-naming line names its own coach");
+  assert.ok(lines.filter((l) => !F.namesSelf(l)).every((l) => !l.text.includes(l.coach)), "a line that quotes its coach's full name is self-naming");
 });
 
 test("a coach naming herself is read as such; an ordinary word that is also a name is not", () => {
@@ -65,7 +72,12 @@ test("with an open bet, the bet is the argument: two coaches on opposite sides, 
   assert.deepEqual(F.argumentTexts(pick), []);
   // The live number against the bet: the newest recorded day of the measure the question names.
   const line = F.betLiveLine(pick.bet, B.week);
-  assert.match(line, /^(Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day: \d+(\.\d)? g protein\. This week, at or above 170 g protein on \d of \d days recorded\.$/, line);
+  // The measure follows the bet's question (a recapture may bring a bet about another measure): protein reads against the plan's floor.
+  const WEEKDAY = "(Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day";
+  const live = /protein/i.test(BETD.question)
+    ? new RegExp(`^${WEEKDAY}: \\d+(\\.\\d)? g protein\\. This week, at or above ${FLOOR} g protein on \\d+ of \\d+ days recorded\\.$`)
+    : new RegExp(`^${WEEKDAY}: .*\\d.*\\. This week, .+\\.$`);
+  assert.match(line, live, line);
   // The first mention of a name carries the job, when the served lines pair the name with its id.
   const jobs = F.jobsByName(DAYS);
   // a name carries its job only when the served lines pair it with one (a recapture may bring a coach with none)
@@ -99,9 +111,11 @@ test("with an open bet, the bet is the argument: two coaches on opposite sides, 
   // no served reason: no door to a card that would not print one
   assert.deepEqual(P.reasonsDoor({ ...B.next, data: { ...B.next.data, bet: bare } }, BASE), {});
   assert.match(P.betHTML(B.next, { sidesText: "x says no.", extra: "Friday: 1 g.", href: "/next/v8/coaches/#ck-bet" }), /<p class="ck-soft">x says no\.<\/p><p class="ck-soft">Friday: 1 g\.<\/p><p><a class="ck-link" href="\/next\/v8\/coaches\/#ck-bet">What each one argued<\/a><\/p><\/div>$/);
-  const food = B.week.data.measures.food.data.values;
-  const lastIdx = food.map((v, i) => (typeof v === "number" ? i : -1)).filter((i) => i >= 0).pop();
-  assert.match(line, new RegExp(`: ${String(Number(food[lastIdx].toFixed(1)))} g protein\\. `));
+  // the newest recorded day's value of the measure the question names (protein -> food; sleep -> sleep)
+  const [measure, unit] = /protein/i.test(BETD.question) ? ["food", "g protein"] : ["sleep", "hours of sleep"];
+  const vals = B.week.data.measures[measure].data.values;
+  const lastIdx = vals.map((v, i) => (typeof v === "number" ? i : -1)).filter((i) => i >= 0).pop();
+  assert.ok(line.includes(`: ${String(Number(vals[lastIdx].toFixed(1)))} ${unit}. `), line);
   assert.equal(F.betLiveLine({ ...pick.bet, data: { ...pick.bet.data, question: "Will the moon be full on Monday?" } }, B.week), "", "a question naming no measure the week carries");
   assert.equal(F.betLiveLine(pick.bet, { state: "unavailable", absent_text: "x", data: null }), "");
 });

@@ -235,13 +235,16 @@ test("the record is a count beside the comparison, never a percentage and never 
   const html = C.recordHTML(SLEEP);
   const tr = SLEEP.report_card.track_record;
   assert.ok(html.includes(`<p class="ck-big">${tr.record.confirmed}<span> of ${tr.record.n} checked calls</span></p>`));
-  // The route serves the comparison for this coach's calls alone, so the sentence says whose.
-  assert.match(tr.comparison.sentence, new RegExp(`^Across ${tr.record.n} checked calls, so far they .*simple guess\\.$`));
-  assert.ok(html.includes(`Across Lisa Park’s ${tr.record.n} checked calls,`));
+  // The route serves the comparison for this coach's calls alone, so the sentence says whose. Its shape changes with the
+  // engine: one "Across N checked calls, so far they ..." line, or a line per kind of call. Either way the served sentence
+  // is printed, never rewritten into another coach's count; the "Across N" shape is named after the coach.
+  assert.ok(tr.comparison.sentence.trim().length > 20 && tr.comparison.sentence.endsWith("."));
+  const named = (p) => p.report_card.track_record.comparison.sentence.replace(/^Across (\d+) checked calls\b/, (all, k) => (Number(k) === p.report_card.track_record.record.n ? `Across ${p.name}’s ${k} checked calls` : all));
+  assert.ok(html.includes(named(SLEEP).replace(/&/g, "&amp;")), "the served comparison is printed");
   assert.match(html, /The simple guess is that nothing changes from the last reading\./);
   assert.match(html, /Lisa Park’s calls alone through [A-Z][a-z]+ \d+\./);
   assert.equal((html.match(/The simple guess is/g) || []).length, 1);
-  assert.ok(C.recordHTML(PHYSICAL).includes(PHYSICAL.report_card.track_record.comparison.sentence.replace(/^Across (\d+) checked/, "Across Max Reyes’s $1 checked")) || C.recordHTML(PHYSICAL).includes(PHYSICAL.report_card.track_record.comparison.sentence), "the served comparison is printed, never rewritten into another coach's count");
+  assert.ok(C.recordHTML(PHYSICAL).includes(named(PHYSICAL).replace(/&/g, "&amp;")), "the served comparison is printed, never rewritten into another coach's count");
   const other = structuredClone(SLEEP);
   other.report_card.track_record.comparison.sentence = "Across 131 checked calls, so far they do not beat a simple guess.";
   assert.doesNotMatch(C.recordHTML(other), /Lisa Park’s 131/, "a count that is not this coach's is never given this coach's name");

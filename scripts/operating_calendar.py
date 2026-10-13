@@ -366,6 +366,25 @@ CALENDAR: dict[str, dict] = {
             "because the series count is only meaningful next to the dollars it explains."
         ),
     ),
+    "preview-fixture-recapture": _entry(
+        skill=None,  # not a command — a script run, recorded in the manifest the script writes
+        cadence_days=25,
+        grace_days=4,
+        attendance=SESSION,
+        probe=(REGEX_IN_FILE, "tests/fixtures/kit_pages_4586/_capture.json", r'^ "captured_at": "(\d{4}-\d{2}-\d{2})T'),
+        obligations=(
+            "Run `python3 scripts/capture_kit_page_fixtures.py` (read-only GETs of the live site: the kit pages "
+            "and the edition wire in one pass), then re-pin whatever a changed served shape reds to BEHAVIOUR, "
+            "never to the new capture's literal (the #4862 pattern), regenerate tests/fixtures/edition_contract_4582/"
+            "editions.json and the scorecard fixture, and change the 'Last recaptured' line in the script's docstring",
+        ),
+        reason=(
+            "#4864 (#4839): tests/test_kit_fixtures_fresh_4839.py reds main when the committed captures are over 30 "
+            "days old, by design — so the recapture is a dated task, not a surprise on main. The manifest the script "
+            "writes is the clock (the capture instant, not a file mtime), first captured 2026-10-13: due 2026-11-07, "
+            "overdue 2026-11-11 — the day the 30-day test would red."
+        ),
+    ),
     # ── Quarterly ─────────────────────────────────────────────────────────────
     "sdlc-review": _entry(
         skill=REVIEW_SPINE,

@@ -1,1 +1,68 @@
-{"_meta": {"generated_at": "2026-10-04T02:29:00+00:00"}, "date": "2026-10-03", "state": "served", "kind": "program", "exercises": [{"name": "Deadlift (Trap bar)", "sets": 2, "reps": "8–12"}, {"name": "Squat (Barbell)", "sets": 3, "reps": "8–12"}, {"name": "Seated Leg Curl (Machine)", "sets": 2, "reps": "8–15"}, {"name": "Calf Press (Machine)", "sets": 2, "reps": "8–15"}, {"name": "Crunch (Machine)", "sets": 2, "reps": "8–15"}]}
+{
+ "_meta": {
+  "generated_at": "2026-10-13T01:33:16.331260+00:00",
+  "served_at": "2026-10-13T01:33:16.331260+00:00",
+  "cache_seconds": 900,
+  "request_id": "a6e010e9517c40af"
+ },
+ "date": "2026-10-12",
+ "state": "served",
+ "reason": null,
+ "source": "hevy-routine-draft",
+ "kind": "program",
+ "session_role": "lower_volume",
+ "position_label": "week 3 \u00b7 session 3 of 4 \u00b7 lower-volume",
+ "routine_ref": "9a602e9b439b",
+ "exercises": [
+  {
+   "name": "Deadlift (Trap bar)",
+   "sets": 3,
+   "reps": "8\u201312",
+   "load_lbs": 215,
+   "loads_lbs": [
+    215,
+    215,
+    215
+   ]
+  },
+  {
+   "name": "Squat (Barbell)",
+   "sets": 3,
+   "reps": "8\u201312",
+   "load_lbs": 200,
+   "loads_lbs": [
+    200,
+    200,
+    200
+   ]
+  },
+  {
+   "name": "Seated Leg Curl (Machine)",
+   "sets": 2,
+   "reps": "8\u201315",
+   "load_lbs": 110,
+   "loads_lbs": [
+    110,
+    110
+   ]
+  },
+  {
+   "name": "Calf Press (Machine)",
+   "sets": 2,
+   "reps": "8\u201315",
+   "load_lbs": 380,
+   "loads_lbs": [
+    380,
+    380
+   ]
+  },
+  {
+   "name": "Crunch (Machine)",
+   "sets": 2,
+   "reps": "8\u201315",
+   "load_lbs": null,
+   "loads_lbs": null
+  }
+ ],
+ "as_of": "2026-10-13T01:33:15.761222+00:00"
+}

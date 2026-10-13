@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-12T15:35:26.116596+00:00",
-  "served_at": "2026-10-12T15:35:26.116596+00:00",
+  "generated_at": "2026-10-13T01:38:37.704311+00:00",
+  "served_at": "2026-10-13T01:38:37.704311+00:00",
   "cache_seconds": 300,
-  "request_id": "cc73d1d6cd854003"
+  "request_id": "2bb6b2eae3844cf0"
  },
  "as_of": "2026-10-12",
  "day_n": 37,
@@ -81,23 +81,23 @@
     },
     "bet": {
      "state": "ok",
-     "as_of": "2026-10-12",
+     "as_of": "2026-10-16",
      "source": "/api/coach_docket",
      "absent_text": "No coach bet is waiting to settle.",
      "data": {
-      "question": "Will the protein eaten (7-day average) be 190 or higher on Monday, October 12?",
-      "topic": "Fuel-cognition link mechanistic validity",
-      "settle_date": "2026-10-12",
+      "question": "Will the deep-sleep share (7-day average) be 26 or higher on Friday, October 16?",
+      "topic": "Deep sleep spike interpretation: signal vs. noise",
+      "settle_date": "2026-10-16",
       "sides": [
        {
-        "coach": "Nathan Reeves",
-        "says": "no",
-        "reason": "Fuel-cognition link may be slower than estimated or barrier is not primarily metabolic"
+        "coach": "Max Reyes",
+        "says": "yes",
+        "reason": "Deep sleep decline is occurring simultaneously with recovery climb"
        },
        {
-        "coach": "Marcus Webb",
-        "says": "yes",
-        "reason": "Protein intake gap (102g vs 190g target) mechanistically suppresses cognition through tryptophan availability"
+        "coach": "Lisa Park",
+        "says": "no",
+        "reason": "27.6% deep sleep spike on Sept 22 (1.8 SD above baseline) is likely regression-to-mean noise without thermal anchor and subjective context"
        }
       ]
      }
@@ -164,7 +164,7 @@
      },
      "training": {
       "state": "ok",
-      "as_of": "2026-10-11",
+      "as_of": "2026-10-12",
       "source": "/api/training_overview",
       "absent_text": "Training has no reading in these seven days.",
       "data": {
@@ -175,9 +175,9 @@
         157.0,
         56.0,
         164.0,
-        null
+        109.0
        ],
-       "text": "Trained on 6 of 6 days recorded.",
+       "text": "Trained on 7 of 7 days recorded.",
        "met": [
         true,
         true,
@@ -185,13 +185,13 @@
         true,
         true,
         true,
-        null
+        true
        ]
       }
      },
      "sleep": {
       "state": "ok",
-      "as_of": "2026-10-11",
+      "as_of": "2026-10-12",
       "source": "/api/pulse_history",
       "absent_text": "Sleep has no reading in these seven days.",
       "data": {
@@ -202,9 +202,9 @@
         7.2,
         6.7,
         8.1,
-        null
+        9.6
        ],
-       "text": "Slept 7 hours or more on 4 of 6 days recorded.",
+       "text": "Slept 7 hours or more on 5 of 7 days recorded.",
        "met": [
         false,
         true,
@@ -212,7 +212,7 @@
         true,
         false,
         true,
-        null
+        true
        ]
       }
      },
@@ -247,11 +247,19 @@
     "detail": [
      {
       "date": "2026-10-12",
-      "summary": "308.3 lb",
+      "summary": "308.3 lb \u00b7 trained \u00b7 slept 9.6 h",
       "facts": [
        {
         "label": "Weight",
         "text": "308.3 lb"
+       },
+       {
+        "label": "Training",
+        "text": "109 minutes of walking"
+       },
+       {
+        "label": "Sleep",
+        "text": "9.6 hours; recovery 67 out of 100"
        }
       ]
      },
@@ -542,7 +550,7 @@
       "source": "/api/sleep_detail",
       "absent_text": "No sleep has been recorded yet.",
       "data": {
-       "text": "Slept 9.6 hours on the night of Sunday, October 11; recovery 88 out of 100."
+       "text": "Slept 9.9 hours on the night of Sunday, October 11; recovery 67 out of 100."
       }
      },
      "food": {
@@ -555,12 +563,12 @@
       }
      },
      "habits": {
-      "state": "stale",
-      "as_of": "2026-10-09",
+      "state": "ok",
+      "as_of": "2026-10-11",
       "source": "/api/habit_streaks",
-      "absent_text": "Nothing newer than Friday, October 9.",
+      "absent_text": "No habits have been recorded yet.",
       "data": {
-       "text": "5 of 7 daily habits kept on Friday, October 9."
+       "text": "4 of 7 daily habits kept on Sunday, October 11."
       }
      },
      "supplements": {
@@ -593,40 +601,16 @@
   },
   "coach_lines": {
    "state": "ok",
-   "as_of": "2026-10-11",
+   "as_of": "2026-10-12",
    "source": "/api/coaching-dashboard",
    "absent_text": "The coaches have written nothing yet.",
    "data": {
     "lines": [
      {
-      "coach": "Marcus Webb",
-      "domain": "food",
-      "text": "Lisa's protein prediction came true, yet Matthew's 28-day average still sits below the 170g floor \u2014 so far, activation hasn't closed the dinner gap I keep flagging. I expect that gap to matter more now, not less.",
-      "as_of": "2026-10-11",
-      "move": "reaction",
-      "move_label": "On a result",
-      "replies_to": null,
-      "bet_settles": null,
-      "truncated": false,
-      "when_text": null
-     },
-     {
-      "coach": "Lisa Park",
-      "domain": "sleep",
-      "text": "Marcus Webb is right that the dinner gap persists, and I'll go further: I was wrong about the mechanism \u2014 protein escalation held, yet deep sleep didn't improve, which means, for now, I can't claim that gap is the only thing standing between Matthew and better recovery.",
-      "as_of": "2026-10-11",
-      "move": "reply",
-      "move_label": "A reply",
-      "replies_to": "Marcus Webb",
-      "bet_settles": null,
-      "truncated": false,
-      "when_text": null
-     },
-     {
       "coach": "James Okafor",
       "domain": "blood tests",
-      "text": "My read is that the two items blocking real progress \u2014 a lab draw and a symptom check-in \u2014 are still unscheduled, for now; has Matthew taken any steps this week to get either one booked?",
-      "as_of": "2026-10-11",
+      "text": "My read is that 20.8 lb gone in 37 days is real progress, yet two items I flagged weeks ago remain unresolved \u2014 has Matthew taken any step this week to schedule either the blood draw or the symptom check-in?",
+      "as_of": "2026-10-12",
       "move": "question",
       "move_label": "A question for Matthew",
       "replies_to": null,
@@ -690,9 +674,9 @@
       "absent_text": "Training has no verdict this week.",
       "data": {
        "name": "Training",
-       "verdict": "going_well",
-       "verdict_text": "Trained, with a rest day",
-       "text": "Trained on 6 of 6 days recorded.",
+       "verdict": "not_yet",
+       "verdict_text": "No rest day",
+       "text": "Trained on 7 of 7 days recorded.",
        "rule": "Days trained in the last seven. Going well at 4 to 6, so at least one rest day. Fewer than 5 days recorded is not enough data."
       }
      },
@@ -703,9 +687,9 @@
       "absent_text": "Sleep has no verdict this week.",
       "data": {
        "name": "Sleep",
-       "verdict": "not_yet",
-       "verdict_text": "Fewer than 5 long nights",
-       "text": "7 hours or more on 4 of 6 nights recorded.",
+       "verdict": "going_well",
+       "verdict_text": "5 or more long nights",
+       "text": "7 hours or more on 5 of 7 nights recorded.",
        "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
       }
      },
@@ -748,23 +732,26 @@
       "absent_text": "The AI has no verdict this week.",
       "data": {
        "name": "The AI",
-       "verdict": "not_yet",
-       "verdict_text": "The coaches do not beat a simple guess yet",
-       "text": "Counted across all 152 calls checked to date, not this week's alone.",
+       "verdict": "going_well",
+       "verdict_text": "The coaches beat a simple guess",
+       "text": "Counted across all 154 calls checked to date, not this week's alone.",
        "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
       }
      }
     },
     "went_right": {
      "matthew": {
-      "area": "training",
-      "text": "Training: Trained on 6 of 6 days recorded.",
-      "source": "/api/training_overview"
+      "area": "sleep",
+      "text": "Sleep: 7 hours or more on 5 of 7 nights recorded.",
+      "source": "/api/pulse_history"
      },
      "engine": {
-      "area": null,
-      "text": "Nothing this week.",
-      "source": null
+      "area": "ai",
+      "text": "The AI: The coaches beat a simple guess, counted across all 154 calls checked to date, not this week's alone.",
+      "source": [
+       "/api/predictions",
+       "/api/calibration"
+      ]
      }
     },
     "verdicts": {
@@ -790,17 +777,17 @@
    ],
    "absent_text": "No coach call has been checked yet.",
    "data": {
-    "right": 62,
-    "decided": 152,
-    "count_text": "62 of 152 checked calls right.",
+    "right": 65,
+    "decided": 154,
+    "count_text": "65 of 154 checked calls right.",
     "counted": {
      "sealed": {
       "n": 11,
-      "right": 5
+      "right": 7
      },
      "bet": {
-      "n": 6,
-      "right": 3
+      "n": 8,
+      "right": 4
      },
      "commentary": {
       "n": 92,
@@ -811,11 +798,11 @@
       "right": 13
      }
     },
-    "counted_text": "Counted: 11 sealed before day one, 6 sides of bets between two coaches, 92 read out of the coaches' running commentary and 43 conditional or hedged sentences.",
-    "beats_simple_guess": false,
-    "comparison_text": "So far they do not beat a simple guess.",
-    "brier_skill": -0.0532,
-    "skill_n": 152
+    "counted_text": "Counted: 11 sealed before day one, 8 sides of bets between two coaches, 92 read out of the coaches' running commentary and 43 conditional or hedged sentences.",
+    "beats_simple_guess": true,
+    "comparison_text": "So far they beat a simple guess.",
+    "brier_skill": 0.0006,
+    "skill_n": 154
    }
   },
   "his_words": {
@@ -914,30 +901,40 @@
   },
   "moves": {
    "state": "ok",
-   "as_of": "2026-10-11",
+   "as_of": "2026-10-12",
    "source": "/api/coach_moves",
    "absent_text": "No coach line is recorded in these seven days.",
    "data": {
     "days": [
      {
       "_meta": {
-       "generated_at": "2026-10-12T15:35:23.194615+00:00",
-       "served_at": "2026-10-12T15:35:23.194615+00:00",
+       "generated_at": "2026-10-13T01:38:35.044194+00:00",
+       "served_at": "2026-10-13T01:38:35.044194+00:00",
        "cache_seconds": 300,
-       "request_id": "cc73d1d6cd854003"
+       "request_id": "2bb6b2eae3844cf0"
       },
-      "state": "absent",
+      "state": "ok",
       "date": "2026-10-12",
       "source": "/api/coach_moves",
       "absent_text": "No coach line is recorded for Monday, October 12.",
-      "lines": []
+      "lines": [
+       {
+        "coach_id": "labs_coach",
+        "coach": "James Okafor",
+        "move": "question",
+        "move_label": "A question for Matthew",
+        "text": "My read is that 20.8 lb gone in 37 days is real progress, yet two items I flagged weeks ago remain unresolved \u2014 has Matthew taken any step this week to schedule either the blood draw or the symptom check-in?",
+        "replies_to": null,
+        "bet_settles": null
+       }
+      ]
      },
      {
       "_meta": {
-       "generated_at": "2026-10-12T15:35:23.275957+00:00",
-       "served_at": "2026-10-12T15:35:23.275957+00:00",
+       "generated_at": "2026-10-13T01:38:35.083809+00:00",
+       "served_at": "2026-10-13T01:38:35.083809+00:00",
        "cache_seconds": 300,
-       "request_id": "cc73d1d6cd854003"
+       "request_id": "2bb6b2eae3844cf0"
       },
       "state": "ok",
       "date": "2026-10-11",
@@ -975,10 +972,10 @@
      },
      {
       "_meta": {
-       "generated_at": "2026-10-12T15:35:23.296338+00:00",
-       "served_at": "2026-10-12T15:35:23.296338+00:00",
+       "generated_at": "2026-10-13T01:38:35.364690+00:00",
+       "served_at": "2026-10-13T01:38:35.364690+00:00",
        "cache_seconds": 300,
-       "request_id": "cc73d1d6cd854003"
+       "request_id": "2bb6b2eae3844cf0"
       },
       "state": "absent",
       "date": "2026-10-10",
@@ -988,10 +985,10 @@
      },
      {
       "_meta": {
-       "generated_at": "2026-10-12T15:35:23.419185+00:00",
-       "served_at": "2026-10-12T15:35:23.419185+00:00",
+       "generated_at": "2026-10-13T01:38:35.626484+00:00",
+       "served_at": "2026-10-13T01:38:35.626484+00:00",
        "cache_seconds": 300,
-       "request_id": "cc73d1d6cd854003"
+       "request_id": "2bb6b2eae3844cf0"
       },
       "state": "ok",
       "date": "2026-10-09",
@@ -1020,10 +1017,10 @@
      },
      {
       "_meta": {
-       "generated_at": "2026-10-12T15:35:23.614346+00:00",
-       "served_at": "2026-10-12T15:35:23.614346+00:00",
+       "generated_at": "2026-10-13T01:38:35.861893+00:00",
+       "served_at": "2026-10-13T01:38:35.861893+00:00",
        "cache_seconds": 300,
-       "request_id": "cc73d1d6cd854003"
+       "request_id": "2bb6b2eae3844cf0"
       },
       "state": "ok",
       "date": "2026-10-08",
@@ -1052,10 +1049,10 @@
      },
      {
       "_meta": {
-       "generated_at": "2026-10-12T15:35:24.020672+00:00",
-       "served_at": "2026-10-12T15:35:24.020672+00:00",
+       "generated_at": "2026-10-13T01:38:36.050773+00:00",
+       "served_at": "2026-10-13T01:38:36.050773+00:00",
        "cache_seconds": 300,
-       "request_id": "cc73d1d6cd854003"
+       "request_id": "2bb6b2eae3844cf0"
       },
       "state": "ok",
       "date": "2026-10-07",
@@ -1093,10 +1090,10 @@
      },
      {
       "_meta": {
-       "generated_at": "2026-10-12T15:35:24.193555+00:00",
-       "served_at": "2026-10-12T15:35:24.193555+00:00",
+       "generated_at": "2026-10-13T01:38:36.205166+00:00",
+       "served_at": "2026-10-13T01:38:36.205166+00:00",
        "cache_seconds": 300,
-       "request_id": "cc73d1d6cd854003"
+       "request_id": "2bb6b2eae3844cf0"
       },
       "state": "absent",
       "date": "2026-10-06",
@@ -1109,11 +1106,33 @@
   },
   "calls": {
    "state": "ok",
-   "as_of": "2026-10-11",
+   "as_of": "2026-10-12",
    "source": "/api/calls",
    "absent_text": "No call has been checked against the data yet.",
    "data": {
     "calls": [
+     {
+      "id": "bet-20261012-e44d5122d7",
+      "kind": "bet",
+      "coach_id": "mind",
+      "coach_name": "Nathan Reeves",
+      "called": "Nathan Reeves and Marcus Webb bet on one question, fixed the day the bet opened: whether the 7-day average of his protein eaten would be at or above 190 g on October 12. Nathan Reeves said no; Marcus Webb said yes.",
+      "called_short": "Nathan Reeves and Marcus Webb bet on whether the 7-day average of his protein eaten would be at or above 190 g on October 12.",
+      "happened_short": "It came in at 158.2 g.",
+      "settled_date": "2026-10-12",
+      "verdict": "right",
+      "verdict_text": "Nathan Reeves was right; Marcus Webb was wrong.",
+      "actual": {
+       "value": 158.2,
+       "text": "158.2 g"
+      },
+      "simple_guess": {
+       "state": "scored",
+       "right": true,
+       "text": "The simple guess was that the answer would be the same as on the day before the bet opened. That guess was also right.",
+       "short": "also right"
+      }
+     },
      {
       "id": "sleep-20260926-a9f7e98e40",
       "kind": "number",
@@ -1710,6 +1729,58 @@
       }
      },
      {
+      "id": "physical-20260906-297ccf261a",
+      "kind": "direction",
+      "coach_id": "physical",
+      "coach_name": "Max Reyes",
+      "called": "Max Reyes called his weight to go down, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
+      "called_short": "Max Reyes called his weight to go down.",
+      "happened_short": "It went down.",
+      "settled_date": "2026-10-04",
+      "verdict": "right",
+      "verdict_text": "Max Reyes was right.",
+      "actual": null,
+      "tolerance": {
+       "value": 1.445,
+       "text": "1.4 lb",
+       "statistic": "the median day-to-day change of his readings inside the window",
+       "window_days": null,
+       "n": 7
+      },
+      "simple_guess": {
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would not move. That guess was wrong.",
+       "short": "wrong"
+      }
+     },
+     {
+      "id": "nutrition-20260906-a1e2c2ba0a",
+      "kind": "direction",
+      "coach_id": "nutrition",
+      "coach_name": "Marcus Webb",
+      "called": "Marcus Webb called his weight to go down, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
+      "called_short": "Marcus Webb called his weight to go down.",
+      "happened_short": "It went down.",
+      "settled_date": "2026-10-04",
+      "verdict": "right",
+      "verdict_text": "Marcus Webb was right.",
+      "actual": null,
+      "tolerance": {
+       "value": 1.445,
+       "text": "1.4 lb",
+       "statistic": "the median day-to-day change of his readings inside the window",
+       "window_days": null,
+       "n": 7
+      },
+      "simple_guess": {
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would not move. That guess was wrong.",
+       "short": "wrong"
+      }
+     },
+     {
       "id": "explorer-20260919-aecd9fef2c",
       "kind": "number",
       "coach_id": "explorer",
@@ -1732,10 +1803,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": true,
+       "text": "The simple guess was that it would stay at 84, the last reading before the call. That guess was also right.",
+       "short": "also right"
       }
      },
      {
@@ -1761,10 +1832,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would stay at 6.7 hours, the last reading before the call. That guess was wrong.",
+       "short": "wrong"
       }
      },
      {
@@ -1790,10 +1861,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": true,
+       "text": "The simple guess was that it would stay at 7.7 hours, the last reading before the call. That guess was also right.",
+       "short": "also right"
       }
      },
      {
@@ -1812,10 +1883,10 @@
        "text": "59"
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that the answer would be the same as on the day before the bet opened. That guess was wrong.",
+       "short": "wrong"
       }
      },
      {
@@ -1841,10 +1912,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": true,
+       "text": "The simple guess was that it would stay at 73, the last reading before the call. That guess was right.",
+       "short": "right"
       }
      },
      {
@@ -1899,10 +1970,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": true,
+       "text": "The simple guess was that it would stay at 59, the last reading before the call. That guess was also right.",
+       "short": "also right"
       }
      },
      {
@@ -1910,19 +1981,25 @@
       "kind": "direction",
       "coach_id": "labs",
       "coach_name": "James Okafor",
-      "called": "James Okafor called his resting heart rate to go down, in a prediction sealed before day one. It was checked on September 27 against the trend in his most recent readings.",
+      "called": "James Okafor called his resting heart rate to go down, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
       "called_short": "James Okafor called his resting heart rate to go down.",
       "happened_short": "It went down.",
       "settled_date": "2026-09-27",
       "verdict": "right",
       "verdict_text": "James Okafor was right.",
       "actual": null,
-      "tolerance": null,
+      "tolerance": {
+       "value": 1.5,
+       "text": "1.5",
+       "statistic": "the median day-to-day change of his readings inside the window",
+       "window_days": null,
+       "n": 15
+      },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would not move. That guess was wrong.",
+       "short": "wrong"
       }
      },
      {
@@ -1930,19 +2007,25 @@
       "kind": "direction",
       "coach_id": "explorer",
       "coach_name": "Henning Brandt",
-      "called": "Henning Brandt called his daily steps to go up, in a prediction sealed before day one. It was checked on September 27 against the trend in his most recent readings.",
+      "called": "Henning Brandt called his daily steps to go up, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
       "called_short": "Henning Brandt called his daily steps to go up.",
       "happened_short": "It went down.",
       "settled_date": "2026-09-27",
       "verdict": "wrong",
       "verdict_text": "Henning Brandt was wrong.",
       "actual": null,
-      "tolerance": null,
+      "tolerance": {
+       "value": 1099.715,
+       "text": "1099.7",
+       "statistic": "the median day-to-day change of his readings inside the window",
+       "window_days": null,
+       "n": 15
+      },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would not move. That guess was also wrong.",
+       "short": "also wrong"
       }
      },
      {
@@ -1968,10 +2051,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would stay at 24, the last reading before the call. That guess was also wrong.",
+       "short": "also wrong"
       }
      },
      {
@@ -1997,10 +2080,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": true,
+       "text": "The simple guess was that it would stay at 44, the last reading before the call. That guess was also right.",
+       "short": "also right"
       }
      },
      {
@@ -2026,10 +2109,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": true,
+       "text": "The simple guess was that it would stay at 44, the last reading before the call. That guess was also right.",
+       "short": "also right"
       }
      },
      {
@@ -2055,10 +2138,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": true,
+       "text": "The simple guess was that it would stay at 44, the last reading before the call. That guess was also right.",
+       "short": "also right"
       }
      },
      {
@@ -2084,10 +2167,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would stay at 6.3 hours, the last reading before the call. That guess was wrong.",
+       "short": "wrong"
       }
      },
      {
@@ -2113,10 +2196,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would stay at 64, the last reading before the call. That guess was also wrong.",
+       "short": "also wrong"
       }
      },
      {
@@ -2142,10 +2225,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would stay at 64, the last reading before the call. That guess was also wrong.",
+       "short": "also wrong"
       }
      },
      {
@@ -2171,10 +2254,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would stay at 64, the last reading before the call. That guess was also wrong.",
+       "short": "also wrong"
       }
      },
      {
@@ -2200,10 +2283,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would stay at 67, the last reading before the call. That guess was also wrong.",
+       "short": "also wrong"
       }
      },
      {
@@ -2229,10 +2312,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would stay at 67, the last reading before the call. That guess was also wrong.",
+       "short": "also wrong"
       }
      },
      {
@@ -2258,10 +2341,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": true,
+       "text": "The simple guess was that it would stay at 76, the last reading before the call. That guess was also right.",
+       "short": "also right"
       }
      },
      {
@@ -2287,10 +2370,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": true,
+       "text": "The simple guess was that it would stay at 76, the last reading before the call. That guess was also right.",
+       "short": "also right"
       }
      },
      {
@@ -2316,10 +2399,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": true,
+       "text": "The simple guess was that it would stay at 76, the last reading before the call. That guess was also right.",
+       "short": "also right"
       }
      },
      {
@@ -2345,10 +2428,36 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would stay at 48, the last reading before the call. That guess was wrong.",
+       "short": "wrong"
+      }
+     },
+     {
+      "id": "sleep-20260906-a668193d50",
+      "kind": "direction",
+      "coach_id": "sleep",
+      "coach_name": "Lisa Park",
+      "called": "Lisa Park called his sleep time to go up, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
+      "called_short": "Lisa Park called his sleep time to go up.",
+      "happened_short": "It held flat.",
+      "settled_date": "2026-09-20",
+      "verdict": "wrong",
+      "verdict_text": "Lisa Park was wrong.",
+      "actual": null,
+      "tolerance": {
+       "value": 1.04,
+       "text": "1 hours",
+       "statistic": "the median day-to-day change of his readings inside the window",
+       "window_days": null,
+       "n": 15
+      },
+      "simple_guess": {
+       "state": "scored",
+       "right": true,
+       "text": "The simple guess was that it would not move. That guess was right.",
+       "short": "right"
       }
      },
      {
@@ -2356,19 +2465,25 @@
       "kind": "direction",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on September 20 against the trend in his most recent readings.",
+      "called": "Lisa Park called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
       "called_short": "Lisa Park called the 7-day average of his heart-rate variability to go up.",
       "happened_short": "It went up.",
       "settled_date": "2026-09-20",
       "verdict": "right",
       "verdict_text": "Lisa Park was right.",
       "actual": null,
-      "tolerance": null,
+      "tolerance": {
+       "value": 1.5402,
+       "text": "1.5",
+       "statistic": "the median day-to-day change of his readings inside the window, over the square root of 7 readings averaged",
+       "window_days": null,
+       "n": 15
+      },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would not move. That guess was wrong.",
+       "short": "wrong"
       }
      },
      {
@@ -2376,19 +2491,25 @@
       "kind": "direction",
       "coach_id": "mind",
       "coach_name": "Nathan Reeves",
-      "called": "Nathan Reeves called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on September 20 against the trend in his most recent readings.",
+      "called": "Nathan Reeves called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
       "called_short": "Nathan Reeves called the 7-day average of his heart-rate variability to go up.",
       "happened_short": "It went up.",
       "settled_date": "2026-09-20",
       "verdict": "right",
       "verdict_text": "Nathan Reeves was right.",
       "actual": null,
-      "tolerance": null,
+      "tolerance": {
+       "value": 1.5402,
+       "text": "1.5",
+       "statistic": "the median day-to-day change of his readings inside the window, over the square root of 7 readings averaged",
+       "window_days": null,
+       "n": 15
+      },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would not move. That guess was wrong.",
+       "short": "wrong"
       }
      },
      {
@@ -2396,19 +2517,25 @@
       "kind": "direction",
       "coach_id": "labs",
       "coach_name": "James Okafor",
-      "called": "James Okafor called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on September 20 against the trend in his most recent readings.",
+      "called": "James Okafor called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
       "called_short": "James Okafor called the 7-day average of his heart-rate variability to go up.",
       "happened_short": "It went up.",
       "settled_date": "2026-09-20",
       "verdict": "right",
       "verdict_text": "James Okafor was right.",
       "actual": null,
-      "tolerance": null,
+      "tolerance": {
+       "value": 1.5402,
+       "text": "1.5",
+       "statistic": "the median day-to-day change of his readings inside the window, over the square root of 7 readings averaged",
+       "window_days": null,
+       "n": 15
+      },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would not move. That guess was wrong.",
+       "short": "wrong"
       }
      },
      {
@@ -2416,19 +2543,25 @@
       "kind": "direction",
       "coach_id": "explorer",
       "coach_name": "Henning Brandt",
-      "called": "Henning Brandt called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on September 20 against the trend in his most recent readings.",
+      "called": "Henning Brandt called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
       "called_short": "Henning Brandt called the 7-day average of his heart-rate variability to go up.",
       "happened_short": "It went up.",
       "settled_date": "2026-09-20",
       "verdict": "right",
       "verdict_text": "Henning Brandt was right.",
       "actual": null,
-      "tolerance": null,
+      "tolerance": {
+       "value": 1.5402,
+       "text": "1.5",
+       "statistic": "the median day-to-day change of his readings inside the window, over the square root of 7 readings averaged",
+       "window_days": null,
+       "n": 15
+      },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would not move. That guess was wrong.",
+       "short": "wrong"
       }
      },
      {
@@ -2454,10 +2587,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would stay at 4.7 hours, the last reading before the call. That guess was also wrong.",
+       "short": "also wrong"
       }
      },
      {
@@ -2483,10 +2616,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would stay at 7.5 hours, the last reading before the call. That guess was also wrong.",
+       "short": "also wrong"
       }
      },
      {
@@ -2512,10 +2645,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would stay at 6.5 hours, the last reading before the call. That guess was also wrong.",
+       "short": "also wrong"
       }
      },
      {
@@ -2541,10 +2674,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": true,
+       "text": "The simple guess was that it would stay at 6.8 hours, the last reading before the call. That guess was also right.",
+       "short": "also right"
       }
      },
      {
@@ -2570,10 +2703,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would stay at 8.4 hours, the last reading before the call. That guess was wrong.",
+       "short": "wrong"
       }
      },
      {
@@ -2599,10 +2732,10 @@
        "n": 31
       },
       "simple_guess": {
-       "state": "not_yet_scored",
-       "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "state": "scored",
+       "right": false,
+       "text": "The simple guess was that it would stay at 8.4 hours, the last reading before the call. That guess was wrong.",
+       "short": "wrong"
       }
      },
      {
@@ -2628,10 +2761,10 @@
        "n": 30
       },
       "simple_guess": {
-       "state": "not_yet_scored",
+       "state": "unscorable",
        "right": null,
-       "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-       "short": "not checked on this call yet"
+       "text": "The simple guess, that nothing changes, could not be checked on this call: no reading before the call was filed.",
+       "short": "could not be checked on this call"
       }
      }
     ]
@@ -2639,7 +2772,7 @@
   },
   "sheet": {
    "state": "ok",
-   "as_of": "2026-10-10",
+   "as_of": "2026-10-11",
    "source": "/api/character",
    "absent_text": "The character sheet has no level yet.",
    "data": {
