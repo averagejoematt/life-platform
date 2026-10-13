@@ -162,6 +162,8 @@ def _moves_wire() -> dict:
                 "bet": {"resolution_date": "2026-10-06"},
             },
         ],
+        # #4583 box 5: who sat out, and why — served beside the lines as data.absent
+        "sidelined": [{"coach": "glucose_coach", "state": "absent", "reason": "This coach had nothing new to add."}],
     }
     wire["dashboard"] = dash
     return wire

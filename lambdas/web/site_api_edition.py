@@ -762,7 +762,16 @@ def _coach_moves(moves: Any, today: str, persona_of) -> dict | None:
     lines = lines[:MAX_COACH_LINES]
     if not lines:
         return _block("absent", day, src, f"No coach had anything to say on {day_in_words(day)}.", voice=COACH_VOICE_MOVE)
-    return _block("ok", day, src, "The coaches have written nothing yet.", {"lines": lines, "mixed_days": False}, voice=COACH_VOICE_MOVE)
+    # #4583 box 5: who sat the day out, and why, beside the lines (a fixed-vocabulary reason).
+    absent = [dict(e) for e in moves.get("sidelined") or [] if isinstance(e, dict)]
+    return _block(
+        "ok",
+        day,
+        src,
+        "The coaches have written nothing yet.",
+        {"lines": lines, "mixed_days": False, "absent": absent},
+        voice=COACH_VOICE_MOVE,
+    )
 
 
 def _coach_lines(dashboard: dict | None, today: str, persona_of_short, persona_of=None) -> dict:
