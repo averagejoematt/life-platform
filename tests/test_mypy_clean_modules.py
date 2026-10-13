@@ -76,7 +76,7 @@ def test_core_modules_are_in_the_clean_set() -> None:
     assert not missing, f"CORE modules absent from the clean set (glob/denylist drift?): {missing}"
 
 
-_COUNT_LITERAL = re.compile(r"\b(\d+)\s+modules\b")
+_COUNT_LITERAL = re.compile(r"\b(\d+)[\s-]+(?:\w+\s+)?modules?\b")
 
 
 def _stale_count_literals(text: str, live: int) -> list[int]:
@@ -96,6 +96,9 @@ def test_module_count_literal_check_can_fail() -> None:
     live = len(clean_modules())
     assert _stale_count_literals(f"plus mcp/ ({live + 1} modules; x)", live) == [live + 1]
     assert _stale_count_literals(f"plus mcp/ ({live} modules)", live) == []
+    assert _stale_count_literals(f"the full {live + 1}-module surface", live) == [live + 1]
+    assert _stale_count_literals(f"{live + 1} Python modules", live) == [live + 1]
+    assert _stale_count_literals(f"the full {live}-module surface", live) == []
 
 
 def test_denylist_entries_exist() -> None:
