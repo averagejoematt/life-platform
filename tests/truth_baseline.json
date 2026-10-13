@@ -3,5 +3,16 @@
     "captured_at": "2026-08-26T02:37:04+00:00",
     "note": "Committed reader-truth debt ledger — honest capture of standing findings per page. The gate reds only on NEW (page, category) HIGH findings vs this file; baselined entries surface as warnings naming their issue every run. Entries are recorded at any observed severity (#2981) — `severity_observed` is context, never part of the key. Update DELIBERATELY via `python3 qa/visual_qa.py --reader-truth --update-truth-baseline` and review the diff; every entry must carry a real issue ref (UNTRIAGED reds the unit suite). Never hand-grow, never auto-regenerate; hand-SHRINKING (deleting a fixed entry) is fine."
   },
-  "pages": {}
+  "pages": {
+    "/story/panel/": [
+      {
+        "category": "temporal_contradiction",
+        "issue": "#4845",
+        "added": "2026-10-13",
+        "severity_observed": "high",
+        "reason": "Week 4's Panel episode is dated by its PUBLISH day (Thu 2026-10-01, the same Thursday convention as EP1-EP3: 09-10, 09-17, 09-24) while the narrative it carries ends on the chapter's last day (Day 24 = 2026-09-29). Both are correct by design; the judge reads one as a contradiction. Re-dating the episode would break the publish-day convention, so no content repair is made.",
+        "note_sample": "[temporal_contradiction] EP4 is dated THURSDAY, OCTOBER 1, with narrative stating Day 24. Twenty-three straight training..."
+      }
+    ]
+  }
 }

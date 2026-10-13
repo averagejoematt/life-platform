@@ -267,5 +267,35 @@ class TestWire(unittest.TestCase):
         self.assertIn("BASELINED", joined)
 
 
+class TestEp4DateBaseline4845(unittest.TestCase):
+    """#4845: the committed ledger holds the EP4 date-vs-Day-24 finding, keyed on the real judge text."""
+
+    FINDING = dict(
+        page="/story/panel/",
+        category="temporal_contradiction",
+        severity="high",
+        note="EP4 is dated THURSDAY, OCTOBER 1, with narrative stating Day 24. Twenty-three straight training...",
+    )
+
+    def _gate(self, finding, base):
+        return tba.gate_finding(finding, base)
+
+    def test_committed_ledger_baselines_the_finding_with_a_reason(self):
+        base = tba.load_baseline()
+        self.assertEqual(self._gate(self.FINDING, base), "baselined")
+        self.assertEqual(tba.baselined_issue(self.FINDING, base), "#4845")
+        row = [r for r in base["pages"]["/story/panel/"] if r["category"] == "temporal_contradiction"][0]
+        self.assertIn("publish", row["reason"])
+
+    def test_mutation_control_without_the_entry_the_finding_gates(self):
+        base = tba.load_baseline()
+        mutated = {"pages": {k: v for k, v in base["pages"].items() if k != "/story/panel/"}}
+        self.assertEqual(self._gate(self.FINDING, mutated), "new")
+
+    def test_a_different_category_on_the_page_still_gates(self):
+        base = tba.load_baseline()
+        self.assertEqual(self._gate(dict(self.FINDING, category="audience_violation"), base), "new")
+
+
 if __name__ == "__main__":
     unittest.main()
