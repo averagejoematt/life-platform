@@ -39,7 +39,7 @@ from typing import Any, Iterable, Optional
 logger = logging.getLogger(__name__)
 
 CLINICAL_SOURCE = "clinical"
-HEADER = "CLINICAL CONTEXT (owner record; cardiology/medical instructions override coaching)"
+HEADER = "CLINICAL CONTEXT (owner record; medical instructions override coaching)"
 
 # Bounds: the block rides every coach's prompt, so it is capped (~800 tokens). Over the
 # cap, in-range lab values go first, then the oldest ECG recordings, then the oldest
