@@ -111,9 +111,9 @@ mostly the first three rows."
 3. Common fixes:
    - `AccessDenied` → IAM role missing permission. Check `cdk/stacks/role_policies.py`, then `cd cdk && npx cdk diff && npx cdk deploy <stack>`.
    - `ResourceNotFoundException` on secret → secret deleted or in deletion window. Run `aws secretsmanager list-secrets --include-planned-deletion`.
-   - `ImportModuleError` → stale code or wrong handler. Redeploy: `bash deploy/deploy_lambda.sh <function-name>`.
+   - `ImportModuleError` → stale code or wrong handler. Redeploy: `bash deploy/deploy_lambda.sh <function-name> <source-file>`.
    - `AttributeError` on a recently-added shared function → some functions missed the last fleet deploy (stale bundle). Fleet-redeploy: `bash deploy/deploy_fleet.sh` (or `cd cdk && npx cdk deploy --all`).
-   - For MCP: `bash deploy/deploy_lambda.sh life-platform-mcp` (since #781 it stages the mcp-shaped full bundle). Never hand-roll a partial zip — missing `lambdas/` tree = import failure at boot.
+   - For MCP: `bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py` (since #781 it stages the mcp-shaped full bundle). Never hand-roll a partial zip — missing `lambdas/` tree = import failure at boot.
 
 ### A data source is stale
 
@@ -192,9 +192,9 @@ V2 P4.1 finding (2026-05, registry then at ~133 tools): only ~11 used in 30 days
 
 | Change | Command | Notes |
 |--------|---------|-------|
-| Single Lambda code | `bash deploy/deploy_lambda.sh <name>` | Auto-reads handler config from AWS |
+| Single Lambda code | `bash deploy/deploy_lambda.sh <name> <source-file>` | Auto-reads handler config from AWS |
 | Lambda code (the one path, #4255) | `bash deploy/deploy_fleet.sh` | What CI runs; every function gets the identical bundle |
-| MCP server | `bash deploy/deploy_lambda.sh life-platform-mcp` | Stages the mcp-shaped full bundle since #781; never hand-roll a partial zip |
+| MCP server | `bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py` | Stages the mcp-shaped full bundle since #781; never hand-roll a partial zip |
 | Website | `bash deploy/sync_site_to_s3.sh` | Uses `safe_sync.sh` wrapper; targets `s3://matthew-life-platform/site/` |
 | Shared module (`lambdas/` root) | Merge to main (CI fleet-deploys) or `bash deploy/deploy_fleet.sh` | ONE bundle per function (#781) — no layer step |
 | CDK stack | `cd cdk && npx cdk diff <Stack> && npx cdk deploy <Stack>` | Always diff first |

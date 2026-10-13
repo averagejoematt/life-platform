@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-12
 
-Last updated: 2026-10-11 (v8.6.0 — 88 MCP tools, 69-module package, 108 Lambdas, 20 data sources)
+Last updated: 2026-10-13 (v8.6.0 — 88 MCP tools, 69-module package, 108 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 108 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -66,7 +66,7 @@ aws s3api delete-bucket-policy --bucket matthew-life-platform
 | Mistake | Result | Fix |
 |---------|--------|-----|
 | Edit a shared module (`lambdas/` root), deploy only one function | Every other function still runs the old copy | Fleet deploy: merge to main (CI auto-fleet-deploys unmapped `lambdas/` changes) or `bash deploy/deploy_fleet.sh` |
-| Hand-rolled MCP zip (only `mcp_server.py` + `mcp/`) | MCP boots but imports fail (`No module named 'reading'`) | `bash deploy/deploy_lambda.sh life-platform-mcp` — since #781 it stages the mcp-shaped full bundle |
+| Hand-rolled MCP zip (only `mcp_server.py` + `mcp/`) | MCP boots but imports fail (`No module named 'reading'`) | `bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py` — since #781 it stages the mcp-shaped full bundle |
 | `aws s3 sync --delete s3://matthew-life-platform/` | Deletes 35K+ objects (ADR-032) | Always use `sync_site_to_s3.sh` |
 | Change Lambda env var in AWS Console | Next `cdk deploy` reverts it silently | Edit CDK stack code instead |
 | Add Lambda to CDK, forget its IAM policy | `AccessDenied` on first run | Add a policy function to the right `cdk/stacks/role_policies_<domain>.py` sibling + one re-export line in the `role_policies.py` facade (#2604) |
@@ -454,7 +454,7 @@ aws lambda list-versions-by-function --function-name <name> \
 # Re-point $LATEST to a known-good version by re-uploading that code:
 # Easiest: redeploy from a known-good git commit
 git checkout <good-sha> -- lambdas/<name>_lambda.py
-bash deploy/deploy_lambda.sh <name>
+bash deploy/deploy_lambda.sh <name> <source-file>
 git checkout HEAD -- lambdas/<name>_lambda.py   # restore working tree
 ```
 
