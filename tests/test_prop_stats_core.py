@@ -50,7 +50,7 @@ import os
 import sys
 import types
 
-from hypothesis import given, settings, strategies as st
+from hypothesis import example, given, settings, strategies as st
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
@@ -217,6 +217,9 @@ _garbage = st.one_of(st.none(), st.text(max_size=4), st.floats(allow_nan=True, a
 
 
 @given(r=_garbage, n=_garbage, n_eff=_garbage, fdr=st.one_of(st.none(), st.booleans(), st.text(max_size=2)))
+@example(r=0.5, n=float("inf"), n_eff=None, fdr=None)
+@example(r=0.5, n=float("-inf"), n_eff=None, fdr=None)
+@example(r=0.5, n=float("inf"), n_eff=float("inf"), fdr=True)
 @_FAST
 def test_correlation_evidence_total_on_garbage_and_bounded(r, n, n_eff, fdr):
     # The docstring promises no raise on garbage (it sits on a public serving path).
@@ -226,6 +229,16 @@ def test_correlation_evidence_total_on_garbage_and_bounded(r, n, n_eff, fdr):
     assert out["n_eff"] <= out["n"] + 0.05  # n_eff is rounded to 1 dp
     assert out["level"] in ("high", "medium", "low")
     assert out["fdr_significant"] in (True, False, None)
+
+
+def test_correlation_evidence_infinite_n_is_zero_not_overflow():
+    # The deterministic pin for #4892's product fix: int(float('inf')) raised OverflowError
+    # out of correlation_evidence before the fix. The property above draws inf only
+    # sometimes, so this plain test is what fails on EVERY run if the fix is reverted.
+    for bad_n in (float("inf"), float("-inf")):
+        out = stats_core.correlation_evidence(0.5, bad_n)
+        assert out["n"] == 0 and out["n_eff"] == 0.0
+        assert out["level"] == "low"
 
 
 @given(r=_r, n=st.integers(0, 300), frac=st.floats(min_value=0.0, max_value=1.0))
@@ -316,10 +329,26 @@ def test_bootstrap_mean_diff_ci_ordered_and_shifts_with_window(base, win, shift,
 
 @st.composite
 def _sced(draw):
-    values = draw(st.lists(st.one_of(_val, st.none()), min_size=6, max_size=30))
-    cands = draw(st.lists(st.integers(0, len(values)), min_size=1, max_size=10, unique=True))
-    actual = draw(st.sampled_from(cands))
-    return values, cands, actual
+    # Biased so the observed split is usable on most draws (>= 2 non-None points per arm
+    # even after the largest washout): an unbiased draw returned None on 51-78 of 80
+    # examples, so the bookkeeping assertions examined almost nothing.
+    values = draw(st.lists(_val, min_size=6, max_size=30))
+    gaps = draw(st.lists(st.integers(0, len(values) - 1), max_size=len(values) // 5, unique=True))
+    for i in gaps:
+        values[i] = None
+    usable = [
+        k
+        for k in range(len(values) + 1)
+        if sum(v is not None for v in values[:k]) >= 2 and sum(v is not None for v in values[k + 2 :]) >= 2
+    ]
+    pool = usable or list(range(len(values) + 1))
+    actual = draw(st.sampled_from(pool))
+    # One more usable split guarantees n_used >= 2; the rest may be unusable (bookkeeping).
+    rival = [k for k in pool if k != actual]
+    others = [draw(st.sampled_from(rival))] if rival else []
+    others += draw(st.lists(st.integers(0, len(values)), max_size=8))
+    cands = list(dict.fromkeys([actual] + others))
+    return values, draw(st.permutations(cands)), actual
 
 
 @given(case=_sced(), direction=st.sampled_from(["higher", "lower"]), washout=st.integers(0, 2), data=st.data())
@@ -346,14 +375,22 @@ def test_cohens_d_antisymmetric(a, b):
         assert _close(d, -d_rev)
 
 
-@given(
-    xs=st.lists(_val, min_size=0, max_size=40),
-    min_segment=st.integers(2, 7),
-    max_cp=st.integers(1, 3),
-    level_shift=st.integers(0, 400),
-)
+@st.composite
+def _cp_case(draw):
+    # Length drawn from min_segment so most series admit a split: an unbiased list drew
+    # fewer than 2*min_segment points on ~39 of 40 examples and the gate assertions below
+    # examined nothing. A few short series stay in so the insufficient branch is covered.
+    min_segment = draw(st.integers(2, 7))
+    lo = draw(st.sampled_from([0, 2 * min_segment, 2 * min_segment, 2 * min_segment, 2 * min_segment]))
+    xs = draw(st.lists(_val, min_size=lo, max_size=40))
+    return xs, min_segment
+
+
+@given(case=_cp_case(), max_cp=st.integers(1, 3), level_shift=st.integers(0, 400))
+@example(case=([0.0, 1.0] * 7 + [100.0, 101.0] * 7, 3), max_cp=1, level_shift=0)
 @_SLOW
-def test_detect_changepoints_every_break_clears_both_gates(xs, min_segment, max_cp, level_shift):
+def test_detect_changepoints_every_break_clears_both_gates(case, max_cp, level_shift):
+    xs, min_segment = case
     # Half the drawn series get a planted step so the accept branch is exercised too.
     half = len(xs) // 2
     series = xs[:half] + [x + level_shift for x in xs[half:]]
@@ -516,6 +553,21 @@ MUTANTS = {
         "test_correlation_evidence_total_on_garbage_and_bounded",
         {"r": _garbage, "n": _garbage, "n_eff": _garbage, "fdr": st.one_of(st.none(), st.booleans(), st.text(max_size=2))},
     ),
+    # detect_changepoints with BOTH acceptance gates removed: every scanned best split is
+    # reported, including insignificant, sub-d=1 slivers.
+    "changepoint_no_gates": (
+        "    if confidence < min_confidence or abs(effect) < min_effect:\n",
+        "    if False:\n",
+        "test_detect_changepoints_every_break_clears_both_gates",
+        {"case": _cp_case(), "max_cp": st.integers(1, 3), "level_shift": st.integers(0, 400)},
+    ),
+    # detect_changepoints without its significance gate (magnitude gate kept).
+    "changepoint_no_confidence_gate": (
+        "    if confidence < min_confidence or abs(effect) < min_effect:\n",
+        "    if abs(effect) < min_effect:\n",
+        "test_detect_changepoints_every_break_clears_both_gates",
+        {"case": _cp_case(), "max_cp": st.integers(1, 3), "level_shift": st.integers(0, 400)},
+    ),
 }
 
 
@@ -540,12 +592,16 @@ def _search(prop_name, strategies):
 def test_mutation_control_every_broken_branch_is_caught(monkeypatch):
     problems = []
     module = sys.modules[__name__]
+    # Bound ONCE: inside the loop the global `stats_core` IS the mutant after a setattr, so
+    # restoring "to stats_core" by name would re-install the previous mutant and run the
+    # next baseline against it (two mutants aimed at one property exposed exactly that).
+    real = stats_core
     for name, (_old, _new, prop_name, strategies) in sorted(MUTANTS.items()):
         mutant = _mutant(name)
         if mutant is None:
             problems.append(f"{name}: target text moved/duplicated in stats_core.py — re-aim the control")
             continue
-        monkeypatch.setattr(module, "stats_core", stats_core)
+        monkeypatch.setattr(module, "stats_core", real)
         _search(prop_name, strategies)()  # baseline: the real module passes
         monkeypatch.setattr(module, "stats_core", mutant)
         try:
@@ -553,6 +609,6 @@ def test_mutation_control_every_broken_branch_is_caught(monkeypatch):
         except (AssertionError, ExceptionGroup):
             continue
         finally:
-            monkeypatch.setattr(module, "stats_core", stats_core)
+            monkeypatch.setattr(module, "stats_core", real)
         problems.append(f"{name}: {prop_name} PASSED against the mutant — the property cannot see this broken branch")
     assert not problems, "\n".join(problems)
