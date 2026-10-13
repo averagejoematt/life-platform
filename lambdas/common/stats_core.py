@@ -200,7 +200,7 @@ def correlation_evidence(r, n, n_eff=None, fdr_significant=None):
     """
     try:
         n_int = max(0, int(n))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):  # OverflowError: int(inf) — #4892's property test found it
         n_int = 0
     try:
         ne = float(n_eff) if n_eff is not None else float(n_int)
