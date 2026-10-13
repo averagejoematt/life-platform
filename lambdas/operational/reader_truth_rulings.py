@@ -1122,6 +1122,49 @@ def is_uncited_temporal_objection(finding):
     return not (note_dates(own) or day_numbers(own) or elapsed_spans(own))
 
 
+# ── #4845: a publish-day dateline beside the chapter's last Day N ─────────────
+#
+# /story/panel/ dates each Panel episode by its PUBLISH Thursday (EP1-EP4:
+# 09-10, 09-17, 09-24, 10-01) while the chapter it carries ends on its own last
+# day (EP4: Day 24 = 2026-09-29, two days earlier). Both numbers are right; the
+# judge reads the pair as a contradiction. STRUCTURAL: category + page + a cited
+# Thursday dateline + a cited Day N whose calendar date (start_date + N - 1) falls
+# 0-7 days BEFORE that dateline. Day N is taken only from the
+# page copy the judge quotes, never from the judge's own arithmetic. A Day N dated AFTER the dateline (EP2 dated
+# 09-17 but "Day 40"), or more than a week before it, is a real contradiction and
+# stays gating. Demoted to low, not dropped.
+PANEL_PAGE = "/story/panel/"
+_PUBLISH_WEEKDAY = 3  # Thursday
+
+
+def is_publish_day_beside_chapter_end(finding, start_date):
+    """True when a /story/panel/ temporal_contradiction cites exactly one Thursday
+    dateline and exactly one Day N whose date is 0-7 days before it (#4845)."""
+    if finding.get("category") != "temporal_contradiction" or finding.get("page") != PANEL_PAGE:
+        return False
+    try:
+        start = date.fromisoformat(str(start_date))
+    except ValueError:
+        return False
+    note = str(finding.get("note") or "")
+    # The judge's OWN arithmetic is not evidence: the live note restates the
+    # dateline's day ("Day 26"), cites the genesis ("Day 1 = Sept 6") and works a
+    # sum. Day N is read ONLY from copy the judge quotes off the page; the genesis
+    # date is the phase anchor, not a dateline.
+    dates = set(note_dates(note, default_year=start.year)) - {start.isoformat()}
+    days = day_numbers(" ".join(quoted_spans(note)))
+    if len(dates) != 1 or len(days) != 1:
+        return False
+    try:
+        dateline = date.fromisoformat(next(iter(dates)))
+    except ValueError:
+        return False
+    if dateline.weekday() != _PUBLISH_WEEKDAY:
+        return False
+    gap = (dateline - start).days - (next(iter(days)) - 1)
+    return 0 <= gap <= 7
+
+
 RULINGS_FIELD = "rulings"
 
 
@@ -1182,6 +1225,12 @@ def advisory_rulings(start_date, today=None):
             "an uncited temporal objection",
             is_uncited_temporal_objection,
             "no temporal value is cited, so no impossibility is established, #3379",
+        ),
+        (
+            "publish_day_beside_chapter_end",
+            "a publish-day dateline beside the chapter's last day",
+            lambda f: is_publish_day_beside_chapter_end(f, start_date),
+            "a Thursday publish dateline 0-7 days after the cited Day N is the panel's convention, #4845",
         ),
     )
 
