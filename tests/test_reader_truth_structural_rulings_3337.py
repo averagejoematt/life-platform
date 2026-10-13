@@ -129,6 +129,11 @@ RULE_CLASSIFICATION = {
         "structural",
         "category + a correlation-engine page + a stated n=N exceeding today's day number + no payload date field",
     ),
+    "is_trailing_window_beside_day_counter": (
+        "structural",
+        "category + a window / since-date the QUOTED page copy states + a cited Day N + no cited date after today (+1 day PT/UTC), "
+        "no future ISO week, no payload date field, quoted weekdays match the calendar",
+    ),
     "is_advisory": ("structural", "reads the `rulings` FIELD the assessment loop wrote — never the note"),
 }
 
@@ -163,8 +168,8 @@ def test_every_is_rule_is_classified():
         "Classify the new rule structural-vs-tiebreak (see the module header's bar) before merging."
     )
     assert (
-        len(found) == 16
-    ), f"the ledger holds {len(found)} rules; the sweep counts 16 (#3337 + #3379 + #4845 + #4834) — update the sweep with the count"
+        len(found) == 17
+    ), f"the ledger holds {len(found)} rules; the sweep counts 17 (#3337 + #3379 + #4845 + #4834 x2) — update the sweep with the count"
 
 
 def test_no_rule_is_classified_purely_lexical():
@@ -787,3 +792,83 @@ def test_n89_narrowing_a_mixed_note_with_a_real_defect_still_gates():
     assert not R.is_stored_history_sample_size(_corr("The page shows n=9999 paired days on Day 37."), _EP_START, d)
     # boundary: n=90 is still the lookback window
     assert R.is_stored_history_sample_size(_corr("The page shows n=90 paired days on Day 37."), _EP_START, d)
+
+
+# ── #4834: a trailing window / since-date figure beside the day counter ──────
+# Judge notes VERBATIM from visual-qa-standalone runs 38339302560 (A) and 38346271277 (B), report.json.
+EP4_NOTE_B = "EP4 is dated THURSDAY, OCTOBER 1, and the narrative states 'Day 24. Twenty-three straight training days.' Day 1 = 2026-09-06. Day 24 = 2026-09-29 (a Tuesday). October 1 is Day 26, not Day 24. The episode date and the day number contradict each other by two days, which is an impossibility."
+EP4_NOTE_A = "EP4 is dated THURSDAY, OCTOBER 1, and states 'Day 24' in its description. October 1, 2026 is a Thursday. Day 1 = September 6, 2026. Counting forward: September 6 + 24 days = September 30, 2026, which is a Tuesday, not October 1. If October 1 is Day 24, then Day 1 would have been September 7 (but the phase specifies Day 1 = September 6). This is an inconsistency: either the date is wrong, the day number is wrong, or the cycle start is wrong. The phase ground truth is Day 1 = September 6, 2026, making October 1 = Day 26, not Day 24. The page asserts both a date and a day number that are mutually contradictory given the fixed cycle start."
+READ_NOTE = "Eli Marsh's read states 'Matthew has lost 20.8 pounds since Sunday, September 6'. September 6, 2026 is the Day 1 cycle start (Saturday, not Sunday). The phrasing 'since Sunday, September 6' is factually incorrect — September 6, 2026 is a Saturday. This is a direct factual error about the date itself, not ambiguity about elapsed time. A reader checking a calendar would find the site contradicting its own ground truth date."
+STATE_NOTE = "Surface 3 states 'DELIVERY — TRAILING 30 DAYS' with metrics including '56.4h MEDIAN CYCLE TIME', '387.4h P90', '504 ISSUES CLOSED', and '670 PRS MERGED'. The experiment is only 37 days old (Day 1 = 2026-09-06, today = 2026-10-12). A 30-day trailing window on Day 37 is arithmetically valid. However, the same section reports 'COHORT / found organically / N: 367 / MEDIAN: 40.4h' and 'found by an audit / N: 137 / MEDIAN: 234.1h', totaling 504 issues closed. The narrative states '184 closed inside a day; 150 took longer than a week.' The three audit reports listed (craft-2026-10-13, data-source-sweep-2026-10-04, harness-audit-2026-09-26) span back to 2026-09-26 (Day 21), which fits within the 30-day window. However, the craft-2026-10-13 audit is dated 2026-10-13, which is tomorrow from the cycle's perspective (today is 2026-10-12). This is impossible—an audit cannot file findings dated in the future relative to the cycle start date. This constitutes a temporal impossibility."
+TIMELINE_NOTE = "Multiple AI Findings dated 2026-09-06 (Day 1) all report 88-day windows: 'Heart Rate Variability → higher Recovery Score, r=+0.93 over 88 days.' 'Heart Rate Variability → higher Sleep Score, r=+0.48 over 88 days.' 'Resting Heart Rate → lower Recovery Score, r=-0.69 over 88 days.' None are labeled as pilot, pre-cycle, or lifetime. On Day 1 of the current cycle, these windows are impossible — 88 days of current-experiment data cannot exist. This is a systematic impossibility across multiple findings on the same surface."
+
+
+def _any(note, page="/x/", category="temporal_contradiction"):
+    return {"page": page, "category": category, "severity": "high", "note": note}
+
+
+def _ids(f):
+    return [rid for rid, _l, fires, _r in R.advisory_rulings(_EP_START, "2026-10-12") if fires(f)]
+
+
+def test_the_judges_restated_dateline_does_not_hide_the_publish_day_ruling():
+    # Run B restated the chapter's last day as a second date (2026-09-29); run A phrased it differently.
+    for note in (EP4_NOTE_B, EP4_NOTE_A):
+        f = _panel(note)
+        assert R.is_publish_day_beside_chapter_end(f, _EP_START) is True
+        assert "publish_day_beside_chapter_end" in _ids(f)
+
+
+def test_publish_day_controls_a_restated_date_after_the_dateline_or_a_wrong_day_still_gates():
+    # a second date AFTER the Thursday dateline is a live claim, not the judge's arithmetic
+    assert not R.is_publish_day_beside_chapter_end(_panel(EP4_NOTE_B + " The page also says 2026-10-20."), _EP_START)
+    # two Thursdays: ambiguous dateline
+    assert not R.is_publish_day_beside_chapter_end(_panel("EP4 is dated October 1 and EP3 September 24; 'Day 24.' appears."), _EP_START)
+    # Day N after the dateline
+    assert not R.is_publish_day_beside_chapter_end(
+        _panel("EP4 is dated October 1 but says 'Day 40. Forty days.' Day 40 = 2026-10-15."), _EP_START
+    )
+
+
+def test_the_real_trailing_window_notes_are_ruled_advisory():
+    for note, page in (
+        (READ_NOTE, "/coaching/read/"),
+        (STATE_NOTE, "/method/state/"),
+        (TIMELINE_NOTE, "/story/timeline/"),
+    ):
+        f = _any(note, page)
+        assert R.is_trailing_window_beside_day_counter(f, _EP_START, "2026-10-12") is True
+        assert "trailing_window_beside_day_counter" in _ids(f)
+
+
+def test_trailing_window_controls_a_genuine_contradiction_still_gates():
+    d = "2026-10-12"
+    ok = "The page says 'DELIVERY - TRAILING 30 DAYS' beside 'Day 37'. Day 1 = 2026-09-06."
+    assert R.is_trailing_window_beside_day_counter(_any(ok, "/x/"), _EP_START, d)
+    # a window that ends AFTER today
+    assert not R.is_trailing_window_beside_day_counter(_any(ok + " The window ends 2026-10-20."), _EP_START, d)
+    # a date two days after today (one day is the PT/UTC slack)
+    assert not R.is_trailing_window_beside_day_counter(_any(ok + " A report is dated 2026-10-14."), _EP_START, d)
+    assert R.is_trailing_window_beside_day_counter(_any(ok + " A report is dated 2026-10-13."), _EP_START, d)
+    # a 'since' date in the future
+    assert not R.is_trailing_window_beside_day_counter(_any("The page says 'lost 5 pounds since October 20' on 'Day 37'."), _EP_START, d)
+    # a window longer than the stored history
+    assert not R.is_trailing_window_beside_day_counter(_any(ok.replace("30 DAYS", "400 DAYS")), _EP_START, d)
+    # a figure the page itself contradicts: the quoted weekday is wrong for the date (Sept 6 2026 is a Sunday)
+    assert not R.is_trailing_window_beside_day_counter(
+        _any(READ_NOTE.replace("since Sunday, September 6", "since Saturday, September 6")), _EP_START, d
+    )
+    # a since-date BEFORE genesis, and a clock before genesis (the recorded cycle-14 pre-start highs)
+    assert not R.is_trailing_window_beside_day_counter(_any("The page says 'lost 5 pounds since 2026-08-26' on 'Day 37'."), _EP_START, d)
+    assert not R.is_trailing_window_beside_day_counter(_any(ok), _EP_START, "2026-09-01")
+    # a future ISO week
+    assert not R.is_trailing_window_beside_day_counter(_any(ok + " Labelled 2026-W45."), _EP_START, d)
+    # a payload date field named
+    assert not R.is_trailing_window_beside_day_counter(_any(ok + " The as_of_date is 2026-10-01."), _EP_START, d)
+    # no window in the page copy / no day counter cited / wrong category / no clock
+    assert not R.is_trailing_window_beside_day_counter(_any("The page says 'all good' on 'Day 37'."), _EP_START, d)
+    assert not R.is_trailing_window_beside_day_counter(_any("The page says 'TRAILING 30 DAYS' only."), _EP_START, d)
+    assert not R.is_trailing_window_beside_day_counter(_any(ok, "/x/", category="stale_data"), _EP_START, d)
+    assert not R.is_trailing_window_beside_day_counter(_any(ok), _EP_START, None)
+    # a window stated only in the judge's own words (nothing quoted off the page)
+    assert not R.is_trailing_window_beside_day_counter(_any("The judge assumes a trailing 30 days beside Day 37."), _EP_START, d)

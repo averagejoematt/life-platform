@@ -47,7 +47,7 @@ tests/test_reader_truth_structural_rulings_3337.py hold each one to it.
 """
 
 import re
-from datetime import date
+from datetime import date, timedelta
 
 # The evidence layer (#3337) — the parsers and the judge's structured `basis`
 # field that a structural ruling decides on. `quoted_spans`, `normalize_copy`,
@@ -1151,15 +1151,22 @@ def is_publish_day_beside_chapter_end(finding, start_date):
     # dateline's day ("Day 26"), cites the genesis ("Day 1 = Sept 6") and works a
     # sum. Day N is read ONLY from copy the judge quotes off the page; the genesis
     # date is the phase anchor, not a dateline.
-    dates = set(note_dates(note, default_year=start.year)) - {start.isoformat()}
-    days = day_numbers(" ".join(quoted_spans(note)))
-    if len(dates) != 1 or len(days) != 1:
-        return False
+    # The dateline is the ONE Thursday the note cites. Run 38346271277 restated the
+    # chapter's last day as a second date ("Day 24 = 2026-09-29 (a Tuesday)"), which
+    # the old "exactly one date" test read as a second dateline. Any other cited date
+    # is the judge's own arithmetic and is ignored while it sits inside the cycle and
+    # no later than the dateline; a date beyond the dateline stays a live claim.
+    dates = sorted(set(note_dates(note, default_year=start.year)) - {start.isoformat()})
     try:
-        dateline = date.fromisoformat(next(iter(dates)))
+        parsed = [date.fromisoformat(d) for d in dates]
     except ValueError:
         return False
-    if dateline.weekday() != _PUBLISH_WEEKDAY:
+    thursdays = [d for d in parsed if d.weekday() == _PUBLISH_WEEKDAY]
+    days = day_numbers(" ".join(quoted_spans(note)))
+    if len(thursdays) != 1 or len(days) != 1:
+        return False
+    dateline = thursdays[0]
+    if any(d < start or d > dateline for d in parsed):
         return False
     gap = (dateline - start).days - (next(iter(days)) - 1)
     return 0 <= gap <= 7
@@ -1217,6 +1224,111 @@ def is_stored_history_sample_size(finding, start_date, today):
     if any(n > CORRELATION_LOOKBACK_DAYS for n in ns):
         return False
     return any(n > day for n in ns)
+
+
+# ── #4834: a stated trailing window / cumulative figure beside the day counter ─
+#
+# The same substance as #2959 and the n=N ruling above, spelled as a window the
+# PAGE states: "TRAILING 30 DAYS" (/method/state/), "r=+0.93 over 88 days"
+# (/story/timeline/), "lost 20.8 pounds since Sunday, September 6"
+# (/coaching/read/). A trailing window or a since-genesis total is measured BACK
+# from today, so it can never exceed what exists today and the day counter is a
+# clock, not a data bound; stored history is cross-phase (ADR-077). Run
+# 38346271277 gated three such notes in one sweep that the previous run had
+# dropped as self-refuted.
+#
+# STRUCTURAL: category + the page's QUOTED copy states a window (trailing/rolling/
+# last/past/over N days|weeks|months, an N-day window, N straight|consecutive days,
+# or "since <date>") + the note cites a Day N + every window is within the stored
+# history (<= CORRELATION_LOOKBACK_DAYS) and every "since" date is not after today +
+# no cited date or ISO week is later than today (one day of slack for the PT/UTC
+# boundary, the same +-1 as #2959) + no payload date field is named + every weekday
+# the quoted copy pairs with a date is the calendar's weekday for that date. A window
+# whose end passes today, a date after today, an N beyond the stored history, a
+# "since" date that is in the future, or a page weekday the calendar contradicts
+# (the page genuinely wrong) keeps gating. Demoted to low, not dropped.
+_WINDOW_COPY_RES = (
+    re.compile(r"\b(?:trailing|rolling|last|past|previous|over|within)\s+(?:the\s+)?(\d{1,3})[\s-]*(day|week|month)s?\b", re.I),
+    re.compile(r"\b(\d{1,3})[\s-]*(day|week|month)s?\s+(?:window|trailing|rolling|average|avg)\b", re.I),
+    re.compile(r"\b(\d{1,3})\s+(?:straight|consecutive)\s+(day|week|month)s?\b", re.I),
+)
+_SINCE_DATE_RE = re.compile(r"\bsince\s+(?:[A-Za-z]+,?\s+)?([A-Za-z]{3,9}\.?\s+\d{1,2}(?:,\s*\d{4})?|\d{4}-\d{2}-\d{2})", re.I)
+_WEEKDAY_DATE_RE = re.compile(
+    r"\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b,?\s+([A-Za-z]{3,9})\.?\s+(\d{1,2})\b",
+    re.I,
+)
+_WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+
+
+def _quoted_window_claims(quoted):
+    """(window lengths in days, 'since' dates) the page copy states."""
+    lengths = []
+    for rx in _WINDOW_COPY_RES:
+        for qty, unit in rx.findall(quoted):
+            lengths.append(int(qty) * {"day": 1, "week": 7, "month": 30}[unit.lower()])
+    return lengths
+
+
+def _quoted_weekdays_match_calendar(quoted, year):
+    for wd, mon, day in _WEEKDAY_DATE_RE.findall(quoted):
+        month = next((i for name, i in _MONTHS.items() if name.startswith(mon.lower()[:3])), None)
+        if month is None:
+            continue
+        try:
+            actual = date(year, month, int(day)).weekday()
+        except ValueError:
+            return False
+        if _WEEKDAYS[actual] != wd.lower():
+            return False
+    return True
+
+
+def is_trailing_window_beside_day_counter(finding, start_date, today):
+    """True when a temporal_contradiction's only subject is a trailing window or
+    cumulative figure the page states, measured against the day counter, whose end
+    does not pass today (#4834, #2959 generalised)."""
+    if finding.get("category") != "temporal_contradiction":
+        return False
+    try:
+        today_d = date.fromisoformat(str(today))
+        start_d = date.fromisoformat(str(start_date))
+    except ValueError:
+        return False
+    if today_d < start_d:  # before genesis no cycle figure can exist: that is the pre-cycle sweep's question
+        return False
+    note = str(finding.get("note") or "")
+    if not note.strip() or cites_payload_date_field(note) or not day_numbers(note):
+        return False
+    # A possessive ("Eli Marsh's read states '...'") would pair the wrong apostrophes
+    # and lose the page copy; the quote parse is fail-closed, so strip possessives first.
+    quoted = " ".join(quoted_spans(re.sub(r"(?<=\w)['\u2019]s\b", "s", note)))
+    lengths = _quoted_window_claims(quoted)
+    since = []
+    for m in _SINCE_DATE_RE.findall(quoted):
+        found = note_dates(m, default_year=today_d.year)
+        if not found:
+            return False
+        since.append(date.fromisoformat(found[0]))
+    if not lengths and not since:
+        return False
+    if any(n > CORRELATION_LOOKBACK_DAYS for n in lengths):
+        return False
+    horizon = today_d + timedelta(days=1)  # PT/UTC boundary slack
+    if any(d > today_d or d < start_d for d in since):  # a since-date before genesis is a pre-cycle claim
+        return False
+    try:
+        cited = [date.fromisoformat(d) for d in note_dates(note, default_year=today_d.year)]
+    except ValueError:
+        return False
+    if any(d > horizon for d in cited):
+        return False
+    for y, w in _ISO_WEEK_RE.findall(note):
+        try:
+            if date.fromisocalendar(int(y), int(w), 1) > today_d:
+                return False
+        except ValueError:
+            return False
+    return _quoted_weekdays_match_calendar(quoted, today_d.year)
 
 
 RULINGS_FIELD = "rulings"
@@ -1291,6 +1403,12 @@ def advisory_rulings(start_date, today=None):
             "a stored-history sample size beside the day counter",
             lambda f: is_stored_history_sample_size(f, start_date, today),
             "the correlation engine reads stored history, so n may exceed the day counter, #4834",
+        ),
+        (
+            "trailing_window_beside_day_counter",
+            "a trailing window or since-date figure beside the day counter",
+            lambda f: is_trailing_window_beside_day_counter(f, start_date, today),
+            "a window measured back from today is not bounded by the day counter, #2959/#4834",
         ),
     )
 
