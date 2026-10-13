@@ -316,7 +316,11 @@ REGISTRY = {
         "is None (never coerced to False) when the batch was never checked. #1372's ONE "
         "deterministic source for the public Evidence Bar — no authored strength grades "
         "anywhere, every component computed.",
-        "d9c3f64f01a0",
+        # Re-recorded 2026-10-12 (#4892). METHOD unchanged, prose re-read: the only source
+        # change is `int(n)` now also catching OverflowError (n=inf raised before, which
+        # broke the "tolerant of None/garbage" promise above — found by the new property
+        # test tests/test_prop_stats_core.py). The prose is now true for that input too.
+        "0c57a8063eaa",
         used_by=(
             "The Evidence Bar on /api/vitals correlations (site_api_discovery.py) and the "
             "correlation ledger surface (site_api_ledger.py) — every published correlation "

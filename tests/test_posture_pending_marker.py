@@ -125,7 +125,16 @@ def _run_config(monkeypatch, posture, *, rc_present, auto_merge):
         "vulnerability-alerts": ({}, None),
         "/apps/github-actions": (_GITHUB_ACTIONS_APP, None),
         "/users/averagejoematt": (_OWNER_USER, None),
-        "repos/": ({"allow_auto_merge": auto_merge}, None),
+        "repos/": (
+            {
+                "allow_auto_merge": auto_merge,
+                "security_and_analysis": {
+                    "secret_scanning": {"status": "enabled"},
+                    "secret_scanning_push_protection": {"status": "enabled"},
+                },
+            },
+            None,
+        ),
     }
 
     def fake(path, timeout=60):

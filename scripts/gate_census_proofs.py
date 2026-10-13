@@ -1898,6 +1898,38 @@ GUARD_PROOFS.update(
     }
 )
 
+STRUCTURAL_HAND_PROOFS.update(
+    {
+        # #4880: the function-length ratchet (D3) — the module-size guard's shape, one level down.
+        "structural::test_function_length_guard_4880.py": {
+            "gate_name": "test_function_length_guard_4880.py",
+            "command": "python3 -m pytest tests/test_function_length_guard_4880.py -q -p no:randomly   # baseline 11 passed",
+            "mutation": (
+                "three plants in the real tracked tree, ONE AT A TIME, each restored from a byte copy, "
+                "FUNCTION_LENGTH_COUNTS never edited: (a) a 151-logical-line `_tree_planted_4880` appended to "
+                "lambdas/web/site_api_lambda.py (a scanned, non-generated module); (a') the same function at 150 "
+                "lines, the boundary control; (b) one code line inserted into the recorded "
+                "deploy/restart_leadin_pages.py::render_post_html (recorded 171); (c) a comment line plus a blank "
+                "line inserted into the same function — the #3537 negative control."
+            ),
+            "observed": (
+                "(a) exit 1, 1 failed / 10 passed — `test_no_new_overlong_function` "
+                "('lambdas/web/site_api_lambda.py::_tree_planted_4880: 151 lines'). (a') 11 passed. "
+                "(b) exit 1, 1 failed / 10 passed — `test_recorded_functions_do_not_grow` "
+                "('render_post_html: 172 lines, recorded 171 (+1)'). (c) 11 passed. Reverted 11 passed."
+            ),
+            "scope": (
+                "git-tracked *.py under lambdas/ mcp/ scripts/ deploy/ only (cdk/ and tests/ are out); the unit is "
+                "the #3537 logical line, so comment/blank growth never reds; generated-header files and a def "
+                "carrying `# function-length-exception: <reason>` on the line above are exempt; an unparseable "
+                "file measures nothing (py_compile owns that). Lowering a recorded number after a shrink is "
+                "allowed, not forced."
+            ),
+            "proved_on": "2026-10-12",
+        },
+    }
+)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # QA_PROOFS — census family 3 (qa-smoke-check). Same `Proof` bar; here, like
