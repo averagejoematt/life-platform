@@ -27,8 +27,10 @@ request. Seeded mode (`/review craft <path-or-note>` — "just `lambdas/web/`", 
 monolith", "our types are decorative") applies the elite resolution discipline in
 `.claude/skills/review/references/full.md`.
 
-**Model-agnostic.** Nothing here pins a model. The driver runs under the session model; every row
-agent inherits it (pass `model` through only when a row genuinely needs a different tier).
+**Model tier (#4773, `docs/AI_MODEL_STRATEGY.md` §6).** The driver runs under the session model; every
+panelist / row agent is spawned on **Sonnet** (`model: sonnet`), and the adversarial verification step
+stays on the strong tier (`finding-verifier`, opus). Pass a different `model` only when a row genuinely
+needs another tier and say why in the review.
 
 ## The three axes (grade against these, always)
 
