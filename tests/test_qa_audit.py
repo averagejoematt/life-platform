@@ -133,3 +133,6 @@ def test_api_deps_ratchet_holds_zero_unchecked():
 def test_smoke_checked_endpoints_derives_from_manifest_once_the_1586_section_lands():
     checked = set(qa_audit.smoke_checked_endpoints())
     assert set(qa_manifest.api_dep_endpoints()) <= checked
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

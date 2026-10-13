@@ -266,3 +266,6 @@ def test_a_census_with_no_coverage_block_is_refused_not_treated_as_empty():
     nothing to check."""
     with pytest.raises(pk_census.CensusPreflightError):
         pk_census.scoped_partitions_from_snapshot({"families": {}})
+
+
+# premerge-gate: 3599 box 1: the same artifact, read for its `coverage_partitions` block — the measured live partition set the wipe's own coverage assertion is now graded against offline. Joined the lane by the derivation above rather than by hand: a PR that refreshes the census must red on itself if the refreshed set is no longer covered, not on whoever merges next.

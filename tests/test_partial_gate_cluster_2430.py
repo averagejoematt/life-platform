@@ -184,3 +184,6 @@ class TestPodcastStaysAtItsCap:
         )
         with open(os.path.join(REPO, PODCAST), encoding="utf-8") as fh:
             assert sum(1 for _ in fh) <= 1904
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

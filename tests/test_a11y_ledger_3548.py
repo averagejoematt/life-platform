@@ -176,3 +176,6 @@ def test_sr_only_class_exists_for_the_corner_th():
     with open(path, encoding="utf-8") as f:
         css = f.read()
     assert ".sr-only {" in css, "the corner <th> relies on .sr-only existing in tokens.css"
+
+
+# premerge-gate: 3548: an os.walk sweep of site/**/*.html for the retired <article data-dx-read> tabpanel host (aria-allowed-role) plus a source-string check that the two generators (v4_build_coaching.py/v4_build_dispatches.py) never re-emit it. Pure repo shape, same idiom as test_no_tool_attribution_3005.py — a PR that reintroduces the pattern must red BEFORE merge, not after the site auto-deploys on it.

@@ -349,3 +349,6 @@ def test_the_shirtless_day_one_photograph_is_on_no_reader_surface():
         if stem.encode() in p.read_bytes():
             offenders.append(f"reference in: {p.relative_to(ROOT)}")
     assert not offenders, "the shirtless day-1 photograph is back on a reader surface:\n  " + "\n  ".join(offenders)
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

@@ -230,3 +230,6 @@ def test_forbidden_provenance_names_exactly_the_attributes_the_class_forbids():
     assert taxonomy.forbidden_provenance("COACH#sleep_coach", "RELATIONSHIP#state", {"payload": "x"}) == []
     # scoped rows are allowed all of it — this is the CROSS_PHASE predicate, not a general one
     assert taxonomy.forbidden_provenance("COACH#sleep_coach", "OUTPUT#2026-09-17", item) == []
+
+
+# premerge-gate: 3514: the write-time provenance gate. Pre-merge because its Set leg is an AST sweep of lambdas/ for direct `experiment_stamp(` calls — a NEW writer inherits the ungated call silently, and the defect it produces (a cycle stamp on a CROSS_PHASE row) is invisible to every read path, so nothing post-merge surfaces it. The failure mode is a reset marking Matthew's coach conversation history for the wip

@@ -191,3 +191,6 @@ def test_lane_covers_rejects_a_narrower_trigger():
     assert reg.lane_covers("lambdas/web/x.py", ["lambdas/**"])
     assert not reg.lane_covers("lambdas/**", ["lambdas/web/x.py"])
     assert not reg.lane_covers("docs/**", ["lambdas/**", "mcp/**"])
+
+
+# premerge-gate: 2986: the derived-artifact registry. Verdict is pure repo shape — a new generator writing a committed artifact must be classified BEFORE the merge, and a guard placed in the wrong lane must red on the PR that placed it there. Post-merge-only is the exact defect this registry was filed about.

@@ -91,3 +91,6 @@ def test_orphan_allowlist_entries_are_real_cards():
     card_names = set(_page_card_names())
     stale = ORPHAN_ALLOWLIST - card_names
     assert not stale, f"ORPHAN_ALLOWLIST names not in og_image_lambda.PAGES: {sorted(stale)}"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

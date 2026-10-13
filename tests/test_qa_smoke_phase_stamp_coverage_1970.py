@@ -294,3 +294,6 @@ def test_the_audit_and_the_backfill_ask_the_taxonomy_the_same_question():
     for sk in _ADR153_SKS + ["PREDICTION#pred_x", "BRIEF#2026-08-01", "STANCE#latest"]:
         stampable, _ = bf.split_by_class(pk, [{"sk": sk}])
         assert bool(stampable) is should_phase_stamp(pk, sk), sk
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

@@ -278,3 +278,6 @@ def test_writer_value_is_decimal_for_dynamodb(monkeypatch):
     monkeypatch.setattr(dmc, "table", FakeTable(), raising=False)
     _table, row = _write(9)
     assert isinstance(row[CANONICAL], Decimal), "boto3 rejects float/int-as-float — the streak must be Decimal"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

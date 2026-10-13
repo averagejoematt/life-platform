@@ -710,3 +710,6 @@ class TestTheDismissalRefusesByName4519:
         )
         assert out["wrote"] is True and out["reads_as"]["state"] == "dismissed_by_owner", out
         assert [p["sk"] for p in tbl.puts] == ["DISMISSAL#hinge#2026-10-01"]
+
+
+# premerge-gate: 4036: the owner-dismissal path for pain flags. Pre-merge because the contract it holds spans THREE modules a PR can change independently — the rule (training_context_registry), the tripwire (plan_engine) and the joints critic — and the failure mode is silent in the direction that matters: a dismissal that stops re-arming reads as a clean plan, with a benched lift or a loaded flagged movement as th

@@ -489,3 +489,6 @@ def test_the_registry_covers_every_module_that_imports_the_ruling():
                         importers.add(rel)
                         break
     assert importers <= listed, f"unregistered direction-of-travel surfaces: {sorted(importers - listed)}"
+
+
+# premerge-gate: 3293: the direction-of-travel registry. Its sweep asks which modules import `web.journey_direction` at all, so a NEW surface that states a direction of travel changes the covered population — the repo-shape property. Pre-merge because #3293 IS the post-merge version of this: #3285 fixed two members of the family, three shipped on, and nothing red for a day.

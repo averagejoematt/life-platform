@@ -419,3 +419,6 @@ def test_training_notes_budget_pause_degrades_before_any_spend(monkeypatch):
     rec = tn.extract_signals("Level 9 for 20 then level 6 for 10, felt tired today", llm_fn=tnl.make_llm_fn(object(), lane="live"))
     assert rec["degraded"] is True
     assert rec["degraded_reason"].startswith("budget_paused:")
+
+
+# premerge-gate: #4643: globs lambdas/ingestion/ + direct imports — a new ingest-path AI caller with no cutoff/ledger row must red pre-merge (~1s)

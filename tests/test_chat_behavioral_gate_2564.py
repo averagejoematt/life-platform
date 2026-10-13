@@ -247,3 +247,6 @@ def test_every_production_build_grounder_call_supplies_available_logs():
                     f"for this surface, and without the kwarg it cannot fire (#2564)"
                 )
     assert checked == 1, f"expected exactly one production build_grounder call site, found {checked}"
+
+
+# premerge-gate: #2564: every build_grounder call site supplies available_logs

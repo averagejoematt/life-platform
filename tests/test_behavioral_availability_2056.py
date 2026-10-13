@@ -466,3 +466,6 @@ class TestLegacyBriefSurfaceProof:
             available_logs=ac._available_logs_for_today({"garmin": {"steps": 9000}}, None, None),
         )
         assert found == []
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

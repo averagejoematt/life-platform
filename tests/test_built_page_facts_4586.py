@@ -183,3 +183,6 @@ def test_the_build_cap_sentence_matches_the_laptop_cap_module():
     day = float(re.search(r"^PER_DAY_USD = ([0-9.]+)", src, re.M).group(1))
     sentence = re.search(r'export const BUILD_CAP = "([^"]+)"', MODULE.read_text()).group(1)
     assert f"${run:g} in one run" in sentence and f"${day:g} in any 24 hours" in sentence, sentence
+
+
+# premerge-gate: #4586: every static fact on the "How it's built" page against its source (model, governor, workflows, incident log) — repo tree only

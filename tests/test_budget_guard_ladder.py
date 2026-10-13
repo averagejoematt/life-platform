@@ -306,3 +306,6 @@ def test_feature_tier_prose_matches_live_cutoff_table():
             f"{path}: comment claims {feature!r} pauses at tier-{claimed_tier}, "
             f"but budget_guard._FEATURE_CUTOFF[{feature!r}] == {cut[feature]} — stale prose (#2000 class)"
         )
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

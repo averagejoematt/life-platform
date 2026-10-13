@@ -671,3 +671,5 @@ def test_the_coach_line_reaches_the_gate_through_gate_strings():
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+# premerge-gate: 3749: reads coach_state_updater's source to hold the ONE write seam for public_summary, and globs config/coaches/. A registry-join check: the card may only quote a coach whose pipeline writes the field through audience_guard.

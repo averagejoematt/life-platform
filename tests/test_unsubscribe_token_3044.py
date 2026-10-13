@@ -227,3 +227,6 @@ def test_conftest_supplies_the_test_signing_key():
     """Sender template tests assert tokenized links; that only holds because the
     suite-wide env key is present (hermetic — no Secrets Manager round-trip)."""
     assert os.environ.get("UNSUB_TOKEN_SECRET"), "conftest.py must set UNSUB_TOKEN_SECRET for the unit suite"
+
+
+# premerge-gate: #3044: tree sweep — no lambdas/deploy module may reintroduce a plaintext-email unsubscribe link

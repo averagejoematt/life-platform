@@ -345,3 +345,5 @@ def test_registered_description_states_the_cross_phase_read_and_the_default_wind
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+# premerge-gate: 4031: the same cross-cycle read one tool over — and here the truncated number IS a prescription. `get_muscle_volume` read SOURCE#hevy through the ADR-058 phase filter, so every trailing window silently shrank to the cycle's AGE, and what shrank is `volume_landmark_status` ("below maintenance" / "optimal" / "exceeding MRV – overtraining risk"). Same file also defaulted the window to 2000-01-01 and

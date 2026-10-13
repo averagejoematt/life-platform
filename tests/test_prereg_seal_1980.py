@@ -315,3 +315,6 @@ def test_regression_guard_fails_on_a_stale_or_wrong_hash():
     stale_payload = {"artifact_url": real["public_artifact_url"], "sha256": "0" * 64}
     with pytest.raises(AssertionError, match="NOT actually carried"):
         assert_current_genesis_prereg_is_referenced(qa_manifest.MANIFEST, [stale_payload], real)
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

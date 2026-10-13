@@ -377,3 +377,6 @@ def test_whoop_consumer_set_guard():
         if not os.path.exists(os.path.join(_REPO, rel)):
             problems.append(f"{rel} is registered but no longer exists — prune the registry entry.")
     assert not problems, "\n".join(problems)
+
+
+# premerge-gate: #3442: AST census — a new date-keyed whoop consumer must pick a guard lane BEFORE merge

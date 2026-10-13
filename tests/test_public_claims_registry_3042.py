@@ -288,3 +288,6 @@ def test_recorded_runtime_mode_matches_live_ssm():
         "and the decision that flipped it) and re-check every surface stating the remediation-mode claim."
     )
     assert not reg.compare_remediation_mode(live), f"live mode {live!r} contradicts the published claim"
+
+
+# premerge-gate: 3042 (Phase D2): the public-claims registry. Verdict is repo shape + published prose — a new page or generator restating a registered behavioural claim must be registered BEFORE the merge. Post-merge is too late by construction: the site auto-deploys on merge, so an unregistered stale claim is live before the red.

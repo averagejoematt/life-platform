@@ -343,3 +343,6 @@ def test_every_food_delivery_reader_is_gated():
         f"gate earlier in their function: {ungated} — every reader of this partition must "
         "check web.site_api_common.nutrition_delivery_public() before querying"
     )
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

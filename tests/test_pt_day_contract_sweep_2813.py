@@ -483,3 +483,6 @@ def test_scan_discovers_a_synthetic_decorated_function(tmp_path, monkeypatch):
     (synthetic_dir / "leaf.py").write_text(decorated)
     modules_using = set(_modules_using_pt_day_contract())
     assert "synthetic_pkg.leaf" in modules_using
+
+
+# premerge-gate: 2813: the PT-day producer/gate contract sweep. Its verdict depends only on repo shape — an os.walk(lambdas/) AST scan for any function accepting a generation_date/day_n-shaped default with neither a @pt_day_contract registration nor a written EXEMPT_PT_DAY_CANDIDATES reason. A new gate that silently defaults to UTC (the #2675/#2812/#2815 defect class) must red BEFORE the merge, not surface in prod

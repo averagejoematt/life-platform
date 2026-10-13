@@ -476,3 +476,6 @@ def test_a_transport_error_is_not_evidence_against_a_door():
 
 def test_fetched_json_never_raises_on_garbage():
     assert Fetched("u", status=200, body="not json").json() is None
+
+
+# premerge-gate: 3615 box 1: an rglob sweep of site/**/*.js for every reader POST door, each of which must be claimed by a HOOK_REGISTRY row. Pure repo shape, and the failure is a PR's own diff — a hook added to the site without a registry row is exactly the thing that must red before it merges, because after the merge it simply joins the set of hooks nothing probes (which was all of them but one).

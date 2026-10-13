@@ -315,3 +315,6 @@ def test_the_energy_targets_load_input_is_the_stored_tsb_not_a_recompute():
     tdee_tree = ast.parse((ROOT / "lambdas/health/tdee.py").read_text(encoding="utf-8"))
     imported = {n.module for n in ast.walk(tdee_tree) if isinstance(n, ast.ImportFrom)}
     assert not any(m and "training" in m for m in imported)
+
+
+# premerge-gate: 4075 4A: an rglob sweep of lambdas/ + mcp/ keeping the Hevy lift rate + per-rep tempo in ONE module and retiring the MCP second load model. Pure repo shape — a second load derivation is exactly a PR's own diff.

@@ -188,3 +188,6 @@ class TestAlertEpisodeDedup:
             send, state, _ = alert_episode_decision(state, True, NOW.replace(minute=i % 60))
             sends += 1 if send else 0
         assert sends == 1
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

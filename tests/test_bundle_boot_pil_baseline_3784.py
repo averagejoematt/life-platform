@@ -184,3 +184,5 @@ if __name__ == "__main__":  # pragma: no cover
     import pytest
 
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+# premerge-gate: 3784: AST sweep of lambdas/ — the bundle-boot PIL baseline must equal the module-scope PIL closure. Belongs in the pre-merge lane precisely because the thing it prevents is a DEPLOY failure: #3780 added three PIL importers, the hand-kept baseline missed them, and the bill arrived on an unrelated PR's Deploy job two days later. A repo-shape ratchet, not a behaviour suite.

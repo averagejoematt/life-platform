@@ -696,3 +696,6 @@ def test_live_inline_policy_matches_the_tracked_json(role_name):
         f"Fix by applying the TRACKED document (`aws iam put-role-policy --policy-document file://...`) — "
         f"never by editing the JSON to match the drift."
     )
+
+
+# premerge-gate: #3336: deploy/ tree sweep — no apply script may embed an IAM policy document for a role with a checked-in infra/iam/*.json; the JSON pair is the only apply source

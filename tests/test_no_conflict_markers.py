@@ -144,3 +144,6 @@ def test_guard_does_not_fire_on_benign_lines(tmp_path, benign):
     sample = tmp_path / "benign.md"
     sample.write_text(benign + "\n", encoding="utf-8")
     assert _offending_lines(sample) == []
+
+
+# premerge-gate: a merge marker reached main once already

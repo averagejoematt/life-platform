@@ -109,8 +109,8 @@ write surface is your own worktree and your own branch.
    red cost a full CI round trip that a 90-second local run would have saved:
    `python3 -m pytest tests/test_premerge_extra_files_derivation_2372.py tests/test_gate_census_lane_3000.py tests/test_gate_census_2578.py tests/test_suite_parallel_safety_3025.py tests/test_restart_verify_gates_3477.py tests/test_schema_families_census.py tests/test_singleton_tombstone_guards.py tests/test_obligation_carriers_3597.py -q`.
    What each one names and how to satisfy it: (#2372) a new test that sweeps the tree
-   (os.walk / rglob / git ls-files) must be listed in `tests/conftest.py`
-   `_PREMERGE_EXTRA_FILES` with a one-line reason; (#3000/#2578) every new gate needs a
+   (os.walk / rglob / git ls-files) must carry a
+   `# premerge-gate: <reason>` line (tests/conftest.py `_PREMERGE_EXTRA_FILES` is derived from it, #4270); (#3000/#2578) every new gate needs a
    verdict in `scripts/gate_census.py` — PROVEN_CAN_FAIL with the mutation you actually ran,
    or ATTEMPTED_UNPROVEN — or a not-applicable reason; NEVER raise
    `BASELINE_UNPROVEN_GATES`, and state your `BASELINE_TOTAL_GATES` / proven-bound entrant

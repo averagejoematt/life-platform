@@ -726,3 +726,6 @@ class TestExtractThreadIsGuarded:
         monkeypatch.setattr(retry_utils, "call_anthropic_raw", fake_call)
         out = ic.extract_thread_from_narrative("sleep", narrative, "fake-key")
         assert out["position_summary"] == faithful
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

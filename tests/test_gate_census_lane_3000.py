@@ -981,3 +981,6 @@ def test_the_live_ratchet_down_verdict_is_printed_whichever_way_it_falls(capsys)
     assert ("RATCHET DOWN AVAILABLE" in msg) is available
     assert available is bool(stale), "the count advisory and the by-name list must agree (slack is 0)"
     assert capsys.readouterr().out.strip(), "the direction-of-travel line must reach the run's output"
+
+
+# premerge-gate: 3000: the census's OWN lane + visibility ratchet (epic #2578's fourth acceptance box) — sibling to the entry above. Its verdict is pure repo shape (the live gate count against a committed ceiling), so it belongs here for the same reason as its sibling: post-merge is too late for a gate that entered unverified.

@@ -271,3 +271,6 @@ def test_slo_doc_describes_the_alarm_as_deployed():
         "MONITORING.md's Active-alarms prose must record the dimensionless-fleet-aggregate contract — "
         "it listed both alarm names while describing neither's dimension semantics (#3260)"
     )
+
+
+# premerge-gate: 3260: the alarm<->emission dimension agreement for the two dimensionless FLEET alarms. It os.walks lambdas/ for every emitter of those metric names and AST-reads cdk/stacks/monitoring_stack.py — pure repo shape, no runtime. Pre-merge because the change that breaks it is a PR's own diff (a new emitter, or a `dims=` added to a fleet aggregate), and because the defect it exists for was an alarm that

@@ -458,3 +458,6 @@ def test_1807_genesis_baselines_lifetime_history_not_the_filtered_view():
     assert "MILESTONE#weight_sub_340" in items, "#1807: lifetime (unfiltered) history must drive the baseline"
     assert items["MILESTONE#weight_sub_340"]["origin"] == "baseline"
     assert items["MILESTONE#weight_sub_340"]["announce"] is False
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

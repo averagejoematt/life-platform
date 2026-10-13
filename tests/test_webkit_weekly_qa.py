@@ -477,3 +477,6 @@ def test_screenshot_path_produces_identical_a11y_verdict_positive_control(monkey
     # this is not a case where the webkit_cap path silently skipped it.
     assert any("falling back to tiled capture" in w for w in cap_result["warnings"])
     assert not any("falling back to tiled capture" in w for w in ok_result["warnings"])
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

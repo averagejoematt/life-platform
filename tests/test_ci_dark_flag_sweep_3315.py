@@ -227,3 +227,6 @@ def test_a_waiver_needs_the_exact_job_not_just_the_script():
     assert any("pr_render_gate.py" in v and "pillow" in v for v in other_job), other_job
     waived = sweep.violations(sweep.evaluate_job("v4-gate.yml", "render-accuracy-gate", job, _REPO))
     assert not any("pillow" in v for v in waived), waived
+
+
+# premerge-gate: #3315: workflow sweep — no CI step may reach a dependency its job never installs

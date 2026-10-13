@@ -372,3 +372,6 @@ def test_the_census_is_not_a_member_of_its_own_set():
         assert ev["member"] is False, f"{rel} is a member of the Set it defines: {ev['prose'][:2]}"
     assert census.SCAN_ROOT == "lambdas"
     assert not any(r.startswith("tests/") for r in census.scan_tree())
+
+
+# premerge-gate: 3614: the two SETs the #1967 registry did not carry — the audience/fail-mode facet, AST-read at each surface's disposition site, and the derived phase-prose census over every prompt builder. Pure repo shape, and pre-merge for the reason both boxes exist: the defect is a NEW door (a surface that ships its best draft to readers, a builder that hand-types a Day-N line) and after the merge it is alrea

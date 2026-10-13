@@ -241,3 +241,6 @@ def test_the_ingester_puts_a_journal_row_through_one_door_that_carries_first():
     # No private list: the ingester's carry must come from the contract.
     source = (_REPO / INGESTER).read_text(encoding="utf-8")
     assert "carry_coowned" in source and "_CARRIED_PREFIXES" not in source
+
+
+# premerge-gate: #4677: rglob sweep — a module that names the journal partition and writes must be a declared co-writer, or its attributes are erased on re-ingest

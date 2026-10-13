@@ -388,3 +388,6 @@ def test_new_interior_gap_count_was_not_added():
             if "cdk.out" in path.parts or "node_modules" in path.parts:
                 continue
             assert "NewInteriorGapCount" not in path.read_text(encoding="utf-8", errors="ignore"), path
+
+
+# premerge-gate: #3597: git ls-files + AST — a new `*_RESIDUE` ledger / tests/*_baseline.json must register a carrier + expiry

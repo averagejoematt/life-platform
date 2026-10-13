@@ -221,3 +221,6 @@ def test_mutation_control_dropping_the_catalogue_leg_leaves_the_s3_fallback_ungr
     doctored[0].pop("spawned_by")
     problems = audit_catalog(doctored)
     assert len(problems) == 1 and doctored[0]["id"] in problems[0]
+
+
+# premerge-gate: 3621 box 5: an rglob sweep of lambdas/ + deploy/ + mcp/ for every module that mentions `PROTOCOL#` AND calls `put_item`, asserting the set is exactly the two sanctioned files (the chokepoint and its one seeder). Pure repo shape, and it must red BEFORE the merge for the usual reason: a SECOND protocol writer is introduced by a PR's own diff, and once merged it is a door the `spawned_by` refusal doe

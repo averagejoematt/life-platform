@@ -1233,3 +1233,6 @@ def test_registry_prefilter_does_not_drop_a_planted_registry(tmp_path):
     gates, counters = gc.discover_registry_gates(tmp_path, [planted, skipped])
     assert sorted(g.name for g in gates) == ["LANE_GUARDS[alpha]", "LANE_GUARDS[beta]"]
     assert counters["registries"] == 1
+
+
+# premerge-gate: 2578: the gate census. Its verdict is a sweep of the whole repo tree (CI workflows, guard entrypoints, registries, qa-smoke checks) and its floors are blindness detectors — a derivation that returns [] must red BEFORE the merge, not after, which is the entire point of this list.

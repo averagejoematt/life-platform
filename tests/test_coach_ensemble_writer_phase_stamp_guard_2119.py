@@ -311,3 +311,6 @@ def test_cache_brief_is_a_real_fixed_instance_of_this_class():
     assert list(_put_item_calls(fn)), "_cache_brief no longer calls put_item — update this test"
     assert any(t.startswith("COACH#") for t in _pk_tokens(fn))
     assert _stamps_directly(fn), "_cache_brief regressed to unstamped — this is the #2119 bug re-appearing"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

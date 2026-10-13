@@ -627,3 +627,6 @@ def test_4520_lookup_reads_a_page_and_returns_its_max(monkeypatch):
     assert watch.newest_scheduled_run("x.yml") is None
     monkeypatch.setattr(watch.subprocess, "run", lambda cmd, **_kw: sp.CompletedProcess(cmd, 0, stdout="not json", stderr=""))
     assert watch.newest_scheduled_run("x.yml") is False
+
+
+# premerge-gate: 3213: the scheduled-workflow cadence registry. Its verdict is pure repo shape (every `cron:` in .github/workflows/ carries a watched/unwatched ruling, no ruling points at a workflow that lost its cron, and the watcher itself never grows the `schedule:` trigger it watches). Reads .github/workflows/ by listdir rather than sweeping the source tree, so premerge_derivation cannot discover it — hand-lis

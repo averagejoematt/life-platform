@@ -127,3 +127,22 @@ def discover_tree_sweeping_test_files(root: Path | None = None) -> set[str]:
         if _SWEEP_PATTERN.search(text) or _imports_a_sweeping_helper(text, helpers):
             found.add(path.name)
     return found
+
+
+# #4270 box 4: the pre-merge structural-gate set is read from a marker in each gate's own file,
+# replacing the 216-name hand-list in tests/conftest.py. The marker must start a line (so a docstring
+# or string that merely quotes it mid-line never registers) and must carry a non-empty reason.
+PREMERGE_MARKER = "premerge-gate"
+_MARKER_RE = re.compile(rf"^# {PREMERGE_MARKER}:[ \t]*(\S.*)$", re.MULTILINE)
+
+
+def discover_marked_premerge_files(root: Path | None = None) -> set[str]:
+    """Basenames of every `test_*.py` directly under `root` (default `tests/`) carrying a
+    `# premerge-gate: <reason>` line. This is `tests/conftest.py::_PREMERGE_EXTRA_FILES`."""
+    scan_root = root if root is not None else TESTS_DIR
+    found: set[str] = set()
+    for path in sorted(scan_root.glob("test_*.py")):
+        text = _read(path)
+        if text is not None and _MARKER_RE.search(text):
+            found.add(path.name)
+    return found

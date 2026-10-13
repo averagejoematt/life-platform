@@ -103,3 +103,6 @@ def test_control_a_dotted_string_patch_of_the_clock_clears(world):
     """The positive twin: the same dotted-string form, but the TARGET names the clock, does clear."""
     src = PINNED + "\n\ndef _x(monkeypatch):\n    monkeypatch.setattr('health.tdee.datetime', lambda: 1)\n"
     assert _scan(src, world) is None
+
+
+# premerge-gate: #4848: AST sweep of lambdas/ + mcp/ + tests/ -- no test pins a literal through an unfrozen clock-scaled producer

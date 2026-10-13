@@ -246,3 +246,6 @@ def test_the_three_known_consumers_no_longer_carry_the_raw_literal():
         text = path.read_text(encoding="utf-8")
         assert "get_food_delivery_streak_state" in text, f"{path} does not call the shared #2235 reader"
         assert 'sk": "STREAK#current"' not in text, f"{path} still reads STREAK#current directly"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

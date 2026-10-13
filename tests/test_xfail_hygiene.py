@@ -94,3 +94,6 @@ def _collect_violations():
 def test_every_xfail_marker_is_strict_or_names_its_nondeterminism():
     violations = _collect_violations()
     assert not violations, "xfail hygiene (#2375):\n" + "\n".join(violations)
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

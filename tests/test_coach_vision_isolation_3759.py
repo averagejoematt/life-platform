@@ -198,3 +198,6 @@ def test_the_named_reader_and_narrative_entry_points_do_not_name_it(rel):
     text = (ROOT / rel).read_text(encoding="utf-8")
     for token in TOKENS:
         assert token not in text, f"{rel} names {token!r}"
+
+
+# premerge-gate: #3759: os.walk sweep of lambdas/ mcp/ site/ scripts/ deploy/ cdk/ — no public or narrative consumer names the owner-only coach-vision record

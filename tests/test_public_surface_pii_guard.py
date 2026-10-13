@@ -441,3 +441,6 @@ def test_site_scan_requires_vice_arm_on_the_deploy_path(monkeypatch, _restore_ch
     # The permissive form reports the arm skipped instead (offline CI posture).
     res = guard.scan_site(_SITE, require_vice=False)
     assert res["vice_arm"] == "skipped"
+
+
+# premerge-gate: privacy — the one most costly to catch late

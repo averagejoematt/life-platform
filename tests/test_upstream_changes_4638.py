@@ -340,3 +340,6 @@ def test_a_failed_range_read_never_costs_the_import(monkeypatch):
     resp = _run(monkeypatch, [_row(d) for d in WINDOW], table)
     assert set(table.puts) == set(WINDOW)
     assert '"days_emptied": 0' in resp["body"]
+
+
+# premerge-gate: #4638: rglob sweep — a new Apple Health rebuild-a-day caller falsifies the stated upstream_changes facet

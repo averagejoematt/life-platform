@@ -422,3 +422,6 @@ def test_plan_next_session_loads_the_heavy_anchor_from_the_nearest_band(key):
     load = by_key[key]
     assert load["fallback"] == "nearest_band" and load["anchor_band"] == NEAREST[key][0], key
     assert load["top_kg"] == _block(ideal, key).sets[0].weight_kg, "planner and draft disagree"
+
+
+# premerge-gate: 4107: an AST sweep asserting `load_ramp.v03_floor` is the ONE v0.3 load path (generator + chat gate). Pure repo shape: a second load path is exactly a PR's own diff, so it must red pre-merge.

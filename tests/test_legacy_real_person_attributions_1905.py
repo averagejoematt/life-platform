@@ -180,3 +180,6 @@ def test_4363_no_invented_real_publication_credits_in_legacy():
             for finding in chronicle_schema.real_publication_credit_findings(f.read()):
                 offenders.append(f"{os.path.relpath(path, LEGACY_ROOT)}: {finding['claim']}")
     assert not offenders, "\n".join(offenders)
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

@@ -843,3 +843,6 @@ def test_every_baseline_is_at_or_above_the_ceiling():
     a new unit is exactly when a stale entry sneaks in as a private, lower ceiling."""
     under = sorted((rel, cap) for rel, cap in BASELINE.items() if cap <= HARD_CEILING)
     assert not under, f"BASELINE entr(ies) at/under the {HARD_CEILING}-line ceiling: {under}"
+
+
+# premerge-gate: #1665: the 1,200-line ceiling + the BASELINE ratchet

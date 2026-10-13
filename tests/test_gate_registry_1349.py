@@ -88,3 +88,6 @@ def test_conventions_verified_date_bumped():
     header = text.splitlines()[2]  # the "> **Status:** ... **Verified:** ..." line
     assert "**Verified:**" in header
     assert "2026-07-18" not in header, "#1349: docs/CONVENTIONS.md's Verified date was not bumped for this edit"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

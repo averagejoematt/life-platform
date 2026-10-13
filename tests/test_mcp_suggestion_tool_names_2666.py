@@ -294,3 +294,6 @@ def test_suggested_tools_are_importable_at_runtime():
         for text in _default_suggestions(code):
             for ref in _tool_references(text, verbs, schema_args):
                 assert ref in TOOLS, f"{code} suggests '{ref}', absent from the live TOOLS dict"
+
+
+# premerge-gate: 2666: derives the MCP error-suggestion strings and the TOOLS dict by AST sweep, and fails when a suggestion names a tool that is not registered — a repo-shape ratchet whose verdict depends only on source, not on data.

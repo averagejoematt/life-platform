@@ -392,3 +392,6 @@ def test_scanner_fires_on_a_synthetic_bomb(tmp_path):
         "def test_c():\n    assert phc and NOW\n"
     )
     assert "test_injected_ctor.py" in _scan_fixture_bombs(tmp_path)
+
+
+# premerge-gate: #2376: dated fixture + unfrozen handler clock (the #2354 midnight red)

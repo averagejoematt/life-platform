@@ -196,3 +196,6 @@ def test_gitignore_pins_the_ratchet():
 def test_the_live_pointer_still_exists():
     """Every consumer (wrap, /uplevel, generate_review_bundle, check_residual_queue) reads it."""
     assert os.path.isfile(os.path.join(_REPO, "handovers", "HANDOVER_LATEST.md"))
+
+
+# premerge-gate: a dated handover committed to main (#1650)

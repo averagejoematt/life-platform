@@ -380,3 +380,6 @@ class TestCensusIsUpdated:
         for key, entry in SURFACES.items():
             reason = entry["exempt"].get("behavioral")
             assert reason is None or len(reason) > 80, f"{key}: exemption reason is too thin to be a decision"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

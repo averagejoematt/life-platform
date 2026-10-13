@@ -124,3 +124,6 @@ def test_guard_ignores_the_tier3_hard_stop_backstop(tmp_path):
         "        return None\n"
     )
     assert not _violations_in(str(ok)), "the Tier-3 hard-stop backstop was wrongly flagged"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

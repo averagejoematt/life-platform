@@ -202,3 +202,6 @@ def test_generated_game_page_states_the_current_plan():
     assert f"target grams {floor}" in page, (
         f"/method/game/ does not render the current {floor} g protein target — " "regenerate with scripts/v4_build_game_explained.py"
     )
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

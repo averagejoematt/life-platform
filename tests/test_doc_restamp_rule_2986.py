@@ -291,3 +291,6 @@ def test_a_regenerated_body_is_live_licensed_on_the_real_repo_surface(live_doc):
     changes = sync.process_doc(_STAMP_DOC, dry_run=False)
     assert _stamp(live_doc) == "2026-08-26", "a regenerated live doc was denied its own stamp"
     assert not any(c.startswith(guard.HOLD_PREFIX) for c in changes)
+
+
+# premerge-gate: 2986/#2838: the generic re-stamp rule, derived from sync_doc_metadata.RULES. Its verdict is pure repo shape (0.5s), and the change that can break it — a new stamped literal, or an edit to deploy/sync_doc_metadata.py — is exactly a PR's own diff, so putting it post-merge would repeat this epic's own "model-guard-post-merge-only" fold.

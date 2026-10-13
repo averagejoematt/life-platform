@@ -240,3 +240,6 @@ def test_the_three_2369_sites_read_clean_and_truncated():
         assert hits == [], f"{rel} still interpolates raw PII: {hits}"
         assert n_calls > 0, f"{rel}: no logging calls seen — the scan went vacuous"
         assert "email[:6]" in (ROOT / rel).read_text(encoding="utf-8"), f"{rel}: truncation idiom missing"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

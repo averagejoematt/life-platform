@@ -26,6 +26,7 @@ from __future__ import annotations
 import tests.conftest as conftest
 from tests.premerge_derivation import (
     TESTS_DIR,
+    discover_marked_premerge_files,
     discover_sweeping_helper_modules,
     discover_tree_sweeping_test_files,
 )
@@ -166,3 +167,36 @@ def test_an_unregistered_synthetic_sweeper_would_fail_the_classification_gate():
         "adding one unregistered tree-sweeping filename to the derived set should red the "
         "classification gate on exactly, and only, that filename"
     )
+
+
+# premerge-gate: the derivation guard itself — its own docstring/synthetic-fixture text mentions the three sweep idioms, so it self-matches; it belongs pre-merge regardless (it IS the structural gate this whole entry is about).
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4270 box 4 - the set is derived from a marker, not hand-listed.
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def test_the_premerge_set_is_exactly_the_marked_files():
+    """conftest's `_PREMERGE_EXTRA_FILES` IS the marker derivation: no second list."""
+    assert conftest._PREMERGE_EXTRA_FILES == frozenset(discover_marked_premerge_files())
+    assert conftest._PREMERGE_EXTRA_FILES, "marker derivation returned nothing - every structural gate is post-merge-only again"
+
+
+def test_a_marked_file_is_picked_up_and_an_unmarked_one_is_not(tmp_path):
+    """Mutation control: the marker is the ONLY selector, and it must start a line."""
+    marker = "# " + "premerge-gate"
+    marked = tmp_path / "test_synthetic_marked_4270.py"
+    marked.write_text("def test_a():\n    assert True\n\n" + marker + ": synthetic reason\n", encoding="utf-8")
+    unmarked = tmp_path / "test_synthetic_unmarked_4270.py"
+    unmarked.write_text("import os\n\ndef test_b():\n    for _ in os.walk('lambdas'):\n        pass\n", encoding="utf-8")
+    quoted = tmp_path / "test_synthetic_quoted_4270.py"
+    quoted.write_text('def test_c():\n    s = "' + marker + ': not a marker"\n    assert s\n', encoding="utf-8")
+    empty_reason = tmp_path / "test_synthetic_noreason_4270.py"
+    empty_reason.write_text(marker + ":   \n", encoding="utf-8")
+    helper = tmp_path / "synthetic_helper_4270.py"
+    helper.write_text(marker + ": helpers are not tests\n", encoding="utf-8")
+
+    found = discover_marked_premerge_files(root=tmp_path)
+
+    assert found == {marked.name}, f"marker derivation selected {sorted(found)}; only the marked test file may be picked up"

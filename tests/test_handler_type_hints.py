@@ -73,3 +73,6 @@ def test_typed_count_grew_or_equal_to_phase412():
         f"Typed handler count is {typed}; should be >= {PHASE_412_TYPED_MIN} "
         f"(Phase 4.12 baseline). Did you revert type hints? Add them back."
     )
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)
