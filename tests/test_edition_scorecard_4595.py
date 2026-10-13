@@ -36,7 +36,7 @@ from web import (
 from web.prediction_reason import metric_words  # noqa: E402
 
 WIRE = os.path.join(ROOT, "tests", "fixtures", "edition_wire_4582")
-SCORECARD_FIXTURE = os.path.join(ROOT, "tests", "fixtures", "edition_scorecard_4595", "scorecard_wire_2026-10-12.json")
+SCORECARD_FIXTURE = os.path.join(ROOT, "tests", "fixtures", "edition_scorecard_4595", "scorecard_wire.json")
 
 
 def _wire_clock():

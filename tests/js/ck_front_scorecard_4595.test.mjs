@@ -1,7 +1,7 @@
 // tests/js/ck_front_scorecard_4595.test.mjs — #4595: the front page prints the served scorecard.
 //
 // The rows are decided in lambdas/web/site_api_edition.py; the page only prints them. Driven from
-// tests/fixtures/edition_scorecard_4595/scorecard_wire_2026-10-12.json — the block compose() makes
+// tests/fixtures/edition_scorecard_4595/scorecard_wire.json — the block compose() makes
 // of the edition wire (tests/test_edition_scorecard_4595.py holds that the file IS that block).
 // What is held: every row prints its verdict IN WORDS beside its own sentence, a source that failed
 // prints its own not-served sentence, the rules and the day they were set are on the page, the
@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const F = await import("../../site/assets/js/ck_front.js");
-const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "edition_scorecard_4595", "scorecard_wire_2026-10-12.json");
+const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "edition_scorecard_4595", "scorecard_wire.json");
 const SC = JSON.parse(readFileSync(FIX, "utf8"));
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const text = (html) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();

@@ -41,7 +41,7 @@ PAGE_FIXTURE = os.path.join(ROOT, "tests", "fixtures", "kit_pages_4586", "editio
 PAGES_JS = os.path.join(ROOT, "site", "assets", "js", "ck_pages.js")
 FRONT_JS = os.path.join(ROOT, "site", "assets", "js", "ck_front.js")
 
-# The wire's own capture clock (tests/test_site_api_routes.py): today 2026-10-12 PT.
+# The wire's own capture clock (tests/test_site_api_routes.py), read from _capture.json.
 
 
 def _wire_clock():

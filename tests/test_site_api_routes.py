@@ -118,11 +118,10 @@ def test_dispatch_call_exists_in_handler():
 # ── #4582: /api/edition — the front page's one composed document ─────────────────
 #
 # Fixtures are the WIRE: tests/fixtures/edition_wire_4582/*.json are the bodies the live
-# read-only API served on 2026-10-03 ~19:29 PT (curl https://averagejoematt.com/api/<route>;
+# read-only API served at the capture time in _capture.json (curl https://averagejoematt.com/api/<route>;
 # /journal/posts.json and /panelcast/episodes.json are the public manifests the shell reads
-# from generated/), byte for byte. The clock is FROZEN to that capture (today 2026-10-03 PT,
-# now 2026-10-04T02:29Z — the PT evening window, where the UTC date has already rolled), so
-# the expectations never read wall time.
+# from generated/), byte for byte. The clock is FROZEN to that capture (read from _capture.json: the PT day
+# and the instant), so the expectations never read wall time.
 
 _sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
@@ -350,7 +349,9 @@ def test_edition_serves_what_the_front_page_read_beside_it():
     # The capture holds no call settled after the edition's day (the newest settles on the day itself),
     # so the one-as_of filter is exercised on a copy of the newest call dated the next day (built, not captured).
     newest = max(wire["calls"]["calls"], key=lambda c: c["settled_date"])
-    wire["calls"]["calls"].append({**newest, "id": "built-after-the-day", "settled_date": "2026-10-13"})
+    wire["calls"]["calls"].append(
+        {**newest, "id": "built-after-the-day", "settled_date": (_dt.fromisoformat(_CAPTURE_DAY) + _td(days=1)).strftime("%Y-%m-%d")}
+    )
     b = _edition(wire)["blocks"]
     calls = b["calls"]
     served = [c for c in wire["calls"]["calls"] if c["settled_date"] <= _CAPTURE_DAY]
