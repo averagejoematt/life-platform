@@ -125,6 +125,10 @@ RULE_CLASSIFICATION = {
         "structural",
         "category + page /story/panel/ + one cited Thursday dateline + one cited Day N dated 0-7 days before it",
     ),
+    "is_stored_history_sample_size": (
+        "structural",
+        "category + a correlation-engine page + a stated n=N exceeding today's day number + no payload date field",
+    ),
     "is_advisory": ("structural", "reads the `rulings` FIELD the assessment loop wrote — never the note"),
 }
 
@@ -159,8 +163,8 @@ def test_every_is_rule_is_classified():
         "Classify the new rule structural-vs-tiebreak (see the module header's bar) before merging."
     )
     assert (
-        len(found) == 15
-    ), f"the ledger holds {len(found)} rules; the sweep counts 15 (#3337 + #3379 + #4845) — update the sweep with the count"
+        len(found) == 16
+    ), f"the ledger holds {len(found)} rules; the sweep counts 16 (#3337 + #3379 + #4845 + #4834) — update the sweep with the count"
 
 
 def test_no_rule_is_classified_purely_lexical():
@@ -712,3 +716,58 @@ def test_ep4_controls_a_mismatched_pair_still_gates():
     assert not R.is_publish_day_beside_chapter_end(_panel("The page says 12 episodes but lists 5."), _EP_START)
     # a Day N that appears only in the judge's own arithmetic (nothing quoted off the page) is not evidence
     assert not R.is_publish_day_beside_chapter_end(_panel("EP4 is dated October 1 and the judge computes Day 24."), _EP_START)
+
+
+# ── #4834: the correlation sample size n beside a young day counter ──────────
+# Verbatim judge notes from visual-qa-standalone run 38339302560 (report.json).
+N89_GATED = (
+    "The Discoveries page reports correlations with n=89.0 days across multiple findings (HRV x Sleep Score, Resting HR x "
+    "Recovery, HRV x Recovery, Sleep Score x Recovery). The experiment is only 37 days old (Day 1 = 2026-09-06, today = "
+    "2026-10-12). The page explicitly states these are 'FDR-corrected significant finding from 2026-W41', 'FDR-corrected "
+    "significant finding from 2026-W40', and 'FDR-corrected significant finding from 2026-W39'. However, even the oldest "
+    "findings dated to 2026-W39 (2026-09-21 to 2026-09-27, Days 16-22) cannot have accumulated 89 days of data by that "
+    "week. An n=89 dataset would require data from before the experiment started or spanning into a prior cycle. The page "
+    "does not label these as 'lifetime', 'all-time', 'previous cycle', or 'pilot' data. On a single-cycle page with no such "
+    "label, claiming n=89 on Day 37 is impossible."
+)
+N89_INTELLIGENCE = (
+    "The correlation matrix is labeled 'CORRELATION MATRIX - STRONGEST FIRST' and contains a column 'n=89' for several "
+    "pairs (HRV <-> Recovery, RHR <-> Recovery). The page header states 'WEEK 2026-W41' and the phase specifies that "
+    "2026-W41 = Days 30-36, meaning 7 days of data maximum in that week alone. The presence of n=89 paired days in a "
+    "37-day cycle is mathematically possible (89 days exceeds the 37-day cycle length), but the page caption 'WEEK "
+    "2026-W41' paired with n=89 creates a direct contradiction: a single ISO week (7 days) cannot produce 89 paired "
+    "observations."
+)
+
+
+def _corr(note, page="/protocols/discoveries/", **kw):
+    return {"page": page, "category": "temporal_contradiction", "severity": "high", "note": note, **kw}
+
+
+def test_n89_beside_day_37_is_ruled_advisory_on_both_surfaces_and_wordings():
+    for page, note in (
+        ("/protocols/discoveries/", N89_GATED),
+        ("/method/intelligence/", N89_INTELLIGENCE),
+        ("/method/intelligence/", N89_GATED),
+        ("/protocols/discoveries/", N89_INTELLIGENCE),
+    ):
+        f = _corr(note, page)
+        assert R.is_stored_history_sample_size(f, _EP_START, "2026-10-12") is True
+        ids = [rid for rid, _l, fires, _r in R.advisory_rulings(_EP_START, "2026-10-12") if fires(f)]
+        assert "stored_history_sample_size" in ids
+
+
+def test_n89_controls_a_genuine_contradiction_still_gates():
+    d = "2026-10-12"
+    # n within the day counter: nothing to rule on
+    assert not R.is_stored_history_sample_size(_corr("The page shows n=30 paired days on Day 37."), _EP_START, d)
+    # not a correlation-engine surface
+    assert not R.is_stored_history_sample_size(_corr(N89_GATED, page="/story/"), _EP_START, d)
+    # other category
+    assert not R.is_stored_history_sample_size(_corr(N89_GATED, category="stale_data"), _EP_START, d)
+    # a payload date field named: a data-staleness claim, not a sample-size one
+    assert not R.is_stored_history_sample_size(_corr("n=89 but the payload as_of_date is 2026-10-01."), _EP_START, d)
+    # no sample size stated
+    assert not R.is_stored_history_sample_size(_corr("The page says today is Day 90 but it is Day 37."), _EP_START, d)
+    # fails closed without the clock
+    assert not R.is_stored_history_sample_size(_corr(N89_GATED), _EP_START, None)
