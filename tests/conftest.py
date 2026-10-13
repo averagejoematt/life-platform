@@ -271,6 +271,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # ── size + type ceilings ──────────────────────────────────────────────
         "test_lambda_size_gate.py",  # ADR-080: *_lambda.py over 2,000 lines
         "test_module_size_guard.py",  # #1665: the 1,200-line ceiling + the BASELINE ratchet
+        "test_function_length_guard_4880.py",  # #4880: git ls-files + AST sweep — the 150-logical-line function ceiling + its down-only counts
         "test_mypy_clean_modules.py",  # tier-2 types (real only when mypy is installed — the lane installs it)
         "test_handler_type_hints.py",
         # ── registries a new module must join (none discoverable from the module) ──
