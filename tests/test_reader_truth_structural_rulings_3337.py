@@ -121,6 +121,10 @@ RULE_CLASSIFICATION = {
         "category + the judge's own sentences (quoted copy excluded) cite NO date, day number, or elapsed span, "
         "and name no payload date field — a parsed-evidence absence, no wording consulted",
     ),
+    "is_publish_day_beside_chapter_end": (
+        "structural",
+        "category + page /story/panel/ + one cited Thursday dateline + one cited Day N dated 0-7 days before it",
+    ),
     "is_advisory": ("structural", "reads the `rulings` FIELD the assessment loop wrote — never the note"),
 }
 
@@ -154,7 +158,9 @@ def test_every_is_rule_is_classified():
         f"  stale entries: {sorted(set(RULE_CLASSIFICATION) - found)}\n"
         "Classify the new rule structural-vs-tiebreak (see the module header's bar) before merging."
     )
-    assert len(found) == 14, f"the ledger holds {len(found)} rules; the sweep counts 14 (#3337 + #3379) — update the sweep with the count"
+    assert (
+        len(found) == 15
+    ), f"the ledger holds {len(found)} rules; the sweep counts 15 (#3337 + #3379 + #4845) — update the sweep with the count"
 
 
 def test_no_rule_is_classified_purely_lexical():
@@ -665,3 +671,32 @@ def test_the_live_alarm_findings_resolve_the_way_the_issue_says():
             assert fired, f"{label} is still unadjudicated — the alarm's cited cause survives"
         else:
             assert not fired, f"{label} was adjudicated away; it is a REAL finding and must keep alarming (fired {sorted(fired)})"
+
+
+# ── #4845: the panel's publish-day dateline beside the chapter's last Day N ──
+_EP_START = "2026-09-06"  # cycle 17 genesis: Day 24 = 2026-09-29, the Thursday after is 10-01
+EP4_NOTE = "EP4 is dated THURSDAY, OCTOBER 1, with narrative stating Day 24. Twenty-three straight training..."
+
+
+def _panel(note, **kw):
+    return {"page": "/story/panel/", "category": "temporal_contradiction", "severity": "high", "note": note, **kw}
+
+
+def test_ep4_publish_dateline_beside_day_24_is_ruled_advisory_not_baselined():
+    f = _panel(EP4_NOTE)
+    assert R.is_publish_day_beside_chapter_end(f, _EP_START) is True
+    ids = [rid for rid, _l, fires, _r in R.advisory_rulings(_EP_START, "2026-10-12") if fires(f)]
+    assert "publish_day_beside_chapter_end" in ids
+
+
+def test_ep4_controls_a_mismatched_pair_still_gates():
+    # EP2 dated Sept 17 but Day 40 (a date AFTER the dateline), and Day 24 under a
+    # Thursday more than a week later, are real contradictions.
+    assert not R.is_publish_day_beside_chapter_end(_panel("EP2 is dated Sept 17 but says Day 40."), _EP_START)
+    assert not R.is_publish_day_beside_chapter_end(_panel("EP4 is dated October 22 but says Day 24."), _EP_START)
+    # not a Thursday
+    assert not R.is_publish_day_beside_chapter_end(_panel("EP4 is dated October 2 but says Day 24."), _EP_START)
+    # other page / other category / no date
+    assert not R.is_publish_day_beside_chapter_end(_panel(EP4_NOTE, page="/story/"), _EP_START)
+    assert not R.is_publish_day_beside_chapter_end(_panel(EP4_NOTE, category="stale_data"), _EP_START)
+    assert not R.is_publish_day_beside_chapter_end(_panel("The page says 12 episodes but lists 5."), _EP_START)
