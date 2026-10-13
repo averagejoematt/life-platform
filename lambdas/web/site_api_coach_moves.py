@@ -14,10 +14,14 @@ WHAT IS SERVED is what the front page printed on that day and nothing more: each
 coach (no honorific), its move, the words as written, who it replies to and the day a bet
 settles. The same filter the edition applies stands here (`honest_text`): a line carrying a
 figure the honest-number rules keep off the page is not served by date either. The row's
-internals — the fact sheet, the held and dropped lines, the token cost, who sat out and
-why — are not part of this contract.
+internals — the fact sheet, the held and dropped lines and their check names, the engine's
+own absence reasons, the token cost — are not part of this contract.
 
-    {state: "ok" | "absent", date, source, absent_text, lines: [...]}
+Who sat out IS (#4583 box 5): `absent` lists every coach who did not speak that day as
+{coach: <id>, state: "absent", reason}, the reason one plain sentence from the fixed
+`coach_moves.SIDELINE_REASONS` vocabulary — never a number, a date or a check name.
+
+    {state: "ok" | "absent", date, source, absent_text, lines: [...], absent: [...]}
 
 A day with no row, or a row with no servable line, is `absent` with `lines: []` (200): the
 day page prints nothing for it. With no `date` the day is today in Pacific time (so the bare
@@ -66,14 +70,22 @@ def lines_of(moves: dict | None) -> list:
 
 def compose(day: str, item: Any) -> dict:
     """The document for one day from its stored row (or None) — pure."""
-    lines = lines_of(coach_moves.served(_decimal_to_float(item))) if isinstance(item, dict) else []
+    served = coach_moves.served(_decimal_to_float(item)) if isinstance(item, dict) else None
+    lines = lines_of(served)
     return {
         "state": "ok" if lines else "absent",
         "date": day,
         "source": SOURCE,
         "absent_text": f"No coach line is recorded for {day_in_words(day)}.",
         "lines": lines,
+        "absent": absent_of(served),
     }
+
+
+def absent_of(moves: dict | None) -> list:
+    """Who sat the day out, and why (#4583 box 5): `coach_moves.served`'s `sidelined` list,
+    each {coach: <id>, state: "absent", reason: <a SIDELINE_REASONS sentence>} — pure."""
+    return [dict(e) for e in (moves or {}).get("sidelined") or [] if isinstance(e, dict)]
 
 
 def handle_coach_moves(event, *, table, today: str | None = None):

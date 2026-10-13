@@ -26,6 +26,7 @@ import os
 import re
 import sys
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
@@ -40,9 +41,19 @@ PAGE_FIXTURE = os.path.join(ROOT, "tests", "fixtures", "kit_pages_4586", "editio
 PAGES_JS = os.path.join(ROOT, "site", "assets", "js", "ck_pages.js")
 FRONT_JS = os.path.join(ROOT, "site", "assets", "js", "ck_front.js")
 
-# The wire's own capture clock (tests/test_site_api_routes.py): today 2026-10-03 PT.
-CAPTURE_DAY = "2026-10-03"
-CAPTURE_INSTANT = datetime(2026, 10, 4, 2, 29, tzinfo=timezone.utc)
+# The wire's own capture clock (tests/test_site_api_routes.py), read from _capture.json.
+
+
+def _wire_clock():
+    """The wire's own capture clock, read from its manifest (#4864): the instant it was fetched and that
+    instant's Pacific day. Re-running scripts/capture_kit_page_fixtures.py re-dates every test that composes
+    the wire, so no literal day or instant is left behind to drift from the files."""
+    with open(os.path.join(WIRE_DIR, "_capture.json"), encoding="utf-8") as fh:
+        taken = datetime.strptime(json.load(fh)["captured_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    return taken.astimezone(ZoneInfo("America/Los_Angeles")).strftime("%Y-%m-%d"), taken
+
+
+CAPTURE_DAY, CAPTURE_INSTANT = _wire_clock()
 START_DATE = "2026-09-06"
 
 # #4582 box 1, "the front page makes one data request": met 2026-10-11, when the last routes
@@ -151,6 +162,8 @@ def _moves_wire() -> dict:
                 "bet": {"resolution_date": "2026-10-06"},
             },
         ],
+        # #4583 box 5: who sat out, and why — served beside the lines as data.absent
+        "sidelined": [{"coach": "glucose_coach", "state": "absent", "reason": "This coach had nothing new to add."}],
     }
     wire["dashboard"] = dash
     return wire

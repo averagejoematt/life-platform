@@ -487,7 +487,15 @@ def test_latest_served_reads_the_newest_visible_row():
         "silent": ["sleep_coach"],
     }
     t = FakeDdbTable(rows=[row])
-    assert M.latest_served(t) == {"date": "2026-10-03", "generated_at": "x", "lines": [], "absent": [], "silent": ["sleep_coach"]}
+    assert M.latest_served(t) == {
+        "date": "2026-10-03",
+        "generated_at": "x",
+        "lines": [],
+        "absent": [],
+        "silent": ["sleep_coach"],
+        # a row written before box 5 carries no `sidelined`: it is derived from `silent`
+        "sidelined": [{"coach": "sleep_coach", "state": "absent", "reason": M.SIDELINE_REASONS["quiet"]}],
+    }
 
 
 def _moves_query_hook(row):
@@ -905,3 +913,126 @@ def test_the_prompts_carry_the_round8_rules():
     assert "vary your opening; do not start with 'I think'" in M.LINE_PROMPT
     assert "('I think'" not in M.LINE_PROMPT, "the prompt no longer hands every coach the same opener"
     assert "{metrics}" in M.CAST_PROMPT and M.CAST_PROMPT.format(metrics="x")
+
+
+# ── box 5: a sidelined coach shows absent with a reason ──────────────────────
+#
+# The live MOVES#2026-10-12 row, read-only from DynamoDB on 2026-10-13 (fact_sheet, cost and
+# model fields left out; the line's words as served). It was written before box 5, so it carries no `sidelined`: the
+# glucose coach is dark, two lines were held, and four eligible coaches did not speak. The
+# 2026-10-12 `/api/coach_moves` wire had no `absent` key at all.
+ROW_1012 = {
+    "pk": "COACH#eli_marsh",
+    "sk": "MOVES#2026-10-12",
+    "date": "2026-10-12",
+    "generated_at": "2026-10-12T19:00:41+00:00",
+    "lines": [
+        {
+            "coach_id": "labs_coach",
+            "name": "James Okafor",
+            "move": "question",
+            "date": "2026-10-12",
+            "text": "My read is that 20.8 lb gone in 37 days is real progress, yet two items I flagged weeks ago remain unresolved — "
+            "has Matthew taken any step this week to schedule either the blood draw or the symptom check-in?",
+            "replies_to": None,
+            "replies_to_name": None,
+            "result_id": None,
+        }
+    ],
+    "absent": [{"coach_id": "glucose_coach", "name": "Amara Patel", "reason": "no sensor since 2026-08-27"}],
+    "silent": ["sleep_coach", "nutrition_coach", "mind_coach", "physical_coach", "explorer_coach"],
+    "held": [
+        {
+            "coach_id": "nutrition_coach",
+            "move": "reaction",
+            "reasons": ["reader:unlabeled_window_figure", 'repeats_yesterday:"my read is that the"'],
+        },
+        {"coach_id": "mind_coach", "move": "reply", "reasons": ["restates_numbers:no_opinion"]},
+    ],
+    "dropped": [],
+}
+EXPECTED_1012 = [
+    {"coach": "glucose_coach", "state": "absent", "reason": M.SIDELINE_REASONS["no_data"]},
+    {"coach": "sleep_coach", "state": "absent", "reason": M.SIDELINE_REASONS["quiet"]},
+    {"coach": "nutrition_coach", "state": "absent", "reason": M.SIDELINE_REASONS["held"]},
+    {"coach": "mind_coach", "state": "absent", "reason": M.SIDELINE_REASONS["held"]},
+    {"coach": "physical_coach", "state": "absent", "reason": M.SIDELINE_REASONS["quiet"]},
+    {"coach": "explorer_coach", "state": "absent", "reason": M.SIDELINE_REASONS["quiet"]},
+]
+
+
+def test_the_sideline_vocabulary_is_plain_sentences_with_no_number():
+    assert set(M.SIDELINE_REASONS) == {"no_data", "held", "quiet"}
+    for code, text in M.SIDELINE_REASONS.items():
+        assert text.endswith(".") and text[0].isupper(), code
+        assert not any(ch.isdigit() for ch in text), f"{code}: a reason never carries a number"
+        assert S.jargon_findings(text) == [], f"{code}: plain words only"
+
+
+def test_the_live_1012_row_serves_every_coach_who_sat_out_with_a_reason():
+    served = M.served(ROW_1012)
+    assert served["sidelined"] == EXPECTED_1012
+    assert "labs_coach" not in {e["coach"] for e in served["sidelined"]}, "a coach who spoke is not absent"
+    flat = json.dumps(served["sidelined"])
+    for internal in ("no sensor since", "2026-08-27", "restates_numbers", "repeats_yesterday", "reader:"):
+        assert internal not in flat, f"the engine's own reason {internal!r} reached the served list"
+    assert M.sideline_findings(served["sidelined"]) == []
+
+
+def test_run_writes_sidelined_beside_the_lines(monkeypatch):
+    cast = {
+        "speakers": [{"coach_id": "mind_coach", "move": "question"}, {"coach_id": "sleep_coach", "move": "call"}],
+        "bet": None,
+    }
+    _out, table, _inv, _opened = _run(monkeypatch, cast, {"mind_coach": GOOD["question"], "sleep_coach": [RESTATEMENT, RESTATEMENT]})
+    row = table.puts[-1]
+    assert [ln["coach_id"] for ln in row["lines"]] == ["mind_coach"]
+    by = {e["coach"]: e["reason"] for e in row["sidelined"]}
+    assert by["glucose_coach"] == M.SIDELINE_REASONS["no_data"]
+    assert by["sleep_coach"] == M.SIDELINE_REASONS["held"]
+    assert by["labs_coach"] == M.SIDELINE_REASONS["quiet"]
+    assert "mind_coach" not in by
+    assert set(by) | {"mind_coach"} == set(NAMES), "every coach on the roster either spoke or is absent"
+    assert all(e["state"] == "absent" for e in row["sidelined"])
+    assert M.sideline_findings(row["sidelined"]) == []
+    assert M.served(row)["sidelined"] == row["sidelined"], "a stored list is served as stored"
+
+
+def test_mutation_control_dropping_the_reason_is_red(monkeypatch):
+    """The planted defect — the writer drops the reason — is caught by the check the
+    served list passes through, and an entry without a vocabulary reason is never served."""
+    real = M.sidelined
+
+    def _no_reason(*a, **kw):
+        return [{k: v for k, v in e.items() if k != "reason"} for e in real(*a, **kw)]
+
+    monkeypatch.setattr(M, "sidelined", _no_reason)
+    cast = {"speakers": [{"coach_id": "mind_coach", "move": "question"}], "bet": None}
+    _out, table, _inv, _opened = _run(monkeypatch, cast, {"mind_coach": GOOD["question"]})
+    row = table.puts[-1]
+    assert row["sidelined"], "the mutation still wrote the list"
+    findings = M.sideline_findings(row["sidelined"])
+    assert findings and all(f.endswith(":no_reason") for f in findings), findings
+    assert M.served(row)["sidelined"] == [], "an entry with no reason is not served"
+    # an off-vocabulary reason (the engine's own words, a raw date) is red too
+    leaked = [{"coach": "glucose_coach", "state": "absent", "reason": "no sensor since 2026-08-27"}]
+    assert M.sideline_findings(leaked) == ["0:reason_off_vocabulary"]
+    assert M.served({**ROW_1012, "sidelined": leaked})["sidelined"] == []
+    assert M.sideline_findings([{"coach": "x", "state": "quiet", "reason": M.SIDELINE_REASONS["quiet"]}]) == ["0:state_not_absent"]
+
+
+def test_both_public_surfaces_carry_absent_beside_the_lines():
+    from coach import persona_registry
+    from web import site_api_coach_moves as day_route, site_api_edition as ed
+
+    body = day_route.compose("2026-10-12", ROW_1012)
+    assert body["state"] == "ok" and [ln["coach_id"] for ln in body["lines"]] == ["labs_coach"]
+    assert body["absent"] == EXPECTED_1012
+    assert set(body) == {"state", "date", "source", "absent_text", "lines", "absent"}
+    assert day_route.compose("2026-10-11", None)["absent"] == [], "no row: nobody is named absent"
+
+    block = ed._coach_moves(M.served(ROW_1012), "2026-10-12", persona_registry.resolve)
+    assert {"state", "as_of", "source", "absent_text", "data"} <= set(block), "the block contract stands"
+    assert block["state"] == "ok" and block["as_of"] == "2026-10-12"
+    assert [ln["coach"] for ln in block["data"]["lines"]] == ["James Okafor"]
+    assert block["data"]["absent"] == EXPECTED_1012

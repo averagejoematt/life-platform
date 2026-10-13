@@ -81,7 +81,21 @@ def test_a_day_with_lines_serves_them_and_nothing_else_from_the_row():
     stored = {ln["coach_id"]: ln["text"] for ln in ROWS["MOVES#2026-10-02"]["lines"]}
     assert {ln["coach_id"]: ln["text"] for ln in body["lines"]} == stored, "the words are served as written"
     flat = json.dumps(body)
-    for internal in ("fact_sheet", "held", "dropped", "cost_usd", "input_tokens", "silent", 'absent":', "docket_sk", "never shipped"):
+    # Who sat out IS part of the contract since #4583 box 5 (`absent`, fixed-vocabulary
+    # reasons); the engine's own reasons and the held line's words and check names are not.
+    for internal in (
+        "fact_sheet",
+        '"held"',
+        "dropped",
+        "cost_usd",
+        "input_tokens",
+        '"silent"',
+        "docket_sk",
+        "never shipped",
+        "no sensor since",
+        "restates numbers",
+        "Amara Patel",
+    ):
         assert internal not in flat, f"{internal} is not part of the contract"
 
 
@@ -142,17 +156,31 @@ def test_the_routes_output_for_the_wire_day_is_pinned_whole():
     assert status == 200 and out == body, "regenerate tests/fixtures/coach_moves_wire_4648/route_output_2026-10-02.json from the route"
 
 
+# Top-level fields the route gained AFTER a kit capture was taken: {field: first instant a
+# capture can carry it}. A capture older than that instant predates the field (the kit set is
+# live GETs, never hand-edited — scripts/capture_kit_page_fixtures.py); a newer one must carry
+# it. #4583 box 5 added `absent` (who sat out, and why); the next recapture after the deploy
+# makes this allowance inert.
+FIELDS_ADDED_AFTER = {"absent": "2026-10-13T00:00:00Z"}
+
+
+def _capture_time() -> str:
+    return json.load(open(os.path.join(_KIT_DIR, "_capture.json"), encoding="utf-8"))["captured_at"]
+
+
 def test_every_kit_page_day_capture_carries_the_fields_this_route_writes():
     """The kit page day files are the DEPLOYED route's output (#4671); each must be this route's
     shape: the same top-level fields, and every line the same fields as a line it writes."""
     _, body = _get("2026-10-02")
     line_fields = set(body["lines"][0])
+    captured = _capture_time()
+    expected = {f for f in body if f not in FIELDS_ADDED_AFTER or captured >= FIELDS_ADDED_AFTER[f]}
     names = sorted(n for n in os.listdir(_KIT_DIR) if n.startswith("coach_moves_") and n.endswith(".json"))
     assert names, "no coach_moves_<day>.json capture in tests/fixtures/kit_pages_4586/"
     with_lines = 0
     for name in names:
         kit = json.load(open(os.path.join(_KIT_DIR, name), encoding="utf-8"))
-        assert set(kit) == set(body), f"{name}: top-level fields differ: {sorted(set(kit) ^ set(body))}"
+        assert set(kit) == expected, f"{name}: top-level fields differ: {sorted(set(kit) ^ expected)}"
         assert kit["date"] == name[len("coach_moves_") : -len(".json")], f"{name}: serves {kit['date']}"
         for line in kit["lines"]:
             assert set(line) == line_fields, f"{name}: line fields differ: {sorted(set(line) ^ line_fields)}"

@@ -1,1 +1,1099 @@
-{"_meta": {"generated_at": "2026-10-12T15:36:03.339589+00:00", "served_at": "2026-10-12T15:36:03.339589+00:00", "cache_seconds": 300, "request_id": "7c935ac4c5304caa"}, "overall": {"total": 426, "confirmed": 62, "refuted": 90, "pending": 58, "inconclusive": 4, "expired": 4, "observational": 208, "decided": 152, "accuracy_pct": 40.8, "due": {"as_of": "2026-10-12", "due_now": 3, "earliest_due": "2026-09-27"}, "counted": {"sealed": {"n": 11, "right": 5}, "bet": {"n": 6, "right": 3}, "commentary": {"n": 92, "right": 41}, "conditional": {"n": 43, "right": 13}}, "counted_text": "Counted: 11 sealed before day one, 6 sides of bets between two coaches, 92 read out of the coaches' running commentary and 43 conditional or hedged sentences.", "lifetime": {"total": 3333, "confirmed": 71, "refuted": 120, "pending": 966, "inconclusive": 552, "expired": 12, "observational": 1612, "decided": 191, "accuracy_pct": 37.2}}, "by_coach": {"sleep": {"total": 67, "confirmed": 17, "refuted": 24, "pending": 6, "inconclusive": 0, "expired": 0, "observational": 20, "decided": 41, "lifetime": {"total": 495, "confirmed": 18, "refuted": 31, "pending": 129, "inconclusive": 102, "expired": 3, "observational": 212, "decided": 49, "hit_rate_pct": 36.7}, "retired": false, "record": {"confirmed": 17, "refuted": 24, "n": 41, "through": "2026-10-11"}, "comparison": {"rule": "nothing_changes", "rule_words": "a guess that nothing changes", "rule_version": 1, "records": {"number": {"graded": 23, "coach_right": 13, "scored": 7, "coach_right_on_scored": 4, "rule_right": 4, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 16, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "direction": {"graded": 14, "coach_right": 2, "scored": 9, "coach_right_on_scored": 2, "rule_right": 1, "coach_only": 2, "rule_only": 1, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 5, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "yes_no": {"graded": 2, "coach_right": 1, "scored": 2, "coach_right_on_scored": 1, "rule_right": 1, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 0, "verdict": "too_few", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "sealed": {"graded": 2, "coach_right": 1, "scored": 0, "coach_right_on_scored": 0, "rule_right": 0, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 2, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}}, "unclassified": 0, "scored_complete": false, "skill": {"n": 41, "brier_skill": -0.0157, "sentence": "Across 41 checked calls, so far they do not beat a simple guess."}, "rule_sentence": null, "sentence": "Across 41 checked calls, so far they do not beat a simple guess.", "min_n_for_rate": 20, "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."}, "hit_rate_pct": 41.5}, "training": {"total": 2, "confirmed": 0, "refuted": 0, "pending": 2, "inconclusive": 0, "expired": 0, "observational": 0, "decided": 0, "lifetime": {"total": 371, "confirmed": 0, "refuted": 9, "pending": 174, "inconclusive": 94, "expired": 0, "observational": 94, "decided": 9, "hit_rate_pct": 0.0}, "retired": true, "record": {"confirmed": 0, "refuted": 0, "n": 0, "through": null}, "comparison": {"rule": "nothing_changes", "rule_words": "a guess that nothing changes", "rule_version": 1, "records": {"number": {"graded": 0, "coach_right": 0, "scored": 0, "coach_right_on_scored": 0, "rule_right": 0, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 0, "verdict": "none_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "direction": {"graded": 0, "coach_right": 0, "scored": 0, "coach_right_on_scored": 0, "rule_right": 0, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 0, "verdict": "none_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "yes_no": {"graded": 0, "coach_right": 0, "scored": 0, "coach_right_on_scored": 0, "rule_right": 0, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 0, "verdict": "none_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "sealed": {"graded": 0, "coach_right": 0, "scored": 0, "coach_right_on_scored": 0, "rule_right": 0, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 0, "verdict": "none_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}}, "unclassified": 0, "scored_complete": false, "skill": {"n": 0, "brier_skill": null, "sentence": "No checked call yet, so nothing to compare with a simple guess."}, "rule_sentence": null, "sentence": "No checked call yet, so nothing to compare with a simple guess.", "min_n_for_rate": 20, "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."}, "hit_rate_pct": null}, "nutrition": {"total": 61, "confirmed": 7, "refuted": 22, "pending": 16, "inconclusive": 0, "expired": 1, "observational": 15, "decided": 29, "lifetime": {"total": 504, "confirmed": 11, "refuted": 24, "pending": 119, "inconclusive": 120, "expired": 1, "observational": 229, "decided": 35, "hit_rate_pct": 31.4}, "retired": false, "record": {"confirmed": 7, "refuted": 22, "n": 29, "through": "2026-10-10"}, "comparison": {"rule": "nothing_changes", "rule_words": "a guess that nothing changes", "rule_version": 1, "records": {"number": {"graded": 6, "coach_right": 1, "scored": 2, "coach_right_on_scored": 0, "rule_right": 2, "coach_only": 0, "rule_only": 2, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 4, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "direction": {"graded": 21, "coach_right": 5, "scored": 6, "coach_right_on_scored": 1, "rule_right": 3, "coach_only": 1, "rule_only": 3, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 15, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "yes_no": {"graded": 1, "coach_right": 1, "scored": 0, "coach_right_on_scored": 0, "rule_right": 0, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 1, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "sealed": {"graded": 1, "coach_right": 0, "scored": 1, "coach_right_on_scored": 0, "rule_right": 1, "coach_only": 0, "rule_only": 1, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 0, "verdict": "too_few", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}}, "unclassified": 0, "scored_complete": false, "skill": {"n": 29, "brier_skill": -0.4542, "sentence": "Across 29 checked calls, so far they do not beat a simple guess."}, "rule_sentence": null, "sentence": "Across 29 checked calls, so far they do not beat a simple guess.", "min_n_for_rate": 20, "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."}, "hit_rate_pct": 24.1}, "mind": {"total": 55, "confirmed": 6, "refuted": 12, "pending": 6, "inconclusive": 0, "expired": 0, "observational": 31, "decided": 18, "lifetime": {"total": 388, "confirmed": 8, "refuted": 12, "pending": 53, "inconclusive": 42, "expired": 2, "observational": 271, "decided": 20, "hit_rate_pct": 40.0}, "retired": false, "record": {"confirmed": 6, "refuted": 12, "n": 18, "through": "2026-10-10"}, "comparison": {"rule": "nothing_changes", "rule_words": "a guess that nothing changes", "rule_version": 1, "records": {"number": {"graded": 6, "coach_right": 2, "scored": 2, "coach_right_on_scored": 1, "rule_right": 1, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 4, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "direction": {"graded": 9, "coach_right": 3, "scored": 2, "coach_right_on_scored": 1, "rule_right": 0, "coach_only": 1, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 7, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "yes_no": {"graded": 1, "coach_right": 0, "scored": 1, "coach_right_on_scored": 0, "rule_right": 1, "coach_only": 0, "rule_only": 1, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 0, "verdict": "too_few", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "sealed": {"graded": 2, "coach_right": 1, "scored": 0, "coach_right_on_scored": 0, "rule_right": 0, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 2, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}}, "unclassified": 0, "scored_complete": false, "skill": {"n": 18, "brier_skill": -0.125, "sentence": "Too few checked calls yet (18) to compare them with a simple guess."}, "rule_sentence": null, "sentence": "Too few checked calls yet (18) to compare them with a simple guess.", "min_n_for_rate": 20, "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."}, "hit_rate_pct": 33.3}, "physical": {"total": 67, "confirmed": 10, "refuted": 12, "pending": 10, "inconclusive": 0, "expired": 1, "observational": 34, "decided": 22, "lifetime": {"total": 468, "confirmed": 11, "refuted": 14, "pending": 171, "inconclusive": 54, "expired": 1, "observational": 217, "decided": 25, "hit_rate_pct": 44.0}, "retired": false, "record": {"confirmed": 10, "refuted": 12, "n": 22, "through": "2026-10-11"}, "comparison": {"rule": "nothing_changes", "rule_words": "a guess that nothing changes", "rule_version": 1, "records": {"number": {"graded": 9, "coach_right": 5, "scored": 6, "coach_right_on_scored": 3, "rule_right": 3, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 3, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "direction": {"graded": 10, "coach_right": 4, "scored": 3, "coach_right_on_scored": 1, "rule_right": 0, "coach_only": 1, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 7, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "yes_no": {"graded": 1, "coach_right": 1, "scored": 1, "coach_right_on_scored": 1, "rule_right": 0, "coach_only": 1, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 0, "verdict": "too_few", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "sealed": {"graded": 2, "coach_right": 0, "scored": 1, "coach_right_on_scored": 0, "rule_right": 1, "coach_only": 0, "rule_only": 1, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 1, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}}, "unclassified": 0, "scored_complete": false, "skill": {"n": 22, "brier_skill": -0.095, "sentence": "Across 22 checked calls, so far they do not beat a simple guess."}, "rule_sentence": null, "sentence": "Across 22 checked calls, so far they do not beat a simple guess.", "min_n_for_rate": 20, "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."}, "hit_rate_pct": 45.5}, "glucose": {"total": 50, "confirmed": 1, "refuted": 5, "pending": 2, "inconclusive": 4, "expired": 2, "observational": 36, "decided": 6, "lifetime": {"total": 401, "confirmed": 1, "refuted": 7, "pending": 128, "inconclusive": 77, "expired": 3, "observational": 185, "decided": 8, "hit_rate_pct": 12.5}, "retired": false, "record": {"confirmed": 1, "refuted": 5, "n": 6, "through": "2026-09-30"}, "comparison": {"rule": "nothing_changes", "rule_words": "a guess that nothing changes", "rule_version": 1, "records": {"number": {"graded": 3, "coach_right": 1, "scored": 1, "coach_right_on_scored": 0, "rule_right": 1, "coach_only": 0, "rule_only": 1, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 2, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "direction": {"graded": 2, "coach_right": 0, "scored": 0, "coach_right_on_scored": 0, "rule_right": 0, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 2, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "yes_no": {"graded": 1, "coach_right": 0, "scored": 0, "coach_right_on_scored": 0, "rule_right": 0, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 1, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "sealed": {"graded": 0, "coach_right": 0, "scored": 0, "coach_right_on_scored": 0, "rule_right": 0, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 0, "verdict": "none_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}}, "unclassified": 0, "scored_complete": false, "skill": {"n": 6, "brier_skill": -0.6331, "sentence": "Too few checked calls yet (6) to compare them with a simple guess."}, "rule_sentence": null, "sentence": "Too few checked calls yet (6) to compare them with a simple guess.", "min_n_for_rate": 20, "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."}, "hit_rate_pct": 16.7}, "labs": {"total": 68, "confirmed": 7, "refuted": 1, "pending": 5, "inconclusive": 0, "expired": 0, "observational": 55, "decided": 8, "lifetime": {"total": 339, "confirmed": 7, "refuted": 2, "pending": 69, "inconclusive": 22, "expired": 0, "observational": 239, "decided": 9, "hit_rate_pct": 77.8}, "retired": false, "record": {"confirmed": 7, "refuted": 1, "n": 8, "through": "2026-10-11"}, "comparison": {"rule": "nothing_changes", "rule_words": "a guess that nothing changes", "rule_version": 1, "records": {"number": {"graded": 3, "coach_right": 3, "scored": 3, "coach_right_on_scored": 3, "rule_right": 3, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 0, "verdict": "too_few", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "direction": {"graded": 3, "coach_right": 2, "scored": 1, "coach_right_on_scored": 1, "rule_right": 0, "coach_only": 1, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 2, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "yes_no": {"graded": 0, "coach_right": 0, "scored": 0, "coach_right_on_scored": 0, "rule_right": 0, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 0, "verdict": "none_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "sealed": {"graded": 2, "coach_right": 2, "scored": 0, "coach_right_on_scored": 0, "rule_right": 0, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 2, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}}, "unclassified": 0, "scored_complete": false, "skill": {"n": 8, "brier_skill": -1.2857, "sentence": "Too few checked calls yet (8) to compare them with a simple guess."}, "rule_sentence": null, "sentence": "Too few checked calls yet (8) to compare them with a simple guess.", "min_n_for_rate": 20, "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."}, "hit_rate_pct": 87.5}, "explorer": {"total": 56, "confirmed": 14, "refuted": 14, "pending": 11, "inconclusive": 0, "expired": 0, "observational": 17, "decided": 28, "lifetime": {"total": 367, "confirmed": 15, "refuted": 21, "pending": 123, "inconclusive": 41, "expired": 2, "observational": 165, "decided": 36, "hit_rate_pct": 41.7}, "retired": false, "record": {"confirmed": 14, "refuted": 14, "n": 28, "through": "2026-10-11"}, "comparison": {"rule": "nothing_changes", "rule_words": "a guess that nothing changes", "rule_version": 1, "records": {"number": {"graded": 6, "coach_right": 4, "scored": 2, "coach_right_on_scored": 1, "rule_right": 1, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 4, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "direction": {"graded": 20, "coach_right": 9, "scored": 8, "coach_right_on_scored": 4, "rule_right": 2, "coach_only": 4, "rule_only": 2, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 12, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "yes_no": {"graded": 0, "coach_right": 0, "scored": 0, "coach_right_on_scored": 0, "rule_right": 0, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 0, "verdict": "none_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "sealed": {"graded": 2, "coach_right": 1, "scored": 0, "coach_right_on_scored": 0, "rule_right": 0, "coach_only": 0, "rule_only": 0, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 2, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}}, "unclassified": 0, "scored_complete": false, "skill": {"n": 28, "brier_skill": 0.0, "sentence": "Across 28 checked calls, so far they do not beat a simple guess."}, "rule_sentence": null, "sentence": "Across 28 checked calls, so far they do not beat a simple guess.", "min_n_for_rate": 20, "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."}, "hit_rate_pct": 50.0}}, "comparison": {"rule": "nothing_changes", "rule_words": "a guess that nothing changes", "rule_version": 1, "records": {"number": {"graded": 56, "coach_right": 29, "scored": 23, "coach_right_on_scored": 12, "rule_right": 15, "coach_only": 0, "rule_only": 3, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 33, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": 52.2, "rule_right_pct": 65.2}, "direction": {"graded": 79, "coach_right": 25, "scored": 29, "coach_right_on_scored": 10, "rule_right": 6, "coach_only": 10, "rule_only": 6, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 50, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": 34.5, "rule_right_pct": 20.7}, "yes_no": {"graded": 6, "coach_right": 3, "scored": 4, "coach_right_on_scored": 2, "rule_right": 2, "coach_only": 1, "rule_only": 1, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 2, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}, "sealed": {"graded": 11, "coach_right": 5, "scored": 2, "coach_right_on_scored": 0, "rule_right": 2, "coach_only": 0, "rule_only": 2, "unscorable": 0, "unscorable_reasons": {}, "not_yet_scored": 9, "verdict": "not_yet_scored", "sign_test_p": null, "coach_right_pct": null, "rule_right_pct": null}}, "unclassified": 0, "scored_complete": false, "skill": {"n": 152, "brier_skill": -0.0532, "sentence": "Across 152 checked calls, so far they do not beat a simple guess."}, "rule_sentence": null, "sentence": "Across 152 checked calls, so far they do not beat a simple guess.", "min_n_for_rate": 20, "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."}, "percent_floor": 10, "predictions": [{"coach_id": "sleep", "coach_name": "Lisa Park", "retired": false, "text": "With a fixed bed time of 9:00 PM and wake time of 4:30 AM targeting 7.5 hours, sleep_duration_hours will trend upward across the first 14 days as the schedule is established and the body adapts to the consistent timing.", "confidence": 0.5, "status": "refuted", "date": "2026-09-06", "pre_registered_at": "2026-09-06T02:13:38.690141+00:00", "pre_registered": true, "due_date": null, "gradeable": true, "metric": "sleep_duration_hours", "eval_type": "directional", "outcome_notes": "{\"actual_value\": -0.01800574780380214, \"reason\": \"predicted up, metric flat (slope=-0.0180, within \\u00b10.02 noise band) \\u2014 no movement to confirm the call\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.0\"}", "reason": "Sleep time held flat \u2014 the call was for it to go up", "graded_on_data": true, "subdomain": "sleep"}], "commitments": {"as_of": "2026-10-11", "lifetime": {"pending": 60.0, "ungradeable": 38.0, "ungradeable_by_metric": {"total_calories_kcal": 2.0, "total_protein_g": 36.0}, "graded": 75.0, "checkable": 118.0, "follow_through_pct": 65.3, "broken": 26.0, "kept": 49.0, "follow_through_ci95": [54.1, 75.1], "unresolved": 627.0, "total": 800.0}, "season": {"follow_through_pct": 68.4, "pending": 55.0, "graded": 57.0, "ungradeable": 0.0, "follow_through_ci95": [55.5, 79.0], "unresolved": 197.0, "kept": 39.0, "broken": 18.0, "ungradeable_by_metric": {}, "total": 309.0, "checkable": 60.0}}, "cycle": 17, "prereg_seal": {"genesis": "2026-09-06", "sha256": "bd225d24f67381c253a34671107ba1bc1a8a3c9cc35dadbca1a5edd061b9782d", "artifact_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json", "stamp_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.sha256.json", "verify": "curl -s https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json | shasum -a 256", "stamped_at": "2026-09-06T02:13:38.690967+00:00"}}
+{
+ "_meta": {
+  "generated_at": "2026-10-13T01:38:52.228185+00:00",
+  "served_at": "2026-10-13T01:38:52.228185+00:00",
+  "cache_seconds": 300,
+  "request_id": "a56248910efc4deb"
+ },
+ "overall": {
+  "total": 433,
+  "confirmed": 65,
+  "refuted": 89,
+  "pending": 60,
+  "inconclusive": 5,
+  "expired": 4,
+  "observational": 210,
+  "decided": 154,
+  "accuracy_pct": 42.2,
+  "due": {
+   "as_of": "2026-10-12",
+   "due_now": 2,
+   "earliest_due": "2026-09-27"
+  },
+  "counted": {
+   "sealed": {
+    "n": 11,
+    "right": 7
+   },
+   "bet": {
+    "n": 8,
+    "right": 4
+   },
+   "commentary": {
+    "n": 92,
+    "right": 41
+   },
+   "conditional": {
+    "n": 43,
+    "right": 13
+   }
+  },
+  "counted_text": "Counted: 11 sealed before day one, 8 sides of bets between two coaches, 92 read out of the coaches' running commentary and 43 conditional or hedged sentences.",
+  "lifetime": {
+   "total": 3340,
+   "confirmed": 74,
+   "refuted": 119,
+   "pending": 968,
+   "inconclusive": 553,
+   "expired": 12,
+   "observational": 1614,
+   "decided": 193,
+   "accuracy_pct": 38.3
+  }
+ },
+ "by_coach": {
+  "sleep": {
+   "total": 67,
+   "confirmed": 17,
+   "refuted": 24,
+   "pending": 6,
+   "inconclusive": 0,
+   "expired": 0,
+   "observational": 20,
+   "decided": 41,
+   "lifetime": {
+    "total": 495,
+    "confirmed": 18,
+    "refuted": 31,
+    "pending": 129,
+    "inconclusive": 102,
+    "expired": 3,
+    "observational": 212,
+    "decided": 49,
+    "hit_rate_pct": 36.7
+   },
+   "retired": false,
+   "record": {
+    "confirmed": 17,
+    "refuted": 24,
+    "n": 41,
+    "through": "2026-10-11"
+   },
+   "comparison": {
+    "rule": "nothing_changes",
+    "rule_words": "a guess that nothing changes",
+    "rule_version": 1,
+    "records": {
+     "number": {
+      "graded": 23,
+      "coach_right": 13,
+      "scored": 23,
+      "coach_right_on_scored": 13,
+      "rule_right": 9,
+      "coach_only": 4,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "no_clear_difference",
+      "sign_test_p": 0.125,
+      "coach_right_pct": 56.5,
+      "rule_right_pct": 39.1
+     },
+     "direction": {
+      "graded": 14,
+      "coach_right": 2,
+      "scored": 14,
+      "coach_right_on_scored": 2,
+      "rule_right": 2,
+      "coach_only": 2,
+      "rule_only": 2,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "yes_no": {
+      "graded": 2,
+      "coach_right": 1,
+      "scored": 2,
+      "coach_right_on_scored": 1,
+      "rule_right": 1,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "sealed": {
+      "graded": 2,
+      "coach_right": 1,
+      "scored": 2,
+      "coach_right_on_scored": 1,
+      "rule_right": 1,
+      "coach_only": 1,
+      "rule_only": 1,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     }
+    },
+    "unclassified": 0,
+    "scored_complete": true,
+    "skill": {
+     "n": 41,
+     "brier_skill": -0.0157,
+     "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
+    },
+    "rule_sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell.",
+    "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell.",
+    "min_n_for_rate": 20,
+    "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+   },
+   "hit_rate_pct": 41.5
+  },
+  "training": {
+   "total": 2,
+   "confirmed": 0,
+   "refuted": 0,
+   "pending": 2,
+   "inconclusive": 0,
+   "expired": 0,
+   "observational": 0,
+   "decided": 0,
+   "lifetime": {
+    "total": 371,
+    "confirmed": 0,
+    "refuted": 9,
+    "pending": 174,
+    "inconclusive": 94,
+    "expired": 0,
+    "observational": 94,
+    "decided": 9,
+    "hit_rate_pct": 0.0
+   },
+   "retired": true,
+   "record": {
+    "confirmed": 0,
+    "refuted": 0,
+    "n": 0,
+    "through": null
+   },
+   "comparison": {
+    "rule": "nothing_changes",
+    "rule_words": "a guess that nothing changes",
+    "rule_version": 1,
+    "records": {
+     "number": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "direction": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "yes_no": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "sealed": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     }
+    },
+    "unclassified": 0,
+    "scored_complete": false,
+    "skill": {
+     "n": 0,
+     "brier_skill": null,
+     "sentence": "No checked call yet, so nothing to compare with a simple guess."
+    },
+    "rule_sentence": null,
+    "sentence": "No checked call yet, so nothing to compare with a simple guess.",
+    "min_n_for_rate": 20,
+    "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+   },
+   "hit_rate_pct": null
+  },
+  "nutrition": {
+   "total": 65,
+   "confirmed": 8,
+   "refuted": 22,
+   "pending": 18,
+   "inconclusive": 1,
+   "expired": 1,
+   "observational": 15,
+   "decided": 30,
+   "lifetime": {
+    "total": 508,
+    "confirmed": 12,
+    "refuted": 24,
+    "pending": 121,
+    "inconclusive": 121,
+    "expired": 1,
+    "observational": 229,
+    "decided": 36,
+    "hit_rate_pct": 33.3
+   },
+   "retired": false,
+   "record": {
+    "confirmed": 8,
+    "refuted": 22,
+    "n": 30,
+    "through": "2026-10-12"
+   },
+   "comparison": {
+    "rule": "nothing_changes",
+    "rule_words": "a guess that nothing changes",
+    "rule_version": 1,
+    "records": {
+     "number": {
+      "graded": 6,
+      "coach_right": 1,
+      "scored": 6,
+      "coach_right_on_scored": 1,
+      "rule_right": 6,
+      "coach_only": 0,
+      "rule_only": 5,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "direction": {
+      "graded": 21,
+      "coach_right": 5,
+      "scored": 21,
+      "coach_right_on_scored": 5,
+      "rule_right": 4,
+      "coach_only": 5,
+      "rule_only": 4,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "no_clear_difference",
+      "sign_test_p": 1.0,
+      "coach_right_pct": 23.8,
+      "rule_right_pct": 19.0
+     },
+     "yes_no": {
+      "graded": 2,
+      "coach_right": 1,
+      "scored": 2,
+      "coach_right_on_scored": 1,
+      "rule_right": 1,
+      "coach_only": 1,
+      "rule_only": 1,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "sealed": {
+      "graded": 1,
+      "coach_right": 1,
+      "scored": 1,
+      "coach_right_on_scored": 1,
+      "rule_right": 0,
+      "coach_only": 1,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     }
+    },
+    "unclassified": 0,
+    "scored_complete": true,
+    "skill": {
+     "n": 30,
+     "brier_skill": -0.2018,
+     "sentence": "Across 30 checked calls, so far they do not beat a simple guess."
+    },
+    "rule_sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right once and a guess that nothing changes 6 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 21 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, but not by a clear margin. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right once and a guess that nothing changes 6 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 21 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, but not by a clear margin. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "min_n_for_rate": 20,
+    "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+   },
+   "hit_rate_pct": 26.7
+  },
+  "mind": {
+   "total": 56,
+   "confirmed": 7,
+   "refuted": 12,
+   "pending": 6,
+   "inconclusive": 0,
+   "expired": 0,
+   "observational": 31,
+   "decided": 19,
+   "lifetime": {
+    "total": 389,
+    "confirmed": 9,
+    "refuted": 12,
+    "pending": 53,
+    "inconclusive": 42,
+    "expired": 2,
+    "observational": 271,
+    "decided": 21,
+    "hit_rate_pct": 42.9
+   },
+   "retired": false,
+   "record": {
+    "confirmed": 7,
+    "refuted": 12,
+    "n": 19,
+    "through": "2026-10-12"
+   },
+   "comparison": {
+    "rule": "nothing_changes",
+    "rule_words": "a guess that nothing changes",
+    "rule_version": 1,
+    "records": {
+     "number": {
+      "graded": 6,
+      "coach_right": 2,
+      "scored": 6,
+      "coach_right_on_scored": 2,
+      "rule_right": 4,
+      "coach_only": 0,
+      "rule_only": 2,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "direction": {
+      "graded": 9,
+      "coach_right": 3,
+      "scored": 9,
+      "coach_right_on_scored": 3,
+      "rule_right": 0,
+      "coach_only": 3,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "yes_no": {
+      "graded": 2,
+      "coach_right": 1,
+      "scored": 2,
+      "coach_right_on_scored": 1,
+      "rule_right": 2,
+      "coach_only": 0,
+      "rule_only": 1,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "sealed": {
+      "graded": 2,
+      "coach_right": 1,
+      "scored": 2,
+      "coach_right_on_scored": 1,
+      "rule_right": 0,
+      "coach_only": 1,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     }
+    },
+    "unclassified": 0,
+    "scored_complete": true,
+    "skill": {
+     "n": 19,
+     "brier_skill": -0.0744,
+     "sentence": "Too few checked calls yet (19) to compare them with a simple guess."
+    },
+    "rule_sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "min_n_for_rate": 20,
+    "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+   },
+   "hit_rate_pct": 36.8
+  },
+  "physical": {
+   "total": 67,
+   "confirmed": 11,
+   "refuted": 11,
+   "pending": 10,
+   "inconclusive": 0,
+   "expired": 1,
+   "observational": 34,
+   "decided": 22,
+   "lifetime": {
+    "total": 468,
+    "confirmed": 12,
+    "refuted": 13,
+    "pending": 171,
+    "inconclusive": 54,
+    "expired": 1,
+    "observational": 217,
+    "decided": 25,
+    "hit_rate_pct": 48.0
+   },
+   "retired": false,
+   "record": {
+    "confirmed": 11,
+    "refuted": 11,
+    "n": 22,
+    "through": "2026-10-11"
+   },
+   "comparison": {
+    "rule": "nothing_changes",
+    "rule_words": "a guess that nothing changes",
+    "rule_version": 1,
+    "records": {
+     "number": {
+      "graded": 9,
+      "coach_right": 5,
+      "scored": 9,
+      "coach_right_on_scored": 5,
+      "rule_right": 5,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "direction": {
+      "graded": 10,
+      "coach_right": 4,
+      "scored": 10,
+      "coach_right_on_scored": 4,
+      "rule_right": 1,
+      "coach_only": 4,
+      "rule_only": 1,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "yes_no": {
+      "graded": 1,
+      "coach_right": 1,
+      "scored": 1,
+      "coach_right_on_scored": 1,
+      "rule_right": 0,
+      "coach_only": 1,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "sealed": {
+      "graded": 2,
+      "coach_right": 1,
+      "scored": 2,
+      "coach_right_on_scored": 1,
+      "rule_right": 0,
+      "coach_only": 1,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     }
+    },
+    "unclassified": 0,
+    "scored_complete": true,
+    "skill": {
+     "n": 22,
+     "brier_skill": 0.0414,
+     "sentence": "Across 22 checked calls, so far they beat a simple guess."
+    },
+    "rule_sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "min_n_for_rate": 20,
+    "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+   },
+   "hit_rate_pct": 50.0
+  },
+  "glucose": {
+   "total": 50,
+   "confirmed": 1,
+   "refuted": 5,
+   "pending": 2,
+   "inconclusive": 4,
+   "expired": 2,
+   "observational": 36,
+   "decided": 6,
+   "lifetime": {
+    "total": 401,
+    "confirmed": 1,
+    "refuted": 7,
+    "pending": 128,
+    "inconclusive": 77,
+    "expired": 3,
+    "observational": 185,
+    "decided": 8,
+    "hit_rate_pct": 12.5
+   },
+   "retired": false,
+   "record": {
+    "confirmed": 1,
+    "refuted": 5,
+    "n": 6,
+    "through": "2026-09-30"
+   },
+   "comparison": {
+    "rule": "nothing_changes",
+    "rule_words": "a guess that nothing changes",
+    "rule_version": 1,
+    "records": {
+     "number": {
+      "graded": 3,
+      "coach_right": 1,
+      "scored": 3,
+      "coach_right_on_scored": 1,
+      "rule_right": 2,
+      "coach_only": 0,
+      "rule_only": 1,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "direction": {
+      "graded": 2,
+      "coach_right": 0,
+      "scored": 2,
+      "coach_right_on_scored": 0,
+      "rule_right": 1,
+      "coach_only": 0,
+      "rule_only": 1,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "yes_no": {
+      "graded": 1,
+      "coach_right": 0,
+      "scored": 1,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "sealed": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     }
+    },
+    "unclassified": 0,
+    "scored_complete": true,
+    "skill": {
+     "n": 6,
+     "brier_skill": -0.6331,
+     "sentence": "Too few checked calls yet (6) to compare them with a simple guess."
+    },
+    "rule_sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 2 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes once \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
+    "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 2 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes once \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
+    "min_n_for_rate": 20,
+    "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+   },
+   "hit_rate_pct": 16.7
+  },
+  "labs": {
+   "total": 68,
+   "confirmed": 7,
+   "refuted": 1,
+   "pending": 5,
+   "inconclusive": 0,
+   "expired": 0,
+   "observational": 55,
+   "decided": 8,
+   "lifetime": {
+    "total": 339,
+    "confirmed": 7,
+    "refuted": 2,
+    "pending": 69,
+    "inconclusive": 22,
+    "expired": 0,
+    "observational": 239,
+    "decided": 9,
+    "hit_rate_pct": 77.8
+   },
+   "retired": false,
+   "record": {
+    "confirmed": 7,
+    "refuted": 1,
+    "n": 8,
+    "through": "2026-10-11"
+   },
+   "comparison": {
+    "rule": "nothing_changes",
+    "rule_words": "a guess that nothing changes",
+    "rule_version": 1,
+    "records": {
+     "number": {
+      "graded": 3,
+      "coach_right": 3,
+      "scored": 3,
+      "coach_right_on_scored": 3,
+      "rule_right": 3,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "direction": {
+      "graded": 3,
+      "coach_right": 2,
+      "scored": 3,
+      "coach_right_on_scored": 2,
+      "rule_right": 0,
+      "coach_only": 2,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "yes_no": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "sealed": {
+      "graded": 2,
+      "coach_right": 2,
+      "scored": 2,
+      "coach_right_on_scored": 2,
+      "rule_right": 0,
+      "coach_only": 2,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     }
+    },
+    "unclassified": 0,
+    "scored_complete": true,
+    "skill": {
+     "n": 8,
+     "brier_skill": -1.2857,
+     "sentence": "Too few checked calls yet (8) to compare them with a simple guess."
+    },
+    "rule_sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "min_n_for_rate": 20,
+    "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+   },
+   "hit_rate_pct": 87.5
+  },
+  "explorer": {
+   "total": 58,
+   "confirmed": 14,
+   "refuted": 14,
+   "pending": 11,
+   "inconclusive": 0,
+   "expired": 0,
+   "observational": 19,
+   "decided": 28,
+   "lifetime": {
+    "total": 369,
+    "confirmed": 15,
+    "refuted": 21,
+    "pending": 123,
+    "inconclusive": 41,
+    "expired": 2,
+    "observational": 167,
+    "decided": 36,
+    "hit_rate_pct": 41.7
+   },
+   "retired": false,
+   "record": {
+    "confirmed": 14,
+    "refuted": 14,
+    "n": 28,
+    "through": "2026-10-11"
+   },
+   "comparison": {
+    "rule": "nothing_changes",
+    "rule_words": "a guess that nothing changes",
+    "rule_version": 1,
+    "records": {
+     "number": {
+      "graded": 6,
+      "coach_right": 4,
+      "scored": 5,
+      "coach_right_on_scored": 4,
+      "rule_right": 3,
+      "coach_only": 1,
+      "rule_only": 0,
+      "unscorable": 1,
+      "unscorable_reasons": {
+       "no reading before the call was filed": 1
+      },
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "direction": {
+      "graded": 20,
+      "coach_right": 9,
+      "scored": 20,
+      "coach_right_on_scored": 9,
+      "rule_right": 3,
+      "coach_only": 9,
+      "rule_only": 3,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "no_clear_difference",
+      "sign_test_p": 0.146,
+      "coach_right_pct": 45.0,
+      "rule_right_pct": 15.0
+     },
+     "yes_no": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "sealed": {
+      "graded": 2,
+      "coach_right": 1,
+      "scored": 2,
+      "coach_right_on_scored": 1,
+      "rule_right": 0,
+      "coach_only": 1,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     }
+    },
+    "unclassified": 0,
+    "scored_complete": true,
+    "skill": {
+     "n": 28,
+     "brier_skill": 0.0,
+     "sentence": "Across 28 checked calls, so far they do not beat a simple guess."
+    },
+    "rule_sentence": "Number calls: on the 5 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 20 a guess could also be checked against, the coaches were right 9 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, but not by a clear margin. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 5 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 20 a guess could also be checked against, the coaches were right 9 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, but not by a clear margin. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "min_n_for_rate": 20,
+    "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+   },
+   "hit_rate_pct": 50.0
+  }
+ },
+ "comparison": {
+  "rule": "nothing_changes",
+  "rule_words": "a guess that nothing changes",
+  "rule_version": 1,
+  "records": {
+   "number": {
+    "graded": 56,
+    "coach_right": 29,
+    "scored": 55,
+    "coach_right_on_scored": 29,
+    "rule_right": 32,
+    "coach_only": 5,
+    "rule_only": 8,
+    "unscorable": 1,
+    "unscorable_reasons": {
+     "no reading before the call was filed": 1
+    },
+    "not_yet_scored": 0,
+    "verdict": "no_clear_difference",
+    "sign_test_p": 0.5811,
+    "coach_right_pct": 52.7,
+    "rule_right_pct": 58.2
+   },
+   "direction": {
+    "graded": 79,
+    "coach_right": 25,
+    "scored": 79,
+    "coach_right_on_scored": 25,
+    "rule_right": 11,
+    "coach_only": 25,
+    "rule_only": 11,
+    "unscorable": 0,
+    "unscorable_reasons": {},
+    "not_yet_scored": 0,
+    "verdict": "coaches_better",
+    "sign_test_p": 0.0288,
+    "coach_right_pct": 31.6,
+    "rule_right_pct": 13.9
+   },
+   "yes_no": {
+    "graded": 8,
+    "coach_right": 4,
+    "scored": 8,
+    "coach_right_on_scored": 4,
+    "rule_right": 4,
+    "coach_only": 2,
+    "rule_only": 2,
+    "unscorable": 0,
+    "unscorable_reasons": {},
+    "not_yet_scored": 0,
+    "verdict": "too_few",
+    "sign_test_p": null,
+    "coach_right_pct": null,
+    "rule_right_pct": null
+   },
+   "sealed": {
+    "graded": 11,
+    "coach_right": 7,
+    "scored": 11,
+    "coach_right_on_scored": 7,
+    "rule_right": 1,
+    "coach_only": 7,
+    "rule_only": 1,
+    "unscorable": 0,
+    "unscorable_reasons": {},
+    "not_yet_scored": 0,
+    "verdict": "too_few",
+    "sign_test_p": null,
+    "coach_right_pct": null,
+    "rule_right_pct": null
+   }
+  },
+  "unclassified": 0,
+  "scored_complete": true,
+  "skill": {
+   "n": 154,
+   "brier_skill": 0.0006,
+   "sentence": "Across 154 checked calls, so far they beat a simple guess."
+  },
+  "rule_sentence": "Number calls: on the 55 a guess could also be checked against, the coaches were right 29 times and a guess that nothing changes 32 times \u2014 the guess was right more often, but not by a clear margin. 1 more could not be checked against the guess. Direction calls: on the 79 a guess could also be checked against, the coaches were right 25 times and a guess that nothing changes 11 times \u2014 the coaches did better. Yes/no bets: on the 8 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 4 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 11 a guess could also be checked against, the coaches were right 7 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell.",
+  "sentence": "Number calls: on the 55 a guess could also be checked against, the coaches were right 29 times and a guess that nothing changes 32 times \u2014 the guess was right more often, but not by a clear margin. 1 more could not be checked against the guess. Direction calls: on the 79 a guess could also be checked against, the coaches were right 25 times and a guess that nothing changes 11 times \u2014 the coaches did better. Yes/no bets: on the 8 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 4 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 11 a guess could also be checked against, the coaches were right 7 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell.",
+  "min_n_for_rate": 20,
+  "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+ },
+ "percent_floor": 10,
+ "predictions": [
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "retired": false,
+   "text": "With a fixed bed time of 9:00 PM and wake time of 4:30 AM targeting 7.5 hours, sleep_duration_hours will trend upward across the first 14 days as the schedule is established and the body adapts to the consistent timing.",
+   "confidence": 0.5,
+   "status": "refuted",
+   "date": "2026-09-06",
+   "pre_registered_at": "2026-09-06T02:13:38.690141+00:00",
+   "pre_registered": true,
+   "due_date": null,
+   "gradeable": true,
+   "metric": "sleep_duration_hours",
+   "eval_type": "directional",
+   "outcome_notes": "{\"actual_value\": -0.052963, \"reason\": \"[window] predicted up, metric flat \\u2014 sleep_duration_hours 7.93 on 2026-09-06 -> 7.51 on 2026-09-20 (change -0.42, band \\u00b11.04, window 2026-09-06..2026-09-20)\", \"beats_null\": false, \"bayesian_update\": null, \"algo_version\": \"1.0\", \"verdict_correction\": {\"issue\": \"#4617\", \"prior_status\": \"refuted\", \"prior_reason\": \"predicted up, metric flat (slope=-0.0180, within \\u00b10.02 noise band) \\u2014 no movement to confirm the call\", \"corrected_at\": \"2026-10-12T16:52:52.522766+00:00\", \"correction\": \"#4617: graded again across the call's own window; the grade is unchanged and now carries the window's first and last readings.\"}, \"window\": {\"start\": \"2026-09-06\", \"end\": \"2026-09-20\", \"first_date\": \"2026-09-06\", \"first_value\": 7.93, \"last_date\": \"2026-09-20\", \"last_value\": 7.51, \"averaged_over\": 1, \"readings\": 15, \"change\": -0.42, \"band\": 1.04, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"flat\"}}",
+   "reason": "Sleep time held flat, from 7.9 hours on September 6 to 7.5 hours on September 20, inside its usual day-to-day swing of 1 hours \u2014 the call was for it to go up",
+   "graded_on_data": true,
+   "subdomain": "sleep"
+  }
+ ],
+ "commitments": {
+  "as_of": "2026-10-12",
+  "lifetime": {
+   "broken": 26.0,
+   "ungradeable": 38.0,
+   "unresolved": 628.0,
+   "total": 800.0,
+   "checkable": 118.0,
+   "graded": 76.0,
+   "follow_through_pct": 65.8,
+   "pending": 58.0,
+   "follow_through_ci95": [
+    54.6,
+    75.5
+   ],
+   "kept": 50.0,
+   "ungradeable_by_metric": {
+    "total_protein_g": 36.0,
+    "total_calories_kcal": 2.0
+   }
+  },
+  "season": {
+   "kept": 40.0,
+   "ungradeable_by_metric": {},
+   "pending": 53.0,
+   "ungradeable": 0.0,
+   "checkable": 60.0,
+   "follow_through_pct": 69.0,
+   "total": 309.0,
+   "follow_through_ci95": [
+    56.2,
+    79.4
+   ],
+   "unresolved": 198.0,
+   "broken": 18.0,
+   "graded": 58.0
+  }
+ },
+ "cycle": 17,
+ "prereg_seal": {
+  "genesis": "2026-09-06",
+  "sha256": "bd225d24f67381c253a34671107ba1bc1a8a3c9cc35dadbca1a5edd061b9782d",
+  "artifact_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json",
+  "stamp_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.sha256.json",
+  "verify": "curl -s https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json | shasum -a 256",
+  "stamped_at": "2026-09-06T02:13:38.690967+00:00"
+ }
+}
