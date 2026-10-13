@@ -187,7 +187,7 @@ def _load_canonical_facts():
         # Sentinel checks the narrative against. No more per-site dict construction.
         from experiment.canonical_facts import build_canonical_facts, overlay_latest_readings
 
-        from intelligence.latest_readings import resolve_latest_readings
+        from intelligence.latest_readings import hrv_series_facts, resolve_latest_readings
 
         _cm = _latest_item("computed_metrics") or {}
         facts = build_canonical_facts(_cm)
@@ -204,21 +204,8 @@ def _load_canonical_facts():
         # weigh-in riders) now derive from the resolvers /api/vitals serves; the rollup keeps
         # the window-derived ones. Rule + evidence: canonical_facts.overlay_latest_readings.
         _live = resolve_latest_readings(table, USER_PREFIX, _latest_item("withings"), now=datetime.now(timezone.utc))
-        facts = overlay_latest_readings(facts, _live)
+        facts = {**overlay_latest_readings(facts, _live), **hrv_series_facts(_query_source, pacific_today(), logger)}  # #4866
         facts.update({_k: _live[_k] for _k in ("last_weighin_date", "days_since_weighin") if _live.get(_k) is not None})
-        # #4866: the stored Whoop HRV series (30 days), so the gate can resolve the authority over
-        # the window a narrative names instead of taking one day's reading as "the" HRV.
-        try:
-            _end = pacific_today()
-            _start = (datetime.fromisoformat(_end) - timedelta(days=30)).date().isoformat()
-            facts["hrv_series"] = [
-                {"date": r["sk"][5:15], "hrv": float(r["hrv"])}
-                for r in _query_source("whoop", _start, _end)
-                if r.get("hrv") is not None and "#" not in r["sk"][5:]
-            ]
-            facts["hrv_series_source"] = "whoop"
-        except Exception as _se:
-            logger.warning("hrv series load failed (gate falls back to the latest reading): %s", _se)
     except Exception as _e:
         logger.warning("canonical facts load failed: %s", _e)
     _CANON_FACTS_CACHE["facts"] = facts
@@ -232,16 +219,10 @@ def _load_canonical_facts():
 # kept as an alias — every internal call site and test stays untouched. Dual-style
 # import: package path in prod (handler intelligence.*), flat path in tests.
 try:
-    from intelligence.grounding_guard import (
-        comparison_basis as _comparison_basis,
-        hard_canonical_contradictions as _hard_canonical_contradictions,
-    )
+    from intelligence.grounding_guard import hard_canonical_contradictions as _hard_canonical_contradictions
 except ImportError:  # pragma: no cover — flat sys.path (tests)
     if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
-        from grounding_guard import (  # noqa: F401
-            comparison_basis as _comparison_basis,
-            hard_canonical_contradictions as _hard_canonical_contradictions,
-        )
+        from grounding_guard import hard_canonical_contradictions as _hard_canonical_contradictions  # noqa: F401
 
 # ADR-104: the shared grounded-generation harness — regen-once keep-if-improved (one impl
 # for every surface) + the allow-list number gate catching fabricated trends ("from 58 to 64").
@@ -1076,19 +1057,16 @@ def _gate_prose(label, text, prompt, api_key, *, shared_system=None, extra_sourc
 
     _pre = _findings_fn(text)
     if _pre:
-        logger.warning(
-            "[grounding] %s finding(s) [compared against: %s]: %s", label, _comparison_basis(_pre), [f["detail"] for f in _pre][:6]
-        )
+        logger.warning("[grounding] %s finding(s): %s", label, [f["detail"] for f in _pre][:6])
     _new_text, _left, _corrected = _gg.regen_once(text, _findings_fn, _regen, surface=label)
     if _corrected:
         text = _new_text
         logger.info("[grounding] %s self-corrected: %d→%d finding(s)", label, len(_pre), len(_left))
     if _left:
         logger.warning(
-            "[grounding] %s HELD — %d residual finding(s) [compared against: %s]; prior cached record preserved (#2391): %s",
+            "[grounding] %s HELD — %d residual finding(s); prior cached record preserved (#2391): %s",
             label,
             len(_left),
-            _comparison_basis(_left),
             [f["detail"] for f in _left][:4],
         )
         return ""

@@ -85,3 +85,16 @@ def test_mutation_control_window_resolution_reverted_reds(monkeypatch):
 def test_numbered_historic_week_has_no_authority_here():
     f = _facts(SEVEN, 136.92)
     assert gg.hard_canonical_contradictions("Week 2 exploded and your HRV tanked to 12 ms.", f) == []
+
+
+def test_hrv_series_facts_loader_filters_and_fails_soft():
+    import latest_readings as lr
+
+    rows = [{"sk": "DATE#2026-10-11", "hrv": "136.92"}, {"sk": "DATE#2026-10-11#x", "hrv": 1}, {"sk": "DATE#2026-10-10"}]
+    out = lr.hrv_series_facts(lambda src, a, b: rows, "2026-10-12")
+    assert out == {"hrv_series": [{"date": "2026-10-11", "hrv": 136.92}], "hrv_series_source": "whoop"}
+
+    def boom(*a):
+        raise RuntimeError("x")
+
+    assert lr.hrv_series_facts(boom, "2026-10-12") == {}

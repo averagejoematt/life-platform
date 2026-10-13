@@ -144,7 +144,11 @@ def _median(vals):
     return v[n // 2] if n % 2 else (v[n // 2 - 1] + v[n // 2]) / 2
 
 
-_NUMBERED_WEEK_RE = _re.compile(r"\bweeks?\s+\d+\b")
+# A numbered week is "Week 2" / "weeks 5-6" (1-52, not a unit): "this week 137 ms", "the past week 20 ms" are not.
+_NUMBERED_WEEK_RE = _re.compile(
+    r"(?<!\bthis )(?<!\bpast )(?<!\blast )(?<!\bnext )(?<!\bper )(?<!\beach )(?<!\bevery )"
+    r"\bweeks?\s+(?:[1-9]|[1-4]\d|5[0-2])\b(?!\s*(?:ms|milliseconds?)\b)"
+)
 
 
 def narrative_window(low, start, end):
@@ -198,7 +202,10 @@ def resolve_hrv_authority(facts, window):
         if day_val is None:
             return None, src, None
         trailing = [v for v in vals if abs(v - day_val) > 0.005]
-        if is_vendor_outlier(day_val, trailing):
+        # Isolated only: another reading in the last 7 days above the same bar means a sustained
+        # change, not a single-day glitch, and the day value stands as its own authority.
+        recent_high = [v for v in trailing[-6:] if is_vendor_outlier(v, [o for o in trailing if o != v])]
+        if not recent_high and is_vendor_outlier(day_val, trailing):
             med = _median(trailing)
             note = (
                 f"the stored {day_val:g} ms reading is a single-day vendor outlier "
