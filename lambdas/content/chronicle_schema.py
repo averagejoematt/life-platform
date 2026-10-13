@@ -38,6 +38,20 @@ INSTALLMENT_SCHEMA = {
     "required": ["title", "weight_lbs", "week_grade", "t0_streak_days", "body_markdown"],
 }
 
+# #4865: the Story Desk's installment envelope. The desk's machine header is
+# ``[Day 18 to Day 24 · 309.4 lbs (-1.6 this week) · 5 training sessions]`` — computed from THAT week's dossier
+# (story_pipeline.stats_line), so it carries a weight (when the week had a weigh-in) and NEVER a "Week Grade" or a
+# "T0 Streak": those two numbers are the legacy writer's packet fields, and the desk does not read the legacy
+# gather (a named-week rehearsal withholds it on purpose, #4804). Validating the desk's envelope against the legacy
+# schema flagged all three numbers missing on every desk-written week, live or rehearsed. Here the three numbers are
+# optional-but-typed: absent is fine, present-and-wrong-typed is still an error.
+DESK_INSTALLMENT_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": INSTALLMENT_SCHEMA["properties"],
+    "required": ["title", "body_markdown"],
+}
+
 _TYPE_CHECKS = {
     "string": lambda v: isinstance(v, str),
     # bool is a subclass of int — exclude it so a stray True can't pass as a number.
@@ -110,6 +124,20 @@ def installment_from_stats(title: str, stats: dict, body_markdown: str) -> dict:
         "t0_streak_days": stats.get("t0_streak_days"),
         "body_markdown": body_markdown,
     }
+
+
+def desk_installment_from_stats(title: str, stats: dict, body_markdown: str) -> dict:
+    """The Story Desk's envelope: only the numbers its header actually carries (a key is ABSENT, never None, so
+    ``validate_installment(..., DESK_INSTALLMENT_SCHEMA)`` can tell "the desk does not write this" from "the
+    parse found a wrong type"). ``stats`` is ``stats_fields`` output (str numbers)."""
+    env: dict = {"title": title, "body_markdown": body_markdown}
+    if stats.get("weight_lbs") is not None:
+        env["weight_lbs"] = float(stats["weight_lbs"])
+    if stats.get("week_grade_avg") is not None:
+        env["week_grade"] = float(stats["week_grade_avg"])
+    if stats.get("t0_streak_days") is not None:
+        env["t0_streak_days"] = int(stats["t0_streak_days"])
+    return env
 
 
 # ── #4191: the envelope is a wire format, never prose ────────────────────────────
