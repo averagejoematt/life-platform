@@ -66,6 +66,14 @@ test("the coaches' record never appears without its comparison", () => {
   assert.match(B.recordHTML({ overall: { confirmed: 0, refuted: 0 } }), /not available right now/, "no checked calls is not printed as 0 and 0");
 });
 
+test("a long per-kind comparison folds under a summary right below the count; a short one stays open (#4864)", () => {
+  const long = B.recordHTML(SRC.predictions);
+  assert.match(long, /<\/span><\/div><details><summary>What a simple guess scored on the same calls<\/summary><p [^>]*data-coach-comparison/);
+  const short = B.recordHTML({ ...SRC.predictions, comparison: { sentence: "Across 152 checked calls, so far they do not beat a simple guess." } });
+  assert.doesNotMatch(short, /<details>/);
+  assert.match(short, /data-coach-comparison/);
+});
+
 const at = (obj, path) => path.split(".").reduce((o, k) => (o == null ? undefined : o[k]), obj);
 // The receipt with one field gone, or renamed (the value moved to `<name>_v2`).
 function without(path, rename = false, base = EARLY) {
