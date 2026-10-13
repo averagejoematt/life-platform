@@ -216,3 +216,6 @@ def test_every_static_get_item_key_exists_in_table():
     ), "Dead DynamoDB key reads (the hypothesis_engine bug class — fix the key " "or add to KNOWN_OPTIONAL with a reason):\n" + "\n".join(
         missing
     )
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

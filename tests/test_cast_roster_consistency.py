@@ -663,3 +663,6 @@ def test_honorific_kept_verbatim_paths_are_real():
         assert any(
             rx.search((_REPO / f).read_text(encoding="utf-8", errors="ignore")) for f in members
         ), f"kept-verbatim entry {prefix!r} no longer carries any honorific — delete the entry"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

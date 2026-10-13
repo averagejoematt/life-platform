@@ -271,3 +271,6 @@ def test_floor_served_as_its_own_field():
         src = f.read()
     for field in ('"protein_floor_g"', '"protein_floor_hit_pct"'):
         assert field in src, f"nutrition_overview must serve {field}"
+
+
+# premerge-gate: 4540: an os.walk AST sweep of lambdas/ + mcp/ for a read of the profile row's calorie/protein target or a stale 1800/190 literal beside a nutrition-target name. Pure repo shape — a reintroduced profile-target read is exactly a PR's own diff.

@@ -1143,3 +1143,6 @@ def test_issue_4377_every_journal_quote_reader_honours_the_revoke_tombstone():
             unguarded.append(rel)
     assert len(readers) >= 3, f"the journal_quotes reader scan found too few readers — did the scan break? {readers}"
     assert unguarded == [], f"journal_quotes readers that ignore the #4377 revoke tombstone: {unguarded}"
+
+
+# premerge-gate: 2026-08-10: Wave-2 call sites + Wave-3 exemptions split across PRs = main red between them

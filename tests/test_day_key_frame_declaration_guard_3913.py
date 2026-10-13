@@ -474,3 +474,6 @@ def test_the_status_page_day_bucket_is_unaffected_by_the_fix():
     for source in ("whoop", "apple_health", "eightsleep", "withings", "strava", "garmin", "hevy"):
         for day in ("2026-01-01", "2026-06-08", "2026-09-21", "2026-12-15"):
             assert anchor_day_key(day, source).date().isoformat() == day
+
+
+# premerge-gate: 3913: two AST sweeps — lambdas/ingestion/ for the modules that DERIVE a UTC calendar day (a Zulu fetch window, an astimezone-then-day cast), each of which must carry an EXPLICIT day_key_frame on its registry entry; and lambdas/ + mcp/ for any function that hand-anchors a YYYY-MM-DD day with a literal tzinfo and then measures a duration from it. Pure repo shape, and pre-merge because the failure it

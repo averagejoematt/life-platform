@@ -274,3 +274,6 @@ def test_coverage_payload_is_timestamp_free():
     for k in stats:
         assert not any(t in k.lower() for t in forbidden), f"coverage_stats key {k!r} looks timestamp-shaped"
     assert stats == qa_manifest.coverage_stats()  # call-to-call deterministic
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

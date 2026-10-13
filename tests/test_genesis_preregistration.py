@@ -391,3 +391,6 @@ def test_genesis_cycle_stamp_is_derived_from_the_registry_not_hand_typed():
         # Ties (a genesis reused by two cycle numbers) resolve to the LATER cycle.
         assert stamp["cycle"] == max(c for c, g in CYCLE_GENESES.items() if g == genesis)
         assert stamp["cycle"] >= cycle
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

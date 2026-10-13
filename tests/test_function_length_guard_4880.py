@@ -45,6 +45,7 @@ in ``docs/ENGINEERING_STANDARDS.md``. Until then this is a ratchet on the existi
 the standards doc is deliberately not edited here.
 """
 
+# premerge-gate: #4880: git ls-files + AST sweep — the 150-logical-line function ceiling + its down-only counts
 import ast
 import io
 import os

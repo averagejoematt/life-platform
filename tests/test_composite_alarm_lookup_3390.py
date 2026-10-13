@@ -425,3 +425,6 @@ def test_a_by_construction_gauge_is_not_escalated_as_an_aged_alarm():
 
     gauge_esc = dict(agent.aged_alarm_escalations({"alarms": [gauge]}, now=now, audience={}))
     assert gauge_esc == {}, f"a by-construction gauge was escalated as an aged incident: {gauge_esc}"
+
+
+# premerge-gate: #3503: AST sweep — every CloudWatch alarm read in first-party source states its AlarmTypes

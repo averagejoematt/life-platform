@@ -283,3 +283,6 @@ def test_every_spec_metric_has_a_stated_unit():
     never re-validated — every outcome the generator can name gets its unit here."""
     missing = sorted(m for m in eng.SPEC_METRICS if m not in prereg_effect.OUTCOME_UNITS)
     assert not missing, f"SPEC_METRICS with no unit in OUTCOME_UNITS: {missing}"
+
+
+# premerge-gate: 3495: reads the sealed `deploy/generated/genesis_preregistration.json` to pin that its literal min_effects do NOT meet the derived-bar predicate (never re-sealed).

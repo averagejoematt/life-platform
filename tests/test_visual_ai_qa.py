@@ -816,3 +816,6 @@ def test_budget_pause_is_not_an_unevaluated_red(tmp_path, monkeypatch):
     assert status == {"status": "skipped_by_budget", "tier": 3}
     assert results[0]["status"] == "PASS"
     assert "ai_unevaluated" not in results[0]
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

@@ -341,3 +341,6 @@ def test_the_gate_does_not_reimplement_the_consent_precedence():
         src = fh.read()
     assert "diary_consent.public_context(" in src
     assert f'"{diary_consent.CONSENT_FIELD}"' not in src, "read the tier through diary_consent, never by re-reading its field"
+
+
+# premerge-gate: 2587: the recall-corpus consent gate. Two of its assertions are pure repo-shape — the writer set (every file calling `make_embedding_item` must also call the consent gate) is a `os.walk` sweep, and the kind registries are derived from `semantic_recall.KINDS` so a new corpus kind reds until someone classifies it. Both are exactly the "invisible until someone adds a file" shape this list exists for,

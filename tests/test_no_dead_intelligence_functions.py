@@ -98,3 +98,6 @@ def test_no_live_module_references_deleted_symbols():
         if refs:
             offenders[os.path.relpath(path, REPO_ROOT)] = sorted(refs)
     assert not offenders, f"live modules still reference deleted symbols: {offenders}"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

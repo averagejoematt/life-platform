@@ -189,3 +189,6 @@ def test_the_zero_uncovered_came_from_registration_not_a_broken_walk():
     sweep = qa_manifest.api_sweep_routes()
     assert len(sweep) > 50, f"api_sweep carries only {len(sweep)} routes — the long tail is not being swept"
     assert set(sweep).isdisjoint(qa_manifest.api_dep_endpoints()), "the sweep double-counts declared api_deps"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

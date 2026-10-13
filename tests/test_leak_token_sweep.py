@@ -524,3 +524,6 @@ def test_tool_call_residue_flags_the_namespaced_and_result_envelopes_too():
     for body in (f'<{ns}invoke name="x">', f"</{ns}parameter>", "<function_results>", "</tool_use>"):
         hits = lts.check_body("/protocols/experiments/", "prose " + body + " prose")
         assert any(label == "Tool-call XML residue" for label, _ in hits), body
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

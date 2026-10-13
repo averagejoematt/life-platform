@@ -2330,3 +2330,6 @@ def test_sweep_stays_clean_when_cadence_is_clean(monkeypatch):
     )
     rec = ds.run_sweep()
     assert rec["status"] == "clean"
+
+
+# premerge-gate: 2692: PR #2884 merged 7/7 green on pr-checks.yml and red-mained main TWICE on these two files — neither is caught by the #2372 tree-sweep derivation above (discover_tree_sweeping_test_files() only matches os.walk(/.rglob(/ `git ls-files`), so nothing forced a classification decision. Both are structural/derivation guards by the CHARTER's own primitives (registry + derivation guard), just shaped di

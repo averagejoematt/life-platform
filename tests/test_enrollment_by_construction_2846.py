@@ -438,3 +438,6 @@ def test_alarm_coverage_links_a_cross_stack_dimension() -> None:
         "alarm_coverage() no longer links serve_stack's dimensions_map alarms to life-platform-site-api — "
         "the alarm-story gate has quietly widened its ledger instead of deriving the answer."
     )
+
+
+# premerge-gate: 2846: enrollment by construction. Verdict is pure repo shape — a Lambda constructed outside create_platform_lambda(), or landing with no deploy registration and no alarm story, must red BEFORE the merge. Post-merge is too late by construction: the next `cdk deploy` puts the unenrolled, unwatched function in production.

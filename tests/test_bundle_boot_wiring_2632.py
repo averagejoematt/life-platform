@@ -203,3 +203,6 @@ def test_baseline_loader_ignores_the_prose_keys():
     known = verify_bundle_boot.load_baseline(str(BASELINE))
     assert not any(k.startswith("_") for k in known)
     assert "web.og_image_lambda" in known
+
+
+# premerge-gate: 2632: the bundle-boot gate's WIRING. The gate itself is a pre-merge step and a deploy-path step; this file is what stops the call site vanishing again, and the removal it guards against is invisible in any diff that does not touch it.

@@ -354,3 +354,6 @@ class TestMutationProof:
         bad = "Push to 9,000 steps this week."
         csu._write_output_record("sleep_coach", "2026-08-08", "daily_brief", NARRATIVE, {"key_recommendation": bad})
         assert captured["key_recommendation"] == bad, "gate bypassed ⇒ the ungated condensation is persisted"
+
+
+# premerge-gate: same registry, derived-prose surface (#2418)

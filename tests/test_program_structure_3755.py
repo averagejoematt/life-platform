@@ -561,3 +561,6 @@ def test_constraint_block_stays_deterministic():
     a = _block(hevy_workouts_rotation_window=rows, rotation_window_start="2026-09-06")
     b = _block(hevy_workouts_rotation_window=rows, rotation_window_start="2026-09-06")
     assert json.dumps(a, sort_keys=True, default=str) == json.dumps(b, sort_keys=True, default=str)
+
+
+# premerge-gate: 3755: an AST sweep of lambdas/ + mcp/ asserting the week-grid config filename has exactly ONE reader (training/program_seam.py) and that both consumers reach it through that seam. Pure repo shape, and the reason it must run pre-merge is the defect it exists to stop: a second direct reader of training_week.json is invisible at runtime — the generator would plan a PPL week while another caller grade

@@ -1480,3 +1480,6 @@ def test_only_a_pre_fix_read_is_superseded_a_post_fix_one_is_left_to_the_gate():
     stamped = {**dark, "data_through": "2026-09-24"}
     later = {**dark, "generated_at": "2026-09-28T17:03:12.000000+00:00"}
     assert [o.get("superseded") for o in g.mark([stamped, later], "2026-09-26")] == [None, None]
+
+
+# premerge-gate: #4220: rglob sweep — no lambdas/web/** reader tallies a coach record from LEARNING#

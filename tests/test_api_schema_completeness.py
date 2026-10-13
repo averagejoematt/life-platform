@@ -610,3 +610,5 @@ def test_hand_mutated_baseline_reds_on_a_removed_key():
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

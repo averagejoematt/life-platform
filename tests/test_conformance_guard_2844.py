@@ -135,3 +135,6 @@ def test_vocabularies_are_live_and_nonempty():
     assert len(vocabs["personas"]) >= 20
     assert len(vocabs["lambdas"]) >= 100
     assert len(vocabs["alarms"]) >= 40
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

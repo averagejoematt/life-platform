@@ -415,3 +415,6 @@ def test_the_chat_resolvers_loose_step_reads_only_reviewed_entries(monkeypatch):
     catalog = {"db_curl": {"title": "Bicep Curl (Dumbbell)"}, "generated": {"title": "Squat Hold", "reviewed": False}}
     assert thr._resolve_movement_key({"title": "Squat"}, catalog, None) is None
     assert thr._resolve_movement_key({"title": "Bicep Curl"}, catalog, None) == "db_curl"
+
+
+# premerge-gate: 4108: reads `config/movement_catalog.json`, which `deploy/build_movement_catalog.py` regenerates from the Hevy history — a PR that lands a rebuilt catalog must red on itself (a fixture entry gone, a tier rule broken), not on whoever merges next. Picked up by `reset_artifact_test_files()`; named here in the same PR (PR #4124).

@@ -230,3 +230,6 @@ def test_the_sweep_reads_the_file_the_engines_import():
     """A sweep pointed at a stale path would pass forever."""
     assert GATES_SOURCE.is_file()
     assert os.path.realpath(gates.__file__) == os.path.realpath(str(GATES_SOURCE))
+
+
+# premerge-gate: 3621 box 3: an AST sweep of lambdas/experiment/experiment_gates.py asserting every module-level arming threshold carries a {value, kind, source} facet. Its verdict depends only on that file's text, and the failure it catches is a bare new literal added in the very PR that should red on it — post-merge is too late for a gate whose whole job is to stop an unpriced number shipping into a public zero-

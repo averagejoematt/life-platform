@@ -792,3 +792,6 @@ def test_cdk_cli_pin_has_a_dependabot_npm_leg():
         cfg = yaml.safe_load(f)
     legs = [u for u in cfg.get("updates", []) if u.get("package-ecosystem") == "npm" and u.get("directory") == "/cdk"]
     assert legs, ".github/dependabot.yml lost the npm /cdk ecosystem — the CDK CLI pin is one-legged again (#2760/#2468)"
+
+
+# premerge-gate: 2570: the CQ-01 pin guard stopped hand-listing the workflow files and now derives its declaration surface from `git ls-files` (the Makefile's stale black/ruff/mypy pins were invisible to the hand-list). That makes it a repo-shape ratchet: a new file declaring a pin must be caught pre-merge.

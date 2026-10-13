@@ -623,3 +623,6 @@ def test_update_configs_prints_the_config_anchor_report(tmp_path, monkeypatch, c
     assert "2026-06-16" in out and "2026-09-06" in out
     assert "[deliberate_carry] training_phases.json:current_started" in out  # untouched file still named
     assert "[derives_live] vacation_fund.json:start_date" in out  # ditto
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

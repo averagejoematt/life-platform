@@ -406,3 +406,5 @@ if __name__ == "__main__":  # pragma: no cover
     import sys
 
     sys.exit(subprocess.run(["python3", "-m", "pytest", __file__, "-v", "--tb=short"], cwd=ROOT).returncode)
+
+# premerge-gate: the #2339 red that widened this whole list

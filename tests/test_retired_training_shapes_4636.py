@@ -408,3 +408,6 @@ def test_the_sweep_sees_each_form(tmp_path):
     assert named == Counter({"lambdas/a.py": 1, "mcp/b.py": 1})
     assert keyed == Counter({"lambdas/a.py": 2})
     assert importers == Counter({"mcp/b.py": 1})
+
+
+# premerge-gate: #4636: rglob sweep — no read of macrofactor_workouts / a nested 'workouts' list outside training/legacy_workouts.py

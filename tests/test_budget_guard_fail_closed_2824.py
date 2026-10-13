@@ -308,3 +308,6 @@ def test_wire_path_public_handlers_gate_on_the_guard():
             if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "_ai_paused_response"
         ]
         assert calls, f"{handler} must gate on _ai_paused_response() — the wire the fail-closed contract enforces"
+
+
+# premerge-gate: #2824: os.walk sweep — no lambdas/mcp module may re-declare FAIL_CLOSED_FEATURES; membership lives in budget_guard alone

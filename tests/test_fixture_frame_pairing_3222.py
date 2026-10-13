@@ -632,3 +632,6 @@ def test_the_pt_evening_window_is_exercised_without_waiting_for_it():
 
     morning = datetime(2026, 8, 26, 9, 0, tzinfo=PACIFIC)
     assert not _frame_disagreement(morning), "09:00 PT must agree with UTC — the schedule-masked case #3206's CI ran in"
+
+
+# premerge-gate: #3222: the fixture half of the PT-day contract — repo-shape sweep of tests/ x lambdas/+mcp/, same lane as its two siblings below

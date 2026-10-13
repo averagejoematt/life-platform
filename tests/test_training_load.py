@@ -328,3 +328,6 @@ def test_no_second_trimp_implementation_in_the_training_or_compute_paths():
                 hits.append(rel)
     assert hits == [], hits
     assert "TRIMP_B = 1.92" in (root / "lambdas/training/training_load.py").read_text(encoding="utf-8")
+
+
+# premerge-gate: 4075: an rglob sweep of lambdas/ + mcp/ keeping the TRIMP exponent in one module. Pure repo shape — a second copy is exactly a PR's own diff.

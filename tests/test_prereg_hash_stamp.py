@@ -362,3 +362,6 @@ def test_lock_email_refuses_any_day_but_genesis_eve():
     for wrong in (date(2026, 7, 19), date(2026, 7, 17), date(2026, 7, 25)):
         with pytest.raises(SystemExit, match="genesis eve"):
             lock_email.check_timing(wrong, genesis)
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

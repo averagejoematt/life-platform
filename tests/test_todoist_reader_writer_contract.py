@@ -418,3 +418,6 @@ def test_the_injected_reader_is_discoverable_by_the_reader_scan():
     have picked this module up as a reader in the first place."""
     assert TODOIST_PARTITION.search(_FAKE_VIOLATING_READER)
     assert "tasks_completed" in todoist_scoped_reads(_FAKE_VIOLATING_READER)
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

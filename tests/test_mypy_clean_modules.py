@@ -230,3 +230,6 @@ def test_this_docstring_names_no_error_codes() -> None:
     # Non-vacuity: the scan must be able to find a code at all.
     assert codes, "mypy.ini disables nothing — this guard has no subject and would pass vacuously"
     assert any(c in f"a docstring mentioning {c} here" for c in codes)
+
+
+# premerge-gate: tier-2 types (real only when mypy is installed — the lane installs it)

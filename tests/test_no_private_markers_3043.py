@@ -109,3 +109,6 @@ def test_no_tracked_file_carries_private_marker():
         "belongs at the S3 owner prefix s3://matthew-life-platform/config/coaching/ "
         "(see docs/coaching/README.md)"
     )
+
+
+# premerge-gate: #3043: git ls-files sweep — no tracked file may carry the PRIVATE marker

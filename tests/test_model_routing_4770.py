@@ -343,3 +343,6 @@ def test_the_module_level_constants_callers_kept_still_carry_the_same_values():
         assert mod.AI_MODEL == os.environ.get("AI_MODEL", _S46)
         assert mod.AI_MODEL_HAIKU == os.environ.get("AI_MODEL_HAIKU", _H45)
     assert bc.TITAN_EMBED_MODEL_ID == os.environ.get("TITAN_EMBED_MODEL_ID", "amazon.titan-embed-text-v2:0")
+
+
+# premerge-gate: #4770: glob sweep of lambdas/ + mcp/ — no model literal, model env read or model_defaults import outside ai/model_routing.py

@@ -158,3 +158,6 @@ def test_scanner_fires_on_pacific_helper_reads_4750(tmp_path):
     found = _scan_wallclock_globals(tmp_path)
     assert "test_inj_attr.py:_TODAY" in found
     assert "test_inj_name.py:_T" in found
+
+
+# premerge-gate: 2026-08-10: #2472's own fix reddened main on this post-merge-only guard

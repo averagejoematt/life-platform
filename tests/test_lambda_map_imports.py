@@ -495,3 +495,5 @@ if __name__ == "__main__":
 
     result = subprocess.run(["python3", "-m", "pytest", __file__, "-v", "--tb=short"], cwd=ROOT)
     sys.exit(result.returncode)
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

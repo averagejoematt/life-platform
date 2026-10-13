@@ -507,7 +507,7 @@ check.** The detector now also follows imports into sweeping `tests/` helpers; t
 found 22 unclassified files (20 added to the lane, 2 excluded with reasons).
 
 **Owner:** whoever changes the pre-merge lane owns this section. Adding a structural gate
-= add it to `_PREMERGE_EXTRA_FILES` **in the same PR** (a guard whose verdict depends only
+= add a `# premerge-gate: <reason>` line (line start) to the test file **in the same PR** (#4270: `_PREMERGE_EXTRA_FILES` is derived from that marker, not hand-listed) (a guard whose verdict depends only
 on the repo tree has no business running after the merge). If you find yourself hand-listing
 test paths in a brief again, that is the defect this section exists to stop.
 

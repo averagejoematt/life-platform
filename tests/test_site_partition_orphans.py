@@ -153,3 +153,6 @@ def test_allowlist_stays_honest():
     for name, reason in ALLOWLIST_ORPHANS.items():
         assert name in reads, f"ALLOWLIST_ORPHANS has a dead entry {name!r} ({reason}) — no site-API endpoint reads it; prune it"
         assert name not in writers, f"ALLOWLIST_ORPHANS entry {name!r} now has a writer ({reason}) — the flag is stale; prune it"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

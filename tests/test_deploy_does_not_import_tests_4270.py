@@ -222,3 +222,6 @@ def test_guard_judges_tracked_tree_only_4846(tmp_path):
     (tmp_path / "cdk" / "bad.py").write_text(bad)
     git("add", "-A")
     assert _invocations_outside_tests(tmp_path) == ["cdk/bad.py: names the shim tests/visual_qa.py"]
+
+
+# premerge-gate: #4270/#4846: git ls-files sweep of workflows/lambdas/qa/cdk for tests/ shim imports

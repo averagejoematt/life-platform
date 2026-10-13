@@ -233,3 +233,6 @@ def test_every_claim_natural_reader_applies_the_hold_or_names_why_not():
             assert re.search(r"claim_sourcing\.unsourced\(", src), f"{name} is classified 'hold' but never calls claim_sourcing.unsourced"
         else:
             assert verdict.startswith("exempt: ") and len(verdict) > 40, f"{name}: an exemption needs a reason"
+
+
+# premerge-gate: #4701: glob sweep — every lambdas/web claim_natural reader applies claim_sourcing or names its exemption

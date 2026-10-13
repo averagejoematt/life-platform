@@ -531,3 +531,6 @@ def test_the_seed_date_is_not_in_the_future():
     assert all(
         entry["seeded"] == SEED_DATE for entry in SCOPED_WRITER_RESIDUE.values()
     ), "a line dated off the seal must carry its own reason"
+
+
+# premerge-gate: 3599 box 2: the SOURCE-tier sibling of the guard above — an AST sweep of lambdas/ mcp/ deploy/ scripts/ for every put_item writer landing a row on an EXPERIMENT_SCOPED `USER#matthew#SOURCE#*` partition with no write-time stamp. Pre-merge for the same reason as its #2119 sibling: the defect arrives in the diff of the PR that adds the writer, and post-merge is after the unstamped rows exist (#3513 m

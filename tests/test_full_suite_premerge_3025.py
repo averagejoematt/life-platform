@@ -375,3 +375,6 @@ def test_sections_report_names_a_failure_by_its_label_and_never_exits_non_zero(t
     bad = tmp_path / "bad.xml"
     bad.write_text("<not closed", encoding="utf-8")
     assert mod.main(["x", str(bad)]) == 0
+
+
+# premerge-gate: #3025: lane-parity contracts sweep two workflow files — repo-shape, pre-merge

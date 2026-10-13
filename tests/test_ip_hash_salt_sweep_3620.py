@@ -128,3 +128,6 @@ def test_salted_ip_hash_call_sites_exist_for_every_fixed_module():
     for rel, needle in expected.items():
         text = open(os.path.join(_ROOT, rel), encoding="utf-8").read()
         assert needle in text, f"{rel} no longer references {needle!r} — did the fix regress?"
+
+
+# premerge-gate: 3620: an os.walk sweep of lambdas/ + mcp/ for every `sha256(...)` call site whose argument mentions an IP, triaged against an explicit allowlist. Pure repo shape — a NEW unsalted `sha256(ip)` call site is exactly a PR's own diff, and the whole point of this file is that it must red BEFORE the merge that introduces it, not sit invisible post-merge the way the six sites this PR fixed did.

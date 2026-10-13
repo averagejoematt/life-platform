@@ -87,3 +87,6 @@ def test_planted_fixture_reds_a_rate_without_its_n(tmp_path):
     )
     offenders = rate_consumers_missing_n([bad, good])
     assert offenders == [str(bad)]
+
+
+# premerge-gate: 4035 box 3: rglob sweep of site/assets/js/**/*.js + non-legacy site/**/index.html for any consumer of weekly_rate_lbs — the rate-shows-its-n contract. Same reasoning as test_glossary_4035.py above: a new rate-rendering file is exactly a PR's own diff, and site/** auto-deploys on merge.

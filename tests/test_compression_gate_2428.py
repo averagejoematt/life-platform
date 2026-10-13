@@ -225,3 +225,6 @@ def test_board_prompt_serves_only_gated_compressed_state(monkeypatch):
     monkeypatch.setattr(ai, "table", _FakeTable(gated))
     bits = ai._coach_memory_bits("sleep_coach")
     assert "gated memory" in bits and "one concern" in bits
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

@@ -93,3 +93,6 @@ def test_deficit_sustainability_and_macros_view_reuse_the_constant_by_reference(
         "expected the shared constant referenced from BOTH tool_get_deficit_sustainability "
         "and _get_macro_targets in mcp/tools_nutrition.py"
     )
+
+
+# premerge-gate: 3754: os.walk sweep of lambdas/ + mcp/ for a literal copy of the ADR-104 "not comparable to the prior cut" sentence — a new nutrition surface that hand-types a drifted paraphrase (rather than importing the shared constant) must red on the PR that adds it, not sit invisible post-merge.

@@ -212,3 +212,6 @@ def test_type_of_is_the_filename_prefix() -> None:
 )
 def test_repo_paths_in_a_home_cell(cell: str, expected: list[str]) -> None:
     assert okl.repo_paths_in(cell) == expected
+
+
+# premerge-gate: 2848: the operating-knowledge ledger. Verdict is pure repo shape — the committed snapshot vs its rows, and whether every cited home is a tracked path. A PR that renames a homed page or drops a ledger row must red BEFORE the merge; post-merge the successor reads a registry pointing at a page no checkout has.

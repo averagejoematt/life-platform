@@ -184,3 +184,6 @@ def test_the_unchecked_fields_are_named_rather_than_forgotten():
     s = _stats()
     for field in ("review_count", "board_technical", "board_product"):
         assert field in s, f"{field} vanished from PLATFORM_STATS; update this file's stated gap"
+
+
+# premerge-gate: 3690: sweeps docs/reviews/*_grades_*.json to re-derive the three hand-maintained public stats (review_grade / site_pages / active_secrets) that /method/platform/ serves. Belongs pre-merge: it is a repo-shape ratchet over literals a PR can move, and the value it guards was wrong in PUBLIC for weeks precisely because nothing cheap ever re-read it.

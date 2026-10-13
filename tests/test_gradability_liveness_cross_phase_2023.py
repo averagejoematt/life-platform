@@ -1059,3 +1059,6 @@ def test_site_api_raw_helpers_expose_include_pilot():
             assert "include_pilot" in args, f"site_api_common.{node.name} no longer takes include_pilot"
             seen.add(node.name)
     assert seen == helpers, f"site-api raw-read helpers moved or were renamed: missing {sorted(helpers - seen)}"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)
