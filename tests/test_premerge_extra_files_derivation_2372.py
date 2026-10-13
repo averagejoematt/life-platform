@@ -200,3 +200,20 @@ def test_a_marked_file_is_picked_up_and_an_unmarked_one_is_not(tmp_path):
     found = discover_marked_premerge_files(root=tmp_path)
 
     assert found == {marked.name}, f"marker derivation selected {sorted(found)}; only the marked test file may be picked up"
+
+
+_MARKED_FILE_FLOOR = 216  # down-only: a dropped marker takes a gate out of the pre-merge lane. Bump UP when you add one.
+
+
+def test_the_marked_set_never_shrinks_below_the_floor():
+    assert len(conftest._PREMERGE_EXTRA_FILES) >= _MARKED_FILE_FLOOR, "a premerge-gate marker was removed"
+
+
+def test_marker_prose_is_not_read_as_a_tree_sweep(tmp_path):
+    """A marker reason that mentions `git ls-files` must not make its file a tree-sweeper (a phantom gate id)."""
+    marker = "# " + "premerge-gate"
+    prose = tmp_path / "test_synthetic_prose_4270.py"
+    prose.write_text("def test_a():\n    assert True\n\n" + marker + ": matches os.walk( and git ls-files in prose\n", encoding="utf-8")
+    real = tmp_path / "test_synthetic_real_4270.py"
+    real.write_text("import os\n\ndef test_b():\n    for _ in os.walk('x'):\n        pass\n", encoding="utf-8")
+    assert discover_tree_sweeping_test_files(root=tmp_path) == {"test_synthetic_real_4270.py"}

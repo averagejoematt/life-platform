@@ -104,6 +104,11 @@ def _imports_a_sweeping_helper(text: str, helpers: set[str]) -> bool:
     return any(re.search(rf"^[ \t]*(?:from|import)[ \t]+(?:tests\.)?{re.escape(name)}\b", text, re.MULTILINE) for name in sorted(helpers))
 
 
+def _strip_marker_lines(text: str) -> str:
+    """Drop `# premerge-gate:` lines so a marker's prose ("`git ls-files`") never reads as a sweep."""
+    return "\n".join(ln for ln in text.splitlines() if not ln.startswith("# premerge-gate:"))
+
+
 def discover_tree_sweeping_test_files(root: Path | None = None) -> set[str]:
     """Return the basenames of every `test_*.py` file under `root` (default: `tests/`
     directory) that sweeps a directory tree — **directly**, or by importing a
@@ -124,7 +129,7 @@ def discover_tree_sweeping_test_files(root: Path | None = None) -> set[str]:
         text = _read(path)
         if text is None:
             continue
-        if _SWEEP_PATTERN.search(text) or _imports_a_sweeping_helper(text, helpers):
+        if _SWEEP_PATTERN.search(_strip_marker_lines(text)) or _imports_a_sweeping_helper(text, helpers):
             found.add(path.name)
     return found
 

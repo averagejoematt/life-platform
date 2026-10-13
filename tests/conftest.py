@@ -264,8 +264,8 @@ _PREMERGE_FILENAME_SUFFIX = "_behavior.py"
 # substance, not repo-shape ratchets, so they belong to the post-merge lane's job.
 #
 # The generalisable lesson, worth more than the list: **a guard whose verdict depends only
-# on the repo tree has no business running after the merge.** When you add one, add it
-# here in the same PR.
+# on the repo tree has no business running after the merge.** When you add one, add a
+# `# premerge-gate: <reason>` line to its own file in the same PR.
 # DERIVED FROM A MARKER, NOT HAND-LISTED (#4270 box 4). A structural gate joins the
 # pre-merge lane by carrying, at the START OF A LINE anywhere in its own file:
 #

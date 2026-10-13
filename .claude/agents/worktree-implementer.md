@@ -117,8 +117,8 @@ write surface is your own worktree and your own branch.
    counts in the PR body because concurrent lanes bump the same two lines and the driver
    stacks them at merge; (#3025) a test that writes inside the checkout is registered in
    `IN_TREE_WRITERS` and marked `pytestmark = pytest.mark.serial`; (#3477) a test reading a
-   regenerated artifact under `deploy/generated/**` or `config/` joins
-   `_PREMERGE_EXTRA_FILES`; (schema census) a new `phase_taxonomy.SOURCE_CLASS` entry gets
+   regenerated artifact under `deploy/generated/**` or `config/` gets a
+   `# premerge-gate: <reason>` marker line (it then joins `_PREMERGE_EXTRA_FILES`); (schema census) a new `phase_taxonomy.SOURCE_CLASS` entry gets
    a `docs/SCHEMA.md` row; (tombstone guard) a `get_item` in a generation path is guarded
    by `singleton_visible` or exempted with a reason; (#3597) a new Load-bearing
    `docs/PROPORTIONALITY.md` row carries `demote_by:` or `demote_when:`. A parametrized
