@@ -77,6 +77,8 @@ _GENERATED_SCAN_LINES = 40
 # keyed ``<repo-relative path>::<qualname>`` (``Class.method``, ``outer.inner``; a second
 # def of the same qualname in one file gets ``#2``). The value is the function's MAXIMUM
 # ALLOWED logical line count, measured, not rounded. Down-only, in membership and numbers.
+# Landing re-measure (not a raise): wednesday_chronicle_lambda.py::_handler_core 581 -> 587 came
+# from #4869, merged to main before this guard existed (measured again on origin/main f3ecb9b6b).
 # ─────────────────────────────────────────────────────────────────────────────
 FUNCTION_LENGTH_COUNTS = {
     "deploy/archive/cleanup_gap_chronicles_2026_05_03.py::main": 224,
@@ -126,7 +128,7 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/emails/freshness_checker_lambda.py::lambda_handler": 477,
     "lambdas/emails/monthly_digest_render.py::build_html": 323,
     "lambdas/emails/partner_email_lambda.py::gather_all": 182,
-    "lambdas/emails/wednesday_chronicle_lambda.py::_handler_core": 581,
+    "lambdas/emails/wednesday_chronicle_lambda.py::_handler_core": 587,
     "lambdas/emails/weekly_digest_lambda.py::build_html": 679,
     "lambdas/health/character_engine.py::compute_character_sheet": 267,
     "lambdas/health/character_engine.py::evaluate_level_changes": 189,
