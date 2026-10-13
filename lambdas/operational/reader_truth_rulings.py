@@ -1129,7 +1129,8 @@ def is_uncited_temporal_objection(finding):
 # day (EP4: Day 24 = 2026-09-29, two days earlier). Both numbers are right; the
 # judge reads the pair as a contradiction. STRUCTURAL: category + page + a cited
 # Thursday dateline + a cited Day N whose calendar date (start_date + N - 1) falls
-# 0-7 days BEFORE that dateline. A Day N dated AFTER the dateline (EP2 dated
+# 0-7 days BEFORE that dateline. Day N is taken only from the
+# page copy the judge quotes, never from the judge's own arithmetic. A Day N dated AFTER the dateline (EP2 dated
 # 09-17 but "Day 40"), or more than a week before it, is a real contradiction and
 # stays gating. Demoted to low, not dropped.
 PANEL_PAGE = "/story/panel/"
@@ -1146,8 +1147,12 @@ def is_publish_day_beside_chapter_end(finding, start_date):
     except ValueError:
         return False
     note = str(finding.get("note") or "")
-    dates = set(note_dates(note, default_year=start.year))
-    days = day_numbers(note)
+    # The judge's OWN arithmetic is not evidence: the live note restates the
+    # dateline's day ("Day 26"), cites the genesis ("Day 1 = Sept 6") and works a
+    # sum. Day N is read ONLY from copy the judge quotes off the page; the genesis
+    # date is the phase anchor, not a dateline.
+    dates = set(note_dates(note, default_year=start.year)) - {start.isoformat()}
+    days = day_numbers(" ".join(quoted_spans(note)))
     if len(dates) != 1 or len(days) != 1:
         return False
     try:

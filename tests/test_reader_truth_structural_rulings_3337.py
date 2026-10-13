@@ -675,7 +675,13 @@ def test_the_live_alarm_findings_resolve_the_way_the_issue_says():
 
 # ── #4845: the panel's publish-day dateline beside the chapter's last Day N ──
 _EP_START = "2026-09-06"  # cycle 17 genesis: Day 24 = 2026-09-29, the Thursday after is 10-01
-EP4_NOTE = "EP4 is dated THURSDAY, OCTOBER 1, with narrative stating Day 24. Twenty-three straight training..."
+# The judge's FULL note, verbatim from visual-qa-standalone run 38171858952 (report.json).
+EP4_NOTE = (
+    "EP4 is dated THURSDAY, OCTOBER 1, with narrative stating 'Day 24. Twenty-three straight training days.' "
+    "October 1, 2026 is Day 26 of the cycle (Day 1 = Sept 6; Sept 6 + 25 days = Oct 1). This is off by 2 days and "
+    "constitutes an impossibility: the episode narrative contradicts the date it bears. Either the date or the day "
+    "count is fabricated."
+)
 
 
 def _panel(note, **kw):
@@ -692,11 +698,17 @@ def test_ep4_publish_dateline_beside_day_24_is_ruled_advisory_not_baselined():
 def test_ep4_controls_a_mismatched_pair_still_gates():
     # EP2 dated Sept 17 but Day 40 (a date AFTER the dateline), and Day 24 under a
     # Thursday more than a week later, are real contradictions.
-    assert not R.is_publish_day_beside_chapter_end(_panel("EP2 is dated Sept 17 but says Day 40."), _EP_START)
-    assert not R.is_publish_day_beside_chapter_end(_panel("EP4 is dated October 22 but says Day 24."), _EP_START)
+    assert not R.is_publish_day_beside_chapter_end(_panel("EP2 is dated Sept 17 but says 'Day 40. Forty straight days.'"), _EP_START)
+    assert not R.is_publish_day_beside_chapter_end(
+        _panel("EP4 is dated October 22 but says 'Day 24. Twenty-three straight days.'"), _EP_START
+    )
     # not a Thursday
-    assert not R.is_publish_day_beside_chapter_end(_panel("EP4 is dated October 2 but says Day 24."), _EP_START)
+    assert not R.is_publish_day_beside_chapter_end(
+        _panel("EP4 is dated October 2 but says 'Day 24. Twenty-three straight days.'"), _EP_START
+    )
     # other page / other category / no date
     assert not R.is_publish_day_beside_chapter_end(_panel(EP4_NOTE, page="/story/"), _EP_START)
     assert not R.is_publish_day_beside_chapter_end(_panel(EP4_NOTE, category="stale_data"), _EP_START)
     assert not R.is_publish_day_beside_chapter_end(_panel("The page says 12 episodes but lists 5."), _EP_START)
+    # a Day N that appears only in the judge's own arithmetic (nothing quoted off the page) is not evidence
+    assert not R.is_publish_day_beside_chapter_end(_panel("EP4 is dated October 1 and the judge computes Day 24."), _EP_START)
