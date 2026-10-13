@@ -1183,6 +1183,10 @@ def is_publish_day_beside_chapter_end(finding, start_date):
 # field (a data-staleness claim), keeps gating. Demoted to low, not dropped.
 CORRELATION_SURFACES = ("/protocols/discoveries/", "/method/intelligence/")
 _SAMPLE_SIZE_RE = re.compile(r"\bn\s*=\s*(\d{1,4})(?:\.0+)?\b", re.I)
+_ISO_WEEK_RE = re.compile(r"\b(\d{4})-W(\d{2})\b")
+# weekly_correlation_compute_lambda.LOOKBACK_DAYS: the longest history the engine reads,
+# so an n above it is a real defect, not the stored-history design.
+CORRELATION_LOOKBACK_DAYS = 90
 
 
 def is_stored_history_sample_size(finding, start_date, today):
@@ -1197,7 +1201,22 @@ def is_stored_history_sample_size(finding, start_date, today):
     note = str(finding.get("note") or "")
     if not note.strip() or cites_payload_date_field(note):
         return False
-    return any(int(m) > day for m in _SAMPLE_SIZE_RE.findall(note))
+    # Narrow: a note that also cites a date after today, or a future ISO week, is a
+    # genuine contradiction that merely quotes n=N; and an N beyond the engine's
+    # lookback cannot be the stored-history design.
+    today_d = date.fromisoformat(str(today))
+    if any(d > today_d.isoformat() for d in _note_dates(note)):
+        return False
+    for y, w in _ISO_WEEK_RE.findall(note):
+        try:
+            if date.fromisocalendar(int(y), int(w), 1) > today_d:
+                return False
+        except ValueError:
+            return False
+    ns = [int(m) for m in _SAMPLE_SIZE_RE.findall(note)]
+    if any(n > CORRELATION_LOOKBACK_DAYS for n in ns):
+        return False
+    return any(n > day for n in ns)
 
 
 RULINGS_FIELD = "rulings"

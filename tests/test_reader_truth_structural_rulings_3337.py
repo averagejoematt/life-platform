@@ -719,7 +719,7 @@ def test_ep4_controls_a_mismatched_pair_still_gates():
 
 
 # ── #4834: the correlation sample size n beside a young day counter ──────────
-# Verbatim judge notes from visual-qa-standalone run 38339302560 (report.json).
+# Judge notes abridged (ASCII, trimmed) from visual-qa-standalone run 38339302560 (report.json).
 N89_GATED = (
     "The Discoveries page reports correlations with n=89.0 days across multiple findings (HRV x Sleep Score, Resting HR x "
     "Recovery, HRV x Recovery, Sleep Score x Recovery). The experiment is only 37 days old (Day 1 = 2026-09-06, today = "
@@ -771,3 +771,19 @@ def test_n89_controls_a_genuine_contradiction_still_gates():
     assert not R.is_stored_history_sample_size(_corr("The page says today is Day 90 but it is Day 37."), _EP_START, d)
     # fails closed without the clock
     assert not R.is_stored_history_sample_size(_corr(N89_GATED), _EP_START, None)
+
+
+def test_n89_narrowing_a_mixed_note_with_a_real_defect_still_gates():
+    d = "2026-10-12"
+    # future 'data through' date beside n=89
+    assert not R.is_stored_history_sample_size(
+        _corr("The page shows n=89 days and says data through 2026-10-20 on Day 37; data through a future date is impossible."),
+        _EP_START,
+        d,
+    )
+    # future ISO week beside n=89 (2026-W45 starts 2026-11-02)
+    assert not R.is_stored_history_sample_size(_corr("Labelled 2026-W45 (a future week) with n=89 days on Day 37."), _EP_START, d)
+    # N beyond the correlation lookback (90 days)
+    assert not R.is_stored_history_sample_size(_corr("The page shows n=9999 paired days on Day 37."), _EP_START, d)
+    # boundary: n=90 is still the lookback window
+    assert R.is_stored_history_sample_size(_corr("The page shows n=90 paired days on Day 37."), _EP_START, d)
