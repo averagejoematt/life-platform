@@ -50,6 +50,13 @@ _RECAP_VITAL_RE = _re.compile(
 )
 
 
+def _recap_raw_vital(text):
+    """The first raw-vital span a recap text cites (the matched text), or None. #4865: the guard used to say only
+    "cites a raw vital", which left a rejected recap undiagnosable from the log."""
+    m = _RECAP_VITAL_RE.search(text or "")
+    return m.group(0) if m else None
+
+
 def _recap_contains_raw_vitals(text):
     """True if the text cites a raw physiological number a recap must not invent."""
     return bool(_RECAP_VITAL_RE.search(text or ""))
@@ -145,8 +152,9 @@ def build_recap(data, new_installment_md=None, new_meta=None, *, _g):
 
         story = (recap.get("story_so_far") or "").strip()
         # Guard 3 — the headline paragraph must not invent vitals either.
-        if _recap_contains_raw_vitals(story):
-            logger.warning("[recap] story_so_far cites a raw vital — skipping recap")
+        _story_vital = _recap_raw_vital(story)
+        if _story_vital:
+            logger.warning("[recap] story_so_far cites a raw vital (%r) — skipping recap", _story_vital)
             return None
 
         as_of = new_meta.get("date") if (new_meta and new_meta.get("date")) else (published[0].get("date") if published else None)
