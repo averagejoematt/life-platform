@@ -29,6 +29,8 @@ Usage:
   python3 deploy/backfill_training_notes.py --apply                # write (MODEL SPEND)
   python3 deploy/backfill_training_notes.py --since 2026-06-01 --apply
   python3 deploy/backfill_training_notes.py --report-overwrites    # READ-ONLY; writes nothing
+  python3 deploy/backfill_training_notes.py --re-extract           # READ-ONLY: record count + mode=batch|realtime (#4875)
+  python3 deploy/backfill_training_notes.py --re-extract --apply   # ONE batch job over the cached history (MODEL SPEND)
   python3 deploy/backfill_training_notes.py --value-census         # READ-ONLY, $0; what is IN the un-extracted notes
   python3 deploy/backfill_training_notes.py --pain-burst-census --since 2026-09-19T21:00Z --until 2026-09-19T21:10Z
                                                                      # READ-ONLY (#3972); lists #pain thread rows + lexicon explanation
@@ -139,7 +141,7 @@ def _cached_llm_fn(table):
     return _fn
 
 
-def batch_prefetch(table, workouts, *, force_realtime=False, wait_hours=None, prefetch=None):
+def batch_prefetch(table, workouts, *, force_realtime=False, wait_hours=None, prefetch=None, reextract=False, plan_only=False):
     """#4814: answer the sweep's uncached notes as one Bedrock batch job at 100+ records (half price).
 
     Prints which path ran and why (`mode=realtime` below the floor, with --realtime, over the cap, or when
@@ -149,14 +151,32 @@ def batch_prefetch(table, workouts, *, force_realtime=False, wait_hours=None, pr
 
     notes = [note for w in workouts for (_ex, _tid, _name, _occ, note) in _noted_sessions(w)]
     prefetch = prefetch or tl.bulk_prefetch
-    res = prefetch(table, notes, tn.TAXONOMY, force_realtime=force_realtime, wait_hours=wait_hours)
-    print(f"batch-prefetch: {res['records']} uncached distinct notes · mode={res['mode']} · {res['reason']}")
-    if res["mode"] != "realtime":
+    extra = {"reextract": True, "plan_only": plan_only} if reextract else {}
+    res = prefetch(table, notes, tn.TAXONOMY, force_realtime=force_realtime, wait_hours=wait_hours, **extra)
+    label = "distinct notes (re-extract, cache ignored)" if reextract else "uncached distinct notes"
+    print(f"batch-prefetch: {res['records']} {label} · mode={res['mode']} · {res['reason']}")
+    if res["mode"] != "realtime" and not plan_only:
         print(
             f"  job={res['job_arn']} answered={res['answered']} degraded={res['degraded']} "
             f"unanswered(retried per-note)={res['errors']} savings={res.get('savings')}"
         )
+    if plan_only:
+        return res  # the dry run reports the plan itself; there is no degrade map to hand on
+    if reextract and res["mode"] == "realtime":
+        # A re-extraction has no per-note realtime leg: every note is cached, so the sweep would read the cache and
+        # change nothing. Refuse loudly rather than report a run that did nothing as a success (#4875).
+        print("re-extract: no batch job was submitted, so nothing was re-extracted and nothing is written")
+        return None
     return res["precomputed"]
+
+
+def reextract_dry_run(table, since, prefetch=None):
+    """#4875 READ-ONLY: the `--report-overwrites` listing, then the record count and `mode=` a `--re-extract --apply`
+    would take. Writes nothing and calls no model (the gates read the budget tier and the cap counter only)."""
+    report_overwrites(table, since)
+    res = batch_prefetch(table, _noted_workouts(table, since), reextract=True, plan_only=True, prefetch=prefetch)
+    print(f"\nRE-EXTRACT (dry-run — nothing written, no model called): {res['records']} records · mode={res['mode']}")
+    return res
 
 
 def report_overwrites(table, since):
@@ -651,6 +671,12 @@ def main():
         help="with --only-note --apply: raise the monthly Haiku cap by exactly N above the live count for this run (bounded spend)",
     )
     ap.add_argument(
+        "--re-extract",
+        action="store_true",
+        help="re-extract the CACHED noted history as one Bedrock batch job (#4875). Without --apply: READ-ONLY, prints the "
+        "record count and the mode=batch|realtime a run would take; writes nothing, calls no model",
+    )
+    ap.add_argument(
         "--realtime", action="store_true", help="with --apply: never submit a Bedrock batch job; every note runs on-demand (#4814)"
     )
     ap.add_argument("--batch-wait-hours", type=float, default=None, help="with --apply: how long to wait on a batch job (default 24)")
@@ -666,6 +692,10 @@ def main():
             only_note = parse_only_note(args.only_note)
         except ValueError as e:
             ap.error(str(e))
+    if args.re_extract and (args.only_note or args.migrate or args.report_overwrites or args.value_census or args.pain_burst_census):
+        ap.error("--re-extract is its own mode; run it on its own")
+    if args.re_extract and args.realtime:
+        ap.error("--re-extract exists to submit a batch job; --realtime would make it a no-op")
     if args.report_overwrites and args.apply:
         ap.error("--report-overwrites is read-only; it cannot be combined with --apply")
     if args.value_census and args.apply:
@@ -679,6 +709,9 @@ def main():
 
     if args.report_overwrites:
         report_overwrites(table, args.since)
+        return
+    if args.re_extract and not args.apply:
+        reextract_dry_run(table, args.since)
         return
     if args.value_census:
         print_value_census(value_census(table, args.since))
@@ -702,7 +735,11 @@ def main():
         # #4151: a sweep charges the bulk lane, so it can never spend the live path's month.
         precomputed = None
         if args.apply:
-            precomputed = batch_prefetch(table, workouts, force_realtime=args.realtime, wait_hours=args.batch_wait_hours)
+            precomputed = batch_prefetch(
+                table, workouts, force_realtime=args.realtime, wait_hours=args.batch_wait_hours, reextract=args.re_extract
+            )
+            if args.re_extract and precomputed is None:
+                return
         llm_fn = make_llm_fn(table, lane="bulk", precomputed=precomputed) if args.apply else None  # dry-run: no model spend
 
     total_records = total_pain = total_workouts = 0
