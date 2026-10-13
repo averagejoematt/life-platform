@@ -37,8 +37,11 @@
     "note": "New alarm (2026-08-23, DIL-036 slice of #2824): fires when budget_guard logs BUDGET_TIER_UNREADABLE on the public site-api-ai path — the SSM budget-tier read failed (ParameterNotFound / AccessDenied / outage), website_ai is failing CLOSED (readers get the honest 'paused' output), and the rest of the fleet is running fail-open with NO ceiling enforcement. Never a routine state: if lit, restore the SSM param/grant (/life-platform/budget-tier) — the guard recovers within one 5-min cache TTL. Prune this entry only if the alarm is retired; while #2824 is open it is the named owner."
   },
   "coherence-overall": {
-    "citation": "2026-08-24 session note — single episode, cleared",
-    "note": "One OK->ALARM->OK cycle in the D2 window while 26 PRs merged and the fleet redeployed — coherence dips during heavy merge/deploy churn are the known shape. Cleared without intervention. If it re-fires on a quiet day, file fresh."
+    "added": "2026-10-13",
+    "cause": "facts_agreement:expert_sleep_stale,facts_agreement:coach_physical_coach_stale",
+    "cause_observed": "2026-10-13T01:30Z",
+    "citation": "#4866 — fired 2026-10-12 18:46Z: facts_agreement reads expert:sleep served from 10-05 and coach:physical_coach from 10-08 because the 10-12 14:00Z ai-expert-analyzer run was HELD by the grounding gate (request 90f7c52f — the gate took the 10-11 Whoop HRV outlier, 136.92 ms, as the authoritative HRV; issue 4703's prior integrator record had already expired by TTL). The gate fix is PR 4870 (merged 2026-10-13 03:09Z, deployed by CI); the stale facts refresh on the next run that PASSES the gate — Monday 2026-10-19 14:00Z, or the owner's one-line invoke on issue 4703 — and the alarm clears with them. Re-cite if still red after 2026-10-19 15:00Z.",
+    "note": "Prior entry (2026-08-24): one OK->ALARM->OK cycle during a 26-PR merge/deploy churn, cleared without intervention — a different, transient shape."
   },
   "compute-pipeline-stale": {
     "added": "2026-10-10",
@@ -174,5 +177,11 @@
     "cause": "daily-metrics-compute async failures (outage now fixed)",
     "cause_observed": "2026-10-10T04:45Z",
     "citation": "#4731 — flapped x6 in the window (entered ~00:06Z and ~16:46Z daily since 2026-10-07): each crashed daily-metrics-compute run (the issue 4704 outage, fixed 2026-10-10 ~04:30Z) landed one message on life-platform-ingestion-dlq, and the dlq-consumer re-invoked the crashing function every 6 h without escalating. Cleared ~09:05Z 2026-10-10 once the consumer retried on fixed code. The never-escalates defect is #4731 (PR 4741 held for the owner)."
+  },
+  "coach-vision-no-invocations-7d": {
+    "added": "2026-10-13",
+    "cause": "new_function_no_history",
+    "cause_observed": "2026-10-13T01:30Z",
+    "citation": "#3759 — one OK->ALARM->OK cycle: the alarm lit when the owner's 2026-10-12 03:04Z LifePlatformCompute apply created coach-vision (a 7-day no-invocation alarm reads a brand-new function as silent by construction) and cleared when its first scheduled run executed at 2026-10-12 17:00Z (honest-empty — no Sunday photo set yet). It re-lights by design only if a Monday 17:00Z run is missed; a lit state with the photo set absent is the expected shape until the owner sends one."
   }
 }
