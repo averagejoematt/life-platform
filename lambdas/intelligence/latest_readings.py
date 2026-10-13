@@ -41,7 +41,7 @@ and the day-scoped rollup is the right producer for them. Only figures that answ
 
 from datetime import datetime, timedelta
 
-from common.pacific_time import PACIFIC, pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
+from common.pacific_time import PACIFIC, pacific_now, parse_iso_utc  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 # The #1369 Truth Spine — the cockpit's resolution, imported rather than re-derived.
 # A second implementation here would be the very defect this module closes.
@@ -119,7 +119,7 @@ def resolve_latest_readings(table, user_prefix, withings_latest=None, now=None):
 def hrv_series_facts(query_fn, today, log=None):
     """Stored Whoop HRV rows, 30 days to ``today`` -> {"hrv_series", "hrv_series_source"}; {} on failure (#4866)."""
     try:
-        start = (datetime.fromisoformat(today) - timedelta(days=30)).date().isoformat()
+        start = (parse_iso_utc(today) - timedelta(days=30)).date().isoformat()
         from common.digest_utils import filter_day_rows
 
         rows = [
