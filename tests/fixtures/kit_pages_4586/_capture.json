@@ -1,5 +1,5 @@
 {
- "captured_at": "2026-10-12T15:35:22Z",
+ "captured_at": "2026-10-13T01:38:57Z",
  "base": "https://averagejoematt.com",
  "by": "scripts/capture_kit_page_fixtures.py (#4671) \u2014 one pass, read-only GETs; re-run it, never hand-edit a file",
  "files": {
@@ -35,5 +35,6 @@
   "transcript_wk4.json": "/panelcast/wk4.transcript.json",
   "weekly_priority.json": "/api/weekly_priority",
   "workouts.json": "/api/workouts"
- }
+ },
+ "ahead_of_live": "coach_moves_*.json carry the top-level `absent: []` key PR #4872 added, hand-added before the fleet deploy (the script only fetches live, which did not serve it yet); the scheduled recapture replaces them with the served value"
 }

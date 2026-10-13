@@ -1,47 +1,11 @@
 {
  "_meta": {
-  "generated_at": "2026-10-12T15:35:27.693578+00:00",
-  "served_at": "2026-10-12T15:35:27.693578+00:00",
+  "generated_at": "2026-10-13T01:38:39.156909+00:00",
+  "served_at": "2026-10-13T01:38:39.156909+00:00",
   "cache_seconds": 300,
-  "request_id": "06ccc3b822ad4362"
+  "request_id": "cb1e907b3f3a4d78"
  },
  "open": [
-  {
-   "topic": "Fuel-cognition link mechanistic validity",
-   "topic_slug": "fuel-cognition-link-mechanistic-validity",
-   "coach_a": "mind_coach",
-   "coach_b": "nutrition_coach",
-   "claims": {
-    "mind_coach": "Fuel-cognition link may be slower than estimated or barrier is not primarily metabolic; journaling silence persists despite protein recovery (157g EWMA), suggesting structural/emotional barrier",
-    "nutrition_coach": "Protein intake gap (102g vs 190g target) mechanistically suppresses cognition through tryptophan availability; dinner disruption during Sept 19-26 window would confirm protein collapse hypothesis"
-   },
-   "criterion": {
-    "metric": "total_protein_g_7day_avg",
-    "condition": "gte",
-    "description": "total_protein_g_7day_avg >= 190 on 2026-10-12",
-    "threshold": 190.0
-   },
-   "sides": {
-    "nutrition_coach": true,
-    "mind_coach": false
-   },
-   "resolution_date": "2026-10-12",
-   "opened_date": "2026-09-28",
-   "stakes": {
-    "mind_coach": {
-     "brier": 0.25,
-     "brier_n": 9.0,
-     "confidence": 0.5,
-     "subdomain": "protein"
-    },
-    "nutrition_coach": {
-     "subdomain": "protein",
-     "brier": 0.25,
-     "confidence": 0.167,
-     "brier_n": 19.0
-    }
-   }
-  },
   {
    "topic": "Deep sleep spike interpretation: signal vs. noise",
    "topic_slug": "deep-sleep-spike-interpretation-signal-vs-noise",
@@ -80,6 +44,54 @@
   }
  ],
  "resolved": [
+  {
+   "topic": "Fuel-cognition link mechanistic validity",
+   "topic_slug": "fuel-cognition-link-mechanistic-validity",
+   "coach_a": "mind_coach",
+   "coach_b": "nutrition_coach",
+   "claims": {
+    "mind_coach": "Fuel-cognition link may be slower than estimated or barrier is not primarily metabolic; journaling silence persists despite protein recovery (157g EWMA), suggesting structural/emotional barrier",
+    "nutrition_coach": "Protein intake gap (102g vs 190g target) mechanistically suppresses cognition through tryptophan availability; dinner disruption during Sept 19-26 window would confirm protein collapse hypothesis"
+   },
+   "criterion": {
+    "metric": "total_protein_g_7day_avg",
+    "condition": "gte",
+    "threshold": 190.0,
+    "description": "total_protein_g_7day_avg >= 190 on 2026-10-12"
+   },
+   "sides": {
+    "nutrition_coach": true,
+    "mind_coach": false
+   },
+   "resolution_date": "2026-10-12",
+   "opened_date": "2026-09-28",
+   "stakes": {
+    "nutrition_coach": {
+     "subdomain": "protein",
+     "brier": 0.25,
+     "confidence": 0.167,
+     "brier_n": 19.0
+    },
+    "mind_coach": {
+     "brier_n": 9.0,
+     "subdomain": "protein",
+     "brier": 0.25,
+     "confidence": 0.5
+    }
+   },
+   "verdict": {
+    "outcome": "graded",
+    "actual_value": 158.2,
+    "winner": "mind_coach",
+    "loser": "nutrition_coach",
+    "holds": false
+   },
+   "winner": "mind_coach",
+   "loser": "nutrition_coach",
+   "actual_value": 158.2,
+   "resolved_date": "2026-10-12",
+   "concession": "CONCESSION (2026-10-12) \u2014 I lost the docket dispute on 'Fuel-cognition link mechanistic validity'. My recorded claim: \"Protein intake gap (102g vs 190g target) mechanistically suppresses cognition through tryptophan availability; dinner disruption during Sept 19-26 window would confirm protein collapse hypothesis\". The criterion we agreed to at open \u2014 total_protein_g_7day_avg >= 190 on 2026-10-12 \u2014 resolved against me: actual value 158.2. The mind coach took the other side and was right. This stays on my record: when I next address Fuel-cognition link mechanistic validity, I cite this concession instead of relitigating it."
+  },
   {
    "topic": "Recovery rebound interpretation: mean reversion vs. corrective action",
    "topic_slug": "recovery-rebound-interpretation-mean-reversion-vs-corrective",
@@ -255,8 +267,8 @@
   }
  ],
  "counts": {
-  "open": 2,
-  "resolved": 3
+  "open": 1,
+  "resolved": 4
  },
  "withheld": 0,
  "disclosure": "Standing disagreements between AI coaches, each with skin in the game: the stake is the coach's own Brier record, frozen when the docket opened. The resolution criterion and date are agreed at open and graded by deterministic code against real data \u2014 no AI writes the verdict, and lost disputes stay on the record next to the wins. Claims and concessions cross the same standing privacy filter as the coach dossier before publishing; any hit withholds the whole entry and this payload counts it."

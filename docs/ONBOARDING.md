@@ -126,7 +126,7 @@ No credentials in code or environment variables. All secrets live under prefix `
 
 The 8 coaches are persistent agents with episodic memory, voice differentiation, cross-coach awareness, and Bayesian prediction accountability. All math happens in the deterministic computation engine — the LLM never does math. The prediction loop is closed end-to-end as of ADR-055 (May 2026).
 
-The 8 coach IDs (from `lambdas/coach_computation_engine.py:COACH_IDS`):
+The 8 coach IDs (from `lambdas/coach/coach_computation_engine.py:COACH_IDS`):
 `dr_johansson` · `fitness_coach` · `nutrition_coach` · `mind_coach` · `sleep_coach` · `body_comp_coach` · `lifestyle_coach` · `recovery_coach`
 
 These are the Coach Intelligence pipeline identities. The advisor *personas* used in emails/observatory (Dr. Sarah Chen, Dr. Marcus Webb, etc.) are configured separately in `s3://matthew-life-platform/config/board_of_directors.json` and bound to data domains — see `docs/BOARDS.md`.

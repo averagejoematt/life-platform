@@ -202,7 +202,7 @@ def test_a_marked_file_is_picked_up_and_an_unmarked_one_is_not(tmp_path):
     assert found == {marked.name}, f"marker derivation selected {sorted(found)}; only the marked test file may be picked up"
 
 
-_MARKED_FILE_FLOOR = 216  # down-only: a dropped marker takes a gate out of the pre-merge lane. Bump UP when you add one.
+_MARKED_FILE_FLOOR = 217  # down-only: a dropped marker takes a gate out of the pre-merge lane. Bump UP when you add one.
 
 
 def test_the_marked_set_never_shrinks_below_the_floor():

@@ -25,7 +25,7 @@ test("the record line names what the count counts, between the count and the com
 test("the big count on Coaches prints what it counts, escaped, above the comparison", () => {
   const html = P.recordBigHTML(WITH);
   assert.match(html, /Counted: 10 sealed before day one/);
-  assert.ok(html.indexOf("Counted:") < html.indexOf("So far they do not beat"), "what it counts sits before the comparison");
+  assert.ok(html.indexOf("Counted:") < html.indexOf(B.record.data.comparison_text), "what it counts sits before the comparison");
   assert.doesNotMatch(P.recordBigHTML({ ...WITH, data: { ...WITH.data, counted_text: "<b>x</b>" } }), /<b>x<\/b>/);
 });
 

@@ -110,6 +110,11 @@
     "enabled": true,
     "source": "ci-cd.yml pip-audit advisory step ('Dependabot will open a bump PR for the affected package') + ADR-082 (Dependabot is the CVE remediation channel). RESOLVED 2026-07-20: alerts ENABLED live (owner toggle after the public flip; SDLC finding P2-4 closed)."
   },
+  "secret_scanning": {
+    "secret_scanning": "enabled",
+    "push_protection": "enabled",
+    "source": "#4887 (craft review 2026-10-13 finding 13, extends #3042): repository secret scanning and push protection are the platform-side credential tripwires behind secret-scan.yml's gitleaks leg (#1659). Both read ENABLED live 2026-10-13 via `gh api repos/averagejoematt/life-platform` security_and_analysis.secret_scanning.status / .secret_scanning_push_protection.status; check_github_config() compares them. security_and_analysis is only returned to a token with admin access, so a workflow token without GH_POSTURE_TOKEN reports `unavailable`, never a false clean."
+  },
   "push_run_detector": {
     "grace_minutes": 30,
     "lookback_days": 7,
