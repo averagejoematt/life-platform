@@ -378,6 +378,56 @@ def _pending_detail(check):
     return f" — {check.get('pending') or check.get('detail', '')}"
 
 
+def _check_secret_scanning(repo, want_ss, scope_gaps):
+    """#4887 — compare live `security_and_analysis` secret scanning + push protection to the
+    posture. Returns the surface verdict; appends to `scope_gaps` when the token cannot read it."""
+    data, err = _gh_api_result(f"repos/{repo}")
+    if err:
+        return {"status": "error", "detail": err["detail"]}
+    saa = data.get("security_and_analysis")
+    if not isinstance(saa, dict):
+        scope_gaps.append("secret scanning (security_and_analysis needs fine-grained Administration:read)")
+        return {
+            "status": "unavailable",
+            "detail": "repos/<repo> returned no security_and_analysis block (token lacks admin read)",
+        }
+    live_ss = {
+        "secret_scanning": (saa.get("secret_scanning") or {}).get("status"),
+        "push_protection": (saa.get("secret_scanning_push_protection") or {}).get("status"),
+    }
+    declared = {k: v for k, v in want_ss.items() if k not in _POSTURE_META_KEYS}
+    mismatches = {k: {"documented": v, "live": live_ss.get(k)} for k, v in declared.items() if live_ss.get(k) != v}
+    if not mismatches:
+        return {"status": "clean", "live": live_ss}
+    return {
+        "status": "drift",
+        "documented": declared,
+        "live": live_ss,
+        "detail": "; ".join(f"{k}: documented {m['documented']!r}, live {m['live']!r}" for k, m in mismatches.items())
+        + " (one-click owner toggle: repo Settings → Advanced Security)",
+    }
+
+
+def _check_repo_settings(repo, want_settings):
+    """#1662 — repo-level merge toggles (auto-merge is the mechanism ADR-148 depends on)."""
+    data, err = _gh_api_result(f"repos/{repo}")
+    if err:
+        return {"status": "error", "detail": err["detail"]}
+    declared = {k: v for k, v in want_settings.items() if k not in _POSTURE_META_KEYS}
+    mismatches = {k: {"documented": v, "live": data.get(k)} for k, v in declared.items() if data.get(k) != v}
+    if mismatches:
+        verdict = {
+            "status": "drift",
+            "detail": "; ".join(f"{k}: documented {m['documented']!r}, live {m['live']!r}" for k, m in mismatches.items())
+            + " (fix: python3 scripts/apply_branch_protection.py --apply)",
+        }
+    else:
+        verdict = {"status": "clean", "live": {k: data.get(k) for k in declared}}
+    # #3207: for a settings toggle there is no "absent" shape — "every declared
+    # key already matches" IS the applied-predicate.
+    return _classify_declared_but_unapplied(want_settings, applied_live=not mismatches, drift_result=verdict)
+
+
 def check_github_config():
     """#1320 — GET-only asserts of documented GitHub config vs. live state.
 
@@ -520,57 +570,14 @@ def check_github_config():
     # 2c. repo-level merge settings — auto-merge is the mechanism ADR-148 depends on
     want_settings = posture.get("repo_settings")
     if want_settings:
-        data, err = _gh_api_result(f"repos/{repo}")
-        if err:
-            surfaces["repo_settings"] = {"status": "error", "detail": err["detail"]}
-        else:
-            declared = {k: v for k, v in want_settings.items() if k not in _POSTURE_META_KEYS}
-            mismatches = {k: {"documented": v, "live": data.get(k)} for k, v in declared.items() if data.get(k) != v}
-            if mismatches:
-                verdict = {
-                    "status": "drift",
-                    "detail": "; ".join(f"{k}: documented {m['documented']!r}, live {m['live']!r}" for k, m in mismatches.items())
-                    + " (fix: python3 scripts/apply_branch_protection.py --apply)",
-                }
-            else:
-                verdict = {"status": "clean", "live": {k: data.get(k) for k in declared}}
-            # #3207: for a settings toggle there is no "absent" shape — "every declared
-            # key already matches" IS the applied-predicate.
-            surfaces["repo_settings"] = _classify_declared_but_unapplied(want_settings, applied_live=not mismatches, drift_result=verdict)
+        surfaces["repo_settings"] = _check_repo_settings(repo, want_settings)
 
     # 2d. repository secret scanning + push protection (#4887) — both live `enabled`, so
     # nothing alarmed if either was switched off. Same `repos/<repo>` payload as 2c, field
     # `security_and_analysis`, which GitHub only returns to an admin-capable token.
     want_ss = posture.get("secret_scanning")
     if want_ss:
-        data, err = _gh_api_result(f"repos/{repo}")
-        if err:
-            surfaces["secret_scanning"] = {"status": "error", "detail": err["detail"]}
-        else:
-            saa = data.get("security_and_analysis")
-            if not isinstance(saa, dict):
-                surfaces["secret_scanning"] = {
-                    "status": "unavailable",
-                    "detail": "repos/<repo> returned no security_and_analysis block (token lacks admin read)",
-                }
-                scope_gaps.append("secret scanning (security_and_analysis needs fine-grained Administration:read)")
-            else:
-                live_ss = {
-                    "secret_scanning": (saa.get("secret_scanning") or {}).get("status"),
-                    "push_protection": (saa.get("secret_scanning_push_protection") or {}).get("status"),
-                }
-                declared = {k: v for k, v in want_ss.items() if k not in _POSTURE_META_KEYS}
-                mismatches = {k: {"documented": v, "live": live_ss.get(k)} for k, v in declared.items() if live_ss.get(k) != v}
-                if mismatches:
-                    surfaces["secret_scanning"] = {
-                        "status": "drift",
-                        "documented": declared,
-                        "live": live_ss,
-                        "detail": "; ".join(f"{k}: documented {m['documented']!r}, live {m['live']!r}" for k, m in mismatches.items())
-                        + " (one-click owner toggle: repo Settings → Advanced Security)",
-                    }
-                else:
-                    surfaces["secret_scanning"] = {"status": "clean", "live": live_ss}
+        surfaces["secret_scanning"] = _check_secret_scanning(repo, want_ss, scope_gaps)
 
     # 3. vulnerability / Dependabot alerts enablement (ADR-082's remediation channel)
     want_va = bool(posture.get("vulnerability_alerts", {}).get("enabled"))
