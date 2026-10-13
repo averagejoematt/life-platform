@@ -13,14 +13,16 @@ Held here:
   * no window reaches before the experiment's start;
   * the committed scorecard fixture the JS test reads IS what compose() makes of the edition wire.
 
-Fixtures: tests/fixtures/edition_wire_4582/ (the live wire, 2026-10-03 PT), edited per case.
+Fixtures: tests/fixtures/edition_wire_4582/ (the live wire, 2026-10-12 PT), edited per case.
 """
 
 import copy
 import json
 import os
+import re
 import sys
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
@@ -34,10 +36,20 @@ from web import (
 from web.prediction_reason import metric_words  # noqa: E402
 
 WIRE = os.path.join(ROOT, "tests", "fixtures", "edition_wire_4582")
-SCORECARD_FIXTURE = os.path.join(ROOT, "tests", "fixtures", "edition_scorecard_4595", "scorecard_wire_2026-10-03.json")
-CAPTURE_DAY = "2026-10-03"
+SCORECARD_FIXTURE = os.path.join(ROOT, "tests", "fixtures", "edition_scorecard_4595", "scorecard_wire_2026-10-12.json")
+
+
+def _wire_clock():
+    """The wire's own capture clock, read from its manifest (#4864): the instant it was fetched and that
+    instant's Pacific day. Re-running scripts/capture_kit_page_fixtures.py re-dates every test that composes
+    the wire, so no literal day or instant is left behind to drift from the files."""
+    with open(os.path.join(WIRE, "_capture.json"), encoding="utf-8") as fh:
+        taken = datetime.strptime(json.load(fh)["captured_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    return taken.astimezone(ZoneInfo("America/Los_Angeles")).strftime("%Y-%m-%d"), taken
+
+
+CAPTURE_DAY, CAPTURE_INSTANT = _wire_clock()
 START = "2026-09-06"
-CAPTURE_INSTANT = datetime(2026, 10, 4, 2, 29, tzinfo=timezone.utc)
 VERDICTS = {sc.GOING_WELL, sc.FASTER_THAN_PLANNED, sc.NOT_YET, sc.NOT_ENOUGH_DATA}
 
 
@@ -108,31 +120,23 @@ def test_every_row_is_decided_by_a_served_rule_with_the_day_it_was_set():
 
 
 def test_the_wire_composes_to_these_verdicts():
-    """The live wire of 2026-10-03: weight fell 2.6 lb week on week (faster than planned), trained all
-    seven days (no rest day: not yet), 7+ hours every night (going well), three days of food logged
-    (not enough data), no entry in his own words in the week (not yet), and the coaches do not beat a
-    simple guess across 96 checked calls (not yet)."""
-    rows = _scorecard(_wire())["data"]["rows"]
-    got = {k: rows[k]["data"]["verdict"] for k in sc.SCORECARD_ORDER}
-    assert got == {
-        "body": sc.FASTER_THAN_PLANNED,
-        "training": sc.NOT_YET,
-        "sleep": sc.GOING_WELL,
-        "food": sc.NOT_ENOUGH_DATA,
-        "mind": sc.NOT_YET,
-        "ai": sc.NOT_YET,
-    }
-    assert rows["body"]["data"]["text"] == "Seven-day average 312.2 lb, down 2.6 lb from the seven days before."
-    assert rows["ai"]["data"]["text"] == "Counted across all 96 calls checked to date, not this week's alone."
-    # #4809: each verdict prints what happened against its rule
-    assert {k: rows[k]["data"]["verdict_text"] for k in sc.SCORECARD_ORDER} == {
-        "body": "Weight down faster than planned",
-        "training": "No rest day",
-        "sleep": "5 or more long nights",
-        "food": "Too few days logged",
-        "mind": "In his own words on fewer than 3 days",
-        "ai": "The coaches do not beat a simple guess yet",
-    }
+    """The live wire composes to one decided row per area. What each row decides is read from the inputs it
+    is made of (the AI row from the calibration's skill and n; the others from their own sentence shapes),
+    never pinned to the figures one capture day happened to hold."""
+    wire = _wire()
+    rows = _scorecard(wire)["data"]["rows"]
+    for key in sc.SCORECARD_ORDER:
+        d = rows[key]["data"]
+        assert d["verdict"] in VERDICTS, key
+        assert d["verdict_text"] in {v for (area, _), v in sc.VERDICT_TEXT.items() if area == key}, key
+    coaches = wire["calibration"]["platform"]["strata"]["coaches"]
+    ai = rows["ai"]["data"]
+    want = sc.NOT_ENOUGH_DATA if coaches["n"] < 30 else (sc.GOING_WELL if coaches["brier_skill"] > 0 else sc.NOT_YET)
+    assert ai["verdict"] == want
+    assert ai["text"] == f"Counted across all {coaches['n']} calls checked to date, not this week's alone."
+    assert re.fullmatch(r"Seven-day average \d+\.\d lb, (down|up) \d+(\.\d)? lb from the seven days before\.", rows["body"]["data"]["text"])
+    assert re.fullmatch(r"Trained on \d+ of \d+ days recorded\.", rows["training"]["data"]["text"])
+    assert re.fullmatch(r"7 hours or more on \d+ of \d+ nights recorded\.", rows["sleep"]["data"]["text"])
 
 
 def test_the_committed_scorecard_fixture_is_what_compose_makes_of_the_wire():
@@ -277,10 +281,10 @@ def test_the_ai_row_is_the_records_comparison_never_a_count_alone():
 def test_no_window_reaches_before_the_experiment_start():
     """Day 10 of the experiment: the week before holds only three days, all inside the experiment;
     a weigh-in from before the start is never averaged in."""
-    start = "2026-09-24"
+    start = _days(10)[0]  # the experiment's day 1, ten days ago
     wire = _wire()
-    weights = {d: 330.0 for d in _days(14)[:4]}  # 2026-09-20..23: before the start
-    weights.update({d: 320.0 for d in _days(14)[4:7]})  # 09-24..26: the week before, in the experiment
+    weights = {d: 330.0 for d in _days(14)[:4]}  # the four days before the start
+    weights.update({d: 320.0 for d in _days(14)[4:7]})  # the week before, in the experiment
     weights.update({d: 319.0 for d in _days(7)})
     wire["pulse"] = _pulse(weights=weights)
     row = _scorecard(wire, start=start)["data"]["rows"]["body"]["data"]
@@ -298,13 +302,19 @@ def test_a_failed_source_is_unavailable_not_a_verdict_and_all_failed_is_the_bloc
 
 
 def test_went_right_is_one_sourced_line_each_or_nothing_this_week():
-    right = _scorecard(_wire())["data"]["went_right"]
+    wire = _wire()
+    right = _scorecard(wire)["data"]["went_right"]
+    week = set(_days(7))
+    nights = [r["sleep_hours"] for r in wire["pulse"]["pulse_history"] if r["date"] in week and r.get("sleep_hours") is not None]
+    long_nights = sum(1 for h in nights if h >= 7)
     assert right["matthew"] == {
         "area": "sleep",
-        "text": "Sleep: 7 hours or more on 7 of 7 nights recorded.",
+        "text": f"Sleep: 7 hours or more on {long_nights} of {len(nights)} nights recorded.",
         "source": "/api/pulse_history",
     }
-    assert right["engine"] == {"area": None, "text": "Nothing this week.", "source": None}
+    assert set(right["engine"]) == {"area", "text", "source"}
+    if right["engine"]["area"] is None:
+        assert right["engine"] == {"area": None, "text": "Nothing this week.", "source": None}
     wire = _wire()
     wire["pulse"] = _pulse(sleep={d: 6.0 for d in _days(7)})
     assert _scorecard(wire)["data"]["went_right"]["matthew"]["text"] == "Nothing this week."

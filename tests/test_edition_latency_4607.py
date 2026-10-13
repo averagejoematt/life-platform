@@ -27,6 +27,7 @@ import sys
 import threading
 import time
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 os.environ.setdefault("AWS_ACCESS_KEY_ID", "FAKE")
 os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "FAKE")
@@ -46,8 +47,18 @@ from web import site_api_coach as coach_api, site_api_coach_ledger as ledger, si
 from web.prediction_reason import metric_words  # noqa: E402
 
 _WIRE_DIR = os.path.join(_REPO, "tests", "fixtures", "edition_wire_4582")
-_DAY = "2026-10-03"
-_INSTANT = datetime(2026, 10, 4, 2, 29, tzinfo=timezone.utc)
+
+
+def _wire_clock():
+    """The wire's own capture clock, read from its manifest (#4864): the instant it was fetched and that
+    instant's Pacific day. Re-running scripts/capture_kit_page_fixtures.py re-dates every test that composes
+    the wire, so no literal day or instant is left behind to drift from the files."""
+    with open(os.path.join(_WIRE_DIR, "_capture.json"), encoding="utf-8") as fh:
+        taken = datetime.strptime(json.load(fh)["captured_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    return taken.astimezone(ZoneInfo("America/Los_Angeles")).strftime("%Y-%m-%d"), taken
+
+
+_DAY, _INSTANT = _wire_clock()
 
 # Which blocks (and nested parts) each upstream feeds — the same map
 # tests/test_site_api_routes.py::test_edition_one_upstream_failing_leaves_only_its_block_unavailable holds.

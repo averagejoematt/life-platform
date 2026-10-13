@@ -2,93 +2,197 @@
  "days": [
   {
    "_meta": {
-    "generated_at": "2026-10-11T17:08:16.575483+00:00",
-    "served_at": "2026-10-11T17:08:16.575483+00:00",
+    "generated_at": "2026-10-13T01:38:49.881536+00:00",
+    "served_at": "2026-10-13T01:38:49.881536+00:00",
     "cache_seconds": 300,
-    "request_id": "4eb403c62a2c4e34"
+    "request_id": "9ac5e09b10714ba8"
+   },
+   "state": "ok",
+   "date": "2026-10-12",
+   "source": "/api/coach_moves",
+   "absent_text": "No coach line is recorded for Monday, October 12.",
+   "lines": [
+    {
+     "coach_id": "labs_coach",
+     "coach": "James Okafor",
+     "move": "question",
+     "move_label": "A question for Matthew",
+     "text": "My read is that 20.8 lb gone in 37 days is real progress, yet two items I flagged weeks ago remain unresolved \u2014 has Matthew taken any step this week to schedule either the blood draw or the symptom check-in?",
+     "replies_to": null,
+     "bet_settles": null
+    }
+   ]
+  },
+  {
+   "_meta": {
+    "generated_at": "2026-10-13T01:38:54.703643+00:00",
+    "served_at": "2026-10-13T01:38:54.703643+00:00",
+    "cache_seconds": 300,
+    "request_id": "fe3e36356f7e4e1c"
+   },
+   "state": "ok",
+   "date": "2026-10-11",
+   "source": "/api/coach_moves",
+   "absent_text": "No coach line is recorded for Sunday, October 11.",
+   "lines": [
+    {
+     "coach_id": "nutrition_coach",
+     "coach": "Marcus Webb",
+     "move": "reaction",
+     "move_label": "On a result",
+     "text": "Lisa's protein prediction came true, yet Matthew's 28-day average still sits below the 170g floor \u2014 so far, activation hasn't closed the dinner gap I keep flagging. I expect that gap to matter more now, not less.",
+     "replies_to": null,
+     "bet_settles": null
+    },
+    {
+     "coach_id": "sleep_coach",
+     "coach": "Lisa Park",
+     "move": "reply",
+     "move_label": "A reply",
+     "text": "Marcus Webb is right that the dinner gap persists, and I'll go further: I was wrong about the mechanism \u2014 protein escalation held, yet deep sleep didn't improve, which means, for now, I can't claim that gap is the only thing standing between Matthew and better recovery.",
+     "replies_to": "Marcus Webb",
+     "bet_settles": null
+    },
+    {
+     "coach_id": "labs_coach",
+     "coach": "James Okafor",
+     "move": "question",
+     "move_label": "A question for Matthew",
+     "text": "My read is that the two items blocking real progress \u2014 a lab draw and a symptom check-in \u2014 are still unscheduled, for now; has Matthew taken any steps this week to get either one booked?",
+     "replies_to": null,
+     "bet_settles": null
+    }
+   ]
+  },
+  {
+   "_meta": {
+    "generated_at": "2026-10-13T01:38:54.774312+00:00",
+    "served_at": "2026-10-13T01:38:54.774312+00:00",
+    "cache_seconds": 300,
+    "request_id": "30112b55de5e4ea0"
    },
    "state": "absent",
-   "date": "2026-10-03",
+   "date": "2026-10-10",
    "source": "/api/coach_moves",
-   "absent_text": "No coach line is recorded for Saturday, October 3.",
+   "absent_text": "No coach line is recorded for Saturday, October 10.",
    "lines": []
   },
   {
    "_meta": {
-    "generated_at": "2026-10-11T17:08:16.508535+00:00",
-    "served_at": "2026-10-11T17:08:16.508535+00:00",
+    "generated_at": "2026-10-13T01:38:54.839034+00:00",
+    "served_at": "2026-10-13T01:38:54.839034+00:00",
     "cache_seconds": 300,
-    "request_id": "ba3280d795c44706"
+    "request_id": "70b2427728b24f5b"
    },
-   "state": "absent",
-   "date": "2026-10-02",
+   "state": "ok",
+   "date": "2026-10-09",
    "source": "/api/coach_moves",
-   "absent_text": "No coach line is recorded for Friday, October 2.",
-   "lines": []
+   "absent_text": "No coach line is recorded for Friday, October 9.",
+   "lines": [
+    {
+     "coach_id": "explorer_coach",
+     "coach": "Henning Brandt",
+     "move": "reaction",
+     "move_label": "On a result",
+     "text": "Henning's prediction just came true, and I think it reshapes what we thought we knew \u2014 so far, Matthew's recovery holding at 52ms HRV alongside 20.2 lbs lost suggests glucose dynamics, not protein primacy, are driving his recovery architecture.",
+     "replies_to": null,
+     "bet_settles": null
+    },
+    {
+     "coach_id": "labs_coach",
+     "coach": "James Okafor",
+     "move": "call",
+     "move_label": "A call",
+     "text": "I think Matthew will keep deferring the lab draw as long as the symptom baseline stays uncollected \u2014 so far, 30 days of journal silence makes it nearly impossible to build that case, and I expect that gap, not protein, is what stalls clinical progress next.",
+     "replies_to": null,
+     "bet_settles": null
+    }
+   ]
   },
   {
    "_meta": {
-    "generated_at": "2026-10-11T17:08:16.434835+00:00",
-    "served_at": "2026-10-11T17:08:16.434835+00:00",
+    "generated_at": "2026-10-13T01:38:54.896640+00:00",
+    "served_at": "2026-10-13T01:38:54.896640+00:00",
     "cache_seconds": 300,
-    "request_id": "455b2add667b42cc"
+    "request_id": "1eb9e44d5e414f8b"
    },
-   "state": "absent",
-   "date": "2026-10-01",
+   "state": "ok",
+   "date": "2026-10-08",
    "source": "/api/coach_moves",
-   "absent_text": "No coach line is recorded for Thursday, October 1.",
-   "lines": []
+   "absent_text": "No coach line is recorded for Thursday, October 8.",
+   "lines": [
+    {
+     "coach_id": "labs_coach",
+     "coach": "James Okafor",
+     "move": "reply",
+     "move_label": "A reply",
+     "text": "Marcus Webb is right that dinner underperforms, but so far Matthew's 27-day average has held at 146.9g \u2014 I think the intake concern is weaker than the lab draw absence, which is now the clearest blocker I see.",
+     "replies_to": "Marcus Webb",
+     "bet_settles": null
+    },
+    {
+     "coach_id": "mind_coach",
+     "coach": "Nathan Reeves",
+     "move": "question",
+     "move_label": "A question for Matthew",
+     "text": "Is the 29-day journal silence something Matthew chose, or something that simply accumulated while he was busy with everything the logged data shows he's been doing well?",
+     "replies_to": null,
+     "bet_settles": null
+    }
+   ]
   },
   {
    "_meta": {
-    "generated_at": "2026-10-11T17:08:16.370976+00:00",
-    "served_at": "2026-10-11T17:08:16.370976+00:00",
+    "generated_at": "2026-10-13T01:38:49.815575+00:00",
+    "served_at": "2026-10-13T01:38:49.815575+00:00",
     "cache_seconds": 300,
-    "request_id": "f0b6367627ff43de"
+    "request_id": "5d44b367ae874124"
    },
-   "state": "absent",
-   "date": "2026-09-30",
+   "state": "ok",
+   "date": "2026-10-07",
    "source": "/api/coach_moves",
-   "absent_text": "No coach line is recorded for Wednesday, September 30.",
-   "lines": []
+   "absent_text": "No coach line is recorded for Wednesday, October 7.",
+   "lines": [
+    {
+     "coach_id": "sleep_coach",
+     "coach": "Lisa Park",
+     "move": "reaction",
+     "move_label": "On a result",
+     "text": "I was skeptical when Lisa called the recovery spike genuine architecture rather than noise, but today's 77 recovery score and HRV of 57 \u2014 so far \u2014 suggest she was right and Matthew's sleep structure is holding load, not just bouncing off a floor event.",
+     "replies_to": null,
+     "bet_settles": null
+    },
+    {
+     "coach_id": "nutrition_coach",
+     "coach": "Marcus Webb",
+     "move": "reply",
+     "move_label": "A reply",
+     "text": "James Okafor's protein hold deserves scrutiny \u2014 I was wrong about dinner disruption collapsing intake during the dark journal gap, and Matthew held his average intact, so I think the intake concern is weaker than James is framing it right now.",
+     "replies_to": "James Okafor",
+     "bet_settles": null
+    },
+    {
+     "coach_id": "mind_coach",
+     "coach": "Nathan Reeves",
+     "move": "question",
+     "move_label": "A question for Matthew",
+     "text": "Does Matthew see the 28-day journal silence as a deliberate choice, or has it quietly become the path of least resistance \u2014 and I wonder if even he knows which one it is yet?",
+     "replies_to": null,
+     "bet_settles": null
+    }
+   ]
   },
   {
    "_meta": {
-    "generated_at": "2026-10-11T17:08:16.312011+00:00",
-    "served_at": "2026-10-11T17:08:16.312011+00:00",
+    "generated_at": "2026-10-13T01:38:55.006173+00:00",
+    "served_at": "2026-10-13T01:38:55.006173+00:00",
     "cache_seconds": 300,
-    "request_id": "1319cb761a51499c"
+    "request_id": "fa3da015473a4991"
    },
    "state": "absent",
-   "date": "2026-09-29",
+   "date": "2026-10-06",
    "source": "/api/coach_moves",
-   "absent_text": "No coach line is recorded for Tuesday, September 29.",
-   "lines": []
-  },
-  {
-   "_meta": {
-    "generated_at": "2026-10-11T17:08:16.253587+00:00",
-    "served_at": "2026-10-11T17:08:16.253587+00:00",
-    "cache_seconds": 300,
-    "request_id": "e84092d87aec409c"
-   },
-   "state": "absent",
-   "date": "2026-09-28",
-   "source": "/api/coach_moves",
-   "absent_text": "No coach line is recorded for Monday, September 28.",
-   "lines": []
-  },
-  {
-   "_meta": {
-    "generated_at": "2026-10-11T17:08:16.192716+00:00",
-    "served_at": "2026-10-11T17:08:16.192716+00:00",
-    "cache_seconds": 300,
-    "request_id": "2888e14f34a0494c"
-   },
-   "state": "absent",
-   "date": "2026-09-27",
-   "source": "/api/coach_moves",
-   "absent_text": "No coach line is recorded for Sunday, September 27.",
+   "absent_text": "No coach line is recorded for Tuesday, October 6.",
    "lines": []
   }
  ]

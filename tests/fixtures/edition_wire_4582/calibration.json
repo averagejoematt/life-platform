@@ -1,1 +1,1637 @@
-{"_meta": {"generated_at": "2026-10-04T02:28:56.522517+00:00", "served_at": "2026-10-04T02:28:56.522517+00:00", "cache_seconds": 300, "request_id": "5e886877c7454641"}, "platform": {"n": 253, "confirmed": 172, "refuted": 81, "accuracy_pct": 68.0, "accuracy_ci95": [62.0, 73.4], "brier": 0.1808, "brier_skill": -0.0129, "skilled": false, "reliability_bins": [{"lo": 0.3, "hi": 0.4, "n": 1, "mean_confidence": 0.333, "observed_rate": 0.0}, {"lo": 0.5, "hi": 0.6, "n": 95, "mean_confidence": 0.5, "observed_rate": 0.432}, {"lo": 0.8, "hi": 0.9, "n": 157, "mean_confidence": 0.8, "observed_rate": 0.834}], "calibration": "not_yet_skillful", "label": "not_yet_skillful", "score": 45, "skill_reference": "stratified", "reliability_gap": 0.006, "worst_stratum_gap": {"stratum": "coaches", "gap": 0.071}, "strata": {"coaches": {"n": 96, "confirmed": 41, "brier": 0.2486, "brier_skill": -0.0158, "skilled": false, "calibration": "not_yet_skillful", "reliability_gap": 0.071, "base_rate": 0.427}, "hypotheses": {"n": 0, "confirmed": 0, "brier": null, "brier_skill": null, "skilled": null, "calibration": "insufficient_data", "reliability_gap": null, "base_rate": null}, "interval_forecasts": {"n": 156, "confirmed": 130, "brier": 0.14, "brier_skill": -0.008, "skilled": false, "calibration": "not_yet_skillful", "reliability_gap": -0.033, "base_rate": 0.833}, "weekly_prescriptions": {"n": 1, "confirmed": 1, "brier": 0.04, "brier_skill": null, "skilled": null, "calibration": "insufficient_data", "reliability_gap": -0.2, "base_rate": 1.0}}, "lifetime": {"n": 429, "confirmed": 289, "refuted": 140, "accuracy_pct": 67.4, "accuracy_ci95": [62.8, 71.6], "brier": 0.1827, "brier_skill": -0.0293, "skilled": false, "reliability_bins": [{"lo": 0.2, "hi": 0.3, "n": 1, "mean_confidence": 0.2, "observed_rate": 0.0}, {"lo": 0.3, "hi": 0.4, "n": 1, "mean_confidence": 0.333, "observed_rate": 0.0}, {"lo": 0.5, "hi": 0.6, "n": 132, "mean_confidence": 0.5, "observed_rate": 0.379}, {"lo": 0.6, "hi": 0.7, "n": 1, "mean_confidence": 0.65, "observed_rate": 0.0}, {"lo": 0.8, "hi": 0.9, "n": 294, "mean_confidence": 0.8, "observed_rate": 0.813}], "calibration": "not_yet_skillful", "label": "not_yet_skillful", "score": 45, "skill_reference": "stratified", "reliability_gap": 0.031, "worst_stratum_gap": {"stratum": "coaches", "gap": 0.128}, "strata": {"coaches": {"n": 135, "confirmed": 50, "brier": 0.2491, "brier_skill": -0.0681, "skilled": false, "calibration": "not_yet_skillful", "reliability_gap": 0.128, "base_rate": 0.37}, "hypotheses": {"n": 0, "confirmed": 0, "brier": null, "brier_skill": null, "skilled": null, "calibration": "insufficient_data", "reliability_gap": null, "base_rate": null}, "interval_forecasts": {"n": 293, "confirmed": 238, "brier": 0.1526, "brier_skill": -0.001, "skilled": false, "calibration": "not_yet_skillful", "reliability_gap": -0.012, "base_rate": 0.812}, "weekly_prescriptions": {"n": 1, "confirmed": 1, "brier": 0.04, "brier_skill": null, "skilled": null, "calibration": "insufficient_data", "reliability_gap": -0.2, "base_rate": 1.0}}}}, "coaches": [{"coach_id": "glucose", "coach_name": "Dr. Amara Patel", "retired": false, "n": 6, "confirmed": 2, "refuted": 4, "accuracy_pct": 33.3, "accuracy_ci95": [9.7, 70.0], "brier": 0.2268, "brier_skill": -0.0207, "skilled": false, "reliability_bins": [{"lo": 0.3, "hi": 0.4, "n": 1, "mean_confidence": 0.333, "observed_rate": 0.0}, {"lo": 0.5, "hi": 0.6, "n": 5, "mean_confidence": 0.5, "observed_rate": 0.4}], "calibration": "not_yet_skillful", "label": "not_yet_skillful", "score": 45, "record": {"confirmed": 2, "refuted": 4, "n": 6, "through": "2026-09-30"}, "lifetime": {"n": 8, "confirmed": 2, "refuted": 6, "accuracy_pct": 25.0, "accuracy_ci95": [7.1, 59.1], "brier": 0.2326, "brier_skill": -0.2406, "skilled": false, "reliability_bins": [{"lo": 0.3, "hi": 0.4, "n": 1, "mean_confidence": 0.333, "observed_rate": 0.0}, {"lo": 0.5, "hi": 0.6, "n": 7, "mean_confidence": 0.5, "observed_rate": 0.286}], "calibration": "over-confident", "label": "not_yet_skillful", "score": 45}}, {"coach_id": "sleep", "coach_name": "Dr. Lisa Park", "retired": false, "n": 23, "confirmed": 10, "refuted": 13, "accuracy_pct": 43.5, "accuracy_ci95": [25.6, 63.2], "brier": 0.25, "brier_skill": -0.0173, "skilled": false, "reliability_bins": [{"lo": 0.5, "hi": 0.6, "n": 23, "mean_confidence": 0.5, "observed_rate": 0.435}], "calibration": "not_yet_skillful", "label": "not_yet_skillful", "score": 45, "record": {"confirmed": 10, "refuted": 13, "n": 23, "through": "2026-10-03"}, "lifetime": {"n": 31, "confirmed": 11, "refuted": 20, "accuracy_pct": 35.5, "accuracy_ci95": [21.1, 53.1], "brier": 0.2505, "brier_skill": -0.0942, "skilled": false, "reliability_bins": [{"lo": 0.2, "hi": 0.3, "n": 1, "mean_confidence": 0.2, "observed_rate": 0.0}, {"lo": 0.5, "hi": 0.6, "n": 29, "mean_confidence": 0.502, "observed_rate": 0.379}, {"lo": 0.6, "hi": 0.7, "n": 1, "mean_confidence": 0.65, "observed_rate": 0.0}], "calibration": "not_yet_skillful", "label": "not_yet_skillful", "score": 45}}, {"coach_id": "nutrition", "coach_name": "Dr. Marcus Webb", "retired": false, "n": 20, "confirmed": 6, "refuted": 14, "accuracy_pct": 30.0, "accuracy_ci95": [14.5, 51.9], "brier": 0.25, "brier_skill": -0.1905, "skilled": false, "reliability_bins": [{"lo": 0.5, "hi": 0.6, "n": 20, "mean_confidence": 0.5, "observed_rate": 0.3}], "calibration": "over-confident", "label": "not_yet_skillful", "score": 45, "record": {"confirmed": 6, "refuted": 14, "n": 20, "through": "2026-10-03"}, "lifetime": {"n": 26, "confirmed": 10, "refuted": 16, "accuracy_pct": 38.5, "accuracy_ci95": [22.4, 57.5], "brier": 0.25, "brier_skill": -0.0562, "skilled": false, "reliability_bins": [{"lo": 0.5, "hi": 0.6, "n": 26, "mean_confidence": 0.5, "observed_rate": 0.385}], "calibration": "not_yet_skillful", "label": "not_yet_skillful", "score": 45}}, {"coach_id": "mind", "coach_name": "Dr. Nathan Reeves", "retired": false, "n": 14, "confirmed": 6, "refuted": 8, "accuracy_pct": 42.9, "accuracy_ci95": [21.4, 67.4], "brier": 0.25, "brier_skill": -0.0208, "skilled": false, "reliability_bins": [{"lo": 0.5, "hi": 0.6, "n": 14, "mean_confidence": 0.5, "observed_rate": 0.429}], "calibration": "not_yet_skillful", "label": "not_yet_skillful", "score": 45, "record": {"confirmed": 6, "refuted": 8, "n": 14, "through": "2026-10-03"}, "lifetime": {"n": 16, "confirmed": 8, "refuted": 8, "accuracy_pct": 50.0, "accuracy_ci95": [28.0, 72.0], "brier": 0.25, "brier_skill": 0.0, "skilled": false, "reliability_bins": [{"lo": 0.5, "hi": 0.6, "n": 16, "mean_confidence": 0.5, "observed_rate": 0.5}], "calibration": "not_yet_skillful", "label": "not_yet_skillful", "score": 45}}, {"coach_id": "physical", "coach_name": "Dr. Max Reyes", "retired": false, "n": 11, "confirmed": 5, "refuted": 6, "accuracy_pct": 45.5, "accuracy_ci95": [21.3, 72.0], "brier": 0.25, "brier_skill": -0.0083, "skilled": false, "reliability_bins": [{"lo": 0.5, "hi": 0.6, "n": 11, "mean_confidence": 0.5, "observed_rate": 0.455}], "calibration": "not_yet_skillful", "label": "not_yet_skillful", "score": 45, "record": {"confirmed": 5, "refuted": 6, "n": 11, "through": "2026-10-02"}, "lifetime": {"n": 14, "confirmed": 6, "refuted": 8, "accuracy_pct": 42.9, "accuracy_ci95": [21.4, 67.4], "brier": 0.25, "brier_skill": -0.0208, "skilled": false, "reliability_bins": [{"lo": 0.5, "hi": 0.6, "n": 14, "mean_confidence": 0.5, "observed_rate": 0.429}], "calibration": "not_yet_skillful", "label": "not_yet_skillful", "score": 45}}, {"coach_id": "labs", "coach_name": "Dr. James Okafor", "retired": false, "n": 4, "confirmed": 3, "refuted": 1, "accuracy_pct": 75.0, "accuracy_ci95": [30.1, 95.4], "brier": 0.25, "brier_skill": -0.3333, "skilled": false, "reliability_bins": [{"lo": 0.5, "hi": 0.6, "n": 4, "mean_confidence": 0.5, "observed_rate": 0.75}], "calibration": "insufficient_data", "label": "not_yet_skillful", "score": 45, "record": {"confirmed": 3, "refuted": 1, "n": 4, "through": "2026-10-03"}, "lifetime": {"n": 5, "confirmed": 3, "refuted": 2, "accuracy_pct": 60.0, "accuracy_ci95": [23.1, 88.2], "brier": 0.25, "brier_skill": -0.0417, "skilled": false, "reliability_bins": [{"lo": 0.5, "hi": 0.6, "n": 5, "mean_confidence": 0.5, "observed_rate": 0.6}], "calibration": "not_yet_skillful", "label": "not_yet_skillful", "score": 45}}, {"coach_id": "explorer", "coach_name": "Dr. Henning Brandt", "retired": false, "n": 18, "confirmed": 9, "refuted": 9, "accuracy_pct": 50.0, "accuracy_ci95": [29.0, 71.0], "brier": 0.25, "brier_skill": 0.0, "skilled": false, "reliability_bins": [{"lo": 0.5, "hi": 0.6, "n": 18, "mean_confidence": 0.5, "observed_rate": 0.5}], "calibration": "not_yet_skillful", "label": "not_yet_skillful", "score": 45, "record": {"confirmed": 9, "refuted": 9, "n": 18, "through": "2026-10-03"}, "lifetime": {"n": 26, "confirmed": 10, "refuted": 16, "accuracy_pct": 38.5, "accuracy_ci95": [22.4, 57.5], "brier": 0.25, "brier_skill": -0.0562, "skilled": false, "reliability_bins": [{"lo": 0.5, "hi": 0.6, "n": 26, "mean_confidence": 0.5, "observed_rate": 0.385}], "calibration": "not_yet_skillful", "label": "not_yet_skillful", "score": 45}}, {"coach_id": "training", "coach_name": "Dr. Sarah Chen", "retired": true, "n": 0, "confirmed": 0, "refuted": 0, "accuracy_pct": null, "accuracy_ci95": null, "brier": null, "brier_skill": null, "skilled": null, "reliability_bins": [], "calibration": "insufficient_data", "label": "nascent", "score": 30, "record": {"confirmed": 0, "refuted": 0, "n": 0, "through": null}, "lifetime": {"n": 9, "confirmed": 0, "refuted": 9, "accuracy_pct": 0.0, "accuracy_ci95": [0.0, 29.9], "brier": 0.25, "brier_skill": null, "skilled": null, "reliability_bins": [{"lo": 0.5, "hi": 0.6, "n": 9, "mean_confidence": 0.5, "observed_rate": 0.0}], "calibration": "over-confident", "label": "developing", "score": 50}}], "hypotheses": {"n": 0, "confirmed": 0, "refuted": 0, "accuracy_pct": null, "accuracy_ci95": null, "brier": null, "brier_skill": null, "skilled": null, "reliability_bins": [], "calibration": "insufficient_data", "label": "nascent", "score": 30, "lifetime": {"n": 0, "confirmed": 0, "refuted": 0, "accuracy_pct": null, "accuracy_ci95": null, "brier": null, "brier_skill": null, "skilled": null, "reliability_bins": [], "calibration": "insufficient_data", "label": "nascent", "score": 30}}, "interval_forecasts": {"n": 156, "confirmed": 130, "refuted": 26, "accuracy_pct": 83.3, "accuracy_ci95": [76.7, 88.4], "brier": 0.14, "brier_skill": -0.008, "skilled": false, "reliability_bins": [{"lo": 0.8, "hi": 0.9, "n": 156, "mean_confidence": 0.8, "observed_rate": 0.833}], "calibration": "not_yet_skillful", "label": "not_yet_skillful", "score": 45, "lifetime": {"n": 293, "confirmed": 238, "refuted": 55, "accuracy_pct": 81.2, "accuracy_ci95": [76.4, 85.3], "brier": 0.1526, "brier_skill": -0.001, "skilled": false, "reliability_bins": [{"lo": 0.8, "hi": 0.9, "n": 293, "mean_confidence": 0.8, "observed_rate": 0.812}], "calibration": "not_yet_skillful", "label": "not_yet_skillful", "score": 45}}, "voided": {"n": 2280, "hypotheses": 57, "predictions": 2223, "by_reset": {"2026-07-13": 1433, "2026-07-18": 84, "2026-07-19": 10, "2026-07-20": 112, "2026-07-22": 31, "2026-07-27": 38, "2026-08-03": 149, "2026-08-10": 130, "2026-08-17": 88, "2026-09-01": 118, "2026-09-04": 45, "2026-09-05": 19, "2026-09-06": 23}}, "cycle": 17, "cycle_start": "2026-09-06", "prereg_seal": {"genesis": "2026-09-06", "sha256": "bd225d24f67381c253a34671107ba1bc1a8a3c9cc35dadbca1a5edd061b9782d", "artifact_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json", "stamp_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.sha256.json", "verify": "curl -s https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json | shasum -a 256", "stamped_at": "2026-09-06T02:13:38.690967+00:00"}, "disclosure": "Self-graded: every prediction here was resolved against the platform's own data by a deterministic evaluator \u2014 no human scoring. Brier score: 0 is perfect, 0.25 is the always-say-50% baseline, lower is better. Calibrated and skilled are different claims: calibrated means stated confidence matches how often calls turn out right (reliability); skilled means beating the base rate (Brier skill > 0). A surface can be reliable without being skillful \u2014 when skill is at or below zero it reads Not Yet Skillful, never Well Calibrated. The platform-wide card scores skill against a STRATIFIED base rate \u2014 coach calls, hypothesis bets and each forecasting MODEL's interval forecasts separately, every one against its own climatology (the daily metric engine and the weekly training prescription are different models and are never counted as one number) \u2014 so pooling strata with different base rates cannot manufacture a skill no stratum has; its over/under-confidence verdict is driven by the worst stratum's gap, and each stratum's own n, Brier and skill are served beside it. Voided bets: a reset voids \u2014 never grades \u2014 every still-open pre-registered bet; each is recorded in the ledger and counted in `voided` so the graded denominator is honest. They are excluded from Brier because they never resolved. Every hit rate here carries its 95% Wilson interval (`accuracy_ci95`) alongside `n` \u2014 a hit rate off a small n reads as more precise than it is.", "as_of": "2026-10-03"}
+{
+ "_meta": {
+  "generated_at": "2026-10-13T01:38:54.125931+00:00",
+  "served_at": "2026-10-13T01:38:54.125931+00:00",
+  "cache_seconds": 300,
+  "request_id": "a0175d1fb4074eeb"
+ },
+ "platform": {
+  "n": 368,
+  "confirmed": 247,
+  "refuted": 121,
+  "accuracy_pct": 67.1,
+  "accuracy_ci95": [
+   62.2,
+   71.7
+  ],
+  "brier": 0.1774,
+  "brier_skill": -0.0087,
+  "skilled": false,
+  "reliability_bins": [
+   {
+    "lo": 0.1,
+    "hi": 0.2,
+    "n": 1,
+    "mean_confidence": 0.167,
+    "observed_rate": 0.0
+   },
+   {
+    "lo": 0.3,
+    "hi": 0.4,
+    "n": 1,
+    "mean_confidence": 0.333,
+    "observed_rate": 0.0
+   },
+   {
+    "lo": 0.4,
+    "hi": 0.5,
+    "n": 1,
+    "mean_confidence": 0.444,
+    "observed_rate": 0.0
+   },
+   {
+    "lo": 0.5,
+    "hi": 0.6,
+    "n": 148,
+    "mean_confidence": 0.5,
+    "observed_rate": 0.419
+   },
+   {
+    "lo": 0.6,
+    "hi": 0.7,
+    "n": 1,
+    "mean_confidence": 0.6,
+    "observed_rate": 1.0
+   },
+   {
+    "lo": 0.8,
+    "hi": 0.9,
+    "n": 216,
+    "mean_confidence": 0.8,
+    "observed_rate": 0.852
+   }
+  ],
+  "calibration": "not_yet_skillful",
+  "label": "not_yet_skillful",
+  "score": 45,
+  "skill_reference": "stratified",
+  "reliability_gap": 0.004,
+  "worst_stratum_gap": {
+   "stratum": "coaches",
+   "gap": 0.08
+  },
+  "strata": {
+   "coaches": {
+    "n": 154,
+    "confirmed": 65,
+    "brier": 0.2438,
+    "brier_skill": 0.0006,
+    "skilled": true,
+    "calibration": "well-calibrated",
+    "reliability_gap": 0.08,
+    "base_rate": 0.422
+   },
+   "hypotheses": {
+    "n": 0,
+    "confirmed": 0,
+    "brier": null,
+    "brier_skill": null,
+    "skilled": null,
+    "calibration": "insufficient_data",
+    "reliability_gap": null,
+    "base_rate": null
+   },
+   "interval_forecasts": {
+    "n": 210,
+    "confirmed": 179,
+    "brier": 0.1286,
+    "brier_skill": -0.0218,
+    "skilled": false,
+    "calibration": "not_yet_skillful",
+    "reliability_gap": -0.052,
+    "base_rate": 0.852
+   },
+   "weekly_prescriptions": {
+    "n": 4,
+    "confirmed": 3,
+    "brier": 0.19,
+    "brier_skill": -0.0133,
+    "skilled": false,
+    "calibration": "insufficient_data",
+    "reliability_gap": 0.05,
+    "base_rate": 0.75
+   }
+  },
+  "lifetime": {
+   "n": 544,
+   "confirmed": 364,
+   "refuted": 180,
+   "accuracy_pct": 66.9,
+   "accuracy_ci95": [
+    62.9,
+    70.7
+   ],
+   "brier": 0.18,
+   "brier_skill": -0.0202,
+   "skilled": false,
+   "reliability_bins": [
+    {
+     "lo": 0.1,
+     "hi": 0.2,
+     "n": 1,
+     "mean_confidence": 0.167,
+     "observed_rate": 0.0
+    },
+    {
+     "lo": 0.2,
+     "hi": 0.3,
+     "n": 1,
+     "mean_confidence": 0.2,
+     "observed_rate": 0.0
+    },
+    {
+     "lo": 0.3,
+     "hi": 0.4,
+     "n": 1,
+     "mean_confidence": 0.333,
+     "observed_rate": 0.0
+    },
+    {
+     "lo": 0.4,
+     "hi": 0.5,
+     "n": 1,
+     "mean_confidence": 0.444,
+     "observed_rate": 0.0
+    },
+    {
+     "lo": 0.5,
+     "hi": 0.6,
+     "n": 185,
+     "mean_confidence": 0.5,
+     "observed_rate": 0.384
+    },
+    {
+     "lo": 0.6,
+     "hi": 0.7,
+     "n": 2,
+     "mean_confidence": 0.625,
+     "observed_rate": 0.5
+    },
+    {
+     "lo": 0.8,
+     "hi": 0.9,
+     "n": 353,
+     "mean_confidence": 0.8,
+     "observed_rate": 0.827
+    }
+   ],
+   "calibration": "not_yet_skillful",
+   "label": "not_yet_skillful",
+   "score": 45,
+   "skill_reference": "stratified",
+   "reliability_gap": 0.025,
+   "worst_stratum_gap": {
+    "stratum": "coaches",
+    "gap": 0.117
+   },
+   "strata": {
+    "coaches": {
+     "n": 193,
+     "confirmed": 74,
+     "brier": 0.2451,
+     "brier_skill": -0.0368,
+     "skilled": false,
+     "calibration": "not_yet_skillful",
+     "reliability_gap": 0.117,
+     "base_rate": 0.383
+    },
+    "hypotheses": {
+     "n": 0,
+     "confirmed": 0,
+     "brier": null,
+     "brier_skill": null,
+     "skilled": null,
+     "calibration": "insufficient_data",
+     "reliability_gap": null,
+     "base_rate": null
+    },
+    "interval_forecasts": {
+     "n": 347,
+     "confirmed": 287,
+     "brier": 0.1437,
+     "brier_skill": -0.0051,
+     "skilled": false,
+     "calibration": "not_yet_skillful",
+     "reliability_gap": -0.027,
+     "base_rate": 0.827
+    },
+    "weekly_prescriptions": {
+     "n": 4,
+     "confirmed": 3,
+     "brier": 0.19,
+     "brier_skill": -0.0133,
+     "skilled": false,
+     "calibration": "insufficient_data",
+     "reliability_gap": 0.05,
+     "base_rate": 0.75
+    }
+   }
+  }
+ },
+ "coaches": [
+  {
+   "coach_id": "glucose",
+   "coach_name": "Amara Patel",
+   "retired": false,
+   "n": 6,
+   "confirmed": 1,
+   "refuted": 5,
+   "accuracy_pct": 16.7,
+   "accuracy_ci95": [
+    3.0,
+    56.4
+   ],
+   "brier": 0.2268,
+   "brier_skill": -0.6331,
+   "skilled": false,
+   "reliability_bins": [
+    {
+     "lo": 0.3,
+     "hi": 0.4,
+     "n": 1,
+     "mean_confidence": 0.333,
+     "observed_rate": 0.0
+    },
+    {
+     "lo": 0.5,
+     "hi": 0.6,
+     "n": 5,
+     "mean_confidence": 0.5,
+     "observed_rate": 0.2
+    }
+   ],
+   "calibration": "over-confident",
+   "label": "not_yet_skillful",
+   "score": 45,
+   "record": {
+    "confirmed": 1,
+    "refuted": 5,
+    "n": 6,
+    "through": "2026-09-30"
+   },
+   "comparison": {
+    "rule": "nothing_changes",
+    "rule_words": "a guess that nothing changes",
+    "rule_version": 1,
+    "records": {
+     "number": {
+      "graded": 3,
+      "coach_right": 1,
+      "scored": 3,
+      "coach_right_on_scored": 1,
+      "rule_right": 2,
+      "coach_only": 0,
+      "rule_only": 1,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "direction": {
+      "graded": 2,
+      "coach_right": 0,
+      "scored": 2,
+      "coach_right_on_scored": 0,
+      "rule_right": 1,
+      "coach_only": 0,
+      "rule_only": 1,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "yes_no": {
+      "graded": 1,
+      "coach_right": 0,
+      "scored": 1,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "sealed": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     }
+    },
+    "unclassified": 0,
+    "scored_complete": true,
+    "skill": {
+     "n": 6,
+     "brier_skill": -0.6331,
+     "sentence": "Too few checked calls yet (6) to compare them with a simple guess."
+    },
+    "rule_sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 2 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes once \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
+    "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 2 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes once \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
+    "min_n_for_rate": 20,
+    "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+   },
+   "lifetime": {
+    "n": 8,
+    "confirmed": 1,
+    "refuted": 7,
+    "accuracy_pct": 12.5,
+    "accuracy_ci95": [
+     2.2,
+     47.1
+    ],
+    "brier": 0.2326,
+    "brier_skill": -1.1267,
+    "skilled": false,
+    "reliability_bins": [
+     {
+      "lo": 0.3,
+      "hi": 0.4,
+      "n": 1,
+      "mean_confidence": 0.333,
+      "observed_rate": 0.0
+     },
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "n": 7,
+      "mean_confidence": 0.5,
+      "observed_rate": 0.143
+     }
+    ],
+    "calibration": "over-confident",
+    "label": "not_yet_skillful",
+    "score": 45
+   }
+  },
+  {
+   "coach_id": "nutrition",
+   "coach_name": "Marcus Webb",
+   "retired": false,
+   "n": 30,
+   "confirmed": 8,
+   "refuted": 22,
+   "accuracy_pct": 26.7,
+   "accuracy_ci95": [
+    14.2,
+    44.4
+   ],
+   "brier": 0.235,
+   "brier_skill": -0.2018,
+   "skilled": false,
+   "reliability_bins": [
+    {
+     "lo": 0.1,
+     "hi": 0.2,
+     "n": 1,
+     "mean_confidence": 0.167,
+     "observed_rate": 0.0
+    },
+    {
+     "lo": 0.5,
+     "hi": 0.6,
+     "n": 28,
+     "mean_confidence": 0.5,
+     "observed_rate": 0.25
+    },
+    {
+     "lo": 0.8,
+     "hi": 0.9,
+     "n": 1,
+     "mean_confidence": 0.85,
+     "observed_rate": 1.0
+    }
+   ],
+   "calibration": "over-confident",
+   "label": "not_yet_skillful",
+   "score": 45,
+   "record": {
+    "confirmed": 8,
+    "refuted": 22,
+    "n": 30,
+    "through": "2026-10-12"
+   },
+   "comparison": {
+    "rule": "nothing_changes",
+    "rule_words": "a guess that nothing changes",
+    "rule_version": 1,
+    "records": {
+     "number": {
+      "graded": 6,
+      "coach_right": 1,
+      "scored": 6,
+      "coach_right_on_scored": 1,
+      "rule_right": 6,
+      "coach_only": 0,
+      "rule_only": 5,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "direction": {
+      "graded": 21,
+      "coach_right": 5,
+      "scored": 21,
+      "coach_right_on_scored": 5,
+      "rule_right": 4,
+      "coach_only": 5,
+      "rule_only": 4,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "no_clear_difference",
+      "sign_test_p": 1.0,
+      "coach_right_pct": 23.8,
+      "rule_right_pct": 19.0
+     },
+     "yes_no": {
+      "graded": 2,
+      "coach_right": 1,
+      "scored": 2,
+      "coach_right_on_scored": 1,
+      "rule_right": 1,
+      "coach_only": 1,
+      "rule_only": 1,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "sealed": {
+      "graded": 1,
+      "coach_right": 1,
+      "scored": 1,
+      "coach_right_on_scored": 1,
+      "rule_right": 0,
+      "coach_only": 1,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     }
+    },
+    "unclassified": 0,
+    "scored_complete": true,
+    "skill": {
+     "n": 30,
+     "brier_skill": -0.2018,
+     "sentence": "Across 30 checked calls, so far they do not beat a simple guess."
+    },
+    "rule_sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right once and a guess that nothing changes 6 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 21 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, but not by a clear margin. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right once and a guess that nothing changes 6 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 21 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, but not by a clear margin. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "min_n_for_rate": 20,
+    "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+   },
+   "lifetime": {
+    "n": 36,
+    "confirmed": 12,
+    "refuted": 24,
+    "accuracy_pct": 33.3,
+    "accuracy_ci95": [
+     20.2,
+     49.7
+    ],
+    "brier": 0.2375,
+    "brier_skill": -0.0688,
+    "skilled": false,
+    "reliability_bins": [
+     {
+      "lo": 0.1,
+      "hi": 0.2,
+      "n": 1,
+      "mean_confidence": 0.167,
+      "observed_rate": 0.0
+     },
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "n": 34,
+      "mean_confidence": 0.5,
+      "observed_rate": 0.324
+     },
+     {
+      "lo": 0.8,
+      "hi": 0.9,
+      "n": 1,
+      "mean_confidence": 0.85,
+      "observed_rate": 1.0
+     }
+    ],
+    "calibration": "over-confident",
+    "label": "not_yet_skillful",
+    "score": 45
+   }
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "retired": false,
+   "n": 22,
+   "confirmed": 11,
+   "refuted": 11,
+   "accuracy_pct": 50.0,
+   "accuracy_ci95": [
+    30.7,
+    69.3
+   ],
+   "brier": 0.2397,
+   "brier_skill": 0.0414,
+   "skilled": true,
+   "reliability_bins": [
+    {
+     "lo": 0.5,
+     "hi": 0.6,
+     "n": 21,
+     "mean_confidence": 0.5,
+     "observed_rate": 0.476
+    },
+    {
+     "lo": 0.8,
+     "hi": 0.9,
+     "n": 1,
+     "mean_confidence": 0.85,
+     "observed_rate": 1.0
+    }
+   ],
+   "calibration": "well-calibrated",
+   "label": "developing",
+   "score": 50,
+   "record": {
+    "confirmed": 11,
+    "refuted": 11,
+    "n": 22,
+    "through": "2026-10-11"
+   },
+   "comparison": {
+    "rule": "nothing_changes",
+    "rule_words": "a guess that nothing changes",
+    "rule_version": 1,
+    "records": {
+     "number": {
+      "graded": 9,
+      "coach_right": 5,
+      "scored": 9,
+      "coach_right_on_scored": 5,
+      "rule_right": 5,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "direction": {
+      "graded": 10,
+      "coach_right": 4,
+      "scored": 10,
+      "coach_right_on_scored": 4,
+      "rule_right": 1,
+      "coach_only": 4,
+      "rule_only": 1,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "yes_no": {
+      "graded": 1,
+      "coach_right": 1,
+      "scored": 1,
+      "coach_right_on_scored": 1,
+      "rule_right": 0,
+      "coach_only": 1,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "sealed": {
+      "graded": 2,
+      "coach_right": 1,
+      "scored": 2,
+      "coach_right_on_scored": 1,
+      "rule_right": 0,
+      "coach_only": 1,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     }
+    },
+    "unclassified": 0,
+    "scored_complete": true,
+    "skill": {
+     "n": 22,
+     "brier_skill": 0.0414,
+     "sentence": "Across 22 checked calls, so far they beat a simple guess."
+    },
+    "rule_sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "min_n_for_rate": 20,
+    "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+   },
+   "lifetime": {
+    "n": 25,
+    "confirmed": 12,
+    "refuted": 13,
+    "accuracy_pct": 48.0,
+    "accuracy_ci95": [
+     30.0,
+     66.5
+    ],
+    "brier": 0.2409,
+    "brier_skill": 0.0349,
+    "skilled": true,
+    "reliability_bins": [
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "n": 24,
+      "mean_confidence": 0.5,
+      "observed_rate": 0.458
+     },
+     {
+      "lo": 0.8,
+      "hi": 0.9,
+      "n": 1,
+      "mean_confidence": 0.85,
+      "observed_rate": 1.0
+     }
+    ],
+    "calibration": "well-calibrated",
+    "label": "developing",
+    "score": 50
+   }
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "retired": false,
+   "n": 41,
+   "confirmed": 17,
+   "refuted": 24,
+   "accuracy_pct": 41.5,
+   "accuracy_ci95": [
+    27.8,
+    56.6
+   ],
+   "brier": 0.2465,
+   "brier_skill": -0.0157,
+   "skilled": false,
+   "reliability_bins": [
+    {
+     "lo": 0.4,
+     "hi": 0.5,
+     "n": 1,
+     "mean_confidence": 0.444,
+     "observed_rate": 0.0
+    },
+    {
+     "lo": 0.5,
+     "hi": 0.6,
+     "n": 39,
+     "mean_confidence": 0.5,
+     "observed_rate": 0.41
+    },
+    {
+     "lo": 0.6,
+     "hi": 0.7,
+     "n": 1,
+     "mean_confidence": 0.6,
+     "observed_rate": 1.0
+    }
+   ],
+   "calibration": "not_yet_skillful",
+   "label": "not_yet_skillful",
+   "score": 45,
+   "record": {
+    "confirmed": 17,
+    "refuted": 24,
+    "n": 41,
+    "through": "2026-10-11"
+   },
+   "comparison": {
+    "rule": "nothing_changes",
+    "rule_words": "a guess that nothing changes",
+    "rule_version": 1,
+    "records": {
+     "number": {
+      "graded": 23,
+      "coach_right": 13,
+      "scored": 23,
+      "coach_right_on_scored": 13,
+      "rule_right": 9,
+      "coach_only": 4,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "no_clear_difference",
+      "sign_test_p": 0.125,
+      "coach_right_pct": 56.5,
+      "rule_right_pct": 39.1
+     },
+     "direction": {
+      "graded": 14,
+      "coach_right": 2,
+      "scored": 14,
+      "coach_right_on_scored": 2,
+      "rule_right": 2,
+      "coach_only": 2,
+      "rule_only": 2,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "yes_no": {
+      "graded": 2,
+      "coach_right": 1,
+      "scored": 2,
+      "coach_right_on_scored": 1,
+      "rule_right": 1,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "sealed": {
+      "graded": 2,
+      "coach_right": 1,
+      "scored": 2,
+      "coach_right_on_scored": 1,
+      "rule_right": 1,
+      "coach_only": 1,
+      "rule_only": 1,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     }
+    },
+    "unclassified": 0,
+    "scored_complete": true,
+    "skill": {
+     "n": 41,
+     "brier_skill": -0.0157,
+     "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
+    },
+    "rule_sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell.",
+    "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell.",
+    "min_n_for_rate": 20,
+    "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+   },
+   "lifetime": {
+    "n": 49,
+    "confirmed": 18,
+    "refuted": 31,
+    "accuracy_pct": 36.7,
+    "accuracy_ci95": [
+     24.7,
+     50.7
+    ],
+    "brier": 0.2474,
+    "brier_skill": -0.0645,
+    "skilled": false,
+    "reliability_bins": [
+     {
+      "lo": 0.2,
+      "hi": 0.3,
+      "n": 1,
+      "mean_confidence": 0.2,
+      "observed_rate": 0.0
+     },
+     {
+      "lo": 0.4,
+      "hi": 0.5,
+      "n": 1,
+      "mean_confidence": 0.444,
+      "observed_rate": 0.0
+     },
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "n": 45,
+      "mean_confidence": 0.501,
+      "observed_rate": 0.378
+     },
+     {
+      "lo": 0.6,
+      "hi": 0.7,
+      "n": 2,
+      "mean_confidence": 0.625,
+      "observed_rate": 0.5
+     }
+    ],
+    "calibration": "not_yet_skillful",
+    "label": "not_yet_skillful",
+    "score": 45
+   }
+  },
+  {
+   "coach_id": "mind",
+   "coach_name": "Nathan Reeves",
+   "retired": false,
+   "n": 19,
+   "confirmed": 7,
+   "refuted": 12,
+   "accuracy_pct": 36.8,
+   "accuracy_ci95": [
+    19.1,
+    59.0
+   ],
+   "brier": 0.25,
+   "brier_skill": -0.0744,
+   "skilled": false,
+   "reliability_bins": [
+    {
+     "lo": 0.5,
+     "hi": 0.6,
+     "n": 19,
+     "mean_confidence": 0.5,
+     "observed_rate": 0.368
+    }
+   ],
+   "calibration": "not_yet_skillful",
+   "label": "not_yet_skillful",
+   "score": 45,
+   "record": {
+    "confirmed": 7,
+    "refuted": 12,
+    "n": 19,
+    "through": "2026-10-12"
+   },
+   "comparison": {
+    "rule": "nothing_changes",
+    "rule_words": "a guess that nothing changes",
+    "rule_version": 1,
+    "records": {
+     "number": {
+      "graded": 6,
+      "coach_right": 2,
+      "scored": 6,
+      "coach_right_on_scored": 2,
+      "rule_right": 4,
+      "coach_only": 0,
+      "rule_only": 2,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "direction": {
+      "graded": 9,
+      "coach_right": 3,
+      "scored": 9,
+      "coach_right_on_scored": 3,
+      "rule_right": 0,
+      "coach_only": 3,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "yes_no": {
+      "graded": 2,
+      "coach_right": 1,
+      "scored": 2,
+      "coach_right_on_scored": 1,
+      "rule_right": 2,
+      "coach_only": 0,
+      "rule_only": 1,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "sealed": {
+      "graded": 2,
+      "coach_right": 1,
+      "scored": 2,
+      "coach_right_on_scored": 1,
+      "rule_right": 0,
+      "coach_only": 1,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     }
+    },
+    "unclassified": 0,
+    "scored_complete": true,
+    "skill": {
+     "n": 19,
+     "brier_skill": -0.0744,
+     "sentence": "Too few checked calls yet (19) to compare them with a simple guess."
+    },
+    "rule_sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "min_n_for_rate": 20,
+    "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+   },
+   "lifetime": {
+    "n": 21,
+    "confirmed": 9,
+    "refuted": 12,
+    "accuracy_pct": 42.9,
+    "accuracy_ci95": [
+     24.5,
+     63.5
+    ],
+    "brier": 0.25,
+    "brier_skill": -0.0208,
+    "skilled": false,
+    "reliability_bins": [
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "n": 21,
+      "mean_confidence": 0.5,
+      "observed_rate": 0.429
+     }
+    ],
+    "calibration": "not_yet_skillful",
+    "label": "not_yet_skillful",
+    "score": 45
+   }
+  },
+  {
+   "coach_id": "labs",
+   "coach_name": "James Okafor",
+   "retired": false,
+   "n": 8,
+   "confirmed": 7,
+   "refuted": 1,
+   "accuracy_pct": 87.5,
+   "accuracy_ci95": [
+    52.9,
+    97.8
+   ],
+   "brier": 0.25,
+   "brier_skill": -1.2857,
+   "skilled": false,
+   "reliability_bins": [
+    {
+     "lo": 0.5,
+     "hi": 0.6,
+     "n": 8,
+     "mean_confidence": 0.5,
+     "observed_rate": 0.875
+    }
+   ],
+   "calibration": "under-confident",
+   "label": "not_yet_skillful",
+   "score": 45,
+   "record": {
+    "confirmed": 7,
+    "refuted": 1,
+    "n": 8,
+    "through": "2026-10-11"
+   },
+   "comparison": {
+    "rule": "nothing_changes",
+    "rule_words": "a guess that nothing changes",
+    "rule_version": 1,
+    "records": {
+     "number": {
+      "graded": 3,
+      "coach_right": 3,
+      "scored": 3,
+      "coach_right_on_scored": 3,
+      "rule_right": 3,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "direction": {
+      "graded": 3,
+      "coach_right": 2,
+      "scored": 3,
+      "coach_right_on_scored": 2,
+      "rule_right": 0,
+      "coach_only": 2,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "yes_no": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "sealed": {
+      "graded": 2,
+      "coach_right": 2,
+      "scored": 2,
+      "coach_right_on_scored": 2,
+      "rule_right": 0,
+      "coach_only": 2,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     }
+    },
+    "unclassified": 0,
+    "scored_complete": true,
+    "skill": {
+     "n": 8,
+     "brier_skill": -1.2857,
+     "sentence": "Too few checked calls yet (8) to compare them with a simple guess."
+    },
+    "rule_sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "min_n_for_rate": 20,
+    "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+   },
+   "lifetime": {
+    "n": 9,
+    "confirmed": 7,
+    "refuted": 2,
+    "accuracy_pct": 77.8,
+    "accuracy_ci95": [
+     45.3,
+     93.7
+    ],
+    "brier": 0.25,
+    "brier_skill": -0.4464,
+    "skilled": false,
+    "reliability_bins": [
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "n": 9,
+      "mean_confidence": 0.5,
+      "observed_rate": 0.778
+     }
+    ],
+    "calibration": "under-confident",
+    "label": "not_yet_skillful",
+    "score": 45
+   }
+  },
+  {
+   "coach_id": "explorer",
+   "coach_name": "Henning Brandt",
+   "retired": false,
+   "n": 28,
+   "confirmed": 14,
+   "refuted": 14,
+   "accuracy_pct": 50.0,
+   "accuracy_ci95": [
+    32.6,
+    67.4
+   ],
+   "brier": 0.25,
+   "brier_skill": 0.0,
+   "skilled": false,
+   "reliability_bins": [
+    {
+     "lo": 0.5,
+     "hi": 0.6,
+     "n": 28,
+     "mean_confidence": 0.5,
+     "observed_rate": 0.5
+    }
+   ],
+   "calibration": "not_yet_skillful",
+   "label": "not_yet_skillful",
+   "score": 45,
+   "record": {
+    "confirmed": 14,
+    "refuted": 14,
+    "n": 28,
+    "through": "2026-10-11"
+   },
+   "comparison": {
+    "rule": "nothing_changes",
+    "rule_words": "a guess that nothing changes",
+    "rule_version": 1,
+    "records": {
+     "number": {
+      "graded": 6,
+      "coach_right": 4,
+      "scored": 5,
+      "coach_right_on_scored": 4,
+      "rule_right": 3,
+      "coach_only": 1,
+      "rule_only": 0,
+      "unscorable": 1,
+      "unscorable_reasons": {
+       "no reading before the call was filed": 1
+      },
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "direction": {
+      "graded": 20,
+      "coach_right": 9,
+      "scored": 20,
+      "coach_right_on_scored": 9,
+      "rule_right": 3,
+      "coach_only": 9,
+      "rule_only": 3,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "no_clear_difference",
+      "sign_test_p": 0.146,
+      "coach_right_pct": 45.0,
+      "rule_right_pct": 15.0
+     },
+     "yes_no": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "sealed": {
+      "graded": 2,
+      "coach_right": 1,
+      "scored": 2,
+      "coach_right_on_scored": 1,
+      "rule_right": 0,
+      "coach_only": 1,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "too_few",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     }
+    },
+    "unclassified": 0,
+    "scored_complete": true,
+    "skill": {
+     "n": 28,
+     "brier_skill": 0.0,
+     "sentence": "Across 28 checked calls, so far they do not beat a simple guess."
+    },
+    "rule_sentence": "Number calls: on the 5 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 20 a guess could also be checked against, the coaches were right 9 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, but not by a clear margin. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 5 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 20 a guess could also be checked against, the coaches were right 9 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, but not by a clear margin. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "min_n_for_rate": 20,
+    "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+   },
+   "lifetime": {
+    "n": 36,
+    "confirmed": 15,
+    "refuted": 21,
+    "accuracy_pct": 41.7,
+    "accuracy_ci95": [
+     27.1,
+     57.8
+    ],
+    "brier": 0.25,
+    "brier_skill": -0.0286,
+    "skilled": false,
+    "reliability_bins": [
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "n": 36,
+      "mean_confidence": 0.5,
+      "observed_rate": 0.417
+     }
+    ],
+    "calibration": "not_yet_skillful",
+    "label": "not_yet_skillful",
+    "score": 45
+   }
+  },
+  {
+   "coach_id": "training",
+   "coach_name": "Sarah Chen",
+   "retired": true,
+   "n": 0,
+   "confirmed": 0,
+   "refuted": 0,
+   "accuracy_pct": null,
+   "accuracy_ci95": null,
+   "brier": null,
+   "brier_skill": null,
+   "skilled": null,
+   "reliability_bins": [],
+   "calibration": "insufficient_data",
+   "label": "nascent",
+   "score": 30,
+   "record": {
+    "confirmed": 0,
+    "refuted": 0,
+    "n": 0,
+    "through": null
+   },
+   "comparison": {
+    "rule": "nothing_changes",
+    "rule_words": "a guess that nothing changes",
+    "rule_version": 1,
+    "records": {
+     "number": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "direction": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "yes_no": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "sealed": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     }
+    },
+    "unclassified": 0,
+    "scored_complete": false,
+    "skill": {
+     "n": 0,
+     "brier_skill": null,
+     "sentence": "No checked call yet, so nothing to compare with a simple guess."
+    },
+    "rule_sentence": null,
+    "sentence": "No checked call yet, so nothing to compare with a simple guess.",
+    "min_n_for_rate": 20,
+    "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+   },
+   "lifetime": {
+    "n": 9,
+    "confirmed": 0,
+    "refuted": 9,
+    "accuracy_pct": 0.0,
+    "accuracy_ci95": [
+     0.0,
+     29.9
+    ],
+    "brier": 0.25,
+    "brier_skill": null,
+    "skilled": null,
+    "reliability_bins": [
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "n": 9,
+      "mean_confidence": 0.5,
+      "observed_rate": 0.0
+     }
+    ],
+    "calibration": "over-confident",
+    "label": "developing",
+    "score": 50
+   }
+  }
+ ],
+ "comparison": {
+  "rule": "nothing_changes",
+  "rule_words": "a guess that nothing changes",
+  "rule_version": 1,
+  "records": {
+   "number": {
+    "graded": 56,
+    "coach_right": 29,
+    "scored": 55,
+    "coach_right_on_scored": 29,
+    "rule_right": 32,
+    "coach_only": 5,
+    "rule_only": 8,
+    "unscorable": 1,
+    "unscorable_reasons": {
+     "no reading before the call was filed": 1
+    },
+    "not_yet_scored": 0,
+    "verdict": "no_clear_difference",
+    "sign_test_p": 0.5811,
+    "coach_right_pct": 52.7,
+    "rule_right_pct": 58.2
+   },
+   "direction": {
+    "graded": 79,
+    "coach_right": 25,
+    "scored": 79,
+    "coach_right_on_scored": 25,
+    "rule_right": 11,
+    "coach_only": 25,
+    "rule_only": 11,
+    "unscorable": 0,
+    "unscorable_reasons": {},
+    "not_yet_scored": 0,
+    "verdict": "coaches_better",
+    "sign_test_p": 0.0288,
+    "coach_right_pct": 31.6,
+    "rule_right_pct": 13.9
+   },
+   "yes_no": {
+    "graded": 8,
+    "coach_right": 4,
+    "scored": 8,
+    "coach_right_on_scored": 4,
+    "rule_right": 4,
+    "coach_only": 2,
+    "rule_only": 2,
+    "unscorable": 0,
+    "unscorable_reasons": {},
+    "not_yet_scored": 0,
+    "verdict": "too_few",
+    "sign_test_p": null,
+    "coach_right_pct": null,
+    "rule_right_pct": null
+   },
+   "sealed": {
+    "graded": 11,
+    "coach_right": 7,
+    "scored": 11,
+    "coach_right_on_scored": 7,
+    "rule_right": 1,
+    "coach_only": 7,
+    "rule_only": 1,
+    "unscorable": 0,
+    "unscorable_reasons": {},
+    "not_yet_scored": 0,
+    "verdict": "too_few",
+    "sign_test_p": null,
+    "coach_right_pct": null,
+    "rule_right_pct": null
+   }
+  },
+  "unclassified": 0,
+  "scored_complete": true,
+  "skill": {
+   "n": 154,
+   "brier_skill": 0.0006,
+   "sentence": "Across 154 checked calls, so far they beat a simple guess."
+  },
+  "rule_sentence": "Number calls: on the 55 a guess could also be checked against, the coaches were right 29 times and a guess that nothing changes 32 times \u2014 the guess was right more often, but not by a clear margin. 1 more could not be checked against the guess. Direction calls: on the 79 a guess could also be checked against, the coaches were right 25 times and a guess that nothing changes 11 times \u2014 the coaches did better. Yes/no bets: on the 8 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 4 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 11 a guess could also be checked against, the coaches were right 7 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell.",
+  "sentence": "Number calls: on the 55 a guess could also be checked against, the coaches were right 29 times and a guess that nothing changes 32 times \u2014 the guess was right more often, but not by a clear margin. 1 more could not be checked against the guess. Direction calls: on the 79 a guess could also be checked against, the coaches were right 25 times and a guess that nothing changes 11 times \u2014 the coaches did better. Yes/no bets: on the 8 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 4 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 11 a guess could also be checked against, the coaches were right 7 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell.",
+  "min_n_for_rate": 20,
+  "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+ },
+ "hypotheses": {
+  "n": 0,
+  "confirmed": 0,
+  "refuted": 0,
+  "accuracy_pct": null,
+  "accuracy_ci95": null,
+  "brier": null,
+  "brier_skill": null,
+  "skilled": null,
+  "reliability_bins": [],
+  "calibration": "insufficient_data",
+  "label": "nascent",
+  "score": 30,
+  "lifetime": {
+   "n": 0,
+   "confirmed": 0,
+   "refuted": 0,
+   "accuracy_pct": null,
+   "accuracy_ci95": null,
+   "brier": null,
+   "brier_skill": null,
+   "skilled": null,
+   "reliability_bins": [],
+   "calibration": "insufficient_data",
+   "label": "nascent",
+   "score": 30
+  }
+ },
+ "interval_forecasts": {
+  "n": 210,
+  "confirmed": 179,
+  "refuted": 31,
+  "accuracy_pct": 85.2,
+  "accuracy_ci95": [
+   79.8,
+   89.4
+  ],
+  "brier": 0.1286,
+  "brier_skill": -0.0218,
+  "skilled": false,
+  "reliability_bins": [
+   {
+    "lo": 0.8,
+    "hi": 0.9,
+    "n": 210,
+    "mean_confidence": 0.8,
+    "observed_rate": 0.852
+   }
+  ],
+  "calibration": "not_yet_skillful",
+  "label": "not_yet_skillful",
+  "score": 45,
+  "lifetime": {
+   "n": 347,
+   "confirmed": 287,
+   "refuted": 60,
+   "accuracy_pct": 82.7,
+   "accuracy_ci95": [
+    78.4,
+    86.3
+   ],
+   "brier": 0.1437,
+   "brier_skill": -0.0051,
+   "skilled": false,
+   "reliability_bins": [
+    {
+     "lo": 0.8,
+     "hi": 0.9,
+     "n": 347,
+     "mean_confidence": 0.8,
+     "observed_rate": 0.827
+    }
+   ],
+   "calibration": "not_yet_skillful",
+   "label": "not_yet_skillful",
+   "score": 45
+  }
+ },
+ "voided": {
+  "n": 2280,
+  "hypotheses": 57,
+  "predictions": 2223,
+  "by_reset": {
+   "2026-07-13": 1433,
+   "2026-07-18": 84,
+   "2026-07-19": 10,
+   "2026-07-20": 112,
+   "2026-07-22": 31,
+   "2026-07-27": 38,
+   "2026-08-03": 149,
+   "2026-08-10": 130,
+   "2026-08-17": 88,
+   "2026-09-01": 118,
+   "2026-09-04": 45,
+   "2026-09-05": 19,
+   "2026-09-06": 23
+  }
+ },
+ "cycle": 17,
+ "cycle_start": "2026-09-06",
+ "prereg_seal": {
+  "genesis": "2026-09-06",
+  "sha256": "bd225d24f67381c253a34671107ba1bc1a8a3c9cc35dadbca1a5edd061b9782d",
+  "artifact_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json",
+  "stamp_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.sha256.json",
+  "verify": "curl -s https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json | shasum -a 256",
+  "stamped_at": "2026-09-06T02:13:38.690967+00:00"
+ },
+ "disclosure": "Self-graded: every prediction here was resolved against the platform's own data by a deterministic evaluator \u2014 no human scoring. Brier score: 0 is perfect, 0.25 is the always-say-50% baseline, lower is better. Calibrated and skilled are different claims: calibrated means stated confidence matches how often calls turn out right (reliability); skilled means beating the base rate (Brier skill > 0). A surface can be reliable without being skillful \u2014 when skill is at or below zero it reads Not Yet Skillful, never Well Calibrated. The platform-wide card scores skill against a STRATIFIED base rate \u2014 coach calls, hypothesis bets and each forecasting MODEL's interval forecasts separately, every one against its own climatology (the daily metric engine and the weekly training prescription are different models and are never counted as one number) \u2014 so pooling strata with different base rates cannot manufacture a skill no stratum has; its over/under-confidence verdict is driven by the worst stratum's gap, and each stratum's own n, Brier and skill are served beside it. Voided bets: a reset voids \u2014 never grades \u2014 every still-open pre-registered bet; each is recorded in the ledger and counted in `voided` so the graded denominator is honest. They are excluded from Brier because they never resolved. Every hit rate here carries its 95% Wilson interval (`accuracy_ci95`) alongside `n` \u2014 a hit rate off a small n reads as more precise than it is.",
+ "as_of": "2026-10-12"
+}

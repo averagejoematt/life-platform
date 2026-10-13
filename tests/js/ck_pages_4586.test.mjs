@@ -19,6 +19,10 @@ const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit
 const load = (name) => JSON.parse(readFileSync(join(FIX, `${name}.json`), "utf8"));
 const edition = load("edition");
 const B = edition.blocks;
+const inWords = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
+const weekday = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
+// The day the next chapter is due, as the captured edition serves it ("Wednesday, October 14").
+const NEXT_DUE = `${weekday(B.next.data.chapter.data.date)}, ${inWords(B.next.data.chapter.data.date)}`;
 // The captured chapter (week 5) has no podcast episode yet. WITH_POD is that chapter carrying
 // the week 4 episode as the edition served it on October 3, so the player stays pinned.
 const POD = { state: "ok", as_of: "2026-10-01", source: "/panelcast/episodes.json", absent_text: "No podcast episode for this chapter yet.", data: { title: "EP4 · The Body Answers Back", guest: "Marcus Webb", guest_domain: "food", duration_sec: 420, duration_minutes: 7, mp3_url: "/panelcast/wk4.mp3", date: "2026-10-01" } };
@@ -47,7 +51,7 @@ test("a fresh chapter leads with its badge, title, player and the AI byline", ()
   assert.match(html, /New this week · Week 5/);
   assert.match(html, /<h1>Park's Blind Spot<\/h1>/);
   assert.match(html, /<audio controls preload="none" src="\/panelcast\/wk4\.mp3"/);
-  assert.match(html, /Written by AI from the record on October 6\. Matthew reads each chapter before it publishes\./);
+  assert.match(html, new RegExp(`Written by AI from the record on ${inWords(B.chapter.data.date)}\\. Matthew reads each chapter before it publishes\\.`));
   assert.ok(html.indexOf("Written by AI") < html.indexOf("After 23 consecutive"), "the AI label sits above the AI's words");
   // As captured: no episode yet, so no player and the block's own sentence.
   const live = P.chapterHTML(B.chapter, B.next);
@@ -133,7 +137,13 @@ test("the bet card states the question, the date and both sides", () => {
   assert.ok(html.includes(`<p class="ck-soft">${SIDES_LINE}</p>`));
   assert.doesNotMatch(html, /Fuel-cognition link|Protein intake gap/);
   assert.equal(P.betLine(B.next), `A bet between ${SIDE_A} and ${SIDE_B} settles ${BET_DAY}.`);
-  assert.equal(P.moreBetsLine(load("coach_docket"), BET.settle_date), `One more bet settles on ${shortDayOf(OTHER_BET)}.`);
+  // As captured: one more bet only if the docket holds another open one; the capture may hold just the shown bet.
+  const docket = load("coach_docket");
+  assert.equal(P.moreBetsLine(docket, BET.settle_date), OTHER_BET ? `One more bet settles on ${shortDayOf(OTHER_BET)}.` : "");
+  // Built from the capture: the same docket with a second open bet a week after the shown one.
+  const later = new Date(Date.parse(`${BET.settle_date}T12:00:00Z`) + 7 * 86400000).toISOString().slice(0, 10);
+  const two = { ...docket, open: [...docket.open.filter((d) => d.resolution_date === BET.settle_date), { ...docket.open[0], resolution_date: later }] };
+  assert.equal(P.moreBetsLine(two, BET.settle_date), `One more bet settles on ${shortDayOf(later)}.`);
   assert.equal(P.moreBetsLine({ open: [{ resolution_date: "2026-10-12" }, { resolution_date: "2026-10-14" }, { resolution_date: "2026-10-16" }] }, "2026-10-12"), "Two more bets settle on October 14 and 16.");
   assert.equal(P.moreBetsLine({ open: [{ resolution_date: "2026-10-05" }] }, "2026-10-05"), "");
 });
@@ -206,11 +216,11 @@ test("the front page runs one sentence of the chapter, a Listen button and no id
   assert.match(html, /<a class="ck-btn ck-btn--ghost" href="\/next\/v8\/story\/">Listen · 7 min<\/a>/);
   assert.equal((html.match(/ck-premise/g) || []).length, 1, "one paragraph of the chapter");
   assert.match(html, /<p class="ck-premise ck-soft">After 23 consecutive training days/);
-  assert.match(html, /On the podcast: the food coach, Marcus Webb\. Next chapter due Wednesday, October 14\./);
+  assert.match(html, new RegExp(`On the podcast: the food coach, Marcus Webb\\. Next chapter due ${NEXT_DUE}\\.`));
   // As captured, with no episode: no Listen button, and the next chapter's day still said.
   const live = P.chapterHTML(B.chapter, B.next, { heading: "h2", player: false, listenHref: "/next/v8/story/" });
   assert.doesNotMatch(live, /Listen|<audio/);
-  assert.match(live, /Next chapter due Wednesday, October 14\./);
+  assert.match(live, new RegExp(`Next chapter due ${NEXT_DUE}\\.`));
 });
 
 test("progress runs from the start to the goal, and is not drawn without a goal", () => {

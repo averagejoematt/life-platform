@@ -1,8 +1,8 @@
 {
- "_about": "#4582 — GET /api/edition's own compose() output over tests/fixtures/edition_wire_4582 (today 2026-10-03 PT). `cases[<upstream>]` holds only the blocks that differ from `green` when that upstream's read fails; `all` is every upstream failing. Regenerate with `python3 tests/test_edition_page_contract_4582.py`; held equal by tests/test_edition_page_contract_4582.py.",
+ "_about": "#4582 — GET /api/edition's own compose() output over tests/fixtures/edition_wire_4582 (today 2026-10-12 PT). `cases[<upstream>]` holds only the blocks that differ from `green` when that upstream's read fails; `all` is every upstream failing. Regenerate with `python3 tests/test_edition_page_contract_4582.py`; held equal by tests/test_edition_page_contract_4582.py.",
  "green": {
-  "as_of": "2026-10-03",
-  "day_n": 28,
+  "as_of": "2026-10-12",
+  "day_n": 37,
   "order": [
    "premise",
    "chapter",
@@ -24,7 +24,7 @@
   "blocks": {
    "premise": {
     "state": "ok",
-    "as_of": "2026-10-03",
+    "as_of": "2026-10-12",
     "source": "static",
     "absent_text": "The introduction is not served right now.",
     "data": {
@@ -33,40 +33,32 @@
    },
    "chapter": {
     "state": "ok",
-    "as_of": "2026-09-29",
+    "as_of": "2026-10-06",
     "source": [
      "/journal/posts.json",
      "/panelcast/episodes.json"
     ],
     "absent_text": "No chapter has been published yet.",
     "data": {
-     "title": "The Body Answers Back",
-     "date": "2026-09-29",
-     "week_label": "Week 4",
-     "dek": "He has trained every day for 23 days straight — his deliberate choice — and by Tuesday his recovery score had fallen to 54%, a sign that the body is starting to answer back. He is down 15 pounds total, but the pace flag is live and the streak is the question that will define the coming week.",
-     "url": "/journal/posts/week-07/",
-     "word_count": 1086,
-     "read_minutes": 5,
+     "title": "Park's Blind Spot",
+     "date": "2026-10-06",
+     "week_label": "Week 5",
+     "dek": "After 23 consecutive training days, three rest days this week sent recovery to 98% four mornings in a row — a season high — while the scale crossed 310 pounds for the first time, suggesting 18.5 pounds gone…",
+     "url": "/journal/posts/week-08/",
+     "word_count": 1262,
+     "read_minutes": 6,
      "podcast": {
-      "state": "ok",
-      "as_of": "2026-10-01",
+      "state": "absent",
+      "as_of": null,
       "source": "/panelcast/episodes.json",
       "absent_text": "No podcast episode for this chapter yet.",
-      "data": {
-       "title": "EP4 · The Body Answers Back",
-       "guest": "Marcus Webb",
-       "guest_domain": "food",
-       "duration_sec": 420,
-       "duration_minutes": 7,
-       "mp3_url": "/panelcast/wk4.mp3",
-       "date": "2026-10-01"
-      }
+      "data": null
      }
     }
    },
    "next": {
     "state": "ok",
-    "as_of": "2026-10-03",
+    "as_of": "2026-10-12",
     "source": [
      "/api/content_cadence",
      "/api/coach_docket"
@@ -75,33 +67,33 @@
     "data": {
      "chapter": {
       "state": "ok",
-      "as_of": "2026-10-07",
+      "as_of": "2026-10-14",
       "source": "/api/content_cadence",
       "absent_text": "The next chapter is paused.",
       "data": {
-       "date": "2026-10-07",
+       "date": "2026-10-14",
        "drafted_not_promised": true
       }
      },
      "bet": {
       "state": "ok",
-      "as_of": "2026-10-05",
+      "as_of": "2026-10-16",
       "source": "/api/coach_docket",
       "absent_text": "No coach bet is waiting to settle.",
       "data": {
-       "question": "Will the morning recovery score (7-day average) be 81.6 or higher on Monday, October 5?",
-       "topic": "Recovery score directional trend confirmation",
-       "settle_date": "2026-10-05",
+       "question": "Will the deep-sleep share (7-day average) be 26 or higher on Friday, October 16?",
+       "topic": "Deep sleep spike interpretation: signal vs. noise",
+       "settle_date": "2026-10-16",
        "sides": [
         {
          "coach": "Max Reyes",
-         "says": "no",
-         "reason": "Recovery EWMA climb from 75.1% to 81.6% shows only one consecutive same-direction point"
+         "says": "yes",
+         "reason": "Deep sleep decline is occurring simultaneously with recovery climb"
         },
         {
          "coach": "Lisa Park",
-         "says": "yes",
-         "reason": "Recovery score will be approximately 85.3% tomorrow with 80% confidence interval of 60.9–100%"
+         "says": "no",
+         "reason": "27.6% deep sleep spike on Sept 22 (1.8 SD above baseline) is likely regression-to-mean noise without thermal anchor and subjective context"
         }
        ]
       }
@@ -110,21 +102,21 @@
    },
    "today": {
     "state": "ok",
-    "as_of": "2026-10-03",
+    "as_of": "2026-10-12",
     "source": "/api/journey",
     "absent_text": "No weigh-in yet.",
     "data": {
-     "weight_lbs": 311.0,
-     "date": "2026-10-03",
+     "weight_lbs": 308.3,
+     "date": "2026-10-12",
      "start_weight_lbs": 327.3,
      "start_date": "2026-09-06",
      "goal_weight_lbs": 185.0,
-     "change_lbs": -16.3
+     "change_lbs": -19.0
     }
    },
    "week": {
     "state": "ok",
-    "as_of": "2026-10-03",
+    "as_of": "2026-10-12",
     "source": [
      "/api/pulse_history",
      "/api/training_overview",
@@ -133,13 +125,13 @@
     "absent_text": "Nothing is recorded in these seven days.",
     "data": {
      "days": [
-      "2026-09-27",
-      "2026-09-28",
-      "2026-09-29",
-      "2026-09-30",
-      "2026-10-01",
-      "2026-10-02",
-      "2026-10-03"
+      "2026-10-06",
+      "2026-10-07",
+      "2026-10-08",
+      "2026-10-09",
+      "2026-10-10",
+      "2026-10-11",
+      "2026-10-12"
      ],
      "order": [
       "weight",
@@ -150,36 +142,36 @@
      "measures": {
       "weight": {
        "state": "ok",
-       "as_of": "2026-10-03",
+       "as_of": "2026-10-12",
        "source": "/api/pulse_history",
        "absent_text": "The weight has no reading in these seven days.",
        "data": {
         "values": [
-         314.5,
-         313.2,
-         312.3,
-         311.4,
-         311.7,
-         311.0,
-         311.0
+         308.9,
+         308.3,
+         307.2,
+         306.1,
+         306.5,
+         null,
+         308.3
         ],
-        "text": "311 lb, down 3.5 across 7 weigh-ins."
+        "text": "308.3 lb, down 0.6 across 6 weigh-ins."
        }
       },
       "training": {
        "state": "ok",
-       "as_of": "2026-10-03",
+       "as_of": "2026-10-12",
        "source": "/api/training_overview",
        "absent_text": "Training has no reading in these seven days.",
        "data": {
         "values": [
-         193.0,
-         116.0,
-         137.0,
-         109.0,
-         137.0,
-         155.0,
-         241.0
+         141.0,
+         147.0,
+         54.0,
+         157.0,
+         56.0,
+         164.0,
+         109.0
         ],
         "text": "Trained on 7 of 7 days recorded.",
         "met": [
@@ -195,26 +187,26 @@
       },
       "sleep": {
        "state": "ok",
-       "as_of": "2026-10-03",
+       "as_of": "2026-10-12",
        "source": "/api/pulse_history",
        "absent_text": "Sleep has no reading in these seven days.",
        "data": {
         "values": [
-         7.5,
-         7.8,
-         8.7,
+         5.0,
          8.2,
-         9.1,
-         8.4,
-         8.8
+         8.9,
+         7.2,
+         6.7,
+         8.1,
+         9.6
         ],
-        "text": "Slept 7 hours or more on 7 of 7 days recorded.",
+        "text": "Slept 7 hours or more on 5 of 7 days recorded.",
         "met": [
+         false,
          true,
          true,
          true,
-         true,
-         true,
+         false,
          true,
          true
         ]
@@ -222,106 +214,40 @@
       },
       "food": {
        "state": "ok",
-       "as_of": "2026-10-03",
+       "as_of": "2026-10-09",
        "source": "/api/nutrition_overview",
        "absent_text": "The food log has no reading in these seven days.",
        "data": {
         "values": [
+         182.0,
+         185.0,
+         120.0,
+         158.0,
          null,
          null,
-         null,
-         null,
-         186.0,
-         172.0,
-         153.0
+         null
         ],
-        "text": "At or above 170 g protein on 2 of 3 days recorded.",
+        "text": "At or above 170 g protein on 2 of 4 days recorded.",
         "met": [
-         null,
-         null,
-         null,
-         null,
          true,
          true,
-         false
+         false,
+         false,
+         null,
+         null,
+         null
         ]
        }
       }
      },
      "detail": [
       {
-       "date": "2026-10-03",
-       "summary": "311.0 lb · trained · slept 8.8 h",
+       "date": "2026-10-12",
+       "summary": "308.3 lb · trained · slept 9.6 h",
        "facts": [
         {
          "label": "Weight",
-         "text": "311.0 lb"
-        },
-        {
-         "label": "Training",
-         "text": "241 minutes of walking"
-        },
-        {
-         "label": "Sleep",
-         "text": "8.8 hours; recovery 98 out of 100"
-        },
-        {
-         "label": "Food",
-         "text": "153 g protein, 1,732 kcal"
-        }
-       ]
-      },
-      {
-       "date": "2026-10-02",
-       "summary": "311.0 lb · trained · slept 8.4 h",
-       "facts": [
-        {
-         "label": "Weight",
-         "text": "311.0 lb"
-        },
-        {
-         "label": "Training",
-         "text": "155 minutes of strength"
-        },
-        {
-         "label": "Sleep",
-         "text": "8.4 hours; recovery 98 out of 100"
-        },
-        {
-         "label": "Food",
-         "text": "172 g protein, 1,568 kcal"
-        }
-       ]
-      },
-      {
-       "date": "2026-10-01",
-       "summary": "311.7 lb · trained · slept 9.1 h",
-       "facts": [
-        {
-         "label": "Weight",
-         "text": "311.7 lb"
-        },
-        {
-         "label": "Training",
-         "text": "137 minutes of strength"
-        },
-        {
-         "label": "Sleep",
-         "text": "9.1 hours; recovery 62 out of 100"
-        },
-        {
-         "label": "Food",
-         "text": "186 g protein, 1,690 kcal"
-        }
-       ]
-      },
-      {
-       "date": "2026-09-30",
-       "summary": "311.4 lb · trained · slept 8.2 h",
-       "facts": [
-        {
-         "label": "Weight",
-         "text": "311.4 lb"
+         "text": "308.3 lb"
         },
         {
          "label": "Training",
@@ -329,61 +255,127 @@
         },
         {
          "label": "Sleep",
-         "text": "8.2 hours; recovery 59 out of 100"
+         "text": "9.6 hours; recovery 67 out of 100"
         }
        ]
       },
       {
-       "date": "2026-09-29",
-       "summary": "312.3 lb · trained · slept 8.7 h",
+       "date": "2026-10-11",
+       "summary": "trained · slept 8.1 h",
        "facts": [
         {
-         "label": "Weight",
-         "text": "312.3 lb"
-        },
-        {
          "label": "Training",
-         "text": "137 minutes of strength"
+         "text": "164 minutes of strength"
         },
         {
          "label": "Sleep",
-         "text": "8.7 hours; recovery 54 out of 100"
+         "text": "8.1 hours; recovery 88 out of 100"
         }
        ]
       },
       {
-       "date": "2026-09-28",
-       "summary": "313.2 lb · trained · slept 7.8 h",
+       "date": "2026-10-10",
+       "summary": "306.5 lb · trained · slept 6.7 h",
        "facts": [
         {
          "label": "Weight",
-         "text": "313.2 lb"
+         "text": "306.5 lb"
         },
         {
          "label": "Training",
-         "text": "116 minutes of strength"
+         "text": "56 minutes of walking"
         },
         {
          "label": "Sleep",
-         "text": "7.8 hours; recovery 64 out of 100"
+         "text": "6.7 hours; recovery 56 out of 100"
         }
        ]
       },
       {
-       "date": "2026-09-27",
-       "summary": "314.5 lb · trained · slept 7.5 h",
+       "date": "2026-10-09",
+       "summary": "306.1 lb · trained · slept 7.2 h",
        "facts": [
         {
          "label": "Weight",
-         "text": "314.5 lb"
+         "text": "306.1 lb"
         },
         {
          "label": "Training",
-         "text": "28 minutes of strength; 165 minutes of walking"
+         "text": "157 minutes of strength"
         },
         {
          "label": "Sleep",
-         "text": "7.5 hours; recovery 89 out of 100"
+         "text": "7.2 hours; recovery 59 out of 100"
+        },
+        {
+         "label": "Food",
+         "text": "158 g protein, 1,911 kcal"
+        }
+       ]
+      },
+      {
+       "date": "2026-10-08",
+       "summary": "307.2 lb · trained · slept 8.9 h",
+       "facts": [
+        {
+         "label": "Weight",
+         "text": "307.2 lb"
+        },
+        {
+         "label": "Training",
+         "text": "54 minutes of walking"
+        },
+        {
+         "label": "Sleep",
+         "text": "8.9 hours; recovery 97 out of 100"
+        },
+        {
+         "label": "Food",
+         "text": "120 g protein, 1,235 kcal"
+        }
+       ]
+      },
+      {
+       "date": "2026-10-07",
+       "summary": "308.3 lb · trained · slept 8.2 h",
+       "facts": [
+        {
+         "label": "Weight",
+         "text": "308.3 lb"
+        },
+        {
+         "label": "Training",
+         "text": "147 minutes of strength"
+        },
+        {
+         "label": "Sleep",
+         "text": "8.2 hours; recovery 78 out of 100"
+        },
+        {
+         "label": "Food",
+         "text": "185 g protein, 1,512 kcal"
+        }
+       ]
+      },
+      {
+       "date": "2026-10-06",
+       "summary": "308.9 lb · trained · slept 5 h",
+       "facts": [
+        {
+         "label": "Weight",
+         "text": "308.9 lb"
+        },
+        {
+         "label": "Training",
+         "text": "141 minutes of strength"
+        },
+        {
+         "label": "Sleep",
+         "text": "5 hours; recovery 82 out of 100"
+        },
+        {
+         "label": "Food",
+         "text": "182 g protein, 1,622 kcal"
         }
        ]
       }
@@ -468,13 +460,45 @@
       {
        "date": "2026-10-03",
        "lbs": 311.0
+      },
+      {
+       "date": "2026-10-04",
+       "lbs": 312.1
+      },
+      {
+       "date": "2026-10-05",
+       "lbs": 311.1
+      },
+      {
+       "date": "2026-10-06",
+       "lbs": 308.9
+      },
+      {
+       "date": "2026-10-07",
+       "lbs": 308.3
+      },
+      {
+       "date": "2026-10-08",
+       "lbs": 307.2
+      },
+      {
+       "date": "2026-10-09",
+       "lbs": 306.1
+      },
+      {
+       "date": "2026-10-10",
+       "lbs": 306.5
+      },
+      {
+       "date": "2026-10-12",
+       "lbs": 308.3
       }
      ]
     }
    },
    "life": {
     "state": "ok",
-    "as_of": "2026-10-03",
+    "as_of": "2026-10-12",
     "source": [
      "/api/decisions",
      "/api/experiments",
@@ -500,16 +524,16 @@
      "rows": {
       "body": {
        "state": "ok",
-       "as_of": "2026-10-03",
+       "as_of": "2026-10-12",
        "source": "/api/journey",
        "absent_text": "No weigh-in yet.",
        "data": {
-        "text": "16.3 lb down so far; 126 lb to go to reach 185."
+        "text": "19 lb down so far; 123.3 lb to go to reach 185."
        }
       },
       "training": {
        "state": "ok",
-       "as_of": "2026-10-03",
+       "as_of": "2026-10-12",
        "source": "/api/session",
        "absent_text": "No session is planned for today.",
        "data": {
@@ -518,47 +542,47 @@
       },
       "sleep": {
        "state": "ok",
-       "as_of": "2026-10-03",
+       "as_of": "2026-10-12",
        "source": "/api/sleep_detail",
        "absent_text": "No sleep has been recorded yet.",
        "data": {
-        "text": "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+        "text": "Slept 9.9 hours on the night of Sunday, October 11; recovery 67 out of 100."
        }
       },
       "food": {
-       "state": "ok",
-       "as_of": "2026-10-02",
+       "state": "stale",
+       "as_of": "2026-10-09",
        "source": "/api/nutrition_overview",
-       "absent_text": "No food has been logged yet.",
+       "absent_text": "Nothing newer than Friday, October 9.",
        "data": {
-        "text": "At or above the 170 g protein floor on 9 of 28 logged days."
+        "text": "At or above the 170 g protein floor on 9 of 27 logged days."
        }
       },
       "habits": {
        "state": "ok",
-       "as_of": "2026-10-02",
+       "as_of": "2026-10-11",
        "source": "/api/habit_streaks",
        "absent_text": "No habits have been recorded yet.",
        "data": {
-        "text": "5 of 7 daily habits kept on Friday, October 2."
+        "text": "4 of 7 daily habits kept on Sunday, October 11."
        }
       },
       "supplements": {
-       "state": "ok",
-       "as_of": "2026-10-03",
+       "state": "stale",
+       "as_of": "2026-10-09",
        "source": "/api/supplements",
-       "absent_text": "No supplements are listed.",
+       "absent_text": "Nothing newer than Friday, October 9.",
        "data": {
         "text": "21 in the daily stack."
        }
       },
       "experiments": {
        "state": "ok",
-       "as_of": "2026-10-03",
+       "as_of": "2026-10-12",
        "source": "/api/experiments",
        "absent_text": "No experiments are listed.",
        "data": {
-        "text": "None running right now; 1 ready to start."
+        "text": "None running right now; 4 ready to start."
        }
       },
       "mind": {
@@ -573,46 +597,31 @@
    },
    "coach_lines": {
     "state": "ok",
-    "as_of": "2026-10-03",
+    "as_of": "2026-10-12",
     "source": "/api/coaching-dashboard",
     "absent_text": "The coaches have written nothing yet.",
     "data": {
      "lines": [
       {
-       "coach": "Lisa Park",
-       "domain": "sleep",
-       "text": "On the night of October 1st, his Whoop captured 98% recovery, 58.8 ms HRV, 54 bpm resting heart rate, and 24.9% deep sleep — objectively strong numbers.",
-       "as_of": "2026-10-03",
-       "data_through": "2026-10-02",
-       "truncated": false,
-       "when_text": null
-      },
-      {
-       "coach": "Nathan Reeves",
-       "domain": "mind",
-       "text": "His recovery on the night of October 1st reached 98%—the highest yet—but his deep sleep is declining and his journal has been silent for eleven days.",
-       "as_of": "2026-10-03",
-       "data_through": "2026-10-02",
-       "truncated": false,
-       "when_text": null
-      },
-      {
-       "coach": "Max Reyes",
-       "domain": "training",
-       "text": "His step count contracted 36% over seven days with no clear cause, and food logging has been quiet for four days.",
-       "as_of": "2026-10-03",
-       "data_through": "2026-10-02",
+       "coach": "James Okafor",
+       "domain": "blood tests",
+       "text": "My read is that 20.8 lb gone in 37 days is real progress, yet two items I flagged weeks ago remain unresolved — has Matthew taken any step this week to schedule either the blood draw or the symptom check-in?",
+       "as_of": "2026-10-12",
+       "move": "question",
+       "move_label": "A question for Matthew",
+       "replies_to": null,
+       "bet_settles": null,
        "truncated": false,
        "when_text": null
       }
      ],
      "mixed_days": false
     },
-    "voice": "restated"
+    "voice": "move"
    },
    "scorecard": {
     "state": "ok",
-    "as_of": "2026-10-03",
+    "as_of": "2026-10-12",
     "source": [
      "/api/calibration",
      "/api/decisions",
@@ -643,20 +652,20 @@
      "rows": {
       "body": {
        "state": "ok",
-       "as_of": "2026-10-03",
+       "as_of": "2026-10-12",
        "source": "/api/pulse_history",
        "absent_text": "Body has no verdict this week.",
        "data": {
         "name": "Body",
         "verdict": "faster_than_planned",
         "verdict_text": "Weight down faster than planned",
-        "text": "Seven-day average 312.2 lb, down 2.6 lb from the seven days before.",
+        "text": "Seven-day average 307.6 lb, down 3.9 lb from the seven days before.",
         "rule": "The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; faster than planned when it fell more than 2.5 lb in the week. Fewer than 3 weigh-ins in either week is not enough data."
        }
       },
       "training": {
        "state": "ok",
-       "as_of": "2026-10-03",
+       "as_of": "2026-10-12",
        "source": "/api/training_overview",
        "absent_text": "Training has no verdict this week.",
        "data": {
@@ -669,33 +678,33 @@
       },
       "sleep": {
        "state": "ok",
-       "as_of": "2026-10-03",
+       "as_of": "2026-10-12",
        "source": "/api/pulse_history",
        "absent_text": "Sleep has no verdict this week.",
        "data": {
         "name": "Sleep",
         "verdict": "going_well",
         "verdict_text": "5 or more long nights",
-        "text": "7 hours or more on 7 of 7 nights recorded.",
+        "text": "7 hours or more on 5 of 7 nights recorded.",
         "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
        }
       },
       "food": {
        "state": "ok",
-       "as_of": "2026-10-03",
+       "as_of": "2026-10-12",
        "source": "/api/nutrition_overview",
        "absent_text": "Food has no verdict this week.",
        "data": {
         "name": "Food",
         "verdict": "not_enough_data",
         "verdict_text": "Too few days logged",
-        "text": "3 days logged; 5 are needed.",
+        "text": "4 days logged; 5 are needed.",
         "rule": "Logged days at or above the plan's protein floor in the last seven. Going well at 5. Fewer than 5 logged days is not enough data."
        }
       },
       "mind": {
        "state": "ok",
-       "as_of": "2026-10-03",
+       "as_of": "2026-10-12",
        "source": [
         "/api/owner_words",
         "/api/decisions"
@@ -711,7 +720,7 @@
       },
       "ai": {
        "state": "ok",
-       "as_of": "2026-10-03",
+       "as_of": "2026-10-12",
        "source": [
         "/api/predictions",
         "/api/calibration"
@@ -719,9 +728,9 @@
        "absent_text": "The AI has no verdict this week.",
        "data": {
         "name": "The AI",
-        "verdict": "not_yet",
-        "verdict_text": "The coaches do not beat a simple guess yet",
-        "text": "Counted across all 96 calls checked to date, not this week's alone.",
+        "verdict": "going_well",
+        "verdict_text": "The coaches beat a simple guess",
+        "text": "Counted across all 154 calls checked to date, not this week's alone.",
         "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
        }
       }
@@ -729,13 +738,16 @@
      "went_right": {
       "matthew": {
        "area": "sleep",
-       "text": "Sleep: 7 hours or more on 7 of 7 nights recorded.",
+       "text": "Sleep: 7 hours or more on 5 of 7 nights recorded.",
        "source": "/api/pulse_history"
       },
       "engine": {
-       "area": null,
-       "text": "Nothing this week.",
-       "source": null
+       "area": "ai",
+       "text": "The AI: The coaches beat a simple guess, counted across all 154 calls checked to date, not this week's alone.",
+       "source": [
+        "/api/predictions",
+        "/api/calibration"
+       ]
       }
      },
      "verdicts": {
@@ -745,8 +757,8 @@
       "not_enough_data": "Not enough data"
      },
      "window": {
-      "from": "2026-09-27",
-      "to": "2026-10-03"
+      "from": "2026-10-06",
+      "to": "2026-10-12"
      },
      "rules_set": "2026-10-09",
      "rules_set_text": "The rules were set on Friday, October 9."
@@ -761,17 +773,17 @@
     ],
     "absent_text": "No coach call has been checked yet.",
     "data": {
-     "right": 62,
-     "decided": 152,
-     "count_text": "62 of 152 checked calls right.",
+     "right": 65,
+     "decided": 154,
+     "count_text": "65 of 154 checked calls right.",
      "counted": {
       "sealed": {
        "n": 11,
-       "right": 5
+       "right": 7
       },
       "bet": {
-       "n": 6,
-       "right": 3
+       "n": 8,
+       "right": 4
       },
       "commentary": {
        "n": 92,
@@ -782,11 +794,11 @@
        "right": 13
       }
      },
-     "counted_text": "Counted: 11 sealed before day one, 6 sides of bets between two coaches, 92 read out of the coaches' running commentary and 43 conditional or hedged sentences.",
-     "beats_simple_guess": false,
-     "comparison_text": "So far they do not beat a simple guess.",
-     "brier_skill": -0.0158,
-     "skill_n": 96
+     "counted_text": "Counted: 11 sealed before day one, 8 sides of bets between two coaches, 92 read out of the coaches' running commentary and 43 conditional or hedged sentences.",
+     "beats_simple_guess": true,
+     "comparison_text": "So far they beat a simple guess.",
+     "brier_skill": 0.0006,
+     "skill_n": 154
     }
    },
    "his_words": {
@@ -802,7 +814,7 @@
    },
    "catch_up": {
     "state": "ok",
-    "as_of": "2026-09-29",
+    "as_of": "2026-10-06",
     "source": "/journal/posts.json",
     "absent_text": "No chapters yet.",
     "data": {
@@ -842,13 +854,19 @@
        "title": "The Body Answers Back",
        "url": "/journal/posts/week-07/",
        "date": "2026-09-29"
+      },
+      {
+       "label": "Week 5",
+       "title": "Park's Blind Spot",
+       "url": "/journal/posts/week-08/",
+       "date": "2026-10-06"
       }
      ]
     }
    },
    "follow": {
     "state": "ok",
-    "as_of": "2026-10-03",
+    "as_of": "2026-10-12",
     "source": [
      "common.subscriber_cadence",
      "/api/content_cadence"
@@ -859,38 +877,905 @@
      "sends": [
       {
        "sender": "weekly-signal",
-       "next_date": "2026-10-04",
+       "next_date": "2026-10-18",
        "conditional": false
       },
       {
        "sender": "chronicle-email-sender",
-       "next_date": "2026-10-07",
+       "next_date": "2026-10-14",
        "conditional": true
       },
       {
        "sender": "between-chronicle",
-       "next_date": "2026-10-04",
+       "next_date": "2026-10-18",
        "conditional": true
       }
      ],
-     "next_chapter_date": "2026-10-07",
+     "next_chapter_date": "2026-10-14",
      "next_chapter_state": "ok"
     }
    },
    "moves": {
-    "state": "absent",
-    "as_of": null,
+    "state": "ok",
+    "as_of": "2026-10-12",
     "source": "/api/coach_moves",
     "absent_text": "No coach line is recorded in these seven days.",
-    "data": null
+    "data": {
+     "days": [
+      {
+       "_meta": {
+        "generated_at": "2026-10-13T01:38:49.881536+00:00",
+        "served_at": "2026-10-13T01:38:49.881536+00:00",
+        "cache_seconds": 300,
+        "request_id": "9ac5e09b10714ba8"
+       },
+       "state": "ok",
+       "date": "2026-10-12",
+       "source": "/api/coach_moves",
+       "absent_text": "No coach line is recorded for Monday, October 12.",
+       "lines": [
+        {
+         "coach_id": "labs_coach",
+         "coach": "James Okafor",
+         "move": "question",
+         "move_label": "A question for Matthew",
+         "text": "My read is that 20.8 lb gone in 37 days is real progress, yet two items I flagged weeks ago remain unresolved — has Matthew taken any step this week to schedule either the blood draw or the symptom check-in?",
+         "replies_to": null,
+         "bet_settles": null
+        }
+       ]
+      },
+      {
+       "_meta": {
+        "generated_at": "2026-10-13T01:38:54.703643+00:00",
+        "served_at": "2026-10-13T01:38:54.703643+00:00",
+        "cache_seconds": 300,
+        "request_id": "fe3e36356f7e4e1c"
+       },
+       "state": "ok",
+       "date": "2026-10-11",
+       "source": "/api/coach_moves",
+       "absent_text": "No coach line is recorded for Sunday, October 11.",
+       "lines": [
+        {
+         "coach_id": "nutrition_coach",
+         "coach": "Marcus Webb",
+         "move": "reaction",
+         "move_label": "On a result",
+         "text": "Lisa's protein prediction came true, yet Matthew's 28-day average still sits below the 170g floor — so far, activation hasn't closed the dinner gap I keep flagging. I expect that gap to matter more now, not less.",
+         "replies_to": null,
+         "bet_settles": null
+        },
+        {
+         "coach_id": "sleep_coach",
+         "coach": "Lisa Park",
+         "move": "reply",
+         "move_label": "A reply",
+         "text": "Marcus Webb is right that the dinner gap persists, and I'll go further: I was wrong about the mechanism — protein escalation held, yet deep sleep didn't improve, which means, for now, I can't claim that gap is the only thing standing between Matthew and better recovery.",
+         "replies_to": "Marcus Webb",
+         "bet_settles": null
+        },
+        {
+         "coach_id": "labs_coach",
+         "coach": "James Okafor",
+         "move": "question",
+         "move_label": "A question for Matthew",
+         "text": "My read is that the two items blocking real progress — a lab draw and a symptom check-in — are still unscheduled, for now; has Matthew taken any steps this week to get either one booked?",
+         "replies_to": null,
+         "bet_settles": null
+        }
+       ]
+      },
+      {
+       "_meta": {
+        "generated_at": "2026-10-13T01:38:54.774312+00:00",
+        "served_at": "2026-10-13T01:38:54.774312+00:00",
+        "cache_seconds": 300,
+        "request_id": "30112b55de5e4ea0"
+       },
+       "state": "absent",
+       "date": "2026-10-10",
+       "source": "/api/coach_moves",
+       "absent_text": "No coach line is recorded for Saturday, October 10.",
+       "lines": []
+      },
+      {
+       "_meta": {
+        "generated_at": "2026-10-13T01:38:54.839034+00:00",
+        "served_at": "2026-10-13T01:38:54.839034+00:00",
+        "cache_seconds": 300,
+        "request_id": "70b2427728b24f5b"
+       },
+       "state": "ok",
+       "date": "2026-10-09",
+       "source": "/api/coach_moves",
+       "absent_text": "No coach line is recorded for Friday, October 9.",
+       "lines": [
+        {
+         "coach_id": "explorer_coach",
+         "coach": "Henning Brandt",
+         "move": "reaction",
+         "move_label": "On a result",
+         "text": "Henning's prediction just came true, and I think it reshapes what we thought we knew — so far, Matthew's recovery holding at 52ms HRV alongside 20.2 lbs lost suggests glucose dynamics, not protein primacy, are driving his recovery architecture.",
+         "replies_to": null,
+         "bet_settles": null
+        },
+        {
+         "coach_id": "labs_coach",
+         "coach": "James Okafor",
+         "move": "call",
+         "move_label": "A call",
+         "text": "I think Matthew will keep deferring the lab draw as long as the symptom baseline stays uncollected — so far, 30 days of journal silence makes it nearly impossible to build that case, and I expect that gap, not protein, is what stalls clinical progress next.",
+         "replies_to": null,
+         "bet_settles": null
+        }
+       ]
+      },
+      {
+       "_meta": {
+        "generated_at": "2026-10-13T01:38:54.896640+00:00",
+        "served_at": "2026-10-13T01:38:54.896640+00:00",
+        "cache_seconds": 300,
+        "request_id": "1eb9e44d5e414f8b"
+       },
+       "state": "ok",
+       "date": "2026-10-08",
+       "source": "/api/coach_moves",
+       "absent_text": "No coach line is recorded for Thursday, October 8.",
+       "lines": [
+        {
+         "coach_id": "labs_coach",
+         "coach": "James Okafor",
+         "move": "reply",
+         "move_label": "A reply",
+         "text": "Marcus Webb is right that dinner underperforms, but so far Matthew's 27-day average has held at 146.9g — I think the intake concern is weaker than the lab draw absence, which is now the clearest blocker I see.",
+         "replies_to": "Marcus Webb",
+         "bet_settles": null
+        },
+        {
+         "coach_id": "mind_coach",
+         "coach": "Nathan Reeves",
+         "move": "question",
+         "move_label": "A question for Matthew",
+         "text": "Is the 29-day journal silence something Matthew chose, or something that simply accumulated while he was busy with everything the logged data shows he's been doing well?",
+         "replies_to": null,
+         "bet_settles": null
+        }
+       ]
+      },
+      {
+       "_meta": {
+        "generated_at": "2026-10-13T01:38:49.815575+00:00",
+        "served_at": "2026-10-13T01:38:49.815575+00:00",
+        "cache_seconds": 300,
+        "request_id": "5d44b367ae874124"
+       },
+       "state": "ok",
+       "date": "2026-10-07",
+       "source": "/api/coach_moves",
+       "absent_text": "No coach line is recorded for Wednesday, October 7.",
+       "lines": [
+        {
+         "coach_id": "sleep_coach",
+         "coach": "Lisa Park",
+         "move": "reaction",
+         "move_label": "On a result",
+         "text": "I was skeptical when Lisa called the recovery spike genuine architecture rather than noise, but today's 77 recovery score and HRV of 57 — so far — suggest she was right and Matthew's sleep structure is holding load, not just bouncing off a floor event.",
+         "replies_to": null,
+         "bet_settles": null
+        },
+        {
+         "coach_id": "nutrition_coach",
+         "coach": "Marcus Webb",
+         "move": "reply",
+         "move_label": "A reply",
+         "text": "James Okafor's protein hold deserves scrutiny — I was wrong about dinner disruption collapsing intake during the dark journal gap, and Matthew held his average intact, so I think the intake concern is weaker than James is framing it right now.",
+         "replies_to": "James Okafor",
+         "bet_settles": null
+        },
+        {
+         "coach_id": "mind_coach",
+         "coach": "Nathan Reeves",
+         "move": "question",
+         "move_label": "A question for Matthew",
+         "text": "Does Matthew see the 28-day journal silence as a deliberate choice, or has it quietly become the path of least resistance — and I wonder if even he knows which one it is yet?",
+         "replies_to": null,
+         "bet_settles": null
+        }
+       ]
+      },
+      {
+       "_meta": {
+        "generated_at": "2026-10-13T01:38:55.006173+00:00",
+        "served_at": "2026-10-13T01:38:55.006173+00:00",
+        "cache_seconds": 300,
+        "request_id": "fa3da015473a4991"
+       },
+       "state": "absent",
+       "date": "2026-10-06",
+       "source": "/api/coach_moves",
+       "absent_text": "No coach line is recorded for Tuesday, October 6.",
+       "lines": []
+      }
+     ]
+    }
    },
    "calls": {
     "state": "ok",
-    "as_of": "2026-10-03",
+    "as_of": "2026-10-12",
     "source": "/api/calls",
     "absent_text": "No call has been checked against the data yet.",
     "data": {
      "calls": [
+      {
+       "id": "bet-20261012-e44d5122d7",
+       "kind": "bet",
+       "coach_id": "mind",
+       "coach_name": "Nathan Reeves",
+       "called": "Nathan Reeves and Marcus Webb bet on one question, fixed the day the bet opened: whether the 7-day average of his protein eaten would be at or above 190 g on October 12. Nathan Reeves said no; Marcus Webb said yes.",
+       "called_short": "Nathan Reeves and Marcus Webb bet on whether the 7-day average of his protein eaten would be at or above 190 g on October 12.",
+       "happened_short": "It came in at 158.2 g.",
+       "settled_date": "2026-10-12",
+       "verdict": "right",
+       "verdict_text": "Nathan Reeves was right; Marcus Webb was wrong.",
+       "actual": {
+        "value": 158.2,
+        "text": "158.2 g"
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that the answer would be the same as on the day before the bet opened. That guess was also right.",
+        "short": "also right"
+       }
+      },
+      {
+       "id": "sleep-20260926-a9f7e98e40",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 85 for September 27.",
+       "called_short": "Lisa Park called his morning recovery score at about 85.",
+       "happened_short": "It came in at 89.",
+       "settled_date": "2026-10-11",
+       "verdict": "right",
+       "verdict_text": "Lisa Park was right.",
+       "actual": {
+        "value": 89.0,
+        "text": "89"
+       },
+       "tolerance": {
+        "value": 21.308,
+        "text": "21.3",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 99, the last reading before the call. That guess was also right.",
+        "short": "also right"
+       }
+      },
+      {
+       "id": "physical-20261002-12e3b80e35",
+       "kind": "number",
+       "coach_id": "physical",
+       "coach_name": "Max Reyes",
+       "called": "Max Reyes called his morning recovery score (his wrist strap’s morning score out of 100) at about 76 for October 3.",
+       "called_short": "Max Reyes called his morning recovery score at about 76.",
+       "happened_short": "It came in at 98.",
+       "settled_date": "2026-10-11",
+       "verdict": "wrong",
+       "verdict_text": "Max Reyes was wrong.",
+       "actual": {
+        "value": 98.0,
+        "text": "98"
+       },
+       "tolerance": {
+        "value": 17.8725,
+        "text": "17.9",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 62, the last reading before the call. That guess was also wrong.",
+        "short": "also wrong"
+       }
+      },
+      {
+       "id": "physical-20260926-2849d27353",
+       "kind": "number",
+       "coach_id": "physical",
+       "coach_name": "Max Reyes",
+       "called": "Max Reyes called his morning recovery score (his wrist strap’s morning score out of 100) at about 85 for September 27.",
+       "called_short": "Max Reyes called his morning recovery score at about 85.",
+       "happened_short": "It came in at 89.",
+       "settled_date": "2026-10-11",
+       "verdict": "right",
+       "verdict_text": "Max Reyes was right.",
+       "actual": {
+        "value": 89.0,
+        "text": "89"
+       },
+       "tolerance": {
+        "value": 21.308,
+        "text": "21.3",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 99, the last reading before the call. That guess was also right.",
+        "short": "also right"
+       }
+      },
+      {
+       "id": "physical-20260912-7c9a8852c3",
+       "kind": "number",
+       "coach_id": "physical",
+       "coach_name": "Max Reyes",
+       "called": "Max Reyes called his morning recovery score (his wrist strap’s morning score out of 100) at about 54.7 for September 13.",
+       "called_short": "Max Reyes called his morning recovery score at about 54.7.",
+       "happened_short": "It came in at 73.",
+       "settled_date": "2026-10-11",
+       "verdict": "wrong",
+       "verdict_text": "Max Reyes was wrong.",
+       "actual": {
+        "value": 73.0,
+        "text": "73"
+       },
+       "tolerance": {
+        "value": 18.2532,
+        "text": "18.25",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 24, the last reading before the call. That guess was also wrong.",
+        "short": "also wrong"
+       }
+      },
+      {
+       "id": "labs-20260924-87bbc45eff",
+       "kind": "number",
+       "coach_id": "labs",
+       "coach_name": "James Okafor",
+       "called": "James Okafor called his morning recovery score (his wrist strap’s morning score out of 100) at about 85 for September 25.",
+       "called_short": "James Okafor called his morning recovery score at about 85.",
+       "happened_short": "It came in at 99.",
+       "settled_date": "2026-10-11",
+       "verdict": "right",
+       "verdict_text": "James Okafor was right.",
+       "actual": {
+        "value": 99.0,
+        "text": "99"
+       },
+       "tolerance": {
+        "value": 20.7078,
+        "text": "20.7",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 80, the last reading before the call. That guess was also right.",
+        "short": "also right"
+       }
+      },
+      {
+       "id": "labs-20260921-b497af605f",
+       "kind": "number",
+       "coach_id": "labs",
+       "coach_name": "James Okafor",
+       "called": "James Okafor called his morning recovery score (his wrist strap’s morning score out of 100) at about 91 for September 22.",
+       "called_short": "James Okafor called his morning recovery score at about 91.",
+       "happened_short": "It came in at 78.",
+       "settled_date": "2026-10-11",
+       "verdict": "right",
+       "verdict_text": "James Okafor was right.",
+       "actual": {
+        "value": 78.0,
+        "text": "78"
+       },
+       "tolerance": {
+        "value": 23.7331,
+        "text": "23.7",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 97, the last reading before the call. That guess was also right.",
+        "short": "also right"
+       }
+      },
+      {
+       "id": "explorer-20260915-6be2fa5fb4",
+       "kind": "number",
+       "coach_id": "explorer",
+       "coach_name": "Henning Brandt",
+       "called": "Henning Brandt called his morning recovery score (his wrist strap’s morning score out of 100) at about 64 for September 16.",
+       "called_short": "Henning Brandt called his morning recovery score at about 64.",
+       "happened_short": "It came in at 92.",
+       "settled_date": "2026-10-11",
+       "verdict": "wrong",
+       "verdict_text": "Henning Brandt was wrong.",
+       "actual": {
+        "value": 92.0,
+        "text": "92"
+       },
+       "tolerance": {
+        "value": 19.2925,
+        "text": "19.3",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 63, the last reading before the call. That guess was also wrong.",
+        "short": "also wrong"
+       }
+      },
+      {
+       "id": "sleep-20261003-762e1a236b",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 91 for October 4.",
+       "called_short": "Lisa Park called his morning recovery score at about 91.",
+       "happened_short": "It came in at 98.",
+       "settled_date": "2026-10-10",
+       "verdict": "right",
+       "verdict_text": "Lisa Park was right.",
+       "actual": {
+        "value": 98.0,
+        "text": "98"
+       },
+       "tolerance": {
+        "value": 18.3648,
+        "text": "18.4",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 98, the last reading before the call. That guess was also right.",
+        "short": "also right"
+       }
+      },
+      {
+       "id": "sleep-20261002-11965e2549",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 76 for October 3.",
+       "called_short": "Lisa Park called his morning recovery score at about 76.",
+       "happened_short": "It came in at 98.",
+       "settled_date": "2026-10-10",
+       "verdict": "wrong",
+       "verdict_text": "Lisa Park was wrong.",
+       "actual": {
+        "value": 98.0,
+        "text": "98"
+       },
+       "tolerance": {
+        "value": 17.8725,
+        "text": "17.9",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 62, the last reading before the call. That guess was also wrong.",
+        "short": "also wrong"
+       }
+      },
+      {
+       "id": "sleep-20261002-0a21ebc7cb",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 65 for October 3.",
+       "called_short": "Lisa Park called his morning recovery score at about 65.",
+       "happened_short": "It came in at 98.",
+       "settled_date": "2026-10-10",
+       "verdict": "wrong",
+       "verdict_text": "Lisa Park was wrong.",
+       "actual": {
+        "value": 98.0,
+        "text": "98"
+       },
+       "tolerance": {
+        "value": 17.8725,
+        "text": "17.9",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 62, the last reading before the call. That guess was also wrong.",
+        "short": "also wrong"
+       }
+      },
+      {
+       "id": "sleep-20261001-0c82650519",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 65 for October 2.",
+       "called_short": "Lisa Park called his morning recovery score at about 65.",
+       "happened_short": "It came in at 98.",
+       "settled_date": "2026-10-10",
+       "verdict": "wrong",
+       "verdict_text": "Lisa Park was wrong.",
+       "actual": {
+        "value": 98.0,
+        "text": "98"
+       },
+       "tolerance": {
+        "value": 17.3031,
+        "text": "17.3",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 59, the last reading before the call. That guess was also wrong.",
+        "short": "also wrong"
+       }
+      },
+      {
+       "id": "physical-20261002-0b83540ced",
+       "kind": "number",
+       "coach_id": "physical",
+       "coach_name": "Max Reyes",
+       "called": "Max Reyes called his morning recovery score (his wrist strap’s morning score out of 100) at about 65 for October 3.",
+       "called_short": "Max Reyes called his morning recovery score at about 65.",
+       "happened_short": "It came in at 98.",
+       "settled_date": "2026-10-10",
+       "verdict": "wrong",
+       "verdict_text": "Max Reyes was wrong.",
+       "actual": {
+        "value": 98.0,
+        "text": "98"
+       },
+       "tolerance": {
+        "value": 17.5951,
+        "text": "17.6",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 30
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 62, the last reading before the call. That guess was also wrong.",
+        "short": "also wrong"
+       }
+      },
+      {
+       "id": "physical-20260922-f397c4a46c",
+       "kind": "number",
+       "coach_id": "physical",
+       "coach_name": "Max Reyes",
+       "called": "Max Reyes called his weight at about 315 lb for September 23.",
+       "called_short": "Max Reyes called his weight at about 315 lb.",
+       "happened_short": "It came in at 315.4 lb.",
+       "settled_date": "2026-10-10",
+       "verdict": "right",
+       "verdict_text": "Max Reyes was right.",
+       "actual": {
+        "value": 315.43,
+        "text": "315.4 lb"
+       },
+       "tolerance": {
+        "value": 5.1527,
+        "text": "5.2 lb",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 13
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 315.8 lb, the last reading before the call. That guess was also right.",
+        "short": "also right"
+       }
+      },
+      {
+       "id": "mind-20261001-a080dd1fc8",
+       "kind": "number",
+       "coach_id": "mind",
+       "coach_name": "Nathan Reeves",
+       "called": "Nathan Reeves called his morning recovery score (his wrist strap’s morning score out of 100) at about 65 for October 2.",
+       "called_short": "Nathan Reeves called his morning recovery score at about 65.",
+       "happened_short": "It came in at 98.",
+       "settled_date": "2026-10-10",
+       "verdict": "wrong",
+       "verdict_text": "Nathan Reeves was wrong.",
+       "actual": {
+        "value": 98.0,
+        "text": "98"
+       },
+       "tolerance": {
+        "value": 17.3031,
+        "text": "17.3",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 59, the last reading before the call. That guess was also wrong.",
+        "short": "also wrong"
+       }
+      },
+      {
+       "id": "explorer-20261008-674d1a44b6",
+       "kind": "number",
+       "coach_id": "explorer",
+       "coach_name": "Henning Brandt",
+       "called": "Henning Brandt called his weight at about 307.2 lb for October 9.",
+       "called_short": "Henning Brandt called his weight at about 307.2 lb.",
+       "happened_short": "It came in at 306.1 lb.",
+       "settled_date": "2026-10-10",
+       "verdict": "right",
+       "verdict_text": "Henning Brandt was right.",
+       "actual": {
+        "value": 306.13,
+        "text": "306.1 lb"
+       },
+       "tolerance": {
+        "value": 3.1713,
+        "text": "3.2 lb",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 24
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 308.3 lb, the last reading before the call. That guess was also right.",
+        "short": "also right"
+       }
+      },
+      {
+       "id": "sleep-20260925-8e1782dfe1",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 89 for September 26.",
+       "called_short": "Lisa Park called his morning recovery score at about 89.",
+       "happened_short": "It came in at 77.",
+       "settled_date": "2026-10-09",
+       "verdict": "right",
+       "verdict_text": "Lisa Park was right.",
+       "actual": {
+        "value": 77.0,
+        "text": "77"
+       },
+       "tolerance": {
+        "value": 21.4664,
+        "text": "21.5",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 86, the last reading before the call. That guess was also right.",
+        "short": "also right"
+       }
+      },
+      {
+       "id": "sleep-20260923-5c04a8f36a",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 84 for September 24.",
+       "called_short": "Lisa Park called his morning recovery score at about 84.",
+       "happened_short": "It came in at 86.",
+       "settled_date": "2026-10-07",
+       "verdict": "right",
+       "verdict_text": "Lisa Park was right.",
+       "actual": {
+        "value": 86.0,
+        "text": "86"
+       },
+       "tolerance": {
+        "value": 20.8524,
+        "text": "20.9",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 78, the last reading before the call. That guess was also right.",
+        "short": "also right"
+       }
+      },
+      {
+       "id": "bet-20261007-7e73e169b4",
+       "kind": "bet",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park and Nathan Reeves bet on one question, fixed the day the bet opened: whether the 7-day average of his morning recovery score (his wrist strap’s morning score out of 100) would be at or above 80 on October 7. Lisa Park said yes; Nathan Reeves said no.",
+       "called_short": "Lisa Park and Nathan Reeves bet on whether the 7-day average of his morning recovery score would be at or above 80 on October 7.",
+       "happened_short": "It came in at 87.6.",
+       "settled_date": "2026-10-07",
+       "verdict": "right",
+       "verdict_text": "Lisa Park was right; Nathan Reeves was wrong.",
+       "actual": {
+        "value": 87.57142857142857,
+        "text": "87.6"
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that the answer would be the same as on the day before the bet opened. That guess was also right.",
+        "short": "also right"
+       }
+      },
+      {
+       "id": "physical-20260922-f98450a959",
+       "kind": "number",
+       "coach_id": "physical",
+       "coach_name": "Max Reyes",
+       "called": "Max Reyes called his morning recovery score (his wrist strap’s morning score out of 100) at about 86 for September 23.",
+       "called_short": "Max Reyes called his morning recovery score at about 86.",
+       "happened_short": "It came in at 80.",
+       "settled_date": "2026-10-06",
+       "verdict": "right",
+       "verdict_text": "Max Reyes was right.",
+       "actual": {
+        "value": 80.0,
+        "text": "80"
+       },
+       "tolerance": {
+        "value": 22.3731,
+        "text": "22.4",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 90, the last reading before the call. That guess was also right.",
+        "short": "also right"
+       }
+      },
+      {
+       "id": "labs-20260922-71a6ea6cb5",
+       "kind": "number",
+       "coach_id": "labs",
+       "coach_name": "James Okafor",
+       "called": "James Okafor called his morning recovery score (his wrist strap’s morning score out of 100) at about 86 for September 23.",
+       "called_short": "James Okafor called his morning recovery score at about 86.",
+       "happened_short": "It came in at 80.",
+       "settled_date": "2026-10-06",
+       "verdict": "right",
+       "verdict_text": "James Okafor was right.",
+       "actual": {
+        "value": 80.0,
+        "text": "80"
+       },
+       "tolerance": {
+        "value": 22.3731,
+        "text": "22.4",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 90, the last reading before the call. That guess was also right.",
+        "short": "also right"
+       }
+      },
+      {
+       "id": "bet-20261005-1e87fb3156",
+       "kind": "bet",
+       "coach_id": "physical",
+       "coach_name": "Max Reyes",
+       "called": "Max Reyes and Lisa Park bet on one question, fixed the day the bet opened: whether the 7-day average of his morning recovery score (his wrist strap’s morning score out of 100) would be at or above 81.6 on October 5. Max Reyes said no; Lisa Park said yes.",
+       "called_short": "Max Reyes and Lisa Park bet on whether the 7-day average of his morning recovery score would be at or above 81.6 on October 5.",
+       "happened_short": "It came in at 81.",
+       "settled_date": "2026-10-05",
+       "verdict": "right",
+       "verdict_text": "Max Reyes was right; Lisa Park was wrong.",
+       "actual": {
+        "value": 81.0,
+        "text": "81"
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that the answer would be the same as on the day before the bet opened. That guess was wrong.",
+        "short": "wrong"
+       }
+      },
+      {
+       "id": "physical-20260906-297ccf261a",
+       "kind": "direction",
+       "coach_id": "physical",
+       "coach_name": "Max Reyes",
+       "called": "Max Reyes called his weight to go down, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
+       "called_short": "Max Reyes called his weight to go down.",
+       "happened_short": "It went down.",
+       "settled_date": "2026-10-04",
+       "verdict": "right",
+       "verdict_text": "Max Reyes was right.",
+       "actual": null,
+       "tolerance": {
+        "value": 1.445,
+        "text": "1.4 lb",
+        "statistic": "the median day-to-day change of his readings inside the window",
+        "window_days": null,
+        "n": 7
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would not move. That guess was wrong.",
+        "short": "wrong"
+       }
+      },
+      {
+       "id": "nutrition-20260906-a1e2c2ba0a",
+       "kind": "direction",
+       "coach_id": "nutrition",
+       "coach_name": "Marcus Webb",
+       "called": "Marcus Webb called his weight to go down, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
+       "called_short": "Marcus Webb called his weight to go down.",
+       "happened_short": "It went down.",
+       "settled_date": "2026-10-04",
+       "verdict": "right",
+       "verdict_text": "Marcus Webb was right.",
+       "actual": null,
+       "tolerance": {
+        "value": 1.445,
+        "text": "1.4 lb",
+        "statistic": "the median day-to-day change of his readings inside the window",
+        "window_days": null,
+        "n": 7
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would not move. That guess was wrong.",
+        "short": "wrong"
+       }
+      },
       {
        "id": "explorer-20260919-aecd9fef2c",
        "kind": "number",
@@ -914,10 +1799,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 84, the last reading before the call. That guess was also right.",
+        "short": "also right"
        }
       },
       {
@@ -943,10 +1828,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 6.7 hours, the last reading before the call. That guess was wrong.",
+        "short": "wrong"
        }
       },
       {
@@ -972,10 +1857,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 7.7 hours, the last reading before the call. That guess was also right.",
+        "short": "also right"
        }
       },
       {
@@ -994,10 +1879,10 @@
         "text": "59"
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that the answer would be the same as on the day before the bet opened. That guess was wrong.",
+        "short": "wrong"
        }
       },
       {
@@ -1023,10 +1908,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 73, the last reading before the call. That guess was right.",
+        "short": "right"
        }
       },
       {
@@ -1081,10 +1966,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 59, the last reading before the call. That guess was also right.",
+        "short": "also right"
        }
       },
       {
@@ -1092,19 +1977,25 @@
        "kind": "direction",
        "coach_id": "labs",
        "coach_name": "James Okafor",
-       "called": "James Okafor called his resting heart rate to go down, in a prediction sealed before day one. It was checked on September 27 against the trend in his most recent readings.",
+       "called": "James Okafor called his resting heart rate to go down, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
        "called_short": "James Okafor called his resting heart rate to go down.",
        "happened_short": "It went down.",
        "settled_date": "2026-09-27",
        "verdict": "right",
        "verdict_text": "James Okafor was right.",
        "actual": null,
-       "tolerance": null,
+       "tolerance": {
+        "value": 1.5,
+        "text": "1.5",
+        "statistic": "the median day-to-day change of his readings inside the window",
+        "window_days": null,
+        "n": 15
+       },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would not move. That guess was wrong.",
+        "short": "wrong"
        }
       },
       {
@@ -1112,19 +2003,25 @@
        "kind": "direction",
        "coach_id": "explorer",
        "coach_name": "Henning Brandt",
-       "called": "Henning Brandt called his daily steps to go up, in a prediction sealed before day one. It was checked on September 27 against the trend in his most recent readings.",
+       "called": "Henning Brandt called his daily steps to go up, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
        "called_short": "Henning Brandt called his daily steps to go up.",
        "happened_short": "It went down.",
        "settled_date": "2026-09-27",
        "verdict": "wrong",
        "verdict_text": "Henning Brandt was wrong.",
        "actual": null,
-       "tolerance": null,
+       "tolerance": {
+        "value": 1099.715,
+        "text": "1099.7",
+        "statistic": "the median day-to-day change of his readings inside the window",
+        "window_days": null,
+        "n": 15
+       },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would not move. That guess was also wrong.",
+        "short": "also wrong"
        }
       },
       {
@@ -1150,10 +2047,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 24, the last reading before the call. That guess was also wrong.",
+        "short": "also wrong"
        }
       },
       {
@@ -1179,10 +2076,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 44, the last reading before the call. That guess was also right.",
+        "short": "also right"
        }
       },
       {
@@ -1208,10 +2105,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 44, the last reading before the call. That guess was also right.",
+        "short": "also right"
        }
       },
       {
@@ -1237,10 +2134,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 44, the last reading before the call. That guess was also right.",
+        "short": "also right"
        }
       },
       {
@@ -1266,10 +2163,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 6.3 hours, the last reading before the call. That guess was wrong.",
+        "short": "wrong"
        }
       },
       {
@@ -1295,10 +2192,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 64, the last reading before the call. That guess was also wrong.",
+        "short": "also wrong"
        }
       },
       {
@@ -1324,10 +2221,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 64, the last reading before the call. That guess was also wrong.",
+        "short": "also wrong"
        }
       },
       {
@@ -1353,10 +2250,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 64, the last reading before the call. That guess was also wrong.",
+        "short": "also wrong"
        }
       },
       {
@@ -1382,10 +2279,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 67, the last reading before the call. That guess was also wrong.",
+        "short": "also wrong"
        }
       },
       {
@@ -1411,10 +2308,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 67, the last reading before the call. That guess was also wrong.",
+        "short": "also wrong"
        }
       },
       {
@@ -1440,10 +2337,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 76, the last reading before the call. That guess was also right.",
+        "short": "also right"
        }
       },
       {
@@ -1469,10 +2366,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 76, the last reading before the call. That guess was also right.",
+        "short": "also right"
        }
       },
       {
@@ -1498,10 +2395,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 76, the last reading before the call. That guess was also right.",
+        "short": "also right"
        }
       },
       {
@@ -1527,10 +2424,36 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 48, the last reading before the call. That guess was wrong.",
+        "short": "wrong"
+       }
+      },
+      {
+       "id": "sleep-20260906-a668193d50",
+       "kind": "direction",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his sleep time to go up, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
+       "called_short": "Lisa Park called his sleep time to go up.",
+       "happened_short": "It held flat.",
+       "settled_date": "2026-09-20",
+       "verdict": "wrong",
+       "verdict_text": "Lisa Park was wrong.",
+       "actual": null,
+       "tolerance": {
+        "value": 1.04,
+        "text": "1 hours",
+        "statistic": "the median day-to-day change of his readings inside the window",
+        "window_days": null,
+        "n": 15
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would not move. That guess was right.",
+        "short": "right"
        }
       },
       {
@@ -1538,19 +2461,25 @@
        "kind": "direction",
        "coach_id": "sleep",
        "coach_name": "Lisa Park",
-       "called": "Lisa Park called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on September 20 against the trend in his most recent readings.",
+       "called": "Lisa Park called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
        "called_short": "Lisa Park called the 7-day average of his heart-rate variability to go up.",
        "happened_short": "It went up.",
        "settled_date": "2026-09-20",
        "verdict": "right",
        "verdict_text": "Lisa Park was right.",
        "actual": null,
-       "tolerance": null,
+       "tolerance": {
+        "value": 1.5402,
+        "text": "1.5",
+        "statistic": "the median day-to-day change of his readings inside the window, over the square root of 7 readings averaged",
+        "window_days": null,
+        "n": 15
+       },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would not move. That guess was wrong.",
+        "short": "wrong"
        }
       },
       {
@@ -1558,19 +2487,25 @@
        "kind": "direction",
        "coach_id": "mind",
        "coach_name": "Nathan Reeves",
-       "called": "Nathan Reeves called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on September 20 against the trend in his most recent readings.",
+       "called": "Nathan Reeves called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
        "called_short": "Nathan Reeves called the 7-day average of his heart-rate variability to go up.",
        "happened_short": "It went up.",
        "settled_date": "2026-09-20",
        "verdict": "right",
        "verdict_text": "Nathan Reeves was right.",
        "actual": null,
-       "tolerance": null,
+       "tolerance": {
+        "value": 1.5402,
+        "text": "1.5",
+        "statistic": "the median day-to-day change of his readings inside the window, over the square root of 7 readings averaged",
+        "window_days": null,
+        "n": 15
+       },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would not move. That guess was wrong.",
+        "short": "wrong"
        }
       },
       {
@@ -1578,19 +2513,25 @@
        "kind": "direction",
        "coach_id": "labs",
        "coach_name": "James Okafor",
-       "called": "James Okafor called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on September 20 against the trend in his most recent readings.",
+       "called": "James Okafor called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
        "called_short": "James Okafor called the 7-day average of his heart-rate variability to go up.",
        "happened_short": "It went up.",
        "settled_date": "2026-09-20",
        "verdict": "right",
        "verdict_text": "James Okafor was right.",
        "actual": null,
-       "tolerance": null,
+       "tolerance": {
+        "value": 1.5402,
+        "text": "1.5",
+        "statistic": "the median day-to-day change of his readings inside the window, over the square root of 7 readings averaged",
+        "window_days": null,
+        "n": 15
+       },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would not move. That guess was wrong.",
+        "short": "wrong"
        }
       },
       {
@@ -1598,19 +2539,25 @@
        "kind": "direction",
        "coach_id": "explorer",
        "coach_name": "Henning Brandt",
-       "called": "Henning Brandt called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on September 20 against the trend in his most recent readings.",
+       "called": "Henning Brandt called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
        "called_short": "Henning Brandt called the 7-day average of his heart-rate variability to go up.",
        "happened_short": "It went up.",
        "settled_date": "2026-09-20",
        "verdict": "right",
        "verdict_text": "Henning Brandt was right.",
        "actual": null,
-       "tolerance": null,
+       "tolerance": {
+        "value": 1.5402,
+        "text": "1.5",
+        "statistic": "the median day-to-day change of his readings inside the window, over the square root of 7 readings averaged",
+        "window_days": null,
+        "n": 15
+       },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would not move. That guess was wrong.",
+        "short": "wrong"
        }
       },
       {
@@ -1636,10 +2583,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 4.7 hours, the last reading before the call. That guess was also wrong.",
+        "short": "also wrong"
        }
       },
       {
@@ -1665,10 +2612,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 7.5 hours, the last reading before the call. That guess was also wrong.",
+        "short": "also wrong"
        }
       },
       {
@@ -1694,10 +2641,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 6.5 hours, the last reading before the call. That guess was also wrong.",
+        "short": "also wrong"
        }
       },
       {
@@ -1723,10 +2670,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 6.8 hours, the last reading before the call. That guess was also right.",
+        "short": "also right"
        }
       },
       {
@@ -1752,10 +2699,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 8.4 hours, the last reading before the call. That guess was wrong.",
+        "short": "wrong"
        }
       },
       {
@@ -1781,10 +2728,10 @@
         "n": 31
        },
        "simple_guess": {
-        "state": "not_yet_scored",
-        "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "state": "scored",
+        "right": false,
+        "text": "The simple guess was that it would stay at 8.4 hours, the last reading before the call. That guess was wrong.",
+        "short": "wrong"
        }
       },
       {
@@ -1810,10 +2757,10 @@
         "n": 30
        },
        "simple_guess": {
-        "state": "not_yet_scored",
+        "state": "unscorable",
         "right": null,
-        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
-        "short": "not checked on this call yet"
+        "text": "The simple guess, that nothing changes, could not be checked on this call: no reading before the call was filed.",
+        "short": "could not be checked on this call"
        }
       }
      ]
@@ -1821,7 +2768,7 @@
    },
    "sheet": {
     "state": "ok",
-    "as_of": "2026-10-03",
+    "as_of": "2026-10-11",
     "source": "/api/character",
     "absent_text": "The character sheet has no level yet.",
     "data": {
@@ -1950,7 +2897,7 @@
     },
     "follow": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "common.subscriber_cadence",
       "/api/content_cadence"
@@ -1961,17 +2908,17 @@
       "sends": [
        {
         "sender": "weekly-signal",
-        "next_date": "2026-10-04",
+        "next_date": "2026-10-18",
         "conditional": false
        },
        {
         "sender": "chronicle-email-sender",
-        "next_date": "2026-10-07",
+        "next_date": "2026-10-14",
         "conditional": true
        },
        {
         "sender": "between-chronicle",
-        "next_date": "2026-10-04",
+        "next_date": "2026-10-18",
         "conditional": true
        }
       ],
@@ -2034,20 +2981,20 @@
    "blocks": {
     "chapter": {
      "state": "ok",
-     "as_of": "2026-09-29",
+     "as_of": "2026-10-06",
      "source": [
       "/journal/posts.json",
       "/panelcast/episodes.json"
      ],
      "absent_text": "No chapter has been published yet.",
      "data": {
-      "title": "The Body Answers Back",
-      "date": "2026-09-29",
-      "week_label": "Week 4",
-      "dek": "He has trained every day for 23 days straight — his deliberate choice — and by Tuesday his recovery score had fallen to 54%, a sign that the body is starting to answer back. He is down 15 pounds total, but the pace flag is live and the streak is the question that will define the coming week.",
-      "url": "/journal/posts/week-07/",
-      "word_count": 1086,
-      "read_minutes": 5,
+      "title": "Park's Blind Spot",
+      "date": "2026-10-06",
+      "week_label": "Week 5",
+      "dek": "After 23 consecutive training days, three rest days this week sent recovery to 98% four mornings in a row — a season high — while the scale crossed 310 pounds for the first time, suggesting 18.5 pounds gone…",
+      "url": "/journal/posts/week-08/",
+      "word_count": 1262,
+      "read_minutes": 6,
       "podcast": {
        "state": "unavailable",
        "as_of": null,
@@ -2063,7 +3010,7 @@
    "blocks": {
     "next": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/content_cadence",
       "/api/coach_docket"
@@ -2079,23 +3026,23 @@
       },
       "bet": {
        "state": "ok",
-       "as_of": "2026-10-05",
+       "as_of": "2026-10-16",
        "source": "/api/coach_docket",
        "absent_text": "No coach bet is waiting to settle.",
        "data": {
-        "question": "Will the morning recovery score (7-day average) be 81.6 or higher on Monday, October 5?",
-        "topic": "Recovery score directional trend confirmation",
-        "settle_date": "2026-10-05",
+        "question": "Will the deep-sleep share (7-day average) be 26 or higher on Friday, October 16?",
+        "topic": "Deep sleep spike interpretation: signal vs. noise",
+        "settle_date": "2026-10-16",
         "sides": [
          {
           "coach": "Max Reyes",
-          "says": "no",
-          "reason": "Recovery EWMA climb from 75.1% to 81.6% shows only one consecutive same-direction point"
+          "says": "yes",
+          "reason": "Deep sleep decline is occurring simultaneously with recovery climb"
          },
          {
           "coach": "Lisa Park",
-          "says": "yes",
-          "reason": "Recovery score will be approximately 85.3% tomorrow with 80% confidence interval of 60.9–100%"
+          "says": "no",
+          "reason": "27.6% deep sleep spike on Sept 22 (1.8 SD above baseline) is likely regression-to-mean noise without thermal anchor and subjective context"
          }
         ]
        }
@@ -2104,7 +3051,7 @@
     },
     "follow": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "common.subscriber_cadence",
       "/api/content_cadence"
@@ -2115,17 +3062,17 @@
       "sends": [
        {
         "sender": "weekly-signal",
-        "next_date": "2026-10-04",
+        "next_date": "2026-10-18",
         "conditional": false
        },
        {
         "sender": "chronicle-email-sender",
-        "next_date": "2026-10-07",
+        "next_date": "2026-10-14",
         "conditional": true
        },
        {
         "sender": "between-chronicle",
-        "next_date": "2026-10-04",
+        "next_date": "2026-10-18",
         "conditional": true
        }
       ],
@@ -2139,7 +3086,7 @@
    "blocks": {
     "next": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/content_cadence",
       "/api/coach_docket"
@@ -2148,11 +3095,11 @@
      "data": {
       "chapter": {
        "state": "ok",
-       "as_of": "2026-10-07",
+       "as_of": "2026-10-14",
        "source": "/api/content_cadence",
        "absent_text": "The next chapter is paused.",
        "data": {
-        "date": "2026-10-07",
+        "date": "2026-10-14",
         "drafted_not_promised": true
        }
       },
@@ -2178,7 +3125,7 @@
     },
     "life": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/decisions",
       "/api/experiments",
@@ -2211,7 +3158,7 @@
        },
        "training": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/session",
         "absent_text": "No session is planned for today.",
         "data": {
@@ -2220,47 +3167,47 @@
        },
        "sleep": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/sleep_detail",
         "absent_text": "No sleep has been recorded yet.",
         "data": {
-         "text": "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+         "text": "Slept 9.9 hours on the night of Sunday, October 11; recovery 67 out of 100."
         }
        },
        "food": {
-        "state": "ok",
-        "as_of": "2026-10-02",
+        "state": "stale",
+        "as_of": "2026-10-09",
         "source": "/api/nutrition_overview",
-        "absent_text": "No food has been logged yet.",
+        "absent_text": "Nothing newer than Friday, October 9.",
         "data": {
-         "text": "At or above the 170 g protein floor on 9 of 28 logged days."
+         "text": "At or above the 170 g protein floor on 9 of 27 logged days."
         }
        },
        "habits": {
         "state": "ok",
-        "as_of": "2026-10-02",
+        "as_of": "2026-10-11",
         "source": "/api/habit_streaks",
         "absent_text": "No habits have been recorded yet.",
         "data": {
-         "text": "5 of 7 daily habits kept on Friday, October 2."
+         "text": "4 of 7 daily habits kept on Sunday, October 11."
         }
        },
        "supplements": {
-        "state": "ok",
-        "as_of": "2026-10-03",
+        "state": "stale",
+        "as_of": "2026-10-09",
         "source": "/api/supplements",
-        "absent_text": "No supplements are listed.",
+        "absent_text": "Nothing newer than Friday, October 9.",
         "data": {
          "text": "21 in the daily stack."
         }
        },
        "experiments": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/experiments",
         "absent_text": "No experiments are listed.",
         "data": {
-         "text": "None running right now; 1 ready to start."
+         "text": "None running right now; 4 ready to start."
         }
        },
        "mind": {
@@ -2290,7 +3237,7 @@
    "blocks": {
     "scorecard": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/calibration",
       "/api/decisions",
@@ -2321,20 +3268,20 @@
       "rows": {
        "body": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/pulse_history",
         "absent_text": "Body has no verdict this week.",
         "data": {
          "name": "Body",
          "verdict": "faster_than_planned",
          "verdict_text": "Weight down faster than planned",
-         "text": "Seven-day average 312.2 lb, down 2.6 lb from the seven days before.",
+         "text": "Seven-day average 307.6 lb, down 3.9 lb from the seven days before.",
          "rule": "The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; faster than planned when it fell more than 2.5 lb in the week. Fewer than 3 weigh-ins in either week is not enough data."
         }
        },
        "training": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/training_overview",
         "absent_text": "Training has no verdict this week.",
         "data": {
@@ -2347,33 +3294,33 @@
        },
        "sleep": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/pulse_history",
         "absent_text": "Sleep has no verdict this week.",
         "data": {
          "name": "Sleep",
          "verdict": "going_well",
          "verdict_text": "5 or more long nights",
-         "text": "7 hours or more on 7 of 7 nights recorded.",
+         "text": "7 hours or more on 5 of 7 nights recorded.",
          "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
         }
        },
        "food": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/nutrition_overview",
         "absent_text": "Food has no verdict this week.",
         "data": {
          "name": "Food",
          "verdict": "not_enough_data",
          "verdict_text": "Too few days logged",
-         "text": "3 days logged; 5 are needed.",
+         "text": "4 days logged; 5 are needed.",
          "rule": "Logged days at or above the plan's protein floor in the last seven. Going well at 5. Fewer than 5 logged days is not enough data."
         }
        },
        "mind": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": [
          "/api/owner_words",
          "/api/decisions"
@@ -2401,7 +3348,7 @@
       "went_right": {
        "matthew": {
         "area": "sleep",
-        "text": "Sleep: 7 hours or more on 7 of 7 nights recorded.",
+        "text": "Sleep: 7 hours or more on 5 of 7 nights recorded.",
         "source": "/api/pulse_history"
        },
        "engine": {
@@ -2417,8 +3364,8 @@
        "not_enough_data": "Not enough data"
       },
       "window": {
-       "from": "2026-09-27",
-       "to": "2026-10-03"
+       "from": "2026-10-06",
+       "to": "2026-10-12"
       },
       "rules_set": "2026-10-09",
       "rules_set_text": "The rules were set on Friday, October 9."
@@ -2440,7 +3387,7 @@
    "blocks": {
     "scorecard": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/calibration",
       "/api/decisions",
@@ -2471,20 +3418,20 @@
       "rows": {
        "body": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/pulse_history",
         "absent_text": "Body has no verdict this week.",
         "data": {
          "name": "Body",
          "verdict": "faster_than_planned",
          "verdict_text": "Weight down faster than planned",
-         "text": "Seven-day average 312.2 lb, down 2.6 lb from the seven days before.",
+         "text": "Seven-day average 307.6 lb, down 3.9 lb from the seven days before.",
          "rule": "The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; faster than planned when it fell more than 2.5 lb in the week. Fewer than 3 weigh-ins in either week is not enough data."
         }
        },
        "training": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/training_overview",
         "absent_text": "Training has no verdict this week.",
         "data": {
@@ -2497,33 +3444,33 @@
        },
        "sleep": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/pulse_history",
         "absent_text": "Sleep has no verdict this week.",
         "data": {
          "name": "Sleep",
          "verdict": "going_well",
          "verdict_text": "5 or more long nights",
-         "text": "7 hours or more on 7 of 7 nights recorded.",
+         "text": "7 hours or more on 5 of 7 nights recorded.",
          "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
         }
        },
        "food": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/nutrition_overview",
         "absent_text": "Food has no verdict this week.",
         "data": {
          "name": "Food",
          "verdict": "not_enough_data",
          "verdict_text": "Too few days logged",
-         "text": "3 days logged; 5 are needed.",
+         "text": "4 days logged; 5 are needed.",
          "rule": "Logged days at or above the plan's protein floor in the last seven. Going well at 5. Fewer than 5 logged days is not enough data."
         }
        },
        "mind": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": [
          "/api/owner_words",
          "/api/decisions"
@@ -2551,7 +3498,7 @@
       "went_right": {
        "matthew": {
         "area": "sleep",
-        "text": "Sleep: 7 hours or more on 7 of 7 nights recorded.",
+        "text": "Sleep: 7 hours or more on 5 of 7 nights recorded.",
         "source": "/api/pulse_history"
        },
        "engine": {
@@ -2567,8 +3514,8 @@
        "not_enough_data": "Not enough data"
       },
       "window": {
-       "from": "2026-09-27",
-       "to": "2026-10-03"
+       "from": "2026-10-06",
+       "to": "2026-10-12"
       },
       "rules_set": "2026-10-09",
       "rules_set_text": "The rules were set on Friday, October 9."
@@ -2590,7 +3537,7 @@
    "blocks": {
     "life": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/decisions",
       "/api/experiments",
@@ -2617,16 +3564,16 @@
       "rows": {
        "body": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/journey",
         "absent_text": "No weigh-in yet.",
         "data": {
-         "text": "16.3 lb down so far; 126 lb to go to reach 185."
+         "text": "19 lb down so far; 123.3 lb to go to reach 185."
         }
        },
        "training": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/session",
         "absent_text": "No session is planned for today.",
         "data": {
@@ -2635,47 +3582,47 @@
        },
        "sleep": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/sleep_detail",
         "absent_text": "No sleep has been recorded yet.",
         "data": {
-         "text": "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+         "text": "Slept 9.9 hours on the night of Sunday, October 11; recovery 67 out of 100."
         }
        },
        "food": {
-        "state": "ok",
-        "as_of": "2026-10-02",
+        "state": "stale",
+        "as_of": "2026-10-09",
         "source": "/api/nutrition_overview",
-        "absent_text": "No food has been logged yet.",
+        "absent_text": "Nothing newer than Friday, October 9.",
         "data": {
-         "text": "At or above the 170 g protein floor on 9 of 28 logged days."
+         "text": "At or above the 170 g protein floor on 9 of 27 logged days."
         }
        },
        "habits": {
         "state": "ok",
-        "as_of": "2026-10-02",
+        "as_of": "2026-10-11",
         "source": "/api/habit_streaks",
         "absent_text": "No habits have been recorded yet.",
         "data": {
-         "text": "5 of 7 daily habits kept on Friday, October 2."
+         "text": "4 of 7 daily habits kept on Sunday, October 11."
         }
        },
        "supplements": {
-        "state": "ok",
-        "as_of": "2026-10-03",
+        "state": "stale",
+        "as_of": "2026-10-09",
         "source": "/api/supplements",
-        "absent_text": "No supplements are listed.",
+        "absent_text": "Nothing newer than Friday, October 9.",
         "data": {
          "text": "21 in the daily stack."
         }
        },
        "experiments": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/experiments",
         "absent_text": "No experiments are listed.",
         "data": {
-         "text": "None running right now; 1 ready to start."
+         "text": "None running right now; 4 ready to start."
         }
        },
        "mind": {
@@ -2693,7 +3640,7 @@
     },
     "scorecard": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/calibration",
       "/api/decisions",
@@ -2724,20 +3671,20 @@
       "rows": {
        "body": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/pulse_history",
         "absent_text": "Body has no verdict this week.",
         "data": {
          "name": "Body",
          "verdict": "faster_than_planned",
          "verdict_text": "Weight down faster than planned",
-         "text": "Seven-day average 312.2 lb, down 2.6 lb from the seven days before.",
+         "text": "Seven-day average 307.6 lb, down 3.9 lb from the seven days before.",
          "rule": "The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; faster than planned when it fell more than 2.5 lb in the week. Fewer than 3 weigh-ins in either week is not enough data."
         }
        },
        "training": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/training_overview",
         "absent_text": "Training has no verdict this week.",
         "data": {
@@ -2750,27 +3697,27 @@
        },
        "sleep": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/pulse_history",
         "absent_text": "Sleep has no verdict this week.",
         "data": {
          "name": "Sleep",
          "verdict": "going_well",
          "verdict_text": "5 or more long nights",
-         "text": "7 hours or more on 7 of 7 nights recorded.",
+         "text": "7 hours or more on 5 of 7 nights recorded.",
          "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
         }
        },
        "food": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/nutrition_overview",
         "absent_text": "Food has no verdict this week.",
         "data": {
          "name": "Food",
          "verdict": "not_enough_data",
          "verdict_text": "Too few days logged",
-         "text": "3 days logged; 5 are needed.",
+         "text": "4 days logged; 5 are needed.",
          "rule": "Logged days at or above the plan's protein floor in the last seven. Going well at 5. Fewer than 5 logged days is not enough data."
         }
        },
@@ -2786,7 +3733,7 @@
        },
        "ai": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": [
          "/api/predictions",
          "/api/calibration"
@@ -2794,9 +3741,9 @@
         "absent_text": "The AI has no verdict this week.",
         "data": {
          "name": "The AI",
-         "verdict": "not_yet",
-         "verdict_text": "The coaches do not beat a simple guess yet",
-         "text": "Counted across all 96 calls checked to date, not this week's alone.",
+         "verdict": "going_well",
+         "verdict_text": "The coaches beat a simple guess",
+         "text": "Counted across all 154 calls checked to date, not this week's alone.",
          "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
         }
        }
@@ -2804,13 +3751,16 @@
       "went_right": {
        "matthew": {
         "area": "sleep",
-        "text": "Sleep: 7 hours or more on 7 of 7 nights recorded.",
+        "text": "Sleep: 7 hours or more on 5 of 7 nights recorded.",
         "source": "/api/pulse_history"
        },
        "engine": {
-        "area": null,
-        "text": "Nothing this week.",
-        "source": null
+        "area": "ai",
+        "text": "The AI: The coaches beat a simple guess, counted across all 154 calls checked to date, not this week's alone.",
+        "source": [
+         "/api/predictions",
+         "/api/calibration"
+        ]
        }
       },
       "verdicts": {
@@ -2820,8 +3770,8 @@
        "not_enough_data": "Not enough data"
       },
       "window": {
-       "from": "2026-09-27",
-       "to": "2026-10-03"
+       "from": "2026-10-06",
+       "to": "2026-10-12"
       },
       "rules_set": "2026-10-09",
       "rules_set_text": "The rules were set on Friday, October 9."
@@ -2843,7 +3793,7 @@
    "blocks": {
     "life": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/decisions",
       "/api/experiments",
@@ -2870,16 +3820,16 @@
       "rows": {
        "body": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/journey",
         "absent_text": "No weigh-in yet.",
         "data": {
-         "text": "16.3 lb down so far; 126 lb to go to reach 185."
+         "text": "19 lb down so far; 123.3 lb to go to reach 185."
         }
        },
        "training": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/session",
         "absent_text": "No session is planned for today.",
         "data": {
@@ -2888,47 +3838,47 @@
        },
        "sleep": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/sleep_detail",
         "absent_text": "No sleep has been recorded yet.",
         "data": {
-         "text": "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+         "text": "Slept 9.9 hours on the night of Sunday, October 11; recovery 67 out of 100."
         }
        },
        "food": {
-        "state": "ok",
-        "as_of": "2026-10-02",
+        "state": "stale",
+        "as_of": "2026-10-09",
         "source": "/api/nutrition_overview",
-        "absent_text": "No food has been logged yet.",
+        "absent_text": "Nothing newer than Friday, October 9.",
         "data": {
-         "text": "At or above the 170 g protein floor on 9 of 28 logged days."
+         "text": "At or above the 170 g protein floor on 9 of 27 logged days."
         }
        },
        "habits": {
         "state": "ok",
-        "as_of": "2026-10-02",
+        "as_of": "2026-10-11",
         "source": "/api/habit_streaks",
         "absent_text": "No habits have been recorded yet.",
         "data": {
-         "text": "5 of 7 daily habits kept on Friday, October 2."
+         "text": "4 of 7 daily habits kept on Sunday, October 11."
         }
        },
        "supplements": {
-        "state": "ok",
-        "as_of": "2026-10-03",
+        "state": "stale",
+        "as_of": "2026-10-09",
         "source": "/api/supplements",
-        "absent_text": "No supplements are listed.",
+        "absent_text": "Nothing newer than Friday, October 9.",
         "data": {
          "text": "21 in the daily stack."
         }
        },
        "experiments": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/experiments",
         "absent_text": "No experiments are listed.",
         "data": {
-         "text": "None running right now; 1 ready to start."
+         "text": "None running right now; 4 ready to start."
         }
        },
        "mind": {
@@ -2946,7 +3896,7 @@
     },
     "scorecard": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/calibration",
       "/api/decisions",
@@ -2977,20 +3927,20 @@
       "rows": {
        "body": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/pulse_history",
         "absent_text": "Body has no verdict this week.",
         "data": {
          "name": "Body",
          "verdict": "faster_than_planned",
          "verdict_text": "Weight down faster than planned",
-         "text": "Seven-day average 312.2 lb, down 2.6 lb from the seven days before.",
+         "text": "Seven-day average 307.6 lb, down 3.9 lb from the seven days before.",
          "rule": "The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; faster than planned when it fell more than 2.5 lb in the week. Fewer than 3 weigh-ins in either week is not enough data."
         }
        },
        "training": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/training_overview",
         "absent_text": "Training has no verdict this week.",
         "data": {
@@ -3003,27 +3953,27 @@
        },
        "sleep": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/pulse_history",
         "absent_text": "Sleep has no verdict this week.",
         "data": {
          "name": "Sleep",
          "verdict": "going_well",
          "verdict_text": "5 or more long nights",
-         "text": "7 hours or more on 7 of 7 nights recorded.",
+         "text": "7 hours or more on 5 of 7 nights recorded.",
          "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
         }
        },
        "food": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/nutrition_overview",
         "absent_text": "Food has no verdict this week.",
         "data": {
          "name": "Food",
          "verdict": "not_enough_data",
          "verdict_text": "Too few days logged",
-         "text": "3 days logged; 5 are needed.",
+         "text": "4 days logged; 5 are needed.",
          "rule": "Logged days at or above the plan's protein floor in the last seven. Going well at 5. Fewer than 5 logged days is not enough data."
         }
        },
@@ -3039,7 +3989,7 @@
        },
        "ai": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": [
          "/api/predictions",
          "/api/calibration"
@@ -3047,9 +3997,9 @@
         "absent_text": "The AI has no verdict this week.",
         "data": {
          "name": "The AI",
-         "verdict": "not_yet",
-         "verdict_text": "The coaches do not beat a simple guess yet",
-         "text": "Counted across all 96 calls checked to date, not this week's alone.",
+         "verdict": "going_well",
+         "verdict_text": "The coaches beat a simple guess",
+         "text": "Counted across all 154 calls checked to date, not this week's alone.",
          "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
         }
        }
@@ -3057,13 +4007,16 @@
       "went_right": {
        "matthew": {
         "area": "sleep",
-        "text": "Sleep: 7 hours or more on 7 of 7 nights recorded.",
+        "text": "Sleep: 7 hours or more on 5 of 7 nights recorded.",
         "source": "/api/pulse_history"
        },
        "engine": {
-        "area": null,
-        "text": "Nothing this week.",
-        "source": null
+        "area": "ai",
+        "text": "The AI: The coaches beat a simple guess, counted across all 154 calls checked to date, not this week's alone.",
+        "source": [
+         "/api/predictions",
+         "/api/calibration"
+        ]
        }
       },
       "verdicts": {
@@ -3073,8 +4026,8 @@
        "not_enough_data": "Not enough data"
       },
       "window": {
-       "from": "2026-09-27",
-       "to": "2026-10-03"
+       "from": "2026-10-06",
+       "to": "2026-10-12"
       },
       "rules_set": "2026-10-09",
       "rules_set_text": "The rules were set on Friday, October 9."
@@ -3096,7 +4049,7 @@
    "blocks": {
     "life": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/decisions",
       "/api/experiments",
@@ -3122,16 +4075,16 @@
       "rows": {
        "body": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/journey",
         "absent_text": "No weigh-in yet.",
         "data": {
-         "text": "16.3 lb down so far; 126 lb to go to reach 185."
+         "text": "19 lb down so far; 123.3 lb to go to reach 185."
         }
        },
        "training": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/session",
         "absent_text": "No session is planned for today.",
         "data": {
@@ -3146,39 +4099,39 @@
         "data": null
        },
        "food": {
-        "state": "ok",
-        "as_of": "2026-10-02",
+        "state": "stale",
+        "as_of": "2026-10-09",
         "source": "/api/nutrition_overview",
-        "absent_text": "No food has been logged yet.",
+        "absent_text": "Nothing newer than Friday, October 9.",
         "data": {
-         "text": "At or above the 170 g protein floor on 9 of 28 logged days."
+         "text": "At or above the 170 g protein floor on 9 of 27 logged days."
         }
        },
        "habits": {
         "state": "ok",
-        "as_of": "2026-10-02",
+        "as_of": "2026-10-11",
         "source": "/api/habit_streaks",
         "absent_text": "No habits have been recorded yet.",
         "data": {
-         "text": "5 of 7 daily habits kept on Friday, October 2."
+         "text": "4 of 7 daily habits kept on Sunday, October 11."
         }
        },
        "supplements": {
-        "state": "ok",
-        "as_of": "2026-10-03",
+        "state": "stale",
+        "as_of": "2026-10-09",
         "source": "/api/supplements",
-        "absent_text": "No supplements are listed.",
+        "absent_text": "Nothing newer than Friday, October 9.",
         "data": {
          "text": "21 in the daily stack."
         }
        },
        "experiments": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/experiments",
         "absent_text": "No experiments are listed.",
         "data": {
-         "text": "None running right now; 1 ready to start."
+         "text": "None running right now; 4 ready to start."
         }
        },
        "mind": {
@@ -3197,7 +4150,7 @@
    "blocks": {
     "life": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/decisions",
       "/api/experiments",
@@ -3223,11 +4176,11 @@
       "rows": {
        "body": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/journey",
         "absent_text": "No weigh-in yet.",
         "data": {
-         "text": "16.3 lb down so far; 126 lb to go to reach 185."
+         "text": "19 lb down so far; 123.3 lb to go to reach 185."
         }
        },
        "training": {
@@ -3239,47 +4192,47 @@
        },
        "sleep": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/sleep_detail",
         "absent_text": "No sleep has been recorded yet.",
         "data": {
-         "text": "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+         "text": "Slept 9.9 hours on the night of Sunday, October 11; recovery 67 out of 100."
         }
        },
        "food": {
-        "state": "ok",
-        "as_of": "2026-10-02",
+        "state": "stale",
+        "as_of": "2026-10-09",
         "source": "/api/nutrition_overview",
-        "absent_text": "No food has been logged yet.",
+        "absent_text": "Nothing newer than Friday, October 9.",
         "data": {
-         "text": "At or above the 170 g protein floor on 9 of 28 logged days."
+         "text": "At or above the 170 g protein floor on 9 of 27 logged days."
         }
        },
        "habits": {
         "state": "ok",
-        "as_of": "2026-10-02",
+        "as_of": "2026-10-11",
         "source": "/api/habit_streaks",
         "absent_text": "No habits have been recorded yet.",
         "data": {
-         "text": "5 of 7 daily habits kept on Friday, October 2."
+         "text": "4 of 7 daily habits kept on Sunday, October 11."
         }
        },
        "supplements": {
-        "state": "ok",
-        "as_of": "2026-10-03",
+        "state": "stale",
+        "as_of": "2026-10-09",
         "source": "/api/supplements",
-        "absent_text": "No supplements are listed.",
+        "absent_text": "Nothing newer than Friday, October 9.",
         "data": {
          "text": "21 in the daily stack."
         }
        },
        "experiments": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/experiments",
         "absent_text": "No experiments are listed.",
         "data": {
-         "text": "None running right now; 1 ready to start."
+         "text": "None running right now; 4 ready to start."
         }
        },
        "mind": {
@@ -3298,7 +4251,7 @@
    "blocks": {
     "week": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/pulse_history",
       "/api/training_overview",
@@ -3307,13 +4260,13 @@
      "absent_text": "Nothing is recorded in these seven days.",
      "data": {
       "days": [
-       "2026-09-27",
-       "2026-09-28",
-       "2026-09-29",
-       "2026-09-30",
-       "2026-10-01",
-       "2026-10-02",
-       "2026-10-03"
+       "2026-10-06",
+       "2026-10-07",
+       "2026-10-08",
+       "2026-10-09",
+       "2026-10-10",
+       "2026-10-11",
+       "2026-10-12"
       ],
       "order": [
        "weight",
@@ -3324,36 +4277,36 @@
       "measures": {
        "weight": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/pulse_history",
         "absent_text": "The weight has no reading in these seven days.",
         "data": {
          "values": [
-          314.5,
-          313.2,
-          312.3,
-          311.4,
-          311.7,
-          311.0,
-          311.0
+          308.9,
+          308.3,
+          307.2,
+          306.1,
+          306.5,
+          null,
+          308.3
          ],
-         "text": "311 lb, down 3.5 across 7 weigh-ins."
+         "text": "308.3 lb, down 0.6 across 6 weigh-ins."
         }
        },
        "training": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/training_overview",
         "absent_text": "Training has no reading in these seven days.",
         "data": {
          "values": [
-          193.0,
-          116.0,
-          137.0,
-          109.0,
-          137.0,
-          155.0,
-          241.0
+          141.0,
+          147.0,
+          54.0,
+          157.0,
+          56.0,
+          164.0,
+          109.0
          ],
          "text": "Trained on 7 of 7 days recorded.",
          "met": [
@@ -3369,26 +4322,26 @@
        },
        "sleep": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/pulse_history",
         "absent_text": "Sleep has no reading in these seven days.",
         "data": {
          "values": [
-          7.5,
-          7.8,
-          8.7,
+          5.0,
           8.2,
-          9.1,
-          8.4,
-          8.8
+          8.9,
+          7.2,
+          6.7,
+          8.1,
+          9.6
          ],
-         "text": "Slept 7 hours or more on 7 of 7 days recorded.",
+         "text": "Slept 7 hours or more on 5 of 7 days recorded.",
          "met": [
+          false,
           true,
           true,
           true,
-          true,
-          true,
+          false,
           true,
           true
          ]
@@ -3404,66 +4357,12 @@
       },
       "detail": [
        {
-        "date": "2026-10-03",
-        "summary": "311.0 lb · trained · slept 8.8 h",
+        "date": "2026-10-12",
+        "summary": "308.3 lb · trained · slept 9.6 h",
         "facts": [
          {
           "label": "Weight",
-          "text": "311.0 lb"
-         },
-         {
-          "label": "Training",
-          "text": "241 minutes of walking"
-         },
-         {
-          "label": "Sleep",
-          "text": "8.8 hours; recovery 98 out of 100"
-         }
-        ]
-       },
-       {
-        "date": "2026-10-02",
-        "summary": "311.0 lb · trained · slept 8.4 h",
-        "facts": [
-         {
-          "label": "Weight",
-          "text": "311.0 lb"
-         },
-         {
-          "label": "Training",
-          "text": "155 minutes of strength"
-         },
-         {
-          "label": "Sleep",
-          "text": "8.4 hours; recovery 98 out of 100"
-         }
-        ]
-       },
-       {
-        "date": "2026-10-01",
-        "summary": "311.7 lb · trained · slept 9.1 h",
-        "facts": [
-         {
-          "label": "Weight",
-          "text": "311.7 lb"
-         },
-         {
-          "label": "Training",
-          "text": "137 minutes of strength"
-         },
-         {
-          "label": "Sleep",
-          "text": "9.1 hours; recovery 62 out of 100"
-         }
-        ]
-       },
-       {
-        "date": "2026-09-30",
-        "summary": "311.4 lb · trained · slept 8.2 h",
-        "facts": [
-         {
-          "label": "Weight",
-          "text": "311.4 lb"
+          "text": "308.3 lb"
          },
          {
           "label": "Training",
@@ -3471,61 +4370,111 @@
          },
          {
           "label": "Sleep",
-          "text": "8.2 hours; recovery 59 out of 100"
+          "text": "9.6 hours; recovery 67 out of 100"
          }
         ]
        },
        {
-        "date": "2026-09-29",
-        "summary": "312.3 lb · trained · slept 8.7 h",
+        "date": "2026-10-11",
+        "summary": "trained · slept 8.1 h",
         "facts": [
          {
-          "label": "Weight",
-          "text": "312.3 lb"
-         },
-         {
           "label": "Training",
-          "text": "137 minutes of strength"
+          "text": "164 minutes of strength"
          },
          {
           "label": "Sleep",
-          "text": "8.7 hours; recovery 54 out of 100"
+          "text": "8.1 hours; recovery 88 out of 100"
          }
         ]
        },
        {
-        "date": "2026-09-28",
-        "summary": "313.2 lb · trained · slept 7.8 h",
+        "date": "2026-10-10",
+        "summary": "306.5 lb · trained · slept 6.7 h",
         "facts": [
          {
           "label": "Weight",
-          "text": "313.2 lb"
+          "text": "306.5 lb"
          },
          {
           "label": "Training",
-          "text": "116 minutes of strength"
+          "text": "56 minutes of walking"
          },
          {
           "label": "Sleep",
-          "text": "7.8 hours; recovery 64 out of 100"
+          "text": "6.7 hours; recovery 56 out of 100"
          }
         ]
        },
        {
-        "date": "2026-09-27",
-        "summary": "314.5 lb · trained · slept 7.5 h",
+        "date": "2026-10-09",
+        "summary": "306.1 lb · trained · slept 7.2 h",
         "facts": [
          {
           "label": "Weight",
-          "text": "314.5 lb"
+          "text": "306.1 lb"
          },
          {
           "label": "Training",
-          "text": "28 minutes of strength; 165 minutes of walking"
+          "text": "157 minutes of strength"
          },
          {
           "label": "Sleep",
-          "text": "7.5 hours; recovery 89 out of 100"
+          "text": "7.2 hours; recovery 59 out of 100"
+         }
+        ]
+       },
+       {
+        "date": "2026-10-08",
+        "summary": "307.2 lb · trained · slept 8.9 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "307.2 lb"
+         },
+         {
+          "label": "Training",
+          "text": "54 minutes of walking"
+         },
+         {
+          "label": "Sleep",
+          "text": "8.9 hours; recovery 97 out of 100"
+         }
+        ]
+       },
+       {
+        "date": "2026-10-07",
+        "summary": "308.3 lb · trained · slept 8.2 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "308.3 lb"
+         },
+         {
+          "label": "Training",
+          "text": "147 minutes of strength"
+         },
+         {
+          "label": "Sleep",
+          "text": "8.2 hours; recovery 78 out of 100"
+         }
+        ]
+       },
+       {
+        "date": "2026-10-06",
+        "summary": "308.9 lb · trained · slept 5 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "308.9 lb"
+         },
+         {
+          "label": "Training",
+          "text": "141 minutes of strength"
+         },
+         {
+          "label": "Sleep",
+          "text": "5 hours; recovery 82 out of 100"
          }
         ]
        }
@@ -3610,13 +4559,45 @@
        {
         "date": "2026-10-03",
         "lbs": 311.0
+       },
+       {
+        "date": "2026-10-04",
+        "lbs": 312.1
+       },
+       {
+        "date": "2026-10-05",
+        "lbs": 311.1
+       },
+       {
+        "date": "2026-10-06",
+        "lbs": 308.9
+       },
+       {
+        "date": "2026-10-07",
+        "lbs": 308.3
+       },
+       {
+        "date": "2026-10-08",
+        "lbs": 307.2
+       },
+       {
+        "date": "2026-10-09",
+        "lbs": 306.1
+       },
+       {
+        "date": "2026-10-10",
+        "lbs": 306.5
+       },
+       {
+        "date": "2026-10-12",
+        "lbs": 308.3
        }
       ]
      }
     },
     "life": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/decisions",
       "/api/experiments",
@@ -3642,16 +4623,16 @@
       "rows": {
        "body": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/journey",
         "absent_text": "No weigh-in yet.",
         "data": {
-         "text": "16.3 lb down so far; 126 lb to go to reach 185."
+         "text": "19 lb down so far; 123.3 lb to go to reach 185."
         }
        },
        "training": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/session",
         "absent_text": "No session is planned for today.",
         "data": {
@@ -3660,11 +4641,11 @@
        },
        "sleep": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/sleep_detail",
         "absent_text": "No sleep has been recorded yet.",
         "data": {
-         "text": "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+         "text": "Slept 9.9 hours on the night of Sunday, October 11; recovery 67 out of 100."
         }
        },
        "food": {
@@ -3676,29 +4657,29 @@
        },
        "habits": {
         "state": "ok",
-        "as_of": "2026-10-02",
+        "as_of": "2026-10-11",
         "source": "/api/habit_streaks",
         "absent_text": "No habits have been recorded yet.",
         "data": {
-         "text": "5 of 7 daily habits kept on Friday, October 2."
+         "text": "4 of 7 daily habits kept on Sunday, October 11."
         }
        },
        "supplements": {
-        "state": "ok",
-        "as_of": "2026-10-03",
+        "state": "stale",
+        "as_of": "2026-10-09",
         "source": "/api/supplements",
-        "absent_text": "No supplements are listed.",
+        "absent_text": "Nothing newer than Friday, October 9.",
         "data": {
          "text": "21 in the daily stack."
         }
        },
        "experiments": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/experiments",
         "absent_text": "No experiments are listed.",
         "data": {
-         "text": "None running right now; 1 ready to start."
+         "text": "None running right now; 4 ready to start."
         }
        },
        "mind": {
@@ -3713,7 +4694,7 @@
     },
     "scorecard": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/calibration",
       "/api/decisions",
@@ -3744,20 +4725,20 @@
       "rows": {
        "body": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/pulse_history",
         "absent_text": "Body has no verdict this week.",
         "data": {
          "name": "Body",
          "verdict": "faster_than_planned",
          "verdict_text": "Weight down faster than planned",
-         "text": "Seven-day average 312.2 lb, down 2.6 lb from the seven days before.",
+         "text": "Seven-day average 307.6 lb, down 3.9 lb from the seven days before.",
          "rule": "The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; faster than planned when it fell more than 2.5 lb in the week. Fewer than 3 weigh-ins in either week is not enough data."
         }
        },
        "training": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/training_overview",
         "absent_text": "Training has no verdict this week.",
         "data": {
@@ -3770,14 +4751,14 @@
        },
        "sleep": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/pulse_history",
         "absent_text": "Sleep has no verdict this week.",
         "data": {
          "name": "Sleep",
          "verdict": "going_well",
          "verdict_text": "5 or more long nights",
-         "text": "7 hours or more on 7 of 7 nights recorded.",
+         "text": "7 hours or more on 5 of 7 nights recorded.",
          "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
         }
        },
@@ -3790,7 +4771,7 @@
        },
        "mind": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": [
          "/api/owner_words",
          "/api/decisions"
@@ -3806,7 +4787,7 @@
        },
        "ai": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": [
          "/api/predictions",
          "/api/calibration"
@@ -3814,9 +4795,9 @@
         "absent_text": "The AI has no verdict this week.",
         "data": {
          "name": "The AI",
-         "verdict": "not_yet",
-         "verdict_text": "The coaches do not beat a simple guess yet",
-         "text": "Counted across all 96 calls checked to date, not this week's alone.",
+         "verdict": "going_well",
+         "verdict_text": "The coaches beat a simple guess",
+         "text": "Counted across all 154 calls checked to date, not this week's alone.",
          "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
         }
        }
@@ -3824,13 +4805,16 @@
       "went_right": {
        "matthew": {
         "area": "sleep",
-        "text": "Sleep: 7 hours or more on 7 of 7 nights recorded.",
+        "text": "Sleep: 7 hours or more on 5 of 7 nights recorded.",
         "source": "/api/pulse_history"
        },
        "engine": {
-        "area": null,
-        "text": "Nothing this week.",
-        "source": null
+        "area": "ai",
+        "text": "The AI: The coaches beat a simple guess, counted across all 154 calls checked to date, not this week's alone.",
+        "source": [
+         "/api/predictions",
+         "/api/calibration"
+        ]
        }
       },
       "verdicts": {
@@ -3840,8 +4824,8 @@
        "not_enough_data": "Not enough data"
       },
       "window": {
-       "from": "2026-09-27",
-       "to": "2026-10-03"
+       "from": "2026-10-06",
+       "to": "2026-10-12"
       },
       "rules_set": "2026-10-09",
       "rules_set_text": "The rules were set on Friday, October 9."
@@ -3853,7 +4837,7 @@
    "blocks": {
     "life": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/decisions",
       "/api/experiments",
@@ -3879,16 +4863,16 @@
       "rows": {
        "body": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/journey",
         "absent_text": "No weigh-in yet.",
         "data": {
-         "text": "16.3 lb down so far; 126 lb to go to reach 185."
+         "text": "19 lb down so far; 123.3 lb to go to reach 185."
         }
        },
        "training": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/session",
         "absent_text": "No session is planned for today.",
         "data": {
@@ -3897,20 +4881,20 @@
        },
        "sleep": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/sleep_detail",
         "absent_text": "No sleep has been recorded yet.",
         "data": {
-         "text": "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+         "text": "Slept 9.9 hours on the night of Sunday, October 11; recovery 67 out of 100."
         }
        },
        "food": {
-        "state": "ok",
-        "as_of": "2026-10-02",
+        "state": "stale",
+        "as_of": "2026-10-09",
         "source": "/api/nutrition_overview",
-        "absent_text": "No food has been logged yet.",
+        "absent_text": "Nothing newer than Friday, October 9.",
         "data": {
-         "text": "At or above the 170 g protein floor on 9 of 28 logged days."
+         "text": "At or above the 170 g protein floor on 9 of 27 logged days."
         }
        },
        "habits": {
@@ -3921,21 +4905,21 @@
         "data": null
        },
        "supplements": {
-        "state": "ok",
-        "as_of": "2026-10-03",
+        "state": "stale",
+        "as_of": "2026-10-09",
         "source": "/api/supplements",
-        "absent_text": "No supplements are listed.",
+        "absent_text": "Nothing newer than Friday, October 9.",
         "data": {
          "text": "21 in the daily stack."
         }
        },
        "experiments": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/experiments",
         "absent_text": "No experiments are listed.",
         "data": {
-         "text": "None running right now; 1 ready to start."
+         "text": "None running right now; 4 ready to start."
         }
        },
        "mind": {
@@ -3954,7 +4938,7 @@
    "blocks": {
     "life": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/decisions",
       "/api/experiments",
@@ -3980,16 +4964,16 @@
       "rows": {
        "body": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/journey",
         "absent_text": "No weigh-in yet.",
         "data": {
-         "text": "16.3 lb down so far; 126 lb to go to reach 185."
+         "text": "19 lb down so far; 123.3 lb to go to reach 185."
         }
        },
        "training": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/session",
         "absent_text": "No session is planned for today.",
         "data": {
@@ -3998,29 +4982,29 @@
        },
        "sleep": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/sleep_detail",
         "absent_text": "No sleep has been recorded yet.",
         "data": {
-         "text": "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+         "text": "Slept 9.9 hours on the night of Sunday, October 11; recovery 67 out of 100."
         }
        },
        "food": {
-        "state": "ok",
-        "as_of": "2026-10-02",
+        "state": "stale",
+        "as_of": "2026-10-09",
         "source": "/api/nutrition_overview",
-        "absent_text": "No food has been logged yet.",
+        "absent_text": "Nothing newer than Friday, October 9.",
         "data": {
-         "text": "At or above the 170 g protein floor on 9 of 28 logged days."
+         "text": "At or above the 170 g protein floor on 9 of 27 logged days."
         }
        },
        "habits": {
         "state": "ok",
-        "as_of": "2026-10-02",
+        "as_of": "2026-10-11",
         "source": "/api/habit_streaks",
         "absent_text": "No habits have been recorded yet.",
         "data": {
-         "text": "5 of 7 daily habits kept on Friday, October 2."
+         "text": "4 of 7 daily habits kept on Sunday, October 11."
         }
        },
        "supplements": {
@@ -4032,11 +5016,11 @@
        },
        "experiments": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/experiments",
         "absent_text": "No experiments are listed.",
         "data": {
-         "text": "None running right now; 1 ready to start."
+         "text": "None running right now; 4 ready to start."
         }
        },
        "mind": {
@@ -4055,7 +5039,7 @@
    "blocks": {
     "life": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/decisions",
       "/api/experiments",
@@ -4081,16 +5065,16 @@
       "rows": {
        "body": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/journey",
         "absent_text": "No weigh-in yet.",
         "data": {
-         "text": "16.3 lb down so far; 126 lb to go to reach 185."
+         "text": "19 lb down so far; 123.3 lb to go to reach 185."
         }
        },
        "training": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/session",
         "absent_text": "No session is planned for today.",
         "data": {
@@ -4099,36 +5083,36 @@
        },
        "sleep": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/sleep_detail",
         "absent_text": "No sleep has been recorded yet.",
         "data": {
-         "text": "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+         "text": "Slept 9.9 hours on the night of Sunday, October 11; recovery 67 out of 100."
         }
        },
        "food": {
-        "state": "ok",
-        "as_of": "2026-10-02",
+        "state": "stale",
+        "as_of": "2026-10-09",
         "source": "/api/nutrition_overview",
-        "absent_text": "No food has been logged yet.",
+        "absent_text": "Nothing newer than Friday, October 9.",
         "data": {
-         "text": "At or above the 170 g protein floor on 9 of 28 logged days."
+         "text": "At or above the 170 g protein floor on 9 of 27 logged days."
         }
        },
        "habits": {
         "state": "ok",
-        "as_of": "2026-10-02",
+        "as_of": "2026-10-11",
         "source": "/api/habit_streaks",
         "absent_text": "No habits have been recorded yet.",
         "data": {
-         "text": "5 of 7 daily habits kept on Friday, October 2."
+         "text": "4 of 7 daily habits kept on Sunday, October 11."
         }
        },
        "supplements": {
-        "state": "ok",
-        "as_of": "2026-10-03",
+        "state": "stale",
+        "as_of": "2026-10-09",
         "source": "/api/supplements",
-        "absent_text": "No supplements are listed.",
+        "absent_text": "Nothing newer than Friday, October 9.",
         "data": {
          "text": "21 in the daily stack."
         }
@@ -4156,7 +5140,7 @@
    "blocks": {
     "week": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/pulse_history",
       "/api/training_overview",
@@ -4165,13 +5149,13 @@
      "absent_text": "Nothing is recorded in these seven days.",
      "data": {
       "days": [
-       "2026-09-27",
-       "2026-09-28",
-       "2026-09-29",
-       "2026-09-30",
-       "2026-10-01",
-       "2026-10-02",
-       "2026-10-03"
+       "2026-10-06",
+       "2026-10-07",
+       "2026-10-08",
+       "2026-10-09",
+       "2026-10-10",
+       "2026-10-11",
+       "2026-10-12"
       ],
       "order": [
        "weight",
@@ -4189,18 +5173,18 @@
        },
        "training": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/training_overview",
         "absent_text": "Training has no reading in these seven days.",
         "data": {
          "values": [
-          193.0,
-          116.0,
-          137.0,
-          109.0,
-          137.0,
-          155.0,
-          241.0
+          141.0,
+          147.0,
+          54.0,
+          157.0,
+          56.0,
+          164.0,
+          109.0
          ],
          "text": "Trained on 7 of 7 days recorded.",
          "met": [
@@ -4223,77 +5207,35 @@
        },
        "food": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-09",
         "source": "/api/nutrition_overview",
         "absent_text": "The food log has no reading in these seven days.",
         "data": {
          "values": [
+          182.0,
+          185.0,
+          120.0,
+          158.0,
           null,
           null,
-          null,
-          null,
-          186.0,
-          172.0,
-          153.0
+          null
          ],
-         "text": "At or above 170 g protein on 2 of 3 days recorded.",
+         "text": "At or above 170 g protein on 2 of 4 days recorded.",
          "met": [
-          null,
-          null,
-          null,
-          null,
           true,
           true,
-          false
+          false,
+          false,
+          null,
+          null,
+          null
          ]
         }
        }
       },
       "detail": [
        {
-        "date": "2026-10-03",
-        "summary": "trained",
-        "facts": [
-         {
-          "label": "Training",
-          "text": "241 minutes of walking"
-         },
-         {
-          "label": "Food",
-          "text": "153 g protein, 1,732 kcal"
-         }
-        ]
-       },
-       {
-        "date": "2026-10-02",
-        "summary": "trained",
-        "facts": [
-         {
-          "label": "Training",
-          "text": "155 minutes of strength"
-         },
-         {
-          "label": "Food",
-          "text": "172 g protein, 1,568 kcal"
-         }
-        ]
-       },
-       {
-        "date": "2026-10-01",
-        "summary": "trained",
-        "facts": [
-         {
-          "label": "Training",
-          "text": "137 minutes of strength"
-         },
-         {
-          "label": "Food",
-          "text": "186 g protein, 1,690 kcal"
-         }
-        ]
-       },
-       {
-        "date": "2026-09-30",
+        "date": "2026-10-12",
         "summary": "trained",
         "facts": [
          {
@@ -4303,32 +5245,78 @@
         ]
        },
        {
-        "date": "2026-09-29",
+        "date": "2026-10-11",
         "summary": "trained",
         "facts": [
          {
           "label": "Training",
-          "text": "137 minutes of strength"
+          "text": "164 minutes of strength"
          }
         ]
        },
        {
-        "date": "2026-09-28",
+        "date": "2026-10-10",
         "summary": "trained",
         "facts": [
          {
           "label": "Training",
-          "text": "116 minutes of strength"
+          "text": "56 minutes of walking"
          }
         ]
        },
        {
-        "date": "2026-09-27",
+        "date": "2026-10-09",
         "summary": "trained",
         "facts": [
          {
           "label": "Training",
-          "text": "28 minutes of strength; 165 minutes of walking"
+          "text": "157 minutes of strength"
+         },
+         {
+          "label": "Food",
+          "text": "158 g protein, 1,911 kcal"
+         }
+        ]
+       },
+       {
+        "date": "2026-10-08",
+        "summary": "trained",
+        "facts": [
+         {
+          "label": "Training",
+          "text": "54 minutes of walking"
+         },
+         {
+          "label": "Food",
+          "text": "120 g protein, 1,235 kcal"
+         }
+        ]
+       },
+       {
+        "date": "2026-10-07",
+        "summary": "trained",
+        "facts": [
+         {
+          "label": "Training",
+          "text": "147 minutes of strength"
+         },
+         {
+          "label": "Food",
+          "text": "185 g protein, 1,512 kcal"
+         }
+        ]
+       },
+       {
+        "date": "2026-10-06",
+        "summary": "trained",
+        "facts": [
+         {
+          "label": "Training",
+          "text": "141 minutes of strength"
+         },
+         {
+          "label": "Food",
+          "text": "182 g protein, 1,622 kcal"
          }
         ]
        }
@@ -4338,7 +5326,7 @@
     },
     "scorecard": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/calibration",
       "/api/decisions",
@@ -4376,7 +5364,7 @@
        },
        "training": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/training_overview",
         "absent_text": "Training has no verdict this week.",
         "data": {
@@ -4396,20 +5384,20 @@
        },
        "food": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/nutrition_overview",
         "absent_text": "Food has no verdict this week.",
         "data": {
          "name": "Food",
          "verdict": "not_enough_data",
          "verdict_text": "Too few days logged",
-         "text": "3 days logged; 5 are needed.",
+         "text": "4 days logged; 5 are needed.",
          "rule": "Logged days at or above the plan's protein floor in the last seven. Going well at 5. Fewer than 5 logged days is not enough data."
         }
        },
        "mind": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": [
          "/api/owner_words",
          "/api/decisions"
@@ -4425,7 +5413,7 @@
        },
        "ai": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": [
          "/api/predictions",
          "/api/calibration"
@@ -4433,9 +5421,9 @@
         "absent_text": "The AI has no verdict this week.",
         "data": {
          "name": "The AI",
-         "verdict": "not_yet",
-         "verdict_text": "The coaches do not beat a simple guess yet",
-         "text": "Counted across all 96 calls checked to date, not this week's alone.",
+         "verdict": "going_well",
+         "verdict_text": "The coaches beat a simple guess",
+         "text": "Counted across all 154 calls checked to date, not this week's alone.",
          "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
         }
        }
@@ -4447,9 +5435,12 @@
         "source": null
        },
        "engine": {
-        "area": null,
-        "text": "Nothing this week.",
-        "source": null
+        "area": "ai",
+        "text": "The AI: The coaches beat a simple guess, counted across all 154 calls checked to date, not this week's alone.",
+        "source": [
+         "/api/predictions",
+         "/api/calibration"
+        ]
        }
       },
       "verdicts": {
@@ -4459,8 +5450,8 @@
        "not_enough_data": "Not enough data"
       },
       "window": {
-       "from": "2026-09-27",
-       "to": "2026-10-03"
+       "from": "2026-10-06",
+       "to": "2026-10-12"
       },
       "rules_set": "2026-10-09",
       "rules_set_text": "The rules were set on Friday, October 9."
@@ -4472,7 +5463,7 @@
    "blocks": {
     "week": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/pulse_history",
       "/api/training_overview",
@@ -4481,13 +5472,13 @@
      "absent_text": "Nothing is recorded in these seven days.",
      "data": {
       "days": [
-       "2026-09-27",
-       "2026-09-28",
-       "2026-09-29",
-       "2026-09-30",
-       "2026-10-01",
-       "2026-10-02",
-       "2026-10-03"
+       "2026-10-06",
+       "2026-10-07",
+       "2026-10-08",
+       "2026-10-09",
+       "2026-10-10",
+       "2026-10-11",
+       "2026-10-12"
       ],
       "order": [
        "weight",
@@ -4498,20 +5489,20 @@
       "measures": {
        "weight": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/pulse_history",
         "absent_text": "The weight has no reading in these seven days.",
         "data": {
          "values": [
-          314.5,
-          313.2,
-          312.3,
-          311.4,
-          311.7,
-          311.0,
-          311.0
+          308.9,
+          308.3,
+          307.2,
+          306.1,
+          306.5,
+          null,
+          308.3
          ],
-         "text": "311 lb, down 3.5 across 7 weigh-ins."
+         "text": "308.3 lb, down 0.6 across 6 weigh-ins."
         }
        },
        "training": {
@@ -4523,26 +5514,26 @@
        },
        "sleep": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/pulse_history",
         "absent_text": "Sleep has no reading in these seven days.",
         "data": {
          "values": [
-          7.5,
-          7.8,
-          8.7,
+          5.0,
           8.2,
-          9.1,
-          8.4,
-          8.8
+          8.9,
+          7.2,
+          6.7,
+          8.1,
+          9.6
          ],
-         "text": "Slept 7 hours or more on 7 of 7 days recorded.",
+         "text": "Slept 7 hours or more on 5 of 7 days recorded.",
          "met": [
+          false,
           true,
           true,
           true,
-          true,
-          true,
+          false,
           true,
           true
          ]
@@ -4550,140 +5541,140 @@
        },
        "food": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-09",
         "source": "/api/nutrition_overview",
         "absent_text": "The food log has no reading in these seven days.",
         "data": {
          "values": [
+          182.0,
+          185.0,
+          120.0,
+          158.0,
           null,
           null,
-          null,
-          null,
-          186.0,
-          172.0,
-          153.0
+          null
          ],
-         "text": "At or above 170 g protein on 2 of 3 days recorded.",
+         "text": "At or above 170 g protein on 2 of 4 days recorded.",
          "met": [
-          null,
-          null,
-          null,
-          null,
           true,
           true,
-          false
+          false,
+          false,
+          null,
+          null,
+          null
          ]
         }
        }
       },
       "detail": [
        {
-        "date": "2026-10-03",
-        "summary": "311.0 lb · slept 8.8 h",
+        "date": "2026-10-12",
+        "summary": "308.3 lb · slept 9.6 h",
         "facts": [
          {
           "label": "Weight",
-          "text": "311.0 lb"
+          "text": "308.3 lb"
          },
          {
           "label": "Sleep",
-          "text": "8.8 hours; recovery 98 out of 100"
+          "text": "9.6 hours; recovery 67 out of 100"
+         }
+        ]
+       },
+       {
+        "date": "2026-10-11",
+        "summary": "slept 8.1 h",
+        "facts": [
+         {
+          "label": "Sleep",
+          "text": "8.1 hours; recovery 88 out of 100"
+         }
+        ]
+       },
+       {
+        "date": "2026-10-10",
+        "summary": "306.5 lb · slept 6.7 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "306.5 lb"
+         },
+         {
+          "label": "Sleep",
+          "text": "6.7 hours; recovery 56 out of 100"
+         }
+        ]
+       },
+       {
+        "date": "2026-10-09",
+        "summary": "306.1 lb · slept 7.2 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "306.1 lb"
+         },
+         {
+          "label": "Sleep",
+          "text": "7.2 hours; recovery 59 out of 100"
          },
          {
           "label": "Food",
-          "text": "153 g protein, 1,732 kcal"
+          "text": "158 g protein, 1,911 kcal"
          }
         ]
        },
        {
-        "date": "2026-10-02",
-        "summary": "311.0 lb · slept 8.4 h",
+        "date": "2026-10-08",
+        "summary": "307.2 lb · slept 8.9 h",
         "facts": [
          {
           "label": "Weight",
-          "text": "311.0 lb"
+          "text": "307.2 lb"
          },
          {
           "label": "Sleep",
-          "text": "8.4 hours; recovery 98 out of 100"
+          "text": "8.9 hours; recovery 97 out of 100"
          },
          {
           "label": "Food",
-          "text": "172 g protein, 1,568 kcal"
+          "text": "120 g protein, 1,235 kcal"
          }
         ]
        },
        {
-        "date": "2026-10-01",
-        "summary": "311.7 lb · slept 9.1 h",
+        "date": "2026-10-07",
+        "summary": "308.3 lb · slept 8.2 h",
         "facts": [
          {
           "label": "Weight",
-          "text": "311.7 lb"
+          "text": "308.3 lb"
          },
          {
           "label": "Sleep",
-          "text": "9.1 hours; recovery 62 out of 100"
+          "text": "8.2 hours; recovery 78 out of 100"
          },
          {
           "label": "Food",
-          "text": "186 g protein, 1,690 kcal"
+          "text": "185 g protein, 1,512 kcal"
          }
         ]
        },
        {
-        "date": "2026-09-30",
-        "summary": "311.4 lb · slept 8.2 h",
+        "date": "2026-10-06",
+        "summary": "308.9 lb · slept 5 h",
         "facts": [
          {
           "label": "Weight",
-          "text": "311.4 lb"
+          "text": "308.9 lb"
          },
          {
           "label": "Sleep",
-          "text": "8.2 hours; recovery 59 out of 100"
-         }
-        ]
-       },
-       {
-        "date": "2026-09-29",
-        "summary": "312.3 lb · slept 8.7 h",
-        "facts": [
-         {
-          "label": "Weight",
-          "text": "312.3 lb"
+          "text": "5 hours; recovery 82 out of 100"
          },
          {
-          "label": "Sleep",
-          "text": "8.7 hours; recovery 54 out of 100"
-         }
-        ]
-       },
-       {
-        "date": "2026-09-28",
-        "summary": "313.2 lb · slept 7.8 h",
-        "facts": [
-         {
-          "label": "Weight",
-          "text": "313.2 lb"
-         },
-         {
-          "label": "Sleep",
-          "text": "7.8 hours; recovery 64 out of 100"
-         }
-        ]
-       },
-       {
-        "date": "2026-09-27",
-        "summary": "314.5 lb · slept 7.5 h",
-        "facts": [
-         {
-          "label": "Weight",
-          "text": "314.5 lb"
-         },
-         {
-          "label": "Sleep",
-          "text": "7.5 hours; recovery 89 out of 100"
+          "label": "Food",
+          "text": "182 g protein, 1,622 kcal"
          }
         ]
        }
@@ -4768,13 +5759,45 @@
        {
         "date": "2026-10-03",
         "lbs": 311.0
+       },
+       {
+        "date": "2026-10-04",
+        "lbs": 312.1
+       },
+       {
+        "date": "2026-10-05",
+        "lbs": 311.1
+       },
+       {
+        "date": "2026-10-06",
+        "lbs": 308.9
+       },
+       {
+        "date": "2026-10-07",
+        "lbs": 308.3
+       },
+       {
+        "date": "2026-10-08",
+        "lbs": 307.2
+       },
+       {
+        "date": "2026-10-09",
+        "lbs": 306.1
+       },
+       {
+        "date": "2026-10-10",
+        "lbs": 306.5
+       },
+       {
+        "date": "2026-10-12",
+        "lbs": 308.3
        }
       ]
      }
     },
     "scorecard": {
      "state": "ok",
-     "as_of": "2026-10-03",
+     "as_of": "2026-10-12",
      "source": [
       "/api/calibration",
       "/api/decisions",
@@ -4805,14 +5828,14 @@
       "rows": {
        "body": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/pulse_history",
         "absent_text": "Body has no verdict this week.",
         "data": {
          "name": "Body",
          "verdict": "faster_than_planned",
          "verdict_text": "Weight down faster than planned",
-         "text": "Seven-day average 312.2 lb, down 2.6 lb from the seven days before.",
+         "text": "Seven-day average 307.6 lb, down 3.9 lb from the seven days before.",
          "rule": "The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; faster than planned when it fell more than 2.5 lb in the week. Fewer than 3 weigh-ins in either week is not enough data."
         }
        },
@@ -4825,33 +5848,33 @@
        },
        "sleep": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/pulse_history",
         "absent_text": "Sleep has no verdict this week.",
         "data": {
          "name": "Sleep",
          "verdict": "going_well",
          "verdict_text": "5 or more long nights",
-         "text": "7 hours or more on 7 of 7 nights recorded.",
+         "text": "7 hours or more on 5 of 7 nights recorded.",
          "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
         }
        },
        "food": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": "/api/nutrition_overview",
         "absent_text": "Food has no verdict this week.",
         "data": {
          "name": "Food",
          "verdict": "not_enough_data",
          "verdict_text": "Too few days logged",
-         "text": "3 days logged; 5 are needed.",
+         "text": "4 days logged; 5 are needed.",
          "rule": "Logged days at or above the plan's protein floor in the last seven. Going well at 5. Fewer than 5 logged days is not enough data."
         }
        },
        "mind": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": [
          "/api/owner_words",
          "/api/decisions"
@@ -4867,7 +5890,7 @@
        },
        "ai": {
         "state": "ok",
-        "as_of": "2026-10-03",
+        "as_of": "2026-10-12",
         "source": [
          "/api/predictions",
          "/api/calibration"
@@ -4875,9 +5898,9 @@
         "absent_text": "The AI has no verdict this week.",
         "data": {
          "name": "The AI",
-         "verdict": "not_yet",
-         "verdict_text": "The coaches do not beat a simple guess yet",
-         "text": "Counted across all 96 calls checked to date, not this week's alone.",
+         "verdict": "going_well",
+         "verdict_text": "The coaches beat a simple guess",
+         "text": "Counted across all 154 calls checked to date, not this week's alone.",
          "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
         }
        }
@@ -4885,13 +5908,16 @@
       "went_right": {
        "matthew": {
         "area": "sleep",
-        "text": "Sleep: 7 hours or more on 7 of 7 nights recorded.",
+        "text": "Sleep: 7 hours or more on 5 of 7 nights recorded.",
         "source": "/api/pulse_history"
        },
        "engine": {
-        "area": null,
-        "text": "Nothing this week.",
-        "source": null
+        "area": "ai",
+        "text": "The AI: The coaches beat a simple guess, counted across all 154 calls checked to date, not this week's alone.",
+        "source": [
+         "/api/predictions",
+         "/api/calibration"
+        ]
        }
       },
       "verdicts": {
@@ -4901,8 +5927,8 @@
        "not_enough_data": "Not enough data"
       },
       "window": {
-       "from": "2026-09-27",
-       "to": "2026-10-03"
+       "from": "2026-10-06",
+       "to": "2026-10-12"
       },
       "rules_set": "2026-10-09",
       "rules_set_text": "The rules were set on Friday, October 9."

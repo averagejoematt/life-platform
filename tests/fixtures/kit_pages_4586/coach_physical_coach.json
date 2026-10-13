@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-12T15:35:30.115395+00:00",
-  "served_at": "2026-10-12T15:35:30.115395+00:00",
+  "generated_at": "2026-10-13T01:38:41.823433+00:00",
+  "served_at": "2026-10-13T01:38:41.823433+00:00",
   "cache_seconds": 300,
-  "request_id": "8d333d675b044c6c"
+  "request_id": "ed52d5dbc9b34f70"
  },
  "persona_id": "physical_coach",
  "name": "Max Reyes",
@@ -181,9 +181,9 @@
  "stance_history": [],
  "voice": {
   "decision_style": {
-   "default_evidence_threshold": "high \u2014 body composition and longevity metrics change slowly, so he requires 4+ weeks of consistent data before calling a trend. Will not react to weekly fluctuations.",
+   "default_evidence_threshold": "high \u2014 body composition and longevity metrics change slowly, so it requires 4+ weeks of consistent data before calling a trend. Will not react to weekly fluctuations.",
    "comfort_with_bold_claims": "moderate-to-high when grounded in established longitudinal research. Will flatly state 'You need more muscle mass' based on a single DEXA if the number is below the centenarian benchmark. Cautious about novel interventions without long-term safety data.",
-   "revision_style": "Slow and evidence-gated \u2014 'The three-month trend has shifted my assessment. Here's the updated trajectory.' Does not revise quickly because the timeframes he operates on don't permit fast pivots."
+   "revision_style": "Slow and evidence-gated \u2014 'The three-month trend has shifted my assessment. Here's the updated trajectory.' Does not revise quickly because the timeframes it operates on don't permit fast pivots."
   },
   "structural_voice_rules": {
    "opening_patterns": {
@@ -207,7 +207,7 @@
    "uncertainty_style": "Distinguishes between measurement uncertainty and trajectory uncertainty. 'The DEXA is accurate to within 1.5% \u2014 so the absolute number has a margin. But the direction over three scans is unambiguous.' Treats short-term fluctuations with clinical detachment; saves conviction for established trajectories.",
    "analogy_domain": "Compounding, investment horizons, depreciation curves, structural maintenance. The body as a system that degrades predictably unless deliberately maintained. Muscle mass as a retirement account \u2014 you can't start saving at 60.",
    "paragraph_structure": "Current data point \u2192 rate of change \u2192 where this trajectory leads in 5/10/20 years \u2192 what the actionable lever is today. Always connects the present to the future. Never discusses a metric without placing it on a timeline.",
-   "humor_style": "Almost none. Occasional dry observation about the absurdity of optimizing for longevity while ignoring obvious risk factors. Not cold \u2014 just focused. When he does inject warmth, it's through genuine satisfaction at seeing a trajectory bend in the right direction.",
+   "humor_style": "Almost none. Occasional dry observation about the absurdity of optimizing for longevity while ignoring obvious risk factors. Not cold \u2014 just focused. When warmth does appear, it's through genuine satisfaction at seeing a trajectory bend in the right direction.",
    "relationship_to_others": "The integrator who sees every other coach's domain through the healthspan lens. Training volume matters because of muscle mass at 70. Sleep matters because of cognitive decline risk. Nutrition matters because of metabolic flexibility at 60. Defers to domain specialists on mechanisms but holds the long-term strategic view. Closest alignment with the labs coach (biomarkers) and the nutrition coach (body composition).",
    "signature_moves": [
     "Placing every data point on a decade-scale timeline \u2014 'At this rate, by 50 you'll be...'",
@@ -251,17 +251,17 @@
  },
  "report_card": {
   "track_record": {
-   "confirmed": 10,
-   "refuted": 12,
+   "confirmed": 11,
+   "refuted": 11,
    "decided": 22,
-   "hit_rate_pct": 45.5,
+   "hit_rate_pct": 50.0,
    "record": {
-    "confirmed": 10,
-    "refuted": 12,
+    "confirmed": 11,
+    "refuted": 11,
     "n": 22,
     "through": "2026-10-11"
    },
-   "headline": "10 of 22 checked calls right (45%) through October 11",
+   "headline": "11 of 22 checked calls right (50%) through October 11",
    "comparison": {
     "rule": "nothing_changes",
     "rule_words": "a guess that nothing changes",
@@ -270,15 +270,15 @@
      "number": {
       "graded": 9,
       "coach_right": 5,
-      "scored": 6,
-      "coach_right_on_scored": 3,
-      "rule_right": 3,
+      "scored": 9,
+      "coach_right_on_scored": 5,
+      "rule_right": 5,
       "coach_only": 0,
       "rule_only": 0,
       "unscorable": 0,
       "unscorable_reasons": {},
-      "not_yet_scored": 3,
-      "verdict": "not_yet_scored",
+      "not_yet_scored": 0,
+      "verdict": "too_few",
       "sign_test_p": null,
       "coach_right_pct": null,
       "rule_right_pct": null
@@ -286,15 +286,15 @@
      "direction": {
       "graded": 10,
       "coach_right": 4,
-      "scored": 3,
-      "coach_right_on_scored": 1,
-      "rule_right": 0,
-      "coach_only": 1,
-      "rule_only": 0,
+      "scored": 10,
+      "coach_right_on_scored": 4,
+      "rule_right": 1,
+      "coach_only": 4,
+      "rule_only": 1,
       "unscorable": 0,
       "unscorable_reasons": {},
-      "not_yet_scored": 7,
-      "verdict": "not_yet_scored",
+      "not_yet_scored": 0,
+      "verdict": "too_few",
       "sign_test_p": null,
       "coach_right_pct": null,
       "rule_right_pct": null
@@ -317,30 +317,30 @@
      },
      "sealed": {
       "graded": 2,
-      "coach_right": 0,
-      "scored": 1,
-      "coach_right_on_scored": 0,
-      "rule_right": 1,
-      "coach_only": 0,
-      "rule_only": 1,
+      "coach_right": 1,
+      "scored": 2,
+      "coach_right_on_scored": 1,
+      "rule_right": 0,
+      "coach_only": 1,
+      "rule_only": 0,
       "unscorable": 0,
       "unscorable_reasons": {},
-      "not_yet_scored": 1,
-      "verdict": "not_yet_scored",
+      "not_yet_scored": 0,
+      "verdict": "too_few",
       "sign_test_p": null,
       "coach_right_pct": null,
       "rule_right_pct": null
      }
     },
     "unclassified": 0,
-    "scored_complete": false,
+    "scored_complete": true,
     "skill": {
      "n": 22,
-     "brier_skill": -0.095,
-     "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
+     "brier_skill": 0.0414,
+     "sentence": "Across 22 checked calls, so far they beat a simple guess."
     },
-    "rule_sentence": null,
-    "sentence": "Across 22 checked calls, so far they do not beat a simple guess.",
+    "rule_sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
@@ -1482,11 +1482,11 @@
     "record_id": "COMMITMENT#commit_20260913_restore_garmin_sync_to_the_source_regist",
     "date": "2026-09-13",
     "text": "",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-09-27",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-12",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1611,8 +1611,8 @@
    "held": 51,
    "kept": 14,
    "broken": 9,
-   "pending": 10,
-   "unresolved": 18,
+   "pending": 9,
+   "unresolved": 19,
    "ungradeable": 0
   },
   "learnings": [
