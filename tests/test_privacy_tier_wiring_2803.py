@@ -28,6 +28,7 @@ import privacy_tier_wiring as wiring  # noqa: E402
 from privacy.field_tiers import (  # noqa: E402
     FIELD_TIERS,
     SOURCE_TIERS,
+    TIER_INTERNAL,
     TIER_OWNER_ONLY,
     TIER_OWNER_PUBLISHED,
     TIER_PUBLIC,
@@ -107,11 +108,22 @@ def test_is_publishable_fails_closed():
 
 
 def test_source_tiers_are_valid_and_owner_grade():
-    """Source-level entries exist only for the owner-published / owner-only grades —
-    a TIER_PUBLIC source entry would be a no-op masquerading as a decision."""
+    """Source-level entries exist only for the internal / owner-published / owner-only
+    grades — a TIER_PUBLIC source entry would be a no-op masquerading as a decision.
+    TIER_INTERNAL is a decision too (ADR-155 amendment, 2026-10-12): never publishable,
+    but admitted to AI context — the owner clinical record is its one source."""
     for source, tier in SOURCE_TIERS.items():
         assert tier in VALID_TIERS, f"source {source} declares tier {tier!r}"
-        assert tier in (TIER_OWNER_ONLY, TIER_OWNER_PUBLISHED), f"source {source} declares a non-decision tier {tier!r}"
+        assert tier in (TIER_INTERNAL, TIER_OWNER_ONLY, TIER_OWNER_PUBLISHED), f"source {source} declares a non-decision tier {tier!r}"
+
+
+def test_internal_sources_are_exactly_the_ruled_set_and_never_publishable():
+    """The ADR-155 amendment admits ONE source to AI context at TIER_INTERNAL. A second
+    internal source is a new ruling, so the set is pinned by name; none is publishable."""
+    internal = {s for s, t in SOURCE_TIERS.items() if t == TIER_INTERNAL}
+    assert internal == {"clinical"}, f"TIER_INTERNAL sources changed without a ruling: {sorted(internal)}"
+    for source in internal:
+        assert not is_publishable(source_tier_of(source)), f"internal source {source} reads as publishable"
 
 
 def test_owner_published_never_enters_a_strip_set():

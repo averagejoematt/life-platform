@@ -929,6 +929,10 @@ def _build_shared_system_prompt():
     except Exception as _pe:  # pragma: no cover — defensive
         logger.warning("Presence block injection failed: %s", _pe)
 
+    # ADR-155 amendment (2026-10-12): the owner clinical record, non-disclosure form (analyses are published).
+    # In shared_system, so `_gate_prose`'s allow-list grounds its figures. Fail-soft: [] leaves the prompt as it was.
+    parts.extend(_ag.clinical_parts(table))
+
     # Format instructions (identical for all experts)
     parts.append("""OBSERVATORY ANALYSIS FORMAT:
 Write a 2-3 paragraph analysis (200-300 words).

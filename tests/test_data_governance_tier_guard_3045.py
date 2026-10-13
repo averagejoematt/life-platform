@@ -31,6 +31,7 @@ from privacy.field_tiers import (  # noqa: E402
     FIELD_TIERS,
     OWNER_CONSENT_ADR,
     SOURCE_TIERS,
+    TIER_INTERNAL,
     TIER_OWNER_ONLY,
     TIER_OWNER_PUBLISHED,
 )
@@ -169,6 +170,10 @@ ROW_MAP: list[dict] = [
     # #4078: the chat pending-writes queue — owner-only because a queued row carries whatever
     # the target write tool accepts. Declared before the first row exists.
     {"key": "pending_writes", "pattern": r"^Chat pending-writes queue", "requirements": [("source", "pending_writes", OO)], "claims": []},
+    # ADR-155 amendment (2026-10-12): the owner clinical record. Owner-only in THIS document's
+    # sense (never on a public surface) but registry tier TIER_INTERNAL, because the owner
+    # ruled it may enter AI coach context. No `claims`: no public projection at all.
+    {"key": "clinical", "pattern": r"^Owner clinical record", "requirements": [("source", "clinical", TIER_INTERNAL)], "claims": []},
 ]
 
 # The #2782/#2809 trio is ruled Tier-2 by docs/SCHEMA.md (its prose home predates this

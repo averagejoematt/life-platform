@@ -907,6 +907,11 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # pins the three registrations a new owner-only SOURCE# family needs (taxonomy class,
         # privacy tier, SCHEMA row), which are repo shape by definition.
         "test_pain_dismissal_4036.py",
+        # ADR-155 amendment (2026-10-12): the owner clinical record. Reads the committed
+        # deploy/generated/pk_family_census.json (the #3669 disposition follow-up, armed on
+        # whichever side of the first load the repo stands) and pins the registrations the
+        # TIER_INTERNAL partition needs (tier, taxonomy class, MCP queryable, raw prefix).
+        "test_clinical_record_context.py",
         # #3760: an rglob sweep of site/** + scripts/** asserting the private progress
         # viewer's route appears in no shipped byte, no sitemap/feed/redirects map, and no
         # QA-manifest page entry — plus the edge behaviour and the two IAM grants that make

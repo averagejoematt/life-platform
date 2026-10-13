@@ -695,7 +695,13 @@ def test_the_note_is_read_for_today_not_for_the_previous_data_day():
     _fresh_note_run()
     table = _NoteTable([])
     ci.served_run_facts({"date": "2026-09-25"}, table=table, today="2026-09-26")
-    rendered = [(ConditionExpressionBuilder().build_expression(c["KeyConditionExpression"], is_key_condition=True), c) for c in table.calls]
+    # The clinical-record read (ADR-155 amendment) uses the string key-condition form and
+    # is another partition; only the boto3-condition reads are rendered here.
+    rendered = [
+        (ConditionExpressionBuilder().build_expression(c["KeyConditionExpression"], is_key_condition=True), c)
+        for c in table.calls
+        if not isinstance(c["KeyConditionExpression"], str)
+    ]
     note_calls = [(b, c) for b, c in rendered if mn.MORNING_NOTE_PK in b.attribute_value_placeholders.values()]
     assert len(note_calls) == 1, "exactly one note window read per run (the macrofactor window is the other query)"
     built, call = note_calls[0]

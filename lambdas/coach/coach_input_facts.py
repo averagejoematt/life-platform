@@ -34,6 +34,14 @@ own served numbers contradicted:
      for the morning (`coach.morning_note.coach_fact` — the SAME derivation
      `/api/morning_note` and the coach packet serve), read for today or yesterday only,
      with absence stated (`state: absent`) rather than a blank the model might fill.
+
+  5. **The owner clinical record (ADR-155 amendment, 2026-10-12).** Every coach's input
+     carries `clinical_context` — `health.clinical_facts.clinical_context_block`, the
+     owner's diagnoses, medications, recent ECGs, latest clinical labs and his clinicians'
+     standing guidance, as plain-text lines — read once per run. The block's own notice
+     tells the coach not to name any of it in prose (coach reads reach public pages); it
+     is in `domain_data`, so its numbers are in the grounding allow-list by construction.
+     Absent when the partition is empty or unreadable — never a placeholder.
 """
 
 from __future__ import annotations
@@ -46,7 +54,7 @@ from typing import Any, Optional
 
 from common.constants import EXPERIMENT_START_DATE
 from common.pacific_time import pacific_clock_label, pacific_today, parse_day_key
-from health import nutrition_logging as _nl
+from health import clinical_facts as _cf, nutrition_logging as _nl
 
 from coach import morning_note as _mn
 
@@ -199,6 +207,10 @@ def served_run_facts(data: Optional[dict] = None, *, table=None, today: Optional
         # #4189: the note is read for TODAY (Pacific) — the brief runs after the morning it
         # was written — not for `data_through`, which is the previous data day.
         "morning_note": morning_note_fact(table, today),
+        # ADR-155 amendment (2026-10-12): the owner clinical record, read once per run.
+        # `published=True`: a coach read can reach a public page, so the block tells the
+        # coach not to name its contents. "" (fail-soft) when absent or unreadable.
+        "clinical": _cf.clinical_context_block(table, published=True),
     }
     # The table itself is held (not its id) so an identity check can never match a
     # different object that happens to reuse a freed id.
@@ -238,6 +250,11 @@ def coach_inputs(coach_id: str, domain_data: Any, data: Optional[dict], *, table
         # for them by name; the rest see the same fact so no coach narrates a morning he
         # described differently.
         out = {**out, "morning_note": (facts or {}).get("morning_note") or _mn.coach_fact(None, read_ok=False)}
+        # ADR-155 amendment (2026-10-12): every coach sees the owner clinical record, as
+        # lines (readable in the prompt's JSON dump). Omitted entirely when there is none.
+        clinical = (facts or {}).get("clinical")
+        if clinical:
+            out = {**out, "clinical_context": clinical.splitlines()}
     return out
 
 
