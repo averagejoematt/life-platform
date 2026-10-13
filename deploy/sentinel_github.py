@@ -381,7 +381,7 @@ def _pending_detail(check):
 def check_github_config():
     """#1320 — GET-only asserts of documented GitHub config vs. live state.
 
-    Five surfaces, each compared against deploy/github_posture.json (the
+    Six surfaces (incl. secret_scanning, #4887), each compared against deploy/github_posture.json (the
     machine-readable mirror of the doc claims — never a hardcoded wish):
 
       * environment_production — the `production` environment's protection rules
@@ -537,6 +537,40 @@ def check_github_config():
             # #3207: for a settings toggle there is no "absent" shape — "every declared
             # key already matches" IS the applied-predicate.
             surfaces["repo_settings"] = _classify_declared_but_unapplied(want_settings, applied_live=not mismatches, drift_result=verdict)
+
+    # 2d. repository secret scanning + push protection (#4887) — both live `enabled`, so
+    # nothing alarmed if either was switched off. Same `repos/<repo>` payload as 2c, field
+    # `security_and_analysis`, which GitHub only returns to an admin-capable token.
+    want_ss = posture.get("secret_scanning")
+    if want_ss:
+        data, err = _gh_api_result(f"repos/{repo}")
+        if err:
+            surfaces["secret_scanning"] = {"status": "error", "detail": err["detail"]}
+        else:
+            saa = data.get("security_and_analysis")
+            if not isinstance(saa, dict):
+                surfaces["secret_scanning"] = {
+                    "status": "unavailable",
+                    "detail": "repos/<repo> returned no security_and_analysis block (token lacks admin read)",
+                }
+                scope_gaps.append("secret scanning (security_and_analysis needs fine-grained Administration:read)")
+            else:
+                live_ss = {
+                    "secret_scanning": (saa.get("secret_scanning") or {}).get("status"),
+                    "push_protection": (saa.get("secret_scanning_push_protection") or {}).get("status"),
+                }
+                declared = {k: v for k, v in want_ss.items() if k not in _POSTURE_META_KEYS}
+                mismatches = {k: {"documented": v, "live": live_ss.get(k)} for k, v in declared.items() if live_ss.get(k) != v}
+                if mismatches:
+                    surfaces["secret_scanning"] = {
+                        "status": "drift",
+                        "documented": declared,
+                        "live": live_ss,
+                        "detail": "; ".join(f"{k}: documented {m['documented']!r}, live {m['live']!r}" for k, m in mismatches.items())
+                        + " (one-click owner toggle: repo Settings → Advanced Security)",
+                    }
+                else:
+                    surfaces["secret_scanning"] = {"status": "clean", "live": live_ss}
 
     # 3. vulnerability / Dependabot alerts enablement (ADR-082's remediation channel)
     want_va = bool(posture.get("vulnerability_alerts", {}).get("enabled"))
