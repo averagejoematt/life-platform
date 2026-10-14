@@ -362,8 +362,10 @@ def _set_chronicle_pending(week_num, reason, display):
     return _store._set_chronicle_pending(week_num, reason, display, _g=globals())
 
 
-def _send_preview_email(title, week_num, date_str, approval_token, email_html, kit_block=""):
-    return _store._send_preview_email(title, week_num, date_str, approval_token, email_html, kit_block=kit_block, _g=globals())
+def _send_preview_email(title, week_num, date_str, approval_token, email_html, kit_block="", desk_fallback=""):
+    return _store._send_preview_email(
+        title, week_num, date_str, approval_token, email_html, kit_block=kit_block, desk_fallback=desk_fallback, _g=globals()
+    )
 
 
 def _held_week(week_num, reason, display, body, status_code=500, dry_run=False):
@@ -754,6 +756,7 @@ def _handler_core(event: dict, context) -> dict:
     # replace the legacy passes below — including the #914 presence gate, which forced a logging stall into the story
     # and so narrated MacroFactor export lag as silence. STORY_DESK=off restores the legacy writer.
     _desk = None
+    _desk_fallback = ""  # #4914: why the desk did not write the week — named in the preview email's subject and banner
     # the week end every output field carries (date, confidence, recap meta, share-kit label) — the desk's when it wrote
     _week_end = data["dates"]["end"]
     if _cached is None and os.environ.get("STORY_DESK", "on").lower() != "off" and _target_date:
@@ -769,6 +772,7 @@ def _handler_core(event: dict, context) -> dict:
         except Exception as _desk_e:  # noqa: BLE001 — the legacy writer is the fallback, never a dark week
             logger.error(f"[#4535] story desk failed — falling back to the legacy writer: {_desk_e}")
             _desk = None
+            _desk_fallback = str(_desk_e) or type(_desk_e).__name__
         if _desk:
             raw_installment = _desk["raw_installment"]
             _skip_model_passes = True
@@ -1200,7 +1204,9 @@ def _handler_core(event: dict, context) -> dict:
                 ),
             }
 
-        _send_preview_email(title, week_num, date_str, approval_token, draft_email_html, kit_block=share_kit_block)
+        _send_preview_email(
+            title, week_num, date_str, approval_token, draft_email_html, kit_block=share_kit_block, desk_fallback=_desk_fallback
+        )
         logger.info(f"FEAT-12: Draft Week {week_num} stored — awaiting approval")
 
     else:

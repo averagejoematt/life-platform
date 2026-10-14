@@ -9,7 +9,20 @@ pick the story up the way a human desk would:
   * ``bets`` — the Panel's on-air bet, with a rule code can grade, and its result once graded;
   * ``featured`` — which coach the week put in front of readers (rotation input);
   * ``leads`` / ``beats`` — the angle that led and the beats already used (repeat guard);
-  * ``arcs`` — one line per character (Elena, each coach) on how they have moved.
+  * ``arcs`` — one line per character (Elena, each coach) on how they have moved;
+  * ``asks`` — what a coach asked of him, ``open | followed_up | escalated`` (#4914).
+
+THE ASK RULE (#4914) — one rule, ``ask_matches``, shared by the desk's validator and ``apply_budget``:
+  * every ask carries a stable ``id`` (``ask_id`` of its normalized text), assigned when ``apply_budget``
+    appends it; an ask already in the ledger WITHOUT an id gets the same deterministic id on read
+    (``ask_key``), so no migration is needed;
+  * a follow-up in the budget's ``asks_followed_up[]`` matches an ask when it cites that ``ask_id``, or —
+    the fallback — quotes the ask's first ``ASK_PREFIX_CHARS`` normalized characters, or shares at least
+    ``ASK_OVERLAP`` of its content words (and ``ASK_OVERLAP_MIN_WORDS`` of them) (a paraphrase is a follow-up);
+  * outcome ``carried`` (``CARRIED``) means no reply and no data yet: the ask stays ``open`` with a
+    ``carried_weeks`` count. After ``CARRIED_MAX_WEEKS`` carried installments it is ESCALATED — status
+    ``escalated`` with ``escalated_week``, no longer demanded of the desk, listed by ``escalated_asks`` for
+    the reply desk (#4546) to put to him by email instead of asking the data something it cannot answer.
 
 Pure: the ledger is a dict in, a dict out. Persistence (`ledger_row` / `latest_visible`)
 is the only part that touches a table, and it reads through ``singleton_visible`` so a
@@ -20,6 +33,8 @@ from a tombstoned cycle-5 row).
 from __future__ import annotations
 
 import copy
+import hashlib
+import re
 from typing import Any, Dict, List, Optional
 
 THREAD_STATUSES = ("open", "advanced", "resolved", "retired")
@@ -31,6 +46,69 @@ MAX_CONSECUTIVE_LEAD = 2
 BET_CARRY_WEEKS = 2
 
 LEDGER_PREFIX = "LEDGER#"
+
+# ── the ask rule (#4914) ─────────────────────────────────────────────────────
+CARRIED = "carried"  # an asks_followed_up outcome: no reply, no data yet
+CARRIED_MAX_WEEKS = 3  # carried this many installments → escalated to the reply desk (#4546)
+ASK_PREFIX_CHARS = 40  # the legacy verbatim rule, kept as one of the accepted ways to name an ask
+ASK_OVERLAP = 0.4  # share of the SHORTER text's content words (4+ letters) the two must share — a paraphrase compresses
+ASK_OVERLAP_MIN_WORDS = 3  # ... and never fewer than this many shared words
+
+_WORD = re.compile(r"[a-z0-9]+")
+
+
+def _norm(text: Any) -> str:
+    return " ".join(_WORD.findall(str(text or "").lower()))
+
+
+def _content_words(text: Any) -> set:
+    return {w for w in _WORD.findall(str(text or "").lower()) if len(w) >= 4}
+
+
+def ask_id(text: Any) -> str:
+    """The stable id of an ask: a short hash of its normalized text."""
+    return "ask-" + hashlib.sha256(_norm(text).encode("utf-8")).hexdigest()[:8]
+
+
+def ask_key(ask: Dict[str, Any]) -> str:
+    """The ask's id — the stored one, or the deterministic one for an ask the ledger holds without an id."""
+    return str(ask.get("id") or ask_id(ask.get("ask")))
+
+
+def ask_matches(followup: Dict[str, Any], ask: Dict[str, Any]) -> bool:
+    """Whether a budget's ``asks_followed_up[]`` entry is a follow-up of this ledger ask (#4914).
+
+    The ONE rule: cites its id; else quotes its opening; else paraphrases it (word overlap)."""
+    cited = str(followup.get("ask_id") or "").strip()
+    if cited:
+        return cited == ask_key(ask)
+    fu_text, ask_text = _norm(followup.get("ask")), _norm(ask.get("ask"))
+    if not fu_text or not ask_text:
+        return False
+    if ask_text[:ASK_PREFIX_CHARS] in fu_text:
+        return True
+    a_words, f_words = _content_words(ask.get("ask")), _content_words(followup.get("ask"))
+    shared = len(a_words & f_words)
+    return shared >= ASK_OVERLAP_MIN_WORDS and shared / min(len(a_words), len(f_words)) >= ASK_OVERLAP
+
+
+def is_open_ask(ask: Dict[str, Any]) -> bool:
+    return ask.get("status") in (None, "", "open")
+
+
+def open_asks(ledger: Dict[str, Any]) -> List[Dict[str, Any]]:
+    return [a for a in ledger.get("asks", []) if is_open_ask(a)]
+
+
+def escalated_asks(ledger: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Asks carried ``CARRIED_MAX_WEEKS`` installments with no reply — for the reply desk (#4546) to put to him."""
+    return [a for a in ledger.get("asks", []) if a.get("status") == "escalated"]
+
+
+def unfollowed_asks(ledger: Dict[str, Any], budget: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Open asks no entry of the budget's ``asks_followed_up`` matches."""
+    fus = budget.get("asks_followed_up") or []
+    return [a for a in open_asks(ledger) if a.get("ask") and not any(ask_matches(fu, a) for fu in fus)]
 
 
 def empty_ledger() -> Dict[str, Any]:
@@ -166,15 +244,18 @@ def apply_budget(prev: Dict[str, Any], budget: Dict[str, Any], *, week: int, dat
         led["spine"] = season_spine()
     for fu in budget.get("asks_followed_up", []):
         for a in led.setdefault("asks", []):
-            if (
-                a.get("status") in (None, "", "open")
-                and (fu.get("ask") or "")[:40]
-                and a.get("ask", "")[:40] in (fu.get("ask") or "") + a.get("ask", "")[:0]
-            ):
+            if not (is_open_ask(a) and a.get("ask") and ask_matches(fu, a)):
+                continue
+            a.setdefault("id", ask_key(a))
+            if _norm(fu.get("outcome")) == CARRIED:
+                a["carried_weeks"] = int(a.get("carried_weeks") or 0) + 1
+                if a["carried_weeks"] >= CARRIED_MAX_WEEKS:
+                    a["status"], a["escalated_week"] = "escalated", week
+            else:
                 a["status"], a["outcome"], a["followed_week"] = "followed_up", fu.get("outcome"), week
     for ask in budget.get("coach_asks", []):
         if ask.get("ask"):
-            led.setdefault("asks", []).append({**ask, "week": week, "status": "open"})
+            led.setdefault("asks", []).append({**ask, "id": ask_id(ask["ask"]), "week": week, "status": "open"})
     if budget.get("throughline_advanced"):
         led.setdefault("throughline_log", []).append({"week": week, "id": budget["throughline_advanced"]})
     return led
@@ -198,7 +279,7 @@ def ledger_for_prompt(ledger: Dict[str, Any], week: int) -> Dict[str, Any]:
         "recently_featured_coaches": recently_featured(ledger, 3),
         "character_arcs": ledger.get("arcs", {}),
         "season_spine": ledger.get("spine") or {},
-        "open_coach_asks": [a for a in ledger.get("asks", []) if a.get("status") in (None, "", "open")],
+        "open_coach_asks": [{**a, "id": ask_key(a)} for a in open_asks(ledger)],
         "throughline_log": ledger.get("throughline_log", [])[-4:],
     }
 
