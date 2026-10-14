@@ -12,9 +12,12 @@ WHY THIS EXISTS (ADR-155 amendment, 2026-10-12)
   Its tier is `TIER_INTERNAL` (`privacy.field_tiers.SOURCE_TIERS["clinical"]`): never
   on a public surface, safe inside owner-facing tooling and AI context. Two of the three
   callers produce text that can reach a public page (the daily brief's coach reads and
-  the expert analyzer's observatory analyses), so the block carries a non-disclosure
-  instruction unless the caller says its output is the owner's own channel
-  (`published=False`, used only by the owner's Telegram coach thread).
+  the expert analyzer's observatory analyses). For those (`published=True`, the default)
+  the block is GUARDRAILS ONLY (owner ruling, 2026-10-14): the neutrally-worded
+  `GUIDANCE#current.public_rules` and nothing else — no diagnosis, medication, lab or
+  ECG ever enters a prompt whose output can be published. No `public_rules` → "" (fail
+  closed). The full record renders only for the owner's own channel (`published=False`,
+  the owner's Telegram coach thread).
 
 THE SORT-KEY FAMILIES (docs/SCHEMA.md)
   EVENT#<date>#<slug>              a diagnosis or clinical event (incl. a clinical ECG read)
@@ -22,7 +25,8 @@ THE SORT-KEY FAMILIES (docs/SCHEMA.md)
   ECG#<YYYY-MM-DDTHH:MM:SS>#<dev>  one consumer-device ECG recording
   LABS#<date>                      a clinical lab panel (`biomarkers`, the labs per-marker shape)
   HISTORY#<date>                   an intake history questionnaire (not rendered here)
-  GUIDANCE#current                 the standing rules for coaches (`rules`, `effective`, `review_after`)
+  GUIDANCE#current                 the standing rules for coaches (`rules`, `public_rules`, `effective`, `review_after`)
+  DOC#<date>#<slug>                an index row for one source document held in S3 (not rendered here)
 
 FAIL-SOFT
   `clinical_context_block` never raises into a coach run: no rows, a failed read or a
@@ -60,10 +64,9 @@ _IN_RANGE_FLAGS = frozenset({"", "normal", "n", "in_range", "in range", "ok"})
 # The fields an EVENT row's one-line detail is drawn from, first present wins.
 _DETAIL_FIELDS = ("interpretation", "presentation", "summary", "note", "detail")
 
+PUBLIC_HEADER = "COACHING GUARDRAILS (owner instructions; they override your usual advice)"
 PUBLISHED_NOTICE = (
-    "Private context: use it to keep your advice safe and consistent with his clinicians. "
-    "Your output may be read by others, so never name a diagnosis, medication, lab value or "
-    "ECG reading from this block in what you write."
+    "Follow these guardrails silently. Your output may be read by others: do not mention, " "explain or speculate about why they exist."
 )
 PRIVATE_NOTICE = "Owner-only channel: you may refer to these facts directly when they bear on your advice."
 
@@ -190,12 +193,12 @@ def _lab_lines(rows: list) -> tuple:
     return heading, flagged, in_range[:MAX_IN_RANGE_LABS]
 
 
-def _guidance_lines(rows: list) -> list:
+def _guidance_lines(rows: list, field: str = "rules") -> list:
     rows_g = [r for r in rows if str(r.get("sk")) == "GUIDANCE#current"]
     if not rows_g:
         return []
     g = rows_g[0]
-    rules = [str(x) for x in (g.get("rules") or []) if str(x).strip()]
+    rules = [str(x) for x in (g.get(field) or []) if str(x).strip()]
     if not rules:
         return []
     window_parts = []
@@ -212,6 +215,13 @@ def render_clinical_block(rows: Optional[list], *, published: bool = True, max_c
     """The block for a set of partition rows (pure; the unit-tested core)."""
     if not rows:
         return ""
+    if published:
+        # Guardrails only: the neutral public_rules, never the record itself.
+        public = _guidance_lines(rows, "public_rules")
+        if not public:
+            return ""
+        text = "\n\n".join([PUBLIC_HEADER, PUBLISHED_NOTICE, "\n".join(public[1:])])
+        return text if len(text) <= max_chars else text[: max_chars - 1].rstrip() + "…"
     guidance = _guidance_lines(rows)
     events = _event_lines(rows)
     meds = _med_lines(rows)
@@ -221,7 +231,7 @@ def render_clinical_block(rows: Optional[list], *, published: bool = True, max_c
         return ""
 
     def assemble() -> str:
-        sections = [HEADER, PUBLISHED_NOTICE if published else PRIVATE_NOTICE]
+        sections = [HEADER, PRIVATE_NOTICE]
         if guidance:
             sections.append("\n".join(guidance))
         if events:
@@ -250,8 +260,8 @@ def render_clinical_block(rows: Optional[list], *, published: bool = True, max_c
 def clinical_context_block(table, *, published: bool = True, user_id: str = "matthew") -> str:
     """THE entry point: the owner clinical record as a prompt block, or "" (fail-soft).
 
-    `published=True` (the default — fail closed) adds the non-disclosure instruction for a
-    coach whose output can reach a public page; only the owner's own channel passes False.
+    `published=True` (the default — fail closed) renders the guardrails only, for a coach
+    whose output can reach a public page; only the owner's own channel passes False.
     """
     if table is None:
         return ""

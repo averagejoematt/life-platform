@@ -22,8 +22,9 @@ INPUT SHAPE -> SORT KEYS  (pk `USER#matthew#SOURCE#clinical`)
     documents[]            -> s3://matthew-life-platform/raw/matthew/clinical/<YYYY-MM-DD>/<file>
   Every item gets `source="clinical"`, `schema_version=1`, `updated_at`; floats become
   Decimal. A document whose filename matches an ECG/EVENT item's `source_file` sets that
-  item's `s3_key` and dates its upload folder; otherwise the folder is the file's
-  `prepared` date (or today).
+  item's `s3_key` and dates its upload folder; otherwise the folder is the document's own
+  `date`, else the file's `prepared` date (or today). Every document also gets an index
+  row `DOC#<date>#<slug>` (kind, s3_key, content_type, sha256, bytes); the bytes stay in S3.
 
 IDEMPOTENT: `put_item` on a deterministic key, and an S3 PUT on a deterministic key — a
 re-run overwrites with the same content. Stdlib + boto3 only.
@@ -32,7 +33,9 @@ re-run overwrites with the same content. Stdlib + boto3 only.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import mimetypes
 import os
 import re
 import sys
@@ -164,12 +167,30 @@ def plan_uploads(record: dict, items: list, docs_dir: str) -> list:
         else:
             local = override or os.path.join(docs_dir, name)
         matched = by_file.get(name) or []
-        date = next((d for d in (_item_date(it) for it in matched) if d), fallback)
+        own = str(doc.get("date") or "")[:10]
+        date = own if _DATE.match(own) else next((d for d in (_item_date(it) for it in matched) if d), fallback)
         key = f"{RAW_PREFIX}/{date}/{os.path.basename(name)}"
         for it in matched:
             it["s3_key"] = key
         plan.append((local, key, matched[0] if matched else None))
+        # Every document also gets its own DynamoDB index row, so the engine can list the
+        # whole record (screenshots and PDFs alike) without listing the bucket. The file
+        # itself stays in S3 — an image or PDF can exceed the 400 KB item limit.
+        doc_row = {k: v for k, v in doc.items() if k not in ("file", "path")}
+        doc_row.update({"file": os.path.basename(name), "s3_key": key, "content_type": _content_type(name)})
+        if os.path.isfile(local):
+            with open(local, "rb") as fh:
+                blob = fh.read()
+            doc_row.update({"sha256": hashlib.sha256(blob).hexdigest(), "bytes": len(blob)})
+        sk = f"DOC#{date}#{slugify(os.path.splitext(os.path.basename(name))[0])}"
+        if any(it["sk"] == sk for it in items):
+            raise ValueError(f"duplicate sort key {sk} — two documents would overwrite each other")
+        items.append(_stamp(sk, doc_row, str(items[0].get("updated_at") or "") if items else ""))
     return plan
+
+
+def _content_type(name: str) -> str:
+    return mimetypes.guess_type(name)[0] or "application/octet-stream"
 
 
 def describe(items: list, plan: list) -> list:
@@ -211,7 +232,7 @@ def apply(items: list, plan: list) -> int:
     s3 = boto3.client("s3", region_name=REGION)
     sse = _bucket_sse(s3)
     for local, key, _m in plan:
-        s3.upload_file(local, BUCKET, key, ExtraArgs=dict(sse))
+        s3.upload_file(local, BUCKET, key, ExtraArgs=dict(sse, ContentType=_content_type(local)))
         print(f"  uploaded {key}")
     table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE_NAME)
     for it in items:

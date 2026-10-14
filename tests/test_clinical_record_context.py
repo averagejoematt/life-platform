@@ -41,6 +41,7 @@ RULES = [
     "Example rule one: keep sessions easy until the example review.",
     "Example rule two: stop and seek care if example symptom B appears.",
 ]
+PUBLIC_RULES = ["Example public rule: prescribe intensity by effort, not numbers."]
 
 
 def _rows(n_ecg: int = 3) -> list:
@@ -68,7 +69,14 @@ def _rows(n_ecg: int = 3) -> list:
             },
         },
         {"pk": PK, "sk": "HISTORY#2026-01-06", "example_field": "example answer"},
-        {"pk": PK, "sk": "GUIDANCE#current", "effective": "2026-01-05", "review_after": "2026-02-01", "rules": list(RULES)},
+        {
+            "pk": PK,
+            "sk": "GUIDANCE#current",
+            "effective": "2026-01-05",
+            "review_after": "2026-02-01",
+            "rules": list(RULES),
+            "public_rules": list(PUBLIC_RULES),
+        },
     ]
     for i in range(n_ecg):
         rows.append(
@@ -109,7 +117,7 @@ class _Table:
 
 def test_the_block_renders_every_family_from_a_paginated_read():
     table = _Table(_rows())
-    block = cf.clinical_context_block(table)
+    block = cf.clinical_context_block(table, published=False)
     assert len(table.calls) > 1, "the fixture must exercise pagination"
     assert all(c["ExpressionAttributeValues"][":pk"] == PK for c in table.calls), "the read is scoped to the clinical partition"
     assert block.startswith(cf.HEADER)
@@ -125,22 +133,32 @@ def test_the_block_renders_every_family_from_a_paginated_read():
 
 
 def test_guidance_is_rendered_verbatim_and_first():
-    block = cf.clinical_context_block(_Table(_rows()))
+    block = cf.clinical_context_block(_Table(_rows()), published=False)
     for rule in RULES:
         assert f"- {rule}" in block
     assert block.index(RULES[0]) < block.index("Example condition A"), "the clinicians' rules lead the block"
     assert "effective 2026-01-05, review after 2026-02-01" in block
 
 
-def test_published_surfaces_carry_the_non_disclosure_notice():
+def test_published_surfaces_get_the_guardrails_only():
     published = cf.clinical_context_block(_Table(_rows()))
     private = cf.clinical_context_block(_Table(_rows()), published=False)
-    assert cf.PUBLISHED_NOTICE in published and cf.PRIVATE_NOTICE not in published
+    assert published.startswith(cf.PUBLIC_HEADER) and cf.PUBLISHED_NOTICE in published
+    assert f"- {PUBLIC_RULES[0]}" in published
+    for leaked in (cf.HEADER, "Example condition A", "Example med", "7.25", "example-device", RULES[0], RULES[1], "effective"):
+        assert leaked not in published, f"a published prompt carried record detail: {leaked!r}"
     assert cf.PRIVATE_NOTICE in private and cf.PUBLISHED_NOTICE not in private
 
 
+def test_published_without_public_rules_is_empty_fail_closed():
+    rows = [r for r in _rows() if r["sk"] != "GUIDANCE#current"]
+    rows.append({"pk": PK, "sk": "GUIDANCE#current", "rules": list(RULES)})
+    assert cf.render_clinical_block(rows) == ""
+    assert "Example condition A" in cf.render_clinical_block(rows, published=False)
+
+
 def test_ecgs_are_newest_first_and_capped():
-    block = cf.clinical_context_block(_Table(_rows(n_ecg=12), page=50))
+    block = cf.clinical_context_block(_Table(_rows(n_ecg=12), page=50), published=False)
     ecg_lines = [ln for ln in block.splitlines() if "example-device:" in ln]
     assert len(ecg_lines) == cf.MAX_ECG
     assert ecg_lines[0].startswith("- 2026-01-12 08:00"), ecg_lines[0]
@@ -168,16 +186,17 @@ def test_a_non_dict_response_is_an_empty_string():
 
 def test_truncation_drops_oldest_ecgs_and_keeps_every_guidance_rule():
     rows = _rows(n_ecg=8)
-    full = cf.render_clinical_block(rows, max_chars=100_000)
+    full = cf.render_clinical_block(rows, published=False, max_chars=100_000)
     cap = len(full) - 80
-    cut = cf.render_clinical_block(_rows(n_ecg=8), max_chars=cap)
+    cut = cf.render_clinical_block(_rows(n_ecg=8), published=False, max_chars=cap)
     assert len(cut) <= cap
     for rule in RULES:
         assert rule in cut
     assert "example normal" not in cut, "in-range lab values go first"
     assert "2026-01-08 08:00" in cut, "the newest recording survives"
     # Driven far below the guidance size, the block still never exceeds the cap.
-    assert len(cf.render_clinical_block(_rows(), max_chars=200)) <= 200
+    assert len(cf.render_clinical_block(_rows(), published=False, max_chars=200)) <= 200
+    assert len(cf.render_clinical_block(_rows(), max_chars=60)) <= 60
 
 
 # ── the loader ───────────────────────────────────────────────────────────────
@@ -267,6 +286,26 @@ def test_the_loader_plans_uploads_and_links_s3_keys_by_source_file(tmp_path):
     assert by_sk["ECG#2026-01-04T21:10:05#example-device"]["s3_key"] == keys[1]
 
 
+def test_every_document_gets_a_dynamodb_index_row(tmp_path):
+    (tmp_path / "rec1.pdf").write_bytes(b"example bytes")
+    record = json.loads(json.dumps(FAKE_RECORD))
+    record["documents"].append({"file": "shot one.png", "kind": "example_screenshot", "date": "2026-01-03", "path": str(tmp_path)})
+    items = loader.build_items(record)
+    loader.plan_uploads(record, items, str(tmp_path))
+    docs = {i["sk"]: i for i in items if i["sk"].startswith("DOC#")}
+    assert sorted(docs) == [
+        "DOC#2026-01-03#shot-one",  # its own `date` wins
+        "DOC#2026-01-04#rec1",
+        "DOC#2026-01-05#example-ecg",
+        "DOC#2026-01-07#unmatched",
+    ]
+    rec = docs["DOC#2026-01-04#rec1"]
+    assert rec["s3_key"] == "raw/matthew/clinical/2026-01-04/rec1.pdf" and rec["content_type"] == "application/pdf"
+    assert rec["bytes"] == 13 and len(rec["sha256"]) == 64 and rec["pk"] == PK
+    assert docs["DOC#2026-01-03#shot-one"]["content_type"] == "image/png" and "path" not in docs["DOC#2026-01-03#shot-one"]
+    assert "sha256" not in docs["DOC#2026-01-07#unmatched"], "a missing file is indexed without a hash"
+
+
 def test_the_dry_run_prints_keys_and_field_names_never_values(tmp_path, capsys):
     path = tmp_path / "record.json"
     path.write_text(json.dumps(FAKE_RECORD))
@@ -285,7 +324,7 @@ def test_the_loader_refuses_a_duplicate_sort_key():
 
 def test_the_loader_round_trips_into_the_renderer():
     items = loader.build_items(json.loads(json.dumps(FAKE_RECORD)))
-    block = cf.render_clinical_block(items)
+    block = cf.render_clinical_block(items, published=False)
     assert "Example condition A" in block and "example marker 7.25" in block and RULES[1] in block
 
 
