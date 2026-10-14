@@ -79,7 +79,7 @@ def ask_key(ask: Dict[str, Any]) -> str:
 
 def _match_score(followup: Dict[str, Any], ask: Dict[str, Any]) -> float:
     """How strongly a follow-up names this ask: 3 = cites its id, 2 = quotes its opening, else the share of the
-    ASK's content words the follow-up carries (0 below the overlap floor)."""
+    FOLLOW-UP's content words that are this ask's (0 below the overlap floor)."""
     cited = str(followup.get("ask_id") or "").strip()
     if cited:
         return 3.0 if cited == ask_key(ask) else 0.0
