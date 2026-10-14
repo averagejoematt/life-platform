@@ -23,6 +23,11 @@ paused by ADR-074 and cannot report at all. `movement_source_reasons()` attaches
 registry's OWN `method` string to each state, so the reason is the registry's, not the
 model's invention.
 
+ADR-155 amendment (2026-10-12) — THE CLINICAL RECORD.
+`clinical_parts()` hands the shared system prompt the owner clinical record
+(`health.clinical_facts`) in its NON-DISCLOSURE form: observatory analyses are published, so
+the block tells every expert to use it for safety and never to name what it contains.
+
 Fail-soft by construction: every helper degrades to the pre-#3517 arithmetic (or to an empty
 reason map) rather than raising into a weekly cron.
 """
@@ -158,3 +163,15 @@ def movement_source_reasons(source_states) -> dict:
         if caveat:
             out[src] = caveat
     return out
+
+
+def clinical_parts(table) -> list:
+    """The shared-prompt part for the owner clinical record: `[block]`, or `[]` when there is
+    none or anything fails. Published form — an observatory analysis can reach a public page."""
+    try:
+        from health.clinical_facts import clinical_context_block
+
+        block = clinical_context_block(table, published=True)
+    except Exception:  # noqa: BLE001 — a weekly cron is never load-bearing on this read
+        return []
+    return [block] if block else []

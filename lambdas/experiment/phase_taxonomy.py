@@ -302,6 +302,9 @@ SOURCE_CLASS: dict[str, str] = {
     "labs": CROSS_PHASE,
     "dexa": CROSS_PHASE,
     "genome": CROSS_PHASE,
+    "clinical": CROSS_PHASE,  # ADR-155 amendment (2026-10-12): the owner clinical record (diagnoses,
+    # medications, ECGs, clinical labs, clinician guidance). A clinical truth like "labs": a reset
+    # must never hide a standing medical instruction, and the record is owner-written, unrecomputable.
     "progress_photos": CROSS_PHASE,  # #3757: body photos. CROSS_PHASE for two reasons that both
     # hold on their own: a before/after that spans attempts is the entire point of taking them (a
     # reset erasing attempt 16's photos would destroy exactly the comparison they exist for), and

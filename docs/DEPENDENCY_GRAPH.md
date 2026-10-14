@@ -104,9 +104,9 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 2. DynamoDB Partitions (ADR-077 census)
 
-### cross_phase (18)
+### cross_phase (19)
 
-`benchmarks`, `calibration`, `chronicling`, `coach_corrections`, `coach_vision`, `dexa`, `effect_fits`, `eyeball_estimate`, `genome`, `labs`, `milestones`, `progress_photos`, `recall_embeddings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
+`benchmarks`, `calibration`, `chronicling`, `clinical`, `coach_corrections`, `coach_vision`, `dexa`, `effect_fits`, `eyeball_estimate`, `genome`, `labs`, `milestones`, `progress_photos`, `recall_embeddings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
 
 ### experiment_scoped (34)
 
@@ -122,7 +122,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-741 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+742 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -144,6 +144,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `character_sheet` | — | challenge_generator_lambda.py, coherence_sentinel_lambda.py, field_notes_lambda.py, monday_compass_lambda.py, monthly_digest_lambda.py, site_api_ai_context.py, site_api_character.py, site_api_discovery.py, site_api_fulfillment.py, site_api_habits.py, site_api_journey.py, site_api_mind.py, site_api_rollups.py, site_stats_refresh_lambda.py, spiral_breaker.py |
 | `chronicle` | chronicle_approve_lambda.py, chronicle_email_sender_lambda.py, chronicle_store.py, wednesday_chronicle_lambda.py | ask_retrieval.py, chronicle_approve_lambda.py, chronicle_data.py, chronicle_email_sender_lambda.py, chronicle_podcast_lambda.py, chronicle_store.py, coach_panel_podcast_lambda.py, panelcast_desk.py, site_api_coach_narrative.py, site_writer.py, wednesday_chronicle_lambda.py |
 | `circadian` | circadian_compliance_lambda.py | — |
+| `clinical` | — | — |
 | `coach_actions` | intelligence_common.py | intelligence_common.py |
 | `coach_corrections` | coach_corrections.py | coach_corrections.py |
 | `coach_credibility` | — | intelligence_common.py |
@@ -446,6 +447,7 @@ Default: public — an unlisted source/field is TIER_PUBLIC by omission (field_t
 | Source (partition) | Tier |
 |--------------------|------|
 | `cgm_readings` | owner_only |
+| `clinical` | internal |
 | `coach_vision` | owner_only |
 | `dexa` | owner_published |
 | `felt_probe` | owner_only |
@@ -518,7 +520,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1290 total · 929 resolved · 361 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1291 total · 930 resolved · 361 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 84 resolved · 0 dynamic of 84 scheduled lambdas (108 lambdas total)
 - Alarms: 139 literal-named declarations across three idioms, 4 composite; routing digest 95 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 18 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only

@@ -162,6 +162,14 @@ LIVE_FAMILIES = [
     ("USER#matthew#SOURCE#apple_health", "DATATYPE_LIVENESS"),
     ("USER#matthew#SOURCE#journal_analysis", "ENTITY_REGISTRY#current"),
     ("USER#matthew#SOURCE#journal_analysis", "BEHAVIOR_REGISTRY#current"),
+    # ADR-155 amendment (2026-10-12): the owner clinical record's sk families, classified
+    # by their pk before the first row exists (ADR-154's ordering).
+    ("USER#matthew#SOURCE#clinical", "EVENT#2026-01-01#example-event"),
+    ("USER#matthew#SOURCE#clinical", "MED#example-med"),
+    ("USER#matthew#SOURCE#clinical", "ECG#2026-01-01T08:00:00#example-device"),
+    ("USER#matthew#SOURCE#clinical", "LABS#2026-01-01"),
+    ("USER#matthew#SOURCE#clinical", "HISTORY#2026-01-01"),
+    ("USER#matthew#SOURCE#clinical", "GUIDANCE#current"),
 ]
 
 
@@ -190,6 +198,7 @@ def test_unknown_pk_raises():
         ("labs", pt.CROSS_PHASE),
         ("dexa", pt.CROSS_PHASE),
         ("genome", pt.CROSS_PHASE),
+        ("clinical", pt.CROSS_PHASE),  # ADR-155 amendment — owner clinical record, a standing medical instruction outlives a reset
         ("supplements", pt.CROSS_PHASE),  # dec A — med safety
         ("chronicling", pt.CROSS_PHASE),  # dec D — frozen "before" archive
         ("subscribers", pt.CROSS_PHASE),

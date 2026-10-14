@@ -573,6 +573,19 @@ def domain_facts_block(coach_id: str, table, today: Optional[str] = None) -> str
     conditions = _weather_section(weather)
     if conditions:
         sections.append(conditions)
+    # ADR-155 amendment (2026-10-12): the owner clinical record is every coach's
+    # constraint, like weather is every coach's texture. This block feeds ONLY the owner's
+    # own Telegram thread (and rides `a["domain"]` into its grounder's vocabulary), so it
+    # renders in owner-channel form. Fail-soft inside the renderer: "" on any trouble.
+    clinical = ""
+    try:
+        from health.clinical_facts import clinical_context_block
+
+        clinical = clinical_context_block(table, published=False)
+    except Exception as e:  # pragma: no cover — bundle edge; the renderer is itself fail-soft
+        logger.warning("[domain_facts] clinical context unavailable: %s", e)
+    if clinical:
+        sections.append(clinical)
     track_section = coach_team_texture.track_record_section(track_lines)
     if track_section:
         sections.append(track_section)
