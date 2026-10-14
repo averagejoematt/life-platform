@@ -80,15 +80,15 @@
     "added": "2026-10-12",
     "cause": "dashboard:date",
     "cause_observed": "2026-10-11T18:31Z",
-    "citation": "#4847 — the only FAIL in the 2026-10-11 18:31Z run (request 51bc0c11) is [content_truth] Score Sanity / dashboard:date: 'Stale date — expected 2026-10-10, got 2026-10-09': the sweep expects the prior PT day in the dashboard and the dashboard still held 10-09 at 11:31 PT; dashboard-refresh itself ran green. The earlier score:day_grade cause (issue 4704, closed) cleared on 2026-10-10 as its citation predicted; this is a new cause on the same count-aggregated alarm.",
-    "updated": "2026-10-12"
+    "citation": "#4847 — the only FAIL in the 2026-10-11 18:31Z run (request 51bc0c11) is [content_truth] Score Sanity / dashboard:date: 'Stale date — expected 2026-10-10, got 2026-10-09': the sweep expects the prior PT day in the dashboard and the dashboard still held 10-09 at 11:31 PT; dashboard-refresh itself ran green. The earlier score:day_grade cause (issue 4704, closed) cleared on 2026-10-10 as its citation predicted; this is a new cause on the same count-aggregated alarm. Cleared: ALARM→OK at 2026-10-12T18:32Z after PR 4858 (issue 4847, closed 2026-10-14 on the 10-13 18:31Z read, 0 failures).",
+    "updated": "2026-10-14"
   },
   "qa-smoke-warnings": {
     "added": "2026-10-04",
-    "cause": "data:orphan_routine_drafts,weeks:fact_agreement",
-    "cause_observed": "2026-10-11T18:31Z",
-    "citation": "#4732 — data:orphan_routine_drafts: 8 live-cycle drafts older than 7 days (the 7 chat-authored ones named on the issue + 1). The pre-draft's own expired drafts are archived since the 10-10 merge (PR 4739); untouched chat and cron drafts are archived after 14 days since the 10-11 merge under the owner's ruling (PR 4793) — the 02:00Z sweep on 2026-10-12 is the first run that can clear the count, then three nightly reads. The run's other warning, weeks:fact_agreement (share_kit and journal_manifest withhold current_weight_lbs), is the withheld-fact shape of issue 3615 and the share-kit box of #4593, not a defect in the week facts (22 of 22 agree).",
-    "updated": "2026-10-12"
+    "cause": "supplement_join_liveness,weeks:fact_agreement",
+    "cause_observed": "2026-10-13T18:31Z",
+    "citation": "#4907 — weeks:fact_agreement: both Story Desk surfaces (journal_manifest, share_kit) read current_weight_lbs NOT RENDERED every night since 2026-10-04 although both render 308.9 lbs — the registry's stats-line transform matches only the retired 'Weight: N lbs' shape while the Story Desk line has been 'Day a to Day b · N lbs (±x this week) · …' since the 10-02 season rebuild (filed 2026-10-14; the earlier reading of this warn as the withheld-fact shape of issue 3615 was wrong). supplement_join_liveness: a data event, not a defect — the owner's three registry supplement habits read failed (miss_source vendor) on 2026-10-10, 10-11 and 10-12, the three closed PT days the leg replays, so the bridge leg had nothing to carry (the issue 4245 box-5 absence-by-name warn); it clears on the first closed day with a ticked supplement, or the habits are unscheduled in Habitify if the supplements are paused on purpose. data:orphan_routine_drafts left the cause line on 2026-10-13 (0 live drafts under the 14-day constant from PR 4867; issue 4732 reads the 10-14 and 10-15 runs).",
+    "updated": "2026-10-14"
   },
   "site-api-invocation-spike": {
     "citation": "2026-08-24 session note — self-inflicted QA traffic",
