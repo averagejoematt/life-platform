@@ -41,7 +41,7 @@ RULES = [
     "Example rule one: keep sessions easy until the example review.",
     "Example rule two: stop and seek care if example symptom B appears.",
 ]
-PUBLIC_RULES = ["Example public rule: prescribe intensity by effort, not numbers."]
+PUBLIC_GUIDANCE = ["Example public rule: prescribe intensity by effort, not numbers."]
 
 
 def _rows(n_ecg: int = 3) -> list:
@@ -75,7 +75,7 @@ def _rows(n_ecg: int = 3) -> list:
             "effective": "2026-01-05",
             "review_after": "2026-02-01",
             "rules": list(RULES),
-            "public_rules": list(PUBLIC_RULES),
+            "public_rules": list(PUBLIC_GUIDANCE),
         },
     ]
     for i in range(n_ecg):
@@ -144,7 +144,7 @@ def test_published_surfaces_get_the_guardrails_only():
     published = cf.clinical_context_block(_Table(_rows()))
     private = cf.clinical_context_block(_Table(_rows()), published=False)
     assert published.startswith(cf.PUBLIC_HEADER) and cf.PUBLISHED_NOTICE in published
-    assert f"- {PUBLIC_RULES[0]}" in published
+    assert f"- {PUBLIC_GUIDANCE[0]}" in published
     for leaked in (cf.HEADER, "Example condition A", "Example med", "7.25", "example-device", RULES[0], RULES[1], "effective"):
         assert leaked not in published, f"a published prompt carried record detail: {leaked!r}"
     assert cf.PRIVATE_NOTICE in private and cf.PUBLISHED_NOTICE not in private
