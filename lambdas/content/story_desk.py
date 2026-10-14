@@ -143,7 +143,7 @@ COACH ASKS: when a coach asks something concrete of him this week (a rest day, a
 it in "coach_asks" with the day by which it can be checked. Every open ask in the ledger (open_coach_asks, each with an "id")
 gets an "asks_followed_up" entry: cite its "ask_id" exactly (and quote the ask in "ask") and give in "outcome" what
 the data shows happened. When there is no reply and no data yet — an ask only he can answer — the outcome is exactly
-"carried"; after three carried weeks the ask goes to him by email instead. Coaches who ask and are ignored, or who prescribe and get proved right, are
+"carried"; after {CARRIED_MAX_WEEKS_WORD} carried weeks the ask goes to him by email instead. Coaches who ask and are ignored, or who prescribe and get proved right, are
 the story's characters.
 
 PRIVACY (absolute): no cycle, reset, restart or attempt counts — the frame is THE experiment and the day. Never
@@ -151,6 +151,11 @@ name a vice or substance; journal material is off the record (its weather may in
 no job details, no named or described third parties). No real-world experts — only the fictional team.
 
 Write every field for the writers who come after you: specific, with the dossier's numbers in "evidence"."""
+# the carried-weeks limit is story_ledger's constant, not a second literal (#4914)
+RUBRIC = RUBRIC.replace(
+    "{CARRIED_MAX_WEEKS_WORD}",
+    {1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}.get(story_ledger.CARRIED_MAX_WEEKS, str(story_ledger.CARRIED_MAX_WEEKS)),
+)
 
 
 def desk_messages(dossier: Dict[str, Any], ledger: Dict[str, Any], *, week: int) -> Dict[str, Any]:

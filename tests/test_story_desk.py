@@ -575,7 +575,7 @@ def test_mutation_control_the_40_char_prefix_rule_fails_the_paraphrase_fixture(m
     led = _ledger_with_wk6_ask()
     budget = _followed({"ask_id": story_ledger.ask_key(led["asks"][0]), "ask": WK6_PARAPHRASE, "outcome": "carried"})
     assert story_ledger.unfollowed_asks(led, budget) == []  # the new rule passes it
-    monkeypatch.setattr(story_ledger, "ask_matches", old_rule)
+    monkeypatch.setattr(story_ledger, "_match_score", lambda fu, a: 1.0 if old_rule(fu, a) else 0.0)
     assert story_ledger.unfollowed_asks(led, budget) != []  # the old rule rejects it, as on 2026-10-14
 
 
@@ -627,3 +627,49 @@ def test_the_desk_prompt_names_the_rule_and_the_retry_message_is_the_week6_wire_
     assert WK6_RETRY_PREFIX.split("\n- ")[1] in bodies[1]["messages"][-1]["content"]
     assert bodies[1]["messages"][-1]["content"].startswith("The desk's checks rejected this budget:\n- ")
     assert "cite ask_id" in bodies[1]["messages"][-1]["content"]
+
+
+LABS_WK2 = "Capture a thyroid symptom baseline today: note fatigue, cold tolerance and energy so the panel has a baseline to compare"
+LABS_WK5 = "Schedule a fasting lab panel this week and note any fatigue or cold tolerance symptom today before the draw baseline"
+
+
+def _two_labs_asks():
+    led = None
+    for wk, text in ((2, LABS_WK2), (5, LABS_WK5)):
+        led = story_ledger.apply_budget(
+            led,
+            {**_budget(), "coach_asks": [{"coach_id": "labs_coach", "ask": text, "follow_up_by": "Sunday"}]},
+            week=wk,
+            date=f"d{wk}",
+            title="t",
+        )
+    return led
+
+
+def test_one_follow_up_closes_at_most_one_ask_and_leaves_the_sibling_open():
+    led = _two_labs_asks()
+    fu = {"ask_id": "", "ask": LABS_WK5, "outcome": "he booked the panel for Oct 20"}
+    assert [a["ask"] for a in story_ledger.unfollowed_asks(led, _followed(fu))] == [LABS_WK2]
+    led = story_ledger.apply_budget(led, _followed(fu), week=6, date="d6", title="t")
+    assert [a["status"] for a in led["asks"]] == ["open", "followed_up"]
+
+
+def test_an_ambiguous_follow_up_matches_nothing_and_one_entry_cannot_satisfy_two_asks():
+    led = _two_labs_asks()
+    both = {"ask_id": "", "ask": LABS_WK2 + " " + LABS_WK5, "outcome": "x"}
+    tie = story_ledger.matched_ask(both, [dict(led["asks"][0]), dict(led["asks"][0], ask=led["asks"][0]["ask"])])
+    assert tie is None
+    assert len(story_ledger.unfollowed_asks(led, _followed(both))) >= 1
+
+
+@pytest.mark.parametrize("outcome", ["carried", "Carried.", "carried \u2014 no reply yet", "Carried: no data yet"])
+def test_an_elaborated_carried_outcome_still_carries(outcome):
+    led = _ledger_with_wk6_ask()
+    led = story_ledger.apply_budget(
+        led, _followed({"ask_id": led["asks"][0]["id"], "ask": "", "outcome": outcome}), week=6, date="d", title="t"
+    )
+    assert led["asks"][0]["status"] == "open" and led["asks"][0]["carried_weeks"] == 1
+
+
+def test_the_rubric_limit_is_the_ledger_constant():
+    assert f"after {['', 'one', 'two', 'three', 'four', 'five'][story_ledger.CARRIED_MAX_WEEKS]} carried weeks" in story_desk.RUBRIC

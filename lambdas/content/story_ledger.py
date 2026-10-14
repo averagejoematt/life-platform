@@ -51,7 +51,9 @@ LEDGER_PREFIX = "LEDGER#"
 CARRIED = "carried"  # an asks_followed_up outcome: no reply, no data yet
 CARRIED_MAX_WEEKS = 3  # carried this many installments → escalated to the reply desk (#4546)
 ASK_PREFIX_CHARS = 40  # the legacy verbatim rule, kept as one of the accepted ways to name an ask
-ASK_OVERLAP = 0.4  # share of the SHORTER text's content words (4+ letters) the two must share — a paraphrase compresses
+ASK_OVERLAP = (
+    0.4  # share of the FOLLOW-UP's own content words (4+ letters) that must be the ask's; the single best match wins, a tie matches nothing
+)
 ASK_OVERLAP_MIN_WORDS = 3  # ... and never fewer than this many shared words
 
 _WORD = re.compile(r"[a-z0-9]+")
@@ -75,21 +77,42 @@ def ask_key(ask: Dict[str, Any]) -> str:
     return str(ask.get("id") or ask_id(ask.get("ask")))
 
 
-def ask_matches(followup: Dict[str, Any], ask: Dict[str, Any]) -> bool:
-    """Whether a budget's ``asks_followed_up[]`` entry is a follow-up of this ledger ask (#4914).
-
-    The ONE rule: cites its id; else quotes its opening; else paraphrases it (word overlap)."""
+def _match_score(followup: Dict[str, Any], ask: Dict[str, Any]) -> float:
+    """How strongly a follow-up names this ask: 3 = cites its id, 2 = quotes its opening, else the share of the
+    ASK's content words the follow-up carries (0 below the overlap floor)."""
     cited = str(followup.get("ask_id") or "").strip()
     if cited:
-        return cited == ask_key(ask)
+        return 3.0 if cited == ask_key(ask) else 0.0
     fu_text, ask_text = _norm(followup.get("ask")), _norm(ask.get("ask"))
     if not fu_text or not ask_text:
-        return False
+        return 0.0
     if ask_text[:ASK_PREFIX_CHARS] in fu_text:
-        return True
-    a_words, f_words = _content_words(ask.get("ask")), _content_words(followup.get("ask"))
-    shared = len(a_words & f_words)
-    return shared >= ASK_OVERLAP_MIN_WORDS and shared / min(len(a_words), len(f_words)) >= ASK_OVERLAP
+        return 2.0
+    f_words = _content_words(followup.get("ask"))
+    shared = len(_content_words(ask.get("ask")) & f_words)
+    if not f_words or shared < ASK_OVERLAP_MIN_WORDS:
+        return 0.0
+    ratio = shared / len(f_words)  # of what the follow-up SAYS, how much is this ask — a paraphrase compresses the ask, never the reverse
+    return ratio if ratio >= ASK_OVERLAP else 0.0
+
+
+def matched_ask(followup: Dict[str, Any], asks: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """The ONE ask a follow-up closes (#4914): the single best-scoring match, or None when nothing matches or the
+    best is tied (ambiguous — a follow-up never closes two asks)."""
+    scored = sorted(((_match_score(followup, a), i) for i, a in enumerate(asks) if a.get("ask")), reverse=True)
+    if not scored or scored[0][0] <= 0 or (len(scored) > 1 and scored[1][0] == scored[0][0]):
+        return None
+    return asks[scored[0][1]]
+
+
+def ask_matches(followup: Dict[str, Any], ask: Dict[str, Any]) -> bool:
+    """Pairwise form of the rule: this follow-up names this ask at all (cites, quotes or paraphrases it)."""
+    return _match_score(followup, ask) > 0
+
+
+def is_carried(outcome: Any) -> bool:
+    """``carried`` — alone or elaborated (``carried — no reply yet``) — means no reply and no data."""
+    return _norm(outcome).split()[:1] == [CARRIED]
 
 
 def is_open_ask(ask: Dict[str, Any]) -> bool:
@@ -107,8 +130,9 @@ def escalated_asks(ledger: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 def unfollowed_asks(ledger: Dict[str, Any], budget: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Open asks no entry of the budget's ``asks_followed_up`` matches."""
-    fus = budget.get("asks_followed_up") or []
-    return [a for a in open_asks(ledger) if a.get("ask") and not any(ask_matches(fu, a) for fu in fus)]
+    opens = [a for a in open_asks(ledger) if a.get("ask")]
+    claimed = {id(matched_ask(fu, opens)) for fu in budget.get("asks_followed_up") or []}
+    return [a for a in opens if id(a) not in claimed]
 
 
 def empty_ledger() -> Dict[str, Any]:
@@ -243,16 +267,16 @@ def apply_budget(prev: Dict[str, Any], budget: Dict[str, Any], *, week: int, dat
 
         led["spine"] = season_spine()
     for fu in budget.get("asks_followed_up", []):
-        for a in led.setdefault("asks", []):
-            if not (is_open_ask(a) and a.get("ask") and ask_matches(fu, a)):
-                continue
-            a.setdefault("id", ask_key(a))
-            if _norm(fu.get("outcome")) == CARRIED:
-                a["carried_weeks"] = int(a.get("carried_weeks") or 0) + 1
-                if a["carried_weeks"] >= CARRIED_MAX_WEEKS:
-                    a["status"], a["escalated_week"] = "escalated", week
-            else:
-                a["status"], a["outcome"], a["followed_week"] = "followed_up", fu.get("outcome"), week
+        a = matched_ask(fu, [x for x in led.setdefault("asks", []) if is_open_ask(x) and x.get("ask")])
+        if a is None:
+            continue
+        a.setdefault("id", ask_key(a))
+        if is_carried(fu.get("outcome")):
+            a["carried_weeks"] = int(a.get("carried_weeks") or 0) + 1
+            if a["carried_weeks"] >= CARRIED_MAX_WEEKS:
+                a["status"], a["escalated_week"] = "escalated", week
+        else:
+            a["status"], a["outcome"], a["followed_week"] = "followed_up", fu.get("outcome"), week
     for ask in budget.get("coach_asks", []):
         if ask.get("ask"):
             led.setdefault("asks", []).append({**ask, "id": ask_id(ask["ask"]), "week": week, "status": "open"})
