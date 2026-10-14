@@ -12,7 +12,7 @@ pick the story up the way a human desk would:
   * ``arcs`` — one line per character (Elena, each coach) on how they have moved;
   * ``asks`` — what a coach asked of him, ``open | followed_up | escalated`` (#4914).
 
-THE ASK RULE (#4914) — one rule, ``ask_matches``, shared by the desk's validator and ``apply_budget``:
+THE ASK RULE (#4914) — one rule, ``matched_ask`` (scored by ``_match_score``), shared by the desk's validator and ``apply_budget``:
   * every ask carries a stable ``id`` (``ask_id`` of its normalized text), assigned when ``apply_budget``
     appends it; an ask already in the ledger WITHOUT an id gets the same deterministic id on read
     (``ask_key``), so no migration is needed;
@@ -21,7 +21,7 @@ THE ASK RULE (#4914) — one rule, ``ask_matches``, shared by the desk's validat
     ``ASK_OVERLAP`` of its content words (and ``ASK_OVERLAP_MIN_WORDS`` of them) (a paraphrase is a follow-up);
   * outcome ``carried`` (``CARRIED``) means no reply and no data yet: the ask stays ``open`` with a
     ``carried_weeks`` count. After ``CARRIED_MAX_WEEKS`` carried installments it is ESCALATED — status
-    ``escalated`` with ``escalated_week``, no longer demanded of the desk, listed by ``escalated_asks`` for
+    ``escalated`` with ``escalated_week``, no longer demanded of the desk, listed by ``_escalated_asks`` (private until the reply desk, #4546, consumes it) for
     the reply desk (#4546) to put to him by email instead of asking the data something it cannot answer.
 
 Pure: the ledger is a dict in, a dict out. Persistence (`ledger_row` / `latest_visible`)
@@ -105,11 +105,6 @@ def matched_ask(followup: Dict[str, Any], asks: List[Dict[str, Any]]) -> Optiona
     return asks[scored[0][1]]
 
 
-def ask_matches(followup: Dict[str, Any], ask: Dict[str, Any]) -> bool:
-    """Pairwise form of the rule: this follow-up names this ask at all (cites, quotes or paraphrases it)."""
-    return _match_score(followup, ask) > 0
-
-
 def is_carried(outcome: Any) -> bool:
     """``carried`` — alone or elaborated (``carried — no reply yet``) — means no reply and no data."""
     return _norm(outcome).split()[:1] == [CARRIED]
@@ -123,7 +118,7 @@ def open_asks(ledger: Dict[str, Any]) -> List[Dict[str, Any]]:
     return [a for a in ledger.get("asks", []) if is_open_ask(a)]
 
 
-def escalated_asks(ledger: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _escalated_asks(ledger: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Asks carried ``CARRIED_MAX_WEEKS`` installments with no reply — for the reply desk (#4546) to put to him."""
     return [a for a in ledger.get("asks", []) if a.get("status") == "escalated"]
 
