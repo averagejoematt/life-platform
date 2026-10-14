@@ -581,3 +581,6 @@ def test_mind_overview_vice_timeline_excludes_a_blocked_vice(monkeypatch):
     assert body["vice_timeline"], "fixture produced no vice_timeline day — test is not exercising the code under test"
     for day in body["vice_timeline"]:
         assert blocked not in day.get("streaks", {}), f"blocked vice name leaked into /api/mind_overview vice_timeline: {day}"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

@@ -95,3 +95,6 @@ def test_fix_present_in_generator_and_artifact():
     art = GENERATED.read_text(encoding="utf-8")
     for label, src in (("generator", gen), ("artifact", art)):
         assert "norm !== uri" in src, f"the #1209 bare-path fallback is missing from the {label}"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

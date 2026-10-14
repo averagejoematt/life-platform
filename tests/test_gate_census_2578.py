@@ -1100,7 +1100,10 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # workflows/lambdas/qa/cdk for tests/ shim imports, now judging tracked files only — arrives PROVEN via
         # STRUCTURAL_HAND_PROOFS in scripts/gate_census_proofs.py (the tracked-file enumeration swapped for a filesystem walk: baseline 6 passed |
         # mutated 1 failed, 5 passed | restored 6 passed; re-watched 2026-10-12). CI's pre-merge lane measured n=260 on ec39d82f2.
-        <= 260
+        # Upper bound 260 -> 261 (2026-10-12, #4880): structural::test_function_length_guard_4880.py — the function-length
+        # ratchet — arrives PROVEN via STRUCTURAL_HAND_PROOFS (151-line plant: 1 failed / 10 passed; recorded function +1 code
+        # line: 1 failed / 10 passed; comment-only control and revert: 11 passed). Measured locally: 785 {261, 512, 7, 5}.
+        <= 261
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
@@ -1233,3 +1236,6 @@ def test_registry_prefilter_does_not_drop_a_planted_registry(tmp_path):
     gates, counters = gc.discover_registry_gates(tmp_path, [planted, skipped])
     assert sorted(g.name for g in gates) == ["LANE_GUARDS[alpha]", "LANE_GUARDS[beta]"]
     assert counters["registries"] == 1
+
+
+# premerge-gate: 2578: the gate census. Its verdict is a sweep of the whole repo tree (CI workflows, guard entrypoints, registries, qa-smoke checks) and its floors are blindness detectors — a derivation that returns [] must red BEFORE the merge, not after, which is the entire point of this list.

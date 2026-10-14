@@ -170,3 +170,6 @@ def test_no_manifest_api_dep_known_stale():
     stale literal reds here before it ever reaches a live smoke run."""
     known_stale = {"/api/agents", "/api/coach_track_records"}
     assert not (set(qa_manifest.api_dep_endpoints()) & known_stale)
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

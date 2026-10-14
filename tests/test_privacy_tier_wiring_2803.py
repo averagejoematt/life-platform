@@ -320,3 +320,6 @@ def test_the_gate_does_not_fire_on_a_comment_or_docstring():
     snippet = '"""Docs: vascular_age is Tier-2 owner-only."""\n# metabolic_age too\ndef h():\n    return 1\n'
     found = wiring.scan_source("lambdas/web/site_api_prose.py", snippet, vocabulary)
     assert not found, f"the scanner treated prose as a consumer: {sorted(found)}"
+
+
+# premerge-gate: #2803: the Tier-2 consumer registry — a new module touching an owner-only field must red BEFORE merge, not after

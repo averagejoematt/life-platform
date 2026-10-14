@@ -235,3 +235,6 @@ def test_mutation_a_baked_count_is_caught():
     assert STATIC_COUNT_RE.search("Webb reads 0 of 9 checked calls right")
     assert STATIC_COUNT_RE.search("7 of seventeen checked calls")
     assert not STATIC_COUNT_RE.search("each checked call is graded")
+
+
+# premerge-gate: #4585: glob/rglob sweep — every site/ module + inline script that shows a coach count renders its comparison

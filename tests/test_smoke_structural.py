@@ -235,3 +235,6 @@ def test_stale_edge_recovers_and_real_regression_stays_red(tmp_path):
     rc_marker, _, sleeps = _run_checks(tmp_path, stale, _MARKER_404, edge_body=stale, budget=30)
     assert rc_marker == 1, "a genuinely broken page must still FAIL after bounded retries"
     assert sleeps == 2, "retries must stop when the shared budget is spent"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

@@ -339,3 +339,6 @@ def test_the_widened_scan_actually_covers_each_root():
             assert hits, f"a synthetic offender in {root.name}/ was NOT caught — the widened scan is vacuous there"
         finally:
             mutant.unlink(missing_ok=True)
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

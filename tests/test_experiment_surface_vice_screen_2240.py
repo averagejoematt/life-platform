@@ -490,3 +490,6 @@ def test_discoveries_active_hypotheses_exclude_a_screened_entry(monkeypatch):
     names = {h["name"] for h in body["active_hypotheses"]}
     assert names == {"Morning sunlight"}, names
     assert blocked not in json.dumps(body)
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

@@ -451,3 +451,6 @@ def test_the_gate_is_wired_into_the_nightly_sweep():
 
     labels = [label for label, _fn in qa_smoke_lambda.check_steps()]
     assert "week_narration_agreement" in labels
+
+
+# premerge-gate: 3615 boxes 2+3: a glob sweep of lambdas/{web,emails,compute,content,coach} for modules that restate a week fact, each of which must be a registered surface or carry a reason. Same shape, same reason: a NEW narrating surface must be classified in the PR that adds it, not discovered by a human reading two pages side by side (which is how all five 2026-09-05 contradictions were found).

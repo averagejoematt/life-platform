@@ -320,3 +320,6 @@ def test_breathwork_weekly_trend_for_a_week_that_straddles_new_year_is_one_bucke
         ("2026-W53", 2, 15.0),  # 10 + 5
         ("2027-W01", 1, 7.0),
     ], f"the straddling week split into {trend}"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

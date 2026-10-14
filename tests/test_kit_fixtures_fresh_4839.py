@@ -7,7 +7,9 @@ described the edition a month before the site served it, and 45 JS tests pinned 
 Two holds: (1) the manifest's ``captured_at`` is no older than ``MAX_AGE_DAYS`` against the real clock
 (this is the gate: it reds on purpose when the captures go stale, and the fix is to re-run the script);
 (2) the "Last recaptured" line in the script's docstring names the same day as the manifest, so the
-line a reader trusts cannot drift from the file. The age RULE is proven on a frozen clock below, with
+line a reader trusts cannot drift from the file; (3) #4864: the edition wire (tests/fixtures/edition_wire_4582/) is
+captured in the same pass, so its manifest names the SAME instant as the kit manifest, and no file in either
+directory is older than the manifest says. The age RULE is proven on a frozen clock below, with
 no literal expectation passed through the live clock (#4848).
 """
 
@@ -25,6 +27,7 @@ sys.path.insert(0, os.path.join(ROOT, "scripts"))
 import capture_kit_page_fixtures as cap  # noqa: E402
 
 MANIFEST = os.path.join(cap.FIXTURES_DIR, cap.MANIFEST)
+WIRE_MANIFEST = os.path.join(cap.WIRE_DIR, cap.MANIFEST)
 
 
 def _captured_at() -> str:
@@ -54,3 +57,17 @@ def test_the_docstring_date_is_the_manifests_date():
     said = re.search(r"Last recaptured: (\d{4}-\d{2}-\d{2})", cap.__doc__ or "")
     assert said, "scripts/capture_kit_page_fixtures.py has no 'Last recaptured: YYYY-MM-DD' line in its docstring"
     assert said.group(1) == _captured_at()[:10], f"docstring says {said.group(1)}, the manifest says {_captured_at()[:10]}"
+
+
+def test_the_edition_wire_is_the_same_capture_as_the_kit_pages():
+    """#4864: one capture date across both directories. The wire's own manifest names the kit manifest's instant,
+    and one file per SOURCES key sits beside it (a source added without a recapture is a missing file)."""
+    with open(WIRE_MANIFEST, encoding="utf-8") as fh:
+        wire = json.load(fh)
+    assert wire["captured_at"] == _captured_at(), "the wire and the kit pages were captured in different passes"
+    sys.path.insert(0, os.path.join(ROOT, "lambdas"))
+    from web import site_api_edition as ed
+
+    assert set(wire["files"]) == set(ed.SOURCES), "the wire manifest names every edition source and nothing else"
+    missing = [k for k in ed.SOURCES if not os.path.exists(os.path.join(cap.WIRE_DIR, f"{k}.json"))]
+    assert not missing, f"wire files missing: {missing}"

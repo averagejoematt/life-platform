@@ -405,3 +405,5 @@ class TestCoverageEnumeration:
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
+
+# premerge-gate: 3294: the channels_quiet reader enumeration — a NEW consumer of the raw presence list must wire through sourced_quiet or write its disposition BEFORE the merge; the board published two false absences from exactly such a reader.

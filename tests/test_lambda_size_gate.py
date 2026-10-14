@@ -75,3 +75,6 @@ def test_grandfathered_is_covered_by_the_module_size_baseline():
         "GRANDFATHERED file(s) missing from test_module_size_guard.BASELINE — the ADR-080 "
         "exemption has no transitively-capping baseline for: " + ", ".join(uncovered)
     )
+
+
+# premerge-gate: ADR-080: *_lambda.py over 2,000 lines

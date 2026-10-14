@@ -477,3 +477,6 @@ def test_the_ceiling_resolver_reuses_the_synth_time_parser_rather_than_a_second_
 def test_the_cycle_day_resolver_tracks_the_genesis_constant():
     res = ras._resolve_cycle_day({"today": date.fromisoformat("2026-09-06")})
     assert res.observed and res.value == 1
+
+
+# premerge-gate: 3607: the sealed review anchors. Its verdict depends only on the tree — docs/reviews/anchors/ANCHORS.json, its sha sibling, and the spine that loads them — and the two failures it catches are both introduced by the diff that would land them: an anchor edited without a re-seal (the sibling stops verifying) and a clause weakened with no owner-signed line. Both are reviewable in the PR and pointless

@@ -256,3 +256,6 @@ def test_the_derived_cutoff_stays_before_the_scheduled_sweep(cdk_map):
             f"derived cutoff ({cutoff_minutes}m UTC) is not before the scheduled sweep ({cron}) — "
             "either the producer moved later or the sweep moved earlier; re-derive _COMPUTE_SLACK_MINUTES"
         )
+
+
+# premerge-gate: 2818: the producer-cron mirror pair (cdk/stacks/compute_stack.py ↔ lambdas/operational/qa_check_outputs.py). Its verdict is pure repo shape — a producer cron moving without its QA-window mirror must red BEFORE the merge, not after the window has silently drifted a second time (#2670's own fix seeded exactly that). Sweeps via check_doc_facts' helpers, which are spec-loaded from scripts/ — invisible

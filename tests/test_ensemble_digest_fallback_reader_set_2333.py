@@ -264,3 +264,5 @@ def test_observatory_propagator_surfaces_the_fallback_mark(monkeypatch):
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

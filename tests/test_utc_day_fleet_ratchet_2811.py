@@ -1038,3 +1038,6 @@ def test_the_anchor_face_leaves_instants_and_named_frames_alone():
         '# utc-exempt(#2817): a vendor UTC-epoch window bound\nx = datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=timezone.utc)\n',
     ):
         assert _day_string_anchored_in_utc(src) == [], f"false positive: {src!r}"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

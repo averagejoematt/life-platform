@@ -349,3 +349,6 @@ def test_site_js_builds_no_iframes_yet():
         "DEPLOYED (cdk deploy LifePlatformWeb) — otherwise the frame is blocked and the "
         "reader sees a blank box. Offenders:\n  " + "\n  ".join(offenders)
     )
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

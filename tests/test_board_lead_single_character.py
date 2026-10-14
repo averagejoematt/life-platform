@@ -280,3 +280,6 @@ def test_the_predicate_rejects_the_original_defect():
     roster = _roster_names()
     assert "Kai Nakamura" not in roster, "the retired integrator byline is back on the roster"
     assert "Integrative Health Director" not in {p.get("board_role") for p in _personas().values()}
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

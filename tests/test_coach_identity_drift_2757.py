@@ -356,3 +356,6 @@ def test_the_three_surfaces_agree_with_each_other_not_just_with_the_registry(mon
             f"{coach_id}: title disagrees across surfaces — "
             f"coach_analysis={analysis_body['coach_title']!r} observatory={obs['title']!r} dashboard={dash['title']!r}"
         )
+
+
+# premerge-gate: #2757: AST sweep — no lambda module may hand-type a persona title/color map

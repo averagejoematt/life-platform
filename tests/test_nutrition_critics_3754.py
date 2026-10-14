@@ -687,3 +687,6 @@ def test_the_resolver_block_never_raises_when_every_reader_raises(monkeypatch):
     assert [v["verdict"] for v in out["verdicts"]] == ["approve", "approve", "approve"]
     assert set(out["inputs_unresolved"]) >= {"macrofactor", "hevy", "withings", "walking_volume", "decisions"}
     assert all(d["state"] == "unevaluable" for d in out["decisions_offered"])
+
+
+# premerge-gate: 3754 boxes 3+4: os.walk sweep of lambdas/ for any importer of health.nutrition_critics outside the MCP layer — the block is OWNER-ONLY (a refeed decision with a `log_decision` payload must never reach site-api, a narrative or an email). A new importer is a repo-shape change that must red on the PR that adds it.

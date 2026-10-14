@@ -903,3 +903,5 @@ def test_the_offtopic_classifier_holds_on_no_span_and_propagates_a_decode_error(
 
 
 _REPO_ROOT_4276 = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# premerge-gate: #4276: rglob sweep — model text (subscript, text transport, fence helper, span grab) is json.loads-ed only in ai/structured_json.py (down-only ledger)

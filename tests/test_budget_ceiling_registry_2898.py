@@ -399,3 +399,6 @@ def test_site_sweep_ignores_the_dated_adr063_original(tmp_path):
     planted.write_text('const t = "ADR-063 set the original $75";\n', encoding="utf-8")
     assert not _site_offenders([planted], FORBIDDEN)
     assert 75 not in FORBIDDEN, "if the ADR-063 original ever re-enters the family, revisit this exemption"
+
+
+# premerge-gate: 2898: sweeps `git ls-files` over lambdas/ cdk/ mcp/ scripts/ deploy/ tests/ and site/ for a hand-typed copy of the budget ceiling. Its covered population is the whole tracked tree and its forbidden VALUES are derived from the cost governor, so both halves change size without anyone editing the file — a repo-shape ratchet by construction, and it must red BEFORE the merge that adds the copy.

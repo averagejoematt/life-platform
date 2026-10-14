@@ -93,3 +93,6 @@ def test_exercise_template_id_only_in_allowed_files():
         f"Move Hevy schema knowledge into hevy_compiler.py. "
         f"Offenders:\n  - " + "\n  - ".join(offenders)
     )
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

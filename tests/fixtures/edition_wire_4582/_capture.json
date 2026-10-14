@@ -1,0 +1,29 @@
+{
+ "captured_at": "2026-10-13T01:38:57Z",
+ "base": "https://averagejoematt.com",
+ "by": "scripts/capture_kit_page_fixtures.py (#4864) \u2014 the same pass as kit_pages_4586; read-only GETs; re-run it, never hand-edit a file",
+ "files": {
+  "cadence": "/api/content_cadence",
+  "calibration": "/api/calibration",
+  "calls": "/api/calls",
+  "character": "/api/character",
+  "dashboard": "/api/coaching-dashboard",
+  "decisions": "/api/decisions",
+  "docket": "/api/coach_docket",
+  "experiments": "/api/experiments",
+  "habits": "/api/habit_streaks",
+  "journal": "/journal/posts.json",
+  "journey": "/api/journey",
+  "moves": "/api/coach_moves?date=<each of the seven days ending 2026-10-12>",
+  "nutrition": "/api/nutrition_overview",
+  "owner_words": "/api/owner_words",
+  "panelcast": "/panelcast/episodes.json",
+  "predictions": "/api/predictions?limit=1",
+  "priority": "/api/weekly_priority",
+  "pulse": "/api/pulse_history",
+  "session": "/api/session",
+  "sleep": "/api/sleep_detail",
+  "supplements": "/api/supplements",
+  "training": "/api/training_overview"
+ }
+}

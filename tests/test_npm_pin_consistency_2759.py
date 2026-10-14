@@ -191,3 +191,6 @@ def test_claude_code_pin_has_a_dependabot_npm_leg():
     assert (
         legs
     ), ".github/dependabot.yml lost the npm /remediation ecosystem entry — the claude-code CLI pin is one-legged again (#2759/#2468)"
+
+
+# premerge-gate: 2759: the npm leg of the same class — derives its workflow surface from `git ls-files` exactly like the pip guard above, so a new workflow with a bare `npm install -g` must red BEFORE the merge, not after.

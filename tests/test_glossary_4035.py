@@ -282,3 +282,6 @@ def test_runtime_half_is_the_registry_and_never_touches_served_coach_text():
         assert "data-verbatim" in (SITE / "assets" / "js" / name).read_text(
             encoding="utf-8"
         ), f"{name} renders served coach text without the data-verbatim fence"
+
+
+# premerge-gate: 4035: rglob sweep of site/**/*.html (+ site/assets/js/) — the two-sided glossary gate. Its covered population (which pages carry a registered term, which acronyms appear un-glossed) changes with every page a PR adds or edits, and site/** merges auto-deploy (#750) — a reader sees the drift before any post-merge lane would.

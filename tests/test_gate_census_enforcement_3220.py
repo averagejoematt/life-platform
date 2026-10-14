@@ -373,3 +373,6 @@ def test_real_repo_still_counts_a_well_known_exiting_guard_script():
     root = pathlib.Path(_REPO)
     text = (root / "scripts" / "check_main_green.py").read_text(encoding="utf-8")
     assert gce.classify_candidate("scripts/check_main_green.py", text)["enforces"] is True
+
+
+# premerge-gate: 3220: what the census is allowed to COUNT. Third sibling of the two above, and pre-merge for the same reason plus one of its own: it decides whether a name-matched file has structural evidence it can enforce anything, so a regression here silently moves the ratchet's denominator. Verdict is pure repo shape (synthetic trees + one property assertion against the real tree), measured at 0.16s.

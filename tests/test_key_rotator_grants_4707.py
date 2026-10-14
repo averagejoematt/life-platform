@@ -204,3 +204,6 @@ def test_an_unknown_method_is_refused_not_silently_mapped():
         missing_grants(
             _LAMBDA + "\n    sm.not_an_operation()\n", _policy("GetSecretValue"), "operational_key_rotator", "life-platform/mcp-api-key"
         )
+
+
+# premerge-gate: #4707: rglob sweep — every Secrets Manager rotation Lambda is registered, and each sm.<method> call it makes is granted

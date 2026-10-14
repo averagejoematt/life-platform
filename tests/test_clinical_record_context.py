@@ -2,7 +2,7 @@
 
 Covers the three parts of the machinery:
   * `health.clinical_facts` — the renderer: fail-soft, Decimal-safe, capped, guidance verbatim,
-    and the non-disclosure notice on published surfaces;
+    and guardrails-only rendering on published surfaces;
   * `scripts/load_clinical_record.py` — the JSON-to-sort-key mapping and Decimal conversion;
   * the three wiring points (daily-brief coach inputs, Telegram domain facts, the expert
     analyzer's shared system prompt), plus the grounding allow-list the coach input feeds.
@@ -464,3 +464,6 @@ def test_the_analyzer_helper_is_fail_soft(monkeypatch):
     assert ag.clinical_parts(object()) == []
     monkeypatch.setattr(cf, "clinical_context_block", lambda table, **kw: "CLINICAL CONTEXT")
     assert ag.clinical_parts(object()) == ["CLINICAL CONTEXT"]
+
+
+# premerge-gate: ADR-155 amendment: the owner clinical record. Reads the committed deploy/generated/pk_family_census.json (the #3669 disposition follow-up) and pins the registrations the TIER_INTERNAL partition needs (tier, taxonomy class, MCP queryable, raw prefix) plus the guardrails-only rule on published coach prompts.

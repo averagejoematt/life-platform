@@ -37,8 +37,11 @@
     "note": "New alarm (2026-08-23, DIL-036 slice of #2824): fires when budget_guard logs BUDGET_TIER_UNREADABLE on the public site-api-ai path — the SSM budget-tier read failed (ParameterNotFound / AccessDenied / outage), website_ai is failing CLOSED (readers get the honest 'paused' output), and the rest of the fleet is running fail-open with NO ceiling enforcement. Never a routine state: if lit, restore the SSM param/grant (/life-platform/budget-tier) — the guard recovers within one 5-min cache TTL. Prune this entry only if the alarm is retired; while #2824 is open it is the named owner."
   },
   "coherence-overall": {
-    "citation": "2026-08-24 session note — single episode, cleared",
-    "note": "One OK->ALARM->OK cycle in the D2 window while 26 PRs merged and the fleet redeployed — coherence dips during heavy merge/deploy churn are the known shape. Cleared without intervention. If it re-fires on a quiet day, file fresh."
+    "added": "2026-10-13",
+    "cause": "facts_agreement:expert_sleep_stale,facts_agreement:coach_physical_coach_stale",
+    "cause_observed": "2026-10-13T01:30Z",
+    "citation": "#4866 — fired 2026-10-12 18:46Z: facts_agreement reads expert:sleep served from 10-05 and coach:physical_coach from 10-08 because the 10-12 14:00Z ai-expert-analyzer run was HELD by the grounding gate (request 90f7c52f — the gate took the 10-11 Whoop HRV outlier, 136.92 ms, as the authoritative HRV; issue 4703's prior integrator record had already expired by TTL). The gate fix is PR 4870 (merged 2026-10-13 03:09Z, deployed by CI); the stale facts refresh on the next run that PASSES the gate — Monday 2026-10-19 14:00Z, or the owner's one-line invoke on issue 4703 — and the alarm clears with them. Re-cite if still red after 2026-10-19 15:00Z.",
+    "note": "Prior entry (2026-08-24): one OK->ALARM->OK cycle during a 26-PR merge/deploy churn, cleared without intervention — a different, transient shape."
   },
   "compute-pipeline-stale": {
     "added": "2026-10-10",
@@ -77,15 +80,15 @@
     "added": "2026-10-12",
     "cause": "dashboard:date",
     "cause_observed": "2026-10-11T18:31Z",
-    "citation": "#4847 — the only FAIL in the 2026-10-11 18:31Z run (request 51bc0c11) is [content_truth] Score Sanity / dashboard:date: 'Stale date — expected 2026-10-10, got 2026-10-09': the sweep expects the prior PT day in the dashboard and the dashboard still held 10-09 at 11:31 PT; dashboard-refresh itself ran green. The earlier score:day_grade cause (issue 4704, closed) cleared on 2026-10-10 as its citation predicted; this is a new cause on the same count-aggregated alarm.",
-    "updated": "2026-10-12"
+    "citation": "#4847 — the only FAIL in the 2026-10-11 18:31Z run (request 51bc0c11) is [content_truth] Score Sanity / dashboard:date: 'Stale date — expected 2026-10-10, got 2026-10-09': the sweep expects the prior PT day in the dashboard and the dashboard still held 10-09 at 11:31 PT; dashboard-refresh itself ran green. The earlier score:day_grade cause (issue 4704, closed) cleared on 2026-10-10 as its citation predicted; this is a new cause on the same count-aggregated alarm. Cleared: ALARM→OK at 2026-10-12T18:32Z after PR 4858 (issue 4847, closed 2026-10-14 on the 10-13 18:31Z read, 0 failures).",
+    "updated": "2026-10-14"
   },
   "qa-smoke-warnings": {
     "added": "2026-10-04",
-    "cause": "data:orphan_routine_drafts,weeks:fact_agreement",
-    "cause_observed": "2026-10-11T18:31Z",
-    "citation": "#4732 — data:orphan_routine_drafts: 8 live-cycle drafts older than 7 days (the 7 chat-authored ones named on the issue + 1). The pre-draft's own expired drafts are archived since the 10-10 merge (PR 4739); untouched chat and cron drafts are archived after 14 days since the 10-11 merge under the owner's ruling (PR 4793) — the 02:00Z sweep on 2026-10-12 is the first run that can clear the count, then three nightly reads. The run's other warning, weeks:fact_agreement (share_kit and journal_manifest withhold current_weight_lbs), is the withheld-fact shape of issue 3615 and the share-kit box of #4593, not a defect in the week facts (22 of 22 agree).",
-    "updated": "2026-10-12"
+    "cause": "supplement_join_liveness,weeks:fact_agreement",
+    "cause_observed": "2026-10-13T18:31Z",
+    "citation": "#4907 — weeks:fact_agreement: both Story Desk surfaces (journal_manifest, share_kit) read current_weight_lbs NOT RENDERED every night since 2026-10-04 although both render 308.9 lbs — the registry's stats-line transform matches only the retired 'Weight: N lbs' shape while the Story Desk line has been 'Day a to Day b · N lbs (±x this week) · …' since the 10-02 season rebuild (filed 2026-10-14; the earlier reading of this warn as the withheld-fact shape of issue 3615 was wrong). supplement_join_liveness: a data event, not a defect — the owner's three registry supplement habits read failed (miss_source vendor) on 2026-10-10, 10-11 and 10-12, the three closed PT days the leg replays, so the bridge leg had nothing to carry (the issue 4245 box-5 absence-by-name warn); it clears on the first closed day with a ticked supplement, or the habits are unscheduled in Habitify if the supplements are paused on purpose. data:orphan_routine_drafts left the cause line on 2026-10-13 (0 live drafts under the 14-day constant from PR 4867; issue 4732 reads the 10-14 and 10-15 runs).",
+    "updated": "2026-10-14"
   },
   "site-api-invocation-spike": {
     "citation": "2026-08-24 session note — self-inflicted QA traffic",
@@ -174,5 +177,11 @@
     "cause": "daily-metrics-compute async failures (outage now fixed)",
     "cause_observed": "2026-10-10T04:45Z",
     "citation": "#4731 — flapped x6 in the window (entered ~00:06Z and ~16:46Z daily since 2026-10-07): each crashed daily-metrics-compute run (the issue 4704 outage, fixed 2026-10-10 ~04:30Z) landed one message on life-platform-ingestion-dlq, and the dlq-consumer re-invoked the crashing function every 6 h without escalating. Cleared ~09:05Z 2026-10-10 once the consumer retried on fixed code. The never-escalates defect is #4731 (PR 4741 held for the owner)."
+  },
+  "coach-vision-no-invocations-7d": {
+    "added": "2026-10-13",
+    "cause": "new_function_no_history",
+    "cause_observed": "2026-10-13T01:30Z",
+    "citation": "#3759 — one OK->ALARM->OK cycle: the alarm lit when the owner's 2026-10-12 03:04Z LifePlatformCompute apply created coach-vision (a 7-day no-invocation alarm reads a brand-new function as silent by construction) and cleared when its first scheduled run executed at 2026-10-12 17:00Z (honest-empty — no Sunday photo set yet). It re-lights by design only if a Monday 17:00Z run is missed; a lit state with the photo set absent is the expected shape until the owner sends one."
   }
 }

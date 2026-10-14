@@ -190,3 +190,6 @@ def test_the_note_asserts_no_unmeasured_figure_for_the_slice_itself():
 @pytest.mark.parametrize("marker", ["<!-- BEGIN GENERATED: cost", "<!-- END GENERATED: cost -->"])
 def test_the_generated_block_is_marked_as_generated(marker):
     assert marker in open(README, encoding="utf-8").read()
+
+
+# premerge-gate: 2541: the starter template's forbidden-literal sweep. `oss/starter-slice/` is built to be COPIED OUT and published, so a leaked owner name, account id or bucket must red before the merge, not after — post-merge is already too late for an artifact whose next step is someone else's `git push`.

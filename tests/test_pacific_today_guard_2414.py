@@ -718,3 +718,6 @@ def test_exempt_marker_suppresses_with_reason_line():
     assert naive_utc_today_sites(src) == []
     # ...and the same site WITHOUT the marker fires (the marker is load-bearing).
     assert len(naive_utc_today_sites(src.splitlines()[1] + "\n")) == 1
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

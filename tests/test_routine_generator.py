@@ -262,3 +262,6 @@ def test_no_draft_caller_hands_the_generator_a_literal_z2_minutes():
                     offenders.append(f"{path.relative_to(root)}:{node.lineno} z2_minutes_7d={ast.unparse(val) if val else '(omitted)'}")
     assert seen >= 2, f"the sweep found {seen} GeneratorInputs call sites — the guard is not reading the tree"
     assert offenders == [], "draft callers must pass the READ aerobic minutes (#4410):\n" + "\n".join(offenders)
+
+
+# premerge-gate: #4410: rglob sweep — no GeneratorInputs caller may pass a literal (or no) z2_minutes_7d

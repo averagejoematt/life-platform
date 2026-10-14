@@ -219,3 +219,6 @@ def test_sender_domain_parses_both_ses_forms():
     assert sender_domain("Odd <Name> <a@B.CoM>") == "b.com"
     assert sender_domain("no-at-sign") == ""
     assert not is_verified_sender("no-at-sign")
+
+
+# premerge-gate: 3568: the sending-vocabulary census. Verdict is pure repo shape — a new sender default or CDK EMAIL_SENDER on a domain SES has not verified must red BEFORE the merge. Post-merge is too late by construction: the next deploy puts a MessageRejected (or, for reader mail, a personal-domain From) in front of subscribers.

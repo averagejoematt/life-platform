@@ -639,23 +639,7 @@ jobs:
           fetch-depth: 0  # Full history: HEAD~1 diff + the wiki drift gate's per-file git log (#973 — shallow clones false-drift every engine doc)
 
       - name: Validate lambda_map.json
-        run: |
-          echo "Validating ci/lambda_map.json..."
-          MISSING=0
-
-          echo "Checking Lambda source files..."
-          while IFS= read -r src; do
-            if [ ! -f "$src" ]; then
-              echo "  ❌ MISSING source: $src (in .lambdas — file not found in repo)"
-              MISSING=$((MISSING + 1))
-            fi
-          done < <(jq -r '.lambdas | keys[]' ci/lambda_map.json)
-
-          if [ "$MISSING" -gt 0 ]; then
-            echo "::error::lambda_map.json references $MISSING missing file(s). Update ci/lambda_map.json to match current repo state."
-            exit 1
-          fi
-          echo "✅ lambda_map.json valid — all source files present"
+        run: bash deploy/validate_lambda_map.sh
 
       - name: Configure AWS credentials (OIDC) — plan
         uses: ./.github/actions/setup-ci

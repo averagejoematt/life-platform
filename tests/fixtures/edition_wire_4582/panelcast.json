@@ -32,7 +32,7 @@
   },
   {
    "week": 2,
-   "title": "EP2 \u00b7 Nine Days and Counting",
+   "title": "EP2 \u00b7 Nine Days and No Rest",
    "date": "2026-09-17",
    "url": "/panelcast/wk2.mp3",
    "bytes": 4370160,
@@ -75,5 +75,12 @@
    "image_url": "",
    "image_credit": ""
   }
- ]
+ ],
+ "pending": {
+  "week": 5,
+  "reason": "held_for_review",
+  "display": "This week's episode is in final review \u2014 it'll drop here as soon as it clears the quality bar.",
+  "expected_date": null,
+  "noted_at": "2026-10-09T18:00:49.178320+00:00"
+ }
 }

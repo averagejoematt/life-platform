@@ -763,3 +763,6 @@ def test_anchor_is_not_refloated():
     overdue ritual, this pins the honest value; changing it must be a deliberate,
     reviewed act that also updates this test's reasoning."""
     assert oc.ADOPTED == date(2026, 8, 22)
+
+
+# premerge-gate: #2832: calendar registry + set guard sweeps the skill registry + docs/reviews — repo-shape, pre-merge

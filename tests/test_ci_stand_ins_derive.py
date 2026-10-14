@@ -334,3 +334,6 @@ def test_the_pr_template_names_the_premerge_lane_not_targeted_pytest():
 
 def test_this_file_is_not_itself_a_pusher():
     assert os.path.relpath(__file__, REPO) not in discover_pushers(REPO)
+
+
+# premerge-gate: 3528: AST/positional sweep of scripts/ + deploy/ for every `git push` caller — a NEW pusher that skips `ci_gate_commands` is a repo-shape change that must red on the PR that adds it, not sit invisible until the next direct push lands untested.

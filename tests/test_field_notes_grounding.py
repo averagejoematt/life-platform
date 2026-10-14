@@ -203,3 +203,6 @@ def test_surface_is_registered_with_the_standard_classes():
     assert key in SURFACES
     assert SURFACES[key]["required"] == frozenset({"numbers", "dates", "freshness"})
     assert set(SURFACES[key]["exempt"]) == {"behavioral", "night"}
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

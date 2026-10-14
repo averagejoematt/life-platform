@@ -591,3 +591,6 @@ def test_the_people_row_is_cross_phase_and_survives_a_reset():
 
     assert phase_taxonomy.classify(PK, ccs.PEOPLE_SK) == phase_taxonomy.CROSS_PHASE
     assert phase_taxonomy.classify(PK, ccs.BITS_SK) == phase_taxonomy.CROSS_PHASE
+
+
+# premerge-gate: #2488: the his-people sk must stay unreachable from the whole coach perimeter

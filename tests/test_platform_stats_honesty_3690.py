@@ -28,7 +28,7 @@ WHY THIS FILE AND NOT AN EXTENSION OF sync_doc_metadata
   the letter is still true. That is the ratchet primitive applied to a judgement.
 
 WHAT EACH FIELD IS CHECKED AGAINST
-  review_grade   → the modal lens grade in the newest docs/reviews/*_grades_*.json
+  review_grade   → the modal lens grade in the newest docs/reviews/fullreview_grades_<date>.json
   site_pages     → len(qa/qa_manifest.MANIFEST), the single page registry
   active_secrets → model/platform_model.json cost_surface.secrets
 
@@ -44,6 +44,7 @@ from __future__ import annotations
 import glob
 import json
 import os
+import re
 import sys
 from collections import Counter
 
@@ -61,10 +62,19 @@ def _stats() -> dict:
     return PLATFORM_STATS
 
 
-def _newest_grades() -> tuple[str, dict]:
-    """(date, lenses) of the newest graded review carrying a `lenses` mapping."""
+# The FULL-review ritual's artifact (docs/OPERATING_CALENDAR.md, scripts/operating_calendar.py): one
+# 17-lens table per run. A craft / accuracy / sdlc review has a different shape and never defines the
+# served platform grade; delta and partial runs cover a subset of lenses.
+_FULLREVIEW_RE = re.compile(r"^fullreview_grades_(\d{4}-\d{2}-\d{2})\.json$")
+
+
+def _newest_grades(reviews_dir: str | None = None) -> tuple[str, dict]:
+    """(date, lenses) of the newest FULL review carrying a `lenses` mapping."""
+    reviews_dir = reviews_dir or os.path.join(_REPO, "docs", "reviews")
     cands = []
-    for f in glob.glob(os.path.join(_REPO, "docs", "reviews", "*grades*.json")):
+    for f in glob.glob(os.path.join(reviews_dir, "*.json")):
+        if not _FULLREVIEW_RE.match(os.path.basename(f)):
+            continue
         try:
             with open(f, encoding="utf-8") as fh:
                 d = json.load(fh)
@@ -73,9 +83,19 @@ def _newest_grades() -> tuple[str, dict]:
         if isinstance(d.get("lenses"), dict) and d.get("date"):
             cands.append((d["date"], d))
     if not cands:
-        pytest.skip("no graded review with a lenses mapping in docs/reviews/")
+        pytest.skip("no full review with a lenses mapping in docs/reviews/")
     date, doc = sorted(cands, key=lambda t: t[0])[-1]
     return date, doc["lenses"]
+
+
+def test_a_newer_non_full_review_never_becomes_the_newest_review(tmp_path):
+    """Control: a craft review dated later than the full review must NOT be selected."""
+    full = {"date": "2026-09-05", "lenses": {"a": {"grade": "B"}}}
+    craft = {"date": "2026-10-13", "lenses": {"D1": {"grade": "A"}}}
+    (tmp_path / "fullreview_grades_2026-09-05.json").write_text(json.dumps(full))
+    (tmp_path / "craft_grades_2026-10-13.json").write_text(json.dumps(craft))
+    (tmp_path / "fullreview_grades_2026-10-14_delta.json").write_text(json.dumps(craft))
+    assert _newest_grades(str(tmp_path))[0] == "2026-09-05"
 
 
 def _grade_counts(lenses: dict) -> Counter:
@@ -164,3 +184,6 @@ def test_the_unchecked_fields_are_named_rather_than_forgotten():
     s = _stats()
     for field in ("review_count", "board_technical", "board_product"):
         assert field in s, f"{field} vanished from PLATFORM_STATS; update this file's stated gap"
+
+
+# premerge-gate: 3690: sweeps docs/reviews/*_grades_*.json to re-derive the three hand-maintained public stats (review_grade / site_pages / active_secrets) that /method/platform/ serves. Belongs pre-merge: it is a repo-shape ratchet over literals a PR can move, and the value it guards was wrong in PUBLIC for weeks precisely because nothing cheap ever re-read it.

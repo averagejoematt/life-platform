@@ -314,3 +314,6 @@ def test_gate_infra_token_twin_with_monitoring_filter():
     assert tokens, "no CDK stack wires the expert-gate-infra-hold alarm to a literal filter token"
     assert tokens == {"EXPERT-GATE-INFRA-HOLD"}, f"CDK filter token(s) {sorted(tokens)} != EXPERT-GATE-INFRA-HOLD"
     assert "[EXPERT-GATE-INFRA-HOLD]" in lam, "the lambda must log the exact token the filter scans for"
+
+
+# premerge-gate: The pair above was hand-added because the #2372 detector reads only tests/test_*.py source text. That blind spot had a second, larger half: a guard whose sweep lives in a sibling HELPER module contains no sweep idiom itself, only an import. `test_conformance_guard_2844.py` — the charter conformance guard, the fleet-wide derivation-guard primitive docs/CHARTER.md names — is exactly that shape (its

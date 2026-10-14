@@ -101,3 +101,6 @@ def test_todays_read_precedes_the_weekly_call_and_the_call_is_labelled_weekly():
     assert label and "week" in label.group(1), "the week's call label must say it is the week's"
     # the first-screen stamps are in words — the machine "as of" never appears in them
     assert "as of" not in body.lower()
+
+
+# premerge-gate: 4182: rglob sweep of site/coaching/**/index.html — "Third Wall" is absent from every coaching page's <main>, the first-screen mount ships on the hub + read shells only, and the hero's roster numeral equals the persona registry's served roster. Pure repo shape on generator output: a PR that re-adds the phrase or hand-types the count is its own diff, and site/** auto-deploys on merge (#750).

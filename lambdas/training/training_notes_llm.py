@@ -428,6 +428,16 @@ def uncached_notes(table, notes) -> dict:
     return out
 
 
+def _distinct_notes(notes) -> dict:
+    """{note_hash: note_text} for the distinct notes, cache ignored (#4875 --re-extract)."""
+    from training.training_notes import note_hash as _nh
+
+    out: dict = {}
+    for text in notes:
+        out.setdefault(_nh(text), text)
+    return out
+
+
 def bulk_prefetch(
     table,
     notes,
@@ -440,6 +450,8 @@ def bulk_prefetch(
     run=None,
     realtime_fn=None,
     log=print,
+    reextract: bool = False,
+    plan_only: bool = False,
 ) -> dict:
     """Answer the uncached notes of a sweep as ONE Bedrock batch job when they clear the 100-record floor.
 
@@ -452,13 +464,19 @@ def bulk_prefetch(
     that gets a model answer, batch or fallback, is charged one call on the lane (`_bump_calls`) and a
     usable answer is `cache_put` — the same two side effects `make_llm_fn` has on-demand. An answer that
     degrades is billed and counted but never cached, and is handed back in `precomputed` so the sweep
-    records the same degrade without re-billing the note."""
+    records the same degrade without re-billing the note.
+
+    `reextract` (#4875): collect EVERY distinct note, cached or not, so a bulk re-extraction over history clears the
+    100-record floor (the cache holds nearly all of it, so the default path sees ~17 records). The batch answers
+    overwrite the hash cache via `cache_put`, and the sweep then versions the changed records through the ordinary
+    write path. `plan_only`: stop after the gates (tier, cap on the record count, floor) — nothing is built, staged,
+    submitted or billed; `mode` is what a real run would take (`batch` when eligible)."""
     import time
 
     from ai import bedrock_batch, bedrock_client
 
     usage_sk(lane=lane)  # validate the lane
-    todo = uncached_notes(table, notes)
+    todo = _distinct_notes(notes) if reextract else uncached_notes(table, notes)
     base = {"mode": "realtime", "records": len(todo), "job_arn": None, "answered": 0, "degraded": 0, "errors": 0, "precomputed": {}}
     if force_realtime:
         return {**base, "reason": f"{len(todo)} uncached notes — real-time requested (--realtime)"}
@@ -474,6 +492,8 @@ def bulk_prefetch(
     eligible, why = bedrock_batch.batch_preflight(len(todo), model)
     if not eligible:
         return {**base, "reason": why}
+    if plan_only:
+        return {**base, "mode": "batch", "reason": f"{why}; plan only — nothing submitted"}
 
     records = [bedrock_batch.build_jsonl_record(h, build_request_body(t, taxonomy, model), model) for h, t in todo.items()]
 

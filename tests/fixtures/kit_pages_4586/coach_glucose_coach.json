@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-12T15:35:30.863686+00:00",
-  "served_at": "2026-10-12T15:35:30.863686+00:00",
+  "generated_at": "2026-10-13T01:38:42.586623+00:00",
+  "served_at": "2026-10-13T01:38:42.586623+00:00",
   "cache_seconds": 300,
-  "request_id": "1dfa4ad62ada484c"
+  "request_id": "4f3f56f0d48a484a"
  },
  "persona_id": "glucose_coach",
  "name": "Amara Patel",
@@ -168,7 +168,7 @@
    "analogy_domain": "Biochemical pathways, signaling cascades, feedback systems, metabolic switches. The body as a chemical plant with sensors and controllers. Insulin as a dispatcher. Glucose as a fuel that becomes toxic above threshold.",
    "paragraph_structure": "Pattern in the data \u2192 underlying biological mechanism \u2192 what this means for metabolic health \u2192 specific intervention (meal timing, composition, or exercise). Every paragraph connects the CGM trace to the biology underneath it. Never reports a number without explaining the mechanism that produced it.",
    "humor_style": "Almost exclusively reserved for the gap between what people believe about food and what the CGM actually shows. 'The acai bowl spiked you to 165. The cheeseburger peaked at 130. Metabolic health is full of surprises.' Dry, data-driven humor.",
-   "relationship_to_others": "The mechanistic bridge between nutrition and the body. Works closely with Marcus on meal composition \u2014 they agree on mechanisms but sometimes diverge on practical trade-offs (she optimizes for glucose response; he optimizes for adherence and total intake). Connects glucose patterns to Lisa's sleep data (nocturnal glucose affects sleep architecture) and Victor's longevity metrics (insulin sensitivity as a longevity marker). Occasionally frustrated when other coaches treat glucose as a secondary metric.",
+   "relationship_to_others": "The mechanistic bridge between nutrition and the body. Works closely with Marcus on meal composition \u2014 they agree on mechanisms but sometimes diverge on practical trade-offs (the glucose view optimizes for glucose response; the nutrition view optimizes for adherence and total intake). Connects glucose patterns to Lisa's sleep data (nocturnal glucose affects sleep architecture) and Victor's longevity metrics (insulin sensitivity as a longevity marker). Occasionally frustrated when other coaches treat glucose as a secondary metric.",
    "signature_moves": [
     "Tracing a glucose spike backward through the meal, the timing, and the preceding activity to identify the actual driver",
     "Connecting nocturnal glucose patterns to sleep quality and morning readiness",
@@ -230,15 +230,15 @@
      "number": {
       "graded": 3,
       "coach_right": 1,
-      "scored": 1,
-      "coach_right_on_scored": 0,
-      "rule_right": 1,
+      "scored": 3,
+      "coach_right_on_scored": 1,
+      "rule_right": 2,
       "coach_only": 0,
       "rule_only": 1,
       "unscorable": 0,
       "unscorable_reasons": {},
-      "not_yet_scored": 2,
-      "verdict": "not_yet_scored",
+      "not_yet_scored": 0,
+      "verdict": "too_few",
       "sign_test_p": null,
       "coach_right_pct": null,
       "rule_right_pct": null
@@ -246,15 +246,15 @@
      "direction": {
       "graded": 2,
       "coach_right": 0,
-      "scored": 0,
+      "scored": 2,
       "coach_right_on_scored": 0,
-      "rule_right": 0,
+      "rule_right": 1,
       "coach_only": 0,
-      "rule_only": 0,
+      "rule_only": 1,
       "unscorable": 0,
       "unscorable_reasons": {},
-      "not_yet_scored": 2,
-      "verdict": "not_yet_scored",
+      "not_yet_scored": 0,
+      "verdict": "too_few",
       "sign_test_p": null,
       "coach_right_pct": null,
       "rule_right_pct": null
@@ -262,15 +262,15 @@
      "yes_no": {
       "graded": 1,
       "coach_right": 0,
-      "scored": 0,
+      "scored": 1,
       "coach_right_on_scored": 0,
       "rule_right": 0,
       "coach_only": 0,
       "rule_only": 0,
       "unscorable": 0,
       "unscorable_reasons": {},
-      "not_yet_scored": 1,
-      "verdict": "not_yet_scored",
+      "not_yet_scored": 0,
+      "verdict": "too_few",
       "sign_test_p": null,
       "coach_right_pct": null,
       "rule_right_pct": null
@@ -293,14 +293,14 @@
      }
     },
     "unclassified": 0,
-    "scored_complete": false,
+    "scored_complete": true,
     "skill": {
      "n": 6,
      "brier_skill": -0.6331,
      "sentence": "Too few checked calls yet (6) to compare them with a simple guess."
     },
-    "rule_sentence": null,
-    "sentence": "Too few checked calls yet (6) to compare them with a simple guess.",
+    "rule_sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 2 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes once \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
+    "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 2 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes once \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },

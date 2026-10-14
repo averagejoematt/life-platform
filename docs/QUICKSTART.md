@@ -91,10 +91,10 @@ CI runs the same commands on every push (`.github/workflows/ci-cd.yml`).
 
 | I edited... | Run this | Why |
 |-------------|----------|-----|
-| A single Lambda file (e.g., `daily_brief_lambda.py`) | `bash deploy/deploy_lambda.sh daily-brief` | Fast (~10s), no CDK synth |
+| A single Lambda file (e.g., `daily_brief_lambda.py`) | `bash deploy/deploy_lambda.sh daily-brief lambdas/emails/daily_brief_lambda.py` | EMERGENCY-only (not the routine path, #4255): needs both args; routine = `deploy_fleet.sh`/merge to main |
 | Lambda code, the way CI ships it | `bash deploy/deploy_fleet.sh` | The one deploy path (#4255): one bundle → every function, ancestry-checked |
 | A shared module at the `lambdas/` root (e.g. `ai_calls.py`) | Merge to main (CI fleet-deploys) or `bash deploy/deploy_fleet.sh` | ONE bundle per function (#781) — every function must receive the new copy |
-| Any file in `mcp/` | `bash deploy/deploy_lambda.sh life-platform-mcp` | Since #781 the script stages the mcp-shaped full bundle (tree + `mcp_server.py` + `mcp/`) |
+| Any file in `mcp/` | `bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py` | EMERGENCY-only (both args required). Since #781 the script stages the mcp-shaped full bundle (tree + `mcp_server.py` + `mcp/`) |
 | CDK stack code (IAM, schedules, new Lambda) | `cd cdk && npx cdk deploy <StackName>` | Infra changes require CloudFormation |
 | Site HTML/CSS/JS | **merge to main** — CI deploys it (`site-deploy.yml`, #750) | Manual fallback: `bash deploy/sync_site_to_s3.sh` |
 
@@ -122,8 +122,10 @@ Since #781, `deploy_lambda.sh` handles MCP correctly — it stages the mcp-shape
 (the whole `lambdas/` tree + `mcp_server.py` + `mcp/`):
 
 ```bash
-bash deploy/deploy_lambda.sh life-platform-mcp
+bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py
 ```
+
+(EMERGENCY-only: the routine path is `bash deploy/deploy_fleet.sh`; the script needs both arguments, function name and source file.)
 
 ⚠️ Do NOT hand-roll a zip of only `mcp_server.py` + `mcp/` — it boots but fails at import
 time (`No module named 'reading'`) because the bundled `lambdas/` tree is missing. The
@@ -132,7 +134,7 @@ curl to the Function URL should return **401** (healthy), not 5xx.
 
 ### Stack names (use with `cdk deploy <name>`)
 
-`LifePlatformCore` · `LifePlatformIngestion` · `LifePlatformCompute` · `LifePlatformEmail` · `LifePlatformOperational` · `LifePlatformServe` · `LifePlatformMcp` · `LifePlatformMonitoring` · `LifePlatformWeb`
+`LifePlatformCore` · `LifePlatformIngestion` · `LifePlatformCompute` · `LifePlatformEmail` · `LifePlatformOperational` · `LifePlatformServe` · `LifePlatformMcp` · `LifePlatformMonitoring` · `LifePlatformWeb` · `LifePlatformBackup`
 
 ---
 
@@ -278,7 +280,7 @@ aws lambda list-functions --region us-west-2 \
 | Run `aws s3 sync --delete` to bucket root | Tries to delete 35k+ objects (blocked by bucket policy + ADR-032 deny statement, but DON'T test it) | S3 versioning recovers; takes hours |
 | Change a Lambda env var in AWS Console | Next `cdk deploy` reverts it silently | Edit the CDK stack instead |
 | Add a Lambda to CDK without a `role_policies.py` entry | `AccessDenied` on first run | Add the IAM policy, redeploy the stack |
-| Hand-roll a partial MCP zip (only `mcp_server.py` + `mcp/`) | MCP boots but imports fail — bundled `lambdas/` tree missing | `bash deploy/deploy_lambda.sh life-platform-mcp` (sanctioned since #781) |
+| Hand-roll a partial MCP zip (only `mcp_server.py` + `mcp/`) | MCP boots but imports fail — bundled `lambdas/` tree missing | `bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py` (EMERGENCY-only; sanctioned since #781) |
 | Use DST-aware cron in EventBridge | Schedule drifts twice yearly | All crons fixed UTC — see RUNBOOK |
 | Default-encrypt the S3 bucket with KMS | CloudFront → 400 on website endpoints (ADR-053) | Revert to AES256 bucket default; use explicit `--sse aws:kms` for sensitive uploads |
 | Re-enable the deleted Lambdas (`email_framework`, `tools_calendar`, `podcast_scanner`) | V2 dead-code closure regression | They were deliberately deleted — check the V2 PR before resurrecting |

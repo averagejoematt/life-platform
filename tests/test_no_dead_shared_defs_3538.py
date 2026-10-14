@@ -696,3 +696,6 @@ def test_the_import_error_fork_scan_fires_on_the_shape_it_removed(tmp_path):
     # ...and the prescribed replacement — a bare import — must not be flagged.
     plain = _ast.parse("from common.numeric import floats_to_decimal\n")
     assert not [n for n in _ast.walk(plain) if isinstance(n, _ast.Try)]
+
+
+# premerge-gate: 3538: AST + string-literal sweep of lambdas/common + lambdas/ai. Verdict is pure repo shape — a public def landing in the every-bundle packages with no caller must red BEFORE the merge, because after it the dead code is already riding ~104 Lambda zips and reads as API to the next reader.

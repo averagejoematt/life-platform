@@ -582,3 +582,6 @@ def test_the_age_clock_is_an_input_and_the_pin_is_what_holds_the_literals(wired,
     monkeypatch.setattr(core, "_PROFILE_CACHE", None)
     assert tn._energy_budget(END)["tdee"] == 2425
     assert th._get_energy_expenditure({"end_date": END})["tdee_7d_avg"] == 2425
+
+
+# premerge-gate: 4032: the same defect on the ENERGY BUDGET — `_get_energy_expenditure` and the ADR-152 `_energy_budget` read hevy/strava/withings/macrofactor (all four raw_timeseries) through the ADR-058 filter, so every trailing window truncated at the current genesis and the published TDEE and calorie target stepped at every restart. Carries an AST leg — no phase-filtered reader may reappear inside `_get_energy

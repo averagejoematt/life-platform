@@ -37,6 +37,13 @@ function bareTags(html) {
   return bare;
 }
 // A list row's verdict is a plain span at the end of its link.
+// The direction call in the capture, with the sentence the route served before #4617: graded against the trend in
+// his most recent readings, no allowed-distance band. Built from the capture (it now serves the window shape).
+function legacyTrend() {
+  const c = clone(byId("labs-20260906-d2deb9b27d"));
+  const who = c.called.split(" called ")[0];
+  return { ...c, called: `${who} called his resting heart rate to go down, in a prediction sealed before day one. It was checked on September 27 against the trend in his most recent readings.`, tolerance: null };
+}
 function bareRows(html) {
   return [...String(html).matchAll(/<span>([^<]*)<\/span><\/a><\/li>/g)].filter((m) => /^(Right|Wrong)\.?$/.test(m[1].trim())).map((m) => m[0]);
 }
@@ -47,7 +54,9 @@ test("the rule is lifted from the served sentence, per kind of call", () => {
   assert.equal(V.ruleFor(number, true), "within 22.5 either way");
   assert.equal(V.ruleFor(byId("mind-20260914-7fc4b43947"), false), "not within 18.6 either way");
   assert.equal(V.ruleFor(byId("sleep-20260925-6c64d91f26"), true), "within 1.2 hours either way", "the unit travels with the number");
-  assert.equal(V.ruleFor(byId("labs-20260906-d2deb9b27d"), true), "by the trend in his most recent readings");
+  // The capture's direction call is graded across its own window (#4617); the legacy trend sentence is built from it.
+  assert.match(V.ruleFor(byId("labs-20260906-d2deb9b27d"), true), /^by the change from [A-Z][a-z]+ \d+ to [A-Z][a-z]+ \d+$/);
+  assert.equal(V.ruleFor(legacyTrend(), true), "by the trend in his most recent readings");
   assert.equal(V.ruleFor(byId("bet-20260930-994b3d89f6"), true), "on whether his morning recovery score would be below 70 on September 30");
   const mute = { ...clone(number), called: "Henning Brandt called it.", tolerance: null };
   assert.equal(V.ruleFor(mute, true), "", "a call with no served rule yields none, never a guess");
@@ -101,7 +110,7 @@ test("no builder on any preview page emits a verdict tag without its rule", () =
 test("every row of the call list says the rule beside the verdict", () => {
   const rows = [...C.listHTML(BODY, BASE).matchAll(/<span>([^<]*)<\/span><\/a><\/li>/g)].map((m) => m[1]);
   assert.equal(rows.length, C.callsOf(BODY).length);
-  for (const text of rows) assert.match(text, / · (within|not within|by the trend) |was right; .* was wrong\./, text);
+  for (const text of rows) assert.match(text, / · (within|not within|by the trend|by the change) |was right; .* was wrong\./, text);
 });
 
 test("only ck_verdict.js writes the verdict tag: no page module hand-builds one", () => {
@@ -135,7 +144,8 @@ test("the call page states the day whose reading the call was graded on, from th
   assert.equal(V.measuredDay(byId("bet-20260930-994b3d89f6")), "September 30");
   const direction = byId("labs-20260906-d2deb9b27d");
   assert.equal(V.measuredDay(direction), "", "a direction call is graded on a trend, not one day");
-  assert.equal(V.gradedOnText(direction), "Graded on the trend in his most recent readings.");
+  assert.match(V.gradedOnText(direction), /^Graded on the readings from [A-Z][a-z]+ \d+ to [A-Z][a-z]+ \d+\.$/);
+  assert.equal(V.gradedOnText(legacyTrend()), "Graded on the trend in his most recent readings.");
   // a sentence that names no day prints no day: nothing is worked out from the other dates
   const mute = { ...clone(number), called: "Henning Brandt called it at about 84." };
   assert.equal(V.gradedOnText(mute), "");
@@ -235,7 +245,7 @@ test("a coach page whose two cards both open a call page says nothing about reco
 });
 
 test("a direction call graded across its own window (#4617) has a rule, and its band is said once with what it is", () => {
-  const base = clone(byId("labs-20260906-d2deb9b27d"));
+  const base = legacyTrend();
   const call = {
     ...base,
     verdict: "wrong",

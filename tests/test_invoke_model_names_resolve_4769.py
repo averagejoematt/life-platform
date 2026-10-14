@@ -299,3 +299,5 @@ def test_mapped_names_profile_ids_and_runtime_values_do_not_red(tmp_path):
 if __name__ == "__main__":  # pragma: no cover
     off, res = sweep(ROOT)
     print(f"{len(res)} resolved, {len(off)} offenders", *off, sep=os.linesep)
+
+# premerge-gate: #4769: glob sweep — every statically-known model_name= under lambdas/ + mcp/ resolves at the Bedrock chokepoint

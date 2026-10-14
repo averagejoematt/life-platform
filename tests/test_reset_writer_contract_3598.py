@@ -531,3 +531,6 @@ def test_no_derived_artifacts_registry_and_no_reverify_workflow():
     assert not (REPO_ROOT / ".github" / "workflows" / "restart-reverify.yml").exists()
     for rel in ("deploy/restart_work_contract.py", "deploy/restart_chronicle_handler.py", "deploy/restart_intelligence_wipe.py"):
         assert "DERIVED_ARTIFACTS" not in (REPO_ROOT / rel).read_text(encoding="utf-8"), rel
+
+
+# premerge-gate: `test_reset_writer_contract_3598.py` arrived on main with #3622 AFTER this branch derived its list, and `reset_artifact_test_files()` picked it up on the merge — which is the whole point of deriving rather than hand-listing. It reads `deploy/generated/**` through the reset writers it contracts.

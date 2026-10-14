@@ -260,3 +260,6 @@ def test_mutation_control_non_blocking_findings_would_be_dropped_by_the_wrapper(
     soft = gate.Finding(gate.CENSUS_FAMILY_APPEARED, "census.X", "…", blocking=False)
     assert gate.blocking([soft]) == []
     assert all(f.blocking for f in gate.audit_census_delta(BEFORE, _after_with_new_family()))
+
+
+# premerge-gate: 3621 box 2: reads the committed live census artifact (deploy/generated/pk_family_census.json) to assert the family names its second-census clause is proved over are ones the live table actually produces. A PR that lands a regenerated artifact must red on the PR that lands it — tests/test_restart_verify_gates_3477.py derives this membership and requires it.

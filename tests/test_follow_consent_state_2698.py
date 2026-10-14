@@ -182,3 +182,6 @@ def test_the_partitions_are_classified_as_audience_state_for_resets():
     text = (pathlib.Path(_REPO) / "lambdas" / "experiment" / "phase_taxonomy.py").read_text()
     for partition in FOLLOW_PARTITIONS:
         assert f'startswith("{partition}")' in text, f"{partition} lost its reset classification"
+
+
+# premerge-gate: 2698: sweeps lambdas/ mcp/ scripts/ for anything touching a follow partition — a repo-shape ratchet whose verdict depends only on source (the consent guard).

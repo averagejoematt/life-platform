@@ -141,3 +141,6 @@ class TestCollectionSafety:
             if isinstance(node, ast.Import):
                 names = [a.name.split(".")[0] for a in node.names]
                 assert "playwright" not in names and "visual_qa" not in names, f"module-level import {names} — must stay lazy"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

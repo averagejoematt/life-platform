@@ -439,3 +439,6 @@ def test_pr_body_carries_no_attribution():
         "banned by the owner decision recorded in CLAUDE.md 'Authorship' (2026-08-12); "
         "remove the footer/trailer and push again (the body is re-read on the next push)"
     )
+
+
+# premerge-gate: #3005: git ls-files sweep — no tracked file may instruct the banned trailer

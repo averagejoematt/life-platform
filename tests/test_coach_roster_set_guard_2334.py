@@ -196,3 +196,6 @@ def test_companion_maps_cover_the_whole_roster():
 
     assert set(cno.COACH_DOMAINS) == set(persona_registry.OPERATIONAL_COACH_IDS)
     assert set(EXPERT_PERSONAS) == SHORT_IDS
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

@@ -140,3 +140,6 @@ def test_public_wellbeing_read_structurally_drops_intake_fields(monkeypatch):
     resp = sad.handle_fulfillment_ritual()
     body = json.loads(resp["body"]) if isinstance(resp.get("body"), str) else resp["body"]
     assert "intake" not in json.dumps(body)
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

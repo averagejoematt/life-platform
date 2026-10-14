@@ -181,3 +181,6 @@ def test_chat_modes_heading_counts_the_modes_it_lists():
     assert words.get(heading.group(1)) == len(
         set(listed)
     ), f"heading says {heading.group(1)!r} but the table lists {len(set(listed))} modes: {sorted(set(listed))}"
+
+
+# premerge-gate: #1571: prose mode file <-> TEMPLATE_SK / date-key / abort semantics

@@ -379,3 +379,6 @@ def test_outcome_series_reads_the_metric_in_date_order_and_keeps_gaps_honest():
     assert prereg_effect.outcome_series({"outcome_metric": "habit_pct"}, rows) == [0.5, 0.9]
     assert prereg_effect.outcome_series({"outcome_metric": "habit_pct"}, []) is None
     assert prereg_effect.outcome_series({"outcome_metric": "weight_lbs"}, rows) is None
+
+
+# premerge-gate: 3552: reads the frozen `deploy/generated/genesis_preregistration.json` as the WIRE SHAPE its additive-projection assertions compare against. Named here in the same PR that adds the test, exactly as the block above instructs.

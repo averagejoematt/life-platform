@@ -170,3 +170,6 @@ def test_gitignore_check_fails_open_without_git():
     """A missing git must not invent findings — fail OPEN, never fabricate."""
     lint_mod._IGNORE_CACHE.clear()
     assert lint_mod._is_gitignored("docs/CHARTER.md") is False
+
+
+# premerge-gate: The skill/agent corpus contract. Sweeps .claude/ via scripts/skill_registry.py rather than the source tree, so premerge_derivation cannot discover it — hand-listed, same shape as test_operating_calendar_2832.py above. Pre-merge because a dead reference in a skill is silent: it misleads the next session rather than raising, and the next session may be an unattended one.

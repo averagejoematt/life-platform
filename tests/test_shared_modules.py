@@ -1161,3 +1161,5 @@ if failed:
 else:
     print(" -- ALL PASSED")
 print("=" * 60)
+
+# premerge-gate: 4419: os.walk AST sweep of lambdas/ + mcp/ — every DynamoDB reader that can be handed the strava partition goes through `strava_read_seam`. A new reader that skips it must red BEFORE the merge; after it, every history read through it counts duplicates twice.
