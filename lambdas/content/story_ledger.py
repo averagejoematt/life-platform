@@ -9,7 +9,20 @@ pick the story up the way a human desk would:
   * ``bets`` — the Panel's on-air bet, with a rule code can grade, and its result once graded;
   * ``featured`` — which coach the week put in front of readers (rotation input);
   * ``leads`` / ``beats`` — the angle that led and the beats already used (repeat guard);
-  * ``arcs`` — one line per character (Elena, each coach) on how they have moved.
+  * ``arcs`` — one line per character (Elena, each coach) on how they have moved;
+  * ``asks`` — what a coach asked of him, ``open | followed_up | escalated`` (#4914).
+
+THE ASK RULE (#4914) — one rule, ``matched_ask`` (scored by ``_match_score``), shared by the desk's validator and ``apply_budget``:
+  * every ask carries a stable ``id`` (``ask_id`` of its normalized text), assigned when ``apply_budget``
+    appends it; an ask already in the ledger WITHOUT an id gets the same deterministic id on read
+    (``ask_key``), so no migration is needed;
+  * a follow-up in the budget's ``asks_followed_up[]`` matches an ask when it cites that ``ask_id``, or —
+    the fallback — quotes the ask's first ``ASK_PREFIX_CHARS`` normalized characters, or shares at least
+    ``ASK_OVERLAP`` of its content words (and ``ASK_OVERLAP_MIN_WORDS`` of them) (a paraphrase is a follow-up);
+  * outcome ``carried`` (``CARRIED``) means no reply and no data yet: the ask stays ``open`` with a
+    ``carried_weeks`` count. After ``CARRIED_MAX_WEEKS`` carried installments it is ESCALATED — status
+    ``escalated`` with ``escalated_week``, no longer demanded of the desk, listed by ``_escalated_asks`` (private until the reply desk, #4546, consumes it) for
+    the reply desk (#4546) to put to him by email instead of asking the data something it cannot answer.
 
 Pure: the ledger is a dict in, a dict out. Persistence (`ledger_row` / `latest_visible`)
 is the only part that touches a table, and it reads through ``singleton_visible`` so a
@@ -20,6 +33,8 @@ from a tombstoned cycle-5 row).
 from __future__ import annotations
 
 import copy
+import hashlib
+import re
 from typing import Any, Dict, List, Optional
 
 THREAD_STATUSES = ("open", "advanced", "resolved", "retired")
@@ -31,6 +46,88 @@ MAX_CONSECUTIVE_LEAD = 2
 BET_CARRY_WEEKS = 2
 
 LEDGER_PREFIX = "LEDGER#"
+
+# ── the ask rule (#4914) ─────────────────────────────────────────────────────
+CARRIED = "carried"  # an asks_followed_up outcome: no reply, no data yet
+CARRIED_MAX_WEEKS = 3  # carried this many installments → escalated to the reply desk (#4546)
+ASK_PREFIX_CHARS = 40  # the legacy verbatim rule, kept as one of the accepted ways to name an ask
+ASK_OVERLAP = (
+    0.4  # share of the FOLLOW-UP's own content words (4+ letters) that must be the ask's; the single best match wins, a tie matches nothing
+)
+ASK_OVERLAP_MIN_WORDS = 3  # ... and never fewer than this many shared words
+
+_WORD = re.compile(r"[a-z0-9]+")
+
+
+def _norm(text: Any) -> str:
+    return " ".join(_WORD.findall(str(text or "").lower()))
+
+
+def _content_words(text: Any) -> set:
+    return {w for w in _WORD.findall(str(text or "").lower()) if len(w) >= 4}
+
+
+def ask_id(text: Any) -> str:
+    """The stable id of an ask: a short hash of its normalized text."""
+    return "ask-" + hashlib.sha256(_norm(text).encode("utf-8")).hexdigest()[:8]
+
+
+def ask_key(ask: Dict[str, Any]) -> str:
+    """The ask's id — the stored one, or the deterministic one for an ask the ledger holds without an id."""
+    return str(ask.get("id") or ask_id(ask.get("ask")))
+
+
+def _match_score(followup: Dict[str, Any], ask: Dict[str, Any]) -> float:
+    """How strongly a follow-up names this ask: 3 = cites its id, 2 = quotes its opening, else the share of the
+    FOLLOW-UP's content words that are this ask's (0 below the overlap floor)."""
+    cited = str(followup.get("ask_id") or "").strip()
+    if cited:
+        return 3.0 if cited == ask_key(ask) else 0.0
+    fu_text, ask_text = _norm(followup.get("ask")), _norm(ask.get("ask"))
+    if not fu_text or not ask_text:
+        return 0.0
+    if ask_text[:ASK_PREFIX_CHARS] in fu_text:
+        return 2.0
+    f_words = _content_words(followup.get("ask"))
+    shared = len(_content_words(ask.get("ask")) & f_words)
+    if not f_words or shared < ASK_OVERLAP_MIN_WORDS:
+        return 0.0
+    ratio = shared / len(f_words)  # of what the follow-up SAYS, how much is this ask — a paraphrase compresses the ask, never the reverse
+    return ratio if ratio >= ASK_OVERLAP else 0.0
+
+
+def matched_ask(followup: Dict[str, Any], asks: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """The ONE ask a follow-up closes (#4914): the single best-scoring match, or None when nothing matches or the
+    best is tied (ambiguous — a follow-up never closes two asks)."""
+    scored = sorted(((_match_score(followup, a), i) for i, a in enumerate(asks) if a.get("ask")), reverse=True)
+    if not scored or scored[0][0] <= 0 or (len(scored) > 1 and scored[1][0] == scored[0][0]):
+        return None
+    return asks[scored[0][1]]
+
+
+def is_carried(outcome: Any) -> bool:
+    """``carried`` — alone or elaborated (``carried — no reply yet``) — means no reply and no data."""
+    return _norm(outcome).split()[:1] == [CARRIED]
+
+
+def is_open_ask(ask: Dict[str, Any]) -> bool:
+    return ask.get("status") in (None, "", "open")
+
+
+def open_asks(ledger: Dict[str, Any]) -> List[Dict[str, Any]]:
+    return [a for a in ledger.get("asks", []) if is_open_ask(a)]
+
+
+def _escalated_asks(ledger: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Asks carried ``CARRIED_MAX_WEEKS`` installments with no reply — for the reply desk (#4546) to put to him."""
+    return [a for a in ledger.get("asks", []) if a.get("status") == "escalated"]
+
+
+def unfollowed_asks(ledger: Dict[str, Any], budget: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Open asks no entry of the budget's ``asks_followed_up`` matches."""
+    opens = [a for a in open_asks(ledger) if a.get("ask")]
+    claimed = {id(matched_ask(fu, opens)) for fu in budget.get("asks_followed_up") or []}
+    return [a for a in opens if id(a) not in claimed]
 
 
 def empty_ledger() -> Dict[str, Any]:
@@ -165,16 +262,19 @@ def apply_budget(prev: Dict[str, Any], budget: Dict[str, Any], *, week: int, dat
 
         led["spine"] = season_spine()
     for fu in budget.get("asks_followed_up", []):
-        for a in led.setdefault("asks", []):
-            if (
-                a.get("status") in (None, "", "open")
-                and (fu.get("ask") or "")[:40]
-                and a.get("ask", "")[:40] in (fu.get("ask") or "") + a.get("ask", "")[:0]
-            ):
-                a["status"], a["outcome"], a["followed_week"] = "followed_up", fu.get("outcome"), week
+        a = matched_ask(fu, [x for x in led.setdefault("asks", []) if is_open_ask(x) and x.get("ask")])
+        if a is None:
+            continue
+        a.setdefault("id", ask_key(a))
+        if is_carried(fu.get("outcome")):
+            a["carried_weeks"] = int(a.get("carried_weeks") or 0) + 1
+            if a["carried_weeks"] >= CARRIED_MAX_WEEKS:
+                a["status"], a["escalated_week"] = "escalated", week
+        else:
+            a["status"], a["outcome"], a["followed_week"] = "followed_up", fu.get("outcome"), week
     for ask in budget.get("coach_asks", []):
         if ask.get("ask"):
-            led.setdefault("asks", []).append({**ask, "week": week, "status": "open"})
+            led.setdefault("asks", []).append({**ask, "id": ask_id(ask["ask"]), "week": week, "status": "open"})
     if budget.get("throughline_advanced"):
         led.setdefault("throughline_log", []).append({"week": week, "id": budget["throughline_advanced"]})
     return led
@@ -198,7 +298,7 @@ def ledger_for_prompt(ledger: Dict[str, Any], week: int) -> Dict[str, Any]:
         "recently_featured_coaches": recently_featured(ledger, 3),
         "character_arcs": ledger.get("arcs", {}),
         "season_spine": ledger.get("spine") or {},
-        "open_coach_asks": [a for a in ledger.get("asks", []) if a.get("status") in (None, "", "open")],
+        "open_coach_asks": [{**a, "id": ask_key(a)} for a in open_asks(ledger)],
         "throughline_log": ledger.get("throughline_log", [])[-4:],
     }
 

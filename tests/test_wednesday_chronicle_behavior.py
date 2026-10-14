@@ -1337,6 +1337,30 @@ def test_the_preview_email_carries_the_week_and_the_title(env):
     assert f"Week 5: &ldquo;{TITLE}&rdquo;" in _preview_email(env)
 
 
+def _subject(env):
+    return env["ses"].sent[0]["Content"]["Simple"]["Subject"]["Data"]
+
+
+def test_a_desk_failure_never_sends_the_legacy_draft_as_an_ordinary_preview(env, monkeypatch):
+    """#4914: the week-6 desk failure fell back to the legacy writer and mailed a plain [PREVIEW]. The subject and
+    banner now say so, with the desk's findings."""
+    from content import story_pipeline
+
+    def boom(*a, **k):
+        raise RuntimeError("desk: week 6 budget failed validation twice: [\"an open coach ask is not followed up: 'x'\"]")
+
+    monkeypatch.setattr(story_pipeline, "live_week", boom)
+    m.lambda_handler({}, None)
+    assert "LEGACY WRITER" in _subject(env) and _subject(env).startswith("[PREVIEW")
+    assert "an open coach ask is not followed up" in _preview_email(env)
+    assert "The Story Desk failed this week" in _preview_email(env)
+
+
+def test_a_desk_week_or_an_ordinary_run_keeps_the_plain_preview_subject(env):
+    m.lambda_handler({}, None)
+    assert _subject(env).startswith("[PREVIEW] ") and "LEGACY" not in _subject(env)
+
+
 def test_the_preview_email_goes_only_to_the_configured_recipient(env):
     m.lambda_handler({}, None)
     assert len(env["ses"].sent) == 1

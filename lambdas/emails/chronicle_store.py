@@ -265,7 +265,7 @@ def dry_run_response(week_num, date_str, title, stats_line, raw_markdown, conf_l
     }
 
 
-def _send_preview_email(title, week_num, date_str, approval_token, email_html, kit_block="", *, _g):
+def _send_preview_email(title, week_num, date_str, approval_token, email_html, kit_block="", desk_fallback="", *, _g):
     """Send preview email to RECIPIENT with Approve / Request Changes links.
 
     The approve link goes to APPROVE_LAMBDA_URL with ?date=, token=, action=approve.
@@ -273,6 +273,10 @@ def _send_preview_email(title, week_num, date_str, approval_token, email_html, k
 
     #405: `kit_block` is the copy-paste share-kit HTML — surfaced right in this approval
     email so posting is a 60-second paste (or ignored). It's injected before </body>.
+
+    #4914: `desk_fallback` is the Story Desk's error when it failed and the legacy writer wrote this draft. The
+    subject then says so ("LEGACY WRITER") and the banner quotes the desk's findings, so a fallback draft is never
+    approved as if the desk had written it. (The held-week path publishes no email, so the subject is the carrier.)
     """
     APPROVE_LAMBDA_URL = _g["APPROVE_LAMBDA_URL"]
     ses = _g["ses"]
@@ -286,10 +290,19 @@ def _send_preview_email(title, week_num, date_str, approval_token, email_html, k
     approve_url = f"{base_url}?date={date_str}&token={approval_token}&action=approve"
     changes_url = f"{base_url}?date={date_str}&token={approval_token}&action=request_changes"
 
+    fallback_html = ""
+    if desk_fallback:
+        import html as _html
+
+        fallback_html = (
+            '<p style="margin:0 0 16px;font-size:13px;color:#fca5a5;">The Story Desk failed this week, so this draft was written by the '
+            f"LEGACY writer without the desk's scoreboard or craft gates. Desk findings: {_html.escape(str(desk_fallback)[:600])}</p>"
+        )
     preview_banner = f"""
 <div style="background:#1a1a1a;color:#fff;padding:20px 32px;font-family:-apple-system,sans-serif;margin-bottom:0;border-bottom:3px solid #f59e0b;">
   <p style="margin:0 0 6px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#f59e0b;">PREVIEW — Not yet published</p>
   <p style="margin:0 0 16px;font-size:14px;color:#ccc;">Week {week_num}: &ldquo;{title}&rdquo; is ready for review.</p>
+  {fallback_html}
   <a href="{approve_url}"
      style="display:inline-block;background:#16a34a;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;margin-right:12px;">
     ✓ Approve &amp; Publish
@@ -311,7 +324,8 @@ def _send_preview_email(title, week_num, date_str, approval_token, email_html, k
         else:
             preview_email = preview_email + kit_block
 
-    subject = f'[PREVIEW] The Measured Life — Week {week_num}: "{title}"'
+    tag = "[PREVIEW · LEGACY WRITER — desk failed]" if desk_fallback else "[PREVIEW]"
+    subject = f'{tag} The Measured Life — Week {week_num}: "{title}"'
     try:
         ses.send_email(
             FromEmailAddress=SENDER,
