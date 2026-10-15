@@ -135,7 +135,8 @@ test("today's weight fails to its sentence and the green weight leaves the mark 
   assert.match(P.frontSlots(green, green.blocks)["ck-mark-caption"], new RegExp(weight.replace(".", "\\.")));
   const slots = P.frontSlots(ed, ed.blocks);
   assert.equal(slots["ck-mark-caption"], esc("Today's weight is not served right now."));
-  assert.equal(slots["ck-mark"], "");
+  // #4586 box 2: a picture with nothing to draw says so, not a blank.
+  assert.equal(slots["ck-mark"], '<p class="ck-soft">No weigh-in in the last 28 days.</p>');
 });
 
 test("with every upstream failing, the page still has one day, and the bet slot does not claim there is no bet", () => {

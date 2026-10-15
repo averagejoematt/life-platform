@@ -429,7 +429,8 @@ export function frontSlots(edition, b, base = "/") {
     // Round 8b: every number on the first screen is a door — the record to the coaches, the
     // weight to its trend. A failed block prints its own sentence, with no door.
     "ck-record": recordLine(b.record) ? `<a href="${esc(base)}coaches/">${esc(recordLine(b.record))}</a>` : esc((b.record && b.record.absent_text) || ""),
-    "ck-mark": F.markHTML(usable(b.week) ? b.week.data.weight_series : null, e.as_of, t.start_weight_lbs, t.goal_weight_lbs),
+    // No weigh-in in the window draws no picture; the slot then says so (#4586 box 2).
+    "ck-mark": F.markHTML(usable(b.week) ? b.week.data.weight_series : null, e.as_of, t.start_weight_lbs, t.goal_weight_lbs) || soft(usable(b.week) ? "No weigh-in in the last 28 days." : (b.week && b.week.absent_text) || "The weigh-ins are not served right now."),
     "ck-mark-caption": F.markCaption(b.today, e) ? `<a href="${esc(base)}trend/?m=weight">${F.markCaption(b.today, e)}</a>` : esc((b.today && b.today.absent_text) || ""),
     ...words,
     // The argument: the open bet is the edition's; the lines come in mountFront from the
