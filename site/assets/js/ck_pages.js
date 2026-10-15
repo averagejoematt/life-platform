@@ -557,26 +557,18 @@ async function mountFront(edition, b) {
   fillSlots(frontReadSlots(edition, b, base));
 }
 
-// The week page's two slots that read a block each, as { id: html } — `null` removes the
-// element. A section with nothing to show does not render its heading (round 8), so an absent
-// lead read removes the whole section; a read that failed says so instead. Pure, so the
-// absence tests drive it (#4586 box 2).
-export function weekReadSlots(b, base = "/") {
-  const lead = F.leadReadHTML(leadReadOf(b), base);
-  const sheet = sheetLine(characterOf(b));
-  const out = { "ck-sheet-line": sheet ? `<a class="ck-link" href="${esc(base)}sheet/">${esc(`${sheet}: the character sheet`)}</a>` : esc(b.sheet.absent_text || "The character sheet is not served right now.") };
-  if (lead) out["ck-lead-read"] = lead;
-  else if (b.lead_read.state === "unavailable") out["ck-lead-read"] = soft(b.lead_read.absent_text || "The lead coach’s read is not served right now.");
-  else out["ck-lead-section"] = null;
-  return out;
-}
 // The week page: the edition, and the chapter's published transcript for its quotes.
 async function mountWeek(edition, b) {
   const base = document.body.dataset.ckBase || "/";
   fillSlots(weekSlots(edition, b, base));
   // Round 8: a section with nothing to show does not render its heading; a read that failed
   // says so instead.
-  fillSlots(weekReadSlots(b, base));
+  const lead = F.leadReadHTML(leadReadOf(b), base);
+  if (lead) fill("ck-lead-read", lead);
+  else if (b.lead_read.state === "unavailable") fill("ck-lead-read", soft(b.lead_read.absent_text));
+  else document.getElementById("ck-lead-section")?.remove();
+  const sheet = sheetLine(characterOf(b));
+  fill("ck-sheet-line", sheet ? `<a class="ck-link" href="${esc(base)}sheet/">${esc(`${sheet}: the character sheet`)}</a>` : esc(b.sheet.absent_text || ""));
   const pod = usable(b.chapter) && usable(b.chapter.data.podcast) ? b.chapter.data.podcast.data : null;
   const transcriptUrl = pod && /\.mp3$/.test(pod.mp3_url || "") ? pod.mp3_url.replace(/\.mp3$/, ".transcript.json") : "";
   const transcript = transcriptUrl ? await tryJSON(transcriptUrl) : null;
