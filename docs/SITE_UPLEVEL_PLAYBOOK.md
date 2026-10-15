@@ -136,6 +136,49 @@ suite with `node --test` from the repo root (auto-discovers everything under `te
 4. **Narrative lambdas** — the `lambdas/` asset zip method above.
 5. Reconcile `main` — open a PR from the worktree branch so `main` matches what's live.
 
+## The front-page cut-over (#4588, epic #4580)
+
+The living front page goes live as **one commit**: the four kit pages of epic #4580 (front page,
+Start here, Story, Coaches) copied from `/next/v8/` to `/`, `/start/`, `/story/` and `/coaches/`.
+Their deep links stay on `/next/v8/` (`data-ck-base`). No page is renamed, and no redirect is added. Every
+other page stays as it is. The rehearsal is the HELD draft PR on #4588. It only merges on the owner's go,
+on a Thursday, outside the Tuesday-evening to Wednesday-noon PT freeze around the weekly chapter
+and email.
+
+- **Every existing URL still resolves.** `tests/test_v4_redirects_function.py::test_every_existing_url_still_resolves_4588`
+  checks this offline. Every site/ page, every sitemap URL and every old URL the edge 301s must end on a served
+  file, and no page under site/ may sit behind a 301. `/start/` (301 to `/`) and `/coaches/` (301 to
+  `/method/board/`) were 301 sources, so the cut-over drops those two 301s in
+  `scripts/v4_migration_inventory.py::SCAN_SKIP_URLS`. It then regenerates `redirects.map` and
+  `deploy/generated/v4_redirects_function.js`. Both URLs keep answering 200, now with the new page. The edge
+  function is published by hand (Deploy surface, step 3). Until it is, the two new pages are unreachable and
+  the two old 301s still answer.
+- **The deploy builders leave a kit page alone.** `v4_build_home_proof.py` would otherwise exit 2
+  (no proof anchor), and that blocks the sync. `v4_build_dispatches.py` would otherwise overwrite `/story/`
+  with the v4 hub and silently undo the cut-over on its first deploy. Both now ask
+  `v4_apply_chrome.is_kit_page()` first.
+- **The rollback** reverts the one squash commit, deploys the site, then re-publishes the edge function:
+  ```bash
+  git fetch origin && git switch -c revert-4588-cutover origin/main
+  git revert --no-edit <the cut-over's squash sha on main>   # restores every live file byte-identical
+  git push -u origin revert-4588-cutover && gh pr create --fill   # merged by the driver; site-deploy runs on merge
+  gh workflow run site-deploy.yml --ref main                   # or dispatch it by hand once the revert is on main
+  # then re-publish deploy/generated/v4_redirects_function.js to E3S424OXQZ8NBE (Deploy surface, step 3)
+  ```
+  The quickest path to the old site is `bash deploy/rollback_site.sh <pre-cut-over sha>`. It restores
+  site/ only. The revert above is the full rollback.
+- **If the AI visual check is paused by the budget tier, the cut-over waits.** `visual_ai_qa` sits in
+  `budget_guard`'s operator-truth band (cutoff 3). It runs at tiers 0–2 and stops only at tier 3. There it
+  prints SKIPPED-BY-BUDGET and the visual-QA job stays green on the Playwright sweep alone (CONVENTIONS
+  §4b; the "cutoff tier 1" in §4b's budget bullet predates ADR-125's 2026-08-03 amendment). The cut-over
+  does not ship on that Playwright-only gate, for three reasons:
+  1. The four pages' Playwright checks in `qa/qa_manifest.py` are structural by construction. They assert
+     elements in the static shell, so a green says nothing about whether the dated edition rendered.
+  2. A tier-3 month is also when the edition's AI-written lines are paused. The front page would open in
+     its degraded state.
+  3. The cut-over has no fixed date, so waiting for the next Thursday costs nothing.
+  So read SSM `/life-platform/budget-tier` before the merge. At tier 3, hold to the next Thursday.
+
 ## Measurement pipeline — traffic digest (infra; Matthew runs the deploy)
 
 The returnability instrument (`lambdas/operational/traffic_digest_lambda.py`): a weekly
