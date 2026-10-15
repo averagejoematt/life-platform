@@ -91,3 +91,9 @@ Tonight's merges: #4586 box 2 · #4888 box 2 · #4629 box 4 · #4632 bridge + dr
 **Ledger:** none — no standing machinery shipped (the drift check is a manual script; the #4628 scheduled check is in the HELD PR #4927)
 
 **Spend:** `ai_spend_attribution.py --days 5` at 18:19Z = $14.13 (haiku 7.77 / sonnet 6.34 / opus 0.03); budget tier 1 since 10-12 08:00Z. Subagent tokens: wave 1 960 k, wave 2 1.22 M.
+
+## Addendum 1 (2026-10-15 19:30Z)
+
+- **PR #4931 merged** 2026-10-15T19:28:48Z as **f9cf38f0d** (docstring only; nothing to deploy). **#4262 CLOSED** 19:29:06Z on `**Shipped:**` + `**Outcome:** realized` (three real-wrap readings 19.2 / 15.2 / 17.2 s). **Open 78 → 74** at the instant written (`gh issue list --state open` = 74).
+- The four closes with instants: #4913 02:45:58Z · #4732 18:42:59Z · #4907 19:06:04Z · #4262 19:29:06Z.
+- Next session's plan: `~/.claude/plans/next-session-zero-run-2026-10-18.md` (boot Sunday 2026-10-18 ~20:30Z for the proof-rich window; its first step harvests every owner word posted since this wrap).
