@@ -267,6 +267,22 @@ def test_a_record_with_no_habit_map_never_retracts(monkeypatch):
     assert table.puts == [] and table.deletes == []
 
 
+def test_a_failed_read_before_merge_never_retracts(monkeypatch):
+    """read_ok=False: the stored row is unknown, so a day with no completions must write and delete nothing."""
+
+    class _Unreadable(_SuppTable):
+        def get_item(self, Key=None, **kw):  # noqa: N803
+            if Key.get("sk") == "PROFILE#v1":
+                return super().get_item(Key=Key)
+            raise RuntimeError("throttled")
+
+    bridged = {"name": SUPP, "habit_id": SUPP_ID, "source": "habitify_bridge"}
+    table = _Unreadable(supplements=[bridged])
+    _bridge(monkeypatch, table, {SUPP: {"status": "failed", "miss_source": "vendor", "habit_id": SUPP_ID, "group": "Core"}})
+    assert table.puts == [] and table.deletes == []
+    assert table.row == {"supplements": [bridged]}
+
+
 def test_the_bridge_resolves_a_registry_alias_of_a_supplement_key(monkeypatch):
     table = _SuppTable(registry={SUPP: {"tier": 2, "habitify_names": [SUPP, "Supp New Name"]}})
     _bridge(monkeypatch, table, {"Supp New Name": {"status": "completed", "habit_id": SUPP_ID, "group": "Core"}})

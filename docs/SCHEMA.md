@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-10-15 (v8.6.0 — 88 MCP tools, 20 data sources, 108 Lambdas, 12 cached tools)
+**Last updated:** 2026-10-14 (v8.6.0 — 88 MCP tools, 20 data sources, 108 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -1401,7 +1401,7 @@ Access via `log_supplement`, `get_supplement_log`, `get_supplement_correlation` 
 
 Note: Daily Brief reads this partition to show today's logged supplements and 7-day adherence chips per supplement.
 
-**Habitify supplement bridge:** the habitify ingestion Lambda's post-store hook (`supplement_bridge` in `habitify_lambda.py`) side-writes checked supplement habits into this partition. The day's record carries `bridge_source: "habitify"` and each bridged entry has `source: "habitify_bridge"` with dose/unit/timing from a hardcoded `SUPPLEMENT_MAP` (resolved by name, a registry `habitify_names` alias, or — same day — the habit id). Since #4632 each bridged entry carries `habit_id` and is keyed on it; the bridge re-derives its own entries in full from the stored habitify day every run, so a completion no longer on that day is **retracted** (removed; a row left with no entries is deleted). Manual `log_supplement` entries (any other `source`) are preserved (#480/E-5).
+**Habitify supplement bridge:** the habitify ingestion Lambda's post-store hook (`supplement_bridge` in `habitify_lambda.py`) side-writes checked supplement habits into this partition. The day's record carries `bridge_source: "habitify"` and each bridged entry has `source: "habitify_bridge"` with dose/unit/timing from a hardcoded `SUPPLEMENT_MAP` (resolved by name, a registry `habitify_names` alias, or — same day — the habit id). Since #4632 each bridged entry carries `habit_id` and is keyed on it; the bridge re-derives its own entries in full from the stored habitify day every run, so a completion no longer on that day is **retracted** (removed; a row left with no entries is deleted). Manual `log_supplement` entries (any other `source`) are preserved when the read-before-merge succeeds (#480/E-5); if that read fails the bridge never retracts, but a write of bridge entries in that run can replace same-day manual entries (pre-existing behaviour).
 
 ### weather (Seattle daily weather)
 

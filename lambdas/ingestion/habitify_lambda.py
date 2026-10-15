@@ -956,14 +956,14 @@ def supplement_bridge(items: list[dict], date_str: str) -> None:
     are re-derived IN FULL every run, so a completion that is no longer on the stored day
     is RETRACTED — the entry leaves the row, and a row left holding nothing is deleted.
     (Whether an un-tick in the app reaches the stored day at all is #4644 Q27; this is
-    only the bridge following the stored record.) Manual entries are never touched.
+    only the bridge following the stored record.) Manual entries are preserved when the
+    read-before-merge succeeds; a failed read never retracts.
     """
     if not items or not (items[0].get("habit_statuses") or items[0].get("habits")):
         return  # no habit map at all = nothing known about the day, so nothing to retract
-    sk = f"DATE#{date_str}"
     read_ok = True
     try:
-        existing = _table.get_item(Key={"pk": _SUPPLEMENTS_PK, "sk": sk}).get("Item") or {}
+        existing = _table.get_item(Key={"pk": _SUPPLEMENTS_PK, "sk": f"DATE#{date_str}"}).get("Item") or {}
     except Exception as ge:
         logger.warning("Supplement bridge: read-before-merge failed (%s) — writing bridge entries only", ge)
         existing, read_ok = {}, False
@@ -979,12 +979,12 @@ def supplement_bridge(items: list[dict], date_str: str) -> None:
     retracted = sum(1 for e in prior_bridge if _bridge_key(e.get("habit_id"), e.get("name")) not in kept)
     try:
         if not entries and not manual_entries:
-            _table.delete_item(Key={"pk": _SUPPLEMENTS_PK, "sk": sk})
+            _table.delete_item(Key={"pk": _SUPPLEMENTS_PK, "sk": f"DATE#{date_str}"})
         else:
             _table.put_item(
                 Item={
                     "pk": _SUPPLEMENTS_PK,
-                    "sk": sk,
+                    "sk": f"DATE#{date_str}",
                     "date": date_str,
                     "source": "supplements",
                     "schema_version": 1,
