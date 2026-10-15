@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, cast
 
 from boto3.dynamodb.conditions import Key
+from common.digest_utils import filter_day_rows
 from experiment.phase_filter import with_phase_filter  # ADR-058
 from training.muscle_volume import normalize_hevy_items, working_sets_by_muscle  # #4071/#4095 — THE per-muscle computation
 
@@ -183,6 +184,43 @@ def _daily_modality_minutes(activities_30d, ah_30d, experiment_start: str) -> li
         _dm_entry["total_min"] = _dm_total
         daily_modality_minutes_30d.append(_dm_entry)
     return daily_modality_minutes_30d
+
+
+def _whoop_strain_and_workouts(table, whoop_30d: list, d30: str, today: str) -> tuple:
+    """(avg_strain, whoop_workouts) for /api/training_overview — #4629, the #3442 class at this site.
+
+    The whoop partition interleaves DATE#<d> day rows with DATE#<d>#WORKOUT#<id> sub-rows, and a
+    workout running across 00:00 UTC is stored under two date keys. So:
+      * avg_strain is the mean over DAY rows only (a workout's own strain is not a day's strain),
+        complete days only (#1084: today's day strain still accrues);
+      * whoop_workouts holds WORKOUT sub-rows only (the range query below also returns the day
+        rows that sort between its bounds), one per workout id — the earliest date key wins.
+    Whoop zone minutes are NOT added to the served Zone 2 total here: that number's definition
+    is #4627's (gate:owner), and the zone values only became real with #4629's writer fix.
+    """
+    strain_vals = [float(w["strain"]) for w in filter_day_rows(whoop_30d) if w.get("strain") and _row_day(w) < today]
+    avg_strain = round(sum(strain_vals) / len(strain_vals), 1) if len(strain_vals) >= _MIN_DAILY_AVG_N else None
+    by_id: dict = {}
+    try:
+        resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot workouts
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}whoop")
+                    & Key("sk").between(f"DATE#{d30}#WORKOUT#", f"DATE#{today}#WORKOUT#~"),
+                }
+            )
+        )
+        for w in _decimal_to_float(resp.get("Items", [])):
+            sk = str(w.get("sk", ""))
+            if "#WORKOUT#" in sk:
+                by_id.setdefault(str(w.get("workout_id") or sk.split("#WORKOUT#", 1)[1]), w)
+    except Exception as e:
+        logger.warning(f"[training_overview] Whoop workout query failed (non-fatal): {e}")
+    return avg_strain, list(by_id.values())
+
+
+def _row_day(w: dict) -> str:
+    return (w.get("date") or w.get("sk", "").replace("DATE#", ""))[:10]
 
 
 def training_overview(*, _g) -> dict:
@@ -466,41 +504,8 @@ def training_overview(*, _g) -> dict:
     _exp_start_date = datetime.strptime(EXPERIMENT_START, "%Y-%m-%d")
     _days_since_exp = (datetime.now(timezone.utc) - _exp_start_date.replace(tzinfo=timezone.utc)).days + 1
 
-    # Whoop strain (30d)
-    whoop_30d = _query_source("whoop", d30, today)
-    # #1084 sibling guard: day strain accrues until midnight, so today's row is a
-    # partial — exclude it, and require the same complete-day floor as the steps
-    # mean before claiming a 30d average.
-    strain_vals = [
-        float(w["strain"]) for w in whoop_30d if w.get("strain") and (w.get("date") or w.get("sk", "").replace("DATE#", ""))[:10] < today
-    ]
-    avg_strain = round(sum(strain_vals) / len(strain_vals), 1) if len(strain_vals) >= _MIN_DAILY_AVG_N else None
-
-    # Whoop workouts — per-workout HR zone data (enriches Strava)
-    whoop_workouts = []
-    try:
-        resp = table.query(
-            **with_phase_filter(
-                {  # ADR-058: hide pilot workouts
-                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}whoop")
-                    & Key("sk").between(f"DATE#{d30}#WORKOUT#", f"DATE#{today}#WORKOUT#~"),
-                }
-            )
-        )
-        whoop_workouts = _decimal_to_float(resp.get("Items", []))
-        # Add Whoop Z2 minutes from actual HR zones to the Z2 calculation
-        for ww in whoop_workouts:
-            z2_from_whoop = float(ww.get("zone_2_minutes", 0) or 0)
-            if z2_from_whoop > 0:
-                z2_minutes_30d += z2_from_whoop
-                _ww_date = ww.get("date") or ww.get("sk", "").replace("DATE#", "")[:10]
-                if (_ww_date or "") >= _d7_cal:
-                    z2_trailing_7d += z2_from_whoop
-        # Recalculate Z2 weekly avg with Whoop data
-        if whoop_workouts:
-            z2_weekly_avg, z2_pct = _z2_weekly_stats(z2_minutes_30d)
-    except Exception as e:
-        logger.warning(f"[training_overview] Whoop workout query failed (non-fatal): {e}")
+    # Whoop strain (30d) + workouts — day rows and #WORKOUT# sub-rows kept apart (#4629, the #3442 class)
+    avg_strain, whoop_workouts = _whoop_strain_and_workouts(table, _query_source("whoop", d30, today), d30, today)
 
     # Hevy — latest strength session info
     hevy_items = _query_source("hevy", d30, today)
