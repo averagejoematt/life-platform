@@ -429,7 +429,8 @@ export function frontSlots(edition, b, base = "/") {
     // Round 8b: every number on the first screen is a door — the record to the coaches, the
     // weight to its trend. A failed block prints its own sentence, with no door.
     "ck-record": recordLine(b.record) ? `<a href="${esc(base)}coaches/">${esc(recordLine(b.record))}</a>` : esc((b.record && b.record.absent_text) || ""),
-    "ck-mark": F.markHTML(usable(b.week) ? b.week.data.weight_series : null, e.as_of, t.start_weight_lbs, t.goal_weight_lbs),
+    // No weigh-in in the window draws no picture; the slot then says so (#4586 box 2).
+    "ck-mark": F.markHTML(usable(b.week) ? b.week.data.weight_series : null, e.as_of, t.start_weight_lbs, t.goal_weight_lbs) || soft(usable(b.week) ? "No weigh-in in the last 28 days." : (b.week && b.week.absent_text) || "The weigh-ins are not served right now."),
     "ck-mark-caption": F.markCaption(b.today, e) ? `<a href="${esc(base)}trend/?m=weight">${F.markCaption(b.today, e)}</a>` : esc((b.today && b.today.absent_text) || ""),
     ...words,
     // The argument: the open bet is the edition's; the lines come in mountFront from the
@@ -556,18 +557,26 @@ async function mountFront(edition, b) {
   fillSlots(frontReadSlots(edition, b, base));
 }
 
+// The week page's two slots that read a block each, as { id: html } — `null` removes the
+// element. A section with nothing to show does not render its heading (round 8), so an absent
+// lead read removes the whole section; a read that failed says so instead. Pure, so the
+// absence tests drive it (#4586 box 2).
+export function weekReadSlots(b, base = "/") {
+  const lead = F.leadReadHTML(leadReadOf(b), base);
+  const sheet = sheetLine(characterOf(b));
+  const out = { "ck-sheet-line": sheet ? `<a class="ck-link" href="${esc(base)}sheet/">${esc(`${sheet}: the character sheet`)}</a>` : esc(b.sheet.absent_text || "The character sheet is not served right now.") };
+  if (lead) out["ck-lead-read"] = lead;
+  else if (b.lead_read.state === "unavailable") out["ck-lead-read"] = soft(b.lead_read.absent_text || "The lead coach’s read is not served right now.");
+  else out["ck-lead-section"] = null;
+  return out;
+}
 // The week page: the edition, and the chapter's published transcript for its quotes.
 async function mountWeek(edition, b) {
   const base = document.body.dataset.ckBase || "/";
   fillSlots(weekSlots(edition, b, base));
   // Round 8: a section with nothing to show does not render its heading; a read that failed
   // says so instead.
-  const lead = F.leadReadHTML(leadReadOf(b), base);
-  if (lead) fill("ck-lead-read", lead);
-  else if (b.lead_read.state === "unavailable") fill("ck-lead-read", soft(b.lead_read.absent_text));
-  else document.getElementById("ck-lead-section")?.remove();
-  const sheet = sheetLine(characterOf(b));
-  fill("ck-sheet-line", sheet ? `<a class="ck-link" href="${esc(base)}sheet/">${esc(`${sheet}: the character sheet`)}</a>` : esc(b.sheet.absent_text || ""));
+  fillSlots(weekReadSlots(b, base));
   const pod = usable(b.chapter) && usable(b.chapter.data.podcast) ? b.chapter.data.podcast.data : null;
   const transcriptUrl = pod && /\.mp3$/.test(pod.mp3_url || "") ? pod.mp3_url.replace(/\.mp3$/, ".transcript.json") : "";
   const transcript = transcriptUrl ? await tryJSON(transcriptUrl) : null;
