@@ -409,7 +409,9 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
     # The weekly card is derived from the daily run, not a second cron.
     weekly_key = None
     day_n = pacific_day_n(EXPERIMENT_START_DATE, date)
-    if day_n and week_close_day(date, EXPERIMENT_START_DATE) == date:
+    # day_n >= 7: genesis day is its own close day in week_close_day (the Day-1 baseline set) but is
+    # not a week -- the weekly card needs a 7-day window (#3761 verifier item 3).
+    if day_n >= 7 and week_close_day(date, EXPERIMENT_START_DATE) == date:
         try:
             week_n = day_n // 7
             wk_start = recap_data._day_range(EXPERIMENT_START_DATE, date)[-7]

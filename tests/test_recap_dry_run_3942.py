@@ -87,3 +87,13 @@ def test_a_dry_run_that_the_gate_holds_writes_no_row_either(harness, monkeypatch
     assert puts == {} and records == {}
     out = C.render_for_date("2026-09-20", deliver=True, force=True, dry_run=False)
     assert out["outcome"] == "held" and set(records) == {"DATE#2026-09-20"}, "the held row IS written when not a dry run"
+
+
+def test_genesis_day_renders_no_weekly_card_and_no_error_3761(harness, monkeypatch):
+    """week_close_day treats genesis as its own close day; the card must not read that as a week (IndexError, week_n 0)."""
+    from content import recap_data
+
+    C, puts, records = harness
+    monkeypatch.setattr(recap_data, "day_facts", lambda *a, **k: _full(date="2026-09-06", day_n=1))
+    out = C.render_for_date("2026-09-06", deliver=True, force=True, dry_run=True)
+    assert "weekly" not in out, out.get("weekly")
