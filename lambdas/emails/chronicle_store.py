@@ -251,14 +251,14 @@ def publish_holds(week_num, title, stats_line, raw_installment, desk, dry_run, *
     kind, found = ("story_door_hold", door) if door else ("craft_hold", craft)
     if not found:
         return None
-    logger.error(f"[{'story-door' if door else 'craft'}] BLOCKED chronicle week {week_num} -- {found}")
+    logger.error(f"[{'story-door' if door else 'craft'}] BLOCKED chronicle week {week_num} — {found}")
     what = (
         "the platform's automatic check on what the series puts on the record" if door else "the series' craft standard after its rewrites"
     )
     return held_week(
         week_num,
         kind,
-        f"Week {week_num}'s installment was generated but withheld before publishing -- it didn't clear {what}. "
+        f"Week {week_num}'s installment was generated but withheld before publishing — it didn't clear {what}. "
         "No content was published or stored for this week.",
         json.dumps({"status": kind, "week": week_num, "findings": found}),
         status_code=200,
