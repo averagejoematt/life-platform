@@ -432,6 +432,7 @@ async function mountDay(base) {
 
 // How each measure is drawn and described: a COUNT is scaled from zero and has a meaningful
 // average; a LEVEL (weight, sleep, recovery, a lift) is a line with no average.
+export const NO_READINGS = "Nothing has been recorded for this yet.";
 const COUNTS = new Set(["steps", "protein", "calories", "carbs", "fat", "training"]);
 
 async function mountTrend(base) {
@@ -495,8 +496,10 @@ async function mountTrend(base) {
   const chart = COUNTS.has(measure)
     ? barChartHTML(points, write, name, { target: sentenceOpts.floor ?? null, targetWords: sentenceOpts.floorWords ? sentenceOpts.floorWords.replace(/^my /, "the ") : "" })
     : trendChartHTML(points, write, name);
-  fill("ck-chart", points.length ? `${soft(trendSentence(points, write, sentenceOpts))}${chart}${COUNTS.has(measure) ? soft(weekOnWeek(points, write)) : ""}` : soft("Nothing has been recorded for this yet."));
+  fill("ck-chart", points.length ? `${soft(trendSentence(points, write, sentenceOpts))}${chart}${COUNTS.has(measure) ? soft(weekOnWeek(points, write)) : ""}` : soft(NO_READINGS));
+  // No reading, no list: the section goes with its heading rather than standing empty (#4586 box 2).
   fill("ck-recent", recentRowsHTML(points, write, base));
+  if (!points.length) document.getElementById("ck-recent-section")?.remove();
   fill("ck-extra", extra);
   if (!extra) document.getElementById("ck-extra-section")?.remove();
   const related = relatedHTML(measure, base, from);

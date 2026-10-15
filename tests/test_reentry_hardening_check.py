@@ -274,3 +274,56 @@ def test_main_json_output_is_valid_json():
     data = json.loads(r.stdout)
     assert len(data) == 6
     assert all({"item", "status", "detail"} <= set(row.keys()) for row in data)
+
+
+# --- #4888 box 2: no docs/ACCOUNTS.md row may read UNDOCUMENTED beyond the carried set ---------
+# The two estate rows below are the owner's to fill (issue #4888 boxes 1 and 3; #4888 stays OPEN).
+# The issue was filed citing seven rows at lines 84-90; the live table has two, so the pin is the
+# measured two. Down-only: an eighth/third row reds, and so does a filled row left in the pin.
+ACCOUNTS_UNDOCUMENTED_COUNTS = {
+    "Which password manager + where its emergency/estate access lives": 1,
+    "MFA device + 2FA recovery-code locations (AWS root, GitHub, SSO)": 1,
+}
+
+
+def _undocumented_rows(text):
+    """Row label -> count, for every markdown table row whose text still reads UNDOCUMENTED."""
+    found = {}
+    for line in text.splitlines():
+        if line.lstrip().startswith("|") and "UNDOCUMENTED" in line:
+            label = line.strip().strip("|").split("|")[0].strip()
+            found[label] = found.get(label, 0) + 1
+    return found
+
+
+def _accounts_undocumented_verdict(text):
+    """'' when the rows equal the carried pin; otherwise a message naming every offender."""
+    found = _undocumented_rows(text)
+    new = sorted(set(found) - set(ACCOUNTS_UNDOCUMENTED_COUNTS))
+    healed = sorted(set(ACCOUNTS_UNDOCUMENTED_COUNTS) - set(found))
+    msgs = []
+    if new:
+        msgs.append(f"new UNDOCUMENTED row(s) in docs/ACCOUNTS.md: {new}")
+    if healed:
+        msgs.append(f"row(s) now filled - remove from ACCOUNTS_UNDOCUMENTED_COUNTS (down-only): {healed}")
+    return "; ".join(msgs)
+
+
+def test_accounts_undocumented_rows_equal_the_carried_set():
+    m = _load()
+    text = m.ACCOUNTS_PATH.read_text(encoding="utf-8")
+    assert _accounts_undocumented_verdict(text) == ""
+
+
+def test_accounts_undocumented_gate_mutation_control():
+    """Fixture copies: restoring the word on a filled row, or adding a row, turns the gate red."""
+    m = _load()
+    live = m.ACCOUNTS_PATH.read_text(encoding="utf-8")
+    assert _accounts_undocumented_verdict(live) == ""
+    # (a) a carried row filled but the pin not lowered -> red
+    filled = live.replace("⚠️ **UNDOCUMENTED — owner action required.** Record where", "Pointer recorded: where")
+    assert filled != live
+    assert "now filled" in _accounts_undocumented_verdict(filled)
+    # (b) a third row reading UNDOCUMENTED -> red
+    extra = live + "\n| Domain registrar login | UNDOCUMENTED |\n"
+    assert "Domain registrar login" in _accounts_undocumented_verdict(extra)
