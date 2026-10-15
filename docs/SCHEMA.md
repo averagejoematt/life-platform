@@ -309,6 +309,7 @@ Daily records (`sk = DATE#YYYY-MM-DD`) + workout sub-items (`sk = DATE#YYYY-MM-D
 | `kilojoule` | number | Daily energy (kJ) |
 | `average_heart_rate` | number | Daily avg HR (bpm) |
 | `max_heart_rate` | number | Daily max HR (bpm) |
+| `step_count` | number | Whoop's own daily step count, from the day's cycle record (vendor field from 2026-09-21; absent before, never 0-filled). Stored per source beside Apple's `steps` — never merged or compared at write time; which count a reader shows is the read-side resolver's (#4630). Back-fill: `scripts/whoop_steps_backfill_4630.py` |
 | `sleep_start` | string | ISO timestamp |
 | `sleep_end` | string | ISO timestamp |
 | `sleep_onset_minutes` | number | Minutes from midnight to sleep onset |
@@ -1005,7 +1006,7 @@ Note: Garmin auto-syncs activities to Strava. `garmin_activities` captures Garmi
 | Field | Type | Description |
 |-------|------|-------------|
 | `habits` | object | Map of habit name → count (Decimal: `1` = completed, `0` = not completed) |
-| `habit_statuses` | object | Per-habit structured status map (TD-11): status, completed_at, `miss_source` (`vendor`\|`platform`, present only when status is `failed` — #3666), etc. Since #422 also carries `notes` (list of verbatim in-app note strings for that day, clipped), `notes_at` (their created timestamps) and `note_channel: "habitify_note"` when the habit has notes — the PRIMARY habit-causality capture channel (a note on a done day = driver context; on a skipped/failed day = the why-missed reason). Stored raw — the `trigger:`/`reward:` line-prefix convention is interpreted on read by `lambdas/habit_causality.parse_note`, never inferred (ADR-104). |
+| `habit_statuses` | object | Per-habit structured status map (TD-11): status, completed_at, `habit_id` (the vendor's habit id, string — #4632, additive; absent on rows ingested before it and when the vendor sends none), `miss_source` (`vendor`\|`platform`, present only when status is `failed` — #3666), etc. Since #422 also carries `notes` (list of verbatim in-app note strings for that day, clipped), `notes_at` (their created timestamps) and `note_channel: "habitify_note"` when the habit has notes — the PRIMARY habit-causality capture channel (a note on a done day = driver context; on a skipped/failed day = the why-missed reason). Stored raw — the `trigger:`/`reward:` line-prefix convention is interpreted on read by `lambdas/habit_causality.parse_note`, never inferred (ADR-104). |
 | `by_group` | object | Map of AREA name → group stats object (see below). #3666: the group set is DERIVED from Habitify's live `/areas` response, not the hardcoded nine P40 names — those had been renamed to `Core`/`Optimize`/`Vice`, which left `by_group` empty and `total_possible` 0 on every stored day. |
 | `total_completed` | number | Total habits completed that day |
 | `total_possible` | number | Total habits tracked that day |
@@ -1403,7 +1404,7 @@ Access via `log_supplement`, `get_supplement_log`, `get_supplement_correlation` 
 
 Note: Daily Brief reads this partition to show today's logged supplements and 7-day adherence chips per supplement.
 
-**Habitify supplement bridge:** the habitify ingestion Lambda's post-store hook (`supplement_bridge` in `habitify_lambda.py`) side-writes checked supplement habits into this partition. The day's record carries `bridge_source: "habitify"` and each bridged entry has `source: "habitify_bridge"` with dose/unit/timing from a hardcoded `SUPPLEMENT_MAP`. The bridge **overwrites the day's record** (`put_item`) — manual `log_supplement` entries for the same day can be replaced on the next habitify sync.
+**Habitify supplement bridge:** the habitify ingestion Lambda's post-store hook (`supplement_bridge` in `habitify_lambda.py`) side-writes checked supplement habits into this partition. The day's record carries `bridge_source: "habitify"` and each bridged entry has `source: "habitify_bridge"` with dose/unit/timing from a hardcoded `SUPPLEMENT_MAP` (resolved by name, a registry `habitify_names` alias, or — same day — the habit id). Since #4632 each bridged entry carries `habit_id` and is keyed on it; the bridge re-derives its own entries in full from the stored habitify day every run, so a completion no longer on that day is **retracted** (removed; a row left with no entries is deleted). Manual `log_supplement` entries (any other `source`) are preserved when the read-before-merge succeeds (#480/E-5); if that read fails the bridge never retracts, but a write of bridge entries in that run can replace same-day manual entries (pre-existing behaviour).
 
 ### weather (Seattle daily weather)
 

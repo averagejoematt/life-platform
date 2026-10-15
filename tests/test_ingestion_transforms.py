@@ -167,6 +167,85 @@ def test_whoop_cycle_scored():
     assert _f(out["max_heart_rate"]) == 160
 
 
+def test_whoop_cycle_captures_the_vendor_step_count_as_its_own_field_4630():
+    """#4630 box 1: the archived v2 day payload carries ``step_count`` on the cycle RECORD (beside
+    ``score``, not inside it) and returns two cycles — the key day's first, the prior day's
+    overlapping one second. The writer reads records[0] (the same cycle ``strain`` comes from),
+    stores it under the vendor's own name, and never fabricates a 0 when the key is absent
+    (126 of 152 archived days predate 2026-09-21 and carry none)."""
+    import json as _json
+
+    fixture = os.path.join(os.path.dirname(__file__), "fixtures", "upstream", "whoop", "cycle.json")
+    with open(fixture) as fh:
+        raw = _json.load(fh)
+    out = _extract_cycle(raw)
+    assert out["step_count"] == Decimal(8421)  # records[0], not the prior cycle's 11237
+    assert isinstance(out["step_count"], Decimal)  # DDB-safe
+    assert "steps" not in out  # its own per-source name — never a merged/generic 'steps'
+
+    pre = _json.loads(_json.dumps(raw))
+    for rec in pre["records"]:
+        rec.pop("step_count")
+    assert "step_count" not in _extract_cycle(pre)  # absent stays absent, never 0
+    assert _f(_extract_cycle(pre)["strain"]) == 12.35  # the rest of the cycle is unchanged
+
+    bad = _json.loads(_json.dumps(raw))
+    bad["records"][0]["step_count"] = True  # a bool is not a count
+    assert "step_count" not in _extract_cycle(bad)
+
+
+def test_whoop_steps_backfill_plan_counts_only_rows_that_lack_the_field_4630():
+    """#4630 box 1's back-fill: the plan reads the archive through the writer's own extractor and
+    names only EXISTING day rows WITHOUT a count — never a new row, never an overwrite, never a
+    workout sub-row; the owner-run apply is conditioned the same way."""
+    import importlib.util
+    import json as _json
+
+    spec = importlib.util.spec_from_file_location(
+        "whoop_steps_backfill_4630", os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts", "whoop_steps_backfill_4630.py")
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    with open(os.path.join(os.path.dirname(__file__), "fixtures", "upstream", "whoop", "cycle.json")) as fh:
+        cycle = _json.load(fh)
+    no_steps = _json.loads(_json.dumps(cycle))
+    for rec in no_steps["records"]:
+        rec.pop("step_count")
+    payloads = {
+        "2026-09-21": {"raw": {"cycle": cycle}},  # count, row lacks it -> gains
+        "2026-09-22": {"raw": {"cycle": cycle}},  # count, row already has the same one
+        "2026-09-23": {"raw": {"cycle": cycle}},  # count, row has a different one -> reported, kept
+        "2026-09-24": {"raw": {"cycle": cycle}},  # count, no day row -> never created
+        "2026-09-20": {"raw": {"cycle": no_steps}},  # pre-field day
+        "2026-09-19": None,  # not archived
+    }
+    rows = [
+        {"sk": "DATE#2026-09-21"},
+        {"sk": "DATE#2026-09-21#WORKOUT#abc"},
+        {"sk": "DATE#2026-09-22", "step_count": Decimal(8421)},
+        {"sk": "DATE#2026-09-23", "step_count": Decimal(9000)},
+        {"sk": "DATE#2026-09-20"},
+        {"sk": "DATE#2026-09-19"},
+    ]
+    counts, gains = mod.plan(payloads, rows)
+    assert gains == {"DATE#2026-09-21": Decimal(8421)}
+    assert counts["rows_that_would_gain_step_count"] == 1
+    assert counts["archived_days_with_step_count"] == 4
+    assert counts["archived_count_without_day_row"] == 1
+    assert counts["stored_rows_differing"] == 1
+    assert counts["days_missing"] == 1 and counts["stored_day_rows"] == 5
+
+    calls = []
+
+    class _Table:
+        def update_item(self, **kw):
+            calls.append(kw)
+
+    assert mod.apply_gains(_Table(), "PK", gains) == 1
+    assert calls[0]["ConditionExpression"] == "attribute_exists(sk) AND attribute_not_exists(#f)"
+    assert calls[0]["ExpressionAttributeNames"] == {"#f": "step_count"}
+
+
 def test_whoop_workout_maps_known_and_unknown_sport():
     known = _extract_workout({"sport_id": 1, "start": "s", "end": "e", "score_state": "SCORED", "score": {"strain": 8.5}})
     assert known["sport_id"] == 1
