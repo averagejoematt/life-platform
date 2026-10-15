@@ -1475,3 +1475,174 @@ class TestReplayEndToEnd:
         hae.lambda_handler(_event(partial), _Ctx())
         _sync_stored(table)
         assert table.stored["blood_glucose_readings_count"] == 5, "a partial re-export must not lower a fuller stored count"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# #4628 box 3 — gait averages over the day's FULL reading set (fixture = the wire)
+# ──────────────────────────────────────────────────────────────────────────────
+
+_GAIT_WIRE = os.path.join(ROOT, "tests", "fixtures", "hae_gait_wire_4628", "payloads.json")
+_GAIT_FIELDS = {
+    "walking_speed": "walking_speed_mph",
+    "walking_step_length": "walking_step_length_in",
+    "walking_double_support_percentage": "walking_double_support_pct",
+    "walking_asymmetry_percentage": "walking_asymmetry_pct",
+}
+
+
+def _gait_wire():
+    with open(_GAIT_WIRE) as fh:
+        return json.load(fh)
+
+
+def _readings_by_field(payloads, utc_day):
+    """{stored_field: {timestamp: qty}} over every reading of `utc_day` in `payloads`."""
+    out = {f: {} for f in _GAIT_FIELDS.values()}
+    for p in payloads:
+        for m in p["data"]["metrics"]:
+            for r in m["data"]:
+                if hae.parse_date_str(r["date"]) == utc_day:
+                    out[_GAIT_FIELDS[m["name"]]][r["date"]] = float(r["qty"])
+    return out
+
+
+class TestGaitFullDayMean:
+    """Two REAL incremental deliveries for one UTC day (tests/fixtures/hae_gait_wire_4628,
+    read from the raw archive), driven through the real handler against a store that
+    persists between calls, then the second delivery re-sent. The stored gait value
+    must be the mean over every reading of the day — not the last payload's mean,
+    which is what the payload-local average stored on 40 of 40 field-days (#4628)."""
+
+    def test_the_stored_gait_average_is_the_mean_over_every_delivered_reading(self, handler_env):
+        _, table = handler_env
+        wire = _gait_wire()
+        day = wire["utc_day"]
+        payloads = [d["payload"] for d in wire["deliveries"]]
+        assert len(payloads) == 2
+
+        for p in payloads + [payloads[-1]]:  # the second delivery is re-sent: re-delivered readings
+            resp = json.loads(hae.lambda_handler(_event(p), _Ctx())["body"])
+            assert resp["status"] == "ok"
+            _sync_stored(table)
+
+        whole_day = _readings_by_field(payloads, day)
+        last_payload = _readings_by_field(payloads[-1:], day)
+        checked = 0
+        for field, readings in whole_day.items():
+            if not readings:
+                continue
+            want = round(sum(readings.values()) / len(readings), 2)
+            got = float(table.stored[field])
+            assert got == pytest.approx(want, abs=0.006), f"{field}: stored {got} != full-day mean {want}"
+            if len(readings) > len(last_payload[field]):
+                last_mean = round(sum(last_payload[field].values()) / len(last_payload[field]), 2)
+                assert got != pytest.approx(last_mean, abs=0.006), f"{field}: stored the LAST payload's mean"
+                checked += 1
+            # the reading map holds each delivered reading exactly once (no double count on re-send)
+            assert set(table.stored[f"_rd_{field}"]) == set(readings)
+        assert checked >= 3, "the fixture must exercise fields delivered across both payloads"
+
+    def test_a_first_sync_alone_stores_its_own_mean(self, wired):
+        _, table = wired
+        hae.merge_day_to_dynamo("2026-10-07", {"walking_speed_mph": 9.0}, reading_timestamps={"walking_speed_mph": {"t1": 2.0, "t2": 4.0}})
+        assert only_update(table)["walking_speed_mph"] == Decimal("3.0")
+
+    def test_gait_is_not_under_the_additive_guard(self):
+        assert not (hae._AVG_DEDUP_FIELDS & (hae._ACTIVITY_MAX_FIELDS | hae._READING_COUNT_GUARD_FIELDS))
+        assert hae._AVG_DEDUP_FIELDS == set(_GAIT_FIELDS.values())
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# #4628 box 5 — the scheduled integrity read: stored day total vs archived readings
+# ──────────────────────────────────────────────────────────────────────────────
+
+from datetime import datetime, timezone  # noqa: E402
+
+from operational import hae_additive_integrity_qa as integ  # noqa: E402
+from operational.qa_check import CONTENT_TRUTH, Check  # noqa: E402
+
+_NOW = datetime(2026, 10, 8, 12, 0, tzinfo=timezone.utc)  # window = 2026-10-05..07 UTC, fixed clock
+_RAW = "raw/matthew/health_auto_export"
+
+
+class _ListingS3(FakeS3):
+    """FakeS3 + the one listing call the integrity read makes."""
+
+    def list_objects_v2(self, Bucket=None, Prefix=None, **kwargs):
+        return {"Contents": [{"Key": k} for k in sorted(self.objects) if k.startswith(Prefix)]}
+
+
+def _steps_payload(readings, source="Matt 17"):
+    """An incremental HAE delivery: only this sync's step readings (the wire shape)."""
+    return {
+        "data": {
+            "metrics": [{"name": "step_count", "units": "count", "data": [{"date": t, "qty": q, "source": source} for t, q in readings]}]
+        }
+    }
+
+
+_SYNC_1 = [("2026-10-07 08:00:00 +0000", 1200), ("2026-10-07 09:00:00 +0000", 800)]
+_SYNC_2 = [("2026-10-07 13:00:00 +0000", 900)]
+_SYNC_3 = [("2026-10-07 18:00:00 +0000", 1500), ("2026-10-07 19:00:00 +0000", 1100)]
+
+
+def _run_check(s3, table):
+    (c,) = integ.check_hae_additive_integrity(table, s3, "matthew-life-platform", Check, CONTENT_TRUTH, now_utc=_NOW)
+    return c
+
+
+class TestAdditiveIntegrityCheck:
+    def test_it_catches_todays_writer_keeping_the_largest_sync(self, handler_env):
+        """Three incremental syncs through the REAL handler (today's max-of-sync +
+        GREATEST writer), then the check over the same archived payloads: the stored
+        steps are the largest sync (2,600), the delivered day is 5,500 — a shortfall."""
+        s3, table = handler_env
+        archived = {}
+        for i, sync in enumerate((_SYNC_1, _SYNC_2, _SYNC_3)):
+            hae.lambda_handler(_event(_steps_payload(sync)), _Ctx())
+            _sync_stored(table)
+            archived[f"{_RAW}/2026/10/0{7 + (i == 2)}_sync{i}.json"] = _steps_payload(sync)
+        assert float(table.stored["steps"]) == 2600.0  # the specimen #4628 describes
+        c = _run_check(_ListingS3(archived), table)
+        assert c.passed is None and c.chronic is True
+        assert c.message.startswith("1 of 1 Apple Health field-days stored BELOW") and "steps 1" in c.message
+
+    def test_a_stored_day_equal_to_the_delivered_readings_is_green(self):
+        archived = {f"{_RAW}/2026/10/07_a.json": _steps_payload(_SYNC_1), f"{_RAW}/2026/10/08_b.json": _steps_payload(_SYNC_3)}
+        c = _run_check(_ListingS3(archived), FakeTable({"steps": Decimal("4600")}))
+        assert c.passed is True and c.message.startswith("0 of 1 ")
+
+    def test_a_re_delivered_reading_is_counted_once(self):
+        archived = {f"{_RAW}/2026/10/07_a.json": _steps_payload(_SYNC_1), f"{_RAW}/2026/10/07_b.json": _steps_payload(_SYNC_1 + _SYNC_2)}
+        assert integ.delivered_day_values([_steps_payload(_SYNC_1), _steps_payload(_SYNC_1 + _SYNC_2)], ["2026-10-07"]) == {
+            ("2026-10-07", "steps"): 2900.0
+        }
+        assert _run_check(_ListingS3(archived), FakeTable({"steps": Decimal("2900")})).passed is True
+
+    def test_two_sources_are_never_summed_into_a_double_count(self):
+        payloads = [_steps_payload(_SYNC_1, "Matt 17"), _steps_payload(_SYNC_1, "Apple Watch")]
+        assert integ.delivered_day_values(payloads, ["2026-10-07"]) == {("2026-10-07", "steps"): 2000.0}
+
+    def test_readings_outside_the_window_are_not_checked(self):
+        assert integ.delivered_day_values([_steps_payload([("2026-10-01 08:00:00 +0000", 5)])], ["2026-10-07"]) == {}
+
+    def test_an_unreadable_archive_is_an_alarmed_warn_never_green(self):
+        class _Denied(_ListingS3):
+            def get_object(self, **kw):
+                raise RuntimeError("AccessDenied")
+
+        c = _run_check(_Denied({f"{_RAW}/2026/10/07_a.json": _steps_payload(_SYNC_1)}), FakeTable({"steps": Decimal("1")}))
+        assert c.passed is None and c.chronic is False and "s3:GetObject" in c.message
+
+    def test_no_delivered_readings_is_not_evaluable_rather_than_green(self):
+        c = _run_check(_ListingS3({}), FakeTable({"steps": Decimal("1")}))
+        assert c.passed is None and "not evaluable" in c.message
+
+    def test_every_additive_field_resolves_to_a_metric_name_the_writer_maps(self):
+        assert set(integ._NAME_TO_FIELD.values()) == set(integ.ADDITIVE_FIELDS)
+        assert set(integ.ADDITIVE_FIELDS) <= hae._ACTIVITY_MAX_FIELDS
+
+    def test_the_listing_covers_every_receipt_day_through_today(self):
+        days = integ.window_days(_NOW)
+        assert days == ["2026-10-05", "2026-10-06", "2026-10-07"]
+        assert integ.archive_folder_prefixes(_RAW, days, _NOW)[-1] == f"{_RAW}/2026/10/08_"

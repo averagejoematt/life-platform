@@ -1,0 +1,166 @@
+{
+ "_provenance": "#4628: two real incremental Health Auto Export deliveries, read (read-only) from the raw archive raw/matthew/health_auto_export/<archive_leaf> (content-hash leaf elided). Each payload's metrics list is trimmed to the four gait metrics; every remaining reading (date, qty, source) and every metric's name/units is verbatim. Both payloads carry readings for the SAME UTC day, 2026-10-07 (07:57 -0700 = 14:57Z; 14:59..16:42 -0700 = 21:59Z..23:42Z).",
+ "utc_day": "2026-10-07",
+ "deliveries": [
+  {
+   "archive_leaf": "2026/10/07_<content-hash>.json",
+   "payload": {
+    "data": {
+     "metrics": [
+      {
+       "data": [
+        {
+         "date": "2026-10-07 07:57:00 -0700",
+         "qty": 18.503937007874015,
+         "source": "Matt 17"
+        }
+       ],
+       "name": "walking_step_length",
+       "units": "in"
+      },
+      {
+       "data": [
+        {
+         "date": "2026-10-07 07:57:00 -0700",
+         "qty": 2.102720114531138,
+         "source": "Matt 17"
+        }
+       ],
+       "name": "walking_speed",
+       "units": "mi/hr"
+      },
+      {
+       "data": [
+        {
+         "date": "2026-10-07 07:57:00 -0700",
+         "qty": 37,
+         "source": "Matt 17"
+        }
+       ],
+       "name": "walking_double_support_percentage",
+       "units": "%"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "archive_leaf": "2026/10/08_<content-hash>.json",
+   "payload": {
+    "data": {
+     "metrics": [
+      {
+       "data": [
+        {
+         "date": "2026-10-07 14:59:00 -0700",
+         "qty": 33.07086614173228,
+         "source": "Matt 17"
+        },
+        {
+         "date": "2026-10-07 15:33:00 -0700",
+         "qty": 28.346456692913385,
+         "source": "Matt 17"
+        },
+        {
+         "date": "2026-10-07 15:34:00 -0700",
+         "qty": 27.95275590551181,
+         "source": "Matt 17"
+        },
+        {
+         "date": "2026-10-07 16:11:00 -0700",
+         "qty": 27.95275590551181,
+         "source": "Matt 17"
+        },
+        {
+         "date": "2026-10-07 16:42:00 -0700",
+         "qty": 29.52755905511811,
+         "source": "Matt 17"
+        }
+       ],
+       "name": "walking_step_length",
+       "units": "in"
+      },
+      {
+       "data": [
+        {
+         "date": "2026-10-07 14:59:00 -0700",
+         "qty": 3.154080171796707,
+         "source": "Matt 17"
+        },
+        {
+         "date": "2026-10-07 15:33:00 -0700",
+         "qty": 2.840909090909091,
+         "source": "Matt 17"
+        },
+        {
+         "date": "2026-10-07 15:34:00 -0700",
+         "qty": 2.6619541875447386,
+         "source": "Matt 17"
+        },
+        {
+         "date": "2026-10-07 16:11:00 -0700",
+         "qty": 2.706692913385827,
+         "source": "Matt 17"
+        },
+        {
+         "date": "2026-10-07 16:42:00 -0700",
+         "qty": 2.930386542591267,
+         "source": "Matt 17"
+        }
+       ],
+       "name": "walking_speed",
+       "units": "mi/hr"
+      },
+      {
+       "data": [
+        {
+         "date": "2026-10-07 14:59:00 -0700",
+         "qty": 33.8,
+         "source": "Matt 17"
+        },
+        {
+         "date": "2026-10-07 15:33:00 -0700",
+         "qty": 33.9,
+         "source": "Matt 17"
+        },
+        {
+         "date": "2026-10-07 15:34:00 -0700",
+         "qty": 34.9,
+         "source": "Matt 17"
+        },
+        {
+         "date": "2026-10-07 16:11:00 -0700",
+         "qty": 34.2,
+         "source": "Matt 17"
+        },
+        {
+         "date": "2026-10-07 16:42:00 -0700",
+         "qty": 33.7,
+         "source": "Matt 17"
+        }
+       ],
+       "name": "walking_double_support_percentage",
+       "units": "%"
+      },
+      {
+       "data": [
+        {
+         "date": "2026-10-07 16:11:00 -0700",
+         "qty": 0,
+         "source": "Matt 17"
+        },
+        {
+         "date": "2026-10-07 16:42:00 -0700",
+         "qty": 0,
+         "source": "Matt 17"
+        }
+       ],
+       "name": "walking_asymmetry_percentage",
+       "units": "%"
+      }
+     ]
+    }
+   }
+  }
+ ]
+}
