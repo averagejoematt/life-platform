@@ -309,6 +309,7 @@ Daily records (`sk = DATE#YYYY-MM-DD`) + workout sub-items (`sk = DATE#YYYY-MM-D
 | `kilojoule` | number | Daily energy (kJ) |
 | `average_heart_rate` | number | Daily avg HR (bpm) |
 | `max_heart_rate` | number | Daily max HR (bpm) |
+| `step_count` | number | Whoop's own daily step count, from the day's cycle record (vendor field from 2026-09-21; absent before, never 0-filled). Stored per source beside Apple's `steps` — never merged or compared at write time; which count a reader shows is the read-side resolver's (#4630). Back-fill: `scripts/whoop_steps_backfill_4630.py` |
 | `sleep_start` | string | ISO timestamp |
 | `sleep_end` | string | ISO timestamp |
 | `sleep_onset_minutes` | number | Minutes from midnight to sleep onset |
