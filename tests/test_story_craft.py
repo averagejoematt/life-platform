@@ -338,3 +338,18 @@ def test_lines_already_heard_are_findings():
     prev = {3: "MAX: One good scan is one good scan, and fast is fine if the protein holds."}
     assert c.repeat_findings("MARCUS: Look, one good scan is one good scan, and fast is fine if it holds.", prev)
     assert c.repeat_findings("MARCUS: A single scan tells us little on its own.", prev) == []
+
+
+def test_the_desk_hands_the_publish_path_only_storys_crafts_residual_verdict(monkeypatch):
+    """#4545 box 3: craft_post/craft_episode/craft_dek are the sublists of post/episode/dek the hold is built on."""
+    from content import story_pipeline, story_writers
+
+    monkeypatch.setattr(story_writers, "fact_check", lambda *a, **k: [])
+    g = story_pipeline._Gates(3, {"weight": {"available": True}}, {}, {})
+    md = '"T"\n\nDay 24, and Matthew had trained twenty-three days straight. His recovery read high.\n\nMore.'
+    assert _of(g.craft_post(md), "which way the scale went") and all(f in g.post(md, "end_turn") for f in g.craft_post(md))
+    ep = {"turns": [{"speaker": "elena", "line": "Hello."}]}
+    assert _of(g.craft_episode(ep), "never names the segment")
+    assert g.craft_dek("Day 24: his HRV rose.") and all(
+        f"dek: {f}" in g.dek("Day 24: his HRV rose.") for f in g.craft_dek("Day 24: his HRV rose.")
+    )

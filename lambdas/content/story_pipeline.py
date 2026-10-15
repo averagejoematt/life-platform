@@ -58,22 +58,36 @@ class _Gates:
             return []
         return [
             f"dek: {f}"
-            for f in story_checks.ungrounded_numbers(top_line, self.allowed)
-            + story_checks.story_door(top_line)
-            + story_craft.banned(top_line)
-            + story_craft.top_line_findings(top_line)
+            for f in story_checks.ungrounded_numbers(top_line, self.allowed) + story_checks.story_door(top_line) + self.craft_dek(top_line)
         ] + [f"dek: {f}" for f in story_writers.fact_check(top_line, self.dossier, context=self.context)]
 
-    def post(self, md: str, stop: Optional[str]) -> List[str]:
+    def craft_dek(self, top_line: str) -> List[str]:
+        return story_craft.banned(top_line) + story_craft.top_line_findings(top_line)
+
+    def craft_post(self, md: str) -> List[str]:
+        """Only story_craft's verdict on a chronicle post: what the publish path holds the installment on (#4545)."""
         _title, body = story_writers.split_title(md)
+        return (
+            story_craft.chronicle_findings(body, week=self.n, weight_known=self.weight_known)
+            + story_craft.callback_findings(body, self.previous)
+            + story_craft.quote_findings(body, self.corpus)
+            + story_craft.repeat_findings(body, self.previous, self.owner_lines)
+        )
+
+    def craft_episode(self, ep: Dict[str, Any]) -> List[str]:
+        txt = story_writers.episode_text(ep)
+        return (
+            story_craft.episode_findings(ep.get("turns", []), segments=self.n > 0)
+            + story_craft.callback_findings(txt, self.previous)
+            + story_craft.repeat_findings(txt, self.previous, self.owner_lines)
+        )
+
+    def post(self, md: str, stop: Optional[str]) -> List[str]:
         return (
             story_checks.all_findings(
                 md, stop_reason=stop, allowed=self.allowed, not_yet_exported=self.nye, footer_pattern=story_writers.CHRONICLE_FOOTER
             )
-            + story_craft.chronicle_findings(body, week=self.n, weight_known=self.weight_known)
-            + story_craft.callback_findings(body, self.previous)
-            + story_craft.quote_findings(body, self.corpus)
-            + story_craft.repeat_findings(body, self.previous, self.owner_lines)
+            + self.craft_post(md)
             + story_writers.fact_check(md, self.dossier, context=self.context)
         )
 
@@ -84,9 +98,7 @@ class _Gates:
             + story_checks.story_door(txt, not_yet_exported=self.nye)
             + story_checks.ungrounded_numbers(txt, self.allowed)
             + story_writers.spoken_word_findings(ep.get("turns", []), body_weights=self.weights)
-            + story_craft.episode_findings(ep.get("turns", []), segments=self.n > 0)
-            + story_craft.callback_findings(txt, self.previous)
-            + story_craft.repeat_findings(txt, self.previous, self.owner_lines)
+            + self.craft_episode(ep)
             + story_writers.fact_check(txt, self.dossier, context=self.context)
         )
 
@@ -209,4 +221,6 @@ def live_week(table: Any, date_str: str, *, chronicle_pk: str = "USER#matthew#SO
         "episode": ep,
         "ledger": new_ledger,
         "findings": {"post": findings, "episode": efind},
+        # story_craft's residual verdict on the final texts: the publish path holds the installment on any of these (#4545)
+        "craft_findings": g.craft_post(f'"{title}"\n\n{body}') + g.craft_episode(ep) + g.craft_dek(budget.get("top_line") or ""),
     }

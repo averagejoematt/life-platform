@@ -64,7 +64,7 @@ class _Log:
     warning = error = info
 
 
-def _wire(monkeypatch, *, desk_returns=True, existing=None):
+def _wire(monkeypatch, *, desk_returns=True, existing=None, craft=()):
     from content import story_pipeline
     from health import whole_life_context
 
@@ -83,6 +83,7 @@ def _wire(monkeypatch, *, desk_returns=True, existing=None):
             "episode": {},
             "ledger": {},
             "findings": {"post": [], "episode": []},
+            "craft_findings": list(craft),
         }
 
     def _model(*a, **k):
@@ -189,3 +190,15 @@ def test_a_publishing_run_keeps_the_gather_windows_date(monkeypatch):
     body = json.loads(m._handler_core({"dry_run": True}, None)["body"])
     assert calls == [(LEGACY_END,)] and body["date"] == LEGACY_END and body["week"] == 5
     assert any(line.startswith("Data packet:") for line in log.lines)
+
+
+def test_a_craft_finding_holds_the_installment_and_a_clean_one_publishes(monkeypatch):
+    """#4545 box 3: story_craft's residual finding on the final desk texts holds the week (nothing mailed, stored or
+    returned as the installment); the same week with no craft finding goes through. Mutation control: drop the
+    ``craft_findings`` list from the desk's return (or the handler's hold) and the first assertion goes red."""
+    _seen, _log = _wire(monkeypatch, craft=["opens on a date, not the day count"])
+    held = m._handler_core({"dry_run": True, "week": 4}, None)
+    body = json.loads(held["body"])
+    assert body["status"] == "craft_hold" and body["findings"] == ["opens on a date, not the day count"]
+    _seen, _log = _wire(monkeypatch)
+    assert json.loads(m._handler_core({"dry_run": True, "week": 4}, None)["body"])["status"] == "dry_run"

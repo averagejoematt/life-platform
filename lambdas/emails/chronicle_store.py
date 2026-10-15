@@ -235,6 +235,38 @@ def held_week(week_num, reason, display, body, status_code=500, dry_run=False, *
     return {"statusCode": status_code, "body": body}
 
 
+def publish_holds(week_num, title, stats_line, raw_installment, desk, dry_run, *, _g):
+    """The two fail-closed holds at the one point every writer passes; None when the week clears both.
+
+    Story door (#4538): the ONE shared reader-surface check -- no cycle/reset/attempt count in the title, the stat line
+    or the body, no off-record specifics. The desk's writers already rewrite against it; this holds the week when a
+    rewrite did not clear it, or when the writer was not the desk.
+    Craft (#4545): a desk installment that still carries a story_craft finding after its corrective rewrites is held --
+    the craft standard is a gate on the publish path, not a log line."""
+    from content import story_checks
+
+    logger = _g["logger"]
+    door = story_checks.reader_surface(f"{title}\n{stats_line}\n{raw_installment}")
+    craft = (desk or {}).get("craft_findings") or []
+    kind, found = ("story_door_hold", door) if door else ("craft_hold", craft)
+    if not found:
+        return None
+    logger.error(f"[{'story-door' if door else 'craft'}] BLOCKED chronicle week {week_num} -- {found}")
+    what = (
+        "the platform's automatic check on what the series puts on the record" if door else "the series' craft standard after its rewrites"
+    )
+    return held_week(
+        week_num,
+        kind,
+        f"Week {week_num}'s installment was generated but withheld before publishing -- it didn't clear {what}. "
+        "No content was published or stored for this week.",
+        json.dumps({"status": kind, "week": week_num, "findings": found}),
+        status_code=200,
+        dry_run=dry_run,
+        _g=_g,
+    )
+
+
 def dry_run_response(week_num, date_str, title, stats_line, raw_markdown, conf_level, has_board, share_kit, recap, preview_mode, *, _g):
     """#2221: the {"dry_run": true} rehearsal's report.
 
