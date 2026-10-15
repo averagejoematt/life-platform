@@ -52,6 +52,26 @@ def _main_green() -> str:
     return f"branch={branch}  main CI/CD={state}"
 
 
+def _site_deploy() -> str:
+    """The newest site-deploy.yml run's conclusion (#4703, incident 2026-10-14).
+
+    A failed site deploy is silent: the workflow has no production gate and nothing pages
+    on its red, so merged `site/**` work can revert or never publish for days — 3 d in
+    #3878 (2026-09-16→19), 23 h in #4703 (2026-10-14→15). This line is the one place
+    every session reads it. A query failure prints UNVERIFIED, never a blank.
+    """
+    code, out = gh(
+        "api",
+        "repos/averagejoematt/life-platform/actions/workflows/site-deploy.yml/runs?per_page=1",
+        "--jq",
+        '.workflow_runs[0]|"\\(.conclusion // .status) \\(.head_sha[0:9]) \\(.created_at)"',
+    )
+    if code != 0 or not out or out.startswith("null"):
+        return "UNVERIFIED (could not query — this is not a pass)"
+    flag = "  <- RED: merged site/** work is NOT live; find out why before anything else" if out.startswith("failure") else ""
+    return out + flag
+
+
 def _waiting_lease() -> str:
     code, out = gh(
         "api",
@@ -129,6 +149,7 @@ def main() -> int:
     read_payload()  # records the payload cwd for git(); an empty/garbage stdin is fine
     print("── session pre-flight " + "─" * 46)
     print(f"  main        {_main_green()}")
+    print(f"  site-deploy {_site_deploy()}")
     print(f"  deploy lease {_waiting_lease()}")
     print(f"  worktrees   {_worktrees()}")
     for line in _boot_brief():
