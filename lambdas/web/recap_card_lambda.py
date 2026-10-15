@@ -17,8 +17,8 @@ So: the 11:30 PT run renders the card for YESTERDAY, and the card says "Day N".
 THE WEEKLY CARD IS DERIVED, NOT A SECOND CRON
 
 Cycle 17's genesis (2026-09-06) is a SUNDAY, so the experiment week Days 1-7 runs Sun..Sat
-and closes on a Saturday; its card renders the Sunday morning after. But the rule is
-`day_n % 7 == 0` on the date being rendered, never a weekday — genesis moves every cycle
+and the card renders on the Sunday close day (day 8, 15 ...; owner ruling 2026-09-27, one
+constant `pacific_time.WEEK_CLOSE_SHIFT_DAYS`). But the rule is derived from day_n, never a weekday — genesis moves every cycle
 (seventeen so far), and a `SAT`/`SUN` literal would be correct until the next reset and
 wrong silently after it. The check itself lives in `pacific_time.week_close_day` (#3761)
 so the progress-photo protocol's target capture day can never independently drift from

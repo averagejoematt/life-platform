@@ -45,19 +45,19 @@ def harness(monkeypatch):
     monkeypatch.setattr(recap_data, "coach_line", lambda *a, **k: ("The Garmin pause has created a data blind spot.", "OUTPUT#x", "ok"))
     monkeypatch.setattr(recap_gate, "gate", lambda strings, **k: recap_gate.GateResult(recap_gate.VERDICT_CLEARED))
     monkeypatch.setattr(recap_deliver, "deliver", lambda png, caption, **k: {"telegram": "dry_run", "email": "dry_run"})
-    # 2026-09-19 is day 14 of a 2026-09-06 genesis: the daily, the detail AND the weekly card
-    monkeypatch.setattr(recap_data, "day_facts", lambda *a, **k: _full(date="2026-09-19", day_n=14))
+    # 2026-09-20 is day 15, the Sunday week-close (#3761) of a 2026-09-06 genesis: the daily, the detail AND the weekly card
+    monkeypatch.setattr(recap_data, "day_facts", lambda *a, **k: _full(date="2026-09-20", day_n=15))
     return C, puts, records
 
 
 def test_a_dry_run_writes_nothing_on_the_daily_detail_and_weekly_paths(harness):
     C, puts, records = harness
-    out = C.render_for_date("2026-09-19", deliver=True, force=True, dry_run=True)
+    out = C.render_for_date("2026-09-20", deliver=True, force=True, dry_run=True)
     assert puts == {}, f"a dry run put objects to S3: {sorted(puts)}"
     assert records == {}, f"a dry run wrote a DynamoDB row: {sorted(records)}"
     # the would-be keys are still reported, and marked
-    assert out["s3_key"] == "recap/2026-09-19.png"
-    assert out["detail_s3_key"] == "recap/2026-09-19-detail.png"
+    assert out["s3_key"] == "recap/2026-09-20.png"
+    assert out["detail_s3_key"] == "recap/2026-09-20-detail.png"
     assert out["weekly"]["s3_key"] == "recap/week-02.png", out.get("weekly")
     assert out["storage"] == "dry_run" and out["weekly"]["storage"] == "dry_run"
     # and the bytes are reachable — a dry run is an inspection, not a no-op
@@ -69,9 +69,9 @@ def test_a_dry_run_writes_nothing_on_the_daily_detail_and_weekly_paths(harness):
 def test_the_same_harness_writes_three_objects_and_one_row_when_not_a_dry_run(harness):
     """Positive control for the zero above: the harness CAN observe writes."""
     C, puts, records = harness
-    out = C.render_for_date("2026-09-19", deliver=True, force=True, dry_run=False)
-    assert set(puts) == {"recap/2026-09-19.png", "recap/2026-09-19-detail.png", "recap/week-02.png"}
-    assert set(records) == {"DATE#2026-09-19"}
+    out = C.render_for_date("2026-09-20", deliver=True, force=True, dry_run=False)
+    assert set(puts) == {"recap/2026-09-20.png", "recap/2026-09-20-detail.png", "recap/week-02.png"}
+    assert set(records) == {"DATE#2026-09-20"}
     assert out["storage"] == "written" and out["weekly"]["storage"] == "written"
     assert "png_base64" not in out and "png_base64" not in out["weekly"], "bytes ride only on a dry run"
 
@@ -82,8 +82,8 @@ def test_a_dry_run_that_the_gate_holds_writes_no_row_either(harness, monkeypatch
 
     C, puts, records = harness
     monkeypatch.setattr(recap_gate, "gate", lambda strings, **k: recap_gate.GateResult("held", reason="planted"))
-    out = C.render_for_date("2026-09-19", deliver=True, force=True, dry_run=True)
+    out = C.render_for_date("2026-09-20", deliver=True, force=True, dry_run=True)
     assert out["outcome"] == "held"
     assert puts == {} and records == {}
-    out = C.render_for_date("2026-09-19", deliver=True, force=True, dry_run=False)
-    assert out["outcome"] == "held" and set(records) == {"DATE#2026-09-19"}, "the held row IS written when not a dry run"
+    out = C.render_for_date("2026-09-20", deliver=True, force=True, dry_run=False)
+    assert out["outcome"] == "held" and set(records) == {"DATE#2026-09-20"}, "the held row IS written when not a dry run"
