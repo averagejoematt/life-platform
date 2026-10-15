@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-10-14 (v8.6.0 — 88 MCP tools, 20 data sources, 108 Lambdas, 12 cached tools)
+**Last updated:** 2026-10-15 (v8.6.0 — 88 MCP tools, 20 data sources, 108 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -322,7 +322,8 @@ Daily records (`sk = DATE#YYYY-MM-DD`) + workout sub-items (`sk = DATE#YYYY-MM-D
 |-------|------|-------------|
 | `workout_id` | string | Whoop workout ID (v2 API UUID) |
 | `sport_id` | number | Whoop sport type ID |
-| `sport_name` | string | Human-readable sport name |
+| `sport_name` | string | Human-readable sport name from the platform's own `WHOOP_SPORT_NAMES` table (`Sport_<id>` when unmapped) |
+| `vendor_sport_name` | string | Whoop's own `sport_name` label, stored beside `sport_id` and the table label, never merged with it (capture-all, #4629; `whoop_lambda.py::_extract_workout`). Absent when the vendor sends none |
 | `start_time` | string | ISO timestamp |
 | `end_time` | string | ISO timestamp |
 | `strain` | number | Workout strain |
@@ -330,7 +331,7 @@ Daily records (`sk = DATE#YYYY-MM-DD`) + workout sub-items (`sk = DATE#YYYY-MM-D
 | `max_heart_rate` | number | Max HR during workout |
 | `kilojoule` | number | Energy (kJ) |
 | `distance_meter` | number | Distance (meters) |
-| `zone_0_minutes` through `zone_5_minutes` | number | Time in each HR zone (minutes) |
+| `zone_0_minutes` through `zone_5_minutes` | number | Time in each HR zone (minutes), from the vendor's `zone_durations`. **Absent, not 0,** when Whoop's score is null (unscored workout) or a zone is missing — a missing value is never stored as 0 (ADR-104; `whoop_lambda.py::zone_minutes_from_score`, #4629) |
 
 ### withings
 | Field | Type | Description |
