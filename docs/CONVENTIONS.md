@@ -122,6 +122,17 @@ was the drift class itself). Manual `sync_site_to_s3.sh` remains sanctioned for
 attended work (its clobber guard still protects a stale checkout), but merge-to-main
 is the default ship path for the site.
 
+**A red site-deploy is silent (#3878, #4703).** The workflow has no production gate and
+nothing pages on its failure, so merged `site/**` work can publish-and-revert, or never
+publish, for days — 3 d in 2026-09 (two sub-floor labels), 23 h in 2026-10 (a stale
+`as of` stamp under the #3515 proof-freshness guard; `docs/INCIDENT_LOG.md` row
+2026-10-14). The reflex: **read the newest `site-deploy.yml` run's conclusion at boot
+(the SessionStart pre-flight prints it) and before merging anything under `site/**` or
+a `scripts/v4_build_*.py` generator** — a `failure` there means the merge will deploy and
+vanish; fix the gate-failing surface first. The workflow's `paths` exclude `scripts/`,
+so a generator fix needs `gh workflow run site-deploy.yml`, and its conclusion is read
+too. Verify a site change by the live page's content, never by the merge.
+
 ## 3. Squash-merge drops unpushed commits — verify before merge, `cdk diff` before deploy
 
 A squash captures whatever is on the **remote PR branch** at merge time, not the local
