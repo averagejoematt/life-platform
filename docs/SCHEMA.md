@@ -346,6 +346,8 @@ Daily records (`sk = DATE#YYYY-MM-DD`) + workout sub-items (`sk = DATE#YYYY-MM-D
 | `heart_pulse` | number | Heart rate at weigh-in (bpm) |
 | `measurement_timestamp` | number | Unix epoch of measurement |
 | `measurement_time_utc` | string | ISO timestamp of measurement |
+| `measurement_attrib` | number | Withings attribution code of the day's latest group, as sent (0 device, 1 ambiguous, 2 manual …). Owner-only (#4642) |
+| `measurement_group_attribs` | list | `{timestamp, attrib}` for every group bucketed to this DATE# (UTC), as sent; capture only, never selects the day's weigh-in (#4644). Owner-only (#4642) |
 | `captured_at` | string | ISO timestamp of ingestion |
 
 Two device modes (#3417, ADR-154 amendment 2026-09-01): a plain stand-on weigh writes **weight only**; a full scan (handles held) also writes the impedance-derived composition fields (fat/muscle/bone/hydration + the BodyScan 2 set below). Composition is therefore **behavioral/sparse** — present only on full-scan days (first: 2026-08-16). Absence of composition on a weigh-day means a basic weigh happened, not a device or pipeline failure (ADR-104). The `lean_mass_delta_14d`/`fat_mass_delta_14d` fields once documented here were **never written**: their computation was deleted 2026-07-04 (#486/B-3) having never produced a value, and stays deleted by recorded decision (ADR-154 amendment 2026-09-01).

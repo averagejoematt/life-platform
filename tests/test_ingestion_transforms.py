@@ -367,6 +367,28 @@ def test_withings_empty_and_unknown_type():
     assert out["measurement_timestamp"] == 1_700_000_000
 
 
+def test_withings_attrib_kept_per_group_and_winner_unchanged_4642():
+    """#4642: every group's attribution code is stored as sent; the winning weight is unchanged.
+    Mutation control: delete the measurement_group_attribs line in _parse_measurements -> reds."""
+    raw = {
+        "measuregrps": [
+            {"date": 1_700_000_000, "attrib": 0, "measures": [{"type": 1, "value": 70000, "unit": -3}]},
+            {"date": 1_700_100_000, "attrib": 1, "measures": [{"type": 1, "value": 68000, "unit": -3}]},
+        ]
+    }
+    out = _parse_measurements(raw)
+    assert out["measurement_attrib"] == 1  # the stored (latest) group's code
+    assert out["measurement_group_attribs"] == [
+        {"timestamp": 1_700_100_000, "attrib": 1},
+        {"timestamp": 1_700_000_000, "attrib": 0},
+    ]
+    assert _f(out["weight_kg"]) == 68.0  # latest-wins untouched
+    from privacy.field_tiers import FIELD_TIERS, TIER_OWNER_ONLY
+
+    assert FIELD_TIERS["withings"]["measurement_attrib"] == TIER_OWNER_ONLY
+    assert FIELD_TIERS["withings"]["measurement_group_attribs"] == TIER_OWNER_ONLY
+
+
 # ── BodyScan 2 (#2782): the wire shape from the 2026-08-16 live capture ───────
 # Structure (group layout, types, positions, attribs) mirrors the real capture;
 # values are altered but keep the device's own invariant — the five segmental
