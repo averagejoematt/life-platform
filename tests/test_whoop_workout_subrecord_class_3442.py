@@ -310,7 +310,11 @@ _WHOOP_CONSUMER_REGISTRY = {
     "lambdas/web/site_api_pulse.py": (1, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
     "lambdas/web/site_api_rollups.py": (7, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
     "lambdas/web/site_api_sleep.py": (2, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
-    "lambdas/web/site_api_training.py": (1, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
+    "lambdas/web/site_api_training.py": (
+        1,
+        "shared-guard",
+        "filter_day_rows for avg_strain + #WORKOUT# rows by distinct id (#4629 — was a missed member, not a non-member)",
+    ),
     "mcp/tools_health.py": (2, "non-member", "field-absent-safe tool extraction"),
     "mcp/tools_plan.py": (1, "shared-guard", "filter_day_rows on the readiness_floor whoop read (#4072)"),
     "mcp/tools_training.py": (1, "non-member", "field-absent-safe tool extraction"),
