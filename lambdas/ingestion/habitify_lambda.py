@@ -241,7 +241,7 @@ def _live_alias(name: str, next_statuses: dict, alias_groups) -> str | None:
     return None
 
 
-# ── Supplement bridge mapping (unchanged) ─────────────────────────────────────
+# ── Supplement bridge mapping (#4632: entries keyed on habit id) ─────────────────────────────────────
 
 SUPPLEMENT_MAP = {
     # ── Morning batch (fasted) ──
@@ -699,6 +699,12 @@ def transform(raw: dict, date_str: str) -> list[dict]:
             "periodicity": periodicity,
             "scheduled_today": True,  # All current habits are RRULE=DAILY per audit
         }
+        # #4632 (capture-all, owner 2026-10-04): the vendor's habit id rides on every entry.
+        # Additive — the map stays name-keyed for every existing reader; the id is what
+        # survives a rename, so it is what the supplements bridge (and, once #4644 rules,
+        # the registry and streaks) can key on.
+        if entry.get("id"):
+            habit_statuses[name]["habit_id"] = str(entry["id"])
         if miss_source:
             # WHO said this was a miss.
             #   "vendor"   — Habitify's own `failed`. That covers BOTH the owner marking it
@@ -878,65 +884,117 @@ def upgrade_only_merge(existing: dict, new: dict) -> dict:
     return new
 
 
+_SUPPLEMENT_META_FIELDS = ("dose", "unit", "timing", "category")
+
+
+def _completed_habits(item: dict) -> list[tuple[str, str | None]]:
+    """(name, vendor habit id) for every habit the STORED day records as completed (#4632).
+
+    Reads `habit_statuses` (which carries the id since #4632); a record without it falls
+    back to the legacy binary `habits` map, with no id.
+    """
+    statuses = item.get("habit_statuses")
+    if isinstance(statuses, dict) and statuses:
+        return [(n, hs.get("habit_id") or None) for n, hs in statuses.items() if isinstance(hs, dict) and hs.get("status") == "completed"]
+    return [(n, None) for n, v in (item.get("habits") or {}).items() if _decimal(v) == 1]
+
+
+def _bridge_key(habit_id, name) -> str:
+    """A bridged entry's identity: the vendor habit id, the name only when no id is known."""
+    return f"id:{habit_id}" if habit_id else f"name:{name}"
+
+
+def _supplement_meta(name: str, habit_id, prior_by_key: dict) -> dict | None:
+    """Dose metadata for a completed habit, or None when it is not a supplement.
+
+    Resolution order: the name in SUPPLEMENT_MAP; any registry alias of the name that is
+    in SUPPLEMENT_MAP (#4362/#4655 `habitify_names`); then id continuity — the same habit
+    id was bridged earlier today under another name, so it is still that supplement.
+    """
+    if name in SUPPLEMENT_MAP:
+        return SUPPLEMENT_MAP[name]
+    for group in _habit_alias_groups():
+        if name in group:
+            alias = next((a for a in sorted(group) if a in SUPPLEMENT_MAP), None)
+            if alias is not None:
+                return SUPPLEMENT_MAP[alias]
+    prior = prior_by_key.get(_bridge_key(habit_id, name)) if habit_id else None
+    if prior and all(prior.get(f) is not None for f in _SUPPLEMENT_META_FIELDS):
+        return {f: prior[f] for f in _SUPPLEMENT_META_FIELDS}
+    return None
+
+
+def _bridge_entries(item: dict, prior_bridge: list[dict]) -> list[dict]:
+    """The bridge's entries for this day, re-derived in full from the stored habit record."""
+    prior_by_key = {_bridge_key(e.get("habit_id"), e.get("name")): e for e in prior_bridge}
+    entries: dict[str, dict] = {}
+    for name, habit_id in _completed_habits(item):
+        meta = _supplement_meta(name, habit_id, prior_by_key)
+        key = _bridge_key(habit_id, name)
+        if meta is None or key in entries:
+            continue
+        entry = {f: meta[f] for f in _SUPPLEMENT_META_FIELDS}
+        entry["dose"] = Decimal(str(meta["dose"]))
+        prior = prior_by_key.get(key) or {}
+        entry.update(
+            {"name": name, "logged_at": prior.get("logged_at") or datetime.now(timezone.utc).isoformat(), "source": "habitify_bridge"}
+        )
+        if habit_id:
+            entry["habit_id"] = habit_id
+        entries[key] = entry
+    return list(entries.values())
+
+
 def supplement_bridge(items: list[dict], date_str: str) -> None:
-    """Post-store hook: extract supplement habit completions → supplements partition.
+    """Post-store hook: the stored day's supplement-habit completions → supplements partition.
 
     Framework calls this AFTER successful DDB write of the main habit record.
     Failures here are logged but never raised — the bridge is auxiliary; if it
     breaks, the primary habitify record still got written.
-    """
-    if not items:
-        return
-    item = items[0]
-    habits = item.get("habits", {})
-    entries = []
-    for habit_name, completed in habits.items():
-        if int(completed) != 1:
-            continue
-        if habit_name not in SUPPLEMENT_MAP:
-            continue
-        meta = SUPPLEMENT_MAP[habit_name]
-        entries.append(
-            {
-                "name": habit_name,
-                "dose": Decimal(str(meta["dose"])),
-                "unit": meta["unit"],
-                "timing": meta["timing"],
-                "category": meta["category"],
-                "logged_at": datetime.now(timezone.utc).isoformat(),
-                "source": "habitify_bridge",
-            }
-        )
 
-    if not entries:
+    #4632: bridged entries are keyed on the vendor habit id, and the bridge's own entries
+    are re-derived IN FULL every run, so a completion that is no longer on the stored day
+    is RETRACTED — the entry leaves the row, and a row left holding nothing is deleted.
+    (Whether an un-tick in the app reaches the stored day at all is #4644 Q27; this is
+    only the bridge following the stored record.) Manual entries are never touched.
+    """
+    if not items or not (items[0].get("habit_statuses") or items[0].get("habits")):
+        return  # no habit map at all = nothing known about the day, so nothing to retract
+    sk = f"DATE#{date_str}"
+    read_ok = True
+    try:
+        existing = _table.get_item(Key={"pk": _SUPPLEMENTS_PK, "sk": sk}).get("Item") or {}
+    except Exception as ge:
+        logger.warning("Supplement bridge: read-before-merge failed (%s) — writing bridge entries only", ge)
+        existing, read_ok = {}, False
+    stored = [e for e in existing.get("supplements", []) if isinstance(e, dict)]
+    # #480/E-5: MERGE, don't clobber — the bridge owns only `source == habitify_bridge`.
+    manual_entries = [e for e in stored if e.get("source") != "habitify_bridge"]
+    prior_bridge = [e for e in stored if e.get("source") == "habitify_bridge"]
+    entries = _bridge_entries(items[0], prior_bridge)
+    if not entries and (not prior_bridge or not read_ok):
         logger.info("Supplement bridge: no supplements checked for %s", date_str)
         return
-
+    kept = {_bridge_key(e.get("habit_id"), e.get("name")) for e in entries}
+    retracted = sum(1 for e in prior_bridge if _bridge_key(e.get("habit_id"), e.get("name")) not in kept)
     try:
-        # #480/E-5: MERGE, don't clobber. MCP log_supplement appends manual
-        # entries to the same key; the old full put_item destroyed any same-day
-        # manual log on the next hourly bridge run. The bridge owns only its own
-        # entries (source == habitify_bridge) — everything else is preserved.
-        manual_entries = []
-        try:
-            existing = _table.get_item(Key={"pk": _SUPPLEMENTS_PK, "sk": f"DATE#{date_str}"}).get("Item") or {}
-            manual_entries = [e for e in existing.get("supplements", []) if isinstance(e, dict) and e.get("source") != "habitify_bridge"]
-        except Exception as ge:
-            logger.warning("Supplement bridge: read-before-merge failed (%s) — writing bridge entries only", ge)
-        _table.put_item(
-            Item={
-                "pk": _SUPPLEMENTS_PK,
-                "sk": f"DATE#{date_str}",
-                "date": date_str,
-                "source": "supplements",
-                "schema_version": 1,
-                "supplements": manual_entries + entries,
-                "bridge_source": "habitify",
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-        )
+        if not entries and not manual_entries:
+            _table.delete_item(Key={"pk": _SUPPLEMENTS_PK, "sk": sk})
+        else:
+            _table.put_item(
+                Item={
+                    "pk": _SUPPLEMENTS_PK,
+                    "sk": sk,
+                    "date": date_str,
+                    "source": "supplements",
+                    "schema_version": 1,
+                    "supplements": manual_entries + entries,
+                    "bridge_source": "habitify",
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
         logger.info(
-            "Supplement bridge: wrote %d bridge + %d preserved manual supplements for %s", len(entries), len(manual_entries), date_str
+            "Supplement bridge: %s — %d bridge, %d retracted, %d preserved manual", date_str, len(entries), retracted, len(manual_entries)
         )
     except Exception as e:
         logger.error("Supplement bridge write failed for %s: %s", date_str, e)
