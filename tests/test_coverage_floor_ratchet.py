@@ -94,20 +94,19 @@ RATCHET_FLOOR = 82
 # Spread across this sample is 0.26pt, which is why 4pt of headroom is generous
 # rather than tight.
 MEASURED_SAMPLE = {
-    # Refreshed 2026-10-01 (#1658): the ten most recent green-main CI/CD runs that
+    # Refreshed 2026-10-15 (#1658): the ten most recent green-main CI/CD runs that
     # carried a reading (the "Measured line coverage" annotation on `test / Unit
-    # Tests`; superseded runs 36794154668 and 36780692612 carried none). The
-    # 2026-09-13 sample (min 83.97, spread 0.26pt) is in git history.
-    "36796012829": 86.41,  # 9c6d7faa  2026-10-01
-    "36794214083": 86.38,  # 4b540e8a  2026-10-01
-    "36792037800": 86.38,  # 3e24f131  2026-09-30
-    "36789759903": 86.38,  # 50e812a8  2026-09-30
-    "36787341449": 86.38,  # 7f0a4bf5  2026-09-30
-    "36784925280": 86.38,  # 07bc75d1  2026-09-30
-    "36781665811": 86.38,  # 1c906cce  2026-09-30
-    "36780761064": 86.38,  # 379695e7  2026-09-30
-    "36778123551": 86.36,  # 136f6ed4  2026-09-30
-    "36775246265": 86.36,  # 724e77a3  2026-09-30
+    # Tests`). The 2026-10-01 sample (min 86.36) is in git history.
+    "38792378058": 87.84,  # 45a1fed8  2026-10-15
+    "38784495082": 87.84,  # 898b0177  2026-10-15
+    "38781588444": 87.84,  # e31343ad  2026-10-15
+    "38779742104": 87.84,  # b9a38a4f  2026-10-15
+    "38777862422": 87.83,  # 898bddd4  2026-10-15
+    "38775029050": 87.83,  # 3cf2ad61  2026-10-15
+    "38669735624": 87.82,  # 9a593f6a  2026-10-15
+    "38635275694": 87.82,  # e208242c  2026-10-14
+    "38633202898": 87.82,  # dafd58a4  2026-10-14
+    "38630563774": 87.82,  # cde57c1a  2026-10-14
 }
 
 # The band the floor is allowed to sit in, below the SAMPLE MINIMUM. Under the low
@@ -153,7 +152,11 @@ FLOOR_HEADROOM_MAX_POINTS = 6.0
 # MEASURED_SAMPLE minimum (86.36) rather than under the one reading, because
 # test_the_high_water_mark_still_sits_under_the_sample requires it. The
 # regression catch line is therefore 84.80%.
-RATCHET_HIGH_WATER = 86.30
+# Raised 86.30 -> 87.80 (2026-10-15, #1658): green main run 38792378058 (45a1fed8)
+# measured 87.84%, 1.54pt past the deadband — the ::warning:: fired and this is the
+# sanctioned response. Banked under the refreshed MEASURED_SAMPLE minimum (87.82),
+# same convention. The regression catch line is therefore 86.30%.
+RATCHET_HIGH_WATER = 87.80
 
 # The regression tolerance CI runs with. Mirrors coverage_gap_warn.py's default;
 # asserted equal below so the two can't drift (the #1206 drift class again).
