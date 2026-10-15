@@ -228,7 +228,7 @@ def _vendor_workout(wid, day, start="18:00", end="18:45", sport_id=63):
         "start": f"{day}T{start}:00.000Z",
         "end": f"{day}T{end}:00.000Z",
         "score_state": "SCORED",
-        "score": {"strain": 8.1, "average_heart_rate": 120, "max_heart_rate": 150, "kilojoule": 900.0, "zone_duration": {}},
+        "score": {"strain": 8.1, "average_heart_rate": 120, "max_heart_rate": 150, "kilojoule": 900.0, "zone_durations": {}},
     }
 
 

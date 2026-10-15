@@ -226,6 +226,40 @@ def test_avg_strain_below_min_n_is_null(monkeypatch):
     assert t["avg_strain"] is None
 
 
+class _WhoopPartitionTable:
+    """The whoop partition as the workout range query really returns it (#4629): the
+    DATE#<d>#WORKOUT# bounds also admit every day row sorting between them, and a workout
+    crossing 00:00 UTC sits under two date keys."""
+
+    def __init__(self, items):
+        self.items = items
+
+    def query(self, **_kw):
+        return {"Items": [dict(i) for i in sorted(self.items, key=lambda r: r["sk"])]}
+
+
+def test_whoop_day_rows_and_workout_rows_are_counted_apart(monkeypatch):
+    """#4629 (the #3442 class at /api/training_overview): avg_strain is the DAY-row mean and
+    whoop_workout_count is the number of DISTINCT workout ids; Whoop zone minutes do not
+    enter the served Zone 2 total (that definition is #4627's)."""
+    day_rows = [{"sk": f"DATE#{_d(i)}", "strain": s} for i, s in ((1, 10.0), (2, 12.0), (3, 14.0))]
+    workout_rows = [
+        {"sk": f"DATE#{_d(3)}#WORKOUT#w-a", "workout_id": "w-a", "strain": 18.0, "zone_2_minutes": 30.0},
+        {"sk": f"DATE#{_d(2)}#WORKOUT#w-a", "workout_id": "w-a", "strain": 18.0, "zone_2_minutes": 30.0},  # same id, next UTC day
+        {"sk": f"DATE#{_d(1)}#WORKOUT#w-b", "workout_id": "w-b", "strain": 4.0, "zone_2_minutes": 12.0},
+    ]
+    _setup_training(monkeypatch, {"whoop": day_rows + workout_rows})
+    monkeypatch.setattr(obs, "table", _WhoopPartitionTable(day_rows + workout_rows))
+    resp = obs.handle_training_overview()
+    assert resp["statusCode"] == 200
+    body = json.loads(resp["body"])
+    t = body["training"]
+    assert t["avg_strain"] == 12.0  # mean of 10/12/14 — not dragged by the 18 and 4 workout strains
+    assert t["whoop_workout_count"] == 2  # w-a once, w-b once; the 3 day rows are not workouts
+    assert [w["strain"] for w in body["whoop_workouts"]] == [18.0, 4.0]
+    assert t["z2_trailing_7d_min"] == 0  # no Strava/Hevy fed in, and Whoop zone 2 is not summed in
+
+
 # ── 2. /api/vitals genesis clamp + hrv min-n ─────────────────────────────────
 
 

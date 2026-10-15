@@ -179,6 +179,83 @@ def test_whoop_workout_maps_known_and_unknown_sport():
     assert "strain" not in unknown  # unscored → no score fields
 
 
+# ── #4629: zone minutes from the vendor's PLURAL key; nothing fabricated on a null score ──
+_WHOOP_WORKOUT_WIRE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "upstream", "whoop", "workout.json")
+_ZONES = [f"zone_{i}_minutes" for i in range(6)]
+
+
+def _whoop_workout_wire():
+    """The committed upstream fixture — shape built from an archived v2 payload (key order, the
+    plural ``zone_durations``, and a SCORED record whose ``score`` is null, as the wire sends it)."""
+    import json
+
+    with open(_WHOOP_WORKOUT_WIRE) as fh:
+        return json.load(fh)["records"]
+
+
+def test_whoop_workout_zone_minutes_read_from_zone_durations():
+    scored = _extract_workout(_whoop_workout_wire()[0])
+    assert [_f(scored[z]) for z in _ZONES] == [0.0, 5.0, 20.0, 10.0, 9.0, 1.0]  # milli / 60_000
+
+
+def test_whoop_workout_null_score_writes_no_zone_fields():
+    null_score = _extract_workout(_whoop_workout_wire()[1])
+    assert null_score["start_time"] and null_score["sport_id"] == 999
+    assert not any(z in null_score for z in _ZONES)  # ADR-104: absent, never six zeros
+    assert "strain" not in null_score
+    # a scored record with no zone_durations at all also writes none
+    assert not any(z in _extract_workout({"score_state": "SCORED", "score": {"strain": 3.0}}) for z in _ZONES)
+
+
+def test_whoop_workout_keeps_the_vendor_sport_name_beside_the_table_label():
+    out = _extract_workout(_whoop_workout_wire()[0])
+    assert out["vendor_sport_name"] == "cycling"  # capture-all: the payload's own label
+    assert out["sport_name"] == "Cycling" and out["sport_id"] == 1  # readers' label unchanged (#4644 Q10/Q11)
+    assert "vendor_sport_name" not in _extract_workout({"sport_id": 1, "score_state": "PENDING_SCORE"})
+
+
+def test_whoop_zone_rebuild_counts_only_and_shares_the_writer_function():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "whoop_zone_rebuild_4629",
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts", "whoop_zone_rebuild_4629.py"),
+    )
+    rebuild = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rebuild)
+    from ingestion import whoop_lambda
+
+    assert rebuild.zone_minutes_from_score is whoop_lambda.zone_minutes_from_score
+    assert not hasattr(rebuild, "apply") and "--apply" not in open(spec.origin).read().split('"""', 2)[2]
+
+    recs = _whoop_workout_wire()
+    payloads = {
+        "2026-06-08": {"fetched_at": "x", "raw": {"workouts": {"records": recs}}},
+        "2026-06-09": {"fetched_at": "x", "raw": {"workouts": {"records": [recs[0]]}}},  # crosses 00:00 UTC: filed twice
+        "2026-06-10": None,
+    }
+    stored = [
+        {"sk": f"DATE#2026-06-08#WORKOUT#{recs[0]['id']}", **{z: Decimal("0") for z in _ZONES}},  # the pre-#4629 zeros
+        {"sk": f"DATE#2026-06-08#WORKOUT#{recs[1]['id']}", **{z: Decimal("0") for z in _ZONES}},  # fabricated on a null score
+        {"sk": "DATE#2026-06-08", "strain": Decimal("9")},  # a day row is not a workout row
+    ]
+    counts = rebuild.tally(payloads, stored)
+    assert counts == {
+        "days_archived": 2,
+        "days_missing": 1,
+        "days_requested": 3,
+        "distinct_workout_ids": 2,
+        "ids_under_two_or_more_days": 1,
+        "records_nonzero_zones": 2,
+        "records_null_score": 1,
+        "records_with_zone_durations": 2,
+        "stored_rows_differing": 2,
+        "stored_rows_nonzero_zones": 0,
+        "stored_workout_rows": 2,
+        "workout_records": 3,
+    }
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # Withings — measurement flattening + kg→lbs conversion
 # ══════════════════════════════════════════════════════════════════════════
