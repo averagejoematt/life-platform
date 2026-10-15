@@ -445,18 +445,16 @@ def _extract_cycle(cycle: dict) -> dict:
     if not records or records[0].get("score_state") != "SCORED":
         return fields
     score = records[0].get("score") or {}
-    _set_dec(fields, "strain", _round(score.get("strain"), 2))
-    _set_dec(fields, "kilojoule", _round(score.get("kilojoule"), 2))
-    _set_dec(fields, "average_heart_rate", score.get("average_heart_rate"))
-    _set_dec(fields, "max_heart_rate", score.get("max_heart_rate"))
+    # strain + kilojoule rounded to 2dp, the two heart rates as sent (folded to a loop for #1665's ceiling).
+    for name, ndigits in (("strain", 2), ("kilojoule", 2), ("average_heart_rate", None), ("max_heart_rate", None)):
+        _set_dec(fields, name, score.get(name) if ndigits is None else _round(score.get(name), ndigits))
     # #4630 box 1 (capture-all, owner rule 2026-10-04): the vendor's daily step count, under its
     # own name on the Whoop day row. It sits on the cycle RECORD, not in ``score`` (archived v2
     # wire: present on the day's records[0] from 2026-09-21). Stored as Whoop said it — never
     # merged, maxed or compared with Apple's steps here; which count a reader shows is the
-    # read-side resolver's job (#4630 box 2, HELD on #4644 Q4/Q5). Absent stays absent, never 0.
-    steps = records[0].get("step_count")
-    if isinstance(steps, int) and not isinstance(steps, bool):
-        fields["step_count"] = Decimal(steps)
+    # read-side resolver's job (#4630 box 2, HELD on #4644 Q4/Q5). Absent stays absent, never 0;
+    # ``type(...) is int`` also refuses a bool.
+    _set_dec(fields, "step_count", steps if type(steps := records[0].get("step_count")) is int else None)
     return fields
 
 
