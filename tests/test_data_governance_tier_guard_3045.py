@@ -179,7 +179,16 @@ ROW_MAP: list[dict] = [
 # The #2782/#2809 trio is ruled Tier-2 by docs/SCHEMA.md (its prose home predates this
 # document's port) — exempt from the "every registry entry needs a DATA_GOVERNANCE row"
 # reverse check, pinned by name so the exemption cannot quietly grow.
-SCHEMA_RULED = frozenset({("withings", "vascular_age"), ("withings", "metabolic_age"), ("withings", "afib_result")})
+SCHEMA_RULED = frozenset(
+    {
+        ("withings", "vascular_age"),
+        ("withings", "metabolic_age"),
+        ("withings", "afib_result"),
+        # #4642: weigh-in attribution, owner-only until tiered; ruled in docs/SCHEMA.md's withings table
+        ("withings", "measurement_attrib"),
+        ("withings", "measurement_group_attribs"),
+    }
+)
 
 
 def tier2_bullets(doc_text: str) -> list[str]:
