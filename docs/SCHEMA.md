@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-10-14 (v8.6.0 — 88 MCP tools, 20 data sources, 108 Lambdas, 12 cached tools)
+**Last updated:** 2026-10-15 (v8.6.0 — 88 MCP tools, 20 data sources, 108 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -309,6 +309,7 @@ Daily records (`sk = DATE#YYYY-MM-DD`) + workout sub-items (`sk = DATE#YYYY-MM-D
 | `kilojoule` | number | Daily energy (kJ) |
 | `average_heart_rate` | number | Daily avg HR (bpm) |
 | `max_heart_rate` | number | Daily max HR (bpm) |
+| `step_count` | number | Whoop's own daily step count, from the day's cycle record (vendor field from 2026-09-21; absent before, never 0-filled). Stored per source beside Apple's `steps` — never merged or compared at write time; which count a reader shows is the read-side resolver's (#4630). Back-fill: `scripts/whoop_steps_backfill_4630.py` |
 | `sleep_start` | string | ISO timestamp |
 | `sleep_end` | string | ISO timestamp |
 | `sleep_onset_minutes` | number | Minutes from midnight to sleep onset |
