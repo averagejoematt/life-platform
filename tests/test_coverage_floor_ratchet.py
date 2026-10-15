@@ -91,8 +91,8 @@ RATCHET_FLOOR = 82
 # runs — the same invocation and pinned deps the gate itself runs, never re-derived
 # locally (a different pytest-cov is a different measurement). Coverage moves with
 # WHICH tests run, so a floor set from one reading is set from a sample of one.
-# Spread across this sample is 0.26pt, which is why 4pt of headroom is generous
-# rather than tight.
+# Spread across this sample is 0.02pt (the 2026-09-13 sample read 0.26pt), which is why
+# 4pt of headroom is generous rather than tight.
 MEASURED_SAMPLE = {
     # Refreshed 2026-10-15 (#1658): the ten most recent green-main CI/CD runs that
     # carried a reading (the "Measured line coverage" annotation on `test / Unit
