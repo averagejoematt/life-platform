@@ -210,6 +210,98 @@ def test_training_publishes_the_real_window_behind_its_30d_counts(monkeypatch):
     assert whole["window_days"] >= 30
 
 
+def test_trailing_7d_zone2_covers_seven_dates(monkeypatch):
+    """#4627: `z2_trailing_7d_min` is labelled trailing 7 days; its cut was `today - 7`
+    inclusive, which is EIGHT dates (today and the seven before it). Ten consecutive
+    days of one 60-min in-band session each must read 7 x 60, not 8 x 60."""
+    strava = [_strava_day(i) for i in range(0, 10)]
+    t = _training_body(monkeypatch, {"strava": strava})["training"]
+    assert t["z2_trailing_7d_min"] == 7 * 60
+
+
+# ── 1b2. #4627: a partial-coverage HR graft is not whole-session Zone 2 ─────
+#
+# Fixture shape = a REAL stored `strava` pair from the experiment window, found with the
+# read-only discovery query in the PR (#4627) — ids and the date replaced, the durations,
+# start offset, devices and HR family as stored. Hevy pushed the whole lifting session
+# (6962 s, no HR); WHOOP recorded 2099 s of it, starting 266 s later, average 125.7 bpm —
+# 30 % of Hevy's interval. The #4419 seam keeps Hevy's copy and grafts WHOOP's HR family;
+# before #4627 the 125.7 average read as the whole 116-minute session's, inside the
+# 60-70 % band of a 184 max, so both endpoints counted all 116 minutes as Zone 2.
+
+
+def _real_partial_hr_pair_day(day):
+    hevy = {
+        "strava_id": "HEVY-COPY",
+        "sport_type": "WeightTraining",
+        "type": "WeightTraining",
+        "device_name": "Hevy",
+        "start_date_local": f"{day}T15:53:34Z",
+        "moving_time_seconds": 6962,
+        "elapsed_time_seconds": 6962,
+        "distance_meters": 0,
+        "average_heartrate": None,
+        "max_heartrate": None,
+        "has_heartrate": False,
+        "summary_polyline": "",
+    }
+    whoop = {
+        "strava_id": "WHOOP-COPY",
+        "sport_type": "WeightTraining",
+        "type": "WeightTraining",
+        "device_name": "WHOOP",
+        "start_date_local": f"{day}T15:58:00Z",
+        "moving_time_seconds": 2099,
+        "elapsed_time_seconds": 2099,
+        "distance_meters": 0,
+        "average_heartrate": 125.7,
+        "max_heartrate": 165,
+        "has_heartrate": True,
+        "summary_polyline": "",
+        "zone1_seconds": 1084,
+        "zone2_seconds": 986,
+        "zone3_seconds": 29,
+        "zone4_seconds": 0,
+        "zone5_seconds": 0,
+    }
+    return {
+        "sk": f"DATE#{day}",
+        "date": day,
+        "activities": [hevy, whoop],
+        "activity_count": 2,
+        "total_moving_time_seconds": 9061,
+        "total_zone2_seconds": 986,
+    }
+
+
+def test_partial_hr_graft_is_not_whole_session_zone2_on_either_endpoint(monkeypatch):
+    from common.strava_read_seam import strava_read_seam
+    from web import site_api_autonomic as az
+
+    day = _d(1)
+    (row,) = strava_read_seam("strava", [_real_partial_hr_pair_day(day)])
+    (kept,) = row["activities"]
+    # the seam: Hevy's copy kept, WHOOP's measured family grafted, its average NOT served as the session's
+    assert kept["strava_id"] == "HEVY-COPY" and kept["hr_from_strava_id"] == "WHOOP-COPY"
+    assert kept.get("average_heartrate") is None
+    assert kept["partial_average_heartrate"] == 125.7 and kept["hr_coverage_share"] == 0.3
+    assert kept["zone2_seconds"] == 986 and row["total_zone2_seconds"] == 986  # measured time-in-zone survives
+
+    # /api/zone2's computation over the seam's output: the session is not Zone 2 time
+    z2 = az._compute_zone2_breakdown([row], {"max_heart_rate": 184}, today=day)
+    assert z2["summary"]["total_zone_2_min"] == 0.0, z2["summary"]
+
+    # /api/training_overview over the same stored row, through the same seam
+    def seamed(src, start, end, include_pilot=False):
+        return strava_read_seam(src, [_real_partial_hr_pair_day(day)]) if src == "strava" else []
+
+    _setup_training(monkeypatch, {})
+    monkeypatch.setattr(obs, "_query_source", seamed)
+    t = json.loads(obs.handle_training_overview()["body"])["training"]
+    assert t["workouts_30d"] == 1
+    assert t["z2_trailing_7d_min"] == 0 and t["z2_weekly_avg_min"] == 0
+
+
 # ── 1c. avg_strain sibling guard ─────────────────────────────────────────────
 
 

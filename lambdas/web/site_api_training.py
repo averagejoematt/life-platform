@@ -339,7 +339,8 @@ def training_overview(*, _g) -> dict:
     # Staleness honesty (truth audit 2026-07-10): the 30d average masks a quiet current
     # week (218 min/wk average over weeks at 21 and 15 min). Track the trailing-7d Z2
     # alongside it so the front-end can show the CURRENT week vs target honestly.
-    _d7_cal = (datetime.now(PT) - timedelta(days=7)).strftime("%Y-%m-%d")
+    # #4627: `>= today - 6` is the 7 dates [today-6, today]; `today - 7` counted 8.
+    _d7_cal = (datetime.now(PT) - timedelta(days=6)).strftime("%Y-%m-%d")
     z2_minutes_30d = 0
     z2_trailing_7d = 0.0
     for a in all_activities_30d:

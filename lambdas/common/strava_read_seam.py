@@ -32,6 +32,16 @@ the HR family (`average_heartrate`, `max_heartrate`, `has_heartrate`, `zone*_sec
 `hr_recovery`) is taken from the dropped copy as a unit and the kept copy is stamped
 `hr_from_strava_id`. The distance stays with the device that measured it.
 
+PARTIAL COVERAGE (#4627) — a donor's AVERAGE heart rate describes only the minutes it
+recorded. When the donor covers less than `CONTAINMENT_SHARE` of the kept copy's interval
+(the live case: Hevy keeps a 2–3.5 h lifting session, WHOOP recorded 13–86 min of it), the
+graft still carries the measured, absolute fields (`zone*_seconds`, `max_heartrate`,
+`hr_recovery`, `has_heartrate`), but `average_heartrate` is NOT written onto the kept copy:
+it would read as the whole session's average and every whole-activity consumer would count
+the full 2–3.5 h as that zone. The donor's average is kept, renamed, as
+`partial_average_heartrate` beside `hr_coverage_share` (overlap / kept interval) — nothing is
+discarded, it is just no longer labelled as something it is not.
+
 Garmin's direct API was retired (ADR-074 amendment, #4640) and the watch now reaches us through
 Strava, so three devices push to Strava today; live days can carry duplicate copies of one
 walk and this runs on them as well as on every historical read.
@@ -102,11 +112,28 @@ def _is_hr_key(k: str) -> bool:
     return k in ("average_heartrate", "max_heartrate", "has_heartrate", "hr_recovery") or (k.startswith("zone") and k.endswith("_seconds"))
 
 
+def _coverage_share(keep: Dict[str, Any], donor: Dict[str, Any]) -> Optional[float]:
+    """Share of `keep`'s wall-clock interval that `donor`'s recording overlaps (None: unknowable)."""
+    tk, td = _start(keep), _start(donor)
+    dk, dd = _duration_s(keep), _duration_s(donor)
+    if tk is None or td is None or dk <= 0 or dd <= 0:
+        return None
+    overlap = (min(tk + timedelta(seconds=dk), td + timedelta(seconds=dd)) - max(tk, td)).total_seconds()
+    return max(0.0, min(1.0, overlap / dk))
+
+
 def _graft_hr(keep: Dict[str, Any], donor: Dict[str, Any]) -> Dict[str, Any]:
-    """`keep` with its HR family replaced, as a unit, by `donor`'s (a new dict)."""
+    """`keep` with its HR family replaced, as a unit, by `donor`'s (a new dict).
+
+    A donor covering less than `CONTAINMENT_SHARE` of `keep`'s interval does not lend its
+    average as the whole session's (#4627, the module docstring's PARTIAL COVERAGE)."""
     out = {k: v for k, v in keep.items() if not _is_hr_key(k)}
     out.update({k: v for k, v in donor.items() if _is_hr_key(k)})
     out["hr_from_strava_id"] = donor.get("strava_id")
+    share = _coverage_share(keep, donor)
+    if share is None or share < CONTAINMENT_SHARE:
+        out["partial_average_heartrate"] = out.pop("average_heartrate", None)
+        out["hr_coverage_share"] = None if share is None else round(share, 2)
     return out
 
 
@@ -142,7 +169,9 @@ def _dedup_plan(activities: List[Dict[str, Any]]) -> Tuple[List[int], Dict[int, 
                 continue
             win, lose = (i, k) if _richness(a_i) >= _richness(a_k) else (k, i)
             a_win, a_lose = eff.get(win, activities[win]), eff.get(lose, activities[lose])
-            if not _hr_plausible(a_win) and _hr_plausible(a_lose):
+            # One graft per session: a partial graft (#4627) leaves no `average_heartrate`, and a
+            # second chunk of the same session must not overwrite the first donor's family.
+            if not _hr_plausible(a_win) and "hr_from_strava_id" not in a_win and _hr_plausible(a_lose):
                 eff[win] = _graft_hr(a_win, a_lose)
             removed.add(lose)
             if lose == i:
