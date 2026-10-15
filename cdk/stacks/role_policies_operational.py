@@ -608,7 +608,12 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
             #   dated findings records for the nightly grounded false-positive-rate
             #   line; fail-soft in the lambda — degrades to a WARN naming this
             #   grant until it deploys).
-            resources=_s3("dashboard/*", "config/*", "blog/*", "ai-canary-log/*"),
+            # + raw/matthew/health_auto_export/* (#4628): hae_additive_integrity_qa reads
+            #   the last few days' archived HAE payloads back to compare each stored
+            #   additive day total with the readings actually delivered. Scoped to the one
+            #   HAE payload prefix (listing is already granted by S3List's raw/*); fail-soft
+            #   in the lambda — an alarmed warn naming this grant until it deploys.
+            resources=_s3("dashboard/*", "config/*", "blog/*", "ai-canary-log/*", "raw/matthew/health_auto_export/*"),
         ),
         iam.PolicyStatement(
             sid="S3List",

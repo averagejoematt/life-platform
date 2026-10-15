@@ -63,6 +63,7 @@ from operational import (
     closure_probe_qa,  # noqa: E402  (#4022 close-on-first-live-output)
     ensemble_digest_qa,  # noqa: E402  (#3829 dead-man)
     habit_cross_source_qa,  # noqa: E402  (#3666 cross-source contract)
+    hae_additive_integrity_qa,  # noqa: E402  (#4628: a stored Apple Health day total below the delivered readings)
     hook_liveness_qa,  # noqa: E402  (#3615 box 1: the hook × artifact liveness matrix)
     nudge_ledger_qa,  # noqa: E402  (#3569 dead-man)
     pending_writes_qa,  # noqa: E402  (#4078 dead-man: queued chat writes left unresolved)
@@ -1183,6 +1184,11 @@ def check_steps():
         ("s3_freshness", check_s3_freshness),
         # #1949: raw_layout facets must be live-true (DDB-fresh/raw-dead reds a check)
         ("raw_archive_liveness", lambda: raw_archive_qa.check_raw_archive_liveness(table, s3, S3_BUCKET, Check, CONTENT_TRUTH, pt_now)),
+        # #4628: no stored Apple Health additive day total may sit below that day's archived readings
+        (
+            "hae_additive_integrity",
+            lambda: hae_additive_integrity_qa.check_hae_additive_integrity(table, s3, S3_BUCKET, Check, CONTENT_TRUTH),
+        ),
         ("score_sanity", check_score_sanity),
         ("lambda_secrets", check_lambda_secrets),
         ("avatar_assets", check_avatar_assets),  # character avatar visuals — kept (real check)
