@@ -151,6 +151,53 @@ class TestCockpitBlock:
         assert out["pillars"] == {"sleep": {"raw_score": 82.9, "tier": "Momentum"}}
         assert out["source"] == "live"
 
+    def _live(self, monkeypatch, payload):
+        monkeypatch.setattr(v4_proof, "pre_start_date", lambda: "")
+        monkeypatch.setattr(v4_proof, "_fetch_json", lambda path, timeout=8: payload)
+
+    def test_as_of_is_newest_coach_date_when_weekly_read_is_held_4703(self, monkeypatch):
+        # The live 2026-10-15 shape: weekly_priority empty (a held read), _meta ten days old,
+        # every rendered coach re-read today. The stamp must not understate the block.
+        self._live(
+            monkeypatch,
+            {
+                "_meta": {"generated_at": "2026-10-05T17:01:57Z"},
+                "weekly_priority": {"text": "", "generated_at": None},
+                "coaches": [
+                    {"coach_id": "a", "name": "A", "position_summary": "x", "analysis_generated_at": "2026-10-15T17:03:00+00:00"},
+                    {"coach_id": "b", "name": "B", "position_summary": "y", "analysis_generated_at": "2026-10-15T17:06:10+00:00"},
+                    {"coach_id": "c", "name": "C", "position_summary": "z", "analysis_generated_at": "2026-10-14T17:04:00+00:00"},
+                    {"coach_id": "d", "name": "D", "position_summary": "", "analysis_generated_at": "2026-10-16T01:00:00+00:00"},
+                ],
+            },
+        )
+        out = v4_proof.load_coaching_read()
+        assert out["as_of"] == "2026-10-15"
+        assert [c["coach_id"] for c in out["coaches"]] == ["a", "b", "c"]  # empty summary dropped (and its date ignored)
+        assert out["source"] == "live"
+
+    def test_as_of_prefers_newer_weekly_priority_date_4703(self, monkeypatch):
+        self._live(
+            monkeypatch,
+            {
+                "_meta": {"generated_at": "2026-10-05T17:01:57Z"},
+                "weekly_priority": {"text": "the call", "generated_at": "2026-10-15T20:00:00+00:00"},
+                "coaches": [{"coach_id": "a", "position_summary": "x", "analysis_generated_at": "2026-10-12T17:03:00+00:00"}],
+            },
+        )
+        assert v4_proof.load_coaching_read()["as_of"] == "2026-10-15"
+
+    def test_as_of_falls_back_to_meta_when_no_content_dates_4703(self, monkeypatch):
+        self._live(
+            monkeypatch,
+            {
+                "_meta": {"generated_at": "2026-10-05T17:01:57Z"},
+                "weekly_priority": {"text": "the call"},
+                "coaches": [{"coach_id": "a", "position_summary": "x"}],
+            },
+        )
+        assert v4_proof.load_coaching_read()["as_of"] == "2026-10-05"
+
     def test_loader_falls_back_to_snapshot_offline(self, monkeypatch):
         monkeypatch.setattr(v4_proof, "_fetch_json", lambda path, timeout=8: None)
         monkeypatch.setattr(v4_proof, "_snapshot", lambda: {"cockpit": {"level": 9, "as_of": "2026-07-01", "pillars": {}}})

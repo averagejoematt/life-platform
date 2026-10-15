@@ -3405,3 +3405,38 @@ GUARD_PROOFS.update(
         },
     }
 )
+
+
+# ── #4632 (2026-10-15): the habit-registry drift check ───────────────────────────────────
+# `scripts/check_habit_registry_drift.py` (family 2, guard-script) reports, as counts only,
+# the name-keyed habit structures a Habitify rename would orphan; its offline twin is
+# fixture-driven and needs no creds. Three plants in the REAL tracked script, one at a time,
+# restored from a pre-mutation copy and md5-verified byte-identical between each.
+GUARD_PROOFS.update(
+    {
+        "guard::scripts/check_habit_registry_drift.py": {
+            "gate_name": "scripts/check_habit_registry_drift.py",
+            "command": "python3 -m pytest tests/test_habitify_rename_alias_merge_4655.py -q -p no:cacheprovider   # baseline 16 passed; the two drift tests are the fixture-driven twin",  # noqa: E501
+            "mutation": (
+                "M1: main()'s `return 1 if drifted else 0` -> `return 0` (the exit code stops carrying the verdict). "
+                "M2: `_bridge_live()` -> `return True` (a SUPPLEMENT_MAP key that no live habit answers to reads as live). "
+                'M3: the `not e.get("is_archived")` filter dropped from live_names() (an archived habit counts as live). '
+                "md5 8df4b10acc1198bed5c2900d3ef440af before, after each restore, and at the end; tree clean afterwards."
+            ),
+            "observed": (
+                "2026-10-15. BASELINE 16 passed. M1: 1 failed / 15 passed (test_the_drift_check_fails_on_each_kind_of_orphan — "
+                "the orphaned fixtures exited 0). M2: 1 failed / 15 passed (the same test — bridge_without_live read 0 on the "
+                "orphaned-bridge fixture). M3: 16 passed — SURVIVED: no fixture carries an archived journal entry, so the "
+                "archived filter is not under test. RESTORED: 16 passed."
+            ),
+            "scope": (
+                "Proves the exit code and the bridge-resolution count are load-bearing for the fixture twin. The archived "
+                "filter (M3) is unproven by this record — a fixture with `is_archived: true` would close it. The `--live` path "
+                "(Secrets Manager + vendor GET + one DynamoDB GetItem, read-only) is `# pragma: no cover` and not exercised "
+                "here; the script is standalone/manual, not wired into blocking CI, so a rename is caught on the next "
+                "invocation, not automatically."
+            ),
+            "proved_on": "2026-10-15",
+        },
+    }
+)
