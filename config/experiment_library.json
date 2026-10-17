@@ -2163,7 +2163,7 @@
       "difficulty": "moderate",
       "experiment_type": "measurable",
       "hypothesis_template": "150+ min/week Zone 2 for 8 weeks will improve cardiac efficiency (pace-at-HR) by >5%",
-      "protocol_template": "Minimum 150 minutes per week in Zone 2 (60-70% max HR). Walking, cycling, or rucking. Track via Garmin/Strava HR.",
+      "protocol_template": "Minimum 150 minutes per week in Zone 2 (each device's own Zone 2, counted as minutes actually in the zone). Walking, cycling, or rucking. Track via Garmin/Strava HR.",
       "metrics_measurable": [
         "zone2_minutes",
         "cardiac_efficiency",
