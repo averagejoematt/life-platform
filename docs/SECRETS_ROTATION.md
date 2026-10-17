@@ -1,6 +1,6 @@
 # Secrets Rotation Procedures
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-19
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 Last updated: 2026-07-25 (#1630 — `life-platform/bluesky` app-password row + procedure, ADR-140 precondition; see `docs/RUNBOOK_SYNDICATION.md`. Prior: #1329 — manual-rotation staleness routed to the remediation agent's curated needs-human email instead of raw daily SNS; one-command `deploy/rotate_ai_keys.sh` prep; #935 — Whoop re-auth script moved to `setup/setup_whoop_auth.py`, callback-server flow)
 
@@ -16,12 +16,12 @@ Phase 2.6 (2026-05-16): single source of truth for how each Life Platform secret
 | `life-platform/whoop` | OAuth refresh token | **Auto on use** (per-invocation refresh) | Hourly | 60 days |
 | `life-platform/withings` | OAuth refresh token | **Auto on use** | Hourly | 60 days |
 | `life-platform/strava` | OAuth refresh token | **Auto on use** | Hourly | 60 days |
-| `life-platform/garmin` | OAuth refresh token (garth) | **Auto on use** | 4×/day | 60 days |
+| ~~`life-platform/garmin`~~ | ~~OAuth refresh token (garth)~~ | **Retired 2026-10-11 (#4640)** — direct-API function retired, no consumer, no checker names it; owner-attended delete pending (`docs/SECRETS_MAP.md`). |
 | `life-platform/eightsleep` | OAuth refresh token | **Auto on use** | Hourly | 60 days |
 | `life-platform/ai-keys` | Anthropic API key | **Manual** | 90 days | 120 days |
 | `life-platform/site-api-ai-key` | Anthropic API key (isolated) | **Manual** | 90 days | 120 days |
-| ~~`life-platform/notion`~~ | ~~Notion integration token~~ | **Retired 2026-05-19** — bundle is authoritative (see `ingestion-keys` row). Secret scheduled for deletion 2026-05-24. |
-| ~~`life-platform/dropbox`~~ | ~~Dropbox app key~~ | **Retired 2026-05-19** — bundle is authoritative (see `ingestion-keys` row). Secret scheduled for deletion 2026-05-24. |
+| `life-platform/notion` | Notion integration token | **Retire-candidate, live but idle** — the deletion due 2026-05-24 was reversed (restored); the `ingestion-keys` bundle is authoritative for ingestion; still in the freshness checker's `MANUAL_ROTATION_SECRETS`; deletion is an owner decision (`docs/SECRETS_MAP.md` Cleanup, #2890). | — | 120 days |
+| ~~`life-platform/dropbox`~~ | ~~Dropbox app key~~ | **Retired 2026-05-19, deleted (window closed 2026-05)** — the dropbox fields live in the `ingestion-keys` bundle. |
 | `life-platform/todoist` | Todoist personal token | **Manual** | 365 days | 120 days |
 | `life-platform/habitify` | API key | **Manual** | 180 days | 120 days |
 | `life-platform/ingestion-keys` | Bundle (Notion + Habitify + Todoist + Dropbox + HAE) | **Manual** | follow individual | 120 days |
@@ -30,7 +30,7 @@ Phase 2.6 (2026-05-16): single source of truth for how each Life Platform secret
 
 ## Auto-rotation: `mcp-api-key`
 
-Implemented by `lambdas/key_rotator_lambda.py`. Secrets Manager triggers the Lambda 30 days before expiry (90-day rotation). 4-step protocol: `createSecret → setSecret → testSecret → finishSecret`. The MCP Lambda picks up the new key within ~5 min via the Bearer cache TTL.
+Implemented by `lambdas/operational/key_rotator_lambda.py` (function `life-platform-key-rotator`). Secrets Manager triggers the Lambda on a 90-day schedule (`AutomaticallyAfterDays: 90`; live-verified 2026-10-17: rotation enabled, last rotated 2026-10-09). 4-step protocol: `createSecret → setSecret → testSecret → finishSecret`. The MCP Lambda picks up the new key within ~5 min via the Bearer cache TTL.
 
 **No manual action needed.** Verify enablement:
 ```bash
@@ -40,7 +40,7 @@ aws secretsmanager describe-secret --secret-id life-platform/mcp-api-key \
 
 ## Auto-on-use: OAuth secrets
 
-Whoop/Withings/Strava/Garmin/EightSleep ingestion Lambdas refresh tokens on every successful API call and write the new refresh token back via `save_secret()` (PR2 of the v7.0.0 alert work added writeback-safety so SM hiccups don't cascade into 401 spam).
+Whoop/Withings/Strava/EightSleep ingestion Lambdas refresh tokens on every successful API call and write the new refresh token back via `save_secret()` (PR2 of the v7.0.0 alert work added writeback-safety so SM hiccups don't cascade into 401 spam).
 
 **No manual action needed under normal operation.** If a source goes silent for >60 days (e.g., extended absence, source API change), the freshness checker fires an alert and the operator should re-auth manually.
 
@@ -69,18 +69,7 @@ aws secretsmanager put-secret-value --secret-id life-platform/whoop --secret-str
 ```
 (#935 closed the find-it trap: the script moved `deploy/` → `setup/setup_whoop_auth.py` so it sits with its siblings, and gained the withings-style local callback server.)
 
-**Garmin (the most operationally fraught — 30-day OAuth1 lifetime + rate-limit traps):**
-```bash
-python3 setup/setup_garmin_browser_auth.py
-# Walks through Garmin login + MFA in headed Chromium (Playwright)
-# Writes garth tokens to life-platform/garmin
-```
-After re-auth, if the `auth_breaker` is tripped, clear the marker:
-```bash
-aws dynamodb delete-item --table-name life-platform \
-  --key '{"pk":{"S":"AUTH_BREAKER#matthew#garmin"},"sk":{"S":"STATE"}}' --region us-west-2
-```
-Then smoke-test: `aws lambda invoke --function-name garmin-data-ingestion --payload '{}' --cli-binary-format raw-in-base64-out /tmp/garmin.json && cat /tmp/garmin.json`.
+**Garmin: retired 2026-10-11 (#4640).** The direct-API ingestion function is gone and no checker names the secret, so there is no live re-auth procedure; the `setup/setup_garmin_*.py` scripts are dormant and apply only if the source is revived (`docs/SECRETS_MAP.md`).
 
 **Withings:**
 ```bash
@@ -119,7 +108,7 @@ Manual procedure (what the script automates):
                        --query SecretString --output text \
                        | jq --arg k 'sk-ant-...' '. + {anthropic_api_key: $k}')"
    ```
-4. Verify next Anthropic call succeeds — check CloudWatch metric `LifePlatform/AI AnthropicAPISuccess` for daily-brief
+4. Verify the next direct-API Anthropic call succeeds — tail the CloudWatch logs of one of the readers listed below (the old `AnthropicAPISuccess` metric is no longer emitted anywhere in the repo)
 5. **Revoke the old key** in the Anthropic console
 
 **Who actually reads this secret (verified 2026-07-19, #1329):** most Claude inference
@@ -128,7 +117,7 @@ migrated to Bedrock/IAM auth (ADR-062) and never touches this secret at all
 read `life-platform/ai-keys` (cached per-container, not via the 15-min `secret_cache.py`
 TTL): `field_notes_lambda.py`, `ai_expert_analyzer_lambda.py`,
 `daily_insight_compute_lambda.py`, `partner_email_lambda.py`, `monday_compass_lambda.py`,
-`data_reconciliation_lambda.py`, `pipeline_health_check_lambda.py`. Each caches the key
+`data_reconciliation_lambda.py`, `pipeline_health_check_lambda.py` (re-checked 2026-10-17; `daily_brief_lambda.py` and `canary_lambda.py` also name the secret as their default `ANTHROPIC_SECRET` — grep `life-platform/ai-keys` under `lambdas/` for the live set). Each caches the key
 in a per-container global for the container's lifetime (NOT the 15-min `secret_cache.py`
 TTL — these lambdas fetch raw via `secretsmanager.get_secret_value` directly), so a
 rotation reaches a given warm container only at its next cold start. If you need it live
@@ -183,7 +172,7 @@ This is a single secret containing keys for multiple sources (Notion + Habitify 
 
 ## Monitoring
 
-The `freshness-checker` Lambda (runs daily at 9:45 AM PT) checks the `LastChangedDate` of every monitored secret:
+The `life-platform-freshness-checker` Lambda (schedule: its `schedule=` in `cdk/stacks/operational_stack.py`) checks the `LastChangedDate` of every monitored secret:
 - **OAuth secrets** stale >60 days → urgent alert (single email, unchanged)
 - **Manual-rotation secrets** stale >120 days → **routed to the self-healing remediation
   agent (#1329, 2026-07-19), NOT raw SNS.** Before #1329, freshness-checker SNS-published
@@ -219,4 +208,4 @@ If a secret is leaked:
 
 ---
 
-**Verified:** 2026-07-19 (#1329 — manual-rotation staleness routed to the remediation agent's curated email instead of raw SNS; `deploy/rotate_ai_keys.sh` one-command prep; prior: #935 Whoop re-auth procedure, full sweep 2026-05-19 V2 audit)
+**Verified:** 2026-10-17 (full re-check against the code; prior: 2026-07-19 #1329 — manual-rotation staleness routed to the remediation agent's curated email instead of raw SNS; `deploy/rotate_ai_keys.sh` one-command prep; prior: #935 Whoop re-auth procedure, full sweep 2026-05-19 V2 audit)

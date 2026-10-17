@@ -1,6 +1,6 @@
 # Security Posture
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 **Last updated:** 2026-05-19 (v8.0.0)
 
@@ -10,7 +10,7 @@
 
 ## Threat model (top-3 realistic threats)
 
-1. **API key / OAuth token leak** — anthropic-api-key, garmin tokens, etc. exposed via accidental git commit, screenshot, or external service compromise.
+1. **API key / OAuth token leak** — `ai-keys` / `site-api-ai-key`, Whoop/Strava/Withings tokens, etc. exposed via accidental git commit, screenshot, or external service compromise.
 2. **Public AI endpoint abuse** — `/api/ask` and `/api/board_ask` hit by a bot, racking up Anthropic charges.
 3. **Account compromise** — AWS root or matthew-admin credentials leaked or phished.
 
@@ -41,11 +41,11 @@ Lower-probability but mentioned in ADR-053/055/057:
 ### Layer 2 — Secrets management
 
 - ✅ **Secrets Manager only** — never `.env` files, never hardcoded
-- ✅ **`life-platform/*` namespace** — 21 active secrets, 0 in deletion window (reconciled 2026-07-10; inventory in `docs/SECRETS_MAP.md`)
+- ✅ **`life-platform/*` namespace** — 28 secrets live in us-west-2 (`aws secretsmanager list-secrets`, count re-read 2026-10-17; the reconciled inventory is `docs/SECRETS_MAP.md`)
 - ✅ **15-min in-Lambda caching** via `secret_cache.py` — reduces SM API calls ~90%
-- ✅ **mcp-api-key auto-rotates** every 90 days via `key_rotator_lambda`
+- ✅ **mcp-api-key auto-rotates** every 90 days via `lambdas/operational/key_rotator_lambda.py` (`life-platform-key-rotator`; rotation enabled, 90-day rule, live-verified 2026-10-17)
 - ⚠️ **Legacy Anthropic keys (`ai-keys`, `site-api-ai-key`) — NO programmatic rotation** — manual at console.anthropic.com (Anthropic doesn't expose a rotation API); runtime inference is Bedrock/IAM (ADR-062), so these are fallback paths
-- ⚠️ **OAuth tokens (Whoop, Garmin, Strava, Withings)** — auto-refreshed on use; manual fallback ~180 days
+- ⚠️ **OAuth tokens (Whoop, Strava, Withings; Garmin retired 2026-10-11, #4640)** — auto-refreshed on use; manual fallback ~180 days
 - ✅ **No tokens in CloudWatch logs** — confirmed via grep of recent log streams
 
 See `docs/SECRETS_MAP.md` for full secret inventory + rotation cadence.
@@ -56,20 +56,20 @@ See `docs/SECRETS_ROTATION.md` for rotation procedures.
 - ⚠️ **WAF removed** — `life-platform-amj-waf` was **deleted** (2026-06, ~−$8/mo). Rate limiting is now entirely **in-Lambda (DDB-backed)**, which is durable across warm containers and was hardened in PG-10. (The `web_stack.py` cleanup is DONE — `web_acl_id` intentionally omitted with an in-code warning against re-adding a dead ARN.)
 - ✅ **In-app rate limiting** (DDB-backed, PG-10 hardened):
   - `/api/ask`: 5/hr anon, 20/hr subscriber
-  - `/api/board_ask`: 5/IP/hour
+  - `/api/board_ask`: 7 Bedrock calls/IP/hour (`BOARD_RATE_LIMIT` in `lambdas/web/site_api_ai_lambda.py` — a fan-out budget, one token per persona, so one full board per IP per hour)
   - `/api/subscribe`: 60 req / 5 min / IP (DDB atomic counter)
-- ✅ **AI cost caps** — per-request `max_tokens` (300–600) + 500-char input cap + reserved concurrency=2; Bedrock spend visible per-endpoint via `LifePlatform/AI`; the $85 cost-governor (ADR-133; $100 in surge mode) pauses public AI at the tier-3 hard stop (ADR-125).
-- ✅ **CORS pinned** to `https://averagejoematt.com` only
-- ✅ **CSP headers** on all responses (no `unsafe-eval`, `script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net`)
+- ✅ **AI cost caps** — per-request `max_tokens` (300–600) + 500-char input cap + reserved concurrency=2; Bedrock spend visible per-endpoint via `LifePlatform/AI`; the cost-governor ($215/month ceiling, $252 in reader-traffic surge mode — ADR-063/ADR-133) pauses public AI at the tier-3 hard stop (ADR-125).
+- ✅ **CORS pinned** to `https://averagejoematt.com` and `https://www.averagejoematt.com` only (`allowed_origins` in `cdk/stacks/serve_stack.py`)
+- ✅ **CSP headers** on all responses — live main-domain policy is `script-src 'self'` (no `unsafe-inline`, no `unsafe-eval`, no CDN; #3048 / DIL-015; built in `cdk/stacks/csp.py`, curl-verified 2026-10-17). `style-src` still carries `'unsafe-inline'`
 - ✅ **HSTS** max-age 1 year, includeSubDomains
-- ⚠️ **`'unsafe-inline'` still in script-src** (V2 P6.2 deferred — inline JS extraction is risky for cosmetic benefit)
+- ✅ **`'unsafe-inline'` is out of script-src** on the main domain (#3048 closed the old V2 P6.2 deferral); only the `style-src` inline allowance remains
 
 ### Layer 4 — Data at rest
 
 - ✅ **DynamoDB:** customer-managed KMS key (CMK) `life-platform-dynamodb` — rotation enabled, audit via CloudTrail
 - ✅ **S3:** AES256 (managed) — explicitly chosen after V2 P5.1 rolled back CMK
   - Rationale: S3 website endpoint cannot serve KMS-encrypted objects to anonymous CloudFront (ADR-053)
-  - S3 CMK retained but disabled, scheduled for deletion 2026-06-16
+  - The S3 CMK is gone (no customer-managed key besides `life-platform-dynamodb` exists in us-west-2, 2026-10-17)
 - ✅ **Secrets Manager:** AWS-managed encryption (every secret)
 - ✅ **CloudWatch Logs:** AES256 (managed); 30-day retention default on new groups (V2 P2.3)
 - ❌ **PII tagging:** in `docs/DATA_GOVERNANCE.md` only; not enforced at storage layer
@@ -78,14 +78,14 @@ See `docs/SECRETS_ROTATION.md` for rotation procedures.
 
 - ✅ **TLS 1.2+** enforced everywhere (CloudFront, API Gateway, Lambda HTTPS endpoints)
 - ✅ **Anthropic API** over HTTPS (urllib stdlib)
-- ✅ **Garmin / Whoop / etc. OAuth** over HTTPS to their endpoints
+- ✅ **Whoop / Withings / Strava / etc. OAuth** over HTTPS to their endpoints
 - ✅ **SES outbound** encrypted at AWS edge
 
 ### Layer 6 — Audit & forensics
 
 - ✅ **CloudTrail management events** — all AWS API calls logged
 - ✅ **CloudTrail data events** (V2 P1.7) — S3 GetObject/PutObject on `matthew-life-platform/raw/*` and `uploads/*`
-- ✅ **90-day CloudTrail retention** in dedicated bucket
+- ✅ **90-day CloudTrail retention** — trail `life-platform-trail` writes under the `cloudtrail/` prefix of `matthew-life-platform`, with lifecycle rule `cloudtrail-expire-90d` (live-verified 2026-10-17; not a dedicated bucket)
 - ⚠️ **No SIEM integration** — manual investigation only (`aws cloudtrail lookup-events`)
 - ✅ **CloudWatch Logs Insights** queries for behavioral anomalies (e.g. failed auth bursts)
 
@@ -99,8 +99,8 @@ See `docs/DISASTER_RECOVERY.md`. Summary:
   DIL-027, #3042. The `raw/` zone (original wearable/API captures) is the platform's only
   unrecomputable data; everything else rebuilds from it plus git. The replica is versioned,
   public-access-blocked, `RETAIN`, carries its own delete-protection Deny, and does **not**
-  replicate delete markers, so a delete on the source does not propagate. Asserted weekly by
-  `deploy/sentinel_replication.py`.
+  replicate delete markers, so a delete on the source does not propagate. Asserted by the
+  infra drift sentinel (`deploy/drift_sentinel.py` → `deploy/sentinel_replication.py`, on the remediation-agent's cron cadence).
 - ⚠️ **Nothing outside `raw/` is replicated, and the backup is in the SAME ACCOUNT** — it
   survives a regional failure and the primary bucket's destruction, not an account-level
   compromise. `aws organizations list-accounts` shows one account, so cross-account has no
@@ -111,9 +111,9 @@ See `docs/DISASTER_RECOVERY.md`. Summary:
 
 ### Layer 8 — Endpoint hardening
 
-- ✅ **HAE webhook signature check** — HMAC verifies request body (ADR ≈ P2.7)
+- ✅ **HAE webhook bearer check** — `Authorization: Bearer` token compared in constant time (`hmac.compare_digest`) in `lambdas/ingestion/health_auto_export_lambda.py` (Phase 2.7); the `?key=` query fallback was removed (#500). It is a shared-secret check, not a body HMAC
 - ✅ **MCP auth, fully hardened 2026-07-10 (#893 A+B):** Desktop path keeps the static HMAC bearer (`life-platform/mcp-api-key`, auto-rotated 90d); the remote OAuth path now mints **short-lived, revocable SESSION bearers** at `/token` (#909) and `/authorize` is a **passcode consent gate** with a 30-day remembered-browser cookie (#912) — URL possession alone yields nothing. NB: the Function URL itself appears in historical `docs/reviews/` bundles from the repo's public era; the control is this auth model + repo visibility, not URL secrecy.
-- ✅ **No public Function URLs without auth** — `chronicle-approve` was flagged as `authType=NONE` but resides behind the dormant chronicle workflow; re-evaluate if reactivated
+- ✅ **Function URLs with `AuthType=NONE` carry application-layer auth** — `chronicle-approve` is live (`AuthType NONE`, verified 2026-10-17) and gated by the per-draft 32-byte token validated against DynamoDB; the Telegram webhook gates on the echoed secret token
 - ✅ **Public Function URLs (mcp, site-api, site-api-ai)**: app-layer Bearer/API-key required in code
 
 ---
@@ -125,7 +125,7 @@ See `docs/DISASTER_RECOVERY.md`. Summary:
 | Bot scans of WordPress admin paths | CloudFront returns 404 (no backend hit) |
 | Bedrock spend runaway via `/api/ask` | DDB rate limit 5/hr per IP + `max_tokens` cap + reserved concurrency=2 + cost-governor tier-2 pause + token telemetry per-endpoint |
 | Subscriber email scraping | DDB partitioned by `USER#matthew` — no public list endpoint |
-| HAE webhook spoofing | HMAC signature required (ADR-052 follow-up) |
+| HAE webhook spoofing | Bearer token, constant-time compare (ADR-052 follow-up) |
 | OAuth token theft | 15-min secret cache + 24h auth_breaker — first failed auth marks DDB record; subsequent attempts short-circuit |
 
 ---
@@ -134,7 +134,7 @@ See `docs/DISASTER_RECOVERY.md`. Summary:
 
 | Gap | Documented in | Reopen if |
 |---|---|---|
-| `'unsafe-inline'` in CSP | ADR-057 W-08 | XSS becomes a real threat |
+| `'unsafe-inline'` in CSP `style-src` (script-src is clean since #3048) | ADR-057 W-08 | XSS becomes a real threat |
 | No cross-region DR **for anything except `raw/`** (partially closed 2026-08-24, DIL-027 — `raw/*` now replicates to us-east-2; DDB, generated artifacts and the site remain single-region, all recomputable from `raw/` + git) | ADR-057 W-03 | Regulated data or SLA |
 | **Backup is in the same AWS account** (DIL-027 residual — dated priced acceptance 2026-08-24) | `docs/reviews/DILIGENCE_2026-08-23_RESPONSE.md` | A second AWS account exists · the restore drill finds the replica unusable · commercialization / second user / regulated obligation · otherwise re-read 2027-02-24 |
 | Anthropic API key has no rotation API | docs/SECRETS_ROTATION.md | Anthropic ships one |
@@ -166,7 +166,7 @@ this inventory's expiry column the one open item of issue 4257's PAT box.
 
 ## Quarterly security checklist
 
-Every 3 months (next: 2026-08-19):
+Every 3 months (last recorded due date 2026-08-19; no "Security review" row exists in `docs/INCIDENT_LOG.md`, so the next one is owed — owner call):
 
 ```bash
 # 1. Verify all secrets rotated within their cadence
@@ -207,4 +207,4 @@ Document findings in `docs/INCIDENT_LOG.md` as "Security review YYYY-MM-DD" entr
 
 ---
 
-**Verified:** 2026-05-19
+**Verified:** 2026-10-17
