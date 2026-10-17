@@ -112,7 +112,7 @@ def _wire(monkeypatch):
     return t
 
 
-def _readers_see(monkeypatch, t, date_str="2026-09-29"):
+def _readers_see(monkeypatch, t, date_str="2026-09-29", craft_post=None):
     """Run the live week through the desk with every model call stubbed; return the ledger each writer was handed."""
     seen = {}
     monkeypatch.setattr(story_dossier, "week_dossier", lambda table, wk: ({"roster": [{"coach_id": "sleep_coach", "name": "S"}]}, []))
@@ -132,9 +132,22 @@ def _readers_see(monkeypatch, t, date_str="2026-09-29"):
     monkeypatch.setattr(story_writers, "write_episode", write_episode)
     for gate in ("post", "episode", "dek"):
         monkeypatch.setattr(story_pipeline._Gates, gate, lambda self, *a, **k: [])
+    if craft_post is not None:
+        monkeypatch.setattr(story_pipeline._Gates, "craft_post", lambda self, text: craft_post)
+        monkeypatch.setattr(story_pipeline._Gates, "craft_episode", lambda self, ep: [])
+        monkeypatch.setattr(story_pipeline._Gates, "craft_dek", lambda self, top_line: [])
     out = story_pipeline.live_week(t, date_str, chronicle_pk=PK, log=lambda m: None)
     assert out is not None, "2026-09-29 must be a season week end"
+    seen["out"] = out
     return seen
+
+
+def test_live_week_hands_the_residual_craft_findings_to_the_publish_hold(monkeypatch):
+    """#4545: the producer seam. `live_week` must carry story_craft's residual verdict as `craft_findings` -- the preview route
+    (chronicle_store.publish_holds) reads that key. Mutation control: `[] and g.craft_post(...)` in live_week turns this red."""
+    residual = ["craft: paragraph 2 carries 6 figures (max 3)"]
+    out = _readers_see(monkeypatch, _wire(monkeypatch), craft_post=residual)["out"]
+    assert out["craft_findings"] == residual
 
 
 # ── the cycle the ledger belongs to ──────────────────────────────────────────

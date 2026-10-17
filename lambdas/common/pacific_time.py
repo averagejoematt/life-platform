@@ -250,26 +250,36 @@ def pacific_day_n(start_date: str, on_date: str | None = None) -> int:
         return 0
 
 
+# THE one constant behind the weekly card's day AND the progress-photo protocol day (#3761).
+# Days after the experiment-week's day 7 on which the week "closes": 0 = day 7 (a Saturday
+# for a Sunday genesis, the pre-ruling behaviour), 1 = day 8 = the NEXT Sunday for a Sunday
+# genesis (owner ruling 2026-09-27: photos every Sunday morning, after the weigh-in).
+# Flip to 0 for "Saturday". Still derived from day_n, never a weekday literal.
+WEEK_CLOSE_SHIFT_DAYS = 1
+
+
 def week_close_day(on_date: str, genesis: str) -> str | None:
     """The day key (``YYYY-MM-DD``) the experiment week containing ``on_date`` closes on.
 
-    THE one week-close derivation (#3761). A week closes on ``day_n % 7 == 0`` — day 7,
-    14, 21 ... — relative to ``genesis``, NEVER a weekday: genesis moves every experiment
-    reset (seventeen so far) and a ``SAT``/``SUN`` literal would be right until the next
-    reset and silently wrong after it (see ``recap_card_lambda.py``'s "THE WEEKLY CARD IS
-    DERIVED" note, which this replaces the inline copy of).
+    THE one week-close derivation (#3761). A week closes on day 7, 14, 21 ... plus
+    ``WEEK_CLOSE_SHIFT_DAYS`` (day 8, 15, 22 ... = Sunday for a Sunday genesis) relative to
+    ``genesis``, NEVER a weekday literal: genesis moves every experiment reset (seventeen
+    so far) and a ``SAT``/``SUN`` literal would be right until the next reset.
 
     Two callers share this rather than each recomputing "the end of the week": the weekly
     recap card (is *today* the close day?) and the progress-photo protocol (what date IS
     the close day for a photo taken any day this week?) — one arithmetic, so neither can
     independently drift from the other's definition of a week.
 
-    Returns None when ``on_date`` can't be resolved to a day-1-or-later day — an
-    unparseable input, or a date before ``genesis`` (``pacific_day_n`` clamps those to 0,
-    and a week has no close before day 1 exists).
+    Genesis day itself is the Day-1 baseline set and is its own close day. Returns None
+    when ``on_date`` can't be resolved to a day-1-or-later day — an unparseable input, or a
+    date before ``genesis`` (``pacific_day_n`` clamps those to 0).
     """
     n = pacific_day_n(genesis, on_date)
     if n < 1:
         return None
-    days_into_week = (n - 1) % 7
-    return shift_day_key(on_date, 6 - days_into_week)
+    if n == 1 and WEEK_CLOSE_SHIFT_DAYS:
+        return on_date
+    ref = shift_day_key(on_date, -WEEK_CLOSE_SHIFT_DAYS)
+    days_into_week = (pacific_day_n(genesis, ref) - 1) % 7
+    return shift_day_key(ref, 6 - days_into_week + WEEK_CLOSE_SHIFT_DAYS)

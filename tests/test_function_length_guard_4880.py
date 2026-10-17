@@ -129,7 +129,7 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/emails/freshness_checker_lambda.py::lambda_handler": 477,
     "lambdas/emails/monthly_digest_render.py::build_html": 323,
     "lambdas/emails/partner_email_lambda.py::gather_all": 182,
-    "lambdas/emails/wednesday_chronicle_lambda.py::_handler_core": 587,
+    "lambdas/emails/wednesday_chronicle_lambda.py::_handler_core": 576,
     "lambdas/emails/weekly_digest_lambda.py::build_html": 679,
     "lambdas/health/character_engine.py::compute_character_sheet": 267,
     "lambdas/health/character_engine.py::evaluate_level_changes": 189,
