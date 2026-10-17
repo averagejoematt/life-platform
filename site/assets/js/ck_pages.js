@@ -63,13 +63,14 @@ const countWord = (n) => NUMBER_WORDS[n] || String(n);
 // What each coach is for, in a reader's words, keyed on the served persona id. A coach
 // that is not here shows its name and record with no job line (never a machine name).
 export const COACH_JOBS = {
-  eli_marsh: "Lead. Turns the others into one plan for the day.",
+  // Round 3: one short form for every coach, a few words each.
+  eli_marsh: "Lead, the day's plan",
   sleep_coach: "Sleep",
-  explorer_coach: "The statistician. Asks whether a pattern is real.",
+  explorer_coach: "Statistics",
   nutrition_coach: "Food and protein",
   mind_coach: "Mind and habits",
   physical_coach: "Training",
-  labs_coach: "Blood tests and long-term health",
+  labs_coach: "Blood tests",
   glucose_coach: "Blood sugar",
 };
 
@@ -132,7 +133,9 @@ export const weekNumberOf = (label) => {
 //     served field says one does.
 // "" when the latest chapter is current.
 export const CHAPTER_DAYS = 7;
-export function heldChapterLine(block, edition, journal) {
+// Round 3: the line says WHICH weeks — the overdue one(s) and the one whose draft comes next —
+// from one week arithmetic: whole chapter-weeks since the latest chapter's date.
+export function heldChapterLine(block, edition, journal, nextBlock = null) {
   if (!usable(block)) return "";
   const n = weekNumberOf(block.data.week_label);
   if (n === null) return "";
@@ -140,7 +143,11 @@ export function heldChapterLine(block, edition, journal) {
   if (p && num(p.week) !== null && p.week > n) return `Week ${p.week} is held before publishing.`;
   const [t0, t1] = [Date.parse(`${block.data.date}T12:00:00Z`), Date.parse(`${(edition && edition.as_of) || ""}T12:00:00Z`)];
   if (!Number.isFinite(t0) || !Number.isFinite(t1) || (t1 - t0) / 86400000 <= CHAPTER_DAYS) return "";
-  return `Week ${n + 1} has not published yet: each chapter waits for Matthew to read and approve it.`;
+  const k = Math.floor((t1 - t0) / 86400000 / CHAPTER_DAYS);
+  const held = k === 1 ? `Week ${n + 1} is waiting for Matthew’s approval` : `Weeks ${n + 1} to ${n + k} are waiting for Matthew’s approval`;
+  const ch = nextBlock && nextBlock.data && nextBlock.data.chapter;
+  const day = usable(ch) ? dayInWords(ch.data.date) : "";
+  return day ? `${held}; week ${n + k + 1}’s draft is due ${day}.` : `${held}.`;
 }
 // The chapter's teaser, with the two claims a reader can check against the page made to agree with
 // it (red team 2026-10-17). "crossed 310 pounds" says which way only through the chapter's own
@@ -180,7 +187,8 @@ export function chapterHTML(block, nextBlock, { heading = "h1", player = true, l
       ? `<a class="ck-btn ck-btn--ghost" href="${esc(listenHref)}">Listen${num(pod.data.duration_minutes) !== null ? ` · ${pod.data.duration_minutes} min` : ""}</a>`
       : "";
   // With the held line printed, the next date is said plainly: the approval is already said once.
-  const nextLine = held ? nextChapterLine(nextBlock).replace(/; it publishes once Matthew approves it\.$/, ".") : nextChapterLine(nextBlock);
+  // The held line names the next draft itself; then the next-date line is not repeated.
+  const nextLine = held ? (/draft is due/.test(held) ? "" : nextChapterLine(nextBlock).replace(/; it publishes once Matthew approves it\.$/, ".")) : nextChapterLine(nextBlock);
   // The front page runs one sentence of the chapter's own summary; Story runs it whole.
   const dek = player ? teaserText(c.dek, teaser || {}) : summarySentence(c.dek) || c.dek;
   return [
@@ -244,13 +252,23 @@ const countedText = (d) => String((d && d.counted_text) || "").trim();
 // names that guess and the gap, both from served fields: `brier_skill` (the gap, as a share of the
 // guess's error) and right/decided (the guess's chance, only when the skill was scored on exactly
 // the calls counted, `skill_n` === decided). With no skill served: "no comparison with a guess yet".
+// Round 3: said plainly everywhere — "about as good as always guessing 42%, which is how often
+// they're right". Within NEAR_SKILL of zero is "about as good as"; past it, "better"/"worse than".
+// The precise skill figure is said once, on Coaches, under the breakdown (`skillClause`).
+export const NEAR_SKILL = 0.05;
+const baseRate = (d) => (num(d.skill_n) !== null && d.skill_n === d.decided && num(d.right) !== null && d.decided > 0 ? Math.round((100 * d.right) / d.decided) : null);
 export function guessClause(d) {
   const skill = num(d && d.brier_skill);
   if (skill === null) return "there is no comparison with a guess yet.";
+  const how = Math.abs(skill) < NEAR_SKILL ? "about as good as" : skill > 0 ? "better than" : "worse than";
+  const base = baseRate(d);
+  return base === null ? `${how} always guessing how often they turn out right.` : `${how} always guessing ${base}%, which is how often they're right.`;
+}
+export function skillClause(d) {
+  const skill = num(d && d.brier_skill);
+  if (skill === null) return "";
   const pct = Math.abs(skill * 100).toFixed(1);
-  const flat = num(d.skill_n) !== null && d.skill_n === d.decided && num(d.right) !== null ? `a guess that gives every call the same ${Math.round((100 * d.right) / d.decided)}% chance` : "a guess that gives every call the same chance";
-  if (pct === "0.0") return `weighing how sure each call was, they score the same as ${flat}.`;
-  return `weighing how sure each call was, they score ${pct}% ${skill > 0 ? "better" : "worse"} than ${flat}.`;
+  return pct === "0.0" ? "Weighing how sure each call was, they score the same as that guess." : `Weighing how sure each call was, they score ${pct}% ${skill > 0 ? "better" : "worse"} than that guess.`;
 }
 export function recordLine(block) {
   if (!usable(block) || !block.data.count_text || !String(block.data.comparison_text || "").trim()) return "";
@@ -288,7 +306,7 @@ export function recordBigHTML(block) {
     d.decided >= MIN_PERCENT_N
       ? `<div class="ck-track" role="img" aria-label="${d.right} of ${d.decided} checked calls right"><i style="width:${Math.round((100 * d.right) / d.decided)}%"></i></div>`
       : "";
-  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span> of ${d.decided} checked calls</span></p>${track}<p>${esc(`${cmp.charAt(0).toUpperCase()}${cmp.slice(1)}`)}</p>${countedHTML(d)}</div>`;
+  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span> of ${d.decided} checked calls</span></p>${track}<p>${esc(`${cmp.charAt(0).toUpperCase()}${cmp.slice(1)}`)}</p>${countedHTML(d)}${skillClause(d) ? `<p class="ck-small">${esc(skillClause(d))}</p>` : ""}</div>`;
 }
 
 // ── the bet card ───────────────────────────────────────────────────────────────
@@ -660,6 +678,10 @@ export function frontReadSlots(edition, b, base = "/") {
     out["ck-coaches-door"] = null;
   } else if (pick && pick.kind === "reply") {
     out["ck-bet"] = null;
+  } else if (!pick && b.next.state !== "unavailable" && !usable(b.next.data && b.next.data.bet)) {
+    // The heading already says there is no open bet; the card's own "No coach bet is waiting to
+    // settle." would say it twice (round 3).
+    out["ck-bet"] = null;
   }
   // A line from the edition's day that the argument already printed is not printed twice.
   // With nothing said today, the newest line the coaches said stands under its own label,
@@ -684,10 +706,12 @@ export function frontReadSlots(edition, b, base = "/") {
   }
   // The clearest miss this week, or on record, or the calls block's own sentence.
   const calls = callsBodyOf(b);
-  const { kind } = lastCallPick(calls, e.as_of);
+  // "This week" is the week the page prints (the week block's first day), one window for both.
+  const weekFrom = usable(b.week) ? (b.week.data.days || [])[0] || "" : "";
+  const { kind } = lastCallPick(calls, e.as_of, { since: weekFrom });
   // The list of every settled call shares the card's door line (one line, not a paragraph of its own).
   const everyDoor = `<a class="ck-link" href="${esc(base)}call/">Every settled call</a>`;
-  const last = lastCallHTML(calls, base, e.as_of, F.SHORT_JOBS, { moreDoor: everyDoor });
+  const last = lastCallHTML(calls, base, e.as_of, F.SHORT_JOBS, { moreDoor: everyDoor, since: weekFrom });
   if (last) {
     const heading = { recent: "The clearest miss this week.", wrong: "The clearest miss so far.", right: "The tightest right call so far." }[kind] || "The latest checked call.";
     out["ck-miss-heading"] = esc(heading);
@@ -750,7 +774,7 @@ export function storyChapterHTML(edition, b, journal, episodes) {
   const post = c ? postsInOrder(journal).find((p) => p.url === c.url) : null;
   const chapterLb = post && _weightOf(post.stats_line) ? Number(_weightOf(post.stats_line)) : null;
   return chapterHTML(b.chapter, b.next, {
-    held: heldChapterLine(b.chapter, edition, journal),
+    held: heldChapterLine(b.chapter, edition, journal, b.next),
     podcastHeld: c ? podcastHeld(episodes, weekNumberOf(c.week_label)) : false,
     teaser: { chapterLb, startLb: startLbOf(b) },
     asOf: (edition && edition.as_of) || "",

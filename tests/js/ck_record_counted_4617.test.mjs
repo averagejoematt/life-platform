@@ -31,7 +31,7 @@ test("the big count on Coaches prints what it counts after one plain sentence, e
   const html = P.recordBigHTML(WITH);
   assert.match(html, /Not all of them are formal predictions\. Of the \d+: 10 sealed before day one/);
   assert.doesNotMatch(html, /Counted:/);
-  assert.ok(html.indexOf("formal predictions") > html.indexOf("than a guess that gives"), "the comparison stays beside the count");
+  assert.ok(html.indexOf("formal predictions") > html.indexOf("always guessing"), "the comparison stays beside the count");
   assert.doesNotMatch(P.recordBigHTML({ ...WITH, data: { ...WITH.data, counted_text: "<b>x</b>" } }), /<b>x<\/b>/);
 });
 

@@ -99,12 +99,13 @@ test("coach lines render at most what is served, and silence is a sentence", () 
 test("the coaches' count never renders without its comparison", () => {
   const rd = B.record.data;
   assert.equal(P.recordLine(B.record), `${rd.count_text.replace(/\.$/, "")}; ${P.guessClause(rd)}`, "the count, then the comparison with its figure, as one sentence");
-  assert.match(P.guessClause(rd), /\d+(\.\d)?% (worse|better) than a guess that gives every call the same \d+% chance\.$|the same as a guess/);
+  assert.match(P.guessClause(rd), /^(about as good as|better than|worse than) always guessing \d+%, which is how often they're right\.$/);
   const alone = { ...B.record, data: { ...B.record.data, comparison_text: "" } };
   assert.equal(P.recordLine(alone), "");
   assert.doesNotMatch(P.recordBigHTML(alone), /ck-big/);
   assert.ok(P.recordBigHTML(B.record).includes(`${rd.right}<span> of ${rd.decided} checked calls</span>`));
-  assert.ok(P.recordBigHTML(B.record).includes("than a guess that gives"));
+  assert.ok(P.recordBigHTML(B.record).includes("always guessing"));
+  assert.ok(P.recordBigHTML(B.record).includes("Weighing how sure each call was"), "the precise clause, once, on Coaches");
   assert.match(P.guessClause({ ...rd, brier_skill: null }), /no comparison with a guess yet/);
 });
 

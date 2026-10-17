@@ -22,7 +22,11 @@ const n = P.weekNumberOf(chapter.data.week_label);
 test("Story: a week that has not published is said in one calm line, never silence", () => {
   assert.ok(n >= 1, "the capture's latest chapter is a numbered week");
   assert.equal(P.heldChapterLine(chapter, { as_of: later(latestDate, 3) }, POSTS), "", "a current chapter needs no line");
-  assert.equal(P.heldChapterLine(chapter, { as_of: later(latestDate, 11) }, POSTS), `Week ${n + 1} has not published yet: each chapter waits for Matthew to read and approve it.`);
+  assert.equal(P.heldChapterLine(chapter, { as_of: later(latestDate, 11) }, POSTS), `Week ${n + 1} is waiting for Matthew’s approval.`);
+  // Round 3: with the next date served, the line names the week whose draft comes next (same arithmetic).
+  const nextB = { state: "ok", data: { chapter: { state: "ok", data: { date: later(latestDate, 15), drafted_not_promised: true } } } };
+  assert.match(P.heldChapterLine(chapter, { as_of: later(latestDate, 11) }, POSTS, nextB), new RegExp(`^Week ${n + 1} is waiting for Matthew’s approval; week ${n + 2}’s draft is due [A-Z][a-z]+day, [A-Z][a-z]+ \\d+\\.$`));
+  assert.match(P.heldChapterLine(chapter, { as_of: later(latestDate, 15) }, POSTS, nextB), new RegExp(`^Weeks ${n + 1} to ${n + 2} are waiting for Matthew’s approval; week ${n + 3}’s draft`));
   const marked = { ...POSTS, pending: { week: n + 1, reason: "story_door_hold" } };
   assert.equal(P.heldChapterLine(chapter, { as_of: later(latestDate, 3) }, marked), `Week ${n + 1} is held before publishing.`, "the chronicle's own marker wins");
   assert.equal(P.heldChapterLine({ state: "unavailable", data: null }, { as_of: later(latestDate, 11) }, POSTS), "");
@@ -41,9 +45,9 @@ test("Story: the lead puts the held line beside the next date, saying the approv
   const edition = { ...EDITION, as_of: later(latestDate, 11) };
   const noPod = { ...chapter, data: { ...chapter.data, podcast: { state: "absent", absent_text: "No podcast episode for this chapter yet.", data: null } } };
   const html = P.storyChapterHTML(edition, { ...B, chapter: noPod }, POSTS, { episodes: [], pending: { week: n, reason: "held_for_review" } });
-  assert.match(html, new RegExp(`Week ${n + 1} has not published yet`));
+  assert.match(html, new RegExp(`Week ${n + 1} is waiting for Matthew’s approval; week ${n + 2}’s draft is due`));
   assert.match(html, /held for review/);
-  assert.equal((html.match(/approve/g) || []).length, 1, html);
+  assert.doesNotMatch(html, /The next draft is due/, "the next date is said once");
 });
 
 test("Story: the teaser says which way the scale crossed, and its pounds gone are the page's own two numbers", () => {
@@ -105,15 +109,15 @@ test("Front: a line in the statistician's jargon, or one with a reader-gate find
   const jargon = "27.6% deep sleep spike (1.8 SD above baseline) is likely regression-to-mean noise without thermal anchor and subjective context";
   assert.equal(F.plainLanguage(jargon), false);
   assert.equal(F.frontQuotable({ coach_id: "sleep_coach", move: "reply", text: jargon }), false);
-  assert.equal(F.frontQuotable({ coach_id: "sleep_coach", move: "reply", text: "Deep sleep fell this week.", reader: ["hedge"] }), false);
-  assert.equal(F.frontQuotable({ coach_id: "sleep_coach", move: "reply", text: "Deep sleep fell this week." }), true);
+  assert.equal(F.frontQuotable({ coach_id: "sleep_coach", move: "reply", text: "Bedtime moved earlier this week.", reader: ["hedge"] }), false);
+  assert.equal(F.frontQuotable({ coach_id: "sleep_coach", move: "reply", text: "Bedtime moved earlier this week." }), true);
 });
 
 test("the record's comparison names the guess and the gap, or says there is none yet", () => {
   const d = B.record.data;
-  assert.match(P.recordLine(B.record), /they score \d+\.\d% (worse|better) than a guess that gives every call the same \d+% chance\.$/);
+  assert.match(P.recordLine(B.record), /; (about as good as|better than|worse than) always guessing \d+%, which is how often they're right\.$/);
   assert.equal(P.guessClause({ ...d, brier_skill: null }), "there is no comparison with a guess yet.");
-  assert.match(P.guessClause({ ...d, skill_n: d.decided + 1 }), /a guess that gives every call the same chance\./);
+  assert.match(P.guessClause({ ...d, skill_n: d.decided + 1 }), /always guessing how often they turn out right\./);
 });
 
 test("Coaches: one rule for every row — the count, no bar; the lead says no checked calls", () => {
@@ -124,8 +128,29 @@ test("Coaches: one rule for every row — the count, no bar; the lead says no ch
 
 test("Story on the capture's own day: the next week has not published, and the next date is ahead of the day", () => {
   const html = P.storyChapterHTML(EDITION, B, POSTS, load("episodes"));
-  assert.match(html, new RegExp(`Week ${n + 1} (has not published yet|is held before publishing)`));
+  assert.match(html, new RegExp(`Week ${n + 1} (is waiting for Matthew’s approval|is held before publishing)`));
+  assert.match(html, new RegExp(`week ${n + 2}’s draft is due`));
   const due = B.next.data.chapter.data.date;
   assert.ok(due > EDITION.as_of, `${due} is after ${EDITION.as_of}`);
   assert.doesNotMatch(html, /New this week/);
+});
+
+// ── round 3 ─────────────────────────────────────────────────────────────────────
+const C = await import("../../site/assets/js/ck_call.js");
+
+test("Front: 'this week' for the miss is the week the page prints; outside it the heading says so", () => {
+  const calls = { state: "ok", calls: load("calls").calls };
+  const days = B.week.data.days;
+  const pick = C.lastCallPick(calls, EDITION.as_of, { since: days[0] });
+  if (pick.kind === "recent") assert.ok(pick.call.settled_date >= days[0] && pick.call.settled_date <= EDITION.as_of, pick.call.settled_date);
+  const slots = P.frontReadSlots(EDITION, B, "/next/v8/");
+  const settled = /Settled [A-Z][a-z]+day, ([A-Z][a-z]+ \d+)/.exec(slots["ck-call"]);
+  if (/this week/.test(slots["ck-miss-heading"]) && settled) {
+    const inWeek = days.some((d) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" }) === settled[1]);
+    assert.ok(inWeek, `${settled[1]} is inside the printed week`);
+  }
+});
+
+test("Coaches: one short job form for every coach", () => {
+  for (const job of Object.values(P.COACH_JOBS)) assert.ok(job.split(" ").length <= 4 && !/\./.test(job), job);
 });

@@ -60,13 +60,13 @@ METRIC_WORDS = {
 
 #: The unit each METRIC_WORDS measure is read in, for a number printed beside its words (a bet's
 #: line: "26% or higher", red team 2026-10-17 — "26 or higher" beside a coach's "27.6%"). A score
-#: out of 100 is in points. One entry per METRIC_WORDS key (tests/test_bet_question_unit_4586.py).
+#: out of 100 says so. One entry per METRIC_WORDS key (tests/test_bet_question_unit_4586.py).
 METRIC_UNITS = {
     "hrv": " ms",
-    "recovery_score": " points",
+    "recovery_score": " out of 100",
     "resting_heart_rate": " bpm",
     "sleep_duration_hours": " hours",
-    "sleep_score": " points",
+    "sleep_score": " out of 100",
     "deep_pct": "%",
     "rem_pct": "%",
     "weight_lbs": " lb",

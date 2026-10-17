@@ -219,9 +219,12 @@ const daysBefore = (iso, n) => {
   const t = Date.parse(`${iso}T12:00:00Z`);
   return Number.isFinite(t) ? new Date(t - n * 86400000).toISOString().slice(0, 10) : "";
 };
-export function lastCallPick(callsBody, asOf = "") {
+// `since`: the first day of the window the page itself prints as "this week" (round 3: a miss
+// settled the day before the printed week was headed "this week"). Without it, the seven days
+// ending on `asOf`, inclusive.
+export function lastCallPick(callsBody, asOf = "", { since: from = "" } = {}) {
   const all = callsOf(callsBody).filter(hasRule);
-  const since = asOf ? daysBefore(asOf, RECENT_DAYS) : "";
+  const since = from || (asOf ? daysBefore(asOf, RECENT_DAYS - 1) : "");
   if (since) {
     const recent = showcasePair(all.filter((c) => c.settled_date >= since && c.settled_date <= asOf));
     if (recent.wrong) return { call: recent.wrong, kind: "recent" };
@@ -234,8 +237,8 @@ export function lastCallPick(callsBody, asOf = "") {
 // `jobs` maps a persona id to the coach's job in a word or two: with it, the card's first line
 // names the coach and the job ("Settled Saturday, October 10 · Lisa Park, the sleep coach"),
 // and the result is the bold line — the punch, not the rule (round 8b).
-export function lastCallHTML(callsBody, base, asOf = "", jobs = null, { moreDoor = "" } = {}) {
-  const { call } = lastCallPick(callsBody, asOf);
+export function lastCallHTML(callsBody, base, asOf = "", jobs = null, { moreDoor = "", since = "" } = {}) {
+  const { call } = lastCallPick(callsBody, asOf, { since });
   if (!call) return "";
   const day = dayInWords(call.settled_date);
   const g = call.simple_guess;

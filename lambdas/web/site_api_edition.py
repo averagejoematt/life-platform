@@ -242,7 +242,7 @@ def _fmt_num(value: Any) -> str | None:
 
 
 def bet_question(criterion: dict, settle_date: str, metric_words: Callable[[Any], str | None]) -> str | None:
-    """'Will the morning recovery score (7-day average) be 81.6 or higher on Monday, October 5?'
+    """'Will the morning recovery score (7-day average) be 81.6 out of 100 or higher on Monday, October 5?'
 
     Built from the docket's CRITERION (engine fields), never from the served topic prose —
     the same rule v7_coaches.js docketQuestion() follows, with the metric's reader words

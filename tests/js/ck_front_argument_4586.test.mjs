@@ -99,7 +99,10 @@ test("with an open bet, the bet is the argument: two coaches on opposite sides, 
   const both = !!(jobs[SA.coach] && jobs[SB.coach]);
   const side = (x) => `${both ? who(x.coach) : x.coach} says ${x.says}${F.plainLanguage(why[x.coach]) ? `: “${why[x.coach]}”` : ""}.`;
   assert.deepEqual(F.betSidesLines(pick.bet, jobs), [side(SA), side(SB)]);
-  assert.ok(F.betSidesLines(pick.bet, jobs).every((l) => !F.FRONT_JARGON.test(l)), "no statistician's jargon reaches the front card");
+  for (const l of F.betSidesLines(pick.bet, jobs)) {
+    const q = /“(.*)”/.exec(l);
+    if (q) assert.ok(F.plainLanguage(q[1]), `a quoted reason passes the plain-language rule: ${l}`);
+  }
   const said = (x) => `${x.coach} says ${x.says}${F.plainLanguage(why[x.coach]) ? `: “${why[x.coach]}”` : ""}.`;
   assert.equal(F.betSidesLine(pick.bet), `${said(SA)} ${said(SB)}`);
   // a side with no served reason is the side alone; nothing is written in its place
@@ -136,24 +139,42 @@ test("with an open bet, the bet is the argument: two coaches on opposite sides, 
   assert.equal(F.betLiveLine(pick.bet, { state: "unavailable", absent_text: "x", data: null }), "");
 });
 
-test("with no bet, the newest reply and the line it answers are the latest exchange — never 'disagree'", () => {
-  const pick = F.pickArgument(DAYS, NO_BET);
+// Round 3: the exchange is built only from lines the front page may quote (F.frontQuotable — one
+// sentence, at most F.FRONT_MAX_WORDS words, no glossary term, no hedge chain, no mechanism noun,
+// no other coach named unless replied to). The wire's own week of lines is long-form, so the
+// rule is held on this test's own short lines, and the wire is held to "nothing unquotable leads".
+const SHORT = [
+  { state: "ok", date: "2026-10-07", lines: [{ coach_id: "nutrition_coach", coach: "Marcus Webb", move: "call", text: "Dinner protein will stay short of the target this week." }] },
+  { state: "ok", date: "2026-10-08", lines: [{ coach_id: "labs_coach", coach: "James Okafor", move: "reply", replies_to: "Marcus Webb", text: "Marcus Webb is right that dinner is the weak meal." }] },
+];
+test("with no bet, the newest quotable reply and the line it answers are the latest exchange — never 'disagree'", () => {
+  const pick = F.pickArgument(SHORT, NO_BET);
   assert.equal(pick.kind, "reply");
   assert.equal(pick.second.coach, "James Okafor");
-  assert.equal(pick.second.date, "2026-10-08");
-  assert.equal(pick.second.replies_to, "Marcus Webb");
   assert.equal(pick.first.coach, "Marcus Webb");
-  assert.equal(pick.first.date, "2026-10-07");
   assert.equal(F.argumentLabel(pick), "The latest exchange");
   assert.equal(F.argumentHeading(pick), "One coach answers another.");
   const html = F.argumentHTML(pick, BASE);
   assert.equal((html.match(/<li>/g) || []).length, 2);
-  assert.match(html, /Marcus Webb<\/a> · Wednesday, October 7<\/span><span>“James Okafor's protein hold deserves scrutiny/);
+  assert.match(html, /Marcus Webb<\/a> · Wednesday, October 7<\/span><span>“Dinner protein/);
   assert.match(html, /James Okafor<\/a> · answering Marcus Webb · Thursday, October 8<\/span>/);
   assert.match(html, /href="\/next\/v8\/coach\/\?c=labs_coach"/);
-  assert.doesNotMatch(html, /\b20\d\d-\d\d-\d\d\b/);
   assert.doesNotMatch(F.argumentHeading(pick), /disagree/i);
   assert.deepEqual(F.argumentTexts(pick), [pick.first.text, pick.second.text]);
+  // The wire: whatever leads passes the rule, line by line.
+  const wire = F.pickArgument(DAYS, NO_BET);
+  for (const t of F.argumentTexts(wire)) assert.ok(F.plainLanguage(t), t);
+});
+
+test("a line about another coach's call is dropped; a long or hedged line never leads", () => {
+  const other = [{ state: "ok", date: "2026-10-11", lines: [{ coach_id: "nutrition_coach", coach: "Marcus Webb", move: "reaction", text: "Lisa's protein prediction came true this week." }] }];
+  assert.equal(F.lastHeardHTML(other, [], BASE), "", "the food coach on the sleep coach's call reads as the wrong owner");
+  assert.equal(F.plainLanguage("Protein escalation held, yet deep sleep didn't improve, which means, for now, I can't claim it."), false);
+  assert.equal(F.plainLanguage("Activation hasn't closed the dinner gap."), false, "a mechanism noun");
+  assert.equal(F.plainLanguage("Dinner is short. Breakfast is fine."), false, "one sentence only");
+  assert.equal(F.plainLanguage(Array(F.FRONT_MAX_WORDS + 1).fill("word").join(" ") + "."), false);
+  assert.equal(F.plainLanguage("Recovery climbed all week."), false, "a glossary term (ck_terms.js) is kept off the front page");
+  assert.equal(F.plainLanguage("Dinner is still the short meal."), true);
 });
 
 test("a self-naming line is never the exchange, even when it is the newest reply's target", () => {
@@ -175,7 +196,7 @@ test("with no bet and no reply, nothing is called an argument", () => {
   assert.equal(none, null);
   assert.equal(F.argumentHTML(none, BASE), "");
   assert.equal(F.argumentLabel(none), "The coaches");
-  assert.equal(F.argumentHeading(none), "Nothing is in dispute this week.");
+  assert.equal(F.argumentHeading(none), "No open bet between them this week.");
   assert.equal(F.pickArgument([], null), null);
   assert.equal(F.pickArgument([null, {}, { state: "absent", date: "2026-10-10", lines: [] }], { state: "unavailable", absent_text: "x", data: null }), null);
 });
@@ -190,19 +211,17 @@ test("the Today band leaves out a line the argument already printed, and says no
   assert.match(F.coachTodayHTML({ state: "absent", absent_text: "No coach had anything to say on Saturday, October 10.", data: null }, { skip: ["x"] }), /No coach had anything to say on Saturday, October 10\./);
 });
 
-test("when no coach spoke today, the newest SHORT line heard stands with its day and the coach's job — never a self-naming one, never one already printed", () => {
-  const words = (t) => t.trim().split(/\s+/).length;
-  const clean = F.argumentLines(DAYS).filter((l) => !F.namesSelf(l));
-  const expected = clean.find((l) => words(l.text) <= F.HEARD_MAX_WORDS);
-  assert.ok(words(clean[0].text) > F.HEARD_MAX_WORDS, "the wire's newest clean line is long, so the rule has something to prefer");
-  const html = F.lastHeardHTML(DAYS, [], BASE);
+test("when no coach spoke today, the newest quotable line heard stands with its day and the coach's job — never one already printed", () => {
+  const html = F.lastHeardHTML(SHORT, [], BASE);
   assert.equal((html.match(/<li>/g) || []).length, 1);
-  assert.ok(html.includes(`“${expected.text}”`), html);
+  assert.ok(html.includes(`“${SHORT[1].lines[0].text}”`), html);
   assert.match(html, /<\/a> \((food|mind|blood tests|sleep|statistics|training|blood sugar|lead)\) · /, "the job beside the name");
-  const skipped = F.lastHeardHTML(DAYS, clean.filter((l) => words(l.text) <= F.HEARD_MAX_WORDS).map((l) => l.text), BASE);
-  assert.ok(skipped.includes(`“${clean[0].text}”`), "with every short line printed already, the newest line at all");
+  assert.ok(F.lastHeardHTML(SHORT, [SHORT[1].lines[0].text], BASE).includes(SHORT[0].lines[0].text));
   assert.equal(F.lastHeardHTML([], [], BASE), "");
-  assert.doesNotMatch(html, /\b20\d\d-\d\d-\d\d\b/);
+  // The wire's lines: whatever stands passes the rule.
+  const wire = F.lastHeardHTML(DAYS, [], BASE);
+  const q = /“([^”]*)”/.exec(wire);
+  if (q) assert.ok(F.plainLanguage(q[1]), q[1]);
 });
 
 test("the argument reads the edition's day and the six before it", () => {

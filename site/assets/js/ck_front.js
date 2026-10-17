@@ -22,6 +22,7 @@
 // and dated), no count of earlier starts, no "Dr.", no percentage on fewer than 20 items.
 import { esc } from "/assets/js/evidence_shared.js";
 import { dayInWords } from "/assets/js/entry_age.js";
+import { TERMS } from "/assets/js/ck_terms.js";
 
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const fmt1 = (v) => (num(v) === null ? "" : v.toFixed(1));
@@ -116,7 +117,10 @@ export function morningLine(week, todayIso) {
   }
   return `${fmt1(now)} lb.`;
 }
-const RECOVERY_GLOSS = "Recovery is the wrist strap’s morning score out of 100.";
+const RECOVERY_GLOSS = "Recovery is the wrist strap’s morning score, as a percentage.";
+// THE recovery display (round 3): the score is served on a 0-100 scale and the chapters write it
+// "98%", so every kit page prints it that way — one helper over the served day text.
+export const recoveryShown = (text) => String(text || "").replace(/\brecovery (\d+(?:\.\d+)?) out of 100\b/gi, (m, n) => `recovery ${n}%`);
 // One day's facts as one line: "241 minutes of walking · 8.8 hours of sleep; recovery 98
 // out of 100 · 153 g protein, 1,732 kcal, under the protein floor". Step counts are left
 // out: the served counts are unreliable (a caveat sits on their trend page).
@@ -124,9 +128,9 @@ export function factLine(facts, { skip = [], floorMet = null } = {}) {
   return (facts || [])
     .filter((f) => f && f.label && f.text && f.label !== "Steps" && !skip.includes(f.label))
     .map((f) => {
-      if (f.label === "Sleep") return `slept ${f.text.replace(/^(\d[\d.]*) hours/, "$1 hours")}`;
+      if (f.label === "Sleep") return `slept ${recoveryShown(f.text.replace(/^(\d[\d.]*) hours/, "$1 hours"))}`;
       if (f.label === "Food" && floorMet !== null) return `${f.text}, ${floorMet ? "at or above" : "under"} the protein target`;
-      return f.text;
+      return recoveryShown(f.text);
     })
     .join(" · ");
 }
@@ -175,21 +179,39 @@ export function todayBandHTML(edition, b, base = "/", { gloss = true } = {}) {
 //       should meet the record, not an AI's diagnosis of the person.
 // It holds for every quote on the front page: the argument, the day's lines and the last-heard
 // row. The excluded lines are still served whole on the coach's own page and the day pages.
-//   (3) it passes the plain-language test (`plainLanguage`, round 2 of the 10-17 red team: "is
-//       likely regression-to-mean noise without thermal anchor and subjective context"): no served
-//       reader-gate finding on the line, and none of the statistician's words in FRONT_JARGON.
+//   (3) it passes the plain-language test (`plainLanguage`, round 3 of the 10-17 red team — a word
+//       list was a losing game, so the rule is structural): at most FRONT_MAX_WORDS words, one
+//       sentence, no term from the coach page's glossary (ck_terms.js TERMS, the one list), no hedge
+//       chain ("which means", "suggesting", "for now"), no mechanism noun, and no served reader-gate
+//       finding; and
+//   (4) a line that names another coach is quoted only as a reply TO that coach — a line about
+//       another coach's call ("Lisa's protein prediction came true", said by the food coach) reads
+//       as the wrong coach owning it, so it is dropped.
 // With no line that qualifies, the front page prints no coach quote rather than a bad one.
 export const FRONT_MOVES = new Set(["call", "reply", "reaction", "bet"]);
 const FRONT_UNQUOTED = { coach_id: new Set(["mind_coach"]), domain: new Set(["mind"]) };
-export const FRONT_JARGON =
-  /regression[- ]to[- ](?:the[- ])?mean|thermal anchor|subjective context|\bnoise\b|\bvariance\b|baseline[- ]relative|confidence interval|\bSD\b|standard deviation|\bconfounder|\bsignal\b|p[- ]value|\bcorrelat|\bstatistically\b|\bn ?= ?\d|masked[- ]depletion|\bEWMA\b|\bBrier\b|z[- ]score|mean reversion|autocorrelat/i;
+export const FRONT_MAX_WORDS = 28;
+const HEDGE_CHAIN = /\bwhich means\b|\bsuggesting\b|\bfor now\b/i;
+export const MECHANISM_NOUNS = /\b(activation|escalation|anchor|regression|variance|mechanism|depletion|confounder|baseline)\b/i;
+const sentenceCount = (t) => (String(t).trim().match(/[.!?]+(?=\s+\S)/g) || []).length + 1;
 export function plainLanguage(text, line = null) {
   const finding = line && (line.reader || line.reader_findings || line.reader_finding);
   if (finding && (!Array.isArray(finding) || finding.length)) return false;
-  return !!String(text || "").trim() && !FRONT_JARGON.test(String(text));
+  const t = String(text || "").trim();
+  if (!t || wordCount(t) > FRONT_MAX_WORDS || sentenceCount(t) > 1) return false;
+  return !HEDGE_CHAIN.test(t) && !MECHANISM_NOUNS.test(t) && !TERMS.some(([rx]) => rx.test(t));
 }
-export function frontQuotable(line) {
-  if (!line || !FRONT_MOVES.has(line.move) || !plainLanguage(line.text, line)) return false;
+// The coach names a line uses, from the roster the page already knows (the served names in the window).
+// Also any "<Name>'s … prediction/call/read/bet" — a call attributed to someone by name, whoever the
+// window's roster holds (the line that prompted this rule named a coach who spoke on another day).
+const ATTRIBUTED = /\b[A-Z][a-z]+(?:'s|’s) (?:[a-z-]+ ){0,2}(?:prediction|call|read|bet|forecast)\b/;
+export function namesOtherCoach(line, names = []) {
+  const text = String((line && line.text) || "");
+  if (ATTRIBUTED.test(text) && !(line.replies_to && text.includes(String(line.replies_to).split(" ")[0]))) return true;
+  return names.some((n) => n && n !== line.coach && n !== line.replies_to && new RegExp(`\\b${escapeRe(n.split(" ")[0])}(?:\\b|’s|'s)`).test(text));
+}
+export function frontQuotable(line, names = []) {
+  if (!line || !FRONT_MOVES.has(line.move) || !plainLanguage(line.text, line) || namesOtherCoach(line, names)) return false;
   return !FRONT_UNQUOTED.coach_id.has(line.coach_id) && !FRONT_UNQUOTED.domain.has(line.domain);
 }
 // What the coaches said today: each line a move, or the block's own plain sentence. A line
@@ -198,7 +220,8 @@ export function frontQuotable(line) {
 export function coachTodayHTML(block, { skip = [] } = {}) {
   const served = usable(block) ? block.data.lines || [] : [];
   if (!served.length) return soft((block && block.absent_text) || "The coaches have written nothing today.");
-  const lines = served.filter((l) => frontQuotable(l) && !skip.includes(l.text));
+  const names = [...new Set(served.map((l) => l && l.coach).filter(Boolean))];
+  const lines = served.filter((l) => frontQuotable(l, names) && !skip.includes(l.text));
   if (!lines.length) return "";
   const rows = lines
     .map((l) => {
@@ -414,7 +437,9 @@ export function pickArgument(days, nextBlock) {
   const bet = nextBlock && nextBlock.data && nextBlock.data.bet;
   const sides = usable(bet) ? (bet.data.sides || []).map((s) => s && s.coach).filter(Boolean) : [];
   if (sides.length >= 2) return { kind: "bet", bet };
-  const lines = argumentLines(days).filter((l) => !namesSelf(l) && frontQuotable(l));
+  const all = argumentLines(days);
+  const names = [...new Set(all.map((l) => l.coach))];
+  const lines = all.filter((l) => !namesSelf(l) && frontQuotable(l, names));
   for (const reply of lines) {
     if (reply.move !== "reply" || !reply.replies_to) continue;
     // The newest line by the coach answered, said no later than the reply.
@@ -430,7 +455,8 @@ export function argumentLabel(pick) {
   return pick.kind === "bet" ? "The open bet" : "The latest exchange";
 }
 export function argumentHeading(pick) {
-  if (!pick) return "Nothing is in dispute this week.";
+  // No open bet and no exchange the front page may quote: the one thing the page can say for sure.
+  if (!pick) return "No open bet between them this week.";
   if (pick.kind === "bet") return "Two coaches disagree.";
   return "One coach answers another.";
 }
@@ -507,7 +533,9 @@ export const betSidesLine = (bet, jobs = {}, opts = {}) => betSidesLines(bet, jo
 export const HEARD_MAX_WORDS = 40;
 const wordCount = (t) => String(t || "").trim().split(/\s+/).filter(Boolean).length;
 export function lastHeardHTML(days, skip = [], base = "/") {
-  const clean = argumentLines(days).filter((l) => !namesSelf(l) && frontQuotable(l) && !skip.includes(l.text));
+  const all = argumentLines(days);
+  const names = [...new Set(all.map((l) => l.coach))];
+  const clean = all.filter((l) => !namesSelf(l) && frontQuotable(l, names) && !skip.includes(l.text));
   const line = clean.find((l) => wordCount(l.text) <= HEARD_MAX_WORDS) || clean[0];
   if (!line) return "";
   const job = line.coach_id && SHORT_JOBS[line.coach_id] ? ` (${SHORT_JOBS[line.coach_id]})` : "";

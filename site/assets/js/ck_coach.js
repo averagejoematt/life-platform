@@ -39,6 +39,7 @@ import { tryJSON, esc, fmtShort, todayPT } from "/assets/js/evidence_shared.js";
 import { dayInWords, countWord } from "/assets/js/entry_age.js";
 import { comparisonText } from "/assets/js/coach_comparison.js";
 import { COACH_JOBS } from "/assets/js/ck_pages.js";
+import { TERMS } from "/assets/js/ck_terms.js";
 import { verdictTag, callCardHTML, gradedOnText, hasRule, ruleless, sharedToleranceNote } from "/assets/js/ck_verdict.js";
 import { callsOf, callHref, withFrom, backFor, setBack } from "/assets/js/ck_call.js";
 import { docketQuestion, recentLines, ledgerLine, standingAsk, shortId } from "/assets/js/v7_coaches.js";
@@ -432,18 +433,9 @@ export function personaHTML(p) {
 // ── the terms ──────────────────────────────────────────────────────────────────
 // A coach's served words use its trade's terms. Each one that appears on the page gets a
 // plain line here; one that does not appear is not listed.
-export const TERMS = [
-  [/\brecovery\b/i, "Recovery", "his wrist strap’s morning score out of 100"],
-  [/\bHRV\b|heart-rate variability/i, "HRV", "heart-rate variability: how much the gap between heartbeats changes overnight, as the wrist strap measures it"],
-  [/deep[- ]sleep|slow-wave/i, "Deep sleep", "also called slow-wave sleep: the share of the night spent in the deepest stage"],
-  [/\bREM\b|dreaming sleep/i, "REM", "the dreaming stage of sleep"],
-  [/\bEWMA\b|running average/i, "Running average", "also written EWMA: an average that counts recent days more than older ones"],
-  [/(seven|7)-(night|day) average/i, "Seven-day average", "the average of the last seven readings"],
-  [/zone 2/i, "Zone 2", "steady, easy cardio, such as a brisk walk"],
-  [/regression[- ]to[- ](the[- ])?mean|mean reversion/i, "Regression to the mean", "an unusual reading tends to be followed by a more ordinary one"],
-  [/\bDEXA\b/i, "DEXA", "a body scan that measures fat, muscle and bone"],
-  [/\bCGM\b/i, "CGM", "a worn sensor that reads blood sugar through the day"],
-];
+// The list lives in ck_terms.js (round 3: the front page bans these terms from its quotes, so the
+// list has one home); re-exported here for the coach page and its tests.
+export { TERMS };
 /** "Deep sleep: also called slow-wave sleep: …" for every known term in a sentence. */
 export const glossLines = (text) => TERMS.filter(([rx]) => rx.test(String(text || ""))).map(([, term, gloss]) => `${term}: ${period(gloss)}`);
 export function termsHTML(html) {

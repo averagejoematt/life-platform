@@ -86,7 +86,7 @@ test("the Today band is this morning, yesterday and the plan, one line each, wit
   assert.match(html, new RegExp(`<span class="ck-rows__key">Yesterday, ${weekday}</span>`));
   assert.match(html, new RegExp(`href="/next/v8/day/\\?d=${yesterday}">The full day</a>`));
   assert.doesNotMatch(html, /Steps|steps/, "step counts stay off the front page");
-  assert.match(html, /Recovery is the wrist strap’s morning score out of 100\./);
+  assert.match(html, /Recovery is the wrist strap’s morning score, as a percentage\./);
   assert.doesNotMatch(html, new RegExp(`d=${dayShift(TODAY, -2)}`), "nothing older than yesterday");
   // Yesterday carries its food when the food log has it: read the morning after a logged day.
   const logged = B.week.data.detail.find((d) => d.facts.some((f) => f.label === "Food"));
