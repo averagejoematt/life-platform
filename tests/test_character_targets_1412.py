@@ -342,5 +342,11 @@ class TestLambdaSeriesBuilders:
 
     def test_steps_series_extraction(self):
         pbl = self._import_lambda()
-        records = [{"steps": 8200}, {"steps": 0}, {"steps": None}, {}, {"steps": 12100.0}]
-        assert pbl._steps_series(records) == [8200.0, 12100.0]
+        # #4630: rows by source, resolved per day (common.metric_truth); a 0 day is still dropped here.
+        records = [
+            {"sk": f"DATE#2026-08-0{i + 1}", **r}
+            for i, r in enumerate([{"steps": 8200}, {"steps": 0}, {"steps": None}, {}, {"steps": 12100.0}])
+        ]
+        assert pbl._steps_series({"apple_health": records}) == [8200.0, 12100.0]
+        whoop = [{"sk": "DATE#2026-08-01", "step_count": 9100}]
+        assert pbl._steps_series({"whoop": whoop, "apple_health": records}) == [9100.0, 12100.0]

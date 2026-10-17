@@ -33,6 +33,7 @@ import statistics
 from typing import Any, Dict, List, Optional, Tuple
 
 from common.constants import EXPERIMENT_START_DATE as GENESIS  # noqa: E402 — one genesis (ADR-058)
+from common.metric_truth import resolve_steps, steps_sources  # #4630: the ONE steps resolver
 
 USER = "matthew"
 
@@ -673,10 +674,16 @@ def _grades(table, wk: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _steps(table, wk: Dict[str, Any]) -> Dict[str, Any]:
-    days = _days(table, "apple_health", wk["start"], wk["end"])
+    # #4630: each day through the ONE resolver (registry METRIC_TRUTH facet) — the wrist's
+    # count when Whoop has one, else the phone's — and the winning source rides the row.
+    by_source = {src: _days(table, src, wk["start"], wk["end"]) for src in steps_sources()}
+    per_day = []
+    for d in sorted({d for days in by_source.values() for d in days}):
+        res = resolve_steps({src: days.get(d) for src, days in by_source.items()})
+        per_day.append({"date": d, "steps": _f(res.value), "source": res.source})
     return {
-        "per_day": [{"date": d, "steps": _f(r.get("steps"))} for d, r in sorted(days.items())],
-        "caveat": "steps come from the phone only this experiment (the watch feed is paused), so they undercount — gym treadmill walks and walks without the phone are invisible; do not build a story on step counts",
+        "per_day": per_day,
+        "caveat": "steps are the wrist's count (Whoop) when it has one and the phone's (Apple Health) otherwise; the phone undercounts on days it is not carried (treadmill, bike) — do not build a story on step counts",
     }
 
 

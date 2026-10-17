@@ -436,7 +436,7 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
         if facts.recovery_pct is None:
             facts.recovery_pct = (details.get("recovery") or {}).get("recovery_score")
         facts.rhr_bpm = computed.get("rhr_bpm")
-        facts.steps = (details.get("movement") or {}).get("steps")
+        facts.steps = (details.get("movement") or {}).get("steps")  # steps-truth: the day grade's score_movement output, resolved (#4630)
         hyd = details.get("hydration") or {}
         facts.water_oz = hyd.get("water_oz")
         facts.water_target_oz = hyd.get("target_oz")

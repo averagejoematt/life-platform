@@ -45,6 +45,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+from common.metric_truth import resolved_metric, resolved_rows, sources_for  # #4630: resolved pseudo-sources
 from experiment.phase_filter import with_phase_filter  # ADR-058
 from experiment.phase_taxonomy import experiment_stamp_for  # #2811: hoisted from two functions; #3514: per-row class gate
 
@@ -493,7 +494,13 @@ def _get_source_data(source, data_cache, end_date, lookback_days=30, include_pil
     start_dt = end_dt - timedelta(days=lookback_days)
     start_str = start_dt.strftime("%Y-%m-%d")
 
-    records = _fetch_range(source, start_str, end_date, include_pilot)
+    metric = resolved_metric(source)
+    if metric:
+        # #4630: a resolved pseudo-source (measurable_metrics maps steps to one) reads every
+        # source in the registry's METRIC_TRUTH facet and serves the resolved day rows.
+        records = resolved_rows(metric, {s: _fetch_range(s, start_str, end_date, include_pilot) for s in sources_for(metric)})
+    else:
+        records = _fetch_range(source, start_str, end_date, include_pilot)
     data_cache[cache_key] = records
     return records
 

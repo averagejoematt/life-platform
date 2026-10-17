@@ -27,8 +27,10 @@ import math
 import random
 from datetime import datetime, timedelta
 
-from common import stats_core  # The criterion metric universe: slug → where the daily value lives. Slugs are what
+from common import stats_core
+from common.metric_truth import resolved_source_id  # #4630: steps resolve per day, never one partition
 
+# The criterion metric universe: slug → where the daily value lives. Slugs are what
 # a design names; source/field are what the closing analysis queries. Whoop sleep
 # aliases (sleep_score, deep_pct, …) exist after normalize_whoop_sleep — the caller
 # normalizes whoop rows before extracting.
@@ -49,7 +51,9 @@ DESIGN_METRICS = {
     "weight_lbs": ("withings", "weight_lbs", "Weight (lbs)"),
     "calories": ("macrofactor", "calories_kcal", "Calories"),
     "protein_g": ("macrofactor", "protein_g", "Protein (g)"),
-    "steps": ("apple_health", "steps", "Steps"),
+    # #4630: steps resolve per day (registry METRIC_TRUTH facet) — the reader's fetch seam
+    # (mcp/tools_lifestyle._query_metric_source) expands this pseudo-source.
+    "steps": (resolved_source_id("steps"), "steps", "Steps"),
     "cgm_mean_glucose": ("apple_health", "blood_glucose_avg", "Mean Glucose"),
     "cgm_time_in_range_pct": ("apple_health", "blood_glucose_time_in_range_pct", "CGM Time in Range %"),
 }

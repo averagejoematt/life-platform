@@ -32,6 +32,7 @@ import boto3
 import coach.coach_presence_gate as _presence  # #4217 — the absent coach is not asked
 from coach import coach_brief_input_gate as _in_gate  # #3107 — the upstream change-gate + the shared data-inventory block
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G
+from common.metric_truth import STEPS  # #4630: the resolved steps key build_data_summary fills
 from common.pacific_time import pacific_today
 from health.scoring_engine import habitify_reading  # #4362
 
@@ -1060,7 +1061,7 @@ YESTERDAY'S SIGNALS:
 - Calories: {data_summary.get("calories")}/target, Protein: {data_summary.get("protein_g")}g/{PLAN_DAILY_PROTEIN_MIN_G}g
 - Glucose: avg {data_summary.get("glucose_avg")} mg/dL, TIR {data_summary.get("glucose_tir")}%, overnight low {data_summary.get("glucose_min")} mg/dL
 - Gait: walking speed {data_summary.get("walking_speed_mph")} mph, step length {data_summary.get("walking_step_length_in")} in, asymmetry {data_summary.get("walking_asymmetry_pct")}%
-- Steps: {data_summary.get("steps")}
+- Steps: {data_summary.get(STEPS)}
 - Weight: {data_summary.get("current_weight")} lbs (week ago: {data_summary.get("week_ago_weight")})
 - Missed habits: {(", ".join(missed_mvp) if missed_mvp else "none — all completed")}
 - Missed habit context: {("; ".join(missed_context[:5]) if missed_context else "n/a")}

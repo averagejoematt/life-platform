@@ -59,9 +59,7 @@ CONFORMANCE_RESIDUE: dict[str, str] = {
     "lambdas/web/site_api_rollups.py::sources::macrofactor,notion,withings": "2026-08-17",
     "lambdas/web/site_api_status.py::sources::eightsleep,whoop": "2026-08-17",
     "lambdas/web/site_stats_refresh_lambda.py::lambdas::habitify-data-ingestion,whoop-data-ingestion,withings-data-ingestion": "2026-08-17",
-    "lambdas/web/vitals_resolver.py::sources::apple_health,garmin": "2026-08-17",
     "mcp/tools_labs.py::sources::apple_health,eightsleep,habitify,whoop": "2026-08-17",
-    "mcp/tools_lifestyle.py::sources::apple_health,hevy,strava": "2026-08-17",
     "mcp/tools_nutrition.py::sources::habitify,hevy,strava,whoop": "2026-08-17",
     "mcp/tools_nutrition.py::sources::macrofactor,withings": "2026-08-17",
 }

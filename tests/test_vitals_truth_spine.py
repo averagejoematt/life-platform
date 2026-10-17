@@ -83,7 +83,7 @@ def _resolver_fixture(now_date="2026-07-18"):
     return FakeTable(
         {
             _WHOOP_PK: [
-                {"sk": f"DATE#{now_date}", "sleep_duration_hours": 8.4},  # unscored yet
+                {"sk": f"DATE#{now_date}", "sleep_duration_hours": 8.4, "step_count": 9100},  # unscored yet
                 {"sk": "DATE#2026-07-17", "recovery_score": 96, "hrv": 61.2, "resting_heart_rate": 52, "sleep_duration_hours": 7.1},
                 {"sk": f"DATE#{now_date}#WORKOUT#abc", "recovery_score": 12},  # workout sub-record: never a vital
             ],
@@ -106,9 +106,10 @@ def test_resolver_finalized_recovery_separate_sleep_and_garmin_steps():
     # sleep finalizes separately — newest record that carries it
     assert out["sleep_hours"] == 8.4
     assert out["sleep_as_of"] == "2026-07-18"
-    # steps: garmin (watch of record) wins over apple_health
-    assert out["steps"] == 525
-    assert out["steps_source"] == "garmin"
+    # steps (#4630): the registry truth facet — Whoop's step_count wins over apple_health,
+    # and the unscored newest Whoop row still answers for steps
+    assert out["steps"] == 9100
+    assert out["steps_source"] == "whoop"
 
 
 def test_resolver_honest_null_on_empty():

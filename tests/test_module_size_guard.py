@@ -291,7 +291,7 @@ BASELINE = {
     # mcp/tools_social_connection.py (257 lines, under the ceiling), which paid for the
     # honest-numbers fixes that stayed behind (get_insights pagination + corpus counts)
     # and still handed back 160 lines. The ratchet tightening.
-    "mcp/tools_lifestyle.py": 1477,
+    "mcp/tools_lifestyle.py": 1463,  # #4630: 1477 -> 1455 measured after the experiment_metrics split; 8 of ~40 extracted lines banked
     "lambdas/emails/coach_panel_podcast_lambda.py": 1508,
     # site_api_coach.py (2664 by the time the slice ran) drained to a ~440-line facade by
     # #1654 — the handler logic now lives in cohesive web/site_api_coach_{profile,stance,
