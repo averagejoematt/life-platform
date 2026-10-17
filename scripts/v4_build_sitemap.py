@@ -43,6 +43,7 @@ from urllib.request import urlopen
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import v4_apply_chrome as _apply_chrome  # noqa: E402 — the post-build chrome normalizer (#3721)
+import v4_chrome  # noqa: E402 — #4604: HELD_UNTIL_RULED, the pages held out of the sitemap
 
 SITE = Path("site")
 BASE = "https://averagejoematt.com"
@@ -125,9 +126,12 @@ def registry_urls() -> list[str]:
     """Every indexable URL in the page registry — the #3567 derivation. A path
     the registry doesn't know about (a fragment, an off-tree artifact) is
     structurally never a candidate; a path whose real file is missing (an
-    offline/partial build) is skipped, never fabricated."""
+    offline/partial build) is skipped, never fabricated. A path held until the
+    owner rules (`v4_chrome.HELD_UNTIL_RULED`, #4604) is never a candidate."""
     urls = []
     for p in _page_registry():
+        if p["path"] in v4_chrome.HELD_UNTIL_RULED:
+            continue  # #4604: held until the owner's per-page ruling — out even if its noindex goes missing
         f = file_for_path(p["path"])
         if not f.exists():
             continue

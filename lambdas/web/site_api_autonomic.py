@@ -25,10 +25,11 @@ zero-that-looks-like-a-real-zero. Captions frame patterns as observation, not ca
 import math
 from datetime import datetime, timedelta
 
+from training import zone2_minutes as z2m  # #4627: THE Zone 2 computation
+
 from web.site_api_common import (
     PT,
     _error,
-    _get_profile,
     _ok,
     _query_source,
     logger,
@@ -242,17 +243,18 @@ def handle_autonomic_balance() -> dict:
 # ── Zone-2 breakdown (RQA-07) ─────────────────────────────────────────────────
 
 ZONE2_WINDOW_DAYS = 90
-ZONE2_WEEKLY_TARGET_MIN = 150  # Attia / Huberman / WHO moderate-intensity reference
-ZONE2_MIN_DURATION_MIN = 10
+ZONE2_WEEKLY_TARGET_MIN = z2m.WEEKLY_TARGET_MIN  # Attia / Huberman / WHO moderate-intensity reference
 
-# 5 zones by % of max HR (standard model)
-_ZONE_BOUNDS = [
-    ("zone_1", "Zone 1 · Recovery", 0.50, 0.60),
-    ("zone_2", "Zone 2 · Aerobic", 0.60, 0.70),
-    ("zone_3", "Zone 3 · Tempo", 0.70, 0.80),
-    ("zone_4", "Zone 4 · Threshold", 0.80, 0.90),
-    ("zone_5", "Zone 5 · VO₂ Max", 0.90, 1.00),
-]
+_ZONE_LABELS = {
+    "below_zone_1": "Below Zone 1",
+    "zone_1": "Zone 1 · Recovery",
+    "zone_2": "Zone 2 · Aerobic",
+    "zone_3": "Zone 3 · Tempo",
+    "zone_4": "Zone 4 · Threshold",
+    "zone_5": "Zone 5 · VO₂ Max",
+}
+#: #4627: the band is each recording device's own — no maximum heart rate is assumed.
+ZONE2_BAND_TEXT = "each recording device's own Zone 2 band (Whoop, Strava)"
 
 
 def _week_start(date_str):
@@ -268,16 +270,12 @@ def _week_end(week_start):
 
 
 def _zero_week(week_start, weekly_target_min):
-    """An explicit, dated zero for a calendar week with no qualifying activity (#3286).
+    """An explicit, dated zero for a calendar week with no session (#3286).
 
-    NOT a fabricated value and not the ADR-104 "absent ⇒ null" case. The 90-day query
-    covers this week in full; zero qualifying sessions landed in it, and zero is the
-    measurement. What ADR-104 forbids is publishing a number the data does not support
-    — which is exactly what the old `weeks[-1]` fallback did by serving an OLDER week's
-    real tally under the name "current week". `activity_count: 0` + `no_activity_recorded`
-    let a consumer tell "measured zero" from "we have nothing", and `source_last_activity`
-    names the last day anything qualified so a dark upstream reads as darkness, not effort.
-    """
+    NOT a fabricated value and not the ADR-104 "absent ⇒ null" case: the 90-day query covers
+    this week in full and zero sessions landed in it. `activity_count: 0` +
+    `no_activity_recorded` let a consumer tell "measured zero" from "we have nothing", and
+    `source_last_activity` names the last day anything was recorded."""
     return {
         "week_start": week_start,
         "week_end": _week_end(week_start),
@@ -290,160 +288,48 @@ def _zero_week(week_start, weekly_target_min):
     }
 
 
+def _public_week(w):
+    return {
+        "week_start": w["week_start"],
+        "week_end": w["week_end"],
+        "zone_2_minutes": w["zone_2_minutes"],
+        "target_pct": w["target_pct"],
+        "target_met": bool(w["target_met"]),
+        "total_exercise_min": w["session_minutes"],
+        "measured_minutes": w["measured_minutes"],
+        "hevy_cardio_minutes": w["hevy_cardio_minutes"],
+        "activity_count": w["activity_count"],
+    }
+
+
 def _compute_zone2_breakdown(
-    strava_items, profile, weekly_target_min=ZONE2_WEEKLY_TARGET_MIN, min_duration_min=ZONE2_MIN_DURATION_MIN, today=None
+    strava_items, whoop_items=None, hevy_items=None, weekly_target_min=ZONE2_WEEKLY_TARGET_MIN, today=None, start_date=None
 ):
-    """Pure port of tool_get_zone2_breakdown, trimmed to the public payload.
+    """/api/zone2's payload from THE Zone 2 computation (`training.zone2_minutes`, #4627).
 
-    Classifies each qualifying Strava activity into an HR zone by average HR as a
-    percentage of max HR (from profile), aggregates weekly Zone-2 minutes against the
-    150-min reference, and rolls up the full 5-zone distribution + a Zone-2 sport
-    breakdown. Returns {"available": False, ...} when there is no qualifying activity
-    (never a fabricated zero week).
+    Zone 2 minutes are minutes actually in each recording device's own Zone 2 band, from the
+    stored time-in-zone rows (Whoop workout sub-rows, Strava `zone{n}_seconds`), each session
+    counted once across sources; Hevy cardio blocks are `hevy_cardio_minutes`, never Zone 2.
+    Before #4627 this classified a whole Strava activity by its AVERAGE heart rate against
+    60–70% of the profile maximum, with a 10-minute floor — that method, the floor and the
+    maximum are gone. `trailing_7d` is the 7 dates [today − 6, today] through the same
+    `zone2_window` `/api/training_overview` and the MCP tool read, so the three agree.
 
-    #3286 — `current_week` MEANS the current calendar week. It used to be `weeks[-1]`,
-    and `weeks` only ever contained weeks that had qualifying activity, so "the last week
-    with data" was published under the name "current week" with no date anywhere on the
-    surface. Measured live 2026-08-27: `/api/zone2` served `week_start 2026-08-17` — the
-    week *before last* — as the current week, with a nonzero tally, while
-    `/api/training_overview` reported trailing-7d Zone-2 of 0 and `/api/source_freshness`
-    had strava behavioral-stale for ~238h. Three surfaces, one loudest and wrong.
-
-    The posture is BOTH halves of the issue's choice, and neither is a new convention:
-      • `current_week` is now the real Pacific calendar week, present with an explicit
-        dated zero when nothing qualified (`_zero_week`) — the honest-absence shape the
-        rest of the platform already uses.
-      • `latest_active_week` keeps the last week that DID have activity, named, so the
-        real number is not withheld — it is just no longer mislabelled.
-    Both carry `week_start`+`week_end`, because a tally without its date range is what
-    made the old bug unreadable from the page.
-
-    `today` is injectable so the calendar boundary can be pinned in tests rather than
-    depending on the hour CI happens to run (#3206's lesson); it defaults to the caller's
-    Pacific day. The frame is PACIFIC — the site is Pacific end-to-end (#2506/#2675) and
-    strava's DATE# keys are Pacific-framed (registry `day_key_frame` default)."""
-    max_hr = _sf((profile or {}).get("max_heart_rate")) or 190.0
-
-    zone_hr_ranges = {}
-    for key, label, lo, hi in _ZONE_BOUNDS:
-        zone_hr_ranges[key] = {"label": label, "hr_low": round(max_hr * lo), "hr_high": round(max_hr * hi)}
-
-    def classify(avg_hr):
-        if avg_hr is None:
-            return "no_hr"
-        pct = avg_hr / max_hr
-        if pct < 0.50:
-            return "below_zone_1"
-        if pct < 0.60:
-            return "zone_1"
-        if pct < 0.70:
-            return "zone_2"
-        if pct < 0.80:
-            return "zone_3"
-        if pct < 0.90:
-            return "zone_4"
-        return "zone_5"
-
-    activities = []
-    for day in sorted(strava_items or [], key=lambda x: (x.get("date") or x.get("sk", ""))):
-        date = (day.get("date") or day.get("sk", "").replace("DATE#", ""))[:10]
-        for act in day.get("activities", []) or []:
-            moving = _sf(act.get("moving_time_seconds")) or 0
-            if moving < min_duration_min * 60:
-                continue
-            avg_hr = _sf(act.get("average_heartrate"))
-            activities.append(
-                {
-                    "date": date,
-                    "name": act.get("enriched_name") or act.get("name") or "Unnamed",
-                    "sport_type": act.get("sport_type") or act.get("type") or "Unknown",
-                    "moving_time_min": round(moving / 60, 1),
-                    "avg_hr": avg_hr,
-                    "zone": classify(avg_hr),
-                }
-            )
-
-    if not activities:
+    #3286 — `current_week` MEANS the current Pacific calendar week (an explicit dated zero
+    when nothing was recorded) and `latest_active_week` is the last week that had a session.
+    `today` is injectable so the calendar boundary can be pinned in tests."""
+    pt_today = today or datetime.now(PT).strftime("%Y-%m-%d")
+    sessions = [s for s in z2m.counted_sessions(strava_items, whoop_items) if s["date"] >= (start_date or "") and s["date"] <= pt_today]
+    if not sessions:
         return {
             "available": False,
-            "reason": "No qualifying cardio activity in the window yet — Zone-2 time fills in as sessions with heart-rate land.",
+            "reason": "No recorded session in the window yet — Zone-2 time fills in as sessions with heart-rate zones land.",
             "weekly_target_min": weekly_target_min,
         }
-
-    # ── Weekly aggregation ──
-    weekly = {}
-    for act in activities:
-        wk = _week_start(act["date"])
-        w = weekly.setdefault(
-            wk,
-            {
-                "zone_1": 0.0,
-                "zone_2": 0.0,
-                "zone_3": 0.0,
-                "zone_4": 0.0,
-                "zone_5": 0.0,
-                "below_zone_1": 0.0,
-                "no_hr": 0.0,
-                "total": 0.0,
-                "count": 0,
-            },
-        )
-        w[act["zone"]] += act["moving_time_min"]
-        w["total"] += act["moving_time_min"]
-        w["count"] += 1
-
-    weeks = []
-    for wk in sorted(weekly.keys()):
-        w = weekly[wk]
-        z2 = w["zone_2"]
-        weeks.append(
-            {
-                "week_start": wk,
-                "week_end": _week_end(wk),  # #3286: a tally is unreadable without its range
-                "zone_2_minutes": round(z2, 1),
-                "target_pct": round(100 * z2 / weekly_target_min) if weekly_target_min > 0 else None,
-                "target_met": z2 >= weekly_target_min,
-                "total_exercise_min": round(w["total"], 1),
-                "activity_count": w["count"],
-            }
-        )
-
-    # ── Full-period zone distribution ──
-    totals = {k: 0.0 for k, *_ in _ZONE_BOUNDS}
-    counts = {k: 0 for k, *_ in _ZONE_BOUNDS}
-    grand_total = 0.0
-    for act in activities:
-        z = act["zone"]
-        grand_total += act["moving_time_min"]
-        if z in totals:
-            totals[z] += act["moving_time_min"]
-            counts[z] += 1
-    zone_distribution = []
-    for key, label, _, _ in _ZONE_BOUNDS:
-        mins = round(totals[key], 1)
-        zone_distribution.append(
-            {
-                "zone": key,
-                "label": label,
-                "total_minutes": mins,
-                "activity_count": counts[key],
-                "pct_of_training": round(100 * mins / grand_total, 1) if grand_total > 0 else 0,
-                "hr_range": f"{zone_hr_ranges[key]['hr_low']:.0f}–{zone_hr_ranges[key]['hr_high']:.0f} bpm",
-            }
-        )
-
-    # ── Zone-2 sport breakdown ──
-    by_sport = {}
-    for act in activities:
-        if act["zone"] == "zone_2":
-            s = by_sport.setdefault(act["sport_type"], {"minutes": 0.0, "count": 0})
-            s["minutes"] += act["moving_time_min"]
-            s["count"] += 1
-    sport_breakdown = [
-        {"sport_type": sport, "zone_2_minutes": round(d["minutes"], 1), "activity_count": d["count"]}
-        for sport, d in sorted(by_sport.items(), key=lambda x: -x[1]["minutes"])
-    ]
-
+    weeks = [_public_week(w) for w in z2m.weekly(sessions, None, weekly_target_min) if w["activity_count"]]
+    hevy_by_week = {w["week_start"]: w["hevy_cardio_minutes"] for w in z2m.weekly([], hevy_items)}
+    for w in weeks:
+        w["hevy_cardio_minutes"] = round(hevy_by_week.get(w["week_start"], 0.0), 1)
     n_weeks = len(weeks)
     z2_vals = [w["zone_2_minutes"] for w in weeks]
     weeks_meeting = sum(1 for w in weeks if w["target_met"])
@@ -457,52 +343,45 @@ def _compute_zone2_breakdown(
         direction = "increasing" if second > first + 5 else "decreasing" if second < first - 5 else "steady"
         trend = {"direction": direction, "first_half_avg_min": round(first, 1), "second_half_avg_min": round(second, 1)}
 
-    # ── #3286: the current CALENDAR week, and separately the last ACTIVE one ──
-    pt_today = today or datetime.now(PT).strftime("%Y-%m-%d")
     current_week_start = _week_start(pt_today)
     by_week_start = {w["week_start"]: w for w in weeks}
-    current_week = by_week_start.get(current_week_start) or _zero_week(current_week_start, weekly_target_min)
-    latest_active_week = weeks[-1] if weeks else None
-    last_activity_date = activities[-1]["date"] if activities else None
+    last_activity_date = sessions[-1]["date"]
     try:
-        days_since_activity = (
-            (datetime.strptime(pt_today, "%Y-%m-%d") - datetime.strptime(last_activity_date, "%Y-%m-%d")).days
-            if last_activity_date
-            else None
-        )
+        days_since_activity = (datetime.strptime(pt_today, "%Y-%m-%d") - datetime.strptime(last_activity_date, "%Y-%m-%d")).days
     except ValueError:
         days_since_activity = None
     current_week = {
-        **current_week,
+        **(by_week_start.get(current_week_start) or _zero_week(current_week_start, weekly_target_min)),
         "is_current_calendar_week": True,
         "source_last_activity": last_activity_date,
         "days_since_activity": days_since_activity,
     }
-
+    t_start, t_end = z2m.trailing_window(pt_today)
+    t7 = z2m.zone2_window(strava_items, whoop_items, hevy_items, t_start, t_end, sessions=sessions)
+    dist = z2m.zone_distribution(sessions)
     return {
         "available": True,
-        "period": {"start_date": activities[0]["date"], "end_date": activities[-1]["date"], "weeks_analyzed": n_weeks},
+        "period": {"start_date": sessions[0]["date"], "end_date": last_activity_date, "weeks_analyzed": n_weeks},
         "weekly_target_min": weekly_target_min,
         "pacific_today": pt_today,  # #3286: the frame the week boundary was drawn in, stated
         "current_week": current_week,
-        # #3286: `weeks` has ALWAYS held only weeks with qualifying activity — a calendar
-        # week with none is simply absent. That is fine for the bar chart and the summary
-        # denominators, and it is precisely why `weeks[-1]` could not be "current week".
-        # Named separately so nothing has to re-derive it (and mislabel it) again.
-        "latest_active_week": latest_active_week,
+        "latest_active_week": weeks[-1] if weeks else None,
         "weeks": weeks,
-        "zone_distribution": zone_distribution,
-        "sport_breakdown": sport_breakdown,
+        "trailing_7d": {k: t7[k] for k in ("start_date", "end_date", "dates", "zone_2_minutes", "by_source", "hevy_cardio_minutes")},
+        "zone_distribution": [{**z, "label": _ZONE_LABELS[z["zone"]], "hr_range": "device's own band"} for z in dist],
+        "sport_breakdown": z2m.sport_breakdown(sessions),
         "trend": trend,
         "summary": {
             "weeks_analyzed": n_weeks,
-            "total_activities": len(activities),
+            "total_activities": len(sessions),
             "avg_weekly_zone_2_min": round(sum(z2_vals) / n_weeks, 1) if n_weeks else 0,
             "weeks_meeting_target": weeks_meeting,
             "target_hit_rate_pct": round(100 * weeks_meeting / n_weeks) if n_weeks else 0,
-            "total_zone_2_min": round(totals["zone_2"], 1),
-            "max_hr_used": max_hr,
-            "zone_2_hr_range": f"{zone_hr_ranges['zone_2']['hr_low']:.0f}–{zone_hr_ranges['zone_2']['hr_high']:.0f} bpm",
+            "total_zone_2_min": round(sum(s["zone_2_minutes"] or 0 for s in sessions if s["source"]), 1),
+            "unmeasured_sessions": sum(1 for s in sessions if not s["source"]),
+            "max_hr_used": None,  # #4627: no maximum is assumed — each device's own band
+            "zone_2_hr_range": ZONE2_BAND_TEXT,
+            "definition": z2m.DEFINITION,
         },
     }
 
@@ -510,22 +389,26 @@ def _compute_zone2_breakdown(
 def handle_zone2_breakdown() -> dict:
     """GET /api/zone2 — weekly Zone-2 minutes against the 150-min reference.
 
-    Read-only. Reads the trailing 90 days of Strava, classifies each session by HR
-    zone, and rolls up the weekly Zone-2 tally + the 5-zone distribution. Honest empty
-    state when no qualifying activity exists. Cache 1800s.
+    Read-only. Reads the trailing 90 days of Strava, Whoop (workout sub-rows; one extra day at the
+    end, as Whoop keys are UTC days) and Hevy, and serves THE Zone 2 computation
+    (`training.zone2_minutes`, #4627). Honest empty state when no session exists. Cache 1800s.
 
-    #3286: the envelope declares `content_as_of` — the last day anything qualified. The
-    payload is computed at request time, but its CONTENT can be a week and a half old
-    while strava is behavioral-stale, and `_meta.generated_at` defaulting to the request
-    instant is the same laundering #3268 named on the coaching board: a held read wearing
-    a fresher date on every fetch. `_meta.served_at` still carries the request time."""
+    #3286: the envelope declares `content_as_of` — the last day anything was recorded — so a
+    held read never wears a fresher date than its content; `_meta.served_at` carries the
+    request time."""
     try:
         today = datetime.now(PT).strftime("%Y-%m-%d")
         start = (datetime.now(PT) - timedelta(days=ZONE2_WINDOW_DAYS - 1)).strftime("%Y-%m-%d")
         strava = _query_source("strava", start, today)
-        payload = _compute_zone2_breakdown(strava, _get_profile(), today=today)
+        whoop = _query_source("whoop", start, _shift(today, 1))  # a Pacific evening workout is keyed the next UTC day
+        hevy = _query_source("hevy", start, today)
+        payload = _compute_zone2_breakdown(strava, whoop, hevy, today=today, start_date=start)
         _last = (payload.get("current_week") or {}).get("source_last_activity")
         return _ok(payload, cache_seconds=1800, content_as_of=_last)
     except Exception as e:
         logger.error(f"[site_api] /api/zone2 failed: {e}")
         return _error(500, "zone 2 breakdown unavailable")
+
+
+def _shift(d, days):
+    return (datetime.strptime(d, "%Y-%m-%d") + timedelta(days=days)).strftime("%Y-%m-%d")

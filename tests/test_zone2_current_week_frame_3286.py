@@ -53,8 +53,6 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
 from web import site_api_autonomic as az  # noqa: E402
 
-PROFILE = {"max_heart_rate": 190.0}
-
 # The live state that filed the issue: Pacific today 2026-08-27 (a Thursday), whose week
 # starts Monday 2026-08-24; the newest qualifying session sits in the week of 2026-08-17.
 FILED_TODAY = "2026-08-27"
@@ -64,7 +62,8 @@ STALE_WEEK_START = "2026-08-17"
 
 def _strava_day(date, *, minutes=45, avg_hr=124.0, name="Zone 2 base run", sport="Run"):
     """The wire shape strava_lambda writes: a Pacific-framed DATE# key carrying an
-    `activities` list of per-activity dicts. 124/190 ≈ 0.65 ⇒ zone_2."""
+    `activities` list of per-activity dicts. #4627: the whole session is in Strava's own
+    Zone 2 (`zone2_seconds`) — Zone 2 is read from the stored time-in-zone, not the average."""
     return {
         "pk": "USER#matthew#SOURCE#strava",
         "sk": f"DATE#{date}",
@@ -75,6 +74,7 @@ def _strava_day(date, *, minutes=45, avg_hr=124.0, name="Zone 2 base run", sport
                 "sport_type": sport,
                 "moving_time_seconds": int(minutes * 60),
                 "average_heartrate": avg_hr,
+                "zone2_seconds": int(minutes * 60),
             }
         ],
     }
@@ -92,7 +92,7 @@ def test_the_current_week_is_the_calendar_week_not_the_last_active_one():
     """THE must-fail case. The newest active week is ten days old; `current_week` must be
     the calendar week Pacific is actually in, with an explicit zero. Before the fix this
     returned week_start 2026-08-17 and a nonzero tally."""
-    out = az._compute_zone2_breakdown(_stale_window(), PROFILE, today=FILED_TODAY)
+    out = az._compute_zone2_breakdown(_stale_window(), today=FILED_TODAY)
     cur = out["current_week"]
     assert cur["week_start"] == FILED_CURRENT_WEEK_START, (
         f"current_week.week_start is {cur['week_start']} on Pacific {FILED_TODAY} — "
@@ -109,7 +109,7 @@ def test_the_pre_fix_selection_reproduced_the_filed_week():
     """POSITIVE CONTROL — a control that cannot fail proves nothing (#3220). Run the OLD
     rule, `weeks[-1]`, over the same fixture and show it yields exactly the week the issue
     reported, with a nonzero tally."""
-    out = az._compute_zone2_breakdown(_stale_window(), PROFILE, today=FILED_TODAY)
+    out = az._compute_zone2_breakdown(_stale_window(), today=FILED_TODAY)
     pre_fix = out["weeks"][-1]
     assert pre_fix["week_start"] == STALE_WEEK_START, "the control is not reproducing the defect's fixture"
     assert pre_fix["zone_2_minutes"] > 0
@@ -119,7 +119,7 @@ def test_the_pre_fix_selection_reproduced_the_filed_week():
 def test_the_real_number_is_not_withheld_only_relabelled():
     """(b) as well as (a). The tally is real and stays published — under the name of the
     week it belongs to. Withholding it would trade one dishonesty for a gap."""
-    out = az._compute_zone2_breakdown(_stale_window(), PROFILE, today=FILED_TODAY)
+    out = az._compute_zone2_breakdown(_stale_window(), today=FILED_TODAY)
     latest = out["latest_active_week"]
     assert latest["week_start"] == STALE_WEEK_START
     assert latest["week_end"] == "2026-08-23"
@@ -131,7 +131,7 @@ def test_the_zero_week_names_the_darkness_rather_than_implying_effort():
     """An explicit zero with nothing beside it reads as "he did nothing this week". When the
     upstream is dark, that is a different claim — `source_last_activity`/`days_since_activity`
     let the page say which (the #3204 sensor-note shape, applied to strava)."""
-    out = az._compute_zone2_breakdown(_stale_window(), PROFILE, today=FILED_TODAY)
+    out = az._compute_zone2_breakdown(_stale_window(), today=FILED_TODAY)
     cur = out["current_week"]
     assert cur["source_last_activity"] == "2026-08-21"
     assert cur["days_since_activity"] == 6
@@ -142,7 +142,7 @@ def test_an_active_current_week_is_served_as_itself():
     """The other direction: when the current calendar week DOES have activity, the real
     tally is served — the fix must not zero a live week."""
     items = _stale_window() + [_strava_day("2026-08-25", minutes=50), _strava_day("2026-08-26", minutes=40)]
-    out = az._compute_zone2_breakdown(items, PROFILE, today=FILED_TODAY)
+    out = az._compute_zone2_breakdown(items, today=FILED_TODAY)
     cur = out["current_week"]
     assert cur["week_start"] == FILED_CURRENT_WEEK_START
     assert cur["zone_2_minutes"] == pytest.approx(90.0)
@@ -168,7 +168,7 @@ def test_an_active_current_week_is_served_as_itself():
 def test_the_week_boundary_is_monday_anchored_on_every_day_of_the_week(today, expected_week_start):
     """A gate for a week-boundary bug that only ever runs on one weekday is not a gate.
     Every day of the week, plus the year-straddling case, at an INJECTED `today`."""
-    out = az._compute_zone2_breakdown(_stale_window(), PROFILE, today=today)
+    out = az._compute_zone2_breakdown(_stale_window(), today=today)
     assert out["current_week"]["week_start"] == expected_week_start
     assert out["current_week"]["week_end"] == az._week_end(expected_week_start)
 
@@ -176,7 +176,7 @@ def test_the_week_boundary_is_monday_anchored_on_every_day_of_the_week(today, ex
 def test_every_week_carries_its_own_date_range():
     """The panel could not name the week it was showing because the payload never told it.
     Both halves of the range ride on every week, current and historical."""
-    out = az._compute_zone2_breakdown(_stale_window(), PROFILE, today=FILED_TODAY)
+    out = az._compute_zone2_breakdown(_stale_window(), today=FILED_TODAY)
     for w in out["weeks"] + [out["current_week"], out["latest_active_week"]]:
         start = datetime.strptime(w["week_start"], "%Y-%m-%d")
         end = datetime.strptime(w["week_end"], "%Y-%m-%d")
@@ -189,7 +189,7 @@ def test_the_three_surfaces_can_agree():
     nothing qualified in the trailing calendar week, the Zone-2 door cannot show a nonzero
     current-week tally — which is precisely what let it contradict a trailing-7d of 0 and a
     238h-stale strava."""
-    out = az._compute_zone2_breakdown(_stale_window(), PROFILE, today=FILED_TODAY)
+    out = az._compute_zone2_breakdown(_stale_window(), today=FILED_TODAY)
     trailing_7d_qualifying = [d for d in _stale_window() if d["date"] > "2026-08-20"]
     assert len(trailing_7d_qualifying) == 1 and trailing_7d_qualifying[0]["date"] == "2026-08-21"
     assert out["current_week"]["zone_2_minutes"] == 0.0
@@ -199,7 +199,7 @@ def test_the_fully_empty_window_keeps_its_honest_unavailable_state():
     """No qualifying activity anywhere in 90 days is a different claim from "zero this
     week", and it keeps the pre-existing `available: False` empty state — a zero week is
     not synthesised out of an empty window."""
-    out = az._compute_zone2_breakdown([], PROFILE, today=FILED_TODAY)
+    out = az._compute_zone2_breakdown([], today=FILED_TODAY)
     assert out["available"] is False
     assert "current_week" not in out
 
@@ -208,10 +208,11 @@ def test_the_fully_empty_window_keeps_its_honest_unavailable_state():
 # ON THE WIRE — the routed handler, not the pure function
 # ─────────────────────────────────────────────────────────────────────────────
 def _wire(monkeypatch, items, today):
-    monkeypatch.setattr(az, "_query_source", lambda *a, **k: items)
-    monkeypatch.setattr(az, "_get_profile", lambda: PROFILE)
+    monkeypatch.setattr(az, "_query_source", lambda src, *a, **k: items if src == "strava" else [])
     real = az._compute_zone2_breakdown
-    monkeypatch.setattr(az, "_compute_zone2_breakdown", lambda *a, **k: real(*a, **{**k, "today": today}))
+    # The handler's own window starts 90 days before the REAL Pacific today; the injected
+    # `today` moves the calendar frame, so the window floor moves with it (None = the rows).
+    monkeypatch.setattr(az, "_compute_zone2_breakdown", lambda *a, **k: real(*a, **{**k, "today": today, "start_date": None}))
     resp = az.handle_zone2_breakdown()
     return json.loads(resp["body"])
 
@@ -242,4 +243,6 @@ def test_the_handler_passes_a_pacific_today_not_a_utc_one():
     and serve next week's empty tally as "this week" (#2675/#3196's exact class)."""
     src = open(os.path.join(_REPO, "lambdas", "web", "site_api_autonomic.py"), encoding="utf-8").read()
     assert "today = datetime.now(PT).strftime" in src
-    assert "_compute_zone2_breakdown(strava, _get_profile(), today=today)" in src, "the handler's Pacific day must reach the computation"
+    assert (
+        "_compute_zone2_breakdown(strava, whoop, hevy, today=today, start_date=start)" in src
+    ), "the handler's Pacific day must reach the computation"

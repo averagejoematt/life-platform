@@ -405,8 +405,9 @@ def _build_habit_outcome_context(data, profile):
     trend_lines = []
     for day_rec in habitify_7d[-7:]:
         date_str = day_rec.get("sk", "").replace("DATE#", "")
-        habits_map = day_rec.get("habits", {}) if isinstance(day_rec, dict) else {}
-        statuses = day_rec.get("habit_statuses") if isinstance(day_rec, dict) else None  # #4632: per-day, id-keyed
+        habits_map, statuses = (
+            (day_rec.get("habits", {}), day_rec.get("habit_statuses")) if isinstance(day_rec, dict) else ({}, None)
+        )  # #4632
         t0_done = sum(1 for h in tier0_names if (habitify_reading(habits_map, h, registry.get(h), statuses) or 0) >= 1)  # #4362
         t1_done = sum(1 for h in tier1_names if (habitify_reading(habits_map, h, registry.get(h), statuses) or 0) >= 1)
         trend_lines.append(f"  {date_str}: T0 {t0_done}/{len(tier0_names)}, T1 {t1_done}/{len(tier1_names)}")
@@ -714,10 +715,10 @@ def _compute_diminishing_returns(character_sheet, data, profile):
     if not character_sheet:
         return ""
 
-    registry = profile.get("habit_registry", {})
-    habitify = data.get("habitify") or {}
-    habits_map = habitify.get("habits", {}) if isinstance(habitify, dict) else {}
-    habit_statuses = habitify.get("habit_statuses") if isinstance(habitify, dict) else None  # #4632
+    registry, habitify = profile.get("habit_registry", {}), (data.get("habitify") or {})
+    habits_map, habit_statuses = (
+        (habitify.get("habits", {}), habitify.get("habit_statuses")) if isinstance(habitify, dict) else ({}, None)
+    )  # #4632
 
     # Map habits to pillars
     HABIT_PILLAR_MAP = {
@@ -749,7 +750,6 @@ def _compute_diminishing_returns(character_sheet, data, profile):
         pillar_habits = HABIT_PILLAR_MAP.get(pillar_name, [])
         active_habits = [h for h in pillar_habits if registry.get(h, {}).get("status") == "active"]
         if active_habits:
-            # #4632: resolved by vendor id / aliases like every other reader — a raw name `.get` lost a renamed habit.
             completed = sum(1 for h in active_habits if (habitify_reading(habits_map, h, registry.get(h), habit_statuses) or 0) >= 1)
             effort_pct = round(completed / len(active_habits) * 100) if active_habits else 0
         else:

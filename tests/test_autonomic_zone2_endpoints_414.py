@@ -5,7 +5,8 @@ MCP tools to the data door (#414, RQA-06/07).
 Pins both the honest empty state (below the day threshold / no qualifying activity ⇒
 explicit "not available", never a fabricated value) and a real payload. All offline —
 the pure `_compute_*` functions are exercised directly, and the handlers with
-_query_source / _get_profile monkeypatched.
+_query_source monkeypatched. #4627: Zone 2 is minutes in each device's own Zone 2 from the
+stored time-in-zone (`zone2_seconds`), never a whole activity by its average HR.
 """
 
 import os
@@ -39,10 +40,10 @@ def _whoop_days(n, base_hrv=60.0):
     return out
 
 
-def _strava_days_with_z2():
-    """Two weeks of Strava days, one Zone-2 run each (avg HR ~ 65% of a 190 max)."""
+def _strava_days_with_z2(dates=("2026-06-01", "2026-06-03", "2026-06-08", "2026-06-10")):
+    """Two weeks of Strava days, one Zone-2 run each — 45 min in Strava's own Zone 2."""
     days = []
-    for d in ("2026-06-01", "2026-06-03", "2026-06-08", "2026-06-10"):
+    for d in dates:
         days.append(
             {
                 "sk": f"DATE#{d}",
@@ -51,8 +52,9 @@ def _strava_days_with_z2():
                     {
                         "name": "Zone 2 base run",
                         "sport_type": "Run",
-                        "moving_time_seconds": 45 * 60,  # 45 min, above the 10-min floor
-                        "average_heartrate": 124.0,  # 124/190 ≈ 0.65 → zone_2
+                        "moving_time_seconds": 45 * 60,
+                        "average_heartrate": 124.0,
+                        "zone2_seconds": 45 * 60,  # the strava writer's time-in-zone field
                     }
                 ],
             }
@@ -119,20 +121,24 @@ def test_autonomic_handler_real_payload(monkeypatch):
 
 
 def test_zone2_no_activity_is_honest():
-    out = az._compute_zone2_breakdown([], {"max_heart_rate": 190})
+    out = az._compute_zone2_breakdown([])
     assert out["available"] is False
     assert out["weekly_target_min"] == 150
     assert "weeks" not in out  # nothing fabricated
 
 
-def test_zone2_short_activity_below_floor_excluded():
-    days = [{"date": "2026-06-01", "activities": [{"name": "quick", "moving_time_seconds": 5 * 60, "average_heartrate": 124}]}]
-    out = az._compute_zone2_breakdown(days, {"max_heart_rate": 190})
-    assert out["available"] is False  # the only activity is under the 10-min floor
+def test_zone2_an_average_hr_alone_is_never_zone2_minutes():
+    """#4627: an activity whose average HR sits in the old 60–70% band but carries no stored
+    time-in-zone adds NOTHING to Zone 2 — it is an unmeasured session, not 45 Zone 2 minutes."""
+    days = [{"date": "2026-06-01", "activities": [{"name": "no zones", "moving_time_seconds": 45 * 60, "average_heartrate": 124}]}]
+    out = az._compute_zone2_breakdown(days, today="2026-06-02")
+    assert out["available"] is True
+    assert out["summary"]["total_zone_2_min"] == 0
+    assert out["summary"]["unmeasured_sessions"] == 1
 
 
 def test_zone2_real_payload_against_150_reference():
-    out = az._compute_zone2_breakdown(_strava_days_with_z2(), {"max_heart_rate": 190})
+    out = az._compute_zone2_breakdown(_strava_days_with_z2(), today="2026-06-14")
     assert out["available"] is True
     assert out["weekly_target_min"] == 150
     assert out["period"]["weeks_analyzed"] == 2
@@ -145,13 +151,16 @@ def test_zone2_real_payload_against_150_reference():
     z2 = next(z for z in out["zone_distribution"] if z["zone"] == "zone_2")
     assert z2["total_minutes"] == 180.0
     assert out["summary"]["total_zone_2_min"] == 180.0
-    assert out["summary"]["max_hr_used"] == 190.0
+    assert out["summary"]["max_hr_used"] is None  # #4627: no maximum assumed — each device's own band
     assert out["sport_breakdown"][0]["sport_type"] == "Run"
 
 
 def test_zone2_handler_real_payload(monkeypatch):
-    monkeypatch.setattr(az, "_query_source", lambda *a, **k: _strava_days_with_z2())
-    monkeypatch.setattr(az, "_get_profile", lambda: {"max_heart_rate": 190})
+    from datetime import datetime, timedelta
+
+    now = datetime.now(az.PT)  # the handler reads 90 days back from its own Pacific today
+    recent = tuple((now - timedelta(days=n)).strftime("%Y-%m-%d") for n in (2, 4, 9, 11))
+    monkeypatch.setattr(az, "_query_source", lambda src, *a, **k: _strava_days_with_z2(recent) if src == "strava" else [])
     resp = az.handle_zone2_breakdown()
     assert resp["statusCode"] == 200
     body = json.loads(resp["body"])
@@ -161,7 +170,6 @@ def test_zone2_handler_real_payload(monkeypatch):
 
 def test_zone2_handler_empty_state(monkeypatch):
     monkeypatch.setattr(az, "_query_source", lambda *a, **k: [])
-    monkeypatch.setattr(az, "_get_profile", lambda: {"max_heart_rate": 190})
     resp = az.handle_zone2_breakdown()
     assert resp["statusCode"] == 200
     body = json.loads(resp["body"])
