@@ -678,9 +678,13 @@ def ingestion_hae() -> list[iam.PolicyStatement]:
             ),
         ),
         # #4628 (Q2 b): the additive day value is the sum of the per-reading archive, so the
-        # webhook READS back the day's object before merging. ListBucket on that prefix only,
-        # so a not-yet-written day returns NoSuchKey (an empty day) rather than AccessDenied
-        # (which the writer treats as "archive unavailable" and falls back to the legacy write).
+        # webhook READS back the day's object before merging. ListBucket is what makes S3 answer
+        # a not-yet-written day with NoSuchKey (an empty day) instead of AccessDenied — which the
+        # writer must treat as "archive unavailable" and fall back to the legacy write, so without
+        # it the first delivery of every day would fall back and the object would never exist.
+        # Bucket-level and UNCONDITIONED on purpose: `s3:prefix` is a ListBucket-request key, and
+        # whether S3's implicit 404-vs-403 check on a GetObject honours it is not documented —
+        # the fleet default (lambda_helpers) grants this same unconditioned form. Key names only.
         iam.PolicyStatement(
             sid="S3ReadAdditiveReadings",
             actions=["s3:GetObject"],
@@ -690,7 +694,6 @@ def ingestion_hae() -> list[iam.PolicyStatement]:
             sid="S3ListAdditiveReadings",
             actions=["s3:ListBucket"],
             resources=[BUCKET_ARN],
-            conditions={"StringLike": {"s3:prefix": ["raw/matthew/additive_readings/*"]}},
         ),
         iam.PolicyStatement(
             sid="Secrets",
