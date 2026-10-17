@@ -397,3 +397,6 @@ def test_the_tool_and_the_planner_read_the_one_computation():
     names = {n.id for n in ast.walk(fn) if isinstance(n, ast.Name)}
     assert "tool_get_muscle_volume" in names
     assert not (names & _ATTRIBUTION_CALLS)
+
+
+# premerge-gate: 4071: an AST sweep of mcp/ + lambdas/training/ asserting that training.muscle_volume.working_sets_by_muscle is the ONE per-muscle set computation. Pure repo shape, and pre-merge for the reason the defect was invisible: a second counter feeding one consumer while the planner reads another number reds nothing at runtime.

@@ -125,9 +125,14 @@ def _t_last_weight_point(value: Any) -> tuple:
 
 
 def _t_stats_line_weight(value: Any) -> tuple:
-    """'Weight: 318.9 lbs | Week Grade: …' → 318.9. None when the line carries no weight."""
-    m = re.search(r"weight:\s*(-?\d+(?:\.\d+)?)", str(value or ""), re.I)
-    return (float(m.group(1)) if m else None), None
+    """Weight from a chronicle stats_line, via the ONE parser (``stats_fields``, #4907).
+
+    Reads both the legacy ``Weight: 318.9 lbs | Week Grade: …`` and the Story Desk
+    ``Day 25 to Day 31 · 308.9 lbs (-3.5 this week) · …`` shapes. None when the line has no weight."""
+    from content.chronicle_schema import stats_fields
+
+    w = stats_fields(value).get("weight_lbs")
+    return (float(w) if w is not None else None), None
 
 
 _TRANSFORMS = {

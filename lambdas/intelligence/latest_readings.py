@@ -39,9 +39,9 @@ and the day-scoped rollup is the right producer for them. Only figures that answ
 "what is the latest reading" move.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from common.pacific_time import PACIFIC, pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
+from common.pacific_time import PACIFIC, pacific_now, parse_iso_utc  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 # The #1369 Truth Spine — the cockpit's resolution, imported rather than re-derived.
 # A second implementation here would be the very defect this module closes.
@@ -114,3 +114,21 @@ def resolve_latest_readings(table, user_prefix, withings_latest=None, now=None):
             out.pop(k, None)
 
     return out
+
+
+def hrv_series_facts(query_fn, today, log=None):
+    """Stored Whoop HRV rows, 30 days to ``today`` -> {"hrv_series", "hrv_series_source"}; {} on failure (#4866)."""
+    try:
+        start = (parse_iso_utc(today) - timedelta(days=30)).date().isoformat()
+        from common.digest_utils import filter_day_rows
+
+        rows = [
+            {"date": r["sk"][5:15], "hrv": float(r["hrv"])}
+            for r in filter_day_rows(query_fn("whoop", start, today))
+            if r.get("hrv") is not None
+        ]
+        return {"hrv_series": rows, "hrv_series_source": "whoop"}
+    except Exception as e:
+        if log:
+            log.warning("hrv series load failed (gate falls back to the latest reading): %s", e)
+        return {}

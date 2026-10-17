@@ -437,3 +437,6 @@ def test_census_board_followup_path_carries_block():
     src = open(os.path.join(_REPO, "lambdas/web/site_api_ai_lambda.py")).read()
     followup_src = src.split("def _handle_board_followup", 1)[1]
     assert "_phase_context_block()" in followup_src
+
+
+# premerge-gate: the phase-context census

@@ -35,12 +35,21 @@ test("the call is shown in the coach's own words, with who, when and what it mea
 });
 
 test("what happened carries the verdict as the kit's tag, beside the simple guess", () => {
-  const right = C.outcomeHTML(C.findCall(BODY, NUMBER));
-  assert.match(right, /<span class="ck-verdicts__tag ck-verdicts__tag--right">Right · within 17\.9 either way<\/span><p><b>His morning recovery score came in at 67 against a call of 61\.<\/b>/);
+  const call = C.findCall(BODY, NUMBER);
+  const tol = call.tolerance.text;
+  const right = C.outcomeHTML(call);
+  assert.match(right, new RegExp(`<span class="ck-verdicts__tag ck-verdicts__tag--right">Right · within ${tol.replace(".", "\\.")} either way</span><p><b>${call.happened.replace(".", "\\.")}</b>`));
   // #4808: the allowed distance is in the tag, and what it is — its statistic and window — once, below
-  assert.match(right, /Lisa Park was right\. The allowed distance is one standard deviation of his readings over the 30 days before the call\. Graded on the reading for September 8\. Checked September 21\./);
-  assert.equal((right.match(/17\.9/g) || []).length, 1, "the number is printed once");
-  assert.match(right, /<span class="ck-verdicts__tag">The simple guess<\/span><p>The simple guess, that nothing changes, has not been checked against this call yet\.<\/p>/);
+  assert.ok(right.includes(`${call.verdict_text} The allowed distance is ${call.tolerance.statistic}.`));
+  assert.match(right, /Graded on the reading for [A-Z][a-z]+ \d+\. Checked [A-Z][a-z]+ \d+\./);
+  // The number sits in the call's own tag; a call the simple guess was scored on prints it in that guess's tag too, and nowhere else.
+  const scored = call.simple_guess && call.simple_guess.state === "scored";
+  assert.equal(right.split(tol).length - 1, scored ? 2 : 1, "the number is printed once per verdict tag");
+  if (scored) assert.ok(right.includes(`<p>${call.simple_guess.text}</p>`));
+  // A call the guess has not been checked on says so (built from the capture: the capture's call is scored).
+  const unchecked = clone(call);
+  delete unchecked.simple_guess;
+  assert.match(C.outcomeHTML(unchecked), /<span class="ck-verdicts__tag">The simple guess<\/span><p>The simple guess has not been checked against this call yet\.<\/p>/);
   const wrong = C.outcomeHTML(C.callsOf(BODY).find((c) => c.verdict === "wrong"));
   assert.match(wrong, /<span class="ck-verdicts__tag">Wrong · not within [\d.]+ either way<\/span>/);
 });
@@ -98,16 +107,20 @@ test("the running record is counts in a sentence, never a percentage", () => {
 test("the front page's last settled call is one block that opens its page", () => {
   // It leads with the clearest miss on record, not the newest call (red team, round 7).
   const html = C.lastCallHTML(BODY, BASE);
-  assert.match(html, /^<div class="ck-bet"><p class="ck-small">Settled Thursday, September 24<\/p>/);
+  // The card is the call the page named in its link, read back from the capture: what it says is that call's own words.
+  const id = html.match(/href="\/next\/v8\/call\/\?id=([a-z0-9-]+)">The whole call/)[1];
+  const call = C.findCall(BODY, id);
+  assert.equal(call.verdict, "wrong", "the front page leads with a miss");
+  const when = new Date(`${call.settled_date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+  assert.ok(html.startsWith(`<div class="ck-bet"><p class="ck-small">Settled ${when}</p>`));
   // #4808, the house rule: the tag (verdict and rule) first, then the call with the RESULT bold,
   // then what the allowed distance is — the number once, in the tag
-  assert.match(
-    html,
-    /<p class="ck-small">Settled Thursday, September 24<\/p><span class="ck-verdicts__tag">Wrong · not within 17\.9 either way<\/span><p>Lisa Park called his morning recovery score \(his wrist strap’s morning score out of 100\) at about 66 for September 11\. <b>It came in at 24\.<\/b><\/p><p class="ck-soft">The allowed distance is one standard deviation of his readings over the 30 days before the call\. </,
-    "the card says which day the call was for and what counts as right",
-  );
-  assert.equal((html.match(/17\.9/g) || []).length, 1, "the allowed distance is printed once");
-  assert.doesNotMatch(html, /The simple guess/, "the guess is said only once it has a result on this call");
+  assert.ok(html.includes(`<span class="ck-verdicts__tag">Wrong · not within ${call.tolerance.text} either way</span><p>${call.called} <b>${call.happened_short}</b></p>`));
+  assert.ok(html.includes(`<p class="ck-soft">The allowed distance is ${call.tolerance.statistic}. `), "the card says what counts as right");
+  assert.equal((html.match(new RegExp(call.tolerance.text.replace(".", "\\."), "g")) || []).length, 1, "the allowed distance is printed once");
+  const scored = call.simple_guess && call.simple_guess.state === "scored" && call.simple_guess.short;
+  if (scored) assert.ok(html.includes(`The simple guess: ${call.simple_guess.short}.`));
+  else assert.doesNotMatch(html, /The simple guess/, "the guess is said only once it has a result on this call");
   assert.match(html, /href="\/next\/v8\/call\/\?id=[a-z0-9-]+">The whole call<\/a>/);
   assert.doesNotMatch(html, /\d{4}-\d{2}-\d{2}|undefined|%/);
 });
@@ -142,10 +155,11 @@ test("the list is every settled call newest first, the older ones folded away", 
   const hrefs = [...html.matchAll(/href="\/next\/v8\/call\/\?id=([a-z0-9-]+)&amp;from=calls"/g)].map((m) => m[1]);
   assert.deepEqual(hrefs, BODY.calls.map((c) => c.id));
   assert.ok(hrefs.length > 0 && hrefs.length === BODY.calls.length, "every served call has its row");
-  assert.match(html, /^<ul class="ck-rows ck-rows--more ck-rows--calls"><li><a href="[^"]+">[A-Z][a-z]+ \d+: [^<]+ <span>(Right|Wrong) · [^<]+<\/span><\/a><\/li>/);
+  assert.match(html, /^<ul class="ck-rows ck-rows--more ck-rows--calls"><li><a href="[^"]+">[A-Z][a-z]+ \d+: [^<]+ <span>((Right|Wrong) · [^<]+|[^<]+ was right; [^<]+ was wrong\.)<\/span><\/a><\/li>/);
   const folded = Number(html.match(/<details><summary>(\d+) earlier calls<\/summary>/)[1]);
   assert.ok(folded > 0 && folded < hrefs.length, "the older calls are folded, the newest stay open");
-  assert.match(html, /<span>Marcus Webb was right; Amara Patel was wrong\.<\/span>/, "a bet row says who was right");
+  const bet = BODY.calls.find((c) => c.kind === "bet");
+  assert.ok(html.includes(`<span>${bet.verdict_text}</span>`), "a bet row says who was right");
   assert.ok(html.includes(`${BODY.excluded.count} more checked calls have no page here`));
   assert.equal(C.listHTML(null, BASE), "");
 });

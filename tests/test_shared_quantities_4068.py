@@ -374,3 +374,6 @@ def test_the_endpoint_weight_trend_is_only_the_tdee_back_solve():
 def test_the_ruled_sites_still_exist():
     for rel in RULED_TDEE_TREND:
         assert "weight_trend_lb_per_wk" in (ROOT / rel).read_text(encoding="utf-8"), f"{rel} no longer needs its ruling — delete it"
+
+
+# premerge-gate: #4068: rglob — only mcp.shared_quantities builds the walking layer / reports the loss rate

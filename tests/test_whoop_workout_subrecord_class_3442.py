@@ -269,6 +269,7 @@ _WHOOP_CONSUMER_REGISTRY = {
     "lambdas/compute/weekly_correlation_compute_lambda.py": (1, "shared-guard", "is_day_row in index_by_date (#3442 member 1)"),
     "lambdas/ingestion/enrichment_lambda.py": (1, "shared-guard", "filter_day_rows on the by-date whoop index (#3442 member 5)"),
     "lambdas/intelligence/ai_expert_analyzer_lambda.py": (2, "shared-guard", "filter_day_rows on both whoop fetches (#3442 member 6)"),
+    "lambdas/intelligence/latest_readings.py": (1, "shared-guard", "filter_day_rows in hrv_series_facts (#4866)"),
     "lambdas/intelligence/field_notes_lambda.py": (1, "shared-guard", "_DAY_SK_RE is the shared predicate (the 2026-W26 prior art)"),
     "lambdas/emails/chronicle_data.py": (
         1,
@@ -309,7 +310,11 @@ _WHOOP_CONSUMER_REGISTRY = {
     "lambdas/web/site_api_pulse.py": (1, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
     "lambdas/web/site_api_rollups.py": (7, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
     "lambdas/web/site_api_sleep.py": (2, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
-    "lambdas/web/site_api_training.py": (1, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
+    "lambdas/web/site_api_training.py": (
+        1,
+        "shared-guard",
+        "filter_day_rows for avg_strain + #WORKOUT# rows by distinct id (#4629 — was a missed member, not a non-member)",
+    ),
     "mcp/tools_health.py": (2, "non-member", "field-absent-safe tool extraction"),
     "mcp/tools_plan.py": (1, "shared-guard", "filter_day_rows on the readiness_floor whoop read (#4072)"),
     "mcp/tools_training.py": (1, "non-member", "field-absent-safe tool extraction"),
@@ -377,3 +382,6 @@ def test_whoop_consumer_set_guard():
         if not os.path.exists(os.path.join(_REPO, rel)):
             problems.append(f"{rel} is registered but no longer exists — prune the registry entry.")
     assert not problems, "\n".join(problems)
+
+
+# premerge-gate: #3442: AST census — a new date-keyed whoop consumer must pick a guard lane BEFORE merge

@@ -256,3 +256,6 @@ def test_the_historical_deletion_records_are_left_intact():
         text = (pathlib.Path(_REPO) / rel).read_text()
         assert "life-platform/dropbox" in text, f"{rel} lost its record that the secret was deleted"
         assert re.search(r"life-platform/dropbox.{0,120}?(delet|DELETED)", text, re.I | re.S), rel
+
+
+# premerge-gate: 2653: sweeps lambdas/ docstrings and cdk/stacks/role_policies*.py to assert no docstring names a secret no role grants — a repo-shape ratchet, source only.

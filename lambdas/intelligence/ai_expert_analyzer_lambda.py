@@ -187,7 +187,7 @@ def _load_canonical_facts():
         # Sentinel checks the narrative against. No more per-site dict construction.
         from experiment.canonical_facts import build_canonical_facts, overlay_latest_readings
 
-        from intelligence.latest_readings import resolve_latest_readings
+        from intelligence.latest_readings import hrv_series_facts, resolve_latest_readings
 
         _cm = _latest_item("computed_metrics") or {}
         facts = build_canonical_facts(_cm)
@@ -204,7 +204,7 @@ def _load_canonical_facts():
         # weigh-in riders) now derive from the resolvers /api/vitals serves; the rollup keeps
         # the window-derived ones. Rule + evidence: canonical_facts.overlay_latest_readings.
         _live = resolve_latest_readings(table, USER_PREFIX, _latest_item("withings"), now=datetime.now(timezone.utc))
-        facts = overlay_latest_readings(facts, _live)
+        facts = {**overlay_latest_readings(facts, _live), **hrv_series_facts(_query_source, pacific_today(), logger)}  # #4866
         facts.update({_k: _live[_k] for _k in ("last_weighin_date", "days_since_weighin") if _live.get(_k) is not None})
     except Exception as _e:
         logger.warning("canonical facts load failed: %s", _e)
@@ -928,6 +928,10 @@ def _build_shared_system_prompt():
             parts.append(_pb)
     except Exception as _pe:  # pragma: no cover — defensive
         logger.warning("Presence block injection failed: %s", _pe)
+
+    # ADR-155 amendment (2026-10-12): the owner clinical record, non-disclosure form (analyses are published).
+    # In shared_system, so `_gate_prose`'s allow-list grounds its figures. Fail-soft: [] leaves the prompt as it was.
+    parts.extend(_ag.clinical_parts(table))
 
     # Format instructions (identical for all experts)
     parts.append("""OBSERVATORY ANALYSIS FORMAT:

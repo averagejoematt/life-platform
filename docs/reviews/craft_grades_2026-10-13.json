@@ -1,0 +1,249 @@
+{
+  "date": "2026-10-13",
+  "run_id": "craft-2026-10-13-sonnet-panel",
+  "ritual": "craft-review",
+  "sequence": "Second craft run. Previous: craft_grades_2026-08-27.json (first run, the baseline). Run for #4773's last acceptance box: one /review lens before and after the Sonnet-panel change, with finding counts and verifier pass rate.",
+  "model": "panel: sonnet (6 Agent-tool panelists, model=sonnet); verifiers: opus (5 finding-verifier agents, model=opus, frontmatter-pinned); driver + Phase-3 scoring: claude-opus-5-5 (session model)",
+  "panel_model": "sonnet",
+  "verifier_model": "opus",
+  "method": "/review craft per .claude/skills/review/SKILL.md (spine) + references/craft.md (rubric). Six-row promotion-committee panel (Eng I / Senior / Staff / Principal / EM / CIO), spawned in parallel on model=sonnet, each brief carrying the shared Phase-0 context block (inlined by reference to one scratch file every panelist read first). Every raw finding then went through finding-verifier (model=opus) in five area batches of 4-8, each batch seeded with one planted false finding; only CONFIRMED and strong-PLAUSIBLE count as upheld. Grades re-derived by the driver after refutations. Magnitudes from scripts/review_anchors.py and scripts/gate_census.py (none hand-typed). Rubric: docs/ENGINEERING_STANDARDS.md D1-D10 A/C/F anchors at graded_sha. NOTE: the sealed anchor artifact has no 'craft' record (review_anchor_seal.py --lens craft exits 2), so the clauses graded are the A cells of ENGINEERING_STANDARDS.md D1-D10 at 75e3a0071, fingerprinted only indirectly via anchor_freeze (which covers SKILL.md + craft.md, not the standards doc). Different method from 2026-08-27 (driver re-reproduction, no separate verifier, no planted controls) - the pass-rate comparison is therefore not like-for-like; see before_after.",
+  "headline": "B overall (3 A-, 2 B+, 5 B). Up a notch within the band since 08-27: the missing merge gate (D7-1) and the frozen CI composite (D5-1) are fixed and D2 debt fell 42.7k -> 27.0k lines; the through-line 'machinery stronger than its self-description' persists in the docs (QUICKSTART commands, README doors, ruleset prose, mypy census, PROPORTIONALITY row). Sonnet panel: 29 raw, 21 upheld, 72.4% verifier pass rate, 5/5 planted controls refuted.",
+  "ground_truth": {
+    "main_sha": "75e3a00712f9f5c8706a51196197e3cf9c02cab5",
+    "version_json_build": "6b25c54 (ancestor of HEAD; later commits are not site changes)",
+    "repo_visibility": "PUBLIC",
+    "experiment": {"cycle": 17, "cycle_day": 37, "genesis": "2026-09-06"},
+    "budget_tier": 1,
+    "budget_tier_pauses": "internal/dev AI",
+    "boot_brief": "model CONSISTENT; 108 lambdas, 84 scheduled (95 crons), 88 MCP tools, 139 alarms",
+    "open_issues_at_phase0": 75,
+    "gate_census": {"gates": 784, "proven": 260, "unproven": 512, "source": "python3 scripts/gate_census.py"},
+    "anchors_source": "python3 scripts/review_anchors.py (derived 2026-10-12)",
+    "anchors": {"test_modules": 1499, "test_suite_files": 1443, "deploy_entrypoints": 180, "deploy_surface": 406, "adr_records": 159, "process_docs": 66, "docs_surface": 394, "ci_workflows": 27, "lambda_modules": 619, "mcp_modules": 70, "claude_commands": 0, "claude_agents": 5, "cdk_stacks": 34}
+  },
+  "anchor_seal": {
+    "artifact": "docs/reviews/anchors/ANCHORS.json",
+    "sha256": "af9f958947dc30c8023d47553fc378e505dc01b56006afb154f183e71be96f57",
+    "sealed_at": "2026-09-21T04:51:14.637047+00:00",
+    "resolved": {"a11y_viewports": "desktop, mobile", "ceiling": "215", "cycle": "17", "cycle_day": "37", "distinct_margin": "35.0", "lane_budget": "1286", "min_n": "6", "mobile_viewport": "390", "page_count": "93", "surge_ceiling": "252", "type_floor_px": "11.0"},
+    "unobserved_placeholders": [],
+    "signed_loosenings": [],
+    "craft_record": "ABSENT - review_anchor_seal.py --lens craft: \"no anchor record for lens 'craft'\" (exit 2)"
+  },
+  "anchor_freeze": {
+    "lens": "craft",
+    "frozen_at": "2026-10-12",
+    "graded_sha": "75e3a00712f9f5c8706a51196197e3cf9c02cab5",
+    "rubric": {
+      ".claude/skills/review/SKILL.md": "sha256:d044e0a84ee7b329",
+      ".claude/skills/review/references/craft.md": "sha256:264b661ef84453a9"
+    },
+    "carry_forward_cap_days": 28,
+    "rule": "Anchors are FROZEN for this run: the A/C/F criteria are the text of the files fingerprinted above, at graded_sha. They may not be extended, narrowed or reworded during the run — an anchor moved inside the run that grades against it makes decay and a raised bar inseparable (#3603). Extensions land between runs, by PR."
+  },
+  "calibration": {
+    "planted_false_findings": {
+      "n": 5,
+      "items": [
+        "eng1-5 (B1): 'no .env.example / local-credentials path' - true, and the documented Secrets-Manager-only posture (CLAUDE.md, docs/SECURITY.md:43)",
+        "STAFF-7 (B2): 'ci-cd.yml delegates lint/test to reusable workflows, fragmenting the pipeline' - the sanctioned composition pattern (ENGINEERING_STANDARDS §5, #1655)",
+        "principal-6 (B3): 'line length 140 with E501 ignored is a loose gate' - documented posture (.flake8:2-10, ENGINEERING_STANDARDS §4 'don't relitigate')",
+        "CIO-6 (B4): 'CodeQL is non-blocking / advisory-only' - documented posture (ADR-148, codeql.yml header)",
+        "EM-5 (B5): 'coverage floor 82 disagrees with the 70% target' - target vs up-only floor, consistent by design"
+      ],
+      "confirmed_by_verifiers": []
+    },
+    "withheld_known_issues": {
+      "n": 2,
+      "items": ["#4270 (55 non-test modules under tests/)", "#4276 (structured_output_config unused; ~20 modules hand-strip code fences)"],
+      "found": ["#4270 - Staff panelist STAFF-3 (56 non-test modules at tests/ root); verifier refuted it as a duplicate of #4270, which is the control firing"],
+      "void": ["#4276 - every acceptance box on the issue is ticked and the tree shows the parse consolidated in lambdas/ai/structured_json.py with structured_output_config callers; the defect no longer exists to be found. The Senior panelist reported the consolidation as an A (D3.A.3 MET), which is the correct reading. Not counted as a miss."],
+      "missed_by_graders": []
+    },
+    "verdict": "CALIBRATED",
+    "note": "One valid withheld control and five plants. A planted control that is never confirmed is one sample, not proof; vary the plants next run."
+  },
+  "panel_stats": {
+    "raw_findings_per_panelist": {"eng1": 4, "senior": 5, "staff": 6, "principal": 5, "em": 4, "cio": 5},
+    "raw_findings_total": 29,
+    "sent_to_verification": 29,
+    "planted_in_verification": 5,
+    "verdicts": {"CONFIRMED": 21, "PLAUSIBLE_strong": 0, "PLAUSIBLE_weak": 2, "REFUTED": 6},
+    "upheld": 21,
+    "not_upheld": 8,
+    "verifier_pass_rate": 0.724,
+    "upheld_per_panelist": {"eng1": 2, "senior": 4, "staff": 4, "principal": 4, "em": 4, "cio": 3},
+    "refutation_reasons": {
+      "documented_posture_or_sanctioned_pattern": ["senior-3 (Verified stamps are gated by scripts/check_doc_index.py: 90d advisory / 180d hard)", "principal-3 (unproven gate pile is the #3329 down-only ratchet, PROPORTIONALITY row 126)", "CIO-3 ('zero third-party' only appears in the 08-27 review snapshot; lambdas/requirements/README.md states layers honestly)", "eng1-1 weak (deploy/archive is ADR-059 policy, #4258)"],
+      "misread_scope": ["eng1-4 (ledgers/ and qa/ are load-bearing, not support - README rule doesn't apply)"],
+      "duplicate": ["CIO-1 (= STAFF-6, and its contents:write aggravator is false)", "STAFF-3 (= open #4270)"],
+      "below_bar": ["STAFF-4 weak (flat deploy/ is a grading observation, no standard broken)"]
+    },
+    "corrections_on_upheld": ["eng1-2: a 4th one-arg call at QUICKSTART:281; ONBOARDING path moved to lambdas/coach/, not untracked", "STAFF-1: P2 -> P3 (instrument only reports)", "STAFF-2: real escape is qa/visual_qa.py 1686 + qa/qa_manifest.py 1092 (unbaselined, out of SCOPE_DIRS after #4270's move), not remediation/agent.py (807)", "STAFF-5: extends #1655 (thin-orchestrator outcome regressed)", "principal-2: flags-off half is a documented posture; only the stale 350 count is the defect", "principal-4: the grounding_wiring '9 exemptions' half is historical narrative, not a census", "senior-1: bodies drift (exception sets differ) - extends #970", "EM-4: DECISIONS.md:4665 is accurate dated history; stale sites are MANAGED_WHERE_LEDGER:40 + ADR-148 body", "EM-3: squash titles never pass the local hook at all"]
+  },
+  "before_after": {
+    "2026-08-27": {"panel_model": "claude-opus-5[1m] (session model, inherited by all six lenses; no pin)", "verifier": "driver re-reproduction (same session model), no separate verifier agent", "raw_findings": 24, "raw_note": "23 graded findings + 1 adjacent EM claim; graders also self-killed 3 hypotheses before submitting (not counted)", "sent_to_verification": 24, "upheld": 23, "refuted": 1, "pass_rate": 0.958, "planted_controls": "none (pre-#3603, grandfathered)"},
+    "2026-10-13": {"panel_model": "sonnet", "verifier": "finding-verifier x5, model opus, adversarial, area-batched", "raw_findings": 29, "sent_to_verification": 29, "upheld": 21, "refuted": 6, "weak_plausible_not_upheld": 2, "pass_rate": 0.724, "planted_controls": "5 planted, 0 confirmed; 1 valid withheld issue, found"},
+    "comparability": "Not like-for-like. 08-27's 95.8% is a driver re-check without plants; 10-13's 72.4% is an adversarial pass with plants that killed 8 findings, 5 of them documented postures or sanctioned patterns (the historical ~50% false-positive class the spine predicts for first-pass agents). Upheld volume rose (21 vs 23, at 29 vs 24 raw) and every upheld finding carries reproduced tree evidence. Quality held at the verified layer: the panel tier is cheaper, the verification layer caught what it should, and the calibration controls fired."
+  },
+  "overall_grade": "B",
+  "overall_justification": "Three A- (D6 supply-chain, D7 team-readiness, D9 AI-era engineering), two B+ (D2 structure, D8 testing), five B (D1, D3, D4, D5, D10). Since 08-27 the sharpest finding of that run is fixed - main now carries a live 3-check ruleset the posture file, ledger and CONVENTIONS §4a0 agree on - the CI composite is current and Dependabot-covered, and the module-size debt fell 37%. What a cold reader still faults is the same through-line: the repo's prose trails its machinery (QUICKSTART commands that exit 1, a README advertising a retired door, a mypy census 1.9x stale, a ledger row crediting the wrong gate, ruleset prose saying two checks where live has three).",
+  "dimensions": {
+    "D1": {"area": "First impression / repo cleanliness", "reviewer": "eng1", "grade": "B", "grade_with_proposed": "B", "prior": "B", "trend": "flat",
+      "justification": "Root is clean (19 conventional files, no exhaust); deploy/archive is ADR-059 policy, so not junk - but the first-day docs still lie: four one-arg deploy_lambda.sh commands exit 1, the stack list is short one, README advertises the retired /evidence/ door. Panel said C+; driver re-derived to B after eng1-1 (archive) and eng1-4 (READMEs) failed verification.",
+      "rubric_anchors": {"A": "Root is load-bearing dirs only; every tracked dir earns its place; no committed archives, process exhaust, or throwaway artifacts", "C": "A few stray dirs; some tracked junk; tree needs the README to be legible", "F": "Committed dead-code archives, spike PNGs, session transcripts, backups; the root reads as a working directory"},
+      "clause_verdicts": [
+        {"clause_id": "D1.A", "verdict": "FAILED", "citation": "docs/QUICKSTART.md:94,97,125,281 vs deploy/deploy_lambda.sh:41 'if [ $# -lt 2 ]'; README.md:25 /evidence/ door vs site/redirects.map:35", "reason": "onboarding path states commands that fail and an IA that no longer exists"},
+        {"clause_id": "D1.A.1", "verdict": "MET", "citation": "tests/test_root_clutter_guard.py allowlist; root = 19 tracked conventional files", "reason": "every top-level dir allowlisted with a reason; 12 load-bearing (the ≤~10 target is labelled aspirational)"},
+        {"clause_id": "D1.A.2", "verdict": "MET", "citation": "deploy/README.md:167-170 Archive Policy; ADR-059 (DECISIONS.md:1765); #4258", "reason": "the archive is documented policy; residue is a doc contradiction with ENGINEERING_STANDARDS §1:46 (owner direction needed)"},
+        {"clause_id": "D1.A.3", "verdict": "MET", "citation": "git ls-files | grep -E '\\.(png|zip|bak|log)$' | grep -v ^site/ -> 2 review-evidence PNGs", "reason": "no transcripts, spikes or backups in the product tree"}],
+      "findings_confirmed": 2, "findings_refuted": 1, "findings_weak": 1,
+      "findings": [
+        {"id": "eng1-2", "summary": "QUICKSTART first-day deploy commands exit 1 (4 one-arg deploy_lambda.sh calls, the script is EMERGENCY-only); stack list 9 vs 10 (LifePlatformBackup); ONBOARDING.md:129 cites a moved path", "sev": "P2", "effort": "S", "class": "A", "dedup": "persisting D1-2; same class as closed #1258 (fixed CLAUDE.md only)", "regression_guard": "doc-command arg-floor contract test over fenced `bash deploy/*.sh` lines; derive the stack list from cdk/app.py"},
+        {"id": "eng1-3", "summary": "README.md:25 advertises the retired v4 three-door IA incl. /evidence/ (now a redirect to /data/)", "sev": "P3", "effort": "S", "class": "A", "dedup": "persisting D1-4", "regression_guard": "derive the door list in sync_doc_metadata.py"}],
+      "prior_findings": {"D1-1": "REFRAMED - archive is ADR-059 policy; contradiction with standards §1 remains", "D1-2": "PERSISTING (partly fixed)", "D1-3": "FIXED (one residual path)", "D1-4": "PERSISTING"}},
+    "D2": {"area": "Structure & module hygiene", "reviewer": "staff", "grade": "B+", "grade_with_proposed": "A-", "prior": "B", "trend": "up",
+      "justification": "Packaging finished (ADR-146 guard), debt fell 24 -> 18 BASELINE entries / 42.7k -> 27.0k lines; held below A because the headroom instrument still cannot see unbaselined files at the wall and qa/ (two modules over the ceiling) fell out of the guard's scope via #4270's move.",
+      "rubric_anchors": {"A": "Packaging finished; no source file over the size ceiling without a documented reason; boundaries are obvious", "C": "Half-done packaging (subpackages + a flat pile); one or two god-modules", "F": "A flat pile of modules; multiple 2-3k-line files; no discernible structure"},
+      "clause_verdicts": [
+        {"clause_id": "D2.A", "verdict": "FAILED", "citation": "qa/visual_qa.py 1686, qa/qa_manifest.py 1092 logical lines, unbaselined; tests/test_module_size_guard.py:125 SCOPE_DIRS omits qa/", "reason": "two first-party files over the ceiling with no documented reason, invisible to the guard"},
+        {"clause_id": "D2.A.1", "verdict": "MET", "citation": "ls lambdas/*.py -> none; tests/test_lambdas_packaging_guard.py", "reason": "packaging finished and ratcheted"},
+        {"clause_id": "D2.A.2", "verdict": "FAILED", "citation": "tests/test_module_size_guard.py:621-635 headroom_table() iterates BASELINE only; program_structure.py 1000, owner_redlines.py 1000", "reason": "the zero-headroom set §2 points at omits files at the wall"}],
+      "findings_confirmed": 2, "findings_refuted": 1, "findings_weak": 1,
+      "findings": [
+        {"id": "STAFF-1", "summary": "headroom instrument blind to unbaselined files at the ceiling (program_structure.py, owner_redlines.py at 1000/1000)", "sev": "P3", "effort": "S", "class": "A", "dedup": "persisting D2-1; extends #3537", "regression_guard": "headroom_table() unions BASELINE with in-scope files within N of HARD_CEILING; synthetic-file test"},
+        {"id": "STAFF-2", "summary": "SCOPE_DIRS omits qa/ (visual_qa.py 1686, qa_manifest.py 1092 - moved there by #4270) and other first-party dirs; archived BASELINE row pads the zero count", "sev": "P2", "effort": "S", "class": "B", "dedup": "persisting D2-2/D2-3; extends #4270", "regression_guard": "derive SCOPE_DIRS from the root-clutter allowlist's first-party set; baseline the two qa/ files"}],
+      "prior_findings": {"D2-1": "PERSISTING", "D2-2": "PERSISTING (worse: qa/ now carries over-ceiling files)", "D2-3": "PERSISTING"}},
+    "D3": {"area": "Naming & code aesthetics", "reviewer": "senior", "grade": "B", "grade_with_proposed": "B+", "prior": "B", "trend": "flat",
+      "justification": "Naming mechanically clean on the core rules and the LLM-parse consolidation is earned abstraction (9/12 cold-sampled files approvable unchanged); held at B by 156 functions over 150 lines with no function-size gate, four private safe_float copies beside the shared one, and §3 conventions with no enforcement or written reason.",
+      "rubric_anchors": {"A": "Idiomatic, consistent, self-explaining names; earned abstractions; a stranger reads a random file and nods", "C": "Mostly consistent; some cryptic or inconsistent names; occasional cleverness tax", "F": "Inconsistent conventions; misleading names; abstraction for its own sake"},
+      "clause_verdicts": [
+        {"clause_id": "D3.A", "verdict": "FAILED", "citation": "AST scan: 156/7739 functions >150 lines (daily_brief_lambda.lambda_handler 1221); 4 private _safe_float copies vs lambdas/common/digest_utils.py:69", "reason": "the 'earned abstraction / stranger nods' half fails"},
+        {"clause_id": "D3.A.1", "verdict": "MET", "citation": "ruff check --select N801,N802,N804,N805,N807,N999 lambdas mcp -> clean", "reason": "core naming idiomatic"},
+        {"clause_id": "D3.A.3", "verdict": "MET", "citation": "lambdas/ai/structured_json.py:3-5 (five copies -> one)", "reason": "LLM JSON parsing consolidated"}],
+      "findings_confirmed": 3, "findings_refuted": 0, "findings_weak": 0,
+      "findings": [
+        {"id": "senior-2", "summary": "156 functions exceed 150 lines; no function-length or complexity gate", "sev": "P2", "effort": "L", "class": "B", "dedup": "new (outside §2's written rubric; proposed extension)", "regression_guard": "function-length ratchet on the module_size_headroom shape, shrink-only baseline"},
+        {"id": "senior-1", "summary": "record-field _safe_float hand-rolled in 4 modules beside digest_utils.safe_float, with drifting exception sets; digest_utils docstring claims the family is gone", "sev": "P3", "effort": "S", "class": "A", "dedup": "extends #970 (closed; its sweep matched only the public name)", "regression_guard": "duplicate-helper ratchet keyed on normalized bodies of common/ helpers"},
+        {"id": "senior-5", "summary": "pep8-naming core subset unclaimed in ruff select (free); JS style neither linted nor documented as deliberately unenforced", "sev": "P3", "effort": "S", "class": "A", "dedup": "persisting D3-1/D3-2", "regression_guard": "add the zero-violation N subset; one §3 sentence for JS"}],
+      "prior_findings": {"D3-1": "PERSISTING", "D3-2": "PERSISTING"}},
+    "D4": {"area": "Trustworthy gates", "reviewer": "principal", "grade": "B", "grade_with_proposed": "B+", "prior": "B", "trend": "flat",
+      "justification": "Gates armed and green (673-module clean set, empty denylist, 3-code disable list, floor 82 + high-water ratchet; proven share 4.5% -> 33.2% under the documented down-only ratchet); held at B because the record is hand-typed and stale (mypy.ini says 350 modules vs 673) and ~86% of noqa codes name rules no configured linter reports, up from 84%.",
+      "rubric_anchors": {"A": "A skeptic believes lint/type/coverage mean something: real mypy, no blanket waivers, a credible coverage floor", "C": "Gates pass but are visibly loose (broad disable_error_code, per-dir suppressions) - or loose-but-documented", "F": "Gates are decorative - everything substantive silenced; green means nothing"},
+      "clause_verdicts": [
+        {"clause_id": "D4.A", "verdict": "FAILED", "citation": "mypy.ini:6 '(350 modules)' vs scripts/mypy_clean_set.py -> 673; ruff --extend-select RUF100 lambdas mcp -> 874 unused noqa", "reason": "the gates are real but a skeptic reading the waivers and census sees prose that does not match"},
+        {"clause_id": "D4.A.1", "verdict": "MET", "citation": "pyproject.toml:104 fail_under = 82; tests/test_coverage_floor_ratchet.py", "reason": "credible, ratcheted floor"},
+        {"clause_id": "D4.A.2", "verdict": "MET", "citation": "mypy.ini:85 disable_error_code = assignment, arg-type, operator; no per-module ignore_errors", "reason": "no blanket waivers; check_untyped_defs off is a documented posture (#2638)"}],
+      "findings_confirmed": 3, "findings_refuted": 1, "findings_weak": 0,
+      "findings": [
+        {"id": "principal-2", "summary": "mypy.ini:6 census says 350 modules, clean set is 673; no guard asserts it", "sev": "P2", "effort": "S", "class": "A", "dedup": "persisting D4-1 (never filed)", "regression_guard": "assert the mypy.ini count == len(clean_modules())"},
+        {"id": "principal-1", "summary": "849/985 noqa code mentions (945 directives) name codes no configured linter reports; BLE001 346 -> 659", "sev": "P3", "effort": "S", "class": "A", "dedup": "persisting D4-2, REGRESSED", "regression_guard": "RUF100-style config-aware test with a shrink-only baseline"},
+        {"id": "principal-4", "summary": "tests/test_mypy_clean_modules.py:41 'Currently: 4 structural codes' vs 3", "sev": "P3", "effort": "S", "class": "A", "dedup": "persisting D4-3 (partly fixed by #3539)", "regression_guard": "assert the comment's count"}],
+      "prior_findings": {"D4-1": "PERSISTING", "D4-2": "REGRESSED", "D4-3": "PERSISTING (partly fixed)"}},
+    "D5": {"area": "CI/CD maintainability", "reviewer": "staff", "grade": "B", "grade_with_proposed": "A-", "prior": "B", "trend": "flat",
+      "justification": "D5-1 fixed (setup-ci composite pins the call sites' SHAs, Dependabot covers nested composites); held at B because ci-cd.yml grew 1440 -> 1748 lines (831 inline run lines) with no size ratchet, regressing #1655's thin-orchestrator outcome, and three action refs float on @v7.",
+      "rubric_anchors": {"A": "Pipelines are DRY: shared setup in composite actions, thin reusable workflows; no mega-file", "C": "Duplicated setup across workflows; one large workflow file", "F": "A single multi-thousand-line workflow + N near-duplicate copies"},
+      "clause_verdicts": [
+        {"clause_id": "D5.A", "verdict": "FAILED", "citation": "wc -l .github/workflows/ci-cd.yml -> 1748 (1440 at 5bd054ac6)", "reason": "one large, growing workflow file"},
+        {"clause_id": "D5.A.1", "verdict": "MET", "citation": ".github/actions/setup-ci used 45x across 21 files", "reason": "shared setup composed"},
+        {"clause_id": "D5.A.4", "verdict": "FAILED", "citation": "docs-ci.yml:178,189; operating-calendar.yml:46 @v7", "reason": "three refs unpinned against the stated SHA-pin convention"}],
+      "findings_confirmed": 2, "findings_refuted": 1, "findings_weak": 0,
+      "findings": [
+        {"id": "STAFF-5", "summary": "ci-cd.yml 1748 lines (+21% since 08-27), 831 inline run lines, plan job ~440 lines; no workflow-size ratchet", "sev": "P2", "effort": "M", "class": "B", "dedup": "extends #1655", "regression_guard": "move plan logic to scripts/, reusable plan/deploy/smoke workflows, workflow-size ratchet"},
+        {"id": "STAFF-6", "summary": "three action refs on floating @v7 (contents: read, no secrets - low impact); only site-deploy.yml has a SHA-pin assertion", "sev": "P3", "effort": "S", "class": "A", "dedup": "new (CIO-1 merged here)", "regression_guard": "one repo-wide test: every non-local `uses:` is @<40-hex>"}],
+      "prior_findings": {"D5-1": "FIXED (#4336, #4253)"}},
+    "D6": {"area": "Supply-chain & security posture", "reviewer": "cio", "grade": "A-", "grade_with_proposed": "A-", "prior": "A", "trend": "down a notch (stricter sub-clauses; no control regressed)",
+      "justification": "All four controls present (two blocking gitleaks lanes + push protection, ADR-148-advisory CodeQL, pip-audit blocking with a zero-entry allowlist, gating SBOM), 27/27 workflows declare permissions, OIDC only, 0 open alerts; held at A- by an SBOM scoped to source not shipped layers (lameenc absent), secret scanning undeclared in the posture file the sentinel checks, three unpinned actions, and two UNDOCUMENTED estate rows.",
+      "rubric_anchors": {"A": "Secret-scan + SAST + CVE gate + SBOM present; the security-relevant gates block or ratchet", "C": "Some scanning, mostly advisory/non-blocking; no SBOM", "F": "No secret-scanning, no SAST, no CVE gate - or all continue-on-error"},
+      "clause_verdicts": [
+        {"clause_id": "D6.A", "verdict": "MET", "citation": "ci-lint.yml:176-216 (pip-audit), :217-241 (gitleaks), :293-352 (syft); secret-scan.yml; codeql.yml + ADR-148", "reason": "all four present; blocking where the ADR says"},
+        {"clause_id": "D6.A.4", "verdict": "MET", "citation": "ci-lint.yml:335 syft scan dir:.", "reason": "SBOM generated and gating; scope caveat filed as CIO-2"},
+        {"clause_id": "D6.A.6", "verdict": "MET", "citation": "grep -L '^permissions:' .github/workflows/*.yml -> none (27/27)", "reason": "least-privilege declared everywhere"}],
+      "findings_confirmed": 3, "findings_refuted": 1, "findings_weak": 0,
+      "findings": [
+        {"id": "CIO-4", "summary": "secret_scanning + push_protection live but undeclared in deploy/github_posture.json (sentinel-blind to a flip)", "sev": "P2", "effort": "S", "class": "A", "dedup": "persisting D6-1; extends #3042 (closed)", "regression_guard": "add the surface to github_posture.json; the existing sentinel verifies it"},
+        {"id": "CIO-5", "summary": "docs/ACCOUNTS.md:84-90 two estate rows UNDOCUMENTED - bus-factor 1 by the doc's own word; #1029 closed with that leg unfilled", "sev": "P2", "effort": "S", "class": "B", "dedup": "extends #1029 (closed)", "regression_guard": "owner fills the rows; scripts/check_reentry_hardening.py to green", "owner_only": true},
+        {"id": "CIO-2", "summary": "SBOM scans the source checkout (dir:.), so shipped layer components are absent (lameenc missing; pillow present only via requirements-dev.txt)", "sev": "P3", "effort": "S", "class": "A", "dedup": "new", "regression_guard": "second syft scan over the built bundle + layer manifests; assert layer components present"}],
+      "prior_findings": {"D6-1": "PERSISTING"}},
+    "D7": {"area": "Team-readiness signals", "reviewer": "em", "grade": "A-", "grade_with_proposed": "A", "prior": "B", "trend": "up",
+      "justification": "The 08-27 headline is fixed: live main ruleset 21867590 requires 3 checks and apply_branch_protection.py --check reports no drift; CODEOWNERS, PR template, CONTRIBUTING path, 200/200 conventional subjects. A- because the commit convention never sees squash titles (no CI/PR-title check) and secondary prose still says two required checks.",
+      "rubric_anchors": {"A": "main protected (posture documented), real ownership routing, a contribution path that works", "C": "Trivial CODEOWNERS; conventions cultural not mechanical; protection undocumented", "F": "No branch protection, no ownership, no contribution path, no explanation"},
+      "clause_verdicts": [
+        {"clause_id": "D7.A", "verdict": "MET", "citation": "gh api .../rules/branches/main -> deletion, non_fast_forward, required_status_checks; apply_branch_protection.py --check -> no drift", "reason": "protected, documented, machine-pinned"},
+        {"clause_id": "D7.A.4", "verdict": "MET", "citation": "git log -200 origin/main subjects -> 200/200 conventional", "reason": "conformance real; remote enforcement absent (EM-3)"}],
+      "findings_confirmed": 2, "findings_refuted": 0, "findings_weak": 0,
+      "findings": [
+        {"id": "EM-3", "summary": "Conventional-Commits enforced only by a local commit-msg hook + agent_commit.sh; squash titles (what lands on main) are never checked; CONTRIBUTING.md:17 says 'mechanical'", "sev": "P3", "effort": "S", "class": "B", "dedup": "persisting D7-2; extends #1663 (closed)", "regression_guard": "PR-title step inside the already-required fast-lane job using deploy/lib/commit_subject_pattern.sh"},
+        {"id": "EM-4", "summary": "MANAGED_WHERE_LEDGER.md:40 and the ADR-148 body say two required checks; live has three since 2026-09-29", "sev": "P3", "effort": "S", "class": "B", "dedup": "new", "regression_guard": "posture test asserts each required context in github_posture.json appears in ledger row 40"}],
+      "prior_findings": {"D7-1": "FIXED", "D7-2": "PERSISTING"}},
+    "D8": {"area": "Testing depth", "reviewer": "em", "grade": "B+", "grade_with_proposed": "A-", "prior": "B", "trend": "up",
+      "justification": "Property tier aimed right (calculators + honesty gates, 35 @given, Hypothesis pinned in every lane), a family of structural wall-clock guards, ratcheted floor; held below A because stats_core.py (ADR-105's pure spine) has no property test and no registry says which pure modules must, and no maintainer doc mentions the tier.",
+      "rubric_anchors": {"A": "Beyond example-based: property-based on pure calculators + honesty gates; a documented coverage ratchet", "C": "Example-based only, but well-structured and non-brittle", "F": "Sparse or brittle tests; coverage floor is a fig leaf"},
+      "clause_verdicts": [
+        {"clause_id": "D8.A", "verdict": "MET", "citation": "tests/test_prop_{achievement_rules,bsts_lite,er03_gate,grounded_generation}.py; pyproject.toml:104 + tests/test_coverage_floor_ratchet.py", "reason": "property tier and documented ratchet present"},
+        {"clause_id": "D8.A.2", "verdict": "FAILED", "citation": "no Hypothesis import in tests/test_stats_core.py; lambdas/common/stats_core.py 'pure and deterministic'", "reason": "the purest calculator lacks the tier"}],
+      "findings_confirmed": 2, "findings_refuted": 0, "findings_weak": 0,
+      "findings": [
+        {"id": "EM-1", "summary": "stats_core.py has no property test and no PURE_CALCULATORS registry requires one", "sev": "P2", "effort": "M", "class": "B", "dedup": "persisting D8-1 (never filed; #1664 closed with stats_core out of scope)", "regression_guard": "tests/test_prop_stats_core.py + registry with a derivation guard"},
+        {"id": "EM-2", "summary": "no maintainer doc mentions the Hypothesis tier; docs/TESTING.md:27 '~3 sec' vs :38 '~2.5 min'", "sev": "P3", "effort": "S", "class": "B", "dedup": "persisting D8-2/D8-3", "regression_guard": "TESTING.md property-test section; replace the runtime literal with a pointer to the derived budget"}],
+      "prior_findings": {"D8-1": "PERSISTING", "D8-2": "PERSISTING", "D8-3": "PERSISTING"}},
+    "D9": {"area": "AI-era engineering & proportionality", "reviewer": "principal", "grade": "A-", "grade_with_proposed": "A", "prior": "A", "trend": "down a notch (same defect was present at 08-27's A; graded stricter, not a regression)",
+      "justification": "AI surfaces AST-derived and asserted both ways (35 = 35), single Bedrock chokepoint, legible rent ledger; A- because PROPORTIONALITY.md:161 credits the weekly golden-brief-eval workflow with 'gating every push' (it runs on schedule; the push gate is the deploy_critical tests), unfixed since 08-27.",
+      "rubric_anchors": {"A": "Every AI surface has a deterministic gate + an eval; AI code meets the human bar; the complexity/keep-retire ledger is legible", "C": "Strong AI guardrails but surface size unexplained", "F": "AI output ungated/unevaluated; sprawling machinery with no rent story"},
+      "clause_verdicts": [
+        {"clause_id": "D9.A", "verdict": "MET", "citation": "tests/test_grounding_wiring_1967.py 11 passed; scan_tree 35 = SURFACES 35", "reason": "derived, both-direction AI-surface policing"},
+        {"clause_id": "D9.A.3", "verdict": "FAILED", "citation": "docs/PROPORTIONALITY.md:161 vs .github/workflows/golden-brief-eval.yml:27-36 (schedule + dispatch only)", "reason": "ledger misattributes its gating mechanism"}],
+      "findings_confirmed": 1, "findings_refuted": 0, "findings_weak": 0,
+      "findings": [
+        {"id": "principal-5", "summary": "PROPORTIONALITY.md:161 says golden-brief-eval workflow gates every push; it is schedule/dispatch only (its own line 116 says it gates nothing)", "sev": "P3", "effort": "S", "class": "A", "dedup": "persisting D9-1 (never filed)", "regression_guard": "check_proportionality_ledger.py resolves cited workflows' trigger blocks"}],
+      "prior_findings": {"D9-1": "PERSISTING"}},
+    "D10": {"area": "Docs & decision hygiene", "reviewer": "senior", "grade": "B", "grade_with_proposed": "A-", "prior": "B", "trend": "flat",
+      "justification": "Superseded ADRs marked in index and body; the Verified stamp is in fact gated by check_doc_index.py (90d advisory / 180d hard) - the 08-27 D10-2 'no owner' premise was wrong. Held at B by the tombstone gate green over mcp/utils.py:12, plus the cross-lens doc-truth defects (eng1-2, eng1-3, EM-4, principal-2, principal-5).",
+      "rubric_anchors": {"A": "Living, self-critical, non-aspirational; anti-drift machinery; the active set is easy to see", "C": "Large surface, some staleness, no drift machinery", "F": "Aspirational docs stating intended state as fact; rotting wiki"},
+      "clause_verdicts": [
+        {"clause_id": "D10.A", "verdict": "FAILED", "citation": "mcp/utils.py:12 cites superseded ADR-027; check_doc_tombstones.py -> OK (31 rules); plus the doc-truth findings across D1/D4/D7/D9", "reason": "anti-drift machinery present but phrase-matched; several hand-typed facts are stale"},
+        {"clause_id": "D10.A.1", "verdict": "MET", "citation": "scripts/check_doc_index.py FRESHNESS_DAYS=90 advisory, FRESHNESS_HARD_DAYS=180 fails CI", "reason": "stamp freshness is gated by design (refuting senior-3)"},
+        {"clause_id": "D10.A.2", "verdict": "MET", "citation": "DECISIONS.md:59, :403 Superseded markers; generated index", "reason": "active ADR set legible"}],
+      "findings_confirmed": 1, "findings_refuted": 1, "findings_weak": 0,
+      "findings": [
+        {"id": "senior-4", "summary": "tombstone gate green over mcp/utils.py:12 'part of the Layer (ADR-027 stable core tier)' - ADR-027 superseded by ADR-131", "sev": "P3", "effort": "S", "class": "A", "dedup": "persisting D10-1", "regression_guard": "derive the retired-ADR set from the DECISIONS.md status column"}],
+      "prior_findings": {"D10-1": "PERSISTING", "D10-2": "REFUTED this run (gated by check_doc_index.py; the 05-19 stamps hit the 180-day hard limit on 2026-11-15)", "D10-3": "UNOBSERVED"}}
+  },
+  "lenses": {
+    "eng1": {"role": "Eng I / new hire", "model": "sonnet", "dimensions": ["D1"], "raw_findings": 4, "findings_confirmed": 2, "findings_refuted": 2, "panel_grade": {"D1": "C+"}, "driver_grade": {"D1": "B"}},
+    "senior": {"role": "Senior engineer", "model": "sonnet", "dimensions": ["D3", "D10"], "raw_findings": 5, "findings_confirmed": 4, "findings_refuted": 1, "panel_grade": {"D3": "B", "D10": "B"}, "driver_grade": {"D3": "B", "D10": "B"}},
+    "staff": {"role": "Staff engineer", "model": "sonnet", "dimensions": ["D2", "D5"], "raw_findings": 6, "findings_confirmed": 4, "findings_refuted": 2, "panel_grade": {"D2": "B+", "D5": "B"}, "driver_grade": {"D2": "B+", "D5": "B"}},
+    "principal": {"role": "Principal engineer", "model": "sonnet", "dimensions": ["D4", "D9"], "raw_findings": 5, "findings_confirmed": 4, "findings_refuted": 1, "panel_grade": {"D4": "B", "D9": "A-"}, "driver_grade": {"D4": "B", "D9": "A-"}},
+    "em": {"role": "Engineering manager", "model": "sonnet", "dimensions": ["D7", "D8"], "raw_findings": 4, "findings_confirmed": 4, "findings_refuted": 0, "panel_grade": {"D7": "A-", "D8": "B+"}, "driver_grade": {"D7": "A-", "D8": "B+"}},
+    "cio": {"role": "CIO / acquirer", "model": "sonnet", "dimensions": ["D6"], "raw_findings": 5, "findings_confirmed": 3, "findings_refuted": 2, "panel_grade": {"D6": "A-"}, "driver_grade": {"D6": "A-"}}
+  },
+  "driver_observations": [
+    {"what": "The craft rubric contradicts the spine on model tier: .claude/skills/review/references/craft.md:30 '**Model-agnostic.** Nothing here pins a model ... every row agent inherits it' vs SKILL.md Phase 1 'Panelists run on Sonnet (#4773)'. The Principal panelist graded D9.A.2 (tier statements consistent) MET without seeing it.", "disposition": "fold into #4773 - one-line rubric edit; not counted in the pass rate (driver-found, not panel-found)"},
+    {"what": "docs/reviews/anchors/ANCHORS.json has no craft record (review_anchor_seal.py --lens craft exits 2), so the craft clauses are fingerprinted only via the rubric prose, not sealed; the standards doc the clauses live in is outside anchor_freeze's fingerprint.", "disposition": "would-file: seal a craft record (D1-D10 A cells) at the next freeze"}
+  ],
+  "already_A": [
+    "The 08-27 headline was fixed by machinery, not prose: main's 3-check ruleset is live, posture-file declared, sentinel-verified, and apply_branch_protection.py --check reports no drift.",
+    "Module-size debt fell 37% in six weeks (42,701 -> 27,021 baselined lines, 24 -> 18 entries) without one baseline raised - the earned-headroom rule works.",
+    "The AI-surface registry is AST-derived and asserted both directions (35 = 35); a single Bedrock chokepoint with no bedrock-runtime client anywhere else.",
+    "LLM JSON parsing consolidated from five copies to one door (lambdas/ai/structured_json.py) - the structured-outputs work #4276 asked for is in the tree.",
+    "Supply chain: two blocking gitleaks lanes + push protection, pip-audit blocking on a zero-entry allowlist, a fail-loud SBOM step with its own regression test, 27/27 workflows with permissions:, OIDC only, 0 open alerts.",
+    "Wall-clock time-bomb defence is a class-level family of guards, extended again in October (#4848).",
+    "Confirmed-correct deliberate postures (refuted as findings, graded A): 140-column lines; Secrets-Manager-only (no .env); CodeQL advisory per ADR-148; reusable lint/test workflows; coverage floor above target under an up-only ratchet; the gate-census down-only ratchet (#3329); deploy/archive per ADR-059; Verified stamps gated by check_doc_index.py."
+  ],
+  "path_to_A": [
+    "Doc truth from derivation, one PR each: QUICKSTART deploy commands + stack list (eng1-2), README doors (eng1-3), ruleset context list (EM-4), mypy.ini census (principal-2), PROPORTIONALITY:161 (principal-5) - each with the guard named in its row.",
+    "Widen the size instruments: SCOPE_DIRS to every first-party dir (qa/), headroom over the full scope, a workflow-size ratchet for ci-cd.yml (STAFF-1/2/5).",
+    "One repo-wide SHA-pin test for every `uses:` (STAFF-6) and declare secret_scanning in github_posture.json (CIO-4).",
+    "tests/test_prop_stats_core.py + a PURE_CALCULATORS registry (EM-1); document the tier (EM-2).",
+    "Owner: fill the two ACCOUNTS.md estate rows (CIO-5) and rule on ENGINEERING_STANDARDS §1 vs ADR-059 (archive)."
+  ],
+  "coverage_boundary": {
+    "not_examined": [
+      "The test suite was not run (targeted files only: coverage ratchet, grounding wiring).",
+      "site/ JS as code; CDK stack factoring; IAM/OIDC trust scope (#4257 graded elsewhere); the scheduled pip_audit_lambda's last run; git history for old secrets; property-test strategy quality.",
+      "Senior sampled 12 of ~690 Python files cold; Eng I checked command contracts statically, not by execution.",
+      "Deploy integrity, product correctness and SDLC process are scope-out (defer to fullreview 2026-09-05, sdlc 2026-07-18)."
+    ]
+  },
+  "standards_doc_sync": "No edit to docs/ENGINEERING_STANDARDS.md in this PR. Two implied rules need an owner direction first: (1) §1 'never commit a manual archive/' contradicts ADR-059 / deploy/README Archive Policy (#4258) - pick one and supersede the other; (2) function length (senior-2) - a new §2/§3 observable is a proposed extension, not yet a rule. Proposed extensions recorded per dimension in the review file."
+}

@@ -159,3 +159,6 @@ def test_the_site_build_refuses_to_guess_when_the_registry_is_unreadable(monkeyp
         assert "hook_registry" in str(exc)
     else:  # pragma: no cover — the whole point is that this branch never runs
         raise AssertionError("dark_feeds() swallowed an unreadable registry and would have advertised every feed")
+
+
+# premerge-gate: 3615 box 5: sweeps every committed site/**/*.html for a `rel=alternate` link to a feed the hook registry declares DARK. A repo-shape ratchet in the strict sense — its verdict is a function of the tree alone — and pre-merge because the failure it catches is a reader-facing false offer (11 pages advertised a podcast feed with zero episodes) on a `site/**` PR, which AUTO-DEPLOYS on merge (#750). Post

@@ -592,3 +592,6 @@ def test_a_pair_with_no_mutations_cannot_be_registered():
                 agree=lambda _p, _c: None,
             )
         )
+
+
+# premerge-gate: 2847: the producer/consumer contract sweep — #2813's primitive generalised past the day-frame agreement. Half its verdict is pure repo shape (the enrolled floor, the enrollment ratchet, the PARTITION_WRITER_LEDGER against the #2845 model's write edges, the registry↔model agreement), and a NEW writer joining a contracted shape must red on the PR that adds it — post-merge is how #2214's dual-writer

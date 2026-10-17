@@ -31,6 +31,7 @@ from privacy.field_tiers import (  # noqa: E402
     FIELD_TIERS,
     OWNER_CONSENT_ADR,
     SOURCE_TIERS,
+    TIER_INTERNAL,
     TIER_OWNER_ONLY,
     TIER_OWNER_PUBLISHED,
 )
@@ -169,12 +170,25 @@ ROW_MAP: list[dict] = [
     # #4078: the chat pending-writes queue — owner-only because a queued row carries whatever
     # the target write tool accepts. Declared before the first row exists.
     {"key": "pending_writes", "pattern": r"^Chat pending-writes queue", "requirements": [("source", "pending_writes", OO)], "claims": []},
+    # ADR-155 amendment (2026-10-12): the owner clinical record. Owner-only in THIS document's
+    # sense (never on a public surface) but registry tier TIER_INTERNAL, because the owner
+    # ruled it may enter AI coach context. No `claims`: no public projection at all.
+    {"key": "clinical", "pattern": r"^Owner clinical record", "requirements": [("source", "clinical", TIER_INTERNAL)], "claims": []},
 ]
 
 # The #2782/#2809 trio is ruled Tier-2 by docs/SCHEMA.md (its prose home predates this
 # document's port) — exempt from the "every registry entry needs a DATA_GOVERNANCE row"
 # reverse check, pinned by name so the exemption cannot quietly grow.
-SCHEMA_RULED = frozenset({("withings", "vascular_age"), ("withings", "metabolic_age"), ("withings", "afib_result")})
+SCHEMA_RULED = frozenset(
+    {
+        ("withings", "vascular_age"),
+        ("withings", "metabolic_age"),
+        ("withings", "afib_result"),
+        # #4642: weigh-in attribution, owner-only until tiered; ruled in docs/SCHEMA.md's withings table
+        ("withings", "measurement_attrib"),
+        ("withings", "measurement_group_attribs"),
+    }
+)
 
 
 def tier2_bullets(doc_text: str) -> list[str]:

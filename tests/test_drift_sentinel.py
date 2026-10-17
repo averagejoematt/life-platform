@@ -865,8 +865,20 @@ _RC_RULESET = {  # the #1662/ADR-148 fast-lane required-checks ruleset, as scrip
         }
     ],
 }
-_REPO_AUTO_MERGE_ON = {"full_name": "averagejoematt/life-platform", "allow_auto_merge": True}
-_REPO_AUTO_MERGE_OFF = {"full_name": "averagejoematt/life-platform", "allow_auto_merge": False}  # LIVE-SHAPE 2026-08-03
+_SECURITY_AND_ANALYSIS = {  # LIVE-SHAPE 2026-10-13 (#4887), trimmed to the fields the posture reads
+    "secret_scanning": {"status": "enabled"},
+    "secret_scanning_push_protection": {"status": "enabled"},
+}
+_REPO_AUTO_MERGE_ON = {
+    "full_name": "averagejoematt/life-platform",
+    "allow_auto_merge": True,
+    "security_and_analysis": _SECURITY_AND_ANALYSIS,
+}
+_REPO_AUTO_MERGE_OFF = {  # LIVE-SHAPE 2026-08-03
+    "full_name": "averagejoematt/life-platform",
+    "allow_auto_merge": False,
+    "security_and_analysis": _SECURITY_AND_ANALYSIS,
+}
 _VULN_DISABLED_ERR = {  # LIVE-SHAPE: the semantic 404 for disabled alerts
     "classification": "absent",
     "detail": '{"message":"Vulnerability alerts are disabled.","status":"404"} gh: Vulnerability alerts are disabled. (HTTP 404)',
@@ -946,6 +958,7 @@ def test_github_posture_file_loads_and_declares_all_surfaces():
         "main_ruleset",
         "main_required_checks_ruleset",
         "repo_settings",
+        "secret_scanning",
         "vulnerability_alerts",
         "push_run_detector",
     ):
@@ -1056,6 +1069,46 @@ def test_github_config_vuln_alerts_fire_when_disabled(monkeypatch):
     va = res["surfaces"]["vulnerability_alerts"]
     assert va["status"] == "drift"
     assert va["documented"] == {"enabled": True} and va["live"] == {"enabled": False}
+
+
+def test_github_config_secret_scanning_clean_when_both_enabled(monkeypatch):
+    posture = sg._load_github_posture()["secret_scanning"]
+    assert posture["secret_scanning"] == "enabled" and posture["push_protection"] == "enabled"  # #4887
+    _fake_gh(monkeypatch, _config_routes(env=(_ENV_WITH_REVIEWERS, None)))
+    res = ds.check_github_config()
+    assert res["surfaces"]["secret_scanning"]["status"] == "clean"
+
+
+@pytest.mark.parametrize("field", ["secret_scanning", "secret_scanning_push_protection"])
+def test_github_config_secret_scanning_drifts_when_either_is_switched_off(monkeypatch, field):
+    # #4887 mutation control: flip EACH live value in the fixture; the surface must drift
+    # and name the one that moved.
+    saa = {k: dict(v) for k, v in _SECURITY_AND_ANALYSIS.items()}
+    saa[field]["status"] = "disabled"
+    repo = ({**_REPO_AUTO_MERGE_ON, "security_and_analysis": saa}, None)
+    _fake_gh(monkeypatch, _config_routes(env=(_ENV_WITH_REVIEWERS, None), repo=repo))
+    res = ds.check_github_config()
+    ss = res["surfaces"]["secret_scanning"]
+    assert ss["status"] == "drift" and res["status"] == "drift"
+    assert "disabled" in ss["detail"]
+
+
+def test_github_config_secret_scanning_drifts_when_declaration_flipped(monkeypatch):
+    # The other direction: live stays enabled, the DECLARATION is flipped.
+    posture = json.loads(json.dumps(sg._load_github_posture()))
+    posture["secret_scanning"]["push_protection"] = "disabled"
+    monkeypatch.setattr(sg, "_load_github_posture", lambda: posture)
+    _fake_gh(monkeypatch, _config_routes(env=(_ENV_WITH_REVIEWERS, None)))
+    assert ds.check_github_config()["surfaces"]["secret_scanning"]["status"] == "drift"
+
+
+def test_github_config_secret_scanning_unavailable_without_admin_block(monkeypatch):
+    # A token that cannot see security_and_analysis must read as a scope gap, not clean.
+    repo = ({"full_name": "averagejoematt/life-platform", "allow_auto_merge": True}, None)
+    _fake_gh(monkeypatch, _config_routes(env=(_ENV_WITH_REVIEWERS, None), repo=repo))
+    res = ds.check_github_config()
+    assert res["surfaces"]["secret_scanning"]["status"] == "unavailable"
+    assert "secret scanning" in res["needs_owner"]
 
 
 def test_github_config_ruleset_drift_on_weakening(monkeypatch):
@@ -2277,3 +2330,6 @@ def test_sweep_stays_clean_when_cadence_is_clean(monkeypatch):
     )
     rec = ds.run_sweep()
     assert rec["status"] == "clean"
+
+
+# premerge-gate: 2692: PR #2884 merged 7/7 green on pr-checks.yml and red-mained main TWICE on these two files — neither is caught by the #2372 tree-sweep derivation above (discover_tree_sweeping_test_files() only matches os.walk(/.rglob(/ `git ls-files`), so nothing forced a classification decision. Both are structural/derivation guards by the CHARTER's own primitives (registry + derivation guard), just shaped di

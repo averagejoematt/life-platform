@@ -80,7 +80,7 @@ BUDGET_SCHEMA: Dict[str, Any] = _obj(
         "throughline_advanced": _STR,
         "cliffhanger": _STR,
         "coach_asks": {"type": "array", "items": _obj({"coach_id": _STR, "ask": _STR, "follow_up_by": _STR})},
-        "asks_followed_up": {"type": "array", "items": _obj({"ask": _STR, "outcome": _STR})},
+        "asks_followed_up": {"type": "array", "items": _obj({"ask_id": _STR, "ask": _STR, "outcome": _STR})},
         "owner_lines_to_use": {"type": "array", "items": _STR},
         "data_caveats": {"type": "array", "items": _STR},
     }
@@ -140,8 +140,10 @@ exactly ("owner_lines_to_use"), never anything marked off the record. If there a
 he did; do not make the absence a story.
 
 COACH ASKS: when a coach asks something concrete of him this week (a rest day, a backup protein, a bedtime), record
-it in "coach_asks" with the day by which it can be checked. Every open ask in the ledger gets an "asks_followed_up"
-entry with what the data shows happened. Coaches who ask and are ignored, or who prescribe and get proved right, are
+it in "coach_asks" with the day by which it can be checked. Every open ask in the ledger (open_coach_asks, each with an "id")
+gets an "asks_followed_up" entry: cite its "ask_id" exactly (and quote the ask in "ask") and give in "outcome" what
+the data shows happened. When there is no reply and no data yet — an ask only he can answer — the outcome is exactly
+"carried"; after {CARRIED_MAX_WEEKS_WORD} carried weeks the ask goes to him by email instead. Coaches who ask and are ignored, or who prescribe and get proved right, are
 the story's characters.
 
 PRIVACY (absolute): no cycle, reset, restart or attempt counts — the frame is THE experiment and the day. Never
@@ -149,6 +151,11 @@ name a vice or substance; journal material is off the record (its weather may in
 no job details, no named or described third parties). No real-world experts — only the fictional team.
 
 Write every field for the writers who come after you: specific, with the dossier's numbers in "evidence"."""
+# the carried-weeks limit is story_ledger's constant, not a second literal (#4914)
+RUBRIC = RUBRIC.replace(
+    "{CARRIED_MAX_WEEKS_WORD}",
+    {1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}.get(story_ledger.CARRIED_MAX_WEEKS, str(story_ledger.CARRIED_MAX_WEEKS)),
+)
 
 
 def desk_messages(dossier: Dict[str, Any], ledger: Dict[str, Any], *, week: int) -> Dict[str, Any]:
@@ -259,12 +266,9 @@ def validate(budget: Dict[str, Any], dossier: Dict[str, Any], ledger: Dict[str, 
         budget.get("cliffhanger") or "",
     ):
         findings.append("cliffhanger names no day — it must be checkable by a named day")
-    open_asks = [a.get("ask") for a in ledger.get("asks", []) if a.get("status") in (None, "", "open")]
-    followed = " ".join(a.get("ask", "") for a in budget.get("asks_followed_up", []))
-    for a in open_asks:
-        if a and a[:40] not in followed and len(budget.get("asks_followed_up", [])) < len(open_asks):
-            findings.append(f"an open coach ask is not followed up: {a!r}")
-            break
+    for a in story_ledger.unfollowed_asks(ledger, budget):
+        findings.append(f"an open coach ask is not followed up: {a.get('ask')!r} (cite ask_id {story_ledger.ask_key(a)!r})")
+        break
     if not budget.get("featured_coaches"):
         findings.append("no featured coach")
     recent = set(story_ledger.recently_featured(ledger, 2))

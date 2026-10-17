@@ -244,3 +244,6 @@ def test_no_banned_private_content_in_frozen_artifact():
     text = cds.FROZEN_PATH.read_text().lower()
     for token in _CYCLE_LANGUAGE_BANNED:
         assert token not in text, f"banned/private token '{token}' found in the public prereg artifact"
+
+
+# premerge-gate: These read `deploy/generated/**` (the frozen pre-registration, its SHA-256 stamp, the channel-divergence prereg) or the deploy scripts that write it. A reset — or a PR that lands a regenerated artifact — stales them by construction, and until 3529 they ran in NEITHER the reset's own gate sweep NOR the pre-merge lane: 13 tests red on main 2026-08-31, then `test_sealed_prereg_agrees_with_the_plan_ro

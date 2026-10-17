@@ -1,1 +1,15 @@
-{"_meta": {"generated_at": "2026-10-04T02:29:00+00:00"}, "habit_streaks": {"as_of_date": "2026-10-02", "tier0_pct": 71, "tier0_done": 5, "tier0_total": 7, "aggregate_streak": 0}}
+{
+ "_meta": {
+  "generated_at": "2026-10-13T01:33:16.823822+00:00",
+  "served_at": "2026-10-13T01:33:16.823822+00:00",
+  "cache_seconds": 3600,
+  "request_id": "89816684c13a4e35"
+ },
+ "habit_streaks": {
+  "as_of_date": "2026-10-11",
+  "tier0_pct": 57,
+  "tier0_done": 4,
+  "tier0_total": 7,
+  "aggregate_streak": 0
+ }
+}

@@ -1,8 +1,8 @@
 # Life Platform — Runbook
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-12
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-10-11 (v8.6.0 — 88 MCP tools, 69-module package, 108 Lambdas, 20 data sources)
+Last updated: 2026-10-17 (v8.6.0 — 88 MCP tools, 69-module package, 108 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 108 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -10,7 +10,7 @@ Last updated: 2026-10-11 (v8.6.0 — 88 MCP tools, 69-module package, 108 Lambda
 - Account concurrency limit: **100** (raised from 10 via Support case 177921309700709 — verified live 2026-07-10 via `aws lambda get-account-settings`; see `docs/RESERVED_CONCURRENCY.md` for the reservation strategy)
 - Alarms currently firing: point-in-time — check `aws cloudwatch describe-alarms --state-value ALARM --query 'MetricAlarms[].AlarmName' --output table --region us-west-2`
 - DLQ: `life-platform-ingestion-dlq`, retention 14d, normally near-empty — check depth via `aws sqs get-queue-attributes --queue-url $(aws sqs get-queue-url --queue-name life-platform-ingestion-dlq --query QueueUrl --output text) --attribute-names ApproximateNumberOfMessages`; investigate via `dlq-consumer` Lambda logs
-- SES configuration set: `life-platform-emails` — wired to 4 email Lambdas, CloudWatch event destination tracks open/click/bounce/complaint/delivery
+- SES configuration set: `life-platform-emails` — wired to the email Lambdas that name it (`grep -rl life-platform-emails lambdas/`; see "SES Email Pipeline"), CloudWatch event destination tracks open/click/bounce/complaint/delivery
 - CloudTrail: `life-platform-trail` now has data events on `s3://matthew-life-platform/raw/*` and `uploads/*`
 
 ---
@@ -66,7 +66,7 @@ aws s3api delete-bucket-policy --bucket matthew-life-platform
 | Mistake | Result | Fix |
 |---------|--------|-----|
 | Edit a shared module (`lambdas/` root), deploy only one function | Every other function still runs the old copy | Fleet deploy: merge to main (CI auto-fleet-deploys unmapped `lambdas/` changes) or `bash deploy/deploy_fleet.sh` |
-| Hand-rolled MCP zip (only `mcp_server.py` + `mcp/`) | MCP boots but imports fail (`No module named 'reading'`) | `bash deploy/deploy_lambda.sh life-platform-mcp` — since #781 it stages the mcp-shaped full bundle |
+| Hand-rolled MCP zip (only `mcp_server.py` + `mcp/`) | MCP boots but imports fail (`No module named 'reading'`) | `bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py` — since #781 it stages the mcp-shaped full bundle |
 | `aws s3 sync --delete s3://matthew-life-platform/` | Deletes 35K+ objects (ADR-032) | Always use `sync_site_to_s3.sh` |
 | Change Lambda env var in AWS Console | Next `cdk deploy` reverts it silently | Edit CDK stack code instead |
 | Add Lambda to CDK, forget its IAM policy | `AccessDenied` on first run | Add a policy function to the right `cdk/stacks/role_policies_<domain>.py` sibling + one re-export line in the `role_policies.py` facade (#2604) |
@@ -90,7 +90,7 @@ Lambdas cache Secrets Manager reads for 15 minutes via `secret_cache.py` (a bund
 
 ## GitHub Actions quota glance (#1334, #1453)
 
-GitHub is a metered production dependency (repo private since 2026-07-13): CI, site-deploy, and the remediation agent all run on Actions minutes. The **automated** path is `deploy/drift_sentinel.py`'s `check_github_quota()`, which runs weekly (Mondays) inside the existing `remediation-agent.yml` schedule — no dedicated cron. It lands in the remediation agent's one curated email (`remediation/drift_report.quota_html()`) with: real minutes-used-vs-allowance + a 70% warn line when the billing API is reachable, top wall-clock-consuming workflows over the trailing 7 days always. See `docs/COST_TRACKER.md` §"GitHub Actions / Repo Hosting" for the full fact table and the confirmed reason the billing figures read as "unavailable" today (the workflow's built-in `GITHUB_TOKEN` lacks the `user` scope).
+GitHub is a metered production dependency (the repo is PUBLIC — `gh repo view --json visibility`, verified 2026-10-17): CI, site-deploy, and the remediation agent all run on Actions minutes. The **automated** path is `deploy/drift_sentinel.py`'s `check_github_quota()`, which runs inside the existing `remediation-agent.yml` schedule (Mon/Wed/Fri — `deploy/sentinel_cadence.py` derives the expected weekdays from the workflow's own cron) — no dedicated cron. It lands in the remediation agent's one curated email (`remediation/drift_report.quota_html()`) with: real minutes-used-vs-allowance + a 70% warn line when the billing API is reachable, top wall-clock-consuming workflows over the trailing 7 days always. See `docs/COST_TRACKER.md` §"GitHub Actions / Repo Hosting" for the full fact table and the confirmed reason the billing figures read as "unavailable" today (the workflow's built-in `GITHUB_TOKEN` lacks the `user` scope).
 
 **Manual monthly-close fallback** (run locally, needs a `gh` session with the `user` scope — `gh auth refresh -h github.com -s user` once, interactively, as the account owner):
 
@@ -108,8 +108,6 @@ Assert both quota figures stay under 80% before the month rolls over; if either 
 
 **Whoop:** Gap-fill checks for `recovery_score` presence. If a record exists but `recovery_score` is missing, the Lambda re-fetches from the Whoop API (recovery data is often delayed ~2 hours after sleep ends).
 
-**Garmin:** Gap-fill checks for `steps` presence. If a record exists but `steps` is missing, the Lambda re-fetches from the Garmin API.
-
 All ingestion Lambdas include today in gap-fill checks (`range(0, N)`, not `range(1, N)`).
 
 ---
@@ -120,13 +118,12 @@ Each OAuth-based ingestion Lambda refreshes its own tokens and writes them back 
 
 | Lambda | Auth Type | When It Refreshes | Writes to Secrets Manager | Concurrent Invocation Risk |
 |--------|-----------|-------------------|--------------------------|---------------------------|
-| whoop | OAuth refresh_token | Every invocation (unconditional) | Yes | High — no concurrency limit yet |
-| garmin | garth OAuth session | Every invocation (garth library) | Yes | High |
-| withings | OAuth refresh_token | On 401 response | Yes | Medium |
+| whoop | OAuth refresh_token | Every invocation (unconditional) | Yes | Low — reserved concurrency 1 |
+| withings | OAuth refresh_token | On 401 response | Yes | Low — reserved concurrency 1 |
 | strava | OAuth expires_at | On expiration check (5-min buffer) | Yes | Medium |
 | eightsleep | Password grant | On 401 response | Yes | Low |
 
-**Note:** A concurrent invocation (manual invoke + cron overlap) could race on the token write. `ReservedConcurrentExecutions=1` is ready in CDK but commented out — requires account concurrency limit increase from 10 to 50+ (pending AWS Support request).
+**Note:** A concurrent invocation (manual invoke + cron overlap) could race on the token write. `ReservedConcurrentExecutions=1` is live in CDK for whoop and withings (`cdk/stacks/ingestion_stack.py`; the account limit is 100, `docs/RESERVED_CONCURRENCY.md`), so a manual invoke that overlaps the cron is throttled rather than racing the token write.
 
 ---
 
@@ -170,78 +167,47 @@ Changing any of them = fleet deploy (merge to main — CI auto-fleet-deploys —
 The pipeline has strict ordering. Changing schedules without maintaining this sequence produces stale data:
 
 ```
-06:45–09:00 AM PT   INGESTION              API pulls from Whoop, Withings, Strava, etc.
-09:05 AM PT         ANOMALY                Runs on freshly ingested data
+hourly (INGEST_HOURLY)  INGESTION   API pulls from Whoop, Withings, Strava, etc. (per-source cadence: source_registry.py)
+15:05 UTC           anomaly-detector        (08:05 PDT)
 16:30 UTC           character-sheet-compute (09:30 PDT)
-16:35 UTC           adaptive-mode-compute  (09:35 PDT)
-16:40 UTC           daily-metrics-compute  (09:40 PDT)
-16:45 UTC           daily-insight-compute  (09:45 PDT)
-17:00 UTC           daily-brief            (10:00 PDT — reads computed results → email → public_stats.json)
-11:30 AM PT         OG IMAGES              Reads public_stats.json → generates share images
+16:35 UTC           adaptive-mode-compute   (09:35 PDT)
+16:40 UTC           daily-metrics-compute   (09:40 PDT)
+16:45 UTC           daily-insight-compute   (09:45 PDT)
+17:00 UTC           daily-brief             (10:00 PDT — reads computed results → email → public_stats.json)
+19:30 UTC           og-image-generator      (12:30 PDT — reads public_stats.json → generates share images)
 ```
 
-**Verify the schedule chain (2026-05-19 verified):**
+**Verify the schedule chain** (the EventBridge rule names are CDK-generated, so match on the target Lambda, not a rule name — the committed answer is `model/platform_model.json`'s `schedules`):
 ```bash
-aws events list-rules --query 'Rules[?Schedule] && Rules[].{Name:Name,Schedule:ScheduleExpression}' --output json \
-  | python3 -c 'import json,sys;
-data=json.load(sys.stdin);
-keep=["character-sheet-compute","adaptive-mode-compute","daily-metrics-compute","daily-insight-compute","daily-brief-schedule"];
-[print(f"{r[\"Name\"]:35s} {r[\"Schedule\"]}") for r in data if r["Name"] in keep]'
+python3 - <<'PY'
+import json
+m = json.load(open("model/platform_model.json"))
+keep = {"anomaly-detector", "character-sheet-compute", "adaptive-mode-compute", "daily-metrics-compute", "daily-insight-compute", "daily-brief", "og-image-generator"}
+for s in sorted(m["schedules"], key=lambda s: s["utc"] or ""):
+    if s["lambda"] in keep:
+        print(f'{s["lambda"]:28s} {s["expr"]}')
+PY
 ```
-
-Expected:
-```
-character-sheet-compute             cron(30 16 * * ? *)
-adaptive-mode-compute               cron(35 16 * * ? *)
-daily-metrics-compute               cron(40 16 * * ? *)
-daily-insight-compute               cron(45 16 * * ? *)
-daily-brief-schedule                cron(0 17 * * ? *)
-```
+Expected: the order above (15:05, 16:30, 16:35, 16:40, 16:45, 17:00, 19:30 UTC). Live cross-check: `aws events list-rules --region us-west-2 --query "Rules[?contains(Name,'CharacterSheet')].[Name,ScheduleExpression]"`.
 
 ---
 
 ## Daily Operations
 
-### Scheduled ingestion times (Pacific Time)
+### Scheduled times — read them, never restate them
 
-**⚠️ All EventBridge crons use fixed UTC. Times below reflect PDT (UTC-7, from March 8 2026). During PST (UTC-8, Nov–Mar) all times shift 1 hour earlier.**
-| Source | Schedule | Lambda |
-|--------|----------|--------|
-| Whoop | 07:00 AM | whoop-data-ingestion |
-| Garmin | Retired 2026-10-11 (#4640) — no function, no rule; data arrives through Strava | (none) |
-| Notion Journal | 07:00 AM | notion-journal-ingestion |
-| Withings | 07:15 AM | withings-data-ingestion |
-| Habitify | 07:15 AM | habitify-data-ingestion |
-| Strava | 07:30 AM | strava-data-ingestion |
-| Journal Enrichment | 07:30 AM | journal-enrichment |
-| Todoist | 2x daily | todoist-data-ingestion |
-| Eight Sleep | 08:00 AM | eightsleep-data-ingestion |
-| Activity Enrichment | 08:30 AM | activity-enrichment |
-| MacroFactor | 09:00 AM | macrofactor-data-ingestion (EventBridge + S3 trigger) |
-| MCP Cache Warmer | 10:00 AM | life-platform-mcp (EventBridge payload) |
-| Whoop Recovery Refresh | 10:30 AM | whoop-data-ingestion (date_override: today) |
-| Character Sheet Compute | 09:30 AM (16:30 UTC) | character-sheet-compute — ADR-052 ordering |
-| Adaptive Mode Compute | 09:35 AM (16:35 UTC) | adaptive-mode-compute — ADR-052 ordering |
-| Daily Metrics Compute | 09:40 AM (16:40 UTC) | daily-metrics-compute (day grade, readiness, streaks, TSB, HRV, weight → `computed_metrics` partition) |
-| Daily Insight Compute | 09:45 AM (16:45 UTC) | daily-insight-compute (IC-8: 7-day habit×outcome correlations, leading indicators, platform_memory pull, structured JSON for Daily Brief AI calls) |
-| Freshness Check | 10:45 AM | life-platform-freshness-checker |
-| Daily Brief | 10:00 AM (17:00 UTC) | daily-brief (v2.62, 18 sections, 4 AI calls; reads char_sheet+adaptive+metrics+insight; synchronously invokes `coach-quality-gate` per coach generation, blocking as of N-06 #390 — regenerate-or-hold) |
-| **DST note** | — | All crons fixed UTC. Times above are PDT (UTC-7). DST is now active (PDT = UTC-7). |
-| Anomaly Detector | 09:05 AM | anomaly-detector |
-| Nutrition Review | 09:00 AM (Saturday only) | nutrition-review (v1.1, Sonnet, 3-expert panel) |
-| Weekly Digest | 08:00 AM (Sunday only) | weekly-digest (v4.3) |
-| Monthly Digest | 08:00 AM (1st Monday only) | monthly-digest (v1.1) |
-| Wednesday Chronicle (compute + email) | Wed 08:00 AM (15:00 UTC) + Wed 08:10 AM (15:10 UTC) | wednesday-chronicle + chronicle-email-sender (V2 P3: re-enabled 2026-05-17) |
-| Monday Compass | 08:00 AM (Monday only) | monday-compass (v1.0, Sonnet, weekly planning email — tasks by pillar, Board Pro Tips, Keystone) |
-| The Weekly Plate | 07:00 PM (Friday only) | weekly-plate (v1.0, Sonnet, food magazine email, ~63s) |
-| Dashboard Refresh | 02:00 PM | dashboard-refresh (lightweight, no AI — updates weight/glucose/zone2/TSB/buddy) |
-| Dashboard Refresh | 06:00 PM | dashboard-refresh (same as above, second daily run) |
-| Weather | 2x daily | weather-data-ingestion |
-| Dropbox Poll | Every 2 hours | dropbox-poll |
+The full per-Lambda cron list used to live in a table here and drifted: ingestion moved from per-source morning times to hourly (`INGEST_HOURLY` / `HABITIFY_HOURLY`, with sparse crons for the sub-daily sources, #4641), and Garmin retired (#4640, 2026-10-11 — no function, no rule; its data arrives through Strava). The sources of truth, all derived from the CDK stacks:
 
-**MacroFactor** uses an automated Dropbox pipeline: phone export → Dropbox `/life-platform/` → `dropbox-poll` Lambda (every 2 hours) → S3 → `macrofactor-data-ingestion`. Auto-detects nutrition vs workout CSVs. Manual S3 upload (`s3://matthew-life-platform/imports/macrofactor/`) still works as fallback.
+- `python3 scripts/boot_brief.py` — next runs and the fleet/alarm counts
+- `python3 scripts/blast_radius.py --lambda <function>` — one function's schedule(s), alarm, reads and writes
+- `model/platform_model.json` → `schedules` (every cron, UTC, with its stack) and `lambdas/ingestion/source_registry.py` (per-source cadence, paused state, `stale_hours`)
+- `cdk/stacks/*.py` — each function's `schedule=`
 
-**Apple Health** primary path is the Health Auto Export webhook (hourly push from iOS): Stelo/Apple Watch → HealthKit → Health Auto Export app → API Gateway → `health-auto-export-webhook`. Manual S3 XML upload (`s3://matthew-life-platform/imports/apple_health/`) still works for backfills.
+All EventBridge crons are fixed UTC; PT = UTC-7 in PDT, UTC-8 in PST. The strict compute chain is the "Pipeline Ordering Constraint" block above. Weekly rhythm (which day each email lands): `docs/OPERATOR_GUIDE.md` → "Weekly Operational Rhythm".
+
+**MacroFactor** uses an automated Dropbox pipeline: phone export → Dropbox `/life-platform/` → `dropbox-poll` Lambda (sparse cron — see the registry) → S3 → `macrofactor-data-ingestion`. Auto-detects nutrition vs workout CSVs. Manual S3 upload (`s3://matthew-life-platform/imports/macrofactor/`) still works as fallback.
+
+**Apple Health** primary path is the Health Auto Export webhook (hourly push from iOS): Stelo/Apple Watch → HealthKit → Health Auto Export app → API Gateway → `health-auto-export-webhook`. The `apple-health-ingestion` export.xml import Lambda was RETIRED 2026-07-04 (#474, ADR-103) — it was a full-replace clobber of the webhook's merged records and its S3 trigger never existed — so there is no manual XML upload path; the HAE webhook is the sole `apple_health` writer (the old XML backfill script is no longer in the tree).
 
 **⚠️ Health Auto Export gotcha:** The app must be configured for hourly (not "since last run") sync to reliably include all metric types. With infrequent syncs, payload size grows and the app may silently drop metrics like Dietary Water and Dietary Caffeine, sending only activity data. If water/caffeine stop appearing in webhook logs, check the app's sync interval.
 
@@ -453,9 +419,10 @@ aws lambda list-versions-by-function --function-name <name> \
 
 # Re-point $LATEST to a known-good version by re-uploading that code:
 # Easiest: redeploy from a known-good git commit
-git checkout <good-sha> -- lambdas/<name>_lambda.py
-bash deploy/deploy_lambda.sh <name>
-git checkout HEAD -- lambdas/<name>_lambda.py   # restore working tree
+git checkout <good-sha> -- <source-file>   # the function's source path under lambdas/<domain>/ (ci/lambda_map.json)
+bash deploy/deploy_lambda.sh <name> <source-file>
+git checkout HEAD -- <source-file>   # restore working tree
+# or use the rollback script: bash deploy/rollback_lambda.sh <name>
 ```
 
 **B) Deployed via CDK (`cd cdk && npx cdk deploy`):**
@@ -468,13 +435,14 @@ Always smoke-test after rollback (`aws lambda invoke ... /tmp/x.json && cat /tmp
 
 ## Cache Warmer
 
-14 tools are pre-computed nightly at 9:00 AM PT via EventBridge → MCP Lambda. Tools with cached results return in <100ms. Custom date ranges bypass cache and compute fresh.
+The dedicated warmer Lambda `life-platform-mcp-warmer` (schedule: its `schedule=` in `cdk/stacks/mcp_stack.py`; same `mcp_server.py` bundle as the MCP server) pre-computes the steps listed in `mcp/warmer.py` (4 after the #395 prune: three `get_training` views and the CGM dashboard) into the `CACHE#matthew` partition. Cached tools return in <100ms. Custom date ranges bypass cache and compute fresh.
 
 Manually trigger warmer:
 ```bash
 aws lambda invoke \
-  --function-name life-platform-mcp \
+  --function-name life-platform-mcp-warmer \
   --payload '{"source": "aws.events"}' \
+  --cli-binary-format raw-in-base64-out \
   /tmp/warmer.json && cat /tmp/warmer.json
 ```
 
@@ -482,11 +450,11 @@ Verify cache items exist:
 ```bash
 aws dynamodb query \
   --table-name life-platform \
-  --key-condition-expression "PK = :pk" \
+  --key-condition-expression "pk = :pk" \
   --expression-attribute-values '{":pk":{"S":"CACHE#matthew"}}' \
   --query 'Count'
 ```
-Expected: 14 items.
+Expected: one item per `mcp/warmer.py` step (4), plus any not-yet-expired older cache keys (live read 2026-10-17: 5, one a stale `TOOL#personal_records_…` key awaiting its 26 h TTL).
 
 ---
 
@@ -494,7 +462,7 @@ Expected: 14 items.
 
 All secrets are stored in AWS Secrets Manager under `life-platform/` prefix. See `docs/SECRETS_MAP.md` for the authoritative inventory; `docs/SECRETS_ROTATION.md` for rotation procedures.
 
-**Inventory snapshot (2026-05-19):** 12 active secrets + 3 in deletion window. Two are tracked for deletion 2026-05-24 (`life-platform/notion`, `life-platform/dropbox`) — both have been replaced by fields inside `life-platform/ingestion-keys`. `life-platform/anthropic-api-key` (orphan, never adopted by any Lambda) scheduled for deletion 2026-05-23.
+**Inventory:** `docs/SECRETS_MAP.md` is the reconciled list; the live count is `aws secretsmanager list-secrets --region us-west-2 --query 'length(SecretList[*])'` (28 on 2026-10-17). The 2026-05 deletion-window era is over: `dropbox` and `anthropic-api-key` completed deletion, `notion` was restored and sits live-but-idle (retire-candidate), and `garmin` is dormant after the source's retirement (#4640).
 
 | Secret | Function(s) | Notes |
 |--------|-------------|-------|
@@ -503,15 +471,14 @@ All secrets are stored in AWS Secrets Manager under `life-platform/` prefix. See
 | `life-platform/strava` | strava-data-ingestion | OAuth2; auto-refresh on expires_at |
 | `life-platform/garmin` | (none — retired #4640) | dormant; owner-attended delete |
 | `life-platform/eightsleep` + `/eightsleep-client` | eightsleep-data-ingestion | User creds + client ID |
-| `life-platform/ai-keys` | 24+ Lambdas (daily-brief, weekly digests, coaches, etc.) | Anthropic API key |
+| `life-platform/ai-keys` | the few direct-API readers (`grep -rl life-platform/ai-keys lambdas/`) — most inference is Bedrock/IAM (ADR-062) | Anthropic API key, fallback path |
 | `life-platform/site-api-ai-key` | life-platform-site-api, life-platform-site-api-ai | Isolated Anthropic key for public site |
 | `life-platform/mcp-api-key` | life-platform-mcp, canary, qa-smoke, key-rotator | HMAC bearer; 90-day auto-rotation |
 | `life-platform/todoist` | life-platform-mcp (write tools) | Dedicated; bundle still used by ingestion |
 | `life-platform/habitify` | habitify-data-ingestion | API key |
 | `life-platform/ingestion-keys` | todoist-data-ingestion, notion-journal-ingestion, dropbox-poll, health-auto-export-webhook | Bundle: Notion + Dropbox + Todoist + Habitify + HAE webhook key |
-| `life-platform/notion` (deletion window) | none — migrated to bundle | Pending delete 2026-05-24 |
-| `life-platform/dropbox` (deletion window) | none — migrated to bundle | Pending delete 2026-05-24 |
-| `life-platform/anthropic-api-key` (deletion window) | none (orphan) | Pending delete 2026-05-23 |
+| `life-platform/notion` (live, idle) | none read by ingestion — the bundle is authoritative | Retire-candidate; owner decision (`docs/SECRETS_MAP.md`) |
+| `life-platform/dropbox`, `life-platform/anthropic-api-key` | — | Deleted (windows closed 2026-05) |
 
 To view a secret value (for debugging):
 ```bash
@@ -528,34 +495,15 @@ aws secretsmanager list-secrets --include-planned-deletion \
 
 ## IAM Roles (per-function, least privilege)
 
-Each Lambda has its own dedicated IAM role scoped to exactly what it needs:
+Each Lambda has its own dedicated, CDK-managed IAM role scoped to what it needs. The hand-kept role table that used to sit here drifted completely (it named `lambda-<fn>-role` roles that no longer exist — live IAM roles are CDK-generated — and secrets `life-platform/anthropic` and `life-platform/health-auto-export` that never existed). Read the roles from the code instead:
 
-| Role | Function | Secrets Access |
-|------|----------|---------------|
-| lambda-whoop-role | whoop-data-ingestion | life-platform/whoop only |
-| lambda-withings-role | withings-data-ingestion | life-platform/withings only |
-| lambda-strava-role | strava-data-ingestion | life-platform/strava only |
-| lambda-todoist-role | todoist-data-ingestion | life-platform/todoist only |
-| lambda-eightsleep-role | eightsleep-data-ingestion | life-platform/eightsleep only |
-| lambda-macrofactor-role | macrofactor-data-ingestion | None |
-| lambda-apple-health-role | apple-health-ingestion | None |
-| lambda-garmin-ingestion-role | (retired #4640 — removed with the function) | — |
-| lambda-habitify-ingestion-role | habitify-data-ingestion | life-platform/habitify only |
-| lambda-mcp-server-role | life-platform-mcp | DynamoDB GetItem + Query + PutItem (cache writes) |
-| lambda-anomaly-detector-role | anomaly-detector | life-platform/anthropic (Haiku for hypothesis) |
-| lambda-notion-ingestion-role | notion-journal-ingestion | life-platform/notion only |
-| lambda-journal-enrichment-role | journal-enrichment | life-platform/anthropic only |
-| lambda-dropbox-poll-role | dropbox-poll | `life-platform/ingestion-keys` only (the bundle; the dedicated `life-platform/dropbox` was deleted 2026-05-17 — #2653) |
-| lambda-health-auto-export-role | health-auto-export-webhook | life-platform/health-auto-export only |
-| lambda-freshness-checker-role | life-platform-freshness-checker | None |
-| lambda-daily-brief-role | daily-brief | life-platform/ai-keys |
-| lambda-weekly-digest-role-v2 | weekly-digest | life-platform/ai-keys |
-| lambda-monthly-digest-role | monthly-digest | life-platform/ai-keys |
-| lambda-nutrition-review-role | nutrition-review | life-platform/ai-keys |
-| lambda-wednesday-chronicle-role | wednesday-chronicle | life-platform/ai-keys |
-| lambda-weekly-plate-role | weekly-plate | life-platform/ai-keys |
+- Policies: `cdk/stacks/role_policies_*.py` (`role_policies.py` is the re-export facade); each stack gives every function its own role (`create_platform_lambda`).
+- Per-function grants and reads/writes: `python3 scripts/blast_radius.py --lambda <function>`.
+- Live: `aws iam list-roles --query "Roles[?contains(RoleName,'LifePlatform')].RoleName"`.
 
-*Note: As of SEC-1 (PROD-1, v3.4.0), all Lambdas have dedicated IAM roles. No shared roles remain. All roles CDK-managed via `role_policies.py`.*
+Worked example (pinned by `tests/test_docstring_secret_ids_2653.py`): the `dropbox-poll` role (historically `lambda-dropbox-poll-role`, live `LifePlatformIngestion-DropboxPollRole…`) is granted only `life-platform/ingestion-keys` (`ingestion_dropbox` in `role_policies_ingestion.py`); the dedicated `life-platform/dropbox` was deleted 2026-05-17 (#2653).
+
+*All Lambdas have dedicated roles (SEC-1, v3.4.0); no shared roles remain.*
 
 ---
 
@@ -563,8 +511,8 @@ Each Lambda has its own dedicated IAM role scoped to exactly what it needs:
 
 Table: `life-platform` (us-west-2)  
 Design: Single-table with composite keys  
-- Partition key: `PK` (e.g., `USER#matthew#SOURCE#whoop`)  
-- Sort key: `SK` (e.g., `DATE#2026-02-22`)
+- Partition key: `pk` (e.g., `USER#matthew#SOURCE#whoop`)  
+- Sort key: `sk` (e.g., `DATE#2026-02-22`) — the attribute names are lowercase (verified `describe-table` 2026-10-17); an uppercase `PK`/`SK` expression fails
 
 ### Check item count
 ```bash
@@ -576,9 +524,9 @@ aws dynamodb describe-table --table-name life-platform \
 ```bash
 aws dynamodb query \
   --table-name life-platform \
-  --key-condition-expression "PK = :pk AND begins_with(SK, :sk)" \
+  --key-condition-expression "pk = :pk AND begins_with(sk, :sk)" \
   --expression-attribute-values '{":pk":{"S":"USER#matthew#SOURCE#whoop"},":sk":{"S":"DATE#2026-02"}}' \
-  --query 'Items[*].SK.S'
+  --query 'Items[*].sk.S'
 ```
 
 ---
@@ -654,7 +602,7 @@ aws dynamodb restore-table-to-point-in-time \
 # 2. Verify integrity (see drill procedure above, substitute table name)
 
 # 3. Update all Lambda env vars to point to life-platform-recovered:
-#    TABLE_NAME env var on all 42 Lambdas — easiest via CDK redeploy
+#    TABLE_NAME env var on every Lambda — easiest via CDK redeploy
 #    cdk deploy --all (will set TABLE_NAME across all stacks)
 
 # 4. Enable PITR on the recovered table:
@@ -764,8 +712,8 @@ therefore means some held source is emitting 0s *right now*.
    per-source `ingest-auth-unhealthy-{source}` alarms (#1960) name the culprit
    directly, so check those first if this aggregate alarm is the only one red.
 4. If both checks are clean, no action is needed — the alarm self-clears once the
-   unhealthy datapoint ages out of the trailing 1h window (#2976). A clean fleet
-   with the alarm still red after ~2h is a real defect — investigate the metric
+   unhealthy datapoint ages out of the trailing 15 h window (#2976, widened by #4641). A clean fleet
+   with the alarm still red after ~16h is a real defect — investigate the metric
    stream, don't silence the alarm.
 
 (The pre-#2976 "reshape into 4×6h evaluation periods" operator option is
@@ -791,7 +739,7 @@ python3 setup/setup_garmin_browser_auth.py
 # Run via aws-vault or python3 with appropriate AWS creds
 python3 -c "
 import boto3
-from lambdas.auth_breaker import clear_failure
+from common.auth_breaker import clear_failure
 import logging
 logging.basicConfig(level=logging.INFO)
 ddb = boto3.resource('dynamodb', region_name='us-west-2')
@@ -800,10 +748,10 @@ clear_failure(table, 'garmin', 'matthew', logging.getLogger())
 "
 ```
 
-Or directly via CLI (PK pattern: `AUTH_BREAKER#matthew#garmin`, SK `STATE`):
+Or directly via CLI (key pattern: `USER#matthew#SOURCE#garmin`, sk `AUTH_FAILURE` — `lambdas/common/auth_breaker.py`; the same shape clears any source):
 ```bash
-aws dynamodb delete-item --table-name life-platform \
-  --key '{"pk":{"S":"AUTH_BREAKER#matthew#garmin"},"sk":{"S":"STATE"}}'
+aws dynamodb delete-item --table-name life-platform --region us-west-2 \
+  --key '{"pk":{"S":"USER#matthew#SOURCE#garmin"},"sk":{"S":"AUTH_FAILURE"}}'
 ```
 
 **Step 3 — Smoke test:**
@@ -832,8 +780,8 @@ How `notion-journal-ingestion` treats the multi-per-day templates (`MULTI_PER_DA
 ### MacroFactor: Function not triggered
 Ensure your export CSV is dropped into the correct S3 path: `s3://matthew-life-platform/uploads/macrofactor/`. The filename does not matter but the prefix does. The primary path is Dropbox poll → S3 → `macrofactor-data-ingestion` (S3 trigger).
 
-### Apple Health: Large export timeout
-Apple Health exports can be large. The function has 1024 MB memory and a 5-minute timeout. If it times out on a very large export, consider exporting a shorter date range.
+### Apple Health: webhook payload too large / timing out
+The only Apple Health writer is `health-auto-export-webhook` (256 MB, 300 s timeout — `cdk/stacks/ingestion_stack.py`). If a sync times out, the payload is too large: lower the Health Auto Export automation's date range or sync more often (hourly, not "since last run" — see the HAE gotcha above). There is no XML-export path any more.
 
 ### Compute Lambda failed (character-sheet / adaptive-mode / daily-metrics / daily-insight)
 
@@ -1055,7 +1003,7 @@ aws dynamodb get-item --table-name life-platform \
 
 Monthly ceiling: **$215 all-in, enforced** (ADR-063 + ADR-133 amendment; $252 in reader-traffic surge mode; cost-governor degrades AI by tier). See `docs/COST_TRACKER.md` for the full breakdown.
 
-Real run-rate (CE, 2026-06-08 sweep): Mar $20.04 → Apr $35.01 → May $48.19 (peak, Bedrock $14.29) → steady-state **~$25-40/mo**. Bedrock is the swing factor (priced from CloudWatch token metrics); WAF deleted (~−$8/mo).
+Real run-rate: read it from `docs/COST_TRACKER.md` (Cost Explorer re-verified there — September 2026 closed at $137.15; the old "~$25-40/mo" figure went stale ~3x, see `docs/OPERATOR_GUIDE.md`). Bedrock is the swing factor (priced from CloudWatch token metrics); WAF deleted (~−$8/mo).
 
 Check current MTD AWS spend:
 ```bash
@@ -1111,7 +1059,7 @@ Two known interpretation notes:
 
 ## MCP Tool Usage Telemetry
 
-MCP tool invocations emit to CloudWatch namespace **`LifePlatform/MCP`** with metrics `ToolInvocations`, `ToolErrors`, `ToolDuration`, `AuthFailures` (dimensioned by `ToolName`).
+MCP tool invocations emit to CloudWatch namespace **`LifePlatform/MCP`** with metrics `ToolInvocations`, `ToolErrors`, `ToolDuration`, `AuthFailures` (`ToolName` dimension; `AuthFailures` is dimensioned `EventType=AuthFailure`).
 
 ```bash
 # List which tools are emitting
@@ -1120,7 +1068,7 @@ aws cloudwatch list-metrics --namespace LifePlatform/MCP \
   --query 'Metrics[*].Dimensions[?Name==`ToolName`].Value' --output text
 
 # Top tools by invocation count over the last 7 days
-for tool in get_daily_snapshot get_health get_habits get_journal_entries; do
+for tool in get_daily_snapshot get_date_range find_days get_sources; do
   count=$(aws cloudwatch get-metric-statistics --namespace LifePlatform/MCP \
     --metric-name ToolInvocations --dimensions Name=ToolName,Value=$tool \
     --start-time $(date -u -v-7d +%Y-%m-%dT00:00:00Z) \
@@ -1141,7 +1089,7 @@ aws ses describe-configuration-set --configuration-set-name life-platform-emails
   --configuration-set-attribute-names eventDestinations
 ```
 
-Four email Lambdas explicitly send through this config set: `daily-brief`, `weekly-digest`, `monthly-digest`, `partner-weekly-email`. Other email Lambdas (chronicle, weekly-plate, monday-compass, nutrition-review, evening-nudge) currently send without the config set — V2 P3 follow-up tracks wiring them.
+The Lambdas that send through this config set are the ones that name it — `grep -rl life-platform-emails lambdas/` (as of 2026-10-17: `daily_brief`, `weekly_digest`, `monthly_digest`, `partner_email`, and `content/recap_deliver`). Other email Lambdas (chronicle, weekly-plate, monday-compass, nutrition-review, evening-nudge) send without the config set — V2 P3 follow-up tracks wiring them.
 
 **SES IAM regression watch-out (V2 P2):** SES requires `ses:SendEmail` on BOTH the identity ARN AND the configuration-set ARN. A 2026-05-17 regression dropped the config-set permission and silently failed deliveries with `AccessDenied`. Fixed via `role_policies.py` — both ARNs in the `Resource` list.
 
@@ -1158,34 +1106,18 @@ aws cloudwatch get-metric-statistics --namespace "LifePlatform/AI" \
   --period 86400 --statistics Sum --region us-west-2
 ```
 
-**Model assignments** — which Lambdas use Sonnet vs Haiku:
+**Model assignments** — which feature runs on which model is the registry `lambdas/ai/model_routing.py` (tiers → model in `TIER_MODELS`, per-call-site `ROUTES`; strategy in `docs/AI_MODEL_STRATEGY.md`). The hand-kept Lambda→model table that used to sit here predated that registry (#4770) and is retired; read the registry, not a copy.
 
-| Lambda | Model | Reason |
-|--------|-------|--------|
-| daily-brief (4 calls) | Sonnet | Core daily coaching voice |
-| wednesday-chronicle | Sonnet | Literary narrative |
-| weekly-plate, nutrition-review | Sonnet | Long-form meal/nutrition analysis |
-| monday-compass, weekly-digest | Sonnet | Weekly intelligence narrative |
-| partner-email | Sonnet | Partner update |
-| ai-expert-analyzer | **Haiku** | Templated observatory content |
-| hypothesis-engine | **Haiku** | Structured JSON output |
-| challenge-generator | **Haiku** | Structured JSON output |
-| field-notes-generate | **Haiku** | Weekly lab notes |
-| _run_analysis_pass (daily-brief) | **Haiku** | 200-token JSON extraction |
-| Coach pipeline (5 Lambdas) | Haiku | Orchestration/extraction |
-| journal-enrichment | Haiku | Per-entry enrichment |
-| anomaly-detector | Haiku | Daily anomaly narrative |
-
-**Rollback a model downgrade** (no code deploy needed):
+**Rollback a model change** (no code deploy needed): a route's historical env var (the `env` field on its `ROUTES` row — e.g. `AI_MODEL_HAIKU`) still wins over the registry default, so set it on the one function:
 ```bash
-# Example: revert expert analyzer to Sonnet
-aws lambda update-function-configuration \
-  --function-name ai-expert-analyzer \
-  --environment "Variables={TABLE_NAME=life-platform,AI_SECRET_NAME=life-platform/ai-keys,AI_MODEL=claude-sonnet-4-6}" \
-  --region us-west-2
+# Read the function's CURRENT environment first, then put back ALL of it plus the override
+aws lambda get-function-configuration --function-name <function> --region us-west-2 --query Environment.Variables
+aws lambda update-function-configuration --function-name <function> \
+  --environment "Variables={...existing vars...,<ROUTE_ENV_VAR>=<model-id>}" --region us-west-2
 ```
+(CDK owns the environment — the next `cdk deploy` reverts this, so it is a stopgap; the durable change is one edit in `model_routing.py`.)
 
-**Anthropic credit balance** — check at [console.anthropic.com/settings/billing](https://console.anthropic.com/settings/billing). API key in Secrets Manager (`life-platform/ai-keys`) ends in `cQAA`. All Lambdas return `[AI_UNAVAILABLE]` when credits are exhausted — site API now filters this to show "Check back soon" instead of raw sentinel.
+**Anthropic credit balance** — check at [console.anthropic.com/settings/billing](https://console.anthropic.com/settings/billing). This only matters for the few direct-API readers of `life-platform/ai-keys` (see `docs/SECRETS_ROTATION.md`); Bedrock inference bills through AWS. A direct-API caller returns `[AI_UNAVAILABLE]` when credits are exhausted — site API now filters this to show "Check back soon" instead of raw sentinel.
 
 ---
 
@@ -1269,17 +1201,19 @@ aws lambda invoke --function-name withings-data-ingestion --payload '{}' /tmp/te
 > technical debt that the next architecture review will find. Complete all steps in the same
 > session as the feature work — don't defer.
 
+> **The ordered checklist is `docs/NEW_SIGNAL_PLAYBOOK.md` (ADR-154); the per-source facets are the `source_registry.py` entry.** The list below is the short operator version, re-checked against the code 2026-10-17.
+
 ### Code & Infrastructure
-- [ ] **Lambda**: Write `lambdas/<source>_lambda.py`. Use `ingestion_framework.py` base if possible (new sources should always use the framework — see ADR-019). Add graceful handling for missing secrets (return 200, not 500, before OAuth is set up).
-- [ ] **CDK IAM**: Add `ingestion_<source>()` policy function in `cdk/stacks/role_policies_ingestion.py` (#2604 — `role_policies.py` is a re-export facade over per-domain siblings) with least-privilege DDB/S3/secret permissions, then add it to the facade's `from stacks.role_policies_ingestion import (...)` list
+- [ ] **Lambda**: Write `lambdas/ingestion/<source>_lambda.py`. Use `ingestion_framework.py` base if possible (new sources should always use the framework — see ADR-019). Add graceful handling for missing secrets (return 200, not 500, before OAuth is set up).
+- [ ] **CDK IAM**: Add `ingestion_<source>()` policy function in `cdk/stacks/role_policies_ingestion.py` (#2604 — `role_policies.py` is a re-export facade over per-domain siblings) with least-privilege DDB/S3/secret permissions, then add it to the facade's `from stacks.role_policies_ingestion import …` re-export
 - [ ] **CDK Stack**: Wire Lambda in `cdk/stacks/ingestion_stack.py` with correct handler, schedule, and IAM
-- [ ] **Secret**: Create `life-platform/<source>` in Secrets Manager (use platform CMK: `alias/life-platform-dynamodb`). Add row to INFRASTRUCTURE.md Secrets table.
-- [ ] **Deploy CDK**: `source cdk/.venv/bin/activate && npx cdk deploy LifePlatformIngestion`
+- [ ] **Secret**: Create `life-platform/<source>` in Secrets Manager (platform CMK `alias/life-platform-dynamodb` is for DynamoDB; Secrets Manager uses the AWS-managed key). Add the row to `docs/SECRETS_MAP.md`.
+- [ ] **Deploy CDK**: `bash deploy/cdk_deploy.sh LifePlatformIngestion` (drift-guarded; owner-attended)
 - [ ] **Deploy Lambda code**: `bash deploy/deploy_fleet.sh` (the one path, #4255 — or merge and let CI run it)
 
 ### Platform Wiring (the steps most often missed)
-- [ ] **SOURCES list**: Add source name to `SOURCES` list in `mcp/config.py`
-- [ ] **Freshness checker**: Add source to monitored list in `lambdas/freshness_checker_lambda.py`
+- [ ] **Source registry**: add the source to `lambdas/ingestion/source_registry.py` — `SOURCES` in `mcp/config.py` is DERIVED from it (`mcp_source_ids()`), not a hand list
+- [ ] **Freshness checker**: `lambdas/emails/freshness_checker_lambda.py` (derives its monitored sources from the registry; its `OAUTH_SECRETS` / `MANUAL_ROTATION_SECRETS` lists are secret names — add a credentialed source there, and mirror in `remediation/agent.py`)
 - [ ] **Ingestion validator**: Add source schema to `_SCHEMAS` dict in `lambdas/ingestion/ingestion_validator.py`. Update docstring count.
 - [ ] **MCP tools**: Add `mcp/tools_<source>.py` with at least one tool. Register in `mcp/registry.py`. Run `python3 -m pytest tests/test_mcp_registry.py -v` before deploying MCP.
 - [ ] **Cache warmer** (if new tools are expensive >1s): Add warm step to `mcp/warmer.py`
@@ -1371,17 +1305,17 @@ Consult this when deciding which docs need human edits beyond what sync_doc_meta
 
 | What changed | Docs to update manually |
 |---|---|
-| **New Lambda added** | ARCHITECTURE (ingest/email/compute/operational table), INFRASTRUCTURE (Lambda list), lambda_map.json, RUNBOOK (schedule table if scheduled), CHANGELOG |
+| **New Lambda added** | ARCHITECTURE (ingest/email/compute/operational table), INFRASTRUCTURE (Lambda list), lambda_map.json, CHANGELOG (the schedule itself is read from CDK/`platform_model.json`; RUNBOOK keeps no schedule table) |
 | **Lambda deleted** | Same as above — remove the row |
-| **Schedule time changed** | ARCHITECTURE (EventBridge table), RUNBOOK (schedule table) — times must match |
+| **Schedule time changed** | ARCHITECTURE (EventBridge table) — times must match; RUNBOOK keeps no schedule table, only the compute-chain ordering block |
 | **New secret added** | ARCHITECTURE (Secrets table + cost profile), INFRASTRUCTURE (Secrets table), DECISIONS ADR-014, COST_TRACKER — then update PLATFORM_FACTS in sync_doc_metadata.py |
 | **Secret deleted** | Same docs — then update PLATFORM_FACTS |
 | **New MCP tools added** | MCP_TOOL_CATALOG (new rows), ARCHITECTURE (serve layer description) — then update PLATFORM_FACTS |
 | **MCP tools removed** | MCP_TOOL_CATALOG (remove rows) — then update PLATFORM_FACTS |
 | **New CDK stack** | ARCHITECTURE (CDK section), INFRASTRUCTURE, cdk/app.py |
 | **DynamoDB schema change** | SCHEMA.md, DATA_DICTIONARY.md |
-| **New data source** | ARCHITECTURE (ingest layer), DATA_DICTIONARY (SOT table), SCHEMA.md, RUNBOOK (schedule table), FEATURES.md |
-| **IAM role changed** | ARCHITECTURE (IAM section), RUNBOOK (IAM table), role_policies.py |
+| **New data source** | ARCHITECTURE (ingest layer), DATA_DICTIONARY (SOT table), SCHEMA.md, FEATURES.md |
+| **IAM role changed** | ARCHITECTURE (IAM section), `cdk/stacks/role_policies_*.py` (RUNBOOK keeps no IAM table) |
 | **New IC feature** | ARCHITECTURE (IC features list), INTELLIGENCE_LAYER.md, CHANGELOG |
 | **Cost change** | COST_TRACKER (breakdown + decisions log) — then update PLATFORM_FACTS |
 | **New ADR** | DECISIONS.md (ADR Index + full entry) |
@@ -1433,11 +1367,11 @@ Fix: Re-run the daily brief pipeline or manually trigger coach generation.
 
 ### 3. Prediction evaluator not running
 
-The prediction evaluator is scheduled daily at 9 AM PT (`cron(0 16 * * ? *)` UTC).
+The prediction evaluator is a daily scheduled Lambda (`coach-prediction-evaluator`; its cron is in `model/platform_model.json` / `cdk/stacks/compute_stack.py`).
 
 1. Check EventBridge rule status:
 ```bash
-aws events describe-rule --name coach-prediction-evaluator-schedule --region us-west-2
+aws events list-rules --name-prefix LifePlatformCompute-CoachPredictionEvaluatorSchedul --region us-west-2   # CDK-generated rule name
 ```
 
 2. Manual invocation:
@@ -1484,12 +1418,12 @@ bash deploy/deploy_fleet.sh   # or: cd cdk && npx cdk deploy --all --require-app
 
 ---
 
-**GitHub repo:** `git@github.com:averagejoematt/life-platform.git` (SSH, private)
+**GitHub repo:** `git@github.com:averagejoematt/life-platform.git` (SSH; the repo has been PUBLIC since 2026-07-20 — `gh repo view --json visibility`)
 **Never commit:** `datadrops/`, `lambdas/dashboard/data.json`, `lambdas/dashboard/clinical.json`, `*.env`, `.config.json`
 
 ---
 
-**Verified:** 2026-05-19 (V2 audit operational sweep)
+**Verified:** 2026-10-17 (full re-check against the code and live read-only AWS; prior stamp 2026-05-19 V2 audit operational sweep)
 
 
 ## Restart Pipeline
@@ -1810,7 +1744,7 @@ param, workflow reads fail open to `standard` (logged).
 ## Urgent-Alarm Dispatcher (fast path, ADR-064)
 
 `life-platform-remediation-dispatcher` Lambda is subscribed to the `life-platform-alerts` SNS topic. On each fire it:
-1. Filters to urgent alarms (substrings: `canary`, `dlq-depth`, `site-api-error`, `budget-tier`, `bedrock-throttle`, `slo-`). Routine ingestion-source errors stay non-urgent — the Mon/Wed/Fri ~10:35 PT sweep handles them.
+1. Filters to urgent alarms (substring match on `_DEFAULT_PATTERNS` in `lambdas/operational/remediation_dispatcher_lambda.py` — currently `slo-`, `budget-tier`, `ai-daily-spend`, `ai-tokens-platform`, `ingest-consecutive-failures`, `ingest-auth-unhealthy`, `ddb-throttled`, `dlq`, `alert-digest`, `daily-brief-errors`, `daily-brief-no-invocations`; read the file, it changes). Routine ingestion-source errors stay non-urgent — the Mon/Wed/Fri ~10:35 PT sweep handles them.
 2. Dedupes per 30-min window via S3 marker (`s3://matthew-life-platform/remediation-log/dispatch-dedupe/{alarm}-{stamp}.marker`; markers expire after 1 day via lifecycle rule).
 3. Calls GitHub `POST /repos/averagejoematt/life-platform/dispatches` with `event_type: urgent_alarm`, authenticated via a fine-grained PAT in Secrets Manager (`life-platform/github-dispatch-token`).
 4. The workflow's `repository_dispatch: [urgent_alarm]` trigger fires the agent immediately.
@@ -1904,7 +1838,7 @@ The Hevy routine write-loop ships with two layers of safety gates. Operator acti
 
 ### Pre-deploy provisioning (one-time, blocks first deploy)
 
-Before the first `cdk deploy` of layer v64+ / OperationalStack / McpStack:
+Before the first `cdk deploy` of OperationalStack / McpStack for the Hevy write loop (one-time; both secrets and all three SSM gates already exist live as of 2026-10-17):
 
 ```bash
 # 1. Create the WRITE secret. Use a SEPARATE Hevy API key from the read one
@@ -1975,9 +1909,9 @@ aws s3 cp config/board_of_directors.json s3://matthew-life-platform/config/
 ### Post-deploy verification
 
 ```bash
-# Layer v64 attached?
+# Shared layer retired (#781) — the invariant is that no Layer is attached:
 aws lambda get-function-configuration --function-name hevy-routine-cron \
-  --query 'Layers[*].Arn' --output text
+  --query 'Layers[*].Arn' --output text   # → empty
 
 # Cron rule is disabled?
 aws events describe-rule --name hevy-routine-cron-weekly --query 'State' --output text   # → DISABLED

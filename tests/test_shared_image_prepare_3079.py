@@ -328,3 +328,6 @@ def test_fresh_eyes_has_no_private_image_block_left():
     # the delegation is real, not a re-implementation that happens to share a name
     fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_image_blocks")
     assert "visual_ai_qa._image_blocks" in (ast.get_source_segment(source, fn) or "")
+
+
+# premerge-gate: 3079: the ONE screenshot -> vision-judge prepare path. An os.walk AST census over lambdas/ tests/ scripts/ mcp/ deploy/ cdk/ for every `{"type": "image"}` block, checked against a registry carrying a written reason per site. Pure repo shape, and pre-merge because the whole defect was a SECOND copy of the prepare path landing without anyone having to decide it was a good idea — a red that arrives a

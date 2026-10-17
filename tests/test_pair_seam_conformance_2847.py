@@ -314,3 +314,6 @@ def test_the_qualname_to_model_path_translation_is_exact(qualname, expected):
     """
     assert lib.module_path(qualname) == expected
     assert os.path.isfile(os.path.join(_REPO, expected)), f"{expected} is not a real module"
+
+
+# premerge-gate: 2847 box 4: the must-agree SEAM guard — charter standing rule 3's fleet-wide enforcement, the peer of #2844's rule-1 guard. Its whole premise is that the birth of a must-agree pair is a decision made ON the PR that creates it; a red arriving post-merge is the seam already shipped, which is exactly how #2804's dead-zone read and #2214's dual writer both reached production. Builds the 2845 model fro

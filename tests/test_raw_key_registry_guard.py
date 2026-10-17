@@ -122,3 +122,6 @@ def test_year_prefix_refuses_a_source_with_no_date_tree():
 def test_year_prefix_refuses_an_unknown_source():
     with pytest.raises(KeyError):
         raw_year_prefix("not_a_source", 2026)
+
+
+# premerge-gate: #2286: no hand-built raw/ S3 keys

@@ -406,3 +406,5 @@ if __name__ == "__main__":
         cwd=ROOT,
     )
     sys.exit(result.returncode)
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

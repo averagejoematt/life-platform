@@ -219,3 +219,6 @@ def test_the_wayfinder_marks_the_same_station_the_doors_nav_marks():
         expected = v4_wayfinding.STATION_BY_DOOR[nav_door.group(1)]
         assert marked and marked.group(1) == expected, f"{rel}: nav says {expected}, wayfinder says {marked and marked.group(1)}"
     assert checked > 0, "no door-bearing pages found — the sweep didn't run over anything"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

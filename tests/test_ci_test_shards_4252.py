@@ -262,3 +262,6 @@ def test_combined_coverage_under_the_floor_reds(legs_tree):
     p = _combine(legs_tree)
     assert p.returncode != 0, p.stdout
     assert (legs_tree / "coverage.xml").is_file(), "the xml is written BEFORE the floor so the ratchet step still reads it"
+
+
+# premerge-gate: #4252: lists tests/ — every test file in exactly one shard leg; ci-test.yml's matrix + combine step held to it

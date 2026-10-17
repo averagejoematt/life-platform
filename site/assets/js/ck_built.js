@@ -21,7 +21,7 @@
 // only thing that touches the DOM.
 import { tryJSON, esc } from "/assets/js/evidence_shared.js";
 import { dayInWords, instantDayInWords } from "/assets/js/entry_age.js";
-import { coachComparison } from "/assets/js/coach_comparison.js";
+import { coachComparison, comparisonText } from "/assets/js/coach_comparison.js";
 
 /** Programs that run on a timer. Source: model/platform_model.json meta.counts.scheduled_lambdas. */
 export const SCHEDULED = { count: 84, asOf: "2026-10-11" };
@@ -61,13 +61,19 @@ export function programsHTML(stats, coaches) {
   return numberHTML(whole(SCHEDULED.count), `programs run on a timer.${onCall}${read}${cast}`, `As of ${day(SCHEDULED.asOf)}.`);
 }
 
+/** Longest comparison sentence printed open under the count; a longer one folds under a summary. */
+const COMPARISON_OPEN_MAX = 160;
+
 /** The coaches' record, never alone: the comparison sits directly under it. */
 export function recordHTML(predictions) {
   const o = predictions && predictions.overall;
   const right = num(o && o.confirmed);
   const wrong = num(o && o.refuted);
   if (right === null || wrong === null || !(right + wrong)) return absent("The coaches’ record is");
-  const cmp = coachComparison(predictions.comparison, { cls: "ck-soft", src: "api_predictions.comparison.sentence" });
+  const line = coachComparison(predictions.comparison, { cls: "ck-soft", src: "api_predictions.comparison.sentence" });
+  // The one-line skill sentence sits open under the count. The per-kind form (four clauses, ~800 characters) folds
+  // under a summary directly below the count instead, so it never pushes the page past its screen budget (#4864).
+  const cmp = comparisonText(predictions.comparison).length > COMPARISON_OPEN_MAX ? `<details><summary>What a simple guess scored on the same calls</summary>${line}</details>` : line;
   const when = day(o.due && o.due.as_of) || instant(predictions._meta && predictions._meta.served_at);
   const dated = `${when ? `As of ${when}. ` : ""}Code does the grading, not a person and not an AI.`;
   return numberHTML(`${whole(right)} right, ${whole(wrong)} wrong`, "is the AI coaches’ record on the predictions that have come due.", dated, cmp);

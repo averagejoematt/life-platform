@@ -1,13 +1,13 @@
 # Reserved Concurrency
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18 (#1328)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17 (#1328)
 
 ## Current state
 
 ```
 Account concurrency limit: 100     # verify: aws lambda get-account-settings
-Reserved: site-api 20 · site-api-ai 2
-Unreserved pool: 78
+Reserved: site-api 20 · site-api-ai 2 · telegram-coach-worker 2 · 4 OAuth ingesters × 1  (= 28)
+Unreserved pool: 72                # live: UnreservedConcurrentExecutions, 2026-10-16
 ```
 
 The account quota is a **maintained fact** — `account_concurrency_limit` in
@@ -22,13 +22,24 @@ aws lambda get-account-settings \
 
 ## Where the reservations live
 
-`cdk/stacks/serve_stack.py` — `add_property_override("ReservedConcurrentExecutions", …)`
-on the two public serving Lambdas (the serve stack is the only stack that reserves):
+`add_property_override("ReservedConcurrentExecutions", …)` in two stacks. The two
+public serving Lambdas (`cdk/stacks/serve_stack.py`) carry the traffic-sized caps:
 
 | Function | Reserved | Rationale |
 |----------|----------|-----------|
 | `life-platform-site-api` | 20 | Public Function-URL origin. The old cap of 5 **bound daily** (ConcurrentExecutions Max = 5.0 every day 07-10..07-17, 627 synchronous 429s to readers over 30d, peak 110/day). 20 = 4× the measured saturation point. |
 | `life-platform-site-api-ai` | 2 | AI ask endpoints; rate-limited 5/IP/hr — 2 is enough, and the cap is the blast-radius isolation (ADR-036). |
+
+Other reservations (small, not traffic-sized; grep `ReservedConcurrentExecutions` in
+`cdk/stacks/` for the live set):
+
+| Function | Reserved | Why | Where |
+|----------|----------|-----|-------|
+| `telegram-coach-worker` | 2 | A chatty evening must not starve the site; sequential model calls, one user. | `serve_stack.py` |
+| `whoop-data-ingestion`, `withings-data-ingestion`, `strava-data-ingestion`, `eightsleep-data-ingestion` | 1 each | OAuth race prevention — one concurrent invocation per OAuth Lambda (ADR-036). | `ingestion_stack.py` |
+
+Live values confirmed read-only with `aws lambda get-function-concurrency` on all
+six functions (20 / 2 / 2 / 1 / 1 / 1 / 1) and `get-account-settings` (100 total, 72 unreserved).
 
 ## Sizing posture
 

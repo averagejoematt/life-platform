@@ -230,3 +230,6 @@ def test_the_add_gsi_regex_ignores_the_function_definition_itself():
     names = deploy_script_gsi_names(text)
     assert "$1" not in names
     assert names == SANCTIONED_GSI_SET
+
+
+# premerge-gate: 3609 box 3: an AST sweep of lambdas/ + mcp/ for every literal `IndexName=` (plus a text sweep of deploy/deploy_reading_gsis.sh's add_gsi calls, the only mechanism that can add a GSI to the out-of-CDK `life-platform` table). Verdict is pure repo shape — a new query naming an unsanctioned GSI, or a third `add_gsi` line, must red BEFORE the merge; the existing live `describe_table` check in test_inte

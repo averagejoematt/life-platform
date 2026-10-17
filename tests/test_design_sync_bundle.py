@@ -190,3 +190,6 @@ class TestVerifyBundleSelfCheck:
         message = str(excinfo.value)
         assert "provenance.html" in message
         assert "@dsCard" in message or "absolute" in message
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

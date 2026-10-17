@@ -1,18 +1,18 @@
 {
  "_meta": {
-  "generated_at": "2026-10-12T15:35:37.395751+00:00",
-  "served_at": "2026-10-12T15:35:37.395751+00:00",
+  "generated_at": "2026-10-13T01:33:18.088779+00:00",
+  "served_at": "2026-10-13T01:33:18.088779+00:00",
   "cache_seconds": 3600,
-  "request_id": "233a1683df124268"
+  "request_id": "57c9a262ebea4763"
  },
  "training": {
-  "workouts_30d": 43,
+  "workouts_30d": 44,
   "window_days": 30,
   "window_full": true,
-  "workouts_90d": 52,
-  "weekly_avg": 10.4,
-  "total_minutes_30d": 4835,
-  "total_distance_mi": 43.9,
+  "workouts_90d": 53,
+  "weekly_avg": 10.6,
+  "total_minutes_30d": 4945,
+  "total_distance_mi": 49.3,
   "z2_weekly_avg_min": 803,
   "z2_target_min": 150,
   "z2_pct": 535,
@@ -26,7 +26,7 @@
    },
    {
     "type": "Walk",
-    "count": 19
+    "count": 20
    },
    {
     "type": "Workout",
@@ -51,12 +51,12 @@
   },
   {
    "type": "Walk",
-   "count_30d": 19,
-   "total_minutes_30d": 1501,
-   "avg_duration_min": 79,
+   "count_30d": 20,
+   "total_minutes_30d": 1611,
+   "avg_duration_min": 81,
    "avg_hr": 115,
-   "total_distance_mi": 43.9,
-   "total_elevation_ft": 2100,
+   "total_distance_mi": 49.3,
+   "total_elevation_ft": 2431,
    "z2_minutes": 1169,
    "trend_vs_prior_30d": null
   },
@@ -527,24 +527,24 @@
   {
    "date": "2026-10-12",
    "strength_min": 0,
-   "walking_min": 0,
+   "walking_min": 109,
    "cycling_min": 0,
    "stretching_min": 0,
    "soccer_min": 0,
    "hiking_min": 0,
    "breathwork_min": 0,
    "other_min": 0,
-   "total_min": 0
+   "total_min": 109
   }
  ],
  "walking": {
   "avg_daily_steps": 3549,
   "avg_daily_steps_n": 29,
   "avg_daily_steps_reason": null,
-  "total_walks_30d": 19,
+  "total_walks_30d": 20,
   "total_rucks_30d": 0,
-  "total_miles_30d": 43.9,
-  "avg_pace_min_per_mi": 19.7,
+  "total_miles_30d": 49.3,
+  "avg_pace_min_per_mi": 19.8,
   "z2_minutes_walking": 1169,
   "daily_steps_trend": [
    {
@@ -694,7 +694,7 @@
    },
    {
     "date": "2026-10-12",
-    "steps": 183,
+    "steps": 1960,
     "is_weekend": false
    }
   ]
@@ -772,6 +772,12 @@
    "workouts": 7,
    "minutes": 790,
    "z2_min": 126
+  },
+  {
+   "week": "2026-W42",
+   "workouts": 1,
+   "minutes": 109,
+   "z2_min": 0
   }
  ],
  "whoop_workouts": [
@@ -958,6 +964,14 @@
  ],
  "cardio_sessions": [
   {
+   "date": "2026-10-12",
+   "sport": "Walk",
+   "distance_mi": 5.39,
+   "minutes": 109,
+   "avg_hr": 101.2,
+   "source": "strava"
+  },
+  {
    "date": "2026-10-11",
    "sport": "Cycling",
    "distance_mi": 10.0,
@@ -1121,15 +1135,6 @@
    "minutes": 50,
    "avg_hr": null,
    "modality": "cardio",
-   "source": "hevy"
-  },
-  {
-   "date": "2026-10-01",
-   "sport": "Stretching",
-   "distance_mi": null,
-   "minutes": 15,
-   "avg_hr": null,
-   "modality": "mobility",
    "source": "hevy"
   }
  ]

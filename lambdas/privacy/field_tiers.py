@@ -93,6 +93,9 @@ FIELD_TIERS: dict[str, dict[str, int]] = {
         "vascular_age": TIER_OWNER_ONLY,  # age-class, #2782
         "metabolic_age": TIER_OWNER_ONLY,  # age-class, same posture
         "afib_result": TIER_OWNER_ONLY,  # event-class medical result (ECG screening)
+        # #4642 capture-all: weigh-in attribution (device / ambiguous / manual) — owner-only until tiered
+        "measurement_attrib": TIER_OWNER_ONLY,
+        "measurement_group_attribs": TIER_OWNER_ONLY,
         # ── ADR-155 owner-published: served today on /api/vitals + the nutrition
         #    surface (weight + deltas + trends; lean mass drives the public protein
         #    floor in site_api_nutrition) ──
@@ -233,6 +236,12 @@ SOURCE_TIERS: dict[str, int] = {
     # arguments — journal-grade text, a pain-site statement, a meal — so it takes the highest tier
     # of anything it can hold. Declared before the first row exists (ADR-154's ordering). MCP-only.
     "pending_writes": TIER_OWNER_ONLY,
+    # ── internal: never published, but inside owner-facing tooling and AI context ──
+    # ADR-155 amendment (2026-10-12, owner ruling): the owner clinical record
+    # (`scripts/load_clinical_record.py`, data kept off-repo) may enter the AI coaches'
+    # context — `health.clinical_facts` renders it, with a non-disclosure instruction for
+    # any coach whose output can reach a public page. No public projection of any kind.
+    "clinical": TIER_INTERNAL,
 }
 
 

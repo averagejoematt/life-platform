@@ -634,7 +634,11 @@ def test_dedup_real_2024_containment_chunk_is_the_same_walk():
 
     out = strava_read_seam("strava", {"2024-10-05": _real_day_2024_10_05()})["2024-10-05"]
     assert [a["strava_id"] for a in out["activities"]] == ["12583986726", "12581225231"]
-    assert out["activities"][0]["average_heartrate"] == 114.5
+    walk = out["activities"][0]
+    # #4627: the WHOOP chunk covers 6749 s of the Garmin's 17194 s interval (39 %) — its average
+    # is kept, renamed, and is no longer served as the whole 4.8 h walk's average.
+    assert "average_heartrate" not in walk and walk["partial_average_heartrate"] == 114.5
+    assert walk["hr_coverage_share"] == 0.39 and walk["hr_from_strava_id"] == "12582923905"
     assert out["activity_count"] == 2 and out["total_moving_time_seconds"] == 12605.0 + 3149.0
     assert out["total_distance_miles"] == 10.31
 
@@ -1161,3 +1165,5 @@ if failed:
 else:
     print(" -- ALL PASSED")
 print("=" * 60)
+
+# premerge-gate: 4419: os.walk AST sweep of lambdas/ + mcp/ — every DynamoDB reader that can be handed the strava partition goes through `strava_read_seam`. A new reader that skips it must red BEFORE the merge; after it, every history read through it counts duplicates twice.

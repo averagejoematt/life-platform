@@ -324,3 +324,6 @@ def test_mutation_dropping_the_restore_line_lets_the_counter_leak_off_main(tmp_p
     assert r.returncode == 0, f"{r.stdout}\n{r.stderr}"
     assert "lambdas/web/platform_counts.py" not in _committed_files(repo)
     assert "platform_counts.py" in _worktree_diff(repo), "the mutated hook should have left the counter dirty — the control did not bite"
+
+
+# premerge-gate: #3984: the literal gate + the hook keep the bot-owned counter off every branch

@@ -1,6 +1,6 @@
 # Life Platform — Operator Guide
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-19
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 > Everything you need to run this platform. Read this on Day 1.
 > For architectural decisions: ARCHITECTURE.md
@@ -15,7 +15,7 @@
 The Life Platform is a personal health intelligence system. It pulls data from ~20 sources (wearables, apps, food logs, labs), stores everything in DynamoDB single-table (`life-platform`, us-west-2), and makes it queryable by Claude through 88 MCP tools. **108 Lambdas** run the ingest → compute → email pipeline daily.
 
 **Pipeline (UTC, ADR-052):**
-- Ingestion: hourly at UTC hours 12–23 + 0–5 (`INGEST_HOURLY`, `ingestion_stack.py` — skips the overnight-PT hours). Exceptions: **Habitify all 24 hours** (`HABITIFY_HOURLY`, #3666 — the skipped UTC 6–11 is 23:00–04:00 PT, when evening habits are ticked), Weather 2x/day, Todoist 1x/day (14:00 UTC), **Hevy all 24 hours** (#3720 — a 5:30 PM PT lift landed after the old 16:00 PT cutoff and stayed invisible until 5 AM), Garmin PAUSED (no schedule — ADR-074)
+- Ingestion: hourly at UTC hours 12–23 + 0–5 (`INGEST_HOURLY`, `ingestion_stack.py` — skips the overnight-PT hours). Exceptions: **Habitify all 24 hours** (`HABITIFY_HOURLY`, #3666 — the skipped UTC 6–11 is 23:00–04:00 PT, when evening habits are ticked), Weather 2x/day, Todoist 1x/day (14:00 UTC), **Hevy all 24 hours** (#3720 — a 5:30 PM PT lift landed after the old 16:00 PT cutoff and stayed invisible until 5 AM), Garmin RETIRED (#4640, 2026-10-11 — no function, no schedule; was paused under ADR-074)
 - 15:05 UTC `anomaly-detector` → 16:30 `character-sheet-compute` → 16:35 `adaptive-mode-compute` → 16:40 `daily-metrics-compute` → 16:45 `daily-insight-compute` → 17:00 `daily-brief`
 - 19:30 UTC (12:30 PM PDT) OG images
 
@@ -39,7 +39,7 @@ Before you can operate the platform, you need:
 3. **Git clone**: `~/dev/life-platform/` is the canonical workdir.
 4. **Read `docs/RUNBOOK.md`** end-to-end at least once.
 5. **Bookmark these**:
-   - https://averagejoematt.com/status/ — system health dashboard
+   - https://averagejoematt.com/status/ — redirects to `/cockpit/` (`redirects.map`), the system-health page
    - https://averagejoematt.com/api/healthz — JSON health check
    - AWS Console → CloudWatch → Dashboards → `life-platform-ops`
    - AWS Console → SQS → `life-platform-ingestion-dlq`
@@ -48,7 +48,7 @@ Before you can operate the platform, you need:
 
 ## Daily Health Check (2 minutes)
 
-1. **Visit** https://averagejoematt.com/status/
+1. **Visit** https://averagejoematt.com/status/ (lands on `/cockpit/`)
 2. All sources should show **green**. Yellow = overdue. Red = broken.
 3. Check inbox for any SNS alarm notifications from overnight (sent to `awsdev@mattsusername.com`).
 4. Hit https://averagejoematt.com/api/healthz — should return `{"status": "ok"}`.
@@ -111,17 +111,21 @@ mostly the first three rows."
 3. Common fixes:
    - `AccessDenied` → IAM role missing permission. Check `cdk/stacks/role_policies.py`, then `cd cdk && npx cdk diff && npx cdk deploy <stack>`.
    - `ResourceNotFoundException` on secret → secret deleted or in deletion window. Run `aws secretsmanager list-secrets --include-planned-deletion`.
-   - `ImportModuleError` → stale code or wrong handler. Redeploy: `bash deploy/deploy_lambda.sh <function-name>`.
+   - `ImportModuleError` → stale code or wrong handler. Redeploy: `bash deploy/deploy_lambda.sh <function-name> <source-file>`.
    - `AttributeError` on a recently-added shared function → some functions missed the last fleet deploy (stale bundle). Fleet-redeploy: `bash deploy/deploy_fleet.sh` (or `cd cdk && npx cdk deploy --all`).
-   - For MCP: `bash deploy/deploy_lambda.sh life-platform-mcp` (since #781 it stages the mcp-shaped full bundle). Never hand-roll a partial zip — missing `lambdas/` tree = import failure at boot.
+   - For MCP: `bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py` (since #781 it stages the mcp-shaped full bundle). Never hand-roll a partial zip — missing `lambdas/` tree = import failure at boot.
 
 ### A data source is stale
 
 1. Identify the source from `https://averagejoematt.com/status/`.
 2. Read the ingestion Lambda's logs.
 3. Common causes:
-   - OAuth token expired → re-run the auth setup (see `setup/` directory). For Garmin: `python3 setup/setup_garmin_browser_auth.py` (Playwright/Chromium). For Withings: `python3 setup/fix_withings_oauth.py`.
-   - `auth_breaker` tripped → clear the marker (see RUNBOOK "Garmin: 429 Too Many Requests" section for the procedure; same pattern applies to all OAuth sources).
+   - OAuth token expired → re-run the auth setup (see `setup/` directory and `docs/SECRETS_ROTATION.md`). For Whoop: `python3 setup/setup_whoop_auth.py`. For Withings: `python3 setup/fix_withings_oauth.py`.
+   - `auth_breaker` tripped → after re-auth, clear the marker (DynamoDB item `USER#matthew#SOURCE#<source>` / `AUTH_FAILURE`, 24h TTL — `lambdas/common/auth_breaker.py`; the RUNBOOK's "Garmin: 429 Too Many Requests" section is a retirement tombstone that keeps the same shape):
+     ```bash
+     aws dynamodb delete-item --table-name life-platform --region us-west-2 \
+       --key '{"pk":{"S":"USER#matthew#SOURCE#<source>"},"sk":{"S":"AUTH_FAILURE"}}'
+     ```
    - Upstream API outage → wait, retry.
    - Secret deleted or in deletion window → restore via Secrets Manager Console (the 7-day recovery window is your friend).
 
@@ -192,9 +196,9 @@ V2 P4.1 finding (2026-05, registry then at ~133 tools): only ~11 used in 30 days
 
 | Change | Command | Notes |
 |--------|---------|-------|
-| Single Lambda code | `bash deploy/deploy_lambda.sh <name>` | Auto-reads handler config from AWS |
+| Single Lambda code | `bash deploy/deploy_lambda.sh <name> <source-file>` | Auto-reads handler config from AWS |
 | Lambda code (the one path, #4255) | `bash deploy/deploy_fleet.sh` | What CI runs; every function gets the identical bundle |
-| MCP server | `bash deploy/deploy_lambda.sh life-platform-mcp` | Stages the mcp-shaped full bundle since #781; never hand-roll a partial zip |
+| MCP server | `bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py` | Stages the mcp-shaped full bundle since #781; never hand-roll a partial zip |
 | Website | `bash deploy/sync_site_to_s3.sh` | Uses `safe_sync.sh` wrapper; targets `s3://matthew-life-platform/site/` |
 | Shared module (`lambdas/` root) | Merge to main (CI fleet-deploys) or `bash deploy/deploy_fleet.sh` | ONE bundle per function (#781) — no layer step |
 | CDK stack | `cd cdk && npx cdk diff <Stack> && npx cdk deploy <Stack>` | Always diff first |
@@ -221,7 +225,7 @@ V2 P4.1 finding (2026-05, registry then at ~133 tools): only ~11 used in 30 days
 
 - **21 active secrets** in AWS Secrets Manager under `life-platform/` prefix (live-verified 2026-07-19; inventory: `docs/SECRETS_MAP.md`).
 - **0 in deletion window** (live-verified 2026-07-10). Note: `notion` was RESTORED 2026-05-24 and is live-but-idle — flagged retire-candidate in `SECRETS_MAP.md` (owner decision pending).
-- OAuth tokens (Whoop, Withings, Strava, Garmin, Eight Sleep) auto-refresh on each successful API call.
+- OAuth tokens (Whoop, Withings, Strava, Eight Sleep) auto-refresh on each successful API call.
 - MCP API key auto-rotates every 90 days via `life-platform-key-rotator`.
 - `pipeline-health-check` Lambda probes all secrets daily and emits CloudWatch metrics.
 - **Never** store secrets in code, env vars, or documentation.
@@ -234,8 +238,8 @@ V2 P4.1 finding (2026-05, registry then at ~133 tools): only ~11 used in 30 days
 The pipeline runs in strict order (ADR-052). Changing schedules without maintaining this order produces stale results.
 
 ```
-hourly, 12–23 + 0–5 UTC  →  Ingestion (15 Lambdas — API sources hourly via INGEST_HOURLY;
-                            webhook/S3 sources land as they arrive)
+hourly, 12–23 + 0–5 UTC  →  Ingestion (the `ingestion_stack` functions in `model/platform_model.json`;
+                            API sources hourly via INGEST_HOURLY; webhook/S3 sources land as they arrive)
 15:05 UTC (8:05 AM PDT)  →  Anomaly detector
 16:30 UTC          →  character-sheet-compute
 16:35 UTC          →  adaptive-mode-compute
@@ -256,7 +260,7 @@ All EventBridge crons are fixed UTC. PT references shift 1 hour at DST boundarie
 The 2026-05 raise request (Support case 177921309700709) was approved — the limit is 100 (AWS default for mature accounts is 1000; a further raise hasn't been needed). Operational habits that still apply:
 
 - Avoid invoking high-fan-out workflows manually during the daily pipeline window (16:30-17:00 UTC).
-- Reserved concurrency in CDK is **pre-staged but commented out** (see `docs/RESERVED_CONCURRENCY.md`).
+- Reserved concurrency is **live** for the two reader-facing functions (`site-api` 20, `site-api-ai` 2, via `ReservedConcurrentExecutions` overrides in `cdk/stacks/serve_stack.py`); see `docs/RESERVED_CONCURRENCY.md`.
 - Throttled invocations land in the DLQ — if you see DLQ growth during the compute window, suspect concurrency.
 
 ---

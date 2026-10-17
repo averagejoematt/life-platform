@@ -285,3 +285,6 @@ def test_the_set_guard_can_actually_fail():
         probe = pathlib.Path(d, "probe_handler.py")
         probe.write_text('def h(e):\n    return e["requestContext"]["http"]["sourceIp"]\n')
         assert any("probe_handler.py" in h for h in _raw_identity_reads(tree_root=d)), "the AST walk does not detect a raw sourceIp read"
+
+
+# premerge-gate: #1221: AST sweep — no handler may derive its own client identity

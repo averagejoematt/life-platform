@@ -25,6 +25,7 @@ the guard is the static surface plus the ledger's noindex/sitemap contract. The 
 restated anywhere in this file (public repo; the ruling is the point) — the seeded fixtures use generic ordinals.
 """
 
+# premerge-gate: rglob sweep of every served site/**/*.html + sitemap + committed feed titles for a start count — a NEW page or title inherits the ledger silently, so it must red on the PR that adds it
 from __future__ import annotations
 
 import html as _html

@@ -189,3 +189,6 @@ def test_a11y_audit_does_not_call_add_script_tag():
         "qa/a11y_audit.py reverted to add_script_tag — that creates a real inline <script>, which the hardened CSP "
         "blocks; the audit would raise on every page. Inject via page.evaluate (CDP) instead."
     )
+
+
+# premerge-gate: #3048: site/ tree sweep — no non-legacy page may reintroduce an executable inline script; repo-shape, pre-merge

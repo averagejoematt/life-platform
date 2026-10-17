@@ -464,3 +464,6 @@ def test_the_operating_calendar_probes_the_census_log():
     assert kind == cal.REGEX_IN_FILE and target == "docs/PROPORTIONALITY.md"
     text = open(os.path.join(_REPO, target), encoding="utf-8").read()
     assert re.search(pattern, text, re.M), f"no line in {target} matches the calendar probe {pattern!r}"
+
+
+# premerge-gate: #2837: AST sweep of every metric emitter — a NEW namespace must join the ledger BEFORE merge, not after the bill

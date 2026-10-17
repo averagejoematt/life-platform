@@ -56,3 +56,6 @@ class TestRegisteredSurfacesAndCensus:
             assert key not in scan_source(module, sabotaged), f"stripping the gate must deregister {key}"
             # and the un-sabotaged source really is discovered (the scan is not vacuous)
             assert key in scan_source(module, src)
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

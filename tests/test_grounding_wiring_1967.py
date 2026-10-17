@@ -188,3 +188,6 @@ def advisory_surface(text):
     found = scan_source("lambdas/web/synthetic_direct.py", src)
     key = "lambdas/web/synthetic_direct.py::advisory_surface"
     assert found[key] == {"freshness", "behavioral"}, sorted(found[key])
+
+
+# premerge-gate: the grounding-surface registry

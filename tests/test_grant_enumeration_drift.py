@@ -894,3 +894,5 @@ if __name__ == "__main__":
     import subprocess
 
     sys.exit(subprocess.run(["python3", "-m", "pytest", __file__, "-v", "--tb=short"], cwd=REPO).returncode)
+
+# premerge-gate: #2824: consumer⊆granted across cdk/stacks + lambdas/ + .github/workflows + infra/iam — a new fail-closed consumer (or a role that drops a grant) must red BEFORE the merge, not after the channel is already stranded

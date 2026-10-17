@@ -1,6 +1,6 @@
 # Quickstart — First Day Commands
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 > Action sequence for a new engineer on day 1: auth, run tests, deploy a single Lambda, verify daily-brief output, roll back if needed.
 > For mental model + concepts, see `docs/ONBOARDING.md`. For full operations, see `docs/RUNBOOK.md`.
@@ -48,14 +48,14 @@ bash scripts/install_hooks.sh         # pre-commit hook: black/ruff format gate 
 ### CDK setup (first time only)
 
 The CDK toolchain is pinned both directions (#814, R22-MOD-01) — CLI in
-`ci-cd.yml`, `aws-cdk-lib`/`constructs` in `cdk/requirements.txt` +
+`cdk/package.json` (which `ci-cd.yml` reads), `aws-cdk-lib`/`constructs` in `cdk/requirements.txt` +
 `requirements-dev.txt`. Match CI's pinned CLI version rather than installing
 whatever npm resolves as latest today (an unpinned install is exactly what
 caused #814):
 
 ```bash
 cd cdk
-npm install -g aws-cdk@2.1135.1   # match the pin in .github/workflows/ci-cd.yml
+npm install -g "aws-cdk@$(node -p "require('./package.json').devDependencies['aws-cdk']")"   # the pin lives in cdk/package.json; ci-cd.yml reads the same field
 pip install -r requirements.txt   # aws-cdk-lib/constructs pinned exactly — see comments in that file
 cdk bootstrap aws://205930651321/us-west-2   # one-time per account
 ```
@@ -91,11 +91,12 @@ CI runs the same commands on every push (`.github/workflows/ci-cd.yml`).
 
 | I edited... | Run this | Why |
 |-------------|----------|-----|
-| A single Lambda file (e.g., `daily_brief_lambda.py`) | `bash deploy/deploy_lambda.sh daily-brief` | Fast (~10s), no CDK synth |
+| A single Lambda file (e.g., `daily_brief_lambda.py`) | `bash deploy/deploy_lambda.sh daily-brief lambdas/emails/daily_brief_lambda.py` | EMERGENCY-only (not the routine path, #4255): needs both args; routine = `deploy_fleet.sh`/merge to main |
 | Lambda code, the way CI ships it | `bash deploy/deploy_fleet.sh` | The one deploy path (#4255): one bundle → every function, ancestry-checked |
-| A shared module at the `lambdas/` root (e.g. `ai_calls.py`) | Merge to main (CI fleet-deploys) or `bash deploy/deploy_fleet.sh` | ONE bundle per function (#781) — every function must receive the new copy |
-| Any file in `mcp/` | `bash deploy/deploy_lambda.sh life-platform-mcp` | Since #781 the script stages the mcp-shaped full bundle (tree + `mcp_server.py` + `mcp/`) |
-| CDK stack code (IAM, schedules, new Lambda) | `cd cdk && npx cdk deploy <StackName>` | Infra changes require CloudFormation |
+| A shared module under `lambdas/` (e.g. `lambdas/ai/ai_calls.py`, `lambdas/common/secret_cache.py`) | Merge to main (CI fleet-deploys) or `bash deploy/deploy_fleet.sh` | ONE bundle per function (#781) — every function must receive the new copy |
+| Any file in `mcp/` | `bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py` | EMERGENCY-only (both args required). Since #781 the script stages the mcp-shaped full bundle (tree + `mcp_server.py` + `mcp/`) |
+| The site-api Lambda (`lambdas/web/site_api_*.py`) | `bash deploy/deploy_site_api.sh` | Multi-module package: the full-tree bundle, never single-file (CLAUDE.md); routine path is merge to main |
+| CDK stack code (IAM, schedules, new Lambda) | `bash deploy/cdk_deploy.sh <StackName>` | Infra changes require CloudFormation; the wrapper is the drift-guarded path (below) |
 | Site HTML/CSS/JS | **merge to main** — CI deploys it (`site-deploy.yml`, #750) | Manual fallback: `bash deploy/sync_site_to_s3.sh` |
 
 ### `cdk deploy` vs `deploy_lambda.sh`
@@ -122,8 +123,10 @@ Since #781, `deploy_lambda.sh` handles MCP correctly — it stages the mcp-shape
 (the whole `lambdas/` tree + `mcp_server.py` + `mcp/`):
 
 ```bash
-bash deploy/deploy_lambda.sh life-platform-mcp
+bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py
 ```
+
+(EMERGENCY-only: the routine path is `bash deploy/deploy_fleet.sh`; the script needs both arguments, function name and source file.)
 
 ⚠️ Do NOT hand-roll a zip of only `mcp_server.py` + `mcp/` — it boots but fails at import
 time (`No module named 'reading'`) because the bundled `lambdas/` tree is missing. The
@@ -132,7 +135,7 @@ curl to the Function URL should return **401** (healthy), not 5xx.
 
 ### Stack names (use with `cdk deploy <name>`)
 
-`LifePlatformCore` · `LifePlatformIngestion` · `LifePlatformCompute` · `LifePlatformEmail` · `LifePlatformOperational` · `LifePlatformServe` · `LifePlatformMcp` · `LifePlatformMonitoring` · `LifePlatformWeb`
+`LifePlatformCore` · `LifePlatformIngestion` · `LifePlatformCompute` · `LifePlatformEmail` · `LifePlatformOperational` · `LifePlatformServe` · `LifePlatformMcp` · `LifePlatformMonitoring` · `LifePlatformWeb` · `LifePlatformBackup`
 
 ---
 
@@ -216,7 +219,7 @@ bash deploy/rollback_site.sh HEAD~1     # redeploys the prior commit's site/ tre
 ### Halt all crons (maintenance mode)
 
 ```bash
-bash deploy/maintenance_mode.sh enable    # disables all EventBridge rules
+bash deploy/maintenance_mode.sh enable    # disables the non-essential EventBridge rules (emails, weekly compute); ingestion/MCP/canary/freshness keep running
 # … fix the issue …
 bash deploy/maintenance_mode.sh disable   # re-enables
 ```
@@ -225,21 +228,22 @@ bash deploy/maintenance_mode.sh disable   # re-enables
 
 ## Shared Modules (bundled — #781/ADR-131)
 
-Shared modules live at the `lambdas/` root and ship **inside every function's code bundle**,
+Shared modules are packaged by domain under `lambdas/` (ADR-146 — no loose modules at the `lambdas/` root) and ship **inside every function's code bundle**,
 staged by `deploy/build_bundle.py` (the shared layer `life-platform-shared-utils` was retired
 2026-07-06). Editing any of them = fleet deploy (see the table above).
 
-**Notable shared modules:**
+**Notable shared modules** (the bundle stages the tree at the zip root, so a handler imports `from common import secret_cache`):
 
 ```
-ai_calls.py              ai_output_validator.py    auth_breaker.py
-board_loader.py          character_engine.py       compute_metadata.py
-digest_utils.py          html_builder.py           http_retry.py
-ingestion_framework.py   ingestion_validator.py    insight_writer.py
-intelligence_common.py   item_size_guard.py        numeric.py
-output_writers.py        platform_logger.py        rate_limiter.py
-request_validator.py     retry_utils.py            scoring_engine.py
-secret_cache.py          sick_day_checker.py       site_writer.py
+common/        auth_breaker  compute_metadata  constants  digest_utils  http_retry  item_size_guard
+               numeric  platform_logger  rate_limiter  request_validator  retry_utils  secret_cache
+ai/            ai_calls  ai_output_validator  bedrock_client  budget_guard  prompt_cache
+coach/         board_loader  persona_registry
+content/       html_builder  insight_writer  output_writers  site_writer
+health/        character_engine  scoring_engine  sick_day_checker
+ingestion/     ingestion_framework  ingestion_validator  source_registry
+intelligence/  intelligence_common
+experiment/    phase_filter  phase_taxonomy
 ```
 
 Note: `email_framework.py` was deleted in V2 (replaced inline). `tools_calendar.py` and `podcast_scanner_lambda.py` were also deleted as dead code.
@@ -278,7 +282,7 @@ aws lambda list-functions --region us-west-2 \
 | Run `aws s3 sync --delete` to bucket root | Tries to delete 35k+ objects (blocked by bucket policy + ADR-032 deny statement, but DON'T test it) | S3 versioning recovers; takes hours |
 | Change a Lambda env var in AWS Console | Next `cdk deploy` reverts it silently | Edit the CDK stack instead |
 | Add a Lambda to CDK without a `role_policies.py` entry | `AccessDenied` on first run | Add the IAM policy, redeploy the stack |
-| Hand-roll a partial MCP zip (only `mcp_server.py` + `mcp/`) | MCP boots but imports fail — bundled `lambdas/` tree missing | `bash deploy/deploy_lambda.sh life-platform-mcp` (sanctioned since #781) |
+| Hand-roll a partial MCP zip (only `mcp_server.py` + `mcp/`) | MCP boots but imports fail — bundled `lambdas/` tree missing | `bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py` (EMERGENCY-only; sanctioned since #781) |
 | Use DST-aware cron in EventBridge | Schedule drifts twice yearly | All crons fixed UTC — see RUNBOOK |
 | Default-encrypt the S3 bucket with KMS | CloudFront → 400 on website endpoints (ADR-053) | Revert to AES256 bucket default; use explicit `--sse aws:kms` for sensitive uploads |
 | Re-enable the deleted Lambdas (`email_framework`, `tools_calendar`, `podcast_scanner`) | V2 dead-code closure regression | They were deliberately deleted — check the V2 PR before resurrecting |
@@ -288,7 +292,8 @@ aws lambda list-functions --region us-west-2 \
 ## Pipeline Ordering
 
 ```
-hourly, 12–23 + 0–5 UTC  INGESTION    15 Lambdas (8 SIMP-2 + 7 exempt — ADR-056/060)
+per-source cadence       INGESTION    each source's cron/trigger is its `source_registry.py` facet
+                                      (hourly 12–23 + 0–5 UTC is the `INGEST_HOURLY` window, not every source)
 15:05 UTC (8:05am PDT)   ANOMALY      Anomaly detector runs on ingested data
 16:30–16:45 UTC          COMPUTE      character-sheet 16:30, adaptive-mode 16:35,
                                       daily-metrics 16:40, daily-insight 16:45
@@ -305,7 +310,7 @@ If compute runs before ingestion completes, it uses yesterday's data. If the bri
 ## Budget
 
 - **Enforced ceiling**: $215/month base, floating to $252 in reader-traffic surge mode (ADR-063 + ADR-133)
-- **Real run-rate**: ~$25–40/month steady-state — see `docs/COST_TRACKER.md` for the live breakdown
+- **Real run-rate**: see `docs/COST_TRACKER.md` (Monthly Actuals + the monthly close) — the figure is deliberately not restated here
 - **Enforcement**: cost-governor writes a tier 0–3 to SSM; `budget_guard.py` degrades AI features by tier (CLAUDE.md "AI Inference" section)
 - **Cost Explorer**:
   ```bash
@@ -328,4 +333,4 @@ If compute runs before ingestion completes, it uses yesterday's data. If the bri
 
 ---
 
-**Verified:** 2026-07-10 (layer-retirement #781 propagated; counts re-derived via sync_doc_metadata discoverers)
+**Verified:** 2026-10-17 (#1348 — paths, shared-module locations, CDK pin source, stack names, scripts and doc links re-checked against the tree; counts via sync_doc_metadata discoverers)

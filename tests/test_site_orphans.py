@@ -143,3 +143,6 @@ def test_this_prs_ia_moves_are_live():
     assert "unlisted: true" in build_entry, "build log is back in the story sub-nav (#1110)"
     ledger = [r for r in v4_build_evidence.REGISTRY if r[0] == "ledger"]
     assert ledger and "unlisted" in ledger[0], "ledger lost its explicit unlisted flag (#1109)"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

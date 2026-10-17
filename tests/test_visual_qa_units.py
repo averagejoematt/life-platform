@@ -246,3 +246,6 @@ def test_mobile_first_load_is_on_by_default_in_capture_page():
 
     sig = inspect.signature(visual_qa.capture_page)
     assert sig.parameters["mobile_first_load"].default is True
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

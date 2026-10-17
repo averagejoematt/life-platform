@@ -1,13 +1,14 @@
 {
  "_meta": {
-  "generated_at": "2026-10-12T15:35:39.254551+00:00",
-  "served_at": "2026-10-12T15:35:39.254551+00:00",
+  "generated_at": "2026-10-13T01:38:49.688488+00:00",
+  "served_at": "2026-10-13T01:38:49.688488+00:00",
   "cache_seconds": 300,
-  "request_id": "a97ea700236d4014"
+  "request_id": "d352f04222f647b0"
  },
  "state": "absent",
  "date": "2026-09-24",
  "source": "/api/coach_moves",
  "absent_text": "No coach line is recorded for Thursday, September 24.",
- "lines": []
+ "lines": [],
+ "absent": []
 }

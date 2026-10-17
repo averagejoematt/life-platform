@@ -583,3 +583,6 @@ class TestTheCensusWriterDelegates:
         assert payload["families"]["SOURCE#whoop"]["rep_sk"] == "DATE#2026-09-01", "first seen must win"
         assert payload["_meta"]["item_count"] == 4, "item_count must count SCANNED items (4), not families (3)"
         assert payload["_meta"]["family_count"] == 3
+
+
+# premerge-gate: 3669: reads `deploy/generated/pk_family_census.json` — the committed pk-family enumeration its partition-coverage guard grades the registry against. Picked up by `reset_artifact_test_files()` for exactly that reason; pre-merge because a PR that adds a live SOURCE# partition (or refreshes the census) must red BEFORE the merge, not after the partition is already invisible to every freshness check.

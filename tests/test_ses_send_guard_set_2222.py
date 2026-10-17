@@ -730,3 +730,6 @@ def test_guarded_send_still_sends_when_not_dry():
     resp = guarded_send_email(ses, False, FromEmailAddress="a@b.invalid", Destination={"ToAddresses": ["c@d.invalid"]})
     assert len(ses.sends) == 1
     assert resp["MessageId"] == "real-send"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

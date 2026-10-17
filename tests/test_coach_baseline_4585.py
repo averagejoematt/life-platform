@@ -393,3 +393,6 @@ def test_backfill_plan_skips_stamped_rows_and_apply_is_idempotent(monkeypatch, c
     assert "dry run" in capsys.readouterr().out
     assert bf.main(["--apply"]) == 0
     assert len(t.updates) == 1 and "attribute_not_exists(baseline)" in t.updates[0]["ConditionExpression"]
+
+
+# premerge-gate: #4585: glob sweep — every lambdas/web record producer serves `comparison` beside the record

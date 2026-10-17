@@ -221,3 +221,6 @@ def test_the_pin_guard_sees_a_drifted_call_site_mutation_control():
         with open(os.path.join(d, "workflows", "x.yml"), "w") as fh:
             fh.write(step.format("a" * 40))
         assert len(_oidc_pins(d)) == 1
+
+
+# premerge-gate: 4253: the same pin class for configure-aws-credentials (os.walk over .github/ — one SHA, composite included) plus every deploy-path job carrying timeout-minutes; a drifted pin or a new unbounded job must red BEFORE the merge.

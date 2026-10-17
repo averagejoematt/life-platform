@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-12T15:35:36.524562+00:00",
-  "served_at": "2026-10-12T15:35:36.524562+00:00",
+  "generated_at": "2026-10-13T01:33:17.441184+00:00",
+  "served_at": "2026-10-13T01:33:17.441184+00:00",
   "cache_seconds": 3600,
-  "request_id": "dc57a0c4018d4f89"
+  "request_id": "a36d68ce0a8c4495"
  },
  "pulse_history": [
   {
@@ -479,13 +479,13 @@
    "day_number": 37,
    "weight_lbs": 308.3,
    "weight_delta": -19.0,
-   "recovery_pct": null,
-   "sleep_hours": null,
-   "hrv_ms": null,
-   "rhr_bpm": null,
-   "strain": null,
-   "steps": 183,
-   "headline": "308 lbs (-19.0)"
+   "recovery_pct": 67,
+   "sleep_hours": 9.6,
+   "hrv_ms": 47.4,
+   "rhr_bpm": 60,
+   "strain": 6.5,
+   "steps": 1960,
+   "headline": "308 lbs (-19.0) \u00b7 Recovery 67% \u00b7 Sleep 9.6h"
   }
  ]
 }

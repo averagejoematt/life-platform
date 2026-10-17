@@ -186,3 +186,6 @@ class TestRegisteredSurfaceAndCensus:
         # and the un-sabotaged source really is discovered (the scan is not vacuous)
         live = scan_source(MODULE, src)
         assert {f"{MODULE}::generate_hypotheses", f"{MODULE}::narrate_resolution"} <= set(live)
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

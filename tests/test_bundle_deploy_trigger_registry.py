@@ -241,3 +241,6 @@ def test_reconcile_counter_file_alone_never_triggers_a_fleet_deploy():
     assert _fleet_for("lambdas/web/platform_counts.py") == "FLEET=false"
     assert _fleet_for("lambdas/web/platform_counts.py lambdas/common/constants.py") == "FLEET=true"
     assert _fleet_for("lambdas/emails/weekly_digest_lambda.py") == "FLEET=false", "a mapped handler is a per-function deploy"
+
+
+# premerge-gate: #2920: every path build_bundle.py stages is a deploy trigger or a dated exemption

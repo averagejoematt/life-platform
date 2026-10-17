@@ -154,3 +154,6 @@ def test_the_census_families_still_classify_against_TODAYS_taxonomy():
 def test_the_exemption_registry_is_documented_when_used():
     for fam, reason in UNDOCUMENTED_FAMILY_REASONS.items():
         assert isinstance(reason, str) and len(reason) >= 25, f"{fam}: an exemption needs a real written reason, got {reason!r}"
+
+
+# premerge-gate: 3514: grades docs/SCHEMA.md against the committed pk-family census, which deploy/write_pk_family_census.py regenerates — a PR that lands a refreshed artifact must red on that PR, not on whoever pushes next (#2975).

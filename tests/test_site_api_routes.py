@@ -14,7 +14,8 @@ import json as _json
 import os
 import re
 import sys as _sys
-from datetime import datetime as _dt, timezone as _tz
+from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+from zoneinfo import ZoneInfo
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SRC = os.path.join(ROOT, "lambdas", "web", "site_api_lambda.py")  # P3.1: moved to web/
@@ -117,11 +118,10 @@ def test_dispatch_call_exists_in_handler():
 # ── #4582: /api/edition — the front page's one composed document ─────────────────
 #
 # Fixtures are the WIRE: tests/fixtures/edition_wire_4582/*.json are the bodies the live
-# read-only API served on 2026-10-03 ~19:29 PT (curl https://averagejoematt.com/api/<route>;
+# read-only API served at the capture time in _capture.json (curl https://averagejoematt.com/api/<route>;
 # /journal/posts.json and /panelcast/episodes.json are the public manifests the shell reads
-# from generated/), byte for byte. The clock is FROZEN to that capture (today 2026-10-03 PT,
-# now 2026-10-04T02:29Z — the PT evening window, where the UTC date has already rolled), so
-# the expectations never read wall time.
+# from generated/), byte for byte. The clock is FROZEN to that capture (read from _capture.json: the PT day
+# and the instant), so the expectations never read wall time.
 
 _sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
@@ -133,8 +133,18 @@ from web import (
 from web.prediction_reason import metric_words as _metric_words  # noqa: E402
 
 _WIRE = os.path.join(ROOT, "tests", "fixtures", "edition_wire_4582")
-_CAPTURE_DAY = "2026-10-03"
-_CAPTURE_INSTANT = _dt(2026, 10, 4, 2, 29, tzinfo=_tz.utc)
+
+
+def _wire_clock():
+    """The wire's own capture clock, read from its manifest (#4864): the instant it was fetched and that
+    instant's Pacific day. Re-running scripts/capture_kit_page_fixtures.py re-dates every test that composes
+    the wire, so no literal day or instant is left behind to drift from the files."""
+    with open(os.path.join(_WIRE, "_capture.json"), encoding="utf-8") as fh:
+        taken = _dt.strptime(_json.load(fh)["captured_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=_tz.utc)
+    return taken.astimezone(ZoneInfo("America/Los_Angeles")).strftime("%Y-%m-%d"), taken
+
+
+_CAPTURE_DAY, _CAPTURE_INSTANT = _wire_clock()
 _STATES = {"ok", "absent", "stale", "unavailable"}
 _CONTRACT_KEYS = ("state", "as_of", "source", "absent_text", "data")
 
@@ -193,28 +203,35 @@ def _parts(doc):
 def test_edition_every_block_carries_the_contract_on_the_wire():
     """Every block (and nested part) has state/as_of/source/absent_text/data; the document
     has ONE Pacific as_of and day_n, and the blocks arrive in page order."""
-    doc = _edition(_wire())
-    assert doc["as_of"] == _CAPTURE_DAY and doc["day_n"] == 28
+    wire = _wire()
+    doc = _edition(wire)
+    assert doc["as_of"] == _CAPTURE_DAY and doc["day_n"] == (_dt.fromisoformat(_CAPTURE_DAY) - _dt.fromisoformat("2026-09-06")).days + 1
     assert list(doc["blocks"]) == list(_ed.ORDER) == doc["order"]
     offences = [o for name, block in _parts(doc) for o in _contract_offences(name, block)]
     assert not offences, offences
     # The live wire composes to real values, not placeholders.
     b = doc["blocks"]
-    assert b["chapter"]["data"]["title"] == "The Body Answers Back" and "*" not in b["chapter"]["data"]["dek"]
-    assert b["chapter"]["data"]["podcast"]["data"]["guest"] == "Marcus Webb"
+    latest = max((p for p in wire["journal"]["posts"] if p["date"] <= _CAPTURE_DAY), key=lambda p: (p["date"], p.get("sequence") or 0))
+    assert b["chapter"]["data"]["title"] == latest["title"] and "*" not in b["chapter"]["data"]["dek"]
+    assert b["chapter"]["data"]["podcast"]["state"] in _STATES
+    j = wire["journey"]["journey"]
     assert b["today"]["data"] == {
-        "weight_lbs": 311.0,
-        "date": "2026-10-03",
-        "start_weight_lbs": 327.3,
-        "start_date": "2026-09-06",
-        "goal_weight_lbs": 185.0,
-        "change_lbs": -16.3,
+        "weight_lbs": j["current_weight_lbs"],
+        "date": j["last_weighin_date"],
+        "start_weight_lbs": j["start_weight_lbs"],
+        "start_date": j["started_date"],
+        "goal_weight_lbs": j["goal_weight_lbs"],
+        "change_lbs": round(j["current_weight_lbs"] - j["start_weight_lbs"], 1),
     }
-    assert b["coach_lines"]["voice"] == "restated" and len(b["coach_lines"]["data"]["lines"]) <= 3
+    # #4583: a dashboard whose moves are the edition's own day speaks in moves; otherwise the restated text.
+    moves_day = (wire["dashboard"].get("moves") or {}).get("date")
+    assert (
+        b["coach_lines"]["voice"] == ("move" if moves_day == _CAPTURE_DAY else "restated") and len(b["coach_lines"]["data"]["lines"]) <= 3
+    )
     assert all("Dr." not in ln["coach"] for ln in b["coach_lines"]["data"]["lines"])
     # #4595: the scorecard is served, one row per area, each decided by a written rule.
     assert b["scorecard"]["state"] == "ok" and b["scorecard"]["data"]["order"] == ["body", "training", "sleep", "food", "mind", "ai"]
-    assert b["next"]["data"]["bet"]["data"]["question"].startswith("Will the morning recovery score")
+    assert b["next"]["data"]["bet"]["data"]["question"].startswith("Will the ")
 
 
 def test_edition_next_bet_carries_each_coachs_reason_through_the_coach_line_filter():
@@ -223,18 +240,12 @@ def test_edition_next_bet_carries_each_coachs_reason_through_the_coach_line_filt
     strip as the coach lines; a clause the filter refuses, or one too long for the card, is None."""
     wire = _wire()
     sides = _edition(wire)["blocks"]["next"]["data"]["bet"]["data"]["sides"]
-    assert sides == [
-        {
-            "coach": "Max Reyes",
-            "says": "no",
-            "reason": "Recovery EWMA climb from 75.1% to 81.6% shows only one consecutive same-direction point",
-        },
-        {
-            "coach": "Lisa Park",
-            "says": "yes",
-            "reason": "Recovery score will be approximately 85.3% tomorrow with 80% confidence interval of 60.9–100%",
-        },
-    ]
+    docket = wire["docket"]["open"][0]
+    assert len(sides) == 2 and all(isinstance(side["coach"], str) and side["coach"] for side in sides)
+    for side in sides:
+        pids = [pid for pid, claim in docket["claims"].items() if side["reason"] and side["reason"] in claim]
+        assert len(pids) == 1, "each side's reason is a clause of exactly one coach's served claim"
+        assert side["says"] == ("yes" if docket["sides"][pids[0]] else "no"), "the side's answer is the docket's own"
     for side in sides:
         assert side["reason"] in " ".join(
             d["claims"][pid] for d in wire["docket"]["open"] for pid in d["claims"]
@@ -250,6 +261,11 @@ def test_edition_next_bet_carries_each_coachs_reason_through_the_coach_line_filt
     for d in bare["docket"]["open"]:
         d.pop("claims", None)
     assert [s["reason"] for s in _edition(bare)["blocks"]["next"]["data"]["bet"]["data"]["sides"]] == [None, None]
+
+
+def _days_back(day, n=7):
+    """``day`` and the six before it, newest first — the window the edition reads."""
+    return [(_dt.fromisoformat(day) - _td(days=i)).strftime("%Y-%m-%d") for i in range(n)]
 
 
 def _fake_route(bodies, fail=None):
@@ -330,23 +346,42 @@ def test_edition_serves_what_the_front_page_read_beside_it():
     b = _edition(wire)["blocks"]
     calls = b["calls"]
     assert calls["state"] == "ok" and calls["source"] == "/api/calls"
+    # The capture holds no call settled after the edition's day (the newest settles on the day itself),
+    # so the one-as_of filter is exercised on a copy of the newest call dated the next day (built, not captured).
+    newest = max(wire["calls"]["calls"], key=lambda c: c["settled_date"])
+    wire["calls"]["calls"].append(
+        {**newest, "id": "built-after-the-day", "settled_date": (_dt.fromisoformat(_CAPTURE_DAY) + _td(days=1)).strftime("%Y-%m-%d")}
+    )
+    b = _edition(wire)["blocks"]
+    calls = b["calls"]
     served = [c for c in wire["calls"]["calls"] if c["settled_date"] <= _CAPTURE_DAY]
     later = [c for c in wire["calls"]["calls"] if c["settled_date"] > _CAPTURE_DAY]
-    assert later, "the capture has no call settled after the edition's day — the one-as_of filter is untested"
+    assert later and "built-after-the-day" not in [c["id"] for c in calls["data"]["calls"]]
     assert [c["id"] for c in calls["data"]["calls"]] == [c["id"] for c in sorted(served, key=lambda c: c["settled_date"], reverse=True)]
     assert calls["as_of"] == max(c["settled_date"] for c in served) <= _CAPTURE_DAY
     assert all(set(c) <= set(_reads.FRONT_CALL_FIELDS) for c in calls["data"]["calls"])
     # The sheet: the level and how many areas it is across, dated the edition's day.
-    assert b["sheet"]["state"] == "ok" and b["sheet"]["as_of"] == _CAPTURE_DAY
+    assert b["sheet"]["state"] == "ok" and b["sheet"]["as_of"] == wire["character"]["character"]["as_of_date"]
     assert set(b["sheet"]["data"]["character"]) == {"level", "composite_pillar_count", "composite_pillar_total"}
-    # The capture's week had no coach line, and the lead had no weekly read: each says so.
-    assert b["moves"]["state"] == "absent" and b["moves"]["absent_text"] == "No coach line is recorded in these seven days."
-    assert b["lead_read"]["state"] == "absent" and b["lead_read"]["data"] is None
+    # The week's moves are as the wire holds them: a line anywhere in the seven days is "ok", none is "absent".
+    spoke = any(d.get("lines") for d in wire["moves"]["days"])
+    assert b["moves"]["state"] == ("ok" if spoke else "absent")
+    quiet = {"days": [{**d, "state": "absent", "lines": []} for d in wire["moves"]["days"]]}
+    silent = _edition({**wire, "moves": quiet})["blocks"]["moves"]
+    assert silent["state"] == "absent" and silent["absent_text"] == "No coach line is recorded in these seven days."
+    # The lead's weekly read: served when the wire's priority carries one, absent (with no data) when it does not.
+    lead = b["lead_read"]
+    if wire["priority"].get("weekly_priority"):
+        assert lead["state"] in {"ok", "stale"} and lead["data"]
+    else:
+        assert lead["state"] == "absent" and lead["data"] is None
 
 
 def test_edition_moves_carry_each_day_as_its_route_serves_it():
     wire = _wire()
-    days = [dict(d) for d in wire["moves"]["days"]]
+    # The capture's newest days carry lines; the state these assertions need (a quiet week with ONE
+    # line on the third day) is built from the capture's days with the others emptied.
+    days = [{**d, "state": "absent", "lines": []} for d in wire["moves"]["days"]]
     line = {
         "coach_id": "sleep_coach",
         "coach": "Lisa Park",
@@ -361,9 +396,7 @@ def test_edition_moves_carry_each_day_as_its_route_serves_it():
     days.append({**days[0], "date": "2026-09-20", "state": "ok", "lines": [line]})
     block = _edition({**wire, "moves": {"days": days}})["blocks"]["moves"]
     assert block["state"] == "ok" and block["as_of"] == days[2]["date"]
-    assert [d["date"] for d in block["data"]["days"]] == [
-        f"2026-{d}" for d in ("10-03", "10-02", "10-01", "09-30", "09-29", "09-28", "09-27")
-    ]
+    assert [d["date"] for d in block["data"]["days"]] == _days_back(_CAPTURE_DAY)
     # Read through the route with no date (read_bodies without its narrow readers): one day.
     one = _edition({**wire, "moves": days[0]})["blocks"]["moves"]
     assert one["state"] == "absent"
@@ -379,38 +412,56 @@ def test_edition_reads_seven_days_of_moves_and_a_failed_day_is_never_an_empty_on
 
     def read(path, qs):
         asked.append((path, dict(qs)))
-        if qs["date"] == "2026-10-01":
+        if qs["date"] == _days_back(_CAPTURE_DAY)[2]:
             return {"statusCode": 503, "body": _json.dumps({"error": "x"})}
         return {"statusCode": 200, "body": _json.dumps({"state": "absent", "date": qs["date"], "lines": []})}
 
     got = _reads.read_moves(read, _CAPTURE_DAY)
     days = [d["date"] for d in got["days"]]
     assert asked == [("/api/coach_moves", {"date": d}) for d in days]
-    assert days == ["2026-10-03", "2026-10-02", "2026-10-01", "2026-09-30", "2026-09-29", "2026-09-28", "2026-09-27"]
+    assert days == _days_back(_CAPTURE_DAY)
     failed = got["days"][2]
     assert failed["state"] == "unavailable" and failed["absent_text"].endswith("are not served right now.")
     assert _edition({**_wire(), "moves": got})["blocks"]["moves"]["state"] == "absent"
 
 
 def test_edition_coach_texts_from_different_days_are_each_dated():
-    """The wire's own two-day state: Lisa Park written 2026-10-03, Marcus Webb written
-    2026-10-02 (the other seats marked absent, so those two are the lines). Each line
-    carries its own as_of AND says which day it is from; same-day lines say nothing extra."""
+    """The wire's own state: the coaches' texts were written on different days. With no current day of
+    moves (so the restated path speaks) and every seat but the sleep and nutrition coaches marked absent,
+    those two are the lines. Each line carries its own as_of AND says which day it is from; same-day lines
+    say nothing extra. The days are read from the wire, never pinned."""
     wire = _wire()
     dash = _json.loads(_json.dumps(wire["dashboard"]))
+    dash["moves"] = None
+
+    def spoken(keep):
+        """The lines the restated path serves when only the seats in ``keep`` are present."""
+        d = _json.loads(_json.dumps(dash))
+        for c in d["coaches"]:
+            c["absent"] = c["coach_id"] not in keep
+        return _edition({**wire, "dashboard": d})["blocks"]["coach_lines"]
+
+    # Which seats the capture's restated text actually serves, and the day each was written.
+    day_of = {}
     for c in dash["coaches"]:
-        if c["coach_id"] not in ("sleep", "nutrition"):
-            c["absent"] = True
-    wire["dashboard"] = dash
-    block = _edition(wire)["blocks"]["coach_lines"]
+        got = spoken({c["coach_id"]})
+        if got["data"]:
+            day_of[c["coach_id"]] = got["data"]["lines"][0]["as_of"]
+    assert len(set(day_of.values())) >= 2, "the capture's coach texts are from at least two different days"
+    newest = max(day_of.values())
+    older = next(cid for cid, day in day_of.items() if day != newest)
+    newer = next(cid for cid, day in day_of.items() if day == newest)
+    block = spoken({older, newer})
     lines = block["data"]["lines"]
-    assert [ln["coach"] for ln in lines] == ["Lisa Park", "Marcus Webb"]
     assert block["data"]["mixed_days"] is True
-    assert {ln["as_of"] for ln in lines} == {"2026-10-03", "2026-10-02"}
-    assert [ln["when_text"] for ln in lines] == ["Written Saturday, October 3.", "Written Friday, October 2."]
-    # Same-day lines (the unmodified wire's top three are all 2026-10-03) carry no day note.
-    same = _edition(_wire())["blocks"]["coach_lines"]["data"]
-    assert same["mixed_days"] is False and all(ln["when_text"] is None for ln in same["lines"])
+    assert {ln["as_of"] for ln in lines} == {day_of[older], day_of[newer]}
+    for ln in lines:
+        assert ln["when_text"] == f"Written {_ed.day_in_words(ln['as_of'])}."
+    # Same-day lines carry no day note.
+    same = [cid for cid, day in day_of.items() if day == newest]
+    if len(same) > 1:
+        one_day = spoken(set(same))["data"]
+        assert one_day["mixed_days"] is False and all(ln["when_text"] is None for ln in one_day["lines"])
 
 
 def test_edition_record_never_serializes_the_count_without_the_comparison():
@@ -422,7 +473,10 @@ def test_edition_record_never_serializes_the_count_without_the_comparison():
     served = wire["predictions"]["overall"]
     count_text = f"{served['confirmed']} of {served['confirmed'] + served['refuted']} checked calls right."
     assert ok["data"]["count_text"] == count_text
-    assert ok["data"]["beats_simple_guess"] is False and ok["data"]["comparison_text"] == "So far they do not beat a simple guess."
+    skill = wire["calibration"]["platform"]["strata"]["coaches"]["brier_skill"]
+    beats = skill > 0
+    assert ok["data"]["beats_simple_guess"] is beats
+    assert ok["data"]["comparison_text"] == ("So far they beat a simple guess." if beats else "So far they do not beat a simple guess.")
     no_stratum = _json.loads(_json.dumps(wire["calibration"]))
     no_stratum["platform"]["strata"].pop("coaches")
     cases = {
@@ -485,7 +539,7 @@ def test_a_day_no_coach_spoke_is_stated_not_backfilled_with_restated_numbers():
     wire["dashboard"]["moves"] = _moves(_CAPTURE_DAY, [])
     block = _edition(wire)["blocks"]["coach_lines"]
     assert block["state"] == "absent" and block["voice"] == "move" and block["data"] is None
-    assert block["absent_text"] == "No coach had anything to say on Saturday, October 3."
+    assert block["absent_text"] == f"No coach had anything to say on {_ed.day_in_words(_CAPTURE_DAY)}."
 
 
 def test_stale_or_missing_moves_fall_back_to_the_restated_text():
@@ -507,17 +561,26 @@ def test_a_move_line_with_a_deficit_figure_or_a_cycle_count_is_dropped():
 def test_the_whole_life_rows_state_one_served_fact_per_area_in_order():
     """#4586: body, training, sleep, food, habits, supplements, experiments, mind — each a
     fact from its own route, none with a verdict."""
-    life = _edition(_wire())["blocks"]["life"]
+    wire = _wire()
+    life = _edition(wire)["blocks"]["life"]
     assert life["state"] == "ok" and life["data"]["order"] == list(_ed.LIFE_ORDER)
     rows = life["data"]["rows"]
     text = {k: (r["data"] or {}).get("text") for k, r in rows.items()}
-    assert text["body"] == "16.3 lb down so far; 126 lb to go to reach 185."
-    assert text["training"] == "Planned for today: Deadlift (Trap bar), Squat (Barbell) and 3 more."
-    assert text["sleep"] == "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
-    assert text["food"] == "At or above the 170 g protein floor on 9 of 28 logged days."
-    assert text["habits"] == "5 of 7 daily habits kept on Friday, October 2."
-    assert text["supplements"] == "21 in the daily stack."
-    assert text["experiments"] == "None running right now; 1 ready to start."
+    # Every figure is read from the wire body the row is made from, or the row's sentence shape is asserted.
+    j = wire["journey"]["journey"]
+    assert text["body"] == f"{j['lost_lbs']:g} lb down so far; {j['remaining_lbs']:g} lb to go to reach {j['goal_weight_lbs']:g}."
+    first = wire["session"]["exercises"][0]["name"]
+    assert text["training"].startswith(f"Planned for today: {first}") and text["training"].endswith(".")
+    assert re.fullmatch(r"Slept \d+(\.\d)? hours on the night of \w+, \w+ \d+; recovery \d+ out of 100\.", text["sleep"]), text["sleep"]
+    n = wire["nutrition"]["nutrition"]
+    assert (
+        text["food"]
+        == f"At or above the {n['protein_floor_g']:g} g protein floor on {n['protein_floor_hit_days']} of {n['days_logged']} logged days."
+    )
+    hs = wire["habits"]["habit_streaks"]
+    assert text["habits"].startswith(f"{hs['tier0_done']} of {hs['tier0_total']} daily habits kept on ")
+    assert text["supplements"] == f"{wire['supplements']['total_count']} in the daily stack."
+    assert re.fullmatch(r"(None running right now|Running now: .+)(; \d+ ready to start)?\.", text["experiments"]), text["experiments"]
     assert rows["mind"]["state"] == "stale" and rows["mind"]["absent_text"].startswith("Nothing new in his own words since")
     for row in rows.values():
         assert not ({"verdict", "status", "going_well"} & set(row.get("data") or {})), "a row carries a verdict (#4595 owns the rules)"
@@ -539,15 +602,34 @@ def test_the_last_seven_days_carry_one_value_per_day_and_never_a_zero_for_a_gap(
     week = _edition(_wire())["blocks"]["week"]
     assert week["state"] == "ok"
     d = week["data"]
-    assert d["days"] == ["2026-09-27", "2026-09-28", "2026-09-29", "2026-09-30", "2026-10-01", "2026-10-02", "2026-10-03"]
+    assert d["days"] == _days_back(_CAPTURE_DAY)[::-1]
     m = d["measures"]
-    assert m["weight"]["data"]["values"] == [314.5, 313.2, 312.3, 311.4, 311.7, 311.0, 311.0]
-    assert m["weight"]["data"]["text"] == "311 lb, down 3.5 across 7 weigh-ins."
-    assert m["training"]["data"]["text"] == "Trained on 7 of 7 days recorded."
-    assert m["sleep"]["data"]["text"] == "Slept 7 hours or more on 7 of 7 days recorded."
-    assert m["food"]["data"]["values"][0] is None and m["food"]["data"]["met"][0] is None
-    assert m["food"]["data"]["text"] == "At or above 170 g protein on 2 of 3 days recorded."
-    assert d["weight_series"][0] == {"date": "2026-09-06", "lbs": 327.3} and d["weight_series"][-1]["date"] == "2026-10-03"
+    wire = _wire()
+    # weight: the wire's own weigh-in per day, None for a day without one, and a sentence from those values
+    weights = [w for w in m["weight"]["data"]["values"] if w is not None]
+    assert len(m["weight"]["data"]["values"]) == 7 and weights, "seven slots, at least one weigh-in"
+    assert (
+        m["weight"]["data"]["text"].startswith(f"{weights[-1]:g} lb, ")
+        and f"across {len(weights)} weigh-ins." in m["weight"]["data"]["text"]
+    )
+    assert (
+        m["training"]["data"]["text"]
+        == f"Trained on {sum(1 for x in m['training']['data']['met'] if x)} of {sum(1 for x in m['training']['data']['met'] if x is not None)} days recorded."
+    )
+    met = m["sleep"]["data"]["met"]
+    assert (
+        m["sleep"]["data"]["text"]
+        == f"Slept 7 hours or more on {sum(1 for x in met if x)} of {sum(1 for x in met if x is not None)} days recorded."
+    )
+    food = m["food"]["data"]
+    floor = wire["nutrition"]["nutrition"]["protein_floor_g"]
+    assert [v is None for v in food["values"]] == [v is None for v in food["met"]], "a gap day is a gap in both"
+    assert all(
+        met_ == (v >= floor) for v, met_ in zip(food["values"], food["met"]) if v is not None
+    ), "the floor is the wire's, not a literal"
+    kept, logged = sum(1 for x in food["met"] if x), sum(1 for x in food["met"] if x is not None)
+    assert food["text"] == f"At or above {floor:g} g protein on {kept} of {logged} days recorded."
+    assert d["weight_series"][0]["date"] == wire["journey"]["journey"]["started_date"] and d["weight_series"][-1]["date"] <= _CAPTURE_DAY
 
 
 def test_a_measure_with_no_reading_this_week_is_absent_not_a_row_of_zeroes():
@@ -559,20 +641,24 @@ def test_a_measure_with_no_reading_this_week_is_absent_not_a_row_of_zeroes():
 
 def test_each_of_the_seven_days_opens_to_what_was_recorded_that_day():
     """#4586 (tap a day): newest first; a measure with no reading that day is left out."""
-    detail = _edition(_wire())["blocks"]["week"]["data"]["detail"]
-    assert [d["date"] for d in detail][:2] == ["2026-10-03", "2026-10-02"] and len(detail) == 7
+    wire = _wire()
+    detail = _edition(wire)["blocks"]["week"]["data"]["detail"]
+    assert [d["date"] for d in detail] == _days_back(_CAPTURE_DAY) and len(detail) == 7
     newest = detail[0]
-    assert newest["summary"] == "311.0 lb · trained · slept 8.8 h"
-    assert newest["facts"] == [
-        {"label": "Weight", "text": "311.0 lb"},
-        {"label": "Training", "text": "241 minutes of walking"},
-        {"label": "Sleep", "text": "8.8 hours; recovery 98 out of 100"},
-        {"label": "Food", "text": "153 g protein, 1,732 kcal"},
-    ]
+    assert re.fullmatch(r"\d+\.\d lb( · trained)?( · slept \d+(\.\d)? h)?", newest["summary"]), newest["summary"]
+    assert [f["label"] for f in newest["facts"]][:1] == ["Weight"]
     # Steps stay off the front page's day (unreliable on days the phone is not carried).
     assert "Steps" not in [f["label"] for d in detail for f in d["facts"]]
-    oldest = detail[-1]
-    assert "Food" not in [f["label"] for f in oldest["facts"]], "no food row was served for that day: the day must not invent one"
+    # A day carries a Food fact exactly when the wire has a food row for it: the day must not invent one,
+    # and must not drop one it was served. The protein and kcal are the row's own.
+    fed = {r["date"]: r for r in wire["nutrition"]["nutrition_trend"]}
+    for d in detail:
+        food = [f for f in d["facts"] if f["label"] == "Food"]
+        assert bool(food) == (d["date"] in fed), d["date"]
+        if food:
+            row = fed[d["date"]]
+            assert food[0]["text"] == f"{row['protein_g']:g} g protein, {row['calories']:,} kcal"
+    assert any("Food" not in [f["label"] for f in d["facts"]] for d in detail), "the capture has a day without a food row"
 
 
 def test_a_day_with_no_rows_at_all_says_nothing_was_recorded():
@@ -626,13 +712,14 @@ def test_the_owner_words_fixture_is_the_routes_own_silence_body():
 def test_a_fresh_owner_note_leads_his_words_exactly_as_typed_with_its_date_and_prompt():
     wire = _wire()
     typed = "  honestly tired —  but still here,, and the walk helped  "
-    wire["owner_words"] = _owner_words(_entry(typed, "2026-10-02", prompt="How did the week feel?"), _entry("older", "2026-09-30"))
+    fresh, older = _days_back(_CAPTURE_DAY, 3)[2], _days_back(_CAPTURE_DAY, 5)[4]  # inside the 7-day window, relative to the edition's day
+    wire["owner_words"] = _owner_words(_entry(typed, fresh, prompt="How did the week feel?"), _entry("older", older))
     block = _edition(wire)["blocks"]["his_words"]
-    assert block["state"] == "ok" and block["source"] == "/api/owner_words" and block["as_of"] == "2026-10-02"
+    assert block["state"] == "ok" and block["source"] == "/api/owner_words" and block["as_of"] == fresh
     assert block["data"]["text"] == typed, "served byte for byte: no trim, no tidy"
-    assert block["data"]["prompt"] == "How did the week feel?" and block["data"]["date_text"] == "Friday, October 2"
+    assert block["data"]["prompt"] == "How did the week feel?" and block["data"]["date_text"] == _ed.day_in_words(fresh)
     mind = _edition(wire)["blocks"]["life"]["data"]["rows"]["mind"]
-    assert mind["state"] == "ok" and mind["as_of"] == "2026-10-02"
+    assert mind["state"] == "ok" and mind["as_of"] == fresh
 
 
 def test_silence_or_an_old_owner_note_falls_back_to_the_decisions_note():

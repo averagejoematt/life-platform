@@ -451,3 +451,20 @@ def test_the_gate_is_wired_into_the_nightly_sweep():
 
     labels = [label for label, _fn in qa_smoke_lambda.check_steps()]
     assert "week_narration_agreement" in labels
+
+
+# premerge-gate: 3615 boxes 2+3: a glob sweep of lambdas/{web,emails,compute,content,coach} for modules that restate a week fact, each of which must be a registered surface or carry a reason. Same shape, same reason: a NEW narrating surface must be classified in the PR that adds it, not discovered by a human reading two pages side by side (which is how all five 2026-09-05 contradictions were found).
+
+
+# ── #4907: both stats_line shapes read through the one parser ────────────────────
+LIVE_STORY_DESK_LINE = "Day 25 to Day 31 · 308.9 lbs (-3.5 this week) · 4 training sessions"
+LEGACY_LINE = "Weight: 305.4 lbs | Week Grade: avg 70 | T0 Streak: 1 days"
+
+
+def test_stats_line_weight_reads_live_and_legacy_shapes_4907():
+    from operational.week_agreement_qa import _t_stats_line_weight
+
+    assert _t_stats_line_weight(LIVE_STORY_DESK_LINE) == (308.9, None)
+    assert _t_stats_line_weight(LEGACY_LINE) == (305.4, None)
+    assert _t_stats_line_weight("Prologue, no numbers") == (None, None)
+    assert _t_stats_line_weight(None) == (None, None)

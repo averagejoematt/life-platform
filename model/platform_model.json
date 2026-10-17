@@ -3092,6 +3092,13 @@
     {
       "direction": "unknown",
       "lambda": null,
+      "module": "lambdas/health/clinical_facts.py",
+      "partition": "clinical",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
       "module": "lambdas/health/flourishing.py",
       "partition": "flourishing",
       "via": "pk"
@@ -7669,12 +7676,12 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 741,
+      "edges": 742,
       "lambdas": 108,
       "mcp_tool_modules": 36,
       "mcp_tools": 88,
-      "partitions": 115,
-      "privacy_fields_owner_only": 33,
+      "partitions": 116,
+      "privacy_fields_owner_only": 35,
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 18,
       "privacy_sources_owner_published": 3,
@@ -7684,8 +7691,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 361,
-        "sites_resolved": 929,
-        "sites_total": 1290
+        "sites_resolved": 931,
+        "sites_total": 1292
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -7790,6 +7797,11 @@
       "class": "experiment_scoped",
       "ingestion": false,
       "privacy_tier": "public"
+    },
+    "clinical": {
+      "class": "cross_phase",
+      "ingestion": false,
+      "privacy_tier": "internal"
     },
     "coach_actions": {
       "class": "experiment_scoped",
@@ -8358,6 +8370,8 @@
         "height_m",
         "hydration_kg",
         "intracellular_water_kg",
+        "measurement_attrib",
+        "measurement_group_attribs",
         "metabolic_age",
         "muscle_mass_kg",
         "muscle_mass_lbs",
@@ -8433,6 +8447,8 @@
         "height_m": "owner_only",
         "hydration_kg": "owner_only",
         "intracellular_water_kg": "owner_only",
+        "measurement_attrib": "owner_only",
+        "measurement_group_attribs": "owner_only",
         "metabolic_age": "owner_only",
         "muscle_mass_kg": "owner_only",
         "muscle_mass_lbs": "owner_only",
@@ -8450,6 +8466,7 @@
     },
     "sources": {
       "cgm_readings": "owner_only",
+      "clinical": "internal",
       "coach_vision": "owner_only",
       "dexa": "owner_published",
       "felt_probe": "owner_only",

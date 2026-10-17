@@ -185,3 +185,6 @@ def test_no_case_twin_namespaces_anywhere():
     assert not twins, "CloudWatch namespace casing twins (case-sensitive to CloudWatch, invisible to a reader):\n" + "\n".join(
         f"  {k}: {v}" for k, v in sorted(twins.items())
     )
+
+
+# premerge-gate: #3002: one site-API metric namespace, no casing twins — repo-shape sweep, pre-merge

@@ -1824,6 +1824,15 @@ UNREGISTERED_PARTITIONS: dict[str, dict[str, str]] = {
 # `unmodeled_legacy` (nothing to resolve; it exists so a reader sees an honest,
 # explained gap instead of silently inferring one doesn't exist).
 NON_INGESTION_RAW_PREFIXES: dict[str, dict[str, str]] = {
+    "raw/matthew/clinical": {
+        "dated": "2026-10-12",
+        "note": "The owner clinical record's source documents (ECG exports, clinical reports) at "
+        "raw/matthew/clinical/<YYYY-MM-DD>/<filename>, uploaded by the owner via "
+        "scripts/load_clinical_record.py --apply — a human upload, not an ingestion source, so no "
+        "SOURCE_REGISTRY raw_layout. Declared before the first object exists (the progress_photos "
+        "posture, #3757). TIER_INTERNAL (ADR-155 amendment, 2026-10-12): no CloudFront route and no "
+        "public projection; the DDB partition `clinical` indexes each document by `s3_key`.",
+    },
     "raw/inbound_email": {
         "dated": "2026-09-06",
         "note": "Legacy no-user-segment inbound-email capture prefix, 4 objects live-confirmed 2026-09-06 — see "
@@ -1861,6 +1870,7 @@ EXTRA_QUERYABLE_PARTITIONS = (
     # made it invisible, which is how a restatement survives).
     "dexa",
     "genome",
+    "clinical",  # ADR-155 amendment (2026-10-12): owner clinical record — owner-written, TIER_INTERNAL
     "state_of_mind",
     "habit_scores",
     "health_auto_export",

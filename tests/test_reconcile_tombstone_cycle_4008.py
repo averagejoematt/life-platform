@@ -100,3 +100,6 @@ def test_MUTATION_the_later_cycle_comparison_is_load_bearing(monkeypatch):
         [_row("USER#matthew#SOURCE#insights", "DATE#a", "experiment_restart_2026-09-05", 16)], GENESES, ABANDONED, rv=rv
     )
     assert plan == [], "with the comparison inverted the opening row is no longer corrected — so the real line is load-bearing"
+
+
+# premerge-gate: #4008: the opening-cycle tombstone re-stamp planner — pure, mutation-guarded, reuses check 22's predicate

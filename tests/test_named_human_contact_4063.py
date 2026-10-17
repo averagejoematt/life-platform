@@ -621,3 +621,6 @@ def test_no_real_identity_in_this_file():
     """This file's own fake must stay on a reserved TLD."""
     assert FAKE_EMAIL.endswith(".invalid") and OWNER.endswith(".invalid")
     assert os.path.basename(__file__) == "test_named_human_contact_4063.py"
+
+
+# premerge-gate: 4063: greps every tracked file for a contact-shaped address (the named human's identity lives ONLY in the private S3 config). Pure repo shape: a PR that adds the contact to this PUBLIC tree must red on itself, before the merge publishes it.

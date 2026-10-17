@@ -279,3 +279,5 @@ def test_registered_description_states_the_cross_phase_all_time_guarantee():
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+# premerge-gate: 4030: the all-time exercise-history read must never be wrapped in the ADR-058 phase filter — `SOURCE#hevy` is raw_timeseries (cross-phase by the taxonomy's own ruling), and with the filter on the tool answered from the current cycle only: 15 of 499 workouts, the owner's June RDL session absent, "no logged sets found" for a movement with 250 of them. The fake table IS the wire (it applies the real

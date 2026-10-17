@@ -122,3 +122,6 @@ def test_positive_control_a_missing_canonical_is_detected(tmp_path):
     f.write_text("<html><head><title>no canonical here</title></head><body></body></html>", encoding="utf-8")
     html = f.read_text(encoding="utf-8")
     assert re.search(r'<link rel="canonical" href="([^"]+)"', html) is None
+
+
+# premerge-gate: 3567: imports qa/qa_manifest.py to derive the sitemap's own registry-vs- disk consistency (registry membership, live noindex, self-matching canonical) — same shape as the 20 files above, joined by the same import-detection rule.

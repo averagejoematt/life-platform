@@ -324,3 +324,6 @@ def test_data_governance_names_the_reader_input_prefix():
     text = GOVERNANCE_DOC.read_text(encoding="utf-8")
     assert f"`{store.READER_INPUT_PREFIX}`" in text, "docs/DATA_GOVERNANCE.md needs the reader_input/ row (#3559 acceptance)"
     assert "#3559" in text
+
+
+# premerge-gate: 3559: AST sweep of lambdas/ — every reader-input capture door keys through web.site_api_capture_store.capture_key(), whose prefix is derived-not-public against deploy/bucket_policy.json. A door minting its own `generated/` key must red BEFORE merge: after it, the next reader's email is on a public prefix.

@@ -233,3 +233,6 @@ def test_the_tier_is_still_owner_only():
     from privacy.field_tiers import TIER_OWNER_ONLY, source_tier_of
 
     assert source_tier_of("progress_photos") == TIER_OWNER_ONLY
+
+
+# premerge-gate: 3760: an rglob sweep of site/** + scripts/** asserting the private progress viewer's route appears in no shipped byte, no sitemap/feed/redirects map, and no QA-manifest page entry — plus the edge behaviour and the two IAM grants that make it a presign-only read. Pure repo shape, and it must red BEFORE the merge for the reason the route exists: a nav partial or a sitemap generator that starts emitt

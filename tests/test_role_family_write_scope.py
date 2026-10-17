@@ -972,3 +972,6 @@ def test_MUTATION_a_put_only_grant_reds_on_the_hold_read():
     assert _hold_prefix_s3_actions('s3.get_object(Bucket=B, Key=f"{HOLD_PREFIX}/wk1.json")\ns3.get_object(Key="other/x")') == {
         "s3:GetObject"
     }
+
+
+# premerge-gate: 3596: IAM write-scope parity as a ROLE FAMILY — every create_platform_lambda's module AST-read for DynamoDB write verbs and pk literals, checked against the role_policies* statement its stack wires to it. Pure repo shape (~3s, the live leg is @integration and deselected here). Pre-merge because the PR that ADDS the write is the only moment the grant is a decision: after it, a FakeDdbTable cannot d

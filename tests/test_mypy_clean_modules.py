@@ -38,7 +38,7 @@ _MYPY_INI = ROOT / "mypy.ini"
 # ratchet tightening) is welcome; adding one silently weakens the whole clean
 # gate and is caught here. To empty a code, remove it from mypy.ini AND from this
 # set in the same PR. Kept in lockstep with mypy.ini's documented "still disabled"
-# note. Currently: 4 structural codes (see mypy.ini for why each remains).
+# note. Currently: 3 structural codes (see mypy.ini for why each remains).
 GLOBAL_DISABLE_BASELINE = {"assignment", "arg-type", "operator"}
 
 
@@ -74,6 +74,31 @@ def test_core_modules_are_in_the_clean_set() -> None:
     clean = set(clean_modules())
     missing = [m for m in CORE if m not in clean]
     assert not missing, f"CORE modules absent from the clean set (glob/denylist drift?): {missing}"
+
+
+_COUNT_LITERAL = re.compile(r"\b(\d+)[\s-]+(?:\w+\s+)?modules?\b")
+
+
+def _stale_count_literals(text: str, live: int) -> list[int]:
+    """Every "N modules" literal in `text` whose N is not the live clean-set size."""
+    return [int(n) for n in _COUNT_LITERAL.findall(text) if int(n) != live]
+
+
+def test_mypy_ini_module_count_literal_matches_clean_set() -> None:
+    """mypy.ini may state the clean-set size only if it is true (#4883)."""
+    live = len(clean_modules())
+    stale = _stale_count_literals(_MYPY_INI.read_text(encoding="utf-8"), live)
+    assert not stale, f"mypy.ini states {stale} modules; the live clean set is {live}"
+
+
+def test_module_count_literal_check_can_fail() -> None:
+    """Mutation control: a wrong literal is flagged, a right one is not."""
+    live = len(clean_modules())
+    assert _stale_count_literals(f"plus mcp/ ({live + 1} modules; x)", live) == [live + 1]
+    assert _stale_count_literals(f"plus mcp/ ({live} modules)", live) == []
+    assert _stale_count_literals(f"the full {live + 1}-module surface", live) == [live + 1]
+    assert _stale_count_literals(f"{live + 1} Python modules", live) == [live + 1]
+    assert _stale_count_literals(f"the full {live}-module surface", live) == []
 
 
 def test_denylist_entries_exist() -> None:
@@ -205,3 +230,6 @@ def test_this_docstring_names_no_error_codes() -> None:
     # Non-vacuity: the scan must be able to find a code at all.
     assert codes, "mypy.ini disables nothing — this guard has no subject and would pass vacuously"
     assert any(c in f"a docstring mentioning {c} here" for c in codes)
+
+
+# premerge-gate: tier-2 types (real only when mypy is installed — the lane installs it)

@@ -1898,6 +1898,38 @@ GUARD_PROOFS.update(
     }
 )
 
+STRUCTURAL_HAND_PROOFS.update(
+    {
+        # #4880: the function-length ratchet (D3) — the module-size guard's shape, one level down.
+        "structural::test_function_length_guard_4880.py": {
+            "gate_name": "test_function_length_guard_4880.py",
+            "command": "python3 -m pytest tests/test_function_length_guard_4880.py -q -p no:randomly   # baseline 11 passed",
+            "mutation": (
+                "three plants in the real tracked tree, ONE AT A TIME, each restored from a byte copy, "
+                "FUNCTION_LENGTH_COUNTS never edited: (a) a 151-logical-line `_tree_planted_4880` appended to "
+                "lambdas/web/site_api_lambda.py (a scanned, non-generated module); (a') the same function at 150 "
+                "lines, the boundary control; (b) one code line inserted into the recorded "
+                "deploy/restart_leadin_pages.py::render_post_html (recorded 171); (c) a comment line plus a blank "
+                "line inserted into the same function — the #3537 negative control."
+            ),
+            "observed": (
+                "(a) exit 1, 1 failed / 10 passed — `test_no_new_overlong_function` "
+                "('lambdas/web/site_api_lambda.py::_tree_planted_4880: 151 lines'). (a') 11 passed. "
+                "(b) exit 1, 1 failed / 10 passed — `test_recorded_functions_do_not_grow` "
+                "('render_post_html: 172 lines, recorded 171 (+1)'). (c) 11 passed. Reverted 11 passed."
+            ),
+            "scope": (
+                "git-tracked *.py under lambdas/ mcp/ scripts/ deploy/ only (cdk/ and tests/ are out); the unit is "
+                "the #3537 logical line, so comment/blank growth never reds; generated-header files and a def "
+                "carrying `# function-length-exception: <reason>` on the line above are exempt; an unparseable "
+                "file measures nothing (py_compile owns that). Lowering a recorded number after a shrink is "
+                "allowed, not forced."
+            ),
+            "proved_on": "2026-10-12",
+        },
+    }
+)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # QA_PROOFS — census family 3 (qa-smoke-check). Same `Proof` bar; here, like
@@ -3370,6 +3402,41 @@ GUARD_PROOFS.update(
                 "`inbound-auth-gate-bypassed` alarm, not by this proof."
             ),
             "proved_on": "2026-10-11",
+        },
+    }
+)
+
+
+# ── #4632 (2026-10-15): the habit-registry drift check ───────────────────────────────────
+# `scripts/check_habit_registry_drift.py` (family 2, guard-script) reports, as counts only,
+# the name-keyed habit structures a Habitify rename would orphan; its offline twin is
+# fixture-driven and needs no creds. Three plants in the REAL tracked script, one at a time,
+# restored from a pre-mutation copy and md5-verified byte-identical between each.
+GUARD_PROOFS.update(
+    {
+        "guard::scripts/check_habit_registry_drift.py": {
+            "gate_name": "scripts/check_habit_registry_drift.py",
+            "command": "python3 -m pytest tests/test_habitify_rename_alias_merge_4655.py -q -p no:cacheprovider   # baseline 16 passed; the two drift tests are the fixture-driven twin",  # noqa: E501
+            "mutation": (
+                "M1: main()'s `return 1 if drifted else 0` -> `return 0` (the exit code stops carrying the verdict). "
+                "M2: `_bridge_live()` -> `return True` (a SUPPLEMENT_MAP key that no live habit answers to reads as live). "
+                'M3: the `not e.get("is_archived")` filter dropped from live_names() (an archived habit counts as live). '
+                "md5 8df4b10acc1198bed5c2900d3ef440af before, after each restore, and at the end; tree clean afterwards."
+            ),
+            "observed": (
+                "2026-10-15. BASELINE 16 passed. M1: 1 failed / 15 passed (test_the_drift_check_fails_on_each_kind_of_orphan — "
+                "the orphaned fixtures exited 0). M2: 1 failed / 15 passed (the same test — bridge_without_live read 0 on the "
+                "orphaned-bridge fixture). M3: 16 passed — SURVIVED: no fixture carries an archived journal entry, so the "
+                "archived filter is not under test. RESTORED: 16 passed."
+            ),
+            "scope": (
+                "Proves the exit code and the bridge-resolution count are load-bearing for the fixture twin. The archived "
+                "filter (M3) is unproven by this record — a fixture with `is_archived: true` would close it. The `--live` path "
+                "(Secrets Manager + vendor GET + one DynamoDB GetItem, read-only) is `# pragma: no cover` and not exercised "
+                "here; the script is standalone/manual, not wired into blocking CI, so a rename is caught on the next "
+                "invocation, not automatically."
+            ),
+            "proved_on": "2026-10-15",
         },
     }
 )

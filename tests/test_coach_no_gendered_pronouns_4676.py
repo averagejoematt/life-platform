@@ -171,3 +171,6 @@ def test_served_detector_catches_a_planted_pronoun():
     # a coach "He" right after a sentence about Matthew is NOT excused
     assert coach_pronoun_offenders({"x": {"r": "Matthew sleeps badly. He flags it before anyone else."}})
     assert coach_pronoun_offenders({"x": {"r": "Matthew's plan is his own."}}) == []
+
+
+# premerge-gate: #4676: glob sweep of config/coaches/*.json + board members — no gendered pronoun in a coach self-description

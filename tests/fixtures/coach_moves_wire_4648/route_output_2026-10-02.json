@@ -36,5 +36,27 @@
    "replies_to": "Max Reyes",
    "bet_settles": "2026-10-09"
   }
+ ],
+ "absent": [
+  {
+   "coach": "glucose_coach",
+   "state": "absent",
+   "reason": "No new readings have reached this coach's area, so there is nothing new to read."
+  },
+  {
+   "coach": "mind_coach",
+   "state": "absent",
+   "reason": "This coach's line did not pass the day's checks, so it was held back."
+  },
+  {
+   "coach": "labs_coach",
+   "state": "absent",
+   "reason": "This coach had nothing new to add."
+  },
+  {
+   "coach": "explorer_coach",
+   "state": "absent",
+   "reason": "This coach had nothing new to add."
+  }
  ]
 }

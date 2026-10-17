@@ -57,11 +57,21 @@ test("the coaches' record never appears without its comparison", () => {
   const html = B.recordHTML(SRC.predictions);
   const o = SRC.predictions.overall;
   assert.match(html, new RegExp(`<b>${o.confirmed} right, ${o.refuted} wrong</b>`));
-  assert.match(html, new RegExp(`data-coach-comparison[^>]*>Across ${o.confirmed + o.refuted} checked calls, so far they (do not )?beat a simple guess\\.`));
+  // The comparison is the served sentence, verbatim (its shape changes with the engine: one skill line, or one line per kind of call).
+  const served = SRC.predictions.comparison.sentence.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  assert.ok(served.length > 20 && html.includes(`data-coach-comparison data-src="api_predictions.comparison.sentence">${served}</p>`), "the served comparison sentence, beside the count");
   assert.match(html, /As of [A-Z][a-z]+ \d+\. Code does the grading/);
   const noCmp = B.recordHTML({ overall: SRC.predictions.overall });
   assert.match(noCmp, /What a simple guess would have scored on these calls is not available right now\./);
   assert.match(B.recordHTML({ overall: { confirmed: 0, refuted: 0 } }), /not available right now/, "no checked calls is not printed as 0 and 0");
+});
+
+test("a long per-kind comparison folds under a summary right below the count; a short one stays open (#4864)", () => {
+  const long = B.recordHTML(SRC.predictions);
+  assert.match(long, /<\/span><\/div><details><summary>What a simple guess scored on the same calls<\/summary><p [^>]*data-coach-comparison/);
+  const short = B.recordHTML({ ...SRC.predictions, comparison: { sentence: "Across 152 checked calls, so far they do not beat a simple guess." } });
+  assert.doesNotMatch(short, /<details>/);
+  assert.match(short, /data-coach-comparison/);
 });
 
 const at = (obj, path) => path.split(".").reduce((o, k) => (o == null ? undefined : o[k]), obj);

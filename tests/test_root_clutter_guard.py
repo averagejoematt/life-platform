@@ -118,3 +118,6 @@ def test_guard_allows_deletion_below_the_allowlist():
     """A tree that is a strict subset of the allowlist passes — pruning dirs never reds CI."""
     shrunk = set(list(ALLOWLIST)[:3])
     assert _unlisted(shrunk, ALLOWLIST) == []
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

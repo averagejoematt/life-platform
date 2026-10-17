@@ -98,3 +98,6 @@ def test_every_lambdas_package_has_an_init():
         + ". The bundle stages lambdas/ at the zip root, so handlers reach these via "
         "`from <pkg> import <module>` — without __init__.py that fails at cold start."
     )
+
+
+# premerge-gate: ADR-146: no loose modules at the lambdas/ root

@@ -122,6 +122,17 @@ was the drift class itself). Manual `sync_site_to_s3.sh` remains sanctioned for
 attended work (its clobber guard still protects a stale checkout), but merge-to-main
 is the default ship path for the site.
 
+**A red site-deploy is silent (#3878, #4703).** The workflow has no production gate and
+nothing pages on its failure, so merged `site/**` work can publish-and-revert, or never
+publish, for days — 3 d in 2026-09 (two sub-floor labels), 23 h in 2026-10 (a stale
+`as of` stamp under the #3515 proof-freshness guard; `docs/INCIDENT_LOG.md` row
+2026-10-14). The reflex: **read the newest `site-deploy.yml` run's conclusion at boot
+(the SessionStart pre-flight prints it) and before merging anything under `site/**` or
+a `scripts/v4_build_*.py` generator** — a `failure` there means the merge will deploy and
+vanish; fix the gate-failing surface first. The workflow's `paths` exclude `scripts/`,
+so a generator fix needs `gh workflow run site-deploy.yml`, and its conclusion is read
+too. Verify a site change by the live page's content, never by the merge.
+
 ## 3. Squash-merge drops unpushed commits — verify before merge, `cdk diff` before deploy
 
 A squash captures whatever is on the **remote PR branch** at merge time, not the local
@@ -507,7 +518,7 @@ check.** The detector now also follows imports into sweeping `tests/` helpers; t
 found 22 unclassified files (20 added to the lane, 2 excluded with reasons).
 
 **Owner:** whoever changes the pre-merge lane owns this section. Adding a structural gate
-= add it to `_PREMERGE_EXTRA_FILES` **in the same PR** (a guard whose verdict depends only
+= add a `# premerge-gate: <reason>` line (line start) to the test file **in the same PR** (#4270: `_PREMERGE_EXTRA_FILES` is derived from that marker, not hand-listed) (a guard whose verdict depends only
 on the repo tree has no business running after the merge). If you find yourself hand-listing
 test paths in a brief again, that is the defect this section exists to stop.
 
@@ -1551,6 +1562,7 @@ commit — the step letters below stay the per-gate contract anchors):
 | Defect class | Owning gate | Where |
 |---|---|---|
 | Unformatted/unsorted Python, a stale-typed module, a syntax error | Lint job (`black`/`ruff`/`mypy`/`py_compile`) | §4 above |
+| A function grows past 150 logical lines, or one already over it grows further — a module-size ceiling cannot see a long function inside a mid-sized module (craft review 2026-10-13 finding 5: no gate bounded function length) | Function-length ratchet (#4880, D3): AST + #3537 logical-line measure over git-tracked `lambdas/ mcp/ scripts/ deploy/`; a new over-ceiling function reds, a recorded one may not grow past its number, an entry that dropped under or vanished must be pruned; the debt is pinned in the down-only `FUNCTION_LENGTH_COUNTS` (`python3 tests/test_function_length_guard_4880.py` prints the live table). Whether it becomes a written `docs/ENGINEERING_STANDARDS.md` rule awaits an owner direction | `tests/test_function_length_guard_4880.py`; module-size sibling `tests/test_module_size_guard.py` |
 | The inbound-email door loses its authentication verdict: a fallback address returns to the parser's allowlist, a record-writing call moves above the sender verdict, the SES receipt rule's gate action stops being the rule's first and only RequestResponse action, or the gate's role grows a grant (#4633 — the 2026-10-04 sweep's top security finding) | Inbound auth verdict pins: the gate's disposition on real receipt shapes, the parser's refusal on every route, the no-fallback AST check, the write-site inventory below the verdict, the CDK rule's static shape | `tests/test_inbound_auth_gate_4633.py` · `cdk/stacks/operational_stack.py` §9a |
 | A reader page's static main content gains a builder term the vocabulary registry ruled cut/renamed, or an unglossed keep-with-gloss term (#4182 ruling vii) | Vocabulary registry guard + shrink-only ledger | `site/data/glossary.json` (registry) · `tests/test_site_vocabulary_registry.py` · `ledgers/site_vocabulary_residue.py` |
 | A new page joins the nav-reachable set from `/` without the reach ceiling being lowered first (#4182 ruling vi — 39 at landing, the owner's cap set by lowering the number) | Static-reach ratchet | `tests/test_site_nav_reach_ratchet.py` · `tests/site_text.py` (the census) |

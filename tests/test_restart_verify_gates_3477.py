@@ -508,3 +508,6 @@ def test_main_ACTUALLY_INVOKES_the_pytest_and_js_legs(tmp_path, monkeypatch):
     assert len(pytest_legs) == 1, f"the sweep did not run the derived pytest leg — it ran {seen}"
     assert set(rvg.reset_artifact_test_files()) <= set(pytest_legs[0])
     assert ["node", "--test"] in seen, "the sweep did not run the v4 site gate's JS suite"
+
+
+# premerge-gate: structural gate that sweeps the repo tree (#2372)

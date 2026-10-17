@@ -583,3 +583,6 @@ def test_the_training_notes_residual_carries_a_re_derivation_not_a_retry():
     assert "2026-09-19" in _read("lambdas/training/training_notes_llm.py"), "the re-derivation is undated in its own source"
     # The residual is a re-derivation, NOT a retry: this site must stay off the chokepoint.
     assert "invoke_until_readable_verdict" not in _read("lambdas/training/training_notes_llm.py")
+
+
+# premerge-gate: 3688: source sweep of lambdas/ mcp/ scripts/ deploy/ cdk/ + the three QA harness files for every site that DECIDES on `stop_reason == "max_tokens"`. A registry-join check, and pre-merge by construction: a NEW AI judge inherits the no-retry default silently, and its failure mode — `ai-unevaluated`, which qa/visual_qa_verdict.py routes to DECLINE — cannot revert a deploy, so post-merge there is noth

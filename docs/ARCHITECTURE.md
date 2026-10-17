@@ -1,8 +1,8 @@
 # Life Platform — Architecture
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-10-11 (v8.6.0 — 88 tools, 69-module MCP package, 20 data sources, 108 Lambdas, 26 secrets, 135 alarms, 10 CDK stacks deployed).
+Last updated: 2026-10-17 (v8.6.0 — 88 tools, 69-module MCP package, 20 data sources, 108 Lambdas, 26 secrets, 135 alarms, 10 CDK stacks deployed).
 
 > **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **Home + five doors** (v5 IA): the cockpit (`/cockpit/`, live data), the data (`/data/`, the evidence archive — old `/evidence/*` slugs 301), the coaching, the protocols, and the story (`/story/`, the writing hub); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **159 ADRs** (ADR-001 → ADR-161 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
@@ -10,7 +10,7 @@ Last updated: 2026-10-11 (v8.6.0 — 88 tools, 69-module MCP package, 20 data so
 
 ## Overview
 
-The life platform is a personal health intelligence system built on AWS. It ingests data from twenty sources (thirteen scheduled + one webhook + three manual/periodic + two MCP-managed + one State of Mind via webhook), normalises everything into a single DynamoDB table, and surfaces it to Claude through a Lambda-backed MCP server. The design philosophy is: get data in automatically, store it cheaply, and make it queryable without a data engineering background.
+The life platform is a personal health intelligence system built on AWS. It ingests data from ~twenty sources (the per-source method, cadence and paused state are the `method`/`stale_hours`/`paused` facets in `lambdas/ingestion/source_registry.py` — the breakdown is not hand-restated here), normalises everything into a single DynamoDB table, and surfaces it to Claude through a Lambda-backed MCP server. The design philosophy is: get data in automatically, store it cheaply, and make it queryable without a data engineering background.
 
 ---
 
@@ -20,9 +20,10 @@ The life platform is a personal health intelligence system built on AWS. It inge
 ┌─────────────────────────────────────────────────────────────┐
 │  INGEST LAYER                                               │
 │  Scheduled Lambdas (EventBridge) + S3 Triggers + Webhooks   │
-│  Whoop · Withings · Strava · Eight Sleep · MacroFactor      │
-│  Garmin · Apple Health · Habitify · Notion Journal          │
-│  Health Auto Export (webhook — CGM/BP/SoM) · Weather        │
+│  Whoop · Withings · Strava (Garmin watch via Strava)        │
+│  Eight Sleep · MacroFactor · Habitify · Notion Journal      │
+│  Health Auto Export (webhook — Apple Health: CGM/BP/SoM) ·  │
+│  Weather · Hevy · Todoist · social feeds                    │
 │  Supplements (MCP write) · Labs · DEXA · Genome (seeds)     │
 └────────────────────────┬────────────────────────────────────┘
                          │ normalised records
@@ -74,7 +75,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | S3 bucket (backup) | Cross-region replica of the irreplaceable zone | `matthew-life-platform-raw-backup` (**us-east-2**) — receives `raw/*` by S3 replication (DIL-027/#3042). Versioned, public-access-blocked, `RETAIN`, its own delete-protection Deny; delete markers are **not** replicated. CDK-owned in `backup_stack.py`; the source-side replication rule is out-of-IaC (`deploy/s3_replication.json`, see MANAGED_WHERE_LEDGER). Same account — see the DIL-027 priced residual |
 | SQS queue | Dead-letter queue | `life-platform-ingestion-dlq` |
 | Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>` (OAuth 2.1 auto-approve + HMAC Bearer) |
-| API Gateway | HTTP endpoint | `health-auto-export-api` (a76xwxt2wa) — webhook ingest |
+| API Gateway | HTTP endpoint | `health-auto-export-api` (`p6clybdkkc`, CDK-owned; the older `a76xwxt2wa` is the retired orphan — `tests/test_teardown_hae_orphan_api.py`) — webhook ingest |
 | Secrets Manager | Credential store | **26 active secrets** at $0.40/month each = **~$10.40/month**
 | SNS topic | Alert routing | `life-platform-alerts` (urgent) + `life-platform-alerts-digest` (batched daily by `alert-digest-lambda` per ADR-050) |
 | CloudFront (amj) | CDN (public) | `E3S424OXQZ8NBE` → site-api Lambda + S3 `/site`, alias `averagejoematt.com` |
@@ -96,13 +97,13 @@ The life platform is a personal health intelligence system built on AWS. It inge
 
 ### Scheduled ingestion (EventBridge → Lambda)
 
-Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire hourly with a 10pm–4am PST maintenance window. All cron expressions use fixed UTC.
+Each source has its own dedicated Lambda and IAM role. Cadence is per source (its `schedule=` in `cdk/stacks/ingestion_stack.py`, mirrored as the registry facet); the `INGEST_HOURLY` helper skips the overnight-PT window for the sources that use it. All cron expressions use fixed UTC.
 
 **Gap-aware backfill (v2.46.0):** All API-based ingestion Lambdas implement self-healing gap detection. On each run, the Lambda queries DynamoDB for the last N days (including today), identifies missing DATE# records, and fetches only those from the upstream API. Cost is ~$0/month — Lambdas short-circuit in <50ms when no new data exists.
 
-**Schedule:** Hourly during active hours (4am–10pm PST) for most sources. Exceptions: Garmin — **paused** (vendor anti-automation crackdown, ADR-074 — no live EventBridge rule), Weather + Todoist at 2x daily (COST-OPT). Maintenance window: 10pm–4am PST (UTC 6–11 skipped).
+**Schedule:** see the table below and `source_registry.py` for the live cadence. Garmin's direct function is **retired** (#4640, ADR-074 amendment — activities arrive through Strava); Weather runs 2x daily, Todoist 1x daily (COST-OPT).
 
-**Shared modules — ONE bundle, no layer (#781/ADR-131, 2026-07-06):** the shared layer (`life-platform-shared-utils`) is **retired**. Shared modules ship **inside every function's code bundle**, staged by `deploy/build_bundle.py` (the whole `lambdas/` tree + `food_vocabulary.json`; the MCP shape adds `mcp_server.py` + `mcp/`). Since ADR-146 (#1653) there are **no loose modules at the `lambdas/` root** — shared engine code is packaged by domain (`common/` infrastructure, `ai/` inference, `experiment/` scientific apparatus, plus `coach/ health/ training/ content/ privacy/`), and the bundle stages that tree at the zip root, so a handler reads `from common import constants`. Key shared modules: `ai_calls.py` (god-module split 2026-06-08 → `ai_calls.py` (AI-call layer: `call_anthropic` + coaches + board) / `ai_context.py` (prompt-context + scoring builders) / `ai_summaries.py` (data-summary builders); `ai_calls` re-exports both for backward compat), `retry_utils.py`, **`bedrock_client.py`** (ADR-062 — all Claude calls funnel here, IAM auth via `bedrock:InvokeModel`), **`budget_guard.py`** (ADR-063 — `allow(feature)` gates AI by SSM tier), `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `intelligence_common.py`, `ingestion_framework.py` (SIMP-2 per ADR-056), `auth_breaker.py`, `http_retry.py`, `rate_limiter.py`, `request_validator.py`, `compute_metadata.py`, `constants.py` (genesis date + baseline), `phase_filter.py` (default-deny by phase), `numeric.py`, `character_engine.py`, `html_builder.py`, `ai_output_validator.py`, `platform_logger.py`, `ingestion_validator.py`, `item_size_guard.py`, `digest_utils.py`, `sick_day_checker.py`, `site_writer.py`, `insight_writer.py`. A shared-module change reaches the fleet via `deploy/deploy_fleet.sh` or `cdk deploy --all` (CI fleet-deploys automatically on unmapped `lambdas/` changes). Invariant: **zero functions reference the old layer** (CI plan job + integration test I2). Dependency layers with real third-party packages (garth, Pillow) are NOT the shared layer and remain. See `docs/CONVENTIONS.md` §1.
+**Shared modules — ONE bundle, no layer (#781/ADR-131, 2026-07-06):** the shared layer (`life-platform-shared-utils`) is **retired**. Shared modules ship **inside every function's code bundle**, staged by `deploy/build_bundle.py` (the whole `lambdas/` tree + `food_vocabulary.json`; the MCP shape adds `mcp_server.py` + `mcp/`). Since ADR-146 (#1653) there are **no loose modules at the `lambdas/` root** — shared engine code is packaged by domain (`common/` infrastructure, `ai/` inference, `experiment/` scientific apparatus, plus `coach/ health/ training/ content/ privacy/`), and the bundle stages that tree at the zip root, so a handler reads `from common import constants`. Key shared modules (each lives in its domain package — `lambdas/ai/ai_calls.py`, `lambdas/common/secret_cache.py`, `lambdas/ingestion/ingestion_framework.py`, `lambdas/health/scoring_engine.py`, …; `find lambdas -name <module>.py`): `ai_calls.py` (god-module split 2026-06-08 → `ai_calls.py` (AI-call layer: `call_anthropic` + coaches + board) / `ai_context.py` (prompt-context + scoring builders) / `ai_summaries.py` (data-summary builders); `ai_calls` re-exports both for backward compat), `retry_utils.py`, **`bedrock_client.py`** (ADR-062 — all Claude calls funnel here, IAM auth via `bedrock:InvokeModel`), **`budget_guard.py`** (ADR-063 — `allow(feature)` gates AI by SSM tier), `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `intelligence_common.py`, `ingestion_framework.py` (SIMP-2 per ADR-056), `auth_breaker.py`, `http_retry.py`, `rate_limiter.py`, `request_validator.py`, `compute_metadata.py`, `constants.py` (genesis date + baseline), `phase_filter.py` (default-deny by phase), `numeric.py`, `character_engine.py`, `html_builder.py`, `ai_output_validator.py`, `platform_logger.py`, `ingestion_validator.py`, `item_size_guard.py`, `digest_utils.py`, `sick_day_checker.py`, `site_writer.py`, `insight_writer.py`. A shared-module change reaches the fleet via `deploy/deploy_fleet.sh` or `cdk deploy --all` (CI fleet-deploys automatically on unmapped `lambdas/` changes). Invariant: **zero functions reference the old layer** (CI plan job + integration test I2). Dependency layers with real third-party packages (garth, Pillow) are NOT the shared layer and remain. See `docs/CONVENTIONS.md` §1.
 
 **Secret caching (COST-OPT-1):** 15-min in-memory TTL cache via `secret_cache.py` (bundled shared module). Reduces Secrets Manager API calls ~90% across 12 active Lambdas.
 
@@ -110,26 +111,28 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 
 | Source | Lambda | Schedule | Type |
 |---|---|---|---|
-| Whoop | `whoop-data-ingestion` | Hourly (active hours) | API pull |
+| Whoop | `whoop-data-ingestion` | Several times daily (see registry) | API pull |
 | Garmin | (none) | Retired 2026-10-11 (#4640, ADR-074 amendment) — watch activities arrive through Strava | via Strava |
 | Eight Sleep | `eightsleep-data-ingestion` | 4x daily (mornings) | API pull |
 | Withings | `withings-data-ingestion` | 4x daily | API pull |
 | Habitify | `habitify-data-ingestion` | Hourly (active hours) | API pull |
 | Strava | `strava-data-ingestion` | Hourly (active hours) | API pull |
-| Todoist | `todoist-data-ingestion` | 2x daily | API pull |
+| Todoist | `todoist-data-ingestion` | 1x daily (14:00 UTC) | API pull |
 | Notion Journal | `notion-journal-ingestion` | 3x daily | API pull |
 | Weather | `weather-data-ingestion` | 2x daily | API pull |
 | MacroFactor | `macrofactor-data-ingestion` | S3 trigger (Dropbox CSV) | File upload |
 | Dropbox Poll | `dropbox-poll` | `rate(2 hours)` | File poll |
-| Journal Enrichment | `journal-enrichment` | Hourly | Compute |
-| Activity Enrichment | `activity-enrichment` | Hourly | Compute |
+| Journal Enrichment | `journal-enrichment` | Daily 14:30 UTC | Compute |
+| Activity Enrichment | `activity-enrichment` | Daily 15:30 UTC | Compute |
 | Apple Health (CGM, water, BP, SOM) | `health-auto-export-webhook` | Near real-time (webhook) | HAE push |
 
-> **SIMP-2 cohort (8 of 15 ingestion Lambdas, ADR-056):** `whoop`, `garmin`, `strava`, `withings`, `eightsleep`, `habitify`, `todoist`, `weather`. All `import from ingestion_framework`. The 7 pattern-exempt ingestion functions are: `notion`, `macrofactor`, `dropbox-poll`, `food-delivery-ingestion`, `health-auto-export-webhook` (HAE near-real-time), `measurements-ingestion` (a separate Lambda from the HAE webhook), and `hevy-backfill` (hourly, all 24 hours — ADR-060; #3720 widened it from 12–23 UTC). (`apple_health` direct ingestion is RETIRED — ADR-103/#474; HAE is the Apple Health path now. Not all 15 are EventBridge-scheduled: macrofactor/food-delivery-ingestion/measurements-ingestion are S3-triggered, HAE is webhook-triggered, and garmin — though SIMP-2 — is currently PAUSED with no live rule, ADR-074. Live cadence + paused state per source: `lambdas/ingestion/source_registry.py`.)
+> **SIMP-2 framework (ADR-056/060):** `lambdas/ingestion/ingestion_framework.py` (`IngestionConfig` + `run_ingestion`). ADR-056 recorded 8 adopters and 7 pattern-exempt functions; the census has moved since (the social-feed ingesters `bluesky`/`mastodon`/`youtube` and the enrichment Lambdas joined the stack, Garmin's direct function was retired), so the live set is the `ingestion_stack` entries in `model/platform_model.json` and the adopters are `grep -l run_ingestion lambdas/ingestion/*_lambda.py`. The long-standing pattern-exempt functions are `notion`, `macrofactor`, `dropbox-poll`, `food-delivery-ingestion`, `health-auto-export-webhook` (HAE near-real-time) and `measurements-ingestion` (a separate Lambda from the HAE webhook); `hevy-backfill` (hourly, all 24 hours — ADR-060; #3720) uses the framework's `run_ingestion`. (`apple_health` direct ingestion is RETIRED — ADR-103/#474; HAE is the Apple Health path now. Not every function is EventBridge-scheduled: macrofactor/food-delivery-ingestion/measurements-ingestion are S3-triggered, HAE is webhook-triggered. Live cadence + paused state per source: `lambdas/ingestion/source_registry.py`.)
 >
 > **Lambda renames + deletions in V2 cleanup (2026-05-17/19):** `weather_handler.py` → `weather_lambda.py`. `tools_calendar.py` DELETED (ADR-030 retired, Google Calendar). `podcast_scanner_lambda.py` DELETED (no AWS counterpart). `email_framework.py` DELETED from shared layer.
 
 ### Compute + Email Lambdas
+
+The headline set; the full inventory (every function, handler, schedule, alarm) is `model/platform_model.json` / `docs/DEPENDENCY_GRAPH.md`.
 
 | Function | Lambda | Cron (UTC) | PT (PDT) |
 |---|---|---|---|
@@ -169,7 +172,7 @@ coaching / generation logic
 
 - **Front door 1 — chat:** `manage_hevy_routine` MCP fat tool (9 actions: draft / dry_run / commit / list / get / archive / floor / re_entry / adherence).
 - **Front door 2 — cron:** `hevy-routine-cron` Lambda, EventBridge rule `enabled=False` at birth + SSM `/life-platform/hevy/cron_enabled=false` (belt-and-suspenders).
-- **Shared modules (layer v64):** `routine_ir`, `hevy_compiler`, `hevy_write_client`, `hevy_template_cache`, `routine_repo`, `routine_generator`, `adherence_calc`.
+- **Shared modules (bundled, `lambdas/training/` + `lambdas/health/adherence_calc.py`):** `routine_ir`, `hevy_compiler`, `hevy_write_client`, `hevy_template_cache`, `routine_repo`, `routine_generator`, `adherence_calc`.
 - **Subtract-only autoregulation** until N≥30 readiness validation passes (PREREQS §C). Add-load SSM (`/life-platform/hevy/autoreg_add_load_enabled`) defaults `false`.
 - **Conflict guard:** GET-before-PUT compares `updated_at`; refuses to clobber in-app edits.
 - **Hevy API surprises:** no DELETE (archive = rename + folder-move), no webhooks (Phase 2 adherence polls `/v1/workouts/events`), no documented rate limits (client-side ≤1 req/s throttle).
@@ -197,7 +200,7 @@ Later phases (B–E): MCP tools + rules-based recommender, the `/mind/` page, th
 
 | Source | Lambda | Endpoint |
 |---|---|---|
-| Health Auto Export | `health-auto-export-webhook` | `https://a76xwxt2wa.execute-api.us-west-2.amazonaws.com/ingest` |
+| Health Auto Export | `health-auto-export-webhook` | `https://p6clybdkkc.execute-api.us-west-2.amazonaws.com/ingest` |
 
 ### Failure handling
 
@@ -256,33 +259,7 @@ Compute → store → read pattern. Standalone Lambdas run before Daily Brief, s
 **Function URL:** Routed through CloudFront (E3S424OXQZ8NBE). Lambda confirmed in us-west-2 (verified via AWS CLI 2026-03-30).
 **IAM:** Primarily read-only — `dynamodb:GetItem, Query, PutItem` + `kms:Decrypt` + `s3:GetObject` on `site/config/*`. Limited writes for interactive features (votes, follows, checkins).
 
-**Source layout** (P1.1 Phase B, 2026-05-26 — 85% reduction from original 7,949-line monolith):
-
-| Module | Lines | Owns |
-|---|---:|---|
-| `lambdas/web/site_api_lambda.py` | 1,216 | `lambda_handler` entry point + `ROUTES`/`_SIMPLE_ROUTES` dispatch + 5 inline coach handlers |
-| `lambdas/web/site_api_common.py` | 320 | Shared helpers: `_ok`, `_error`, `_query_source`, `_latest_item`, `_decimal_to_float`, `_load_s3_json`, CORS, request-id state |
-| `lambdas/web/site_api_observatory.py` | 1,591 | 14 `/api/*_overview` + meal/strength/journal handlers |
-| `lambdas/web/site_api_intelligence.py` | 179 | **Facade** (#1654): the 14 routed intelligence entrypoints, each a thin delegator to a sibling below. Keeps the router bindings, `handler.__module__`, and the test monkeypatch surface unchanged |
-| `lambdas/web/site_api_status.py` | 834 | (#1654) `/api/status`, `/api/status/summary` — the active pipeline probe, per-source freshness, component rollup, and the shared response cache |
-| `lambdas/web/site_api_pulse.py` | 643 | (#1654) `/api/pulse`, `/api/pulse_history` |
-| `lambdas/web/site_api_discovery.py` | 540 | (#1654) `/api/hypotheses`, `/api/intelligence_summary`, `/api/pillar_coupling`, `/api/correlations` — the statistical-discovery surface |
-| `lambdas/web/site_api_budget.py` | 609 | (#1654) `/api/inference_receipt`, `/api/receipts`, and the `/api/status` cost block — the AI-spend envelope, read from the governor's own numbers |
-| `lambdas/web/site_api_foresight.py` | 355 | (#1654) `/api/forecast`, `/api/scenarios`, `/api/state_of_matthew`, `/api/wrong` — predictions and their public reckoning |
-| `lambdas/web/site_api_social.py` | 1,168 | 15 subscriber/experiment/challenge/nudge handlers + token-HMAC machinery |
-| `lambdas/web/site_api_vitals.py` | 222 | **Facade** (#1654): the 19 routed homepage/dashboard entrypoints, each a thin delegator to a sibling below |
-| `lambdas/web/site_api_body.py` | 407 | (#1654) `/api/vitals`, `/api/weight_progress`, `/api/snapshot` — the live body reading + the homepage fan-out |
-| `lambdas/web/site_api_journey.py` | 743 | (#1654) `/api/journey`, `/api/timeline`, `/api/journey_timeline`, `/api/journey_waveform`, `/api/achievements` — the progress record over time |
-| `lambdas/web/site_api_character.py` | 530 | (#1654) `/api/character`, `/api/character_config`, `/api/character_receipt`, `/api/character_stats` — the game layer |
-| `lambdas/web/site_api_sleep.py` | 631 | (#1654) `/api/sleep_detail`, `/api/sleep_correlations`, `/api/circadian` |
-| `lambdas/web/site_api_biomarkers.py` | 486 | (#1654) `/api/labs`, `/api/glucose`, `/api/phenoage`, `/api/genome_risks` — the measured chemistry and its privacy absolutes |
-| `lambdas/web/site_api_coach.py` | 434 | **Facade** (#1654): the 19 routed coach/misc entrypoints, each a thin delegator to a sibling below, plus the shared monkeypatch/hand-off surface (`table`, `EXPERIMENT_START`, the cross-seam helper wrappers) |
-| `lambdas/web/site_api_coach_profile.py` | 674 | (#1654) `/api/coaches`, `/api/coach/{persona_id}` — who each coach IS: the persona registry read, authored character, self-assessed report card, and the #1387 verbatim dossier |
-| `lambdas/web/site_api_coach_stance.py` | 410 | (#1654) `/api/coach_team` — what the coaches think right now: `STANCE#latest`, the ladder scaffold, held-since, the integrator digest, tensions, the live dispute |
-| `lambdas/web/site_api_coach_ledger.py` | 720 | (#1654) `/api/calibration`, `/api/predictions`, `/api/coach_docket`, `/api/panel_ledger`, `/api/voice_fidelity` — calls with skin in the game, over ONE `PREDICTION#`/`CALIB#` fetch spine so season stays a derived subset of career |
-| `lambdas/web/site_api_coach_narrative.py` | 715 | (#1654) `/api/coach_analysis`, `/api/ai_analysis`, `/api/coach_timeline`, `/api/recap`, `/api/experiment_synthesis`, `/api/weekly_priority`, `/api/month_rollup` — guarded reads of pre-computed prose (staleness refusal + the #802 regeneration-paused disclosure) |
-| `lambdas/web/site_api_thirdwall.py` | 362 | (#1654) `/api/field_notes`, `/api/decisions`, `/api/journal_quotes`, `/api/diary_reactions` — the human voice on the record, all four screened all-or-nothing through one `_public_decision_note` |
-| `lambdas/web/site_api_data.py` | ~2,740 | domain-data grab-bag after the #1240 split: habits, experiments, ledger/discoveries, pipeline freshness, cycle_compare/survival, protocols/domains (docstring lists the routed set; guarded by `tests/test_site_api_data_split.py`) |
+**Source layout** (P1.1 Phase B split the original 7,949-line monolith; #1654 split the facades): `lambdas/web/site_api_lambda.py` holds `lambda_handler` plus the `ROUTES`/`_SIMPLE_ROUTES` dispatch (the endpoint set is `ROUTES`); `site_api_common.py` the shared helpers (`_ok`, `_error`, `_query_source`, CORS, request-id state, the response cache); and ~40 sibling `site_api_<domain>.py` modules own the handlers by domain — e.g. `site_api_observatory.py`, `site_api_status.py`, `site_api_pulse.py`, `site_api_discovery.py`, `site_api_budget.py`, `site_api_foresight.py`, `site_api_social.py`, `site_api_body.py`, `site_api_journey.py`, `site_api_character.py`, `site_api_sleep.py`, `site_api_biomarkers.py`, the `site_api_coach_*.py` family (profile · stance · ledger · narrative), `site_api_nutrition.py`, `site_api_habits.py`, `site_api_edition.py`, `site_api_data.py` (guarded by `tests/test_site_api_data_split.py`). Several are thin **facades** (`site_api_intelligence.py`, `site_api_vitals.py`, `site_api_coach.py`) that delegate to a sibling and keep the router bindings stable. The list is `ls lambdas/web/site_api_*.py`; line counts are deliberately not stated (they rotted within weeks). Each module's docstring names the `/api/*` routes it owns.
 
 All of these ship together via the standard `Code.from_asset("../lambdas")` zip. `/api/ask` + `/api/board_ask` are served by the separate `life-platform-site-api-ai` Lambda (ADR-036).
 
@@ -296,10 +273,10 @@ All of these ship together via the standard `Code.from_asset("../lambdas")` zip.
 - `GET /api/weight_progress` — 180-day weight series
 - `GET /api/experiments` — N=1 experiment list
 - `GET /api/current_challenge` — weekly challenge ticker
-- `POST /api/ask` — AI Q&A (Haiku 4.5), 3 anon / 20 subscriber q/hr
+- `POST /api/ask` (served by `life-platform-site-api-ai`) — AI Q&A (Haiku 4.5), 3 anon / 20 subscriber q/hr
 - `POST /api/board_ask` — board AI, up to the full 7-coach roster in parallel (Haiku 4.5), 7/hr IP fan-out budget (#3419)
 - `GET /api/verify_subscriber?email=` — HMAC token for subscriber gate (24hr)
-- `POST /api/subscribe` — email subscriber capture
+- `POST /api/subscribe` — email subscriber capture (served by the `email-subscriber` Lambda, not site-api)
 
 **Rate limiting:** DynamoDB-backed per-IP atomic counters (`lambdas/common/rate_limiter.py`, since Phase 2.1 — survives warm-container distribution). The module-level dicts `_ask_rate_store`/`_board_rate_store` are the in-memory fail-open fallback only (used if the DDB limiter is unavailable). Vote/follow rate limits also use DynamoDB atomic counters with TTL. Role is primarily read-only with limited writes for interactive features (votes, follows, checkins).
 
@@ -322,22 +299,11 @@ schedule change that skips this table reds CI.
 
 ### Coach Intelligence Layer (v6.0.0)
 
-Eight domain-specific AI coaches generate daily analyses through a multi-stage pipeline. Each coach has a persistent voice, relationship state, and confidence model stored in DynamoDB. The coach pipeline replaces the legacy `ai_expert_analyzer_lambda.py` (deprecated).
+The operational coaches generate daily analyses through a multi-stage pipeline. Each coach has a persistent voice, relationship state, and confidence model stored in DynamoDB. The coach pipeline replaces the legacy `ai_expert_analyzer_lambda.py` (deprecated).
 
-**Coaches (8):**
+**The roster is data, not prose** (coaching-team v2, ADR-153): the identities are `config/personas.json`; `lambdas/coach/persona_registry.py` derives the id lists (`OPERATIONAL_COACH_IDS`, `CONSULTING_COACH_IDS`, `CHAT_COACH_IDS`, `RETIRED_COACH_IDS`, `LEAD_PERSONA_ID`), and `tests/test_persona_registry.py` is the contract. The paved path to change it is [ADD_A_COACH.md](ADD_A_COACH.md); the people behind each seat are in [BOARDS.md](BOARDS.md). At this verification the operational ids are `sleep_coach`, `nutrition_coach`, `mind_coach`, `physical_coach`, `glucose_coach` (consulting), `labs_coach` (consulting) and `explorer_coach`; `pattern_coach`, `career_coach` and the lead `eli_marsh` are the chat tier; `training_coach` is retired (the Performance seat absorbed it at the cycle-13 genesis).
 
-| Coach ID | Name | Domain |
-|----------|------|--------|
-| `sleep_coach` | Dr. Lisa Park | Sleep & circadian rhythm |
-| `nutrition_coach` | Dr. Marcus Webb | Nutrition & metabolism |
-| `training_coach` | Dr. Sarah Chen | Training & exercise |
-| `mind_coach` | Dr. Nathan Reeves | Mental health & mindfulness |
-| `physical_coach` | Dr. Victor Reyes | Physical health & body composition |
-| `glucose_coach` | Dr. Amara Patel | Glucose regulation & CGM |
-| `labs_coach` | Dr. James Okafor | Lab biomarkers & blood work |
-| `explorer_coach` | Dr. Henning Brandt | Cross-domain patterns & experiments |
-
-**Pipeline Lambdas (8):**
+**Pipeline Lambdas (the core set; `compute_stack` also carries `coach-daily-reflection`, `coach-memoir`, `coach-vision`, `inter-coach-dialogue` and `voice-fidelity-harness`):**
 
 | Function | Lambda | Purpose |
 |----------|--------|---------|
@@ -354,7 +320,7 @@ Eight domain-specific AI coaches generate daily analyses through a multi-stage p
 
 **Observatory integration:** `observatory-v3.js` calls `/api/coach_analysis?coach=<id>` first, with automatic fallback to legacy `/api/ai_analysis?expert=<key>` if the new endpoint is unavailable.
 
-**S3 config:** Voice specifications at `config/coaches/*.json` (8 files), influence graph at `config/coaches/influence_graph.json`, computation params at `config/computation/ewma_params.json` + `config/computation/seasonal_adjustments.json`, narrative arcs at `config/narrative/arc_definitions.json`.
+**S3 config:** Voice specifications at `config/coaches/<coach_id>.json` (+ `*_stance.json` stance specs and `_shared_standard.json`), influence graph at `config/coaches/influence_graph.json`, computation params at `config/computation/ewma_params.json` + `config/computation/seasonal_adjustments.json`, narrative arcs at `config/narrative/arc_definitions.json`.
 
 **Deprecated:** `ai_expert_analyzer_lambda.py` — replaced by `coach-observatory-renderer`. Legacy `/api/ai_analysis` endpoint still functional as fallback.
 
@@ -371,13 +337,13 @@ Each Lambda has a **dedicated, least-privilege IAM role**, all CDK-managed. No s
 - `pipeline-health-check-role`
 - `subscriber-onboarding-role`
 
-Active role categories (approx counts):
-- **Ingestion roles (14):** DDB write, S3 write, Secrets read, SQS DLQ
+Role categories (counts are deliberately not stated — they are the per-stack `role_policies_*.py` modules in `cdk/stacks/` and the functions in `model/platform_model.json`):
+- **Ingestion roles:** DDB write, S3 write, Secrets read, SQS DLQ (`role_policies_ingestion.py`)
 - **MCP role:** DDB CRUD + S3 `config/*` + `raw/matthew/cgm_readings/*` + `life-platform/todoist` read
-- **Email/digest roles (7):** DDB read/write, ai-keys, SES, S3 write
-- **Compute roles (5–7):** DDB read/write, ai-keys
-- **Coach Intelligence roles (8):** DDB read/write on COACH#/ENSEMBLE#/NARRATIVE# partitions, S3 read on config/coaches/*, ai-keys
-- **Operational roles (14+):** scoped per function
+- **Email/digest roles:** DDB read/write, ai-keys, SES, S3 write (`role_policies_email.py`)
+- **Compute roles:** DDB read/write, ai-keys (`role_policies_compute.py`)
+- **Coach Intelligence roles:** DDB read/write on COACH#/ENSEMBLE#/NARRATIVE# partitions, S3 read on config/coaches/*, ai-keys
+- **Operational roles:** scoped per function (`role_policies_operational.py`)
 - **Site API role:** DDB primarily read-only (`GetItem, Query`) + limited `PutItem` for interactive features (votes, follows, checkins), `kms:Decrypt`, S3 `site/config/*`, Secrets read (`site-api-ai-key` only) — **NO Scan**
 - **`dynamodb:Scan` is granted, deliberately, to exactly three operational roles** (`cdk/stacks/role_policies_operational.py`, re-exported by the `role_policies.py` facade): `life-platform-data-export` and `life-platform-data-reconciliation` (whole-table reads are their job) and `life-platform-delete-user-data` (it must find every item belonging to a user). No serving, ingest, compute or coach role has it. The un-audited fallback branch in `lambda_helpers.py` also lists Scan, but no deployed function reaches it — every function passes either `custom_policies=` or an explicit `role=`.
 - No role has cross-account permissions
@@ -449,7 +415,7 @@ CloudWatch on exactly the days the control was broken. Add it to the table and b
 
 ## Cost Profile
 
-Target: within the **$215/mo all-in budget ceiling** (ADR-063; surge-to-$252 per ADR-133). The canonical spend ledger is [COST_TRACKER.md](COST_TRACKER.md) (measured $5.74/day over 2026-08-01..08-25, n=25 -> ~$172/mo); the **live** tier is never stated here — read it from SSM `/life-platform/budget-tier`, which `life-platform-cost-governor` rewrites every 8h.
+Target: within the **$215/mo all-in budget ceiling** (ADR-063; surge-to-$252 per ADR-133). The canonical spend ledger is [COST_TRACKER.md](COST_TRACKER.md) (Monthly Actuals + the monthly close, measured from Cost Explorer); the **live** tier is never stated here — read it from SSM `/life-platform/budget-tier`, which `life-platform-cost-governor` rewrites every 8h.
 
 There is deliberately **no per-driver cost table here**: a hand-maintained copy understated CloudWatch ~6x and the monthly total ~2x before it was removed (#3371). The per-driver breakdown lives in [COST_TRACKER.md](COST_TRACKER.md)'s monthly close, measured from Cost Explorer under a 45-day freshness gate — read it there.
 
@@ -462,70 +428,39 @@ There is deliberately **no per-driver cost table here**: a hand-maintained copy 
   mcp_server.py                   ← MCP Lambda entry point
   mcp_bridge.py                   ← Local MCP adapter (Claude Desktop → Lambda HTTPS)
   mcp/                            ← MCP server package (36 tool modules + helpers)
-    handler.py, config.py, utils.py, core.py, helpers.py, labs_helpers.py
-    strength_helpers.py, registry.py, warmer.py
-    tools_sleep, tools_health, tools_training, tools_nutrition, tools_habits
-    tools_cgm, tools_labs, tools_journal, tools_lifestyle, tools_social
-    tools_strength, tools_correlation, tools_character, tools_board
-    tools_decisions, tools_adaptive, tools_hypotheses, tools_memory
-    tools_data, tools_todoist, tools_protocols, tools_challenges,
-    tools_sick_days, tools_food_delivery, tools_measurements,
-    tools_coach_intelligence
+    handler.py, config.py, utils.py, core.py, helpers.py, registry.py, warmer.py, …
+    tools_<domain>.py               ← one module per tool domain (`ls mcp/tools_*.py`);
+                                      tools are wired in registry.py's TOOLS dict
     # tools_calendar.py DELETED V2 (ADR-030 retired Google Calendar)
 
-  lambdas/
-    # 16 ingestion (whoop, withings, strava, garmin, habitify,
-    #   eightsleep, macrofactor, notion, todoist, weather, apple_health,
-    #   health_auto_export, dropbox_poll, food_delivery, measurements,
-    #   journal_enrichment, activity_enrichment)
-    # 11 email/digest (daily_brief, weekly_digest, monthly_digest,
-    #   nutrition_review, wednesday_chronicle, weekly_plate, monday_compass,
-    #   anomaly_detector, evening_nudge, chronicle_email_sender,
-    #   subscriber_onboarding)
-    # 12 compute (character_sheet, adaptive_mode, daily_metrics_compute,
-    #   daily_insight_compute, hypothesis_engine, weekly_correlation_compute,
-    #   acwr_compute, sleep_reconciler, circadian_compliance,
-    #   ai_expert_analyzer [deprecated], journal_analyzer, field_notes)
-    # 8 coach intelligence (coach_computation_engine, coach_narrative_orchestrator,
-    #   coach_state_updater, coach_ensemble_digest, coach_prediction_evaluator,
-    #   coach_history_summarizer, coach_quality_gate, coach_observatory_renderer)
-    # 21 operational (freshness_checker, dashboard_refresh, data_export,
-    #   qa_smoke, key_rotator, mcp_server, insight_email_parser,
-    #   site_api_lambda — public web API, us-west-2,
-    #   site_stats_refresh, challenge_generator, og_image_generator,
-    #   email_subscriber, pipeline_health_check, chronicle_approve,
-    #   canary, dlq_consumer, data_reconciliation, pip_audit,
-    #   partner_email, mcp_warmer)
-    # 2 Lambda@Edge (cf-auth, buddy-auth)
-    board_loader.py               ← Shared: Board of Directors config loader
-    ai_calls.py                   ← Shared: AI call utilities (prompt caching, model selection)
-    retry_utils.py                ← Shared: Anthropic retry + caching for bundled Lambdas
-    insight_writer.py             ← Shared: Insights ledger writer
-    output_writers.py             ← Shared: S3/DDB output utilities
-    scoring_engine.py             ← Shared: Day grade scoring
-    secret_cache.py               ← Shared: 15-min TTL secret cache (COST-OPT)
-    site_writer.py                ← Shared: Public stats S3 writer
+  lambdas/                          ← packaged by domain (ADR-146); no loose root modules
+    ingestion/  compute/  emails/  web/  operational/  intelligence/  reading/   ← handlers
+    common/  ai/  experiment/  coach/  health/  training/  content/  privacy/      ← shared code
+    cf-auth/ (Lambda@Edge) · dashboard/ · fonts/ · requirements/ (dependency layers)
+    # function inventory by stack: model/platform_model.json (never restated here)
+    # e.g. ai/ai_calls.py (AI-call layer) · common/retry_utils.py · common/secret_cache.py ·
+    #      health/scoring_engine.py · content/output_writers.py · content/site_writer.py ·
+    #      coach/board_loader.py · content/insight_writer.py
 
-  site/                           ← static website (averagejoematt.com, ~72 pages)
-    index.html                    ← Homepage
-    story/, live/, journal/       ← Journey pages
-    platform/, character/         ← Technical pages
-    ask/, board/                  ← Interactive AI tools
-    experiments/, explorer/       ← Data pages
-    biology/, about/              ← Context pages
-    subscribe.html                ← Email capture
-    assets/css/, assets/js/       ← Design system (tokens.css, base.css, reveal.js)
+  site/                           ← static website (averagejoematt.com)
+    index.html                    ← Home
+    cockpit/ data/ coaching/ protocols/ story/   ← the five doors (v5 IA)
+    method/ gear/ mind/ journal/ privacy/ subscribe*  ← footer-tier + reader pages
+    next/ kit/                    ← the preview path and the v8 component kit
+    legacy/                       ← pre-v4 site, private rollback (never linked)
+    assets/                       ← css/js design system (tokens.css, …)
+    # pages are generated: scripts/v4_build_*.py → change the generator, then regenerate
 
   docs/                           ← All documentation
-  deploy/                         ← ~120 deploy scripts
+  deploy/                         ← deploy, restart-pipeline and doc-sync scripts (deploy_fleet.sh, cdk_deploy.sh, …)
   cdk/                            ← 10 CDK stacks
-  tests/                          ← the pytest suite (live count: docs/TESTING.md) + 8 CI linters
+  tests/                          ← the pytest suite (live count: docs/TESTING.md); structural/CI gates in tests/ and scripts/check_*.py
   handovers/                      ← The live session pointer (HANDOVER_LATEST.md); history on the session-archive branch
 ```
 
 ---
 
-**Verified:** 2026-07-10 — wiki accuracy pass (layer-retirement #781 propagated; counts re-derived). Lambda/tool/alarm/ADR counts via `deploy/sync_doc_metadata.py` discoverers (AST); SIMP-2 cohort via `grep -l 'from ingestion_framework import' lambdas/*_lambda.py`; secret list via `aws secretsmanager list-secrets`. The retired-layer version check is gone — the invariant is now zero layer references (CI plan job + I2).
+**Verified:** 2026-10-17 — re-verified against the tree (#1348): coach roster, ingestion census, site-api layout, local structure, HAE API id (live read-only `apigatewayv2 get-apis`), CloudFront/SES/SQS/CloudTrail/SNS names and the concurrency quota (100, live read-only). Lambda/tool/alarm/ADR counts via `deploy/sync_doc_metadata.py` discoverers (AST); secret list via `aws secretsmanager list-secrets`. NOT re-verified in this pass: the IC feature census, the Hevy write-loop prose, the daily-brief "18-section / 4 Haiku calls" description, and the Experiment Phase Filtering call-site tally. The retired-layer version check is gone — the invariant is now zero layer references (CI plan job + I2).
 
 
 ### Experiment Phase Filtering

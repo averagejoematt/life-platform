@@ -277,3 +277,6 @@ def test_a_pull_request_run_reports_the_leftover_literal_and_never_writes_it(tmp
 def test_platform_stats_serves_the_live_test_count_not_a_committed_one():
     """In a checkout the reader derives from tests/ itself; in a bundle it reads the stamp."""
     assert PLATFORM_STATS.get("test_count") == sync._count_test_functions()
+
+
+# premerge-gate: 3101: the doc-literal conflict surface. Its verdict is pure repo shape — whether a discovered counter has grown a SECOND committed home, and whether the single-writer plumbing (agent_commit refusal, hook stage pathspec, reconcile whitelist) is still wired. Post-merge is too late by construction: the whole point is that the surface must not reopen on the branch that reopens it, and a red arriving a
