@@ -12,15 +12,15 @@ copy is the source of truth.
 
 ## When
 
-**The experiment's week-close day** — the day `day_n % 7 == 0` for the running
+**The experiment's week-close day** — day 8, 15, 22 ... (day 7 + `pacific_time.WEEK_CLOSE_SHIFT_DAYS`, #3761) for the running
 cycle's genesis (`EXPERIMENT_START_DATE` in `lambdas/common/constants.py`),
 derived by `pacific_time.week_close_day()`. **Not a weekday literal**: genesis
 moves on every experiment reset (seventeen cycles so far — see
 `docs/PHASE_TAXONOMY.md`), so the protocol day is whatever weekday day 7 lands on
 for the *current* cycle, and it silently changes at the next reset. For cycle 17
-(genesis 2026-09-06, a Sunday) the protocol day is **Saturday**; if a set is
-missed, **Sunday morning** is the fallback, still counted against the same
-protocol day (see the Telegram reply's day-offset, below).
+(genesis 2026-09-06, a Sunday) the protocol day is **Sunday** (owner ruling 2026-09-27; HELD on his
+confirmation, flip the one constant for Saturday); a set taken on another day
+is counted against the same protocol day (see the Telegram reply's day-offset, below).
 
 Do not hardcode a weekday anywhere that reads this file. If the coaching system
 ever needs "is today the protocol day", it calls `week_close_day()` — the same

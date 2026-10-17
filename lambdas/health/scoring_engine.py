@@ -23,6 +23,8 @@ from typing import Any, Iterable, Optional, Union
 from common.constants import PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
 from common.metric_truth import resolve_steps
 
+from health.habit_identity import day_name_for  # #4632: id first, then names, then ingest-derived aliases
+
 logger = logging.getLogger(__name__)
 
 # Public type aliases used across this module.
@@ -208,7 +210,9 @@ def score_movement(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     return clamp(round(sum(parts) / sum(weights))), details
 
 
-def habitify_reading(habits_map: dict[str, Any], name: str, meta: Optional[dict[str, Any]] = None) -> Optional[float]:
+def habitify_reading(
+    habits_map: dict[str, Any], name: str, meta: Optional[dict[str, Any]] = None, statuses: Optional[dict[str, Any]] = None
+) -> Optional[float]:
     """The day's Habitify value for registry habit `name`, or None when the day never names it.
 
     #4362: a habit renamed in Habitify ("Walk 5k" -> "Walk Outdoor >2mi") kept arriving
@@ -222,16 +226,23 @@ def habitify_reading(habits_map: dict[str, Any], name: str, meta: Optional[dict[
         so history written before a rename still resolves after the key is corrected);
       * a habit the day's record does not name at all is UNOBSERVED (None), never a miss —
         the same ruling habit_streaks made for #2221 ("absent is unknown", ADR-104).
+
+    #4632: pass the day's `habit_statuses` as `statuses` and the lookup keys on the vendor
+    habit id first (the registry entry's `habitify_id`), then names, then the ingest-derived
+    `aliases` on each entry — so a habit renamed after ids were stored still resolves with
+    no registry edit (`health.habit_identity`). Without `statuses` it is the #4362 lookup.
     """
-    names = [name] + [n for n in ((meta or {}).get("habitify_names") or []) if isinstance(n, str) and n != name]
-    for n in names:
-        if n in habits_map:
-            v = habits_map.get(n)
-            try:
-                return float(v) if v is not None else 0.0
-            except (TypeError, ValueError):
-                return 0.0
-    return None
+    hit = day_name_for(habits_map, statuses, name, meta)
+    if hit is None:
+        return None
+    if hit not in habits_map:
+        hs = (statuses or {}).get(hit) or {}
+        return 1.0 if hs.get("status") == "completed" else 0.0
+    v = habits_map.get(hit)
+    try:
+        return float(v) if v is not None else 0.0
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _registry_number(meta: dict[str, Any], key: str, default: float, drift: list[str], habit_name: str) -> float:
@@ -264,6 +275,7 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
     if not habitify:
         return None, {}
     habits_map = habitify.get("habits", {})
+    statuses = habitify.get("habit_statuses")  # #4632: carries the vendor habit id + aliases
     registry = profile.get("habit_registry", {})
     if not registry:
         return _score_habits_mvp_legacy(data, profile)
@@ -301,7 +313,7 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
             strava = data.get("strava") or {}
             if not strava.get("activities"):
                 continue
-        reading = habitify_reading(habits_map, habit_name, meta)
+        reading = habitify_reading(habits_map, habit_name, meta, statuses)
         if reading is None:
             # #4362: unobserved (renamed/archived upstream, or not on today's journal) —
             # named in the details so the drift is visible, never scored as a miss.
@@ -319,7 +331,8 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
             week_count = 1 if is_done else 0
             for day_rec in habitify_7d[-6:]:
                 day_habits = day_rec.get("habits", {}) if isinstance(day_rec, dict) else {}
-                d = habitify_reading(day_habits, habit_name, meta)
+                day_statuses = day_rec.get("habit_statuses") if isinstance(day_rec, dict) else None
+                d = habitify_reading(day_habits, habit_name, meta, day_statuses)
                 if d is not None and d >= 1:
                     week_count += 1
             freq_score = min(100.0, round(week_count / max(target_freq, 1) * 100))

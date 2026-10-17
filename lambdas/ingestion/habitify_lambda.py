@@ -105,6 +105,7 @@ from urllib.parse import urlencode
 from urllib.request import Request
 
 import boto3
+from boto3.dynamodb.conditions import Key
 
 try:
     from common.platform_logger import get_logger
@@ -239,6 +240,110 @@ def _live_alias(name: str, next_statuses: dict, alias_groups) -> str | None:
                 if other != name and isinstance(next_statuses.get(other), dict):
                     return other
     return None
+
+
+# ── Habit identity (#4632): the vendor habit id is the habit; names are aliases ──────────────────────
+# The aliases are derived AT INGEST from id continuity: the nearest earlier stored day is read
+# once per date, and every name its entries carried for an id (the entry's name plus its own
+# `aliases`) is stamped on today's entry with that id as `aliases`. A chain of rows therefore
+# carries a habit's whole name history forward, and the read side (`health.habit_identity`)
+# resolves a registry entry by id, then name, then alias. #4644 Q26's recommended answer
+# (HELD for the owner): "same habit keeps its streak (id-keyed), applied to the history too".
+PRIOR_IDENTITY_LOOKBACK_DAYS = 14
+# None = no prior-identity read at all (the default, so `transform` stays pure for every test
+# and offline caller); the handler installs the DynamoDB reader for a real run.
+_prior_identity_reader = None
+_PRIOR_IDENTITY_CACHE: dict = {}
+
+
+def reset_identity_cache(reader=None) -> None:
+    global _prior_identity_reader
+    _PRIOR_IDENTITY_CACHE.clear()
+    _prior_identity_reader = reader
+
+
+def identity_from_record(record) -> dict[str, set]:
+    """{habit_id: every name the stored day carried for it (entry name + its `aliases`)}."""
+    out: dict[str, set] = {}
+    statuses = (record or {}).get("habit_statuses") if isinstance(record, dict) else None
+    for name, hs in (statuses or {}).items():
+        if not isinstance(hs, dict) or not hs.get("habit_id"):
+            continue
+        names = out.setdefault(str(hs["habit_id"]), set())
+        names.add(name)
+        names.update(a for a in hs.get("aliases") or () if isinstance(a, str) and a)
+    return out
+
+
+def _ddb_prior_identity(date_str: str) -> dict[str, set]:
+    """The nearest earlier stored habitify day's identity map (read-only Query, newest first)."""
+    day = datetime.strptime(date_str, "%Y-%m-%d")
+    lo = (day - timedelta(days=PRIOR_IDENTITY_LOOKBACK_DAYS)).strftime("%Y-%m-%d")
+    hi = (day - timedelta(days=1)).strftime("%Y-%m-%d")
+    resp = _table.query(
+        KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}#SOURCE#habitify") & Key("sk").between(f"DATE#{lo}", f"DATE#{hi}"),
+        ScanIndexForward=False,
+        Limit=5,  # a gap-exhausted `absent` marker carries no statuses; look past a few
+    )
+    for item in resp.get("Items") or []:
+        found = identity_from_record(item)
+        if found:
+            return found
+    return {}
+
+
+def _prior_identity(date_str: str) -> dict[str, set]:
+    """Fail-soft, memoised per invocation: an unreadable prior day means no aliases, never no day."""
+    if _prior_identity_reader is None:
+        return {}
+    if date_str not in _PRIOR_IDENTITY_CACHE:
+        try:
+            _PRIOR_IDENTITY_CACHE[date_str] = _prior_identity_reader(date_str) or {}
+        except Exception as e:
+            logger.warning("[IDENTITY] prior-day read failed, aliases unavailable for %s: %s", date_str, type(e).__name__)
+            _PRIOR_IDENTITY_CACHE[date_str] = {}
+    return _PRIOR_IDENTITY_CACHE[date_str]
+
+
+def _merge_aliases(entry: dict, names) -> None:
+    """Add `names` (minus the entry's own name, which the caller excludes) to `entry["aliases"]`."""
+    merged = {a for a in entry.get("aliases") or () if isinstance(a, str) and a} | {n for n in names if isinstance(n, str) and n}
+    if merged:
+        entry["aliases"] = sorted(merged)
+
+
+# ── Explicit corrections (#4632, #4644 Q27) ───────────────────────────────────────────────────────
+# #4644 Q27's recommended answer (HELD for the owner): "b (explicit correction only)". A stored
+# `completed` stays terminal on every ordinary run; only an invocation that names the date AND
+# asks for a correction — `{"date_override": "YYYY-MM-DD", "correction": true}` — lets a
+# vendor-authored `failed`, decided on a SUCCESSFUL logs read, replace it. A fetch failure (the
+# journal fallback, a vanished habit) or a platform-inferred miss can never downgrade it, with
+# or without the flag. Set by the handler per invocation; empty otherwise.
+_CORRECTION_DATES: frozenset = frozenset()
+
+
+def correction_dates_from_event(event) -> frozenset:
+    """The dates this invocation may correct: exactly the explicit `date_override`, or none."""
+    if not isinstance(event, dict) or event.get("correction") is not True:
+        return frozenset()
+    day = event.get("date_override")
+    try:
+        datetime.strptime(str(day), "%Y-%m-%d")
+    except ValueError:
+        logger.warning("[CORRECTION] ignored: a correction needs an explicit date_override (YYYY-MM-DD)")
+        return frozenset()
+    return frozenset({str(day)})
+
+
+def _corrects_a_completion(prev_status, cur: dict, date_str: str) -> bool:
+    """True when `cur` is a vendor-authored miss allowed to replace a stored completion."""
+    return (
+        prev_status == "completed"
+        and date_str in _CORRECTION_DATES
+        and cur.get("status") == "failed"
+        and cur.get("miss_source") == "vendor"
+        and cur.get("status_channel") == "logs"
+    )
 
 
 # ── Supplement bridge mapping (#4632: entries keyed on habit id) ─────────────────────────────────────
@@ -624,6 +729,7 @@ def transform(raw: dict, date_str: str) -> list[dict]:
     # calendar day, which is the frame the key, the site, and the owner all use.
     today_pt = pacific_today()
     day_open = date_str >= today_pt
+    prior_ids = _prior_identity(date_str)  # #4632: {habit_id: names it carried on the prior day}
 
     for entry in journal:
         if entry.get("is_archived"):
@@ -657,11 +763,13 @@ def transform(raw: dict, date_str: str) -> list[dict]:
         # whole Pacific day, and a platform-side resolution at day close says so in
         # `miss_source` rather than hiding inside the same label.
         miss_source = None
+        channel = "journal"  # #4632: which channel decided the status — only `logs` may correct
         if status == "skipped":
             # A skip is an owner decision with no log channel — the journal is its only source.
             resolved = "skipped"
         elif attributed is not None and periodicity == "daily":
             log_attributed += 1
+            channel = "logs"
             if logged_value >= target_value:
                 resolved = "completed"
             elif status == "failed":
@@ -698,13 +806,16 @@ def transform(raw: dict, date_str: str) -> list[dict]:
             "target_value": target_value,
             "periodicity": periodicity,
             "scheduled_today": True,  # All current habits are RRULE=DAILY per audit
+            "status_channel": channel,
         }
         # #4632 (capture-all, owner 2026-10-04): the vendor's habit id rides on every entry.
         # Additive — the map stays name-keyed for every existing reader; the id is what
-        # survives a rename, so it is what the supplements bridge (and, once #4644 rules,
-        # the registry and streaks) can key on.
+        # survives a rename, so it is what the supplements bridge, the tiered scoring lookup
+        # and the streaks key on (`health.habit_identity`).
         if entry.get("id"):
             habit_statuses[name]["habit_id"] = str(entry["id"])
+            # #4632: every other name this id carried on the prior stored day = its aliases.
+            _merge_aliases(habit_statuses[name], prior_ids.get(str(entry["id"]), set()) - {name})
         if miss_source:
             # WHO said this was a miss.
             #   "vendor"   — Habitify's own `failed`. That covers BOTH the owner marking it
@@ -768,6 +879,18 @@ def transform(raw: dict, date_str: str) -> list[dict]:
     return [record]
 
 
+def _same_id_live_name(prev: dict, next_statuses: dict) -> str | None:
+    """The name under which the new journal carries `prev`'s vendor habit id, or None (#4632)."""
+    habit_id = prev.get("habit_id") if isinstance(prev, dict) else None
+    if not habit_id:
+        return None
+    for n in sorted(next_statuses):
+        hs = next_statuses[n]
+        if isinstance(hs, dict) and str(hs.get("habit_id") or "") == str(habit_id):
+            return n
+    return None
+
+
 def upgrade_only_merge(existing: dict, new: dict) -> dict:
     """#3666: re-ingest may only UPGRADE a Pacific day, never downgrade it.
 
@@ -781,6 +904,9 @@ def upgrade_only_merge(existing: dict, new: dict) -> dict:
          Restored here, with the original `completed_at` instant. The one exception
          (#4622): a stored `skipped` is an unconfirmed day, so an owner-authored `failed`
          (`miss_source == "vendor"`) settles it — see `SETTLEABLE_STATUSES`.
+         #4632 (#4644 Q27, HELD): a stored `completed` yields only to an EXPLICIT correction
+         run for that date, and only to a vendor-authored `failed` decided on a successful
+         logs read — see `_corrects_a_completion`. A fetch failure never downgrades it.
       2. **`pending` is finalised early.** A 17:05 PT run writes `pending` for the evening
          habits; nothing may turn that into `failed` while the Pacific day is still open.
          Once the day HAS closed, `pending -> failed` is the correct, allowed resolution —
@@ -806,10 +932,14 @@ def upgrade_only_merge(existing: dict, new: dict) -> dict:
     # (name, transition) pairs. The transition alone — never the name — reaches the log
     # line (#4655: vice habit names must never be logged).
     upgrades: list[tuple[str, str]] = []
+    corrected: list[str] = []  # #4632: names whose stored completion an explicit correction withdrew
 
-    def _hold_terminal(prev: dict, prev_status, cur: dict) -> str | None:
+    def _hold_terminal(prev: dict, prev_status, cur: dict, name: str | None = None) -> str | None:
         """Carry a stored terminal decision onto `cur` when `cur` is weaker; the transition or None."""
         cur_status = cur.get("status")
+        if name is not None and _corrects_a_completion(prev_status, cur, date_str):
+            corrected.append(name)
+            return None
         if prev_status in TERMINAL_STATUSES and cur_status not in TERMINAL_STATUSES and not _settles_a_skip(prev_status, cur):
             cur["status"] = prev_status
             if prev.get("completed_at"):
@@ -826,6 +956,15 @@ def upgrade_only_merge(existing: dict, new: dict) -> dict:
         prev_status = prev.get("status")
         cur = next_statuses.get(name)
         if cur is None:
+            # #4632: a RENAME by id continuity — the vendor id this row carried is on the new
+            # journal under another name. One habit: its old name becomes an alias of the
+            # live row, a stored decision holds over a weaker one, and the old row is dropped.
+            same_id = _same_id_live_name(prev, next_statuses)
+            if same_id is not None:
+                _merge_aliases(next_statuses[same_id], ({name} | set(prev.get("aliases") or ())) - {same_id})
+                held = _hold_terminal(prev, prev_status, next_statuses[same_id])
+                upgrades.append((same_id, f"renamed-by-id:{held}" if held else "renamed-by-id"))
+                continue
             # The habit vanished from the journal (archived/renamed upstream). Keep the
             # stored row when it recorded a decision; drop it otherwise.
             if prev_status in TERMINAL_STATUSES:
@@ -844,7 +983,9 @@ def upgrade_only_merge(existing: dict, new: dict) -> dict:
         if not isinstance(cur, dict):
             continue
         cur_status = cur.get("status")
-        held = _hold_terminal(prev, prev_status, cur)
+        if prev.get("aliases"):
+            _merge_aliases(cur, set(prev["aliases"]) - {name})
+        held = _hold_terminal(prev, prev_status, cur, name)
         if held:
             upgrades.append((name, held))
         elif prev_status == "pending" and cur_status == "failed" and day_open and cur.get("miss_source") != "vendor":
@@ -862,6 +1003,14 @@ def upgrade_only_merge(existing: dict, new: dict) -> dict:
         new["mood"] = existing["mood"]
         if "mood_label" in existing:
             new["mood_label"] = existing["mood_label"]
+
+    # #4632: the audit trail of explicit corrections survives every later ordinary rewrite.
+    trail = [c for c in existing.get("corrections") or [] if isinstance(c, str)]
+    trail += [f"{n}:completed->failed" for n in corrected]
+    if trail:
+        new["corrections"] = trail[-50:]
+    if corrected:
+        logger.info("[CORRECTION] %s: %d stored completion(s) withdrawn by the vendor's failed", date_str, len(corrected))
 
     if not upgrades:
         return new
@@ -887,16 +1036,20 @@ def upgrade_only_merge(existing: dict, new: dict) -> dict:
 _SUPPLEMENT_META_FIELDS = ("dose", "unit", "timing", "category")
 
 
-def _completed_habits(item: dict) -> list[tuple[str, str | None]]:
-    """(name, vendor habit id) for every habit the STORED day records as completed (#4632).
+def _completed_habits(item: dict) -> list[tuple[str, str | None, tuple]]:
+    """(name, vendor habit id, aliases) for every habit the STORED day records as completed (#4632).
 
-    Reads `habit_statuses` (which carries the id since #4632); a record without it falls
-    back to the legacy binary `habits` map, with no id.
+    Reads `habit_statuses` (which carries the id and the ingest-derived aliases since #4632);
+    a record without it falls back to the legacy binary `habits` map, with neither.
     """
     statuses = item.get("habit_statuses")
     if isinstance(statuses, dict) and statuses:
-        return [(n, hs.get("habit_id") or None) for n, hs in statuses.items() if isinstance(hs, dict) and hs.get("status") == "completed"]
-    return [(n, None) for n, v in (item.get("habits") or {}).items() if _decimal(v) == 1]
+        return [
+            (n, hs.get("habit_id") or None, tuple(hs.get("aliases") or ()))
+            for n, hs in statuses.items()
+            if isinstance(hs, dict) and hs.get("status") == "completed"
+        ]
+    return [(n, None, ()) for n, v in (item.get("habits") or {}).items() if _decimal(v) == 1]
 
 
 def _bridge_key(habit_id, name) -> str:
@@ -904,15 +1057,19 @@ def _bridge_key(habit_id, name) -> str:
     return f"id:{habit_id}" if habit_id else f"name:{name}"
 
 
-def _supplement_meta(name: str, habit_id, prior_by_key: dict) -> dict | None:
+def _supplement_meta(name: str, habit_id, prior_by_key: dict, aliases=()) -> dict | None:
     """Dose metadata for a completed habit, or None when it is not a supplement.
 
     Resolution order: the name in SUPPLEMENT_MAP; any registry alias of the name that is
     in SUPPLEMENT_MAP (#4362/#4655 `habitify_names`); then id continuity — the same habit
-    id was bridged earlier today under another name, so it is still that supplement.
+    id was bridged earlier today under another name, so it is still that supplement; and the
+    entry's ingest-derived `aliases` (an earlier name of the same id, #4632).
     """
     if name in SUPPLEMENT_MAP:
         return SUPPLEMENT_MAP[name]
+    alias_hit = next((a for a in sorted(a for a in aliases if isinstance(a, str)) if a in SUPPLEMENT_MAP), None)
+    if alias_hit is not None:
+        return SUPPLEMENT_MAP[alias_hit]
     for group in _habit_alias_groups():
         if name in group:
             alias = next((a for a in sorted(group) if a in SUPPLEMENT_MAP), None)
@@ -928,8 +1085,8 @@ def _bridge_entries(item: dict, prior_bridge: list[dict]) -> list[dict]:
     """The bridge's entries for this day, re-derived in full from the stored habit record."""
     prior_by_key = {_bridge_key(e.get("habit_id"), e.get("name")): e for e in prior_bridge}
     entries: dict[str, dict] = {}
-    for name, habit_id in _completed_habits(item):
-        meta = _supplement_meta(name, habit_id, prior_by_key)
+    for name, habit_id, aliases in _completed_habits(item):
+        meta = _supplement_meta(name, habit_id, prior_by_key, aliases)
         key = _bridge_key(habit_id, name)
         if meta is None or key in entries:
             continue
@@ -1041,8 +1198,12 @@ def lambda_handler(event: dict, context) -> dict:
     {}                                 — gap-aware backfill (default, includes today)
     {"date_override": "today"}         — force today's data only
     {"date_override": "2026-05-15"}    — single explicit date
+    {"date_override": "2026-05-15", "correction": true}
+                                       — #4632/#4644 Q27: re-read that date and let the
+                                         vendor's `failed` withdraw a stored completion
     {"healthcheck": true}              — boot check, returns 200/"ok"
     """
+    global _CORRECTION_DATES
     try:
         if event.get("healthcheck"):
             return {"statusCode": 200, "body": "ok"}
@@ -1050,6 +1211,8 @@ def lambda_handler(event: dict, context) -> dict:
         # a stale hit would freeze a day's completions at whatever the last run saw.
         reset_logs_cache()
         reset_alias_cache()  # #4655: a registry alias added between runs must be seen
+        reset_identity_cache(_ddb_prior_identity)  # #4632: aliases from id continuity, read per date
+        _CORRECTION_DATES = correction_dates_from_event(event)  # #4644 Q27: empty unless asked
         return run_ingestion(_config, authenticate, fetch_day, transform, event, context, post_store_fn=supplement_bridge)
     except Exception as e:
         logger.error("habitify ingestion failed: %s", e, exc_info=True)
