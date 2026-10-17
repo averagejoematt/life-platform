@@ -92,9 +92,9 @@ export function hisWordsHTML(block) {
   if (hisWordsFresh(block)) {
     const d = block.data;
     const asked = d.prompt || d.question ? small(`Asked: ${d.prompt || d.question}`) : "";
-    return `${label(`In my words · ${shortDay(d.date) || d.date_text || ""}`)}<p class="ck-quote">“${esc(d.text)}”</p>${asked}`;
+    return `${label(`In his own words · ${shortDay(d.date) || d.date_text || ""}`)}<p class="ck-quote">“${esc(d.text)}”</p>${asked}`;
   }
-  return `${label("In my words")}${absent(block, "Nothing in his own words is served right now.")}`;
+  return `${label("In his own words")}${absent(block, "Nothing in his own words is served right now.")}`;
 }
 
 // ── the chapter lead, with the player ──────────────────────────────────────────
@@ -162,12 +162,16 @@ export function nextChapterLine(nextBlock) {
   if (!day) return (ch && ch.state !== "ok" && ch.absent_text) || "";
   return ch.data.drafted_not_promised ? `The next draft is due ${day}; it publishes once Matthew approves it.` : `Next chapter due ${day}.`;
 }
-export function chapterHTML(block, nextBlock, { heading = "h1", player = true, listenHref = "", held = "", podcastHeld: podHeld = false, teaser = null } = {}) {
+export function chapterHTML(block, nextBlock, { heading = "h1", player = true, listenHref = "", held = "", podcastHeld: podHeld = false, teaser = null, asOf = "" } = {}) {
   if (!usable(block)) return absent(block, "The latest chapter is not served right now.");
   const c = block.data;
-  const fresh = block.state === "ok";
+  // "New this week" only while the chapter is under a week old on the edition's day (round 2:
+  // "New this week · Week 5" on a day week 5 was last week's); otherwise its date says how old.
   const week = c.week_label || "";
-  const badge = fresh ? `New this week${week ? ` · ${week}` : ""}` : `The latest chapter${week ? ` · ${week}` : ""}`;
+  const age = (Date.parse(`${asOf}T12:00:00Z`) - Date.parse(`${c.date}T12:00:00Z`)) / 86400000;
+  const fresh = block.state === "ok" && (!asOf || (Number.isFinite(age) && age <= CHAPTER_DAYS));
+  const written = shortDay(c.date);
+  const badge = fresh ? `New this week${week ? ` · ${week}` : ""}` : `Latest chapter${week ? ` · ${week}` : ""}${written ? ` (written ${written})` : ""}`;
   const read = c.url ? `<a class="ck-btn" href="${esc(c.url)}">Read${num(c.read_minutes) !== null ? ` · ${c.read_minutes} min` : ""}</a>` : "";
   const pod = c.podcast;
   const hasPod = usable(pod) && pod.data.mp3_url;
@@ -182,7 +186,7 @@ export function chapterHTML(block, nextBlock, { heading = "h1", player = true, l
   return [
     `<span class="ck-badge">${esc(badge)}</span>`,
     `<${heading}>${esc(c.title)}</${heading}>`,
-    small(`Written by AI from the record on ${shortDay(c.date)}. Matthew reads each chapter before it publishes.`),
+    small(fresh ? `Written by AI from the record on ${shortDay(c.date)}. Matthew reads each chapter before it publishes.` : "Written by AI from the record. Matthew reads each chapter before it publishes."),
     dek ? `<p class="ck-premise ck-soft">${esc(dek)}</p>` : "",
     read || listen ? `<div class="ck-actions">${read}${listen}</div>` : "",
     player ? playerHTML(pod, { held: podHeld }) : "",
@@ -234,11 +238,24 @@ export function coachLinesHTML(block) {
 // `counted_text`: sealed, bets, commentary, conditional) is the Coaches page's, under the big
 // count (recordBigHTML) — not the front page's or Start's, where it read as accounting before the story.
 const countedText = (d) => String((d && d.counted_text) || "").trim();
+// Round 2: "they do not beat a simple guess" said nothing about the guess. The served comparison
+// is a Brier skill score (lambdas/common/stats_core.brier_skill_score) against the base rate: a
+// guess that gives every call the same chance, the share that came true. So the sentence
+// names that guess and the gap, both from served fields: `brier_skill` (the gap, as a share of the
+// guess's error) and right/decided (the guess's chance, only when the skill was scored on exactly
+// the calls counted, `skill_n` === decided). With no skill served: "no comparison with a guess yet".
+export function guessClause(d) {
+  const skill = num(d && d.brier_skill);
+  if (skill === null) return "there is no comparison with a guess yet.";
+  const pct = Math.abs(skill * 100).toFixed(1);
+  const flat = num(d.skill_n) !== null && d.skill_n === d.decided && num(d.right) !== null ? `a guess that gives every call the same ${Math.round((100 * d.right) / d.decided)}% chance` : "a guess that gives every call the same chance";
+  if (pct === "0.0") return `weighing how sure each call was, they score the same as ${flat}.`;
+  return `weighing how sure each call was, they score ${pct}% ${skill > 0 ? "better" : "worse"} than ${flat}.`;
+}
 export function recordLine(block) {
   if (!usable(block) || !block.data.count_text || !String(block.data.comparison_text || "").trim()) return "";
   const count = String(block.data.count_text).trim().replace(/[.\s]+$/, "");
-  const cmp = comparisonText({ sentence: block.data.comparison_text });
-  return `${count}; ${cmp.charAt(0).toLowerCase()}${cmp.slice(1)}`;
+  return `${count}; ${guessClause(block.data)}`;
 }
 // The breakdown on Coaches, after one plain sentence that says why there is one: "Not all of
 // them are formal predictions. Of the 183: 11 sealed before day one, …". The served sentence's
@@ -266,11 +283,12 @@ export function recordBigHTML(block) {
   }
   const d = block.data;
   if (!String(d.comparison_text || "").trim()) return soft(comparisonText(null));
+  const cmp = guessClause(d);
   const track =
     d.decided >= MIN_PERCENT_N
       ? `<div class="ck-track" role="img" aria-label="${d.right} of ${d.decided} checked calls right"><i style="width:${Math.round((100 * d.right) / d.decided)}%"></i></div>`
       : "";
-  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span> of ${d.decided} checked calls</span></p>${track}<p>${esc(comparisonText({ sentence: d.comparison_text }))}</p>${countedHTML(d)}</div>`;
+  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span> of ${d.decided} checked calls</span></p>${track}<p>${esc(`${cmp.charAt(0).toUpperCase()}${cmp.slice(1)}`)}</p>${countedHTML(d)}</div>`;
 }
 
 // ── the bet card ───────────────────────────────────────────────────────────────
@@ -362,15 +380,30 @@ export const postsInOrder = (journal) => ((journal && journal.posts) || []).filt
 // from a stat line to a narrative em-dash chain). A week is its code-rendered stats line, in lb,
 // its change in words; a prologue is "Before day one." The chapters' own sentences are one tap
 // away on Story.
-export function chapterStatLine(p) {
+// Round 2: the week's change is computed here, by `weekChange`, from the two ROUNDED weights the
+// list prints (this row's and the row above's) — never the served "(-3.5 this week)", which came
+// from unrounded readings and disagreed with the printed weights by 0.1.
+export const weekChange = (prevShown, nowShown) => {
+  if (!prevShown || !nowShown) return "";
+  const d = Number((Number(prevShown) - Number(nowShown)).toFixed(1));
+  if (!Number.isFinite(d)) return "";
+  return d === 0 ? "the same as the week before" : `${d > 0 ? "down" : "up"} ${Math.abs(d).toFixed(1)} this week`;
+};
+export function chapterStatLine(p, prevShown = "") {
   if (isPrologue(p)) return "Before day one.";
   const raw = lbText(String((p && p.stats_line) || "").split("|")[0].trim());
   if (!raw) return "";
-  const line = raw.replace(/\s*\(([-−+])?(\d+(?:\.\d+)?) this week\)/, (m, sign, n) => `, ${sign === "+" ? "up" : "down"} ${n} this week`);
+  const change = weekChange(prevShown, _weightOf(p.stats_line));
+  const line = raw.replace(/\s*\([-−+]?\d+(?:\.\d+)? this week\)/, change ? `, ${change}` : "");
   return /[.!?]$/.test(line) ? line : `${line}.`;
 }
 export function recapHTML(posts) {
-  const rows = (posts || []).map((p) => ({ p, line: chapterStatLine(p) })).filter((r) => r.p.title && r.line);
+  let prev = "";
+  const rows = (posts || []).map((p) => {
+    const line = chapterStatLine(p, isPrologue(p) ? "" : prev);
+    if (!isPrologue(p)) prev = _weightOf(p.stats_line) || prev;
+    return { p, line };
+  }).filter((r) => r.p.title && r.line);
   if (!rows.length) return "";
   return `<ul class="ck-coach">${rows
     .map(({ p, line }) => `<li><span class="ck-coach__who">${esc([String(p.label || "").replace(/^Prologue.*$/, "Start"), p.title].filter(Boolean).join(" · "))}</span><span>${esc(line)}</span></li>`)
@@ -404,7 +437,7 @@ export function chartHTML(weights, { sentence: withSentence = true } = {}) {
   const first = pts[0];
   const last = pts[pts.length - 1];
   const aria = `Weight from ${fmt1(first.lbs)} pounds on ${shortDay(first.date)} to ${fmt1(last.lbs)} on ${shortDay(last.date)}, ${pts.length} weigh-ins`;
-  const sentence = `My weight at every weigh-in: ${fmt1(first.lbs)} lb on ${shortDay(first.date)}, ${fmt1(last.lbs)} on ${shortDay(last.date)}.`;
+  const sentence = `His weight at every weigh-in: ${fmt1(first.lbs)} lb on ${shortDay(first.date)}, ${fmt1(last.lbs)} on ${shortDay(last.date)}.`;
   return `${withSentence ? `<p class="ck-soft">${esc(sentence)}</p>` : ""}<svg class="ck-chart" viewBox="0 0 640 196" role="img" aria-label="${esc(aria)}"><polygon class="ck-chart__area" points="8.0,164 ${line} 632.0,164"/><polyline class="ck-chart__line" points="${line}"/><circle class="ck-chart__now" cx="${x(last).toFixed(1)}" cy="${y(last).toFixed(1)}" r="5"/></svg><div class="ck-ends"><span>${esc(`${shortDay(first.date)} · ${fmt1(first.lbs)}`)}</span><span>${esc(`${shortDay(last.date)} · ${fmt1(last.lbs)}`)}</span></div>`;
 }
 
@@ -429,12 +462,11 @@ export function teamHTML(coachesBody, base = "", from = "", { startDate = "" } =
       const sitting = c.absent
         ? ` Sitting out${c.reason ? `: ${String(c.reason).replace(ISO_RE, (iso) => shortDay(iso))}` : ""}${preStart ? ", before day one, so the calls counted here were checked on other readings" : ""}.`
         : "";
+      // One rule for every row (round 2: a bar on some rows and not others read as a ranking):
+      // the count alone, never a bar — a coach's n is often under MIN_PERCENT_N. The lead's
+      // empty record is "no checked calls" like any other (bets are a subset of calls).
       let record = "no checked calls";
-      if (c.tier === "lead" && !r) record = "no bets";
-      else if (r && num(r.n) !== null && r.n > 0) {
-        const meter = r.n >= MIN_PERCENT_N ? `<span class="ck-meter"><i style="width:${Math.round((100 * r.confirmed) / r.n)}%"></i></span>` : "";
-        record = `${r.confirmed} of ${r.n}${meter}`;
-      }
+      if (r && num(r.n) !== null && r.n > 0) record = `${r.confirmed} of ${r.n}`;
       const jobLine = `${job}${job && sitting && !/[.!?]$/.test(job) ? "." : ""}${sitting}`.trim();
       const name = base && c.persona_id ? `<a class="ck-link" href="${esc(withFrom(`${base}coach/?c=${encodeURIComponent(c.persona_id)}`, from))}">${esc(c.name)}</a>` : esc(c.name);
       return `<li><span class="ck-coach__name">${name}</span><span class="ck-coach__job">${esc(jobLine)}</span><span class="ck-coach__record">${record}</span></li>`;
@@ -494,7 +526,9 @@ export function callVerdictsHTML(callsBody, base = "/", from = "", { trailer = "
   const card = (call, word) => {
     if (!call) return `<div>${soft(`No call with a page has been found ${word} yet.`)}</div>`;
     const day = shortDay(call.settled_date);
-    const when = `${gradedOnText(call)} ${day ? `Checked ${day}.` : ""}`.trim();
+    // Round 2: "Graded on the reading for September 11. Checked September 24." gave two dates and
+    // no reason for the gap (the API carries none), so the day it was graded on stands alone.
+    const when = gradedOnText(call) || (day ? `Checked ${day}.` : "");
     return callCardHTML(call, { when, note: !shared, href: withFrom(`${base}call/?id=${encodeURIComponent(call.id)}`, from) });
   };
   const after = [shared, ruleless(calls.filter((c) => !hasRule(c)).length)].filter(Boolean).join(" ");
@@ -528,7 +562,9 @@ export function frontSlots(edition, b, base = "/") {
   // there is nothing new sits at the foot of the page instead.
   const words = hisWordsFresh(b.his_words)
     ? { "ck-words": hisWordsHTML(b.his_words) }
-    : { "ck-words": null, "ck-words-absent": esc((b.his_words && b.his_words.absent_text) || "") };
+    : { "ck-words": null, "ck-words-absent": esc(String((b.his_words && b.his_words.absent_text) || "").replace(/ in his own words\b/i, "")) };
+  // Fresh words lead the page; then the "In his own words" row under Go deeper is not drawn.
+  if (hisWordsFresh(b.his_words)) words["ck-words-row"] = null;
   const span = F.weekSpan(b.week);
   return {
     // The fixed top: the record beside the premise, the daily mark, his own dated note when
@@ -717,6 +753,7 @@ export function storyChapterHTML(edition, b, journal, episodes) {
     held: heldChapterLine(b.chapter, edition, journal),
     podcastHeld: c ? podcastHeld(episodes, weekNumberOf(c.week_label)) : false,
     teaser: { chapterLb, startLb: startLbOf(b) },
+    asOf: (edition && edition.as_of) || "",
   });
 }
 async function mountStory(edition, b) {

@@ -27,6 +27,12 @@ const load = (dir, name) => JSON.parse(readFileSync(join(dir, `${name}.json`), "
 const DAYS = readdirSync(FIX).filter((n) => n.startsWith("coach_moves_")).map((n) => load(FIX, n.replace(/\.json$/, "")));
 const edition = load(KIT, "edition");
 const B = edition.blocks;
+// #4586 round 2: the 2026-10-17 recapture has no open bet. The bet card's tests read the bet the
+// 2026-10-13 capture served (tests/fixtures/kit_pages_4586_pinned), injected only when the capture has none.
+const PINNED = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit_pages_4586_pinned", "open_bet.json"), "utf8"));
+const PINNED_DOCKET = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit_pages_4586_pinned", "coach_docket.json"), "utf8"));
+const CAPTURE_HAS_BET = !!(B.next.data.bet && B.next.data.bet.data);
+if (!CAPTURE_HAS_BET) B.next.data.bet = PINNED.bet;
 const BASE = "/next/v8/";
 const inWords = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
 const esc0 = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -34,7 +40,7 @@ const esc0 = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const FLOOR = load(KIT, "nutrition_overview").nutrition.protein_floor_g;
 const BETD = B.next.data.bet.data;
 const [SA, SB] = BETD.sides;
-const OTHER = load(KIT, "coach_docket").open.map((d) => d.resolution_date).filter((d) => d && d !== BETD.settle_date).sort()[0];
+const OTHER = (CAPTURE_HAS_BET ? load(KIT, "coach_docket") : PINNED_DOCKET).open.map((d) => d.resolution_date).filter((d) => d && d !== BETD.settle_date).sort()[0];
 const MORE_BETS = `One more bet settles on ${inWords(OTHER)}.`;
 const WEEK_SPAN = `${inWords(B.week.data.days[0])} to ${inWords(B.week.data.days.at(-1))}`;
 // The edition's `next` block with its bet absent: what the page sees between bets.
@@ -77,7 +83,10 @@ test("with an open bet, the bet is the argument: two coaches on opposite sides, 
   const live = /protein/i.test(BETD.question)
     ? new RegExp(`^${WEEKDAY}: \\d+(\\.\\d)? g protein\\. This week, at or above ${FLOOR} g protein on \\d+ of \\d+ days recorded\\.$`)
     : new RegExp(`^${WEEKDAY}: .*\\d.*\\. This week, .+\\.$`);
-  assert.match(line, live, line);
+  // Round 2: a deep- or REM-sleep share is not a measure the week carries — no line, rather than
+  // the night's hours beside a bet about the share.
+  if (/deep|REM|share/i.test(BETD.question)) assert.equal(line, "", line);
+  else assert.match(line, live, line);
   // The first mention of a name carries the job, when the served lines pair the name with its id.
   const jobs = F.jobsByName(DAYS);
   // a name carries its job only when the served lines pair it with one (a recapture may bring a coach with none)
@@ -86,14 +95,16 @@ test("with an open bet, the bet is the argument: two coaches on opposite sides, 
   // clause in its served words (`next.bet.data.sides[].reason`) — on its own line under the question.
   const why = Object.fromEntries(pick.bet.data.sides.map((s) => [s.coach, s.reason]));
   assert.ok(why[SA.coach] && why[SB.coach], "the wire fixture serves both reasons");
-  assert.deepEqual(F.betSidesLines(pick.bet, jobs), [
-    `${who(SA.coach)} says ${SA.says}: “${why[SA.coach]}”.`,
-    `${who(SB.coach)} says ${SB.says}: “${why[SB.coach]}”.`,
-  ]);
-  assert.equal(F.betSidesLine(pick.bet), `${SA.coach} says ${SA.says}: “${why[SA.coach]}”. ${SB.coach} says ${SB.says}: “${why[SB.coach]}”.`);
+  // Round 2: a job beside every side or none; a reason only when it reads in plain language.
+  const both = !!(jobs[SA.coach] && jobs[SB.coach]);
+  const side = (x) => `${both ? who(x.coach) : x.coach} says ${x.says}${F.plainLanguage(why[x.coach]) ? `: “${why[x.coach]}”` : ""}.`;
+  assert.deepEqual(F.betSidesLines(pick.bet, jobs), [side(SA), side(SB)]);
+  assert.ok(F.betSidesLines(pick.bet, jobs).every((l) => !F.FRONT_JARGON.test(l)), "no statistician's jargon reaches the front card");
+  const said = (x) => `${x.coach} says ${x.says}${F.plainLanguage(why[x.coach]) ? `: “${why[x.coach]}”` : ""}.`;
+  assert.equal(F.betSidesLine(pick.bet), `${said(SA)} ${said(SB)}`);
   // a side with no served reason is the side alone; nothing is written in its place
   const bare = { ...pick.bet, data: { ...pick.bet.data, sides: pick.bet.data.sides.map((s) => ({ coach: s.coach, says: s.says })) } };
-  assert.equal(F.betSidesLine(bare, jobs), `${who(SA.coach)} says ${SA.says}. ${who(SB.coach)} says ${SB.says}.`);
+  assert.equal(F.betSidesLine(bare, jobs), `${both ? who(SA.coach) : SA.coach} says ${SA.says}. ${both ? who(SB.coach) : SB.coach} says ${SB.says}.`);
   // Ruling 2026-10-11 (the coaches page keeps four screens): the FRONT card prints each reason
   // under its side; the coaches page's card prints the sides alone, on one line, and its door
   // goes to the front card — the two doors never loop on a promise neither page keeps.
@@ -103,7 +114,9 @@ test("with an open bet, the bet is the argument: two coaches on opposite sides, 
   const coaches = P.betHTML(B.next, { ...P.reasonsDoor(B.next, BASE), extra: MORE_BETS, oneLine: true });
   for (const [who, reason] of Object.entries(why)) {
     const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    assert.match(front, new RegExp(`<p class="ck-soft">${esc(who)}(?: \\([a-z ]+\\))? says (yes|no): “${esc(reason)}”\\.</p>`), front);
+    // Round 2: a reason in the statistician's jargon is not printed; the side stands alone.
+    if (F.plainLanguage(reason)) assert.match(front, new RegExp(`<p class="ck-soft">${esc(who)}(?: \\([a-z ]+\\))? says (yes|no): “${esc(reason)}”\\.</p>`), front);
+    else assert.match(front, new RegExp(`<p class="ck-soft">${esc(who)}(?: \\([a-z ]+\\))? says (yes|no)\\.</p>`), front);
     assert.ok(!coaches.includes(reason), `the coaches page does not print ${who}'s reason`);
   }
   // one paragraph (the four-screen budget): the sides, the door to the reasons, the extra sentence
@@ -115,7 +128,10 @@ test("with an open bet, the bet is the argument: two coaches on opposite sides, 
   const [measure, unit] = /protein/i.test(BETD.question) ? ["food", "g protein"] : ["sleep", "hours of sleep"];
   const vals = B.week.data.measures[measure].data.values;
   const lastIdx = vals.map((v, i) => (typeof v === "number" ? i : -1)).filter((i) => i >= 0).pop();
-  assert.ok(line.includes(`: ${String(Number(vals[lastIdx].toFixed(1)))} ${unit}. `), line);
+  // A deep-sleep-share bet has no live line (round 2); the rule is held on a sleep-time question.
+  const timeBet = { ...pick.bet, data: { ...pick.bet.data, question: "Will the sleep time (7-day average) be 7 hours or more on Friday?" } };
+  const subject = /deep|REM|share/i.test(BETD.question) ? F.betLiveLine(timeBet, B.week) : line;
+  assert.ok(subject.includes(`: ${String(Number(vals[lastIdx].toFixed(1)))} ${unit}. `), subject);
   assert.equal(F.betLiveLine({ ...pick.bet, data: { ...pick.bet.data, question: "Will the moon be full on Monday?" } }, B.week), "", "a question naming no measure the week carries");
   assert.equal(F.betLiveLine(pick.bet, { state: "unavailable", absent_text: "x", data: null }), "");
 });

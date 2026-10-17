@@ -19,6 +19,12 @@ const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit
 const load = (name) => JSON.parse(readFileSync(join(FIX, `${name}.json`), "utf8"));
 const edition = load("edition");
 const B = edition.blocks;
+// #4586 round 2: the 2026-10-17 recapture has no open bet. The bet card's tests read the bet the
+// 2026-10-13 capture served (tests/fixtures/kit_pages_4586_pinned), injected only when the capture has none.
+const PINNED = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit_pages_4586_pinned", "open_bet.json"), "utf8"));
+const PINNED_DOCKET = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit_pages_4586_pinned", "coach_docket.json"), "utf8"));
+const CAPTURE_HAS_BET = !!(B.next.data.bet && B.next.data.bet.data);
+if (!CAPTURE_HAS_BET) B.next.data.bet = PINNED.bet;
 const inWords = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
 const weekday = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
 // The day the next chapter is due, as the captured edition serves it ("Wednesday, October 14").
@@ -26,7 +32,7 @@ const NEXT_DUE = `${weekday(B.next.data.chapter.data.date)}, ${inWords(B.next.da
 // The captured chapter (week 5) has no podcast episode yet. WITH_POD is that chapter carrying
 // the week 4 episode as the edition served it on October 3, so the player stays pinned.
 const POD = { state: "ok", as_of: "2026-10-01", source: "/panelcast/episodes.json", absent_text: "No podcast episode for this chapter yet.", data: { title: "EP4 · The Body Answers Back", guest: "Marcus Webb", guest_domain: "food", duration_sec: 420, duration_minutes: 7, mp3_url: "/panelcast/wk4.mp3", date: "2026-10-01" } };
-const WITH_POD = { ...B.chapter, data: { ...B.chapter.data, podcast: POD } };
+const WITH_POD = { ...B.chapter, state: "ok", data: { ...B.chapter.data, podcast: POD } };
 const WEIGHT = B.today.data.weight_lbs;
 const fmt1 = (n) => n.toFixed(1);
 // Dates and names the tests print are read from the capture they test, so a recapture that
@@ -38,7 +44,7 @@ const BET_DAY = longDay(BET.settle_date);
 const [SIDE_A, SIDE_B] = BET.sides.map((x) => x.coach);
 const SAYS = (x) => `${x.coach} says ${x.says}.`;
 const SIDES_LINE = BET.sides.map(SAYS).join(" ");
-const OTHER_BET = load("coach_docket").open.map((d) => d.resolution_date).filter((d) => d && d !== BET.settle_date).sort()[0];
+const OTHER_BET = (CAPTURE_HAS_BET ? load("coach_docket") : PINNED_DOCKET).open.map((d) => d.resolution_date).filter((d) => d && d !== BET.settle_date).sort()[0];
 const UNAVAILABLE = { state: "unavailable", as_of: null, source: null, absent_text: "The latest chapter is not served right now.", data: null };
 
 test("the header carries the edition's one day and day number, in words", () => {
@@ -60,7 +66,7 @@ test("a fresh chapter leads with its badge, title, player and the AI byline", ()
 });
 
 test("a stale chapter is not called new, and an unserved one prints its sentence", () => {
-  assert.match(P.chapterHTML({ ...B.chapter, state: "stale" }, B.next), /The latest chapter · Week 5/);
+  assert.match(P.chapterHTML({ ...B.chapter, state: "stale" }, B.next), /Latest chapter · Week 5 \(written October 6\)/);
   assert.doesNotMatch(P.chapterHTML({ ...B.chapter, state: "stale" }, B.next), /New this week/);
   assert.equal(P.chapterHTML(UNAVAILABLE, B.next), '<p class="ck-soft">The latest chapter is not served right now.</p>');
 });
@@ -92,13 +98,14 @@ test("coach lines render at most what is served, and silence is a sentence", () 
 
 test("the coaches' count never renders without its comparison", () => {
   const rd = B.record.data;
-  const cmp = rd.comparison_text.charAt(0).toLowerCase() + rd.comparison_text.slice(1);
-  assert.equal(P.recordLine(B.record), `${rd.count_text.replace(/\.$/, "")}; ${cmp}`, "the count, then the comparison, as one sentence");
+  assert.equal(P.recordLine(B.record), `${rd.count_text.replace(/\.$/, "")}; ${P.guessClause(rd)}`, "the count, then the comparison with its figure, as one sentence");
+  assert.match(P.guessClause(rd), /\d+(\.\d)?% (worse|better) than a guess that gives every call the same \d+% chance\.$|the same as a guess/);
   const alone = { ...B.record, data: { ...B.record.data, comparison_text: "" } };
   assert.equal(P.recordLine(alone), "");
   assert.doesNotMatch(P.recordBigHTML(alone), /ck-big/);
   assert.ok(P.recordBigHTML(B.record).includes(`${rd.right}<span> of ${rd.decided} checked calls</span>`));
-  assert.ok(P.recordBigHTML(B.record).includes(rd.comparison_text));
+  assert.ok(P.recordBigHTML(B.record).includes("than a guess that gives"));
+  assert.match(P.guessClause({ ...rd, brier_skill: null }), /no comparison with a guess yet/);
 });
 
 test("no percentage picture on fewer than 20 checked calls", () => {
@@ -108,9 +115,10 @@ test("no percentage picture on fewer than 20 checked calls", () => {
   assert.ok(withRecord.length >= 2, "the capture has coaches with a checked call");
   for (const c of withRecord) {
     assert.ok(row(c.name).includes(`${c.record.confirmed} of ${c.record.n}`), c.name);
-    assert.equal(row(c.name).includes('<span class="ck-meter">'), c.record.n >= 20, `${c.name}: a percentage picture only from 20 checked calls`);
+    // Round 2: one rule for every row — the count, never a bar.
+    assert.doesNotMatch(row(c.name), /ck-meter/, c.name);
   }
-  assert.match(row("Eli Marsh"), /no bets/);
+  assert.match(row("Eli Marsh"), /no checked calls/);
   assert.match(row("Amara Patel"), /Sitting out: no sensor since August 27\./);
   const few = { ...B.record, data: { ...B.record.data, right: 3, decided: 7 } };
   assert.doesNotMatch(P.recordBigHTML(few), /ck-track/);
@@ -122,7 +130,7 @@ test("his words are quoted only when fresh; silence prints the block's sentence"
   assert.doesNotMatch(P.hisWordsHTML(B.his_words), /ck-quote/);
   const fresh = { state: "ok", as_of: "2026-10-01", data: { text: "Right now I still feel good.", date: "2026-10-01" } };
   assert.equal(P.hisWordsFresh(fresh), true);
-  assert.match(P.hisWordsHTML(fresh), /In my words · October 1/);
+  assert.match(P.hisWordsHTML(fresh), /In his own words · October 1/);
   assert.match(P.hisWordsHTML(fresh), /“Right now I still feel good\.”/);
   assert.match(P.hisWordsHTML({ ...fresh, data: { ...fresh.data, question: "What did this week ask of you?" } }), /Asked: What did this week ask of you\?/);
 });
@@ -165,7 +173,7 @@ test("the showcase pair leads with the tightest right call and the clearest miss
   // #4808, the house rule: the tag (the rule, once), the call with the RESULT bold, then in one
   // soft line what the allowed distance is in words, the day it was graded on, and the door.
   assert.match(html, /--right">Right · within [\d.]+ [a-z]+ either way<\/span><p>[^<]+ called [^<]+\. <b>It came in at [^<]+\.<\/b><\/p>/);
-  assert.match(html, /<p class="ck-soft">Graded on the reading for [A-Z][a-z]+ \d+\. Checked [A-Z][a-z]+ \d+\. <a class="ck-link" href="\/next\/v8\/call\/\?id=[a-z0-9-]+">The whole call<\/a>/);
+  assert.match(html, /<p class="ck-soft">Graded on the reading for [A-Z][a-z]+ \d+\. <a class="ck-link" href="\/next\/v8\/call\/\?id=[a-z0-9-]+">The whole call<\/a>/);
   // both distances were computed the same way, so what they are is said once, under the pair
   assert.match(html, /<\/div><\/div><p class="ck-soft">Each allowed distance is one standard deviation of his readings over the 30 days before the call\.<\/p>$/);
   assert.equal((html.match(/standard deviation/g) || []).length, 1);

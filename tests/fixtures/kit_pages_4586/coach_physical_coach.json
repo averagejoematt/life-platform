@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-13T01:38:41.823433+00:00",
-  "served_at": "2026-10-13T01:38:41.823433+00:00",
+  "generated_at": "2026-10-17T23:29:09.890627+00:00",
+  "served_at": "2026-10-17T23:29:09.890627+00:00",
   "cache_seconds": 300,
-  "request_id": "ed52d5dbc9b34f70"
+  "request_id": "d11ce6df7fc342ee"
  },
  "persona_id": "physical_coach",
  "name": "Max Reyes",
@@ -94,17 +94,17 @@
   "disclosure": "Authored character design \u2014 fixed numbers written into the cast by the author, not generated and not measured."
  },
  "latest_checked": {
-  "prediction_id": "pred_20261002_tomorrow_s_recovery_will_reach_approxima",
-  "claim": "Tomorrow's recovery will reach approximately 75.8%, a single-day rebound from the September 30 low",
-  "created_date": "2026-10-02",
+  "prediction_id": "pred_20261015_weight_will_be_around_304_5_pounds_tomor",
+  "claim": "Weight will be around 304.5 pounds tomorrow morning",
+  "created_date": "2026-10-15",
   "pre_registered_at": null,
-  "outcome_date": "2026-10-11",
-  "metric": "recovery_score",
+  "outcome_date": "2026-10-17",
+  "metric": "weight_lbs",
   "eval_type": "point",
   "condition": "within",
-  "threshold": 75.8,
-  "actual_value": 98.0,
-  "status": "refuted"
+  "threshold": 304.5,
+  "actual_value": 304.03,
+  "status": "confirmed"
  },
  "instrument": {
   "source": "hevy",
@@ -135,7 +135,7 @@
   "grounding_flag": false,
   "graduation_gate": "A steady downward weight trend over a month unlocks the 'recomposition' rung.",
   "band_metric": "weight_lbs",
-  "current_value": 308.29,
+  "current_value": 302.22,
   "rung": {
    "stage_id": "foundation",
    "entry": {
@@ -251,28 +251,28 @@
  },
  "report_card": {
   "track_record": {
-   "confirmed": 11,
-   "refuted": 11,
-   "decided": 22,
-   "hit_rate_pct": 50.0,
+   "confirmed": 13,
+   "refuted": 14,
+   "decided": 27,
+   "hit_rate_pct": 48.1,
    "record": {
-    "confirmed": 11,
-    "refuted": 11,
-    "n": 22,
-    "through": "2026-10-11"
+    "confirmed": 13,
+    "refuted": 14,
+    "n": 27,
+    "through": "2026-10-17"
    },
-   "headline": "11 of 22 checked calls right (50%) through October 11",
+   "headline": "13 of 27 checked calls right (48%) through October 17",
    "comparison": {
     "rule": "nothing_changes",
     "rule_words": "a guess that nothing changes",
     "rule_version": 1,
     "records": {
      "number": {
-      "graded": 9,
-      "coach_right": 5,
-      "scored": 9,
-      "coach_right_on_scored": 5,
-      "rule_right": 5,
+      "graded": 10,
+      "coach_right": 6,
+      "scored": 10,
+      "coach_right_on_scored": 6,
+      "rule_right": 6,
       "coach_only": 0,
       "rule_only": 0,
       "unscorable": 0,
@@ -284,13 +284,13 @@
       "rule_right_pct": null
      },
      "direction": {
-      "graded": 10,
-      "coach_right": 4,
-      "scored": 10,
-      "coach_right_on_scored": 4,
-      "rule_right": 1,
-      "coach_only": 4,
-      "rule_only": 1,
+      "graded": 13,
+      "coach_right": 5,
+      "scored": 13,
+      "coach_right_on_scored": 5,
+      "rule_right": 2,
+      "coach_only": 5,
+      "rule_only": 2,
       "unscorable": 0,
       "unscorable_reasons": {},
       "not_yet_scored": 0,
@@ -300,13 +300,13 @@
       "rule_right_pct": null
      },
      "yes_no": {
-      "graded": 1,
+      "graded": 2,
       "coach_right": 1,
-      "scored": 1,
+      "scored": 2,
       "coach_right_on_scored": 1,
-      "rule_right": 0,
+      "rule_right": 1,
       "coach_only": 1,
-      "rule_only": 0,
+      "rule_only": 1,
       "unscorable": 0,
       "unscorable_reasons": {},
       "not_yet_scored": 0,
@@ -335,18 +335,42 @@
     "unclassified": 0,
     "scored_complete": true,
     "skill": {
-     "n": 22,
-     "brier_skill": 0.0414,
-     "sentence": "Across 22 checked calls, so far they beat a simple guess."
+     "n": 27,
+     "brier_skill": 0.0324,
+     "sentence": "Across 27 checked calls, so far they beat a simple guess."
     },
-    "rule_sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
-    "sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "rule_sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
    "preliminary": false,
-   "n_note": "n=22 decided",
+   "n_note": "n=27 decided",
    "recent": [
+    {
+     "date": "2026-10-17",
+     "status": "confirmed",
+     "metric": "weight_lbs",
+     "reason": "weight_lbs=304.03 on 2026-10-16 vs predicted 304.5 \u00b13.9712 (\u00b11 SD of the trailing 30-day personal series (n=29 readings, SD=3.9712)); |\u0394|=0.47 \u2192 within tolerance"
+    },
+    {
+     "date": "2026-10-16",
+     "status": "confirmed",
+     "metric": "recovery_score",
+     "reason": "recovery_score 98 on 2026-10-02 -> 70 on 2026-10-16 (change -28, band \u00b111.5, window 2026-10-02..2026-10-16): trend=down, predicted=down"
+    },
+    {
+     "date": "2026-10-16",
+     "status": "refuted",
+     "metric": "recovery_score",
+     "reason": "recovery_score 98 on 2026-10-02 -> 70 on 2026-10-16 (change -28, band \u00b111.5, window 2026-10-02..2026-10-16): trend=down, predicted=up"
+    },
+    {
+     "date": "2026-10-14",
+     "status": "refuted",
+     "metric": "steps",
+     "reason": "predicted up, metric flat \u2014 steps 2520 on 2026-09-23 -> 890 on 2026-10-07 (change -1630, band \u00b14432.82, window 2026-09-23..2026-10-07)"
+    },
     {
      "date": "2026-10-11",
      "status": "refuted",
@@ -358,30 +382,6 @@
      "status": "confirmed",
      "metric": "recovery_score",
      "reason": "recovery_score=89.00 on 2026-09-27 vs predicted 85.3 \u00b121.308 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=21.308)); |\u0394|=3.70 \u2192 within tolerance"
-    },
-    {
-     "date": "2026-10-11",
-     "status": "refuted",
-     "metric": "recovery_score",
-     "reason": "recovery_score trend=down (slope=-0.0334), predicted=up"
-    },
-    {
-     "date": "2026-10-11",
-     "status": "refuted",
-     "metric": "recovery_score",
-     "reason": "recovery_score=73.00 on 2026-09-13 vs predicted 54.7 \u00b118.2532 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=18.2532)); |\u0394|=18.30 \u2192 outside tolerance"
-    },
-    {
-     "date": "2026-10-10",
-     "status": "refuted",
-     "metric": "recovery_score",
-     "reason": "recovery_score=98.00 on 2026-10-03 vs predicted 64.7 \u00b117.5951 (\u00b11 SD of the trailing 30-day personal series (n=30 readings, SD=17.5951)); |\u0394|=33.30 \u2192 outside tolerance"
-    },
-    {
-     "date": "2026-10-10",
-     "status": "confirmed",
-     "metric": "weight_lbs",
-     "reason": "weight_lbs=315.43 on 2026-09-23 vs predicted 315 \u00b15.1527 (\u00b11 SD of the trailing 30-day personal series (n=13 readings, SD=5.1527)); |\u0394|=0.43 \u2192 within tolerance"
     }
    ],
    "caveat": "Self-assessment of this coach's own calls \u2014 not external validation."
@@ -484,6 +484,22 @@
   ]
  },
  "recent_outputs": [
+  {
+   "date": "2026-10-15",
+   "summary": "I've asked him to restart food logging tonight and explain the 36% step drop in one sentence.",
+   "themes": [
+    "step tracking",
+    "protein intake",
+    "body composition",
+    "weight loss",
+    "training stimulus",
+    "recovery",
+    "food logging",
+    "thyroid symptoms"
+   ],
+   "generated_at": "2026-10-15T17:04:46.751971+00:00",
+   "data_through": "2026-10-14"
+  },
   {
    "date": "2026-10-08",
    "summary": "I've asked him to log food consistently and reach 170 grams of protein daily for seven straight days.",
@@ -777,7 +793,7 @@
    "superseded": {
     "note": "superseded \u2014 generated before the logging-record fix",
     "claimed_logging_stopped_after": "2026-09-10",
-    "served_last_log": "2026-10-09",
+    "served_last_log": "2026-10-12",
     "ref": "#4185 / #4227"
    }
   },
@@ -870,6 +886,35 @@
   "commitments": [
    {
     "kind": "commitment",
+    "record_id": "COMMITMENT#commit_20261015_restart_food_logging_tonight",
+    "date": "2026-10-15",
+    "text": "I've asked him to restart food logging tonight to verify protein intake direction.",
+    "status": "pending",
+    "due_date": "2026-10-22",
+    "outcome": null,
+    "outcome_date": null,
+    "outcome_notes": null,
+    "check": {
+     "metric": "total_protein_g",
+     "direction": "up"
+    },
+    "evidence_link": "/data/nutrition/"
+   },
+   {
+    "kind": "commitment",
+    "record_id": "COMMITMENT#commit_20261015_provide_one_sentence_explanation_of_the",
+    "date": "2026-10-15",
+    "text": "I've asked him to explain the 36% step drop in one sentence this week.",
+    "status": "pending",
+    "due_date": "2026-10-22",
+    "outcome": null,
+    "outcome_date": null,
+    "outcome_notes": null,
+    "check": null,
+    "evidence_link": null
+   },
+   {
+    "kind": "commitment",
     "record_id": "COMMITMENT#commit_20261008_explain_the_reason_for_the_step_drop",
     "date": "2026-10-08",
     "text": "I need him to explain the reason for the recent step drop.",
@@ -886,11 +931,11 @@
     "record_id": "COMMITMENT#commit_20261008_achieve_and_maintain_protein_intake_at_o",
     "date": "2026-10-08",
     "text": "I've asked him to log food consistently and reach 170 grams of protein daily for seven straight days.",
-    "status": "pending",
+    "status": "kept",
     "due_date": "2026-10-15",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "kept",
+    "outcome_date": "2026-10-15",
+    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.0533), predicted=up\", \"algo_version\": \"1.0\"}",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -963,11 +1008,11 @@
     "record_id": "COMMITMENT#commit_20261002_provide_one_sentence_explanation_for_why",
     "date": "2026-10-02",
     "text": "I've asked him to clarify why his step count dropped 36% from baseline.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-09",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-17",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -976,11 +1021,11 @@
     "record_id": "COMMITMENT#commit_20261002_provide_answers_about_dinner_consistency",
     "date": "2026-10-02",
     "text": "I've asked him to clarify dinner consistency this week and report any unusual fatigue or cold sensitivity.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-09",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-17",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1005,11 +1050,11 @@
     "record_id": "COMMITMENT#commit_20261002_identify_the_reason_for_the_step_contrac",
     "date": "2026-10-02",
     "text": "I've asked him to identify the reason for his recent step contraction.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-09",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-17",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1018,11 +1063,11 @@
     "record_id": "COMMITMENT#commit_20261002_daily_two_data_point_thyroid_symptom_che",
     "date": "2026-10-02",
     "text": "I've asked him to log daily thyroid symptoms \u2014 fatigue rating and cold sensitivity \u2014 through April.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-09",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-17",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1031,11 +1076,11 @@
     "record_id": "COMMITMENT#commit_20261002_activate_thyroid_symptom_log",
     "date": "2026-10-02",
     "text": "I've asked him to activate his thyroid symptom log.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-09",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-17",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1608,14 +1653,84 @@
    }
   ],
   "commitment_counts": {
-   "held": 51,
-   "kept": 14,
+   "held": 53,
+   "kept": 15,
    "broken": 9,
-   "pending": 9,
-   "unresolved": 19,
+   "pending": 5,
+   "unresolved": 24,
    "ungradeable": 0
   },
   "learnings": [
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-17#pred-20261015-weight-will-be-around-304-5-pounds-tomor-confi",
+    "date": "2026-10-17",
+    "status": "confirmed",
+    "metric": "weight_lbs",
+    "reason": "weight_lbs=304.03 on 2026-10-16 vs predicted 304.5 \u00b13.9712 (\u00b11 SD of the trailing 30-day personal series (n=29 readings, SD=3.9712)); |\u0394|=0.47 \u2192 within tolerance",
+    "evidence": {
+     "prediction_id": "pred_20261015_weight_will_be_around_304_5_pounds_tomor",
+     "actual_value": 304.03,
+     "threshold": 304.5,
+     "condition": "within"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-16#pred-20261002-running-average-of-recovery-across-27-da-confi",
+    "date": "2026-10-16",
+    "status": "confirmed",
+    "metric": "recovery_score",
+    "reason": "recovery_score 98 on 2026-10-02 -> 70 on 2026-10-16 (change -28, band \u00b111.5, window 2026-10-02..2026-10-16): trend=down, predicted=down",
+    "evidence": {
+     "prediction_id": "pred_20261002_running_average_of_recovery_across_27_da",
+     "actual_value": -0.285714,
+     "condition": "down"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-16#pred-20261002-recovery-score-will-rebound-toward-regre-refut",
+    "date": "2026-10-16",
+    "status": "refuted",
+    "metric": "recovery_score",
+    "reason": "recovery_score 98 on 2026-10-02 -> 70 on 2026-10-16 (change -28, band \u00b111.5, window 2026-10-02..2026-10-16): trend=down, predicted=up",
+    "evidence": {
+     "prediction_id": "pred_20261002_recovery_score_will_rebound_toward_regre",
+     "actual_value": -0.285714,
+     "condition": "up"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-16#docket-physical_coach__sleep_coach-sleep-deep-sleep-spike-interpretation-signal-vs-noise",
+    "date": "2026-10-16",
+    "status": "refuted",
+    "metric": "deep_pct_7day_avg",
+    "reason": "dispute docket resolved: deep_pct_7day_avg >= 26 on 2026-10-16",
+    "evidence": {
+     "threshold": 26.0,
+     "condition": "gte"
+    },
+    "evidence_link": null
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-14#pred-20260923-daily-steps-will-consistently-meet-the-t-refut",
+    "date": "2026-10-14",
+    "status": "refuted",
+    "metric": "steps",
+    "reason": "predicted up, metric flat \u2014 steps 2520 on 2026-09-23 -> 890 on 2026-10-07 (change -1630, band \u00b14432.82, window 2026-09-23..2026-10-07)",
+    "evidence": {
+     "prediction_id": "pred_20260923_daily_steps_will_consistently_meet_the_t",
+     "actual_value": -0.646825,
+     "condition": "up"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
    {
     "kind": "learning",
     "record_id": "LEARNING#2026-10-11#pred-20261002-tomorrow-s-recovery-will-reach-approxima-refut",
@@ -1901,77 +2016,21 @@
      "condition": "up"
     },
     "evidence_link": "/coaching/scorecard/"
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-09-24#pred-20260910-recovery-score-tomorrow-will-be-59-5-refuted",
-    "date": "2026-09-24",
-    "status": "refuted",
-    "metric": "recovery_score",
-    "reason": "recovery_score=24.00 on 2026-09-11 vs predicted 59.5 \u00b117.9488 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=17.9488)); |\u0394|=35.50 \u2192 outside tolerance",
-    "evidence": {
-     "prediction_id": "pred_20260910_recovery_score_tomorrow_will_be_59_5",
-     "actual_value": 24.0,
-     "threshold": 59.5,
-     "condition": "within"
-    },
-    "evidence_link": "/coaching/scorecard/"
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-09-24#pred-20260910-if-nocturnal-glucose-dips-are-driving-co-confi",
-    "date": "2026-09-24",
-    "status": "confirmed",
-    "metric": "recovery_score",
-    "reason": "recovery_score trend=up (slope=0.1439), predicted=up",
-    "evidence": {
-     "prediction_id": "pred_20260910_if_nocturnal_glucose_dips_are_driving_co",
-     "actual_value": 0.143852,
-     "condition": "up"
-    },
-    "evidence_link": "/coaching/scorecard/"
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-09-22#pred-20260908-recovery-score-will-be-approximately-61-confir",
-    "date": "2026-09-22",
-    "status": "confirmed",
-    "metric": "recovery_score",
-    "reason": "recovery_score=64.00 on 2026-09-09 vs predicted 61 \u00b117.6379 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=17.6379)); |\u0394|=3.00 \u2192 within tolerance",
-    "evidence": {
-     "prediction_id": "pred_20260908_recovery_score_will_be_approximately_61",
-     "actual_value": 64.0,
-     "threshold": 61.0,
-     "condition": "within"
-    },
-    "evidence_link": "/coaching/scorecard/"
    }
   ],
   "relationship": {
    "kind": "relationship",
    "record_id": "RELATIONSHIP#state",
-   "date": "2026-10-08",
+   "date": "2026-10-15",
    "journey_phase": "invested",
-   "rapport_level": 1.0,
-   "interaction_count": 82,
-   "tenure_days": 43,
+   "rapport_level": 0.995,
+   "interaction_count": 94,
+   "tenure_days": 50,
    "first_interaction_date": "2026-08-26",
-   "last_interaction_date": "2026-10-08",
-   "context_summary": "physical_coach: invested (1.00 rapport, 82 interactions across 43d)"
+   "last_interaction_date": "2026-10-15",
+   "context_summary": "physical_coach: invested (1.00 rapport, 94 interactions across 50d)"
   },
-  "docket_positions": [
-   {
-    "kind": "docket_position",
-    "record_id": "OPEN#physical_coach__sleep_coach#sleep",
-    "date": "2026-10-02",
-    "topic": "Deep sleep spike interpretation: signal vs. noise",
-    "my_claim": "Deep sleep decline is occurring simultaneously with recovery climb; opposing vectors suggest internal depletion masked by external scores; deep sleep architecture is high-influence confounder",
-    "versus": "sleep_coach",
-    "criterion": "deep_pct_7day_avg >= 26 on 2026-10-16",
-    "resolution_date": "2026-10-16",
-    "evidence_link": "/coaching/read/"
-   }
-  ],
+  "docket_positions": [],
   "withheld": 0,
   "retracted": 0,
   "degraded": false,

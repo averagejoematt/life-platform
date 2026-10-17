@@ -84,3 +84,48 @@ test("Coaches: a coach sitting out since before day one says what its counted ca
   assert.doesNotMatch(P.teamHTML(body, "", "", { startDate: "2026-08-01" }), /before day one/, "a sitting-out date inside the run is not called pre-start");
   assert.doesNotMatch(P.teamHTML(body), /before day one/, "no start date served: no claim");
 });
+
+// ── round 2 (2026-10-17, the independent re-grade) ──────────────────────────────
+const F = await import("../../site/assets/js/ck_front.js");
+
+test("Start: the week's change is the difference of the two weights the list prints, never the served unrounded one", () => {
+  const html = P.recapHTML(P.postsInOrder(POSTS));
+  const rows = [...html.matchAll(/· (\d+\.\d) lb(?:, (down|up) (\d+\.\d) this week)?/g)].map((m) => ({ w: Number(m[1]), dir: m[2], d: m[3] }));
+  assert.ok(rows.length >= 3);
+  for (let i = 1; i < rows.length; i += 1) {
+    const want = (rows[i - 1].w - rows[i].w).toFixed(1);
+    assert.equal(rows[i].d, Math.abs(Number(want)).toFixed(1), `row ${i}`);
+    assert.equal(rows[i].dir, Number(want) > 0 ? "down" : "up");
+  }
+  assert.equal(P.weekChange("315.0", "312.3"), "down 2.7 this week");
+  assert.equal(P.weekChange("", "312.3"), "");
+});
+
+test("Front: a line in the statistician's jargon, or one with a reader-gate finding, is never quoted", () => {
+  const jargon = "27.6% deep sleep spike (1.8 SD above baseline) is likely regression-to-mean noise without thermal anchor and subjective context";
+  assert.equal(F.plainLanguage(jargon), false);
+  assert.equal(F.frontQuotable({ coach_id: "sleep_coach", move: "reply", text: jargon }), false);
+  assert.equal(F.frontQuotable({ coach_id: "sleep_coach", move: "reply", text: "Deep sleep fell this week.", reader: ["hedge"] }), false);
+  assert.equal(F.frontQuotable({ coach_id: "sleep_coach", move: "reply", text: "Deep sleep fell this week." }), true);
+});
+
+test("the record's comparison names the guess and the gap, or says there is none yet", () => {
+  const d = B.record.data;
+  assert.match(P.recordLine(B.record), /they score \d+\.\d% (worse|better) than a guess that gives every call the same \d+% chance\.$/);
+  assert.equal(P.guessClause({ ...d, brier_skill: null }), "there is no comparison with a guess yet.");
+  assert.match(P.guessClause({ ...d, skill_n: d.decided + 1 }), /a guess that gives every call the same chance\./);
+});
+
+test("Coaches: one rule for every row — the count, no bar; the lead says no checked calls", () => {
+  const html = P.teamHTML(load("coaches"));
+  assert.doesNotMatch(html, /ck-meter/);
+  assert.doesNotMatch(html, /no bets/);
+});
+
+test("Story on the capture's own day: the next week has not published, and the next date is ahead of the day", () => {
+  const html = P.storyChapterHTML(EDITION, B, POSTS, load("episodes"));
+  assert.match(html, new RegExp(`Week ${n + 1} (has not published yet|is held before publishing)`));
+  const due = B.next.data.chapter.data.date;
+  assert.ok(due > EDITION.as_of, `${due} is after ${EDITION.as_of}`);
+  assert.doesNotMatch(html, /New this week/);
+});

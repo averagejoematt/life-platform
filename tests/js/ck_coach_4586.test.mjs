@@ -13,7 +13,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const C = await import("../../site/assets/js/ck_coach.js");
-const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit_pages_4586");
+// #4586 round 2: these tests pin the coach pages to the 2026-10-13 capture they were written against
+// (copied verbatim into kit_pages_4586_pinned when kit_pages_4586 was recaptured on 2026-10-17); the
+// kit gate renders the coach pages from the live recapture.
+const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit_pages_4586_pinned");
 const load = (name) => JSON.parse(readFileSync(join(FIX, `${name}.json`), "utf8"));
 const [SLEEP, PHYSICAL, GLUCOSE, LEAD, MIND] = ["sleep_coach", "physical_coach", "glucose_coach", "eli_marsh", "mind_coach"].map((id) => load(`coach_${id}`));
 const DOCKET = load("coach_docket_full");

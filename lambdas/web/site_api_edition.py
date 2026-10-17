@@ -247,11 +247,18 @@ def bet_question(criterion: dict, settle_date: str, metric_words: Callable[[Any]
     Built from the docket's CRITERION (engine fields), never from the served topic prose —
     the same rule v7_coaches.js docketQuestion() follows, with the metric's reader words
     from ``web.prediction_reason.metric_words`` (the server-side registry). None when the
-    metric has no reader words or no threshold: a question is never guessed."""
+    metric has no reader words or no threshold: a question is never guessed. The threshold
+    carries the measure's unit (``prediction_reason.metric_unit``: "26% or higher"); a measure
+    with no registered unit gets no question, so no bare number is ever printed (red team
+    2026-10-17)."""
+    from web.prediction_reason import metric_unit
+
     words = metric_words((criterion or {}).get("metric"))
-    thr = _fmt_num((criterion or {}).get("threshold"))
-    if not words or thr is None:
+    num = _fmt_num((criterion or {}).get("threshold"))
+    unit = metric_unit((criterion or {}).get("metric"))
+    if not words or num is None or unit is None:
         return None
+    thr = f"{num}{unit}"
     cond = str(criterion.get("condition") or "").lower()
     when = day_in_words(settle_date) if parse_day_key(settle_date or "") else ""
     on = f" on {when}" if when else ""

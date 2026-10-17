@@ -175,10 +175,21 @@ export function todayBandHTML(edition, b, base = "/", { gloss = true } = {}) {
 //       should meet the record, not an AI's diagnosis of the person.
 // It holds for every quote on the front page: the argument, the day's lines and the last-heard
 // row. The excluded lines are still served whole on the coach's own page and the day pages.
+//   (3) it passes the plain-language test (`plainLanguage`, round 2 of the 10-17 red team: "is
+//       likely regression-to-mean noise without thermal anchor and subjective context"): no served
+//       reader-gate finding on the line, and none of the statistician's words in FRONT_JARGON.
+// With no line that qualifies, the front page prints no coach quote rather than a bad one.
 export const FRONT_MOVES = new Set(["call", "reply", "reaction", "bet"]);
 const FRONT_UNQUOTED = { coach_id: new Set(["mind_coach"]), domain: new Set(["mind"]) };
+export const FRONT_JARGON =
+  /regression[- ]to[- ](?:the[- ])?mean|thermal anchor|subjective context|\bnoise\b|\bvariance\b|baseline[- ]relative|confidence interval|\bSD\b|standard deviation|\bconfounder|\bsignal\b|p[- ]value|\bcorrelat|\bstatistically\b|\bn ?= ?\d|masked[- ]depletion|\bEWMA\b|\bBrier\b|z[- ]score|mean reversion|autocorrelat/i;
+export function plainLanguage(text, line = null) {
+  const finding = line && (line.reader || line.reader_findings || line.reader_finding);
+  if (finding && (!Array.isArray(finding) || finding.length)) return false;
+  return !!String(text || "").trim() && !FRONT_JARGON.test(String(text));
+}
 export function frontQuotable(line) {
-  if (!line || !FRONT_MOVES.has(line.move)) return false;
+  if (!line || !FRONT_MOVES.has(line.move) || !plainLanguage(line.text, line)) return false;
   return !FRONT_UNQUOTED.coach_id.has(line.coach_id) && !FRONT_UNQUOTED.domain.has(line.domain);
 }
 // What the coaches said today: each line a move, or the block's own plain sentence. A line
@@ -430,7 +441,8 @@ export function argumentHeading(pick) {
 const BET_MEASURES = [
   [/protein/i, "food", (v) => `${trim1(v)} g protein`],
   [/weight|lb\b|pounds/i, "weight", (v) => `${fmt1(v)} lb`],
-  [/sleep|hours/i, "sleep", (v) => `${trim1(v)} hours of sleep`],
+  // Sleep TIME only: a deep- or REM-sleep share is not the hours the week carries (round 2).
+  [/^(?!.*(?:deep|REM|share|%)).*(?:sleep time|hours of sleep|sleep duration)/i, "sleep", (v) => `${trim1(v)} hours of sleep`],
   [/train|minutes/i, "training", (v) => `${trim1(v)} minutes of training`],
 ];
 const trim1 = (v) => (num(v) === null ? "" : String(Number(v.toFixed(1))));
@@ -472,15 +484,19 @@ export function jobsByName(days) {
 // side with no reason is the side alone; nothing is written in a coach's voice here.
 // `reasons: false` prints the sides alone: the reasons are the FRONT card's (ruling
 // 2026-10-11 — the coaches page keeps its four-screen budget and links to the front card).
+// Round 2 of the 10-17 red team: a job label goes beside every side or none ("Lisa Park (sleep)"
+// beside a bare "Max Reyes" read as a ranking), and a reason is printed only when it passes the
+// front page's plain-language test — otherwise the side stands alone.
 export function betSidesLines(bet, jobs = {}, { reasons = true } = {}) {
   if (!usable(bet)) return [];
-  return (bet.data.sides || [])
-    .filter((s) => s && s.coach)
-    .map((s) => {
-      const who = `${s.coach}${jobs[s.coach] ? ` (${jobs[s.coach]})` : ""} says ${s.says}`;
-      const why = reasons && typeof s.reason === "string" ? s.reason.trim() : "";
-      return why ? `${who}: “${why}”.` : `${who}.`;
-    });
+  const sides = (bet.data.sides || []).filter((s) => s && s.coach);
+  const labelled = sides.length > 0 && sides.every((s) => jobs[s.coach]);
+  return sides.map((s) => {
+    const who = `${s.coach}${labelled ? ` (${jobs[s.coach]})` : ""} says ${s.says}`;
+    const raw = reasons && typeof s.reason === "string" ? s.reason.trim() : "";
+    const why = raw && plainLanguage(raw) ? raw : "";
+    return why ? `${who}: “${why}”.` : `${who}.`;
+  });
 }
 // The sides as one line: "Nathan Reeves (mind) says no. Marcus Webb (food) says yes."
 export const betSidesLine = (bet, jobs = {}, opts = {}) => betSidesLines(bet, jobs, opts).join(" ");

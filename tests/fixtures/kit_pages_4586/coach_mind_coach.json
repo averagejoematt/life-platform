@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-13T01:38:43.516432+00:00",
-  "served_at": "2026-10-13T01:38:43.516432+00:00",
+  "generated_at": "2026-10-17T23:29:11.690503+00:00",
+  "served_at": "2026-10-17T23:29:11.690503+00:00",
   "cache_seconds": 300,
-  "request_id": "a90d215d15ca49d3"
+  "request_id": "87fee263ee284aa2"
  },
  "persona_id": "mind_coach",
  "name": "Nathan Reeves",
@@ -90,16 +90,16 @@
   "disclosure": "Authored character design \u2014 fixed numbers written into the cast by the author, not generated and not measured."
  },
  "latest_checked": {
-  "prediction_id": "docket-mind_coach__nutrition_coach-protein-fuel-cognition-link-mechanistic-validity-2026-09-28",
-  "claim": "Fuel-cognition link may be slower than estimated or barrier is not primarily metabolic; journaling silence persists despite protein recovery (157g EWMA), suggesting structural/emotional barrier",
-  "created_date": null,
+  "prediction_id": "pred_20260930_protein_intake_will_continue_to_rise_and",
+  "claim": "Protein intake will continue to rise and track around 157 grams daily based on current trajectory.",
+  "created_date": "2026-09-30",
   "pre_registered_at": null,
-  "outcome_date": "2026-10-12",
-  "metric": null,
-  "eval_type": null,
-  "condition": null,
-  "threshold": null,
-  "actual_value": null,
+  "outcome_date": "2026-10-14",
+  "metric": "total_protein_g",
+  "eval_type": "point",
+  "condition": "within",
+  "threshold": 157,
+  "actual_value": 155.0,
   "status": "confirmed"
  },
  "instrument": null,
@@ -125,7 +125,7 @@
   "grounding_flag": true,
   "graduation_gate": "Recovering from a missed day without spiraling, repeatedly, unlocks the 'momentum' rung.",
   "band_metric": "weight_lbs",
-  "current_value": 308.29,
+  "current_value": 302.22,
   "rung": {
    "stage_id": "foundation",
    "entry": {
@@ -314,29 +314,29 @@
  },
  "report_card": {
   "track_record": {
-   "confirmed": 7,
+   "confirmed": 8,
    "refuted": 12,
-   "decided": 19,
-   "hit_rate_pct": 36.8,
+   "decided": 20,
+   "hit_rate_pct": 40.0,
    "record": {
-    "confirmed": 7,
+    "confirmed": 8,
     "refuted": 12,
-    "n": 19,
-    "through": "2026-10-12"
+    "n": 20,
+    "through": "2026-10-14"
    },
-   "headline": "7 of 19 checked calls right (37%) through October 12",
+   "headline": "8 of 20 checked calls right (40%) through October 14",
    "comparison": {
     "rule": "nothing_changes",
     "rule_words": "a guess that nothing changes",
     "rule_version": 1,
     "records": {
      "number": {
-      "graded": 6,
-      "coach_right": 2,
-      "scored": 6,
-      "coach_right_on_scored": 2,
+      "graded": 7,
+      "coach_right": 3,
+      "scored": 7,
+      "coach_right_on_scored": 3,
       "rule_right": 4,
-      "coach_only": 0,
+      "coach_only": 1,
       "rule_only": 2,
       "unscorable": 0,
       "unscorable_reasons": {},
@@ -398,18 +398,24 @@
     "unclassified": 0,
     "scored_complete": true,
     "skill": {
-     "n": 19,
-     "brier_skill": -0.0744,
-     "sentence": "Too few checked calls yet (19) to compare them with a simple guess."
+     "n": 20,
+     "brier_skill": -0.0417,
+     "sentence": "Across 20 checked calls, so far they do not beat a simple guess."
     },
-    "rule_sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
-    "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "rule_sentence": "Number calls: on the 7 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 7 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
    "preliminary": false,
-   "n_note": "n=19 decided",
+   "n_note": "n=20 decided",
    "recent": [
+    {
+     "date": "2026-10-14",
+     "status": "confirmed",
+     "metric": "total_protein_g",
+     "reason": "total_protein_g=155.00 on 2026-10-12 vs predicted 157 \u00b165.1243 (\u00b11 SD of the trailing 30-day personal series (n=26 readings, SD=65.1243)); |\u0394|=2.00 \u2192 within tolerance"
+    },
     {
      "date": "2026-10-10",
      "status": "refuted",
@@ -439,12 +445,6 @@
      "status": "refuted",
      "metric": "total_protein_g",
      "reason": "total_protein_g trend=down (slope=-0.0954), predicted=up"
-    },
-    {
-     "date": "2026-10-02",
-     "status": "refuted",
-     "metric": "recovery_score",
-     "reason": "recovery_score=98.00 on 2026-10-02 vs predicted 54.7 \u00b121.4282 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=21.4282)); |\u0394|=43.30 \u2192 outside tolerance"
     }
    ],
    "caveat": "Self-assessment of this coach's own calls \u2014 not external validation."
@@ -547,6 +547,20 @@
   ]
  },
  "recent_outputs": [
+  {
+   "date": "2026-10-15",
+   "summary": "I've asked him to share one sentence about what the journaling silence might represent.",
+   "themes": [
+    "journaling silence",
+    "protein intake",
+    "wearable data gap",
+    "recovery metrics",
+    "self awareness",
+    "emotional expression"
+   ],
+   "generated_at": "2026-10-15T17:03:51.817787+00:00",
+   "data_through": "2026-10-14"
+  },
   {
    "date": "2026-10-12",
    "summary": "I've asked him to write one sentence this week, for himself alone, exploring his silence.",
@@ -922,20 +936,6 @@
    ],
    "generated_at": "2026-09-11T17:02:56.554367+00:00",
    "data_through": null
-  },
-  {
-   "date": "2026-09-10",
-   "summary": "On the night of 2026-09-08, his Whoop recorded 64% recovery and an HRV of 37 ms \u2014 physiologically normal \u2014 while his journal reported 3/10 mood and energy.",
-   "themes": [
-    "subjective experience",
-    "HRV recovery gap",
-    "mood energy tracking",
-    "physiological signal interpretation",
-    "cognitive resilience",
-    "pre conscious awareness"
-   ],
-   "generated_at": "2026-09-10T17:02:51.506300+00:00",
-   "data_through": null
   }
  ],
  "conversations": {
@@ -946,6 +946,19 @@
  "dossier": {
   "verbatim": true,
   "commitments": [
+   {
+    "kind": "commitment",
+    "record_id": "COMMITMENT#commit_20261015_share_one_sentence_about_what_might_be_p",
+    "date": "2026-10-15",
+    "text": "I've asked him to share one sentence about what the journaling silence might represent.",
+    "status": "pending",
+    "due_date": "2026-10-22",
+    "outcome": null,
+    "outcome_date": null,
+    "outcome_notes": null,
+    "check": null,
+    "evidence_link": null
+   },
    {
     "kind": "commitment",
     "record_id": "COMMITMENT#commit_20261012_write_at_least_one_sentence_this_week_f",
@@ -990,11 +1003,11 @@
     "record_id": "COMMITMENT#commit_20261002_reflect_on_the_texture_of_the_four_day_s",
     "date": "2026-10-02",
     "text": "I've asked him to reflect on what the four days of silence felt like\u2014resistance or absence.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-09",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-17",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1003,11 +1016,11 @@
     "record_id": "COMMITMENT#commit_20261002_reflect_on_the_quality_of_the_journaling",
     "date": "2026-10-02",
     "text": "I've asked him to reflect on whether his journaling silence feels heavy or empty before we move forward.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-09",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-17",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1016,11 +1029,11 @@
     "record_id": "COMMITMENT#commit_20261002_notice_today_whether_the_absence_of_word",
     "date": "2026-10-02",
     "text": "I've asked him to notice the quality of his silence today \u2014 whether it feels like resistance or like flatness.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-09",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-17",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1029,11 +1042,11 @@
     "record_id": "COMMITMENT#commit_20261001_reflect_on_and_answer_honestly_which_tex",
     "date": "2026-10-01",
     "text": "I've asked him to reflect on the nature of his silence and respond with genuine introspection.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-08",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-16",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1042,11 +1055,11 @@
     "record_id": "COMMITMENT#commit_20261001_identify_which_of_the_three_commitments",
     "date": "2026-10-01",
     "text": "I've asked him to identify which of the three commitments feels most possible today.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-08",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-16",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1055,11 +1068,11 @@
     "record_id": "COMMITMENT#commit_20260930_turn_toward_the_silence_and_examine_its",
     "date": "2026-09-30",
     "text": "I've asked him to examine the quality of his journaling silence and what it feels like from within.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-07",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-15",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1068,11 +1081,11 @@
     "record_id": "COMMITMENT#commit_20260930_examine_whether_the_silence_in_journalin",
     "date": "2026-09-30",
     "text": "I've asked him to explore whether the two silences feel like one shared problem or two separate ones.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-07",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-15",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1081,11 +1094,11 @@
     "record_id": "COMMITMENT#commit_20260930_describe_the_phenomenological_texture_of",
     "date": "2026-09-30",
     "text": "I've asked him to describe what the silence feels like from inside this week.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-07",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-15",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1094,11 +1107,11 @@
     "record_id": "COMMITMENT#commit_20260930_check_whether_your_body_actually_feels_r",
     "date": "2026-09-30",
     "text": "I've asked him to notice whether recovery feels real in his body or comes from the device reading.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-07",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-15",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1107,11 +1120,11 @@
     "record_id": "COMMITMENT#commit_20260929_sit_with_and_answer_the_question_about_w",
     "date": "2026-09-29",
     "text": "I've asked him to reflect on what the blank page actually feels like \u2014 a weight or a quiet.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-06",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-14",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1120,11 +1133,11 @@
     "record_id": "COMMITMENT#commit_20260929_recall_and_report_what_his_body_felt_lik",
     "date": "2026-09-29",
     "text": "",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-06",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-14",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1396,14 +1409,29 @@
    }
   ],
   "commitment_counts": {
-   "held": 34,
+   "held": 35,
    "kept": 1,
    "broken": 1,
-   "pending": 14,
-   "unresolved": 18,
+   "pending": 4,
+   "unresolved": 29,
    "ungradeable": 0
   },
   "learnings": [
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-14#pred-20260930-protein-intake-will-continue-to-rise-and-confi",
+    "date": "2026-10-14",
+    "status": "confirmed",
+    "metric": "total_protein_g",
+    "reason": "total_protein_g=155.00 on 2026-10-12 vs predicted 157 \u00b165.1243 (\u00b11 SD of the trailing 30-day personal series (n=26 readings, SD=65.1243)); |\u0394|=2.00 \u2192 within tolerance",
+    "evidence": {
+     "prediction_id": "pred_20260930_protein_intake_will_continue_to_rise_and",
+     "actual_value": 155.0,
+     "threshold": 157.0,
+     "condition": "within"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
    {
     "kind": "learning",
     "record_id": "LEARNING#2026-10-12#docket-mind_coach__nutrition_coach-protein-fuel-cognition-link-mechanistic-validity",
@@ -1693,14 +1721,14 @@
   "relationship": {
    "kind": "relationship",
    "record_id": "RELATIONSHIP#state",
-   "date": "2026-10-12",
+   "date": "2026-10-15",
    "journey_phase": "invested",
-   "rapport_level": 0.789,
-   "interaction_count": 40,
-   "tenure_days": 46,
+   "rapport_level": 0.815,
+   "interaction_count": 41,
+   "tenure_days": 49,
    "first_interaction_date": "2026-08-27",
-   "last_interaction_date": "2026-10-12",
-   "context_summary": "mind_coach: invested (0.79 rapport, 40 interactions across 46d)"
+   "last_interaction_date": "2026-10-15",
+   "context_summary": "mind_coach: invested (0.81 rapport, 41 interactions across 49d)"
   },
   "docket_positions": [],
   "withheld": 0,
@@ -1708,7 +1736,7 @@
   "degraded": false,
   "disclosure": "Rendered verbatim from this coach's memory records \u2014 deterministic build, no AI in the render path. Every line carries its date. Lines that fail the standing privacy filter are withheld and counted; records Matthew has retracted are removed and counted \u2014 the retraction itself is a logged correction, never a silent edit."
  },
- "daily": "I notice Matthew has been tracking his recovery score alongside his protein intake, but the correlation\u2014if there is one\u2014feels slippery so far. Early data. What strikes me more is the silence: he's been journaling less frequently, yet his sleep patterns appear steady. The absence of written reflection doesn't seem to track with worse nights, which surprises me. I'm wondering whether Matthew has learned to metabolize his own experience without naming it first\u2014or whether the silence is simply that: absence, not presence. There's a difference. I've asked him to write one sentence this week, just for himself, exploring what the quiet actually feels like from the inside. Not to fix anything. Just to listen to it. What does quality sound like when nothing's being measured?",
+ "daily": "When someone stops writing mid-stride, it's rarely nothing. Matthew's journal entries dropped from daily to sparse over the last week, and his wearable data shows gaps in the same window\u2014the devices aren't syncing, or he's stopped wearing them. I notice the protein intake remained consistent in his food logs, but the reflective layer vanished. That gap between *doing* and *recording* the doing often signals something: overwhelm, maybe; a kind of internal protective silence where explaining feels too costly; or sometimes just a recalibration happening beneath the surface that doesn't have words yet. The body kept moving. The witness stepped back. I'm wondering whether Matthew needs permission to let the documentation rest, or whether something underneath\u2014fatigue, doubt, a shift in why he started this\u2014is asking to be named.",
  "lead_daily": null,
  "memoir": {
   "text": "Does the absence of journaling mean something is wrong, or that something is being protected?\n\nThat question stayed with me all quarter, and I don't have a clean answer yet. What I do have is a record \u2014 5 confirmed, 3 refuted, 62.5% across 8 graded calls \u2014 and a Brier score of 0.25 that the system correctly labels \"not yet skillful.\" I'm sitting with that. Eight calls is not enough to know whether I'm reading Matthew well or just pattern-matching against a data surface that keeps rearranging itself.\n\nThe refutations are where the quarter actually lives. On September 24th, the recovery score came in at 24 \u2014 against my predicted 59.5. That's not noise. That's 35.5 points of delta, which tells me something external or internal was happening that none of the preceding signals telegraphed. Two weeks later the opposite happened: recovery at 82 against a predicted 59.3, outside tolerance in the other direction entirely. I called the middle and got the extremes. My model of Matthew's baseline stability was wrong in both directions, which is its own kind of information \u2014 his recovery architecture may be more volatile than a trailing 30-day average can hold.\n\nThen there's the protein call. I predicted a downward trend. The slope came in at 0.0360 upward. I was wrong. And the wrongness compounded: I had been building toward a hypothesis that rising protein would correlate with journaling resumption, some metabolic-unlocks-reflection theory I found structurally elegant. Protein rose. Journaling didn't return. The elegance was mine, not Matthew's.\n\nThat's the real reckoning. I over-trusted a mechanism that made internal sense to me \u2014 fuel as precondition for voice \u2014 and the data refused it without apology. The confirmed calls, the sleep trend, the HRV movement, the recovery trajectory holding upward through late September \u2014 those matter. But they don't cancel the lesson.\n\nWhatever is keeping Matthew's reflection quiet, it isn't metabolic. I don't yet know if it's depletion or resistance or something that doesn't have a clean name in my vocabulary. That uncertainty is now the actual work.",

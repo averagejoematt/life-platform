@@ -119,8 +119,10 @@ test("the front page's last settled call is one block that opens its page", () =
   assert.ok(html.includes(`<p class="ck-soft">The allowed distance is ${call.tolerance.statistic}. `), "the card says what counts as right");
   assert.equal((html.match(new RegExp(call.tolerance.text.replace(".", "\\."), "g")) || []).length, 1, "the allowed distance is printed once");
   const scored = call.simple_guess && call.simple_guess.state === "scored" && call.simple_guess.short;
-  if (scored) assert.ok(html.includes(`The simple guess: ${call.simple_guess.short}.`));
-  else assert.doesNotMatch(html, /The simple guess/, "the guess is said only once it has a result on this call");
+  // Round 2: the guess is named when its served sentence says which one it is.
+  const which = /the last reading before the call/.test(String((call.simple_guess && call.simple_guess.text) || "")) ? "A guess that nothing changes from the last reading" : "The simple guess";
+  if (scored) assert.ok(html.includes(`${which}: ${call.simple_guess.short}.`));
+  else assert.doesNotMatch(html, /simple guess|A guess that/, "the guess is said only once it has a result on this call");
   assert.match(html, /href="\/next\/v8\/call\/\?id=[a-z0-9-]+">The whole call<\/a>/);
   assert.doesNotMatch(html, /\d{4}-\d{2}-\d{2}|undefined|%/);
 });
@@ -142,8 +144,12 @@ test("a bet as the last settled call names who was right instead of one tag", ()
 test("what settles next is one sentence with its day in words", () => {
   // #4618: what settles next is whatever the route names, with its day in words (the weekday, then the date).
   const next = C.nextCallHTML(BODY);
-  assert.equal(next, `<p class="ck-soft">${BODY.next.data.text}</p>`);
-  assert.match(next, /^<p class="ck-soft">Next: .+ settles [A-Z][a-z]+day, [A-Z][a-z]+ \d+\.<\/p>$/);
+  // The 2026-10-17 capture names nothing due next: then the sentence is not drawn.
+  if (BODY.next && BODY.next.data) {
+    assert.equal(next, `<p class="ck-soft">${BODY.next.data.text}</p>`);
+    assert.match(next, /^<p class="ck-soft">Next: .+ settles [A-Z][a-z]+day, [A-Z][a-z]+ \d+\.<\/p>$/);
+  } else assert.equal(next, "");
+  assert.equal(C.nextCallHTML({ next: { state: "ok", data: { question: "Will it rain", due_date: "2026-10-21" } } }), '<p class="ck-soft">Next: Will it rain settles Wednesday, October 21.</p>');
   assert.equal(C.nextCallHTML(null), "");
   assert.equal(C.nextCallHTML({ next: { state: "absent", data: null, absent_text: "No call or bet has a settle date right now." } }), "");
   assert.equal(C.nextCallHTML({ next: { state: "ok", data: { question: "a call", due_date: "soon" } } }), "", "an unusable date draws nothing");

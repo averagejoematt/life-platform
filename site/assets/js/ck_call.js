@@ -239,7 +239,10 @@ export function lastCallHTML(callsBody, base, asOf = "", jobs = null, { moreDoor
   if (!call) return "";
   const day = dayInWords(call.settled_date);
   const g = call.simple_guess;
-  const guess = g && g.state === "scored" && g.short ? `The simple guess: ${g.short}.` : "";
+  // Round 2: say which guess. The served sentence names it ("…stay at 75, the last reading before
+  // the call"); otherwise it stays "The simple guess".
+  const which = g && /the last reading before the call/.test(String(g.text || "")) ? "A guess that nothing changes from the last reading" : "The simple guess";
+  const guess = g && g.state === "scored" && g.short ? `${which}: ${g.short}.` : "";
   const job = jobs && call.kind !== "bet" && call.coach_name && jobs[personaOfCall(call.coach_id)] ? ` · ${call.coach_name}, the ${jobs[personaOfCall(call.coach_id)]} coach` : "";
   const head = `<p class="ck-small">${esc(day ? `Settled ${day}` : "A settled call")}${esc(job)}</p>`;
   if (call.kind === "bet") {

@@ -20,7 +20,8 @@ const WITH = { ...B.record, data: { ...B.record.data, counted_text: COUNTED } };
 
 // Red team 2026-10-17: the front page and Start carry ONE plain sentence (count; comparison); the
 // breakdown is the Coaches page's, under one plain sentence that says why there is one.
-const ONE = (rd) => `${rd.count_text.replace(/\.$/, "")}; ${rd.comparison_text.charAt(0).toLowerCase()}${rd.comparison_text.slice(1)}`;
+// Round 2: the comparison names the guess and the gap (P.guessClause), from the served skill fields.
+const ONE = (rd) => `${rd.count_text.replace(/\.$/, "")}; ${P.guessClause(rd)}`;
 test("the record line is one plain sentence: the count and the comparison, with no breakdown", () => {
   assert.equal(P.recordLine(WITH), ONE(B.record.data));
   assert.doesNotMatch(P.recordLine(WITH), /Counted|sealed/);
@@ -30,7 +31,7 @@ test("the big count on Coaches prints what it counts after one plain sentence, e
   const html = P.recordBigHTML(WITH);
   assert.match(html, /Not all of them are formal predictions\. Of the \d+: 10 sealed before day one/);
   assert.doesNotMatch(html, /Counted:/);
-  assert.ok(html.indexOf("formal predictions") > html.indexOf(B.record.data.comparison_text), "the comparison stays beside the count");
+  assert.ok(html.indexOf("formal predictions") > html.indexOf("than a guess that gives"), "the comparison stays beside the count");
   assert.doesNotMatch(P.recordBigHTML({ ...WITH, data: { ...WITH.data, counted_text: "<b>x</b>" } }), /<b>x<\/b>/);
 });
 
