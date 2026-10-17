@@ -21,6 +21,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET  # ADR-058
+from common.metric_truth import steps_series  # #4630: the ONE steps resolver
 from common.pacific_time import PACIFIC
 
 from content import labs_scope  # #3728 — the /api/labs scope block
@@ -645,6 +646,14 @@ def write_dashboard_json(
 # ==============================================================================
 
 
+def _steps_28d(whoop_30d, apple_28d, today):
+    """#4630: the 28-day daily steps through the ONE resolver (registry METRIC_TRUTH facet);
+    the 30-day Whoop read already in hand is trimmed to the same 28-day window as Apple's."""
+    d28 = (today - timedelta(days=28)).isoformat()
+    whoop_28d = [r for r in whoop_30d if str(r.get("date") or r.get("sk", "")[5:15]) >= d28]
+    return steps_series({"whoop": whoop_28d, "apple_health": apple_28d})
+
+
 def write_clinical_json(data, profile, yesterday):
     """Write dashboard/clinical.json to S3 for the clinical summary view."""
     try:
@@ -780,7 +789,7 @@ def write_clinical_json(data, profile, yesterday):
                 if avg_hr_v and z2_lo <= avg_hr_v <= z2_hi:
                     total_z2_min += dur_s / 60
 
-        step_vals = [v for v in (_safe_float(r, "steps") for r in apple_28d) if v is not None]
+        step_vals = _steps_28d(whoop_30d, apple_28d, today)
         top_sports = sorted(sport_counts.items(), key=lambda x: -x[1])[:3]
         primary_types = [sp[0] for sp in top_sports]
 

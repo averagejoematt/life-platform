@@ -12,12 +12,41 @@ nobody priced. The caller then emits the claim as an observation.
 import logging
 from datetime import datetime, timedelta, timezone
 
+from common.metric_truth import resolved_metric, resolved_rows, sources_for  # #4630: resolved pseudo-sources
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device duplicates removed at the read
 from experiment.measurable_metrics import METRIC_SOURCES, base_metric
 from experiment.phase_filter import with_phase_filter
 
 from coach.prediction_emission import point_tolerance_from_series
 
 logger = logging.getLogger(__name__)
+
+
+def source_items(table, user_id, source, start, end):
+    """Every DATE# item of `source` in [start, end] (cross-phase, paginated) — raises on a read error.
+
+    #4630: a resolved pseudo-source (`resolved:<metric>`, which measurable_metrics maps steps
+    to) reads each source in the registry's METRIC_TRUTH facet and returns the resolved day
+    rows, so a caller that reads `item[<metric>]` reads the one truth."""
+    metric = resolved_metric(source)
+    if metric:
+        return resolved_rows(metric, {s: source_items(table, user_id, s, start, end) for s in sources_for(metric)})
+    kwargs = {
+        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+        "ExpressionAttributeValues": {
+            ":pk": f"USER#{user_id}#SOURCE#{source}",
+            ":s": "DATE#" + start,
+            ":e": "DATE#" + end + "~",
+        },
+    }
+    items = []
+    while True:
+        resp = table.query(**with_phase_filter(kwargs, include_pilot=True))
+        items.extend(resp.get("Items", []))
+        if "LastEvaluatedKey" not in resp:
+            break
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    return strava_read_seam(source, items)  # #4419: a no-op for every source but strava
 
 
 def trailing_values(table, user_id, metric_key, lookback_days):
@@ -31,28 +60,15 @@ def trailing_values(table, user_id, metric_key, lookback_days):
         # utc-exempt(#2815): the same widened DATE#-keyed bound the liveness gate uses.
         end = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         start = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
-        kwargs = {
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": f"USER#{user_id}#SOURCE#{source}",
-                ":s": "DATE#" + start,
-                ":e": "DATE#" + end + "~",
-            },
-        }
         rows = []
-        while True:
-            resp = table.query(**with_phase_filter(kwargs, include_pilot=True))
-            for item in resp.get("Items", []):
-                val = item.get(base)
-                if val is None:
-                    continue
-                try:
-                    rows.append((str(item.get("sk", "")), float(val)))
-                except (TypeError, ValueError):
-                    pass
-            if "LastEvaluatedKey" not in resp:
-                break
-            kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+        for item in source_items(table, user_id, source, start, end):
+            val = item.get(base)
+            if val is None:
+                continue
+            try:
+                rows.append((str(item.get("sk", "")), float(val)))
+            except (TypeError, ValueError):
+                pass
         rows.sort(key=lambda r: r[0])
         return [v for _, v in rows]
     except Exception as e:

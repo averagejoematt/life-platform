@@ -290,7 +290,8 @@ _WHOOP_CONSUMER_REGISTRY = {
     "lambdas/compute/dashboard_refresh_lambda.py": (1, "non-member", "fetch_date = exact-key day read"),
     "lambdas/compute/personal_baselines_lambda.py": (1, "non-member", "field-absent-safe per-field series extraction"),
     "lambdas/content/output_writers.py": (4, "non-member", "field-absent-safe extraction (calc-proof sweep)"),
-    "lambdas/emails/daily_brief_lambda.py": (7, "non-member", "fetch_date exact-key + field-absent-safe ranges (calc-proof sweep)"),
+    # #4630: 7 -> 6 — sleep_7d now reuses the identical 7-day hrv_7d_recs read instead of re-querying the same window.
+    "lambdas/emails/daily_brief_lambda.py": (6, "non-member", "fetch_date exact-key + field-absent-safe ranges (calc-proof sweep)"),
     "lambdas/emails/monday_compass_lambda.py": (
         1,
         "non-member",
@@ -307,6 +308,11 @@ _WHOOP_CONSUMER_REGISTRY = {
     "lambdas/web/site_api_fingerprint.py": (1, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
     "lambdas/web/site_api_freshness.py": (1, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
     "lambdas/web/site_api_nutrition.py": (1, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
+    "lambdas/web/site_api_physical.py": (
+        1,
+        "shared-guard",
+        "#4630: filter_day_rows on the steps-resolver whoop read (the resolver also skips sub-rows)",
+    ),
     "lambdas/web/site_api_pulse.py": (1, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
     "lambdas/web/site_api_rollups.py": (7, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
     "lambdas/web/site_api_sleep.py": (2, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),

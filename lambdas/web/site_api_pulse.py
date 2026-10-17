@@ -20,6 +20,7 @@ facade; no import cycle. Every other shared helper comes straight from
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
+from common.metric_truth import steps_by_date as resolved_steps_by_date  # #4630 — the ONE steps resolver
 
 from web.journey_direction import DOWN, EVEN, UNKNOWN, UP, classify_delta  # #3293 — the ONE ruling on the sign of a weight delta
 from web.site_api_common import (
@@ -320,10 +321,10 @@ def pulse(*, _g) -> dict:
     start_weight = float(_p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
 
     # #1369: the canonical resolver already applied the finalized-recovery,
-    # sleep-finalizes-separately, and garmin-then-apple-steps policies.
+    # sleep-finalizes-separately policies; steps come from common.metric_truth (#4630).
     recovery = _vr["recovery_pct"]
     sleep_hrs = _vr["sleep_hours"]
-    steps = _vr["steps"]
+    steps = _vr["steps"]  # steps-truth: vitals_resolver output, resolved by common.metric_truth
     # Water: get the PT-date record specifically (user logs water throughout the day in their timezone)
     water_ml = float(ah.get("water_intake_ml", 0)) if ah and ah.get("water_intake_ml") else None
     water_l = round(water_ml / 1000, 2) if water_ml else None
@@ -818,7 +819,7 @@ def pulse_history(*, _g) -> dict:
     whoop_items = _query_source("whoop", EXPERIMENT_START, today)
     withings_items = _query_source("withings", EXPERIMENT_START, today)
     garmin_items = _query_source("garmin", EXPERIMENT_START, today)
-    ah_items = _query_source("apple_health", EXPERIMENT_START, today)  # real steps (Garmin is dead/phantom)
+    ah_items = _query_source("apple_health", EXPERIMENT_START, today)
 
     # Index by date
     whoop_by_date = {}
@@ -831,17 +832,11 @@ def pulse_history(*, _g) -> dict:
         d = w.get("sk", "").replace("DATE#", "")[:10]
         if d and w.get("weight_lbs"):
             withings_by_date[d] = w
-    # Steps: Apple Health first; Garmin only if AH-absent AND plausible (>=1000) — drops the
-    # phantom ~298 Garmin record that left steps null on 7/8 days (Vitals + Mirror depend on this).
-    steps_by_date: dict[str, int] = {}
-    for h in ah_items:
-        d = h.get("sk", "").replace("DATE#", "")[:10]
-        if d and h.get("steps") and float(h["steps"]) > 0:
-            steps_by_date[d] = max(steps_by_date.get(d, 0), int(float(h["steps"])))
-    for g in garmin_items:
-        d = g.get("sk", "").replace("DATE#", "")[:10]
-        if d and g.get("steps") and float(g["steps"]) >= 1000 and d not in steps_by_date:
-            steps_by_date[d] = int(float(g["steps"]))
+    # #4630: steps through the ONE resolver (registry METRIC_TRUTH facet — Whoop's
+    # step_count, else Apple Health, else Garmin at >=1000, which still drops the phantom
+    # ~298 partial-sync record). Raw whoop_items, NOT whoop_by_date: a day whose recovery
+    # is not yet scored can still carry the wrist's count.
+    steps_by_date: dict[str, int] = resolved_steps_by_date({"whoop": whoop_items, "apple_health": ah_items, "garmin": garmin_items})
 
     # Build daily summaries
     days = []

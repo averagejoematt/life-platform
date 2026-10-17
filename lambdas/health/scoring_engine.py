@@ -21,6 +21,7 @@ from datetime import datetime
 from typing import Any, Iterable, Optional, Union
 
 from common.constants import PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
+from common.metric_truth import resolve_steps
 
 logger = logging.getLogger(__name__)
 
@@ -191,9 +192,12 @@ def score_movement(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     parts.append(exercise_score * 0.50)
     weights.append(0.50)
     details["exercise_score"] = exercise_score
-    apple = data.get("apple")
-    steps = safe_float(apple, "steps") if apple else None
+    # #4630: the day's steps come from the ONE resolver (registry METRIC_TRUTH facet) —
+    # the step half's REWARD is unchanged here; what movement rewards is #4644 Q5 (box 3).
+    _steps = resolve_steps({"whoop": data.get("whoop"), "apple_health": data.get("apple"), "garmin": data.get("garmin")})
+    steps = _steps.value
     if steps is not None:
+        details["steps_source"] = _steps.source
         step_score = clamp(round(min(100, steps / step_target * 100)))
         parts.append(step_score * 0.50)
         weights.append(0.50)
