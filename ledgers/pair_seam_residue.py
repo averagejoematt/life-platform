@@ -363,6 +363,13 @@ _WHOOP_HISTORY_READ_REASON = (
 
 
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
+    "whoop::lambdas/web/site_api_physical.py::read": (
+        "2026-10-16",
+        "#4630: the weekly physical summary reads whoop rows ONLY to hand them to common.metric_truth's steps resolver, "
+        "which reads the field the registry's METRIC_TRUTH facet names (step_count). The writer side "
+        "(whoop_lambda._set_dec(fields, 'step_count', ...)) and the facet are pinned to agree, with a mutation control, "
+        "by tests/test_steps_truth_resolver_4630.py::test_the_facet_fields_are_the_fields_the_writers_write.",
+    ),
     "chronicle::lambdas/emails/panelcast_desk.py::read": (
         "2026-10-02",
         "#4536: the Panel's desk path (split out of coach_panel_podcast_lambda for #1665) reads desk_episode_json off "

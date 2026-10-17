@@ -177,7 +177,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `food_delivery` | food_delivery_lambda.py | digest_utils.py, site_api_meals.py, site_api_nutrition.py |
 | `food_responses` | — | — |
 | `forecast` | forecast_engine_lambda.py | ai_calls.py, site_api_foresight.py, state_of_matthew_lambda.py |
-| `garmin` | — | ai_expert_analyzer_lambda.py, intelligence_common.py, site_api_fingerprint.py, site_api_freshness.py, site_api_physical.py, site_api_pulse.py, site_api_training.py, site_api_vitals_depth.py, tools_health.py, tools_training.py |
+| `garmin` | — | ai_expert_analyzer_lambda.py, site_api_fingerprint.py, site_api_freshness.py, site_api_physical.py, site_api_pulse.py, site_api_training.py, site_api_vitals_depth.py, tools_health.py, tools_training.py |
 | `genome` | — | nutrition_review_lambda.py, site_api_biomarkers.py |
 | `habit_causality` | — | site_api_habits.py |
 | `habit_scores` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coach_prediction_evaluator.py, failure_pattern_compute_lambda.py, monday_compass_lambda.py, recap_data.py, site_api_ai_context.py, site_api_habits.py, site_api_mind.py |
@@ -237,7 +237,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `weekly_correlations` | weekly_correlation_compute_lambda.py | ai_expert_analyzer_lambda.py, daily_insight_compute_lambda.py, site_api_ai_context.py, site_api_discovery.py, site_api_journey.py, site_api_ledger.py, weekly_correlation_compute_lambda.py |
 | `weight_episodes` | — | — |
 | `what_changed` | weekly_correlation_compute_lambda.py | between_chronicle_lambda.py, site_api_ai_context.py, site_api_ledger.py, weekly_correlation_compute_lambda.py |
-| `whoop` | whoop_lambda.py | ai_expert_analyzer_lambda.py, cardio_hr_store.py, enrichment_lambda.py, failure_pattern_compute_lambda.py, hevy_restamp_lambda.py, intake_response.py, monday_compass_lambda.py, site_api_autonomic.py, site_api_body.py, site_api_fingerprint.py, site_api_freshness.py, site_api_lambda.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, tools_correlation.py, tools_health.py, tools_hevy_routine.py, tools_plan.py, tools_training.py, weight_truth_qa.py, whoop_lambda.py |
+| `whoop` | whoop_lambda.py | ai_expert_analyzer_lambda.py, cardio_hr_store.py, enrichment_lambda.py, failure_pattern_compute_lambda.py, hevy_restamp_lambda.py, intake_response.py, monday_compass_lambda.py, site_api_autonomic.py, site_api_body.py, site_api_fingerprint.py, site_api_freshness.py, site_api_lambda.py, site_api_nutrition.py, site_api_physical.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, tools_correlation.py, tools_health.py, tools_hevy_routine.py, tools_plan.py, tools_training.py, weight_truth_qa.py, whoop_lambda.py |
 | `withings` | — | adaptive_mode_lambda.py, ai_expert_analyzer_lambda.py, progress_viewer_lambda.py, recap_data.py, site_api_body.py, site_api_coach_profile.py, site_api_journey.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_benchmark.py, tools_health.py, tools_nutrition.py |
 | `zone2_efficiency` | weekly_correlation_compute_lambda.py | — |
 
@@ -522,7 +522,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1300 total · 939 resolved · 361 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1302 total · 939 resolved · 363 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 84 resolved · 0 dynamic of 84 scheduled lambdas (108 lambdas total)
 - Alarms: 139 literal-named declarations across three idioms, 4 composite; routing digest 95 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 18 owner-only + 3 owner-published sources; 35 owner-only + 11 owner-published fields — non-default entries only

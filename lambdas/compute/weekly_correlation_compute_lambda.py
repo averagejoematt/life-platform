@@ -49,6 +49,7 @@ from common import (
     digest_utils,  # shared query_range implementations (#970)
     stats_core,  # bundled shared module (#529): the one sanctioned stats implementation
 )
+from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import experiment_gates  # #1371: the ONE registry of arming thresholds
 from experiment.phase_filter import source_reads_cross_phase  # #3444/#2109: per-source cross-phase decision
@@ -294,7 +295,8 @@ def assemble_daily_series(start_date, end_date):
         metrics["fat_g"] = safe_float(mf, "total_fat_g")
 
         # ── Activity ─────────────────────────────────────────────────────
-        metrics["steps"] = safe_float(ap, "steps")
+        # #4630: the day's steps through the ONE resolver (registry METRIC_TRUTH facet).
+        metrics["steps"] = resolve_steps({"whoop": w, "apple_health": ap}).value
 
         # ── Composite / Computed ──────────────────────────────────────────
         metrics["day_grade"] = safe_float(cm, "day_grade_score")

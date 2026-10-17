@@ -16,6 +16,7 @@ from typing import Any, cast
 
 from boto3.dynamodb.conditions import Key
 from common.digest_utils import filter_day_rows
+from common.metric_truth import steps_by_date as resolved_steps_by_date  # #4630 — the ONE steps resolver
 from experiment.phase_filter import with_phase_filter  # ADR-058
 from training import zone2_minutes  # #4627: THE Zone 2 computation (shared with /api/zone2 and the MCP tool)
 from training.muscle_volume import normalize_hevy_items, working_sets_by_muscle  # #4071/#4095 — THE per-muscle computation
@@ -389,25 +390,13 @@ def training_overview(*, _g) -> dict:
     z2_trailing_7d = z2_7d["zone_2_minutes"]
     z2_weekly_avg, z2_pct = _z2_weekly_stats(z2_30d["zone_2_minutes"])
 
-    # ── Walking stats — per-day step merge, Apple-Health-first ──
-    # Garmin is rate-limited/dead and emits a phantom ~298-step record that used to block
-    # the Apple-Health fallback (it only fired when Garmin was *empty*). Now merge both
-    # sources per day, prefer Apple Health, and only accept a Garmin-only day if it's
-    # plausible (>=1000 steps) — which drops the phantom 298. (#8)
+    # ── Walking stats — per-day steps through the ONE resolver (#4630) ──
+    # The registry METRIC_TRUTH facet decides: Whoop's step_count, else Apple Health, else
+    # Garmin at >=1000 — the floor that still drops the phantom ~298 Garmin record (#8).
+    whoop_30d = _query_source("whoop", d30, today)
     garmin_30d = _query_source("garmin", d30, today)
     ah_30d = _query_source("apple_health", d30, today)
-    _PHANTOM_STEP_FLOOR = 1000
-    steps_by_date: dict = {}
-    for h in ah_30d:
-        if h.get("steps") and float(h["steps"]) > 0:
-            _d = h.get("date") or h.get("sk", "").replace("DATE#", "")
-            steps_by_date[_d] = max(steps_by_date.get(_d, 0), int(float(h["steps"])))
-    for g in garmin_30d:
-        if g.get("steps") and float(g["steps"]) > 0:
-            _d = g.get("date") or g.get("sk", "").replace("DATE#", "")
-            gs = int(float(g["steps"]))
-            if _d not in steps_by_date and gs >= _PHANTOM_STEP_FLOOR:
-                steps_by_date[_d] = gs  # Garmin only when Apple Health absent AND plausible
+    steps_by_date: dict = resolved_steps_by_date({"whoop": whoop_30d, "apple_health": ah_30d, "garmin": garmin_30d})
     # #1084 root cause: this mean divided by however few days existed — including
     # an n=1 "average" of ONLY today's partial count on Day 1 (ADR-105 violation:
     # no n, no uncertainty). Guard: today never counts (steps accrue until
@@ -497,7 +486,7 @@ def training_overview(*, _g) -> dict:
     _days_since_exp = (datetime.now(timezone.utc) - _exp_start_date.replace(tzinfo=timezone.utc)).days + 1
 
     # Whoop strain (30d) + workouts — day rows and #WORKOUT# sub-rows kept apart (#4629, the #3442 class)
-    avg_strain, whoop_workouts = _whoop_strain_and_workouts(table, _query_source("whoop", d30, today), d30, today)
+    avg_strain, whoop_workouts = _whoop_strain_and_workouts(table, whoop_30d, d30, today)  # #4630: the one whoop read, shared with steps
 
     # Hevy — latest strength session info
     hevy_items = _query_source("hevy", d30, today)

@@ -644,7 +644,13 @@ class TestMetricResolution:
         """Derived from the source registry: a metric pointing at a partition that
         does not exist grades 'no data' forever (the #813 failure mode)."""
         known = set(SOURCE_REGISTRY) | set(EXTRA_QUERYABLE_PARTITIONS)
-        assert set(METRIC_SOURCES.values()) - known == set()
+        from common.metric_truth import resolved_metric, sources_for
+
+        # #4630: a resolved pseudo-source is known when every source its truth facet reads is.
+        mapped = set()
+        for src in METRIC_SOURCES.values():
+            mapped |= set(sources_for(resolved_metric(src))) if resolved_metric(src) else {src}
+        assert mapped - known == set()
 
 
 class TestSeriesExtraction:

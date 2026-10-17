@@ -1797,7 +1797,9 @@ def _paradox_router(todoist=None, strava_count=0, notion_count=0, habitify=None,
         "USER#matthew#SOURCE#strava": ("Count", strava_count),
         "USER#matthew#SOURCE#notion": ("Count", notion_count),
         "USER#matthew#SOURCE#habitify": ("Items", habitify or []),
-        "USER#matthew#SOURCE#garmin": ("Items", garmin or []),
+        # #4630: the wire — a stored day row always carries its DATE# sk; the steps read now
+        # resolves per day (common.metric_truth), so an undated row would answer for no day.
+        "USER#matthew#SOURCE#garmin": ("Items", [{"sk": f"DATE#2026-08-0{i + 1}", **r} for i, r in enumerate(garmin or [])]),
     }
 
     def router(kwargs, pk):

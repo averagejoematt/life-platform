@@ -75,6 +75,7 @@ from common import (
 )
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # ADR-058
 from common.input_manifest import COMPUTE_INPUTS  # #3049: the compute-input census
+from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import experiment_gates, prereg_effect  # #1371: the arming-threshold registry · #3552: the min_effect facet
@@ -167,7 +168,6 @@ SPEC_METRICS = frozenset(
         "total_sleep_hrs",
         "stress",
         "body_battery",
-        "steps_garmin",
         "calories",
         "protein_g",
         "carbs_g",
@@ -408,7 +408,7 @@ def build_data_narrative(data):
         if garmin:
             row["stress"] = safe_float(garmin, "avg_stress")  # #2221: the writer's names — never average_stress_level/total_steps
             row["body_battery"] = safe_float(garmin, "body_battery_high")
-            row["steps_garmin"] = safe_float(garmin, "steps")
+            # #4630: no per-source steps column — Garmin's count is the resolver's last fallback below.
 
         # MacroFactor
         mf = next((i for i in data.get("macrofactor", []) if i.get("date") == date), {})
@@ -426,8 +426,11 @@ def build_data_narrative(data):
 
         # Apple Health
         ah = next((i for i in data.get("apple_health", []) if i.get("date") == date), {})
+        # #4630: the day's steps through the ONE resolver (registry METRIC_TRUTH facet).
+        _steps = resolve_steps({"whoop": whoop, "apple_health": ah, "garmin": garmin})
+        if _steps.value is not None or ah:
+            row["steps"] = _steps.value
         if ah:
-            row["steps"] = safe_float(ah, "steps")
             row["active_cal"] = safe_float(ah, "active_calories")
             row["mindful_min"] = safe_float(ah, "mindful_minutes")
             row["glucose_avg"] = safe_float(ah, "blood_glucose_avg")

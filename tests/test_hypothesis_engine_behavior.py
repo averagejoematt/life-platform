@@ -662,8 +662,9 @@ class TestVocabularyIsMeasurable:
         assert row["stress"] == 34.0
 
     def test_garmin_steps_are_read_from_the_field_garmin_writes(self):
+        # #4630: Garmin's count is the steps resolver's last fallback — no per-source column.
         row = eng.build_data_narrative(_data({"garmin": WRITER_TRUTH["garmin"]}))[0]
-        assert row["steps_garmin"] == 9412.0
+        assert row["steps"] == 9412.0 and "steps_garmin" not in row
 
     def test_strava_zone2_is_read_from_the_field_strava_writes(self):
         row = eng.build_data_narrative(_data({"strava": WRITER_TRUTH["strava"]}))[0]
