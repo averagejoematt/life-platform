@@ -143,8 +143,8 @@ def _readers_see(monkeypatch, t, date_str="2026-09-29", craft_post=None):
 
 
 def test_live_week_hands_the_residual_craft_findings_to_the_publish_hold(monkeypatch):
-    """#4545: the producer seam. `live_week` must carry story_craft's residual verdict as `craft_findings` -- the hold
-    reads that key. Mutation control: `[] and g.craft_post(...)` in live_week turns this red."""
+    """#4545: the producer seam. `live_week` must carry story_craft's residual verdict as `craft_findings` -- the preview route
+    (chronicle_store.publish_holds) reads that key. Mutation control: `[] and g.craft_post(...)` in live_week turns this red."""
     residual = ["craft: paragraph 2 carries 6 figures (max 3)"]
     out = _readers_see(monkeypatch, _wire(monkeypatch), craft_post=residual)["out"]
     assert out["craft_findings"] == residual

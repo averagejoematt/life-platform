@@ -65,7 +65,7 @@ class _Gates:
         return story_craft.banned(top_line) + story_craft.top_line_findings(top_line)
 
     def craft_post(self, md: str) -> List[str]:
-        """Only story_craft's verdict on a chronicle post: what the publish path holds the installment on (#4545)."""
+        """Only story_craft's verdict on a chronicle post: what routes the week to the preview (#4545, owner ruling "b")."""
         _title, body = story_writers.split_title(md)
         return (
             story_craft.chronicle_findings(body, week=self.n, weight_known=self.weight_known)
@@ -221,6 +221,6 @@ def live_week(table: Any, date_str: str, *, chronicle_pk: str = "USER#matthew#SO
         "episode": ep,
         "ledger": new_ledger,
         "findings": {"post": findings, "episode": efind},
-        # story_craft's residual verdict on the final texts: the publish path holds the installment on any of these (#4545)
+        # story_craft's residual verdict on the final texts: any of these routes the week to the preview, never auto-published (#4545 "b")
         "craft_findings": g.craft_post(f'"{title}"\n\n{body}') + g.craft_episode(ep) + g.craft_dek(budget.get("top_line") or ""),
     }

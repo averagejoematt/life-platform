@@ -217,7 +217,7 @@ def test_both_publish_paths_invoke_the_updater():
     assert "elena_state" not in sweep_block, "the sweep must not defer or decline her update"
     # wednesday direct-publish (non-preview branch only)
     assert "_invoke_elena_state_updater(date_str)" in CHRONICLE_SRC
-    preview_branch = CHRONICLE_SRC[CHRONICLE_SRC.index("if PREVIEW_MODE:") : CHRONICLE_SRC.index("    else:\n        # ── Standard flow")]
+    preview_branch = CHRONICLE_SRC[CHRONICLE_SRC.index("if _preview:") : CHRONICLE_SRC.index("    else:\n        # ── Standard flow")]
     assert "_invoke_elena_state_updater" not in preview_branch, "draft path must not update her memory"
 
 

@@ -4,6 +4,7 @@ team actually flagged in the first rebuilt season, with a mutation control showi
 from __future__ import annotations
 
 import datetime as _dt
+import json
 import os
 import re
 import sys
@@ -341,7 +342,7 @@ def test_lines_already_heard_are_findings():
 
 
 def test_the_desk_hands_the_publish_path_only_storys_crafts_residual_verdict(monkeypatch):
-    """#4545 box 3: craft_post/craft_episode/craft_dek are the sublists of post/episode/dek the hold is built on."""
+    """#4545 box 3: craft_post/craft_episode/craft_dek are the sublists of post/episode/dek the preview route is built on."""
     from content import story_pipeline, story_writers
 
     monkeypatch.setattr(story_writers, "fact_check", lambda *a, **k: [])
@@ -353,3 +354,18 @@ def test_the_desk_hands_the_publish_path_only_storys_crafts_residual_verdict(mon
     assert g.craft_dek("Day 24: his HRV rose.") and all(
         f"dek: {f}" in g.dek("Day 24: his HRV rose.") for f in g.craft_dek("Day 24: his HRV rose.")
     )
+
+
+def test_the_sweep_refuses_a_craft_held_draft_and_only_that(monkeypatch):
+    """#4545 owner ruling "b": the 48 h sweep's audit blocks a draft whose row carries the residual craft verdict
+    (``publish_hold = craft_hold`` / ``desk_craft_json``), fail-closed on an unreadable record; the ``craft:`` notes
+    inside ``desk_findings_json`` stay non-blocking, and a row with neither field (pre-#4545, or clean) is not blocked
+    by it. Mutation control: ``return []`` at the top of ``craft_hold_blocking`` turns this red."""
+    from content import autopublish_audit as a
+
+    held = {"publish_hold": "craft_hold", "desk_craft_json": json.dumps(["craft: paragraph 2 carries 6 figures (max 3)"])}
+    assert a.craft_hold_blocking(held) == ["craft hold (approve from the preview to publish): craft: paragraph 2 carries 6 figures (max 3)"]
+    assert a.craft_hold_blocking({"publish_hold": "craft_hold"}) == ["craft hold (approve from the preview to publish)"]
+    assert a.craft_hold_blocking({"desk_craft_json": "{not json"}) == ["craft hold: the desk's craft record is unreadable"]
+    assert a.craft_hold_blocking({}) == [] and a.craft_hold_blocking({"desk_craft_json": "[]"}) == []
+    assert a.desk_blocking(json.dumps({"post": ["craft: long"], "episode": ["repeat: heard it"]})) == []
