@@ -1113,7 +1113,10 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # start-count sweep over every served site/ page, the sitemap and the committed feed titles — arrives PROVEN via STRUCTURAL_PROOFS
         # in scripts/gate_census_mutations.py (an untracked site/ page counting the restarts: baseline 11 passed | mutated 1 failed,
         # 10 passed | reverted 11 passed). Enters exactly that id, leaves {}, unproven does NOT move.
-        <= 264
+        # Upper bound 264 -> 265 (2026-10-17, #4632 follow-on merged onto the post-#4604 main): structural::test_habit_identity_4632.py — the AST
+        # sweep for a habitify_reading/day_name_for call that drops the day's habit_statuses + the seven reader call sites' rename fixture —
+        # arrives PROVEN via STRUCTURAL_HAND_PROOFS (six plants, each 1-2 failed; restored 18 passed). Enters exactly that id, leaves {}.
+        <= 265
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

@@ -14,6 +14,13 @@ names are owner data and never leave this script):
   bridge_without_live     a SUPPLEMENT_MAP key that is not a live habit, directly or
                           through a registry alias (the bridge resolves both ways)
 
+#4644 Q26 (owner ruling 2026-10-17): "same habit keeps its streak (id-keyed), applied to
+the history too". A registry entry carrying `habitify_id` IS the live habit with that
+vendor id whatever either side is called now, so a rename (same id, new name) is the SAME
+registry entry — never one `registry_without_live` plus one `live_without_registry`.
+The id match is read from the journal entries' `id`; an entry with no `habitify_id` (or a
+fixture with no ids) falls back to the name rule above.
+
 Exit 1 when any of the three is non-zero, 0 otherwise.
 
 Modes:
@@ -46,6 +53,20 @@ def live_names(journal) -> set[str]:
     return {e["name"] for e in journal or [] if isinstance(e, dict) and isinstance(e.get("name"), str) and not e.get("is_archived")}
 
 
+def live_ids(journal) -> dict[str, str]:
+    """The live habits by vendor id: id -> current name (non-archived entries that carry an id)."""
+    out: dict[str, str] = {}
+    for e in journal or []:
+        if isinstance(e, dict) and isinstance(e.get("name"), str) and e.get("id") and not e.get("is_archived"):
+            out[str(e["id"])] = e["name"]
+    return out
+
+
+def registry_ids(registry) -> list:
+    """Each registry entry's `habitify_id` (str), or None — aligned with `registry_name_sets`."""
+    return [str(meta["habitify_id"]) if isinstance(meta, dict) and meta.get("habitify_id") else None for meta in (registry or {}).values()]
+
+
 def registry_name_sets(registry) -> list[set[str]]:
     """Each registry entry as the set of names it answers to (its key + `habitify_names`)."""
     out = []
@@ -58,20 +79,27 @@ def registry_name_sets(registry) -> list[set[str]]:
     return out
 
 
-def drift_counts(live: set[str], registry, bridge_keys) -> dict:
-    """The COUNTS the check reports — never a name."""
+def drift_counts(live: set[str], registry, bridge_keys, ids: dict[str, str] | None = None) -> dict:
+    """The COUNTS the check reports — never a name. `ids` (vendor id -> live name) makes a
+    registry entry's `habitify_id` match its live habit across a rename (#4644 Q26)."""
     entries = registry_name_sets(registry)
+    entry_ids = registry_ids(registry)
+    ids = ids or {}
     known = set().union(*entries) if entries else set()
+    claimed = {ids[i] for i in entry_ids if i and i in ids}  # live names an entry owns by id
+
+    def _entry_live(idx: int) -> bool:
+        return bool(entries[idx] & live) or (entry_ids[idx] is not None and entry_ids[idx] in ids)
 
     def _bridge_live(key: str) -> bool:
-        return key in live or any(key in names and names & live for names in entries)
+        return key in live or any(key in names and _entry_live(i) for i, names in enumerate(entries))
 
     return {
         "live_habits": len(live),
         "registry_entries": len(entries),
         "bridge_keys": len(list(bridge_keys)),
-        "live_without_registry": sum(1 for n in live if n not in known),
-        "registry_without_live": sum(1 for names in entries if not names & live),
+        "live_without_registry": sum(1 for n in live if n not in known and n not in claimed),
+        "registry_without_live": sum(1 for i in range(len(entries)) if not _entry_live(i)),
         "bridge_without_live": sum(1 for k in bridge_keys if not _bridge_live(k)),
     }
 
@@ -88,16 +116,16 @@ def _lambda_imports():
     return habitify_lambda
 
 
-def load_fixture(path: str) -> tuple[set[str], dict, list]:
+def load_fixture(path: str) -> tuple[set[str], dict, list, dict[str, str]]:
     data = json.loads(Path(path).read_text())
     live = set(data["live_names"]) if "live_names" in data else live_names(data.get("journal"))
     bridge = data.get("bridge_keys")
     if bridge is None:
         bridge = list(_lambda_imports().SUPPLEMENT_MAP)
-    return live, data.get("habit_registry") or {}, list(bridge)
+    return live, data.get("habit_registry") or {}, list(bridge), live_ids(data.get("journal"))
 
 
-def load_live() -> tuple[set[str], dict, list]:  # pragma: no cover — read-only AWS + vendor GET
+def load_live() -> tuple[set[str], dict, list, dict[str, str]]:  # pragma: no cover — read-only AWS + vendor GET
     import boto3
 
     hab = _lambda_imports()
@@ -106,7 +134,7 @@ def load_live() -> tuple[set[str], dict, list]:  # pragma: no cover — read-onl
     journal = hab.fetch_journal(api_key, hab.pacific_today())
     table = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ["TABLE_NAME"])
     profile = (table.get_item(Key={"pk": f"USER#{hab.USER_ID}", "sk": "PROFILE#v1"}) or {}).get("Item") or {}
-    return live_names(journal), profile.get("habit_registry") or {}, list(hab.SUPPLEMENT_MAP)
+    return live_names(journal), profile.get("habit_registry") or {}, list(hab.SUPPLEMENT_MAP), live_ids(journal)
 
 
 def main(argv=None) -> int:
@@ -116,8 +144,8 @@ def main(argv=None) -> int:
     mode.add_argument("--live", action="store_true", help="read-only live check")
     ap.add_argument("--json", action="store_true", help="print the counts as JSON")
     args = ap.parse_args(argv)
-    live, registry, bridge = load_fixture(args.fixture) if args.fixture else load_live()
-    counts = drift_counts(live, registry, bridge)
+    live, registry, bridge, ids = load_fixture(args.fixture) if args.fixture else load_live()
+    counts = drift_counts(live, registry, bridge, ids)
     if args.json:
         print(json.dumps(counts, sort_keys=True))
     else:

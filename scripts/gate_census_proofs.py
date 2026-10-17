@@ -1927,6 +1927,34 @@ STRUCTURAL_HAND_PROOFS.update(
             ),
             "proved_on": "2026-10-12",
         },
+        # #4632 (2026-10-17): every reader resolves a habit by vendor id — the AST sweep over
+        # lambdas/ + mcp/ for a `habitify_reading` / `day_name_for` call that drops the day's
+        # `habit_statuses` (the #4362 name-only path), plus the seven call sites' rename fixture.
+        "structural::test_habit_identity_4632.py": {
+            "gate_name": "test_habit_identity_4632.py",
+            "command": "python3 -m pytest tests/test_habit_identity_4632.py -q -p no:cacheprovider   # baseline 18 passed",
+            "mutation": (
+                "six plants, ONE AT A TIME, each restored from an in-memory byte copy: M1 ai/ai_calls.py "
+                "_missed_registry_habits drops `statuses` from its habitify_reading call; M2 ai/ai_context.py "
+                "the 7-day trend's T0 call drops `statuses`; M3 ai/ai_context.py the pillar effort count back to "
+                "the raw `habits_map.get(h)` name lookup; M4 content/html_builder.py _habits_deep_dive drops "
+                "`h_statuses`; M5 scripts/check_habit_registry_drift.py `ids = ids or {}` -> `ids = {}`; M6 the "
+                "sweep's offender append replaced by `pass`."
+            ),
+            "observed": (
+                "M1 2 failed / 16 passed (the call-site test + the sweep). M2 2 failed / 16. M3 1 failed / 17 "
+                "(the call-site test only — a raw .get is outside the sweep's pattern). M4 2 failed / 16. M5 1 "
+                "failed / 17 (the drift rename test). M6 1 failed / 17 (the sweep's planted positive control). "
+                "Restored 18 passed."
+            ),
+            "scope": (
+                "The sweep matches only calls named habitify_reading / day_name_for (Name or Attribute) whose "
+                "statuses argument is absent or the literal None; *args/**kwargs splats are trusted. A raw "
+                "`habits.get(name)` lookup is NOT swept (the legacy mvp_habits lists are bare names with no vendor "
+                "id, out of scope) — the call-site fixture test is what holds the seven sites."
+            ),
+            "proved_on": "2026-10-17",
+        },
     }
 )
 

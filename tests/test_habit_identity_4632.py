@@ -278,3 +278,148 @@ def test_the_handler_arms_the_correction_for_that_invocation_only(monkeypatch):
     habitify_lambda.lambda_handler({"date_override": DAY, "correction": True}, None)
     habitify_lambda.lambda_handler({}, None)
     assert seen == [frozenset({DAY}), frozenset()]
+
+
+# ── #4632 follow-on: every reader resolves a habit by vendor id (#4644 Q26) ──────────────
+#
+# PR #4945 keyed the scoring and the streaks on id; seven reader call sites (coach context in
+# `ai/ai_calls.py` + `ai/ai_context.py`, the brief HTML in `content/html_builder.py`) still
+# called `habitify_reading` WITHOUT the day's `habit_statuses`, i.e. the #4362 name-only
+# lookup, so a habit renamed after ids were stored read as unobserved there. Rows below are
+# the real `transform` output over the committed wire capture, renamed by id continuity.
+
+
+def _renamed_days():
+    """(done, missed): the renamed day as stored, and the same day after a vendor un-tick."""
+    before = _stored_day()
+    reset_identity_cache(lambda _d: identity_from_record(before))
+    done = transform(_raw(_renamed(_wire())), DAY)[0]
+    missed = transform(_raw(_unticked(_renamed(_wire()), NEW)), DAY)[0]
+    assert done["habit_statuses"][NEW]["aliases"] == [OLD] == missed["habit_statuses"][NEW]["aliases"]
+    assert missed["habit_statuses"][NEW]["status"] == "failed"
+    return done, missed
+
+
+def _reader_modules():
+    for k, v in (("AWS_DEFAULT_REGION", "us-west-2"), ("AWS_ACCESS_KEY_ID", "testing"), ("AWS_SECRET_ACCESS_KEY", "testing")):
+        os.environ.setdefault(k, v)
+    from ai import ai_calls, ai_context  # noqa: E402
+    from content import html_builder  # noqa: E402
+
+    return ai_calls, ai_context, html_builder
+
+
+def test_every_reader_call_site_resolves_a_renamed_habit_to_the_same_identity():
+    """One test over all seven sites (one census gate): each names every site that lost the habit."""
+    ai_calls, ai_context, html_builder = _reader_modules()
+    done, missed = _renamed_days()
+    meta = {"status": "active", "tier": 0, "synergy_group": "stack", "why_matthew": "w"}
+    by_id = {"status": "active", "tier": 0, "habitify_id": done["habit_statuses"][NEW]["habit_id"]}
+    profile = {"habit_registry": {OLD: meta}}
+    cs = {"pillar_mind": {"raw_score": 90, "level": 5}, "pillar_sleep": {"raw_score": 40, "level": 2}}
+    checks = {
+        # ai_calls.py — call_board_of_directors (missed T0/T1 + synergy) and call_tldr_and_guidance
+        "ai_calls._missed_registry_habits": ai_calls._missed_registry_habits(profile["habit_registry"], missed) == [(OLD, meta)],
+        # ai_context.py — the 7-day T0/T1 trend lines (two calls)
+        "ai_context._build_habit_outcome_context": "T0 1/1" in ai_context._build_habit_outcome_context({"habitify_7d": [done]}, profile),
+        # ai_context.py — the pillar effort count (registry key with no name in common: the id keys it)
+        "ai_context._compute_diminishing_returns": "Diminishing returns on: Mind"
+        in ai_context._compute_diminishing_returns(cs, {"habitify": done}, {"habit_registry": {"journal": by_id}}),
+        # html_builder.py — the HABITS DEEP-DIVE rows and its synergy count
+        "html_builder._habits_deep_dive (done)": "✅" in html_builder._habits_deep_dive({"habitify": done}, profile),
+        "html_builder._habits_deep_dive (missed)": "❌" in html_builder._habits_deep_dive({"habitify": missed}, profile),
+    }
+    lost = sorted(k for k, ok in checks.items() if not ok)
+    assert not lost, f"a renamed habit lost its identity at: {lost}"
+
+
+# ── the SET guard: no reader looks a habit up by name through the old path ───────────────
+# premerge-gate: #4632: AST sweep of lambdas/ + mcp/ — every habitify_reading call passes the day's habit_statuses
+
+_SWEEP_ROOTS = ("lambdas", "mcp")
+_LOOKUPS = {"habitify_reading": (3, "statuses"), "day_name_for": (1, "statuses")}  # fn -> (statuses arg index, kw name)
+
+
+def _name_keyed_lookups(source: str, path: str = "<src>") -> list[str]:
+    """`path:line fn` for each call of `habitify_reading` / `day_name_for` that does not pass
+    the day's `habit_statuses` (argument missing, or the literal None) — the #4362 name-only
+    path #4632 retired. `**kwargs` / `*args` splats are trusted (not statically decidable)."""
+    import ast
+
+    out = []
+    for node in ast.walk(ast.parse(source, filename=path)):
+        if not isinstance(node, ast.Call):
+            continue
+        fn = node.func.id if isinstance(node.func, ast.Name) else getattr(node.func, "attr", None)
+        if fn not in _LOOKUPS:
+            continue
+        idx, kw = _LOOKUPS[fn]
+        if any(isinstance(a, ast.Starred) for a in node.args) or any(k.arg is None for k in node.keywords):
+            continue
+        arg = node.args[idx] if len(node.args) > idx else next((k.value for k in node.keywords if k.arg == kw), None)
+        if arg is None or (isinstance(arg, ast.Constant) and arg.value is None):
+            out.append(f"{path}:{node.lineno} {fn}")
+    return out
+
+
+def _sweep_tree() -> list[str]:
+    offenders = []
+    for root in _SWEEP_ROOTS:
+        for dirpath, _dirs, files in os.walk(os.path.join(ROOT, root)):
+            for f in sorted(files):
+                if f.endswith(".py"):
+                    p = os.path.join(dirpath, f)
+                    with open(p, encoding="utf-8") as fh:
+                        offenders += _name_keyed_lookups(fh.read(), os.path.relpath(p, ROOT))
+    return offenders
+
+
+def test_no_reader_looks_a_habit_up_by_name_without_the_days_statuses():
+    planted = (
+        "from health.scoring_engine import habitify_reading\n"
+        "a = habitify_reading(h_map, h_name, meta)\n"
+        "b = habitify_reading(h_map, h_name, meta, None)\n"
+        "c = day_name_for(h_map, None, key, meta)\n"
+        "ok = habitify_reading(h_map, h_name, meta, day.get('habit_statuses'))\n"
+        "ok2 = habitify_reading(h_map, h_name, meta=meta, statuses=s)\n"
+    )
+    assert _name_keyed_lookups(planted, "planted.py") == [
+        "planted.py:2 habitify_reading",
+        "planted.py:3 habitify_reading",
+        "planted.py:4 day_name_for",
+    ]
+    offenders = _sweep_tree()
+    assert not offenders, f"name-keyed habit lookups (pass the day's habit_statuses — #4632, #4644 Q26): {offenders}"
+
+
+# ── the drift check treats a renamed habit (same id, new name) as the same registry entry ──
+
+
+def test_the_drift_check_matches_a_renamed_habit_by_id_not_as_two_orphans(tmp_path, capsys):
+    sys.path.insert(0, os.path.join(ROOT, "scripts"))
+    import check_habit_registry_drift as drift  # noqa: E402
+
+    journal = copy.deepcopy(_renamed(_wire())["journal"])  # the live wire, Collagen renamed in the app
+    habit_id = next(e for e in journal if e["name"] == NEW)["id"]
+    live = drift.live_names(journal)
+    others = {n: {} for n in live if n != NEW}
+    stale = {**others, OLD: {"habitify_id": habit_id}}  # the registry still says the old name
+    counts = drift.drift_counts(live, stale, [], drift.live_ids(journal))
+    assert (counts["live_without_registry"], counts["registry_without_live"]) == (0, 0)
+    # Without ids it is the name rule: the same rename reads as one orphan on each side.
+    blind = drift.drift_counts(live, stale, [])
+    assert (blind["live_without_registry"], blind["registry_without_live"]) == (1, 1)
+    # The bridge resolves through the id-matched entry too, and an id with no live habit stays an orphan.
+    assert (
+        drift.drift_counts(
+            live, {**stale, OLD: {"habitify_id": habit_id, "habitify_names": ["Supp X"]}}, ["Supp X"], drift.live_ids(journal)
+        )["bridge_without_live"]
+        == 0
+    )
+    gone = drift.drift_counts(live, {**others, OLD: {"habitify_id": "no-such-id"}}, [], drift.live_ids(journal))
+    assert (gone["live_without_registry"], gone["registry_without_live"]) == (1, 1)
+    # End to end through --fixture (the journal carries ids), exit code kept: 0 aligned.
+    p = tmp_path / "habit_drift_4632_rename.json"
+    p.write_text(json.dumps({"journal": journal, "habit_registry": stale, "bridge_keys": []}))
+    assert drift.main(["--fixture", str(p)]) == 0
+    assert NEW not in capsys.readouterr().out
