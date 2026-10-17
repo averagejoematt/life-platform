@@ -488,19 +488,21 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # against the API is cheap and catches the late-workout / dropped-day silent
         # drop the DDB-only checks are blind to. whoop_lambda._reconcile.
         "provider_reconcile": True,
-        # #4638: stated default (owner ruling pending). Re-fetch is refresh_trailing_days=2.
+        # #4638: owner ruling 2026-10-17 "write it" (deletes → empty day). Re-fetch is refresh_trailing_days=2.
         "upstream_changes": {
             "edits": "inside_window",
-            "deletes": "not_propagated",
+            "deletes": "inside_window",
             "window_days": 2,
             "standing": "stated_default",
             "note": (
                 "An edit (re-typed workout, revised score) inside the 2-day trailing re-fetch overwrites the "
-                "stored record by id; older edits are never re-fetched. A workout deleted in the app keeps its "
-                "DATE#…#WORKOUT#id row at any age — the vendor's update/delete webhooks are unused. Since #4638 the "
-                "daily _reconcile REPORTS the store → vendor difference inside its 14-day window (stored workout ids "
-                "the vendor no longer lists, and changed sport or start/end, as StoreOnlyActivityCount / "
-                "ChangedActivityCount with Source=whoop) but stays read-only: nothing is removed."
+                "stored record by id; older edits are never re-fetched. The daily _reconcile compares the vendor's "
+                "trailing workout list with the store inside its 14-day window and REPORTS stored workout ids the "
+                "vendor no longer lists, and changed sport or start/end, as StoreOnlyActivityCount / "
+                'ChangedActivityCount with Source=whoop. Since the owner\'s 2026-10-17 ruling on #4638 ("write it") a '
+                "delete propagates as an empty day: when every stored workout of a day strictly inside the window is "
+                "gone from a non-empty vendor list, each row is replaced by a tombstone (the day's recovery/sleep row "
+                "is untouched); changed rows are reported only."
             ),
         },
     },
