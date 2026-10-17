@@ -36,18 +36,43 @@ GENESIS = "2026-09-06"  # cycle 17, a Sunday — day 7 lands on a Saturday
 # ══════════════════════════════════════════════════════════════════════════════
 # 1. week_close_day itself
 # ══════════════════════════════════════════════════════════════════════════════
-def test_genesis_day_closes_on_day_seven():
-    """Day 1 (genesis itself) is in the week that closes on day 7."""
-    assert week_close_day(GENESIS, GENESIS) == "2026-09-12"
+def test_genesis_day_is_its_own_close_day():
+    """Day 1 is the Day-1 baseline set (a Sunday) and is its own close day."""
+    assert week_close_day(GENESIS, GENESIS) == GENESIS
 
 
-def test_day_seven_is_its_own_close_day():
-    assert week_close_day("2026-09-12", GENESIS) == "2026-09-12"
+def test_day_two_closes_on_day_eight_the_next_sunday():
+    assert week_close_day("2026-09-07", GENESIS) == "2026-09-13"
 
 
-def test_day_eight_closes_on_day_fourteen():
-    """Day 8 is the first day of week 2 — its close is a full week later."""
-    assert week_close_day("2026-09-13", GENESIS) == "2026-09-19"
+def test_day_eight_is_its_own_close_day():
+    assert week_close_day("2026-09-13", GENESIS) == "2026-09-13"
+
+
+def test_day_nine_closes_on_day_fifteen():
+    """Day 9 starts the next window — its close is a full week later."""
+    assert week_close_day("2026-09-14", GENESIS) == "2026-09-20"
+
+
+def test_the_protocol_day_is_sunday_and_both_consumers_read_the_one_function():
+    """THE pin (#3761 box 3, owner ruling 2026-09-27: every Sunday).
+
+    Mutation control: WEEK_CLOSE_SHIFT_DAYS = 0 (Saturday) leaves the same-source assertions
+    green and reds ONLY the Sunday assertion below.
+    """
+    import datetime
+    import inspect
+
+    from web import progress_viewer_lambda, recap_card_lambda
+
+    # Same source: card, viewer and capture path all call pacific_time.week_close_day.
+    assert recap_card_lambda.week_close_day is week_close_day
+    assert progress_viewer_lambda.week_close_day is week_close_day
+    assert "week_close_day" in inspect.getsource(pc.expected_capture_day)
+    # The day: every close day across several weeks is a Sunday.
+    for date in ("2026-09-07", "2026-09-13", "2026-09-20", "2026-10-04", "2026-10-30"):
+        close = week_close_day(date, GENESIS)
+        assert datetime.date.fromisoformat(close).strftime("%A") == "Sunday", (date, close)
 
 
 def test_a_date_before_genesis_has_no_close_day():
@@ -72,10 +97,11 @@ def test_mutation_control_a_weekday_literal_would_diverge_on_a_tuesday_genesis()
     tuesday_genesis = "2026-09-01"
     assert datetime.date.fromisoformat(tuesday_genesis).strftime("%A") == "Tuesday"
     close = week_close_day(tuesday_genesis, tuesday_genesis)
-    # Day 1 (Tue 09-01) + 6 days = day 7 = Mon 09-07 — NOT a Saturday or a Sunday, which
-    # is exactly what a weekday-literal implementation would have hardcoded.
-    assert close == "2026-09-07"
-    assert datetime.date.fromisoformat(close).strftime("%A") == "Monday"
+    # Day 1 (Tue 09-01) is its own close; day 2 closes on day 8 = Tue 09-08 — derived from
+    # day_n, not from any weekend literal.
+    assert close == "2026-09-01"
+    assert week_close_day("2026-09-02", tuesday_genesis) == "2026-09-08"
+    assert datetime.date.fromisoformat("2026-09-08").strftime("%A") == "Tuesday"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -84,7 +110,7 @@ def test_mutation_control_a_weekday_literal_would_diverge_on_a_tuesday_genesis()
 def _old_formula(date: str, genesis: str) -> bool:
     """The exact expression `recap_card_lambda.py` used before this issue."""
     day_n = pacific_day_n(genesis, date)
-    return bool(day_n and day_n % 7 == 0)
+    return bool(day_n and day_n % 7 == 0)  # pre-#3761 formula, day 7/14/21 (Saturday)
 
 
 def _new_formula(date: str, genesis: str) -> bool:
@@ -93,21 +119,23 @@ def _new_formula(date: str, genesis: str) -> bool:
     return bool(day_n and week_close_day(date, genesis) == date)
 
 
-def test_new_formula_matches_old_on_genesis_day_and_close_day_and_a_mid_week_day():
-    for date in (GENESIS, "2026-09-12", "2026-09-14"):
-        assert _new_formula(date, GENESIS) == _old_formula(date, GENESIS), date
-    # And the boundary values themselves, spelled out:
-    assert _old_formula(GENESIS, GENESIS) is False  # day 1, not a close day
-    assert _old_formula("2026-09-12", GENESIS) is True  # day 7, IS the close day
-    assert _old_formula("2026-09-14", GENESIS) is False  # day 9, mid-week-2
+def test_new_formula_is_the_old_one_shifted_by_the_constant():
+    """The card now fires on day 8/15 (Sunday) instead of 7/14 (Saturday): one shift."""
+    from common.pacific_time import WEEK_CLOSE_SHIFT_DAYS
+
+    assert WEEK_CLOSE_SHIFT_DAYS == 1
+    assert _new_formula("2026-09-13", GENESIS) is True  # day 8
+    assert _new_formula("2026-09-12", GENESIS) is False  # day 7 — the old close
+    assert _new_formula("2026-09-20", GENESIS) is True  # day 15
+    assert _old_formula("2026-09-12", GENESIS) is True
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 3. progress_capture.expected_capture_day + the days-off phrase
 # ══════════════════════════════════════════════════════════════════════════════
 def test_expected_capture_day_is_the_week_close_for_that_date():
-    assert pc.expected_capture_day("2026-09-14", GENESIS) == "2026-09-19"
-    assert pc.expected_capture_day("2026-09-19", GENESIS) == "2026-09-19"
+    assert pc.expected_capture_day("2026-09-14", GENESIS) == "2026-09-20"
+    assert pc.expected_capture_day("2026-09-20", GENESIS) == "2026-09-20"
 
 
 def test_expected_capture_day_off_cycle_is_none():
@@ -116,14 +144,14 @@ def test_expected_capture_day_off_cycle_is_none():
 
 
 def test_offset_phrase_on_the_protocol_day():
-    assert pc._protocol_offset_phrase("2026-09-19", GENESIS) == "on the protocol day"
+    assert pc._protocol_offset_phrase("2026-09-20", GENESIS) == "on the protocol day"
 
 
 def test_offset_phrase_names_the_day_count():
-    # 2026-09-14 is 5 days before its week's close (2026-09-19).
-    assert pc._protocol_offset_phrase("2026-09-14", GENESIS) == "5 days off the protocol day"
+    # 2026-09-14 is 6 days before its week's close (2026-09-20).
+    assert pc._protocol_offset_phrase("2026-09-14", GENESIS) == "6 days off the protocol day"
     # Singular day.
-    assert pc._protocol_offset_phrase("2026-09-18", GENESIS) == "1 day off the protocol day"
+    assert pc._protocol_offset_phrase("2026-09-19", GENESIS) == "1 day off the protocol day"
 
 
 def test_offset_phrase_empty_off_cycle():
