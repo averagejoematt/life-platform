@@ -1,6 +1,6 @@
 # Repository Structure
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 The canonical top-level layout. Read this before adding a new file so things land where they belong — the root stays intentional, not accreted.
 
@@ -28,19 +28,17 @@ The canonical top-level layout. Read this before adding a new file so things lan
 | `ingest/` | Local macOS `launchd` drop-folder watchers for manual data uploads (operational tooling, runs on the operator's machine). |
 | `setup/` | One-time OAuth/credential setup scripts per integration (Garmin, Withings, Eight Sleep, …). Run locally for token rotation. |
 | `infra/` | IAM policy/trust JSON snapshots (`infra/iam/`) — the committed audit record of the GitHub-Actions OIDC roles. Live IAM is CDK-owned; this is the reviewable snapshot. |
-| `oss/` | Standalone MIT-licensed extractions published outward — `calibration-core/` (the forecast grader behind /method/calibration, #1396). Each package has no platform imports, its own LICENSE, and a parity gate against the in-platform original. |
+| `.github/` | GitHub Actions workflows (`ci-cd.yml`, `docs-ci.yml`, `site-deploy.yml`, `remediation-agent.yml`, …), composite actions, CODEOWNERS, dependabot — the CI/CD control plane. |
+| `.claude/` | Claude Code project config — agents, skills, slash commands, checked-in settings (not `settings.local.json`). |
+| `oss/` | Standalone MIT-licensed extractions published outward — `calibration-core/` (the forecast grader behind /method/calibration, #1396) and `starter-slice/` (one source → one bucket → one table → one chart; the "fork the architecture, not the data" starter). Each package has no platform imports, its own LICENSE, and a parity gate against the in-platform original. |
 
 > **Ratchet:** this allowlist is enforced by `tests/test_root_clutter_guard.py` (#1652, ENGINEERING_STANDARDS.md §1) — a new tracked top-level dir that is not on the guard's allowlist fails CI until it is added there with a one-line reason (or not committed at the root). Support dirs also carry a one-line `README.md`.
 
-### Audit-trail — run-once, kept as the incident/operation record
-| Dir | Purpose |
-|---|---|
-| `patches/` | One-shot DDB/S3 data corrections (`patch_*.py`). Each is a dated surgical fix — kept for audit, never blindly re-run. |
-| `backfill/` | One-shot historical data imports. Same discipline as `patches/`. |
-| `seeds/` | Test/dev bootstrap data generators for DynamoDB state. |
+### Retired — run-once dirs are not kept at the root
+`patches/`, `backfill/` and `spikes/` were deleted by #1649 (verified-dead one-shots; the history is in git). `seeds/` (above) is the only bootstrap-data dir that remains. A new one-shot data fix or backfill is a dated script under `scripts/` (e.g. `scripts/backfill_vocal_metrics.py`, `scripts/whoop_steps_backfill_4630.py`) that is dry-run by default — kept only while it is still referenced; delete it once it has run and been proven.
 
 ### Local / scratch / generated — gitignored or owner-local
-`datadrops/` (personal health data), `qa-screenshots/` (Playwright output), `show_and_tell/` (PDF-builder scratch), `captures/` (superseded capture harness — use `qa/visual_qa.py`), `spikes/` (exploratory prototypes, e.g. `pg14_ai_me`), and build artifacts (`cdk/cdk.out/`, `.venv/`, `__pycache__/`, `.mypy_cache/`, `.pytest_cache/`, `.ruff_cache/`, `layer-build/`) — all gitignored. `archive/` holds pre-CDK v3.x snapshots as on-disk history only (nothing there runs).
+`datadrops/` (personal health data), `qa-screenshots/` (Playwright output), `show_and_tell/` (PDF-builder scratch), `captures/` (superseded capture harness — use `qa/visual_qa.py`), and build artifacts (`cdk/cdk.out/`, `.venv/`, `__pycache__/`, `.mypy_cache/`, `.pytest_cache/`, `.ruff_cache/`, `layer-build/`) — all gitignored. A local `archive/` directory, if present, is on-disk history only (nothing there runs; only a backup subfolder is gitignored, so do not commit into it).
 
 Run `make clean` to reclaim local build/cache cruft (chiefly `cdk/cdk.out`, ~6 GB) — all of it is regenerated on demand.
 
@@ -49,11 +47,10 @@ Run `make clean` to reclaim local build/cache cruft (chiefly `cdk/cdk.out`, ~6 G
 - **New shared module** → `lambdas/<domain>/<name>.py`, never the `lambdas/` root — `tests/test_lambdas_packaging_guard.py` fails the build on a loose root module (ADR-146). Since #1656 the mypy gate covers **every** package under `lambdas/` plus `mcp/`, so a NEW package must be added to `CLEAN_DIRS` in `scripts/mypy_clean_set.py` in the same PR — those globs are non-recursive, and `test_every_first_party_package_is_in_the_clean_set` fails until you do.
 - **New MCP tool** → `mcp/tools_<domain>.py` → wire into `mcp/registry.py` (and `tests/test_wiring_coverage.py` will enforce it).
 - **Infra / IAM / schedule change** → `cdk/stacks/` only — never the AWS console.
-- **One-shot data fix** → `patches/patch_<desc>.py` (keep it; it's the audit trail).
-- **One-shot data import** → `backfill/`.
+- **One-shot data fix or import** → a dry-run-by-default script under `scripts/` named for its issue (`scripts/<desc>_<issue>.py`); `patches/` and `backfill/` no longer exist (#1649).
 - **A decision worth recording** → an ADR in `docs/DECISIONS.md`.
 - **End-of-session handover** → archive the prior one onto the `session-archive` branch (`python3 scripts/archive_handover.py --slug <slug>`), then overwrite `handovers/HANDOVER_LATEST.md` in place (#1650).
-- **Throwaway experiment / prototype** → `spikes/` (kept out of the deployed product) or `/tmp`.
+- **Throwaway experiment / prototype** → a scratch directory outside the repo (`spikes/` was retired, #1649); nothing exploratory is committed at the root.
 
 ## Conventions
 - Lambda handlers end in `*_lambda.py` and define `lambda_handler` (enforced by `tests/test_cdk_handler_consistency.py` + the size gate).
