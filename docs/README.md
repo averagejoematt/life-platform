@@ -95,6 +95,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [NEW_SIGNAL_PLAYBOOK.md](NEW_SIGNAL_PLAYBOOK.md) | A new metric/device/source lands through one ordered checklist — absence semantics + privacy tier first (ADR-154, from the BodyScan 2 spike #2782) |
 | [DATA_GOVERNANCE.md](DATA_GOVERNANCE.md) | PII classification + retention |
 | [PERMANENCE_CONTRACT.md](PERMANENCE_CONTRACT.md) | **The written commitment** — nightly public archive, its admission gate, the continuity clock, and what none of it promises (#1400) |
+| [FRONTIER.md](FRONTIER.md) | **The parked quantified-life register** — the folded Roadmap vision (#3943) plus the variant-slot (#4423) and conditioning-stage (#4424) training programs, scores and acceptance verbatim; one promotion per cycle (ADR-099 amendment 2026-08-22) |
 | [PROPORTIONALITY.md](PROPORTIONALITY.md) | The complexity-posture ledger — posture, rent, demote trigger per subsystem (ADR-103/144) |
 | [SECURITY.md](SECURITY.md) | Threat model, defense layers, accepted risks |
 | [CI_CONTINUE_ON_ERROR_REGISTRY.md](CI_CONTINUE_ON_ERROR_REGISTRY.md) | **Every `continue-on-error` site in `.github/workflows/`, with a dated verdict** — covered / accepted / residual / resolved; a swallowed step reports `success`, which is how one build shipped with no SBOM while both steps read green (3848). Guarded by `tests/test_continue_on_error_registry_3848.py` |
