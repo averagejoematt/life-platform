@@ -26,7 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import v4_apply_chrome as _apply_chrome  # noqa: E402 — the post-build chrome normalizer (#3721)
-from v4_chrome import doors_nav, site_footer  # noqa: E402  — shared doors nav + footer (#1009)
+from v4_chrome import doors_nav, robots_meta, site_footer  # noqa: E402  — shared doors nav + footer (#1009); #4604 held-page noindex
 from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
 from v4_proof import (  # noqa: E402  — #1395 static core + data-driven OG on the door hubs
     data_block_html,
@@ -1047,7 +1047,7 @@ def shell(start_slug: str, canonical: str, title: str, desc: str, pillar, proof:
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>{esc(title)}</title>
   <meta name="description" content="{esc(desc)}">
-  <link rel="canonical" href="https://averagejoematt.com{canonical}">
+{robots_meta(canonical)}  <link rel="canonical" href="https://averagejoematt.com{canonical}">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="averagejoematt">
   <meta property="og:url" content="https://averagejoematt.com{canonical}">

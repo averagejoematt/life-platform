@@ -50,6 +50,21 @@ def test_registry_derivation_ignores_a_file_absent_from_the_registry(tmp_path, m
     assert not any("orphan" in u for u in urls), "a file absent from the registry must never appear, even though it exists on disk"
 
 
+def test_registry_derivation_leaves_a_held_page_out_even_without_noindex(tmp_path, monkeypatch):
+    """#4604: a page held until the owner rules is never a candidate — the generator's own exclusion, so the
+    sitemap stays clean even if a generator drops the page's noindex. Control: the same page, unheld, is listed."""
+    fake_site = tmp_path / "site"
+    for slug in ("held-page", "open-page"):
+        (fake_site / slug).mkdir(parents=True)
+        (fake_site / slug / "index.html").write_text("<html><body>no robots meta</body></html>", encoding="utf-8")
+    monkeypatch.setattr(sm, "SITE", fake_site)
+    monkeypatch.setattr(sm, "_page_registry", lambda: [{"path": "/held-page/"}, {"path": "/open-page/"}])
+    monkeypatch.setattr(sm.v4_chrome, "HELD_UNTIL_RULED", {"/held-page/": "#4604"})
+    assert sm.registry_urls() == [f"{sm.BASE}/open-page/"]
+    monkeypatch.setattr(sm.v4_chrome, "HELD_UNTIL_RULED", {})
+    assert sm.registry_urls() == [f"{sm.BASE}/held-page/", f"{sm.BASE}/open-page/"]
+
+
 def test_registry_derivation_respects_live_noindex():
     """A registered page whose OWN html asserts noindex is excluded (cockpit,
     the redirect stubs) — the same live check as before, just registry-scoped."""
@@ -66,7 +81,10 @@ def test_real_repo_sitemap_has_no_dead_fragment_or_duplicate_subscribe_url():
     assert f"{sm.BASE}/journal/essays/org-chart-of-one/body" not in locs, "the dead extensionless fragment URL is back"
     assert f"{sm.BASE}/subscribe" not in locs, "the bare, no-trailing-slash duplicate of /subscribe/ is back"
     assert f"{sm.BASE}/subscribe/" in locs, "the real target must still be present"
-    assert f"{sm.BASE}/journal/essays/org-chart-of-one/" in locs, "the real essay permalink must still be present"
+    # #4604: the one essay is held out of the sitemap until the owner's per-page ruling; once ruled back in, the
+    # permalink must be present again.
+    if "/journal/essays/org-chart-of-one/" not in sm.v4_chrome.HELD_UNTIL_RULED:
+        assert f"{sm.BASE}/journal/essays/org-chart-of-one/" in locs, "the real essay permalink must still be present"
 
 
 def test_real_repo_subscribe_html_stub_is_noindex_with_a_matching_canonical():
