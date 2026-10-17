@@ -1930,6 +1930,42 @@ STRUCTURAL_HAND_PROOFS.update(
     }
 )
 
+STRUCTURAL_HAND_PROOFS.update(
+    {
+        # #4630: one resolver for the day's steps — the registry facet, the resolver, and the reader guard.
+        "structural::test_steps_truth_resolver_4630.py": {
+            "gate_name": "test_steps_truth_resolver_4630.py",
+            "command": "python3 -m pytest tests/test_steps_truth_resolver_4630.py -q -p no:randomly   # baseline 16 passed",
+            "mutation": (
+                "three plants in the real tracked tree, ONE AT A TIME, each restored from a byte copy "
+                "(md5 3f2221362ede44580a77d14d7ac8e51b of lambdas/ingestion/source_registry.py before and after): "
+                "(M1) METRIC_TRUTH['steps'] swapped to Apple first — truth_source 'apple_health', fallback_order "
+                "('apple_health', 'whoop', 'garmin'); (M1b) fallback_order alone swapped; (M2) a new file "
+                'lambdas/web/zz_planted_4630.py whose one function returns `_safe_float(apple, "steps")`.'
+            ),
+            "observed": (
+                "2026-10-16. BASELINE 16 passed. M1: 8 failed / 8 passed (test_whoop_wins_when_both_devices_have_a_count, "
+                "test_apple_health_when_whoop_has_no_count, test_unfetched_source_is_named_in_the_reason, "
+                "test_a_zero_report_counts_only_when_no_source_has_a_positive_count, "
+                "test_by_date_resolves_each_day_and_takes_the_per_source_max, "
+                "test_resolver_reads_the_registry_facet_not_its_own_list, test_facet_refuses_a_malformed_truth, "
+                "test_the_reproduce_command_names_the_winner_and_rebuilds_the_movement_score). "
+                "M1b: collection error — ValueError 'fallback_order must start with truth_source' at import. "
+                "M2: 1 failed / 15 passed (test_no_reader_reads_a_steps_field_directly names zz_planted_4630.py:2). "
+                "RESTORED: 16 passed."
+            ),
+            "scope": (
+                "The reader guard is a line-pattern sweep of lambdas/ and mcp/ (.get/subscript/helper-call/`in` reads of "
+                "steps|step_count, (source, 'steps') metric tables, {'steps': source} maps); a read through a variable "
+                "field name (`row.get(field)` with field='steps') is NOT caught — the metric tables that feed such reads "
+                "are, which is how measurable_metrics/experiment_design/tools_lifestyle were found. A line carrying "
+                "`# steps-truth: <reason>` is exempt by design; EXEMPT_FILES names the writers and per-source liveness checks."
+            ),
+            "proved_on": "2026-10-16",
+        },
+    }
+)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # QA_PROOFS — census family 3 (qa-smoke-check). Same `Proof` bar; here, like

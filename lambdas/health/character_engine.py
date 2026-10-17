@@ -32,6 +32,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_today  # #2811: the character sheet's DAY is the Pacific day
 
@@ -474,8 +475,8 @@ def compute_movement_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[
     scores["movement_diversity"] = _pct_of_target(len(activity_types), diversity_target, 1.5)
 
     # Daily steps
-    apple = data.get("apple") or {}
-    steps = _safe_float(apple, "steps")
+    # #4630: the day's steps through the ONE resolver (registry METRIC_TRUTH facet).
+    steps = resolve_steps({"whoop": data.get("whoop"), "apple_health": data.get("apple"), "garmin": data.get("garmin")}).value
     step_target = components.get("daily_steps", {}).get("target", 8000)
     scores["daily_steps"] = _pct_of_target(steps, step_target, 1.5) if steps else None
 

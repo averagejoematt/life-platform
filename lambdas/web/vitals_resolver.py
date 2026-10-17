@@ -13,8 +13,8 @@ Canonical semantics:
   reading; a color is never served without a number behind it (ADR-104).
 - sleep comes from the newest whoop record carrying sleep_duration_hours
   (sleep finalizes separately from recovery).
-- steps prefer garmin (the watch of record), falling back to apple_health,
-  within the last ~2 days only — older step counts aren't "current".
+- steps come from common.metric_truth (#4630: the registry METRIC_TRUTH facet —
+  Whoop's step_count, else Apple Health, else Garmin), within the last ~2 days only — older step counts aren't "current".
 - No genesis clamp and no phase filter: the latest reading is the latest
   reading regardless of experiment cycle (same liveness reasoning as the
   freshness board, #1203). Provenance is the *_as_of date — consumers surface
@@ -31,6 +31,7 @@ Canonical semantics:
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
+from common.metric_truth import STEPS, resolve_by_date, steps_sources  # #4630: the ONE steps resolver
 from common.pacific_time import PACIFIC  # #1964: THE Pacific frame — never a local ZoneInfo
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from ingestion.source_registry import day_key_frame_for  # #3257: which calendar a source's DATE# key names
@@ -195,28 +196,27 @@ def resolve_vitals(table, user_prefix, now=None):
             out["sleep_as_of"] = _sk_date(rec)
             break
 
-    # Steps: garmin (watch of record) then apple_health, recent days only. apple_health's
-    # DATE# names a UTC day, so the newest key in this range is a partial next-UTC-day
-    # record for ~7h every evening; the scan still fetches it, `reached_in_pacific` refuses
-    # to let it win, and the Pacific day's record is served instead (#3287).
+    # #4630: steps through the ONE resolver (registry METRIC_TRUTH facet — Whoop's
+    # step_count, else Apple Health, else Garmin), recent days only, newest day Pacific has
+    # reached. apple_health's DATE# names a UTC day, so the newest key in this range is a
+    # partial next-UTC-day record for ~7h every evening; the scan still fetches it,
+    # `reached_in_pacific` refuses to let it win, and the Pacific day's record is served
+    # instead (#3287). The frame disclosed is the WINNING source's.
     # utc-exempt(#2414, bounded by #3287): the same widened-bounds SCAN as above.
     steps_start = (now - timedelta(days=STEPS_LOOKBACK_DAYS)).strftime("%Y-%m-%d")
-    for source in ("garmin", "apple_health"):
+    step_rows: dict = {}
+    for source in steps_sources():
         try:
-            for rec in _daily_records(table, user_prefix, source, steps_start, end, limit=STEPS_LOOKBACK_DAYS + 3):
-                day = _sk_date(rec)
-                if not reached_in_pacific(day, pt_today):
-                    continue
-                s = _num(rec, "steps")
-                if s is not None:
-                    out["steps"] = s
-                    out["steps_source"] = source
-                    out["steps_as_of"] = day
-                    out["steps_as_of_frame"] = day_key_frame_for(source)
-                    break
+            step_rows[source] = _daily_records(table, user_prefix, source, steps_start, end, limit=STEPS_LOOKBACK_DAYS + 3)
         except Exception:
             continue
-        if out["steps"] is not None:
-            break
+    for day, res in sorted(resolve_by_date(STEPS, step_rows).items(), reverse=True):
+        if not reached_in_pacific(day, pt_today) or res.value is None:
+            continue
+        out["steps"] = res.value
+        out["steps_source"] = res.source
+        out["steps_as_of"] = day
+        out["steps_as_of_frame"] = day_key_frame_for(res.source)
+        break
 
     return out

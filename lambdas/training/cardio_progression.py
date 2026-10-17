@@ -43,7 +43,9 @@ Nineteen cycling blocks are on the record; TEN of them carry a note with a singl
 parseable level, and exactly TWO of those ten can be joined to a ride-scoped Whoop average
 HR. That is not a bug in the join — a Hevy exercise block carries no timestamps of its
 own, and Whoop's workout records are usually session-scoped ("Cross Training", 18:12–19:18,
-spanning two hours of barbell work plus the bike). A session-scoped average HR is not
+spanning two hours of barbell work plus the bike — sport id 45, the vendor's own
+``weightlifting``; "Cross Training" is the pre-#4629 table label, kept on stored history until
+the owner's relabel). A session-scoped average HR is not
 HR-at-level, so this module declines to substitute one: `join_whoop_hr` returns a NAMED
 absence rather than the nearest available number.
 
@@ -235,7 +237,8 @@ def join_whoop_hr(
     ambiguity, and picking the closer one would be a guess wearing a number's clothes.
 
     AMBIGUITY RUNS BOTH WAYS, and the second direction is the one that bites. On the live
-    2026-09-12 session a 1,739 s Whoop "Hiking" workout matched the 1,800 s CYCLING block
+    2026-09-12 session a 1,739 s Whoop "Hiking" workout (sport id 63 — the vendor's own name is
+    ``walking``; "Hiking" was the pre-#4629 hand-written table label) matched the 1,800 s CYCLING block
     — and equally matched the 1,800 s WALKING block sitting beside it in the same session.
     A per-block join that only looks at its own block sees one candidate and reports a
     heart rate for the bike that was almost certainly the treadmill. `sibling_block_seconds`

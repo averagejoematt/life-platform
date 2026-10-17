@@ -53,19 +53,25 @@ USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 ALGO_VERSION = "1.0"
 LOOKBACK_DAYS = 30
 from common.constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
+from common.metric_truth import resolved_rows, resolved_source_id, steps_sources  # #4630: the ONE steps resolver
 
 # Metrics by source for EWMA processing.
 # #813: whoop records carry NO sleep_score/deep_pct/rem_pct attributes (those live
 # on eightsleep records, mapped below) — the whoop entries for them only ever
 # produced empty series. Keep each metric under the source that actually has it.
+RESOLVED_STEPS_KEY = resolved_source_id("steps")
+
 SOURCE_METRICS = {
     "whoop": ["hrv", "recovery_score", "resting_heart_rate", "sleep_duration_hours"],
     "withings": ["weight_lbs"],
     "macrofactor": ["total_calories_kcal", "total_protein_g"],
-    "apple_health": ["steps", "blood_glucose_avg", "blood_glucose_std_dev", "som_avg_valence"],
+    "apple_health": ["blood_glucose_avg", "blood_glucose_std_dev", "som_avg_valence"],
     "strava": ["moving_time_seconds"],
     "eightsleep": ["sleep_score", "deep_pct", "rem_pct"],  # bed_temp_f retired — ADR-118, #489
-    "garmin": ["steps"],
+    # #4630: steps are not any one source's — RESOLVED_STEPS_KEY is a pseudo-source whose rows
+    # are `{date, steps}` built by common.metric_truth from every source the registry's
+    # METRIC_TRUTH facet names (Whoop's step_count, else Apple Health, else Garmin).
+    RESOLVED_STEPS_KEY: ["steps"],  # steps-truth: the resolved rows, built in _fetch_all_source_data
 }
 
 # Metrics that are highly autocorrelated — need >=5 consecutive data points
@@ -220,9 +226,13 @@ def _fetch_all_source_data(start_date, end_date):
     """Fetch data from all sources for the given date range."""
     data = {}
     for source in SOURCE_METRICS:
+        if source == RESOLVED_STEPS_KEY:
+            continue
         records = _fetch_range(source, start_date, end_date)
         data[source] = records
         logger.info("Fetched %d records from %s", len(records), source)
+    step_rows = {src: (data[src] if src in data else _fetch_range(src, start_date, end_date)) for src in steps_sources()}
+    data[RESOLVED_STEPS_KEY] = resolved_rows("steps", step_rows)
     return data
 
 

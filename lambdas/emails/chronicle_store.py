@@ -235,6 +235,36 @@ def held_week(week_num, reason, display, body, status_code=500, dry_run=False, *
     return {"statusCode": status_code, "body": body}
 
 
+def publish_holds(week_num, title, stats_line, raw_installment, desk, dry_run, preview_mode, *, _g):
+    """The publish-path holds at the one point every writer passes: ``(held, preview, craft)``.
+
+    Story door (#4538, fail-closed): the ONE shared reader-surface check -- no cycle/reset/attempt count in the title,
+    the stat line or the body, no off-record specifics. The desk's writers already rewrite against it; this holds the
+    week (``held`` is the handler's response) when a rewrite did not clear it, or when the writer was not the desk.
+    Craft (#4545, owner ruling "b" 2026-10-17 -- hold on preview only): a desk installment that still carries a
+    story_craft finding after its corrective rewrites is never auto-published and never writes a reader-facing marker.
+    ``preview`` is forced true, so the week is stored as a draft and the preview email lists ``craft``; the draft row
+    carries ``publish_hold = craft_hold`` (approval metadata), which the 48 h sweep refuses, so only the owner's approve
+    click publishes it. A week with no residual craft finding returns ``(None, preview_mode, [])`` -- as on main."""
+    from content import story_checks
+
+    logger = _g["logger"]
+    door = story_checks.reader_surface(f"{title}\n{stats_line}\n{raw_installment}")
+    craft = list((desk or {}).get("craft_findings") or [])
+    if door:
+        logger.error(f"[story-door] BLOCKED chronicle week {week_num} — {door}")
+        display = (
+            f"Week {week_num}'s installment was generated but withheld before publishing — it didn't clear "
+            "the platform's automatic check on what the series puts on the record. No content was published "
+            "or stored for this week."
+        )
+        body = json.dumps({"status": "story_door_hold", "week": week_num, "findings": door})
+        return held_week(week_num, "story_door_hold", display, body, status_code=200, dry_run=dry_run, _g=_g), preview_mode, craft
+    if craft:
+        logger.warning(f"[craft] week {week_num} routed to the preview (owner approval; never auto-published) — {craft}")
+    return None, bool(preview_mode or craft), craft
+
+
 def dry_run_response(week_num, date_str, title, stats_line, raw_markdown, conf_level, has_board, share_kit, recap, preview_mode, *, _g):
     """#2221: the {"dry_run": true} rehearsal's report.
 
@@ -265,7 +295,7 @@ def dry_run_response(week_num, date_str, title, stats_line, raw_markdown, conf_l
     }
 
 
-def _send_preview_email(title, week_num, date_str, approval_token, email_html, kit_block="", desk_fallback="", *, _g):
+def _send_preview_email(title, week_num, date_str, approval_token, email_html, kit_block="", desk_fallback="", craft=(), *, _g):
     """Send preview email to RECIPIENT with Approve / Request Changes links.
 
     The approve link goes to APPROVE_LAMBDA_URL with ?date=, token=, action=approve.
@@ -277,6 +307,9 @@ def _send_preview_email(title, week_num, date_str, approval_token, email_html, k
     #4914: `desk_fallback` is the Story Desk's error when it failed and the legacy writer wrote this draft. The
     subject then says so ("LEGACY WRITER") and the banner quotes the desk's findings, so a fallback draft is never
     approved as if the desk had written it. (The held-week path publishes no email, so the subject is the carrier.)
+
+    #4545 (owner ruling "b"): `craft` is story_craft's residual verdict on the final desk texts. The banner lists every
+    finding and the subject says CRAFT HOLD: the 48 h sweep will not publish this draft, only the approve link does.
     """
     APPROVE_LAMBDA_URL = _g["APPROVE_LAMBDA_URL"]
     ses = _g["ses"]
@@ -298,11 +331,22 @@ def _send_preview_email(title, week_num, date_str, approval_token, email_html, k
             '<p style="margin:0 0 16px;font-size:13px;color:#fca5a5;">The Story Desk failed this week, so this draft was written by the '
             f"LEGACY writer without the desk's scoreboard or craft gates. Desk findings: {_html.escape(str(desk_fallback)[:600])}</p>"
         )
+    craft_html = ""
+    if craft:
+        import html as _html
+
+        items = "".join(f"<li>{_html.escape(str(f)[:300])}</li>" for f in list(craft)[:20])
+        craft_html = (
+            '<p style="margin:0 0 6px;font-size:13px;color:#fcd34d;">CRAFT HOLD (#4545): the craft gate still found these after '
+            "the rewrites, so this week will NOT publish itself after 48 h. Approve to publish it as is.</p>"
+            f'<ul style="margin:0 0 16px;font-size:13px;color:#fcd34d;">{items}</ul>'
+        )
     preview_banner = f"""
 <div style="background:#1a1a1a;color:#fff;padding:20px 32px;font-family:-apple-system,sans-serif;margin-bottom:0;border-bottom:3px solid #f59e0b;">
   <p style="margin:0 0 6px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#f59e0b;">PREVIEW — Not yet published</p>
   <p style="margin:0 0 16px;font-size:14px;color:#ccc;">Week {week_num}: &ldquo;{title}&rdquo; is ready for review.</p>
   {fallback_html}
+  {craft_html}
   <a href="{approve_url}"
      style="display:inline-block;background:#16a34a;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;margin-right:12px;">
     ✓ Approve &amp; Publish
@@ -324,7 +368,7 @@ def _send_preview_email(title, week_num, date_str, approval_token, email_html, k
         else:
             preview_email = preview_email + kit_block
 
-    tag = "[PREVIEW · LEGACY WRITER — desk failed]" if desk_fallback else "[PREVIEW]"
+    tag = "[PREVIEW · LEGACY WRITER — desk failed]" if desk_fallback else ("[PREVIEW · CRAFT HOLD]" if craft else "[PREVIEW]")
     subject = f'{tag} The Measured Life — Week {week_num}: "{title}"'
     try:
         ses.send_email(

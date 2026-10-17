@@ -129,6 +129,7 @@ SITE_RULINGS = {
     ("weekly_physical_summary", "_query_source", "'strava'", "site_api_physical.py"): CLAMPED,
     ("weekly_physical_summary", "_query_source", "'garmin'", "site_api_physical.py"): CLAMPED,
     ("weekly_physical_summary", "_query_source", "'apple_health'", "site_api_physical.py"): CLAMPED,
+    ("weekly_physical_summary", "_query_source", "'whoop'", "site_api_physical.py"): CLAMPED,  # #4630: same _experiment_date(7) window
     ("pulse_history", "_query_source", "'whoop'", "site_api_pulse.py"): CLAMPED,
     ("pulse_history", "_query_source", "'withings'", "site_api_pulse.py"): CLAMPED,
     ("pulse_history", "_query_source", "'garmin'", "site_api_pulse.py"): CLAMPED,

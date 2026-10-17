@@ -15,6 +15,7 @@ from boto3.dynamodb.conditions import Key
 # ── Serialisation ──
 from common.digest_utils import d2f as decimal_to_float  # shared bundled helpers (#970)
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the chokepoint
+from ingestion.source_registry import METRIC_TRUTH  # #4630: metrics resolved per day, never by get_sot
 
 from mcp.config import (
     _DEFAULT_SOURCE_OF_TRUTH,
@@ -60,7 +61,19 @@ def get_profile():
 
 
 def get_sot(domain: str) -> str:
-    """Return the source-of-truth source name for a given domain."""
+    """Return the source-of-truth source name for a given domain.
+
+    #4630 box 5: a metric with a registry truth facet (`METRIC_TRUTH` in
+    ingestion/source_registry.py — steps today) is NOT answered here. Its truth is
+    per-day (Whoop when the wrist has a count, Apple Health otherwise), so a single
+    source name would be a second, wrong statement of it — and the stored profile's
+    `source_of_truth.steps` (still "apple_health" in the row) would silently win.
+    Callers resolve those through common.metric_truth instead.
+    """
+    if domain in METRIC_TRUTH:
+        raise ValueError(
+            f"get_sot({domain!r}): resolved per day by common.metric_truth (the METRIC_TRUTH registry facet), not a domain owner"
+        )
     profile = get_profile()
     sot_overrides = profile.get("source_of_truth", {})
     return sot_overrides.get(domain, _DEFAULT_SOURCE_OF_TRUTH.get(domain, "strava"))

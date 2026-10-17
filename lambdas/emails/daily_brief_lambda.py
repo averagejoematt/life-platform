@@ -757,13 +757,11 @@ def gather_daily_data(profile, yesterday):
                 avatar_weight = wt
                 break
 
-    # 7-day Apple Health for CGM trend context
-    apple_7d = fetch_range("apple_health", (today - timedelta(days=7)).isoformat(), yesterday)
+    apple_7d = fetch_range("apple_health", (today - timedelta(days=7)).isoformat(), yesterday)  # CGM trend + 7d steps baseline
 
     # Cumulative sleep debt (last 7 days) for smart guidance
-    sleep_7d = [_normalize_whoop_sleep(i) for i in fetch_range("whoop", (today - timedelta(days=7)).isoformat(), yesterday)]
-    target_hrs = profile.get("sleep_target_hours_ideal", 7.5)
-    sleep_debt_hrs = 0.0
+    sleep_7d = [_normalize_whoop_sleep(i) for i in hrv_7d_recs]  # #4630: the same 7-day Whoop read, not a second query
+    target_hrs, sleep_debt_hrs = profile.get("sleep_target_hours_ideal", 7.5), 0.0
     for s in sleep_7d:
         dur = safe_float(s, "sleep_duration_hours")
         if dur is not None:
@@ -925,6 +923,7 @@ def gather_daily_data(profile, yesterday):
         "journal_entries": journal_entries,
         "social_posts": social_posts,  # #1671: enriched public voice → coach signal
         "apple_7d": apple_7d,
+        "whoop_7d": hrv_7d_recs,  # #4630: the same window's Whoop rows, so the 7d steps baseline resolves like the day
         "anomaly": anomaly,
         "latest_weight": latest_weight,
         # #1924: namespaced rather than spread, so adding dated weight facts cannot

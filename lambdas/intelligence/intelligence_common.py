@@ -24,6 +24,7 @@ from boto3.dynamodb.conditions import Attr, Key
 from coach.reading_date_fidelity import guard_derived_summary  # #2343: derived-summary day correspondence
 from coach.voice_register_guard import sanitize_summary  # #1987: deterministic voice-register check
 from common.digest_utils import is_day_row  # #3442: whoop inventory counts day rows, not #WORKOUT# fragments
+from common.metric_truth import steps_series, steps_sources  # #4630: the ONE steps resolver
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 from experiment import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
@@ -637,7 +638,7 @@ _CLAIM_DOMAIN_MAP = {
 
 # SOT definitions — which source is authoritative for each metric
 _SOURCE_OF_TRUTH = {
-    "steps": "garmin",
+    # "steps" retired (#4630): resolved per day by common.metric_truth from the registry facet.
     "weight": "withings",
     "sleep_duration": "whoop",
     "recovery": "whoop",
@@ -1064,25 +1065,22 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
 
     avg_steps = 0
     try:
-        resp = table.query(
-            **with_phase_filter(
-                {
-                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}garmin") & Key("sk").between(f"DATE#{start}", f"DATE#{today}~"),
-                }
+        # #4630: the day's steps through the ONE resolver (registry METRIC_TRUTH facet) — this
+        # read was Garmin-only, so with Garmin paused (ADR-074) the step quarter scored 0.
+        # A device's 0 is "no count" to the resolver (ADR-104: a missing wrist is not a
+        # sedentary day); a genuinely low day still pulls the mean down.
+        rows_by_source = {}
+        for _src in steps_sources():
+            resp = table.query(
+                **with_phase_filter(
+                    {
+                        "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}{_src}")
+                        & Key("sk").between(f"DATE#{start}", f"DATE#{today}~"),
+                    }
+                )
             )
-        )
-        # #1658: filter on PRESENCE, not truth. `if i.get("steps")` is falsy for a
-        # genuine 0-step day, so sedentary days were dropped from the mean instead of
-        # pulling it down — a week with two zero days reported the average of the
-        # active ones, systematically flattering the health side of the ratio.
-        step_vals = []
-        for i in resp.get("Items", []):
-            if "steps" not in i:
-                continue
-            try:
-                step_vals.append(float(i["steps"]))
-            except (TypeError, ValueError):
-                continue
+            rows_by_source[_src] = resp.get("Items", [])
+        step_vals = steps_series(rows_by_source)
         if step_vals:
             avg_steps = round(sum(step_vals) / len(step_vals))
             step_days = len(step_vals)
@@ -1168,7 +1166,7 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
 # iff Strava is live. A state not in this set is treated as unavailable (paused / stale / rate_limited / missing).
 _MOVEMENT_LIVE_STATES = {"live", "fresh", "ok", "current", None}
 # Movement sources surfaced in the unavailability note, in priority order.
-_MOVEMENT_NOTE_SOURCES = ("strava", "garmin", "steps")
+_MOVEMENT_NOTE_SOURCES = ("strava", "garmin", "steps")  # steps-truth: note labels, not a read
 # C-4 (#494): INGEST_HEALTH sentinel statuses (ingest_health.evaluate_source_health)
 # that mean the ingestion pipe *ran and completed its fetch without error* — i.e. the
 # source is confirmed live regardless of whether it returned any new records. Only "ok"

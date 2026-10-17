@@ -45,6 +45,7 @@ from typing import TYPE_CHECKING, Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from common.metric_truth import STEPS, resolve_by_date  # #4630: the ONE steps resolver
 
 # #1993: labs fact extraction against the real draw-record schema (SCHEMA.md).
 from intelligence import (
@@ -377,16 +378,13 @@ def gather_data_for_expert(expert_key):
         _garmin_rl = has_rate_limit_marker(table, USER_ID, "garmin")
         _garmin_state = resolve_source_state("garmin", _latest_date(garmin_items), today, rate_limited=_garmin_rl)
 
-        # DI-1.4: state-aware step precedence. The watch (via Garmin) is the better step
-        # counter WHEN live, but a rate-limited/stale Garmin emits sparse partial readings
-        # (e.g. 298 steps on 6/15) that misrepresent movement — averaging those was the
-        # "phantom 298" bug. Use Garmin steps only when Garmin is live; else Apple Health.
-        if _garmin_state == "live":
-            step_vals = [float(g["steps"]) for g in garmin_items if g.get("steps")]
-            step_source = "garmin"
-        else:
-            step_vals = [float(s["steps"]) for s in steps_items if s.get("steps") and float(s["steps"]) > 0]
-            step_source = "apple_health"
+        # #4630: the day's steps through the ONE resolver (registry METRIC_TRUTH facet —
+        # Whoop's step_count, else Apple Health, else Garmin at its >=1000 floor, which keeps
+        # DI-1.4's "phantom 298" partial-sync readings out of the mean).
+        _resolved_steps = resolve_by_date(STEPS, {"whoop": whoop_items, "apple_health": steps_items, "garmin": garmin_items})
+        step_vals = [r.value for _, r in sorted(_resolved_steps.items()) if r.value]  # a 0 day stays out of the mean, as before
+        _winners = sorted({r.source for r in _resolved_steps.values() if r.source})
+        step_source = "+".join(_winners) if _winners else "none"
         avg_steps = round(sum(step_vals) / len(step_vals)) if step_vals else 0
         # Step completeness = days with a usable step value / experiment days (DI-1.4 flag).
         step_completeness_pct = round(len(step_vals) / max(1, _frame.days_in) * 100)

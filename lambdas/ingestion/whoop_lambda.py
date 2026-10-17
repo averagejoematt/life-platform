@@ -47,6 +47,7 @@ from common.http_retry import urlopen_with_retry
 from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive input == UTC, never runner-local)
 
 from ingestion.ingestion_framework import IngestionConfig, run_ingestion
+from ingestion.whoop_empty_day import store_vendor_result
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 USER_ID = os.environ.get("USER_ID", "matthew")
@@ -87,32 +88,6 @@ _GLITCH_SK = "AUTH_GLITCH"
 _GLITCH_TTL_SECONDS = 2 * 3600
 WHOOP_SCOPES = "offline read:recovery read:cycles read:workout read:sleep " "read:profile read:body_measurement"
 
-WHOOP_SPORT_NAMES = {
-    -1: "Activity",
-    0: "Running",
-    1: "Cycling",
-    16: "Basketball",
-    17: "Baseball",
-    18: "Football",
-    19: "Soccer",
-    25: "Swimming",
-    27: "Tennis",
-    44: "Weightlifting",
-    45: "Cross Training",
-    46: "Functional Fitness",
-    48: "Yoga",
-    49: "Pilates",
-    50: "HIIT",
-    51: "Spin",
-    57: "Rowing",
-    63: "Hiking",
-    71: "Triathlon",
-    72: "Golf",
-    73: "Skiing / Snowboarding",
-    74: "Skateboarding",
-    85: "Lacrosse",
-    91: "Walking",
-}
 _ZONE_WORD = ["zero", "one", "two", "three", "four", "five"]
 
 # Module-level DDB resource — needed by transform() for sleep-consistency
@@ -480,9 +455,15 @@ def _extract_workout(workout: dict) -> dict:
     sport_id = workout.get("sport_id")
     if sport_id is not None:
         fields["sport_id"] = int(sport_id)
-        # The hand-written label stays: readers depend on it, and relabelling waits on #4644 Q10/Q11.
-        fields["sport_name"] = WHOOP_SPORT_NAMES.get(sport_id, f"Sport_{sport_id}")
-    if workout.get("sport_name"):  # capture-all (owner rule 2026-10-04): the vendor's own label beside the table's
+    # #4629 box 2 (#4644 Q10): ``sport_name`` is the payload's own label. The hand-written id table
+    # this replaced disagreed with the vendor on 21 of its 24 ids (63 "Hiking" is the vendor's
+    # ``walking``, 45 "Cross Training" its ``weightlifting``) and minted ``Sport_<id>`` for the rest
+    # (128 is ``stretching``). An absent vendor label stores NO name — never a guessed one (ADR-104).
+    # ``vendor_sport_name`` (capture-all, #4922) keeps naming the provenance, so a row whose two
+    # fields agree is a vendor-labelled row; a stored row whose ``sport_name`` differs from it is a
+    # pre-#4629 table label awaiting the owner's relabel (scripts/whoop_workout_history_4629.py).
+    if workout.get("sport_name"):
+        fields["sport_name"] = str(workout["sport_name"])
         fields["vendor_sport_name"] = str(workout["sport_name"])
     for key in ("start", "end"):
         if workout.get(key):
@@ -779,6 +760,20 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
         ) from e
 
 
+def workout_files_under(workout: dict, date_str: str) -> bool:
+    """True when ``date_str`` is the ONE date key this workout is filed under (#4629 box 3).
+
+    The vendor's ``start``/``end`` query returns every workout that OVERLAPS the UTC window
+    [date T00:00Z, next T00:00Z), so a workout running across 00:00 UTC came back from two days'
+    fetches and was written under both keys (181 of 2,520 ids at filing). The key is the UTC day
+    the workout STARTED (#4644 Q11, consistent with #3913's UTC ruling and with ``_utc_day``, the
+    reconciler's expected key), so the other day's fetch skips it. A record with no parseable
+    ``start`` has nothing to key on and stays under the day that fetched it, as before.
+    """
+    day = _utc_day(workout.get("start"))
+    return day is None or day == date_str
+
+
 def transform(raw: dict, date_str: str) -> list[dict]:
     """Build the daily aggregate item + one item per workout."""
     if not raw:
@@ -807,6 +802,8 @@ def transform(raw: dict, date_str: str) -> list[dict]:
         items.append({"source": "whoop", "date": date_str, **normalized})
 
     for workout in raw["workouts"].get("records", []):
+        if not workout_files_under(workout, date_str):
+            continue  # another day's fetch files it — one key per workout id (#4629 box 3)
         wid = workout["id"]
         items.append(
             {
@@ -1043,9 +1040,11 @@ def _emit_reconciliation_metric(missing_count: int) -> None:
 # answers it at no extra Whoop request. REPORTED ONLY, as two metrics with Source=whoop:
 #   StoreOnlyActivityCount — stored workout ids absent from the vendor's trailing list
 #   ChangedActivityCount   — stored ids whose sport or start/end (duration) differ
-# This path stays read-only on the store (test_reconcile_is_read_only): removing or
-# rewriting a whoop workout row on the strength of a list diff is a separate decision,
-# left on #4638. The 2-day trailing re-fetch still overwrites edits inside its window.
+# Owner ruling 2026-10-17 on #4638: "write it". A day whose every stored workout row is gone
+# from the vendor's list is written as the explicit empty day (each row replaced in place by a
+# tombstone, see whoop_empty_day.empty_day_records) — behind the same two guards the Strava path uses. Nothing
+# else is written: changed rows are reported only, and the day's recovery/sleep row is untouched.
+# The 2-day trailing re-fetch still overwrites edits inside its window.
 
 # Seconds of start/end disagreement below which a stored workout is not "changed".
 _STORE_VENDOR_TIME_TOLERANCE_SECONDS = 1
@@ -1058,11 +1057,11 @@ def _fetch_stored_workouts(table, start_date: str, end_date: str) -> list:
     out: list = []
     kwargs = {
         "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}￿"),
-        "ProjectionExpression": "sk, workout_id, sport_id, start_time, end_time",
+        "ProjectionExpression": "sk, workout_id, sport_id, start_time, end_time, tombstone",
     }
     while True:
         resp = table.query(**kwargs)
-        out.extend(item for item in resp.get("Items", []) if "#WORKOUT#" in str(item.get("sk", "")))
+        out.extend(item for item in resp.get("Items", []) if "#WORKOUT#" in str(item.get("sk", "")) and not item.get("tombstone"))
         lek = resp.get("LastEvaluatedKey")
         if not lek:
             break
@@ -1142,11 +1141,11 @@ def _store_vendor_report(vendor_workouts: list, start, today) -> dict:
             len(changed),
             changed,
         )
-    return {"absent_count": len(absent), "absent": absent, "changed_count": len(changed), "changed": changed}
+    return store_vendor_result(absent, changed, _table, vendor_workouts, stored, start, today, USER_ID, logger)  # never raises
 
 
 def _reconcile(event: dict, context) -> dict:
-    """Diff the trailing-window Whoop API record set against the store (read-only).
+    """Diff the trailing-window Whoop API record set against the store (writes only the #4638 empty day).
 
     #2196 (acceptance box 5): this path used to bypass the ADR-052 auth breaker
     entirely — while the credential was dead from 08-03 to 08-07 the reconcile
