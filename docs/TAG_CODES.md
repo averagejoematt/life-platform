@@ -1,6 +1,6 @@
 # Tag-Code Legend
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-06-07
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 This codebase labels work with short tag-codes in **commits, code comments, `docs/BACKLOG.md`, and `docs/CHANGELOG.md`** (e.g. `IC-3`, `PG-10`, `SEC-02`, `COST-OPT-1`, `R17-04`). They come from successive audit / backlog / sprint cycles. This file decodes the **families**; for any specific item, see "How to decode a specific tag" at the bottom.
 
@@ -9,7 +9,7 @@ This codebase labels work with short tag-codes in **commits, code comments, `doc
 ## Decision & architecture
 | Tag | Meaning | Lives in |
 |---|---|---|
-| **ADR-###** | Architecture Decision Record (001–078). The authoritative "why". | `docs/DECISIONS.md` |
+| **ADR-###** | Architecture Decision Record (the range grows — the latest is in the `docs/DECISIONS.md` index). The authoritative "why". | `docs/DECISIONS.md` |
 | **CONF-##** | Config / constants centralization refactor (CDK `constants.py`, env-var wiring). | `cdk/stacks/` |
 
 ## Initiatives (cross-cutting programs)
@@ -39,13 +39,26 @@ This codebase labels work with short tag-codes in **commits, code comments, `doc
 |---|---|
 | **R17-##** | "Round 17" hardening batch (e.g. `R17-04` = separate site-api Anthropic key via CDK env). |
 | **WR-##** | Work Request (e.g. `WR-40` = question safety-filter on `/api/ask`). |
-| **SEC-##** | Security work (e.g. `SEC-02` = CDK-owned WAF association — since **removed**, WAF deleted 2026-06). |
+| **SEC-##** | Security work (e.g. `SEC-02` = the MCP Function URL is resolved at runtime, never committed, #780 — `lambdas/common/mcp_url.py`). |
 | **OBS-##** | Observability (e.g. `OBS-03` = EMF metric on rate-limit hit). |
 | **BS-##** | Subscriber/email backend (e.g. `BS-03` = the email-subscriber Lambda). |
 | **HP-##** | Home-page / share-card work (e.g. `HP-13` = OG share card). |
 | **TB#-##** | Tech-backlog (e.g. `TB7-25` = auto-rollback on smoke-test failure). |
 | **A11Y** | Accessibility (see `docs/A11Y_BASELINE.md`). |
 | **lv#** | A test-name shorthand from the retired layer-consistency suite (the suite was removed with the layer, #781; the invariant is now `test_i2_shared_layer_retired`). |
+
+## Families seen in code and commits, not in a backlog table above
+These have no row of their own elsewhere in this file; they are real and in use (counts of source files carrying the code, 2026-10-16). The meaning is read from the code that carries them; the item text lives in `docs/BACKLOG.md` / `docs/CHANGELOG.md`.
+| Prefix | Domain |
+|---|---|
+| **DIL-###** | Data-integrity-ledger findings (e.g. `DIL-001` = private coaching files moved off the public prefix, `DIL-025` = raw-archive replay-safety) — ~47 files. |
+| **ER-##** | External-review rigor items (e.g. `ER-01` = the ingest-liveness `INGEST_HEALTH#` sentinel). |
+| **SS-##** | Self-sustainability items — failures that would otherwise go dark silently (e.g. `SS-01` = chronicle auto-publish fallback). |
+| **DI-#.#** | Movement/source-state data-integrity workorder (`DI-1.3` honesty guard, ADR-091). |
+| **CC-##** | Coach-page items (e.g. `CC-02` report card, `CC-03` tuning changelog). |
+| **R22-SEC-##** | Round-22 security findings (e.g. `R22-SEC-04` = delimit untrusted reader text). |
+| **BENCH-#** | Cut benchmarking (ADR-089). |
+| **DATA-# / REL-# / DA-# / EVR-## / RQA-## / BL-## / PRE-##** | Smaller families: write validation, reliability, deep-audit findings, habit-driver capture, recovery-quality analysis, builders/ledger backlog, pre-launch gates (`PRE-13` = genome publication boundary). |
 
 ## How to decode a specific tag
 1. **Shipped?** → `grep "<TAG>" docs/CHANGELOG.md` (what landed + when).
