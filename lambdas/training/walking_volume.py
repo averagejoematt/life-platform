@@ -396,3 +396,30 @@ def build(
         "derived_steps_estimate": derived_steps_estimate(by_modality.get("walking") if contributing else None),
         "honesty": honesty,
     }
+
+
+def walking_minutes_for_day(
+    *, day: str, strava_items: list[dict[str, Any]] | None, hevy_workouts: list[dict[str, Any]] | None
+) -> dict[str, Any] | None:
+    """The WALKING-modality minutes of ONE day, from the day rows a compute already holds (ADR-163).
+
+    Not a second definition: it is `build` over the single day — the same counted types and names,
+    the same #4068 time de-dup (a WHOOP walk recorded inside a Hevy treadmill session is that block
+    seen twice and counts once) — reading only the `walking` modality (cycling is the layer's other
+    modality and is not walking time). None when neither source has a record for the day: unknown,
+    never zero minutes (ADR-104). A source with records but no counted walking reads 0.
+    """
+    layer = build(window_start=day, window_end=day, strava_items=strava_items, hevy_workouts=hevy_workouts)
+    if layer["total_hr"] is None:
+        return None
+    walking_hr = float(layer["by_modality"].get("walking") or 0.0)
+    by_source = {
+        name: (round(float(block["by_modality"].get("walking") or 0.0) * 60.0, 1) if block["hours"] is not None else None)
+        for name, block in layer["by_source"].items()
+    }
+    return {
+        "minutes": round(walking_hr * 60.0, 1),
+        "by_source": by_source,
+        "dedup_minutes_removed": round(float(layer["dedup"]["hours_removed"]) * 60.0, 1),
+        "version": layer["version"],
+    }

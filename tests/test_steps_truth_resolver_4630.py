@@ -252,8 +252,14 @@ class _FakeTable:
         item = self._items.get((Key["pk"], Key["sk"]))
         return {"Item": dict(item)} if item else {}
 
+    def query(self, KeyConditionExpression, ExpressionAttributeValues):
+        assert KeyConditionExpression == "pk = :pk AND begins_with(sk, :sk)"  # the hevy day read, nothing wider
+        pk, sk = ExpressionAttributeValues[":pk"], ExpressionAttributeValues[":sk"]
+        return {"Items": [dict(v) for (p, k), v in self._items.items() if p == pk and k.startswith(sk)]}
+
 
 def test_the_reproduce_command_names_the_winner_and_rebuilds_the_movement_score():
+    """Box 4's steps lines plus, since ADR-163, the movement score's walking-time half."""
     sys.path.insert(0, os.path.join(ROOT, "scripts"))
     import resolve_steps_day_4630 as cmd
 
@@ -270,5 +276,9 @@ def test_the_reproduce_command_names_the_winner_and_rebuilds_the_movement_score(
     lines = cmd.explain_day(table, day)
     assert "  whoop         17,739" in lines and "  garmin        no row" in lines
     assert lines[4] == "resolved 17739 from whoop — whoop is the truth source and has a count"
-    assert lines[5].startswith("movement 100 = exercise 100 x0.50 + steps 100 x0.50")
-    assert lines[6] == "stored component_movement 100 (matches)"
+    # ADR-163: the movement line scores walking time; this strava row carries no activities and there is
+    # no hevy session, so walking reads 0 of the 73-minute default and the stored (steps-era) 100 differs
+    assert lines[5] == (
+        "movement 50 = exercise 100 x0.50 + walking 0 x0.50 (0 min of walking_minutes_target 73; strava 0, hevy no records)"
+    ), lines[5]
+    assert lines[6].startswith("stored component_movement 100 (differs — the stored grade predates ADR-163")

@@ -1072,6 +1072,9 @@ def assemble_data(yesterday_str, profile):
         "apple": apple,
         "macrofactor": macrofactor,
         "strava": strava,
+        # ADR-163: the day's Hevy workout rows (sk DATE#<day>#WORKOUT#<id>) — the movement score's walking
+        # half reads Hevy walking/treadmill blocks beside Strava's walks, time-de-duplicated (#4068)
+        "hevy": [r for r in hevy_60d if str(r.get("sk", "")).startswith("DATE#" + yesterday_str + "#")],
         "habitify": habitify,
         "habitify_7d": habitify_7d,
         "journal_entries": journal_entries,

@@ -353,7 +353,7 @@ class TestComputeDayGrade:
             assert 0 <= score <= 100
 
     def test_perfect_data_returns_high_score(self):
-        """score_movement needs both strava (exercise) and apple (steps) for full score."""
+        """score_movement needs strava exercise AND walking time for full score (ADR-163: walking, not steps)."""
         data = {
             "sleep": {
                 "sleep_score": 100,
@@ -367,8 +367,11 @@ class TestComputeDayGrade:
                 "total_fat_g": 65,
                 "total_carbs_g": 150,
             },
-            "apple": {"steps": 10000},
-            "strava": {"activity_count": 1, "total_moving_time_seconds": 3600},
+            "strava": {
+                "activity_count": 1,
+                "total_moving_time_seconds": 4500,
+                "activities": [{"type": "Walk", "sport_type": "Walk", "moving_time_seconds": 4500}],
+            },
         }
         score, grade, _, _ = se.compute_day_grade(data, self._minimal_profile())
         assert score is not None
