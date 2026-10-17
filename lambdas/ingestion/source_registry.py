@@ -956,7 +956,11 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "probe_functions": (("habitify-data-ingestion", "Habitify"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": "required",
-        # cadence reason (internal, kept out of the published method text): kept hourly by decision (#3666 same-day freshness); notes/mood calls await ruling #4644 (#4641)
+        # cadence reason (internal, kept out of the published method text): kept hourly by decision (#3666 same-day freshness).
+        # Per-habit notes + mood calls STOPPED 2026-10-17 (calls removed, not flagged), owner Q28 (#4644):
+        # "yes, stop (2,928 calls/day for 0 notes)" — 0 notes in all 223 stored rows; run average was 36.5 s,
+        # expected ~1 s. Supersedes the #422/#950 capture-channel reason. Rows written from this date carry no
+        # `notes`/`mood`; earlier rows are untouched (#4641).
         "method": "API pull, hourly (24h)",
         "metrics": "Daily habit completions",
         "posture": "load-bearing",
@@ -1269,7 +1273,9 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # was checked as a phantom "journal" partition in qa_smoke — the real
         # partition is notion (X-10; the check is warn-only either way).
         "qa_tier": "optional",
-        # cadence reason (internal, kept out of the published method text): was hourly; 0 of 252 runs found a page (#4641)
+        # cadence reason (internal, kept out of the published method text): was hourly; 0 of 252 runs found a page (#4641).
+        # Journal stays a channel at 3/day by the owner's word, Q33 2026-10-17 (#4644): "yes, keep polling at 3/day
+        # (already cut)" — no further cadence change.
         "method": "API pull (journal database), 3x daily",
         "metrics": "Journal entries — the subjective layer",
         "posture": "portfolio",
