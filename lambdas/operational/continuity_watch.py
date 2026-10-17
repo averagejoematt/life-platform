@@ -69,14 +69,17 @@ VALUE_GATED: dict[str, tuple[str, int]] = {
 # the derived behavioural set covers the registry exactly — a new source cannot
 # join the platform without someone deciding which side of the clock it is on.
 AMBIENT_REASONS: dict[str, str] = {
+    "bluesky": "schedule retired by the owner (Q39, 2026-10-17) — no live schedule to be silent",
     "apple_health": "watched on a value instead: the partition stays fresh from automations that need no person",
     "dropbox": "a transport poller — it reports on itself, not on anyone",
     "eightsleep": "device telemetry that continues while the bed is empty",
     "garmin": "paused at the vendor's insistence (ADR-074) — no live schedule to be silent",
     "habitify": "the habit engine writes a daily row whether or not anything was ticked",
+    "mastodon": "schedule retired by the owner (Q39, 2026-10-17) — no live schedule to be silent",
     "todoist": "a daily snapshot of the task list, written even when nothing is touched",
     "weather": "an external forecast pull — the sky reports whether or not anyone is here",
     "whoop": "device telemetry; a charging strap on a desk still produces rows",
+    "youtube": "schedule retired by the owner (Q39, 2026-10-17) — no live schedule to be silent",
 }
 
 
