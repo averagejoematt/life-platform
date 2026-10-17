@@ -1,6 +1,6 @@
 # Third-Party License Inventory
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-12
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 > **Purpose.** One-lookup answer to the license-DD question: what third-party code
 > runs in this platform, under what license, and does any of it create a distribution
@@ -11,11 +11,12 @@
 > **Scope reality that makes this short:** the Lambda *runtime* is **stdlib-only** — all
 > outbound HTTP is Python's `urllib.request` (see `CLAUDE.md` → "No external HTTP
 > libraries"; Bedrock is the one exception, reached via the runtime-provided `boto3`).
-> Third-party code enters in exactly three places: three **binary/native Lambda layers**,
-> the **CDK** (build/deploy-time only, never shipped in a Lambda), and **dev/CI tooling**
-> (never shipped at all). Each is inventoried below.
+> Third-party code enters in exactly four places: three **binary/native Lambda layers**,
+> the **CDK** (build/deploy-time only, never shipped in a Lambda), **dev/CI tooling**
+> (never shipped at all), and **self-hosted fonts** (shipped to readers' browsers and
+> bundled into the share-card Lambda; §3.1). Each is inventoried below.
 
-Last reconciled: 2026-08-12. **Pins are authoritative in their source files**
+Last reconciled: 2026-10-17. **Pins are authoritative in their source files**
 (`deploy/build_lambda_layer.py` + `lambdas/requirements/*.txt` for layer package pins,
 `cdk/stacks/constants.py` for layer *versions*, `cdk/requirements.txt`,
 `requirements-dev.txt`); this table is the license annotation over them, and it
@@ -37,7 +38,7 @@ Package pins live in `deploy/build_lambda_layer.py`'s `LAYERS` registry (from wh
 
 | Layer | Package | Used by | License | Distribution obligation |
 |---|---|---|---|---|
-| `pillow-layer` | Pillow (PIL) | OG share-card image generator (HP-13), visual-QA render | **HPND** (MIT/BSD-style permissive) | None. Permissive; server-side use only. |
+| `pillow-layer` | Pillow (PIL) | `og-image-generator` (HP-13), `reading-cover-pipeline`, `recap-card-generator` | **HPND** (MIT/BSD-style permissive) | None. Permissive; server-side use only. |
 | `garth-layer` | `garth`, `garminconnect` | none (retired #4640; `garmin-data-ingestion` no longer consumes it) | **MIT** | None. |
 | `lameenc-layer` | `lameenc` (LAME MP3 encoder wheel, #1018) | `coach-panel-podcast` → `lambdas/ai/audio_encode.py` (WAV→MP3 compression) | Wrapper permissive; **statically links LGPL-2.1 LAME** | **None today** — see §1.1. |
 
@@ -69,8 +70,9 @@ machine. Pinned exactly (#814).
 |---|---|---|
 | `aws-cdk-lib` | Infrastructure-as-code synth | **Apache-2.0** |
 | `constructs` | CDK construct programming model | **Apache-2.0** |
+| `aws-cdk` (npm CLI; `cdk/package.json` devDependency, version of record for CI's `npm install -g`, #2760) | CDK CLI | **Apache-2.0** |
 
-Permissive; both are AWS-published. No obligation beyond notice retention.
+Permissive; all AWS-published. The root `package.json` (`life-platform-site-js-tests`, `node --test`) declares **no** dependencies (`devDependencies: {}`). No obligation beyond notice retention.
 
 ---
 
@@ -81,10 +83,12 @@ Lambda bundle or the published site.
 
 | Package | Purpose | License |
 |---|---|---|
-| `pytest`, `pytest-cov` | Test runner + coverage | **MIT** |
+| `pytest`, `pytest-cov`, `pytest-xdist` | Test runner, coverage, parallel workers | **MIT** |
 | `hypothesis` | Property-based tests (#1664) | **MPL-2.0** (file-level copyleft; used unmodified as a library — no obligation) |
 | `playwright` | Visual-QA browser automation | **Apache-2.0** |
 | `pyyaml` | Workflow parsing in `scripts/apply_branch_protection.py`'s preflight (#2200) | **MIT** |
+| `pillow` (#2973) | Dev-side image tests/QA; the shipped copy is the Lambda layer in §1 | **HPND** |
+| `claude-agent-sdk` | Remediation-agent runtime (`remediation-agent.yml`, ADR-064/065) | **MIT** (per PyPI metadata) |
 | `boto3`, `botocore` | AWS SDK for tests that call boto3 directly | **Apache-2.0** |
 | `flake8` | Lint | **MIT** |
 | `ruff` | Lint + import-sort | **MIT** |
@@ -95,6 +99,27 @@ Lambda bundle or the published site.
 | `syft` (CI-installed, #1661) | SBOM provenance | **Apache-2.0** |
 
 All permissive or library-use-exempt; nothing here reaches a distributable artifact.
+
+### 3.1 Self-hosted fonts (shipped to readers)
+
+Not Python, so no manifest lists them; they are binary assets in the tree. All four
+families below are published under the **SIL Open Font License 1.1** (permissive for
+embedding and redistribution; the OFL forbids selling the font on its own and requires
+the copyright/licence notice to travel with redistributed font files).
+
+| Family | Where | Used for |
+|---|---|---|
+| Fraunces | `site/assets/fonts/v4/`, `lambdas/fonts/fraunces-400.ttf` | Site display face; share-card display face (`card_engine.py`) |
+| IBM Plex Mono | `site/assets/fonts/v4/`, `lambdas/fonts/ibm-plex-mono-{400,500}.ttf` | Site mono; share-card mono |
+| Instrument Sans | `site/assets/fonts/v4/` | Site body face (`site/assets/css/fonts.css`) |
+| Geist | `site/assets/fonts/clean/geist-latin.woff2` | The clean/v5 pages (`site/assets/css/clean.css`) |
+
+`site/legacy/assets/fonts/` additionally holds Inter, Lora and Space Mono woff2 files
+(by filename; the other hashed files there are unidentified Google-Fonts subsets) — the
+frozen legacy tree, not linked from the UI. **Gap found 2026-10-17:** no OFL text or
+per-font copyright notice is committed beside any of these files. OFL permits the
+current use; adding the notices is an owner/housekeeping decision, recorded here rather
+than silently fixed.
 
 ---
 
