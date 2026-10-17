@@ -1,11 +1,11 @@
 # Re-Entry Protocol — Reusable Runbook
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (#1029 added the stolen-laptop cross-reference in "See also"; the day-by-day content itself is unchanged since the 2026-05-19 V2 audit sweep)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17 (every named script, Lambda, MCP tool and doc re-checked against the tree; stale tool names, the retired Garmin/Apple-XML paths and the dead links fixed — see the closing Verified line)
 
-Last updated: 2026-05-19 (V2 audit operational sweep)
+Last updated: 2026-10-17 (re-verification pass; day-by-day structure from the 2026-05-19 V2 audit sweep)
 
 **Trigger:** Any planned or unplanned platform gap > 7 days.
-**Source:** Synthesized from `Downloads/ajm_reentry_plan.md` (the 2026-05-02/03 re-entry from a 30-day move silence). Promoted to runbook 2026-05-03. Reinforced by the 2026-04-05→2026-05-19 Garmin OAuth outage (44 days; see INCIDENT_LOG.md).
+**Source:** Synthesized from a local plan file (since removed) for the 2026-05-02/03 re-entry from a 30-day move silence. Promoted to runbook 2026-05-03. Reinforced by the 2026-04-05→2026-05-19 Garmin OAuth outage (44 days; see INCIDENT_LOG.md).
 **Goal:** Every source flowing or explicitly known-broken with a workaround, by Day 2 evening. New baseline captured. Honest journal entry posted. Pause Mode → Re-Entry Day Template (WR-50) loaded once it ships.
 
 ---
@@ -38,33 +38,31 @@ If WR-47 isn't live yet:
 Goal: every source either flowing or explicitly known-broken with a plan.
 
 ### 1. Verify-only sources (no action)
-For each source that's been flowing during the gap, run `get_daily_snapshot view=latest sources=['<source>']` and confirm latest date is ≤ 24h. Sources that historically held during gaps (per 2026-05-02 evidence): Whoop, Eight Sleep, Withings, Strava, Notion ingestion (the polling Lambdas keep firing).
+For each source that's been flowing during the gap, run `get_daily_snapshot view=latest sources=['<source>']` (or `get_freshness_status` for every source at once) and confirm latest date is ≤ 24h. Sources that historically held during gaps (per 2026-05-02 evidence): Whoop, Eight Sleep, Withings, Strava, Notion ingestion (the polling Lambdas keep firing).
 
 ### 2. Re-auth + force-pull stale OAuth sources
 
 | Source | Re-auth path | Notes |
 |---|---|---|
-| Garmin | `setup/setup_garmin_browser_auth.py` (Playwright/Chromium MFA) | OAuth1 refresh has ~30d lifetime — disable EventBridge rule before any planned silence > 2 weeks to prevent rate-limit accumulation. After re-auth, **clear the `auth_breaker` marker** (see RUNBOOK "Garmin: 429" section). The 2026-04-05→05-19 outage was caused by this exact gap pattern. |
-| Withings | `setup/fix_withings_oauth.py` | Similar pattern; same mitigation |
+| Garmin | **RETIRED (#4640, ADR-074 amendment 2026-10-11)** — no direct-API Lambda, the `life-platform/garmin` secret is in its deletion window, and Garmin data arrives through Strava. Nothing to re-auth. (`setup/setup_garmin_browser_auth.py` remains in the tree for revival only; the historical rule — disable the EventBridge rule before a silence > 2 weeks and clear the `auth_breaker` marker after re-auth, RUNBOOK "Garmin: 429" — is what the 2026-04-05→05-19 outage taught.) | Skip. |
+| Withings | `setup/fix_withings_oauth.py` | Rate-limit accumulation on cron retries during silence — disable the EventBridge rule before a planned silence |
 | Strava | OAuth via setup helper (manually re-auth via Strava developer console if needed) | Open app on phone first, force a sync |
-| Whoop | OAuth refresh tokens long-lived | Less risky during gaps |
+| Whoop | OAuth refresh tokens long-lived; if it does die, `setup/setup_whoop_auth.py` | Less risky during gaps |
 | Eight Sleep | `setup/setup_eightsleep_auth.py` | Password may have changed during gap |
 | Dropbox | `setup/setup_dropbox_auth.py` | If MacroFactor pipeline silent for >2 weeks |
 
-### 3. Backfill Apple Health (if HAE webhook went silent)
-- iPhone → Health app → profile → Export All Health Data → wait for ZIP
-- Drop ZIP into `datadrops/apple_health_drop/apple_health_export_<dropname>/` and unzip
-- Run `python3 backfill/backfill_apple_health_export_v16.py datadrops/apple_health_drop/apple_health_export_<dropname>/export.xml --since YYYY-MM-DD` where `--since` is the last known good Apple Health date
-- v16.1 source-priority dedup ensures no double-counting (TD-15/16, fixed in v6.8.3)
+### 3. Apple Health (if the HAE webhook went silent)
+- The Health Auto Export webhook (`health-auto-export-webhook`) is the **sole** `apple_health` writer. The export.xml import Lambda and its backfill script were retired 2026-07-04 (#474, ADR-103) — there is no manual XML path. See `docs/RUNBOOK.md` → Apple Health.
+- Fix the cause, not the data: open the Health Auto Export app on the iPhone, confirm the automation is on **hourly** sync (not "since last run" — infrequent syncs drop Dietary Water/Caffeine), and force a sync. The webhook merges what it receives at reading level, so a catch-up push fills the gap.
 
 ### 4. Lab data
-- If a Function Health draw is pending: download PDFs + CSV, save to `s3://matthew-life-platform/raw/matthew/labs/<draw_date>/`
-- Build the structured biomarker dict via the existing `backfill/draw_*.py` pattern
-- Run the ingest script; verify via `get_labs view=results`
+- If a draw is pending: save the PDF (and its markdown transcription) under `s3://matthew-life-platform/raw/matthew/labs/<draw_date>/` — the `raw_layout` facet of the labs entry in `lambdas/ingestion/source_registry.py` (hand-uploaded; no Lambda writes it)
+- The structured biomarker record (DDB `SOURCE#labs`, shape in `docs/SCHEMA.md`) is written by an owner-attended session — the old `backfill/draw_*.py` scripts no longer exist in the tree, so nothing here is one command
+- Verify via `get_labs view=results`
 
 ### 5. Verify
-- `get_daily_snapshot view=latest` — every source ≤ 24h or flagged broken with a workaround
-- `get_health view=dashboard` — readiness, training load, biomarkers fresh
+- `get_daily_snapshot view=latest` / `get_freshness_status` — every source ≤ 24h or flagged broken with a workaround
+- `get_readiness_score` and `get_training` — readiness and training load fresh; `get_labs view=results` — biomarkers
 
 ---
 
@@ -101,8 +99,8 @@ CloudWatch sweep:
 - EventBridge rule integrity: `aws events list-rules --region us-west-2`
 
 Common things that break during gaps:
-- Lambda timeouts that cold-start poorly (e.g., `list_protocols`, `get_field_notes` per the 2026-05-02 evening session)
-- Polling Lambdas where the upstream auth expired (Garmin, Withings)
+- Lambda timeouts that cold-start poorly (e.g., `get_field_notes` per the 2026-05-02 evening session; `list_protocols` has since been removed)
+- Polling Lambdas where the upstream auth expired (Withings, Strava, Dropbox)
 - "Computed" tables (e.g., chronicling) that depend on upstream Lambdas — verify they're still being written
 
 Manually re-run nightly warming jobs to refresh dashboards (invoke `life-platform-mcp-warmer` directly).
@@ -115,9 +113,9 @@ If WR-48 (Stale-Source Alerts) is live and a source still shows stale, the alarm
 
 This anchors the new "Cycle" as a measurement reference for future "where am I now vs. when I came back" comparisons.
 
-- Run `capture_baseline label='reentry_<YYYY_MM_DD>'` via MCP (uses `tool_capture_baseline` in `mcp/tools_memory.py`)
-- Write a one-paragraph platform_memory entry under category `re_entry` documenting: the gap dates, what caused it, what got broken, how you came back. This is for future-you and future Claude.
-- Add a Cycle marker to platform_memory:
+- Capture the baseline: `capture_baseline` was removed from the MCP surface (zero invocations, `docs/MCP_TOOL_AUDIT.md` batch 2), so record it by hand — `get_daily_snapshot view=summary date=<re-entry date>` plus `get_readiness_score`, and paste the key numbers into the platform_memory entry below
+- Write a one-paragraph platform_memory entry (`write_platform_memory`; categories via `list_memory_categories`) under category `re_entry` documenting: the gap dates, what caused it, what got broken, how you came back. This is for future-you and future Claude.
+- Add a Cycle marker to platform_memory (this is the *gap* marker, not an experiment restart — the experiment cycle counter is `get_experiment_cycle` / SSM `/life-platform/experiment-cycle`, and a gap re-entry never runs `restart_pipeline.py`; the owner ruled no further resets, #4037):
   - `CYCLE#<N>#<label>` where N is the new cycle number, label is the entry name
   - `start_date`, `end_date` (open-ended for current cycle), `summary`
 
@@ -140,18 +138,18 @@ If WR-50 (Re-Entry Day Template) is live, this auto-loads as a challenge in Habi
 ## Day 2 evening — Validation sweep
 
 - `get_daily_snapshot view=latest` — every source within 24-48h or explicitly labeled
-- `get_health view=dashboard` — readiness, training load, biomarkers all fresh
-- `get_habits view=dashboard` — today reflects reality (even if low — that's fine)
-- `get_journal_entries start_date=<re-entry date>` — re-entry entry present and enriched
+- `get_readiness_score` / `get_training` — readiness and training load fresh
+- `get_habit_completion` — today reflects reality (even if low — that's fine)
+- `get_date_range source=notion start_date=<re-entry date> end_date=<today>` — re-entry entry present and enriched
 - `get_labs view=results` — new draw visible if applicable
-- All ~76 MCP tools respond < 30s. Spot-check 10 representative tools.
+- The MCP tools respond < 30s (the live count is `python3 scripts/boot_brief.py`). Spot-check 10 representative tools.
 
 ---
 
 ## Day 3+ — Gradual ramp
 
 - Re-add habits beyond Tier-0 only as you actually do them. Don't aspire on day 3 — observe what's real, then ratchet up.
-- Run a 7-day re-entry challenge: `create_challenge name="7-Day Re-Entry: Essential Seven Only" duration_days=7`
+- Run a 7-day re-entry stretch by hand (the `create_challenge` MCP tool was removed, `docs/MCP_TOOL_AUDIT.md`): Essential Seven only, tracked with `get_habit_completion`
 - After 7 days, measure honest completion rate. If <60%, the floor is too high — reduce. If >80%, ratchet up next week.
 - Address the Todoist accumulation (likely 100+ overdue tasks): bulk-archive aggressively; most are pre-gap artifacts.
 
@@ -184,14 +182,13 @@ By Day 2 evening:
 
 ## See also
 
-- `docs/WR_47_48_ARCHITECTURE_SPEC.md` — Pause Mode + Stale-Source Alerts design
+- Pause Mode + Stale-Source Alerts design: the spec file `docs/WR_47_48_ARCHITECTURE_SPEC.md` no longer exists (recoverable from git history, last present at `0650e3c3c~1`); ADR-051 in `docs/DECISIONS.md` carries the WR-48 decision. WR-48 is live (daily-brief "Data Status" banner, `get_freshness_status`); WR-47 Pause Mode is **not** shipped as a UI — only the `/life-platform/pause-mode` SSM parameter that some writers (e.g. `hevy_restamp_lambda`) honour
 - `docs/audits/TD-19_DATE_PARTITION_AUDIT.md` — date-keying convention per Lambda (relevant for any backfill work)
 - `docs/audits/TD-11_HABITIFY_API_AUDIT.md` — Habitify state taxonomy (informs the Tier-0 habit reset)
-- `handovers/HANDOVER_v6.8.7.md` — what shipped 2026-05-03 (the re-entry session itself)
-- `Downloads/ajm_reentry_plan.md` — the original 2026-05-02 plan this runbook was synthesized from
+- The 2026-05-03 re-entry session's handover (v6.8.7) is no longer on `main` — the handover corpus moved to the `session-archive` branch (#1650)
 - `docs/INCIDENT_LOG.md` — Garmin OAuth outage entry (2026-04-05 → 2026-05-19) is the canonical example of "what breaks during gaps without active pause-mode discipline"
 - `docs/ACCOUNTS.md` / `docs/AWS_ACCESS.md` / `docs/NEW_MACHINE_BOOTSTRAP.md` + `scripts/check_reentry_hardening.py` — a *stolen or lost* laptop is a different, harder gap than the ones this runbook covers (data silence vs. losing the device itself); issue **#1029** (epic #1024) is the owner-gated hardening checklist for that scenario
 
 ---
 
-**Verified:** 2026-07-26 (#1029 — added the stolen-laptop cross-reference; the runbook's own day-by-day content is unchanged, still last substantively verified 2026-05-19)
+**Verified:** 2026-10-17 — script paths (`setup/*`), Lambda names (`notion-journal-ingestion`, `life-platform-mcp-warmer`), the labs S3 prefix, every MCP tool name and the doc cross-references checked against the tree. **Not exercised:** the owner-only physical steps (phone re-auth flows, Notion journal entry, Habitify sweep) and the CloudWatch/EventBridge commands (generic AWS CLI, unchanged).

@@ -1,6 +1,6 @@
 # Life Platform — Monitoring & Observability
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 **Last updated:** 2026-05-19 (v8.0.0)
 
@@ -56,19 +56,20 @@ read the stack for routing.
 > (`life-platform-monthly-75`, $215 ceiling, ADR-133), not a CloudWatch alarm.
 
 **OAuth auth-death coverage (#1960).** `ingest-auth-unhealthy-24h` is the fleet-wide
-aggregate (dimensionless `LifePlatform/OAuth IngestAuthHealthy`, Min<1 over 1h — re-cut
-from 24h by #2976, safe now that every authenticated-successful run emits a 1, so the
-stream is dense and a recovered fleet clears within ~1h instead of latching red for a
-day; the name's `-24h` suffix is historical). It
+aggregate (dimensionless `LifePlatform/OAuth IngestAuthHealthy`, Min<1 over a
+`period=54000s` (15 h) window — #2976 re-cut it from 24h to 1h once every
+authenticated-successful run emitted a 1, and #4641 widened it to 15 h because the sparse
+sub-daily crons leave a 14 h gap a shorter window would flap across; a recovered fleet
+therefore clears up to ~15 h after the last unhealthy datapoint; the name's `-24h` suffix
+is historical). It
 fires for ANY breaker source but by construction cannot name which one — so it is a
 "something died" page, not a diagnosis. `lambdas/common/auth_breaker.py` therefore emits
 the same 0/1 twice: dimensionless (feeding that aggregate, unchanged) and with
 `Source=<name>`, which the per-source `ingest-auth-unhealthy-{src}` alarms read. Every
 credentialed source now has per-source coverage — either an
 `ingest-consecutive-failures-{src}` alarm (whoop, withings, strava, eightsleep, hevy) or
-an `ingest-auth-unhealthy-{src}` one (todoist, habitify, dropbox urgent; garmin and notion
-to digest — garmin's 429 auth death is the accepted, unfixable state ADR-074 de-paged, and
-notion is `monitored: False`). The set is **derived, not hand-listed**: the `oauth` facet
+an `ingest-auth-unhealthy-{src}` one (todoist, habitify, dropbox urgent; whoop and notion
+to digest — notion is `monitored: False`; garmin's alarms went with the source's retirement, #4640). The set is **derived, not hand-listed**: the `oauth` facet
 in `lambdas/ingestion/source_registry.py` is the authority and
 `tests/test_oauth_alarm_coverage.py` fails CI if a credentialed source has no alarm or is
 routed to the wrong topic.
@@ -362,45 +363,40 @@ fields @timestamp, @log, @message
 ```
 fields @timestamp, @message
 | filter @log like /daily-brief/
-| filter @message like /Filed:/ or @message like /Sent:/
+| filter @message like /Sent:/
 | sort @timestamp desc
 | limit 10
 ```
 
 ### Slowest MCP tool calls last 24h
+`mcp/handler.py::_emit_tool_metric` prints one EMF JSON line per call (`ToolName`, `ToolDuration` ms, `ToolErrors`), which Logs Insights auto-parses:
 ```
-fields @timestamp, @message
-| filter @log like /mcp/
-| filter @message like /tool_*/ and @message like /duration_ms/
-| parse @message /duration_ms=(?<duration>\d+)/
-| sort duration desc
+fields @timestamp, ToolName, ToolDuration
+| filter ispresent(ToolDuration)
+| sort ToolDuration desc
 | limit 20
 ```
 
 ### Token telemetry — daily AI cost estimation
+Spend is metered centrally in `bedrock_client.invoke()` (G1), not by per-Lambda log lines — there is no `Token usage` log line to query. Read the metrics instead (namespace `LifePlatform/AI`: `AnthropicInputTokens`, `AnthropicOutputTokens`, `AnthropicCacheReadTokens`, `AnthropicCacheWriteTokens`, `EstimatedCostUSD`, each per `LambdaFunction` plus a dimensionless twin):
+```bash
+aws cloudwatch get-metric-statistics --namespace LifePlatform/AI --metric-name EstimatedCostUSD \
+  --start-time $(date -u -v-1d +%Y-%m-%dT%H:%M:%S) --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+  --period 3600 --statistics Sum --region us-west-2
 ```
-fields @timestamp, @log
-| filter @message like /Token usage/
-| parse @message /input: (?<in>\d+), output: (?<out>\d+)/
-| stats sum(in) as total_in, sum(out) as total_out by bin(1h)
-```
-
-Apply: total_in × $0.25/M (Haiku input) or $3/M (Sonnet input) + total_out × $1.25/M or $15/M.
+Prices live in `lambdas/ai/bedrock_client.py` (per-model rows), not here.
 
 ---
 
 ## Dashboards (CloudWatch)
 
-Suggested dashboards (manual creation recommended):
+CDK-managed dashboards (`cdk/stacks/monitoring_dashboards.py`; names live-verified 2026-10-17):
 
-1. **Platform Health** — alarm states, error counts, recent invocations
-2. **Daily Pipeline** — character_sheet → adaptive_mode → daily_metrics → daily_insight → daily_brief timing
-3. **AI Spend** — per-Lambda token usage, cache hit rate, Anthropic 429 count
-4. **Public Site** — CloudFront hit rate, 4xx/5xx, top paths, response time
-5. **Subscriber Engagement** — SES Send/Delivery/Open/Click/Bounce
-6. **Ingestion Sources** — per-source: invocations, last-success, gap count, DLQ contribution
+- `life-platform-ops` — the headline ops view: ingestion health (a `SEARCH` over every ingestion Lambda's errors), the compute pipeline, alarm states
+- `life-platform-site-api-dashboard` — site-api traffic and errors
+- `life-platform-site-api-latency` — exists live but is **not defined anywhere in `cdk/`** (console-created; a retire-or-adopt owner call)
 
-None of these are committed to source (CDK custom dashboards). Build them in the CloudWatch console; pin to your bookmarks.
+Anything else (AI spend, subscriber engagement, CloudFront) is read from the metrics directly: `LifePlatform/AI`, `AWS/SES`, `AWS/CloudFront`.
 
 ---
 
@@ -418,7 +414,7 @@ If you're paged (or notice red alarms during a routine check):
    ```
 4. **Mitigate** — common patterns:
    - Lambda erroring on every invoke → rollback (`bash deploy/rollback_lambda.sh <fn>`)
-   - OAuth failure → check secret, re-auth source (e.g., `python3 setup/setup_garmin_browser_auth.py`)
+   - OAuth failure → check secret, re-auth source (e.g., `python3 setup/setup_whoop_auth.py`; procedures: `docs/SECRETS_ROTATION.md`)
    - Rate limit → wait or raise the rate limiter cap
    - Cost spike → identify spending Lambda; consider throttling
 5. **Document** — add entry to `docs/INCIDENT_LOG.md` if user-impacting
@@ -427,13 +423,13 @@ If you're paged (or notice red alarms during a routine check):
 
 ## Metrics gaps + open items
 
-See `docs/BACKLOG.md` for the full backlog. Monitoring-relevant gaps:
+The backlog is GitHub Issues (ADR-099; `docs/BACKLOG.md` is a frozen archive). Monitoring-relevant gaps:
 
-- **No synthetic monitoring** for public site beyond CloudWatch canary on MCP + Anthropic
+- **Synthetic monitoring** for the public site is the qa-smoke Lambda (`qa-smoke-failures` / `qa-smoke-warnings` / `qa-smoke-heartbeat` alarms) plus the CloudWatch canary on MCP, DDB, S3 and Anthropic (`life-platform-canary-*-failure`)
 - Positive daily-brief absence detection exists: `daily-brief-no-invocations-24h` (<1 invocation in 24h). (`life-platform-daily-brief-invocations` was REMOVED 2026-03-10 — don't cite it.) The old "infer from absence of errors" gap is closed
-- **Token telemetry rolling out** — 9 of 22 AI-calling Lambdas now emit (V2 follow-up); remaining 13 still dark
+- **Token telemetry is central** — every Claude call goes through `bedrock_client.invoke()`, which emits tokens + `EstimatedCostUSD` (the old per-Lambda rollout gap is closed)
 - **Cost anomaly detector** is on (Default-Services-Subscription, daily email)
-- **Dashboard-as-code** not used — CDK could define dashboards; currently console-managed
+- **Dashboard-as-code** is in use for `life-platform-ops` and the site-api dashboards (`cdk/stacks/monitoring_dashboards.py`)
 
 ---
 
@@ -468,4 +464,4 @@ line buys.
 
 ---
 
-**Verified:** 2026-05-19
+**Verified:** 2026-10-17
