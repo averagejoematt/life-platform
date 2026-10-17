@@ -186,7 +186,11 @@ def extract_lambdas() -> dict[str, dict]:
                     record[field] = v.value
             sched = kwargs.get("schedule")
             if sched is not None:
-                record["schedules"].append(_schedule_of(sched, consts))
+                entry = _schedule_of(sched, consts)
+                tz = kwargs.get("schedule_timezone")  # #4284: a zoned (EventBridge Scheduler) schedule
+                if isinstance(tz, ast.Constant) and isinstance(tz.value, str) and entry:
+                    entry["tz"] = tz.value
+                record["schedules"].append(entry)
             an = kwargs.get("alarm_name")
             if isinstance(an, ast.Constant) and isinstance(an.value, str):
                 record["declared_alarm"] = an.value
@@ -921,7 +925,7 @@ def render_doc(model: dict) -> str:
     add("")
     add("## 1. Scheduled Lambdas (CDK ground truth)")
     add("")
-    add("Crons are the CDK `schedule=` strings (fixed UTC, no DST drift); `resolved` = an")
+    add("Crons are the CDK `schedule=` strings (fixed UTC, no DST drift — except a schedule marked with its zone, #4284); `resolved` = an")
     add("f-string schedule resolved through module constants; `constructed` = built from a")
     add("`Schedule.cron(...)` keyword form. Multi-schedule lambdas show every schedule.")
     add("")
@@ -934,7 +938,7 @@ def render_doc(model: dict) -> str:
         # crons in ONE cell — check_doc_facts's one-row-one-cron scan skips
         # multi-cron lines by design, and its per-block cmap mis-attributes
         # multi-schedule functions (see the #1205 parser's own comments).
-        exprs = " + ".join(f"`{s['expr']}`" for s in rec["schedules"])
+        exprs = " + ".join(f"`{s['expr']}`" + (f" ({s['tz']}, not UTC)" if s.get("tz") else "") for s in rec["schedules"])
         resolutions = ", ".join(s["resolution"] for s in rec["schedules"])
         add(f"| `{name}` | {rec['stack']} | {exprs} | {resolutions} |")
     add("")

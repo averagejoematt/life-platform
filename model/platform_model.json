@@ -6598,8 +6598,9 @@
       "module": "lambdas/emails/daily_brief_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 17 * * ? *)",
-          "resolution": "constant"
+          "expr": "cron(0 10 * * ? *)",
+          "resolution": "constant",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -8596,6 +8597,13 @@
     },
     {
       "expr": "cron(0 10 * * ? *)",
+      "lambda": "daily-brief",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "10:00"
+    },
+    {
+      "expr": "cron(0 10 * * ? *)",
       "lambda": "journal-analyzer",
       "resolution": "constant",
       "stack": "compute_stack",
@@ -8858,13 +8866,6 @@
       "lambda": "coach-vision",
       "resolution": "constant",
       "stack": "compute_stack",
-      "utc": "17:00"
-    },
-    {
-      "expr": "cron(0 17 * * ? *)",
-      "lambda": "daily-brief",
-      "resolution": "constant",
-      "stack": "email_stack",
       "utc": "17:00"
     },
     {

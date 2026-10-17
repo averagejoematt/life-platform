@@ -249,7 +249,7 @@ Reviews are run from `docs/REVIEW_METHODOLOGY.md`. The platform is at audit V2 (
 1. **Single-user platform.** All DynamoDB keys are `USER#matthew#...`. IAM roles, secrets, schedules — everything assumes one user. Do not generalize without reading ADR-001 + ADR-057 (the "Phase 6 multi-user" decision was formally deferred).
 2. **Site-api is primarily read-only (ADR-037).** Limited writes for interactive features only (votes, follows, checkins, suggestions, user-submitted findings).
 3. **`public_stats.json` is the website heartbeat.** Home, story, mission, observatory pages all read from this one S3 file, refreshed by daily-brief at 17:00 UTC (10 AM PDT) and `site-stats-refresh` (schedule: the model). A daily-brief failure = stale website data.
-4. **All EventBridge crons are fixed UTC.** Schedules don't drift with DST. PT times in docs are for humans only.
+4. **All EventBridge crons are fixed UTC** (one exception: `daily-brief`, #4284, a zoned Scheduler schedule). Schedules don't drift with DST. PT times in docs are for humans only.
 5. **Pipeline ordering is strict.** Ingestion → Anomaly → Compute → Brief → OG. Changing schedules without preserving order produces stale results.
 6. **Budget is a $215/month enforced ceiling** (ADR-063 + the ADR-133 amendment; floats to $252 in reader-traffic surge mode). Measured run-rate: `docs/COST_TRACKER.md`; the cost-governor projects month-end spend every 8h and degrades AI features by budget tier (`lambdas/ai/budget_guard.py`). See `docs/COST_TRACKER.md`.
 7. **Coaches are stateful entities with persistent memory and cross-coach awareness over 12 months.** All math happens in the deterministic computation engine — the LLM never does math.
