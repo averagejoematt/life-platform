@@ -47,6 +47,7 @@ from common.http_retry import urlopen_with_retry
 from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive input == UTC, never runner-local)
 
 from ingestion.ingestion_framework import IngestionConfig, run_ingestion
+from ingestion.whoop_empty_day import store_vendor_result
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 USER_ID = os.environ.get("USER_ID", "matthew")
@@ -1039,9 +1040,11 @@ def _emit_reconciliation_metric(missing_count: int) -> None:
 # answers it at no extra Whoop request. REPORTED ONLY, as two metrics with Source=whoop:
 #   StoreOnlyActivityCount — stored workout ids absent from the vendor's trailing list
 #   ChangedActivityCount   — stored ids whose sport or start/end (duration) differ
-# This path stays read-only on the store (test_reconcile_is_read_only): removing or
-# rewriting a whoop workout row on the strength of a list diff is a separate decision,
-# left on #4638. The 2-day trailing re-fetch still overwrites edits inside its window.
+# Owner ruling 2026-10-17 on #4638: "write it". A day whose every stored workout row is gone
+# from the vendor's list is written as the explicit empty day (each row replaced in place by a
+# tombstone, see whoop_empty_day.empty_day_records) — behind the same two guards the Strava path uses. Nothing
+# else is written: changed rows are reported only, and the day's recovery/sleep row is untouched.
+# The 2-day trailing re-fetch still overwrites edits inside its window.
 
 # Seconds of start/end disagreement below which a stored workout is not "changed".
 _STORE_VENDOR_TIME_TOLERANCE_SECONDS = 1
@@ -1054,11 +1057,11 @@ def _fetch_stored_workouts(table, start_date: str, end_date: str) -> list:
     out: list = []
     kwargs = {
         "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}￿"),
-        "ProjectionExpression": "sk, workout_id, sport_id, start_time, end_time",
+        "ProjectionExpression": "sk, workout_id, sport_id, start_time, end_time, tombstone",
     }
     while True:
         resp = table.query(**kwargs)
-        out.extend(item for item in resp.get("Items", []) if "#WORKOUT#" in str(item.get("sk", "")))
+        out.extend(item for item in resp.get("Items", []) if "#WORKOUT#" in str(item.get("sk", "")) and not item.get("tombstone"))
         lek = resp.get("LastEvaluatedKey")
         if not lek:
             break
@@ -1138,11 +1141,11 @@ def _store_vendor_report(vendor_workouts: list, start, today) -> dict:
             len(changed),
             changed,
         )
-    return {"absent_count": len(absent), "absent": absent, "changed_count": len(changed), "changed": changed}
+    return store_vendor_result(absent, changed, _table, vendor_workouts, stored, start, today, USER_ID, logger)  # never raises
 
 
 def _reconcile(event: dict, context) -> dict:
-    """Diff the trailing-window Whoop API record set against the store (read-only).
+    """Diff the trailing-window Whoop API record set against the store (writes only the #4638 empty day).
 
     #2196 (acceptance box 5): this path used to bypass the ADR-052 auth breaker
     entirely — while the credential was dead from 08-03 to 08-07 the reconcile
