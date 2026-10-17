@@ -246,15 +246,17 @@ def test_whoop_steps_backfill_plan_counts_only_rows_that_lack_the_field_4630():
     assert calls[0]["ExpressionAttributeNames"] == {"#f": "step_count"}
 
 
-def test_whoop_workout_maps_known_and_unknown_sport():
+def test_whoop_workout_without_a_vendor_label_stores_no_name():
+    # #4629 box 2: the hand-written id table is gone; with no payload ``sport_name`` there is no label
+    # to store, and none is guessed (no "Cycling" from an id, no ``Sport_<id>`` fallback).
     known = _extract_workout({"sport_id": 1, "start": "s", "end": "e", "score_state": "SCORED", "score": {"strain": 8.5}})
     assert known["sport_id"] == 1
-    assert known["sport_name"] == "Cycling"  # WHOOP_SPORT_NAMES[1]
+    assert "sport_name" not in known and "vendor_sport_name" not in known
     assert known["start_time"] == "s" and known["end_time"] == "e"
     assert _f(known["strain"]) == 8.5
 
     unknown = _extract_workout({"sport_id": 999, "score_state": "PENDING_SCORE"})
-    assert unknown["sport_name"] == "Sport_999"  # fallback label
+    assert unknown["sport_id"] == 999 and "sport_name" not in unknown
     assert "strain" not in unknown  # unscored → no score fields
 
 
@@ -286,10 +288,10 @@ def test_whoop_workout_null_score_writes_no_zone_fields():
     assert not any(z in _extract_workout({"score_state": "SCORED", "score": {"strain": 3.0}}) for z in _ZONES)
 
 
-def test_whoop_workout_keeps_the_vendor_sport_name_beside_the_table_label():
+def test_whoop_workout_sport_name_is_the_payloads_own():
     out = _extract_workout(_whoop_workout_wire()[0])
     assert out["vendor_sport_name"] == "cycling"  # capture-all: the payload's own label
-    assert out["sport_name"] == "Cycling" and out["sport_id"] == 1  # readers' label unchanged (#4644 Q10/Q11)
+    assert out["sport_name"] == "cycling" and out["sport_id"] == 1  # #4629 box 2 / #4644 Q10: no table label
     assert "vendor_sport_name" not in _extract_workout({"sport_id": 1, "score_state": "PENDING_SCORE"})
 
 
