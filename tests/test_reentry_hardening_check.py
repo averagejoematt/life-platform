@@ -277,13 +277,11 @@ def test_main_json_output_is_valid_json():
 
 
 # --- #4888 box 2: no docs/ACCOUNTS.md row may read UNDOCUMENTED beyond the carried set ---------
-# The two estate rows below are the owner's to fill (issue #4888 boxes 1 and 3; #4888 stays OPEN).
-# The issue was filed citing seven rows at lines 84-90; the live table has two, so the pin is the
-# measured two. Down-only: an eighth/third row reds, and so does a filled row left in the pin.
-ACCOUNTS_UNDOCUMENTED_COUNTS = {
-    "Which password manager + where its emergency/estate access lives": 1,
-    "MFA device + 2FA recovery-code locations (AWS root, GitHub, SSO)": 1,
-}
+# The carried set is EMPTY since 2026-10-17: the owner filled both estate rows (#4888 — 1Password,
+# the printed Emergency Kit at home and with his brother; the 2FA recovery codes in the vault).
+# The issue was filed citing seven rows at lines 84-90; the live table had two; the pin went 2 -> 0.
+# Down-only: any ACCOUNTS.md table row that reads UNDOCUMENTED again reds this gate.
+ACCOUNTS_UNDOCUMENTED_COUNTS: dict[str, int] = {}
 
 
 def _undocumented_rows(text):
@@ -320,10 +318,10 @@ def test_accounts_undocumented_gate_mutation_control():
     m = _load()
     live = m.ACCOUNTS_PATH.read_text(encoding="utf-8")
     assert _accounts_undocumented_verdict(live) == ""
-    # (a) a carried row filled but the pin not lowered -> red
-    filled = live.replace("⚠️ **UNDOCUMENTED — owner action required.** Record where", "Pointer recorded: where")
-    assert filled != live
-    assert "now filled" in _accounts_undocumented_verdict(filled)
+    # (a) the word restored on a filled estate row (the pin is empty since 2026-10-17) -> red
+    restored = live.replace("| **1Password.** Estate access:", "| ⚠️ **UNDOCUMENTED — owner action required.** Estate access:")
+    assert restored != live
+    assert "Which password manager" in _accounts_undocumented_verdict(restored)
     # (b) a third row reading UNDOCUMENTED -> red
     extra = live + "\n| Domain registrar login | UNDOCUMENTED |\n"
     assert "Domain registrar login" in _accounts_undocumented_verdict(extra)
