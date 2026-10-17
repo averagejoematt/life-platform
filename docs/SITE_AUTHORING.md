@@ -1,6 +1,6 @@
 # Site Authoring — add or change a page on averagejoematt.com
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 > **Sources of truth:** `site/` tree, `scripts/v4_build_*.py`, `site/sw.js`, `.github/workflows/site-deploy.yml`
 
 The end-to-end guide for changing the public site: where a page belongs, what a page is
@@ -21,18 +21,21 @@ Top nav = **Home + 5 doors** (DESIGN_SYSTEM_V5.md §2):
 | Door | Route | What goes there |
 |---|---|---|
 | Home | `/` | The front door — teaches the loop, routes in |
-| The Cockpit | `/now/` | Today's live slice (the daily instrument; noindex) |
+| The Cockpit | `/cockpit/` | Today's live slice (the daily instrument; noindex) — `/now/` 301s here (`redirects.map`) |
 | The Data | `/data/` | Every source, now & over time (was `/evidence/`) |
 | The Coaching | `/coaching/` | The AI team — profiles, stances, board |
 | The Protocols | `/protocols/` | Supplements · experiments · challenges · discoveries |
 | The Story | `/story/` | Chronicle · journal · timeline · about |
 
+The nav labels are the reader's words — `today · the numbers · the coaches · what he tries ·
+the story` — set in `scripts/v4_chrome.py::DOORS` (#4182); the URLs above did not move.
+
 **Footer-tier** (no top-nav door): `/method/` — the under-the-hood pages (methodology,
-cost, pipeline, calibration, …), reachable from About + the global footer. `/legacy/` is
+cost, pipeline, calibration, …), reachable from the global footer's "How it's built" column. `/legacy/` is
 the frozen pre-v4 site — never edit it, never link it from the UI.
 
 > You may still see "three doors" in older docs — that's the original v4 cut
-> (`/now/ /story/ /evidence/`); the v5 split above is current.
+> (`/cockpit/ /story/ /evidence/`); the v5 split above is current.
 
 **Before adding a page, read [SITE_MAP_AND_INTENT.md](SITE_MAP_AND_INTENT.md)** — the
 intent registry for every existing page (what it must deliver, its endpoints, its
@@ -41,12 +44,17 @@ that's a design conversation, not a new top-level directory.
 
 Routing is directory-style: a page is `site/<path>/index.html`, served at `/<path>/`.
 
+`site/next/**` is the preview path for the page rebuilds (`/next/`, `/next/v8/…`; see
+[SITE_TRANSFORMATION_V7.md](SITE_TRANSFORMATION_V7.md) and [design/v8/README.md](design/v8/README.md)).
+Those pages carry no doors nav or footer (`v4_apply_chrome.py` leaves them chrome-free) and are not part
+of the reachable set. A page built from the kit loads `clean.css` instead of the stylesheet pair below.
+
 ## 2. Anatomy of a page
 
 The stack (all self-hosted, zero external requests):
 
 - **`site/assets/css/tokens.css`** — the design-token system (colors, type triad,
-  spacing, the shared kit incl. `.prose` — DESIGN_SYSTEM_V5.md §3). Every page loads
+  spacing, the shared kit incl. `.prose` — DESIGN_SYSTEM_V5.md §3). Every v5 page loads
   `fonts.css` + `tokens.css` + one page/door stylesheet.
 - **Self-hosted fonts** — `site/assets/fonts/`, preloaded `woff2` (CSP is
   `font-src 'self'`). Note fonts have a *separate* deploy step (§7).
@@ -59,50 +67,50 @@ The stack (all self-hosted, zero external requests):
 - **`.prose`** — the wrapper class for all injected/long-form HTML (DESIGN_SYSTEM_V5.md §3).
 
 A real minimal skeleton — lifted from **`site/privacy/index.html`** (the simplest
-hand-authored page; head trimmed, body classes verbatim):
+hand-authored page; head trimmed, chrome elided to the comments that name its source):
 
 ```html
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-door="story">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Privacy Policy — averagejoematt</title>
+  <meta name="description" content="…">
+  <link rel="canonical" href="https://averagejoematt.com/privacy/">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
-  <link rel="icon" href="/favicon.ico">
+  <!-- icon / manifest / apple-touch-icon: the head-chrome block, normalized by v4_apply_chrome.py -->
   <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/story.css">
-  <link rel="canonical" href="https://averagejoematt.com/privacy/">
+  <script src="/assets/js/boot_theme.js"></script>
 </head>
 <body>
-<header class="story-top">
-  <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">privacy</span></a>
-  <nav class="doors" aria-label="Doors">
-      <a href="/now/" title="…">the cockpit</a>
-      <a href="/data/" title="…">the data</a>
-      <a href="/coaching/" title="…">the coaching</a>
-      <a href="/protocols/" title="…">the protocols</a>
-      <a href="/story/" title="…">the story</a>
-    <a href="/subscribe/" class="nav-follow" aria-label="Follow the experiment">follow</a><button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button>
-  </nav>
-</header>
-<main>
-  <!-- page content -->
-</main>
-<footer class="dx-foot-bar"><span class="label">averagejoematt · privacy</span> <span class="label"><a href="/">← home</a></span></footer>
-<script><!-- the inline no-flash theme + toggle snippet — copy it verbatim from site/privacy/index.html --></script>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="story-top">
+    <a class="brand" href="/">…</a>
+    <nav class="doors" aria-label="Doors"><!-- generated: v4_chrome.doors_nav() --></nav>
+  </header>
+  <main id="main" class="policy-layout">
+    <!-- page content -->
+  </main>
+  <aside class="loop-forward"><!-- generated: v4_chrome.loop_forward() --></aside>
+  <footer class="site-foot"><!-- generated: v4_chrome.site_footer() --></footer>
+  <script src="/assets/js/boot_theme_toggle.js"></script>
 </body>
+</html>
 ```
 
-(One caveat on that example: privacy's `<head>` also carries an "old-design token shim"
-`<style>` block mapping pre-v4 token names — don't copy that into a new page; write new
-pages against the current `tokens.css` names directly.)
+(The theme script and toggle are the external `boot_theme.js` / `boot_theme_toggle.js` — no inline
+snippet to copy. The doors nav, loop-forward close, footer and head-chrome block are not hand-authored:
+`v4_apply_chrome.py` re-flattens them on every deploy (§3) for any page that carries a
+`<nav class="doors">`, inserting the loop-forward close and footer if absent and the head-chrome block
+if the page has a head-chrome tag to anchor on. Write new pages against the current `tokens.css` names.)
 
-For a richer page, crib from **`site/now/index.html`** (the hand-authored flagship): font
-preloads, the no-flash theme script, the `.loop-ribbon` spine (whose one source of truth
-for *generated* pages is `scripts/v4_kit.py`), skip-link, PWA meta, and an ES-module
+For a richer page, crib from **`site/cockpit/index.html`** (the hand-authored flagship): font
+preloads, `boot_theme.js` / `boot_motion.js` / `boot_sw.js`, the `.loop-ribbon` spine (whose one
+source of truth for *generated* pages is `scripts/v4_kit.py`), skip-link, PWA meta, and an ES-module
 entry (`<script type="module" src="/assets/js/cockpit.js">`).
 
 ## 3. Generated vs hand-authored
@@ -114,40 +122,52 @@ Generated files carry "GENERATED — never hand-edit" comments; the generators a
 
 | Generator (`scripts/`) | Output | Source data | Runs in every site sync? |
 |---|---|---|---|
-| `v4_build_evidence.py` | `/data/`, `/protocols/`, `/method/` app shells + per-slug shells (engine: `assets/js/evidence.js`, registry embedded as `window.__EVIDENCE_REGISTRY__`) | the PILLARS/REGISTRY in the script | No — run manually, commit output |
+| `v4_build_evidence.py` | `/data/`, `/protocols/`, `/method/` app shells + per-slug shells (engine: `assets/js/evidence.js`, registry embedded as `window.__EVIDENCE_REGISTRY__`); the Data + Protocols hubs' baked `<noscript>` core (#3515) | the PILLARS/REGISTRY in the script; live API with a committed snapshot fallback | Yes |
 | `v4_build_methods.py` | `/method/registry/index.html` | `lambdas/experiment/methods_registry.py` (ADR-105) | Yes |
 | `v4_build_coaching.py` | `/coaching/` + per-section shells (with the board's read baked into `<noscript>`) | section list in `assets/js/coaching.js`; live coaching read | Yes |
 | `v4_build_dispatches.py` | `/story/` + per-section shells | section list in `assets/js/dispatches.js`; live chronicle state | Yes |
-| `v4_build_gear.py` | `/gear/index.html` | `lambdas/ingestion/source_registry.py::catalog_entries()` + the script's GEAR dict (coverage assert) | No — run manually, commit output |
-| `v4_build_cockpit_proof.py` | the `<noscript>` proof block *inside* `site/now/index.html` (sentinel comments, idempotent injection — the page itself is hand-authored) | `/api/character` via `scripts/v4_proof.py` | Yes |
+| `v4_build_cockpit_proof.py` | the `<noscript>` proof block *inside* `site/cockpit/index.html` (sentinel comments, idempotent injection — the page itself is hand-authored) | `/api/character` via `scripts/v4_proof.py` | Yes |
+| `v4_build_home_proof.py` | the baked `<noscript>` core + data-driven OG tags inside `site/index.html` (#1395; home is otherwise hand-authored) | `load_journey()` — live API, committed snapshot fallback | Yes |
+| `v4_build_journal.py` | the `/journal/essays/*` permalink pages (run with `--write`; dry-run by default) | `site/journal/blog.json` + each essay's body fragment | Yes |
 | `v4_build_data_sources.py` | `site/data/data_sources.json` | `lambdas/ingestion/source_registry.py` (#498) | Yes |
+| `v4_build_stack_manifest.py` | `site/data/stack.json` (the public instrument manifest, #1401) | `source_registry.py` + the public catalogues (runs after `data_sources`) | Yes |
+| `v4_build_theme_river.py` | `/story/theme-river/` + `site/data/theme_river.json` | the live journal-enrichment partition | Yes |
 | `v4_build_rss.py` | `site/rss.xml` | live published chronicle `posts.json` | Yes |
 | `v4_build_sitemap.py` | `site/sitemap.xml` + a `<noscript>` post-link list injected into `/story/chronicle/index.html` | the real `site/` tree + live `posts.json` | Yes |
 | `v4_build_portraits.py` | `site/assets/js/portrait_data.js` (only *signed* recipes bundle — ADR-106) | `config/portraits/*.json` | Yes — and a validation failure **blocks the sync** |
 | `render_portraits.py` | `site/assets/portraits/*.png` | same recipes | Yes |
+| `build_platform_state.py` | `site/data/platform_state.json` (the build-state read) | the repo + `gh` + the public receipts API | Yes (bare — a non-zero exit stops the sync) |
+| `v4_apply_chrome.py` | the doors nav, loop-forward close, footer, head-chrome block and glossary pass on every chrome-bearing page (§3, "Shared chrome") | `scripts/v4_chrome.py`, `v4_glossary.py` | Yes — runs **last** |
+| `v4_build_gear.py` | `/gear/index.html` | `lambdas/ingestion/source_registry.py::catalog_entries()` + the script's GEAR dict (coverage assert) | No — run manually, commit output |
+| `v4_build_agent_review.py`, `v4_build_eyeball.py`, `v4_build_game_explained.py`, `v4_build_grade_your_coach.py`, `v4_build_horizons.py`, `v4_build_mirror.py`, `v4_build_tone.py`, `v4_build_permanence_terms.py` | the single pages each names in its docstring (`/story/build/agent-review/`, `/method/eyeball/`, `/method/game/`, `/method/grade-your-coach/`, the Horizons feed at `/data/horizons/`, `/method/mirror/`, `/method/tone/`, the Permanence Contract clause list inside `/privacy/`) | each script's docstring | No — run manually, commit output |
 | `v4_migration_inventory.py` | `redirects.map` (§6) | the preserved `site/legacy/` tree | No |
 
-("Yes" = wired into `deploy/sync_site_to_s3.sh` lines 56–89, so every deploy re-runs it;
-your hand edit to those outputs dies at the next deploy. "No" = run it from repo root
+("Yes" = a `run_site_generator` step (or bare call) in `deploy/sync_site_to_s3.sh`, so every
+deploy re-runs it — read that file for the current set and order; your hand edit to those outputs
+dies at the next deploy. "No" = run it from repo root
 after editing, commit the regenerated output in the same PR.)
 
-**Hand-authored pages** (edit the HTML directly): `/` (`site/index.html`), `/now/`
-(except the sentinel-marked proof block), `/privacy/`, `/subscribe/` (+ `subscribe.html`,
-`/subscribe/confirm/`), `/journal/essays/*`, `404.html`, the redirect stub `/mind/`, and
-all of `assets/css/` + `assets/js/` **except** the generated `assets/js/portrait_data.js`.
+**Hand-authored pages** (edit the HTML directly): `/` (`site/index.html`, except its sentinel-marked
+proof block), `/cockpit/` (same), `/privacy/` (except the generated Permanence clause list),
+`/subscribe/` (+ `subscribe.html`, `/subscribe/confirm/`), `404.html`, the redirect stub `/mind/`,
+`site/kit/`, `site/next/**` (the preview path), and all of `assets/css/` + `assets/js/` **except** the
+generated `assets/js/portrait_data.js`. The `/journal/essays/*` pages are generator output
+(`v4_build_journal.py`); an essay's body fragment and `site/journal/blog.json` are what you edit.
 `/legacy/` is frozen verbatim — served with unhashed assets, never touched.
 
 ### Shared chrome — the doors nav + footer are ONE source (#1009)
 
-The `<nav class="doors">` and `<footer class="site-foot">` appear on ~75 pages. They are
+The `<nav class="doors">` and `<footer class="site-foot">` appear on every content page
+(~90 — `tests/test_site_chrome.py` derives the set from the tree, never a list). They are
 **not** authored per-page (that copy-paste is what drifted — icon-less navs, a stray
 `/gear/` footer link, per-section base labels). The single source of truth is
 `scripts/v4_chrome.py` (`doors_nav(current_door, with_follow)` + `site_footer()`), and
-`scripts/v4_apply_chrome.py` re-flattens every page's chrome to it.
+`scripts/v4_apply_chrome.py` re-flattens every page's chrome to it (also the loop-forward close,
+the head-chrome block and the glossary pass).
 
 **To change a door label, tooltip, footer link, or icon: edit `scripts/v4_chrome.py`,
 then run `python3 scripts/v4_apply_chrome.py` and commit the regenerated HTML.** That is
-the whole edit — do not touch the ~75 pages by hand, and do not edit the inline chrome in
+the whole edit — do not touch the pages by hand, and do not edit the inline chrome in
 `v4_build_coaching.py` / `v4_build_dispatches.py` (they emit their own copy, which the
 apply pass normalizes away). `v4_apply_chrome.py` **runs last in
 `deploy/sync_site_to_s3.sh`** (after every `v4_build_*`), so chrome can't re-drift on a
@@ -191,15 +211,16 @@ is content-hashed and immutable, so no version skew is possible. (`legacy/` is s
 
 **The service worker (`site/sw.js`)** — actual strategy, from the file:
 - `/api/*`, page navigations, and **all `*.json`** → network-first (falls back to cache,
-  then the cached `/now/` shell when fully offline). JSON feeds are data, not immutable
+  then the cached cockpit shell when fully offline). JSON feeds are data, not immutable
   assets — cache-first here once hid a new chronicle post ("chronicle shows 2 not 3",
   2026-06-21, per the comment in `sw.js`).
 - Hashed/static assets → cache-first (immutable filenames make that safe).
 - Audio (`*.wav|mp3|m4a`) and cross-origin → never touched.
 - **Registration scope — the cockpit-PWA island (deliberate, #1020):** only the pages
-  in Matthew's daily-return loop register the worker — **home (`/`), `/now/`, and the
+  in Matthew's daily-return loop register the worker — **home (`/`), `/cockpit/`, and the
   `/coaching/` shells** (`v4_build_coaching.py` emits the registration line; home and
-  `/now/` carry it hand-authored). Everything else — `/story/`, `/data/`,
+  `/cockpit/` carry it hand-authored). Registration is the one-line `boot_sw.js`
+  (`<script src="/assets/js/boot_sw.js">`), not an inline block (#3048). Everything else — `/story/`, `/data/`,
   `/protocols/`, `/method/`, … — deliberately does **not** register: those are
   read-and-leave pages with no offline case, and every registering page widens the
   stale-cache blast radius. Note the worker's *scope* is still `/` once installed
@@ -247,34 +268,47 @@ The chain, when you move/rename a page:
    **`deploy/generated/v4_redirects_function.js`** from `redirects.map`.
 3. Apply: update + publish the `v4-redirects` CloudFront function with that artifact
    (SITE_UPLEVEL_PLAYBOOK.md "Deploy surface" #3 — this is a live-infra step; it is
-   **not** part of the site sync, and deploys are Matthew's call).
+   **not** part of the site sync, and applying it is Matthew's call).
 
 ## 7. Ship it
 
 **The normal path is automatic (#750):** merge to `main` touching `site/**` →
 `.github/workflows/site-deploy.yml` runs, with no approval gate:
 
-1. **Superseded-run check** — skips cleanly if a newer `site/` merge already queued.
+1. **Superseded-run check** — skips cleanly if a newer commit touching a trigger path
+   already queued (a docs-only merge no longer supersedes a run, #1907).
 2. **Deploy** — `deploy/deploy_site.sh` → `deploy/sync_site_to_s3.sh`: clobber guard
    (refuses to sync a checkout missing origin/main `site/` commits), regenerates the
-   §3 "Yes" artifacts, **PII surface guard (fail-closed)**, **JS parse gate** (every
+   §3 "Yes" artifacts, **PII surface guard (fail-closed)**, **proof-page freshness guard
+   (fail-closed, `scripts/check_proof_freshness.py`, #3515 — a baked "as of" stamp that has
+   gone stale blocks the publish)**, **JS parse gate** (every
    site module through `node --check --input-type=module` — a typo in `evidence.js`
    blocks the publish instead of breaking 40+ pages), full-graph hashing (§4), build
    stamp, per-type cache headers, CloudFront invalidation.
 3. **Fonts** — explicit `aws s3 sync site/assets/fonts/` (the main sync deliberately
    excludes non-CSS/JS under `assets/`; the workflow automates the once-manual step).
 4. **Gates** — `deploy/smoke_test_site.sh` (HTTP/content) ∥ visual + AI-vision QA
-   (`qa/visual_qa.py --screenshot --ai-qa`) + accuracy audit
+   (`qa/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1`) + the accuracy gate
    (`qa/accuracy_audit.py --live`).
 5. **Auto-rollback** — a red gate after a successful deploy runs
    `deploy/rollback_site.sh HEAD~1` (re-hash, re-stamp `version.json` to the prior
-   build, re-invalidate) + SNS alert.
+   build, re-invalidate) + SNS alert — but only when the failed check's surface is
+   `site/**`-reachable (#3352 / #3395); a data-plane or edge-config red files an issue instead.
+
+**A red site-deploy is silent (#3878, #4703).** Nothing pages on the workflow's failure, so a
+merge can publish-and-revert, or never publish. Read the newest `site-deploy.yml` conclusion
+before merging anything under `site/**` or a `scripts/v4_build_*.py` generator — the SessionStart
+pre-flight (`scripts/hooks/session_preflight.py`) prints it — and verify a change by the live
+page's content, never by the merge (`docs/CONVENTIONS.md` §2). The workflow's `paths` exclude
+`scripts/`, so a generator-only fix needs `gh workflow run site-deploy.yml`, and its conclusion
+is read too.
 
 **Attended fallback** (when authorized — deploys are Matthew's call, and always from
 `main`, never a worktree branch — `docs/CONVENTIONS.md` §2):
 `bash deploy/sync_site_to_s3.sh` + the explicit fonts sync if fonts changed.
 
-**Ordering rule — deploy the API before the front-end.** A change spanning
+**Ordering rule — deploy the API before the front-end** (`scripts/check_api_before_frontend.py`
+checks it at PR time against `deploy/api_deploy_sequencing.json`). A change spanning
 `lambdas/web/` + `site/` must get the site-api deployed **first**
 (`bash deploy/deploy_site_api.sh` — full-tree bundle, never single-file; or the CI
 production gate). Merging the pair at once means site-deploy.yml ships the page
@@ -283,7 +317,8 @@ auto-rolls the site back (this happened on #750's first day).
 
 **Before you merge — local render-QA.** `node --check` proves nothing about runtime;
 render the page:
-- `python3 qa/visual_qa.py --screenshot --ai-qa` (needs `playwright install chromium`)
+- `python3 qa/visual_qa.py --screenshot --ai-qa` (needs `playwright install chromium`; the pre-merge
+  render gate at 390 + 360 is `python3 qa/pr_render_gate.py`, DESIGN_SYSTEM_V5.md §10)
   against live, or drive the changed page locally with Playwright + route-mocked
   `/api/*`. Route-mock gotchas: register the **catch-all route first**, **block service
   workers** (or the mocks are bypassed), and scroll the page before a full-page shot
@@ -295,7 +330,7 @@ render the page:
 1. **`deploy/smoke_test_site.sh`** — HTTP/content smoke: v4 pages 200, legacy URLs 301,
    API freshness. Runs post-deploy in CI; cheap to run any time.
 2. **`lambdas/operational/qa_smoke_lambda.py`** — data/output health (DDB freshness,
-   score sanity), nightly against the live pipeline.
+   score sanity), daily against the live pipeline.
 3. **`qa/visual_qa.py` (+ `visual_ai_qa.py`)** — Playwright browser sweep + Claude
    vision QA of each screenshot; **gating** in CI (deterministic FAIL or AI "high"
    verdict blocks/rolls back).

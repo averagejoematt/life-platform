@@ -1,6 +1,6 @@
 # The Platform Charter
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-16
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 **The five-primitive constitution** (#2843, epic #2842 "The Kernel"). This is the
 session-boot architecture source: read this first, derive the rest. The 2026-08-16
@@ -49,14 +49,18 @@ sweeps keep re-finding; if a road is missing, pave it before driving.
   capture unfiltered → privacy tier BEFORE the first cron → absence semantics at
   birth → ingest-vs-park per consumer → SoT ruling per overlap → the consumer
   sweep. Registry: `source_registry.py`. The per-field × consumer-family wiring
-  registry is epic #2797.
+  is epic #2797 (closed 2026-08-22): privacy tiers are declared in
+  `lambdas/privacy/field_tiers.py` and gated by `tests/test_privacy_tier_wiring_2803.py`.
 - **A lambda**: its ADR-146 domain package under `lambdas/`, registered in its CDK
   stack with its own least-privilege role, added to the mypy clean set
   (`scripts/mypy_clean_set.py` globs are non-recursive), and — if scheduled — a
   heartbeat under `tests/test_heartbeat_completeness.py`. Enrollment-by-construction
-  (all of that from one declaration) is being paved as #2846; until it lands the
-  consumer sweep is manual and `tests/test_lambdas_packaging_guard.py` holds the
-  packaging invariant.
+  landed as #2846 (closed 2026-08-25): `create_platform_lambda()` validates and records
+  every Lambda at synth (`cdk/stacks/lambda_enrollment.py`), and
+  `tests/test_enrollment_by_construction_2846.py` re-derives the set by AST, with the
+  dated shrink-only ledger `ledgers/lambda_enrollment_ledger.py` for raw constructions
+  that predate it. The consumer sweep beyond that is still manual, and
+  `tests/test_lambdas_packaging_guard.py` holds the packaging invariant.
 - **A page**: `qa/qa_manifest.py` is THE page registry (#1426); visual QA and
   the smoke sweep derive from it (`tests/test_qa_manifest.py` gates the
   derivation). A page not in the manifest does not exist to QA.
