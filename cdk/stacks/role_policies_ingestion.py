@@ -15,6 +15,7 @@ from aws_cdk import aws_iam as iam
 
 from stacks.role_policies_base import (
     ACCT,
+    BUCKET_ARN,
     DLQ_ARN,
     KMS_KEY_ARN,
     REGION,
@@ -673,7 +674,23 @@ def ingestion_hae() -> list[iam.PolicyStatement]:
                 "raw/matthew/state_of_mind/*",
                 "raw/matthew/workouts/*",
                 "raw/matthew/health_auto_export/*",
+                "raw/matthew/additive_readings/*",
             ),
+        ),
+        # #4628 (Q2 b): the additive day value is the sum of the per-reading archive, so the
+        # webhook READS back the day's object before merging. ListBucket on that prefix only,
+        # so a not-yet-written day returns NoSuchKey (an empty day) rather than AccessDenied
+        # (which the writer treats as "archive unavailable" and falls back to the legacy write).
+        iam.PolicyStatement(
+            sid="S3ReadAdditiveReadings",
+            actions=["s3:GetObject"],
+            resources=_s3("raw/matthew/additive_readings/*"),
+        ),
+        iam.PolicyStatement(
+            sid="S3ListAdditiveReadings",
+            actions=["s3:ListBucket"],
+            resources=[BUCKET_ARN],
+            conditions={"StringLike": {"s3:prefix": ["raw/matthew/additive_readings/*"]}},
         ),
         iam.PolicyStatement(
             sid="Secrets",
