@@ -17,6 +17,7 @@ from typing import Any, cast
 from boto3.dynamodb.conditions import Key
 from common.digest_utils import filter_day_rows
 from experiment.phase_filter import with_phase_filter  # ADR-058
+from training import zone2_minutes  # #4627: THE Zone 2 computation (shared with /api/zone2 and the MCP tool)
 from training.muscle_volume import normalize_hevy_items, working_sets_by_muscle  # #4071/#4095 — THE per-muscle computation
 
 from web.site_api_common import (
@@ -195,8 +196,8 @@ def _whoop_strain_and_workouts(table, whoop_30d: list, d30: str, today: str) -> 
         complete days only (#1084: today's day strain still accrues);
       * whoop_workouts holds WORKOUT sub-rows only (the range query below also returns the day
         rows that sort between its bounds), one per workout id — the earliest date key wins.
-    Whoop zone minutes are NOT added to the served Zone 2 total here: that number's definition
-    is #4627's (gate:owner), and the zone values only became real with #4629's writer fix.
+    Zone 2 is not computed here: since #4627 it is `training.zone2_minutes`, which reads these
+    workout sub-rows' own zone minutes (one per workout id) alongside Strava's.
     """
     strain_vals = [float(w["strain"]) for w in filter_day_rows(whoop_30d) if w.get("strain") and _row_day(w) < today]
     avg_strain = round(sum(strain_vals) / len(strain_vals), 1) if len(strain_vals) >= _MIN_DAILY_AVG_N else None
@@ -217,6 +218,12 @@ def _whoop_strain_and_workouts(table, whoop_30d: list, d30: str, today: str) -> 
     except Exception as e:
         logger.warning(f"[training_overview] Whoop workout query failed (non-fatal): {e}")
     return avg_strain, list(by_id.values())
+
+
+def _next_day(d: str) -> str:
+    """A Whoop workout on a Pacific evening is keyed the next UTC day (#3913), so a read that
+    ends on a Pacific day reaches one key further."""
+    return (datetime.strptime(d, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
 
 
 def _row_day(w: dict) -> str:
@@ -254,12 +261,14 @@ def training_overview(*, _g) -> dict:
     strava_items = _query_source("strava", d90, today)
     strava_30d = [s for s in strava_items if (s.get("date") or s.get("sk", "").replace("DATE#", "")) >= d30]
 
-    # Zone 2 detection: HR between 60-70% of max HR
-    max_hr = 184  # Matthew's measured max HR — matches profile.max_heart_rate
-    z2_low, z2_high = max_hr * 0.60, max_hr * 0.70
-    z2_minutes_30d = 0
-    # Z2 is recalculated after flattening activities below
-    z2_target = 150  # minutes/week
+    # #4627: Zone 2 is THE shared computation (`training.zone2_minutes`) — minutes actually in
+    # each recording device's own Zone 2 band, from the stored time-in-zone rows, each session
+    # counted once across Strava + Whoop; Hevy cardio blocks are reported, never Zone 2. The
+    # average-HR-in-60–70%-of-184 whole-activity method this replaced is gone from every split.
+    z2_target = zone2_minutes.WEEKLY_TARGET_MIN  # minutes/week
+    _z2_hevy = _query_source("hevy", d30, today)
+    z2_sessions = zone2_minutes.counted_sessions(strava_items, _query_source("whoop", d90, _next_day(today)))
+    z2_by_sid = zone2_minutes.zone2_by_strava_id(z2_sessions)
 
     def _z2_weekly_stats(total_min):
         # #1084: weekly average over the real (genesis-clamped) window — None
@@ -352,8 +361,7 @@ def training_overview(*, _g) -> dict:
         if avg_hr:
             m["hr_sum"] += float(avg_hr)
             m["hr_count"] += 1
-            if z2_low <= float(avg_hr) <= z2_high:
-                m["z2_min"] += dur
+        m["z2_min"] += z2_by_sid.get(str(a.get("strava_id")), 0.0)
 
     modality_breakdown = []
     for sport, m in sorted(modality_map.items(), key=lambda x: -x[1]["count"]):
@@ -373,23 +381,13 @@ def training_overview(*, _g) -> dict:
             }
         )
 
-    # Recalculate Z2 from all flattened activities
     # Staleness honesty (truth audit 2026-07-10): the 30d average masks a quiet current
-    # week (218 min/wk average over weeks at 21 and 15 min). Track the trailing-7d Z2
-    # alongside it so the front-end can show the CURRENT week vs target honestly.
-    # #4627: `>= today - 6` is the 7 dates [today-6, today]; `today - 7` counted 8.
-    _d7_cal = (datetime.now(PT) - timedelta(days=6)).strftime("%Y-%m-%d")
-    z2_minutes_30d = 0
-    z2_trailing_7d = 0.0
-    for a in all_activities_30d:
-        avg_hr = a.get("average_heartrate") or a.get("avg_hr")
-        dur = _act_minutes(a)
-        if avg_hr and dur:
-            if z2_low <= float(avg_hr) <= z2_high:
-                z2_minutes_30d += dur
-                if (a.get("_day_date") or "") >= _d7_cal:
-                    z2_trailing_7d += dur
-    z2_weekly_avg, z2_pct = _z2_weekly_stats(z2_minutes_30d)
+    # week, so the trailing-7d Z2 rides alongside it. #4627: both windows are THE shared
+    # computation; the trailing window is exactly the 7 dates [today-6, today].
+    z2_30d = zone2_minutes.zone2_window(None, None, _z2_hevy, d30, today, sessions=z2_sessions)
+    z2_7d = zone2_minutes.zone2_window(None, None, _z2_hevy, *zone2_minutes.trailing_window(today), sessions=z2_sessions)
+    z2_trailing_7d = z2_7d["zone_2_minutes"]
+    z2_weekly_avg, z2_pct = _z2_weekly_stats(z2_30d["zone_2_minutes"])
 
     # ── Walking stats — per-day step merge, Apple-Health-first ──
     # Garmin is rate-limited/dead and emits a phantom ~298-step record that used to block
@@ -446,13 +444,7 @@ def training_overview(*, _g) -> dict:
         "total_rucks_30d": len(ruck_activities),
         "total_miles_30d": round(sum(_act_miles(a) for a in walk_activities), 1),
         "avg_pace_min_per_mi": None,
-        "z2_minutes_walking": round(
-            sum(
-                _act_minutes(a)
-                for a in walk_activities
-                if a.get("average_heartrate") and z2_low <= float(a["average_heartrate"]) <= z2_high
-            )
-        ),
+        "z2_minutes_walking": round(sum(z2_by_sid.get(str(a.get("strava_id")), 0.0) for a in walk_activities)),
         "daily_steps_trend": daily_steps_trend,
     }
     # Avg walking pace (min/mi)
@@ -542,9 +534,9 @@ def training_overview(*, _g) -> dict:
         week_buckets[week_key]["workouts"] += 1
         dur = _act_minutes(a)
         week_buckets[week_key]["minutes"] += dur
-        avg_hr = a.get("average_heartrate") or a.get("avg_hr")
-        if avg_hr and z2_low <= float(avg_hr) <= z2_high:
-            week_buckets[week_key]["z2_min"] += dur
+    for _s in z2_sessions:  # #4627: the weekly Z2 bar is the shared computation's sessions
+        if _s["source"] and _s["date"] >= d90:
+            week_buckets[datetime.strptime(_s["date"], "%Y-%m-%d").strftime("%G-W%V")]["z2_min"] += _s["zone_2_minutes"]
 
     weekly_trend = sorted(
         [
@@ -603,8 +595,7 @@ def training_overview(*, _g) -> dict:
     # shows as a session even with no distance.
     _HEVY_CARDIO = {"cycling", "elliptical", "rowing", "treadmill", "stair", "ski erg", "ski-erg", "assault", "echo bike", "air bike"}
     _HEVY_MOBILITY = {"stretching", "stretch", "mobility", "yoga", "foam roll"}
-    hevy_cardio_30d = _query_source("hevy", d30, today)
-    _hevy_cardio_min = 0.0  # P0.4: Hevy bike/elliptical steady-cardio minutes → Zone-2 base
+    hevy_cardio_30d = _z2_hevy
     for w in sorted(hevy_cardio_30d, key=lambda x: x.get("date") or x.get("sk", ""), reverse=True):
         wdate = w.get("date") or w.get("sk", "").replace("DATE#", "")[:10]
         for ex in w.get("exercises") or []:
@@ -617,10 +608,6 @@ def training_overview(*, _g) -> dict:
             sets = ex.get("sets") or []
             dist_m = sum(float(s.get("distance_m") or 0) for s in sets)
             secs = sum(float(s.get("duration_sec") or 0) for s in sets)
-            if is_cardio and secs:
-                _hevy_cardio_min += secs / 60.0
-                if (wdate or "") >= _d7_cal:
-                    z2_trailing_7d += secs / 60.0
             cardio_sessions.append(
                 {
                     "date": wdate,
@@ -634,11 +621,9 @@ def training_overview(*, _g) -> dict:
             )
     cardio_sessions = sorted(cardio_sessions, key=lambda x: x.get("date") or "", reverse=True)[:20]
 
-    # P0.4 — Zone-2 is cross-source: fold Hevy bike/elliptical minutes (logged steady
-    # cardio, no HR stream) into the Z2 base alongside Strava + Whoop. Never Strava-only.
-    if _hevy_cardio_min:
-        z2_minutes_30d += _hevy_cardio_min
-        z2_weekly_avg, z2_pct = _z2_weekly_stats(z2_minutes_30d)
+    # #4627: the P0.4 fold that added these Hevy blocks to Zone 2 is retired — a Hevy block is
+    # cardio minutes (`hevy_cardio_minutes_30d`), and its HR minutes reach Zone 2 only through
+    # the wearable that recorded them.
 
     return _ok(
         {
@@ -659,6 +644,10 @@ def training_overview(*, _g) -> dict:
                 # the current week — the number that goes quiet when training stops.
                 "z2_pct": z2_pct,
                 "z2_trailing_7d_min": round(z2_trailing_7d),
+                # #4627: the window the trailing figure covers (7 dates) and what it is.
+                "z2_trailing_7d_window": {k: z2_7d[k] for k in ("start_date", "end_date", "dates", "zone_2_minutes", "by_source")},
+                "z2_definition": zone2_minutes.DEFINITION,
+                "hevy_cardio_minutes_30d": z2_30d["hevy_cardio_minutes"],
                 "avg_strain": avg_strain,
                 "strength_sessions_30d": strength_sessions_30d,
                 "top_activities": [{"type": t, "count": c} for t, c in top_activities],

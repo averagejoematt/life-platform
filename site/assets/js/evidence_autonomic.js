@@ -157,7 +157,7 @@ export function renderZone2(d) {
       : "";
     parts.push(sec(`This week (${range}) vs the 150-minute reference`,
       targetSpine(cur.zone_2_minutes, target, { valueLabel: range, targetLabel: "150 min", unit: " min", label: "Zone-2 aerobic minutes" }) +
-      `<p class="rd-meta label">The week-so-far Zone-2 tally for the current calendar week, <strong>${esc(range)}</strong>, against the widely-cited 150 min/week aerobic reference (Attia · Huberman · WHO).${darkNote}${lastNote} Zone 2 is ${esc(s.zone_2_hr_range || "—")} for a max HR of ${fmt(s.max_hr_used, 0)}. A reference line, not a prescription.</p>`));
+      `<p class="rd-meta label">The week-so-far Zone-2 tally for the current calendar week, <strong>${esc(range)}</strong>, against the widely-cited 150 min/week aerobic reference (Attia · Huberman · WHO).${darkNote}${lastNote} Zone 2 is ${esc(s.zone_2_hr_range || "—")}${s.max_hr_used != null ? ` for a max HR of ${fmt(s.max_hr_used, 0)}` : " — minutes actually in the zone"}. A reference line, not a prescription.</p>`));
   }
 
   // Altitude 2 — weekly Zone-2 minutes (barChart reuse).
