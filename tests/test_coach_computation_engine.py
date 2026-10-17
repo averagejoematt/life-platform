@@ -664,7 +664,8 @@ class TestFetchAllSourceData:
         assert set(data) == set(engine.SOURCE_METRICS)
         assert len(data["whoop"]) == 1
         assert data["withings"] == []
-        assert {s for s, _, _ in seen} == set(engine.SOURCE_METRICS)
+        # #4630: the resolved-steps pseudo-source is built, not fetched; its inputs are the registry's steps sources.
+        assert {s for s, _, _ in seen} == (set(engine.SOURCE_METRICS) - {engine.RESOLVED_STEPS_KEY}) | set(engine.steps_sources())
         assert all((start, end) == ("2026-06-01", "2026-06-15") for _, start, end in seen)
 
 

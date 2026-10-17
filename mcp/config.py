@@ -58,7 +58,8 @@ _DEFAULT_SOURCE_OF_TRUTH = {
     # sleep_environment (eightsleep bed-temp) retired — ADR-118, #489
     "journal": "notion",
     "body": "withings",
-    "steps": "apple_health",
+    # "steps" retired (#4630 box 5): the truth for steps is the METRIC_TRUTH facet in
+    # ingestion/source_registry.py, applied by common/metric_truth.py — get_sot() refuses it.
     "tasks": "todoist",
     "habits": "habitify",
     "gait": "apple_health",
@@ -70,6 +71,8 @@ _DEFAULT_SOURCE_OF_TRUTH = {
     "weather": "weather",
     "state_of_mind": "state_of_mind",
 }
+# Public alias: the static domain map (the stored profile's `source_of_truth` overrides it).
+SOURCE_OF_TRUTH = _DEFAULT_SOURCE_OF_TRUTH
 
 P40_GROUPS = ["Data", "Discipline", "Growth", "Hygiene", "Nutrition", "Performance", "Recovery", "Supplements", "Wellbeing"]
 

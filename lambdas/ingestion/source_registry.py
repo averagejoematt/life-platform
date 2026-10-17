@@ -2665,3 +2665,80 @@ def catalog_entries() -> list:
             }
         )
     return sorted(rows, key=lambda r: (posture_rank.get(r["posture"], 9), r["name"]))
+
+
+# ── #4630: the per-metric TRUTH facet — which stored field answers "what was the day's X?" ──
+#
+# The owner rule of 2026-10-04 ("capture all, interpret later", docs/CONVENTIONS.md): every
+# writer stores its own source's value under that source and never picks a winner; the
+# precedence lives HERE, and ONE read-side resolver (lambdas/common/metric_truth.py) applies
+# it. A consumer never names a source or a field for a metric listed below — it calls the
+# resolver (tests/test_steps_truth_resolver_4630.py fails on a direct read of a steps field).
+#
+# Facets per metric:
+#   truth_source     — the source that wins whenever it has a usable value
+#   unit             — the unit every field below is stored in (the resolver never converts)
+#   fallback_order   — the sources the resolver consults, in order; truth_source is first
+#   field_by_source  — the stored DATE# row field that carries the metric for each source
+#   min_by_source    — the smallest POSITIVE value that counts as "has a count" for a source;
+#                      a positive value below it is absent for the day (not zero); 0 is a
+#                      zero report (see overlap_rule)
+#   overlap_rule     — what happens when more than one source has a usable value:
+#                      first_positive_else_first_zero = the first source in fallback_order
+#                      with a POSITIVE value wins; only when none has one does the
+#                      highest-precedence zero report stand (a genuine 0-step day, #1658)
+#   ruling           — where the precedence was decided (or is pending)
+#
+# steps: HELD on #4644 Q4. Built on the recommended answer "4: yes — Whoop when both devices
+# have a count": the phone delivers roughly 0.27-0.62 of the wrist's count on days it is not
+# carried (treadmill, bike), and the two agree closely on outdoor-walk days. Garmin is paused
+# (ADR-074) and stays last so pre-pause history still resolves; its 1000 floor is the one the
+# site readers already applied to drop the phantom ~298 partial-sync row.
+METRIC_TRUTH: dict[str, dict[str, Any]] = {
+    "steps": {
+        "truth_source": "whoop",
+        "unit": "count/day",
+        "fallback_order": ("whoop", "apple_health", "garmin"),
+        "field_by_source": {"whoop": "step_count", "apple_health": "steps", "garmin": "steps"},
+        "min_by_source": {"whoop": 1, "apple_health": 1, "garmin": 1000},
+        "overlap_rule": "first_positive_else_first_zero",
+        "ruling": "#4644 Q4 (recommended: 'yes — Whoop when both devices have a count') — pending the owner",
+    },
+}
+
+METRIC_TRUTH_OVERLAP_KINDS = ("first_positive_else_first_zero",)
+
+
+def _validate_metric_truth() -> None:
+    """Import-time shape check: a truth facet that names an unknown source or a source
+    with no field is a resolver that silently answers None — refuse it at import."""
+    for metric, facet in METRIC_TRUTH.items():
+        order = tuple(facet["fallback_order"])
+        if not order or order[0] != facet["truth_source"]:
+            raise ValueError(f"METRIC_TRUTH[{metric!r}]: fallback_order must start with truth_source")
+        if len(set(order)) != len(order):
+            raise ValueError(f"METRIC_TRUTH[{metric!r}]: fallback_order repeats a source")
+        if facet["overlap_rule"] not in METRIC_TRUTH_OVERLAP_KINDS:
+            raise ValueError(f"METRIC_TRUTH[{metric!r}]: unknown overlap_rule {facet['overlap_rule']!r}")
+        for src in order:
+            if src not in SOURCE_REGISTRY:
+                raise ValueError(f"METRIC_TRUTH[{metric!r}]: {src!r} is not a registered source")
+            if src not in facet["field_by_source"]:
+                raise ValueError(f"METRIC_TRUTH[{metric!r}]: no field_by_source entry for {src!r}")
+
+
+_validate_metric_truth()
+
+
+def metric_truth(metric: str) -> dict:
+    """The truth facet for `metric` (a copy — callers cannot mutate the registry).
+
+    Raises KeyError for a metric with no facet: a resolver asked about an unresolved
+    metric must fail loudly rather than guess a source."""
+    facet = METRIC_TRUTH[metric]
+    return {
+        **facet,
+        "fallback_order": tuple(facet["fallback_order"]),
+        "field_by_source": dict(facet["field_by_source"]),
+        "min_by_source": dict(facet["min_by_source"]),
+    }

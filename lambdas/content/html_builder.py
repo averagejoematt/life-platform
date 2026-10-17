@@ -12,6 +12,7 @@ Exports:
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G
 from common.digest_utils import compute_confidence
+from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.pacific_time import day_in_words, shift_day_key  # #4182: dates in words, one PT spelling
 from health.scoring_engine import habitify_reading  # #4362
 
@@ -794,8 +795,8 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
                 out += "</div>"
 
         elif data.get("garmin"):
-            garmin = data.get("garmin")
-            steps = safe_float(garmin, "steps")
+            # #4630: the day's steps through the ONE resolver (registry METRIC_TRUTH facet).
+            steps = resolve_steps({"whoop": data.get("whoop"), "apple_health": data.get("apple"), "garmin": data.get("garmin")}).value
             out += '<p style="color:#64748b;font-size:12px;margin:0;">No structured workouts. Steps: ' + fmt_num(steps) + "</p>"
         else:
             out += '<p style="color:#64748b;font-size:12px;margin:0;">No training data for yesterday.</p>'
