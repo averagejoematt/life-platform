@@ -234,7 +234,7 @@ export function lastCallPick(callsBody, asOf = "") {
 // `jobs` maps a persona id to the coach's job in a word or two: with it, the card's first line
 // names the coach and the job ("Settled Saturday, October 10 · Lisa Park, the sleep coach"),
 // and the result is the bold line — the punch, not the rule (round 8b).
-export function lastCallHTML(callsBody, base, asOf = "", jobs = null) {
+export function lastCallHTML(callsBody, base, asOf = "", jobs = null, { moreDoor = "" } = {}) {
   const { call } = lastCallPick(callsBody, asOf);
   if (!call) return "";
   const day = dayInWords(call.settled_date);
@@ -246,7 +246,7 @@ export function lastCallHTML(callsBody, base, asOf = "", jobs = null) {
     return `<div class="ck-bet">${head}<p>${esc(call.verdict_text)}</p><p>${esc(call.called || call.called_short)} <b>${esc(call.happened_short)}</b></p>${soft(guess)}<p><a class="ck-link" href="${esc(callHref(base, call.id))}">The whole call</a></p></div>`;
   }
   // The house rule (#4808): the shared card — tag, the call with the result in bold, one soft line.
-  const card = callCardHTML(call, { full: true, extra: guess, href: callHref(base, call.id), wrap: "" });
+  const card = callCardHTML(call, { full: true, extra: guess, href: callHref(base, call.id), wrap: "", moreDoor });
   return card ? `<div class="ck-bet">${head}${card}</div>` : "";
 }
 

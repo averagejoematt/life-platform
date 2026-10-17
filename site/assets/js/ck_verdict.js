@@ -148,14 +148,15 @@ export function sharedToleranceNote(calls) {
  *    wrap     "div" (a card in a .ck-verdicts pair), "li" (a day page's row) or "" (inside a
  *             card the caller already drew)
  *    note     false when the caller prints `sharedToleranceNote` once under a pair */
-export function callCardHTML(call, { full = false, when = "", extra = "", href = "", linkText = "The whole call", wrap = "div", note = true } = {}) {
+export function callCardHTML(call, { full = false, when = "", extra = "", href = "", linkText = "The whole call", wrap = "div", note = true, moreDoor = "" } = {}) {
   if (!call || call.kind === "bet") return "";
   const tag = callVerdictTag(call);
   const said = String((full && call.called) || call.called_short || "").trim();
   const result = String(call.happened_short || "").trim();
   if (!tag || !said || !result) return "";
   const soft = [note ? toleranceNote(call) : "", String(when || "").trim(), String(extra || "").trim()].filter(Boolean).join(" ");
-  const door = href ? `<a class="ck-link" href="${esc(href)}">${esc(linkText)}</a>` : "";
+  // `moreDoor`: trusted HTML, a second door sharing the line (the front page's "Every settled call").
+  const door = href ? `<a class="ck-link" href="${esc(href)}">${esc(linkText)}</a>${moreDoor ? ` · ${moreDoor}` : ""}` : "";
   const softHTML = soft || door ? `<p class="ck-soft">${esc(soft)}${soft && door ? " " : ""}${door}</p>` : "";
   const inner = `${tag}<p>${esc(said)} <b>${esc(result)}</b></p>${softHTML}`;
   return wrap ? `<${wrap}>${inner}</${wrap}>` : inner;

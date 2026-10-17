@@ -649,11 +649,13 @@ export function frontReadSlots(edition, b, base = "/") {
   // The clearest miss this week, or on record, or the calls block's own sentence.
   const calls = callsBodyOf(b);
   const { kind } = lastCallPick(calls, e.as_of);
-  const last = lastCallHTML(calls, base, e.as_of, F.SHORT_JOBS);
+  // The list of every settled call shares the card's door line (one line, not a paragraph of its own).
+  const everyDoor = `<a class="ck-link" href="${esc(base)}call/">Every settled call</a>`;
+  const last = lastCallHTML(calls, base, e.as_of, F.SHORT_JOBS, { moreDoor: everyDoor });
   if (last) {
     const heading = { recent: "The clearest miss this week.", wrong: "The clearest miss so far.", right: "The tightest right call so far." }[kind] || "The latest checked call.";
     out["ck-miss-heading"] = esc(heading);
-    out["ck-call"] = `${last}<p><a class="ck-link" href="${esc(base)}call/">Every settled call</a></p>`;
+    out["ck-call"] = last.includes(everyDoor) ? last : `${last}<p>${everyDoor}</p>`;
   } else {
     out["ck-call"] = soft(b.calls.absent_text || "The settled calls are not served right now.");
   }
