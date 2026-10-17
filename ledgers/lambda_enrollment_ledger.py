@@ -156,30 +156,6 @@ ALARM_STORY: dict[str, tuple[str, str]] = {
         "is settled against live AWS, 'what should alarm' is not answerable — an alarm on a Lambda that is "
         "never invoked would be decoration.",
     ),
-    "youtube-social-ingestion": (
-        "2026-10-17",
-        "Q39 (owner 2026-10-17, #4641/#4644): \"no — retire the three schedules\". The EventBridge rule is removed; the "
-        "function stays deployed only so it can be invoked by hand if a YouTube account is ever provisioned. A "
-        "function with no trigger cannot fail on its own, so an Errors alarm would be decoration, and its liveness row "
-        "in test_heartbeat_completeness was retired with the schedule. Retire this row the day the schedule returns "
-        "or the function is deleted.",
-    ),
-    "bluesky-social-ingestion": (
-        "2026-10-17",
-        "Q39 (owner 2026-10-17, #4641/#4644): \"no — retire the three schedules\". The EventBridge rule is removed; the "
-        "function stays deployed only so it can be invoked by hand if a Bluesky account is ever provisioned. A "
-        "function with no trigger cannot fail on its own, so an Errors alarm would be decoration, and its liveness row "
-        "in test_heartbeat_completeness was retired with the schedule. Retire this row the day the schedule returns "
-        "or the function is deleted.",
-    ),
-    "mastodon-social-ingestion": (
-        "2026-10-17",
-        "Q39 (owner 2026-10-17, #4641/#4644): \"no — retire the three schedules\". The EventBridge rule is removed; the "
-        "function stays deployed only so it can be invoked by hand if a Mastodon account is ever provisioned. A "
-        "function with no trigger cannot fail on its own, so an Errors alarm would be decoration, and its liveness row "
-        "in test_heartbeat_completeness was retired with the schedule. Retire this row the day the schedule returns "
-        "or the function is deleted.",
-    ),
     # 2026-08-25: the og-image ALARM_STORY row retired — #3161 (same integration
     # train) added life-platform-og-image-errors in web_stack.py, digest-routed, so
     # the function now HAS an alarm story and the G4 ratchet tightened on the spot.

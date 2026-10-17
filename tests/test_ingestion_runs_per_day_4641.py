@@ -9,6 +9,9 @@ import ingestion_runs_per_day as rpd  # noqa: E402
 
 CUTS = {
     "notion-journal-ingestion": 3,
+    "youtube-social-ingestion": 2,
+    "bluesky-social-ingestion": 2,
+    "mastodon-social-ingestion": 2,
     "dropbox-poll": 12,
     "withings-data-ingestion": 4,
     "eightsleep-data-ingestion": 4,
@@ -18,12 +21,6 @@ CUTS = {
 def test_cut_sources_run_at_the_new_cadence():
     rows = {r["function"]: r for r in rpd.table()}
     assert {k: rows[k]["own"] for k in CUTS} == CUTS
-
-
-def test_the_three_social_feeds_are_unscheduled_q39():
-    """Q39 (owner 2026-10-17): "no — retire the three schedules". No EventBridge rule, so no runs/day row."""
-    rows = {r["function"] for r in rpd.table()}
-    assert not rows & {"youtube-social-ingestion", "bluesky-social-ingestion", "mastodon-social-ingestion"}
 
 
 def test_site_stats_refresh_invocations_are_counted():
@@ -69,6 +66,6 @@ def test_broken_join_loses_the_comparison(monkeypatch):
     really covers the cadence-bearing sources (a silently empty join would pass a mismatch gate)."""
     rows = {r["function"]: r for r in rpd.table()}
     checked = [fn for fn, r in rows.items() if r["claimed"] is not None]
-    assert len(checked) >= 10, checked
+    assert len(checked) >= 13, checked
     for fn in ("dropbox-poll", "notion-journal-ingestion", "withings-data-ingestion"):
         assert fn in checked

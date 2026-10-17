@@ -1013,7 +1013,7 @@
     "ai_features": 25,
     "alarms": 139,
     "emf_namespaces": 33,
-    "schedules": 92,
+    "schedules": 95,
     "secrets": 30
   },
   "edges": [
@@ -6351,7 +6351,12 @@
       "handler": "ingestion.bluesky_lambda.lambda_handler",
       "memory_mb": null,
       "module": "lambdas/ingestion/bluesky_lambda.py",
-      "schedules": [],
+      "schedules": [
+        {
+          "expr": "cron(0 14,2 * * ? *)",
+          "resolution": "resolved"
+        }
+      ],
       "stack": "ingestion_stack",
       "timeout_seconds": 120
     },
@@ -7196,7 +7201,12 @@
       "handler": "ingestion.mastodon_lambda.lambda_handler",
       "memory_mb": null,
       "module": "lambdas/ingestion/mastodon_lambda.py",
-      "schedules": [],
+      "schedules": [
+        {
+          "expr": "cron(0 14,2 * * ? *)",
+          "resolution": "resolved"
+        }
+      ],
       "stack": "ingestion_stack",
       "timeout_seconds": 120
     },
@@ -7665,7 +7675,12 @@
       "handler": "ingestion.youtube_lambda.lambda_handler",
       "memory_mb": null,
       "module": "lambdas/ingestion/youtube_lambda.py",
-      "schedules": [],
+      "schedules": [
+        {
+          "expr": "cron(0 14,2 * * ? *)",
+          "resolution": "resolved"
+        }
+      ],
       "stack": "ingestion_stack",
       "timeout_seconds": 120
     }
@@ -7705,8 +7720,8 @@
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 18,
       "privacy_sources_owner_published": 3,
-      "scheduled_lambdas": 81,
-      "schedules": 92
+      "scheduled_lambdas": 84,
+      "schedules": 95
     },
     "coverage": {
       "edge_sites": {
@@ -7716,7 +7731,7 @@
       },
       "schedule_resolution": {
         "dynamic": 0,
-        "resolved": 81
+        "resolved": 84
       }
     },
     "non_census_families": [
@@ -7774,7 +7789,7 @@
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "Schedule retired 2026-10-17 (Q39) \u2014 no scheduled pull; function kept, invoke by hand if an account is provisioned",
+      "method": "Keyless public AppView pull (framework), 2x daily",
       "privacy_tier": "public",
       "stale_hours": null
     },
@@ -8116,7 +8131,7 @@
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "Schedule retired 2026-10-17 (Q39) \u2014 no scheduled pull; function kept, invoke by hand if an account is provisioned",
+      "method": "Keyless public REST pull (framework), 2x daily",
       "privacy_tier": "public",
       "stale_hours": null
     },
@@ -8419,7 +8434,7 @@
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "Schedule retired 2026-10-17 (Q39) \u2014 no scheduled pull; function kept, invoke by hand if an account is provisioned",
+      "method": "Keyless per-channel RSS pull (framework), 2x daily",
       "privacy_tier": "public",
       "stale_hours": null
     }
@@ -9056,6 +9071,13 @@
       "utc": "22:00"
     },
     {
+      "expr": "cron(0 14,2 * * ? *)",
+      "lambda": "bluesky-social-ingestion",
+      "resolution": "resolved",
+      "stack": "ingestion_stack",
+      "utc": null
+    },
+    {
       "expr": "cron(10 0-5,15-23 * * ? *)",
       "lambda": "coach-nudge",
       "resolution": "constant",
@@ -9112,6 +9134,13 @@
       "utc": null
     },
     {
+      "expr": "cron(0 14,2 * * ? *)",
+      "lambda": "mastodon-social-ingestion",
+      "resolution": "resolved",
+      "stack": "ingestion_stack",
+      "utc": null
+    },
+    {
       "expr": "cron(0 14,21,3 * * ? *)",
       "lambda": "notion-journal-ingestion",
       "resolution": "resolved",
@@ -9156,6 +9185,13 @@
     {
       "expr": "cron(5 14,17,21,0 * * ? *)",
       "lambda": "withings-data-ingestion",
+      "resolution": "resolved",
+      "stack": "ingestion_stack",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 14,2 * * ? *)",
+      "lambda": "youtube-social-ingestion",
       "resolution": "resolved",
       "stack": "ingestion_stack",
       "utc": null

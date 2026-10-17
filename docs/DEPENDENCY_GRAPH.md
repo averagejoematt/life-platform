@@ -22,6 +22,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `ai-review-pack` | email_stack | `cron(0 18 ? * SUN *)` | constant |
 | `anomaly-detector` | compute_stack | `cron(5 15 * * ? *)` | constant |
 | `between-chronicle` | email_stack | `cron(0 17 ? * SUN *)` | constant |
+| `bluesky-social-ingestion` | ingestion_stack | `cron(0 14,2 * * ? *)` | resolved |
 | `challenge-generator` | compute_stack | `cron(0 22 ? * SUN *)` | constant |
 | `character-sheet-compute` | compute_stack | `cron(30 16 * * ? *)` | constant |
 | `chronicle-approve` | email_stack | `cron(0 18 * * ? *)` | constant |
@@ -68,6 +69,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `life-platform-pip-audit` | operational_stack | `cron(0 15 ? * MON *)` | constant |
 | `life-platform-qa-smoke` | operational_stack | `cron(30 18 ? * * *)` | constant |
 | `life-platform-traffic-digest` | operational_stack | `cron(0 16 ? * MON *)` | constant |
+| `mastodon-social-ingestion` | ingestion_stack | `cron(0 14,2 * * ? *)` | resolved |
 | `milestone-digest` | email_stack | `cron(15 17 * * ? *)` | constant |
 | `monday-compass` | email_stack | `cron(0 15 ? * MON *)` | constant |
 | `monthly-digest` | email_stack | `cron(0 16 ? * 1#1 *)` | constant |
@@ -96,8 +98,9 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `weekly-signal` | email_stack | `cron(30 16 ? * SUN *)` | constant |
 | `whoop-data-ingestion` | ingestion_stack | `cron(0 0,4,12,16,20 * * ? *)` + `cron(20 18 * * ? *)` + `cron(30 17 * * ? *)` | resolved, constructed, constant |
 | `withings-data-ingestion` | ingestion_stack | `cron(5 14,17,21,0 * * ? *)` | resolved |
+| `youtube-social-ingestion` | ingestion_stack | `cron(0 14,2 * * ? *)` | resolved |
 
-**Unscheduled lambdas (27)** — webhook/S3-trigger/invoked-on-demand: `bluesky-social-ingestion`, `chronicle-podcast`, `coach-computation-engine`, `coach-ensemble-digest`, `coach-narrative-orchestrator`, `coach-observatory-renderer`, `coach-quality-gate`, `coach-state-updater`, `elena-state-updater`, `email-subscriber`, `food-delivery-ingestion`, `health-auto-export-webhook`, `inbound-auth-gate`, `insight-email-parser`, `life-platform-data-export`, `life-platform-key-rotator`, `life-platform-og-image`, `life-platform-remediation-dispatcher`, `life-platform-site-api`, `life-platform-site-api-ai`, `macrofactor-data-ingestion`, `mastodon-social-ingestion`, `measurements-ingestion`, `progress-viewer`, `reading-cover-pipeline`, `telegram-webhook`, `youtube-social-ingestion`
+**Unscheduled lambdas (24)** — webhook/S3-trigger/invoked-on-demand: `chronicle-podcast`, `coach-computation-engine`, `coach-ensemble-digest`, `coach-narrative-orchestrator`, `coach-observatory-renderer`, `coach-quality-gate`, `coach-state-updater`, `elena-state-updater`, `email-subscriber`, `food-delivery-ingestion`, `health-auto-export-webhook`, `inbound-auth-gate`, `insight-email-parser`, `life-platform-data-export`, `life-platform-key-rotator`, `life-platform-og-image`, `life-platform-remediation-dispatcher`, `life-platform-site-api`, `life-platform-site-api-ai`, `macrofactor-data-ingestion`, `measurements-ingestion`, `progress-viewer`, `reading-cover-pipeline`, `telegram-webhook`
 
 ## 2. DynamoDB Partitions (ADR-077 census)
 
@@ -520,10 +523,10 @@ Field-level rulings (only non-default fields are declared):
 ## 6. Coverage (honest numbers, ADR-104)
 
 - Edge sites: 1303 total · 939 resolved · 364 dynamic (unresolvable at AST time, tagged — never guessed)
-- Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (108 lambdas total)
+- Schedules: 84 resolved · 0 dynamic of 84 scheduled lambdas (108 lambdas total)
 - Alarms: 139 literal-named declarations across three idioms, 4 composite; routing digest 95 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 18 owner-only + 3 owner-published sources; 35 owner-only + 11 owner-published fields — non-default entries only
-- Schedules: 92 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
+- Schedules: 95 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
 
@@ -540,7 +543,7 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 | ai_features | 25 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
 | alarms | 139 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 33 | `deploy/emf_namespace_ledger.py::LEDGER` |
-| schedules | 92 | this model's schedules plane (CDK AST) |
+| schedules | 95 | this model's schedules plane (CDK AST) |
 | secrets | 30 | `tests/test_secret_references.py::KNOWN_SECRETS` |
 
 Scope cut (#3447 leg d, the alarms scope-cut pattern applied to secrets): `secrets` counts CODE REFERENCES (KNOWN_SECRETS, scanned lambdas/+mcp/ source only), never the live billable Secrets Manager estate — the two have already drifted (28 registry vs 26 live, 2026-09-02); a secret referenced only from `deploy/` (e.g. `life-platform/github-billing`, live+billed) is invisible to this count. `scripts/monthly_close.py` emits a read-only registry-vs-estate reconciliation at close.

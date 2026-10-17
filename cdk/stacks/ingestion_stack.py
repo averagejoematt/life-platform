@@ -58,8 +58,7 @@ INGEST_HOURLY = "0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23"
 # row, Eight Sleep ~5%. Each hour is vendor-API churn and (for the rotating-token sources)
 # a token exchange. The hours are UTC; PT in the comments (PDT = UTC-7).
 NOTION_HOURS = "14,21,3"  # 07:00, 14:00, 20:00 PT — journal entries are rare; 3/day
-# The three social feeds (youtube/bluesky/mastodon) have NO schedule: owner Q39, 2026-10-17 (#4644) — "no — retire the
-# three schedules". The functions stay deployed (invokable by hand) until accounts exist; see the registry tombstones.
+SOCIAL_HOURS = "14,2"  # 07:00, 19:00 PT — placeholder accounts (#1669); 2/day, ready for real ids
 WITHINGS_HOURS = "14,17,21,0"  # 07:00, 10:00, 14:00, 17:00 PT; site-stats-refresh adds 4 more invokes
 EIGHTSLEEP_HOURS = "14,16,18,20"  # 07:00-13:00 PT — the nightly record lands in the morning
 
@@ -205,8 +204,7 @@ class IngestionStack(Stack):
             **{k: v for k, v in shared.items() if k != "alerts_topic"},
         )
 
-        # ── 3a. YouTube — inbound social (#1669, epic #1668). SCHEDULE RETIRED 2026-10-17 (owner Q39, #4644):
-        # no `schedule=` kwarg on purpose; the function is kept (invoke by hand once an account exists).
+        # ── 3a. YouTube — inbound social (#1669, epic #1668), hourly.
         # The reference inbound-social source: Matthew's own public videos ingested back
         # in as coach-interpretable signal + (later) site display. FREE keyless per-channel
         # RSS pull (no paid token). The life-platform/youtube secret (owner-provisioned)
@@ -219,6 +217,7 @@ class IngestionStack(Stack):
             function_name="youtube-social-ingestion",
             source_file="lambdas/ingestion/youtube_lambda.py",
             handler="ingestion.youtube_lambda.lambda_handler",
+            schedule=f"cron(0 {SOCIAL_HOURS} * * ? *)",
             timeout_seconds=120,
             environment={"YOUTUBE_SECRET_NAME": "life-platform/youtube"},
             custom_policies=rp.ingestion_youtube(),
@@ -226,7 +225,7 @@ class IngestionStack(Stack):
             **{k: v for k, v in shared.items() if k != "alerts_topic"},
         )
 
-        # ── 3b. Bluesky — inbound social (#1676, epic #1668). SCHEDULE RETIRED 2026-10-17 (owner Q39, #4644).
+        # ── 3b. Bluesky — inbound social (#1676, epic #1668), hourly.
         # Extends the youtube reference source to a second open platform: FREE, keyless
         # public AppView feed (no paid token). The life-platform/bluesky secret
         # (owner-provisioned) holds only the handle; until it exists the Lambda boots and
@@ -238,6 +237,7 @@ class IngestionStack(Stack):
             function_name="bluesky-social-ingestion",
             source_file="lambdas/ingestion/bluesky_lambda.py",
             handler="ingestion.bluesky_lambda.lambda_handler",
+            schedule=f"cron(0 {SOCIAL_HOURS} * * ? *)",
             timeout_seconds=120,
             environment={"BLUESKY_SECRET_NAME": "life-platform/bluesky"},
             custom_policies=rp.ingestion_bluesky(),
@@ -245,7 +245,7 @@ class IngestionStack(Stack):
             **{k: v for k, v in shared.items() if k != "alerts_topic"},
         )
 
-        # ── 3c. Mastodon — inbound social (#1676, epic #1668). SCHEDULE RETIRED 2026-10-17 (owner Q39, #4644).
+        # ── 3c. Mastodon — inbound social (#1676, epic #1668), hourly.
         # Extends the youtube reference source to a third open platform: FREE, keyless
         # public REST API (no paid token). The life-platform/mastodon secret
         # (owner-provisioned) holds only the instance + handle; until it exists the
@@ -257,6 +257,7 @@ class IngestionStack(Stack):
             function_name="mastodon-social-ingestion",
             source_file="lambdas/ingestion/mastodon_lambda.py",
             handler="ingestion.mastodon_lambda.lambda_handler",
+            schedule=f"cron(0 {SOCIAL_HOURS} * * ? *)",
             timeout_seconds=120,
             environment={"MASTODON_SECRET_NAME": "life-platform/mastodon"},
             custom_policies=rp.ingestion_mastodon(),
