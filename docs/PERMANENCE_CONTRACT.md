@@ -1,6 +1,6 @@
 # The Permanence Contract
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-10
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 > **Contract version:** 1.0.0 · **Effective:** 2026-08-10 · **Issue:** #1400 (epic #1367)
 
 The question this document exists to answer is the one friends and family actually
@@ -126,6 +126,8 @@ edition you are reading.
 | P6 | mechanism | `lambdas/operational/continuity_watch.py::apply_transition`, plus the freeze/seal branch in the handler. |
 | P7 | limit | No mechanism by definition — this clause exists to name what the mechanisms cannot do. |
 | P8 | mechanism | `lambdas/operational/permanence_terms.py::public_terms` + this document's amendment table. |
+
+**Schedule and watchers.** `life-platform-permanence` is declared in `cdk/stacks/operational_stack.py` (the `schedule=` there is the nightly cadence; this page does not restate it). It carries a `permanence-errors` alarm and a separate dead-man alarm `permanence-heartbeat` on the `ArchiveBuilt` metric, because a Lambda that stops running errors nothing. Verified 2026-10-17: every file, function and test named in the table above exists, and `TERMS_VERSION` is still 1.0.0, so no amendment row is owed.
 
 ### The admission rule, in full
 

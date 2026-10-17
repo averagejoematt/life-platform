@@ -3226,6 +3226,13 @@
       "direction": "read",
       "lambda": "habitify-data-ingestion",
       "module": "lambdas/ingestion/habitify_lambda.py",
+      "partition": "habitify",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "habitify-data-ingestion",
+      "module": "lambdas/ingestion/habitify_lambda.py",
       "partition": "supplements",
       "via": "pk"
     },
@@ -3325,6 +3332,13 @@
       "lambda": "strava-data-ingestion",
       "module": "lambdas/ingestion/strava_lambda.py",
       "partition": "strava",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/ingestion/whoop_empty_day.py",
+      "partition": "whoop",
       "via": "pk"
     },
     {
@@ -7697,7 +7711,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 745,
+      "edges": 747,
       "lambdas": 108,
       "mcp_tool_modules": 36,
       "mcp_tools": 88,
@@ -7712,8 +7726,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 361,
-        "sites_resolved": 937,
-        "sites_total": 1298
+        "sites_resolved": 939,
+        "sites_total": 1300
       },
       "schedule_resolution": {
         "dynamic": 0,

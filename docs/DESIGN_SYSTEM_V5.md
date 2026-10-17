@@ -1,6 +1,6 @@
 # Design System v5 — "Coherence"
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 > **Superseded for pages built from the kit (2026-10-03, #4581).** A reader page that
 > loads `site/assets/css/clean.css` follows [design/v8/README.md](design/v8/README.md),
@@ -9,7 +9,7 @@
 > set below do not apply to it. This document still governs every page that does not
 > load `clean.css`.
 
-Extends (does **not** replace) `DESIGN_SYSTEM_V4_THE_MEASURED_LIFE.md` and
+Extends (does **not** replace) `docs/archive/DESIGN_SYSTEM_V4_THE_MEASURED_LIFE.md` (archived) and
 `site/assets/css/tokens.css`. v4 gave us the *materials* (palette, type triad,
 spacing, signatures). v5 gives us the *through-line*: one editorial spine and a
 small shared kit so every page reads as a single package, not a pile of features.
@@ -33,7 +33,7 @@ THE DATA ──reads──▶ THE COACHING ──proposes──▶ THE PROTOCOLS
                           │
                      THE STORY  (narrates the whole loop, week by week)
 
-THE COCKPIT (/now) = today's slice of the loop.   HOME = teaches the loop.
+THE COCKPIT (/cockpit) = today's slice of the loop.   HOME = teaches the loop.
 ```
 
 **The one rule that kills "scattered":** every page's first screen must answer
@@ -47,7 +47,7 @@ Top nav = **Home + 5 doors**: `today · the numbers · the coaches · what he tr
 | Door | Route | Loop role |
 |---|---|---|
 | Home | `/` | Teaches the loop; day-counter; routes in |
-| The Cockpit | `/now/` | Today's slice |
+| The Cockpit | `/cockpit/` (`/now/` 301s here) | Today's slice |
 | The Data | `/data/` (was `/evidence/`) | The engine: sources + domain readouts, now & over time |
 | The Coaching | `/coaching/` | AI reads the data; tabbed coach profiles + board |
 | The Protocols | `/protocols/` (new) | Supplements · Experiments · Challenges · Discoveries |
@@ -87,7 +87,8 @@ The full causal-loop card row (`.loop-node` × 4 + `.loop-arrow`). Home + About 
 ### `.wayfinder` — the wayfinding layer (#1475)
 The compact loop that ships **inside the canonical footer**, so the loop is one
 interaction away from any page — including the eight that carry no `.page-hero`
-ribbon. Five station cards in loop order (`Now · Data → Coaching → Protocols → Story ↻`),
+ribbon. Five station cards in loop order (`Today · The numbers → The coaches → What he tries → The story ↻`,
+the doors nav's own labels, `v4_wayfinding.STATIONS`),
 each with its loop role, in three reader-actionable states:
 
 | state | class | treatment |
@@ -101,7 +102,7 @@ cockpit is tagged **start here** (`v4_chrome.DEFAULT_NEXT`) — the ribbon still
 
 Below it the `.site-foot` mega-menu is re-poured **on the loop**: row 1 is the four
 causal stages in loop order (each `.sf-col[data-station]`), row 2 the two columns that
-sit outside it (The Technology, Follow & context). **Ember in the footer now means
+sit outside it (How it's built, Follow). **Ember in the footer now means
 exactly one thing — you are here.** Before this every column heading was ember, so the
 accent carried no information at all; headings are `--ink` and only the station you're
 inside keeps its ember rail + heading.
@@ -238,8 +239,8 @@ advisory by construction, it can never block a deploy on its own.
 
 ### Wiring (every page)
 The motion head-guard goes in `<head>` after the theme script; `<script src="/assets/js/motion.js" defer>`
-goes before the page's main module script. The three builders inject both (evidence/coaching/dispatches
-shells); the hand-authored Home + Cockpit have them inline.
+goes before the page's main module script. The head guard is `/assets/js/boot_motion.js`. The three builders inject both
+(evidence/coaching/dispatches shells); the hand-authored Home + Cockpit carry the same two tags.
 
 ### Micro-interaction grammar v2 — the designed-state registry (#1472)
 One motion vocabulary for the site's *transient* and *selection* surfaces, so interaction
@@ -309,9 +310,10 @@ door, or section is labelled — **never reintroduce emoji** for these.
   coach `short_id`) via `DOMAIN_ICON` to one icon.
 - **Adding a domain/icon:** add a `<symbol id="i-NAME">` to the sprite, then map the key(s) in
   `DOMAIN_ICON`. Nothing else — every consumer (cockpit rows, `/data/` nav+title, kickers) picks it up.
-- **Door icons** are server-rendered inline `<use>` (no JS) — the nav markup is **duplicated** in
-  `v4_build_evidence.py:topbar()`, `v4_build_coaching.py`, `v4_build_dispatches.py`, and the
-  hand-authored `site/index.html` + `site/now/index.html`. Change all five together.
+- **Door icons** are server-rendered inline `<use>` (no JS). The nav markup has ONE source,
+  `scripts/v4_chrome.py::doors_nav()`, and `v4_apply_chrome.py` re-flattens every page to it
+  (`docs/SITE_AUTHORING.md` §3) — change the icon/label there, then run the apply pass; do not edit
+  the copies the generators and hand-authored pages carry.
 - **Gotcha:** keep `.ico` OUT of any `.chart` figure (`.chart svg{width:100%}` would stretch it).
 
 ### 8.2 Coach sigils — `site/assets/js/sigils.js`
@@ -422,8 +424,8 @@ generation, no random state: same seed → byte-identical SVG, forever.
   resting nodes). The story hub's hero closes with one (fixed seed); each chronicle installment
   header opens with its own (seeded by the installment, `emphasis` = the real week number).
 - `seasonBand(cycle, {seed})` — the season banner: the rule band whose counted ember beads ARE
-  the attempt number (cycle 10 renders ten beads — the mark literally counts the record). On the
-  home season-premiere beat (#1244) and every card of the attempts ledger (#1375).
+  the attempt number (cycle 10 renders ten beads — the mark literally counts the record). On every
+  card of the attempts ledger (#1375, `story_attempts.js`); the home season-premiere beat (#1244) no longer uses it.
 
 Rules: texture is decorative (`aria-hidden`, `pointer-events: none`, no `<text>` — nothing for the
 §10.5 SVG type floor to police), quiet (muted ink at low opacity — the `.art-band` host classes in
@@ -477,7 +479,9 @@ and still ride the global ceiling.
 subset (the site is English-only; a browser's `unicode-range` selection never fetched the
 vietnamese/latin-ext/cyrillic/cyrillic-ext blocks anyway, so this is a build/deploy-hygiene cut,
 not a runtime-fetch one) — 18 vendored woff2 files → 5, 456KB → ~194KB under
-`site/assets/fonts/v4/`, and `fonts.css` drops from 26 `@font-face` rules to 10. The weight/style
+`site/assets/fonts/v4/` (as measured 2026-07; the vendored set is whatever that script last wrote),
+and `fonts.css` drops from 26 `@font-face` rules to the latin-only set (count them in `fonts.css`; the
+kit's `clean.css` pages add their own face under `site/assets/fonts/clean/`). The weight/style
 axis was already tight: the triad is used at weight 400/500 only (`--weight-reg`/`--weight-med`
 are the only numeric-weight custom properties in `tokens.css`) with italic scoped to Fraunces
 alone (the "human voice" token) — nothing on that axis was vendored-but-unused.
@@ -488,8 +492,8 @@ swept across all 33 pages) found the opposite is true almost everywhere: `.hero-
 `.page-hero .ph-title`, `.ev-h1`, `.dx-h1` — the actual LCP candidate on Home, Cockpit, and most
 hub pages — are all **normal**-style Fraunces at weight 500; italic is reserved for secondary
 quote/aside text that's essentially never the largest paint. The preload now points at the
-normal-400-latin file instead (same swap across `site/**/index.html` and the three page-builder
-scripts' `FONTS` constant). One page — `/method/benchmarks/`'s honest "no readouts yet" empty
+normal-400-latin file instead (same swap across `site/**/index.html` and the page-builder
+scripts' preload blocks). One page — `/method/benchmarks/`'s honest "no readouts yet" empty
 state — currently LCPs on italic text; that's a transient sparse-data condition, not the page's
 steady-state shape, so it wasn't used to justify keeping italic preloaded everywhere. Per-page-type
 preload differentiation (drop Instrument Sans where it's not needed, etc.) was investigated but
@@ -530,7 +534,8 @@ min/max pair straddling a boundary never both fire at the same pixel. A PR must 
 a seventh value — `grep -rhoE '\((max|min)-width: *[0-9]+px\)' site/assets/css` returns only
 those nine numbers. **Enforced (#1212):** `scripts/check_css_tokens.py` turns that grep into an
 assertion (a rogue value fails the gate), alongside the raw-hex / font-size / undefined-token
-sweep over the seven consumer sheets; run in CI via `tests/test_css_tokens.py`.
+sweep over the consumer sheets (`SWEPT` in the script — the list grows with each new sheet); run in CI via
+`tests/test_css_tokens.py`.
 
 **The rule covers *generated* CSS too (#1974).** A page-scoped `<style>` block emitted by a
 `scripts/v4_build_*.py` generator is CSS on a live page, so the nine numbers and the `--fs-*`
@@ -600,8 +605,8 @@ The triad's jobs are unchanged on mobile; only the register tightens. Data table
 smallest register that ships, and only for machine-voice labels, never body copy. App-bar door
 labels sit at `--fs-label` too (#2674 retired their `.66rem` = 10.56px drop — measured @360px the
 five doors + toggle still fit at 11px with no wrap; icon-over-label gives them the width). The
-floor is enforced in the browser: `qa/visual_qa.py` measures every rendered text node on the
-three highest-traffic pages (`/`, `/cockpit/`, `/data/`) and fails the sweep below 11px — the
+floor is enforced in the browser: `qa/visual_qa.py` measures every rendered text node on every
+tier-1/2 page (`TEXT_FLOOR_PAGES`, derived by `qa/qa_manifest.py::text_floor_paths`, #3543) and fails the sweep below 11px — the
 HTML-text sibling of the #1210 SVG-text audit.
 
 ### 10.6 The responsive-table primitive (#1008)
@@ -663,6 +668,6 @@ by contract** so it can never collide with the bottom app-bar (§10.2), `z-index
 app-bar's 60; the open list is an absolute overlay (no layout shift), height-capped; toggle and
 links meet the 44px floor (§10.4); anchor targets get `scroll-margin-top` so the stuck bar never
 covers a jumped-to heading. `scope` must be sticky-safe (no overflow/transform ancestor between it
-and the viewport — `.ev-main` and `.gr-wrap` qualify). Adopted: `/data/labs/`, `/data/character/`
-(allowlisted in `evidence.js` — shallower topics keep thumb-scroll), `/gear/` (static mount from
-`v4_build_gear.py`). Adding it to another deep page is one `mountSectionToc` call.
+and the viewport — `.ev-main` and `.gr-wrap` qualify). Adopted: `/data/character/`
+(the `TOC_SLUGS` allowlist in `evidence.js` — shallower topics keep thumb-scroll; `/data/labs/` left the set in
+#4182 when its readout stopped being a deep page), `/gear/` (static mount from `v4_build_gear.py`, via `gear_toc.js`). Adding it to another deep page is one `mountSectionToc` call.

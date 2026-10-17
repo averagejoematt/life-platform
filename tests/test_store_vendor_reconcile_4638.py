@@ -35,6 +35,7 @@ from ingestion import (
     strava_lambda as strava,  # noqa: E402
     whoop_lambda as whoop,  # noqa: E402
 )
+from ingestion.whoop_empty_day import EMPTIED_DAY_REASON  # noqa: E402
 
 # ── Strava ────────────────────────────────────────────────────────────────────
 
@@ -236,13 +237,19 @@ def _stored_workout(vendor_row, day):
     return {"sk": f"DATE#{day}#WORKOUT#{vendor_row['id']}", "workout_id": vendor_row["id"], **whoop._extract_workout(vendor_row)}
 
 
-def _run_whoop(monkeypatch, vendor_workouts, stored_workouts, stored_sks=None, fetch_stored=None):
+def _run_whoop(monkeypatch, vendor_workouts, stored_workouts, stored_sks=None, fetch_stored=None, put_error=None):
+    """`writes` collects every put_item Item; any other write API is recorded by name and refused."""
     emitted = {}
     writes = []
 
     class GuardTable:
+        def put_item(self, Item):
+            if put_error:
+                raise put_error
+            writes.append(Item)
+
         def __getattr__(self, name):
-            if name in ("put_item", "update_item", "delete_item", "batch_writer"):
+            if name in ("update_item", "delete_item", "batch_writer"):
                 writes.append(name)
             raise AttributeError(name)
 
@@ -301,7 +308,9 @@ def test_whoop_both_directions_in_one_pass(monkeypatch):
     assert [m["id"] for m in body["missing"]] == ["w-new"]
     assert body["store_vendor"]["absent"] == [{"id": "w-gone", "date": day}]
     assert emitted["missing"] == 1 and emitted["absent"] == 1
-    assert writes == []
+    # #4638 "write it": the day's only stored workout is gone from a non-empty vendor list.
+    assert [w["sk"] for w in writes] == [f"DATE#{day}#WORKOUT#w-gone"]
+    assert body["store_vendor"]["emptied_days"] == [day]
 
 
 def test_whoop_a_stored_workout_outside_the_judged_window_is_not_absent(monkeypatch):
@@ -326,3 +335,63 @@ def test_whoop_a_failed_store_vendor_read_never_costs_the_api_to_store_result(mo
     assert body["missing_count"] == 1
     assert body["store_vendor"] == {"error": "throttled"}
     assert "absent" not in emitted
+
+
+# ── Whoop empty-day write (#4638, owner ruling 2026-10-17: "write it") ───────────
+
+
+def test_whoop_a_day_whose_workouts_are_all_deleted_is_written_empty(monkeypatch):
+    day, other = _day(5), _day(4)
+    gone_a, gone_b = _vendor_workout("w-a", day, "07:00", "07:30"), _vendor_workout("w-b", day, "12:00", "12:40")
+    elsewhere = _vendor_workout("w-other", other)  # keeps the vendor list non-empty
+    logged = []
+    monkeypatch.setattr(whoop.logger, "warning", lambda msg, *a, **k: logged.append(msg % a if a else msg))
+
+    body, _, writes = _run_whoop(monkeypatch, [elsewhere], [_stored_workout(gone_a, day), _stored_workout(gone_b, day)])
+
+    assert sorted(w["sk"] for w in writes) == [f"DATE#{day}#WORKOUT#w-a", f"DATE#{day}#WORKOUT#w-b"]
+    for w in writes:
+        assert w["tombstone"] is True and w["tombstoned_reason"] == EMPTIED_DAY_REASON
+        assert w["emptied_activity_ids"] == ["w-a", "w-b"] and "strain" not in w and "kilojoule" not in w
+    assert body["store_vendor"]["emptied_days"] == [day]
+    assert body["store_vendor"]["empty_day_writes_skipped"] is None
+    assert any("[RECONCILE] #4638" in m and day in m and "w-a" in m and "wrote the empty day" in m for m in logged)
+
+
+def test_whoop_a_day_with_an_id_still_listed_is_not_emptied(monkeypatch):
+    day = _day(5)
+    kept, gone = _vendor_workout("w-kept", day, "07:00", "07:30"), _vendor_workout("w-gone", day, "12:00", "12:40")
+
+    body, _, writes = _run_whoop(monkeypatch, [kept], [_stored_workout(kept, day), _stored_workout(gone, day)])
+
+    assert writes == [] and body["store_vendor"]["empty_day_candidates"] == []
+
+
+def test_whoop_empty_vendor_list_writes_nothing(monkeypatch):
+    day = _day(5)
+    body, _, writes = _run_whoop(monkeypatch, [], [_stored_workout(_vendor_workout("w-a", day), day)])
+
+    assert writes == []
+    assert body["store_vendor"]["empty_day_writes_skipped"] == "vendor_list_empty"
+
+
+def test_whoop_today_is_never_emptied(monkeypatch):
+    today, other = _day(0), _day(4)
+    body, _, writes = _run_whoop(monkeypatch, [_vendor_workout("w-o", other)], [_stored_workout(_vendor_workout("w-t", today), today)])
+
+    assert writes == [] and body["store_vendor"]["empty_day_candidates"] == []
+
+
+def test_whoop_a_failed_empty_day_write_is_non_fatal(monkeypatch):
+    day, other = _day(5), _day(4)
+    body, emitted, writes = _run_whoop(
+        monkeypatch,
+        [_vendor_workout("w-o", other)],
+        [_stored_workout(_vendor_workout("w-a", day), day)],
+        put_error=RuntimeError("throttled"),
+    )
+
+    assert writes == []
+    sv = body["store_vendor"]
+    assert sv["empty_day_candidates"] == [day] and sv["emptied_days"] == [] and sv["absent"] == [{"id": "w-a", "date": day}]
+    assert emitted["absent"] == 1

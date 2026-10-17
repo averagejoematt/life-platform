@@ -1,6 +1,6 @@
 # The Four Audience Journeys
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 > The site's four north-star audiences ([PLATFORM_NORTH_STAR.md](../PLATFORM_NORTH_STAR.md))
 > have always had a *destination* (the doors registry, [SITE_MAP_AND_INTENT.md](../SITE_MAP_AND_INTENT.md)),
@@ -33,7 +33,8 @@ back).
 - **Entry point:** `/` (home) — almost always via a Reddit/HN link, cold, skeptical of
   "another AI wellness thing."
 - **First hook:** the loop diagram + headline proof (lbs down, the waveform) in one
-  screen, no scroll required — home's whole job per SITE_MAP_AND_INTENT.md.
+  screen, no scroll required — home's whole job per SITE_MAP_AND_INTENT.md (whose home
+  "must deliver" order was amended 2026-09-26, #4182; read it there for the current order).
 - **Next station:** home's loop-forward close now points at **the cockpit** ("start with
   today's live read") — the fastest way to see the loop is *actually running*, not just
   diagrammed. From the cockpit the close continues the loop: cockpit → data → coaching →
@@ -85,9 +86,15 @@ back).
 
 ## The audit: exit links vs. the map, before and after
 
+*The page counts and "~30 links" in this table are the 2026-07-18 audit snapshot, kept as the record of
+the gap; the doors' labels have since become the reader's words (`today · the numbers · the coaches ·
+what he tries · the story`, #4182) and the mapping below is unchanged — read it live from
+`v4_chrome.NEXT_STATION`.*
+
 The audit runs at the **door level** — every page under a door shares that door's
 loop-forward mapping by construction (`scripts/v4_chrome.py::NEXT_STATION`), so auditing
-per-door covers all 78 chrome-bearing pages without re-litigating page-by-page (a page
+per-door covers every chrome-bearing page (78 when audited, 2026-07-18; `tests/test_site_chrome.py`
+derives the live set) without re-litigating page-by-page (a page
 whose door differs from its siblings would be a bug the guard test below would catch).
 
 | Door / section | Actual exit links, before #1468 | Gap | Actual exit, after #1468 |
@@ -138,9 +145,12 @@ subscribe-page audit finding both ways. `scripts/v4_apply_chrome.py --check` (al
 the CI Unit Tests gate via `test_apply_chrome_check_is_green`) fails the build if any page
 drifts from the canonical partial.
 
-At the time of writing: 80 non-legacy HTML files in `site/`, 78 carry a doors nav (and
-now a loop-forward close), 2 are the redirect stubs (`/mind/`, `/subscribe.html`)
-correctly excluded by construction.
+At the time of writing (2026-07-18): 80 non-legacy HTML files in `site/`, 78 carried a doors nav
+(and now a loop-forward close), 2 were the redirect stubs (`/mind/`, `/subscribe.html`) correctly
+excluded by construction. The tree has grown since and the count is not pinned here: the preview pages
+under `site/next/**`, `site/kit/` and the essay body fragment carry no doors nav and so, by the same
+construction, no close — `test_every_content_page_has_one_loop_forward_close_before_the_footer` derives
+the set from the tree.
 
 ## The wayfinding layer: the map behind the close (#1475)
 
@@ -153,8 +163,10 @@ where this doc's own finding landed — "a directory of ~30 links with no opinio
 `.wayfinder` — the loop's five stations, this page's station marked ember and
 `aria-current="page"`, the next one tagged `next`, the one the loop arrived from lifted —
 and the mega-menu below it is re-poured in loop order with each stage column keyed to its
-station. Both ship on every chrome-bearing page through the same `v4_apply_chrome.py`
-sweep, off the same detected door, so a reader is never more than one interaction from the
+station. (Since #4182 the station names are the doors nav's own reader-words — `Today · The numbers ·
+The coaches · What he tries · The story` — and the mega-menu is the reach-set pour in
+`v4_chrome.FOOTER_COLUMNS`, not the ~30-link directory this section quotes.) Both ship on every
+chrome-bearing page through the same `v4_apply_chrome.py` sweep, off the same detected door, so a reader is never more than one interaction from the
 loop no matter which page a Reddit link dropped them on.
 
 **Why a map AND a close, not one or the other.** They answer different questions and are

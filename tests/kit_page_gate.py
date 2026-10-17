@@ -18,7 +18,12 @@ time in _capture.json; never fetched here):
 
 It runs BEFORE merge only (v4-gate.yml, the render job). It is never a deploy rollback:
 page height depends on the day's data, so a long chapter title on a Wednesday must not
-revert a deploy. The fixtures pin the data, so the verdict is about the page.
+revert a deploy. The fixtures pin the data, and the browser's clock is pinned to the
+fixtures' capture instant (`_capture.json: captured_at`), so the verdict is about the page:
+a page that lists what is "upcoming" or "today" against the Pacific wall clock
+(ck_coach.js isUpcoming/todayPT) must not change height as the calendar moves past the
+capture (the #4848 class — on 2026-10-17 the physical coach page crossed its budget by
+17 px with no site change, the day after the fixture's last due date).
 
 MUTATION CONTROL (always runs first): the same harness is pointed at an over-long edition
 — the coach lines inflated to 40 — and MUST report the height failure. A gate
@@ -31,6 +36,7 @@ Usage:
 
 import argparse
 import copy
+import datetime
 import functools
 import json
 import os
@@ -42,6 +48,16 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 FIXTURES_DIR = os.path.join(HERE, "fixtures", "kit_pages_4586")
+
+
+def captured_at() -> datetime.datetime:
+    """The instant the fixtures were captured (`_capture.json`), as an aware datetime: the
+    browser clock every page is rendered under, so a day-relative list cannot move the verdict."""
+    with open(os.path.join(FIXTURES_DIR, "_capture.json"), encoding="utf-8") as fh:
+        stamp = json.load(fh)["captured_at"]
+    return datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+
+
 VIEWPORT = {"width": 390, "height": 844}
 AXE_JS_PATH = os.path.join(HERE, "vendor", "axe.min.js")  # the bundle tests/a11y_audit.py vendors
 AXE_GATING_IMPACTS = ("critical", "serious")
@@ -204,6 +220,7 @@ def measure(browser, base_url, fixtures, pages, out_dir=None, axe=True):
         for path, budget in pages.items():
             res = results.setdefault(path, {"findings": []})
             page = context.new_page()
+            page.clock.set_fixed_time(captured_at())  # the fixtures' instant, not the wall clock (#4848 class)
             errors = []
             page.on("pageerror", lambda e, errors=errors: errors.append(str(e)))
             page.on("console", lambda m, errors=errors: errors.append(m.text) if m.type == "error" else None)

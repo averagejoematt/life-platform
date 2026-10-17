@@ -1,7 +1,7 @@
 # AWS Access — the authoritative human-access procedure
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (#1029 re-entry hardening — §3 break-glass status re-verified read-only)
-> **Sources of truth:** `grep -h "role-to-assume" .github/workflows/*.yml | sort -u` (CI role inventory) · `aws sts get-caller-identity` (live auth check) · `docs/SECURITY.md` (policy stance) · `docs/OPERATOR_GUIDE.md` (day-1 checklist)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17 (OIDC role inventory, trust subjects and break-glass key state re-read live, read-only; SSO instance re-confirmed ACTIVE)
+> **Sources of truth:** `grep -ho "github-actions-[a-z-]*-role" .github/workflows/*.yml | sort -u` (CI role inventory; the roles are passed as `aws-role:` to the `setup-ci` composite action, so a bare `role-to-assume` grep finds only the read-only role) · `python3 deploy/verify_oidc_iam.py --strict` (checked-in `infra/iam/` vs live) · `aws sts get-caller-identity` (live auth check) · `docs/SECURITY.md` (policy stance) · `docs/OPERATOR_GUIDE.md` (day-1 checklist)
 
 This file is the **single home** for how a human gets AWS access to the platform.
 `docs/SECURITY.md` and `docs/OPERATOR_GUIDE.md` state the *policy* ("no long-lived
@@ -109,12 +109,12 @@ just `aws sso login` again.
 ## 3. Break-glass: long-lived keys on `matthew-admin`
 
 **When this is acceptable:** IAM Identity Center outage, or initial bootstrap
-(no Identity Center provisioned yet — the state as of 2026-07-10). Not for daily
+(no Identity Center provisioned yet — the state before 2026-07-12). Not for daily
 work once SSO is live.
 
-> ⚠️ **#1029 finding (verified 2026-07-26, read-only `iam:ListAccessKeys`):**
+> ⚠️ **#1029 finding (re-verified 2026-10-17, read-only `iam:ListAccessKeys` and `scripts/check_reentry_hardening.py` item 1b):**
 > Identity Center has been LIVE since 2026-07-12 (§2), but `matthew-admin` still
-> has one **Active** access key created 2026-02-21 — 155+ days old, well past
+> has one **Active** access key created 2026-02-21 — 237 days old on 2026-10-17, well past
 > the 90-day rotation cadence below, and now redundant now that SSO is the
 > daily path. **Owner action required** (deactivating a key is an IAM mutation
 > — no AI session performs it). Get the exact key ID first (never hardcode it
@@ -164,19 +164,21 @@ is public; a committed key is a full account compromise (threat #3 in
 ## 4. CI / OIDC roles inventory
 
 GitHub Actions authenticates via OIDC federation — no stored AWS keys anywhere in
-GitHub. Five roles are assumed across the workflows (verified 2026-10-01 by
-grepping `role-to-assume`; re-derive with the command below, never from memory):
+GitHub. Five roles are assumed across the workflows (re-verified 2026-10-17 against
+`.github/workflows/`, `infra/iam/` and live `iam get-role`; re-derive with the commands below, never from memory):
 
 ```bash
-grep -h "role-to-assume" .github/workflows/*.yml | sort -u
+grep -ho "github-actions-[a-z-]*-role" .github/workflows/*.yml | sort -u   # the roles named
+grep -ln "aws-role:.*github-actions-<name>-role\|role-to-assume:.*github-actions-<name>-role" .github/workflows/*.yml   # who assumes <name>
+python3 deploy/verify_oidc_iam.py --strict    # infra/iam/ == live (read-only)
 ```
 
 | Role | Assumed by | Scope (one line) |
 |---|---|---|
 | `github-actions-deploy-role` | `ci-cd.yml` (`deploy-iam`, `deploy`, `rollback-on-smoke-failure`), `site-deploy.yml` (`deploy-site`, `rollback-site-on-failure`) — only jobs bound to the `production` or `ungated-deploy` environment (#4257) | The deploy path — Lambda code updates, CDK deploys, S3 site sync; slimmed 2026-07-10 (#903/#906: shed `IAMReadOnly` + Bedrock vision-QA perms). Its trust accepts the two environment subjects only — no bare main ref. |
 | `github-actions-readonly-role` | `ci-cd.yml` (`plan`, `smoke-test`, `post-deploy-checks`, `notify-failure`), `site-deploy.yml` (`notify-deploy-failure`), `config-drift.yml`, `pii-endpoint-sweep.yml` | Observe-only (#4257): describe/list/get, `config/` reads, the qa-smoke + canary invokes, the failure-digest publish, the CDK lookup role. No Lambda update, no S3 write, no secret value. |
-| `github-actions-diagnosis-role` | `ci-cd.yml`, `site-deploy.yml`, `visual-qa.yml` (diagnosis/QA steps) | Read-only diagnosis: logs, metrics, alarm state — no mutation. |
-| `github-actions-remediation-role` | `remediation-agent.yml`, `fresh-eyes.yml` | Self-healing agent (ADR-064/065): Bedrock invoke + read-only diagnosis + scoped audit-log S3 writes; NO deploy, NO IAM mutate. |
+| `github-actions-diagnosis-role` | `ci-cd.yml`, `site-deploy.yml`, `visual-qa.yml`, `webkit-mobile-qa.yml` (diagnosis/QA steps) | Read-only diagnosis: logs, metrics, alarm state — no mutation. |
+| `github-actions-remediation-role` | `remediation-agent.yml`, `fresh-eyes.yml`, `hae-webhook-ingress-drift.yml`, `raw-kms-readability.yml` | Self-healing agent (ADR-064/065): Bedrock invoke + read-only diagnosis + scoped audit-log S3 writes; NO deploy, NO IAM mutate. |
 | `github-actions-golden-eval-role` | `golden-brief-eval.yml`, `eval-harvest.yml` | Golden-output eval harness (judge): read fixtures + Bedrock invoke for grading. |
 
 Since ADR-158 only the additive-IAM CDK deploy (`deploy-iam`) waits on the GitHub

@@ -1,6 +1,6 @@
 # Secrets Map — central reference for source → secret mapping
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-02
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 > **Dated publication note (2026-08-23, #3043 DIL-012):** this inventory of secret
 > **names and locations** is published deliberately — names are references, not
 > credentials; every value lives in AWS Secrets Manager behind IAM. The map is what
@@ -13,7 +13,7 @@
 `secret_count` literal + its `live-verified` stamp; `scripts/check_doc_facts.py` reds CI
 when that stamp passes 90 days).
 
-**Current state (2026-08-23): 26 active secrets us-west-2, 0 in deletion window (+3 us-east-1 — see the us-east-1 section below).**
+**Current state (re-read live 2026-10-17, names only): 28 active secrets us-west-2 + 1 in its deletion window (`life-platform/garmin`, DeletedDate 2026-10-12, #4640) + 2 us-east-1 — see the us-east-1 section below.** The platform-wide count is the `secrets` key of `model/platform_model.json` `cost_surface` (30 = 28 + 2); the synced `secret_count` literal in `deploy/sync_doc_metadata.py` is refreshed by `--refresh-secrets`, not by hand here.
 The 2026-05-19 state (12 active + 3 pending deletion) is history: `dropbox` and
 `anthropic-api-key` completed deletion; `notion` was kept (restored 2026-05-24, the
 day its deletion was due — it exists live, last accessed 2026-03-09; ingestion reads
@@ -46,7 +46,7 @@ aws secretsmanager list-secrets --include-planned-deletion --region us-west-2 \
   --query 'SecretList[].{Name:Name,DeletedDate:DeletedDate}' --output table
 ```
 
-Last reconciled: **2026-08-23**. 26 active us-west-2 + 3 us-east-1, 0 in deletion window, all under `life-platform/*`.
+Last reconciled: **2026-10-17**. 28 active us-west-2 + 2 us-east-1, 1 in deletion window (`garmin`), all under `life-platform/*`.
 
 ---
 
@@ -84,6 +84,9 @@ Last reconciled: **2026-08-23**. 26 active us-west-2 + 3 us-east-1, 0 in deletio
 | CloudFront → site-api origin verification | `life-platform/site-api-origin-secret` | Shared header secret so the site-api Function URL only serves CloudFront (`cdk/stacks/constants.py`; referenced by NAME — partial-ARN resolution breaks on `…-secret` suffixes) | ✅ 2026-07-10 |
 | Google Cloud TTS (podcasts) | `life-platform/google-tts` | API key — Chirp/Gemini TTS (`lambdas/ai/google_tts.py`, `lambdas/ai/gemini_tts.py`, ADR-087) | ✅ 2026-07-10 |
 | Pexels (editorial images) | `life-platform/pexels` | API key (`lambdas/content/editorial_image.py`) | ✅ 2026-07-10 |
+| Reader IP-hash salt (#3620) | `life-platform/ip-hash-salt` | Salt for the reader `ip_hash` on the social-engage doors, fail-closed when absent (`lambdas/common/client_ip.py`, `lambdas/web/site_api_social_engage.py`; grant in `cdk/stacks/role_policies_serve.py`) | ✅ 2026-10-17 |
+| Progress-photo viewer signing (#3760) | `life-platform/progress-photos-signing` | HMAC key: mints the one-time owner link and verifies it + the session cookie (`lambdas/privacy/progress_access.py`; secret name injected by `cdk/stacks/serve_stack.py` / `web_stack.py`) | ✅ 2026-10-17 |
+| Progress-photo viewer — **orphan** | `life-platform/progress-token-secret` | Created 2026-09-13 with owner pre-approval for #3760; **no consumer anywhere in the tree** (the viewer reads `progress-photos-signing`) and `LastAccessedDate` is empty. Delete candidate — owner-attended, pre-check the empty access date first | ⚠️ 2026-10-17 |
 | Telegram coach chat (#2363) | `life-platform/telegram` | per-bot tokens + chat-id allow-list + `webhook_secret` (`coach/telegram_worker_lambda.py`, `web/telegram_webhook_lambda.py`; owner-provisioned via `setup/setup_telegram_bots.py`) | ✅ 2026-08-09 |
 
 ---
@@ -104,7 +107,7 @@ Last reconciled: **2026-08-23**. 26 active us-west-2 + 3 us-east-1, 0 in deletio
 
 | Source | Pattern | Mitigation if platform silent |
 |---|---|---|
-| Garmin | OAuth1 expires ~30d | Disable EventBridge rule before silence; re-auth via Playwright |
+| Garmin | RETIRED (#4640) — secret in its deletion window since 2026-10-12 | n/a — restore with `restore-secret` only inside the window, if the source is ever revived |
 | Withings | OAuth2 — rate-limit accumulation on cron retries during silence | Disable EventBridge rule before silence |
 | Strava | similar to Withings | Disable rule |
 | Whoop | OAuth2 — refresh tokens long-lived; less risky | Disable rule if silence > 30 days |
@@ -133,18 +136,18 @@ split/merge decisions are priced in #2890.
 
 | Family | Secrets | Rotation owner | Expiry / next action |
 |---|---|---|---|
-| OAuth data sources | `whoop` · `withings` · `strava` · `garmin` | Lambda auto-refresh; **Matthew** on refresh-token death (re-auth procedures above) | No fixed expiry; garmin idle (ADR-074 pause) — re-auth only on revival |
+| OAuth data sources | `whoop` · `withings` · `strava` · `garmin` | Lambda auto-refresh; **Matthew** on refresh-token death (re-auth procedures above) | No fixed expiry; garmin retired (#4640), in its deletion window — no re-auth |
 | Static source keys (dedicated) | `habitify` · `hevy` · `hevy-write` · `todoist` · `eightsleep` + `eightsleep-client` | **Matthew** | Static — on exposure |
 | Bundled ingestion keys | `ingestion-keys` (todoist / notion / dropbox / HAE fields) | **Matthew** (per-field, at the provider) | Static — on exposure; dropbox OAuth refresh in-Lambda. Widest blast radius: one secret → 4 providers × 6 consumer Lambdas (#2890 prices the split) |
 | Anthropic direct-API | `ai-keys` · `site-api-ai-key` | **Matthew** | Static — on exposure; runtime inference is Bedrock/IAM (ADR-062), these are fallback/isolated paths |
 | Platform-minted HMAC | `subscriber-token-secret` · `ritual-token-secret` · `site-api-origin-secret` | **Matthew** (rotation = mass token invalidation — plan it) | Static — on exposure |
-| Auto-rotating | `mcp-api-key` | **Automated** (`life-platform-key-rotator`, 90d) | Next rotation ~2026-10-05 |
+| Auto-rotating | `mcp-api-key` | **Automated** (`life-platform-key-rotator`, 90d) | Last rotated 2026-10-09; next ~2027-01-08 (live `describe`, 90-day schedule) |
 | GitHub PATs | `github-dispatch-token` · `github-billing` | **Matthew** (regenerate in GitHub → update secret) | ⚠️ Expiry set in GitHub UI, unrecorded here — record on next regeneration |
 | Content/publish keys | `google-tts` · `pexels` · `youtube` · `bluesky` (app password) · `telegram` (bot tokens) | **Matthew** (at each provider) | Static — on exposure; bluesky is a scoped app password, never the account password |
 | Operator config (not credentials) | `digest` (recipient list) | **Matthew** | n/a — configuration kept out of git, no rotation concept |
 | Retire-candidate | `notion` (dedicated) | **Matthew** | **Deletion batched to the owner 2026-08-23 (#2890)** — see Cleanup below; pre-check required (live LastAccessedDate 2026-07-25 says something still reads it) |
 
-## us-east-1 secrets (region is structural, not drift — verified live 2026-08-23)
+## us-east-1 secrets (region is structural, not drift — verified live 2026-10-17: `cf-auth` + `site-api-origin-secret` present, `buddy-auth` gone)
 
 | Secret (us-east-1) | Why it exists there | Consumer |
 |---|---|---|
@@ -181,6 +184,9 @@ Cache TTL note: COST-OPT-1 uses `secret_cache.py` (15-min in-memory TTL — a bu
 | `life-platform/ai-keys` | legacy direct-API fallback (`AI_SECRET_NAME` in `intelligence_common.py`); referenced across intelligence/email Lambdas — `grep -lrn life-platform/ai-keys lambdas/ mcp/` for the live list | Bedrock/IAM is the primary inference path (ADR-062) |
 | `life-platform/site-api-ai-key` | `life-platform-site-api`, `life-platform-site-api-ai`, `site_api_social`, `life-platform-freshness-checker`, `pipeline-health-check` | Isolated per R17-04 |
 | `life-platform/mcp-api-key` | `life-platform-mcp` (config), `life-platform-canary`, `life-platform-qa-smoke`, `life-platform-key-rotator` | HMAC bearer; auto-rotates 90d |
+| `life-platform/ip-hash-salt` | `life-platform-site-api` social-engage doors (`site_api_social_engage.py`, `common/client_ip.py`; grant `role_policies_serve.py`) | salt, fail-closed when absent (#3620) |
+| `life-platform/progress-photos-signing` | `telegram-coach-worker` (mints link), `progress-viewer` (verifies) — `lambdas/privacy/progress_access.py`; grants `role_policies_serve.py` | owner-only photo viewer (#3760) |
+| `life-platform/progress-token-secret` | **none** — orphan, no reader in the tree, never accessed | delete candidate (owner-attended) |
 | `life-platform/github-dispatch-token` | `life-platform-remediation-dispatcher` (`lambdas/operational/remediation_dispatcher_lambda.py`) | repo-scoped PAT |
 | `life-platform/subscriber-token-secret` | `life-platform-site-api` (`site_api_social.py`), `life-platform-site-api-ai` | HMAC signing |
 | `life-platform/ritual-token-secret` | `life-platform-site-api` (`site_api_social.py`), `evening-nudge` | HMAC signing |
@@ -197,6 +203,7 @@ Cache TTL note: COST-OPT-1 uses `secret_cache.py` (15-min in-memory TTL — a bu
 
 ## Cleanup state (2026-07-10 reconciliation)
 
+0. 🗑️ **`life-platform/garmin`** — in its deletion window (DeletedDate 2026-10-12, #4640); restore within the window with the command below if ever needed.
 1. ✅ **`life-platform/anthropic-api-key`** — deleted (window closed 2026-05). Gone from live inventory.
 2. ✅ **`life-platform/dropbox`** — deleted (window closed 2026-05). Bundle path authoritative.
 3. ⚠️ **`life-platform/notion`** — was scheduled for deletion 2026-05-24 but is LIVE (LastChangedDate = 2026-05-24, i.e. restored the day deletion was due). Ingestion reads the bundle. **Deletion is batched to the owner (2026-08-23, #2890 / DIL-016)** with a required pre-check: live `LastAccessedDate` is **2026-07-25** (not 2026-03-09 as previously recorded), so something DOES still call `GetSecretValue` on it — identify that reader (start with `life-platform-freshness-checker` / `pipeline-health-check`, whose references were assumed name-only) before scheduling deletion, or adopt it as the authoritative Notion path. Either way, resolve the split.
@@ -221,4 +228,4 @@ If this doc drifts from reality, it becomes worse than nothing. Treat divergence
 
 ---
 
-**Verified:** 2026-07-11 (#935 Whoop re-auth row — script now `setup/setup_whoop_auth.py`; secrets inventory last reconciled 2026-07-10, wiki-3 pass)
+**Verified:** 2026-10-17 — secret NAMES, deletion-window state, rotation dates and every named consumer file reconciled against live `list-secrets` (both regions) and the tree. The per-row `✅ 2026-07-10` auth-pattern / re-auth-procedure cells were not re-exercised (that needs a provider-side login) and keep their original dates.
