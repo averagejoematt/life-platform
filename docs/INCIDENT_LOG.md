@@ -2,7 +2,7 @@
 
 > **Status:** log · **Owner:** Matthew · **Verified:** 2026-05-19
 
-Last updated: 2026-10-15 Session BU Fable zero-run (#1332 gate; +1 row — the 2026-10-14 silent site-publish block, #4703 class, with its pre-flight line and class tracker)
+Last updated: 2026-10-17 Session BV Fable proofs-and-alarms run (#1332 gate; +1 row — the 2026-10-14 missed week-6 chronicle send, #4914/#4531 class, with its pre-flight chronicle-queue line)
 
 > Tracks operational incidents, outages, and bugs that affected data flow or system behavior.
 > For full details on any incident, check the corresponding CHANGELOG entry or handover file.
@@ -24,6 +24,7 @@ Last updated: 2026-10-15 Session BU Fable zero-run (#1332 gate; +1 row — the 2
 
 | Date | Severity | Summary | Root Cause | TTD* | TTR* | Data Loss? |
 |------|----------|---------|------------|------|------|------------|
+| 2026-10-14 | **P3** (the week-6 chronicle never reached subscribers; nothing served was wrong; silent to the reader for 2 d 3 h, then loud) | **Week 6 (2026-10-13) was drafted by the legacy writer and never sent:** the `wednesday-chronicle` run at 2026-10-14T15:00Z had the desk's budget rejected twice on the open-ask follow-up class (#4914) and fell back to the legacy writer at 15:03:25Z; the draft was stored and the preview email sent at 15:04:40Z; the fix (PR #4916) merged 20:15Z and deployed 20:22Z, five hours after the run; nobody approved the legacy draft. The 48-hour sweep refused it at 2026-10-16T18:00:44Z (`CHRONICLE-AUTOPUBLISH-HELD Week 6 … no audit on record` — the #4694 audit gate, and its live proof) and `chronicle-delivery-heartbeat` went ALARM at 19:02Z. Found by Session BV's boot read of the alarm board on 2026-10-17, after both detectors had fired. | Verified: a desk-failure fallback produces a draft only an owner approval can publish (an unaudited draft never auto-publishes, by design — #4694), and no instrument showed the waiting draft to the sessions that booted inside the 48-hour review window (BU, 2026-10-15 19:32Z, had no line for it). The detectors fired after their windows as designed; the gap is the review window itself. Class tracker: the dated `## Backlog rows` line on #4531; procedure edit in the same commit as this row: `scripts/hooks/session_preflight.py` prints every chronicle `DATE#` draft awaiting approval with its age at SessionStart (`chronicle   DRAFT DATE#2026-10-13 (week 6) unapproved 2d12h — HELD by the 48-h sweep daily …`; UNVERIFIED on a failed read, never blank). The way out is the owner's (#4914): approve from the preview email or force the desk. | 2 d 3 h to the alarm (10-14 15:04Z → 10-16 18:01Z); to a session, the next boot after it (2026-10-17 02:55Z) | Open at 2026-10-17 — awaits the owner's approval or force; week 7 runs 2026-10-21 15:00Z | No — the draft is stored; week 6 is late, not lost. |
 | 2026-10-14 | **P3** (two merged site PRs unpublished for 23 h; nothing served was wrong, the site was stale; silent) | **Every `site-deploy.yml` run from 2026-10-14T19:21Z to 2026-10-15T18:07Z failed before publishing, and no session noticed for a day:** the #3515 proof-freshness guard red-flagged `site/coaching/index.html` because the baked `as of` stamp read 2026-10-05 while every coach read on the block was dated the same day. PR #4916 (#4914) and PR #4919 (#4586) merged into a site that would not publish. Found by Session BT's boot read of the last site-deploy conclusion (`gh run list --workflow site-deploy.yml`), not by any alarm. | Verified: the held weekly read (#4703 class — the grounding gate kept the prior record and its TTL removed it) left `weekly_priority.generated_at` empty, and `scripts/v4_proof.py::load_coaching_read` fell back to `_meta.generated_at`, the analyzer's last productive run (10-05); the guard worked as designed over a stale stamp. Fixed by PR #4924 (898bddd43): the block stamps its newest content date; the site-deploy workflow's `paths` exclude `scripts/`, so the fix needed a hand dispatch (run 38779463603, success 18:07:02Z — the first publish since 10-13). Class: a failed site-deploy is silent (second instance after #3878, 2026-09-16→19); the tracker is the dated `## Backlog rows` line on #3493 (a scheduled read of the newest run's conclusion, or the pre-flight accepted as the instrument); the procedure edits are in the same commit as this row (`scripts/hooks/session_preflight.py` prints the newest site-deploy conclusion at every boot; `docs/CONVENTIONS.md` §2 and `.claude/skills/land/SKILL.md` §4 carry the reflex). | ~23 h (the next session's boot read; no alarm fires on a site-deploy failure). | Code fixed and merged 2026-10-15 17:30Z; published 18:07:02Z by the dispatched run. | No — nothing stored changed; two merged site changes were simply not live for 23 h. |
 | 2026-10-12 | **P3** (main red ~2 h; nothing served was wrong; the night's two in-flight PRs were blocked until the cause was found) | **`tests/test_energy_budget_cross_phase_4032.py` went red on main at exactly 2026-10-12T00:00Z — five tests, `2425 == 2426`:** the test pinned literal TDEEs for a profile with a date of birth while `lambdas/health/tdee.py::resolve_age` computes a fractional age from `datetime.now()`; the BMR's `-5 × age` term is rounded to whole kcal, so the value steps down one kcal about every 73 days and did so at midnight UTC. CI's full suite on PR #4840 and #4844 (both green on their own merge refs an hour earlier) surfaced it; every run of main after 00:00Z was red on it. | Verified by bisect: four clean `git archive` exports (before and at #4820, before and at #4838 — the two suspects from the previous hour) all gave `5 failed`, and stepping the clock a day at a time put the 2341 → 2340 BMR step at 2026-10-12T00:00Z. Fixed by PR #4843 (eb04144f6): the fixture runs the real `resolve_age` with its clock fixed to the test's own `END` date, plus a control that moves only the clock and reads 2425. Class: a literal expected value pinned through an unfrozen clock — the tracker is #4848 (an AST sweep of the set and a guard); the procedure gaps are closed in the same commit (`worktree-implementer.md` 6a2 freezes the clock before pinning; `finding-verifier.md` item 10 bisects the clock before the diffs when the first red is at a round-number instant). | ~0 h to detect (the first PR suite after midnight), ~2 h to name the cause (the two merges were bisected before the clock). | Code fixed and merged 2026-10-12 ~01:50Z; the two held PRs re-ran green and merged by 02:30Z. | No — a test fixture; no stored or served number changed. |
 | 2026-10-05 | **P2** (daily compute down five days; day grade, weight, projections and the first-earn badge sweep not written; the alarms fired and nobody read them) | **`daily-metrics-compute` raised on every invocation from 2026-10-05T00:00:43Z to at least 2026-10-10T00:00:42Z:** `TypeError: '>' not supported between instances of 'int' and 'str'` in `scoring_engine.score_habits_registry`. `computed_metrics` rows from `DATE#2026-10-04` carry only the ACWR fields, `BADGE#lost_20` was never recorded (served earned with no date), and the character sheet's earned count (5) disagreed with `summary.earned` (6). `compute-pipeline-stale`, both ingestion-DLQ alarms (the function's DeadLetterConfig) and the QA smoke's `score:day_grade` check all went red and stayed red or flapped daily; no session read them until the Session BK kit-fixture re-capture traced the undated badge. | Verified: two `habit_registry` entries added by hand on 2026-10-04 (the Habitify session) store `target_frequency` as a DynamoDB string (`"7"`, `"5"`); the scorer compared it with an int. Fixed by #4706 (`_registry_number` reads `tier`, `scoring_weight` and `target_frequency` as numbers however stored and names any non-numeric value in `details.registry_type_drift`; the sheet now counts and lists an undated earned badge). Class: a hand-edited profile config field read with no type tolerance; the tracker is #4704 (open until live proof and the back-fill); the procedure gap (the boot pre-flight names no red alarm) is #4709. | ~5 days (found 2026-10-10 ~03:05Z by a fixture lane, not by the four red alarms). | Code fixed and merged 2026-10-10 ~04:15Z; live proof, the two registry values' correction and the 10-04→today back-fill are owner steps on #4704. | No raw data lost; derived rows for 10-04 onward are missing until the back-fill. |
@@ -288,7 +289,7 @@ Last updated: 2026-10-15 Session BU Fable zero-run (#1332 gate; +1 row — the 2
 > that looks maintained and is three months stale is worse than one that is obviously old.
 
 <!-- INCIDENT-PATTERNS:DISTRIBUTION:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**Distribution — 242 dated rows, 207 post-June** (newest row 2026-10-14):
+**Distribution — 243 dated rows, 208 post-June** (newest row 2026-10-14):
 
 | month | rows |
 |---|---|
@@ -300,16 +301,16 @@ Last updated: 2026-10-15 Session BU Fable zero-run (#1332 gate; +1 row — the 2
 | 2026-07 | 36 |
 | 2026-08 | 126 |
 | 2026-09 | 41 |
-| 2026-10 | 4 |
+| 2026-10 | 5 |
 
-**By severity:** P1 6 · P2 35 · P3 92 · P4 104 · Low 3 · Info 1 · DR drill 1.
+**By severity:** P1 6 · P2 35 · P3 93 · P4 104 · Low 3 · Info 1 · DR drill 1.
 
 **By root-cause class** (keyword-derived over Summary + Root Cause; a row may match more
 than one, and 31 match none):
 
 | n | class |
 |---|---|
-| 152 | deployment error |
+| 153 | deployment error |
 | 63 | stale config / literal drift |
 | 47 | QA-oracle false positive |
 | 43 | QA false positive — deploy-race (#2978) |
@@ -346,17 +347,17 @@ scored orthogonally (loud/silent × class) rather than as a tenth category.
 but modest*, and materially weaker than this axis was described as when filed:
 
 <!-- INCIDENT-PATTERNS:SILENCE:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**55 of 242 rows are silent.**
+**55 of 243 rows are silent.**
 
 | | silent | loud |
 |---|---|---|
-| rows | 55 | 187 |
-| TTD parseable | 42 | 127 |
-| median TTD | **29 min** | 20 min |
-| mean TTD | 1,743 min | 1,436 min |
-| exceeded 1 day | 6 (14% of parsed) | 10 (8% of parsed) |
+| rows | 55 | 188 |
+| TTD parseable | 42 | 128 |
+| median TTD | **29 min** | 22 min |
+| mean TTD | 1,743 min | 1,447 min |
+| exceeded 1 day | 6 (14% of parsed) | 11 (9% of parsed) |
 
-Silent rows take **~1.4× longer to detect at the median** and are **~1.8× more likely to run past a day**. But the *means* are only 18% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (5 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **73 of 242 TTD cells (30%) state no parseable duration** — they are excluded rather than counted as zero.
+Silent rows take **~1.3× longer to detect at the median** and are **~1.6× more likely to run past a day**. But the *means* are only 17% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (5 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **73 of 243 TTD cells (30%) state no parseable duration** — they are excluded rather than counted as zero.
 <!-- INCIDENT-PATTERNS:SILENCE:END -->
 
 The durable finding is not the multiplier. It is that **38 failures in this corpus
@@ -367,7 +368,7 @@ by making a silent class loud.
 ### Pre-July frequencies are FLOORS, not counts
 
 <!-- INCIDENT-PATTERNS:FLOORS:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**April has zero rows, May has one and June has two**, against 36 in July, 126 in August, 41 in September and 4 in October. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
+**April has zero rows, May has one and June has two**, against 36 in July, 126 in August, 41 in September and 5 in October. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
 <!-- INCIDENT-PATTERNS:FLOORS:END -->
 
 ### Row-inclusion rule (extends #1332)
