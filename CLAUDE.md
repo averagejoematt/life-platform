@@ -71,7 +71,7 @@ python3 mcp_bridge.py
 
 **Site API is primarily read-only** — limited writes exist only for interactive features (votes, follows, checkins, suggestions, user-submitted findings). Core data queries must never write. Rate limiting is DynamoDB-backed per-IP atomic counters (`rate_limiter.py`; the in-memory dict is fail-open fallback only).
 
-**EventBridge crons use fixed UTC** — every schedule in `cdk/stacks/`.
+**EventBridge crons use fixed UTC** — every schedule in `cdk/stacks/` except `daily-brief`, a zoned EventBridge Scheduler schedule (`schedule_timezone=`, #4284; `docs/CONVENTIONS.md` §1b).
 
 **Shared code — ONE bundle, no layer (#781)** — `docs/CONVENTIONS.md` §1.
 

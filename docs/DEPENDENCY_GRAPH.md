@@ -9,7 +9,7 @@
 
 ## 1. Scheduled Lambdas (CDK ground truth)
 
-Crons are the CDK `schedule=` strings (fixed UTC, no DST drift); `resolved` = an
+Crons are the CDK `schedule=` strings (fixed UTC, no DST drift — except a schedule marked with its zone, #4284); `resolved` = an
 f-string schedule resolved through module constants; `constructed` = built from a
 `Schedule.cron(...)` keyword form. Multi-schedule lambdas show every schedule.
 
@@ -35,7 +35,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `coach-panel-podcast` | email_stack | `cron(0 18 * * MON,WED *)` | constructed |
 | `coach-prediction-evaluator` | compute_stack | `cron(0 16 * * ? *)` | constant |
 | `coach-vision` | compute_stack | `cron(0 17 ? * MON *)` | constant |
-| `daily-brief` | email_stack | `cron(0 17 * * ? *)` | constant |
+| `daily-brief` | email_stack | `cron(0 10 * * ? *)` (America/Los_Angeles, not UTC) | constant |
 | `daily-debrief` | email_stack | `cron(0 19 * * ? *)` | constant |
 | `daily-insight-compute` | compute_stack | `cron(45 16 * * ? *)` | constant |
 | `daily-metrics-compute` | compute_stack | `cron(40 16 * * ? *)` | constant |

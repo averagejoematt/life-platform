@@ -162,7 +162,7 @@ Changing any of them = fleet deploy (merge to main — CI auto-fleet-deploys —
 
 ## Pipeline Ordering Constraint (ADR-052)
 
-**All EventBridge cron expressions are fixed UTC.** The PT times below are for reference only — they shift by 1 hour when DST begins (March) and ends (November). The UTC times never change.
+**All EventBridge cron expressions are fixed UTC — except `daily-brief` (EventBridge Scheduler, `America/Los_Angeles`, #4284).** The PT times below are for reference only — they shift by 1 hour when DST begins (March) and ends (November). The UTC times never change.
 
 The pipeline has strict ordering. Changing schedules without maintaining this sequence produces stale data:
 
@@ -173,7 +173,7 @@ hourly (INGEST_HOURLY)  INGESTION   API pulls from Whoop, Withings, Strava, etc.
 16:35 UTC           adaptive-mode-compute   (09:35 PDT)
 16:40 UTC           daily-metrics-compute   (09:40 PDT)
 16:45 UTC           daily-insight-compute   (09:45 PDT)
-17:00 UTC           daily-brief             (10:00 PDT — reads computed results → email → public_stats.json)
+17:00 UTC (18:00 after 2026-11-01)  daily-brief  (10:00 Pacific — zoned schedule, #4284; 10:00 PDT — reads computed results → email → public_stats.json)
 19:30 UTC           og-image-generator      (12:30 PDT — reads public_stats.json → generates share images)
 ```
 
