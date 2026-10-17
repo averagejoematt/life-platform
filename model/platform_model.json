@@ -4283,6 +4283,13 @@
       "direction": "read",
       "lambda": null,
       "module": "lambdas/web/site_api_autonomic.py",
+      "partition": "hevy",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_autonomic.py",
       "partition": "strava",
       "via": "seam"
     },
@@ -5795,7 +5802,21 @@
       "direction": "read",
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_correlation.py",
+      "partition": "hevy",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_correlation.py",
       "partition": "strava",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_correlation.py",
+      "partition": "whoop",
       "via": "seam"
     },
     {
@@ -7690,7 +7711,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 744,
+      "edges": 747,
       "lambdas": 108,
       "mcp_tool_modules": 36,
       "mcp_tools": 88,
@@ -7705,8 +7726,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 363,
-        "sites_resolved": 933,
-        "sites_total": 1296
+        "sites_resolved": 939,
+        "sites_total": 1302
       },
       "schedule_resolution": {
         "dynamic": 0,

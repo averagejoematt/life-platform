@@ -303,7 +303,11 @@ _WHOOP_CONSUMER_REGISTRY = {
         "filter_day_rows on both raw arms before ex_whoop (#3442 member 7; fetch is via SOURCES loop, no literal site)",
     ),
     "lambdas/intelligence/challenge_generator_lambda.py": (1, "non-member", "field-absent-safe context summary"),
-    "lambdas/web/site_api_autonomic.py": (1, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
+    "lambdas/web/site_api_autonomic.py": (
+        2,
+        "non-member",
+        "site_api_* verified explicit filters (calc-proof non-member) + #4627: the Zone 2 read hands rows to training.zone2_minutes.whoop_recordings, which keeps ONLY #WORKOUT# sub-rows, one per workout_id",
+    ),
     "lambdas/web/site_api_body.py": (2, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
     "lambdas/web/site_api_fingerprint.py": (1, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
     "lambdas/web/site_api_freshness.py": (1, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
@@ -317,13 +321,22 @@ _WHOOP_CONSUMER_REGISTRY = {
     "lambdas/web/site_api_rollups.py": (7, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
     "lambdas/web/site_api_sleep.py": (2, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
     "lambdas/web/site_api_training.py": (
-        1,
+        2,
         "shared-guard",
-        "filter_day_rows for avg_strain + #WORKOUT# rows by distinct id (#4629 — was a missed member, not a non-member)",
+        "filter_day_rows for avg_strain + #WORKOUT# rows by distinct id (#4629 — was a missed member, not a non-member) + #4627: the Zone 2 read hands rows to training.zone2_minutes.whoop_recordings, which keeps ONLY #WORKOUT# sub-rows, one per workout_id",
     ),
     "mcp/tools_health.py": (2, "non-member", "field-absent-safe tool extraction"),
     "mcp/tools_plan.py": (1, "shared-guard", "filter_day_rows on the readiness_floor whoop read (#4072)"),
-    "mcp/tools_training.py": (1, "non-member", "field-absent-safe tool extraction"),
+    "mcp/tools_training.py": (
+        2,
+        "non-member",
+        "field-absent-safe tool extraction + #4627: the Zone 2 read hands rows to training.zone2_minutes.whoop_recordings, which keeps ONLY #WORKOUT# sub-rows, one per workout_id",
+    ),
+    "mcp/tools_correlation.py": (
+        1,
+        "non-member",
+        "#4627: get_zone2_breakdown's whoop read goes only to training.zone2_minutes.whoop_recordings (#WORKOUT# sub-rows only, one per workout_id)",
+    ),
 }
 
 _GUARD_TOKENS = ("filter_day_rows", "is_day_row", "DAY_SK_RE", "digest_utils.query_range")

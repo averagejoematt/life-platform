@@ -2,274 +2,148 @@
 Correlation tools: caffeine, exercise, zone2, alcohol vs sleep.
 """
 
-from collections import defaultdict
 from datetime import datetime, timedelta
 
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from training import zone2_minutes as z2m  # #4627: THE Zone 2 computation (shared with /api/zone2 + /api/training_overview)
 
-from mcp.core import get_profile, query_source
-from mcp.helpers import HR_ZONE_BOUNDS, classify_hr_zone, pearson_r
+from mcp.core import query_source
+from mcp.helpers import pearson_r
+
+
+def _calendar_weeks(start_date, end_date):
+    """Monday of every calendar week touching [start, end], and the partial ones among them (#2661)."""
+    win_start, win_end = datetime.strptime(start_date, "%Y-%m-%d"), datetime.strptime(end_date, "%Y-%m-%d")
+    weeks, cur = [], win_start - timedelta(days=win_start.weekday())
+    while cur <= win_end:
+        weeks.append(cur.strftime("%Y-%m-%d"))
+        cur += timedelta(days=7)
+    partial = sorted(
+        {
+            wk
+            for wk in (weeks[0], weeks[-1])
+            if not (win_start <= datetime.strptime(wk, "%Y-%m-%d") and datetime.strptime(wk, "%Y-%m-%d") + timedelta(days=6) <= win_end)
+        }
+    )
+    return weeks, partial
+
+
+def _zone2_alerts(avg_z2_weekly, weekly_target_min, zones, sessions):
+    alerts = []
+    # #2661: a non-positive target makes "shortfall" meaningless too.
+    if weekly_target_min > 0 and avg_z2_weekly < weekly_target_min * 0.5:
+        alerts.append(
+            f"Zone 2 deficit: averaging {avg_z2_weekly} min/week vs {weekly_target_min} min target "
+            f"({round(weekly_target_min - avg_z2_weekly):.0f} min shortfall), measured as minutes in each device's own Zone 2. "
+            "Zone 2 is the foundation of cardiovascular longevity -- consider adding 2-3 sessions of easy cardio per week."
+        )
+    elif weekly_target_min > 0 and avg_z2_weekly < weekly_target_min:
+        alerts.append(
+            f"Close to target: averaging {avg_z2_weekly} min/week vs {weekly_target_min} min target "
+            f"({round(weekly_target_min - avg_z2_weekly):.0f} min shortfall). One additional Zone 2 session per week would close the gap."
+        )
+    z2, z3, z5 = zones["zone_2"], zones["zone_3"], zones["zone_5"]
+    if z3 > z2 and z3 > 30:
+        alerts.append(
+            f"Training polarization issue: more time in Zone 3 ({round(z3)} min) than Zone 2 ({round(z2)} min). Per Seiler's "
+            "polarized model, ~80% of endurance volume should be easy (Zone 1-2) with ~20% hard (Zone 4-5)."
+        )
+    if z5 > z2 and z5 > 20:
+        alerts.append(
+            f"High-intensity dominant: more Zone 5 ({round(z5)} min) than Zone 2 ({round(z2)} min). Prioritize Zone 2 base building."
+        )
+    unmeasured = sum(1 for s in sessions if not s["source"])
+    if sessions and unmeasured > len(sessions) * 0.3:
+        alerts.append(
+            f"{unmeasured} of {len(sessions)} sessions ({round(100 * unmeasured / len(sessions))}%) carry no stored time-in-zone, "
+            "so they add nothing to Zone 2 -- a gap, never a zero."
+        )
+    return alerts
 
 
 def tool_get_zone2_breakdown(args):
     """
-    Zone 2 training tracker. Classifies each Strava activity into HR zones based on
-    average heartrate as a percentage of max HR (from profile). Aggregates weekly Zone 2
-    minutes, compares to the 150 min/week target (Attia, Huberman, WHO guidelines for
-    moderate-intensity aerobic activity), and shows full 5-zone distribution.
-
-    Zone 2 is the highest-evidence longevity training modality — it builds mitochondrial
-    density, fat oxidation capacity, and cardiovascular base. Most people drastically
-    undertrain Zone 2 relative to higher intensities.
+    Zone 2 training tracker over THE shared computation (`training.zone2_minutes`, #4627): minutes
+    actually spent in each recording device's own Zone 2 band (Whoop workout zones, Strava activity
+    zones), each session counted once across sources; Hevy bike/elliptical/treadmill blocks are
+    reported as cardio minutes, never Zone 2. Aggregates weekly Zone 2 minutes over every calendar
+    week in the window (#2661), compares to the 150 min/week target (Attia, Huberman, WHO) and
+    shows the zone distribution. The same numbers `/api/zone2` and `/api/training_overview` serve.
     """
     end_date = args.get("end_date", pacific_today())
     start_date = args.get("start_date", (pacific_now() - timedelta(days=89)).strftime("%Y-%m-%d"))
-    weekly_target_min = int(args.get("weekly_target_minutes", 150))
-    min_duration_min = int(args.get("min_duration_minutes", 10))
+    weekly_target_min = int(args.get("weekly_target_minutes", z2m.WEEKLY_TARGET_MIN))
 
-    # HR zone thresholds from profile
-    profile = get_profile()
-    max_hr = float(profile.get("max_heart_rate", 190))
-
-    # 5 zones by % of max HR (standard model) — the ONE definition, shared with
-    # mcp/tools_training.py's periodization view via mcp.helpers (#2221).
-    ZONE_BOUNDS = list(HR_ZONE_BOUNDS)
-
-    zone_hr_ranges = {}
-    for key, label, lo_pct, hi_pct in ZONE_BOUNDS:
-        zone_hr_ranges[key] = {
-            "label": label,
-            "hr_low": round(max_hr * lo_pct, 0),
-            "hr_high": round(max_hr * hi_pct, 0),
-        }
-
-    def _sf(v):
-        if v is None:
-            return None
-        try:
-            return float(v)
-        except (ValueError, TypeError):
-            return None
-
-    def classify_zone(avg_hr):
-        """Classify activity into HR zone by avg HR (mcp.helpers — one definition)."""
-        return classify_hr_zone(avg_hr, max_hr)
-
-    # ── Query Strava activities ──────────────────────────────────────────────
     strava_items = query_source("strava", start_date, end_date)
-    if not strava_items:
-        return {"error": "No Strava data for range.", "start_date": start_date, "end_date": end_date}
+    whoop_end = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")  # Pacific evening -> next UTC key
+    whoop_items = query_source("whoop", start_date, whoop_end)
+    hevy_items = query_source("hevy", start_date, end_date)
+    sessions = [s for s in z2m.counted_sessions(strava_items, whoop_items) if start_date <= s["date"] <= end_date]
+    if not sessions:
+        return {"error": "No recorded sessions for range.", "start_date": start_date, "end_date": end_date}
+    window = z2m.zone2_window(None, None, hevy_items, start_date, end_date, sessions=sessions)
 
-    # Flatten all activities
-    all_activities = []
-    for day in sorted(strava_items, key=lambda x: x.get("date", "")):
-        date = day.get("date", "")
-        for act in day.get("activities", []):
-            moving = _sf(act.get("moving_time_seconds")) or 0
-            if moving < min_duration_min * 60:
-                continue
-            avg_hr = _sf(act.get("average_heartrate"))
-            zone = classify_zone(avg_hr)
-            sport = act.get("sport_type") or act.get("type") or "Unknown"
-            all_activities.append(
-                {
-                    "date": date,
-                    "name": act.get("enriched_name") or act.get("name") or "Unnamed",
-                    "sport_type": sport,
-                    "moving_time_min": round(moving / 60, 1),
-                    "avg_hr": avg_hr,
-                    "max_hr": _sf(act.get("max_heartrate")),
-                    "zone": zone,
-                    "distance_miles": _sf(act.get("distance_miles")),
-                }
-            )
-
-    if not all_activities:
-        return {"error": "No qualifying activities found.", "start_date": start_date, "end_date": end_date}
-
-    # ── Weekly aggregation ───────────────────────────────────────────────────
-
-    def iso_week(date_str):
-        """Return ISO year-week string like '2025-W48'."""
-        from datetime import datetime as dt
-
-        d = dt.strptime(date_str, "%Y-%m-%d")
-        iso = d.isocalendar()
-        return f"{iso[0]}-W{iso[1]:02d}"
-
-    def week_start(date_str):
-        """Return Monday of the week for a given date."""
-        from datetime import datetime as dt
-
-        d = dt.strptime(date_str, "%Y-%m-%d")
-        monday = d - timedelta(days=d.weekday())
-        return monday.strftime("%Y-%m-%d")
-
-    weekly = defaultdict(
-        lambda: {
-            "zone_1_min": 0,
-            "zone_2_min": 0,
-            "zone_3_min": 0,
-            "zone_4_min": 0,
-            "zone_5_min": 0,
-            "below_zone_1_min": 0,
-            "no_hr_min": 0,
-            "total_exercise_min": 0,
-            "activity_count": 0,
-            "zone_2_activities": [],
-        }
-    )
-
-    for act in all_activities:
-        wk = week_start(act["date"])
-        z = act["zone"]
-        mins = act["moving_time_min"]
-        weekly[wk]["total_exercise_min"] += mins
-        weekly[wk]["activity_count"] += 1
-        if z in ("zone_1", "zone_2", "zone_3", "zone_4", "zone_5"):
-            weekly[wk][f"{z}_min"] += mins
-        elif z == "below_zone_1":
-            weekly[wk]["below_zone_1_min"] += mins
-        else:
-            weekly[wk]["no_hr_min"] += mins
-        if z == "zone_2":
-            weekly[wk]["zone_2_activities"].append(
-                {
-                    "date": act["date"],
-                    "name": act["name"],
-                    "sport": act["sport_type"],
-                    "minutes": mins,
-                    "avg_hr": act["avg_hr"],
-                }
-            )
-
-    # #2661: BACKFILL EVERY CALENDAR WEEK IN THE WINDOW. `weekly` is a defaultdict keyed
-    # by activity, so a week with no qualifying activity simply did not exist — and
-    # `n_weeks = len(weekly_sorted)` then divided by ACTIVE weeks. A missed week vanished
-    # from the denominator instead of lowering the rate, which is the opposite of what an
-    # adherence number is for: 150 minutes in one week out of thirteen reported
-    # `avg_weekly_zone_2_min: 150` and `target_hit_rate_pct: 100`. Measured live on
-    # 2026-08-15, a 2026-05-18..08-15 window (13 calendar weeks, 1 qualifying activity)
-    # reported `weeks_analyzed: 1`.
-    #
-    # ADR-105: the denominator is now the weeks the caller asked about. The first and
-    # last may be partial — the window rarely starts on a Monday — so `partial_weeks`
-    # says which, rather than quietly rounding either way.
-    _win_start = datetime.strptime(start_date, "%Y-%m-%d")
-    _win_end = datetime.strptime(end_date, "%Y-%m-%d")
-    calendar_weeks = []
-    _cur = _win_start - timedelta(days=_win_start.weekday())  # Monday of the first week
-    while _cur <= _win_end:
-        calendar_weeks.append(_cur.strftime("%Y-%m-%d"))
-        _cur += timedelta(days=7)
-    for _wk in calendar_weeks:
-        weekly[_wk]  # noqa: B018 — defaultdict touch; materialises the zero template
-    partial_weeks = sorted(
-        {
-            wk
-            for wk in (calendar_weeks[0], calendar_weeks[-1])
-            if not (_win_start <= datetime.strptime(wk, "%Y-%m-%d") and datetime.strptime(wk, "%Y-%m-%d") + timedelta(days=6) <= _win_end)
-        }
-    )
-
-    # A target of zero or less makes "did I meet it?" unanswerable, not universally true.
-    # `z2 >= 0` is True for every week including the empty ones, so the old code reported
-    # a 100% hit rate for a target nobody set.
+    calendar_weeks, partial_weeks = _calendar_weeks(start_date, end_date)
+    by_week = {w["week_start"]: w for w in z2m.weekly(sessions, hevy_items, weekly_target_min)}
     target_is_meaningful = weekly_target_min > 0
-
     weekly_sorted = []
-    for wk in sorted(weekly.keys()):
-        w = weekly[wk]
-        z2 = w["zone_2_min"]
-        pct_target = round(100 * z2 / weekly_target_min, 0) if target_is_meaningful else None
+    for wk in calendar_weeks:
+        w = by_week.get(wk) or {"zone_2_minutes": 0.0, "session_minutes": 0.0, "activity_count": 0, "hevy_cardio_minutes": 0.0}
+        z2 = w["zone_2_minutes"]
+        wk_sess = [s for s in sessions if s["source"] and z2m._monday(s["date"]) == wk]
         weekly_sorted.append(
             {
                 "week_start": wk,
-                "zone_2_minutes": round(z2, 1),
-                "target_pct": pct_target,
+                "zone_2_minutes": z2,
+                "target_pct": round(100 * z2 / weekly_target_min, 0) if target_is_meaningful else None,
                 "target_met": (z2 >= weekly_target_min) if target_is_meaningful else None,
-                "zone_1_min": round(w["zone_1_min"], 1),
-                "zone_3_min": round(w["zone_3_min"], 1),
-                "zone_4_min": round(w["zone_4_min"], 1),
-                "zone_5_min": round(w["zone_5_min"], 1),
-                "total_exercise_min": round(w["total_exercise_min"], 1),
+                **{f"{k}_min": round(sum(s["zones_minutes"][k] for s in wk_sess), 1) for k in ("zone_1", "zone_3", "zone_4", "zone_5")},
+                "total_exercise_min": w["session_minutes"],
+                "hevy_cardio_min": w["hevy_cardio_minutes"],
                 "activity_count": w["activity_count"],
-                "zone_2_activities": w["zone_2_activities"],
+                "zone_2_activities": [
+                    {"date": s["date"], "sport": s["sport"], "minutes": s["zone_2_minutes"], "source": s["source"]}
+                    for s in wk_sess
+                    if s["zone_2_minutes"]
+                ],
             }
         )
 
-    # ── Zone distribution (full period) ──────────────────────────────────────
-    zone_totals = {"zone_1": 0, "zone_2": 0, "zone_3": 0, "zone_4": 0, "zone_5": 0, "below_zone_1": 0, "no_hr": 0}
-    zone_counts = {"zone_1": 0, "zone_2": 0, "zone_3": 0, "zone_4": 0, "zone_5": 0, "below_zone_1": 0, "no_hr": 0}
-    for act in all_activities:
-        z = act["zone"]
-        zone_totals[z] = zone_totals.get(z, 0) + act["moving_time_min"]
-        zone_counts[z] = zone_counts.get(z, 0) + 1
+    zones = window["zones_minutes"]
+    dist = z2m.zone_distribution(sessions)
+    zone_distribution = {
+        z["zone"]: {"total_minutes": z["total_minutes"], "activity_count": z["activity_count"], "pct_of_training": z["pct_of_training"]}
+        for z in dist
+    }
 
-    total_min = sum(zone_totals.values())
-    zone_distribution = {}
-    for key, label, _, _ in ZONE_BOUNDS:
-        mins = round(zone_totals.get(key, 0), 1)
-        zone_distribution[key] = {
-            "label": label,
-            "total_minutes": mins,
-            "activity_count": zone_counts.get(key, 0),
-            "pct_of_training": round(100 * mins / total_min, 1) if total_min > 0 else 0,
-            "hr_range": f"{zone_hr_ranges[key]['hr_low']:.0f}-{zone_hr_ranges[key]['hr_high']:.0f} bpm",
-        }
-
-    # ── Sport type breakdown for Zone 2 ──────────────────────────────────────
-    z2_by_sport = defaultdict(lambda: {"minutes": 0, "count": 0})
-    for act in all_activities:
-        if act["zone"] == "zone_2":
-            z2_by_sport[act["sport_type"]]["minutes"] += act["moving_time_min"]
-            z2_by_sport[act["sport_type"]]["count"] += 1
-
-    sport_breakdown = []
-    for sport, data in sorted(z2_by_sport.items(), key=lambda x: -x[1]["minutes"]):
-        sport_breakdown.append(
-            {
-                "sport_type": sport,
-                "zone_2_minutes": round(data["minutes"], 1),
-                "activity_count": data["count"],
-            }
-        )
-
-    # ── Trend analysis ───────────────────────────────────────────────────────
     z2_weekly_vals = [w["zone_2_minutes"] for w in weekly_sorted]
     trend = None
     if len(z2_weekly_vals) >= 3:
-        xs = list(range(len(z2_weekly_vals)))
-        slope_r = pearson_r(xs, z2_weekly_vals) if len(xs) >= 3 else None
-        avg_first_half = sum(z2_weekly_vals[: len(z2_weekly_vals) // 2]) / max(len(z2_weekly_vals) // 2, 1)
-        avg_second_half = sum(z2_weekly_vals[len(z2_weekly_vals) // 2 :]) / max(len(z2_weekly_vals) - len(z2_weekly_vals) // 2, 1)
+        half = len(z2_weekly_vals) // 2
+        first, second = sum(z2_weekly_vals[:half]) / max(half, 1), sum(z2_weekly_vals[half:]) / max(len(z2_weekly_vals) - half, 1)
         trend = {
-            "direction": (
-                "INCREASING" if avg_second_half > avg_first_half + 5 else "DECREASING" if avg_second_half < avg_first_half - 5 else "STABLE"
-            ),
-            "first_half_avg_min": round(avg_first_half, 1),
-            "second_half_avg_min": round(avg_second_half, 1),
-            "correlation_r": slope_r,
+            "direction": "INCREASING" if second > first + 5 else "DECREASING" if second < first - 5 else "STABLE",
+            "first_half_avg_min": round(first, 1),
+            "second_half_avg_min": round(second, 1),
+            "correlation_r": pearson_r(list(range(len(z2_weekly_vals))), z2_weekly_vals),
         }
 
-    # ── Summary ──────────────────────────────────────────────────────────────
     n_weeks = len(weekly_sorted)  # #2661: calendar weeks in the window, not active weeks
     active_weeks = sum(1 for w in weekly_sorted if w["activity_count"] > 0)
     avg_z2_weekly = round(sum(z2_weekly_vals) / n_weeks, 1) if n_weeks > 0 else 0
     weeks_meeting_target = sum(1 for w in weekly_sorted if w["target_met"]) if target_is_meaningful else None
-
     summary = {
         "period": {"start_date": start_date, "end_date": end_date},
         "weeks_analyzed": n_weeks,
-        # ADR-105: state n and what it counted. `weeks_analyzed` is the denominator every
-        # rate below divides by; `active_weeks` is how many of them had any qualifying
-        # activity. When they differ, the gap IS the adherence story.
+        # ADR-105: `weeks_analyzed` is the denominator every rate divides by; `active_weeks`
+        # is how many had any session. When they differ, the gap IS the adherence story.
         "denominator": "calendar weeks in the requested window",
         "active_weeks": active_weeks,
         "zero_activity_weeks": n_weeks - active_weeks,
         "partial_weeks": partial_weeks,
-        "total_activities": len(all_activities),
-        "zone_2_activities": zone_counts.get("zone_2", 0),
+        "total_activities": len(sessions),
+        "zone_2_activities": sum(1 for s in sessions if s["source"] and s["zone_2_minutes"]),
+        "unmeasured_sessions": window["unmeasured_sessions"],
         "avg_weekly_zone_2_min": avg_z2_weekly,
         "weekly_target_min": weekly_target_min,
         "weeks_meeting_target": weeks_meeting_target,
@@ -280,73 +154,24 @@ def tool_get_zone2_breakdown(args):
             if target_is_meaningful
             else f"weekly_target_minutes={weekly_target_min} — a hit rate against a non-positive target is not defined, so none is reported."
         ),
-        "total_zone_2_min": round(zone_totals.get("zone_2", 0), 1),
-        "max_hr_used": max_hr,
-        "zone_2_hr_range": f"{zone_hr_ranges['zone_2']['hr_low']:.0f}-{zone_hr_ranges['zone_2']['hr_high']:.0f} bpm",
+        "total_zone_2_min": window["zone_2_minutes"],
+        "zone_2_by_source": window["by_source"],
+        "hevy_cardio_min": window["hevy_cardio_minutes"],
+        "max_hr_used": None,  # #4627: no maximum is assumed — each device's own band
+        "zone_2_hr_range": "each recording device's own Zone 2 band (Whoop, Strava)",
+        "definition": z2m.DEFINITION,
     }
-
-    # ── Alerts + recommendations ─────────────────────────────────────────────
-    alerts = []
-
-    # #2661: a non-positive target makes "shortfall" meaningless too — the deficit text
-    # would read "0 min target (-N min shortfall)". No target, no verdict about it.
-    if not target_is_meaningful:
-        pass
-    elif avg_z2_weekly < weekly_target_min * 0.5:
-        deficit = round(weekly_target_min - avg_z2_weekly, 0)
-        alerts.append(
-            f"Zone 2 deficit: averaging {avg_z2_weekly} min/week vs {weekly_target_min} min target "
-            f"({deficit:.0f} min shortfall). Zone 2 is the foundation of cardiovascular longevity -- "
-            "consider adding 2-3 sessions of easy cardio (walking, cycling, easy jogging) per week "
-            f"where HR stays in {zone_hr_ranges['zone_2']['hr_low']:.0f}-{zone_hr_ranges['zone_2']['hr_high']:.0f} bpm."
-        )
-    elif avg_z2_weekly < weekly_target_min:
-        deficit = round(weekly_target_min - avg_z2_weekly, 0)
-        alerts.append(
-            f"Close to target: averaging {avg_z2_weekly} min/week vs {weekly_target_min} min target "
-            f"({deficit:.0f} min shortfall). One additional Zone 2 session per week would close the gap."
-        )
-
-    # Polarization check: too much Zone 3 relative to Zone 2
-    z3_total = zone_totals.get("zone_3", 0)
-    z2_total = zone_totals.get("zone_2", 0)
-    if z3_total > z2_total and z3_total > 30:
-        alerts.append(
-            f"Training polarization issue: more time in Zone 3 ({round(z3_total, 0)} min) than Zone 2 "
-            f"({round(z2_total, 0)} min). Per Seiler's polarized training model, ~80% of endurance "
-            "volume should be easy (Zone 1-2) with ~20% hard (Zone 4-5). Zone 3 is 'no man's land' -- "
-            "too hard to build aerobic base, too easy for VO2 max gains."
-        )
-
-    # Zone 5 volume check
-    z5_total = zone_totals.get("zone_5", 0)
-    if z5_total > z2_total and z5_total > 20:
-        alerts.append(
-            f"High-intensity dominant: more Zone 5 ({round(z5_total, 0)} min) than Zone 2 ({round(z2_total, 0)} min). "
-            "This pattern correlates with overtraining risk. Prioritize Zone 2 base building."
-        )
-
-    # No HR data warning
-    no_hr_count = zone_counts.get("no_hr", 0)
-    if no_hr_count > len(all_activities) * 0.3:
-        alerts.append(
-            f"{no_hr_count} of {len(all_activities)} activities ({round(100*no_hr_count/len(all_activities))}%) "
-            "lack HR data. Zone classification requires heart rate -- ensure your HR monitor is connected during workouts."
-        )
-
     return {
         "summary": summary,
         "zone_distribution": zone_distribution,
-        "zone_hr_thresholds": zone_hr_ranges,
         "weekly_breakdown": weekly_sorted,
-        "sport_type_zone2": sport_breakdown,
+        "sport_type_zone2": z2m.sport_breakdown(sessions),
         "trend": trend,
-        "alerts": alerts,
+        "alerts": _zone2_alerts(avg_z2_weekly, weekly_target_min, zones, sessions),
         "methodology": (
-            f"Activities classified by average HR as percentage of max HR ({max_hr:.0f} bpm from profile). "
-            f"Zone 2 = 60-70% max = {zone_hr_ranges['zone_2']['hr_low']:.0f}-{zone_hr_ranges['zone_2']['hr_high']:.0f} bpm. "
-            "Full activity moving time is attributed to the classified zone. This is an approximation -- "
-            "average HR doesn't capture intra-activity zone transitions. Activities without HR data are excluded "
-            "from zone classification."
+            "Minutes actually spent in each recording device's own Zone 2 band, from the stored time-in-zone rows "
+            "(Whoop workout zones; Strava activity zones). Each session is counted once across sources — Whoop's own "
+            "zones unless another recording measured materially more of the session. Sessions with no stored zones "
+            "add nothing (a gap, not a zero). Hevy bike/elliptical/treadmill blocks are cardio minutes, not Zone 2."
         ),
     }

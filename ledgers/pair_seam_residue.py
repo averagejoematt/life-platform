@@ -630,6 +630,19 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "tests/test_walking_volume_3930.py::test_the_live_rides_join_through_the_store_and_the_0928_ride_needs_the_"
         "whoop_partition (the live rows).",
     ),
+    # #4627 (2026-10-16): THE Zone 2 computation's two new readers (the shared module parses; these only fetch).
+    "hevy::lambdas/web/site_api_autonomic.py::read": (
+        "2026-10-16",
+        "#4627: the read hands Hevy workout rows to the pure `training.zone2_minutes.hevy_cardio_blocks`, which reads only `workout_uid`/`source_workout_id`, `exercises[].name` and `sets[].duration_sec` — the names `hevy_common` writes (VERIFIED against live rows 2026-10-16). The value is reported as cardio minutes and NEVER enters Zone 2, so a drift can only zero `hevy_cardio_minutes`, a visible change. Pinned by tests/test_zone2_shared_computation_4627.py.",
+    ),
+    "hevy::mcp/tools_correlation.py::read": (
+        "2026-10-16",
+        "#4627: the read hands Hevy workout rows to the pure `training.zone2_minutes.hevy_cardio_blocks`, which reads only `workout_uid`/`source_workout_id`, `exercises[].name` and `sets[].duration_sec` — the names `hevy_common` writes (VERIFIED against live rows 2026-10-16). The value is reported as cardio minutes and NEVER enters Zone 2, so a drift can only zero `hevy_cardio_minutes`, a visible change. Pinned by tests/test_zone2_shared_computation_4627.py.",
+    ),
+    "whoop::mcp/tools_correlation.py::read": (
+        "2026-10-16",
+        "#4627: the read hands Whoop workout sub-rows to the pure `training.zone2_minutes`, which reads only `workout_id`, `start_time`/`end_time`, `vendor_sport_name`/`sport_name` and `zone_{0..5}_minutes` — exactly the names `whoop_lambda._extract_workout` writes through `zone_minutes_from_score` (#4629). VERIFIED against live rows 2026-10-16. A drift cannot fabricate a number: an absent or all-zero zone family makes the recording UNMEASURED (adds nothing to Zone 2, counted in `unmeasured_sessions`). Pinned on the real row shapes by tests/test_zone2_shared_computation_4627.py.",
+    ),
     # #4412 (2026-09-29): the cardio-HR join reads the Strava day item's `activities[]`.
     "strava::lambdas/training/cardio_hr_store.py::read": (
         "2026-09-29",
