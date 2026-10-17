@@ -49,6 +49,13 @@ export function summarySentence(excerpt) {
   }
   return "";
 }
+// The one weight unit label on every kit page (red team 2026-10-17: "lbs" beside "lb"). A served
+// stats line spells it "lbs"; lbText rewrites it before it is printed.
+export const LB = "lb";
+export const lbText = (text) => String(text || "").replace(/\blbs\b/g, LB);
+// Pounds gone between two weights, ONE rounding (fmt1 of the difference): every page that prints
+// a pounds-lost figure beside the two weights it came from uses this, so the three always agree.
+export const poundsDown = (start, now) => (num(start) === null || num(now) === null ? "" : fmt1(start - now));
 const listWords = (items) => (items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`);
 const NUMBER_WORDS = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
 const countWord = (n) => NUMBER_WORDS[n] || String(n);
@@ -91,15 +98,71 @@ export function hisWordsHTML(block) {
 }
 
 // ── the chapter lead, with the player ──────────────────────────────────────────
-export function playerHTML(podcast) {
-  if (!usable(podcast) || !podcast.data.mp3_url) return small((podcast && podcast.absent_text) || "No podcast episode for this chapter yet.");
+// `held`: the episode list's own hold marker (/panelcast/episodes.json `pending`, reason
+// held_for_review) for this chapter's week — then the line says the episode is held, never that
+// there is none yet (red team 2026-10-17: an episode held since October 9 read "no episode yet").
+export function podcastHeld(episodes, weekNumber) {
+  const p = episodes && episodes.pending;
+  return !!p && p.reason === "held_for_review" && num(p.week) !== null && p.week === weekNumber;
+}
+export function playerHTML(podcast, { held = false } = {}) {
+  if (!usable(podcast) || !podcast.data.mp3_url) {
+    if (held) return small("This chapter’s podcast episode is recorded and held for review before it publishes.");
+    return small((podcast && podcast.absent_text) || "No podcast episode for this chapter yet.");
+  }
   const p = podcast.data;
   const mins = num(p.duration_minutes) !== null ? ` · ${p.duration_minutes} min` : "";
   const who = p.guest ? `The podcast this week: ${p.guest_domain ? `the ${p.guest_domain} coach, ` : ""}${p.guest}${mins}.` : `The podcast this week${mins}.`;
   return `<audio controls preload="none" src="${esc(p.mp3_url)}" aria-label="${esc(p.title || "This week’s podcast episode")}"></audio>${small(who)}`;
 }
 
-export function chapterHTML(block, nextBlock, { heading = "h1", player = true, listenHref = "" } = {}) {
+// The week number a chapter's label names ("Week 5" -> 5); null for a prologue.
+export const weekNumberOf = (label) => {
+  const m = /^Week (\d+)\b/.exec(String(label || ""));
+  return m ? Number(m[1]) : null;
+};
+// THE HELD STATE (red team 2026-10-17: on day 42 Story showed week 5 as "the latest chapter" with
+// "next chapter due Wednesday" and no word about week 6). A chapter publishes only after Matthew
+// approves it, so a week can be written and waiting. What the page can read: the chronicle's own
+// hold marker on /journal/posts.json (`pending`: {week, reason}, written by
+// emails/chronicle_store.held_week), and the edition's day against the latest chapter's date.
+//   - the marker names a later week: "Week N is held before publishing."
+//   - no marker, but the latest chapter is more than a week older than the edition's day: the
+//     next week has not published. One calm line; it never claims a draft exists, because no
+//     served field says one does.
+// "" when the latest chapter is current.
+export const CHAPTER_DAYS = 7;
+export function heldChapterLine(block, edition, journal) {
+  if (!usable(block)) return "";
+  const n = weekNumberOf(block.data.week_label);
+  if (n === null) return "";
+  const p = journal && journal.pending;
+  if (p && num(p.week) !== null && p.week > n) return `Week ${p.week} is held before publishing.`;
+  const [t0, t1] = [Date.parse(`${block.data.date}T12:00:00Z`), Date.parse(`${(edition && edition.as_of) || ""}T12:00:00Z`)];
+  if (!Number.isFinite(t0) || !Number.isFinite(t1) || (t1 - t0) / 86400000 <= CHAPTER_DAYS) return "";
+  return `Week ${n + 1} has not published yet: each chapter waits for Matthew to read and approve it.`;
+}
+// The chapter's teaser, with the two claims a reader can check against the page made to agree with
+// it (red team 2026-10-17). "crossed 310 pounds" says which way only through the chapter's own
+// weight: below it, "went below"; above it, "went above". "N pounds gone" is recomputed with
+// poundsDown from the start weight and the chapter's weight — the two numbers the page prints.
+// Without the chapter's weight the teaser is printed as served.
+export function teaserText(dek, { chapterLb = null, startLb = null } = {}) {
+  let t = String(dek || "");
+  if (num(chapterLb) === null) return t;
+  t = t.replace(/\bcrossed (\d+(?:\.\d+)?) (pounds|lb|lbs)\b/g, (m, n, unit) => (chapterLb < Number(n) ? `went below ${n} ${unit}` : chapterLb > Number(n) ? `went above ${n} ${unit}` : m));
+  const down = poundsDown(startLb, chapterLb);
+  return down ? t.replace(/\b\d+(?:\.\d+)? pounds gone\b/g, `${down} pounds gone`) : t;
+}
+// "Next chapter due <day>." — or, when the cadence says the date is a draft and not a promise,
+// what actually happens on it.
+export function nextChapterLine(nextBlock) {
+  const ch = nextBlock && nextBlock.data && nextBlock.data.chapter;
+  const day = usable(ch) ? dayInWords(ch.data.date) : "";
+  if (!day) return (ch && ch.state !== "ok" && ch.absent_text) || "";
+  return ch.data.drafted_not_promised ? `The next draft is due ${day}; it publishes once Matthew approves it.` : `Next chapter due ${day}.`;
+}
+export function chapterHTML(block, nextBlock, { heading = "h1", player = true, listenHref = "", held = "", podcastHeld: podHeld = false, teaser = null } = {}) {
   if (!usable(block)) return absent(block, "The latest chapter is not served right now.");
   const c = block.data;
   const fresh = block.state === "ok";
@@ -112,19 +175,18 @@ export function chapterHTML(block, nextBlock, { heading = "h1", player = true, l
     !player && hasPod && listenHref
       ? `<a class="ck-btn ck-btn--ghost" href="${esc(listenHref)}">Listen${num(pod.data.duration_minutes) !== null ? ` · ${pod.data.duration_minutes} min` : ""}</a>`
       : "";
-  const nextCh = nextBlock && nextBlock.data && nextBlock.data.chapter;
-  const nextDate = usable(nextCh) ? dayInWords(nextCh.data.date) : "";
-  const nextLine = nextDate ? `Next chapter due ${nextDate}.` : (nextCh && nextCh.state !== "ok" && nextCh.absent_text) || "";
+  // With the held line printed, the next date is said plainly: the approval is already said once.
+  const nextLine = held ? nextChapterLine(nextBlock).replace(/; it publishes once Matthew approves it\.$/, ".") : nextChapterLine(nextBlock);
   // The front page runs one sentence of the chapter's own summary; Story runs it whole.
-  const dek = player ? c.dek : summarySentence(c.dek) || c.dek;
+  const dek = player ? teaserText(c.dek, teaser || {}) : summarySentence(c.dek) || c.dek;
   return [
     `<span class="ck-badge">${esc(badge)}</span>`,
     `<${heading}>${esc(c.title)}</${heading}>`,
     small(`Written by AI from the record on ${shortDay(c.date)}. Matthew reads each chapter before it publishes.`),
     dek ? `<p class="ck-premise ck-soft">${esc(dek)}</p>` : "",
     read || listen ? `<div class="ck-actions">${read}${listen}</div>` : "",
-    player ? playerHTML(pod) : "",
-    !player && hasPod && pod.data.guest ? small(`On the podcast: ${pod.data.guest_domain ? `the ${pod.data.guest_domain} coach, ` : ""}${pod.data.guest}.${nextLine ? ` ${nextLine}` : ""}`) : small(nextLine),
+    player ? playerHTML(pod, { held: podHeld }) : "",
+    !player && hasPod && pod.data.guest ? small(`On the podcast: ${pod.data.guest_domain ? `the ${pod.data.guest_domain} coach, ` : ""}${pod.data.guest}.${nextLine ? ` ${nextLine}` : ""}`) : small([held, nextLine].filter(Boolean).join(" ")),
   ].join("");
 }
 
@@ -167,12 +229,24 @@ export function coachLinesHTML(block) {
 // ── the record, never alone ────────────────────────────────────────────────────
 // One sentence pair: the count and what a simple guess would have done. With either half
 // missing the block is `unavailable` upstream and this prints its sentence instead.
-// #4617: the count states what it counts — sealed, bets, commentary, conditional — when served.
+// Red team 2026-10-17: the count and its comparison are ONE plain sentence ("76 of 183 checked
+// calls right; so far they do not beat a simple guess."). What the count counts (#4617's
+// `counted_text`: sealed, bets, commentary, conditional) is the Coaches page's, under the big
+// count (recordBigHTML) — not the front page's or Start's, where it read as accounting before the story.
 const countedText = (d) => String((d && d.counted_text) || "").trim();
 export function recordLine(block) {
   if (!usable(block) || !block.data.count_text || !String(block.data.comparison_text || "").trim()) return "";
-  const counted = countedText(block.data);
-  return `${block.data.count_text}${counted ? ` ${counted}` : ""} ${comparisonText({ sentence: block.data.comparison_text })}`;
+  const count = String(block.data.count_text).trim().replace(/[.\s]+$/, "");
+  const cmp = comparisonText({ sentence: block.data.comparison_text });
+  return `${count}; ${cmp.charAt(0).toLowerCase()}${cmp.slice(1)}`;
+}
+// The breakdown on Coaches, after one plain sentence that says why there is one: "Not all of
+// them are formal predictions. Of the 183: 11 sealed before day one, …". The served sentence's
+// own "Counted:" lead is dropped; its figures are printed as served.
+export function countedHTML(d) {
+  const counted = countedText(d).replace(/^Counted:\s*/, "");
+  if (!counted || num(d.decided) === null) return "";
+  return `<p class="ck-small">${esc(`Not all of them are formal predictions. Of the ${d.decided}: ${counted}`)}</p>`;
 }
 export function betLine(nextBlock) {
   const bet = nextBlock && nextBlock.data && nextBlock.data.bet;
@@ -196,7 +270,7 @@ export function recordBigHTML(block) {
     d.decided >= MIN_PERCENT_N
       ? `<div class="ck-track" role="img" aria-label="${d.right} of ${d.decided} checked calls right"><i style="width:${Math.round((100 * d.right) / d.decided)}%"></i></div>`
       : "";
-  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span> of ${d.decided} checked calls</span></p>${track}${countedText(d) ? `<p class="ck-small">${esc(countedText(d))}</p>` : ""}<p>${esc(comparisonText({ sentence: d.comparison_text }))}</p></div>`;
+  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span> of ${d.decided} checked calls</span></p>${track}<p>${esc(comparisonText({ sentence: d.comparison_text }))}</p>${countedHTML(d)}</div>`;
 }
 
 // ── the bet card ───────────────────────────────────────────────────────────────
@@ -256,23 +330,47 @@ const _weightOf = (statsLine) => {
   const m = /([\d.]+)\s*lbs/.exec(String(statsLine || ""));
   return m ? m[1] : "";
 };
-export function chapterRowsHTML(items, { currentUrl = "" } = {}) {
+const isPrologue = (p) => /^Prologue/.test(String((p && p.label) || ""));
+// Red team 2026-10-17: every row is `label · value`, and the value is always the same kind of
+// thing. A week's value is its weight in lb; the first week's is labelled the start when it is
+// the edition's start weight (the run's first weigh-in). A prologue was written before day one,
+// so it says that — never a date where a weight belongs, and never a pre-start reading that would
+// make week 1 read as a gain.
+export function chapterValue(p, { startLb = null, first = false } = {}) {
+  if (isPrologue(p)) return "Before day one";
+  const w = _weightOf(p.stats_line);
+  if (!w) return shortDay(p.date);
+  const start = first && num(startLb) !== null && Math.abs(Number(w) - startLb) < 0.05;
+  return `${w} ${LB}${start ? ", the start" : ""}`;
+}
+export function chapterRowsHTML(items, { currentUrl = "", startLb = null } = {}) {
   const rows = (items || []).filter((p) => p && p.title && p.url);
   if (!rows.length) return "";
+  const firstWeek = rows.find((p) => !isPrologue(p));
   return `<ul class="ck-rows ck-rows--chapters">${rows
     .map((p) => {
       const key = String(p.label || "").replace(/^Prologue.*$/, "Start");
-      const value = _weightOf(p.stats_line) || shortDay(p.date);
+      const value = chapterValue(p, { startLb, first: p === firstWeek });
       return `<li${p.url === currentUrl ? ' class="ck-rows__now"' : ""}><span class="ck-rows__key">${esc(key)}</span><a href="${esc(p.url)}">${esc(p.title)}</a><span class="ck-rows__value">${esc(value)}</span></li>`;
     })
     .join("")}</ul>`;
 }
 export const postsInOrder = (journal) => ((journal && journal.posts) || []).filter((p) => p && p.title && p.url).sort((a, b) => String(a.date).localeCompare(String(b.date)));
 
-// One line per chapter on Start here: the chapter's own first sentence (AI-written, third
-// person) when the manifest serves a whole one, otherwise its code-rendered stats line.
+// One line per chapter on Start here, the same kind of line for every chapter (red team
+// 2026-10-17: two prologues opened with the same "Tomorrow morning…" sentence, and week 4 switched
+// from a stat line to a narrative em-dash chain). A week is its code-rendered stats line, in lb,
+// its change in words; a prologue is "Before day one." The chapters' own sentences are one tap
+// away on Story.
+export function chapterStatLine(p) {
+  if (isPrologue(p)) return "Before day one.";
+  const raw = lbText(String((p && p.stats_line) || "").split("|")[0].trim());
+  if (!raw) return "";
+  const line = raw.replace(/\s*\(([-−+])?(\d+(?:\.\d+)?) this week\)/, (m, sign, n) => `, ${sign === "+" ? "up" : "down"} ${n} this week`);
+  return /[.!?]$/.test(line) ? line : `${line}.`;
+}
 export function recapHTML(posts) {
-  const rows = (posts || []).map((p) => ({ p, line: summarySentence(p.excerpt) || String(p.stats_line || "").trim() })).filter((r) => r.p.title && r.line);
+  const rows = (posts || []).map((p) => ({ p, line: chapterStatLine(p) })).filter((r) => r.p.title && r.line);
   if (!rows.length) return "";
   return `<ul class="ck-coach">${rows
     .map(({ p, line }) => `<li><span class="ck-coach__who">${esc([String(p.label || "").replace(/^Prologue.*$/, "Start"), p.title].filter(Boolean).join(" · "))}</span><span>${esc(line)}</span></li>`)
@@ -312,7 +410,12 @@ export function chartHTML(weights, { sentence: withSentence = true } = {}) {
 
 // ── the team ───────────────────────────────────────────────────────────────────
 // `from` is the page this list is on, so the coach page returns to it by name (#4675).
-export function teamHTML(coachesBody, base = "", from = "") {
+// Red team 2026-10-17: "Sitting out: no sensor since August 27" beside a counted record read as
+// calls with no instrument. The record is this run's only (the route counts from the run's start),
+// so when the sitting-out date is before the run's first day (`startDate`, the edition's
+// today.start_date — never a literal), the line says so and says what the counted calls rest on.
+const ISO_RE = /(\d{4}-\d{2}-\d{2})/;
+export function teamHTML(coachesBody, base = "", from = "", { startDate = "" } = {}) {
   const coaches = ((coachesBody && coachesBody.coaches) || []).filter((c) => c && c.name);
   if (!coaches.length) return "";
   const n = (c) => (c.record && num(c.record.n)) || 0;
@@ -320,8 +423,12 @@ export function teamHTML(coachesBody, base = "", from = "") {
   return `<ul class="ck-coach ck-coach--record">${ordered
     .map((c) => {
       const job = COACH_JOBS[c.persona_id] || "";
-      const sitting = c.absent ? ` Sitting out${c.reason ? `: ${String(c.reason).replace(/(\d{4}-\d{2}-\d{2})/, (iso) => shortDay(iso))}` : ""}.` : "";
       const r = c.record;
+      const since = c.absent && c.reason ? (ISO_RE.exec(String(c.reason)) || [])[1] : "";
+      const preStart = since && startDate && since < startDate && r && num(r.n) !== null && r.n > 0;
+      const sitting = c.absent
+        ? ` Sitting out${c.reason ? `: ${String(c.reason).replace(ISO_RE, (iso) => shortDay(iso))}` : ""}${preStart ? ", before day one, so the calls counted here were checked on other readings" : ""}.`
+        : "";
       let record = "no checked calls";
       if (c.tier === "lead" && !r) record = "no bets";
       else if (r && num(r.n) !== null && r.n > 0) {
@@ -513,6 +620,8 @@ export function frontReadSlots(edition, b, base = "/") {
     // The card in the bet's own terms: each coach with its job, the live number inside the
     // card, and the door to what each one argued (round 8b).
     out["ck-bet"] = betHTML(b.next, { sidesText: F.betSidesLines(pick.bet, F.jobsByName(moves)), extra: F.betLiveLine(pick.bet, b.week), href: `${base}coaches/#ck-bet`, hrefText: "Every open bet, on the coaches page" });
+    // The card's own door goes to the coaches page; a second door there under it says it twice.
+    out["ck-coaches-door"] = null;
   } else if (pick && pick.kind === "reply") {
     out["ck-bet"] = null;
   }
@@ -525,7 +634,10 @@ export function frontReadSlots(edition, b, base = "/") {
   const spokeToday = usable(b.coach_lines) && (b.coach_lines.data.lines || []).length > 0;
   if (today && spokeToday) out["ck-coach-lines"] = today;
   else {
-    const heard = F.lastHeardHTML(moves, shown, base);
+    // The last line heard stands in only when the argument section is empty: with an exchange or
+    // an open bet above it, the coaches have already spoken on this page, and a further quote is the
+    // same voice twice (a quarter screen; red team 2026-10-17 — the front page should get shorter).
+    const heard = pick ? "" : F.lastHeardHTML(moves, shown, base);
     if (heard) {
       out["ck-coach-lines-label"] = "The coaches, last heard";
       out["ck-coach-lines"] = heard;
@@ -545,6 +657,9 @@ export function frontReadSlots(edition, b, base = "/") {
   } else {
     out["ck-call"] = soft(b.calls.absent_text || "The settled calls are not served right now.");
   }
+  // What recovery is, said once: when the miss card's served sentence already glosses it, the
+  // Today band does not repeat it.
+  if (/morning score out of 100/.test(out["ck-call"] || "")) out["ck-today"] = F.todayBandHTML(e, b, base, { gloss: false });
   const sheet = sheetLine(characterOf(b));
   if (sheet) out["ck-sheet-span"] = esc(sheet);
   return out;
@@ -579,19 +694,34 @@ async function mountStart(edition, b) {
   const [journal, timeline] = await Promise.all([tryJSON("/journal/posts.json"), tryJSON("/api/timeline")]);
   fill("ck-recap", recapHTML(postsInOrder(journal)) || soft("The chapters are not served right now."));
   fill("ck-chart", chartHTML(timeline && timeline.timeline && timeline.timeline.weights) || soft("The weigh-ins are not served right now."));
-  fill("ck-open", `${betHTML(b.next)}${small(chapterNextLine(b.next))}`);
+  // Nothing waiting to settle is not a section's content: with no bet, the next chapter's line alone.
+  const bet = coachesBetHTML(b.next, null);
+  fill("ck-open", `${bet === null ? "" : bet}${small(chapterNextLine(b.next))}`);
   fill("ck-record", esc(recordLine(b.record) || (b.record && b.record.absent_text) || ""));
 }
 const chapterNextLine = (nextBlock) => {
   const ch = nextBlock && nextBlock.data && nextBlock.data.chapter;
-  return usable(ch) && dayInWords(ch.data.date) ? `The next chapter is due ${dayInWords(ch.data.date)}.` : "";
+  return usable(ch) && dayInWords(ch.data.date) ? nextChapterLine(nextBlock).replace(/^Next chapter due/, "The next chapter is due") : "";
 };
 
+const startLbOf = (b) => (usable(b.today) ? num(b.today.data.start_weight_lbs) : null);
+// Story's lead: the latest chapter, its held state, the podcast's hold and the teaser made to
+// agree with the rows below it. Pure, for tests/js/ck_red_team_4586.test.mjs.
+export function storyChapterHTML(edition, b, journal, episodes) {
+  const c = usable(b.chapter) ? b.chapter.data : null;
+  const post = c ? postsInOrder(journal).find((p) => p.url === c.url) : null;
+  const chapterLb = post && _weightOf(post.stats_line) ? Number(_weightOf(post.stats_line)) : null;
+  return chapterHTML(b.chapter, b.next, {
+    held: heldChapterLine(b.chapter, edition, journal),
+    podcastHeld: c ? podcastHeld(episodes, weekNumberOf(c.week_label)) : false,
+    teaser: { chapterLb, startLb: startLbOf(b) },
+  });
+}
 async function mountStory(edition, b) {
   const [journal, episodes] = await Promise.all([tryJSON("/journal/posts.json"), tryJSON("/panelcast/episodes.json")]);
-  fill("ck-chapter", chapterHTML(b.chapter, b.next));
+  fill("ck-chapter", storyChapterHTML(edition, b, journal, episodes));
   const current = usable(b.chapter) ? b.chapter.data.url : "";
-  fill("ck-chapters", chapterRowsHTML(postsInOrder(journal), { currentUrl: current }) || soft("The chapters are not served right now."));
+  fill("ck-chapters", chapterRowsHTML(postsInOrder(journal), { currentUrl: current, startLb: startLbOf(b) }) || soft("The chapters are not served right now."));
   fill("ck-episodes", episodeRowsHTML(episodes) || soft("The podcast episodes are not served right now."));
 }
 
@@ -599,14 +729,27 @@ async function mountCoaches(edition, b) {
   const base = document.body.dataset.ckBase || "/";
   const [coaches, docket, calls] = await Promise.all([tryJSON("/api/coaches"), tryJSON("/api/coach_docket"), tryJSON("/api/calls")]);
   fill("ck-record-big", recordBigHTML(b.record));
-  fill("ck-team", teamHTML(coaches, base, "coaches") || soft("The team is not served right now."));
+  fill("ck-team", teamHTML(coaches, base, "coaches", { startDate: usable(b.today) ? b.today.data.start_date || "" : "" }) || soft("The team is not served right now."));
   // The shell's scorecard door joins the note under the pair; with no pair it stands as served.
   const more = document.getElementById("ck-verdicts-more");
   const pair = callVerdictsHTML(calls, base, "coaches", { trailer: more ? more.innerHTML.trim() : "" });
   if (pair && more) more.remove();
   fill("ck-verdicts", pair || verdictsHTML(coaches) || soft("No checked call is served right now."));
-  const bet = b.next && b.next.data && b.next.data.bet;
-  fill("ck-bet", betHTML(b.next, { extra: moreBetsLine(docket, usable(bet) ? bet.data.settle_date : ""), ...reasonsDoor(b.next, base), oneLine: true }));
+  const bet = coachesBetHTML(b.next, docket, base);
+  if (bet === null) document.getElementById("ck-bet")?.closest("section")?.remove();
+  else fill("ck-bet", bet);
+}
+// The bet section on Coaches. null — the section is not drawn — when the edition read the docket
+// and there is nothing waiting to settle (red team 2026-10-17: the page ended on an empty "When
+// two disagree, they bet. No coach bet is waiting to settle."). A failed read still says so.
+export function coachesBetHTML(nextBlock, docket, base = "/") {
+  const bet = nextBlock && nextBlock.data && nextBlock.data.bet;
+  const open = usable(bet) && bet.data.question;
+  if (bet && !open && bet.state !== "unavailable") {
+    const more = moreBetsLine(docket, "");
+    return more ? soft(more) : null;
+  }
+  return betHTML(nextBlock, { extra: moreBetsLine(docket, open ? bet.data.settle_date : ""), ...reasonsDoor(nextBlock, base), oneLine: true });
 }
 
 const PAGES = { front: mountFront, week: mountWeek, start: mountStart, story: mountStory, coaches: mountCoaches };

@@ -18,21 +18,25 @@ const COUNTED = "Counted: 10 sealed before day one, 4 sides of bets between two 
 // The wording is this test's own: the capture now serves a counted record of its own, and its figures change.
 const WITH = { ...B.record, data: { ...B.record.data, counted_text: COUNTED } };
 
-test("the record line names what the count counts, between the count and the comparison", () => {
-  assert.equal(P.recordLine(WITH), `${B.record.data.count_text} ${COUNTED} ${B.record.data.comparison_text}`);
+// Red team 2026-10-17: the front page and Start carry ONE plain sentence (count; comparison); the
+// breakdown is the Coaches page's, under one plain sentence that says why there is one.
+const ONE = (rd) => `${rd.count_text.replace(/\.$/, "")}; ${rd.comparison_text.charAt(0).toLowerCase()}${rd.comparison_text.slice(1)}`;
+test("the record line is one plain sentence: the count and the comparison, with no breakdown", () => {
+  assert.equal(P.recordLine(WITH), ONE(B.record.data));
+  assert.doesNotMatch(P.recordLine(WITH), /Counted|sealed/);
 });
 
-test("the big count on Coaches prints what it counts, escaped, above the comparison", () => {
+test("the big count on Coaches prints what it counts after one plain sentence, escaped, below the comparison", () => {
   const html = P.recordBigHTML(WITH);
-  assert.match(html, /Counted: 10 sealed before day one/);
-  assert.ok(html.indexOf("Counted:") < html.indexOf(B.record.data.comparison_text), "what it counts sits before the comparison");
+  assert.match(html, /Not all of them are formal predictions\. Of the \d+: 10 sealed before day one/);
+  assert.doesNotMatch(html, /Counted:/);
+  assert.ok(html.indexOf("formal predictions") > html.indexOf(B.record.data.comparison_text), "the comparison stays beside the count");
   assert.doesNotMatch(P.recordBigHTML({ ...WITH, data: { ...WITH.data, counted_text: "<b>x</b>" } }), /<b>x<\/b>/);
 });
 
-test("a record served without it prints exactly as before", () => {
+test("a record served without it prints the count and comparison alone", () => {
   const bare = { ...B.record, data: { ...B.record.data, counted_text: undefined, counted: undefined } };
-  assert.equal(P.recordLine(bare), `${B.record.data.count_text} ${B.record.data.comparison_text}`);
-  assert.doesNotMatch(P.recordBigHTML(bare), /Counted:/);
-  // The capture itself serves the counted record (#4617): its sentence reaches the line, ahead of the comparison.
-  assert.ok(B.record.data.counted_text && P.recordLine(B.record).includes(B.record.data.counted_text));
+  assert.equal(P.recordLine(bare), ONE(B.record.data));
+  assert.doesNotMatch(P.recordBigHTML(bare), /formal predictions/);
+  assert.ok(B.record.data.counted_text && P.recordBigHTML(B.record).includes("formal predictions"));
 });

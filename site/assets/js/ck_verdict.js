@@ -57,13 +57,28 @@ export function toleranceNote(call) {
   return call.kind === "direction" && n ? `It counted as a move only beyond ${n} either way, ${st}.` : "";
 }
 
+/** The unit a served allowed distance is in (red team 2026-10-17: "not within 17.3 either way"
+ *  had none). A served text that carries its unit ("4 lb", "1.2 hours") keeps it. A bare number
+ *  takes the unit of the measure the call's own served sentence names — only measures listed
+ *  here, each one a score whose unit is not a guess. Anything else: null, and the rule is said
+ *  without the number ("not within the allowed distance") rather than with a unit invented. */
+const SCORE_UNITS = [[/\brecovery score\b/i, "points"]];
+export function toleranceWithUnit(call) {
+  const tol = toleranceText(call);
+  if (!tol) return "";
+  if (!/^-?\d+(?:\.\d+)?$/.test(tol)) return tol;
+  const hit = SCORE_UNITS.find(([re]) => re.test(String((call && call.called) || "")));
+  return hit ? `${tol} ${hit[1]}` : null;
+}
+
 /** The rule that decided a verdict on this call, in the route's own words. `right` is the
  *  verdict being printed (a bet has one per side; the simple guess has its own), so a miss
- *  on a number call reads "not within 18.6 either way". "" when the sentence carries none. */
+ *  on a number call reads "not within 18.6 points either way". "" when the sentence carries none. */
 export function ruleFor(call, right) {
   if (!call) return "";
   if (call.kind === "number") {
-    const tol = toleranceText(call);
+    const tol = toleranceWithUnit(call);
+    if (tol === null) return right ? "within the allowed distance" : "not within the allowed distance";
     return tol ? `${right ? "within" : "not within"} ${tol} either way` : "";
   }
   if (call.kind === "direction") {

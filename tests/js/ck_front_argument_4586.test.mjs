@@ -165,10 +165,10 @@ test("with no bet and no reply, nothing is called an argument", () => {
 });
 
 test("the Today band leaves out a line the argument already printed, and says nothing when every line was", () => {
-  const block = { state: "ok", as_of: "2026-10-08", data: { lines: [{ coach: "James Okafor", domain: "labs", text: "A line the argument printed.", replies_to: "Marcus Webb" }, { coach: "Nathan Reeves", domain: "mind", text: "A question for Matthew?" }] } };
+  const block = { state: "ok", as_of: "2026-10-08", data: { lines: [{ coach: "James Okafor", domain: "labs", move: "reply", text: "A line the argument printed.", replies_to: "Marcus Webb" }, { coach: "Lisa Park", domain: "sleep", move: "call", text: "A call on his sleep." }] } };
   const html = F.coachTodayHTML(block, { skip: ["A line the argument printed."] });
   assert.equal((html.match(/<li>/g) || []).length, 1);
-  assert.match(html, /Nathan Reeves · mind/);
+  assert.match(html, /Lisa Park · sleep/);
   assert.equal(F.coachTodayHTML(block, { skip: block.data.lines.map((l) => l.text) }), "");
   assert.equal(F.coachTodayHTML(block), F.coachTodayHTML(block, { skip: [] }));
   assert.match(F.coachTodayHTML({ state: "absent", absent_text: "No coach had anything to say on Saturday, October 10.", data: null }, { skip: ["x"] }), /No coach had anything to say on Saturday, October 10\./);
@@ -226,7 +226,7 @@ test("the deeper rows: the chapter is one door with its week and its own first s
   assert.equal(slots["ck-week-span"], `How the whole thing is going · ${WEEK_SPAN}`);
   for (const gone of ["ck-week", "ck-quotes", "ck-lead-read", "ck-sheet-line"]) assert.equal(slots[gone], undefined, `${gone} left the front page`);
   // The first screen's numbers are doors; a failed block prints its sentence with no door.
-  assert.ok(slots["ck-record"].startsWith(`<a href="/next/v8/coaches/">${B.record.data.count_text}`));
+  assert.ok(slots["ck-record"].startsWith(`<a href="/next/v8/coaches/">${B.record.data.count_text.replace(/\.$/, "")};`));
   assert.ok(slots["ck-mark-caption"].startsWith(`<a href="/next/v8/trend/?m=weight"><b>${B.today.data.weight_lbs.toFixed(1)} lb</b>`));
   const gone = { state: "unavailable", absent_text: "Not served right now.", data: null };
   assert.equal(P.frontSlots(edition, { ...B, record: gone, today: gone }, BASE)["ck-record"], "Not served right now.");
@@ -252,4 +252,25 @@ test("nothing the round-8 builders emit carries an honorific, an ISO date or a l
   assert.doesNotMatch(out, /\bDr\.\s/);
   assert.doesNotMatch(out, /\b20\d\d-\d\d-\d\d\b/);
   assert.doesNotMatch(out, /undefined|NaN|\[object Object\]/);
+});
+
+// Red team 2026-10-17: the front page quoted the mind coach diagnosing him ("until he names what he's
+// actually avoiding"). The rule (F.frontQuotable) is read off served fields: a move about the record
+// (call / reply / reaction / bet — not a question), and never the mind coach.
+test("the front page never quotes the mind coach or a question, on any of its three quote paths", () => {
+  const mind = { coach: "Nathan Reeves", coach_id: "mind_coach", domain: "mind", move: "call", text: "Until he names what he is avoiding." };
+  const ask = { coach: "James Okafor", coach_id: "labs_coach", move: "question", text: "When is the lab draw?" };
+  const data = { coach: "Max Reyes", coach_id: "physical_coach", move: "reaction", text: "The scale moved." };
+  assert.equal(F.frontQuotable(mind), false);
+  assert.equal(F.frontQuotable({ ...mind, coach_id: undefined }), false, "the day's lines carry the domain only");
+  assert.equal(F.frontQuotable(ask), false);
+  assert.equal(F.frontQuotable({ ...data, move: undefined }), false, "a line with no served move is not quoted");
+  assert.equal(F.frontQuotable(data), true);
+  const today = { state: "ok", as_of: "2026-10-17", data: { lines: [mind, ask] } };
+  assert.equal(F.coachTodayHTML(today), "", "nothing quotable today: the caller falls back to the last line heard");
+  const days = [{ state: "ok", date: "2026-10-17", lines: [mind, ask] }, { state: "ok", date: "2026-10-16", lines: [data] }];
+  assert.match(F.lastHeardHTML(days, [], BASE), /The scale moved\./);
+  assert.doesNotMatch(F.lastHeardHTML(days, [], BASE), /avoiding|lab draw/);
+  const reply = { coach: "Nathan Reeves", coach_id: "mind_coach", domain: "mind", move: "reply", replies_to: "Max Reyes", text: "Max is wrong." };
+  assert.equal(F.pickArgument([{ state: "ok", date: "2026-10-17", lines: [reply] }, ...days.slice(1)], null), null, "a mind-coach reply never leads the argument");
 });

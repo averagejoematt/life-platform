@@ -130,7 +130,9 @@ export function factLine(facts, { skip = [], floorMet = null } = {}) {
     })
     .join(" · ");
 }
-export function todayBandHTML(edition, b, base = "/") {
+// `gloss: false` when the page already says what recovery is (the miss card's served sentence
+// often carries the same gloss) — said once per page.
+export function todayBandHTML(edition, b, base = "/", { gloss = true } = {}) {
   const todayIso = (edition && edition.as_of) || "";
   const week = b.week;
   if (!usable(week)) return soft((week && week.absent_text) || "The last 24 hours are not served right now.");
@@ -159,7 +161,25 @@ export function todayBandHTML(edition, b, base = "/") {
   const plan = b.life && usable(b.life) && b.life.data.rows && b.life.data.rows.training;
   if (usable(plan) && /^Planned for today: /.test(plan.data.text || "")) rows.push(row("Planned", plan.data.text.replace(/^Planned for today: /, "")));
   const html = `<ul class="ck-rows">${rows.join("")}</ul>`;
-  return /recovery/i.test(html) ? `${html}${small(RECOVERY_GLOSS)}` : html;
+  return gloss && /recovery/i.test(html) ? `${html}${small(RECOVERY_GLOSS)}` : html;
+}
+// ── which coach line the front page may quote (red team 2026-10-17) ────────────
+// THE RULE, deterministic, read off two served fields of every line: the front page quotes a
+// coach line only when
+//   (1) its `move` (the move classifier's own type) is about the record: a call, a reply, a
+//       reaction to a result or a bet. A `question` is addressed to him, not about the data,
+//       and a line with no served move is not quoted; and
+//   (2) its coach is not the mind coach (`coach_id` mind_coach, or `domain` mind on the day's
+//       lines). That coach's served domain is behavioral psychology: its lines read HIM (his
+//       motive, what he is "avoiding"), not the data or the plan, and a first-time reader
+//       should meet the record, not an AI's diagnosis of the person.
+// It holds for every quote on the front page: the argument, the day's lines and the last-heard
+// row. The excluded lines are still served whole on the coach's own page and the day pages.
+export const FRONT_MOVES = new Set(["call", "reply", "reaction", "bet"]);
+const FRONT_UNQUOTED = { coach_id: new Set(["mind_coach"]), domain: new Set(["mind"]) };
+export function frontQuotable(line) {
+  if (!line || !FRONT_MOVES.has(line.move)) return false;
+  return !FRONT_UNQUOTED.coach_id.has(line.coach_id) && !FRONT_UNQUOTED.domain.has(line.domain);
 }
 // What the coaches said today: each line a move, or the block's own plain sentence. A line
 // already printed in the argument above (`skip`: its served texts) is not printed twice;
@@ -167,7 +187,7 @@ export function todayBandHTML(edition, b, base = "/") {
 export function coachTodayHTML(block, { skip = [] } = {}) {
   const served = usable(block) ? block.data.lines || [] : [];
   if (!served.length) return soft((block && block.absent_text) || "The coaches have written nothing today.");
-  const lines = served.filter((l) => !skip.includes(l && l.text));
+  const lines = served.filter((l) => frontQuotable(l) && !skip.includes(l.text));
   if (!lines.length) return "";
   const rows = lines
     .map((l) => {
@@ -341,6 +361,9 @@ export function weekSpan(week) {
 export function followLine(nextBlock) {
   const ch = nextBlock && nextBlock.data && nextBlock.data.chapter;
   const day = usable(ch) ? dayInWords(ch.data.date) : "";
+  // A drafted date is not a promise (the cadence says `drafted_not_promised`): a chapter publishes
+  // once Matthew approves it, so the box does not say it is "due".
+  if (day && ch.data.drafted_not_promised) return "A new chapter and podcast most weeks, each once Matthew approves it, and the numbers every Sunday.";
   return day ? `The next chapter and podcast are due ${day}. The week’s numbers go out every Sunday.` : "A new chapter and podcast most weeks, the numbers every Sunday.";
 }
 
@@ -380,7 +403,7 @@ export function pickArgument(days, nextBlock) {
   const bet = nextBlock && nextBlock.data && nextBlock.data.bet;
   const sides = usable(bet) ? (bet.data.sides || []).map((s) => s && s.coach).filter(Boolean) : [];
   if (sides.length >= 2) return { kind: "bet", bet };
-  const lines = argumentLines(days).filter((l) => !namesSelf(l));
+  const lines = argumentLines(days).filter((l) => !namesSelf(l) && frontQuotable(l));
   for (const reply of lines) {
     if (reply.move !== "reply" || !reply.replies_to) continue;
     // The newest line by the coach answered, said no later than the reply.
@@ -468,7 +491,7 @@ export const betSidesLine = (bet, jobs = {}, opts = {}) => betSidesLines(bet, jo
 export const HEARD_MAX_WORDS = 40;
 const wordCount = (t) => String(t || "").trim().split(/\s+/).filter(Boolean).length;
 export function lastHeardHTML(days, skip = [], base = "/") {
-  const clean = argumentLines(days).filter((l) => !namesSelf(l) && !skip.includes(l.text));
+  const clean = argumentLines(days).filter((l) => !namesSelf(l) && frontQuotable(l) && !skip.includes(l.text));
   const line = clean.find((l) => wordCount(l.text) <= HEARD_MAX_WORDS) || clean[0];
   if (!line) return "";
   const job = line.coach_id && SHORT_JOBS[line.coach_id] ? ` (${SHORT_JOBS[line.coach_id]})` : "";

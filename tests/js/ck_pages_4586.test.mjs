@@ -92,7 +92,8 @@ test("coach lines render at most what is served, and silence is a sentence", () 
 
 test("the coaches' count never renders without its comparison", () => {
   const rd = B.record.data;
-  assert.ok(P.recordLine(B.record).startsWith(rd.count_text) && P.recordLine(B.record).endsWith(rd.comparison_text), "the count, then the comparison");
+  const cmp = rd.comparison_text.charAt(0).toLowerCase() + rd.comparison_text.slice(1);
+  assert.equal(P.recordLine(B.record), `${rd.count_text.replace(/\.$/, "")}; ${cmp}`, "the count, then the comparison, as one sentence");
   const alone = { ...B.record, data: { ...B.record.data, comparison_text: "" } };
   assert.equal(P.recordLine(alone), "");
   assert.doesNotMatch(P.recordBigHTML(alone), /ck-big/);
@@ -185,7 +186,11 @@ test("the recap skips an editor's note and never prints a clipped sentence", () 
   const html = P.recapHTML(P.postsInOrder(load("posts")));
   assert.doesNotMatch(html, /Editor/);
   assert.doesNotMatch(html, /…/);
-  assert.match(html, /Week 3 · Storming Mode<\/span><span>Day 11 to Day 17 · 315\.0 lbs/);
+  assert.match(html, /Week 3 · Storming Mode<\/span><span>Day 11 to Day 17 · 315\.0 lb, down 3\.9 this week · 7 training sessions\.<\/span>/);
+  // Red team 2026-10-17: one kind of line per chapter, one unit label, no repeated opening sentence.
+  assert.doesNotMatch(html, /\blbs\b|Tomorrow morning/);
+  const lines = [...html.matchAll(/<\/span><span>([^<]*)<\/span>/g)].map((m) => m[1]);
+  for (const l of lines) assert.match(l, /^(Before day one\.|Day \d+ to Day \d+ · .* lb.*\.)$/, l);
 });
 
 test("chapters list in order with the current one marked; the chart labels both ends", () => {
@@ -216,11 +221,11 @@ test("the front page runs one sentence of the chapter, a Listen button and no id
   assert.match(html, /<a class="ck-btn ck-btn--ghost" href="\/next\/v8\/story\/">Listen · 7 min<\/a>/);
   assert.equal((html.match(/ck-premise/g) || []).length, 1, "one paragraph of the chapter");
   assert.match(html, /<p class="ck-premise ck-soft">After 23 consecutive training days/);
-  assert.match(html, new RegExp(`On the podcast: the food coach, Marcus Webb\\. Next chapter due ${NEXT_DUE}\\.`));
+  assert.match(html, new RegExp(`On the podcast: the food coach, Marcus Webb\\. The next draft is due ${NEXT_DUE}; it publishes once Matthew approves it\\.`));
   // As captured, with no episode: no Listen button, and the next chapter's day still said.
   const live = P.chapterHTML(B.chapter, B.next, { heading: "h2", player: false, listenHref: "/next/v8/story/" });
   assert.doesNotMatch(live, /Listen|<audio/);
-  assert.match(live, new RegExp(`Next chapter due ${NEXT_DUE}\\.`));
+  assert.match(live, new RegExp(`The next draft is due ${NEXT_DUE}; it publishes once Matthew approves it\\.`));
 });
 
 test("progress runs from the start to the goal, and is not drawn without a goal", () => {

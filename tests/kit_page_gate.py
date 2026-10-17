@@ -170,10 +170,12 @@ def _fixtures():
 
 
 def _over_long(fixtures):
-    """The mutation: an edition whose coach lines run far past any budget."""
+    """The mutation: an edition whose coach lines run far past any budget. Each line is made one the
+    front page may quote (a `call` — ck_front.js frontQuotable, red team 2026-10-17): the capture's own
+    line is a question, which the front page leaves out, and a control the page never prints is blind."""
     mutated = copy.deepcopy(fixtures)
     lines = mutated["**/api/edition"]["blocks"]["coach_lines"]["data"]["lines"]
-    mutated["**/api/edition"]["blocks"]["coach_lines"]["data"]["lines"] = [dict(lines[i % len(lines)]) for i in range(40)]
+    mutated["**/api/edition"]["blocks"]["coach_lines"]["data"]["lines"] = [dict(lines[i % len(lines)], move="call") for i in range(40)]
     return mutated
 
 
