@@ -1106,7 +1106,11 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 261 -> 262 (2026-10-15, #4632): guard::scripts/check_habit_registry_drift.py — the habit-registry drift
         # check — arrives PROVEN via GUARD_PROOFS (M1 exit code and M2 bridge resolution each 1 failed / 15 passed; M3 the
         # archived filter survived and is named unproven in the record). CI's pre-merge lane measured n=262 on 3cc971adf.
-        <= 262
+        # Upper bound 262 -> 263 (2026-10-17, #4632 follow-on): structural::test_habit_identity_4632.py — the AST sweep for a
+        # habitify_reading/day_name_for call that drops the day's habit_statuses + the seven reader call sites' rename fixture —
+        # arrives PROVEN via STRUCTURAL_HAND_PROOFS (six plants, each 1-2 failed; restored 18 passed). Measured locally by id-set
+        # diff vs origin/main 7e41da6c3: 785 {262, 511, 7, 5} -> 786 {263, 511, 7, 5}.
+        <= 263
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

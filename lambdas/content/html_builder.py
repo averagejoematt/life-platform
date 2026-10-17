@@ -743,6 +743,70 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
     return out
 
 
+def _habits_deep_dive(data, profile):
+    # The HABITS DEEP-DIVE section (lifted out of `_brief_training_body`, #4632). Every registry
+    # habit is resolved through `habitify_reading` WITH the day's `habit_statuses` — by vendor id
+    # first, names as aliases (`health.habit_identity`) — so a habit renamed in Habitify renders
+    # under its registry key with its real state (#4644 Q26).
+    out = (
+        '<!-- S:habits --><div style="background:#16213e;padding:20px 24px;border-bottom:1px solid #2d2d5e;">'
+        '<p style="color:#64748b;font-size:10px;margin:0 0 12px;font-weight:700;letter-spacing:1px;">HABITS DEEP-DIVE</p>'
+    )
+
+    habitify = data.get("habitify") or {}
+    registry = profile.get("habit_registry", {})
+    h_map, h_statuses = habitify.get("habits", {}), habitify.get("habit_statuses")  # #4632: id-keyed lookup
+
+    if registry:
+        # Tier 0 first
+        for tier_label, tier_num, tier_color in [
+            ("TIER 0 — NON-NEGOTIABLE", 0, "#ef4444"),
+            ("TIER 1 — HIGH PRIORITY", 1, "#f59e0b"),
+            ("TIER 2 — GOOD TO DO", 2, "#64748b"),
+        ]:
+            tier_habits = [(n, m) for n, m in registry.items() if m.get("tier", 2) == tier_num and m.get("status") == "active"]
+            if not tier_habits:
+                continue
+            out += '<p style="color:' + tier_color + ';font-size:9px;margin:8px 0 4px;font-weight:700;">' + tier_label + "</p>"
+            for h_name, meta in sorted(tier_habits, key=lambda x: x[0]):
+                done = habitify_reading(h_map, h_name, meta, h_statuses)  # #4362/#4632: by vendor id, names as aliases
+                completed = done is not None and done >= 1
+                icon = "✅" if completed else ("·" if done is None else "❌")
+                why = meta.get("why_matthew", "")
+                out += (
+                    '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:4px;">'
+                    '<span style="font-size:12px;flex-shrink:0;">' + icon + "</span>"
+                    '<div><p style="color:' + ("#e2e8f0" if completed else "#94a3b8") + ';font-size:12px;margin:0;">' + h_name + "</p>"
+                )
+                if why and not completed:
+                    out += '<p style="color:#475569;font-size:10px;margin:0;">' + why[:80] + "</p>"
+                out += "</div></div>"
+
+        # Synergy alert
+        synergy_misses = {}
+        for h_name, meta in registry.items():
+            if meta.get("status") != "active":
+                continue
+            sg = meta.get("synergy_group")
+            if not sg:
+                continue
+            if (done := habitify_reading(h_map, h_name, meta, h_statuses)) is not None and done < 1:  # #4362/#4632
+                synergy_misses.setdefault(sg, []).append(h_name)
+        for sg, misses in synergy_misses.items():
+            total = sum(1 for _, m in registry.items() if m.get("synergy_group") == sg and m.get("status") == "active")
+            if len(misses) >= total * 0.5 and total >= 3:
+                out += '<p style="color:#f59e0b;font-size:10px;margin:6px 0 0;">' "⚠ Synergy alert: " + sg + " stack mostly missed</p>"
+    elif h_map:
+        done_count = sum(1 for v in h_map.values() if v and float(v) >= 1)
+        total_count = len(h_map)
+        out += '<p style="color:#94a3b8;font-size:13px;margin:0;">' + str(done_count) + " / " + str(total_count) + " habits completed</p>"
+    else:
+        out += '<p style="color:#64748b;font-size:12px;margin:0;">No habit data for yesterday.</p>'
+
+    out += "</div><!-- /S:habits -->"
+    return out
+
+
 def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrition):
     """Section group of the daily brief (extracted from build_html, ADR-pending).
 
@@ -964,65 +1028,7 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
 
     # --- Habits Deep-Dive ---
     try:
-        out += "<!-- S:habits -->"
-        out += (
-            '<div style="background:#16213e;padding:20px 24px;border-bottom:1px solid #2d2d5e;">'
-            '<p style="color:#64748b;font-size:10px;margin:0 0 12px;font-weight:700;letter-spacing:1px;">HABITS DEEP-DIVE</p>'
-        )
-
-        habitify = data.get("habitify") or {}
-        registry = profile.get("habit_registry", {})
-        h_map = habitify.get("habits", {})
-
-        if registry:
-            # Tier 0 first
-            for tier_label, tier_num, tier_color in [
-                ("TIER 0 — NON-NEGOTIABLE", 0, "#ef4444"),
-                ("TIER 1 — HIGH PRIORITY", 1, "#f59e0b"),
-                ("TIER 2 — GOOD TO DO", 2, "#64748b"),
-            ]:
-                tier_habits = [(n, m) for n, m in registry.items() if m.get("tier", 2) == tier_num and m.get("status") == "active"]
-                if not tier_habits:
-                    continue
-                out += '<p style="color:' + tier_color + ';font-size:9px;margin:8px 0 4px;font-weight:700;">' + tier_label + "</p>"
-                for h_name, meta in sorted(tier_habits, key=lambda x: x[0]):
-                    done = habitify_reading(h_map, h_name, meta)  # #4362: rename-aware
-                    completed = done is not None and done >= 1
-                    icon = "✅" if completed else ("·" if done is None else "❌")
-                    why = meta.get("why_matthew", "")
-                    out += (
-                        '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:4px;">'
-                        '<span style="font-size:12px;flex-shrink:0;">' + icon + "</span>"
-                        '<div><p style="color:' + ("#e2e8f0" if completed else "#94a3b8") + ';font-size:12px;margin:0;">' + h_name + "</p>"
-                    )
-                    if why and not completed:
-                        out += '<p style="color:#475569;font-size:10px;margin:0;">' + why[:80] + "</p>"
-                    out += "</div></div>"
-
-            # Synergy alert
-            synergy_misses = {}
-            for h_name, meta in registry.items():
-                if meta.get("status") != "active":
-                    continue
-                sg = meta.get("synergy_group")
-                if not sg:
-                    continue
-                if (done := habitify_reading(h_map, h_name, meta)) is not None and done < 1:  # #4362: unobserved is not a miss
-                    synergy_misses.setdefault(sg, []).append(h_name)
-            for sg, misses in synergy_misses.items():
-                total = sum(1 for _, m in registry.items() if m.get("synergy_group") == sg and m.get("status") == "active")
-                if len(misses) >= total * 0.5 and total >= 3:
-                    out += '<p style="color:#f59e0b;font-size:10px;margin:6px 0 0;">' "⚠ Synergy alert: " + sg + " stack mostly missed</p>"
-        elif h_map:
-            done_count = sum(1 for v in h_map.values() if v and float(v) >= 1)
-            total_count = len(h_map)
-            out += (
-                '<p style="color:#94a3b8;font-size:13px;margin:0;">' + str(done_count) + " / " + str(total_count) + " habits completed</p>"
-            )
-        else:
-            out += '<p style="color:#64748b;font-size:12px;margin:0;">No habit data for yesterday.</p>'
-
-        out += "</div><!-- /S:habits -->"
+        out += _habits_deep_dive(data, profile)
     except Exception as _e:
         out += _section_error_html("Habits Deep-Dive", _e)
 
