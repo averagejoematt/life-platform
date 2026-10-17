@@ -1,4 +1,4 @@
-# Handover — Session BW (carrying Session BV): the paydown run on the owner's "Rulings as written" pick — 16 rulings quoted and acted on, 11 closed on his word, 13 PRs merged and fleet-deployed by CI, five lanes built, two gate classes fixed, open 71 → 61 — 2026-10-17
+# Handover — Session BW (carrying Session BV): the paydown run on the owner's "Rulings as written" pick — 16 rulings quoted and acted on, 11 closed on his word, 13 PRs merged and fleet-deployed by CI, five lanes built and merged, two gate classes fixed, open 71 → 60 — 2026-10-17
 
 **Driving instruction:** `~/.claude/plans/next-session-paydown-2026-10-19.md` — a plan Session BV wrote for Monday 10-19 15:00Z, started two days early. The owner `/clear`-ed BV mid-wrap (its handover never landed on `main`; its memory file did) and said "start the plan". Asked once, at the keyboard, he picked **"Rulings as written, skip 'ran:' lines"** (2026-10-17 ~17:40Z): the plan's 16 RULINGS lines became his word; the eight `ran:` lines were verifiably untrue (week 6 unapproved, #4927 unmerged, no `GH_POSTURE_TOKEN`, remediation-mode `off`) and were dropped. Boot 17:35Z · wrap started 19:25Z · BV's hard stop 20:54:56Z honoured (the plan's own window ran to 11:35Z 10-18; margin beats the clock).
 
@@ -43,9 +43,9 @@ BV booted Friday evening, 36 h before its Sunday window, on `next-session-proofs
 | #4957 | #4935 | 19:11:09 | 604361577 | `qa-smoke-warnings` citation re-stamped to its live cause |
 | direct push | #4630 #3493 | 18:35 | 21ef1f8ea | CHARACTER / COACH_STANCE / HYPOTHESIS engine docs re-stamped against the #4630 squash |
 
-**Still in CI at the wrap (merge on ALL GREEN, read the gate in its own command):** #4955 (ADR-162 + the Zone 2 copy; after merge the two config files need the owner's `aws s3 cp` to `s3://matthew-life-platform/config/`, named in the PR) · #4956 (#4632's seven name-keyed call sites, pins 788/265) · #4958 (ADR-163 — the day-grade movement score rewards walking time, not steps; **a visible grade change**: 10-15 drops 88 → 50 on a lift + gym-cycling day with no walk, per the owner's "b"). The ADR index re-orders itself once both ADR PRs are in (`generate_adr_index.py --apply` runs in each).
+**Addendum 1 (19:30–19:57Z, before the hard stop):** #4955 merged 19:30:12Z 033721053 (ADR-162 + the Zone 2 copy; the two config files need the owner's `aws s3 cp` to `s3://matthew-life-platform/config/`, morning item 7) · #4956 merged 19:33:20Z 8e22a6a7c (#4632's seven name-keyed call sites + an eighth; pins 788/265) · #4958 merged 19:56:36Z 8ba41af5a (ADR-163 — the day-grade movement score rewards walking time, not steps; **a visible grade change**: 10-15 drops 88 → 50 on a lift + gym-cycling day with no walk, per the owner's "b"; its branch briefly carried two unresolved conflict hunks after a bad resolver — fixed on the branch at 04a8b1636 before any gate read, nothing reached main) · **#4604 closed 19:50Z on the live read** (site-deploy run 39060890327 success; sitemap 86 entries with 0 of the nine; all nine 200 + noindex) — 12 closes, open **60**. Fleet live at 8e22a6a7 on site-api / daily-metrics-compute / wednesday-chronicle (postflight 19:52Z); the 8ba41af5a run was in flight at the stop.
 
-**Fleet at the wrap:** the 8c328b4fd run's fleet deploy was mid-flight (site-api / whoop / wednesday-chronicle read 1aa8c754, daily-metrics-compute / habitify read 8c328b4f); `verify_bundle_ancestry.sh <fn> postflight 8c328b4fd` after it concludes is the proof. `check_main_green`: GREEN at 604361577 (run 39061353957).
+**Fleet at the wrap:** live at 8e22a6a7 (site-api / daily-metrics-compute / wednesday-chronicle, postflight 19:52Z); the run for 8ba41af5a (#4958) was in flight — `verify_bundle_ancestry.sh daily-metrics-compute postflight 8ba41af5a` after it concludes is the proof. `check_main_green`: GREEN at 033721053.
 
 ## Verified (reads with the proof on the issue)
 
@@ -80,8 +80,7 @@ BV booted Friday evening, 36 h before its Sunday window, on `next-session-proofs
 
 ## Residual / next picks
 
-- #4604 — after the site deploy for 8c328b4fd concludes: `curl -s https://averagejoematt.com/sitemap.xml | grep -c` the nine paths (expect 0), `curl -s <page> | grep -c 'name="robots" content="noindex"'` on each (expect 1), each old address 200/301; tick boxes 2–4, close.
-- #4955 #4956 #4958 — merge on ALL GREEN (gate in its own command); after #4958 the next daily-metrics-compute run's movement details show `walking_minutes` and no `steps`; after #4956 the next stored habitify row carries `status_channel`; #4632 box 1's live rename proof after that.
+- #4630 #4632 — after the 8ba41af5a deploy: the next daily-metrics-compute run's movement details show `walking_minutes` and no `steps` (#4630's first live proof; box 1 is the owner's backfill); the next stored habitify row carries `status_channel` and #4632 box 1's live rename proof follows the owner's next rename in the app.
 - #4703 #4866 — 10-19 14:00Z analyzer → `/api/weekly_priority` non-null → close both; prune the `coherence-overall` citation 72 h later.
 - #4276 (Sunday 21:30Z `_note_truncation`), #4589 (day 14 on 10-18), #3552/#3495 (Sunday 19:00Z hypothesis engine) — the plan's wave 0, unchanged.
 - #4284 — reopened on Q42: the morning brief's schedule across the 2026-11-01 clock change (EventBridge Scheduler with a Pacific zone, or one moved cron); a sonnet lane.
@@ -93,11 +92,11 @@ BV booted Friday evening, 36 h before its Sunday window, on `next-session-proofs
 
 **Build beat:** none — reader-facing changes today are the nine pages' `noindex` and one Zone 2 copy sentence (the sentence is in #4955, not yet merged); nothing a reader would notice as a beat
 **Docs:** `docs/FRONTIER.md` (new, + README index row), `docs/ENGINEERING_STANDARDS.md` (D2 function-length rule), `docs/engines/CHARACTER.md` / `COACH_STANCE.md` / `HYPOTHESIS.md` / `SCORING.md` (re-stamped against the merged engines), `docs/alarm_citations.json` (the qa-smoke-warnings cause), `docs/DECISIONS.md` (ADR-162 / ADR-163 in #4955 / #4958), `docs/OPERATING_KNOWLEDGE_LEDGER.md` (+3 rows, snapshot 565) in this commit
-**Decisions:** ADR-162 and ADR-163 filed (PRs #4955 / #4958, the owner's Q1 and Q5 verbatim); the rest of the rulings are recorded on their issues, not governance
-**Main:** green (604361577) — run 39061353957, HEAD covered; the 8c328b4fd fleet deploy in flight
+**Decisions:** ADR-162 and ADR-163 filed and merged (PRs #4955 033721053 / #4958 8ba41af5a, the owner's Q1 and Q5 verbatim; index regenerated, 161 records); the rest of the rulings are recorded on their issues, not governance
+**Main:** green (033721053) — run for 8e22a6a7c/8ba41af5a in flight; HEAD covered by the addendum's postflight
 **Incidents:** none — the two red Docs-CI windows on main (18:06Z–18:35Z, 18:32Z–18:35Z) were under an hour each and are the gate class in Gotchas, not an incident row
 **Stash/hooks:** clean — stash empty, hook freshness 🟢, reaper removed 1 released lane (issue-1348-docs-reverify-technical), 0 dirty; 24 worktrees remain (the HELD lanes locked by name)
-**Closures:** #4261 #4257 #4789 #4702 #4677 #4642 #4644 #3943 #4423 #4424 #4880 commented (each on the owner's quoted word) · DoD: scanned 15, hits 0 after the `**Outcome:**` verdict lines and the #4677 residual homed on #4625 (`closure:live-proof` removed on the owner's "no")
+**Closures:** #4261 #4257 #4789 #4702 #4677 #4642 #4644 #3943 #4423 #4424 #4880 #4604 commented (each on the owner's quoted word) · DoD: scanned 16, hits 0 after the `**Outcome:**` verdict lines and the #4677 residual homed on #4625 (`closure:live-proof` removed on the owner's "no")
 **Backlog:** Now live at 2 actionable in the fable lane after promoting #4630 (milestone + score line); `--refill-now --lane fable` finds NO REMEDY IN THE CORPUS (1 short — the nine startable stories outside the lane were refused; the morning list IS the unblock) · Later sweep — 0 stale (61 open satisfy the contract)
 **Alarms:** 4 red >72h, all cited — `qa-smoke-warnings` (#4935, now on `data:orphan_routine_drafts`, the owner's draft archive), `coherence-overall` (#4703/#4866, 10-19 14:00Z), `qa-smoke-failures` (#4536, the wk5 release/retire), `chronicle-delivery-heartbeat` (#4914, week 6's approval); the `chronicle-autopublish-held` daily flap cited on #4914; gate green at the gather
 **CI warnings:** 5 on the latest green run (604361577) — the five `SKIPPED in CI — no playwright/chromium` annotations, the standing #3640 class: no action, they run on any chromium machine (the kit gate's own chromium job passes)
