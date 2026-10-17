@@ -317,13 +317,14 @@ Daily records (`sk = DATE#YYYY-MM-DD`) + workout sub-items (`sk = DATE#YYYY-MM-D
 | `nap_count` | number | Number of nap sessions (only present when ≥1 nap) |
 | `nap_duration_hours` | number | Total nap sleep (hours, in-bed minus awake) |
 
-**Workout sub-items** (`sk = DATE#YYYY-MM-DD#WORKOUT#<id>`):
+**Workout sub-items** (`sk = DATE#YYYY-MM-DD#WORKOUT#<id>`). **One key per workout id:** the date is the UTC day the workout STARTED (#4629 box 3, #4644 Q11, the #3913 UTC frame; `whoop_lambda.py::workout_files_under`, the same `_utc_day` the reconciler expects). The vendor returns every workout that overlaps a fetch window, so before #4629 a workout running across 00:00 UTC was written under both days; those stored copies stay until the owner's approved removal (183 ids under two keys on 2026-10-16, `scripts/whoop_workout_history_4629.py --dry-run`). Until then a reader that counts or sums workout rows dedups by `workout_id`.
 | Field | Type | Description |
 |-------|------|-------------|
 | `workout_id` | string | Whoop workout ID (v2 API UUID) |
 | `sport_id` | number | Whoop sport type ID |
-| `sport_name` | string | Human-readable sport name from the platform's own `WHOOP_SPORT_NAMES` table (`Sport_<id>` when unmapped) |
-| `vendor_sport_name` | string | Whoop's own `sport_name` label, stored beside `sport_id` and the table label, never merged with it (capture-all, #4629; `whoop_lambda.py::_extract_workout`). Absent when the vendor sends none |
+| `sport_name` | string | Whoop's own `sport_name` label, as the payload sends it (lowercase, hyphenated: `walking`, `weightlifting`, `functional-fitness`, `stretching`; #4629 box 2, `whoop_lambda.py::_extract_workout`). Absent when the vendor sends none — never guessed from `sport_id`. **Rows stored before #4629 still carry the removed hand-written table's label** (`Hiking` for the vendor's walking, `Cross Training` for weightlifting, `Sport_<id>` for unmapped ids — 21 of its 24 ids disagreed with the vendor) until the owner's relabel (#4644 Q10), which moves the old label to `legacy_sport_name`; a row whose `sport_name` differs from its `vendor_sport_name` is such a row |
+| `vendor_sport_name` | string | Whoop's own `sport_name` label (capture-all, #4629). Equal to `sport_name` on every row written since #4629 — it names the provenance, so `sport_name == vendor_sport_name` marks a vendor-labelled row. Absent when the vendor sends none, and on rows stored before 2026-10-15 |
+| `legacy_sport_name` | string | **Not yet written.** The pre-#4629 table label, kept as an alias by the owner's relabel of stored history (#4644 Q10 recommended answer: "yes, vendor names, old label kept as an alias"). No writer in the repo produces it; `scripts/whoop_workout_history_4629.py --dry-run` counts the rows the relabel would touch |
 | `start_time` | string | ISO timestamp |
 | `end_time` | string | ISO timestamp |
 | `strain` | number | Workout strain |

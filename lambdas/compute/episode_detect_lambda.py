@@ -1098,8 +1098,10 @@ def _load_inputs() -> tuple:
                 if name and kg > bucket["top_kg"].get(name, 0.0):
                     bucket["top_kg"][name] = kg
 
-    # #3709 — session heart rate. Whoop `sport_name` is largely unmapped
-    # (Sport_128 / Sport_242 / None), so Whoop is used ONLY for session-level HR;
+    # #3709 — session heart rate. Whoop `sport_name` was largely unmapped when
+    # this was written (Sport_128 / Sport_242 / None from the hand-written table
+    # #4629 removed; new rows carry the vendor's own label, history keeps the old
+    # one until the owner's relabel), so Whoop is used ONLY for session-level HR;
     # walk-specific HR comes from Strava, where the sport type is trustworthy.
     # Whoop zone minutes are deliberately NOT read — present on 2,167 of 4,822
     # records and zero on every one (verified 2026-09-08).
