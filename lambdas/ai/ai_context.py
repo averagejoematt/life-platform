@@ -405,9 +405,7 @@ def _build_habit_outcome_context(data, profile):
     trend_lines = []
     for day_rec in habitify_7d[-7:]:
         date_str = day_rec.get("sk", "").replace("DATE#", "")
-        habits_map, statuses = (
-            (day_rec.get("habits", {}), day_rec.get("habit_statuses")) if isinstance(day_rec, dict) else ({}, None)
-        )  # #4632
+        habits_map, statuses = (day_rec.get("habits", {}), day_rec.get("habit_statuses")) if isinstance(day_rec, dict) else ({}, None)
         t0_done = sum(1 for h in tier0_names if (habitify_reading(habits_map, h, registry.get(h), statuses) or 0) >= 1)  # #4362
         t1_done = sum(1 for h in tier1_names if (habitify_reading(habits_map, h, registry.get(h), statuses) or 0) >= 1)
         trend_lines.append(f"  {date_str}: T0 {t0_done}/{len(tier0_names)}, T1 {t1_done}/{len(tier1_names)}")
@@ -716,9 +714,7 @@ def _compute_diminishing_returns(character_sheet, data, profile):
         return ""
 
     registry, habitify = profile.get("habit_registry", {}), (data.get("habitify") or {})
-    habits_map, habit_statuses = (
-        (habitify.get("habits", {}), habitify.get("habit_statuses")) if isinstance(habitify, dict) else ({}, None)
-    )  # #4632
+    habits_map, habit_statuses = (habitify.get("habits", {}), habitify.get("habit_statuses")) if isinstance(habitify, dict) else ({}, None)
 
     # Map habits to pillars
     HABIT_PILLAR_MAP = {
