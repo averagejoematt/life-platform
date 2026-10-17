@@ -3893,6 +3893,41 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/4843"
         }
       ]
+    },
+    {
+      "id": "2026-10-15-capture-everything-and-the-stale-stamp",
+      "date": "2026-10-15",
+      "title": "Store what the devices actually sent, and a page that had quietly stopped publishing",
+      "shipped": "An unattended session landed nine pull requests under one rule: a device's own number is stored under that device's name, and nothing picks a winner at write time. Whoop's heart-rate zones now come from the field the vendor fills (they had been stored as zero for every workout), its daily step count is kept beside Apple's instead of merged, the vendor's own sport name sits beside the platform's label, habits carry the vendor's id so a renamed habit is still the same habit, and Hevy superset groupings and Withings measurement attribution are no longer dropped on the floor. On the reading side, a short heart-rate recording can no longer lend its average to a long session and inflate Zone 2 minutes. Separately, the coaching page's static proof block now dates itself by the newest coach read it shows.",
+      "why_it_mattered": "Every chart on this site is only as honest as the row underneath it. A zone minute that was always zero, a step count silently replaced by another device's, a habit streak that resets because its name changed: none of those are visible from the page, and each one quietly breaks a claim a reader might check. Storing every vendor field as sent, and deciding precedence in one read-side place later, means the owner can rule on the definitions (which heart-rate band is Zone 2, which weigh-in is the day's) without a rebuild each time he changes his mind. And the stale stamp mattered more than it looked: the freshness guard had been refusing to publish the whole site for two days, so two merged site changes were invisible to every reader.",
+      "gotcha": "The site had stopped publishing and nothing said so. A guard that blocks a publish when a baked 'as of' date is older than a week did exactly its job, but the date it read came from the weekly priority's generation stamp, and a held weekly read had deleted that record, so the page fell back to the analyzer's last productive run ten days earlier while every coach read on the same block was from today. The fix was eleven lines, the discovery took reading a failed workflow nobody had opened, and the deploy workflow's path filter does not even watch the generator, so the republish had to be dispatched by hand. A second surprise: adding one new check script turned the full test suite red twice, because the platform's gate census demands a recorded mutation proof for every new gate, and that proof then moves a pinned count.",
+      "honest_miss": "Five of the session's eleven lanes could not finish: four are open pull requests waiting on the owner's words, one of them a rehearsal of the new front page that must never merge on its own and still fails 35 tests. The Whoop zone history is not rebuilt yet (the rebuild script only reports what it would change), the step count has not been backfilled, and the weekly priority itself is still empty: the stamp fix made the page honest about what it shows, it did not make the analyzer run. One opus lane ran for fourteen hours alone and set the whole first wave's duration; the second wave of six lanes took 37 minutes.",
+      "prs": [
+        {
+          "label": "PR #4922",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4922"
+        },
+        {
+          "label": "PR #4926",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4926"
+        },
+        {
+          "label": "PR #4921",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4921"
+        },
+        {
+          "label": "PR #4929",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4929"
+        },
+        {
+          "label": "PR #4925",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4925"
+        },
+        {
+          "label": "PR #4924",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4924"
+        }
+      ]
     }
   ]
 }

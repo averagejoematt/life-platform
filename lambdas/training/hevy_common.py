@@ -279,6 +279,9 @@ def _normalize_exercise(ex: dict, unit_hint: str) -> dict:
         "template_id": ex.get("exercise_template_id") or ex.get("template_id"),
         "sets": [_normalize_set(s, unit_hint) for s in (ex.get("sets") or [])],
         "notes": ex.get("notes") or "",
+        # #4642 capture-all: the wire's own grouping + order, stored as sent (None when absent).
+        "superset_id": ex.get("superset_id"),
+        "exercise_index": ex.get("index"),
     }
 
 
@@ -354,6 +357,7 @@ def normalize_workout(raw: dict) -> dict:
         "description": (workout.get("description") or "")[:1000],
         "start_time": start_iso,
         "end_time": end_iso,
+        "hevy_updated_at": workout.get("updated_at"),  # #4642: Hevy's own edit stamp, as sent
         "duration_sec": duration_sec,
         "total_volume_kg": total_volume_kg,
         "exercises": exercises,

@@ -44,11 +44,35 @@ def _sane_sleep_score(raw, hours, whoop_quality):
         raw = round(float(raw), 0)
     except (TypeError, ValueError):
         return None
-    hrs = float(hours) if hours else 0
     wq = float(whoop_quality) if whoop_quality else 0
-    if raw < 40 and (hrs >= 6 or wq >= 70):
+    if _eight_night_discounted(raw, hours, whoop_quality):
         return round(wq, 0) if wq else None
     return raw
+
+
+def _eight_night_discounted(raw, hours, whoop_quality):
+    """The ONE predicate for "Eight Sleep's night is a non-detect Whoop contradicts" (score
+    <40 beside >=6 h slept or a healthy Whoop quality). `_sane_sleep_score` and the trend row's
+    `efficiency` both key off it, so a night is discounted for every top-level figure or none."""
+    if raw is None:
+        return False
+    try:
+        raw_f = float(raw)
+        hrs = float(hours) if hours else 0
+        wq = float(whoop_quality) if whoop_quality else 0
+    except (TypeError, ValueError):
+        return False
+    return round(raw_f, 0) < 40 and (hrs >= 6 or wq >= 70)
+
+
+def _trend_efficiency(r, w):
+    """#4935 — per-field source rule for a trend row's top-level `efficiency`: Eight Sleep's own
+    figure, EXCEPT on a night `_eight_night_discounted` flags, where it is Whoop's
+    `sleep_efficiency_percentage` (None if Whoop has none) so it never sits beside Whoop's hours
+    and score as Eight Sleep's non-detect 16.9 %. The nested `eightsleep` block keeps the raw."""
+    discounted = _eight_night_discounted(r.get("sleep_score"), w.get("sleep_duration_hours"), w.get("sleep_quality_score"))
+    v = w.get("sleep_efficiency_percentage") if discounted else r.get("sleep_efficiency_pct")
+    return round(float(v), 1) if v else None
 
 
 # ── #2921: per-device stage blocks, each internally self-consistent ──────────
@@ -597,7 +621,7 @@ def sleep_detail(*, _g) -> dict:
             {
                 "date": date,
                 "sleep_score": _row_score,
-                "efficiency": round(float(r["sleep_efficiency_pct"]), 1) if r.get("sleep_efficiency_pct") else None,
+                "efficiency": _trend_efficiency(r, w),
                 "hours": round(float(w["sleep_duration_hours"]), 1) if w.get("sleep_duration_hours") else None,
                 "whoop_quality": round(float(w["sleep_quality_score"]), 0) if w.get("sleep_quality_score") else None,
                 "deep_sleep_hours": round(float(w["slow_wave_sleep_hours"]), 2) if w.get("slow_wave_sleep_hours") else None,

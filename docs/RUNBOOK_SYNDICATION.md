@@ -1,31 +1,44 @@
 # Syndication Runbooks — token rotation + post recall
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-05
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-08-05 (#1402 — the artifact-class table below; the runbooks themselves
-are unchanged from #1630). Originally 2026-07-25 (#1630 — written BEFORE the first automated post, per the ADR-140
-requirement and the R22 precedent (#893): "how do I delete a bad post and rotate a leaked
-token" must be a document, not a 2am improvisation.)
+Last updated: 2026-10-17 (re-verified against the code: the automated poster #1629 was retired
+won't-do 2026-09-19, so rows and steps that assumed an unbuilt-but-coming poster now describe the
+manual script only). Earlier: 2026-08-05 (#1402 — the artifact-class table); originally 2026-07-25
+(#1630 — written BEFORE the first automated post, per the ADR-140 requirement and the R22
+precedent (#893): "how do I delete a bad post and rotate a leaked token" must be a document,
+not a 2am improvisation.)
 
 **Scope:** the social syndication surface governed by **ADR-140** (`docs/DECISIONS.md`) —
-the Phase 0 manual script (`scripts/post_social.py`, #1622), the gated Bluesky poster
-(#1629, unbuilt), and the Phase 2 X channel (explicitly not built — see ADR-140 rule 4).
-Covers **Bluesky** (the staged `life-platform/bluesky` credential) and, prospectively, **X**.
+the manual script (`scripts/post_social.py`, #1622), which is the **only** poster. The
+automated Bluesky poster (#1629) was **retired as won't-do on 2026-09-19** (owner ruling:
+its own promotion trigger passed 2026-09-01 at 0/30 days of use) and the X channel
+(#1631) is closed unbuilt — both stay governed by ADR-140 should either ever be revived.
+Covers **Bluesky** (the `life-platform/bluesky` credential) and, prospectively, **X**.
+
+**Not to be confused with the inbound social feeds.** `bluesky-social-ingestion`,
+`mastodon-social-ingestion` and `youtube-social-ingestion` (`lambdas/ingestion/bluesky_lambda.py`,
+`mastodon_lambda.py`, `youtube_lambda.py`; schedules are each function's `schedule=` in
+`cdk/stacks/ingestion_stack.py`) READ public feeds; they post nothing. All three run on
+**placeholder account ids** (`__OWNER_MUST_SUPPLY__` sentinels, deliberate and documented in
+#1669), so they find zero rows until the owner supplies real accounts; whether to disable the
+schedules meanwhile is an open ruling on #4641. `life-platform/bluesky` is shared: the
+`handle` field feeds the inbound lambda, the app password is the poster's credential.
 
 ## What exists today vs. what ships with #1629
 
-Honesty note (`reference_docs_current_truth_only`) — this runbook is deliberately written
-*before* the poster, so it names what is live now vs. pre-staged:
+Honesty note (`reference_docs_current_truth_only`) — this runbook was written *before* the
+first post; the table is the state read from the code and AWS on 2026-10-17:
 
-| Thing | State (2026-07-25) |
+| Thing | State (2026-10-17) |
 |---|---|
-| `life-platform/bluesky` secret (handle + **scoped app password**, AT Protocol `createSession`) | **LIVE** — created 2026-07-25, createSession-validated. App password only, never the account password (#1629 non-negotiable 10) |
-| `scripts/post_social.py` Phase 0 manual poster | Gated on owner trial (#1622) |
-| The syndication lambda (`lambdas/syndication/`) | **Unbuilt** — #1629, gated on Phase 0 hitting ≥15/30 days |
-| SSM `/life-platform/syndication-mode` (`off \| shadow \| live`) | **Does not exist yet** — ships with #1629; until then there is no automated poster to switch off |
-| `life-platform/bluesky` in the freshness checker's `MANUAL_ROTATION_SECRETS` (`lambdas/emails/freshness_checker_lambda.py`) | **Not yet listed** — add the entry in the #1629 PR so staleness alerting starts when the consumer does |
-| `life-platform/x` secret / X developer-portal app | **Does not exist** — Phase 2 is do-not-build until the ADR-063 per-post-spend amendment is signed |
-| The daily-fingerprint broadcast artifact (`/moments/fingerprint/{date}/`, #1402) | **LIVE after the next og-image-generator run** — dated card + permalink + provenance caption, written by `og_moments._sweep_fingerprint`. Nothing posts it; see the class table below |
+| `life-platform/bluesky` secret (handle + **scoped app password**, AT Protocol `createSession`) | **EXISTS** — created 2026-07-25, last changed the same day (read-only `describe-secret`), createSession-validated then. App password only, never the account password (#1629 non-negotiable 10). Rotation cadence below is measured from the last-changed date |
+| `scripts/post_social.py` manual poster | **LIVE, ungated.** The 30-day usage-trial gate was removed 2026-08-02; Bluesky posts live, `--platform x` prints a pointer to #1631 and exits with no network call. **Its Bluesky credential is read from the macOS keychain (service `life-platform-bluesky`), not from AWS** — a rotation must update the keychain entry as well as the secret |
+| The syndication lambda (`lambdas/syndication/`) | **Does not exist, and will not** — #1629 retired won't-do 2026-09-19 (see Scope) |
+| SSM `/life-platform/syndication-mode` (`off \| shadow \| live`) | **Does not exist** (no code or CDK references it) — there is no automated poster to switch off. ADR-140 rule 3 requires it before any automated poster ships |
+| `life-platform/bluesky` in the freshness checker's `MANUAL_ROTATION_SECRETS` (`lambdas/emails/freshness_checker_lambda.py`) | **Not listed** (the list is `ai-keys`, `site-api-ai-key`, `eightsleep-client`, `notion`, `todoist`, `ingestion-keys`) — so no staleness alert fires; calendar the 180-day rotation by hand. Add the entry only if an automated consumer is ever built |
+| `life-platform/x` secret / X developer-portal app | **Does not exist** (`describe-secret` → ResourceNotFound, 2026-10-17) — #1631 closed unbuilt; do-not-build until the ADR-063 per-post-spend amendment is signed |
+| The daily-fingerprint broadcast artifact (`/moments/fingerprint/{date}/`, #1402) | **LIVE** — dated card + permalink + provenance caption, written by `og_moments._sweep_fingerprint`. Nothing posts it; see the class table below |
 
 ## What may be posted by what — the artifact-class table (#1402)
 
@@ -35,9 +48,9 @@ non-negotiable is broader: no automated surface may post a claim about Matthew's
 The Daily Fingerprint is a pure function of his recovery, sleep, HRV and streak — so it is
 a vitals-derived artifact, and the row below is the consequence, not a preference.
 
-| Artifact class | Human post (`scripts/post_social.py`) | Automated post (the #1629 lambda, when built) |
+| Artifact class | Human post (`scripts/post_social.py`) | Automated post (no such poster exists — #1629 retired; the rule binds any successor) |
 |---|---|---|
-| Chronicle / podcast / essay / build beat | **Yes** — `--kind chronicle` | **Yes**, once #1629 clears its 14-day / ≥90% shadow bar |
+| Chronicle / podcast / essay / build beat | **Yes** — `--kind chronicle` | **Not built** — would need a new poster clearing ADR-140's shadow bar |
 | Daily fingerprint card (#1402) | **Yes** — `--kind fingerprint`, caption printed in full for approval before the choice | **NO — structurally denied.** `fingerprint_broadcast.AUTOMATED_SYNDICATION_ALLOWED = False`; the payload says so in-band and `tests/test_fingerprint_broadcast.py` pins it. Reversing needs a new three-board convening, not a code change |
 | Milestones / achievements / weigh-ins / body composition | Matthew's own account, by hand, outside this tooling | **NO — permanently denied** (ADR-140 rule 5) |
 
@@ -59,7 +72,7 @@ the permalink is an archive entry, and removing it would make the reader's back-
 
 The credential is a **scoped app password** (Bluesky → Settings → Privacy and Security →
 App Passwords). Rotation is create-new → update secret → revoke-old, in that order, so
-there is no gap for the (future) poster's scheduled runs:
+there is no gap for the poster (the manual script, which reads the keychain):
 
 1. Create a new app password: bsky.app (or the app) → **Settings → Privacy and Security →
    App Passwords → Add App Password**. Name it with the date (e.g. `life-platform-2026-07`).
@@ -79,8 +92,10 @@ there is no gap for the (future) poster's scheduled runs:
    ```
 4. **Revoke the old app password** in the same Settings screen (delete it — revocation is
    immediate at the source).
-5. Consumers pick up the new value within ~15 min via the `secret_cache.py` TTL; no
-   redeploy needed (force one only if you can't wait).
+5. Update the keychain entry the manual poster reads:
+   `security add-generic-password -U -s life-platform-bluesky -a <handle> -w '<new app password>'`.
+   The inbound `bluesky-social-ingestion` lambda reads only the `handle` field (keyless
+   public AppView), so it is unaffected; its `secret_cache.py` TTL is ~15 min.
 
 Cadence: 180 days, or immediately on any suspicion. Inventory row: `docs/SECRETS_ROTATION.md`.
 
@@ -90,13 +105,11 @@ Cadence: 180 days, or immediately on any suspicion. Inventory row: `docs/SECRETS
    Settings → Privacy and Security → App Passwords → delete the leaked app password.
    Every session created with it dies immediately. Do this before anything else; a
    leaked app password can post *as you*.
-2. **Kill the poster** (once #1629 exists): set SSM `/life-platform/syndication-mode`
-   → `off` (phone-operable by ADR-140 rule 3 — AWS Console mobile app, or the laptop
-   command below). Today, with no poster built, step 1 alone stops all writing.
-   ```bash
-   aws ssm put-parameter --name /life-platform/syndication-mode --value off \
-     --type String --overwrite --region us-west-2
-   ```
+2. **Kill the poster.** There is no automated poster and no `syndication-mode` parameter,
+   so step 1 alone stops all writing. Also delete the keychain entry the manual script
+   reads (`security delete-generic-password -s life-platform-bluesky`) and stop running
+   `scripts/post_social.py`. (If an automated poster is ever built, ADR-140 rule 3's
+   SSM `/life-platform/syndication-mode` → `off` becomes step 2.)
 3. **Audit for abuse:**
    - The Bluesky profile timeline — any post you did not make → Runbook 2 for each.
    - CloudTrail for secret reads:
@@ -127,9 +140,9 @@ A post is *bad* if it is wrong, private, milestone/body-composition-class (struc
 excluded by ADR-140 rule 5 — reaching public means the exclusion failed), or was not
 made by an authorized path.
 
-1. **Stop the next post before cleaning up this one.** SSM
-   `/life-platform/syndication-mode` → `off` (command in Runbook 1 step 2; phone-operable).
-   In Phase 0 (manual script only), there is nothing scheduled — skip to step 2.
+1. **Stop the next post before cleaning up this one.** Today the manual script is the only
+   poster and nothing is scheduled — skip to step 2. (With a future automated poster:
+   SSM `/life-platform/syndication-mode` → `off`, ADR-140 rule 3.)
 2. **Delete the post at the channel:**
    - **Phone (fastest):** Bluesky app → the post → **⋯ → Delete post**.
    - **API** (when you have the handle + app password and the post's `rkey` from its URL
@@ -145,10 +158,10 @@ made by an authorized path.
    irreversibility is exactly why milestone and body-composition posting is permanently
    excluded (ADR-140 rule 5) — for those classes there is no acceptable recall story.
 4. **Classify the cause — it decides the rest:**
-   - **(a) The poster selected the wrong artifact** (selection/claims bug): file a BUG
-     issue; syndication-mode stays `off` until the fix lands *with a test*; reconcile the
-     poster's claim record so the artifact cannot be re-claimed and re-posted on the next
-     run (#1629's three-state CLAIMED/POSTED/FAILED design — mark the claim per its docs).
+   - **(a) The poster selected the wrong artifact** (selection/claims bug in
+     `scripts/post_social.py` or the candidate builders): file a BUG issue; do not run the
+     script again until the fix lands *with a test*. (A future automated poster would also
+     need syndication-mode `off` and its claim record reconciled.)
    - **(b) The artifact itself was wrong:** fix/unpublish upstream on averagejoematt.com
      first (the post only projected it — ADR-140 rule 1), then repost manually if warranted.
    - **(c) You didn't make it and the platform didn't either:** token compromise —
@@ -159,4 +172,4 @@ made by an authorized path.
 ---
 
 **See also:** ADR-140 (`docs/DECISIONS.md`) · `docs/SECRETS_ROTATION.md` ·
-`docs/SECRETS_MAP.md` · epic #1619 / story #1629 · `docs/INCIDENT_LOG.md`.
+`docs/SECRETS_MAP.md` · epic #1619 / story #1629 (retired) / #1631 (X, closed unbuilt) · #4641 (the placeholder-id feeds) · `docs/INCIDENT_LOG.md`.

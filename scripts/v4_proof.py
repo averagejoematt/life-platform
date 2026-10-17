@@ -203,6 +203,20 @@ def load_chronicle() -> list:
     return _snapshot().get("chronicle", [])
 
 
+def _coaching_as_of(d: dict, wp: dict, rendered: list) -> str:
+    """The block's honest 'as of' (#4703): the NEWEST content date it carries.
+
+    Max over the weekly priority's own generated_at and every RENDERED coach's
+    analysis_generated_at; `_meta.generated_at` (the analyzer's last productive run)
+    only when none of those exist. A held weekly read has no generated_at of its own,
+    and falling straight to _meta understated the block by the days the coaches
+    had been re-read since."""
+    dates = [str(wp.get("generated_at") or "")[:10]]
+    dates += [str(c.get("analysis_generated_at") or "")[:10] for c in rendered]
+    newest = max(dates)
+    return newest or str((d.get("_meta") or {}).get("generated_at") or "")[:10]
+
+
 def load_coaching_read() -> dict:
     """The board's live read from /api/coaching-dashboard, else the committed snapshot.
 
@@ -225,10 +239,12 @@ def load_coaching_read() -> dict:
     if isinstance(d, dict) and (d.get("weekly_priority") or d.get("coaches")):
         wp = d.get("weekly_priority") or {}
         coaches = []
+        rendered = []
         for c in d.get("coaches", []) or []:
             summary = str(c.get("position_summary") or "").strip()
             if not summary:
                 continue  # honest absence — a coach with no live read is omitted
+            rendered.append(c)
             coaches.append(
                 {
                     "name": c.get("name", ""),
@@ -250,15 +266,15 @@ def load_coaching_read() -> dict:
             if snap:
                 return snap
             return {"as_of": _today(), "source": "live-empty"}
-        # honest stamp: prefer the priority's own generation date, else the payload's
-        generated = str(wp.get("generated_at") or d.get("_meta", {}).get("generated_at") or "")
+        # honest stamp: the newest content date the block carries (#4703)
+        as_of = _coaching_as_of(d, wp, rendered)
         return {
             "weekly_priority": {
                 "text": text,
                 "coach_name": str(wp.get("coach_name") or "").strip(),
             },
             "coaches": coaches,
-            "as_of": generated[:10] or _today(),
+            "as_of": as_of or _today(),
             "source": "live",
         }
     # No live content at all (dashboard empty-shaped or unreachable): snapshot,
