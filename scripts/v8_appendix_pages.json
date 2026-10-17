@@ -98,7 +98,8 @@
     {"url": "/coaching/coaches/", "why": "opens on the same view as /coaching/team/"},
     {"url": "/protocols/", "why": "opens on the same view as /protocols/supplements/"},
     {"url": "/method/", "why": "opens on the same view as /method/wrong/"},
-    {"url": "/story/", "why": "opens on the same view as /story/chronicle/"}
+    {"url": "/story/", "why": "opens on the same view as /story/chronicle/"},
+    {"url": "/method/state/", "why": "already in the live sitemap, absent from the committed one until the #4604 regeneration; whether the appendix lists it is #4586's call"}
   ],
   "held_prefixes": [
     {"url": "/journal/posts/", "why": "each chapter is reached from the preview's story page"},

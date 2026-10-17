@@ -112,7 +112,7 @@ SHELL = """<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>{title}</title>
   <meta name="description" content="{desc}">
-  <link rel="canonical" href="https://averagejoematt.com/story/{canon}">
+{robots}  <link rel="canonical" href="https://averagejoematt.com/story/{canon}">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="averagejoematt">
   <meta property="og:url" content="https://averagejoematt.com/story/{canon}">
@@ -240,6 +240,7 @@ def main() -> None:
             title="The Story — averagejoematt",
             desc="An AI journalist writes up each week; Matthew writes in his own words.",
             canon="",
+            robots=v4_chrome.robots_meta("/story/"),  # #4604: "" unless the path is held until ruled
             start="chronicle",
             og_card="og-chronicle.png",  # #1395: the story hub leads with the chronicle card
             og_title=hub_og[("property", "og:title")],
@@ -258,6 +259,7 @@ def main() -> None:
                 title=section_title,
                 desc=desc,
                 canon=f"{key}/",
+                robots=v4_chrome.robots_meta(f"/story/{key}/"),  # #4604: /story/build/ is held until ruled
                 start=key,
                 og_card=OG_CARD_BY_SECTION.get(key, DEFAULT_OG_CARD),
                 og_title=section_title,
