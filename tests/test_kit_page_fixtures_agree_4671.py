@@ -134,3 +134,18 @@ def test_a_bet_no_other_capture_carries_is_reported():
     fx[day]["lines"] = [{"coach": "Max Reyes", "bet_settles": "2031-01-01"}]
     got = cap.bet_disagreements(fx)
     assert got and "2031-01-01" in got[0], got
+
+
+def test_the_gate_renders_under_the_fixtures_capture_instant_not_the_wall_clock():
+    """#4848 class: the kit pages list what is "upcoming" / "today" against the Pacific wall
+    clock (ck_coach.js isUpcoming / todayPT), so a verdict taken on a later day than the
+    capture is about the calendar, not the page (2026-10-17: the physical coach page
+    crossed its 6-screen budget by 17 px with no site change). The gate pins every page's
+    clock to `_capture.json: captured_at` before it navigates."""
+    stamp = gate.captured_at()
+    assert stamp.tzinfo is not None and stamp.utcoffset().total_seconds() == 0
+    with open(os.path.join(gate.FIXTURES_DIR, "_capture.json"), encoding="utf-8") as fh:
+        assert stamp.isoformat().replace("+00:00", "Z") == json.load(fh)["captured_at"]
+    src = open(gate.__file__, encoding="utf-8").read()
+    pin = src.index("page.clock.set_fixed_time(captured_at())")
+    assert pin < src.index('page.goto(base_url + path, wait_until="networkidle")'), "the clock is pinned before the page navigates"
