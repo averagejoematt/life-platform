@@ -78,17 +78,18 @@
   },
   "qa-smoke-failures": {
     "added": "2026-10-12",
-    "cause": "dashboard:date",
-    "cause_observed": "2026-10-11T18:31Z",
-    "citation": "#4847 — the only FAIL in the 2026-10-11 18:31Z run (request 51bc0c11) is [content_truth] Score Sanity / dashboard:date: 'Stale date — expected 2026-10-10, got 2026-10-09': the sweep expects the prior PT day in the dashboard and the dashboard still held 10-09 at 11:31 PT; dashboard-refresh itself ran green. The earlier score:day_grade cause (issue 4704, closed) cleared on 2026-10-10 as its citation predicted; this is a new cause on the same count-aggregated alarm. Cleared: ALARM→OK at 2026-10-12T18:32Z after PR 4858 (issue 4847, closed 2026-10-14 on the 10-13 18:31Z read, 0 failures).",
-    "updated": "2026-10-14"
+    "cause": "story_season:episode_or_hold",
+    "cause_observed": "2026-10-17",
+    "citation": "#4536 — the only FAIL in the 2026-10-16 18:30Z run (request eeffea60, CAUSE fail 6eea130d) is [content_truth] Data Freshness / story_season:episode_or_hold: 'HELD more than 7 days: week 5 held since 2026-10-09T18:00:49Z (7.0 d, chronicle published 2026-10-09T18:00:45Z) — release it, re-generate it or retire the week by name.' The week-5 Panel episode is on the SS-02 safety/sensitivity hold (panelcast-holds/wk5.json, hold_class safety, human review only — the MON/WED sweep logs 'hold sweep wk5 SKIP' every run, last 2026-10-14T18:00:04Z); no Friday episode ran on 10-16 (the standing Friday cron was retired, issue 734). The three ways out are the FAIL line's, all the owner's: review s3://matthew-life-platform/panelcast-holds/wk5.json then release it ({\"owner_approved\": true} to coach-panel-podcast) or retire week 5 by name — plus the CDK s3:ListBucket grant on arn:aws:s3:::matthew-life-platform for the coach-panel-podcast role (every sweep since 10-09 logs 'hold read wk5 FAILED — AccessDenied'). Expiry: the first 18:30Z run after the hold is released or retired. Issue 4536's box 3 is the next published episode. Alarm OK→ALARM 2026-10-16T18:32Z.",
+    "updated": "2026-10-17",
+    "note": "Prior episode (added 2026-10-12, cause dashboard:date, observed 2026-10-11T18:31Z): the only FAIL in the 2026-10-11 run was Score Sanity / dashboard:date 'Stale date — expected 2026-10-10, got 2026-10-09' (issue 4847, closed 2026-10-14 after PR 4858); ALARM→OK 2026-10-12T18:32Z. History only — a different cause on the same count-aggregated alarm."
   },
   "qa-smoke-warnings": {
     "added": "2026-10-04",
-    "cause": "supplement_join_liveness",
-    "cause_observed": "2026-10-15T18:31Z",
-    "citation": "supplement_join_liveness is the one live cause (a dated, self-clearing data event — see below; it expires on the first closed PT day with a ticked registry supplement habit, or when the habits are unscheduled in Habitify). weeks:fact_agreement (issue 4907, CLOSED 2026-10-15 on the read that dropped it): both Story Desk surfaces (journal_manifest, share_kit) read current_weight_lbs NOT RENDERED every night since 2026-10-04 although both render 308.9 lbs — the registry's stats-line transform matches only the retired 'Weight: N lbs' shape while the Story Desk line has been 'Day a to Day b · N lbs (±x this week) · …' since the 10-02 season rebuild (filed 2026-10-14; FIXED by PR 4915, merged 780b80dc3 and fleet-deployed at cde57c1a7 on 2026-10-14 ~20:22Z — the transform now reads through chronicle_schema.stats_fields; the 2026-10-15 18:31Z run (request 338cb6ce, START 18:30:39Z) DROPPED weeks:fact_agreement from the cause line — read 2026-10-15; issue 4907 closed 19:06Z on PR 4930; the earlier reading of this warn as the withheld-fact shape of issue 3615 was wrong). supplement_join_liveness: a data event, not a defect — the owner's three registry supplement habits read failed (miss_source vendor) on 2026-10-10, 10-11 and 10-12, the three closed PT days the leg replays, so the bridge leg had nothing to carry (the issue 4245 box-5 absence-by-name warn) and was still the only alarmed warn on 2026-10-15 (1 alarmed, 6 chronic, 0 failures); it clears on the first closed day with a ticked supplement, or the habits are unscheduled in Habitify if the supplements are paused on purpose. data:orphan_routine_drafts left the cause line on 2026-10-13 (0 live drafts under the 14-day constant from PR 4867; issue 4732 read the 10-14 run clean, the 10-15 run completes its box).",
-    "updated": "2026-10-15"
+    "cause": "reader_truth:confirm,reader_truth:verdict,supplement_join_liveness",
+    "cause_observed": "2026-10-17",
+    "citation": "#4935 — the mandatory issue-or-fix tracker (issue 2378: red since 2026-10-02T18:32Z, 14.3 d at 2026-10-17T03:05Z, filed 2026-10-17T03:01Z). The 2026-10-16 18:30Z run (request eeffea60, CAUSE warn 7a8412b5) names two live causes. (1) supplement_join_liveness: 'no supplement habit completed on any of the last 3 closed days — the bridge leg had nothing to carry' — the owner's three registry supplement habits read failed (miss_source vendor) on every closed PT day the leg replays since 10-02; a dated data event, the issue 4245 box-5 absence-by-name warn working as designed; it clears on the first closed PT day with a ticked registry supplement habit, or when the habits are unscheduled in Habitify. (2) reader_truth:confirm,reader_truth:verdict, finding fcd7d5 on /api/sleep_detail (temporal_contradiction, demoted to WARN as a measured 2/8 flake, issue 2741): the sleep_trend row dated 2026-09-19 serves eightsleep.total_sleep_hours 1.7 (deep 0.05 / rem 0.47 / light 1.18) beside hours 8.6, sleep_score 83, efficiency 16.9%, whoop 8.6 h — the stored Eight Sleep row is a non-detect (10.04 h in bed, 1.7 h asleep, efficiency 16.9, score 38) and the Whoop row reads 8.61 h / score 83, so the reader composes one row from two sources field by field; the resolver question is issue 4935's first box (a sonnet lane, 2026-10-17). Expiry: issue 4935's box 3 — the alarm OK on an 18:30Z run with both causes fixed or owned. Earlier causes that left the line: weeks:fact_agreement (issue 4907, closed 2026-10-15, fixed by PR 4915) and data:orphan_routine_drafts (issue 4732, 2026-10-13).",
+    "updated": "2026-10-17"
   },
   "site-api-invocation-spike": {
     "citation": "2026-08-24 session note — self-inflicted QA traffic",
@@ -136,9 +137,11 @@
   },
   "chronicle-delivery-heartbeat": {
     "added": "2026-10-04",
-    "cause": "week-4-not-delivered",
-    "cause_observed": "2026-10-02T19:10Z",
-    "citation": "#4593 — week 4 was published by the season promote, which bypasses chronicle-approve, the only path that invokes the email sender; last delivery 2026-09-25T18:00Z. Clears when week 5 delivers through the approve path (Friday 2026-10-09 18:00Z) or the owner has week 4 sent."
+    "cause": "week-6-unapproved-draft",
+    "cause_observed": "2026-10-17",
+    "citation": "#4914 — the week-6 chronicle was never sent: on 2026-10-14 15:02:07Z and 15:03:25Z the desk's week-6 budget failed validation twice on the open-ask follow-up (issue 4914's class) and the run fell back to the legacy writer, which stored week 6 as a draft and sent the preview email at 15:04:40Z; the fix (PR 4916, cde57c1a7) merged 20:15Z and deployed 20:22Z, five hours after the run, and nobody approved the legacy draft. chronicle-approve's 48-hour sweep refused it at 2026-10-16T18:00:44Z (CHRONICLE-AUTOPUBLISH-HELD Week 6 (2026-10-13): 'no audit on record: the Story Desk did not write this week'), so ChronicleSent + ChroniclePaused stayed 0 for the seven daily datapoints 10-09 → 10-15 19:00Z and the heartbeat went ALARM 2026-10-16T19:02Z (chronicle-email-sender's last event: 2026-10-14T15:10Z, the preview). Clears when the owner approves week 6 from the preview email or forces the desk ({\"force\": true} on wednesday-chronicle) and chronicle-email-sender runs — or at the first delivered week after the 2026-10-21 15:00Z run. Read 2026-10-17T03:05Z from /aws/lambda/wednesday-chronicle, /aws/lambda/chronicle-approve, describe-alarms.",
+    "updated": "2026-10-17",
+    "note": "Prior entry (2026-10-04, issue 4593, closed): week 4 published by the season promote, which bypasses chronicle-approve, the only path that invokes the email sender; cleared when week 5 delivered through the approve path 2026-10-09 18:00Z. The current episode is a different cause on the same heartbeat."
   },
   "swallowed-permission-denial": {
     "added": "2026-10-04",
@@ -183,5 +186,12 @@
     "cause": "new_function_no_history",
     "cause_observed": "2026-10-13T01:30Z",
     "citation": "#3759 — one OK->ALARM->OK cycle: the alarm lit when the owner's 2026-10-12 03:04Z LifePlatformCompute apply created coach-vision (a 7-day no-invocation alarm reads a brand-new function as silent by construction) and cleared when its first scheduled run executed at 2026-10-12 17:00Z (honest-empty — no Sunday photo set yet). It re-lights by design only if a Monday 17:00Z run is missed; a lit state with the photo set absent is the expected shape until the owner sends one."
+  },
+  "chronicle-autopublish-held": {
+    "added": "2026-10-17",
+    "cause": "week-6-audit-held",
+    "cause_observed": "2026-10-17",
+    "citation": "#4914 — the alarm doing its job: chronicle-approve's 48-hour sweep refused the unapproved, unaudited week-6 legacy draft at 2026-10-16T18:00:44Z (CHRONICLE-AUTOPUBLISH-HELD Week 6 (2026-10-13) held: unapproved for 48.0h and the audit found 1 blocking item(s) — 'no audit on record: the Story Desk did not write this week'), the alarm went OK→ALARM 2026-10-16T18:01:57Z and ALARM→OK 18:16:57Z (period 300, missing data notBreaching: one datapoint per refusal is its design, routed to life-platform-alerts-digest — SNS NumberOfNotificationsDelivered 1 in the 18:00Z bucket). That episode is issue 4694's live proof (closed on it 2026-10-17T02:58Z). The sweep runs daily at 18:00Z and the draft stays inside its 10-day window until 2026-10-24, so the same 15-minute episode is expected every day at ~18:01Z until the owner approves week 6 from the preview email or forces the desk (issue 4914, the open owner). No action for the alarm itself; prune this entry 72 h after the last episode.",
+    "updated": "2026-10-17"
   }
 }
