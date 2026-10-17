@@ -49,7 +49,7 @@ def test_qa_smoke_tiers_derive():
     paused = dict(reg.qa_paused())
     assert set(req) == {"whoop", "habitify", "apple_health"}
     assert set(opt) == {"withings", "eightsleep", "supplements", "notion", "strava"}
-    assert set(paused) == {"garmin"}
+    assert set(paused) == {"garmin", "youtube", "bluesky", "mastodon"}  # Q39 tombstones (#4641)
     # a paused source never appears in a checked tier
     assert not (set(req) | set(opt)) & set(paused)
     # the derivation is what the lambda actually uses (source text, not a copy)

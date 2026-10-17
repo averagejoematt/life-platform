@@ -1,4 +1,6 @@
-"""tests/test_habitify_notes.py — #422 EVR-01/02 primary channel.
+"""tests/test_habitify_notes.py — #422 EVR-01/02 replay shape; the FETCH is retired (Q28, #4641).
+
+The notes/moods calls were removed 2026-10-17; transform() still reads a `notes`/`mood` an archived raw carries.
 
 Habitify is the primary causality-capture channel: notes attached to a habit at check-off
 / skip time flow through transform() verbatim onto the per-habit day record. The read side
@@ -61,38 +63,3 @@ def test_transform_backward_compatible_without_notes_key():
     raw = {"date": today, "area_map": {"A1": "Nutrition"}, "journal": [_entry("Water", "completed")], "moods": []}
     out = hl.transform(raw, today)
     assert out[0]["habits"]["Water"] == 1
-
-
-def test_fetch_notes_sends_from_to_range(monkeypatch):
-    # #950: the notes endpoint requires from/to range params — it 412'd on every call
-    # since ship ("Unable to find to, from. Expect to, from in query") and the non-fatal
-    # contract swallowed it. Assert the request carries the target day's UTC bounds in
-    # the file's ISO-8601 +00:00 convention, and no target_date param.
-    captured = {}
-
-    def _fake_api_get(endpoint, api_key, params=None):
-        captured["endpoint"] = endpoint
-        captured["params"] = params
-        return []
-
-    monkeypatch.setattr(hl, "api_get", _fake_api_get)
-    assert hl.fetch_notes("KEY", "habit-123", "2026-07-01") == []
-    assert captured["endpoint"] == "/notes/habit-123"
-    assert captured["params"] == {
-        "from": "2026-07-01T00:00:00+00:00",
-        "to": "2026-07-01T23:59:59+00:00",
-    }
-
-
-def test_fetch_notes_filters_off_target_date(monkeypatch):
-    # If the API returns a wider range than requested, only notes created on the
-    # requested date survive — never smear one note across every day.
-    def _fake_api_get(endpoint, api_key, params=None):
-        return [
-            {"content": "on target", "created_date": "2026-07-01T09:00:00+00:00"},
-            {"content": "other day", "created_date": "2026-06-15T09:00:00+00:00"},
-        ]
-
-    monkeypatch.setattr(hl, "api_get", _fake_api_get)
-    got = hl.fetch_notes("KEY", "habit-123", "2026-07-01")
-    assert [n["content"] for n in got] == ["on target"]
