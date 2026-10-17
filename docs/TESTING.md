@@ -331,7 +331,7 @@ Style-only flake8 findings do not fail CI; black, ruff, mypy-clean-set, `py_comp
 
 ## Pre-commit and commit-msg hooks
 
-Installed per clone by `bash scripts/install_hooks.sh` (the hooks live in untracked `.git/hooks/`, so rerun it after cloning and whenever it changes; `python3 deploy/session_postflight.py` reports hook freshness). The commit-msg hook enforces Conventional Commits and refuses tool-attribution trailers; agents commit through `deploy/agent_commit.sh`. Details: `CONTRIBUTING.md`. Never bypass them (`--no-verify`).
+Installed per clone by `bash scripts/install_hooks.sh` (the hooks live in untracked `.git/hooks/`, so rerun it after cloning and whenever it changes; `python3 deploy/session_postflight.py` reports hook freshness). The commit-msg hook enforces Conventional Commits and refuses tool-tool-attribution lines; agents commit through `deploy/agent_commit.sh`. Details: `CONTRIBUTING.md`. Never bypass them (`--no-verify`).
 
 ---
 
