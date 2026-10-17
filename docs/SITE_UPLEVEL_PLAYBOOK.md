@@ -1,6 +1,6 @@
 # Site Uplevel Playbook
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-03
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 > **How to redesign or uplevel the site well** — the method and the hard-won lessons, so the
 > next Claude inherits the playbook, not just the state. Start from
@@ -18,8 +18,8 @@ moment someone actually looked at it.
 
 ### 1. Render-QA sweep (before AND after)
 - Screenshot **every page at desktop (1280) + mobile (390)**, full-page, with Playwright (chromium).
-  Build the URL list from the registry (`scripts/v4_build_evidence.py` PILLARS/REGISTRY) + the static
-  routes so nothing is missed (~56 pages).
+  Build the URL list from the page registry (`python3 qa/qa_manifest.py --emit paths`, which derives
+  from `scripts/v4_build_evidence.py` PILLARS/REGISTRY + the static routes) so nothing is missed.
 - **Scroll each page through** before screenshotting so lazy/reveal content renders.
 - Triage for **objective bugs only**: broken/empty/flat charts, text overflow/clipping (esp. mobile),
   literal `undefined`/`null`/`NaN`/`[object Object]`/`{placeholder}`/walls-of-"—"/stuck loaders,
@@ -44,17 +44,21 @@ moment someone actually looked at it.
   Matthew or surgically de-fabricate the published file).
 - **CloudFront: invalidate the VIEWER path, not the S3 key.** `generated/journal/*` is served at
   `/journal/*` (the `generated/` prefix is stripped at the edge). Invalidating `/generated/...` does nothing.
-- **The 3 narrative lambdas (chronicle/podcast/ai-expert) are CDK-asset-bundled** — they import
-  non-layer siblings. A single-file `deploy_lambda.sh` strips them and breaks the function. Ship
-  code-only changes by zipping `lambdas/` with `_ASSET_EXCLUDES` (from `cdk/stacks/lambda_helpers.py`)
-  and `update-function-code` directly — avoids a drift-risky full `cdk deploy`.
-- **Matthew runs prod deploys.** This is a standing boundary; explicit in-session authorization
-  ("you run it this time") unblocks it. (Memory: `feedback_prod_deploy_authorization`.)
+- **The narrative lambdas (chronicle/podcast/ai-expert) ship in the ONE code bundle** — the whole
+  `lambdas/` tree staged by `deploy/build_bundle.py` (`docs/CONVENTIONS.md` §1), so there is no
+  single-file strip hazard any more. Ship code-only changes with `bash deploy/deploy_fleet.sh` (the
+  one fleet path; `deploy_lambda.sh` is the laptop hot-fix path) — not a hand-zipped `_ASSET_EXCLUDES`
+  upload (that list was retired from CDK; `build_bundle.py` carries the one copy).
+- **Matthew runs prod deploys of Lambdas and infrastructure.** This is a standing boundary; explicit
+  in-session authorization ("you run it this time") unblocks it. (Memory: `feedback_prod_deploy_authorization`.)
+  **The site is the exception:** a merge to `main` touching `site/**` deploys it automatically
+  (`.github/workflows/site-deploy.yml`, `docs/CONVENTIONS.md` §2), and a red site-deploy is silent — read
+  the newest run's conclusion (the SessionStart pre-flight prints it) before and after a site merge.
 - **Work in a git worktree** — Matthew runs concurrent sessions on one repo (memory:
   `feedback_concurrent_session_worktree`).
 - **Build scripts generate committed HTML.** `sync_site_to_s3.sh` re-runs the generator suite
-  per deploy (8 `v4_build_*.py` scripts as of 2026-07-10 — see `docs/SITE_AUTHORING.md` §3 for the
-  inventory). After editing a generator, run it and commit its output — never hand-edit generated pages.
+  per deploy (the set is the `run_site_generator` steps in that script — see `docs/SITE_AUTHORING.md` §3 for the
+  inventory; a generator-only change does not trigger `site-deploy.yml`, so dispatch it). After editing a generator, run it and commit its output — never hand-edit generated pages.
 - **The pre-commit hook auto-bumps doc dates** (`sync_doc_metadata.py`) — cosmetic, expect it.
 - **Assets are hashed across the FULL module graph, not just HTML** (ADR-098). `deploy/hash_site_assets.py`
   hashes every CSS/JS file leaves-first and rewrites HTML refs, intra-module `import`s, and CSS. If you
@@ -129,11 +133,11 @@ suite with `node --test` from the repo root (auto-discovers everything under `te
 - **CI gate:** `.github/workflows/v4-gate.yml`'s `site-gate` job runs `node --test` right after
   the #1432 import-graph gate, on every `site/**`-touching PR and push to main.
 
-## Deploy surface (when authorized)
-1. **Site** — `bash deploy/sync_site_to_s3.sh` (+ explicit `aws s3 sync site/assets/fonts/` if fonts changed). Content-hashes + invalidates + rolls the SW version.
+## Deploy surface
+1. **Site** — automatic on merge to `main` (`site-deploy.yml`: sync + explicit fonts sync + smoke ∥ visual/AI-QA, auto-rollback on a red; `docs/SITE_AUTHORING.md` §7). Attended fallback, when authorized and always from `main`: `bash deploy/sync_site_to_s3.sh` (+ explicit `aws s3 sync site/assets/fonts/` if fonts changed). Content-hashes + invalidates + rolls the SW version.
 2. **Site-API** — `bash deploy/deploy_site_api.sh [verify_path]` (ships the full `web/` package; never single-file).
 3. **CloudFront redirects** — apply `deploy/generated/v4_redirects_function.js` to dist `E3S424OXQZ8NBE` (update-function → publish).
-4. **Narrative lambdas** — the `lambdas/` asset zip method above.
+4. **Narrative lambdas** — `bash deploy/deploy_fleet.sh` (the one-bundle path above).
 5. Reconcile `main` — open a PR from the worktree branch so `main` matches what's live.
 
 ## Measurement pipeline — traffic digest (infra; Matthew runs the deploy)
@@ -144,10 +148,11 @@ email of page views / unique / returning visitors / top pages / referrers, parse
 memory for distinct/returning counts then discarded; output is aggregate only. The
 privacy page documents this verbatim under "Cookies and tracking."
 
-Two one-time infra steps (both require AWS perms beyond the site/API deploys — **hand to
-Matthew**, do not run from the agent):
+One-time infra (step 2 below is already CDK-declared; both require AWS perms beyond the site/API deploys — **hand to
+Matthew**, do not run from the agent). It is the weekly Monday ops-pack email (#2835): the same
+digest also carries the folded data-reconciliation and pip-audit artifacts.
 
-1. **CDK** — `cd cdk && npx cdk deploy LifePlatformOperational`. This creates:
+1. **CDK** — `bash deploy/cdk_deploy.sh LifePlatformOperational` (the drift-guarded path, `docs/CONVENTIONS.md` §6). This creates:
    - the log bucket `matthew-life-platform-cf-logs` (BUCKET_OWNER_PREFERRED ACL so
      CloudFront can write; 90-day lifecycle; `RETAIN` on stack delete), and
    - the `life-platform-traffic-digest` Lambda on `cron(0 16 ? * MON *)` (9 AM PT Mondays),
@@ -155,17 +160,12 @@ Matthew**, do not run from the agent):
      failing is low-stakes — same as the other `alerts_topic=None` operational Lambdas).
    Run `npx cdk diff LifePlatformOperational` first — expect **no IAM changes to existing
    roles**, one new role + bucket + function.
-2. **Enable CloudFront logging** — point dist `E3S424OXQZ8NBE`'s standard logging at the
-   new bucket, prefix `cf/`:
-   ```bash
-   aws cloudfront get-distribution-config --id E3S424OXQZ8NBE > /tmp/cf.json   # capture ETag
-   # set Logging: { Enabled:true, IncludeCookies:false,
-   #   Bucket:"matthew-life-platform-cf-logs.s3.amazonaws.com", Prefix:"cf/" }
-   aws cloudfront update-distribution --id E3S424OXQZ8NBE \
-     --distribution-config file:///tmp/cf-config.json --if-match <ETag>
-   ```
-   Logs begin landing within ~an hour. The first digest fires the following Monday (it
-   self-skips and sends nothing if the window is empty).
+2. **CloudFront logging — done, now CDK-declared.** The standard-logging block (bucket
+   `matthew-life-platform-cf-logs.s3.amazonaws.com`, prefix `cf/`, cookies off) is part of the
+   distribution in `cdk/stacks/web_stack.py` (`LoggingProperty`, ADR-099 #349), so a redeploy preserves
+   it; the old `get-distribution-config` / `update-distribution` hand step is retired. (Read-only check
+   2026-10-17: dist `E3S424OXQZ8NBE` reports `Logging.Enabled: true`, prefix `cf/`.) The first digest
+   fires the Monday after logs land; it self-skips and sends nothing if the window is empty.
 
 Verify after a few days of logs exist: `aws lambda invoke --function-name
 life-platform-traffic-digest /tmp/out.json` → a digest email arrives (or a logged

@@ -1,6 +1,6 @@
 # The New-Signal Playbook
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-16 (written from the live BodyScan 2 spike, #2782)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17 (written from the live BodyScan 2 spike, #2782; every named file, function, registry facet and test re-checked against the tree)
 > **Sources of truth:** `lambdas/ingestion/withings_lambda.py` (`MEAS_TYPES`/`SEGMENT_POSITIONS` — the worked example's code half), `lambdas/ingestion/source_registry.py`, `docs/SCHEMA.md`
 
 **When a new metric, device, or source starts emitting — what updates, where, in what order.**
@@ -43,11 +43,25 @@ skips the sweep).
   session finds the decision instead of re-deriving it.
 - Multi-valued/structured fields (segmental body comp, waveforms) are their own
   follow-on story, never a naive map entry — see step 4.
+- **Update 2026-10-17 — capture-all.** Since the 2026-10-04 data-source sweep (epic #4624)
+  the ingestion posture leans *capture everything the vendor sends, interpret on the read
+  side*: e.g. `withings_lambda.py` keeps the `attrib` code of every measurement group
+  (`measurement_group_attribs`, #4642) rather than picking a winner at write time. "Park"
+  therefore governs what gets a **named, consumer-facing column**, not whether the raw
+  value may be retained; when unsure, store the raw reading and defer the interpretation.
+  The privacy tier (step 3) still applies to whatever is stored. The rule's own repo home
+  is not written yet (`docs/OPERATING_KNOWLEDGE_LEDGER.md` tracks it).
 
 ### 3. Privacy tier BEFORE the first ingestion run
 
 - Classify each new field against `docs/DATA_GOVERNANCE.md` **before** it lands in
   DynamoDB, because dormant mappings can start writing without a deploy (step 1).
+  The tier is a structural fact, not prose (#2803/#3045, ADR-155):
+  `lambdas/privacy/field_tiers.py` is the per-field registry (`TIER_PUBLIC` /
+  `TIER_INTERNAL` / `TIER_OWNER_ONLY` / `TIER_OWNER_PUBLISHED`), and
+  `tests/privacy_tier_wiring.py` derives the consumer set from the tree — a new
+  Tier-2 field needs its registry row, and the wiring scan fails on a consumer that
+  reads one unguarded. Do the registry row in the same PR as the mapping.
 - Age-class metrics (vascular age, metabolic age) are Tier-2 owner-only per the
   PhenoAge posture — never on a public surface, never in an AI narrative context.
 - Event-class medical results (afib flags, ECG classifications) default owner-only.
@@ -93,11 +107,11 @@ answers are "nothing yet" — write that down too):
 | Source registry facets | `lambdas/ingestion/source_registry.py` |
 | Schema reference | `docs/SCHEMA.md` |
 | Character engine inputs | `lambdas/compute/` character sheet |
-| Coach fact pack | `ai_expert_analyzer` + `lambdas/web/site_api_ai_context.py` |
+| Coach fact pack | `lambdas/intelligence/ai_expert_analyzer_lambda.py` + `lambdas/web/site_api_ai_context.py` |
 | Site surfaces | `/data/` pages, cockpit vitals, `/api/vitals` |
-| MCP tools | `mcp/tools_health.py` (+ registry wiring test) — **and `mcp/tools_data.py`'s generic row dumpers** (`_get_latest`, `_get_daily_summary`, `tool_get_date_range`, `_find_days_filter`): they return whatever fields a partition holds, so a new Tier-2 field lands in them with NO code change on their side — check whether it needs adding to `TIER2_STRIP_FIELDS` (#2809: the #2782 sweep checked `tools_health.py` and missed `tools_data.py`, so `vascular_age`/`metabolic_age`/`afib_result` reached conversation context through the generic path for 4 days) |
+| MCP tools | `mcp/tools_health.py` (+ registry wiring test) — **and `mcp/tools_data.py`'s generic row dumpers** (`_get_latest`, `_get_daily_summary`, `tool_get_date_range`, `_find_days_filter`): they return whatever fields a partition holds, so a new Tier-2 field lands in them with NO code change on their side — check whether it needs a Tier-2 row in `lambdas/privacy/field_tiers.py` — `TIER2_STRIP_FIELDS` in `mcp/tools_data.py` is now *derived* from that registry (`strip_map()`), no longer a hand-kept literal (#2809: the #2782 sweep checked `tools_health.py` and missed `tools_data.py`, so `vascular_age`/`metabolic_age`/`afib_result` reached conversation context through the generic path for 4 days) |
 | Daily brief | `lambdas/emails/` |
-| OG share cards | OG image lambda |
+| OG share cards | `lambdas/web/og_image_lambda.py` |
 
 ### 8. QA + verification
 
