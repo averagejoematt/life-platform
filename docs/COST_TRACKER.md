@@ -1,6 +1,6 @@
 # Life Platform — Cost Tracker
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-31
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 Last updated: 2026-08-31 (v8.6.0)
 
@@ -34,6 +34,20 @@ Last updated: 2026-08-31 (v8.6.0)
 
 ---
 
+## Live posture snapshot — 2026-10-17
+
+Re-verified 2026-10-17T03:10Z from live Cost Explorer (unblended, `aws ce get-cost-and-usage`
+grouped by SERVICE) and SSM (`/life-platform/budget-tier`, `/life-platform/budget-breakdown`
+computed 2026-10-17T00:00:11Z):
+
+| Fact | Value |
+|------|-------|
+| Tier | **1** (Caution — internal/dev AI paused) since 2026-10-12 08:00Z |
+| Ceiling | **$215** base (surge inactive) — the governor projects `prod-cron`, `remediation` and `ci`; `episodic_premise_violations` is empty (#4652) |
+| September 2026, closed | **$137.15** — Haiku 4.5 $57.27 + Sonnet 4.6 $22.13 (AI $79.41) · CloudWatch $27.25 · Tax $12.90 · Secrets Manager $11.90 · KMS $1.15 · Cost Explorer API $1.17 |
+| October MTD-16d (10-01..10-16) | **$106.76** — Sonnet 4.6 $51.26 + Haiku 4.5 $24.30 + Opus $0.03 (AI $75.59, 71 %) · CloudWatch $11.17 · Tax $10.08 · Secrets Manager $6.26 · KMS $0.51 · Cost Explorer API $0.63 |
+| October pace | $6.67/day all-in → ~$207 linear month-end against the $215 base; the AI line is Sonnet-heavy this month (the 10-01..10-02 Story Desk season rebuilds, then the dev-session cap of PR #4623) |
+
 ## Live posture snapshot — 2026-08-18
 
 From SSM `/life-platform/budget-tier` + `/life-platform/budget-breakdown` (the governor's
@@ -51,7 +65,9 @@ own output, computed 2026-08-19T00:00Z):
 
 Mar **$20.04** → Apr **$35.01** → May **$48.19** → Jun **$79.80** (94% of the $85 base)
 → Jul **$98.35 closed** (first month over the $85 base — the fact forcing the #2836
-September decision) → Aug MTD-18d **$100.98** inside the $200 window.
+September decision) → Aug MTD-18d **$100.98** inside the $200 window. → Sep **$137.15 closed** (the
+first month under the permanent $215 base; AI $79.41, Haiku-led) → Oct MTD-16d **$106.76**
+(Sonnet-led; re-verified 2026-10-17).
 
 **The bill is two things:**
 
