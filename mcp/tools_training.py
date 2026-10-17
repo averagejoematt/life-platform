@@ -6,7 +6,10 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
-from training import training_load  # #4075: the ONE load model (computed_metrics' TSB)
+from training import (
+    training_load,  # #4075: the ONE load model (computed_metrics' TSB)
+    zone2_minutes,  # #4627: THE Zone 2 computation
+)
 
 from mcp.core import get_profile, query_source
 from mcp.helpers import classify_hr_zone, compute_ewa, warm_start_seed
@@ -230,6 +233,17 @@ def _get_training_load(args):
     }
 
 
+def _zone2_by_iso_week(strava_items, start_date, end_date):
+    """Zone 2 minutes per ISO week over [start, end] from THE shared computation (#4627). The
+    Whoop read reaches one UTC key past `end_date` (a Pacific evening workout is keyed the next day)."""
+    whoop_end = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    out = defaultdict(float)
+    for s in zone2_minutes.counted_sessions(strava_items, query_source("whoop", start_date, whoop_end)):
+        if s["source"] and start_date <= s["date"] <= end_date:
+            out[datetime.strptime(s["date"], "%Y-%m-%d").strftime("%G-W%V")] += s["zone_2_minutes"]
+    return dict(out)
+
+
 def _get_training_periodization(args):
     """
     Training periodization analysis. Detects mesocycle phases, deload needs,
@@ -323,15 +337,11 @@ def _get_training_periodization(args):
                 weeks[wk]["cardio_minutes"] += duration_min
 
                 if avg_hr:
-                    # ONE Zone-2 definition (#2221). This used to count every minute at
-                    # avg HR <= 70% of max as Zone 2 — Zone 1 and below included, and with
-                    # an INCLUSIVE upper bound — while the canonical publisher
-                    # (tool_get_zone2_breakdown) counts 60% <= pct < 70%. The two tools
-                    # answered the same question with different numbers, and this tool's
-                    # inflated figure drove its own 150 min/week Attia target check.
+                    # The easy / moderate / hard split below is an INTENSITY distribution by
+                    # average HR. Zone 2 MINUTES are not counted here: since #4627 they are THE
+                    # shared computation (`training.zone2_minutes`, folded in after this loop),
+                    # so this view and get_zone2_breakdown cannot disagree (#2221's invariant).
                     zone = classify_hr_zone(avg_hr, max_hr)
-                    if zone == "zone_2":
-                        weeks[wk]["zone2_minutes"] += duration_min
                     if zone in ("below_zone_1", "zone_1", "zone_2"):
                         weeks[wk]["easy_minutes"] += duration_min
                     elif zone == "zone_3":
@@ -364,6 +374,11 @@ def _get_training_periodization(args):
             continue
         wk = _week_key(date)
         weeks[wk]["total_volume_lbs"] += sum(s["weight_lbs"] * s["reps"] for ex in workout["exercises"] for s in ex["sets"])
+
+    # #4627: Zone 2 minutes per ISO week from THE shared computation — minutes in each device's
+    # own Zone 2, each session once across Strava + Whoop; Hevy cardio blocks are not Zone 2.
+    for _wk, _z2 in _zone2_by_iso_week(strava_items, start_date, end_date).items():
+        weeks[_wk]["zone2_minutes"] += _z2
 
     # How many calendar days of each ISO week the QUERY actually covers. #1917 window
     # honesty: `rest_days = 7 - len(dates)` charged the in-progress week (and the
@@ -532,7 +547,7 @@ def _get_training_periodization(args):
 
     # ── 8. Zone 2 target tracking ────────────────────────────────────────────
     z2_weekly = [ws["zone2_minutes"] for ws in weekly_summary]
-    z2_target = 150
+    z2_target = zone2_minutes.WEEKLY_TARGET_MIN
     z2_hit_rate = round(sum(1 for z in z2_weekly if z >= z2_target) / len(z2_weekly) * 100, 1) if z2_weekly else 0
 
     zone2_status = {
@@ -597,9 +612,9 @@ def _get_training_periodization(args):
             "peak (>300 min/week), deload (<60 min or <=2 sessions). Polarization per Seiler (80/20 model). "
             "Progressive overload = first-half vs second-half average weekly volume. "
             "Deload trigger: 4+ consecutive loading weeks or 3 weeks of rising volume. "
-            "Zone 2 = avg HR 60-70% of max, the same band get_zone2_breakdown publishes "
-            "(Attia/WHO 150 min/week target); Zone 3 (70-80%) is reported separately as "
-            "middle_zone_pct, not folded into easy. rest_days is bounded by the days of "
+            "Zone 2 minutes = minutes in each device's own Zone 2 (stored time-in-zone), as get_zone2_breakdown "
+            "publishes (150 min/week target); the easy/moderate/hard split is by average HR (60/70/80% of max), "
+            "Zone 3 reported separately as middle_zone_pct, not folded into easy. rest_days is bounded by the days of "
             "each ISO week the query actually covers (days_in_window), so an in-progress "
             "or truncated week does not count unelapsed days as rest."
         ),

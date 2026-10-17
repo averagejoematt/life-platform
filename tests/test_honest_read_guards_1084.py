@@ -168,10 +168,10 @@ def test_steps_avg_n0_no_data(monkeypatch):
 
 
 def _strava_day(days_ago, minutes=60, avg_hr=120):
-    # avg_hr 120 sits inside Zone 2 for max_hr 184 (110.4–128.8)
+    # #4627: Zone 2 is the stored time-in-zone — the whole session sits in Strava's own Zone 2
     return {
         "sk": f"DATE#{_d(days_ago)}",
-        "activities": [{"sport_type": "Walk", "duration_minutes": minutes, "average_heartrate": avg_hr}],
+        "activities": [{"sport_type": "Walk", "duration_minutes": minutes, "average_heartrate": avg_hr, "zone2_seconds": minutes * 60}],
     }
 
 
@@ -287,9 +287,11 @@ def test_partial_hr_graft_is_not_whole_session_zone2_on_either_endpoint(monkeypa
     assert kept["partial_average_heartrate"] == 125.7 and kept["hr_coverage_share"] == 0.3
     assert kept["zone2_seconds"] == 986 and row["total_zone2_seconds"] == 986  # measured time-in-zone survives
 
-    # /api/zone2's computation over the seam's output: the session is not Zone 2 time
-    z2 = az._compute_zone2_breakdown([row], {"max_heart_rate": 184}, today=day)
-    assert z2["summary"]["total_zone_2_min"] == 0.0, z2["summary"]
+    # /api/zone2's computation over the seam's output: Zone 2 is the 986 MEASURED seconds
+    # (#4627 time-in-zone), never the 116-minute session read by a grafted average
+    measured_z2 = round(986 / 60, 1)
+    z2 = az._compute_zone2_breakdown([row], today=day)
+    assert z2["summary"]["total_zone_2_min"] == measured_z2, z2["summary"]
 
     # /api/training_overview over the same stored row, through the same seam
     def seamed(src, start, end, include_pilot=False):
@@ -299,7 +301,8 @@ def test_partial_hr_graft_is_not_whole_session_zone2_on_either_endpoint(monkeypa
     monkeypatch.setattr(obs, "_query_source", seamed)
     t = json.loads(obs.handle_training_overview()["body"])["training"]
     assert t["workouts_30d"] == 1
-    assert t["z2_trailing_7d_min"] == 0 and t["z2_weekly_avg_min"] == 0
+    assert t["z2_trailing_7d_min"] == round(measured_z2)  # the same measured 16.4 min, rounded as served
+    assert t["z2_weekly_avg_min"] == round(986 / 60 / (30 / 7.0))
 
 
 # ── 1c. avg_strain sibling guard ─────────────────────────────────────────────
@@ -332,8 +335,8 @@ class _WhoopPartitionTable:
 
 def test_whoop_day_rows_and_workout_rows_are_counted_apart(monkeypatch):
     """#4629 (the #3442 class at /api/training_overview): avg_strain is the DAY-row mean and
-    whoop_workout_count is the number of DISTINCT workout ids; Whoop zone minutes do not
-    enter the served Zone 2 total (that definition is #4627's)."""
+    whoop_workout_count is the number of DISTINCT workout ids. #4627: Whoop's own zone minutes
+    ARE the served Zone 2 now — each workout id once (w-a under two keys counts 30, not 60)."""
     day_rows = [{"sk": f"DATE#{_d(i)}", "strain": s} for i, s in ((1, 10.0), (2, 12.0), (3, 14.0))]
     workout_rows = [
         {"sk": f"DATE#{_d(3)}#WORKOUT#w-a", "workout_id": "w-a", "strain": 18.0, "zone_2_minutes": 30.0},
@@ -349,7 +352,7 @@ def test_whoop_day_rows_and_workout_rows_are_counted_apart(monkeypatch):
     assert t["avg_strain"] == 12.0  # mean of 10/12/14 — not dragged by the 18 and 4 workout strains
     assert t["whoop_workout_count"] == 2  # w-a once, w-b once; the 3 day rows are not workouts
     assert [w["strain"] for w in body["whoop_workouts"]] == [18.0, 4.0]
-    assert t["z2_trailing_7d_min"] == 0  # no Strava/Hevy fed in, and Whoop zone 2 is not summed in
+    assert t["z2_trailing_7d_min"] == 30 + 12  # w-a once + w-b; the duplicate key is not a second workout
 
 
 # ── 2. /api/vitals genesis clamp + hrv min-n ─────────────────────────────────

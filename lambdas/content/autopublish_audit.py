@@ -14,6 +14,9 @@ a Lambda CAN run, and the sweep runs it before it publishes anything nobody appr
     door, for the post AND the episode the Panel renders from the same row. Style findings (``craft:`` and ``repeat:``)
     are a writer's notes, not claims, and do not block. Every other finding blocks — an unknown prefix included, so a
     gate the desk adds later is blocking until someone decides otherwise.
+  * the craft hold (#4545, owner ruling "b"): story_craft's RESIDUAL verdict on the final texts, stored separately as
+    ``desk_craft_json`` with ``publish_hold = "craft_hold"``, keeps the draft for the owner's approve click. The
+    ``craft:`` notes inside ``desk_findings_json`` above stay non-blocking; the residual list is the hold.
   * no desk record at all (the legacy writer wrote the week, or the row predates the desk) is itself blocking: there is
     no audit to read, and an unaudited draft is exactly what the sweep must not publish.
   * the shared reader-surface door (``story_checks.reader_surface``), re-run on the stored text at publish time, so a
@@ -137,10 +140,27 @@ def legacy_episode_blocking(chronicle_row: Optional[Dict[str, Any]], text: str, 
     return out
 
 
+def craft_hold_blocking(item: Dict[str, Any]) -> List[str]:
+    """#4545 (owner ruling "b", 2026-10-17 -- hold on preview only): a desk draft whose final texts still carry a
+    story_craft finding is never auto-published; only the owner's approve click publishes it. The row says so with
+    ``publish_hold = "craft_hold"`` and lists the findings in ``desk_craft_json``. A row with neither (a clean week, or
+    one that predates #4545) is not blocked here; an unreadable ``desk_craft_json`` is (fail-closed)."""
+    raw = item.get("desk_craft_json")
+    try:
+        craft = json.loads(raw) if isinstance(raw, str) and raw else (raw or [])
+    except (TypeError, ValueError):
+        return ["craft hold: the desk's craft record is unreadable"]
+    if not isinstance(craft, list):
+        return ["craft hold: the desk's craft record is not a list"]
+    if item.get("publish_hold") != "craft_hold" and not craft:
+        return []
+    return [f"craft hold (approve from the preview to publish): {f}" for f in craft] or ["craft hold (approve from the preview to publish)"]
+
+
 def blocking_items(item: Dict[str, Any]) -> List[str]:
     """Every reason the sweep may NOT publish this unapproved draft. Empty means the deterministic audit passed."""
     text = "\n".join(str(item.get(k) or "") for k in ("title", "stats_line", "content_markdown"))
-    out = desk_blocking(item.get("desk_findings_json"))
+    out = desk_blocking(item.get("desk_findings_json")) + craft_hold_blocking(item)
     if not str(item.get("content_markdown") or "").strip():
         out.append("no stored text to audit")
     out += [f"reader surface: {f}" for f in story_checks.reader_surface(text)]

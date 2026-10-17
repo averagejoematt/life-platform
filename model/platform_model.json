@@ -3335,6 +3335,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/ingestion/whoop_empty_day.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": "whoop-data-ingestion",
       "module": "lambdas/ingestion/whoop_lambda.py",
@@ -3675,13 +3682,6 @@
       "lambda": null,
       "module": "lambdas/intelligence/intelligence_common.py",
       "partition": "coach_thread",
-      "via": "pk"
-    },
-    {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/intelligence/intelligence_common.py",
-      "partition": "garmin",
       "via": "pk"
     },
     {
@@ -4278,6 +4278,13 @@
       "module": "lambdas/web/site_api_ai_context.py",
       "partition": "what_changed",
       "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_autonomic.py",
+      "partition": "hevy",
+      "via": "seam"
     },
     {
       "direction": "read",
@@ -5087,6 +5094,13 @@
     {
       "direction": "read",
       "lambda": null,
+      "module": "lambdas/web/site_api_physical.py",
+      "partition": "whoop",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
       "module": "lambdas/web/site_api_protocols.py",
       "partition": "experiments",
       "via": "pk"
@@ -5788,7 +5802,21 @@
       "direction": "read",
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_correlation.py",
+      "partition": "hevy",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_correlation.py",
       "partition": "strava",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_correlation.py",
+      "partition": "whoop",
       "via": "seam"
     },
     {
@@ -7683,7 +7711,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 743,
+      "edges": 747,
       "lambdas": 108,
       "mcp_tool_modules": 36,
       "mcp_tools": 88,
@@ -7697,9 +7725,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 361,
-        "sites_resolved": 932,
-        "sites_total": 1293
+        "sites_dynamic": 363,
+        "sites_resolved": 939,
+        "sites_total": 1302
       },
       "schedule_resolution": {
         "dynamic": 0,

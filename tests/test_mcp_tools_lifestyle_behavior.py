@@ -1205,7 +1205,12 @@ def _drive_metric_audit(table_fixture, sources_fixture):
 def test_experiment_metric_registry_has_a_writer_true_fixture_for_every_source():
     """Guard the SET: derive the sources from _EXPERIMENT_METRICS so a new metric
     on a new partition cannot slip past this audit."""
-    declared_sources = {src for src, *_rest in tl._EXPERIMENT_METRICS}
+    from common.metric_truth import resolved_metric, sources_for
+
+    declared_sources = set()
+    for src, *_rest in tl._EXPERIMENT_METRICS:
+        # #4630: a resolved pseudo-source (steps) reads every partition its registry truth facet names.
+        declared_sources |= set(sources_for(resolved_metric(src))) if resolved_metric(src) else {src}
     assert declared_sources == set(WRITER_TRUE_RECORD), (
         "mcp/tools_lifestyle.py::_EXPERIMENT_METRICS changed its source set to "
         f"{sorted(declared_sources)}; add a writer-true fixture for the new partition."

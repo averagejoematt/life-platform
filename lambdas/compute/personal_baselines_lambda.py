@@ -21,7 +21,7 @@ Metrics banded (the #543 inventory that is safely personalizable):
 Character-engine target bands (#1412, v1.1.0 — personal_baselines.CHARACTER_TARGET_SPECS):
   sleep_duration_hours / deep_sleep_fraction / rem_sleep_fraction — from Matthew's whoop
       sleep history (mirrors character_engine's field fallbacks: hours, pct, or seconds).
-  daily_steps — from apple_health steps history.
+  daily_steps — the resolved daily steps (common.metric_truth, #4630).
   Each band is {p25, p50, p75, n, window_days}; the character consumers take p75 as the
   target ("a good day by his own distribution"), guardrail-clamped + provenance-labeled
   by personal_baselines.apply_character_targets. Below MIN_N the authored config value
@@ -48,6 +48,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+from common.metric_truth import steps_series  # #4630: the ONE steps resolver
 from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from health import personal_baselines
 
@@ -213,15 +214,11 @@ def _sleep_series(records):
     return durations, deep_fracs, rem_fracs
 
 
-def _steps_series(records):
-    """Daily step counts from apple_health history — zero/absent days dropped (a
-    wearable gap is not a 0-step day; ADR-104 measured-class semantics)."""
-    out = []
-    for rec in records or []:
-        steps = _sf(rec, "steps")
-        if steps and steps > 0:
-            out.append(steps)
-    return out
+def _steps_series(rows_by_source):
+    """Daily step counts through the ONE resolver (#4630, registry METRIC_TRUTH facet —
+    Whoop's step_count, else Apple Health) — zero/absent days dropped (a wearable gap is
+    not a 0-step day; ADR-104 measured-class semantics)."""
+    return [v for v in steps_series(rows_by_source) if v > 0]
 
 
 def _write_snapshot(bands, lookback_days):
@@ -273,7 +270,7 @@ def _impl(event, context):
     whoop_records = _fetch_source("whoop", start, end)
     apple_records = _fetch_source("apple_health", start, end)
     durations, deep_fracs, rem_fracs = _sleep_series(whoop_records)
-    steps = _steps_series(apple_records)
+    steps = _steps_series({"whoop": whoop_records, "apple_health": apple_records})
     logger.info(
         "Character series: sleep n=%d, deep n=%d, rem n=%d, steps n=%d (MIN_N=%d)",
         len(durations),
