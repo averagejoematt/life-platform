@@ -167,6 +167,85 @@ def test_whoop_cycle_scored():
     assert _f(out["max_heart_rate"]) == 160
 
 
+def test_whoop_cycle_captures_the_vendor_step_count_as_its_own_field_4630():
+    """#4630 box 1: the archived v2 day payload carries ``step_count`` on the cycle RECORD (beside
+    ``score``, not inside it) and returns two cycles — the key day's first, the prior day's
+    overlapping one second. The writer reads records[0] (the same cycle ``strain`` comes from),
+    stores it under the vendor's own name, and never fabricates a 0 when the key is absent
+    (126 of 152 archived days predate 2026-09-21 and carry none)."""
+    import json as _json
+
+    fixture = os.path.join(os.path.dirname(__file__), "fixtures", "upstream", "whoop", "cycle.json")
+    with open(fixture) as fh:
+        raw = _json.load(fh)
+    out = _extract_cycle(raw)
+    assert out["step_count"] == Decimal(8421)  # records[0], not the prior cycle's 11237
+    assert isinstance(out["step_count"], Decimal)  # DDB-safe
+    assert "steps" not in out  # its own per-source name — never a merged/generic 'steps'
+
+    pre = _json.loads(_json.dumps(raw))
+    for rec in pre["records"]:
+        rec.pop("step_count")
+    assert "step_count" not in _extract_cycle(pre)  # absent stays absent, never 0
+    assert _f(_extract_cycle(pre)["strain"]) == 12.35  # the rest of the cycle is unchanged
+
+    bad = _json.loads(_json.dumps(raw))
+    bad["records"][0]["step_count"] = True  # a bool is not a count
+    assert "step_count" not in _extract_cycle(bad)
+
+
+def test_whoop_steps_backfill_plan_counts_only_rows_that_lack_the_field_4630():
+    """#4630 box 1's back-fill: the plan reads the archive through the writer's own extractor and
+    names only EXISTING day rows WITHOUT a count — never a new row, never an overwrite, never a
+    workout sub-row; the owner-run apply is conditioned the same way."""
+    import importlib.util
+    import json as _json
+
+    spec = importlib.util.spec_from_file_location(
+        "whoop_steps_backfill_4630", os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts", "whoop_steps_backfill_4630.py")
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    with open(os.path.join(os.path.dirname(__file__), "fixtures", "upstream", "whoop", "cycle.json")) as fh:
+        cycle = _json.load(fh)
+    no_steps = _json.loads(_json.dumps(cycle))
+    for rec in no_steps["records"]:
+        rec.pop("step_count")
+    payloads = {
+        "2026-09-21": {"raw": {"cycle": cycle}},  # count, row lacks it -> gains
+        "2026-09-22": {"raw": {"cycle": cycle}},  # count, row already has the same one
+        "2026-09-23": {"raw": {"cycle": cycle}},  # count, row has a different one -> reported, kept
+        "2026-09-24": {"raw": {"cycle": cycle}},  # count, no day row -> never created
+        "2026-09-20": {"raw": {"cycle": no_steps}},  # pre-field day
+        "2026-09-19": None,  # not archived
+    }
+    rows = [
+        {"sk": "DATE#2026-09-21"},
+        {"sk": "DATE#2026-09-21#WORKOUT#abc"},
+        {"sk": "DATE#2026-09-22", "step_count": Decimal(8421)},
+        {"sk": "DATE#2026-09-23", "step_count": Decimal(9000)},
+        {"sk": "DATE#2026-09-20"},
+        {"sk": "DATE#2026-09-19"},
+    ]
+    counts, gains = mod.plan(payloads, rows)
+    assert gains == {"DATE#2026-09-21": Decimal(8421)}
+    assert counts["rows_that_would_gain_step_count"] == 1
+    assert counts["archived_days_with_step_count"] == 4
+    assert counts["archived_count_without_day_row"] == 1
+    assert counts["stored_rows_differing"] == 1
+    assert counts["days_missing"] == 1 and counts["stored_day_rows"] == 5
+
+    calls = []
+
+    class _Table:
+        def update_item(self, **kw):
+            calls.append(kw)
+
+    assert mod.apply_gains(_Table(), "PK", gains) == 1
+    assert calls[0]["ConditionExpression"] == "attribute_exists(sk) AND attribute_not_exists(#f)"
+    assert calls[0]["ExpressionAttributeNames"] == {"#f": "step_count"}
+
+
 def test_whoop_workout_maps_known_and_unknown_sport():
     known = _extract_workout({"sport_id": 1, "start": "s", "end": "e", "score_state": "SCORED", "score": {"strain": 8.5}})
     assert known["sport_id"] == 1
@@ -177,6 +256,83 @@ def test_whoop_workout_maps_known_and_unknown_sport():
     unknown = _extract_workout({"sport_id": 999, "score_state": "PENDING_SCORE"})
     assert unknown["sport_name"] == "Sport_999"  # fallback label
     assert "strain" not in unknown  # unscored → no score fields
+
+
+# ── #4629: zone minutes from the vendor's PLURAL key; nothing fabricated on a null score ──
+_WHOOP_WORKOUT_WIRE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "upstream", "whoop", "workout.json")
+_ZONES = [f"zone_{i}_minutes" for i in range(6)]
+
+
+def _whoop_workout_wire():
+    """The committed upstream fixture — shape built from an archived v2 payload (key order, the
+    plural ``zone_durations``, and a SCORED record whose ``score`` is null, as the wire sends it)."""
+    import json
+
+    with open(_WHOOP_WORKOUT_WIRE) as fh:
+        return json.load(fh)["records"]
+
+
+def test_whoop_workout_zone_minutes_read_from_zone_durations():
+    scored = _extract_workout(_whoop_workout_wire()[0])
+    assert [_f(scored[z]) for z in _ZONES] == [0.0, 5.0, 20.0, 10.0, 9.0, 1.0]  # milli / 60_000
+
+
+def test_whoop_workout_null_score_writes_no_zone_fields():
+    null_score = _extract_workout(_whoop_workout_wire()[1])
+    assert null_score["start_time"] and null_score["sport_id"] == 999
+    assert not any(z in null_score for z in _ZONES)  # ADR-104: absent, never six zeros
+    assert "strain" not in null_score
+    # a scored record with no zone_durations at all also writes none
+    assert not any(z in _extract_workout({"score_state": "SCORED", "score": {"strain": 3.0}}) for z in _ZONES)
+
+
+def test_whoop_workout_keeps_the_vendor_sport_name_beside_the_table_label():
+    out = _extract_workout(_whoop_workout_wire()[0])
+    assert out["vendor_sport_name"] == "cycling"  # capture-all: the payload's own label
+    assert out["sport_name"] == "Cycling" and out["sport_id"] == 1  # readers' label unchanged (#4644 Q10/Q11)
+    assert "vendor_sport_name" not in _extract_workout({"sport_id": 1, "score_state": "PENDING_SCORE"})
+
+
+def test_whoop_zone_rebuild_counts_only_and_shares_the_writer_function():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "whoop_zone_rebuild_4629",
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts", "whoop_zone_rebuild_4629.py"),
+    )
+    rebuild = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rebuild)
+    from ingestion import whoop_lambda
+
+    assert rebuild.zone_minutes_from_score is whoop_lambda.zone_minutes_from_score
+    assert not hasattr(rebuild, "apply") and "--apply" not in open(spec.origin).read().split('"""', 2)[2]
+
+    recs = _whoop_workout_wire()
+    payloads = {
+        "2026-06-08": {"fetched_at": "x", "raw": {"workouts": {"records": recs}}},
+        "2026-06-09": {"fetched_at": "x", "raw": {"workouts": {"records": [recs[0]]}}},  # crosses 00:00 UTC: filed twice
+        "2026-06-10": None,
+    }
+    stored = [
+        {"sk": f"DATE#2026-06-08#WORKOUT#{recs[0]['id']}", **{z: Decimal("0") for z in _ZONES}},  # the pre-#4629 zeros
+        {"sk": f"DATE#2026-06-08#WORKOUT#{recs[1]['id']}", **{z: Decimal("0") for z in _ZONES}},  # fabricated on a null score
+        {"sk": "DATE#2026-06-08", "strain": Decimal("9")},  # a day row is not a workout row
+    ]
+    counts = rebuild.tally(payloads, stored)
+    assert counts == {
+        "days_archived": 2,
+        "days_missing": 1,
+        "days_requested": 3,
+        "distinct_workout_ids": 2,
+        "ids_under_two_or_more_days": 1,
+        "records_nonzero_zones": 2,
+        "records_null_score": 1,
+        "records_with_zone_durations": 2,
+        "stored_rows_differing": 2,
+        "stored_rows_nonzero_zones": 0,
+        "stored_workout_rows": 2,
+        "workout_records": 3,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -209,6 +365,28 @@ def test_withings_empty_and_unknown_type():
     out = _parse_measurements({"measuregrps": [{"date": 1_700_000_000, "measures": [{"type": 99999, "value": 1, "unit": 0}]}]})
     assert "weight_kg" not in out
     assert out["measurement_timestamp"] == 1_700_000_000
+
+
+def test_withings_attrib_kept_per_group_and_winner_unchanged_4642():
+    """#4642: every group's attribution code is stored as sent; the winning weight is unchanged.
+    Mutation control: delete the measurement_group_attribs line in _parse_measurements -> reds."""
+    raw = {
+        "measuregrps": [
+            {"date": 1_700_000_000, "attrib": 0, "measures": [{"type": 1, "value": 70000, "unit": -3}]},
+            {"date": 1_700_100_000, "attrib": 1, "measures": [{"type": 1, "value": 68000, "unit": -3}]},
+        ]
+    }
+    out = _parse_measurements(raw)
+    assert out["measurement_attrib"] == 1  # the stored (latest) group's code
+    assert out["measurement_group_attribs"] == [
+        {"timestamp": 1_700_100_000, "attrib": 1},
+        {"timestamp": 1_700_000_000, "attrib": 0},
+    ]
+    assert _f(out["weight_kg"]) == 68.0  # latest-wins untouched
+    from privacy.field_tiers import FIELD_TIERS, TIER_OWNER_ONLY
+
+    assert FIELD_TIERS["withings"]["measurement_attrib"] == TIER_OWNER_ONLY
+    assert FIELD_TIERS["withings"]["measurement_group_attribs"] == TIER_OWNER_ONLY
 
 
 # ── BodyScan 2 (#2782): the wire shape from the 2026-08-16 live capture ───────

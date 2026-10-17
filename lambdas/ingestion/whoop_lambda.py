@@ -445,11 +445,34 @@ def _extract_cycle(cycle: dict) -> dict:
     if not records or records[0].get("score_state") != "SCORED":
         return fields
     score = records[0].get("score") or {}
-    _set_dec(fields, "strain", _round(score.get("strain"), 2))
-    _set_dec(fields, "kilojoule", _round(score.get("kilojoule"), 2))
-    _set_dec(fields, "average_heart_rate", score.get("average_heart_rate"))
-    _set_dec(fields, "max_heart_rate", score.get("max_heart_rate"))
+    # strain + kilojoule rounded to 2dp, the two heart rates as sent (folded to a loop for #1665's ceiling).
+    for name, ndigits in (("strain", 2), ("kilojoule", 2), ("average_heart_rate", None), ("max_heart_rate", None)):
+        _set_dec(fields, name, score.get(name) if ndigits is None else _round(score.get(name), ndigits))
+    # #4630 box 1 (capture-all, owner rule 2026-10-04): the vendor's daily step count, under its
+    # own name on the Whoop day row. It sits on the cycle RECORD, not in ``score`` (archived v2
+    # wire: present on the day's records[0] from 2026-09-21). Stored as Whoop said it — never
+    # merged, maxed or compared with Apple's steps here; which count a reader shows is the
+    # read-side resolver's job (#4630 box 2, HELD on #4644 Q4/Q5). Absent stays absent, never 0;
+    # ``type(...) is int`` also refuses a bool.
+    _set_dec(fields, "step_count", steps if type(steps := records[0].get("step_count")) is int else None)
     return fields
+
+
+# #4629: the vendor's key is PLURAL (``zone_durations`` — the archived v2 wire and the vendor's
+# reference agree); the singular read this replaced matched nothing, so every workout stored six
+# zeros. A null score, an absent ``zone_durations`` or an absent zone yields NO field — a missing
+# value is never stored as 0 (ADR-104). Shared with scripts/whoop_zone_rebuild_4629.py so the
+# read-side rebuild can never compute zones differently from the writer.
+def zone_minutes_from_score(score: dict | None) -> dict:
+    out: dict = {}
+    zone_dur = (score or {}).get("zone_durations")
+    if not isinstance(zone_dur, dict):
+        return out
+    for i, word in enumerate(_ZONE_WORD):
+        ms = zone_dur.get(f"zone_{word}_milli")
+        if ms is not None:
+            out[f"zone_{i}_minutes"] = Decimal(str(round(ms / 60_000, 2)))
+    return out
 
 
 def _extract_workout(workout: dict) -> dict:
@@ -457,7 +480,10 @@ def _extract_workout(workout: dict) -> dict:
     sport_id = workout.get("sport_id")
     if sport_id is not None:
         fields["sport_id"] = int(sport_id)
+        # The hand-written label stays: readers depend on it, and relabelling waits on #4644 Q10/Q11.
         fields["sport_name"] = WHOOP_SPORT_NAMES.get(sport_id, f"Sport_{sport_id}")
+    if workout.get("sport_name"):  # capture-all (owner rule 2026-10-04): the vendor's own label beside the table's
+        fields["vendor_sport_name"] = str(workout["sport_name"])
     for key in ("start", "end"):
         if workout.get(key):
             fields[f"{key}_time"] = workout[key]
@@ -469,10 +495,7 @@ def _extract_workout(workout: dict) -> dict:
     _set_dec(fields, "max_heart_rate", score.get("max_heart_rate"))
     _set_dec(fields, "kilojoule", _round(score.get("kilojoule"), 2))
     _set_dec(fields, "distance_meter", _round(score.get("distance_meter"), 1))
-    zone_dur = score.get("zone_duration", {}) or {}
-    for i, word in enumerate(_ZONE_WORD):
-        ms = zone_dur.get(f"zone_{word}_milli") or 0
-        fields[f"zone_{i}_minutes"] = Decimal(str(round(ms / 60_000, 2)))
+    fields.update(zone_minutes_from_score(score))
     return fields
 
 

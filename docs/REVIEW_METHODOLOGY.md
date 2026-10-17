@@ -1,12 +1,12 @@
 # Life Platform — Architecture Review Methodology
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 > Repeatable process for conducting comprehensive architecture reviews.
-> First review: 2026-03-08 (v2.91.0). Latest: V2 audit (2026-05-17, 76 findings, ~33 shipped, formally closed in ADR-057).
+> First review: 2026-03-08 (v2.91.0). Last full architecture review in this form: the V2 audit (2026-05-17, ~130 findings across 8 phases per ADR-057, formally closed there). Since then, standing judgment runs through the `/review <lens>` skill (below), not this manual process.
 > Reviews stored in `docs/reviews/`; V2-style audits in `docs/v2-audits/`.
 > Tech Board: invoke as "tech board" or by name. 12 seats across Architecture, Security, Data, AI, Operations, Product, and FinOps.
-> Last updated: 2026-06-14 (v8.6.0)
+> Last updated: 2026-10-17 (re-verified against `.claude/skills/review/SKILL.md`, `.claude/agents/finding-verifier.md`, `deploy/generate_review_bundle.py`, `docs/BOARDS.md`)
 
 ---
 
@@ -25,6 +25,18 @@ it cheap to act on, `deploy/generate_review_bundle.py` produces a single self-co
 bundle a cold external reviewer can read with **no repo access** — the intended input
 to that one external review. Treat any internal letter grade as "passes our own bar,"
 never as "validated." Reproduce this caveat at the top of every review document.
+
+---
+
+## Current practice — the `/review` skill
+
+Scheduled and on-request reviews now run as **`/review <lens>`** (`.claude/skills/review/SKILL.md`; lenses `full`, `accuracy`, `craft`, `sdlc`, `site`, `platform`, `journey`, each with its rubric under `.claude/skills/review/references/`). The spine is the same for every lens: orient (live ground truth, derived and sealed anchors) → panel fan-out → **adversarial verification** → scorecard → disposition. This document's lessons are built into it:
+
+- Phase-1 panelists run on Sonnet; **Phase-2 verification is never skipped** and runs the `finding-verifier` agent (`.claude/agents/finding-verifier.md`, pinned `opus`, #4773), which tries to REFUTE every finding against the current repo and live state (verdicts CONFIRMED / PLAUSIBLE / REFUTED, lean REFUTED).
+- Dedup-first: each brief checks the do-not-refile list and the resolved-findings inventory (§13b of `deploy/generate_review_bundle.py`) before finalizing.
+- The cadence of each lens is the `CALENDAR` registry in `scripts/operating_calendar.py` ([OPERATING_CALENDAR.md](OPERATING_CALENDAR.md)); findings are filed through the `issue-filer` agent contract (`.claude/agents/issue-filer.md`), whose severities are P1|P2|P3 with S/M/L effort — the Critical/High/Medium/Low model below is the legacy architecture-review vocabulary.
+
+The manual bundle process below remains valid for a cold external or whole-architecture review.
 
 ---
 
@@ -185,9 +197,9 @@ The single biggest failure mode is Opus re-flagging already-resolved findings. T
 
 ## V2 Audit Learnings (2026-05-17)
 
-The V2 audit produced ~130 findings across 8 phases — ~33 shipped, ~37 deferred-with-rationale (closed in ADR-057), the rest superseded or merged. Things to do differently next time:
+The V2 audit produced ~130 findings across 8 phases — ADR-057 records ~70 shipped within two days and the remainder closed deferred-with-rationale, superseded or merged. Things to do differently next time:
 
-1. **Verify before recommending.** ~10% of V2 findings had wrong premises (P1.2 said the WAF was orphaned — it wasn't, it protects HAE webhook; P5.2 proposed prompt-caching savings below Anthropic's 1024-token cache minimum; P5.7 said to build a coach prediction evaluator that already existed and was running daily). Future auditors must read the actual code/AWS state before issuing the finding, not just the docs. Section 13b helps for resolved findings but doesn't catch wrong-premise *new* findings.
+1. **Verify before recommending.** ~10% of V2 findings had wrong premises (P1.2 said the WAF was orphaned; ADR-057 first answered that it protects the HAE webhook, and the 2026-07-05 correction found even that wrong — WAFv2 cannot attach to an HTTP API, and the WAF was removed platform-wide 2026-06; P5.2 proposed prompt-caching savings below Anthropic's 1024-token cache minimum; P5.7 said to build a coach prediction evaluator that already existed and was running daily). Future auditors must read the actual code/AWS state before issuing the finding, not just the docs. Section 13b helps for resolved findings but doesn't catch wrong-premise *new* findings.
 
 2. **Audit the docs alongside the code.** The V1 ADR list, ONBOARDING, ARCHITECTURE all carried stale Lambda counts, MCP tool counts, ADR counts, and layer versions for 2–6 months. The fix is to **bake live discovery into the docs** — today that is `deploy/sync_doc_metadata.py` (AST discoverers + the `--check` CI gate; the old `grep -c` counting method is banned — it over-counts nested schema fields) so the next reader can re-verify in 5 seconds rather than asking "is this stale?"
 
@@ -195,10 +207,10 @@ The V2 audit produced ~130 findings across 8 phases — ~33 shipped, ~37 deferre
 
 4. **Bundle still matters.** The pre-compiled review bundle (Section 13b inventory + full ci-cd.yml + test function names + last review .md content + 400-line CHANGELOG) is still the single biggest defense against re-flagging. Don't skip generating it.
 
-5. **Plan != ship.** V2 had 76 findings *planned* and ~33 *shipped*. The shipped:planned ratio is fine but the plan must include explicit "defer-or-do" decisions on every item before audit close — otherwise the unplanned remainder leaks into the next audit as "you didn't do this."
+5. **Plan != ship.** Not every planned V2 finding shipped (see ADR-057 for the counts). The ratio is fine but the plan must include explicit "defer-or-do" decisions on every item before audit close — otherwise the unplanned remainder leaks into the next audit as "you didn't do this."
 
 6. **Track corrections in the closure ADR.** ADR-057 is the V2 record. The next audit pass should produce a similar ADR — every item closed, every premise correction documented, every re-open trigger named.
 
 ---
 
-**Verified:** 2026-05-19
+**Verified:** 2026-10-17

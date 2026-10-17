@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-10-14 (v8.6.0 — 88 MCP tools, 20 data sources, 108 Lambdas, 12 cached tools)
+**Last updated:** 2026-10-15 (v8.6.0 — 88 MCP tools, 20 data sources, 108 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -309,6 +309,7 @@ Daily records (`sk = DATE#YYYY-MM-DD`) + workout sub-items (`sk = DATE#YYYY-MM-D
 | `kilojoule` | number | Daily energy (kJ) |
 | `average_heart_rate` | number | Daily avg HR (bpm) |
 | `max_heart_rate` | number | Daily max HR (bpm) |
+| `step_count` | number | Whoop's own daily step count, from the day's cycle record (vendor field from 2026-09-21; absent before, never 0-filled). Stored per source beside Apple's `steps` — never merged or compared at write time; which count a reader shows is the read-side resolver's (#4630). Back-fill: `scripts/whoop_steps_backfill_4630.py` |
 | `sleep_start` | string | ISO timestamp |
 | `sleep_end` | string | ISO timestamp |
 | `sleep_onset_minutes` | number | Minutes from midnight to sleep onset |
@@ -321,7 +322,8 @@ Daily records (`sk = DATE#YYYY-MM-DD`) + workout sub-items (`sk = DATE#YYYY-MM-D
 |-------|------|-------------|
 | `workout_id` | string | Whoop workout ID (v2 API UUID) |
 | `sport_id` | number | Whoop sport type ID |
-| `sport_name` | string | Human-readable sport name |
+| `sport_name` | string | Human-readable sport name from the platform's own `WHOOP_SPORT_NAMES` table (`Sport_<id>` when unmapped) |
+| `vendor_sport_name` | string | Whoop's own `sport_name` label, stored beside `sport_id` and the table label, never merged with it (capture-all, #4629; `whoop_lambda.py::_extract_workout`). Absent when the vendor sends none |
 | `start_time` | string | ISO timestamp |
 | `end_time` | string | ISO timestamp |
 | `strain` | number | Workout strain |
@@ -329,7 +331,7 @@ Daily records (`sk = DATE#YYYY-MM-DD`) + workout sub-items (`sk = DATE#YYYY-MM-D
 | `max_heart_rate` | number | Max HR during workout |
 | `kilojoule` | number | Energy (kJ) |
 | `distance_meter` | number | Distance (meters) |
-| `zone_0_minutes` through `zone_5_minutes` | number | Time in each HR zone (minutes) |
+| `zone_0_minutes` through `zone_5_minutes` | number | Time in each HR zone (minutes), from the vendor's `zone_durations`. **Absent, not 0,** when Whoop's score is null (unscored workout) or a zone is missing — a missing value is never stored as 0 (ADR-104; `whoop_lambda.py::zone_minutes_from_score`, #4629) |
 
 ### withings
 | Field | Type | Description |
@@ -345,6 +347,8 @@ Daily records (`sk = DATE#YYYY-MM-DD`) + workout sub-items (`sk = DATE#YYYY-MM-D
 | `heart_pulse` | number | Heart rate at weigh-in (bpm) |
 | `measurement_timestamp` | number | Unix epoch of measurement |
 | `measurement_time_utc` | string | ISO timestamp of measurement |
+| `measurement_attrib` | number | Withings attribution code of the day's latest group, as sent (0 device, 1 ambiguous, 2 manual …). Owner-only (#4642) |
+| `measurement_group_attribs` | list | `{timestamp, attrib}` for every group bucketed to this DATE# (UTC), as sent; capture only, never selects the day's weigh-in (#4644). Owner-only (#4642) |
 | `captured_at` | string | ISO timestamp of ingestion |
 
 Two device modes (#3417, ADR-154 amendment 2026-09-01): a plain stand-on weigh writes **weight only**; a full scan (handles held) also writes the impedance-derived composition fields (fat/muscle/bone/hydration + the BodyScan 2 set below). Composition is therefore **behavioral/sparse** — present only on full-scan days (first: 2026-08-16). Absence of composition on a weigh-day means a basic weigh happened, not a device or pipeline failure (ADR-104). The `lean_mass_delta_14d`/`fat_mass_delta_14d` fields once documented here were **never written**: their computation was deleted 2026-07-04 (#486/B-3) having never produced a value, and stays deleted by recorded decision (ADR-154 amendment 2026-09-01).
@@ -1003,7 +1007,7 @@ Note: Garmin auto-syncs activities to Strava. `garmin_activities` captures Garmi
 | Field | Type | Description |
 |-------|------|-------------|
 | `habits` | object | Map of habit name → count (Decimal: `1` = completed, `0` = not completed) |
-| `habit_statuses` | object | Per-habit structured status map (TD-11): status, completed_at, `miss_source` (`vendor`\|`platform`, present only when status is `failed` — #3666), etc. Since #422 also carries `notes` (list of verbatim in-app note strings for that day, clipped), `notes_at` (their created timestamps) and `note_channel: "habitify_note"` when the habit has notes — the PRIMARY habit-causality capture channel (a note on a done day = driver context; on a skipped/failed day = the why-missed reason). Stored raw — the `trigger:`/`reward:` line-prefix convention is interpreted on read by `lambdas/habit_causality.parse_note`, never inferred (ADR-104). |
+| `habit_statuses` | object | Per-habit structured status map (TD-11): status, completed_at, `habit_id` (the vendor's habit id, string — #4632, additive; absent on rows ingested before it and when the vendor sends none), `miss_source` (`vendor`\|`platform`, present only when status is `failed` — #3666), etc. Since #422 also carries `notes` (list of verbatim in-app note strings for that day, clipped), `notes_at` (their created timestamps) and `note_channel: "habitify_note"` when the habit has notes — the PRIMARY habit-causality capture channel (a note on a done day = driver context; on a skipped/failed day = the why-missed reason). Stored raw — the `trigger:`/`reward:` line-prefix convention is interpreted on read by `lambdas/habit_causality.parse_note`, never inferred (ADR-104). |
 | `by_group` | object | Map of AREA name → group stats object (see below). #3666: the group set is DERIVED from Habitify's live `/areas` response, not the hardcoded nine P40 names — those had been renamed to `Core`/`Optimize`/`Vice`, which left `by_group` empty and `total_possible` 0 on every stored day. |
 | `total_completed` | number | Total habits completed that day |
 | `total_possible` | number | Total habits tracked that day |
@@ -1401,7 +1405,7 @@ Access via `log_supplement`, `get_supplement_log`, `get_supplement_correlation` 
 
 Note: Daily Brief reads this partition to show today's logged supplements and 7-day adherence chips per supplement.
 
-**Habitify supplement bridge:** the habitify ingestion Lambda's post-store hook (`supplement_bridge` in `habitify_lambda.py`) side-writes checked supplement habits into this partition. The day's record carries `bridge_source: "habitify"` and each bridged entry has `source: "habitify_bridge"` with dose/unit/timing from a hardcoded `SUPPLEMENT_MAP`. The bridge **overwrites the day's record** (`put_item`) — manual `log_supplement` entries for the same day can be replaced on the next habitify sync.
+**Habitify supplement bridge:** the habitify ingestion Lambda's post-store hook (`supplement_bridge` in `habitify_lambda.py`) side-writes checked supplement habits into this partition. The day's record carries `bridge_source: "habitify"` and each bridged entry has `source: "habitify_bridge"` with dose/unit/timing from a hardcoded `SUPPLEMENT_MAP` (resolved by name, a registry `habitify_names` alias, or — same day — the habit id). Since #4632 each bridged entry carries `habit_id` and is keyed on it; the bridge re-derives its own entries in full from the stored habitify day every run, so a completion no longer on that day is **retracted** (removed; a row left with no entries is deleted). Manual `log_supplement` entries (any other `source`) are preserved when the read-before-merge succeeds (#480/E-5); if that read fails the bridge never retracts, but a write of bridge entries in that run can replace same-day manual entries (pre-existing behaviour).
 
 ### weather (Seattle daily weather)
 

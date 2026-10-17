@@ -7681,7 +7681,7 @@
       "mcp_tool_modules": 36,
       "mcp_tools": 88,
       "partitions": 116,
-      "privacy_fields_owner_only": 33,
+      "privacy_fields_owner_only": 35,
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 18,
       "privacy_sources_owner_published": 3,
@@ -7691,8 +7691,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 361,
-        "sites_resolved": 930,
-        "sites_total": 1291
+        "sites_resolved": 931,
+        "sites_total": 1292
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8370,6 +8370,8 @@
         "height_m",
         "hydration_kg",
         "intracellular_water_kg",
+        "measurement_attrib",
+        "measurement_group_attribs",
         "metabolic_age",
         "muscle_mass_kg",
         "muscle_mass_lbs",
@@ -8445,6 +8447,8 @@
         "height_m": "owner_only",
         "hydration_kg": "owner_only",
         "intracellular_water_kg": "owner_only",
+        "measurement_attrib": "owner_only",
+        "measurement_group_attribs": "owner_only",
         "metabolic_age": "owner_only",
         "muscle_mass_kg": "owner_only",
         "muscle_mass_lbs": "owner_only",

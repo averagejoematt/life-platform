@@ -163,9 +163,13 @@ CONTRACTS = [
             ("records[0].score.kilojoule", "number"),
             ("records[0].score.average_heart_rate", "number"),
             ("records[0].score.max_heart_rate", "number"),
+            # #4630: the daily step count is on the cycle RECORD (not in ``score``) — the archived
+            # v2 wire carries it on every day's records[0] from 2026-09-21; the fixture mirrors that
+            # two-record shape (the key day's cycle first, the prior day's overlapping cycle second).
+            ("records[0].step_count", "number"),
         ],
         _extract_cycle,
-        ["strain", "kilojoule", "average_heart_rate", "max_heart_rate"],
+        ["strain", "kilojoule", "average_heart_rate", "max_heart_rate", "step_count"],
     ),
     Contract(
         "whoop",
@@ -176,9 +180,13 @@ CONTRACTS = [
             ("records[0].start", "str"),
             ("records[0].end", "str"),
             ("records[0].score.strain", "number"),
+            # #4629: the vendor's key is PLURAL; the singular read matched nothing for months.
+            ("records[0].score.zone_durations", "dict"),
+            ("records[0].score.zone_durations.zone_two_milli", "number"),
+            ("records[0].sport_name", "str"),
         ],
         lambda fx: _extract_workout(fx["records"][0]),
-        ["sport_id", "sport_name", "strain", "average_heart_rate", "max_heart_rate"],
+        ["sport_id", "sport_name", "vendor_sport_name", "strain", "average_heart_rate", "max_heart_rate", "zone_2_minutes"],
     ),
     Contract(
         "withings",

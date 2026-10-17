@@ -1,6 +1,6 @@
 # The stack manifest — `stack.json`
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-08
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 **Fork the architecture, not the data.**
 
@@ -10,7 +10,7 @@ and supplements sit under measurement, and what it honestly costs to own. Its sc
 published next to it at `/data/stack.schema.json`.
 
 It exists because "fork my setup" is a reasonable thing to want and a bad thing to answer
-with a repo tour. The repo is public, but reading 101 Lambdas to find out *which wearables
+with a repo tour. The repo is public, but reading the Lambdas (the count lives in `model/platform_model.json`, not on this page) to find out *which wearables
 feed this and what the bill is* is not a good use of anyone's evening. The manifest answers
 that in one fetch.
 
