@@ -59,6 +59,7 @@ from typing import Any
 
 from common.constants import PLAN_DAILY_PROTEIN_MIN_G
 from common.digest_utils import d2f
+from common.metric_truth import resolve_steps, steps_sources  # #4630 / ADR-163: the ONE steps resolver
 from common.pacific_time import pacific_day_n
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.phase_filter import with_phase_filter
@@ -436,7 +437,9 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
         if facts.recovery_pct is None:
             facts.recovery_pct = (details.get("recovery") or {}).get("recovery_score")
         facts.rhr_bpm = computed.get("rhr_bpm")
-        facts.steps = (details.get("movement") or {}).get("steps")  # steps-truth: the day grade's score_movement output, resolved (#4630)
+        # ADR-163: the movement score scores walking time and no longer carries steps — the card's
+        # steps are the ONE resolver over the day's own rows (#4630)
+        facts.steps = resolve_steps({src: _get_day(table, src, date) for src in steps_sources()}).value
         hyd = details.get("hydration") or {}
         facts.water_oz = hyd.get("water_oz")
         facts.water_target_oz = hyd.get("target_oz")

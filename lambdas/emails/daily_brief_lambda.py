@@ -738,8 +738,7 @@ def gather_daily_data(profile, yesterday):
     withings_14d = fetch_range("withings", (today - timedelta(days=14)).isoformat(), yesterday)
     # #2221: one definition, one place — the compute Lambda resolves the same concept
     # through this helper, so the weekly delta no longer flips on which pipeline ran.
-    target_date = (today - timedelta(days=7)).isoformat()
-    week_ago_weight = weight_recency.week_ago_weight(withings_14d, target_date)
+    week_ago_weight = weight_recency.week_ago_weight(withings_14d, (today - timedelta(days=7)).isoformat())
 
     # Avatar weight: 30-day lookback so avatar doesn't reset to frame 1 on missed weigh-ins
     avatar_weight = latest_weight
@@ -912,6 +911,9 @@ def gather_daily_data(profile, yesterday):
         "habitify": habitify,
         "garmin": garmin,
         "mf_workouts": mf_workouts,
+        # ADR-163: the day's raw Hevy workout rows — the inline day grade's movement score reads its
+        # walking/treadmill blocks beside Strava's walks (the compute Lambda carries the same key)
+        "hevy": fetch_range("hevy", yesterday, yesterday),
         "hrv": {"hrv_7d": avg(hrv_7d_vals), "hrv_30d": avg(hrv_30d_vals), "hrv_yesterday": safe_float(whoop, "hrv")},
         # #2221: the CGM day aggregate rides the apple_health row (where the HAE webhook
         # writes it and /api/biomarkers reads it) — a re-key of a row already in hand,

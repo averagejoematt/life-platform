@@ -21,7 +21,8 @@ from datetime import datetime
 from typing import Any, Iterable, Optional, Union
 
 from common.constants import PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
-from common.metric_truth import resolve_steps
+from training.owner_redlines import REDLINES  # ADR-163: the walking floor the movement target defaults from
+from training.walking_volume import WALKING_VOLUME_VERSION, walking_minutes_for_day  # ADR-163: the ONE walking definition
 
 from health.habit_identity import day_name_for  # #4632: id first, then names, then ingest-derived aliases
 
@@ -36,6 +37,13 @@ Numeric = Union[int, float]
 # weighted mean). The old alias described a narrower contract than any scorer has
 # ever honoured; nothing about the returned VALUES changes here.
 ScoreTuple = tuple[Optional[Numeric], dict[str, Any]]
+
+# ADR-163 (#4644 Q5 "b"): the movement score's second half is walking minutes, not steps. Its target is
+# the profile's `walking_minutes_target`; absent that, the PERMANENT weekly walking floor spread over
+# seven days (8.5 h -> 73 min) — the floor, not the 11–12 h target, because the floor is the vital sign
+# that holds in every phase and the target moves by block week.
+WALKING_MINUTES_TARGET_DEFAULT = round(float(REDLINES["walking_floor_hr_wk"]["value"]) * 60 / 7)
+WALKING_SOURCE = WALKING_VOLUME_VERSION + ": Strava walk/hike UNION Hevy walking/treadmill blocks, time de-duplicated (#4068)"
 
 
 # ==============================================================================
@@ -176,8 +184,17 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
 
 
 def score_movement(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
-    step_target = profile.get("step_target", 7000)
-    details = {}
+    """Exercise half (Strava activity + moving time) + walking-time half (ADR-163, #4644 Q5 "b").
+
+    The second half was steps until ADR-163: a phone-carried count that read the phone's partial
+    delivery on the days it was not carried (#4628/#4630). It is now the day's WALKING minutes from
+    `training.walking_volume.walking_minutes_for_day` — Strava walks/hikes UNION Hevy walking/treadmill
+    blocks, a WHOOP walk inside a Hevy session counted once (#4068) — against the profile's
+    `walking_minutes_target` (default: the permanent walking floor over seven days). Unknown walking
+    (no Strava row and no Hevy session) drops the half and the exercise half scores alone — exactly
+    what a missing step count did."""
+    walking_target = float(profile.get("walking_minutes_target") or WALKING_MINUTES_TARGET_DEFAULT)
+    details: dict[str, Any] = {}
     parts, weights = [], []
     strava = data.get("strava")
     if strava:
@@ -194,17 +211,18 @@ def score_movement(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     parts.append(exercise_score * 0.50)
     weights.append(0.50)
     details["exercise_score"] = exercise_score
-    # #4630: the day's steps come from the ONE resolver (registry METRIC_TRUTH facet) —
-    # the step half's REWARD is unchanged here; what movement rewards is #4644 Q5 (box 3).
-    _steps = resolve_steps({"whoop": data.get("whoop"), "apple_health": data.get("apple"), "garmin": data.get("garmin")})
-    steps = _steps.value
-    if steps is not None:
-        details["steps_source"] = _steps.source
-        step_score = clamp(round(min(100, steps / step_target * 100)))
-        parts.append(step_score * 0.50)
+    walk = walking_minutes_for_day(
+        day=str(data.get("date") or ""), strava_items=[strava] if strava else [], hevy_workouts=data.get("hevy") or []
+    )
+    if walk is not None:
+        walking_score = clamp(round(min(100, walk["minutes"] / walking_target * 100)))
+        parts.append(walking_score * 0.50)
         weights.append(0.50)
-        details["step_score"] = step_score
-        details["steps"] = round(steps)
+        details["walking_score"] = walking_score
+        details["walking_minutes"] = walk["minutes"]
+        details["walking_minutes_by_source"] = walk["by_source"]
+        details["walking_source"] = WALKING_SOURCE
+        details["walking_minutes_target"] = round(walking_target)
     if not weights:
         return None, details
     return clamp(round(sum(parts) / sum(weights))), details
