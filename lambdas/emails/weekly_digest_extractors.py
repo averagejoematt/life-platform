@@ -26,6 +26,7 @@ from common.digest_utils import (
     fmt,
     safe_float,
 )
+from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PURE CELL FORMATTERS — summary dict → the HTML fragment a table cell carries.
@@ -380,11 +381,20 @@ def ex_habitify(recs_dict, profile):
     }
 
 
-def ex_apple_health(recs_dict):
+def ex_apple_health(recs_dict, whoop_recs=None):
     recs = list(recs_dict.values()) if recs_dict else []
     if not recs:
         return None
-    steps = [float(r["steps"]) for r in recs if "steps" in r]
+    # #4630: the week's daily steps through the ONE resolver (registry METRIC_TRUTH facet) —
+    # the wrist's count when Whoop has one for the day, else the phone's.
+    _whoop = whoop_recs if isinstance(whoop_recs, dict) else {}
+    steps = [
+        v
+        for v in (
+            resolve_steps({"whoop": _whoop.get(d), "apple_health": recs_dict.get(d)}).value for d in sorted(set(recs_dict) | set(_whoop))
+        )
+        if v is not None
+    ]
     water = [float(r["water_intake_ml"]) for r in recs if "water_intake_ml" in r and float(r.get("water_intake_ml", 0)) >= 118]
     glucose_avgs = [float(r["blood_glucose_avg"]) for r in recs if "blood_glucose_avg" in r]
     tir_vals = [float(r["blood_glucose_time_in_range_pct"]) for r in recs if "blood_glucose_time_in_range_pct" in r]

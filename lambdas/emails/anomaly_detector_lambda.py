@@ -70,7 +70,9 @@ from decimal import Decimal
 
 import boto3
 from common import send_ledger  # #3113 / DIL-025: the durable replay guard
+from common.metric_truth import resolve, resolve_by_date, sources_for  # #4630: the ONE multi-source resolver
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
+from ingestion.source_registry import METRIC_TRUTH  # #4630: metrics resolved per day across sources
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
@@ -151,6 +153,8 @@ DOW_NORMALIZED_METRICS = {"steps", "completed_count", "completion_pct"}
 # Add a metric here only if its distribution is verifiably right-skewed from your data.
 LOG_TRANSFORM_METRICS = {"hrv"}
 
+STEPS_TRUTH_SOURCE = METRIC_TRUTH["steps"]["truth_source"]  # steps-truth: the registry facet itself
+
 # 4th element (low_is_bad): True=flag LOW values, False=flag HIGH, None=flag either direction
 METRICS = [
     ("whoop", "recovery_score", "Recovery Score", True),
@@ -159,7 +163,9 @@ METRICS = [
     ("whoop", "sleep_quality_score", "Sleep Score", True),
     ("whoop", "sleep_efficiency_percentage", "Sleep Efficiency", True),
     ("withings", "weight_lbs", "Weight", None),
-    ("apple_health", "steps", "Steps", True),
+    # #4630: steps resolve per day through common.metric_truth (registry METRIC_TRUTH facet);
+    # the source named here is the facet's truth source, and a flag carries the day's WINNER.
+    (STEPS_TRUTH_SOURCE, "steps", "Steps", True),
     ("apple_health", "walking_speed_mph", "Walking Speed", True),
     ("apple_health", "walking_asymmetry_pct", "Walking Asymmetry", False),
     # #2271: field was "tasks_completed", which todoist_lambda has never
@@ -279,6 +285,16 @@ def compute_adaptive_threshold(cv):
     return 1.5
 
 
+def _baseline_records(source, field, start, end):
+    """The baseline window's rows for (source, field). A metric with a registry truth facet
+    (steps, #4630) is resolved per day across ALL its sources — `source` is ignored — and
+    handed back as `{date, field}` rows, so the baseline and the observation share one truth."""
+    if field not in METRIC_TRUTH:
+        return fetch_range(source, start, end)
+    resolved = resolve_by_date(field, {src: fetch_range(src, start, end) for src in sources_for(field)})
+    return [{"date": d, field: r.value} for d, r in sorted(resolved.items()) if r.value is not None]
+
+
 def compute_baseline(source, field, end_date, lookback_days=30, dow_normalize=False, target_is_weekend=False, log_transform=False):
     """Compute rolling baseline mean, SD, CV, and adaptive Z-threshold.
 
@@ -291,7 +307,7 @@ def compute_baseline(source, field, end_date, lookback_days=30, dow_normalize=Fa
     """
     start = (end_date - timedelta(days=lookback_days)).isoformat()
     end = (end_date - timedelta(days=1)).isoformat()
-    records = fetch_range(source, start, end)
+    records = _baseline_records(source, field, start, end)
 
     if dow_normalize:
         weekday_vals = []
@@ -344,12 +360,17 @@ def check_anomalies(yesterday_str, today):
     yesterday_is_weekend = is_weekend(yesterday_str)
 
     records_cache = {}
-    sources_needed = set(source for source, _, _, _ in METRICS)
+    sources_needed = set(source for source, _, _, _ in METRICS) | {s for _, f, _, _ in METRICS if f in METRIC_TRUTH for s in sources_for(f)}
     for source in sources_needed:
         records_cache[source] = fetch_date(source, yesterday_str)
 
     for source, field, label, low_is_bad in METRICS:
-        yesterday_val = safe_float(records_cache[source], field)
+        if field in METRIC_TRUTH:
+            # #4630: the day's value through the ONE resolver; the flag names the winning source.
+            _res = resolve(field, {s: records_cache.get(s) for s in sources_for(field)})
+            yesterday_val, source = _res.value, (_res.source or source)
+        else:
+            yesterday_val = safe_float(records_cache[source], field)
         if yesterday_val is None:
             continue
 

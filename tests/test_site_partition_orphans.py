@@ -58,6 +58,11 @@ ALLOWLIST_ORPHANS = {
     "state_of_mind": "pre-existing orphan (out of #1218 scope): the reader queries SOURCE#state_of_mind, but HAE "
     "merges State-of-Mind aggregates into SOURCE#apple_health (merge_day_to_dynamo), so the dedicated partition "
     "has no writer",
+    # #4630: SOURCE#garmin's direct writer was retired (#4640, ADR-074 — paused); its stored
+    # history is still read as the steps truth facet's last fallback. The only static pk-form
+    # "writer" left was intelligence_common's garmin-only steps QUERY, which #4630 routed
+    # through the resolver (a dynamic per-source read), so the guard now sees the truth.
+    "garmin": "#4630 — paused source (ADR-074), direct writer retired #4640; history read as the steps fallback",
 }
 
 

@@ -21,6 +21,7 @@ from typing import Any
 
 from boto3.dynamodb.conditions import Key
 from common import stats_core  # #1240: sanctioned stats implementation (ADR-105) — correlations
+from common.metric_truth import steps_label  # #4630: the steps precedence label, from the registry facet
 from experiment import experiment_gates  # #1371: arming thresholds served to zero-states — same objects the engines enforce
 from experiment.phase_filter import with_phase_filter  # ADR-058 / #946 / #1197
 
@@ -468,7 +469,7 @@ def correlations(event: dict = None, *, _g) -> dict:
         "calories": {"label": "Calories", "source": "MacroFactor"},
         "carbs_g": {"label": "Carbs (g)", "source": "MacroFactor"},
         "fat_g": {"label": "Fat (g)", "source": "MacroFactor"},
-        "steps": {"label": "Steps", "source": "Apple Health"},
+        "steps": {"label": "Steps", "source": steps_label()},  # #4630: the resolver's precedence, from the registry facet
         "habit_pct": {"label": "Habit Completion %", "source": "Habitify"},
         "day_grade": {"label": "Day Grade", "source": "Computed"},
         "readiness": {"label": "Readiness Score", "source": "Computed"},
