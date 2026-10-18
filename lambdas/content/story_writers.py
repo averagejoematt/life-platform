@@ -20,7 +20,7 @@ from ai.model_routing import model_for  # noqa: E402 — #4770: the one model re
 
 WRITER_MODEL = model_for("story.writer")
 
-from content import story_checks, story_craft, story_ledger
+from content import body_numbers, story_checks, story_craft, story_ledger
 
 CHRONICLE_MAX_TOKENS = 7000  # ~1,100-1,500 words lands near 2,500 tokens; the ceiling is headroom, never the target
 EPISODE_MAX_TOKENS = 8000
@@ -237,7 +237,9 @@ def write_episode(
 
 # ── the spoken-word gate (mirrors the Panel renderer's fail-closed checks) ───
 
-_BODY_NUM_RE = re.compile(r"\b\d{2,3}(?:\.\d+)?\s?(?:lb|lbs|pound|pounds|kg|kilo|kilos|kilograms)\b", re.I)
+# A rate is not a body number (#4993): "2.64 pounds per week" is a pace, and the old pattern read its "64 pounds" as a
+# weigh-in. The figure must not be the tail of a decimal ("2.64"), and a rate unit after the weight unit clears it.
+_BODY_NUM_RE = body_numbers.BODY_NUM_RE  # the ONE detector, shared with the Panel renderer (#4993)
 _GRIEF_RE = re.compile(
     r"\b(?:grief|grieving|died|passed away|funeral|cancer|terminal|hospice|"
     r"my (?:mom|mum|dad|mother|father|parent|parents|wife|husband|girlfriend|boyfriend|partner|brother|sister|son|daughter|family))\b",
@@ -280,7 +282,7 @@ def spoken_word_findings(turns: List[Dict[str, Any]], body_weights: Optional[Lis
                 )
     if turns[0].get("speaker") != "elena":
         findings.append("episode: the cold open belongs to Elena")
-    if "this has been the measured life" not in str(turns[-1].get("line", "")).lower():
+    if story_craft.SIGN_OFF_LINE.lower() not in str(turns[-1].get("line", "")).lower():
         findings.append("episode: the sign-off line is missing from the last turn")
     return findings
 

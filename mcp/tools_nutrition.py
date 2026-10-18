@@ -12,6 +12,7 @@ from health import (
     tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
     training_output_channel,  # #3754: THE training-output input (daily training load, never Strava kJ)
 )
+from health.protein_floor import met_floor
 
 from mcp.core import (
     get_profile,
@@ -108,6 +109,30 @@ def _trend_check(end_date, tdee, intake_avg, days=14):
         wt_rows = []
     trend, span = tdee_core.weight_trend_lb_per_wk(wt_rows)
     return tdee_core.implied_deficit_vs_trend(tdee, intake_avg, trend, span)
+
+
+# #5001: on 2026-10-18 this view printed -4.38 lb/wk (`calorie_target_check.weight_trend_lb_per_wk`) beside the
+# plan's 4.12 for the same body. The check's trend is the TDEE back-solve's ENDPOINT input (#3931, ruled a different
+# quantity in `mcp.shared_quantities`) — it stays, labelled; the loss rate is `shared_quantities.loss_rate_lb_wk`.
+TREND_CHECK_NOTE = (
+    "weight_trend_lb_per_wk here is the first-vs-last ENDPOINT slope the impossibility check needs (signed, negative = losing) — "
+    "NOT the loss rate. The loss rate is shared_quantities.loss_rate_lb_wk (14-day least-squares, water weeks excluded), "
+    "the number plan_next_session's critics read."
+)
+
+
+def _labelled_trend_check(check):
+    return {**check, "weight_trend_is_not_the_loss_rate": TREND_CHECK_NOTE} if isinstance(check, dict) else check
+
+
+def _shared_loss_rate(end_date):
+    """THE stated loss rate for the view's end date (#5001). A failed read is named, never a missing key."""
+    from mcp import shared_quantities
+
+    try:
+        return shared_quantities.loss_rate_lb_wk(end_date)
+    except Exception as e:  # noqa: BLE001 — an unreadable rate is unknown, never 0
+        return {"value": None, "source": shared_quantities.LOSS_RATE_SOURCE, "read_failed": f"{type(e).__name__}: {e}"[:160]}
 
 
 def _hevy_workouts(start_date, end_date):
@@ -599,7 +624,7 @@ def _get_macro_targets(args):
         carbs = measured(item, "total_carbs_g")
 
         hit_cal = (0.85 <= cal / calorie_target <= 1.10) if (cal is not None and calorie_target) else None
-        hit_prot = (prot >= protein_target * 0.95) if prot is not None else None
+        hit_prot = met_floor(prot, protein_target)  # #5003: strictly at/above the floor - the tripwire's definition
         hit_fiber = (fiber >= _FIBER_TARGET_G) if fiber is not None else None
         for axis, hit in (("calorie", hit_cal), ("protein", hit_prot), ("fiber", hit_fiber)):
             if hit is not None:
@@ -650,7 +675,7 @@ def _get_macro_targets(args):
                 if args.get("calorie_target")
                 else (budget.get("target_basis") if budget else "flat_default_no_weight_or_height")
             ),
-            "calorie_target_check": budget.get("trend_check") if budget else None,
+            "calorie_target_check": _labelled_trend_check(budget.get("trend_check")) if budget else None,
             "note": (
                 "REFUSED: the deficit this model implies cannot be reconciled with the measured weight trend, so no "
                 "calorie target is published and calorie adherence is not graded. Both figures are in "
@@ -674,6 +699,8 @@ def _get_macro_targets(args):
             "days_scored": dict(measured_days),
         },
         "daily_breakdown": daily_rows,
+        # #5001: THE stated loss rate — the same quantity, method and window plan_next_session's packet carries
+        "shared_quantities": {"loss_rate_lb_wk": _shared_loss_rate(end_date)},
         # #3754 box 5: adherence read as "is this the same discipline as last time" is a
         # natural question this view invites and cannot answer — reuse the ADR-104 sentence
         # verbatim rather than let the omission read as silence.

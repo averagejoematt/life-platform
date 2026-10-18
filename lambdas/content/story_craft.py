@@ -396,17 +396,53 @@ def quote_findings(body: str, corpus: str) -> List[str]:
     return out
 
 
+# ── the show's fixed lines (#4993) ──────────────────────────────────────────
+#
+# The episode's sign-off is REQUIRED by the spoken-word gate (``story_writers.spoken_word_findings``) and the welcome is
+# the show's format, so both recur every week by design. The repeat gate reads them as boilerplate, never as a repeat:
+# before #4993 the two gates contradicted each other on the same sentence and the promote refused a repaired season on it.
+SHOW_NAME = "The Measured Life"
+HOST_LINE = "I'm Elena Voss"
+SIGN_OFF_LINE = f"This has been {SHOW_NAME}"  # the sign-off gate's required words — ONE constant, both gates
+SIGN_OFF = f"{HOST_LINE}. {SIGN_OFF_LINE}."
+CANONICAL_LINES = (SIGN_OFF, SIGN_OFF_LINE, HOST_LINE, f"Welcome to {SHOW_NAME}", f"This is {SHOW_NAME}")
+
+
+def _words(s: str) -> List[str]:
+    return re.findall(r"[a-z0-9']+", (s or "").lower().replace("\u2019", "'"))
+
+
+_CANONICAL_WORDS = sorted((_words(x) for x in CANONICAL_LINES), key=len, reverse=True)
+
+
+def boilerplate_free_runs(text: str) -> List[List[str]]:
+    """The text's words, split into runs at every canonical show line, which is cut out — so no n-word run can be made
+    of (or reach across) the welcome or the sign-off."""
+    w = _words(text)
+    runs: List[List[str]] = [[]]
+    i = 0
+    while i < len(w):
+        hit = next((len(c) for c in _CANONICAL_WORDS if w[i : i + len(c)] == c), 0)
+        if hit:
+            runs.append([])
+            i += hit
+            continue
+        runs[-1].append(w[i])
+        i += 1
+    return [r for r in runs if r]
+
+
 def repeat_findings(text: str, previous: Dict[int, str], owner_lines: Iterable[str] = (), n: int = 7) -> List[str]:
     """Lines a returning reader or listener has already heard (the producer's re-score: two coaches sharing whole sentences
     across episodes; the same owner quote in two weeks). Any n-word run from an earlier installment, and any of his quoted
-    lines already used in one, is a finding."""
+    lines already used in one, is a finding. The show's canonical lines (``CANONICAL_LINES``: the welcome and the sign-off
+    the sign-off gate requires) are format, not a repeat, and never form or extend a run (#4993)."""
     out: List[str] = []
     if not previous:
         return out
 
     def grams(s: str) -> set:
-        w = re.findall(r"[a-z0-9']+", (s or "").lower())
-        return {" ".join(w[i : i + n]) for i in range(len(w) - n + 1)}
+        return {" ".join(r[i : i + n]) for r in boilerplate_free_runs(s) for i in range(len(r) - n + 1)}
 
     mine = grams(text)
     for wk, prev in sorted(previous.items()):

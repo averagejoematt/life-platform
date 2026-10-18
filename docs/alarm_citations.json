@@ -6,7 +6,11 @@
     "note": "Added 2026-09-01 (Session Q), while the alarm was still ~31h old and therefore BELOW the 72h citation bar — the gate was silent on it and would have stayed silent until 2026-09-03. Cited early on purpose: this is the #1959 'a new red hiding among the old ones' case, and it was a live public-surface regression across the launch itself. The 72h bar is a floor for when a citation becomes MANDATORY, not advice to wait. Found by reading the alarm board rather than by any gate escalating it."
   },
   "ai-daily-spend-high": {
-    "citation": "2026-08-24 session note — self-clearing",
+    "added": "2026-10-18",
+    "cause_observed": "2026-10-18",
+    "updated": "2026-10-18",
+    "cause": "rolling-24h spend above the bar on an attended Bedrock night (owner's word)",
+    "citation": "self-clearing, 24 h: the 2026-10-18 episode (ALARM since ~05:00Z) is the owner-authorized dev-session spend — season_rebuild.py through week 4 at DEV_AI_BUDGET_USD=20 (~$14) + twelve --repair runs ($9.13, #4537/#4993) + the forced ai-expert-analyzer run; dev-session total $19.12 in 24 h (ai_spend_attribution.py --days 1 at 17:10Z). Clears as the rolling window passes 2026-10-19 ~05:00Z; the threshold class is #4517. Prior entry: the 2026-08-24 D2 session-window flap decode (same shape, dev-day spend), kept as history.",
     "note": "Flapped x2 in the 2026-08-23/24 D2 session window: the 18-agent implementation fan-out + merge-train verification is a known heavy-dev-day spend shape (same decode as the D1 wrap's flap). Cleared on its own both times. The #2892 CallerClass dimension (deployed 2026-08-24) separates dev/CI spend from prod-class going forward, which removes this alarm's dev-session false-fire mode. Expiry: if it fires on a NON-dev day, investigate fresh."
   },
   "ai-tokens-daily-brief-runaway": {
@@ -19,7 +23,7 @@
   "ai-tokens-platform-daily-total": {
     "added": "2026-10-02",
     "cause": "rolling-24h output tokens above the bar on an attended Bedrock night (owner's word)",
-    "cause_observed": "2026-10-18T07:55Z",
+    "cause_observed": "2026-10-18",
     "citation": "self-clearing, 24 h: the 2026-10-18 episode is the owner-authorized season re-stage + repair passes (#4537, #4993) and the forced analyzer; clears as the rolling window passes 2026-10-19 ~05:00Z; the bar class is #4517 · Prior entry (2026-10-18T07:55Z): #4517 — the episode beginning 2026-10-01T20:00:34Z (13:00 PT) is the class #4517 re-derives: 250,000 sat inside the measured daily distribution. The re-derived bar (337,000; log-normal mean+3 SD, n=30, 30-day backtest 0 …",
     "updated": "2026-10-18"
   },
@@ -40,8 +44,8 @@
   "coherence-overall": {
     "added": "2026-10-13",
     "cause": "facts_agreement:expert_sleep_stale,facts_agreement:coach_physical_coach_stale",
-    "cause_observed": "2026-10-18T07:55Z",
-    "citation": "self-clearing, dated: #4866 and #4703 closed 2026-10-18 on the live proof — the analyzer run forced 04:36Z (request 94204290) passed the gate for weekly_priority (served non-null 04:41Z) while expert:sleep / experiment_arc / integrator_month were HELD with their prior records preserved (the #4703 fix); the facts_agreement reads clear at the next ai-expert-analyzer run that passes those surfaces (Mon 2026-10-19 14:00Z). Expiry: if still ALARM after 2026-10-19 15:00Z, file a story under #4580 for the stale-surface class; prune the entry 72 h after OK · Prior entry (2026-10-18T07:55Z): #4866 — fired 2026-10-12 18:46Z: facts_agreement reads expert:sleep served from 10-05 and coach:physical_coach from 10-08 because the 10-12 14:00Z ai-expert-analyzer run was HELD by the grounding gate (request 90f7c52f —…",
+    "cause_observed": "2026-10-18",
+    "citation": "self-clearing, dated (no open issue owns it — the two stories that did, the stale expert:sleep and physical-coach surfaces, closed 2026-10-18 on the live proof): the analyzer run forced 2026-10-18 04:36Z (request 94204290) passed the gate for weekly_priority (served non-null 04:41Z) while expert:sleep / experiment_arc / integrator_month were HELD with their prior records preserved by design; the facts_agreement reads clear at the next ai-expert-analyzer run that passes those surfaces (Mon 2026-10-19 14:00Z). Expiry: if still ALARM after 2026-10-19 15:00Z, file a story under epic 4580 for the stale-surface class (write it as a new issue, not a re-cite); prune this entry 72 h after OK.",
     "note": "Prior entry (2026-08-24): one OK->ALARM->OK cycle during a 26-PR merge/deploy churn, cleared without intervention — a different, transient shape.",
     "updated": "2026-10-18"
   },
@@ -81,16 +85,15 @@
   "qa-smoke-failures": {
     "added": "2026-10-12",
     "cause": "story_season:episode_or_hold,story_season:ledger_advanced",
-    "cause_observed": "2026-10-18T07:55Z",
+    "cause_observed": "2026-10-18",
     "citation": "#4536 (episode_or_hold: weeks 5 AND 6 Panel episodes HELD on the body-number safety class 2026-10-18 — the owner flag lifts the audit, not the safety class; his call: retire or regenerate) and #4533 (ledger_advanced: week 6 was approved and sent 2026-10-18T04:29Z but has no LEDGER#2026-10-13 row — the ledger predates the week-6 draft; the 2026-10-21 15:00Z installment writes the next row, or a backfill of wk6's ledger row closes it sooner) · Prior entry (2026-10-18T07:55Z): #4536 — the only FAIL in the 2026-10-16 18:30Z run (request eeffea60, CAUSE fail 6eea130d) is [content_truth] Data Freshness / story_season:episode_or_hold: 'HELD more than 7 days: week 5 held since 2026-10-09T18:00:49Z …",
     "updated": "2026-10-18",
     "note": "Prior episode (added 2026-10-12, cause dashboard:date, observed 2026-10-11T18:31Z): the only FAIL in the 2026-10-11 run was Score Sanity / dashboard:date 'Stale date — expected 2026-10-10, got 2026-10-09' (issue 4847, closed 2026-10-14 after PR 4858); ALARM→OK 2026-10-12T18:32Z. History only — a different cause on the same count-aggregated alarm."
   },
   "qa-smoke-warnings": {
     "added": "2026-10-04",
-    "cause": "-",
-    "cause_observed": "2026-10-18T07:55Z",
-    "citation": "#4935 — self-clearing: the five orphan routine drafts were archived 2026-10-18 (03:33Z ×2, 04:3xZ ×3, manage_hevy_routine on the owner's word); the live run after them carries no warn cause ('-'), so the alarm goes OK at its next evaluation (the 2026-10-18 18:30Z run is the proof read on #4935); prune this entry 72 h after OK · Prior entry (2026-10-18T07:55Z): #4935 — the mandatory issue-or-fix tracker (issue 2378: red since 2026-10-02T18:32Z, filed 2026-10-17T03:01Z). The 2026-10-17 18:30Z run (request 7702240e, CAUSE warn 6839bf91) names ONE live cause: data:orphan_routine_d…",
+    "cause_observed": "2026-10-18",
+    "citation": "#4935 — self-clearing: the five orphan routine drafts were archived 2026-10-18 (03:33Z ×2, 04:3xZ ×3, manage_hevy_routine on the owner's word); the live run after them carries NO warn cause (an empty cause list, so this entry declares none), so the alarm goes OK at its next evaluation — the 2026-10-18 18:30Z run is the proof read on #4935; prune this entry 72 h after OK · Prior entry (2026-10-18T07:55Z): #4935 — the mandatory issue-or-fix tracker (issue 2378: red since 2026-10-02T18:32Z, filed 2026-10-17T03:01Z). The 2026-10-17 18:30Z run (request 7702240e, CAUSE warn 6839bf91) named ONE live cause: data:orphan_routine_drafts.",
     "updated": "2026-10-18"
   },
   "site-api-invocation-spike": {
@@ -127,14 +130,14 @@
   },
   "ai-daily-spend-high-urgent": {
     "added": "2026-10-01",
-    "cause_observed": "2026-10-18T07:55Z",
+    "cause_observed": "2026-10-18",
     "cause": "rolling-24h threshold crossed by attended laptop Bedrock on the owner's word",
     "citation": "self-clearing, 24 h: the 2026-10-18 episode is the owner-authorized dev-session spend — season_rebuild.py through week 4 at DEV_AI_BUDGET_USD=20 (~$14) + twelve --repair runs ($9.13, #4537/#4993) + the forced ai-expert-analyzer run; dev-session total $18.60 in 24 h (ai_spend_attribution.py). Clears as the rolling window passes 2026-10-19 ~05:00Z; the threshold class itself is #4517 · Prior entry (2026-10-18T07:55Z): #4517 — fired and cleared twice on 09-30 (08:13–14:34Z, 20:17Z–01:41Z) with the budget tier at 0; the threshold sits ~4 % above the measured $5.74/day steady state (ADR-133), so ordinary heavy days (brief + AI-vision vis…",
     "updated": "2026-10-18"
   },
   "ai-tokens-platform-daily-total-urgent": {
     "added": "2026-10-01",
-    "cause_observed": "2026-10-18T07:55Z",
+    "cause_observed": "2026-10-18",
     "cause": "rolling-24h output tokens above the urgent bar on an attended Bedrock night (owner's word)",
     "citation": "self-clearing, 24 h: same episode as ai-tokens-platform-daily-total — the owner-authorized season re-stage + repairs (#4537, #4993) and the forced analyzer on 2026-10-18; clears as the rolling window passes 2026-10-19 ~05:00Z; the bar class is #4517 · Prior entry (2026-10-18T07:55Z): #4517 — fired and cleared twice on 09-30 (08:13–14:34Z, 20:17Z–01:41Z) with the budget tier at 0; the threshold sits ~4 % above the measured $5.74/day steady state (ADR-133), so ordinary heavy days (brief + AI-vision vis…",
     "updated": "2026-10-18"

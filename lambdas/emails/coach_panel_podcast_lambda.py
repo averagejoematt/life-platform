@@ -33,6 +33,7 @@ from common import media_tombstone  # #4365: a restart tombstone is not a publis
 from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
+from content import body_numbers  # #4993: ONE body-number detector with the story desk
 from experiment import er03_gate
 from experiment.phase_filter import with_phase_filter
 
@@ -259,7 +260,6 @@ def _blocked_vice_terms() -> list:
     return [t.lower() for t in (cf.get("blocked_vice_keywords") or [])] + [v.lower() for v in (cf.get("blocked_vices") or [])]
 
 
-_BODY_NUM_RE = re.compile(r"\b\d{2,3}(?:\.\d+)?\s?(?:lb|lbs|pound|pounds|kg|kilo|kilos|kilograms)\b", re.I)
 _GRIEF_RE = re.compile(
     r"\b(?:grief|grieving|died|passed away|funeral|cancer|terminal|hospice|"
     r"my (?:mom|mum|dad|mother|father|parent|parents|wife|husband|girlfriend|boyfriend|partner|brother|sister|son|daughter|family))\b",
@@ -286,7 +286,7 @@ def _safety_gate(text: str) -> list:
         if term and re.search(rf"\b{re.escape(term)}\b", low):
             reasons.append(f"blocked-vice:{term}")
             break
-    if _BODY_NUM_RE.search(t):
+    if body_numbers.BODY_NUM_RE.search(t):  # the desk's detector (#4993)
         reasons.append("body-number")
     if _GRIEF_RE.search(t):
         reasons.append("grief/family/named-person")
@@ -388,7 +388,7 @@ def _write_indexes(episodes: list) -> None:
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=f"{PREFIX}/episodes.json",
-        Body=json.dumps({"episodes": episodes}, indent=1),
+        Body=json.dumps(_panel_retire().index_doc(episodes, _g=globals()), indent=1),  # #4536: keeps the retired weeks
         ContentType="application/json",
         CacheControl="max-age=3600, public",
     )
@@ -1198,6 +1198,9 @@ def _weekly_gate(turns: list, allowed_numbers, guest_id: str):
     return clean, sorted(set(hold))
 
 
+HELD_DISPLAY = "This week's episode is in final review — it'll drop here as soon as it clears the quality bar."
+
+
 def _hold_and_alert(week, reasons: list, draft: dict, hold_class: str = "safety") -> dict:
     """Loud HOLD: stash the draft on a NON-public prefix + SNS alert. Never publishes.
 
@@ -1241,11 +1244,7 @@ def _hold_and_alert(week, reasons: list, draft: dict, hold_class: str = "safety"
     # Surface a PUBLIC-SAFE pending marker so the Panel tab explains the gap instead of
     # going silent on a Friday. The raw `reasons` can name sensitive content, so they stay
     # internal (SNS + private draft) — only a generic message is published.
-    _set_pending(
-        week,
-        "held_for_review",
-        "This week's episode is in final review — it'll drop here as soon as it clears the quality bar.",
-    )
+    _set_pending(week, "held_for_review", HELD_DISPLAY)
     logger.warning("[panel] wk%s HELD (%s) — %s", week, hold_class, reasons)
     # Reason code (#374): a quality HOLD is auto-retriable; a safety HOLD is not.
     _emit_outcome("held-safety" if (hold_class if hold_class in ("safety", "quality") else "safety") == "safety" else "held-quality")
@@ -1322,6 +1321,8 @@ def _sweep_held_episodes(dry_run: bool = False) -> dict:
     the decision without regenerating or writing anything."""
     post = _select_week_post()
     week = post.get("week")
+    if retired := _panel_retire().sweep_skip(post, _g=globals()):  # #4536: a week retired by name is never retried
+        return retired
     hold = _read_hold(week)
     if not hold:
         logger.info("[panel] hold sweep wk%s: no hold on the current week — nothing to retry", week)
@@ -1520,7 +1521,7 @@ def _select_week_post(week=None) -> dict:
         return _panel_desk().select_post(posts, week, EXPERIMENT_START_DATE)
     weekly = [p for p in posts if p.get("week") and p.get("week") > 0 and p.get("date") and p["date"] >= EXPERIMENT_START_DATE]
     if weekly:
-        return max(weekly, key=lambda x: x["date"])
+        return _panel_retire().choose(weekly, _g=globals())  # #4536: the newest week NOT retired by name
     genesis = datetime.fromisoformat(EXPERIMENT_START_DATE).date()
     wk = max(1, ((pacific_now().date() - genesis).days // 7) + 1)
     return {"week": wk, "date": pacific_now().date().isoformat(), "title": f"Week {wk}"}
@@ -1534,6 +1535,15 @@ def _publish_desk_episode(week, post: dict, ep: dict, dry_run: bool = False) -> 
     return _panel_desk().publish_desk_episode(week, post, ep, dry_run, _g=globals())
 
 
+def _panel_retire():
+    try:
+        from emails import panelcast_retire
+    except ImportError:
+        if not TYPE_CHECKING:
+            import panelcast_retire
+    return panelcast_retire
+
+
 def _panel_desk():
     try:
         from emails import panelcast_desk
@@ -1541,6 +1551,17 @@ def _panel_desk():
         if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
             import panelcast_desk
     return panelcast_desk
+
+
+def _published_skip(week, force: bool, dry_run: bool):
+    published_key = None if force else _episode_exists(week)  # read-only, so a dry run proves it too (#4365)
+    if not published_key:
+        return None
+    logger.info("[panel] wk%s already published — %s matched; skipping (outcome=already-published)", week, published_key)
+    if dry_run:
+        return _dry(week, "SKIP", stage="already-published", matched_key=published_key)
+    _emit_outcome("already-published")
+    return {"statusCode": 200, "body": json.dumps({"week": week, "already_published": True})}
 
 
 def _run_weekly(force: bool, dry_run: bool = False, week=None, approved: bool = False) -> dict:
@@ -1553,13 +1574,9 @@ def _run_weekly(force: bool, dry_run: bool = False, week=None, approved: bool = 
 
     post = _select_week_post(week) if week is not None else _select_week_post()
     week = post["week"]
-    published_key = None if force else _episode_exists(week)  # read-only, so a dry run proves it too (#4365)
-    if published_key:
-        logger.info("[panel] wk%s already published — %s matched; skipping (outcome=already-published)", week, published_key)
-        if dry_run:
-            return _dry(week, "SKIP", stage="already-published", matched_key=published_key)
-        _emit_outcome("already-published")
-        return {"statusCode": 200, "body": json.dumps({"week": week, "already_published": True})}
+    skip = _panel_retire().run_skip(post, week, dry_run, _g=globals()) or _published_skip(week, force, dry_run)
+    if skip:  # #4536: a week retired by name is not generated — force and owner_approved included
+        return skip
 
     # #4536: when the week's chronicle was written by the Story Desk, the episode script was written WITH it — from the
     # same story budget, dossier and season ledger, through the same gates — and rides on the chronicle row. The Panel
@@ -1825,6 +1842,8 @@ def lambda_handler(event, context):
     force = bool(event.get("force"))
     dry_run = bool(event.get("dry_run"))
 
+    if event.get("retire") or event.get("unretire"):  # #4536: a marker beside the hold, no AI — before the budget gate
+        return _panel_retire().route(event, dry_run, _g=globals())
     try:
         from ai.budget_guard import current_tier
 
