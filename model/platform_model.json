@@ -3342,6 +3342,13 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/ingestion/whoop_cycle_day.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
       "direction": "unknown",
       "lambda": null,
       "module": "lambdas/ingestion/whoop_empty_day.py",
@@ -5736,6 +5743,13 @@
       "via": "seam"
     },
     {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/shared_quantities.py",
+      "partition": "withings",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_benchmark.py",
@@ -7683,7 +7697,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 745,
+      "edges": 747,
       "lambdas": 108,
       "mcp_tool_modules": 36,
       "mcp_tools": 88,
@@ -7698,8 +7712,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 364,
-        "sites_resolved": 939,
-        "sites_total": 1303
+        "sites_resolved": 941,
+        "sites_total": 1305
       },
       "schedule_resolution": {
         "dynamic": 0,
