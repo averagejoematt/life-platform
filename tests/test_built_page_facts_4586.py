@@ -97,8 +97,8 @@ def built_page_findings(page: str, module: str) -> list[str]:
             f"ci-cd.yml's jobs behind `environment: production` are {gated}, not ['deploy-iam'] — the page says only a permissions change waits"
         )
     for said in (
-        "approves one thing by hand: a change to what the programs are permitted to do",
-        "The one thing I approve by hand",
+        "approves two things by hand: a change to what the programs are permitted to do, and each chapter and podcast episode before it publishes",
+        "I approve two things by hand, a change to what the programs are permitted to do and each chapter and podcast episode before it publishes",
     ):
         if said not in text:
             out.append(

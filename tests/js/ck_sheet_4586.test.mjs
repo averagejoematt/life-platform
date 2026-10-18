@@ -63,7 +63,8 @@ test("the level says how many areas it came from and the day it is for", () => {
   // Site-to-A round 1: "Level 12 on Friday, October 16", never "12 level on …".
   assert.match(html, new RegExp(`<p class="ck-big"><span>Level </span>${Math.round(c.level)}<span> on [A-Z][a-z]+day, [A-Z][a-z]+ \\d+</span></p>`));
   assert.ok(html.includes(`Worked out from ${c.composite_pillar_count} of ${c.composite_pillar_total} areas`));
-  if (c.composite_pillar_count < c.composite_pillar_total) assert.match(html, /an area with nothing measuring it is left out, not counted as average\./);
+  // Site-to-A round 2: which areas are left out and which are thin-but-counted, by name, once, here.
+  if (c.composite_pillar_count < c.composite_pillar_total) assert.match(html, /areas: Relationships has nothing measuring it and is left out; Metabolic health is measured thinly and still counts\./);
   assert.match(S.levelHTML(null), /not served right now/);
   assert.match(S.sheetLine(character), new RegExp(`^Level ${Math.round(c.level)} across \\w+ of \\w+ areas of his life$`), "the front page states the same count the sheet does");
   assert.equal(S.sheetLine({}), "");
@@ -93,8 +94,8 @@ test("the page carries no emoji, honorific, ISO date or count of earlier starts"
   assert.doesNotMatch(text, /\bDr\.\s|\b20\d\d-\d\d-\d\d\b|\bcycle\b|\battempt\b|\breset\b/i);
 });
 
-test("an area held for thin coverage prints no score beside a fully measured one (red team, round 7)", () => {
-  assert.equal(S.areaLine({ level: 1, raw_score: 59.4, coverage_hold: true }), "Level 1. Too little of this area is measured to score it yet.");
+test("an area held for thin coverage prints its score like every other row; that it is thin is said once, beside the level (site-to-A round 2)", () => {
+  assert.equal(S.areaLine({ level: 1, raw_score: 59.4, coverage_hold: true }), "Level 1. Score 59.4 of 100, level on the day.");
   assert.match(S.areaLine({ level: 2, raw_score: 1.8, score_delta: 0 }), /^Level 2\. Score 1\.8 of 100/);
 });
 
