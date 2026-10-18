@@ -313,15 +313,20 @@ def extract_schedules(lambdas: dict[str, dict]) -> list[dict]:
     rows: list[dict] = []
     for name, rec in sorted(lambdas.items()):
         for sched in rec["schedules"]:
-            rows.append(
-                {
-                    "lambda": name,
-                    "stack": rec["stack"],
-                    "expr": sched["expr"],
-                    "resolution": sched["resolution"],
-                    "utc": _utc_of(sched["expr"]),
-                }
-            )
+            row = {
+                "lambda": name,
+                "stack": rec["stack"],
+                "expr": sched["expr"],
+                "resolution": sched["resolution"],
+                "utc": _utc_of(sched["expr"]),
+            }
+            if sched.get("tz"):
+                # #4284: a zoned (EventBridge Scheduler) schedule is a wall-clock time in its zone, NOT a
+                # UTC instant — its UTC hour moves with DST, so `utc` is None and `local` carries HH:MM.
+                row["tz"] = sched["tz"]
+                row["local"] = row.pop("utc")
+                row["utc"] = None
+            rows.append(row)
     rows.sort(key=lambda r: (r["utc"] is None, r["utc"] or "", r["lambda"]))
     return rows
 
@@ -848,7 +853,7 @@ def build_model() -> dict:
                     "unioned with the KNOWN_MUST_AGREE_PAIRS floor and ratcheted by ENROLLED_FLOOR"
                 ),
                 "privacy": "lambdas/privacy/field_tiers.py SOURCE_TIERS + FIELD_TIERS (#2803/#3045, ADR-155 consent) — loaded, not re-typed",
-                "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron",
+                "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead",
                 "cost_surface": (
                     "#3374 R1 — the five cost-bearing population counts: alarms + schedules from this model's own planes; "
                     "emf_namespaces from deploy/emf_namespace_ledger.LEDGER (AST), secrets from "
@@ -1079,7 +1084,9 @@ def render_doc(model: dict) -> str:
         f"- Privacy: {counts.get('privacy_sources_owner_only', 0)} owner-only + {counts.get('privacy_sources_owner_published', 0)} owner-published sources; "
         f"{counts.get('privacy_fields_owner_only', 0)} owner-only + {counts.get('privacy_fields_owner_published', 0)} owner-published fields — non-default entries only"
     )
-    add(f"- Schedules: {counts.get('schedules', 0)} (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not")
+    add(
+        f"- Schedules: {counts.get('schedules', 0)} (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not, a zoned row carries its zone + wall-clock (#4284)"
+    )
     non_census = model["meta"].get("non_census_families", [])
     if non_census:
         add(

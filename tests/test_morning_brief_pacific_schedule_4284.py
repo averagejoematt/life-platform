@@ -38,7 +38,10 @@ def test_scheduler_role_is_invoke_only_and_account_scoped():
     src = _read("cdk/stacks/lambda_helpers.py")
     body = src[src.index("def _add_zoned_schedule") : src.index("def create_platform_lambda")]
     assert body.count('"lambda:InvokeFunction"') == 1 and "resources=[fn.function_arn]" in body
-    assert "aws:SourceAccount" in body and "scheduler.amazonaws.com" in body
+    # The trust is the exact ServicePrincipal literal, matched whole (not a hostname substring — CodeQL
+    # py/incomplete-url-substring-sanitization), conditioned on this account.
+    assert re.search(r'iam\.ServicePrincipal\("scheduler\.amazonaws\.com"\)', body), body
+    assert "aws:SourceAccount" in body
     assert '"*"' not in body
 
 

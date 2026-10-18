@@ -7695,7 +7695,7 @@
       "lambdas": "cdk/stacks/*.py function_name= declarations (AST)",
       "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets",
       "privacy": "lambdas/privacy/field_tiers.py SOURCE_TIERS + FIELD_TIERS (#2803/#3045, ADR-155 consent) \u2014 loaded, not re-typed",
-      "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
+      "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead"
     },
     "counts": {
       "alarms": 139,
@@ -8597,13 +8597,6 @@
     },
     {
       "expr": "cron(0 10 * * ? *)",
-      "lambda": "daily-brief",
-      "resolution": "constant",
-      "stack": "email_stack",
-      "utc": "10:00"
-    },
-    {
-      "expr": "cron(0 10 * * ? *)",
       "lambda": "journal-analyzer",
       "resolution": "constant",
       "stack": "compute_stack",
@@ -9083,6 +9076,15 @@
       "lambda": "coach-nudge",
       "resolution": "constant",
       "stack": "email_stack",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 10 * * ? *)",
+      "lambda": "daily-brief",
+      "local": "10:00",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
       "utc": null
     },
     {
