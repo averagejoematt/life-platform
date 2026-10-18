@@ -1,6 +1,6 @@
 # averagejoematt.com — Holistic Site Review Methodology
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-18
 
 > Repeatable process for reviewing the *whole* public site as a product and a story —
 > not "did it render" (that's the gating `qa/visual_qa.py`), but "does each page's
@@ -10,8 +10,13 @@
 > First review: 2026-06-20. Cadence: event-driven, **no clock** — the lens runs when the site's
 > story changes (a redesign, a new door); `scripts/operating_calendar.py` carries the dated exemption
 > (2026-08-22), and `/review accuracy` owns the site's monthly truth pass. See "Cadence & scope" below.
-> Findings stored in `docs/site-reviews/`. Tooling: `qa/site_review.py` (capture +
-> data corroboration), `qa/site_review_bindings.py` (page→endpoint map).
+> Findings stored in `docs/site-reviews/` (index: `docs/site-reviews/README.md`; latest:
+> `SITE_REVIEW_2026-10-18.md`, the twelve v8 kit pages — eight independent graders, two
+> verifiers reproducing every finding, one fix round, a fresh pair after; its letters are
+> `site_grades_2026-10-18.json`). Tooling: `qa/site_review.py` (capture +
+> data corroboration), `qa/site_review_bindings.py` (page→endpoint map); the 2026-10-18 pass
+> rendered the kit gate's pinned fixtures instead of a live capture, so grader and verifier
+> read the same bytes.
 
 ---
 
