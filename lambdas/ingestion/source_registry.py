@@ -2775,6 +2775,19 @@ METRIC_TRUTH: dict[str, dict[str, Any]] = {
         "overlap_rule": "first_positive_else_first_zero",
         "ruling": "#4644 Q4 (recommended: 'yes — Whoop when both devices have a count') — pending the owner",
     },
+    # vo2_max (#4976): the Apple Watch's estimate from now on, Garmin's stored estimates for the
+    # history before it (the direct Garmin feed is retired, #4640 — its rows stay and stay
+    # readable). The two are different vendors' estimators, so a reader that draws an arc across
+    # both carries each point's `source` and says when the arc spans more than one device.
+    "vo2_max": {
+        "truth_source": "apple_health",
+        "unit": "ml/kg/min",
+        "fallback_order": ("apple_health", "garmin"),
+        "field_by_source": {"apple_health": "vo2max", "garmin": "vo2_max"},
+        "min_by_source": {"apple_health": 10, "garmin": 10},
+        "overlap_rule": "first_positive_else_first_zero",
+        "ruling": "#4976 + owner ruling 2026-10-17 (a): keep Whoop and the Apple Watch; Garmin's feed is retired (#4640)",
+    },
 }
 
 METRIC_TRUTH_OVERLAP_KINDS = ("first_positive_else_first_zero",)

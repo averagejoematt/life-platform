@@ -27,6 +27,7 @@ from typing import Any, Iterable, Mapping, Optional
 from ingestion.source_registry import metric_truth, source_label
 
 STEPS = "steps"
+VO2_MAX = "vo2_max"
 
 
 @dataclass(frozen=True)

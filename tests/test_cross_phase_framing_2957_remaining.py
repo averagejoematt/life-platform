@@ -201,14 +201,14 @@ class TestWrongValidatorArchival:
 
 class TestDeviceAgreementArchivalFraming:
     def test_a_window_that_ends_before_genesis_is_framed_as_previous_cycle(self):
-        """The live finding: Garmin's paused since 2026-06, so the whole 'night by
-        night' window predates a cycle-14 genesis of 2026-08-17 — reproduced here
+        """The live finding (then Whoop vs Garmin; #4976 re-pointed it at the Apple Watch):
+        Garmin's pause put the whole 'night by night' window before a cycle-14 genesis of 2026-08-17 — reproduced here
         with a relative genesis so the test never goes wall-clock stale."""
         genesis = _iso(_today_pt() - timedelta(days=7))
         last_night = _iso(_today_pt() - timedelta(days=70))
 
         def _query_source(source, start, end, include_pilot=False):
-            return [{"date": last_night, "resting_heart_rate": 60.0 if source == "whoop" else 58.0}]
+            return [{"date": last_night, "resting_heart_rate": 60.0, "resting_heart_rate_apple": 58.0}]
 
         resp = freshness.device_agreement(_g={"_query_source": _query_source, "EXPERIMENT_START": genesis})
         assert resp["statusCode"] == 200, resp
@@ -221,7 +221,7 @@ class TestDeviceAgreementArchivalFraming:
         recent_night = _iso(_today_pt() - timedelta(days=1))
 
         def _query_source(source, start, end, include_pilot=False):
-            return [{"date": recent_night, "resting_heart_rate": 60.0 if source == "whoop" else 58.0}]
+            return [{"date": recent_night, "resting_heart_rate": 60.0, "resting_heart_rate_apple": 58.0}]
 
         resp = freshness.device_agreement(_g={"_query_source": _query_source, "EXPERIMENT_START": genesis})
         body = json.loads(resp["body"])

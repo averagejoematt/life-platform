@@ -509,7 +509,7 @@ ROUTES = {
     "/api/platform_stats": handle_platform_stats,
     # Live pipeline status: per-source freshness (fresh/stale/paused)
     "/api/source_freshness": handle_source_freshness,
-    # #735 (/verify/ page): Whoop vs Garmin cross-device HRV/RHR agreement
+    # #735 (/verify/ page): Whoop vs Apple Watch cross-device RHR agreement (#4976: was Garmin)
     "/api/device_agreement": handle_device_agreement,
     # #406: real intra-day ingestion write times for the cockpit sync strip
     "/api/last_sync": handle_last_sync,

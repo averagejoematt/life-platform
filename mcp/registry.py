@@ -691,9 +691,10 @@ TOOLS = {
             "description": (
                 "Unified readiness score (0-100) synthesising Whoop recovery (40%), Whoop sleep quality (25%), "
                 "HRV 7-day trend vs 30-day baseline (20%), TSB training form (10%), and "
-                "Garmin Body Battery (5%) into a single GREEN / YELLOW / RED signal with a 1-line "
-                "actionable recommendation. Also includes a device_agreement section showing Whoop vs "
-                "Garmin HRV/RHR delta as a confidence signal — flag status means lower score reliability; "
+                "Overnight physiology (5%) — respiratory rate + skin temperature vs his own 30-night baseline — into "
+                "a single GREEN / YELLOW / RED signal with a 1-line actionable recommendation; the formula ships in "
+                "the output. No Body Battery. Also includes a device_agreement section showing Whoop vs "
+                "Apple Watch same-night resting-HR delta as a confidence signal — flag status means lower score reliability; "
                 "when the cross-check can't run it returns status=unavailable with a reason instead of null. "
                 "Reduces cognitive load: one number instead of 5 separate metrics tells you "
                 "'train hard today' vs 'go easy' vs 'rest day'. Missing components are excluded and "
@@ -1489,7 +1490,6 @@ TOOLS = {
         },
     },
     # ── BS-01: Essential Seven Protocol ─────────────────────────────────────────────
-    # ── Garmin biometrics + device agreement ─────────────────────────────────────────
     # ── BS-09: ACWR Training Load ────────────────────────────────────────────────────
     "get_acwr_status": {
         "fn": tool_get_acwr_status,
