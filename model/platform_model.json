@@ -2663,6 +2663,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": "insight-email-parser",
+      "module": "lambdas/emails/insight_email_parser_lambda.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": "insight-email-parser",
       "module": "lambdas/emails/insight_email_parser_lambda.py",
@@ -7712,7 +7719,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 747,
+      "edges": 748,
       "lambdas": 108,
       "mcp_tool_modules": 36,
       "mcp_tools": 88,
@@ -7727,8 +7734,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 364,
-        "sites_resolved": 939,
-        "sites_total": 1303
+        "sites_resolved": 940,
+        "sites_total": 1304
       },
       "schedule_resolution": {
         "dynamic": 0,
