@@ -40,6 +40,23 @@ const soft = (t) => (t ? `<p class="ck-soft">${esc(t)}</p>` : "");
 const shortDay = (iso) => dayInWords(iso, { weekday: false });
 const isCall = (c) => c && typeof c.id === "string" && c.called_short && c.happened_short && c.settled_date;
 
+// The served `called_short` of a bet can drop the unit its long `called` carries ("at or above 26"
+// beside "(… as a percentage)"). Until the route serves the unit on the short form, it is read off
+// the long one — only when the long form names it, never guessed (#4580 round 1, call-4).
+const UNIT_FROM_CALLED = [
+  [/\bas a percentage\b/i, "%", ""],
+  [/\bin pounds\b/i, " lb", " "],
+  [/\bin grams\b/i, " g", " "],
+];
+export function calledShortWithUnit(call) {
+  const short = String((call && call.called_short) || "");
+  const long = String((call && call.called) || "");
+  const bare = /\b((?:at or )?(?:above|below|over|under|at least|at most)\s+)(-?\d+(?:\.\d+)?)(?=\s+on\b|\s+by\b|[.,;]|$)/;
+  if (!short || !long || !bare.test(short)) return short;
+  for (const [names, unit] of UNIT_FROM_CALLED) if (names.test(long)) return short.replace(bare, `$1$2${unit}`);
+  return short;
+}
+
 // ── where a deep page returns to (#4675) ───────────────────────────────────────
 // A deep page exists only as the destination of a number or a name, and returns to where the
 // reader came from, by name. The page that links one sets `from=`; the page opened reads it
@@ -324,7 +341,7 @@ export function nextCallHTML(callsBody) {
 // is the rule, is the row's own sentence.
 // A row opens the call's page, which then returns here by name (#4675).
 const row = (base) => (c) =>
-  `<li><a href="${esc(withFrom(callHref(base, c.id), "calls"))}">${esc(`${shortDay(c.settled_date)}: ${c.called_short}`)} <span>${esc(c.kind === "bet" ? c.verdict_text || "Settled" : callVerdictText(c) || "Not shown as right or wrong: its rule is not served.")}</span></a></li>`;
+  `<li><a href="${esc(withFrom(callHref(base, c.id), "calls"))}">${esc(`${shortDay(c.settled_date)}: ${calledShortWithUnit(c)}`)} <span>${esc(c.kind === "bet" ? c.verdict_text || "Settled" : callVerdictText(c) || "Not shown as right or wrong: its rule is not served.")}</span></a></li>`;
 export function listHTML(callsBody, base) {
   const calls = callsOf(callsBody);
   if (!calls.length) return "";
@@ -342,7 +359,7 @@ export function metaFor(call) {
   if (!isCall(call)) return { title: "A coach’s call, checked — Average Joe Matt", description: "" };
   const text = call.kind === "bet" ? call.verdict_text : callVerdictText(call);
   const result = text ? `${text}${call.kind === "bet" ? "" : "."}` : "";
-  return { title: `${call.title} — Average Joe Matt`, description: [call.called_short, call.happened_short, result].filter(Boolean).join(" ") };
+  return { title: `${call.title} — Average Joe Matt`, description: [calledShortWithUnit(call), call.happened_short, result].filter(Boolean).join(" ") };
 }
 
 // ── mount ──────────────────────────────────────────────────────────────────────
@@ -387,7 +404,7 @@ export async function mount() {
   }
   const day = dayInWords(call.settled_date);
   fill("ck-label", esc(day ? `Settled ${day}` : "A settled call"));
-  fill("ck-title", esc(call.called_short));
+  fill("ck-title", esc(calledShortWithUnit(call)));
   setMeta(metaFor(call));
   fill("ck-call", claimHTML(call, base));
   fill("ck-happened", esc(call.kind === "bet" ? call.verdict_text : call.happened_short));

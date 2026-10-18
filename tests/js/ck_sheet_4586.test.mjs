@@ -23,9 +23,9 @@ test("an area's line is its level, its score and which way it moved", () => {
   for (const name of ["sleep", "movement", "nutrition"]) {
     const p = pillar(name);
     const move = Math.abs(p.score_delta) < 0.05 ? "level on the day" : `${p.score_delta > 0 ? "up" : "down"} ${Math.abs(p.score_delta).toFixed(1)} on the day`;
-    assert.equal(S.areaLine(p), `Level ${p.level}. Score ${Math.round(p.raw_score)} of 100, ${move}.`, name);
+    assert.equal(S.areaLine(p), `Level ${p.level}. Score ${p.raw_score.toFixed(1)} of 100, ${move}.`, name);
   }
-  assert.equal(S.areaLine({ ...pillar("sleep"), score_delta: 3.7 }), `Level ${pillar("sleep").level}. Score ${Math.round(pillar("sleep").raw_score)} of 100, up 3.7 on the day.`);
+  assert.equal(S.areaLine({ ...pillar("sleep"), score_delta: 3.7 }), `Level ${pillar("sleep").level}. Score ${pillar("sleep").raw_score.toFixed(1)} of 100, up 3.7 on the day.`);
   assert.match(S.areaLine({ ...pillar("sleep"), score_delta: -1.25 }), /, down 1\.[23] on the day\.$/);
   assert.match(S.areaLine({ ...pillar("nutrition"), score_delta: 0.01 }), /, level on the day\.$/, "a move under 0.05 is no move");
 });
@@ -95,7 +95,7 @@ test("the page carries no emoji, honorific, ISO date or count of earlier starts"
 
 test("an area held for thin coverage prints no score beside a fully measured one (red team, round 7)", () => {
   assert.equal(S.areaLine({ level: 1, raw_score: 59.4, coverage_hold: true }), "Level 1. Too little of this area is measured to score it yet.");
-  assert.match(S.areaLine({ level: 2, raw_score: 1.8, score_delta: 0 }), /^Level 2\. Score 2 of 100/);
+  assert.match(S.areaLine({ level: 2, raw_score: 1.8, score_delta: 0 }), /^Level 2\. Score 1\.8 of 100/);
 });
 
 test("an earned badge with no recorded date is counted and says so, never dated (#4704)", () => {
