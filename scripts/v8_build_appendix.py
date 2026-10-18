@@ -3,8 +3,13 @@
 
 The appendix is one plain list at the foot of the preview: every live page that is off the
 usual path, so that nothing is deleted and nothing has to sit in a menu. It is a reference
-list, never a second navigation: rows are grouped by what a page IS (at most four kinds, a
-small label each) and sorted by title inside a kind.
+list, never a second navigation: rows are grouped by what a page IS (at most five kinds, a
+small label each, Tools first) and sorted by title inside a kind. A jump list of plain links
+at the top reaches each kind (#4580 round 1: 69 rows over nine screens had no anchors). A
+row that is the earlier version of a v8 page says so; a page whose own name is an internal
+codename is listed under a plain title with the codename in the small print. A kind with no
+rows yet prints its `empty` sentence — the "Replaced layouts" kind lists the reference copies
+the cut-over makes (ruling 2026-10-18), and is empty until it copies the first.
 
 The page is a kit page (docs/design/v8/README.md): `site/assets/css/clean.css` only, `ck-`
 classes only, no page-scoped style and no script beyond the theme boot. Each row is the
@@ -30,13 +35,13 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = Path(__file__).resolve().parent / "v8_appendix_pages.json"
 OUT = ROOT / "site" / "next" / "v8" / "appendix" / "index.html"
 
-MAX_KINDS = 4
+MAX_KINDS = 5
 TITLE = "Appendix — Average Joe Matt"
 DESCRIPTION = "Everything else on the site, in one list."
 # The share image is the wordmark card until the daily mark is ruled (#4646, owner 2026-10-18).
 OG_IMAGE = "https://averagejoematt.com/assets/og/wordmark-1200x630.png"
 OG_IMAGE_ALT = "Average Joe Matt. 327 to 185, in public. Every coach call checked."
-INTRO = "Everything else on the site, in one list. These pages are older or more detailed than the ones you came from."
+INTRO = "Everything else on the site, in one list, by kind. These pages are older or more detailed than the ones you came from."
 EARLIER_DESIGN = "These pages still use the site’s earlier design."
 
 
@@ -54,6 +59,11 @@ def problems(data: dict) -> list[str]:
     kinds = [k["key"] for k in data.get("kinds", [])]
     if not 1 <= len(kinds) <= MAX_KINDS:
         out.append(f"{len(kinds)} kinds — the appendix groups by at most {MAX_KINDS}")
+    for k in data.get("kinds", []):
+        if not str(k.get("key", "")).strip() or not str(k.get("label", "")).strip():
+            out.append(f"{k!r}: a kind has a `key` and a `label`")
+        if not any(r.get("kind") == k.get("key") for r in data.get("pages", [])) and not str(k.get("empty", "")).strip():
+            out.append(f"{k.get('key')}: a kind with no rows carries an `empty` sentence")
     seen = set()
     for row in data.get("pages", []):
         url = row.get("url", "")
@@ -71,34 +81,61 @@ def problems(data: dict) -> list[str]:
 
 
 def grouped(data: dict) -> list[tuple[str, list[dict]]]:
-    """[(label, rows sorted by title)] in the file's kind order; an empty kind is dropped."""
+    """[(label, rows sorted by title)] in the file's kind order; a kind with no rows is dropped
+    here (its `empty` sentence is rendered by `kinds_to_render`)."""
+    return [(label, rows) for _key, label, rows, _empty in kinds_to_render(data) if rows]
+
+
+def kinds_to_render(data: dict) -> list[tuple[str, str, list[dict], str]]:
+    """[(key, label, rows sorted by title, empty sentence)] in the file's kind order, every kind."""
     out = []
     for kind in data["kinds"]:
         rows = sorted((r for r in data["pages"] if r["kind"] == kind["key"]), key=lambda r: r["title"].lower())
-        if rows:
-            out.append((kind["label"], rows))
+        out.append((kind["key"], kind["label"], rows, str(kind.get("empty", ""))))
     return out
+
+
+def row_line(row: dict) -> str:
+    """The row's small print: its line, then that it is an earlier version of a v8 page
+    (`earlier_of` names the page) or that the page calls itself by a codename."""
+    parts = [row["line"]]
+    if row.get("earlier_of"):
+        parts.append(f"Earlier version of “{row['earlier_of']}”, superseded.")
+    if row.get("codename"):
+        parts.append(f"Called “{row['codename']}” on the page.")
+    return " ".join(parts)
 
 
 def _row(row: dict) -> str:
     return (
         f'        <li><a class="ck-coach__name ck-link" href="{esc(row["url"])}">{esc(row["title"])}</a>'
-        f'<span class="ck-coach__job">{esc(row["line"])}</span></li>'
+        f'<span class="ck-coach__job">{esc(row_line(row))}</span></li>'
     )
 
 
-def _group(label: str, rows: list[dict]) -> str:
-    items = "\n".join(_row(r) for r in rows)
-    return f"""    <section class="ck-section ck-section--tight">
+def _group(key: str, label: str, rows: list[dict], empty: str) -> str:
+    body = (
+        f"""      <ul class="ck-coach">
+{chr(10).join(_row(r) for r in rows)}
+      </ul>"""
+        if rows
+        else f"""      <p class="ck-soft">{esc(empty)}</p>"""
+    )
+    return f"""    <section class="ck-section" id="kind-{esc(key)}">
       <p class="ck-label">{esc(label)}</p>
-      <ul class="ck-coach">
-{items}
-      </ul>
+{body}
     </section>"""
 
 
+def _jump_list(data: dict) -> str:
+    links = " · ".join(
+        f'<a class="ck-link" href="#kind-{esc(key)}">{esc(label)}</a>' for key, label, _rows, _empty in kinds_to_render(data)
+    )
+    return f'      <p class="ck-soft">{links}</p>'
+
+
 def render(data: dict) -> str:
-    groups = "\n\n".join(_group(label, rows) for label, rows in grouped(data))
+    groups = "\n\n".join(_group(*kind) for kind in kinds_to_render(data))
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -141,13 +178,10 @@ def render(data: dict) -> str:
       <h1>Appendix</h1>
       <p class="ck-soft">{esc(INTRO)}</p>
       <p class="ck-soft">{esc(EARLIER_DESIGN)}</p>
+{_jump_list(data)}
     </section>
 
 {groups}
-
-    <section class="ck-section ck-section--tight">
-      <p><a class="ck-link" href="/next/v8/">Back</a></p>
-    </section>
   </main>
 
   <footer class="ck-footer">

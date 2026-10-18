@@ -128,6 +128,7 @@ _sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 from coach import persona_registry as _personas  # noqa: E402
 from web import (
     edition_page_reads as _reads,  # noqa: E402
+    record_words as _record_words,  # noqa: E402
     site_api_edition as _ed,  # noqa: E402
 )
 from web.prediction_reason import metric_words as _metric_words  # noqa: E402
@@ -329,6 +330,19 @@ def test_edition_one_upstream_failing_leaves_only_its_block_unavailable():
         "character": {"sheet"},
         "priority": {"lead_read"},
     }
+
+    # #4580 round 1: two blocks read a SECOND upstream for one field and degrade that field alone, never the
+    # block: the chapter's `next_due` is the cadence's date (None when that read failed) and the sleep row
+    # reads its hours off the pulse row the week block reads (its own sleep_detail figure when pulse failed).
+    def _without_next_due(block):
+        (block.get("data") or {}).pop("next_due", None)
+        return block
+
+    def _without_sleep_row(block):
+        ((block.get("data") or {}).get("rows") or {}).pop("sleep", None)
+        return block
+
+    degrades = {("cadence", "chapter"): _without_next_due, ("pulse", "life"): _without_sleep_row}
     offenders = []
     for key, fed in feeds.items():
         s3 = {k: (None if k == key else wire[k]) for k in ("journal", "panelcast")}
@@ -343,12 +357,19 @@ def test_edition_one_upstream_failing_leaves_only_its_block_unavailable():
             if p["state"] != "unavailable" or p["data"] is not None or not p["absent_text"].endswith("is not served right now."):
                 offenders.append(f"{key} failing: {name} -> {p['state']} {p['absent_text']!r}")
         untouched = [n for n in doc["blocks"] if n not in fed and not any(f.startswith(n + ".") for f in fed)]
+        if key == "pulse" and doc["blocks"]["life"]["data"]["rows"]["sleep"]["data"]["read_from"] != _ed.SOURCES["sleep"]:
+            offenders.append("pulse failing: the sleep row did not fall back to sleep_detail's own figure")
         if key == "cadence":
+            if doc["blocks"]["chapter"]["data"]["next_due"] is not None:
+                offenders.append("cadence failing: the chapter still claims a next_due")
             untouched.remove("follow")  # follow carries the cadence date: checked below
             if doc["blocks"]["follow"]["data"]["next_chapter_state"] != "unavailable":
                 offenders.append("cadence failing: follow still claims a next chapter date")
         for n in untouched:
-            if doc["blocks"][n] != baseline["blocks"][n]:
+            got, was = doc["blocks"][n], baseline["blocks"][n]
+            if (key, n) in degrades:
+                got, was = degrades[(key, n)](_copy.deepcopy(got)), degrades[(key, n)](_copy.deepcopy(was))
+            if got != was:
                 offenders.append(f"{key} failing: unrelated block {n} changed")
         offenders += [o for name, block in parts.items() for o in _contract_offences(name, block)]
     # A degraded 200 (a fallback payload from inside an except, #2686) is a failed read too.
@@ -501,7 +522,8 @@ def test_edition_record_never_serializes_the_count_without_the_comparison():
     skill = wire["calibration"]["platform"]["strata"]["coaches"]["brier_skill"]
     beats = skill > 0
     assert ok["data"]["beats_simple_guess"] is beats
-    assert ok["data"]["comparison_text"] == ("So far they beat a simple guess." if beats else "So far they do not beat a simple guess.")
+    assert ok["data"]["comparison_text"] == (_record_words.GUESS_BEATS if beats else _record_words.GUESS_NOT_YET)
+    assert ok["data"]["baseline"]["rule"] == "base_rate" and 0 < ok["data"]["baseline"]["rate"] < 1
     no_stratum = _json.loads(_json.dumps(wire["calibration"]))
     no_stratum["platform"]["strata"].pop("coaches")
     cases = {
@@ -708,7 +730,9 @@ def test_todays_zero_training_minutes_is_not_a_day_without_training():
     rows[-2] = {"date": rows[-2]["date"], "total_min": 0}
     past = _edition(wire)["blocks"]["week"]["data"]
     assert past["measures"]["training"]["data"]["text"] == "Trained on 5 of 6 days recorded."
-    assert {"label": "Training", "text": "No training recorded."} in past["detail"][1]["facts"]
+    assert {"label": "Training", "text": "No training recorded."}.items() <= next(
+        f for f in past["detail"][1]["facts"] if f["label"] == "Training"
+    ).items()
 
 
 # ── #4584: his own words — the owner-words store leads, the decisions note is the fallback ──

@@ -45,7 +45,7 @@ test("the programs block leads with the timer count and never prints the total a
   const html = B.programsHTML(SRC.stats, SRC.coaches);
   assert.ok(num(html) > 0, "the timer count leads, as a number");
   assert.match(html, /programs run on a timer\. Another \d+ run when called\. They read \d+ sources of data: devices, apps and lab results\. \d+ AI coaches write and predict\./);
-  assert.match(html, /As of [A-Z][a-z]+ \d+\./);
+  assert.match(html, /Counted [A-Z][a-z]+ \d+, from the code\./);
   assert.doesNotMatch(html, /served/);
   const figures = [...html.matchAll(/<b>(\d+)<\/b>/g)].map((m) => m[1]);
   assert.deepEqual(figures, [String(num(html))], "the total of timer + called programs is never printed as a figure of its own");
@@ -60,7 +60,7 @@ test("the coaches' record never appears without its comparison", () => {
   // The comparison is the served sentence, verbatim (its shape changes with the engine: one skill line, or one line per kind of call).
   const served = SRC.predictions.comparison.sentence.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   assert.ok(served.length > 20 && html.includes(`data-coach-comparison data-src="api_predictions.comparison.sentence">${served}</p>`), "the served comparison sentence, beside the count");
-  assert.match(html, /As of [A-Z][a-z]+ \d+\. Code does the grading/);
+  assert.match(html, /Checked to [A-Z][a-z]+ \d+\. Code does the grading/);
   const noCmp = B.recordHTML({ overall: SRC.predictions.overall });
   assert.match(noCmp, /What a simple guess would have scored on these calls is not available right now\./);
   assert.match(B.recordHTML({ overall: { confirmed: 0, refuted: 0 } }), /not available right now/, "no checked calls is not printed as 0 and 0");
@@ -100,7 +100,7 @@ test("the cost paragraphs add up: an ordinary day, the high days with dates, and
   const rc = SRC.receipts;
   const td = rc.typical_day;
   const hd = rc.high_days;
-  assert.match(html, new RegExp(`The ceiling is \\$${rc.base_ceiling_usd} a month for the whole cloud bill, AI included\\. It rises to \\$${rc.surge_ceiling_usd} when reader traffic is high\\. As of [A-Z][a-z]+ \\d+, \\${usd(rc.month_to_date_usd)} is spent this month\\. (Nothing is paused|The system is at tier \\d)\\.`));
+  assert.match(html, new RegExp(`The ceiling is \\$${rc.base_ceiling_usd} a month for the whole cloud bill, AI included\\. It rises to \\$${rc.surge_ceiling_usd} when reader traffic is high\\. As of [A-Z][a-z]+ \\d+, \\${usd(rc.month_to_date_usd)} is spent this month, and the forecast for [A-Z][a-z]+ \\d+ is \\${usd(rc.projected_month_end_usd)}, (under|above) the ceiling\\. (Nothing is paused\\.|The system is at tier \\d: [^.]+\\.)`));
   assert.match(html, new RegExp(`An ordinary day costs \\${usd(td.usd)}, AI included: the middle day of the ${td.days_counted} days to [A-Z][a-z]+ \\d+\\. ${td.month_days} days like it come to \\${usd(td.month_usd)}, (under|over) the ceiling\\.`));
   if (hd.days.length > 1) {
     assert.match(html, new RegExp(`${hd.days.length} days this month each cost more than twice that: [A-Z][a-z]+ [\\d, and]+, \\${usd(hd.total_usd)} together, \\${usd(hd.above_typical_usd)} more than ${hd.days.length} ordinary days\\.</p>`));
@@ -163,7 +163,7 @@ test("the cost paragraphs do not explain away what the figures do not show", () 
   assert.match(one, /One day this month cost more than 3 times that: October 2, at \$24\.68, \$20\.11 more than an ordinary day\./);
   const same = B.costHTML({ ...SRC.receipts, projected_all_classes_usd: SRC.receipts.projected_month_end_usd });
   assert.doesNotMatch(same, /If building and testing/, "no wider forecast is printed when the route gives the same figure twice");
-  assert.match(B.costHTML({ ...SRC.receipts, tier: 2 }), /The system is at tier 2\./);
+  assert.match(B.costHTML({ ...SRC.receipts, tier: 2 }), /The system is at tier 2: behind-the-scenes AI, the coaches’ daily commentary, the weekly writing and the podcast are paused\./);
   assert.match(B.costHTML({ ...SRC.receipts, stale: true }), /This figure is out of date\./);
   assert.match(B.costHTML(null), /not available right now/);
   assert.doesNotMatch(B.costHTML(null), /\$/, "no figure is printed when the route does not answer");
@@ -194,9 +194,11 @@ test("three plain figures stand in the open; the high days, the forecast and the
   assert.ok(open.includes(`${usd(SRC.receipts.month_to_date_usd)} is spent this month`));
   assert.ok(open.includes(`An ordinary day costs ${usd(SRC.receipts.typical_day.usd)}`));
   assert.ok(open.includes(B.BUILD_CAP), "the limit on building and testing is said in the open");
-  assert.doesNotMatch(open, /forecast|tier 2/, "no forecast arithmetic above the fold");
+  // Round 1 of the site-to-A pass (built-2) put the one forecast figure beside the spend, each with its date;
+  // the arithmetic behind it — the pace, the second forecast, the tier sums — still sits behind the disclosure.
+  assert.doesNotMatch(open, /at their pace|tier 2/, "no forecast arithmetic above the fold");
   assert.ok(!open.includes(usd(SRC.receipts.projected_all_classes_usd)), "no forecast figure above the fold");
-  assert.doesNotMatch(B.costHTML(EARLY).split("<details>")[0], /forecast|tier 2|\$496/, "nor early in the month");
+  assert.doesNotMatch(B.costHTML(EARLY).split("<details>")[0], /at their pace|tier 2|\$496/, "nor early in the month");
   assert.match(folded, /The forecast that sets the tier/);
   assert.match(folded, /days this month each cost more than/);
 });

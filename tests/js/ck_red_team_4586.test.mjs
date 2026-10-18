@@ -19,17 +19,28 @@ const chapter = { ...B.chapter, state: "stale" };
 const latestDate = chapter.data.date;
 const n = P.weekNumberOf(chapter.data.week_label);
 
-test("Story: a week that has not published is said in one calm line, never silence", () => {
+test("Story: a held week is a served fact or the chronicle's own marker, never calendar arithmetic", () => {
   assert.ok(n >= 1, "the capture's latest chapter is a numbered week");
-  assert.equal(P.heldChapterLine(chapter, { as_of: later(latestDate, 3) }, POSTS), "", "a current chapter needs no line");
-  assert.equal(P.heldChapterLine(chapter, { as_of: later(latestDate, 11) }, POSTS), `Week ${n + 1} is waiting for Matthew’s approval.`);
-  // Round 3: with the next date served, the line names the week whose draft comes next (same arithmetic).
+  // Site-to-A round 1: the line said "Week 6 is waiting for Matthew’s approval" from the date gap, on the
+  // night week 6 published. With nothing served about a held week the page says nothing of one.
+  assert.equal(P.heldChapterLine(chapter, { as_of: later(latestDate, 3) }, POSTS), "");
+  assert.equal(P.heldChapterLine(chapter, { as_of: later(latestDate, 11) }, POSTS), "", "eleven days on is not a held week");
+  assert.equal(P.heldChapterLine(chapter, { as_of: later(latestDate, 40) }, POSTS), "");
+  // The served status (`chronicle.latest.status`, lane E), on whichever document carries it.
   const nextB = { state: "ok", data: { chapter: { state: "ok", data: { date: later(latestDate, 15), drafted_not_promised: true } } } };
-  assert.match(P.heldChapterLine(chapter, { as_of: later(latestDate, 11) }, POSTS, nextB), new RegExp(`^Week ${n + 1} is waiting for Matthew’s approval; week ${n + 2}’s draft is due [A-Z][a-z]+day, [A-Z][a-z]+ \\d+\\.$`));
-  assert.match(P.heldChapterLine(chapter, { as_of: later(latestDate, 15) }, POSTS, nextB), new RegExp(`^Weeks ${n + 1} to ${n + 2} are waiting for Matthew’s approval; week ${n + 3}’s draft`));
+  const held = (status, week) => ({ as_of: later(latestDate, 11), chronicle: { latest: { status, week } } });
+  assert.equal(P.heldChapterLine(chapter, held("held", n + 1), POSTS), `Week ${n + 1} is written and held before publishing.`);
+  assert.match(P.heldChapterLine(chapter, held("awaiting_approval", n + 1), POSTS, nextB), new RegExp(`^Week ${n + 1} is written and held before publishing; its draft was due [A-Z][a-z]+day, [A-Z][a-z]+ \\d+\\.$`));
+  assert.equal(P.heldChapterLine(chapter, held("pending"), POSTS), "The next chapter is written and held before publishing.", "no week named: no week invented");
+  assert.equal(P.heldChapterLine(chapter, held("published", n), POSTS), "", "published: nothing is held");
+  assert.equal(P.heldChapterLine(chapter, held("something_else", n + 1), POSTS), "", "an unrecognised status claims nothing");
+  assert.equal(P.heldChapterLine(chapter, { as_of: later(latestDate, 11) }, { ...POSTS, chronicle: { latest: { status: { state: "held" } } } }), "The next chapter is written and held before publishing.", "the journal may carry it, as an object");
+  assert.deepEqual(P.chronicleStatus({ chronicle: { latest: { status: "Held", week: 6 } } }, null, null), { status: "held", week: 6 });
+  assert.equal(P.chronicleStatus({}, POSTS, chapter), null);
+  // The chronicle's own marker still wins over silence.
   const marked = { ...POSTS, pending: { week: n + 1, reason: "story_door_hold" } };
-  assert.equal(P.heldChapterLine(chapter, { as_of: later(latestDate, 3) }, marked), `Week ${n + 1} is held before publishing.`, "the chronicle's own marker wins");
-  assert.equal(P.heldChapterLine({ state: "unavailable", data: null }, { as_of: later(latestDate, 11) }, POSTS), "");
+  assert.equal(P.heldChapterLine(chapter, { as_of: later(latestDate, 3) }, marked), `Week ${n + 1} is held before publishing.`);
+  assert.equal(P.heldChapterLine({ state: "unavailable", data: null }, held("held", n + 1), POSTS), "");
 });
 
 test("Story: the podcast line says held when the episode list marks this week held", () => {
@@ -41,23 +52,24 @@ test("Story: the podcast line says held when the episode list marks this week he
   assert.match(P.playerHTML({ state: "absent", absent_text: "No podcast episode for this chapter yet.", data: null }), /No podcast episode/);
 });
 
-test("Story: the lead puts the held line beside the next date, saying the approval once", () => {
-  const edition = { ...EDITION, as_of: later(latestDate, 11) };
+test("Story: a served held line sits beside the next date, said once", () => {
+  const edition = { ...EDITION, as_of: later(latestDate, 11), chronicle: { latest: { status: "held", week: n + 1 } } };
   const noPod = { ...chapter, data: { ...chapter.data, podcast: { state: "absent", absent_text: "No podcast episode for this chapter yet.", data: null } } };
   const html = P.storyChapterHTML(edition, { ...B, chapter: noPod }, POSTS, { episodes: [], pending: { week: n, reason: "held_for_review" } });
-  assert.match(html, new RegExp(`Week ${n + 1} is waiting for Matthew’s approval; week ${n + 2}’s draft is due`));
+  assert.match(html, new RegExp(`Week ${n + 1} is written and held before publishing; its draft was due`));
   assert.match(html, /held for review/);
   assert.doesNotMatch(html, /The next draft is due/, "the next date is said once");
 });
 
-test("Story: the teaser says which way the scale crossed, and its pounds gone are the page's own two numbers", () => {
+test("Story: the chapter's dek is printed as served, never recomputed", () => {
+  // Site-to-A round 1: the teaser rewrote "crossed 310 pounds … 18.5 pounds gone" to "went below 310 … 18.4"
+  // from rounded values — an edit to a quoted sentence of the chapter. The dek is the chapter's own words.
   const dek = "Rest days, while the scale crossed 310 pounds for the first time, suggesting 18.5 pounds gone…";
-  const out = P.teaserText(dek, { chapterLb: 308.9, startLb: 327.3 });
-  assert.match(out, /went below 310 pounds for the first time/);
-  assert.match(out, new RegExp(`suggesting ${P.poundsDown(327.3, 308.9)} pounds gone`));
-  assert.equal(P.poundsDown(327.3, 308.9), (327.3 - 308.9).toFixed(1), "one helper, one rounding");
-  assert.match(P.teaserText("the scale crossed 310 pounds", { chapterLb: 311 }), /went above 310/);
-  assert.equal(P.teaserText(dek, {}), dek, "without the chapter's weight the teaser is printed as served");
+  assert.equal(P.teaserText(dek), dek);
+  assert.equal(P.teaserText(dek, { chapterLb: 308.9, startLb: 327.3 }), dek, "a caller's numbers change nothing");
+  const html = P.storyChapterHTML(EDITION, B, POSTS, load("episodes"));
+  assert.ok(html.includes(`<p class="ck-premise ck-soft">${B.chapter.data.dek}</p>`), "the served dek, whole");
+  assert.doesNotMatch(html, /went below|went above|18\.4 pounds/);
 });
 
 test("Story: every chapter row is label · value; a prologue is before day one, week 1 is labelled the start", () => {
@@ -141,10 +153,11 @@ test("Coaches: one rule for every row — the count, no bar; the lead says no ch
   assert.doesNotMatch(html, /no bets/);
 });
 
-test("Story on the capture's own day: the next week has not published, and the next date is ahead of the day", () => {
+test("Story on the capture's own day: the latest chapter and its date, the next date ahead, and no inferred held week", () => {
   const html = P.storyChapterHTML(EDITION, B, POSTS, load("episodes"));
-  assert.match(html, new RegExp(`Week ${n + 1} (is waiting for Matthew’s approval|is held before publishing)`));
-  assert.match(html, new RegExp(`week ${n + 2}’s draft is due`));
+  assert.match(html, new RegExp(`Latest chapter · Week ${n} \\(written [A-Z][a-z]+ \\d+\\)`), "the dated fact the served data supports");
+  assert.doesNotMatch(html, new RegExp(`Week ${n + 1}|waiting for Matthew’s approval|held before publishing`), "no held week is inferred (week 6 published 2026-10-18T04:29Z)");
+  assert.match(html, /The next draft is due [A-Z][a-z]+day, [A-Z][a-z]+ \d+; it publishes once Matthew approves it\./);
   const due = B.next.data.chapter.data.date;
   assert.ok(due > EDITION.as_of, `${due} is after ${EDITION.as_of}`);
   assert.doesNotMatch(html, /New this week/);
@@ -199,8 +212,8 @@ test("Front, no bet and no exchange: the newest quotable line keeps the coaches'
 });
 
 // ── site-to-A round 1, lane A: the front page and Start here (#4580, #4590) ──────────────────
-const SITE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "site", "next", "v8");
-const shell = (page) => readFileSync(join(SITE, page, "index.html"), "utf8");
+const V8 = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "site", "next", "v8");
+const shell = (page) => readFileSync(join(V8, page, "index.html"), "utf8");
 
 test("item 1: the two premise sentences are the drafts posted on #4590, marked as drafts until his word", () => {
   const front = shell("");
@@ -224,9 +237,12 @@ test("item 3: one sayable guess sentence on the front and Start, the exact rate 
   assert.equal(P.recordHTML(B.record).startsWith("76 of 183 checked calls right. The coaches"), true, "Start: no door on the count, the page has its own");
   assert.equal(P.guessSentence({ ...B.record.data, beats_simple_guess: true }), "The coaches beat a simple guess.");
   assert.equal(P.guessSentence({ ...B.record.data, brier_skill: null }), "There is no comparison with a guess yet.");
-  assert.equal(P.guessSentence({ ...B.record.data, baseline: "A guess that nothing changes does about as well." }), "A guess that nothing changes does about as well.", "lane E's served sentence wins");
-  assert.equal(P.guessSentence({ ...B.record.data, baseline: { text: "Served." } }), "Served.");
-  assert.equal(P.guessSentence({ ...B.record.data, baseline: { rate: 0.42 } }), "The coaches do not beat a simple guess yet.", "a baseline with no sentence changes nothing");
+  // Lane E's served shapes (lambdas/web/record_words.py): comparison_text is the one sentence, baseline.text the exact rate.
+  assert.equal(P.guessSentence({ ...B.record.data, comparison_text: "Too few checked calls yet to compare the coaches with a simple guess." }), "Too few checked calls yet to compare the coaches with a simple guess.", "lane E's served sentence wins");
+  assert.equal(P.guessSentence(B.record.data), "The coaches do not beat a simple guess yet.", "the capture's older 'So far they…' form is re-said");
+  const served = { ...B.record.data, comparison_text: "The coaches do not beat a simple guess yet.", baseline: { rule: "base_rate", rate: 0.415, rate_pct: 42, text: "A guess that every call has a 42% chance of coming true does about as well." } };
+  assert.match(P.recordHTML({ ...B.record, data: served }), /<details class="ck-small"><summary>The exact rate<\/summary><p>A guess that every call has a 42% chance of coming true does about as well\.<\/p><\/details>$/);
+  assert.equal(P.exactRateText({ ...B.record.data, baseline: { rate: 0.42 } }), P.guessClause(B.record.data), "a baseline with no text: the clause computed here");
   const failed = { state: "unavailable", absent_text: "The record is not here.", data: null };
   assert.equal(P.recordHTML(failed, { href: "/x/" }), "The record is not here.");
 });
@@ -235,13 +251,15 @@ test("item 4: Go deeper leads with the latest chapter — chronicle.latest when 
   const front = shell("");
   const deeper = /<ul class="ck-rows ck-rows--deeper">\s*<li id="ck-chapter-row">/.test(front);
   assert.ok(deeper, "the chapter row is the first row");
-  assert.equal(P.latestChapterBlock(B), B.chapter, "no chronicle block: the chapter block as today");
-  const latest = { title: "The Quiet Accumulation", date: "2026-10-13", url: "/journal/posts/week-09/", week_label: "Week 6", read_minutes: 7, status: "published", next_due: "2026-10-21" };
-  const withChronicle = { ...B, chronicle: { state: "ok", as_of: "2026-10-18", absent_text: "", data: { latest } } };
-  const row = P.frontSlots(EDITION, withChronicle, "/next/v8/")["ck-chapter-row"];
+  assert.equal(P.latestChapterBlock(B), B.chapter, "no served latest: the chapter block as today");
+  // Lane E: chapter.data.latest {week, label, date, status} over the block's own label and date.
+  const latest = { week: 6, label: "Week 6", date: "2026-10-13", status: "published" };
+  const served = { ...B, chapter: { ...B.chapter, data: { ...B.chapter.data, title: "The Quiet Accumulation", url: "/journal/posts/week-09/", read_minutes: 7, latest, held: null, next_due: "2026-10-21" } } };
+  const row = P.frontSlots(EDITION, served, "/next/v8/")["ck-chapter-row"];
   assert.match(row, /Week 6 · “The Quiet Accumulation”/);
   assert.match(row, /The latest chapter · October 13 · 7 min/);
-  assert.equal(P.latestChapterBlock({ ...B, chronicle: { state: "ok", data: { latest: { title: "x" } } } }), B.chapter, "a latest with no url or date is not bound");
+  assert.equal(P.latestChapterBlock({ ...B, chapter: { ...B.chapter, data: { ...B.chapter.data, latest: { status: "published" } } } }).data.date, B.chapter.data.date, "a latest with no date or label changes nothing");
+  assert.doesNotMatch(row, /held|waiting/);
   for (const page of ["", "start"]) assert.doesNotMatch(shell(page), /waiting for approval|held before publishing/);
   assert.doesNotMatch(shell("start"), /Open now/, "start:S3 — the date is the chapter list's tail, not a section");
   assert.match(shell("start"), /<div id="ck-recap"><\/div>\s*<p class="ck-small" id="ck-open"><\/p>/);
@@ -283,4 +301,288 @@ test("item 8: the mark names its floor — the start at one end, 185 at the othe
   // front:F5: the caption sits under the mark, then the record — not the record between them.
   const front = shell("");
   assert.ok(front.indexOf('id="ck-mark"') < front.indexOf("One column a day") && front.indexOf("One column a day") < front.indexOf('id="ck-record"'));
+});
+
+// ── site-to-A round 1 (2026-10-18, the verified shared-helper defects of #4580, lane J) ──────
+// One case per item, each on the committed fixtures: the chart's frame, the unit agreement, the
+// Food row's dot, the trend index rows, the call page rendered once, the sheet's headline, the
+// coach not-found doors. (The dek passthrough and the Story status binding are the tests above.)
+const D = await import("../../site/assets/js/ck_depth.js");
+const S = await import("../../site/assets/js/ck_sheet.js");
+const K = await import("../../site/assets/js/ck_coach.js");
+const { TERMS } = await import("../../site/assets/js/ck_terms.js");
+
+test("Start: the weight chart is framed start to goal, as the front page's mark is, with no fill and both ends labelled", () => {
+  const series = B.week.data.weight_series;
+  const t = B.today.data;
+  const html = P.chartHTML(series, { start: t.start_weight_lbs, goal: t.goal_weight_lbs });
+  assert.doesNotMatch(html, /<polygon/, "no fill under a level");
+  assert.match(html, new RegExp(`<text [^>]*>${String(t.start_weight_lbs)} lb, the start</text>`));
+  assert.match(html, new RegExp(`<text [^>]*>${String(Number(t.goal_weight_lbs))} lb, the goal</text>`));
+  // The same frame as the mark: the latest point sits the same share of the way down the frame
+  // as the mark says is gone.
+  const pts = [...series].sort((a, b) => a.date.localeCompare(b.date));
+  const last = pts[pts.length - 1];
+  const cy = Number(/<circle class="ck-chart__now" cx="[\d.]+" cy="([\d.]+)"/.exec(html)[1]);
+  const cells = F.markDays(series, last.date, t.start_weight_lbs, t.goal_weight_lbs);
+  const gone = cells[cells.length - 1].gone;
+  assert.ok(Math.abs((cy - 20) / 122 - gone) < 0.002, `${(cy - 20) / 122} vs the mark's ${gone}`);
+  assert.ok(gone < 0.3 && cy < 20 + 122 * 0.3, "a 25 lb drop is a small share of the frame, not most of it");
+  assert.match(html, /aria-label="[^"]*in the frame from the start weight of 327\.3 to the goal of 185"/);
+  // Without a start and goal the frame is the series' own range, still unfilled.
+  const bare = P.chartHTML(series);
+  assert.doesNotMatch(bare, /<polygon|the goal/);
+  assert.match(bare, /ck-chart__line/);
+});
+
+test("one quantity, one unit: recovery is a percentage on the day line, the trend and the call card; a served unit wins", () => {
+  assert.equal(F.recoveryShown("recovery 62 out of 100"), "recovery 62%");
+  assert.equal(D.MEASURES.recovery.write(62), "62%");
+  assert.equal(D.MEASURES.recovery.unit, "%");
+  assert.doesNotMatch(D.MEASURES.recovery.about, /out of 100/);
+  const calls = load("calls").calls;
+  const recovery = calls.find((c) => c.kind === "number" && /recovery score/.test(c.called) && /^\d+(\.\d+)?$/.test(c.tolerance.text));
+  assert.match(V.ruleFor(recovery, recovery.verdict === "right"), /^(not )?within [\d.]+% either way$/);
+  assert.doesNotMatch(V.ruleFor(recovery, true), /points|out of 100/);
+  assert.match(TERMS.find(([, term]) => term === "Recovery")[2], /percentage/);
+  // The served unit, when the route names one (lane E of #4580), is read before any of this.
+  assert.equal(V.ruleFor({ ...recovery, tolerance: { ...recovery.tolerance, unit: "points" } }, true), `within ${recovery.tolerance.text} points either way`);
+  assert.equal(D.servedUnit("recovery", { pulse: { units: { recovery_pct: "points" } } }), "points");
+  assert.equal(D.writerFor("recovery", { pulse: { units: { recovery_pct: "points" } } })(62), "62 points");
+  assert.equal(D.writerFor("recovery", { pulse: {} })(62), "62%");
+  // A unit in parentheses beside a number survives the rule reader; a gloss in parentheses does not.
+  const bet = { kind: "bet", called: "Two coaches bet on whether his weight (lb) would be below 305 on October 16. Max Reyes said yes." };
+  assert.equal(V.ruleFor(bet, true), "on whether his weight (lb) would be below 305 on October 16");
+  const gloss = { kind: "bet", called: "Two coaches bet on whether his morning recovery score (his wrist strap’s morning score out of 100) would be below 70 on September 30. Max Reyes said yes." };
+  assert.equal(V.ruleFor(gloss, true), "on whether his morning recovery score would be below 70 on September 30");
+});
+
+test("Week: a row with too little data takes the hollow dot and says so; every scored row has a dot", () => {
+  const html = F.scorecardHTML(B.scorecard, "/next/v8/");
+  const food = /<li><a class="ck-rows__key" href="[^"]*">Food<\/a><span>(.*?)<\/span><\/li>/.exec(html);
+  assert.ok(food, "the Food row");
+  assert.equal(B.scorecard.data.rows.food.data.verdict, "not_enough_data", "the capture's Food row is the thin one");
+  assert.match(food[1], /^<i class="ck-dot ck-dot--off ck-dot--none" aria-hidden="true"><\/i><b>Too few days logged\.<\/b> 2 days logged; 5 are needed\. <span class="ck-small">Not enough data for a verdict\.<\/span>/);
+  const rows = F.scorecardRows(B.scorecard).filter(({ row }) => row.state === "ok" && row.data && row.data.verdict_text);
+  assert.equal((html.match(/<i class="ck-dot/g) || []).length, rows.length, "one dot per scored row, the thin one included");
+  assert.equal((html.match(/ck-dot--none/g) || []).length, 1);
+});
+
+test("Trend index: each row carries its latest served reading and the day, and the page has a date line", () => {
+  const src = { pulse: load("pulse_history"), nutrition: load("nutrition_overview"), training: load("training_overview") };
+  const today = EDITION.as_of;
+  const html = D.trendIndexHTML("/next/v8/", src, today);
+  assert.match(html, /Weight · 302\.2 lb <span>October 17 <span aria-hidden="true">→<\/span><\/span>/);
+  for (const [key, m] of Object.entries(D.MEASURES)) {
+    const pts = D.seriesOf(key, src, today);
+    const last = pts[pts.length - 1];
+    assert.ok(last, `${key} has a served reading`);
+    assert.ok(html.includes(`>${m.name} · ${m.write(last.value)} <span>${new Date(`${last.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" })} `), `${key}: its latest value and day`);
+  }
+  assert.match(D.trendIndexDay(src), /^Saturday, October 17 · Day 42$/);
+  assert.equal(D.trendIndexDay({}), "");
+  assert.doesNotMatch(D.trendIndexHTML("/next/v8/"), / · /, "with no bodies, the names alone");
+  assert.doesNotMatch(html, /\d{4}-\d{2}-\d{2}|undefined|NaN/);
+});
+
+test("Call page: the call once at the top, the record as two sentences naming the coach, the guess's win on the verdict line", () => {
+  const body = load("calls");
+  const call = body.calls[0];
+  assert.equal(call.kind, "number", "the capture's newest settled call is a number call");
+  const claim = C.claimHTML(call, "/next/v8/");
+  const outcome = C.outcomeHTML(call, "/next/v8/");
+  const record = C.recordHTML(call, body);
+  // The route's call sentence is the title; the card under it is who, when, and the coach's own words.
+  assert.ok(claim.includes(`<b>“${call.claim}”</b>`));
+  assert.ok(!claim.includes(call.called) && !claim.includes(call.called_short), "the call is not said again under its title");
+  // The result is the heading; the outcome card is the verdict tag and its rule, with the guess's win.
+  assert.ok(!outcome.includes(call.happened) && !outcome.includes(call.verdict_text), "neither the result nor the verdict sentence is restated");
+  assert.match(outcome, /<p class="ck-soft">The allowed distance is [^<]+\. Graded on the reading for <a [^>]+>October 16<\/a>\. The simple guess was also right\.<\/p>/);
+  assert.doesNotMatch(outcome, /Checked October/);
+  const number = String(/about ([\d.]+)/.exec(call.called)[1]);
+  const page = [call.called_short, claim, call.happened_short, outcome, record].join("");
+  assert.equal(page.split(number).length - 1, 2, "the called number: once in the title, once in the coach's own words");
+  // The record: the served count and the comparison's verdict per kind, naming the coach, and the served sentence one tap below.
+  const p = /<p>([^<]+)<\/p><details><summary>The record by kind of call<\/summary>/.exec(record);
+  assert.ok(p, record);
+  assert.equal(p[1].split(/(?<=\.) /).length, 2, "two sentences");
+  assert.ok(p[1].startsWith(`${call.coach_name}: `) && p[1].includes(`, ${call.coach_name} is `), p[1]);
+  assert.doesNotMatch(p[1], /the coaches/);
+  assert.ok(record.includes(`data-coach-comparison>${call.records[0].comparison.sentence}</p>`), "the served sentence, whole");
+});
+
+test("Sheet: 'Level 12 on Friday, October 16'; badges say lb and Level", () => {
+  const character = load("character");
+  const html = S.levelHTML(character);
+  assert.match(html, new RegExp(`<p class="ck-big"><span>Level </span>${Math.round(character.character.level)}<span> on [A-Z][a-z]+day, [A-Z][a-z]+ \\d+</span></p>`));
+  assert.doesNotMatch(html, /\d+<span> level/);
+  const badges = S.badgesHTML(load("achievements"));
+  assert.doesNotMatch(badges, /\blbs\b|Character Level/);
+  assert.equal(S.badgeWords("Lost 10 lbs · Reached Character Level 2"), "Lost 10 lb · Reached Level 2");
+});
+
+test("Coach, no coach by that name: the eight coaches as doors, from the roster or the page's own eight ids", () => {
+  const roster = load("coaches");
+  const html = K.coachListHTML(roster, "/next/v8/");
+  const links = [...html.matchAll(/<a href="\/next\/v8\/coach\/\?c=([a-z_]+)">([^<]+) <span>/g)];
+  assert.equal(links.length, 8);
+  assert.deepEqual(links.map((m) => m[1]).sort(), roster.coaches.map((c) => c.persona_id).sort());
+  for (const m of links) assert.equal(m[2], roster.coaches.find((c) => c.persona_id === m[1]).name);
+  const fallback = K.coachListHTML(null, "/next/v8/");
+  assert.equal((fallback.match(/<a href="\/next\/v8\/coach\/\?c=/g) || []).length, 8);
+  assert.doesNotMatch(fallback, /undefined/);
+});
+
+// ── site-to-A round 1, lane D (2026-10-18): the sheet, how it's built, the appendix, a call, a coach ──
+const BU = await import("../../site/assets/js/ck_built.js");
+const SITE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "site");
+const page = (name) => readFileSync(join(SITE, "next", "v8", name, "index.html"), "utf8");
+const textOf = (html) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+
+test("Sheet: each area is the kit's record row — name, level at the right, one plain sentence — not a four-bucket formula", () => {
+  const character = load("character");
+  const html = S.areasHTML(character);
+  assert.match(html, /^<ul class="ck-coach ck-coach--record">/);
+  const rows = [...html.matchAll(/<li>(.*?)<\/li>/g)].map((m) => m[1]);
+  assert.equal(rows.length, character.pillars.length);
+  for (const row of rows) {
+    assert.match(row, /^<span class="ck-coach__name">[^<]+<\/span><span class="ck-coach__job">[^<]+<\/span>(<span class="ck-coach__record">Level \d+<\/span>)?$/, row);
+    assert.doesNotMatch(row, /Helping:|Holding it back:|Not done or not logged:|No data yet:/, "the bucket list is not in the row");
+  }
+  const both = character.pillars.find((p) => (p.drivers?.top || []).length && (p.drivers?.dragging || []).length);
+  assert.ok(both, "the capture has an area with a helper and a drag");
+  assert.equal(S.areaBrief(both), `Helped most by ${S.driverWords(both.drivers.top)[0]}; held back most by ${S.driverWords(both.drivers.dragging)[0]}.`);
+  assert.equal(S.areaBrief({ ...both, drivers: { top: both.drivers.top } }), `Helped most by ${S.driverWords(both.drivers.top)[0]}.`);
+  assert.equal(S.areaBrief({ ...both, coverage_hold: true }), "", "a held area's drivers are not named as helping");
+  assert.equal(S.areaLevel(character.pillars.find((p) => p.not_instrumented)), "", "an unmeasured area carries no level figure");
+});
+
+test("Sheet: the score and its move share one precision, so the move can be read off two days' scores", () => {
+  assert.equal(S.areaSentence({ level: 22, raw_score: 80.5, score_delta: -0.5 }), "Score 80.5 of 100, down 0.5 on the day.");
+  assert.equal(S.areaLine({ level: 22, raw_score: 80.5, score_delta: -0.5 }), "Level 22. Score 80.5 of 100, down 0.5 on the day.");
+  assert.doesNotMatch(S.areasHTML(load("character")), /Score \d+ of 100/, "no whole score beside a tenth-of-a-point move");
+});
+
+test("Sheet: an area on hold for thin data that still counts toward the level is said so beside the level", () => {
+  const character = load("character");
+  const held = character.pillars.filter((p) => p.coverage_hold && !p.not_instrumented);
+  assert.ok(held.length >= 1, "the capture has a held area (metabolic)");
+  assert.equal(S.compositeNote(character), "Metabolic health is on hold for thin data, yet its score still counts toward the level.");
+  assert.equal(S.compositeNote({ pillars: character.pillars.filter((p) => !p.coverage_hold) }), "", "no held area, no note");
+  assert.match(S.compositeNote({ pillars: [{ name: "metabolic", coverage_hold: true }, { name: "mind", coverage_hold: true }] }), /^Metabolic health and Mind are on hold for thin data, yet their scores still count toward the level\.$/);
+});
+
+test("Sheet: one sentence before the areas; the rule a level moves by sits one tap deeper", () => {
+  const html = page("sheet");
+  const areas = html.slice(html.indexOf("The seven areas"), html.indexOf('id="ck-areas"'));
+  const intro = [...areas.matchAll(/<p class="ck-soft">([^<]*)<\/p>/g)].map((m) => m[1]);
+  assert.equal(intro.length, 1);
+  assert.equal((intro[0].match(/\./g) || []).length, 1, "one sentence");
+  assert.match(html, /<details>\s*<summary>How a level moves<\/summary>/);
+  assert.match(html, /<h1>The whole of it, so far\.<\/h1>/);
+  assert.ok(html.includes('id="ck-sheet-late"') && html.indexOf('id="ck-sheet-late"') > html.indexOf('id="ck-areas"'), "the late-sources caveat sits under the areas, not stacked under the level");
+});
+
+test("Built: one dated fold fact at the top; a section carries at most one 'as of'", () => {
+  const src = { stats: load("platform_stats"), receipts: load("receipts"), predictions: load("predictions"), coaches: load("coaches") };
+  assert.match(BU.foldDay(src), /^[A-Z][a-z]+day, [A-Z][a-z]+ \d+$/);
+  assert.equal(BU.foldDay({}), "");
+  const numbers = textOf(BU.numbersHTML(src));
+  assert.equal((numbers.match(/As of /g) || []).length, 0, numbers);
+  assert.match(numbers, /Counted [A-Z][a-z]+ \d+, from the code\./);
+  assert.match(numbers, /Checked to [A-Z][a-z]+ \d+\. Code does the grading/);
+  assert.equal((textOf(BU.costHTML(src.receipts)).match(/As of /g) || []).length, 1);
+  assert.match(page("built"), /<span class="ck-header__day" id="ck-day"><\/span>/);
+});
+
+test("Built: the tier is defined in plain words where it is first named, with spend and forecast side by side and dated", () => {
+  const rc = load("receipts");
+  const open = BU.costHTML(rc).split("<details>")[0];
+  assert.match(open, new RegExp(`As of [A-Z][a-z]+ \\d+, \\$${rc.month_to_date_usd.toFixed(2)} is spent this month, and the forecast for [A-Z][a-z]+ \\d+ is \\$${rc.projected_month_end_usd.toFixed(2)}, (under|above) the ceiling\\. The system is at tier ${rc.tier}: ${BU.TIER_WORDS[rc.tier]}\\.`));
+  assert.doesNotMatch(open, /at their pace/, "the forecast's arithmetic stays one tap deeper");
+  for (const [tier, words] of Object.entries(BU.TIER_WORDS)) assert.match(BU.costHTML({ ...rc, tier: Number(tier) }), new RegExp(`The system is at tier ${tier}: ${words.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.`));
+  assert.match(BU.costHTML({ ...rc, tier: 0 }), /Nothing is paused\./);
+  const text = textOf(page("built"));
+  assert.ok(text.indexOf("sets a tier from the forecast’s share of the ceiling") < text.indexOf("Tier 1 From about 73%"));
+});
+
+test("Built: what runs is the kit's numbered row list in pipeline order, not a hand-drawn picture; prose is full width; incidents closed", () => {
+  const html = page("built");
+  assert.doesNotMatch(html, /<svg/);
+  const steps = /<ul class="ck-rows ck-rows--steps">(.*?)<\/ul>/s.exec(html);
+  assert.ok(steps, "the numbered steps");
+  const rows = [...steps[1].matchAll(/<li><span>([^<]*)<\/span><\/li>/g)].map((m) => m[1]);
+  assert.equal(rows.length, 5);
+  assert.match(rows[0], /^Devices and apps/);
+  assert.match(rows[1], /^One store/);
+  assert.match(rows[2], /^AI coaches/);
+  assert.match(rows[3], /checker/);
+  assert.match(rows[4], /^The site/);
+  for (const r of rows) assert.ok(r.split(" ").length <= 10, r);
+  const who = /Who decides<\/p>(.*?)<\/section>/s.exec(html)[1];
+  assert.doesNotMatch(who, /ck-rows/, "the four paragraphs are full width, not a narrow value column");
+  assert.equal((who.match(/<p>/g) || []).length, 4);
+  assert.doesNotMatch(html, /<details open>/);
+  const broke = /What broke<\/p>(.*?)<\/section>/s.exec(html)[1];
+  assert.doesNotMatch(broke, /ck-rows__key/, "an incident's body is full width under its summary");
+  assert.equal((broke.match(/<details>/g) || []).length, 4);
+  assert.equal((broke.match(/before day one/g) || []).length, 3, "the three failures before 2026-09-06 are labelled");
+  assert.doesNotMatch(broke, /\b(Sept|Oct|Aug)\b/, "full month names, the one date rule");
+});
+
+test("Built: the first-person draft sits under the fold with one draft mark, and the approval rule is said twice, not three times", () => {
+  const html = page("built");
+  const text = textOf(html);
+  assert.ok(html.indexOf('id="ck-draft"') < html.indexOf("The numbers</p>"), "the draft is above the numbers");
+  assert.equal((text.match(/Draft wording\. Matthew has not rewritten this yet\./g) || []).length, 1);
+  assert.match(html, /<p class="ck-small">Preview\.<\/p>\s*<\/div>/, "the footer is the short preview mark");
+  assert.equal((text.match(/permitted to do/g) || []).length, 2, text.match(/[^.]*permitted to do[^.]*\./g));
+  const draft = /<section class="ck-section" id="ck-draft">(.*?)<\/section>/s.exec(html)[1];
+  const body = /<p>([^<]+)<\/p>/.exec(draft)[1];
+  assert.equal((body.match(/[.!?](\s|$)/g) || []).length, 2, "the draft is two sentences, not three paragraphs");
+});
+
+test("Appendix: a jump list of plain links reaches each kind, Tools first, with the replaced-layouts group's empty sentence", () => {
+  const html = page("appendix");
+  const jump = /<p class="ck-soft">((?:<a class="ck-link" href="#kind-[a-z]+">[^<]+<\/a>(?: · )?)+)<\/p>/.exec(html);
+  assert.ok(jump, "the jump list is one paragraph of kit links");
+  const targets = [...jump[1].matchAll(/href="#(kind-[a-z]+)"/g)].map((m) => m[1]);
+  assert.equal(targets[0], "kind-tools");
+  for (const id of targets) assert.ok(html.includes(`<section class="ck-section" id="${id}">`), id);
+  const sections = [...html.matchAll(/<section class="ck-section" id="(kind-[a-z]+)">/g)].map((m) => m[1]);
+  assert.deepEqual(sections, targets, "the links are in the sections' order");
+  assert.match(html, /id="kind-replaced">\s*<p class="ck-label">Replaced layouts<\/p>\s*<p class="ck-soft">The home page’s earlier layout will be listed here once the cut-over copies it\. Nothing is here yet\.<\/p>/);
+  assert.doesNotMatch(html, /<a class="ck-link" href="\/next\/v8\/">Back<\/a>/, "no second back link under the list");
+});
+
+test("Appendix: an earlier version of a v8 page says so, and a codename is small print under a plain title", () => {
+  const html = page("appendix");
+  const rows = [...html.matchAll(/<li><a class="ck-coach__name ck-link" href="([^"]+)">([^<]+)<\/a><span class="ck-coach__job">([^<]+)<\/span><\/li>/g)].map((m) => ({ url: m[1], title: m[2], line: m[3] }));
+  const row = (url) => rows.find((r) => r.url === url);
+  assert.match(row("/data/character/").line, /Earlier version of “The whole of it”, superseded\.$/);
+  assert.match(row("/method/build/").line, /Earlier version of “How it’s built”, superseded\.$/);
+  assert.match(row("/coaching/team/").line, /Earlier version of “The AI coaches”, superseded\.$/);
+  for (const [url, title, codename] of [["/story/membrane/", "Posts and replies", "Membrane"], ["/method/wrong/", "Every time the AI was wrong", "Wrong page"], ["/story/theme-river/", "Journal themes, charted", "Theme river"], ["/data/horizons/", "A weekly pick to read or watch", "Horizons"], ["/method/explorer/", "The raw record, as a table", "Explorer"]]) {
+    assert.equal(row(url).title, title, url);
+    assert.ok(row(url).line.endsWith(`Called “${codename}” on the page.`), row(url).line);
+  }
+  for (const r of rows) assert.doesNotMatch(r.title, /^(Membrane|Theme river|Horizons|Wrong page|Explorer|Mirror|Broadcast)$/, "no codename as a title");
+});
+
+test("Call: a bet's short sentence carries the unit its long sentence names; a short sentence with no unit in the long one is left alone", () => {
+  const bet = load("calls").calls.find((c) => c.id.startsWith("bet-20261016"));
+  assert.ok(bet && /as a percentage/.test(bet.called) && /at or above 26 on/.test(bet.called_short), "the capture's bet drops the unit on the short form");
+  assert.equal(C.calledShortWithUnit(bet), bet.called_short.replace("at or above 26 on", "at or above 26% on"));
+  assert.equal(C.calledShortWithUnit({ called_short: "X bet on whether it would be at or above 26 on October 16.", called: "X bet on whether the share would be at or above 26 on October 16." }), "X bet on whether it would be at or above 26 on October 16.", "no unit named, none invented");
+  assert.equal(C.calledShortWithUnit({ called_short: "at or above 190 g on October 16.", called: "(in grams) at or above 190 g" }), "at or above 190 g on October 16.", "a unit already there is not doubled");
+  assert.equal(C.calledShortWithUnit({ called_short: "below 305 by October 20.", called: "his weight (in pounds) below 305" }), "below 305 lb by October 20.");
+  assert.equal(C.calledShortWithUnit(null), "");
+  assert.match(page("call"), /<h1 id="ck-title">[^<]+<\/h1>\s*<p class="ck-soft">Average Joe Matt is one man’s public health experiment/, "the frame sentence under the h1 stays");
+});
+
+test("Coach: the footer is the short preview mark, and the page says what a coach page is in both states", () => {
+  const html = page("coach");
+  assert.match(html, /<p class="ck-small">Preview\.<\/p>\s*<\/div>/);
+  assert.doesNotMatch(html, /first-person line/);
+  assert.match(html, /<h1 id="ck-title">An AI coach<\/h1>\s*<p class="ck-soft">One of the AI coaches reading Matthew’s numbers in public: who it is, its checked calls and what it is watching\.<\/p>\s*<div class="ck-section ck-section--tight" id="ck-who">/, "static, so the not-found state keeps it");
 });

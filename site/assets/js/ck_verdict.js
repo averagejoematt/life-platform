@@ -30,7 +30,13 @@ const RE_BET = /\b(whether .+?)\. [^.]*\bsaid\b/;
 const RE_FOR_DAY = new RegExp(`\\bfor ((?:${MONTHS}) \\d{1,2})\\.`);
 const RE_ON_DAY = new RegExp(`\\bon ((?:${MONTHS}) \\d{1,2})$`);
 const RE_CALLED_AT = /\bat about (-?\d+(?:\.\d+)?)/;
-const plain = (s) => String(s || "").replace(/\s*\([^)]*\)/g, "");
+// A parenthetical is dropped from the sentence a rule is read from — unless it IS a unit: a short
+// one ("(lb)", "(in pounds)", "(17.9 points)") that names a unit, which must survive so the number
+// beside it keeps it (site-to-A round 1). A gloss in parentheses ("(his wrist strap’s morning score
+// out of 100)") is still dropped: the unit of that score is said by `toleranceWithUnit`.
+const UNIT_WORDS = /\b(?:lbs?|pounds?|kg|hours?|minutes?|kcal|g|grams?|points?)\b|%/i;
+const isUnit = (inner) => UNIT_WORDS.test(inner) && (/\d/.test(inner) || inner.trim().split(/\s+/).length <= 3);
+const plain = (s) => String(s || "").replace(/\s*\(([^)]*)\)/g, (m, inner) => (isUnit(inner) ? m : ""));
 const betQuestion = (call) => {
   const m = RE_BET.exec(plain(call && call.called));
   return m ? m[1] : "";
@@ -59,16 +65,28 @@ export function toleranceNote(call) {
 
 /** The unit a served allowed distance is in (red team 2026-10-17: "not within 17.3 either way"
  *  had none). A served text that carries its unit ("4 lb", "1.2 hours") keeps it. A bare number
- *  takes the unit of the measure the call's own served sentence names — only measures listed
- *  here, each one a score whose unit is not a guess. Anything else: null, and the rule is said
- *  without the number ("not within the allowed distance") rather than with a unit invented. */
-const SCORE_UNITS = [[/\brecovery score\b/i, "points"]];
+ *  takes the SERVED unit when the route names one (`tolerance.unit`, then the call's own `unit` —
+ *  lane E of #4580 adds them; absent, nothing breaks), else the unit of the measure the call's
+ *  own served sentence names — only measures listed here, each one a score whose unit is not a
+ *  guess. Site-to-A round 1: recovery is a percentage on every kit page (the day's "recovery 62%",
+ *  the trend, this card), so a bare recovery distance is "17.9%" — one quantity, one unit, where it
+ *  was "points" here, "%" there and "out of 100" on the trend. Anything else: null, and the rule
+ *  is said without the number ("not within the allowed distance") rather than with a unit invented. */
+const SCORE_UNITS = [[/\brecovery score\b/i, "%"]];
+const withUnit = (tol, unit) => (unit === "%" ? `${tol}%` : `${tol} ${unit}`);
+export function servedUnit(call) {
+  const t = call && call.tolerance;
+  const u = (t && typeof t.unit === "string" && t.unit.trim()) || (call && typeof call.unit === "string" && call.unit.trim()) || "";
+  return u;
+}
 export function toleranceWithUnit(call) {
   const tol = toleranceText(call);
   if (!tol) return "";
   if (!/^-?\d+(?:\.\d+)?$/.test(tol)) return tol;
+  const served = servedUnit(call);
+  if (served) return withUnit(tol, served);
   const hit = SCORE_UNITS.find(([re]) => re.test(String((call && call.called) || "")));
-  return hit ? `${tol} ${hit[1]}` : null;
+  return hit ? withUnit(tol, hit[1]) : null;
 }
 
 /** The rule that decided a verdict on this call, in the route's own words. `right` is the
