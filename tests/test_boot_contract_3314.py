@@ -340,4 +340,17 @@ def test_schedules_plane_matches_the_lambdas_plane():
     fixed = [r for r in MODEL["schedules"] if r["utc"]]
     assert all(re.fullmatch(r"\d{2}:\d{2}", r["utc"]) for r in fixed)
     daily_brief = [r for r in MODEL["schedules"] if r["lambda"] == "daily-brief"]
-    assert daily_brief and daily_brief[0]["utc"] == "17:00"  # the 17:00 UTC brief CLAUDE.md describes
+    # #4284: the brief is 10:00 America/Los_Angeles (EventBridge Scheduler), so the model carries its
+    # zone + wall-clock and NO fixed UTC clock — 17:00 UTC until 2026-11-01, 18:00 UTC after.
+    assert daily_brief and daily_brief[0]["utc"] is None, daily_brief
+    assert daily_brief[0]["tz"] == "America/Los_Angeles" and daily_brief[0]["local"] == "10:00", daily_brief
+
+
+def test_next_runs_resolve_the_zoned_brief_under_the_given_clock():
+    """#4284: the boot brief places the zoned daily-brief on the UTC clock of the instant it is
+    handed — 17:00Z under PDT, 18:00Z under PST — never a UTC literal pinned in the model."""
+    pdt = dt.datetime(2026, 10, 31, 16, 0, tzinfo=dt.timezone.utc)
+    pst = dt.datetime(2026, 11, 2, 16, 0, tzinfo=dt.timezone.utc)
+    by_name = lambda runs: {r["lambda"]: r["utc"] for r in runs}  # noqa: E731
+    assert by_name(bb.next_runs(MODEL, pdt, n=len(MODEL["schedules"])))["daily-brief"] == "17:00"
+    assert by_name(bb.next_runs(MODEL, pst, n=len(MODEL["schedules"])))["daily-brief"] == "18:00"

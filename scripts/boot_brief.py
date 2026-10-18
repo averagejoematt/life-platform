@@ -112,11 +112,27 @@ def resolve(model: dict, path: str):
     return cur
 
 
+def _zoned_utc(local_hhmm: str, tz: str, now: _dt.datetime) -> str:
+    """`HH:MM` UTC of a zone's wall-clock time on `now`'s date in that zone (#4284)."""
+    from zoneinfo import ZoneInfo
+
+    hh, mm = (int(x) for x in local_hhmm.split(":"))
+    aware = now if now.tzinfo is not None else now.replace(tzinfo=_dt.timezone.utc)
+    wall = aware.astimezone(ZoneInfo(tz)).replace(hour=hh, minute=mm, second=0, microsecond=0)
+    return wall.astimezone(_dt.timezone.utc).strftime("%H:%M")
+
+
 def next_runs(model: dict, now: _dt.datetime, n: int = 3) -> list[dict]:
     """The next `n` fixed-time schedule rows after `now` (UTC), wrapping past midnight.
     Day-of-week/month fields are NOT evaluated — this is 'what the clock says next', and
     it says so; a MON-only cron shows on a Tuesday with its expr visible."""
     rows = [r for r in model.get("schedules", []) if r.get("utc")]
+    # #4284: a zoned row (tz + local wall-clock, utc None in the model) resolves to a UTC
+    # clock under THIS `now` — the only place the brief may do that, because `now` is the
+    # caller's instant (frozen in tests), not a value pinned into the generated model.
+    for r in model.get("schedules", []):
+        if not r.get("utc") and r.get("tz") and r.get("local"):
+            rows.append({**r, "utc": _zoned_utc(r["local"], r["tz"], now)})
     if not rows:
         return []
     hhmm = now.strftime("%H:%M")
@@ -194,7 +210,10 @@ def render_lines(model: dict, now: _dt.datetime | None = None) -> list[str]:
         else "STALE — " + "; ".join(problems) + " — regenerate: python3 scripts/generate_platform_model.py"
     )
     routing = " · ".join(f"{k} {v}" for k, v in f["alarms_by_routing"].items())
-    runs = " · ".join(f"{r['utc']}Z {r['lambda']}" for r in f["next_runs"]) or "no fixed-time schedules"
+    runs = (
+        " · ".join(f"{r['utc']}Z {r['lambda']}" + (f" ({r['local']} {r['tz']})" if r.get("tz") else "") for r in f["next_runs"])
+        or "no fixed-time schedules"
+    )
     consent = f["consent"]
     carry = f["_review_carry_forward"]
     cap = carry["cap_days"] if carry["cap_days"] is not None else "?"

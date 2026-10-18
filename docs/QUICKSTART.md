@@ -141,7 +141,7 @@ curl to the Function URL should return **401** (healthy), not 5xx.
 
 ## 4. Check Daily-Brief Output
 
-The daily-brief Lambda runs at 17:00 UTC (10 AM PDT / 9 AM PST — `cron(0 17 * * ? *)` in `email_stack.py`) and is the platform heartbeat. To verify it ran successfully today:
+The daily-brief Lambda runs at 10:00 Pacific year-round (17:00 UTC until 2026-11-01, 18:00 UTC after — `cron(0 10 * * ? *)` in `America/Los_Angeles`, an EventBridge Scheduler schedule in `email_stack.py`, #4284) and is the platform heartbeat. To verify it ran successfully today:
 
 ```bash
 # Latest invocation logs (last 10 minutes)

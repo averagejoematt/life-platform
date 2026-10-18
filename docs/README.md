@@ -139,7 +139,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | `briefs/` | Dated feature briefs (historical) |
 | `audits/` · `v2-audits/` · `rca/` | Dated audit + post-mortem records |
 | `restart/` | **Machine-written** reset-pipeline run reports (the restart scripts write here — do not relocate) |
-| `site-reviews/` | Dated site reviews |
+| `site-reviews/` | Dated site reviews. **Latest: [SITE_REVIEW_2026-10-18](site-reviews/SITE_REVIEW_2026-10-18.md)** — the twelve v8 kit pages graded by eight independent graders + two verifiers, fixed once (PR #4988), re-graded by a fresh pair; letters in [`site_grades_2026-10-18.json`](site-reviews/site_grades_2026-10-18.json). Prior: [SITE_REVIEW_2026-06-21](site-reviews/SITE_REVIEW_2026-06-21.md) (the v4 four-door full-site pass, superseded by the rebuild) |
 | `qa/` | QA gate ledgers ([SURFACE_DRIFT_EXEMPTIONS.md](qa/SURFACE_DRIFT_EXEMPTIONS.md) — the #1454 surface-drift gate's dated exemption ledger) |
 
 ---

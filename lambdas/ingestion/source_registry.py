@@ -1297,6 +1297,9 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "probe_functions": (
             ("notion-journal-ingestion", "Notion"),
             ("journal-enrichment", "Journal Enrichment"),
+            # Q39: the three feeds that owned this probe are retired (paused), and a paused source is never
+            # invoked; social-enrichment is still scheduled daily, so a live source carries its probe.
+            ("social-enrichment", "Social Enrichment"),
         ),  # #4643: the daily boot probe's targets
         "expected_days": 5,
         # was checked as a phantom "journal" partition in qa_smoke — the real
@@ -1340,19 +1343,18 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "behavioral": True,  # public posting is the behavior
         "social_channel": True,  # #2806/#2807/#2808: registry vocabulary for social/broadcast channels
         "stale_hours": None,
+        "paused": True,  # Q39 tombstone: the entry stays, reported paused, never counted stale
         "freshness": False,  # registry-resident until the channel id is provisioned (#1669)
         "monitored": False,  # never paged; not on the public board yet
         "active_api": False,  # keyless RSS pull; flip True once the channel id is live
-        "probe_functions": (
-            ("youtube-social-ingestion", "YouTube"),
-            ("social-enrichment", "Social Enrichment"),
-        ),  # #4643: the daily boot probe's targets
+        "probe_functions": (("youtube-social-ingestion", "YouTube"),),  # #4643: the daily boot probe's targets
         "expected_days": None,  # sporadic — not a reconciliation source
         "qa_tier": None,
-        # cadence reason (internal, kept out of the published method text): was hourly; 0 rows in 252 runs; placeholder account (#4641, #1669)
-        "method": "Keyless per-channel RSS pull (framework), 2x daily",
+        # RETIRED schedule, owner Q39 2026-10-17 (#4644): "no — retire the three schedules". 0 rows in 756 scheduled runs across the three feeds
+        # (#4641); the function stays deployed, invokable by hand, until accounts exist.
+        "method": "Schedule retired 2026-10-17 (Q39) — no scheduled pull; function kept, invoke by hand if an account is provisioned",
         "metrics": "Video posts — the outbound public voice, ingested back in",
-        "posture": "portfolio",
+        "posture": "paused",
         # #1682 follow-up: deliberately NO capture_channel. YouTube is a scheduled,
         # keyless RSS pull with no human in the capture loop — per this registry's
         # contract (see the capture_channel doc above) an automatic pipe must not
@@ -1388,19 +1390,18 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "behavioral": True,  # public posting is the behavior
         "social_channel": True,  # #2806/#2807/#2808: registry vocabulary for social/broadcast channels
         "stale_hours": None,
+        "paused": True,  # Q39 tombstone: the entry stays, reported paused, never counted stale
         "freshness": False,  # registry-resident until the handle is provisioned (#1676)
         "monitored": False,  # never paged; not on the public board yet
         "active_api": False,  # keyless public AppView pull; flip True once the handle is live
-        "probe_functions": (
-            ("bluesky-social-ingestion", "Bluesky"),
-            ("social-enrichment", "Social Enrichment"),
-        ),  # #4643: the daily boot probe's targets
+        "probe_functions": (("bluesky-social-ingestion", "Bluesky"),),  # #4643: the daily boot probe's targets
         "expected_days": None,  # sporadic — not a reconciliation source
         "qa_tier": None,
-        # cadence reason (internal, kept out of the published method text): was hourly; 0 rows in 252 runs; placeholder account (#4641, #1669)
-        "method": "Keyless public AppView pull (framework), 2x daily",
+        # RETIRED schedule, owner Q39 2026-10-17 (#4644): "no — retire the three schedules". 0 rows in 756 scheduled runs across the three feeds
+        # (#4641); the function stays deployed, invokable by hand, until accounts exist.
+        "method": "Schedule retired 2026-10-17 (Q39) — no scheduled pull; function kept, invoke by hand if an account is provisioned",
         "metrics": "Posts — the outbound public voice, ingested back in",
-        "posture": "portfolio",
+        "posture": "paused",
         # Deliberately NO capture_channel — same #1682 rationale as youtube: a
         # scheduled, keyless pull with no human in the capture loop must not carry
         # one (would mislabel it a manual "you forgot to log" source).
@@ -1432,19 +1433,18 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "behavioral": True,  # public posting is the behavior
         "social_channel": True,  # #2806/#2807/#2808: registry vocabulary for social/broadcast channels
         "stale_hours": None,
+        "paused": True,  # Q39 tombstone: the entry stays, reported paused, never counted stale
         "freshness": False,  # registry-resident until the instance/handle is provisioned (#1676)
         "monitored": False,  # never paged; not on the public board yet
         "active_api": False,  # keyless public REST pull; flip True once the account is live
-        "probe_functions": (
-            ("mastodon-social-ingestion", "Mastodon"),
-            ("social-enrichment", "Social Enrichment"),
-        ),  # #4643: the daily boot probe's targets
+        "probe_functions": (("mastodon-social-ingestion", "Mastodon"),),  # #4643: the daily boot probe's targets
         "expected_days": None,  # sporadic — not a reconciliation source
         "qa_tier": None,
-        # cadence reason (internal, kept out of the published method text): was hourly; 0 rows in 252 runs; placeholder account (#4641, #1669)
-        "method": "Keyless public REST pull (framework), 2x daily",
+        # RETIRED schedule, owner Q39 2026-10-17 (#4644): "no — retire the three schedules". 0 rows in 756 scheduled runs across the three feeds
+        # (#4641); the function stays deployed, invokable by hand, until accounts exist.
+        "method": "Schedule retired 2026-10-17 (Q39) — no scheduled pull; function kept, invoke by hand if an account is provisioned",
         "metrics": "Posts — the outbound public voice, ingested back in",
-        "posture": "portfolio",
+        "posture": "paused",
         # Deliberately NO capture_channel — same #1682 rationale as youtube.
         # Not on the public /data/ + gear catalogues yet — the source is wired but
         # awaits owner instance/handle provisioning + the S4 display story (epic #1668).
