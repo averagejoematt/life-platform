@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-13T01:38:40.548004+00:00",
-  "served_at": "2026-10-13T01:38:40.548004+00:00",
+  "generated_at": "2026-10-17T23:29:08.831243+00:00",
+  "served_at": "2026-10-17T23:29:08.831243+00:00",
   "cache_seconds": 300,
-  "request_id": "9b59aa28075d4a0b"
+  "request_id": "76625914e7dd43f0"
  },
  "persona_id": "sleep_coach",
  "name": "Lisa Park",
@@ -89,17 +89,17 @@
   "disclosure": "Authored character design \u2014 fixed numbers written into the cast by the author, not generated and not measured."
  },
  "latest_checked": {
-  "prediction_id": "pred_20260926_recovery_score_will_be_approximately_85",
-  "claim": "Recovery score will be approximately 85.3% tomorrow, with 80% confidence interval of 60.9\u2013100%",
-  "created_date": "2026-09-26",
+  "prediction_id": "pred_20261003_once_morning_notes_resume_and_protein_st",
+  "claim": "Once morning notes resume and protein stabilizes above 145 grams, the recovery interval will narrow in a defensible direction",
+  "created_date": "2026-10-03",
   "pre_registered_at": null,
-  "outcome_date": "2026-10-11",
+  "outcome_date": "2026-10-17",
   "metric": "recovery_score",
-  "eval_type": "point",
-  "condition": "within",
-  "threshold": 85.3,
-  "actual_value": 89.0,
-  "status": "confirmed"
+  "eval_type": "directional",
+  "condition": "up",
+  "threshold": null,
+  "actual_value": -0.3878,
+  "status": "refuted"
  },
  "instrument": {
   "source": "whoop",
@@ -109,26 +109,24 @@
  "reason": null,
  "stance": {
   "source": "stance",
-  "headline_read": "I've refuted three consecutive deep sleep predictions in a row, which means I'm reading noise as signal rather than waiting for the behavioral drivers to activate. Matthew's protein is drifting below the threshold I set for slow-wave sleep, Zone 2 training hasn't appeared in Strava, and morning logging has gone silent for sixteen days. I'm holding my deep sleep directional claims and watching whether any of these three levers move.",
+  "headline_read": "I've now refuted six consecutive predictions across deep sleep and recovery score, which means my mechanistic model is not capturing what drives Matthew's sleep architecture. The latest refutation\u2014recovery score collapsing sharply over two weeks when I predicted stability\u2014tells me I'm still fitting noise. Protein remains below target, Zone 2 training is absent, and morning logging has gone silent. I'm holding tight to what I can actually see: wearable data collection is reliable, but behavioral activation on all three levers has stalled completely.",
   "focused_on_now": [
-   "whether his protein intake stays up or keeps dropping",
-   "whether he starts logging how he feels when waking up",
-   "whether easy cardio workouts show up in his training log"
+   "whether his protein intake stabilizes or continues dropping",
+   "whether he resumes logging how he feels in the morning",
+   "whether structured easy cardio workouts appear in his training log"
   ],
-  "set_aside_for_now": [
-   "predicting which direction his deep sleep will go next"
-  ],
+  "set_aside_for_now": [],
   "stage": {
-   "rationale": "Matthew collects wearable data reliably, but three refuted deep sleep predictions in a row tell me I'm pattern-matching noise. His protein is at the edge of my activation threshold and trending down. Zone 2 training\u2014the mechanism I hypothesized would drive deep sleep\u2014has not appeared in Strava. Morning logging silence blocks subjective validation. He's in a holding pattern until one of these behavioral levers engages.",
-   "label": "Waiting for behavioral activation; noise-signal boundary unclear"
+   "label": "Prediction model unreliable; behavioral levers disengaged",
+   "rationale": "Six refuted predictions in sequence tell me I am fitting noise, not signal. The three mechanisms I hypothesized\u2014protein intake, Zone 2 adenosine accumulation, and morning subjective anchoring\u2014remain dormant. The latest recovery score collapse refutes my stability prediction directly. Without movement on any of these levers, I cannot distinguish real sleep architecture change from device variance. Matthew is in a holding pattern, and my model cannot resolve it."
   },
-  "how_my_read_changed": "",
-  "confidence_note": "My hit rate across sleep subdomain is 0.467, and my recent deep sleep directional predictions are 0-for-3. I'm holding wide uncertainty on deep sleep until protein stabilizes, Zone 2 training appears, or morning logging resumes. On recovery score directional trend, I concede the October 5 docket dispute (2026-10-05)\u2014my prediction missed the criterion we agreed to at open\u2014so I'm not making directional recovery claims without wider intervals.",
-  "as_of": "2026-10-11",
+  "how_my_read_changed": "The recovery score refutation on 2026-10-17 (sharp downward swing when I predicted stability) extends my pattern of six consecutive prediction misses. This is not a minor miss\u2014it's a directional reversal that confirms my mechanistic model is not capturing the drivers of his recovery. I'm not revising my positions on protein or Zone 2; I'm deepening my conviction that without behavioral activation on those levers, my predictions will continue to fail. The silence on morning logging remains the critical gap.",
+  "confidence_note": "My hit rate across sleep and recovery domains is low (0.5 each), and my recent prediction streak is 0-for-6. I have high confidence in wearable data reliability and in the structural barriers blocking protocol adoption, but very low confidence in directional recovery or deep sleep claims. I cite the standing concession on recovery score directional trend (2026-10-05) and will not relitigate that topic.",
+  "as_of": "2026-10-17",
   "grounding_flag": false,
   "graduation_gate": "",
   "band_metric": "weight_lbs",
-  "current_value": 308.29,
+  "current_value": 302.22,
   "rung": {
    "stage_id": "foundation",
    "entry": {
@@ -172,6 +170,33 @@
  },
  "stance_history": [
   {
+   "as_of": "2026-10-17",
+   "headline_read": "I've now refuted six consecutive predictions across deep sleep and recovery score, which means my mechanistic model is not capturing what drives Matthew's sleep architecture. The latest refutation\u2014recovery score collapsing sharply over two weeks when I predicted stability\u2014tells me I'm still fitting noise. Protein remains below target, Zone 2 training is absent, and morning logging has gone silent. I'm holding tight to what I can actually see: wearable data collection is reliable, but behavioral activation on all three levers has stalled completely.",
+   "stage": {
+    "label": "Prediction model unreliable; behavioral levers disengaged",
+    "rationale": "Six refuted predictions in sequence tell me I am fitting noise, not signal. The three mechanisms I hypothesized\u2014protein intake, Zone 2 adenosine accumulation, and morning subjective anchoring\u2014remain dormant. The latest recovery score collapse refutes my stability prediction directly. Without movement on any of these levers, I cannot distinguish real sleep architecture change from device variance. Matthew is in a holding pattern, and my model cannot resolve it."
+   },
+   "how_my_read_changed": "The recovery score refutation on 2026-10-17 (sharp downward swing when I predicted stability) extends my pattern of six consecutive prediction misses. This is not a minor miss\u2014it's a directional reversal that confirms my mechanistic model is not capturing the drivers of his recovery. I'm not revising my positions on protein or Zone 2; I'm deepening my conviction that without behavioral activation on those levers, my predictions will continue to fail. The silence on morning logging remains the critical gap."
+  },
+  {
+   "as_of": "2026-10-15",
+   "headline_read": "I've now refuted five consecutive predictions across deep sleep and recovery score, which means my mechanistic model is not capturing what drives Matthew's sleep architecture. Protein remains below threshold, Zone 2 training is absent, and morning logging has gone silent for 16 days. I'm no longer attempting directional recovery claims and am holding tight to what I can actually see: wearable data collection is reliable, but behavioral activation on the three levers I need\u2014protein intake, structured training, and subjective logging\u2014has stalled completely.",
+   "stage": {
+    "label": "Prediction model unreliable; behavioral levers disengaged",
+    "rationale": "Five refuted predictions in sequence tell me I am fitting noise, not signal. The three mechanisms I hypothesized\u2014protein intake, Zone 2 adenosine accumulation, and morning subjective anchoring\u2014remain dormant. Without movement on any of these levers, I cannot distinguish real sleep architecture change from device variance. Matthew is in a holding pattern, and my model cannot resolve it."
+   },
+   "how_my_read_changed": "The recovery score prediction refutation (down predicted, flat observed) confirms what the deep sleep refutations already showed: my mechanistic model is not capturing the drivers of Matthew's sleep metrics. I am now explicitly setting aside directional recovery and deep sleep claims rather than continuing to generate predictions I cannot ground in activated behavioral change. This is a genuine shift from attempting to model the mechanism to acknowledging that without protein intake movement, training volume, or morning logging data, I have no reliable signal to work with."
+  },
+  {
+   "as_of": "2026-10-14",
+   "headline_read": "I've now refuted four consecutive deep sleep predictions, which tells me my adenosine hypothesis is not activating as I modeled it. Matthew's protein remains below threshold, Zone 2 training is absent from Strava, and morning logging has stayed silent for over two weeks. I'm no longer confident in directional deep sleep claims and am shifting focus to the structural barriers blocking the behavioral levers I need to see move.",
+   "stage": {
+    "label": "Behavioral activation stalled; prediction model unreliable",
+    "rationale": "Four refuted deep sleep predictions in sequence mean I'm fitting noise, not signal. The three mechanisms I hypothesized\u2014protein intake, Zone 2 adenosine accumulation, and morning subjective anchoring\u2014have not engaged. Matthew collects wearable data reliably, but without behavioral movement on any of these levers, I cannot distinguish real sleep architecture change from device variance. He remains in a holding pattern."
+   },
+   "how_my_read_changed": "The fourth consecutive deep sleep prediction refutation has shifted me from 'waiting for activation' to 'my model is not capturing what's happening.' I'm no longer making directional deep sleep claims. I'm now prioritizing whether the three behavioral levers (protein, Zone 2 training, morning logging) actually move, because without at least one of them engaging, I have no mechanistic ground to stand on. This is a genuine correction: my adenosine hypothesis was premature."
+  },
+  {
    "as_of": "2026-10-11",
    "headline_read": "I've refuted three consecutive deep sleep predictions in a row, which means I'm reading noise as signal rather than waiting for the behavioral drivers to activate. Matthew's protein is drifting below the threshold I set for slow-wave sleep, Zone 2 training hasn't appeared in Strava, and morning logging has gone silent for sixteen days. I'm holding my deep sleep directional claims and watching whether any of these three levers move.",
    "stage": {
@@ -212,15 +237,6 @@
    "headline_read": "I remain cautious about deep sleep trend interpretation given early-window noise and the absence of the Zone 2 training driver I predicted would activate slow-wave increases. The recent downward refutation doesn't shift my core mechanistic read\u2014I predicted upward movement contingent on structured adenosine accumulation that hasn't yet appeared in his logs, so the absence of that driver is more informative than the direction itself. My focus stays on protocol stability, protein intake stabilization, and waiting for the training data that would reshape architecture.",
    "stage": {
     "rationale": "Matthew is in a holding pattern after 38 days with high rapport but incomplete behavioral compliance on logging. The simplified protocol is now active but signal quality remains unproven. The deep sleep refutation is consistent with noise in the absence of the mechanistic driver (Zone 2 adenosine accumulation) I predicted would activate increases. He's waiting for the levers\u2014protein intake sustained at threshold, structured training volume\u2014to appear before architecture changes become interpretable.",
-    "label": "Protocol stabilization, signal waiting"
-   },
-   "how_my_read_changed": ""
-  },
-  {
-   "as_of": "2026-10-03",
-   "headline_read": "I'm watching Matthew's deep sleep closely but remain cautious about trend interpretation given early-window noise and unresolved sensor-subjective gaps. The recent downward refutation doesn't shift my core read\u2014I predicted upward movement pending Zone 2 training data that hasn't yet appeared in his logs, so the absence of that driver is more informative than the direction itself. My focus stays on stabilizing the protocol, anchoring subjective experience first, and waiting for structured training to generate the adenosine signal I expect will reshape his architecture.",
-   "stage": {
-    "rationale": "Matthew is 31 days in with high rapport but low behavioral compliance on logging. I've shifted from elegant friction-heavy design to simplified checks. The deep sleep refutation is noise in the absence of the Zone 2 training driver I predicted would activate slow-wave increases. He's not yet in the structured training phase where adenosine accumulation becomes measurable. My read is that he's in a holding pattern\u2014protocol is now usable, but the mechanistic levers (protein intake, Zone 2 volume) are either absent or not yet visible in the data. I'm waiting for those to appear before interpreting architecture changes.",
     "label": "Protocol stabilization, signal waiting"
    },
    "how_my_read_changed": ""
@@ -298,17 +314,17 @@
  },
  "report_card": {
   "track_record": {
-   "confirmed": 17,
-   "refuted": 24,
-   "decided": 41,
-   "hit_rate_pct": 41.5,
+   "confirmed": 19,
+   "refuted": 27,
+   "decided": 46,
+   "hit_rate_pct": 41.3,
    "record": {
-    "confirmed": 17,
-    "refuted": 24,
-    "n": 41,
-    "through": "2026-10-11"
+    "confirmed": 19,
+    "refuted": 27,
+    "n": 46,
+    "through": "2026-10-17"
    },
-   "headline": "17 of 41 checked calls right (41%) through October 11",
+   "headline": "19 of 46 checked calls right (41%) through October 17",
    "comparison": {
     "rule": "nothing_changes",
     "rule_words": "a guess that nothing changes",
@@ -331,13 +347,13 @@
       "rule_right_pct": 39.1
      },
      "direction": {
-      "graded": 14,
-      "coach_right": 2,
-      "scored": 14,
-      "coach_right_on_scored": 2,
-      "rule_right": 2,
-      "coach_only": 2,
-      "rule_only": 2,
+      "graded": 18,
+      "coach_right": 3,
+      "scored": 18,
+      "coach_right_on_scored": 3,
+      "rule_right": 3,
+      "coach_only": 3,
+      "rule_only": 3,
       "unscorable": 0,
       "unscorable_reasons": {},
       "not_yet_scored": 0,
@@ -347,11 +363,11 @@
       "rule_right_pct": null
      },
      "yes_no": {
-      "graded": 2,
-      "coach_right": 1,
-      "scored": 2,
-      "coach_right_on_scored": 1,
-      "rule_right": 1,
+      "graded": 3,
+      "coach_right": 2,
+      "scored": 3,
+      "coach_right_on_scored": 2,
+      "rule_right": 2,
       "coach_only": 0,
       "rule_only": 0,
       "unscorable": 0,
@@ -382,18 +398,42 @@
     "unclassified": 0,
     "scored_complete": true,
     "skill": {
-     "n": 41,
-     "brier_skill": -0.0157,
-     "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
+     "n": 46,
+     "brier_skill": -0.0214,
+     "sentence": "Across 46 checked calls, so far they do not beat a simple guess."
     },
-    "rule_sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell.",
-    "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell.",
+    "rule_sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell.",
+    "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
    "preliminary": false,
-   "n_note": "n=41 decided",
+   "n_note": "n=46 decided",
    "recent": [
+    {
+     "date": "2026-10-17",
+     "status": "refuted",
+     "metric": "recovery_score",
+     "reason": "recovery_score 98 on 2026-10-03 -> 60 on 2026-10-17 (change -38, band \u00b111.5, window 2026-10-03..2026-10-17): trend=down, predicted=up"
+    },
+    {
+     "date": "2026-10-16",
+     "status": "confirmed",
+     "metric": "recovery_score",
+     "reason": "recovery_score 98 on 2026-10-02 -> 70 on 2026-10-16 (change -28, band \u00b111.5, window 2026-10-02..2026-10-16): trend=down, predicted=down"
+    },
+    {
+     "date": "2026-10-15",
+     "status": "refuted",
+     "metric": "recovery_score",
+     "reason": "predicted down, metric flat \u2014 recovery_score 62 on 2026-10-01 -> 59 on 2026-10-15 (change -3, band \u00b114, window 2026-10-01..2026-10-15)"
+    },
+    {
+     "date": "2026-10-14",
+     "status": "refuted",
+     "metric": "deep_pct",
+     "reason": "deep_pct 24.1 on 2026-09-23 -> 18.2 on 2026-10-07 (change -5.9, band \u00b12.3, window 2026-09-23..2026-10-07): trend=down, predicted=up"
+    },
     {
      "date": "2026-10-11",
      "status": "confirmed",
@@ -405,30 +445,6 @@
      "status": "confirmed",
      "metric": "total_protein_g",
      "reason": "total_protein_g trend=up (slope=0.0236), predicted=up"
-    },
-    {
-     "date": "2026-10-11",
-     "status": "refuted",
-     "metric": "deep_pct",
-     "reason": "deep_pct trend=down (slope=-0.1247), predicted=up"
-    },
-    {
-     "date": "2026-10-10",
-     "status": "confirmed",
-     "metric": "recovery_score",
-     "reason": "recovery_score=98.00 on 2026-10-04 vs predicted 90.6 \u00b118.3648 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=18.3648)); |\u0394|=7.40 \u2192 within tolerance"
-    },
-    {
-     "date": "2026-10-10",
-     "status": "refuted",
-     "metric": "recovery_score",
-     "reason": "recovery_score=98.00 on 2026-10-03 vs predicted 75.8 \u00b117.8725 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=17.8725)); |\u0394|=22.20 \u2192 outside tolerance"
-    },
-    {
-     "date": "2026-10-10",
-     "status": "refuted",
-     "metric": "recovery_score",
-     "reason": "recovery_score=98.00 on 2026-10-03 vs predicted 64.7 \u00b117.8725 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=17.8725)); |\u0394|=33.30 \u2192 outside tolerance"
     }
    ],
    "caveat": "Self-assessment of this coach's own calls \u2014 not external validation."
@@ -1016,11 +1032,11 @@
     "record_id": "COMMITMENT#commit_20261002_restore_or_redesign_the_morning_check_in",
     "date": "2026-10-02",
     "text": "I've asked him to restore the morning sleep quality and room temperature check-in, trying a simpler format if needed.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-09",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-17",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1029,11 +1045,11 @@
     "record_id": "COMMITMENT#commit_20261002_provide_a_single_morning_note_with_two_n",
     "date": "2026-10-02",
     "text": "I've asked him to provide a morning note with his subjective feeling and room temperature.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-09",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-17",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1042,11 +1058,11 @@
     "record_id": "COMMITMENT#commit_20261002_before_opening_whoop_each_morning_pause",
     "date": "2026-10-02",
     "text": "I've asked him to register one word\u2014good, okay, or rough\u2014each morning before checking his device.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-09",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-17",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1055,11 +1071,11 @@
     "record_id": "COMMITMENT#commit_20261001_provide_a_two_word_morning_report_on_sle",
     "date": "2026-10-01",
     "text": "I've asked him to report his morning felt sense and room temperature for September 29.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-08",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-16",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1084,11 +1100,11 @@
     "record_id": "COMMITMENT#commit_20260930_send_one_word_good_okay_or_rough_i",
     "date": "2026-09-30",
     "text": "I've asked him to send a one-word morning check-in (good, okay, or rough) tomorrow.",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-07",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-15",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1620,11 +1636,80 @@
    "held": 48,
    "kept": 1,
    "broken": 1,
-   "pending": 7,
-   "unresolved": 39,
+   "pending": 2,
+   "unresolved": 44,
    "ungradeable": 0
   },
   "learnings": [
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-17#pred-20261003-once-morning-notes-resume-and-protein-st-refut",
+    "date": "2026-10-17",
+    "status": "refuted",
+    "metric": "recovery_score",
+    "reason": "recovery_score 98 on 2026-10-03 -> 60 on 2026-10-17 (change -38, band \u00b111.5, window 2026-10-03..2026-10-17): trend=down, predicted=up",
+    "evidence": {
+     "prediction_id": "pred_20261003_once_morning_notes_resume_and_protein_st",
+     "actual_value": -0.387755,
+     "condition": "up"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-16#pred-20261002-recovery-running-average-shows-downward-confir",
+    "date": "2026-10-16",
+    "status": "confirmed",
+    "metric": "recovery_score",
+    "reason": "recovery_score 98 on 2026-10-02 -> 70 on 2026-10-16 (change -28, band \u00b111.5, window 2026-10-02..2026-10-16): trend=down, predicted=down",
+    "evidence": {
+     "prediction_id": "pred_20261002_recovery_running_average_shows_downward",
+     "actual_value": -0.285714,
+     "condition": "down"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-16#docket-physical_coach__sleep_coach-sleep-deep-sleep-spike-interpretation-signal-vs-noise",
+    "date": "2026-10-16",
+    "status": "confirmed",
+    "metric": "deep_pct_7day_avg",
+    "reason": "dispute docket resolved: deep_pct_7day_avg >= 26 on 2026-10-16",
+    "evidence": {
+     "threshold": 26.0,
+     "condition": "gte"
+    },
+    "evidence_link": null
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-15#pred-20261001-recovery-running-average-over-the-past-s-refut",
+    "date": "2026-10-15",
+    "status": "refuted",
+    "metric": "recovery_score",
+    "reason": "predicted down, metric flat \u2014 recovery_score 62 on 2026-10-01 -> 59 on 2026-10-15 (change -3, band \u00b114, window 2026-10-01..2026-10-15)",
+    "evidence": {
+     "prediction_id": "pred_20261001_recovery_running_average_over_the_past_s",
+     "actual_value": -0.048387,
+     "condition": "down"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-14#pred-20260923-protein-slow-wave-hypothesis-could-activ-refut",
+    "date": "2026-10-14",
+    "status": "refuted",
+    "metric": "deep_pct",
+    "reason": "deep_pct 24.1 on 2026-09-23 -> 18.2 on 2026-10-07 (change -5.9, band \u00b12.3, window 2026-09-23..2026-10-07): trend=down, predicted=up",
+    "evidence": {
+     "prediction_id": "pred_20260923_protein_slow_wave_hypothesis_could_activ",
+     "actual_value": -0.244813,
+     "condition": "up"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
    {
     "kind": "learning",
     "record_id": "LEARNING#2026-10-11#pred-20260926-recovery-score-will-be-approximately-85-confir",
@@ -1910,80 +1995,6 @@
      "condition": "up"
     },
     "evidence_link": "/coaching/scorecard/"
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-10-02#pred-20260925-sleep-duration-will-be-7-8-hours-tonight-confi",
-    "date": "2026-10-02",
-    "status": "confirmed",
-    "metric": "sleep_duration_hours",
-    "reason": "sleep_duration_hours=8.61 on 2026-09-26 vs predicted 7.8 \u00b11.2107 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=1.2107)); |\u0394|=0.81 \u2192 within tolerance",
-    "evidence": {
-     "prediction_id": "pred_20260925_sleep_duration_will_be_7_8_hours_tonight",
-     "actual_value": 8.61,
-     "threshold": 7.8,
-     "condition": "within"
-    },
-    "evidence_link": "/coaching/scorecard/"
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-10-01#pred-20260910-as-training-load-builds-from-walking-bas-refut",
-    "date": "2026-10-01",
-    "status": "refuted",
-    "metric": "deep_pct",
-    "reason": "deep_pct trend=down (slope=-0.0836), predicted=up",
-    "evidence": {
-     "prediction_id": "pred_20260910_as_training_load_builds_from_walking_bas",
-     "actual_value": -0.083602,
-     "condition": "up"
-    },
-    "evidence_link": "/coaching/scorecard/"
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-09-30#pred-20260923-sleep-duration-will-be-7-4-hours-tonight-confi",
-    "date": "2026-09-30",
-    "status": "confirmed",
-    "metric": "sleep_duration_hours",
-    "reason": "sleep_duration_hours=6.69 on 2026-09-24 vs predicted 7.4 \u00b11.1787 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=1.1787)); |\u0394|=0.71 \u2192 within tolerance",
-    "evidence": {
-     "prediction_id": "pred_20260923_sleep_duration_will_be_7_4_hours_tonight",
-     "actual_value": 6.69,
-     "threshold": 7.4,
-     "condition": "within"
-    },
-    "evidence_link": "/coaching/scorecard/"
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-09-27#pred-20260913-sleep-duration-will-land-around-7-2-hour-confi",
-    "date": "2026-09-27",
-    "status": "confirmed",
-    "metric": "sleep_duration_hours",
-    "reason": "sleep_duration_hours=7.55 on 2026-09-27 vs predicted 7.2 \u00b11.2952 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=1.2952)); |\u0394|=0.35 \u2192 within tolerance",
-    "evidence": {
-     "prediction_id": "pred_20260913_sleep_duration_will_land_around_7_2_hour",
-     "actual_value": 7.55,
-     "threshold": 7.2,
-     "condition": "within"
-    },
-    "evidence_link": "/coaching/scorecard/"
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-09-27#pred-20260913-recovery-will-be-around-52-9-refuted",
-    "date": "2026-09-27",
-    "status": "refuted",
-    "metric": "recovery_score",
-    "reason": "recovery_score=89.00 on 2026-09-27 vs predicted 52.9 \u00b118.6473 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=18.6473)); |\u0394|=36.10 \u2192 outside tolerance",
-    "evidence": {
-     "prediction_id": "pred_20260913_recovery_will_be_around_52_9",
-     "actual_value": 89.0,
-     "threshold": 52.9,
-     "condition": "within"
-    },
-    "evidence_link": "/coaching/scorecard/"
    }
   ],
   "relationship": {
@@ -1998,19 +2009,7 @@
    "last_interaction_date": "2026-10-05",
    "context_summary": "sleep_coach: invested (0.94 rapport, 53 interactions across 40d)"
   },
-  "docket_positions": [
-   {
-    "kind": "docket_position",
-    "record_id": "OPEN#physical_coach__sleep_coach#sleep",
-    "date": "2026-10-02",
-    "topic": "Deep sleep spike interpretation: signal vs. noise",
-    "my_claim": "27.6% deep sleep spike on Sept 22 (1.8 SD above baseline) is likely regression-to-mean noise without thermal anchor and subjective context; requires five consecutive same-direction observations to confirm signal",
-    "versus": "physical_coach",
-    "criterion": "deep_pct_7day_avg >= 26 on 2026-10-16",
-    "resolution_date": "2026-10-16",
-    "evidence_link": "/coaching/read/"
-   }
-  ],
+  "docket_positions": [],
   "withheld": 0,
   "retracted": 0,
   "degraded": false,

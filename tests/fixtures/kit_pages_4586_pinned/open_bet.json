@@ -1,0 +1,26 @@
+{
+ "note": "The open bet and docket as captured 2026-10-13 (tests/fixtures/kit_pages_4586 at that capture). The 2026-10-17 recapture has no open bet; tests that exercise the bet card read this pinned one instead (#4586 round 2). Copied from the earlier capture, not hand-written.",
+ "bet": {
+  "state": "ok",
+  "as_of": "2026-10-16",
+  "source": "/api/coach_docket",
+  "absent_text": "No coach bet is waiting to settle.",
+  "data": {
+   "question": "Will the deep-sleep share (7-day average) be 26 or higher on Friday, October 16?",
+   "topic": "Deep sleep spike interpretation: signal vs. noise",
+   "settle_date": "2026-10-16",
+   "sides": [
+    {
+     "coach": "Max Reyes",
+     "says": "yes",
+     "reason": "Deep sleep decline is occurring simultaneously with recovery climb"
+    },
+    {
+     "coach": "Lisa Park",
+     "says": "no",
+     "reason": "27.6% deep sleep spike on Sept 22 (1.8 SD above baseline) is likely regression-to-mean noise without thermal anchor and subjective context"
+    }
+   ]
+  }
+ }
+}

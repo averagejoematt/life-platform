@@ -563,7 +563,6 @@ def test_the_logs_fetch_is_memoised_across_the_dates_one_run_ingests(monkeypatch
 
     monkeypatch.setattr(habitify_lambda, "api_get", fake_api_get)
     monkeypatch.setattr(habitify_lambda, "pacific_today", lambda: "2026-09-06")
-    monkeypatch.setattr(habitify_lambda, "FETCH_NOTES", False)
     habitify_lambda.reset_logs_cache()
     habitify_lambda.fetch_day({"api_key": "k"}, "2026-09-06")
     habitify_lambda.fetch_day({"api_key": "k"}, "2026-09-05")
@@ -592,7 +591,6 @@ def test_a_failed_logs_fetch_degrades_that_habit_alone_and_says_so(monkeypatch):
 
     monkeypatch.setattr(habitify_lambda, "api_get", fake_api_get)
     monkeypatch.setattr(habitify_lambda, "pacific_today", lambda: "2026-09-07")
-    monkeypatch.setattr(habitify_lambda, "FETCH_NOTES", False)
     habitify_lambda.reset_logs_cache()
     raw = habitify_lambda.fetch_day({"api_key": "k"}, "2026-09-06")
     assert set(raw["logs"]) == {"Stretch"}

@@ -1,24 +1,24 @@
 {
  "_meta": {
-  "generated_at": "2026-10-13T01:38:45.867488+00:00",
-  "served_at": "2026-10-13T01:38:45.867488+00:00",
+  "generated_at": "2026-10-17T23:29:14.146531+00:00",
+  "served_at": "2026-10-17T23:29:14.146531+00:00",
   "cache_seconds": 300,
-  "request_id": "3b4f61b17d2241f8"
+  "request_id": "70e2ea53f5464978"
  },
  "overall": {
-  "total": 67,
-  "confirmed": 11,
-  "refuted": 11,
-  "pending": 10,
-  "inconclusive": 0,
+  "total": 70,
+  "confirmed": 13,
+  "refuted": 14,
+  "pending": 7,
+  "inconclusive": 1,
   "expired": 1,
   "observational": 34,
-  "decided": 22,
-  "accuracy_pct": 50.0,
+  "decided": 27,
+  "accuracy_pct": 48.1,
   "due": {
-   "as_of": "2026-10-12",
+   "as_of": "2026-10-17",
    "due_now": 0,
-   "earliest_due": "2026-10-14"
+   "earliest_due": "2026-10-19"
   },
   "counted": {
    "sealed": {
@@ -26,58 +26,58 @@
     "right": 1
    },
    "bet": {
-    "n": 1,
+    "n": 2,
     "right": 1
    },
    "commentary": {
-    "n": 12,
-    "right": 6
+    "n": 16,
+    "right": 8
    },
    "conditional": {
     "n": 7,
     "right": 3
    }
   },
-  "counted_text": "Counted: 2 sealed before day one, 1 side of a bet between two coaches, 12 read out of the coaches' running commentary and 7 conditional or hedged sentences.",
+  "counted_text": "Counted: 2 sealed before day one, 2 sides of bets between two coaches, 16 read out of the coaches' running commentary and 7 conditional or hedged sentences.",
   "lifetime": {
-   "total": 468,
-   "confirmed": 12,
-   "refuted": 13,
-   "pending": 171,
-   "inconclusive": 54,
+   "total": 471,
+   "confirmed": 14,
+   "refuted": 16,
+   "pending": 168,
+   "inconclusive": 55,
    "expired": 1,
    "observational": 217,
-   "decided": 25,
-   "accuracy_pct": 48.0
+   "decided": 30,
+   "accuracy_pct": 46.7
   }
  },
  "by_coach": {
   "physical": {
-   "total": 67,
-   "confirmed": 11,
-   "refuted": 11,
-   "pending": 10,
-   "inconclusive": 0,
+   "total": 70,
+   "confirmed": 13,
+   "refuted": 14,
+   "pending": 7,
+   "inconclusive": 1,
    "expired": 1,
    "observational": 34,
-   "decided": 22,
+   "decided": 27,
    "lifetime": {
-    "total": 468,
-    "confirmed": 12,
-    "refuted": 13,
-    "pending": 171,
-    "inconclusive": 54,
+    "total": 471,
+    "confirmed": 14,
+    "refuted": 16,
+    "pending": 168,
+    "inconclusive": 55,
     "expired": 1,
     "observational": 217,
-    "decided": 25,
-    "hit_rate_pct": 48.0
+    "decided": 30,
+    "hit_rate_pct": 46.7
    },
    "retired": false,
    "record": {
-    "confirmed": 11,
-    "refuted": 11,
-    "n": 22,
-    "through": "2026-10-11"
+    "confirmed": 13,
+    "refuted": 14,
+    "n": 27,
+    "through": "2026-10-17"
    },
    "comparison": {
     "rule": "nothing_changes",
@@ -85,11 +85,11 @@
     "rule_version": 1,
     "records": {
      "number": {
-      "graded": 9,
-      "coach_right": 5,
-      "scored": 9,
-      "coach_right_on_scored": 5,
-      "rule_right": 5,
+      "graded": 10,
+      "coach_right": 6,
+      "scored": 10,
+      "coach_right_on_scored": 6,
+      "rule_right": 6,
       "coach_only": 0,
       "rule_only": 0,
       "unscorable": 0,
@@ -101,13 +101,13 @@
       "rule_right_pct": null
      },
      "direction": {
-      "graded": 10,
-      "coach_right": 4,
-      "scored": 10,
-      "coach_right_on_scored": 4,
-      "rule_right": 1,
-      "coach_only": 4,
-      "rule_only": 1,
+      "graded": 13,
+      "coach_right": 5,
+      "scored": 13,
+      "coach_right_on_scored": 5,
+      "rule_right": 2,
+      "coach_only": 5,
+      "rule_only": 2,
       "unscorable": 0,
       "unscorable_reasons": {},
       "not_yet_scored": 0,
@@ -117,13 +117,13 @@
       "rule_right_pct": null
      },
      "yes_no": {
-      "graded": 1,
+      "graded": 2,
       "coach_right": 1,
-      "scored": 1,
+      "scored": 2,
       "coach_right_on_scored": 1,
-      "rule_right": 0,
+      "rule_right": 1,
       "coach_only": 1,
-      "rule_only": 0,
+      "rule_only": 1,
       "unscorable": 0,
       "unscorable_reasons": {},
       "not_yet_scored": 0,
@@ -152,16 +152,16 @@
     "unclassified": 0,
     "scored_complete": true,
     "skill": {
-     "n": 22,
-     "brier_skill": 0.0414,
-     "sentence": "Across 22 checked calls, so far they beat a simple guess."
+     "n": 27,
+     "brier_skill": 0.0324,
+     "sentence": "Across 27 checked calls, so far they beat a simple guess."
     },
-    "rule_sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
-    "sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "rule_sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
-   "hit_rate_pct": 50.0
+   "hit_rate_pct": 48.1
   }
  },
  "comparison": {
@@ -170,11 +170,11 @@
   "rule_version": 1,
   "records": {
    "number": {
-    "graded": 9,
-    "coach_right": 5,
-    "scored": 9,
-    "coach_right_on_scored": 5,
-    "rule_right": 5,
+    "graded": 10,
+    "coach_right": 6,
+    "scored": 10,
+    "coach_right_on_scored": 6,
+    "rule_right": 6,
     "coach_only": 0,
     "rule_only": 0,
     "unscorable": 0,
@@ -186,13 +186,13 @@
     "rule_right_pct": null
    },
    "direction": {
-    "graded": 10,
-    "coach_right": 4,
-    "scored": 10,
-    "coach_right_on_scored": 4,
-    "rule_right": 1,
-    "coach_only": 4,
-    "rule_only": 1,
+    "graded": 13,
+    "coach_right": 5,
+    "scored": 13,
+    "coach_right_on_scored": 5,
+    "rule_right": 2,
+    "coach_only": 5,
+    "rule_only": 2,
     "unscorable": 0,
     "unscorable_reasons": {},
     "not_yet_scored": 0,
@@ -202,13 +202,13 @@
     "rule_right_pct": null
    },
    "yes_no": {
-    "graded": 1,
+    "graded": 2,
     "coach_right": 1,
-    "scored": 1,
+    "scored": 2,
     "coach_right_on_scored": 1,
-    "rule_right": 0,
+    "rule_right": 1,
     "coach_only": 1,
-    "rule_only": 0,
+    "rule_only": 1,
     "unscorable": 0,
     "unscorable_reasons": {},
     "not_yet_scored": 0,
@@ -237,17 +237,36 @@
   "unclassified": 0,
   "scored_complete": true,
   "skill": {
-   "n": 22,
-   "brier_skill": 0.0414,
-   "sentence": "Across 22 checked calls, so far they beat a simple guess."
+   "n": 27,
+   "brier_skill": 0.0324,
+   "sentence": "Across 27 checked calls, so far they beat a simple guess."
   },
-  "rule_sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
-  "sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+  "rule_sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+  "sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
   "min_n_for_rate": 20,
   "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
  },
  "percent_floor": 10,
  "predictions": [
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "retired": false,
+   "text": "Weight will continue to decline over the coming week",
+   "confidence": 0.5,
+   "status": "pending",
+   "date": "2026-10-15",
+   "pre_registered_at": null,
+   "pre_registered": false,
+   "due_date": "2026-11-12",
+   "gradeable": true,
+   "metric": "weight_lbs",
+   "eval_type": "directional",
+   "outcome_notes": "",
+   "reason": null,
+   "graded_on_data": null,
+   "subdomain": "weight"
+  },
   {
    "coach_id": "physical",
    "coach_name": "Max Reyes",
@@ -266,63 +285,6 @@
    "reason": null,
    "graded_on_data": null,
    "subdomain": "protein"
-  },
-  {
-   "coach_id": "physical",
-   "coach_name": "Max Reyes",
-   "retired": false,
-   "text": "Protein intake at 146.5 g per day is insufficient to defend lean mass at a 3.6 lbs per week loss rate",
-   "confidence": 0.5,
-   "status": "pending",
-   "date": "2026-10-03",
-   "pre_registered_at": null,
-   "pre_registered": false,
-   "due_date": "2026-10-17",
-   "gradeable": true,
-   "metric": "total_protein_g",
-   "eval_type": "directional",
-   "outcome_notes": "",
-   "reason": null,
-   "graded_on_data": null,
-   "subdomain": "protein"
-  },
-  {
-   "coach_id": "physical",
-   "coach_name": "Max Reyes",
-   "retired": false,
-   "text": "Running average of recovery across 27 data points since September 6 is moving downward",
-   "confidence": 0.5,
-   "status": "pending",
-   "date": "2026-10-02",
-   "pre_registered_at": null,
-   "pre_registered": false,
-   "due_date": "2026-10-16",
-   "gradeable": true,
-   "metric": "recovery_score",
-   "eval_type": "directional",
-   "outcome_notes": "",
-   "reason": null,
-   "graded_on_data": null,
-   "subdomain": "recovery"
-  },
-  {
-   "coach_id": "physical",
-   "coach_name": "Max Reyes",
-   "retired": false,
-   "text": "Recovery score will rebound toward regression-to-mean levels",
-   "confidence": 0.5,
-   "status": "pending",
-   "date": "2026-10-02",
-   "pre_registered_at": null,
-   "pre_registered": false,
-   "due_date": "2026-10-16",
-   "gradeable": true,
-   "metric": "recovery_score",
-   "eval_type": "directional",
-   "outcome_notes": "",
-   "reason": null,
-   "graded_on_data": null,
-   "subdomain": "recovery"
   },
   {
    "coach_id": "physical",
@@ -385,25 +347,6 @@
    "coach_id": "physical",
    "coach_name": "Max Reyes",
    "retired": false,
-   "text": "Daily steps will consistently meet the target on each of the first 14 days.",
-   "confidence": 0.5,
-   "status": "pending",
-   "date": "2026-09-23",
-   "pre_registered_at": null,
-   "pre_registered": false,
-   "due_date": "2026-10-14",
-   "gradeable": true,
-   "metric": "steps",
-   "eval_type": "directional",
-   "outcome_notes": "",
-   "reason": null,
-   "graded_on_data": null,
-   "subdomain": "general"
-  },
-  {
-   "coach_id": "physical",
-   "coach_name": "Max Reyes",
-   "retired": false,
    "text": "Weight loss trajectory from September 6th directional prediction will continue tracking downward.",
    "confidence": 0.5,
    "status": "pending",
@@ -421,41 +364,41 @@
   }
  ],
  "commitments": {
-  "as_of": "2026-10-12",
+  "as_of": "2026-10-17",
   "lifetime": {
    "broken": 26.0,
-   "ungradeable": 38.0,
-   "unresolved": 628.0,
-   "total": 800.0,
-   "checkable": 118.0,
-   "graded": 76.0,
-   "follow_through_pct": 65.8,
-   "pending": 58.0,
+   "checkable": 120.0,
    "follow_through_ci95": [
-    54.6,
-    75.5
+    55.1,
+    75.8
    ],
-   "kept": 50.0,
+   "follow_through_pct": 66.2,
+   "graded": 77.0,
+   "kept": 51.0,
+   "pending": 34.0,
+   "total": 812.0,
+   "ungradeable": 38.0,
    "ungradeable_by_metric": {
-    "total_protein_g": 36.0,
-    "total_calories_kcal": 2.0
-   }
+    "total_calories_kcal": 2.0,
+    "total_protein_g": 36.0
+   },
+   "unresolved": 663.0
   },
   "season": {
-   "kept": 40.0,
-   "ungradeable_by_metric": {},
-   "pending": 53.0,
-   "ungradeable": 0.0,
-   "checkable": 60.0,
-   "follow_through_pct": 69.0,
-   "total": 309.0,
-   "follow_through_ci95": [
-    56.2,
-    79.4
-   ],
-   "unresolved": 198.0,
    "broken": 18.0,
-   "graded": 58.0
+   "checkable": 62.0,
+   "follow_through_ci95": [
+    56.9,
+    79.7
+   ],
+   "follow_through_pct": 69.5,
+   "graded": 59.0,
+   "kept": 41.0,
+   "pending": 29.0,
+   "total": 321.0,
+   "ungradeable": 0.0,
+   "ungradeable_by_metric": {},
+   "unresolved": 233.0
   }
  },
  "cycle": 17,

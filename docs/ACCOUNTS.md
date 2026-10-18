@@ -1,6 +1,6 @@
 # External Accounts Inventory — what a successor needs to keep the platform alive
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-23 (#3043 DIL-012 — day-1 recovery ordering redacted to the estate kit, dated publication note added; the two ⚠️ estate rows below remain open, owner action)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17 (#4888 — the two estate rows filled from the owner's words, pointer-level; the UNDOCUMENTED pin in tests/test_reentry_hardening_check.py went 2 → 0. Prior verify 2026-08-23: #3043 DIL-012 — day-1 recovery ordering redacted to the estate kit, dated publication note added; the two ⚠️ estate rows below remain open, owner action)
 > **Sources of truth:** `lambdas/ingestion/source_registry.py` (data sources) · `docs/SECRETS_MAP.md` (credential locations) · `aws route53 list-hosted-zones` + `whois averagejoematt.com` (domain facts) · `aws ses list-identities` (email identities)
 
 Every external account/service the platform depends on, what it's for, where its
@@ -83,11 +83,11 @@ successor needs, recorded pointer-level only:
 
 | Item | Status |
 |---|---|
-| Which password manager + where its emergency/estate access lives | ⚠️ **UNDOCUMENTED — owner action required.** Matthew: record (a) the manager, (b) the estate mechanism (e.g. 1Password Emergency Kit / family recovery, iCloud Legacy Contact, printed kit + physical location) here, pointer-level only. |
-| MFA device + 2FA recovery-code locations (AWS root, GitHub, SSO) | ⚠️ **UNDOCUMENTED — owner action required.** Record where backup codes live (pointer-level only). |
+| Which password manager + where its emergency/estate access lives | **1Password.** Estate access: the printed 1Password Emergency Kit — one copy at home, one with his brother (owner's words, 2026-10-17, #4888). Pointer-level only; no vault names, codes or addresses in this repo. |
+| MFA device + 2FA recovery-code locations (AWS root, GitHub, SSO) | **In the 1Password vault** — the 2FA recovery codes for AWS root, GitHub and SSO live beside their logins (owner's words, 2026-10-17, #4888); the MFA device itself is his phone, recoverable through the Emergency Kit above. Pointer-level only. |
 | AWS root email | See password manager (deliberate — never in this repo). |
 
-Until both ⚠️ rows are filled, treat bus-factor as **1** regardless of how good the rest
+Both estate rows are filled (2026-10-17); the bus-factor leg that #1029 left open is closed, so long as the rest
 of this wiki is. This section exists so the gap is loud, not silent.
 
 **Live status check (#1029):** `python3 scripts/check_reentry_hardening.py` re-derives

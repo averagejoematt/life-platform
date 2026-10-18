@@ -47,6 +47,10 @@ BV booted Friday evening, 36 h before its Sunday window, on `next-session-proofs
 
 **Fleet at the wrap:** live at 8e22a6a7 (site-api / daily-metrics-compute / wednesday-chronicle, postflight 19:52Z); the run for 8ba41af5a (#4958) was in flight — `verify_bundle_ancestry.sh daily-metrics-compute postflight 8ba41af5a` after it concludes is the proof. `check_main_green`: GREEN at 033721053.
 
+**Addendum 2 (20:05–20:40Z, after the owner asked for more and a mobile unblock list):** three lanes ran; all three PRs are verified ships **HELD for the owner's CDK hand** (additive IAM or a schedule removal — the 2026-10-04 class): **#4959** (#4284 — the morning brief at 10:00 America/Los_Angeles through EventBridge Scheduler, unchanged before 2026-11-01; `cdk_deploy.sh LifePlatformEmail`, away from 10:00 PT) · **#4962** (#4628 box 2 — the five additive Apple Health day fields as the sum over unique reading timestamps, readings archived in S3, one S3 grant; `cdk_deploy.sh LifePlatformIngestion`) · **#4960** (#4641 — being split at the stop into a mergeable Habitify half (Q28: the 2,928 notes/mood calls a day removed; Q33 recorded) and a HELD social-schedule half (Q39; `cdk_deploy.sh LifePlatformIngestion`, `test_i24` red until the apply)). **New data bug, filed as a row on #4626:** the live HAE role has no `s3:GetObject`, so the CGM / blood-pressure / state-of-mind / workout day-file merges fail their read and keep only the latest delivery — one Get grant on the same Ingestion apply. The owner's mobile unblock list (10 items + 3b) is in the conversation of 20:05Z and restated in the morning list below with #4959/#4962/#4960-B added to item 3.
+
+**Addendum 3 (2026-10-18 00:00–03:35Z, the owner's "1 hour to use 10% of fable" and his three words "1. yes 2. confirmed 3. archive those too"):** PR #4964 merged 00:46:53Z 9e2f513f2 — the four v8 pages (`/next/v8/`, `/start/`, `/story/`, `/coaches/`) through four independent red-team rounds to A / A / A on clarity, truth and calm (voice B until his two premise sentences; site-deploy success 00:46:55Z, the fleet deploy covers site-api's `metric_unit`); PR #4963 merged 03:31Z e5fc89a13 on his "confirmed" — the two ACCOUNTS.md estate rows (1Password, the Emergency Kit at home and with his brother, the recovery codes in the vault; pointer-level), `ACCOUNTS_UNDOCUMENTED_COUNTS` 2 → 0, 28 tests green on main; #4888 closed realized and #4586 closed partial on his "yes" per screen (all five boxes ticked; the voice sentences, the "out of 100" wording and the quote-rule strictness are rows on epic #4580); the five orphan Hevy drafts archived through `manage_hevy_routine` (10-03 ×2 on "yes archive them", 10-04/10-05 ×3 on "archive those too", all `archived_local_only`) — #4935 box 4 ticks on the next 18:30Z qa-smoke run; `curate_horizon` + `archive_horizon` dry-run on "a. curate and dry-run". Open 60 → 57. Closure sweep: scanned 2, hits 0.
+
 ## Verified (reads with the proof on the issue)
 
 - **Wave 0 (none matured — the plan said so):** `/api/weekly_priority` null at 17:37Z (#4703/#4866 wait on the 10-19 14:00Z analyzer); `coherence-overall` ALARM since 10-12; budget projection day 13 at $175.60 / $215 (#4589, day 14 is 10-18); #4276 / #3552 / #3495 wait on Sunday's crons.
@@ -67,16 +71,16 @@ BV booted Friday evening, 36 h before its Sunday window, on `next-session-proofs
 **One `!` line / app action each**
 1. **Week 6**: approve the 2026-10-13 draft from the preview email or `aws lambda invoke --function-name wednesday-chronicle … '{"force": true}'` — nothing has reached subscribers since 10-09; ticks #4914 box 5 + #4533 box 3, clears `chronicle-delivery-heartbeat` at the next 19:00Z datapoint.
 2. **wk5 Panel**: release (`{"owner_approved": true}`) or retire — clears `qa-smoke-failures` (red since 10-16), ticks #4536 box 3 + #4564; the `s3:ListBucket` grant for the podcast role is still the blocker named on 10-15.
-3. **#4927**: merge it, then `bash deploy/cdk_deploy.sh LifePlatformOperational` — ticks #4628 boxes 3/5.
+3. **#4927**: merge it, then `bash deploy/cdk_deploy.sh LifePlatformOperational` — ticks #4628 boxes 3/5. **Same sitting:** `gh pr merge 4959 --squash && bash deploy/cdk_deploy.sh LifePlatformEmail` (away from 10:00 PT) and `gh pr merge 4962 --squash` + the HELD #4641 social half + `bash deploy/cdk_deploy.sh LifePlatformIngestion` (one apply covers both and the HAE GetObject row on #4626 if you add the grant first).
 4. `python3 scripts/whoop_steps_backfill_4630.py --apply` — #4630 box 1 (the last box after #4958 merges).
 5. `python3 scripts/whoop_workout_history_4629.py --apply` (two writes: the 183 off-start-day copies, the relabel — glance at Yoga → functional-fitness ×15 first) — #4629 boxes 1/3, then #4627's release box.
 6. `aws s3 cp ~/.claude/plans/PROGRESS_PHOTO_PROTOCOL_v1_2026-09-27.md s3://matthew-life-platform/config/coaching/PROGRESS_PHOTO_PROTOCOL.md` — closes #3761.
 7. `aws s3 cp config/experiment_library.json s3://matthew-life-platform/config/` + the same for `challenges_catalog.json` after #4955 merges — the live protocol text says "60–70% max HR" until then.
-8. Archive or commit the two 10-03 routine drafts (`manage_hevy_routine`) — clears `qa-smoke-warnings` (red since 10-02), #4935 box 4.
+8. ~~Archive or commit the routine drafts~~ — done 2026-10-18 03:33Z on his words (five archived); `qa-smoke-warnings` clears at the next 18:30Z run, #4935 box 4.
 9. One old Strava edit + one Whoop delete in the apps — #4638 box 5, closes it after the 17:20Z/18:20Z reconciles.
 10. `GH_POSTURE_TOKEN` → #4887 · `aws ssm put-parameter --name /life-platform/remediation-mode --value shadow` (ADR-129 names shadow; `off` since 10-03) · the #4631 journal-enrichment invoke for 2026-05-16 · `cdk_deploy.sh LifePlatformCore` + `backfill_training_notes --re-extract --apply` (#4875 #4814 #4777).
 
-**Replies:** #4584 · #4546 · #4586 (yes per screen) · #4888 (the two UNDOCUMENTED rows) · #4646 · #4590 · #4588 (PR #4928 stays a held draft) · #4645 (the sweep report PR).
+**Replies:** #4584 · #4546 · #4646 · #4590 · #4588 (PR #4928 stays a held draft) · #4645 (the sweep report PR) · epic #4580 (the two premise sentences, voice B → A). ~~#4586~~ ~~#4888~~ answered 2026-10-18 and closed.
 
 ## Residual / next picks
 
@@ -84,7 +88,7 @@ BV booted Friday evening, 36 h before its Sunday window, on `next-session-proofs
 - #4703 #4866 — 10-19 14:00Z analyzer → `/api/weekly_priority` non-null → close both; prune the `coherence-overall` citation 72 h later.
 - #4276 (Sunday 21:30Z `_note_truncation`), #4589 (day 14 on 10-18), #3552/#3495 (Sunday 19:00Z hypothesis engine) — the plan's wave 0, unchanged.
 - #4284 — reopened on Q42: the morning brief's schedule across the 2026-11-01 clock change (EventBridge Scheduler with a Pacific zone, or one moved cron); a sonnet lane.
-- #4935 — box 3 (the alarm OK on an 18:30Z run) after the owner's draft archive; prune its citation 72 h later.
+- #4935 — the drafts are archived (2026-10-18); box 4 ticks on the next 18:30Z run without `data:orphan_routine_drafts`, box 5 on the alarm OK; prune its citation 72 h later.
 - #4583 — day 14 read on 10-24 19:00Z.
 - not-work — the morning list above is the owner's; nothing on it is a lane.
 
@@ -96,7 +100,7 @@ BV booted Friday evening, 36 h before its Sunday window, on `next-session-proofs
 **Main:** green (033721053) — run for 8e22a6a7c/8ba41af5a in flight; HEAD covered by the addendum's postflight
 **Incidents:** none — the two red Docs-CI windows on main (18:06Z–18:35Z, 18:32Z–18:35Z) were under an hour each and are the gate class in Gotchas, not an incident row
 **Stash/hooks:** clean — stash empty, hook freshness 🟢, reaper removed 1 released lane (issue-1348-docs-reverify-technical), 0 dirty; 24 worktrees remain (the HELD lanes locked by name)
-**Closures:** #4261 #4257 #4789 #4702 #4677 #4642 #4644 #3943 #4423 #4424 #4880 #4604 commented (each on the owner's quoted word) · DoD: scanned 16, hits 0 after the `**Outcome:**` verdict lines and the #4677 residual homed on #4625 (`closure:live-proof` removed on the owner's "no")
+**Closures:** #4261 #4257 #4789 #4702 #4677 #4642 #4644 #3943 #4423 #4424 #4880 #4604 (+ #4888 #4586 on 10-18, addendum 3) commented (each on the owner's quoted word) · DoD: scanned 16, hits 0 after the `**Outcome:**` verdict lines and the #4677 residual homed on #4625 (`closure:live-proof` removed on the owner's "no")
 **Backlog:** Now live at 2 actionable in the fable lane after promoting #4630 (milestone + score line); `--refill-now --lane fable` finds NO REMEDY IN THE CORPUS (1 short — the nine startable stories outside the lane were refused; the morning list IS the unblock) · Later sweep — 0 stale (61 open satisfy the contract)
 **Alarms:** 4 red >72h, all cited — `qa-smoke-warnings` (#4935, now on `data:orphan_routine_drafts`, the owner's draft archive), `coherence-overall` (#4703/#4866, 10-19 14:00Z), `qa-smoke-failures` (#4536, the wk5 release/retire), `chronicle-delivery-heartbeat` (#4914, week 6's approval); the `chronicle-autopublish-held` daily flap cited on #4914; gate green at the gather
 **CI warnings:** 5 on the latest green run (604361577) — the five `SKIPPED in CI — no playwright/chromium` annotations, the standing #3640 class: no action, they run on any chromium machine (the kit gate's own chromium job passes)
