@@ -605,7 +605,16 @@ def check_line(
         reasons.append("checks_unavailable")
     reasons += binding_findings(t, sheet)
     reasons += jargon_findings(t)
+    reasons += journal_silence_findings(t)
     return list(dict.fromkeys(reasons))
+
+
+def journal_silence_findings(text: str) -> list:
+    """Journal silence is not reader copy (#4583): the Story Desk's rule, from the one shared pattern
+    (``common.journal_silence``). Live 2026-10-18: "... yet 39 days of journal silence. My read is ..."""
+    from common import journal_silence
+
+    return ["journal_silence"] if journal_silence.mentions_journal_silence(text) else []
 
 
 def jargon_findings(text: str) -> list:
@@ -699,6 +708,8 @@ def retry_note(reasons: list) -> str:
             )
         elif kind == "tic" and what in _TIC_RETRY:
             notes.append(_TIC_RETRY[what])
+        elif kind == "journal_silence":
+            notes.append("do not mention the journal's silence, absence or blank page — it is off the record; talk about the data instead")
         elif kind == "jargon":
             notes.append(f"'{what}' is a specialist word — use the plain word a friend would use")
         else:
