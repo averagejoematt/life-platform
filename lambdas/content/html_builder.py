@@ -757,7 +757,6 @@ def _habits_deep_dive(data, profile):
     habitify = data.get("habitify") or {}
     registry = profile.get("habit_registry", {})
     h_map, h_statuses = habitify.get("habits", {}), habitify.get("habit_statuses")  # #4632: id-keyed lookup
-    h_date = (habitify.get("sk") or "").replace("DATE#", "") or habitify.get("date")  # #5007: a paused habit is not scheduled
 
     if registry:
         # Tier 0 first
@@ -771,7 +770,9 @@ def _habits_deep_dive(data, profile):
                 continue
             out += '<p style="color:' + tier_color + ';font-size:9px;margin:8px 0 4px;font-weight:700;">' + tier_label + "</p>"
             for h_name, meta in sorted(tier_habits, key=lambda x: x[0]):
-                done = habitify_reading(h_map, h_name, meta, h_statuses, h_date)  # #4362/#4632: by vendor id, names as aliases
+                done = habitify_reading(
+                    h_map, h_name, meta, h_statuses, habitify.get("date")
+                )  # #4362/#4632: by vendor id, names as aliases
                 completed = done is not None and done >= 1
                 icon = "✅" if completed else ("·" if done is None else "❌")
                 why = meta.get("why_matthew", "")
@@ -792,7 +793,7 @@ def _habits_deep_dive(data, profile):
             sg = meta.get("synergy_group")
             if not sg:
                 continue
-            if (done := habitify_reading(h_map, h_name, meta, h_statuses, h_date)) is not None and done < 1:  # #4362/#4632
+            if (done := habitify_reading(h_map, h_name, meta, h_statuses, habitify.get("date"))) is not None and done < 1:  # #4362/#4632
                 synergy_misses.setdefault(sg, []).append(h_name)
         for sg, misses in synergy_misses.items():
             total = sum(1 for _, m in registry.items() if m.get("synergy_group") == sg and m.get("status") == "active")

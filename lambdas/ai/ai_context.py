@@ -11,7 +11,7 @@ import re
 from datetime import date as _date_cls
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, EXPERIMENT_TZ, PLAN_DAILY_CALORIES_TARGET  # noqa: F401
-from common.habit_pause import is_paused_on  # #5007: a paused habit is not scheduled
+from common.habit_pause import count_scheduled  # #5007: a paused habit is not scheduled
 from common.metric_truth import resolve_steps, steps_series  # #4630: the ONE steps resolver
 from common.pacific_time import pacific_now  # #2811: THE Pacific frame — journey days are PT days
 from health.scoring_engine import habitify_reading  # #4362: rename-aware habit lookup
@@ -409,9 +409,7 @@ def _build_habit_outcome_context(data, profile):
         habits_map, statuses = (day_rec.get("habits", {}), day_rec.get("habit_statuses")) if isinstance(day_rec, dict) else ({}, None)
         t0_done = sum(1 for h in tier0_names if (habitify_reading(habits_map, h, registry.get(h), statuses, date_str) or 0) >= 1)  # #4362
         t1_done = sum(1 for h in tier1_names if (habitify_reading(habits_map, h, registry.get(h), statuses, date_str) or 0) >= 1)
-        # #5007: a habit paused on this day is not scheduled — out of the denominator too.
-        t0_n = sum(1 for h in tier0_names if not is_paused_on(registry.get(h), date_str))
-        t1_n = sum(1 for h in tier1_names if not is_paused_on(registry.get(h), date_str))
+        t0_n, t1_n = count_scheduled(registry, tier0_names, date_str), count_scheduled(registry, tier1_names, date_str)  # #5007
         trend_lines.append(f"  {date_str}: T0 {t0_done}/{t0_n}, T1 {t1_done}/{t1_n}")
 
     # Known habit-outcome relationships to surface to the AI

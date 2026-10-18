@@ -51,3 +51,8 @@ def registry_entry_for(registry: Optional[Mapping[str, Any]], name: str) -> Opti
 
 def is_name_paused_on(registry: Optional[Mapping[str, Any]], name: str, date_str: Optional[str]) -> bool:
     return is_paused_on(registry_entry_for(registry, name), date_str)
+
+
+def count_scheduled(registry: Optional[Mapping[str, Any]], names: Any, date_str: Optional[str]) -> int:
+    """How many of `names` are scheduled (not paused) on `date_str` — the completion denominator."""
+    return sum(1 for n in names if not is_paused_on((registry or {}).get(n), date_str))
