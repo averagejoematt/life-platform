@@ -47,6 +47,7 @@ import json
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
+from common.pacific_time import parse_day_key
 from ingestion import health_auto_export_lambda as hae
 from ingestion.source_registry import raw_layout_for
 
@@ -71,7 +72,7 @@ def window_days(now_utc, days=WINDOW_DAYS):
 def archive_folder_prefixes(prefix, days, now_utc):
     """One listing prefix per receipt day from the first checked day through today: a
     reading for day D is archived on the day it was DELIVERED, which is D or later."""
-    first = datetime.fromisoformat(days[0]).date()
+    first = parse_day_key(days[0])  # a YYYY-MM-DD day key — the calendar-day parse, not an instant (#3609)
     today = now_utc.astimezone(timezone.utc).date()
     out = []
     d = first
