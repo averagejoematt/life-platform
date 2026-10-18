@@ -68,12 +68,11 @@ def _life_sleep(pulse: dict | None) -> Callable[[dict], tuple | None]:
     def build(body: dict) -> tuple | None:
         d = body.get("sleep_detail") or {}
         night = d.get("night_of")
-        if not parse_day_key(str(night or "")):
+        night_day = parse_day_key(str(night or ""))
+        if night_day is None:
             return None
         # The night of the 3rd is the sleep he woke from on the 4th: the row is about that morning.
-        wake = (
-            d.get("as_of_date") if parse_day_key(str(d.get("as_of_date") or "")) else (parse_day_key(night) + timedelta(days=1)).isoformat()
-        )
+        wake = d.get("as_of_date") if parse_day_key(str(d.get("as_of_date") or "")) else (night_day + timedelta(days=1)).isoformat()
         row = _rows_by_date((pulse or {}).get("pulse_history")).get(wake) or {}
         hours, recovery, read_from = _num(row.get("sleep_hours")), _num(row.get("recovery_pct")), SOURCES["pulse"]
         if hours is None:
