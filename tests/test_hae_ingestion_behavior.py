@@ -1592,18 +1592,22 @@ def _run_check(s3, table):
 
 
 class TestAdditiveIntegrityCheck:
-    def test_it_catches_todays_writer_keeping_the_largest_sync(self, handler_env):
-        """Three incremental syncs through the REAL handler (today's max-of-sync +
-        GREATEST writer), then the check over the same archived payloads: the stored
-        steps are the largest sync (2,600), the delivered day is 5,500 — a shortfall."""
+    def test_the_summing_writer_agrees_with_the_check_and_the_old_specimen_still_reds(self, handler_env):
+        """Three incremental syncs through the REAL handler, then the check over the same
+        archived payloads. Since #4962 the additive writer sums unique reading timestamps,
+        so the stored steps ARE the delivered day (5,500) and the check is green. The
+        pre-#4962 writer kept the largest sync (2,600) — the specimen #4628 describes —
+        and a stored day holding that value is still named as a shortfall."""
         s3, table = handler_env
         archived = {}
         for i, sync in enumerate((_SYNC_1, _SYNC_2, _SYNC_3)):
             hae.lambda_handler(_event(_steps_payload(sync)), _Ctx())
             _sync_stored(table)
             archived[f"{_RAW}/2026/10/0{7 + (i == 2)}_sync{i}.json"] = _steps_payload(sync)
-        assert float(table.stored["steps"]) == 2600.0  # the specimen #4628 describes
+        assert float(table.stored["steps"]) == 5500.0  # the #4962 writer: the sum over unique reading timestamps
         c = _run_check(_ListingS3(archived), table)
+        assert c.passed is True and c.message.startswith("0 of 1 ")
+        c = _run_check(_ListingS3(archived), FakeTable({"steps": Decimal("2600")}))  # the pre-#4962 specimen
         assert c.passed is None and c.chronic is True
         assert c.message.startswith("1 of 1 Apple Health field-days stored BELOW") and "steps 1" in c.message
 
