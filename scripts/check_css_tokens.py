@@ -626,6 +626,7 @@ _KIT_GROUNDS = ("--ck-bg", "--ck-panel")
 KIT_ACCENT_USES = frozenset(
     {
         "a:focus-visible",
+        "summary:focus-visible",  # the same focus ring on a disclosure (#4580 lane S)
         ".ck-badge",
         ".ck-track i",
         ".ck-meter i",
