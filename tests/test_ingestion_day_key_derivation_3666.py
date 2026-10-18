@@ -165,19 +165,6 @@ DAY_KEY_WRITERS = {
             "phantom gap nightly — pinned against exactly that by tests/test_whoop_reconciler_frame_3677.py."
         ),
     },
-    "health_auto_export_sleep.py": {
-        "source": "apple_health",
-        "origin": "reading_timestamp",
-        "frame": "utc",
-        "reason": (
-            "#4971 — NOT a new exemption: the Apple sleep sibling of health_auto_export_lambda writes the SAME "
-            "apple_health partition, whose frame is the kept-UTC ruling below (#3677). A night is keyed by the UTC "
-            "day of its own wake reading (the sleepEnd / last sample end), so its DATE# agrees with every other "
-            "field on the row; a Pacific key here would split one partition across two frames. For a wake before "
-            "17:00 PT the UTC day is the Pacific wake date, and for an onset after 17:00 PT it is the key whoop "
-            "files the same night under (#3913). Pinned by tests/test_hae_apple_sleep_4971.py::TestDayFrame."
-        ),
-    },
     "health_auto_export_lambda.py": {
         "source": "apple_health",
         "origin": "reading_timestamp",
@@ -303,9 +290,7 @@ def test_the_utc_framed_writer_set_is_exactly_the_two_ruled_on():
     migration, not the closure of an open bug.
     """
     utc = {name for name, entry in DAY_KEY_WRITERS.items() if entry["frame"] == "utc"}
-    # #4971: health_auto_export_sleep.py is the HAE partition's sleep sibling — the same
-    # kept-UTC partition, not a new UTC frame; it moves with health_auto_export_lambda.py.
-    assert utc == {"health_auto_export_lambda.py", "health_auto_export_sleep.py", "whoop_lambda.py"}, (
+    assert utc == {"health_auto_export_lambda.py", "whoop_lambda.py"}, (
         "The UTC-framed DATE# writer set changed. This ratchet only shrinks, and both members are now "
         "RULED ON (#3677): health_auto_export keeps UTC with a written consequence, whoop is UTC because its "
         f"store measurably is. Removing either means a re-frame WITH a backfill. Got: {sorted(utc)}"

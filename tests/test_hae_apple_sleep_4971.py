@@ -109,7 +109,9 @@ class StatefulTable:
 
 
 def write(table, metrics):
-    return sleep.write_apple_sleep(metrics, table, PK, hae.is_apple_device, phase_for_date=None)
+    return sleep.write_apple_sleep(
+        metrics, table, hae.is_apple_device, hae.parse_date_str, lambda d: {"pk": PK, "sk": f"DATE#{d}"}, phase_for_date=None
+    )
 
 
 # ── Source filter: Whoop / Eight Sleep never become Apple fields ──────────────
@@ -146,7 +148,7 @@ class TestDayFrame:
     def test_a_night_is_filed_under_the_morning_it_ends(self):
         """22:40 PDT 10-19 -> 06:30 PDT 10-20 is DATE#2026-10-20 — the wake date, the key
         Whoop files the same night under (onset after 17:00 PT lands on the UTC next day)."""
-        assert list(sleep.entries_from_metrics(payload(summary()), hae.is_apple_device)) == ["2026-10-20"]
+        assert list(sleep.entries_from_metrics(payload(summary()), hae.is_apple_device, hae.parse_date_str)) == ["2026-10-20"]
 
     def test_samples_of_one_session_share_the_wake_day_even_across_utc_midnight(self):
         """Samples before and after 00:00 UTC (17:00 PDT) of one session stay one night."""
@@ -154,12 +156,12 @@ class TestDayFrame:
             sample("Core", "2026-10-19 16:30:00 -0700", "2026-10-19 17:30:00 -0700"),
             sample("Deep", "2026-10-19 17:30:00 -0700", "2026-10-19 18:30:00 -0700"),
         ]
-        assert list(sleep.entries_from_metrics(payload(*recs), hae.is_apple_device)) == ["2026-10-20"]
+        assert list(sleep.entries_from_metrics(payload(*recs), hae.is_apple_device, hae.parse_date_str)) == ["2026-10-20"]
 
     def test_the_key_is_the_utc_day_of_the_wake_not_the_local_date(self):
         """A wake after 17:00 PDT is the next UTC day — the stated cost of the UTC frame."""
         rec = summary(sleepEnd="2026-10-20 18:10:00 -0700", inBedEnd="2026-10-20 18:10:00 -0700")
-        assert list(sleep.entries_from_metrics(payload(rec), hae.is_apple_device)) == ["2026-10-21"]
+        assert list(sleep.entries_from_metrics(payload(rec), hae.is_apple_device, hae.parse_date_str)) == ["2026-10-21"]
 
 
 # ── Absence (ADR-104) ────────────────────────────────────────────────────────

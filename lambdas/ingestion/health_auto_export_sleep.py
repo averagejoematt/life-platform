@@ -19,8 +19,9 @@ The contract (docs/SCHEMA.md "Apple sleep fields"):
     when EVERY `|`-separated part of its source names an Apple device — stricter than the
     generic `is_apple_device`, which accepts a missing source.
   * DAY FRAME. A night is filed under the morning it ENDS: the UTC day (the apple_health
-    `day_key_frame`, #3677) of its wake instant. For any wake before 17:00 PT that UTC day
-    IS the Pacific wake date, and for any onset after 17:00 PT it is the key Whoop files
+    `day_key_frame`, #3677) of its wake instant, derived by the webhook's own
+    `parse_date_str` (passed in) — this module derives no day of its own. For any wake
+    before 17:00 PT that UTC day IS the Pacific wake date, and for any onset after 17:00 PT it is the key Whoop files
     the same night under (#3913: a sleep begun 21:44 PT 09-18 is on DATE#2026-09-19).
   * ABSENCE (ADR-104). No Apple reading -> no field. A stage with no reading is absent,
     never 0. HAE's aggregated export zero-fills, so in that shape an unstaged night (core,
@@ -118,11 +119,6 @@ def parse_instant(value):
     return parse_iso_utc(s)
 
 
-def night_key(wake):
-    """The DATE# day a night ending at `wake` is filed under: the UTC day of the wake."""
-    return wake.astimezone(timezone.utc).strftime("%Y-%m-%d")
-
-
 def is_apple_sleep_source(source, is_apple_device):
     """True only when every `|`-part of the source is an Apple device (never a blank source)."""
     parts = [p.strip() for p in (source or "").split("|") if p.strip()]
@@ -175,8 +171,12 @@ def _summary_entry(reading, source, units):
     return key, entry, wake
 
 
-def entries_from_metrics(metrics, is_apple_device):
-    """`{night_day: {key: entry}}` for every Apple sleep reading in one payload."""
+def entries_from_metrics(metrics, is_apple_device, day_of):
+    """`{night_day: {key: entry}}` for every Apple sleep reading in one payload.
+
+    `day_of` is the webhook's own `parse_date_str` — the ONE place the apple_health
+    partition's UTC day is derived (#3677/#3913) — applied to the wake instant, so this
+    module adds no second UTC-day writer."""
     samples, nights = [], defaultdict(dict)
     for metric in metrics or ():
         if metric.get("name") not in SLEEP_METRIC_NAMES:
@@ -193,7 +193,7 @@ def entries_from_metrics(metrics, is_apple_device):
             else:
                 got = _summary_entry(reading, source, units)
                 if got:
-                    nights[night_key(got[2])][got[0]] = got[1]
+                    nights[day_of(got[2].isoformat())][got[0]] = got[1]
     # Group samples into sessions; a session is filed under the UTC day of its last end.
     samples.sort(key=lambda t: parse_instant(t[1]["start"]))
     sessions = []
@@ -204,7 +204,7 @@ def entries_from_metrics(metrics, is_apple_device):
         sessions[-1]["entries"][key] = entry
         sessions[-1]["end"] = max(sessions[-1]["end"], end)
     for sess in sessions:
-        nights[night_key(sess["end"])].update(sess["entries"])
+        nights[day_of(sess["end"].isoformat())].update(sess["entries"])
     return {d: e for d, e in nights.items() if e}
 
 
@@ -313,8 +313,11 @@ def _default_phase():
         return None
 
 
-def write_apple_sleep(metrics, table, pk, is_apple_device, phase_for_date=_default_phase):
+def write_apple_sleep(metrics, table, is_apple_device, day_of, key_of, phase_for_date=_default_phase):
     """Merge each Apple night in `metrics` into its apple_health day row. Returns nights written.
+
+    The webhook hands in its own day derivation (`day_of`, parse_date_str) and row key
+    (`key_of(day)`), so the partition's DATE# frame is decided in one module only.
 
     Read-merge-recompute per night: the stored `_rd_sleep_apple` map is unioned with this
     payload's readings (stored wins a collision) and the fields are recomputed from the
@@ -324,8 +327,8 @@ def write_apple_sleep(metrics, table, pk, is_apple_device, phase_for_date=_defau
     written = 0
     if phase_for_date is _default_phase:
         phase_for_date = _default_phase()
-    for day, new_entries in sorted(entries_from_metrics(metrics, is_apple_device).items()):
-        key = {"pk": pk, "sk": f"DATE#{day}"}
+    for day, new_entries in sorted(entries_from_metrics(metrics, is_apple_device, day_of).items()):
+        key = key_of(day)
         try:
             stored = table.get_item(Key=key, ProjectionExpression="#rd", ExpressionAttributeNames={"#rd": RD_FIELD}).get("Item", {})
         except Exception as e:  # noqa: BLE001 — fail toward stored history

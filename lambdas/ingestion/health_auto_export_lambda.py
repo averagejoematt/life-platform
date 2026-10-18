@@ -1567,7 +1567,7 @@ def lambda_handler(event, context):
     if other_days:
         logger.info(f"Other metrics: {other_days} days updated, fields: {sorted(set().union(*other_daily.values()))}")
     # #4971: sleep_analysis skips the generic path (SKIP_METRICS) and lands here, Apple devices only.
-    sleep_nights = _sleep.write_apple_sleep(metrics, table, PK, is_apple_device)
+    sleep_nights = _sleep.write_apple_sleep(metrics, table, is_apple_device, parse_date_str, lambda d: {"pk": PK, "sk": f"DATE#{d}"})
 
     # ── Process blood pressure individual readings (v1.4.0 + v1.4.1 combined format) ──
     bp_readings_new = 0
