@@ -16,6 +16,8 @@ rewritten — it is the commitment device, quoted to the writers as written.
     python3 scripts/season_rebuild.py --through-week 4 --out <dir>
     python3 scripts/season_rebuild.py --weeks 3 --out <dir>      # one week, ledger read from <dir>
     python3 scripts/season_rebuild.py --recheck 0-4 --out <dir>  # the fact-read sweep over staged weeks (#4777)
+    python3 scripts/season_rebuild.py --repair 4 --out <dir> --note "<post fix>" --episode-note "<episode fix>" \
+        --ledger-note "verdict_note: <the corrected verdict>" --ledger-note "ask-64b4036b: (drop)" --dek "<top line>"
 
 THE FACT-READ SWEEP (#4777, ADR-132 as amended). The write chain above is sequential — every call reads the one
 before it and the previous week's ledger — so it never holds 100 independent records and stays on-demand. The
@@ -214,10 +216,185 @@ def run_week(
     return {"ledger": new_ledger, "post": md, "episode": story_writers.episode_text(ep)}
 
 
-def repair_week(out: str, n: int, notes: Optional[List[str]] = None, episode_notes: Optional[List[str]] = None) -> int:
+# ── the repair path's reach into the series record (#4993) ──────────────────
+#
+# A text note cannot fix a wrong fact the RECORD holds: the fact read is grounded in the budget's ``bet_scored`` and the
+# ledger, so a wrong ``verdict_note`` ("Elena wins" on a bet she lost) was re-asserted into every rewrite and a correct
+# post drifted back. ``--ledger-note`` corrects the record itself, BEFORE the gates are built, so the fact read reads the
+# corrected record; ``--dek`` replaces the budget's ``top_line``. Corrections reach this week's ledger and budget and
+# every LATER staged ledger that carries the same bet / ask / thread (each week's ledger is a cumulative snapshot).
+
+DROP = "(drop)"  # an ask or thread note text that removes the item instead of rewording it
+_BET_FIELDS = ("verdict_note", "winner")
+_ASK_FIELDS = ("ask", "outcome", "status")
+_THREAD_FIELDS = ("title", "note", "status")
+
+
+def parse_ledger_note(spec: str) -> Dict[str, Any]:
+    """``"<target>[.<field>]: <text>"`` → {kind, key, field, text}. Targets: ``verdict_note[@W]`` / ``winner[@W]`` (the
+    bet made in week W; without @W, the one bet scored this week), an ask id (``ask-xxxxxxxx``, field ``ask`` by
+    default) or a thread id or exact title (field ``title`` by default; a title holding a colon must be named by its
+    id — the first colon ends the target). ``(drop)`` as the text removes an ask/thread."""
+    target, sep, text = spec.partition(":")
+    target, text = target.strip(), text.strip()
+    if not sep or not target or not text:
+        raise SystemExit(f"--ledger-note {spec!r}: expected '<ask id|verdict_note|thread id>[.field]: <text>'")
+    head, _, at = target.partition("@")
+    if head in _BET_FIELDS:
+        if at and not at.isdigit():
+            raise SystemExit(f"--ledger-note {spec!r}: @{at} is not a week number")
+        if text == DROP:
+            raise SystemExit(f"--ledger-note {spec!r}: a bet's {head} is corrected, never dropped")
+        return {"kind": "bet", "key": int(at) if at else None, "field": head, "text": text}
+    if at:
+        raise SystemExit(f"--ledger-note {spec!r}: @<week> applies only to verdict_note / winner")
+    if target.startswith("ask-"):
+        key, _, field = target.partition(".")
+        field = field or "ask"
+        if field not in _ASK_FIELDS:
+            raise SystemExit(f"--ledger-note {spec!r}: an ask's field is one of {_ASK_FIELDS}")
+        return {"kind": "ask", "key": key, "field": field, "text": text}
+    key, field = target, "title"
+    for f in _THREAD_FIELDS:
+        if target.endswith(f".{f}"):
+            key, field = target[: -len(f) - 1], f
+    return {"kind": "thread", "key": key, "field": field, "text": text}
+
+
+def _bet_for(note: Dict[str, Any], ledger: Dict[str, Any], n: int, spec: str) -> Dict[str, Any]:
+    bets = ledger.get("bets", [])
+    if note["key"] is not None:
+        hit = [b for b in bets if b.get("week") == note["key"]]
+    else:
+        hit = [b for b in bets if b.get("scored_week") == n]
+    if len(hit) != 1:
+        which = f"made in Week {note['key']}" if note["key"] is not None else f"scored in Week {n}"
+        raise SystemExit(f"--ledger-note {spec!r}: {len(hit)} bets {which} in wk{n}_ledger.json — name one with @<bet week>")
+    return hit[0]
+
+
+def _apply_to_ledger(note: Dict[str, Any], led: Dict[str, Any], bet_week: Optional[int]) -> bool:
+    """One correction on one staged ledger. True when it found its target there."""
+    field, text = note["field"], note["text"]
+    if note["kind"] == "bet":
+        hit = [b for b in led.get("bets", []) if b.get("week") == bet_week]
+        for b in hit:
+            b[field] = text
+        return bool(hit)
+    items = led.get("asks" if note["kind"] == "ask" else "threads", [])
+    if note["kind"] == "ask":
+        hit = [a for a in items if story_ledger.ask_key(a) == note["key"]]
+    else:
+        hit = [t for t in items if note["key"] in (t.get("id"), t.get("title"))]
+    for x in hit:
+        if text == DROP:
+            items.remove(x)
+        else:
+            x[field] = text
+    return bool(hit)
+
+
+def _apply_to_budget(note: Dict[str, Any], budget: Dict[str, Any], bet_week: Optional[int], old: Any, thread_ids: List[str]) -> bool:
+    """The same correction on the week's budget — the writers read the budget, and the fact read's
+    ``this_weeks_bet_scoring`` IS ``budget.bet_scored``, so a ledger-only fix would be re-asserted from here."""
+    field, text = note["field"], note["text"]
+    found = False
+    if note["kind"] == "bet":
+        bs = budget.get("bet_scored") or {}
+        if field == "verdict_note" and old and bs.get("note") == old:
+            bs["note"], found = text, True
+        for sc in budget.get("bets_scored") or []:
+            if sc.get("bet_week") == bet_week:
+                sc["note" if field == "verdict_note" else "winner"], found = text, True
+        return found
+    if note["kind"] == "ask":
+        asks = budget.get("coach_asks") or []
+        for a in list(asks):
+            if story_ledger.ask_id(a.get("ask")) == note["key"]:
+                found = True
+                if text == DROP:
+                    asks.remove(a)
+                elif field in ("ask", "outcome"):
+                    a[field] = text
+        fus = budget.get("asks_followed_up") or []
+        for fu in list(fus):
+            if fu.get("ask_id") == note["key"]:
+                found = True
+                if text == DROP:
+                    fus.remove(fu)
+                elif field in ("ask", "outcome"):
+                    fu[field] = text
+        return found
+    acts = budget.get("thread_actions") or []
+    for act in list(acts):
+        if act.get("thread_id") in thread_ids or note["key"] in (act.get("thread_id"), act.get("title")):
+            found = True
+            if text == DROP:
+                acts.remove(act)
+            elif field in ("title", "note"):
+                act[field] = text
+    return found
+
+
+def apply_record_fixes(out: str, n: int, ledger_notes: List[str], dek: Optional[str] = None) -> List[str]:
+    """Correct the staged record for week ``n`` (and the later staged ledgers carrying the same items) in place.
+    Returns one line per correction made. Fails loudly on a target it cannot find — a silent no-op is how the wrong
+    winner survived two repair passes."""
+    done: List[str] = []
+    budget = _load(out, f"wk{n}_budget.json")
+    ledger = _load(out, f"wk{n}_ledger.json")
+    if budget is None or ledger is None:
+        raise SystemExit(f"--repair {n}: wk{n}_budget.json / wk{n}_ledger.json are not staged in {out}")
+    later = sorted(int(f[2:].split("_", 1)[0]) for f in os.listdir(out) if f.startswith("wk") and f.endswith("_ledger.json"))
+    later = [k for k in later if k > n]
+    for spec in ledger_notes:
+        note = parse_ledger_note(spec)
+        bet_week, old = None, None
+        if note["kind"] == "bet":
+            bet = _bet_for(note, ledger, n, spec)
+            bet_week, old = bet.get("week"), bet.get("verdict_note")
+        thread_ids = [t.get("id") for t in ledger.get("threads", []) if note["key"] in (t.get("id"), t.get("title"))]
+        in_ledger = _apply_to_ledger(note, ledger, bet_week)
+        in_budget = _apply_to_budget(note, budget, bet_week, old, thread_ids)
+        if not (in_ledger or in_budget):
+            raise SystemExit(f"--ledger-note {spec!r}: no {note['kind']} {note['key']!r} in wk{n}_ledger.json or wk{n}_budget.json")
+        carried = []
+        for k in later:
+            led_k = _load(out, f"wk{k}_ledger.json")
+            if _apply_to_ledger(note, led_k, bet_week):
+                _save(out, f"wk{k}_ledger.json", led_k)
+                carried.append(k)
+        done.append(
+            f"{note['kind']} {note['key'] if note['key'] is not None else f'scored wk{n}'}.{note['field']} → {note['text'][:80]!r}"
+            + (" (ledger)" if in_ledger else "")
+            + (" (budget)" if in_budget else "")
+            + (f" (carried to wk{', wk'.join(map(str, carried))})" if carried else "")
+        )
+    if dek is not None:
+        if not dek.strip():
+            raise SystemExit("--dek: the top line cannot be empty")
+        budget["top_line"] = dek.strip()
+        done.append(f"dek → {dek.strip()[:80]!r}")
+    _save(out, f"wk{n}_budget.json", budget)
+    _save(out, f"wk{n}_ledger.json", ledger)
+    return done
+
+
+def repair_week(
+    out: str,
+    n: int,
+    notes: Optional[List[str]] = None,
+    episode_notes: Optional[List[str]] = None,
+    ledger_notes: Optional[List[str]] = None,
+    dek: Optional[str] = None,
+) -> int:
     """Re-gate a STAGED week and fix only what the gates (and an editor's notes) still find, in the post and the
-    episode, without re-running the desk. The budget and the ledger later weeks were built on are kept; only the
-    installment's title in the ledger follows a retitled post."""
+    episode, without re-running the desk. The budget and the ledger later weeks were built on are kept — except where
+    ``ledger_notes`` / ``dek`` correct them (#4993), which happens FIRST so every gate below reads the corrected record;
+    the installment's title in the ledger follows a retitled post."""
+    if ledger_notes or dek is not None:
+        for line in apply_record_fixes(out, n, list(ledger_notes or []), dek):
+            print(f"  wk{n} record: {line}")
     dossier = _load(out, f"wk{n}_dossier.json")
     budget = _load(out, f"wk{n}_budget.json")
     prev_ledger = _load(out, f"wk{n - 1}_ledger.json") if n > 0 else story_ledger.empty_ledger()
@@ -230,6 +407,8 @@ def repair_week(out: str, n: int, notes: Optional[List[str]] = None, episode_not
     md = strip_dek(_load(out, f"wk{n}_chronicle.md"))
     pf = [f"editor's note: {x}" for x in (notes or [])] + g.post(md, "end_turn")
     md, pf = _write_post(g, dossier, budget, prev_ledger, n, prev_post, md=md, findings=pf)
+    if dek is not None:  # a replaced top line gets the same gate run_week gives the desk's
+        pf = pf + g.dek(budget.get("top_line") or "")
     md = with_dek(md, dossier, ledger, budget, n)
     _save(out, f"wk{n}_chronicle.md", md)
     title, body = story_writers.split_title(md)
@@ -410,6 +589,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--repair", type=int, default=None, help="re-gate and fix a staged week's post without re-running the desk")
     ap.add_argument("--note", action="append", default=[], help="with --repair: an editor's note on the POST (repeatable)")
     ap.add_argument("--episode-note", action="append", default=[], help="with --repair: an editor's note on the EPISODE (repeatable)")
+    ap.add_argument(
+        "--ledger-note",
+        action="append",
+        default=[],
+        help="with --repair: correct the staged RECORD, '<ask id|verdict_note[@W]|winner[@W]|thread id>[.field]: <text>' "
+        "(repeatable; '(drop)' removes an ask/thread) — applied before the gates, so the fact read reads it (#4993)",
+    )
+    ap.add_argument("--dek", default=None, help="with --repair: replace the budget's top_line (the dek) before the gates (#4993)")
     ap.add_argument("--recheck", type=str, default=None, help="e.g. '0-4': the fact-read sweep over staged weeks (batch at 100+ reads)")
     ap.add_argument("--realtime", action="store_true", help="with --recheck: never submit a batch job, run every read on-demand")
     ap.add_argument("--batch-wait-hours", type=float, default=None, help="with --recheck: how long to wait on a batch job (default 24)")
@@ -417,7 +604,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.recheck is not None:
         return recheck(args.out, _parse_weeks(args.recheck), force_realtime=args.realtime, wait_hours=args.batch_wait_hours)
     if args.repair is not None:
-        return repair_week(args.out, args.repair, args.note, args.episode_note)
+        return repair_week(args.out, args.repair, args.note, args.episode_note, args.ledger_note, args.dek)
+    if args.ledger_note or args.dek is not None:
+        raise SystemExit("--ledger-note / --dek apply only with --repair N")
     os.makedirs(args.out, exist_ok=True)
     os.environ.setdefault("AWS_MAX_ATTEMPTS", "1")
     table = _table()
