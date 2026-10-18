@@ -84,6 +84,16 @@ requires already knowing which symbol to look for.
 
 **The bundle is byte-reproducible (#3625, 2026-09-20):** `build_bundle.zip_dir` writes a sorted walk with a fixed entry timestamp (1980-01-01) and mode, and no `__pycache__`/`.pyc` — the same staged tree zips to the same SHA-256, so a post-deploy `cdk diff` on an unchanged tree shows zero `Code.S3Key` changes. `tests/test_bundle_zip_reproducible_3625.py` builds twice and asserts identical bytes, with a one-byte-change positive control. **And the CDK asset is content-addressed because `build_info.json`'s `built_at` is the COMMIT's timestamp, not the clock's** (`built_at_source: commit`; the wall clock only on a dirty local tree, labelled `clock`) — CDK hashes the staged *directory*, and a per-synth timestamp in one file minted a new asset hash every synth (32 `S3Key` lines on an unchanged tree, measured 2026-09-20) which made the zip invariant inert on the CDK path. `tests/test_bundle_fingerprint_2377.py` pins two fingerprints of one commit byte-equal.
 
+### 1b. Schedules are fixed UTC — with ONE zoned exception (#4284)
+
+Every `schedule=` in `cdk/stacks/` is an `events.Rule` cron in fixed UTC. The one exception is
+`daily-brief`: `create_platform_lambda(..., schedule="cron(0 10 * * ? *)", schedule_timezone="America/Los_Angeles")`
+creates an EventBridge **Scheduler** schedule (`AWS::Scheduler::Schedule` + one invoke-only role) instead of a
+rule, so the brief keeps its Pacific wall-clock time across the DST change (owner ruling, docket #4644 Q42):
+17:00 UTC until 2026-11-01, 18:00 UTC after. A zoned `schedule=` reads as wall-clock in that zone, NOT UTC
+(`docs/DEPENDENCY_GRAPH.md` marks it). Generalising this to the other crons is a follow-up row on #4284.
+Producers the brief reads must stay at or before 16:55 UTC; consumers that follow it run at 19:00 UTC or later.
+
 ## 2. Deploy from `main`, not the worktree branch
 
 > **Authority, not mechanics:** who may run a production deploy, what a standing grant is,

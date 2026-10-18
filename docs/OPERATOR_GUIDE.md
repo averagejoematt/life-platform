@@ -249,7 +249,7 @@ hourly, 12–23 + 0–5 UTC  →  Ingestion (the `ingestion_stack` functions in 
 19:30 UTC (12:30 PM PDT) →  OG image generator
 ```
 
-All EventBridge crons are fixed UTC. PT references shift 1 hour at DST boundaries; UTC never does.
+All EventBridge crons are fixed UTC, except `daily-brief` (a zoned Scheduler schedule at 10:00 Pacific, #4284). PT references shift 1 hour at DST boundaries; UTC never does.
 
 ---
 
