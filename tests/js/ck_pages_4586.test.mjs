@@ -57,7 +57,7 @@ test("a fresh chapter leads with its badge, title, player and the AI byline", ()
   assert.match(html, /New this week · Week 6/);
   assert.match(html, /<h1>The Quiet Accumulation<\/h1>/);
   assert.match(html, /<audio controls preload="none" src="\/panelcast\/wk4\.mp3"/);
-  assert.match(html, new RegExp(`Written by AI from the record on ${inWords(B.chapter.data.date)}\\. Matthew reads each chapter before it publishes\\.`));
+  assert.match(html, new RegExp(`Dated ${inWords(B.chapter.data.date)}\\. Written by AI from what the devices and logs recorded\\. Matthew reads each chapter before it publishes\\.`));
   assert.ok(html.indexOf("Written by AI") < html.indexOf("The Monday afternoon walk"), "the AI label sits above the AI's words");
   // As captured: no episode yet, so no player and the block's own sentence.
   const live = P.chapterHTML(B.chapter, B.next);
@@ -124,7 +124,8 @@ test("no percentage picture on fewer than 20 checked calls", () => {
   assert.match(row("Eli Marsh"), /runs the program, so no checked calls/);
   // #4580 C5: the sitting-out sentence is one small line under the list, not a four-line job cell.
   assert.doesNotMatch(row("Amara Patel").split("</li>")[0], /sitting out/i);
-  assert.match(html, /<\/ul><p class="ck-small">Amara Patel is sitting out: no sensor since August 27\.<\/p>$/);
+  // Red team round 3 (A-26): the served "no sensor" names her device.
+  assert.match(html, /<\/ul><p class="ck-small">Amara Patel is sitting out: no glucose monitor reading since August 27\.<\/p>$/);
   const few = { ...B.record, data: { ...B.record.data, right: 3, decided: 7 } };
   assert.doesNotMatch(P.recordBigHTML(few), /ck-track/);
 });
@@ -180,11 +181,12 @@ test("the showcase pair leads with the tightest right call and the clearest miss
   assert.match(html, /--right">Right · within [\d.]+ [a-z]+ either way<\/span><p>[^<]+ called [^<]+\. <b>It came in at [^<]+\.<\/b><\/p>/);
   assert.match(html, /<p class="ck-soft">Graded on the reading for [A-Z][a-z]+ \d+\. <a class="ck-link" href="\/next\/v8\/call\/\?id=[a-z0-9-]+">The whole call<\/a>/);
   // both distances were computed the same way, so what they are is said once, under the pair
-  assert.match(html, /<\/div><\/div><p class="ck-soft">Each allowed distance is one standard deviation of his readings over the 30 days before the call\.<\/p>$/);
+  // Red team round 3 (A-07/A-28): plain words first, the term in brackets (no count: none served fits its window).
+  assert.match(html, /<\/div><\/div><p class="ck-soft">Each allowed distance is the usual spread of his readings over the 30 days before the call \(one standard deviation\)\.<\/p>$/);
   assert.equal((html.match(/standard deviation/g) || []).length, 1);
   // the coaches page's scorecard door closes that same paragraph (one line given back, 2026-10-11)
   const door = '<a class="ck-link" href="/coaching/scorecard/">Every prediction, right and wrong</a>';
-  assert.ok(P.callVerdictsHTML(calls, "/next/v8/", "coaches", { trailer: door }).endsWith(`before the call. ${door}</p>`));
+  assert.ok(P.callVerdictsHTML(calls, "/next/v8/", "coaches", { trailer: door }).endsWith(`(one standard deviation). ${door}</p>`));
   assert.match(html, /<span class="ck-verdicts__tag">Wrong · not within [\d.]+(%| [a-z]+| out of 100)? either way<\/span><p>[^<]+ called [^<]+\. <b>It came in at [^<]+\.<\/b><\/p>/);
   const ids = [...html.matchAll(/call\/\?id=([a-z0-9-]+)/g)].map((m) => m[1]);
   assert.equal(ids.length, 2, "one door per call");

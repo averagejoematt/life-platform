@@ -146,7 +146,8 @@ test("the call page states the day whose reading the call was graded on, from th
   const number = byId("explorer-20260919-aecd9fef2c");
   assert.equal(V.measuredDay(number), "September 20");
   assert.equal(V.gradedOnText(number), "Graded on the reading for September 20.");
-  assert.match(C.outcomeHTML(number), /<p class="ck-soft">The allowed distance is one standard deviation of his readings over the 30 days before the call\. Graded on the reading for September 20\.( The simple guess was also right\.)?<\/p>/);
+  // Red team round 3 (A-07/B-19): plain words first, the term (and a count that fits its window) in brackets.
+  assert.match(C.outcomeHTML(number), /<p class="ck-soft">The allowed distance is the usual spread of his readings over the 30 days before the call \(one standard deviation(, \d+ readings)?\)\. Graded on the reading for September 20\.( The simple guess was also right\.)?<\/p>/);
   assert.equal(V.measuredDay(byId("bet-20260930-994b3d89f6")), "September 30");
   const direction = byId("labs-20260906-d2deb9b27d");
   assert.equal(V.measuredDay(direction), "", "a direction call is graded on a trend, not one day");
@@ -195,7 +196,8 @@ test("the four pages print the same call in one order: the rule in the tag, the 
       assert.equal(m[1], call.verdict === "right" ? "Right" : "Wrong", `${page}: the tag is the call's verdict`);
       assert.equal(m[3], `${call.tolerance.text} out of 100`, `${page}: the tag carries the served allowed distance, with the score's unit`);
       assert.equal(m[5], call.happened_short, `${page}: the result is the bold part`);
-      assert.equal(m[6], call.tolerance.statistic, `${page}: what the distance is, in the route's words`);
+      // Red team round 3: the route's statistic in plain words first ("the usual spread of …"), the term after.
+      assert.ok(m[6].startsWith(call.tolerance.statistic.replace(/^one standard deviation of (.+)$/, "the usual spread of $1 (one standard deviation")), `${page}: what the distance is, from the route's words: ${m[6]}`);
       assert.equal(html.split(`within ${call.tolerance.text} out of 100 either way`).length - 1, 1, `${page}: the allowed distance is printed once`);
       assert.doesNotMatch(html, /either way, his usual day-to-day swing|day-to-day swing/, `${page}: the old unnamed "swing"`);
       // a score out of 100 is a whole number on every page (#4808 box 2)
