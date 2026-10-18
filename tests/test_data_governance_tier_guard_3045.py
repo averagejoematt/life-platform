@@ -77,6 +77,10 @@ ROW_MAP: list[dict] = [
             ("field", "withings", "temperature_c"),
             ("field", "withings", "body_temperature_c"),
             ("field", "withings", "skin_temperature_c"),
+            # #4970: the Apple Watch's overnight vitals, under the same raw-biometrics row
+            ("field", "apple_health", "spo2_pct_apple"),
+            ("field", "apple_health", "wrist_temp_sleep_c_apple"),
+            ("field", "apple_health", "breathing_disturbances_apple"),
         ],
     },
     {

@@ -48,7 +48,7 @@ Visible at `averagejoematt.com` to anyone:
 > (DIL-008/DIL-011). `tests/test_data_governance_tier_guard_3045.py` fails CI if this
 > section and the registry ever disagree.
 
-- Raw biometrics: HRV, heart rate, sleep stages, CGM glucose readings
+- Raw biometrics: HRV, heart rate, sleep stages, CGM glucose readings, overnight vitals (SpO2, skin/wrist temperature, and the Apple Watch's breathing-disturbances screen — `apple_health` `spo2_pct_apple` / `wrist_temp_sleep_c_apple` / `breathing_disturbances_apple`, #4970)
 - Lab results (cholesterol, biomarkers, genome variants)
 - Body composition (DEXA scan details, weight, body fat %)
 - Nutrition logs (every meal, every calorie)

@@ -705,6 +705,32 @@ def find_interior_gaps(present_dates, window_start: str, window_end: str) -> lis
     return gaps
 
 
+def _overall_freshness_tier(stale_count, max_age_stale):
+    """WR-48 Enhancement 2 escalation tiers (reporting only) — extracted by #4970 to pay
+    for the device dead-man rows under the #4880 length guard; logic unchanged."""
+    if stale_count == 0:
+        return "green"
+    if stale_count == 1 and max_age_stale < 7:
+        return "yellow"
+    if stale_count >= 3 or max_age_stale > 14:
+        return "red"
+    return "orange"
+
+
+def _device_dead_men_rows():
+    """#4970: the Apple Watch dead-man rows — the same rows the freshness-checker Lambda
+    alarms on, from the same registry `dead_man` facet. REPORT-ONLY here: `status` is
+    defined over source freshness (the output-artifact reasoning in the tool below), and
+    the alarm path is the checker. A failed check is a row saying so, never an omission."""
+    try:
+        from ingestion.watch_presence import check_dead_men
+
+        return check_dead_men(table, pacific_now())
+    except Exception as e:  # noqa: BLE001
+        logger.warning("device dead-man check failed: %s", e)
+        return [{"key": "watch", "label": "Device dead-man check", "status": "unknown", "detail": f"{type(e).__name__}: {e}"}]
+
+
 def tool_get_freshness_status(args):
     """Per-source data freshness summary (WR-48 Enhancement 4, PR-reentry-4).
 
@@ -878,14 +904,7 @@ def tool_get_freshness_status(args):
         (s["age_days"] for s in per_source if s.get("status") == "stale"),
         default=0,
     )
-    if stale_count == 0:
-        overall = "green"
-    elif stale_count == 1 and max_age_stale < 7:
-        overall = "yellow"
-    elif stale_count >= 3 or max_age_stale > 14:
-        overall = "red"
-    else:
-        overall = "orange"
+    overall = _overall_freshness_tier(stale_count, max_age_stale)
 
     # ── Output artifacts: dead-man switches on jobs that run OFF-platform ────────
     # Everything above measures whether data ARRIVED in DynamoDB. Some jobs cannot be
@@ -945,6 +964,8 @@ def tool_get_freshness_status(args):
         _stale_art = [r for r in _bad if r.get("status") == "stale"]
         if _stale_art:
             overall = "red"
+
+    device_dead_men = _device_dead_men_rows()  # #4970: report-only; the checker Lambda pages
 
     # "stale_sources" is the needs-attention bucket; an unreadable source belongs in
     # it, because the one thing it must never do is disappear from the answer.
@@ -1047,6 +1068,7 @@ def tool_get_freshness_status(args):
         "paused_sources": paused_sources,
         "output_artifacts": output_artifacts,
         "output_artifacts_not_ok": [r["label"] for r in output_artifacts if r.get("status") != "fresh"],
+        "device_dead_men": device_dead_men,
         "interior_gaps": interior_gaps,
         "interior_gap_count": interior_gap_count,
         "macrofactor_format_drift": macro_drift,

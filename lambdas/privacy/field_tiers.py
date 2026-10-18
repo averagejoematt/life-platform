@@ -147,6 +147,28 @@ FIELD_TIERS: dict[str, dict[str, int]] = {
         "time_awake_hours": TIER_OWNER_ONLY,
         "sleep_consistency_percentage": TIER_OWNER_ONLY,
     },
+    # #4970 (ADR-154 step 3, declared BEFORE the first watch reading is merged): the
+    # Apple Watch's daily fields in the apple_health partition. Whoop's twins set the
+    # posture — its SpO2 and skin temperature are owner-only, so the watch's are too, and
+    # breathing disturbances (the sleep-apnea screen) is diagnostic-class like afib_result.
+    # The watch's HRV / resting / walking HR, respiratory rate and cardio recovery are
+    # INTERNAL: safe in AI context, not published — Whoop's HRV/RHR publication consent
+    # (ADR-155) does not extend to a second instrument; #4980 owns any publication ruling.
+    # Activity, daylight, audio, VO2 max and physical effort stay TIER_PUBLIC by omission
+    # (behavioural / fitness numbers the site already publishes in kind).
+    # Heart-RHYTHM data (AFib burden, ECG, notifications, medications) is #4972's lane.
+    "apple_health": {
+        "spo2_pct_apple": TIER_OWNER_ONLY,
+        "wrist_temp_sleep_c_apple": TIER_OWNER_ONLY,
+        "breathing_disturbances_apple": TIER_OWNER_ONLY,
+        "hrv_sdnn_apple": TIER_INTERNAL,
+        "resting_heart_rate_apple": TIER_INTERNAL,
+        "walking_heart_rate_avg": TIER_INTERNAL,
+        "respiratory_rate_apple": TIER_INTERNAL,
+        "cardio_recovery_bpm_apple": TIER_INTERNAL,
+        "walking_steadiness_pct": TIER_INTERNAL,
+        "watch_last_reading_epoch_apple": TIER_INTERNAL,
+    },
     # ADR-097 reading keyspace (BOOK#/READING# pks — a pseudo-source, see SOURCE_TIERS
     # note). The two named private fields from DATA_GOVERNANCE's reading row that exist
     # as literal item attributes; the rest of the row (RECALL# records, calibration

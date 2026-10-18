@@ -346,6 +346,10 @@ DEFAULT_STALE_HOURS = 48
 #                  BP/State of Mind) vs the passive device streams (steps/workouts)
 #                  — only the manual ones are nudge-eligible. Read by
 #                  hae_datatype_thresholds().
+#                  `dead_man` (#4970) {field, stale_hours} is the one ALARMING bar on a
+#                  sub-datatype: `field` holds an instant (epoch seconds), and older
+#                  than `stale_hours` counts toward StaleSourceCount. Read by
+#                  ingestion.watch_presence.check_dead_men(); today only `watch`.
 #                  `evidence_for` (#3294) is the SUB-datatype's answer to the same
 #                  question the source-level facet asks, and apple_health is the one
 #                  source that needs both: every HAE stream shares ONE partition, so a
@@ -921,6 +925,76 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
                 "stale_days": 2,
                 "manual": False,
                 "evidence_for": ("steps",),
+            },
+            # ── #4970: the Apple Watch (Ultra 4, worn day and night from 2026-10-16) ──
+            # The watch writes into this SAME partition, so the phone's steps/water keep
+            # the partition "fresh" whether or not the watch is alive. Four day-level
+            # liveness groups (behavioural bars: they narrate, never alarm) plus ONE
+            # dead-man that DOES alarm (digest route). Field semantics, tiers and absence rules:
+            # docs/SCHEMA.md "Apple Watch daily metrics (#4970)".
+            #
+            # The dead-man. `dead_man` = {field, stale_hours}: the newest watch-sourced
+            # reading instant (any metric, `watch_last_reading_epoch_apple`, written
+            # GREATEST-on-merge by the webhook) older than `stale_hours` is a silent watch
+            # — dead battery, revoked Health access, a stuck background sync. 36 h is the
+            # owner's bar (#4970): a full night plus a full day with no watch sample at all
+            # is never "he took it off for a shower". Read by
+            # ingestion.watch_presence.check_dead_men(); the freshness checker folds a
+            # not-ok row into StaleSourceCount, the metric slo-source-freshness (to_digest=True)
+            # alarms on — the daily digest route; no hand-built alarm, no new schedule. Resolution is the checker's
+            # daily cadence: it fires on the first run after the 36 h mark (<= 60 h worst case).
+            {
+                "key": "watch",
+                "label": "Apple Watch (any watch-sourced reading)",
+                "fields": ["watch_last_reading_epoch_apple"],
+                "stale_days": 2,
+                "manual": False,
+                "dead_man": {"field": "watch_last_reading_epoch_apple", "stale_hours": 36},
+            },
+            # Overnight vitals: written once per sleep by the watch (wrist temperature needs
+            # a Sleep Focus; breathing disturbances need sleep tracking). The watch is worn
+            # nightly (owner ruling 2026-10-17), so two dark days means a missed capture.
+            {
+                "key": "watch_overnight_vitals",
+                "label": "Apple Watch overnight vitals",
+                "fields": ["wrist_temp_sleep_c_apple", "respiratory_rate_apple", "spo2_pct_apple", "breathing_disturbances_apple"],
+                "stale_days": 2,
+                "manual": False,
+            },
+            # Heart: HRV (SDNN) and resting HR arrive daily from a worn watch; walking HR
+            # and cardio recovery ride walks/workouts, so the any-of set stays live on a
+            # rest day through the first two.
+            {
+                "key": "watch_heart",
+                "label": "Apple Watch heart (HRV / resting / walking HR / cardio recovery)",
+                "fields": ["hrv_sdnn_apple", "resting_heart_rate_apple", "walking_heart_rate_avg", "cardio_recovery_bpm_apple"],
+                "stale_days": 2,
+                "manual": False,
+            },
+            # Activity rings + exposure: every worn waking day carries stand hours at least.
+            {
+                "key": "watch_activity",
+                "label": "Apple Watch activity (exercise / stand / effort / daylight / audio)",
+                "fields": [
+                    "exercise_minutes_apple",
+                    "stand_minutes_apple",
+                    "stand_hours_apple",
+                    "physical_effort",
+                    "daylight_minutes_apple",
+                    "environmental_audio_db_apple",
+                ],
+                "stale_days": 2,
+                "manual": False,
+            },
+            # Fitness estimates: VO2 max needs an outdoor walk/run/hike with GPS and
+            # walking steadiness is a weekly estimate — a fortnight dark means the
+            # estimate stopped, not a missed day.
+            {
+                "key": "watch_fitness",
+                "label": "Apple Watch fitness estimates (VO2 max / walking steadiness)",
+                "fields": ["vo2max", "walking_steadiness_pct"],
+                "stale_days": 14,
+                "manual": False,
             },
         ],
         # #4638: stated default (owner ruling pending). The webhook path is append-only by design:
