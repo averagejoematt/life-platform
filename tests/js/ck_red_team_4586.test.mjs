@@ -460,3 +460,157 @@ test("Day D3: a 'call' with no date and no number in it is labelled a note", () 
   const dated = { ...moves, lines: [{ ...moves.lines[0], text: "Weight will be around 304.5 pounds tomorrow morning" }] };
   assert.match(D.daySaidHTML(EDITION.as_of, dated, "/next/v8/"), /· A call<\/span>/);
 });
+
+// ── site-to-A round 1, lane D (2026-10-18): the sheet, how it's built, the appendix, a call, a coach ──
+const BU = await import("../../site/assets/js/ck_built.js");
+const SITE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "site");
+const page = (name) => readFileSync(join(SITE, "next", "v8", name, "index.html"), "utf8");
+const textOf = (html) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+
+test("Sheet: each area is the kit's record row — name, level at the right, one plain sentence — not a four-bucket formula", () => {
+  const character = load("character");
+  const html = S.areasHTML(character);
+  assert.match(html, /^<ul class="ck-coach ck-coach--record">/);
+  const rows = [...html.matchAll(/<li>(.*?)<\/li>/g)].map((m) => m[1]);
+  assert.equal(rows.length, character.pillars.length);
+  for (const row of rows) {
+    assert.match(row, /^<span class="ck-coach__name">[^<]+<\/span><span class="ck-coach__job">[^<]+<\/span>(<span class="ck-coach__record">Level \d+<\/span>)?$/, row);
+    assert.doesNotMatch(row, /Helping:|Holding it back:|Not done or not logged:|No data yet:/, "the bucket list is not in the row");
+  }
+  const both = character.pillars.find((p) => (p.drivers?.top || []).length && (p.drivers?.dragging || []).length);
+  assert.ok(both, "the capture has an area with a helper and a drag");
+  assert.equal(S.areaBrief(both), `Helped most by ${S.driverWords(both.drivers.top)[0]}; held back most by ${S.driverWords(both.drivers.dragging)[0]}.`);
+  assert.equal(S.areaBrief({ ...both, drivers: { top: both.drivers.top } }), `Helped most by ${S.driverWords(both.drivers.top)[0]}.`);
+  assert.equal(S.areaBrief({ ...both, coverage_hold: true }), "", "a held area's drivers are not named as helping");
+  assert.equal(S.areaLevel(character.pillars.find((p) => p.not_instrumented)), "", "an unmeasured area carries no level figure");
+});
+
+test("Sheet: the score and its move share one precision, so the move can be read off two days' scores", () => {
+  assert.equal(S.areaSentence({ level: 22, raw_score: 80.5, score_delta: -0.5 }), "Score 80.5 of 100, down 0.5 on the day.");
+  assert.equal(S.areaLine({ level: 22, raw_score: 80.5, score_delta: -0.5 }), "Level 22. Score 80.5 of 100, down 0.5 on the day.");
+  assert.doesNotMatch(S.areasHTML(load("character")), /Score \d+ of 100/, "no whole score beside a tenth-of-a-point move");
+});
+
+test("Sheet: an area on hold for thin data that still counts toward the level is said so beside the level", () => {
+  const character = load("character");
+  const held = character.pillars.filter((p) => p.coverage_hold && !p.not_instrumented);
+  assert.ok(held.length >= 1, "the capture has a held area (metabolic)");
+  assert.equal(S.compositeNote(character), "Metabolic health is on hold for thin data, yet its score still counts toward the level.");
+  assert.equal(S.compositeNote({ pillars: character.pillars.filter((p) => !p.coverage_hold) }), "", "no held area, no note");
+  assert.match(S.compositeNote({ pillars: [{ name: "metabolic", coverage_hold: true }, { name: "mind", coverage_hold: true }] }), /^Metabolic health and Mind are on hold for thin data, yet their scores still count toward the level\.$/);
+});
+
+test("Sheet: one sentence before the areas; the rule a level moves by sits one tap deeper", () => {
+  const html = page("sheet");
+  const areas = html.slice(html.indexOf("The seven areas"), html.indexOf('id="ck-areas"'));
+  const intro = [...areas.matchAll(/<p class="ck-soft">([^<]*)<\/p>/g)].map((m) => m[1]);
+  assert.equal(intro.length, 1);
+  assert.equal((intro[0].match(/\./g) || []).length, 1, "one sentence");
+  assert.match(html, /<details>\s*<summary>How a level moves<\/summary>/);
+  assert.match(html, /<h1>The whole of it, so far\.<\/h1>/);
+  assert.ok(html.includes('id="ck-sheet-late"') && html.indexOf('id="ck-sheet-late"') > html.indexOf('id="ck-areas"'), "the late-sources caveat sits under the areas, not stacked under the level");
+});
+
+test("Built: one dated fold fact at the top; a section carries at most one 'as of'", () => {
+  const src = { stats: load("platform_stats"), receipts: load("receipts"), predictions: load("predictions"), coaches: load("coaches") };
+  assert.match(BU.foldDay(src), /^[A-Z][a-z]+day, [A-Z][a-z]+ \d+$/);
+  assert.equal(BU.foldDay({}), "");
+  const numbers = textOf(BU.numbersHTML(src));
+  assert.equal((numbers.match(/As of /g) || []).length, 0, numbers);
+  assert.match(numbers, /Counted [A-Z][a-z]+ \d+, from the code\./);
+  assert.match(numbers, /Checked to [A-Z][a-z]+ \d+\. Code does the grading/);
+  assert.equal((textOf(BU.costHTML(src.receipts)).match(/As of /g) || []).length, 1);
+  assert.match(page("built"), /<span class="ck-header__day" id="ck-day"><\/span>/);
+});
+
+test("Built: the tier is defined in plain words where it is first named, with spend and forecast side by side and dated", () => {
+  const rc = load("receipts");
+  const open = BU.costHTML(rc).split("<details>")[0];
+  assert.match(open, new RegExp(`As of [A-Z][a-z]+ \\d+, \\$${rc.month_to_date_usd.toFixed(2)} is spent this month, and the forecast for [A-Z][a-z]+ \\d+ is \\$${rc.projected_month_end_usd.toFixed(2)}, (under|above) the ceiling\\. The system is at tier ${rc.tier}: ${BU.TIER_WORDS[rc.tier]}\\.`));
+  assert.doesNotMatch(open, /at their pace/, "the forecast's arithmetic stays one tap deeper");
+  for (const [tier, words] of Object.entries(BU.TIER_WORDS)) assert.match(BU.costHTML({ ...rc, tier: Number(tier) }), new RegExp(`The system is at tier ${tier}: ${words.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.`));
+  assert.match(BU.costHTML({ ...rc, tier: 0 }), /Nothing is paused\./);
+  const text = textOf(page("built"));
+  assert.ok(text.indexOf("sets a tier from the forecast’s share of the ceiling") < text.indexOf("Tier 1 From about 73%"));
+});
+
+test("Built: what runs is the kit's numbered row list in pipeline order, not a hand-drawn picture; prose is full width; incidents closed", () => {
+  const html = page("built");
+  assert.doesNotMatch(html, /<svg/);
+  const steps = /<ul class="ck-rows ck-rows--steps">(.*?)<\/ul>/s.exec(html);
+  assert.ok(steps, "the numbered steps");
+  const rows = [...steps[1].matchAll(/<li><span>([^<]*)<\/span><\/li>/g)].map((m) => m[1]);
+  assert.equal(rows.length, 5);
+  assert.match(rows[0], /^Devices and apps/);
+  assert.match(rows[1], /^One store/);
+  assert.match(rows[2], /^AI coaches/);
+  assert.match(rows[3], /checker/);
+  assert.match(rows[4], /^The site/);
+  for (const r of rows) assert.ok(r.split(" ").length <= 10, r);
+  const who = /Who decides<\/p>(.*?)<\/section>/s.exec(html)[1];
+  assert.doesNotMatch(who, /ck-rows/, "the four paragraphs are full width, not a narrow value column");
+  assert.equal((who.match(/<p>/g) || []).length, 4);
+  assert.doesNotMatch(html, /<details open>/);
+  const broke = /What broke<\/p>(.*?)<\/section>/s.exec(html)[1];
+  assert.doesNotMatch(broke, /ck-rows__key/, "an incident's body is full width under its summary");
+  assert.equal((broke.match(/<details>/g) || []).length, 4);
+  assert.equal((broke.match(/before day one/g) || []).length, 3, "the three failures before 2026-09-06 are labelled");
+  assert.doesNotMatch(broke, /\b(Sept|Oct|Aug)\b/, "full month names, the one date rule");
+});
+
+test("Built: the first-person draft sits under the fold with one draft mark, and the approval rule is said twice, not three times", () => {
+  const html = page("built");
+  const text = textOf(html);
+  assert.ok(html.indexOf('id="ck-draft"') < html.indexOf("The numbers</p>"), "the draft is above the numbers");
+  assert.equal((text.match(/Draft wording\. Matthew has not rewritten this yet\./g) || []).length, 1);
+  assert.match(html, /<p class="ck-small">Preview\.<\/p>\s*<\/div>/, "the footer is the short preview mark");
+  assert.equal((text.match(/permitted to do/g) || []).length, 2, text.match(/[^.]*permitted to do[^.]*\./g));
+  const draft = /<section class="ck-section" id="ck-draft">(.*?)<\/section>/s.exec(html)[1];
+  const body = /<p>([^<]+)<\/p>/.exec(draft)[1];
+  assert.equal((body.match(/[.!?](\s|$)/g) || []).length, 2, "the draft is two sentences, not three paragraphs");
+});
+
+test("Appendix: a jump list of plain links reaches each kind, Tools first, with the replaced-layouts group's empty sentence", () => {
+  const html = page("appendix");
+  const jump = /<p class="ck-soft">((?:<a class="ck-link" href="#kind-[a-z]+">[^<]+<\/a>(?: · )?)+)<\/p>/.exec(html);
+  assert.ok(jump, "the jump list is one paragraph of kit links");
+  const targets = [...jump[1].matchAll(/href="#(kind-[a-z]+)"/g)].map((m) => m[1]);
+  assert.equal(targets[0], "kind-tools");
+  for (const id of targets) assert.ok(html.includes(`<section class="ck-section" id="${id}">`), id);
+  const sections = [...html.matchAll(/<section class="ck-section" id="(kind-[a-z]+)">/g)].map((m) => m[1]);
+  assert.deepEqual(sections, targets, "the links are in the sections' order");
+  assert.match(html, /id="kind-replaced">\s*<p class="ck-label">Replaced layouts<\/p>\s*<p class="ck-soft">The home page’s earlier layout will be listed here once the cut-over copies it\. Nothing is here yet\.<\/p>/);
+  assert.doesNotMatch(html, /<a class="ck-link" href="\/next\/v8\/">Back<\/a>/, "no second back link under the list");
+});
+
+test("Appendix: an earlier version of a v8 page says so, and a codename is small print under a plain title", () => {
+  const html = page("appendix");
+  const rows = [...html.matchAll(/<li><a class="ck-coach__name ck-link" href="([^"]+)">([^<]+)<\/a><span class="ck-coach__job">([^<]+)<\/span><\/li>/g)].map((m) => ({ url: m[1], title: m[2], line: m[3] }));
+  const row = (url) => rows.find((r) => r.url === url);
+  assert.match(row("/data/character/").line, /Earlier version of “The whole of it”, superseded\.$/);
+  assert.match(row("/method/build/").line, /Earlier version of “How it’s built”, superseded\.$/);
+  assert.match(row("/coaching/team/").line, /Earlier version of “The AI coaches”, superseded\.$/);
+  for (const [url, title, codename] of [["/story/membrane/", "Posts and replies", "Membrane"], ["/method/wrong/", "Every time the AI was wrong", "Wrong page"], ["/story/theme-river/", "Journal themes, charted", "Theme river"], ["/data/horizons/", "A weekly pick to read or watch", "Horizons"], ["/method/explorer/", "The raw record, as a table", "Explorer"]]) {
+    assert.equal(row(url).title, title, url);
+    assert.ok(row(url).line.endsWith(`Called “${codename}” on the page.`), row(url).line);
+  }
+  for (const r of rows) assert.doesNotMatch(r.title, /^(Membrane|Theme river|Horizons|Wrong page|Explorer|Mirror|Broadcast)$/, "no codename as a title");
+});
+
+test("Call: a bet's short sentence carries the unit its long sentence names; a short sentence with no unit in the long one is left alone", () => {
+  const bet = load("calls").calls.find((c) => c.id.startsWith("bet-20261016"));
+  assert.ok(bet && /as a percentage/.test(bet.called) && /at or above 26 on/.test(bet.called_short), "the capture's bet drops the unit on the short form");
+  assert.equal(C.calledShortWithUnit(bet), bet.called_short.replace("at or above 26 on", "at or above 26% on"));
+  assert.equal(C.calledShortWithUnit({ called_short: "X bet on whether it would be at or above 26 on October 16.", called: "X bet on whether the share would be at or above 26 on October 16." }), "X bet on whether it would be at or above 26 on October 16.", "no unit named, none invented");
+  assert.equal(C.calledShortWithUnit({ called_short: "at or above 190 g on October 16.", called: "(in grams) at or above 190 g" }), "at or above 190 g on October 16.", "a unit already there is not doubled");
+  assert.equal(C.calledShortWithUnit({ called_short: "below 305 by October 20.", called: "his weight (in pounds) below 305" }), "below 305 lb by October 20.");
+  assert.equal(C.calledShortWithUnit(null), "");
+  assert.match(page("call"), /<h1 id="ck-title">[^<]+<\/h1>\s*<p class="ck-soft">Average Joe Matt is one man’s public health experiment/, "the frame sentence under the h1 stays");
+});
+
+test("Coach: the footer is the short preview mark, and the page says what a coach page is in both states", () => {
+  const html = page("coach");
+  assert.match(html, /<p class="ck-small">Preview\.<\/p>\s*<\/div>/);
+  assert.doesNotMatch(html, /first-person line/);
+  assert.match(html, /<h1 id="ck-title">An AI coach<\/h1>\s*<p class="ck-soft">One of the AI coaches reading Matthew’s numbers in public: who it is, its checked calls and what it is watching\.<\/p>\s*<div class="ck-section ck-section--tight" id="ck-who">/, "static, so the not-found state keeps it");
+});
