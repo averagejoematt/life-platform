@@ -398,11 +398,19 @@ class TestEveryLivePartitionIsDispositioned:
         assert undisposed(["adaptive_mode"]) == []
 
     def test_dexa_and_genome_got_their_disposition_in_the_same_pass(self):
-        """Named in the issue's own Set so the next pass does not rediscover them."""
+        """Named in the issue's own Set so the next pass does not rediscover them.
+
+        #4639 (2026-10-17) paid the residual this test used to pin: dexa is a REGISTERED
+        source now (`cadence_months: 12`, writer `scripts/ingest_lab_report.py`), so its
+        disposition is the registry entry, not an exemption — and an exemption for a
+        registered source would be the restatement the registry exists to end.
+        """
         for key in ("dexa", "genome"):
-            assert key in reg.UNREGISTERED_PARTITIONS, f"{key} is still undispositioned"
-            assert key in LIVE_SOURCES, f"{key} is not live — the exemption describes nothing"
-        assert "12-month" in reg.UNREGISTERED_PARTITIONS["dexa"]["reason"]
+            assert key in LIVE_SOURCES, f"{key} is not live — the disposition describes nothing"
+        assert "dexa" in reg.SOURCE_REGISTRY and reg.SOURCE_REGISTRY["dexa"]["cadence_months"] == 12
+        assert "dexa" not in reg.UNREGISTERED_PARTITIONS, "dexa is registered — an exemption beside the entry is a second description"
+        assert reg.SOURCE_REGISTRY["dexa"]["raw_layout"]["prefix"] == "raw/matthew/dexa"
+        assert "genome" in reg.UNREGISTERED_PARTITIONS, "genome is still undispositioned"
         assert "ONE-OFF import" in reg.UNREGISTERED_PARTITIONS["genome"]["reason"]
 
     def test_every_exemption_is_dated_reasoned_and_names_a_writer(self):

@@ -47,10 +47,11 @@ from web.site_api_common import (
 # disagreeing. `due_months()` is spliced in LAST so the registry always wins: a source
 # that declares `cadence_months` owns its cadence outright, and the literals below are
 # only the rows the registry does not hold yet — each a candidate for the same treatment
-# (dexa's 12-month cadence is the named residual on #3669).
+# (dexa's 12-month cadence was the named residual on #3669; it moved to the registry in #4639).
 # `tests/test_source_registry_coverage_3669.py` asserts the two are the same number, in
 # both directions: the panel's months AND the registry's derived `stale_hours`.
-_DUE_MONTHS_UNREGISTERED = {"dexa": 12, "food_delivery": 3, "bp_readings": 3, "measurements": 2}
+# "dexa" left this literal in #4639 — it is a registry source with `cadence_months: 12` now, so due_months() carries it.
+_DUE_MONTHS_UNREGISTERED = {"food_delivery": 3, "bp_readings": 3, "measurements": 2}
 DUE_MONTHS = {**_DUE_MONTHS_UNREGISTERED, **due_months()}
 DUE_MONTHS_DEFAULT = 6
 

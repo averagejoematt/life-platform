@@ -1546,7 +1546,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "active_api": False,
         "expected_days": None,  # episodic — a week with no draw is not a gap
         "qa_tier": None,
-        "method": "Manual upload of the lab PDF/report after each draw (~6-month cadence)",
+        "method": "Manual upload of the lab PDF/report after each draw (~6-month cadence) via scripts/ingest_lab_report.py",
         "metrics": "Blood biomarkers (episodic panels), ASCVD 10-year risk, clinician notes",
         "posture": "load-bearing",  # clinical truth — the deepest evidence the platform holds
         # #3571: manual-by-method, so the explicit answer is required rather than optional.
@@ -1563,11 +1563,56 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             "scheme": "date-folder",
             "filename": "<draw-date>/<document>.pdf|.md",
             "note": (
-                "one folder per DRAW DATE holding N documents (the PDF plus a markdown transcription), "
-                "hand-uploaded — not written by any lambda in this file. 7 objects live-confirmed 2026-09-06 "
-                "(#3570). The prefix also holds hand-uploaded DEXA documents, whose DDB partition is SOURCE#dexa "
-                "(see UNREGISTERED_PARTITIONS below) — the S3 prefix and the DDB partition do not partition the "
-                "same way. No per-day key: raw_date_key() raises for a non-date-tree scheme by design."
+                "one folder per DRAW DATE holding N documents (the PDF plus a markdown transcription). Written by "
+                "scripts/ingest_lab_report.py (#4639: archive-first, then one DDB row with `provenance`) — not by "
+                "any lambda in this file. 7 objects live-confirmed 2026-09-06 (#3570), all under one dated folder. "
+                "DEXA documents have their own prefix since #4639 (raw/matthew/dexa, the `dexa` entry below) — a "
+                "2026-09-06 note claimed they lived here; the live listing on 2026-10-17 held none. No per-day key: "
+                "raw_date_key() raises for a non-date-tree scheme by design."
+            ),
+        },
+    },
+    # ── #4639 (epic #4625): dexa joins the registry — the #3669 residual, paid when the writer arrived.
+    # Owner ruling 2026-10-17 (Q37 on #4644): a repeatable upload -> review -> store path for labs
+    # and DEXA. `scripts/ingest_lab_report.py dexa` is that writer; a partition with a writer and a
+    # cadence is a source, so the dated UNREGISTERED_PARTITIONS disposition and the serving-layer
+    # `_DUE_MONTHS_UNREGISTERED["dexa"]` literal both retire here (the registry owns the number).
+    "dexa": {
+        "label": "DEXA",
+        "checker_label": "DEXA scan",
+        "desc": "Body-composition scans — a DXA scan roughly every 12 months, uploaded after each visit",
+        "category": "Clinical",
+        "behavioral": True,  # a scan happens when he books one; silence is never breakage
+        # no `instrument_for`: physical_coach reads body composition but is not darked by a 12-month scan cadence (#4217 is for sensors)
+        "cadence_months": 12,  # THE cadence — `stale_hours` is DERIVED from it (same rule as labs)
+        "stale_hours": None,  # computed by _derive_cadence_stale_hours(); never typed here
+        # freshness: False for the same reason as labs — a ~8,700-hour healthy state would sit
+        # permanently 🟡 under the checker's global 24h warning tier. The cadence is enforced
+        # where an episodic cadence belongs: /api/status's due-date panel via due_months().
+        "freshness": False,
+        "active_api": False,
+        "expected_days": None,  # episodic — a week with no scan is not a gap
+        "qa_tier": None,
+        "method": "Manual upload of the scan report after each visit (~12-month cadence) via scripts/ingest_lab_report.py",
+        "metrics": "Body composition (lean/fat mass, body fat %, visceral fat), bone density, segmental and limb detail",
+        "posture": "load-bearing",  # the body-composition truth Withings trends against
+        # #3571: manual-by-method, so the explicit answer is required rather than optional.
+        "capture_channel": None,
+        "capture_channel_reason": (
+            "2026-10-17: a scan upload is manual capture on a ~12-month cadence; the #746 channel set "
+            "('hae'|'notion'|'mcp') is an OWNER decision (the same open ruling as labs on issue 3571), and a "
+            "'you have not uploaded a scan' nudge would be noise at this cadence. Stated, not left as a missing key."
+        ),
+        "raw_layout": {
+            "prefix": "raw/matthew/dexa",
+            "scheme": "date-folder",
+            "filename": "<scan-date>/<document>.pdf",
+            "note": (
+                "one folder per SCAN DATE holding the scan report(s), archived by scripts/ingest_lab_report.py "
+                "BEFORE the DDB row is written (#4639). New prefix on 2026-10-17 — 0 objects until the next scan; "
+                "the two stored scans (2025-05-10, 2026-03-30) predate the path and their reports are the owner's "
+                "to back-archive or record as unavailable (the issue's last box). No per-day key: raw_date_key() "
+                "raises for a non-date-tree scheme by design."
             ),
         },
     },
@@ -1676,16 +1721,8 @@ RETIRED_SOURCES: dict[str, dict[str, Any]] = {
 # cross_phase) that still are not ingestion sources. Each carries a dated reason naming
 # WHAT WRITES IT, because "I could not find a writer" is not evidence there isn't one.
 UNREGISTERED_PARTITIONS: dict[str, dict[str, str]] = {
-    "dexa": {
-        "dated": "2026-09-17",
-        "reason": (
-            "Body-composition scans, 2 rows. Episodic clinical capture on a ~12-month cadence (last scan "
-            "2026-03-30), hand-entered per scan with no ingestion pipe — no lambda writes this partition. "
-            "Named by #3669 so the set is complete. A registry entry with `cadence_months: 12` is the obvious "
-            "follow-on and is deliberately NOT taken here: `/api/status` renders dexa from its own DUE_MONTHS "
-            "row, and #3669's box 1 ruled on labs only. Tracked as the residual on 3669's PR."
-        ),
-    },
+    # "dexa" LEFT this dict in #4639 (2026-10-17): it is a SOURCE_REGISTRY source now, with
+    # `cadence_months: 12` and a writer (scripts/ingest_lab_report.py) — the #3669 residual.
     "genome": {
         "dated": "2026-09-17",
         "reason": (
@@ -1904,8 +1941,7 @@ EXTRA_QUERYABLE_PARTITIONS = (
     # "labs" left this tuple in #3669 — it is a SOURCE_REGISTRY source now, so
     # mcp_source_ids() already derives it from the registry's partition-bearing keys.
     # Listing it twice would be the restatement this registry exists to end (the union
-    # made it invisible, which is how a restatement survives).
-    "dexa",
+    # made it invisible, which is how a restatement survives). "dexa" left the same way in #4639.
     "genome",
     "clinical",  # ADR-155 amendment (2026-10-12): owner clinical record — owner-written, TIER_INTERNAL
     "state_of_mind",
