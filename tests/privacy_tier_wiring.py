@@ -132,15 +132,25 @@ CONSUMERS: dict[tuple[str, str], dict] = {
         "blood_oxygen_saturation from Apple devices only, and lists the field in its "
         "zero-is-absent and timestamp-mean sets. Writer-only footprint; no reader yet.",
     ),
-    ("lambdas/ingestion/health_auto_export_lambda.py", "wrist_temp_sleep_c_apple"): _d(
+    ("lambdas/ingestion/health_auto_export_units.py", "wrist_temp_sleep_c_apple"): _d(
         SAW,
-        "The HAE webhook (#4970): maps Apple Sleeping Wrist Temperature and converts "
-        "degF to Celsius on write. Writer-only footprint; no reader yet.",
+        "The webhook's day-field units sibling (#4970): passes the reported wrist-temperature "
+        "unit to the Celsius conversion during the per-day derivation pass. Writer-only.",
     ),
-    ("lambdas/ingestion/health_auto_export_lambda.py", "breathing_disturbances_apple"): _d(
+    ("lambdas/ingestion/health_auto_export_watch.py", "wrist_temp_sleep_c_apple"): _d(
         SAW,
-        "The HAE webhook (#4970): maps the watch's nightly Breathing Disturbances rate "
-        "(sleep-apnea screen, diagnostic-class). Writer-only footprint; no reader yet.",
+        "The webhook's watch-map sibling (#4970): maps Apple Sleeping Wrist Temperature, "
+        "lists it in the mean/zero-absent sets and converts degF to Celsius on write.",
+    ),
+    ("lambdas/ingestion/health_auto_export_watch.py", "breathing_disturbances_apple"): _d(
+        SAW,
+        "The webhook's watch-map sibling (#4970): maps the nightly Breathing Disturbances "
+        "rate (sleep-apnea screen, diagnostic-class) into the timestamp-mean set.",
+    ),
+    ("lambdas/ingestion/health_auto_export_watch.py", "spo2_pct_apple"): _d(
+        SAW,
+        "The webhook's watch-map sibling (#4970): names the pre-existing SpO2 field in the "
+        "timestamp-mean and zero-is-absent sets; the mapping itself stays in the webhook.",
     ),
     ("lambdas/ingestion/ingestion_validator.py", "spo2_pct_apple"): _d(
         SAW,

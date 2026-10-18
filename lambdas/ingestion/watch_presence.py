@@ -38,8 +38,10 @@ not-fresh (an unreadable dead-man is not a live watch).
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any, cast
+
+from common.pacific_time import parse_iso_utc
 
 # A HealthKit source string names the device the reading came from, e.g.
 # "Matthew’s Apple\xa0Watch" (curly apostrophe + NO-BREAK SPACE, measured in the
@@ -73,24 +75,14 @@ def is_watch_source(source: Any) -> bool:
 def reading_epoch(stamp: Any) -> float | None:
     """Epoch seconds for an HAE reading stamp ("2026-10-17 21:14:00 -0700", or ISO), or None.
 
-    A stamp with no offset is read as UTC (the webhook's own partition rule, TD-19).
-    A date-only stamp is not an instant and returns None — presence needs a time.
+    Parsed by THE platform ISO parser (`common.pacific_time.parse_iso_utc`, #1964): a stamp
+    with no offset is UTC (the webhook's own partition rule, TD-19). A date-only stamp is
+    not an instant and returns None — presence needs a time.
     """
-    if not stamp or not isinstance(stamp, str):
+    if not stamp or not isinstance(stamp, str) or len(stamp.strip()) <= 10:
         return None
-    s = stamp.strip()
-    if len(s) <= 10:
-        return None
-    s = s.replace(" ", "T", 1)
-    if len(s) >= 24 and s[-5] in ("+", "-") and s[-3] != ":":
-        s = s[:-2] + ":" + s[-2:]
-    try:
-        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.timestamp()
+    dt = parse_iso_utc(stamp.strip())
+    return dt.timestamp() if dt is not None else None
 
 
 def presence_by_day(metrics: Any, day_of: Callable[[Any], str | None]) -> dict[str, int]:
@@ -115,6 +107,12 @@ def presence_by_day(metrics: Any, day_of: Callable[[Any], str | None]) -> dict[s
             if int(epoch) > out.get(day, 0):
                 out[day] = int(epoch)
     return out
+
+
+def stamp_presence(daily: Any, metrics: Any, day_of: Callable[[Any], str | None]) -> None:
+    """Write each day's presence stamp into the webhook's {day: fields} dict, in place."""
+    for day, epoch in presence_by_day(metrics, day_of).items():
+        daily.setdefault(day, {})[WATCH_PRESENCE_FIELD] = epoch
 
 
 def dead_man_specs() -> list[dict[str, Any]]:

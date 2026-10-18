@@ -147,6 +147,8 @@ except ImportError:
 from ingestion import (
     health_auto_export_additive as _additive,  # #4628: the archived day sum
     health_auto_export_archive as _archive,
+    health_auto_export_units as _units,  # #4970: day-field units + derived totals
+    health_auto_export_watch as _watch,  # #4970: the Apple Watch's daily-metric map
     watch_presence as _watch_presence,  # #4970: the watch dead-man's presence stamp
 )
 
@@ -587,37 +589,10 @@ _METRIC_DEFS = [
     ({"Heart Rate Variability", "heart_rate_variability"}, {"field": "hrv_sdnn_apple", "agg": "avg", "tier": 2}),
     ({"Respiratory Rate", "respiratory_rate"}, {"field": "respiratory_rate_apple", "agg": "avg", "tier": 2}),
     ({"Oxygen Saturation", "blood_oxygen_saturation"}, {"field": "spo2_pct_apple", "agg": "avg", "tier": 2}),
-    # ── #4970: the Apple Watch's own daily metrics (Ultra 4, from 2026-10-16) ─────────
-    # Title-Case names verified against the HAE automation config
-    # (datadrops/hae_config, datadrops/logs/automations.json); the snake_case twins
-    # follow HAE's JSON-v2 convention and are re-verified by #4969's raw-capture diff.
-    # Tier 2 (Apple-device readings only), so a vendor mirror (Whoop, Oura) writing the
-    # same HealthKit type can never land in an *_apple field — capture-all per source,
-    # never a winner picked across vendors. `hae_summarize` is the HAE automation
-    # setting each field expects (docs/SCHEMA.md "Apple Watch daily metrics (#4970)"):
-    # every new field is deduped by reading timestamp (_WATCH_SUM_DEDUP_FIELDS /
-    # _WATCH_AVG_DEDUP_FIELDS below), so raw samples (summarize OFF) are the contract —
-    # a summarized daily point is also correct alone, but a mid-day switch between the
-    # two double-counts the additive ones. Overnight sleep stages are #4971's lane and
-    # ECG / notifications / medications / AFib burden are #4972's — NOT mapped here.
-    (
-        {"Apple Sleeping Wrist Temperature", "apple_sleeping_wrist_temperature", "sleeping_wrist_temperature"},
-        {"field": "wrist_temp_sleep_c_apple", "agg": "avg", "tier": 2, "hae_summarize": False},
-    ),
-    (
-        {"Breathing Disturbances", "breathing_disturbances"},
-        {"field": "breathing_disturbances_apple", "agg": "avg", "tier": 2, "hae_summarize": False},
-    ),
-    ({"Cardio Recovery", "cardio_recovery"}, {"field": "cardio_recovery_bpm_apple", "agg": "avg", "tier": 2, "hae_summarize": False}),
-    ({"Time in Daylight", "time_in_daylight"}, {"field": "daylight_minutes_apple", "agg": "sum", "tier": 2, "hae_summarize": False}),
-    (
-        {"Environmental Audio Exposure", "environmental_audio_exposure"},
-        {"field": "environmental_audio_db_apple", "agg": "avg", "tier": 2, "hae_summarize": False},
-    ),
-    ({"Apple Exercise Time", "apple_exercise_time"}, {"field": "exercise_minutes_apple", "agg": "sum", "tier": 2, "hae_summarize": False}),
-    ({"Apple Stand Time", "apple_stand_time"}, {"field": "stand_minutes_apple", "agg": "sum", "tier": 2, "hae_summarize": False}),
-    ({"Apple Stand Hour", "apple_stand_hour"}, {"field": "stand_hours_apple", "agg": "sum", "tier": 2, "hae_summarize": False}),
 ]
+# #4970: the Apple Watch's own daily metrics — names, tiers, summarize contract and lane
+# exclusions live in the cohesive sibling (health_auto_export_watch.py).
+_METRIC_DEFS += _watch.WATCH_METRIC_DEFS
 
 # Build lookup from all name variants
 for names, config in _METRIC_DEFS:
@@ -722,111 +697,23 @@ _DEDUP_FIELDS = {"water_intake_raw", "caffeine_mg"}
 # reading's own timestamp, so a re-delivered reading cannot shift the mean.
 _GAIT_AVG_DEDUP_FIELDS = {"walking_speed_mph", "walking_step_length_in", "walking_double_support_pct", "walking_asymmetry_pct"}
 
-# #4970: the watch's averaged daily metrics take the SAME timestamp-keyed mean as gait —
-# the export is incremental, so a payload-local mean of HRV (193 samples over 10-17/18)
-# would otherwise overwrite the day with whichever sync arrived last. The existing
-# watch-capable averages (HRV/RHR/RR/SpO2/walking HR/VO2/steadiness) join the new ones.
-_WATCH_AVG_DEDUP_FIELDS = {
-    "hrv_sdnn_apple",
-    "resting_heart_rate_apple",
-    "respiratory_rate_apple",
-    "spo2_pct_apple",
-    "walking_heart_rate_avg",
-    "vo2max",
-    "walking_steadiness_pct",
-    "wrist_temp_sleep_c_apple",
-    "breathing_disturbances_apple",
-    "cardio_recovery_bpm_apple",
-    "environmental_audio_db_apple",
-}
+# #4970: the watch's averaged daily metrics take the SAME timestamp-keyed mean as gait, its
+# additive ones the unique-timestamp sum, and a 0 on a physiological reading is absent —
+# the sets and their reasons live in health_auto_export_watch.py.
+_WATCH_AVG_DEDUP_FIELDS = _watch.WATCH_AVG_DEDUP_FIELDS
 _AVG_DEDUP_FIELDS = _GAIT_AVG_DEDUP_FIELDS | _WATCH_AVG_DEDUP_FIELDS
-
-# #4970: the watch's additive daily metrics are the SUM over the unique-timestamp map (the
-# water/caffeine path) — never a payload-local sum, never a max across syncs.
-_WATCH_SUM_DEDUP_FIELDS = {"daylight_minutes_apple", "exercise_minutes_apple", "stand_minutes_apple", "stand_hours_apple"}
-_DEDUP_FIELDS = _DEDUP_FIELDS | _WATCH_SUM_DEDUP_FIELDS
-
-# #4970 ADR-104: a 0 on a physiological reading is a failed measurement, not a value
-# (the Withings SpO2 precedent, #2782) — dropped as ABSENT, never averaged in as a zero.
-# Additive fields and breathing disturbances are NOT here: 0 exercise minutes or 0
-# disturbances on a worn day is a real reading.
-_ZERO_IS_ABSENT_FIELDS = {
-    "hrv_sdnn_apple",
-    "resting_heart_rate_apple",
-    "respiratory_rate_apple",
-    "spo2_pct_apple",
-    "walking_heart_rate_avg",
-    "vo2max",
-    "wrist_temp_sleep_c_apple",
-    "cardio_recovery_bpm_apple",
-}
+_DEDUP_FIELDS = _DEDUP_FIELDS | _watch.WATCH_SUM_DEDUP_FIELDS
+_ZERO_IS_ABSENT_FIELDS = _watch.ZERO_IS_ABSENT_FIELDS
 
 # #4970: the dead-man's presence stamp (newest watch-sourced reading, epoch seconds) —
 # GREATEST-on-merge so a late re-export of older readings never pulls it backwards.
 _PRESENCE_GUARD_FIELDS = {_watch_presence.WATCH_PRESENCE_FIELD}
 
 
-def _water_ml_factor(units):
-    """mL per reported water unit (#483/D-9). Historical payloads report fl-oz, which the
-    old code hard-assumed; honor mL/L when tagged so a mL-reporting app isn't ×29.5735'd."""
-    u = (units or "").lower().replace(" ", "").replace("_", "")
-    if u in ("ml", "milliliter", "milliliters", "millilitre", "millilitres"):
-        return 1.0
-    if u in ("l", "liter", "liters", "litre", "litres"):
-        return 1000.0
-    if u in ("floz", "flozus", "fluidounce", "fluidounces", "oz", "ounce", "ounces"):
-        return 29.5735
-    if u:
-        logger.warning(f"[HAE] unexpected water units {units!r}; assuming fl-oz")
-    return 29.5735  # historical default
-
-
-def _derive_day_fields(daily_data, daily_timestamps, field_units):
-    """Derived fields + unit normalisation per day, in place (extracted from
-    process_generic_metrics by #4970 to pay for the watch fields under the #4880 guard)."""
-    for date, fields in daily_data.items():
-        ac = fields.get("active_calories")
-        bc = fields.get("basal_calories")
-        if ac is not None and bc is not None:
-            fields["total_calories_burned"] = round(ac + bc, 2)
-
-        # Water → mL, honoring the reported unit rather than assuming fl-oz (#483/D-9).
-        # oz is derived from ml after dedup, not tracked independently.
-        water_raw = fields.pop("water_intake_raw", None)
-        if water_raw is not None:
-            factor = _water_ml_factor(field_units.get("water_intake_raw"))
-            fields["water_intake_ml"] = round(water_raw * factor)
-            # Carry dedup timestamps from water_intake_raw → water_intake_ml
-            if date in daily_timestamps and "water_intake_raw" in daily_timestamps[date]:
-                raw_ts = daily_timestamps[date].pop("water_intake_raw")
-                daily_timestamps[date]["water_intake_ml"] = {ts: round(qty * factor) for ts, qty in raw_ts.items()}
-
-        # Weight is stored as lbs (HAE is a Withings fallback). Convert kg if so tagged (#483/D-9).
-        w = fields.get("weight_lbs")
-        if w is not None:
-            wu = (field_units.get("weight_lbs") or "").lower().strip()
-            if wu in ("kg", "kilogram", "kilograms"):
-                fields["weight_lbs"] = round(w * 2.20462, 2)
-            elif wu and wu not in ("lb", "lbs", "pound", "pounds"):
-                logger.warning(f"[HAE] unexpected weight units {wu!r} for {date}; assuming lbs")
-
-        # #4970: wrist temperature is stored in Celsius; HAE reports the phone's unit.
-        wt = fields.get("wrist_temp_sleep_c_apple")
-        if wt is not None:
-            wtu = (field_units.get("wrist_temp_sleep_c_apple") or "").lower().replace("°", "").strip()
-            if wtu in ("degf", "f", "fahrenheit"):
-                fields["wrist_temp_sleep_c_apple"] = round((wt - 32) * 5 / 9, 2)
-                if date in daily_timestamps and "wrist_temp_sleep_c_apple" in daily_timestamps[date]:
-                    daily_timestamps[date]["wrist_temp_sleep_c_apple"] = {
-                        ts: round((q - 32) * 5 / 9, 2) for ts, q in daily_timestamps[date]["wrist_temp_sleep_c_apple"].items()
-                    }
-            elif wtu and wtu not in ("degc", "c", "celsius"):
-                logger.warning(f"[HAE] unexpected wrist-temperature units {wtu!r} for {date}; assuming Celsius")
-
-        # Distances are stored as miles. Convert km/m if so tagged; warn on anything else (#483/D-9).
-        for dfield in [f for f in fields if f.endswith("_miles")]:
-            if fields.get(dfield) is not None:
-                fields[dfield] = _additive.to_miles(fields[dfield], field_units.get(dfield))
+# #4970: the day-field unit normalisation + derived totals moved to the cohesive sibling
+# health_auto_export_units.py (the #1665 size guard); the names stay bound here.
+_water_ml_factor = _units.water_ml_factor
+_derive_day_fields = _units.derive_day_fields
 
 
 def process_generic_metrics(metrics):
@@ -1012,16 +899,11 @@ def process_generic_metrics(metrics):
     return daily_data, dict(daily_timestamps), dict(source_audit)
 
 
+# #4970: process_generic_metrics + the watch dead-man's presence stamp — the newest
+# watch-sourced reading per day, over EVERY metric (mapped or not), GREATEST-guarded on merge.
 def process_metrics_with_watch_presence(metrics):
-    """process_generic_metrics + the watch dead-man's presence stamp (#4970).
-
-    The stamp (`watch_last_reading_epoch_apple`, the newest watch-sourced reading per
-    day) is taken over EVERY metric in the payload, mapped or not, and joins the same
-    day merge, where the GREATEST guard keeps it from moving backwards.
-    """
     daily, timestamps, audit = process_generic_metrics(metrics)
-    for day, epoch in _watch_presence.presence_by_day(metrics, parse_date_str).items():
-        daily[day][_watch_presence.WATCH_PRESENCE_FIELD] = epoch
+    _watch_presence.stamp_presence(daily, metrics, parse_date_str)
     return daily, timestamps, audit
 
 
