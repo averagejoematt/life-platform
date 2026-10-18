@@ -173,7 +173,8 @@ test("the podcast line is the guest's own first turn, verbatim, and absent when 
 
 test("the chapter and podcast lines are labelled as AI-written and carry Read and Listen", () => {
   const html = F.quotesHTML(WITH_POD, load("transcript_wk4"), "/next/v8/");
-  assert.match(html, /Written by AI from the record on October 13; Matthew reads each chapter before it publishes\./);
+  // Red team round 3 (B-03/A-10): the chapter's date is its dateline, and "the record" is said plainly.
+  assert.match(html, /“The Quiet Accumulation”, the chapter, dated October 13\. Written by AI from what the devices and logs recorded; Matthew reads each chapter before it publishes\./);
   assert.match(html, /Marcus Webb, the AI food coach, on the podcast/);
   assert.match(html, /<a class="ck-btn" href="\/journal\/posts\/week-09\/">Read · 7 min<\/a>/);
   assert.doesNotMatch(F.quotesHTML(B.chapter, load("transcript_wk4"), "/"), /on the podcast|Listen/, "as captured, no episode: no podcast line");

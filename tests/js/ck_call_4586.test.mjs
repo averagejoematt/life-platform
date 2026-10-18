@@ -18,6 +18,9 @@ const NUMBER = "sleep-20260907-8436f03290";
 const BET = "bet-20260930-994b3d89f6";
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
+// Red team round 3: the served "one standard deviation of X" is printed "the usual spread of X (one standard deviation, …)".
+const plainSd = (st) => st.replace(/^one standard deviation of (.+)$/, (_, rest) => `the usual spread of ${rest} (one standard deviation`);
+
 test("a call is found by its own id, and an address that names none finds nothing", () => {
   assert.equal(C.findCall(BODY, NUMBER).coach_name, "Lisa Park");
   assert.equal(C.findCall(BODY, "sleep-20260907-0000000000"), null);
@@ -45,7 +48,8 @@ test("what happened carries the verdict as the kit's tag, beside the simple gues
   assert.match(right, new RegExp(`<span class="ck-verdicts__tag ck-verdicts__tag--right">Right · within ${tol.replace(".", "\\.")} out of 100 either way</span><p class="ck-soft">The allowed distance is`));
   assert.ok(!right.includes(`<b>${call.happened}</b>`) && !right.includes(call.verdict_text), "the call and its verdict are not restated");
   // #4808: the allowed distance is in the tag, and what it is — its statistic and window — once, below
-  assert.ok(right.includes(`The allowed distance is ${call.tolerance.statistic}.`));
+  // Red team round 3 (A-07/B-19): the statistic in plain words first, the term and its count after.
+  assert.ok(right.includes(`The allowed distance is ${plainSd(call.tolerance.statistic)}`), right);
   assert.match(right, /The allowed distance is [^<]+\. Graded on the reading for [A-Z][a-z]+ \d+\.(<\/p>| The simple guess was also right\.<\/p>)/);
   assert.doesNotMatch(right, /Checked [A-Z][a-z]+ \d+\./, "the page's label says the day it settled");
   // The number sits in the call's own tag; a call the simple guess was scored on prints it in that guess's tag too, and nowhere else.
@@ -135,7 +139,7 @@ test("the front page's last settled call is one block that opens its page", () =
   // #4808, the house rule: the tag (verdict and rule) first, then the call with the RESULT bold,
   // then what the allowed distance is — the number once, in the tag
   assert.ok(html.includes(`<span class="ck-verdicts__tag">Wrong · not within ${call.tolerance.text} out of 100 either way</span><p>${V.matthewsCall(call.called)} <b>${call.happened_short}</b></p>`));
-  assert.ok(html.includes(`<p class="ck-soft">The allowed distance is ${call.tolerance.statistic}. `), "the card says what counts as right");
+  assert.ok(html.includes(`<p class="ck-soft">The allowed distance is ${plainSd(call.tolerance.statistic)}`), "the card says what counts as right");
   assert.equal((html.match(new RegExp(call.tolerance.text.replace(".", "\\."), "g")) || []).length, 1, "the allowed distance is printed once");
   const scored = call.simple_guess && call.simple_guess.state === "scored" && call.simple_guess.short;
   // Round 2: the guess is named when its served sentence says which one it is.

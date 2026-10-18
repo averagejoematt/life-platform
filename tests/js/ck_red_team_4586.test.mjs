@@ -103,7 +103,7 @@ test("Coaches: a coach sitting out since before day one says what its counted ca
   const body = { coaches: [{ persona_id: "glucose_coach", name: "Amara Patel", absent: true, reason: "no sensor since 2026-08-27", record: { confirmed: 1, refuted: 6, n: 7 } }] };
   const start = B.today.data.start_date;
   assert.ok(start > "2026-08-27");
-  assert.match(P.teamHTML(body, "", "", { startDate: start }), /no sensor since August 27, before day one, so the calls counted here were checked on other readings\./);
+  assert.match(P.teamHTML(body, "", "", { startDate: start }), /no glucose monitor reading since August 27, before day one, so the calls counted here were checked on other readings\./);
   assert.doesNotMatch(P.teamHTML(body, "", "", { startDate: "2026-08-01" }), /before day one/, "a sitting-out date inside the run is not called pre-start");
   assert.doesNotMatch(P.teamHTML(body), /before day one/, "no start date served: no claim");
 });
@@ -138,7 +138,7 @@ test("Start: a chapter row prints the chapter's own change, the window named, no
   // Each row is a kit chapter row whose title is a door; each prologue says what it is.
   assert.match(html, /<ul class="ck-rows ck-rows--chapters">/);
   assert.match(html, /<a href="\/journal\/posts\/week-05\/">Nine Days and No Rest<\/a>/);
-  assert.match(html, /Who he was before the record\./);
+  assert.match(html, /Who he was before any of it was measured\./);
   assert.match(html, /The plan, written before day one\./);
   assert.doesNotMatch(html, /Before day one\./, "no prologue falls back to the shared line on the capture");
 });
@@ -169,7 +169,7 @@ test("Story on the capture's own day: the latest chapter and its date, the next 
   // The 2026-10-18 capture: week 6 is served `ok` with `latest.status` "published", five days after it was written,
   // so the accent badge is right on the capture's own day; the written date is the byline's.
   assert.match(html, new RegExp(`New this week · Week ${n}`), "the served chapter is fresh on the capture's day");
-  assert.match(html, new RegExp(`Written by AI from the record on ${inWords(latestDate)}\\.`), "the dated fact the served data supports");
+  assert.match(html, new RegExp(`Dated ${inWords(latestDate)}\\. Written by AI from what the devices and logs recorded\\.`), "the dated fact the served data supports");
   assert.doesNotMatch(html, new RegExp(`Week ${n + 1}|waiting for Matthew’s approval|waiting for approval|held before publishing`), "no held week is inferred (week 6 published 2026-10-18T04:29Z)");
   assert.equal(B.chapter.data.latest.status, "published", "the held line binds chronicle.latest.status, which is published");
   assert.match(html, /The next draft is due [A-Z][a-z]+day, [A-Z][a-z]+ \d+; it publishes once Matthew approves it\./);
@@ -342,9 +342,9 @@ test("Start: the weight chart is framed start to goal, as the front page's mark 
   // Round 2 (start, G10): no text inside the SVG — it scaled with the viewBox to ~6 px on a phone.
   // The frame's two rules are named in one kit text row under the dates.
   assert.doesNotMatch(html, /<text/, "no text inside the drawing");
-  assert.ok(html.includes(`<div class="ck-ends"><span>The top rule is ${String(t.start_weight_lbs)} lb, the start; the dashed rule is ${String(Number(t.goal_weight_lbs))} lb, the goal.</span></div>`), html.slice(-300));
-  assert.ok(html.indexOf("October 17 · ") < html.indexOf("The top rule is"), "the dates row first, the frame line under it");
-  assert.doesNotMatch(P.chartHTML(series), /The top rule/, "no frame served: no frame line");
+  assert.ok(html.includes(`<div class="ck-ends"><span>The top line is ${String(t.start_weight_lbs)} lb, the start; the dashed line is ${String(Number(t.goal_weight_lbs))} lb, the goal.</span></div>`), html.slice(-300));
+  assert.ok(html.indexOf("October 17 · ") < html.indexOf("The top line is"), "the dates row first, the frame line under it");
+  assert.doesNotMatch(P.chartHTML(series), /The top line/, "no frame served: no frame line");
   // The same frame as the mark: the latest point sits the same share of the way down the frame
   // as the mark says is gone.
   const pts = [...series].sort((a, b) => a.date.localeCompare(b.date));
@@ -452,7 +452,7 @@ test("Trend index: each row carries its latest served reading and the day, and t
     const pts = D.seriesOf(key, src, today);
     const last = pts[pts.length - 1];
     assert.ok(last, `${key} has a served reading`);
-    assert.ok(html.includes(`>${m.name} · ${m.write(last.value)} <span>${new Date(`${last.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" })} `), `${key}: its latest value and day`);
+    assert.ok(html.includes(`>${m.source ? `${m.name} (${m.source})` : m.name} · ${m.write(last.value)} <span>${new Date(`${last.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" })} `), `${key}: its latest value and day`);
   }
   assert.match(D.trendIndexDay(src), /^Sunday, October 18 · Day 43$/);
   assert.equal(D.trendIndexDay({}), "");
@@ -517,7 +517,8 @@ const plain = (html) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(
 
 test("Story ST10: one frame sentence under the chapter title says what the site is", () => {
   const html = P.storyChapterHTML(EDITION, B, POSTS, EPISODES);
-  assert.match(html, new RegExp(`</h1><p class="ck-soft">${P.STORY_FRAME.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/’/g, "(?:’|&#39;|&rsquo;)")}</p>`));
+  // Red team round 3 (A-16): his sentence opens the lead, above the chapter's label and title.
+  assert.match(html, new RegExp(`^<p class="ck-soft">${P.STORY_FRAME.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/’/g, "(?:’|&#39;|&rsquo;)")}</p><span class="ck-(badge|label)">`));
   assert.match(P.STORY_FRAME, /predicts how it will go, and code checks every call\.$/);
 });
 
@@ -531,7 +532,8 @@ test("Story ST1: the newest published episode plays under the chapter when this 
   const html = P.storyChapterHTML(EDITION, B, POSTS, EPISODES);
   const newest = [...EPISODES.episodes].sort((a, b) => b.date.localeCompare(a.date))[0];
   assert.match(html, new RegExp(`<audio controls preload="none" src="${newest.url}"`));
-  assert.match(html, new RegExp(`The newest episode, for week ${newest.week}: ${newest.guest_name} · ${Math.round(newest.duration_sec / 60)} min\\.`));
+  // Red team round 3 (A-17): the weeks between the newest episode and this held chapter's are said.
+  assert.match(html, new RegExp(`No episode yet for week ${newest.week + 1}; the newest, for week ${newest.week}: ${newest.guest_name} · ${Math.round(newest.duration_sec / 60)} min\\.`));
   assert.match(html, /This chapter’s own episode is recorded and held for review\./);
   const rows = P.episodeRowsHTML(EPISODES, { playing: newest.url });
   assert.doesNotMatch(rows, /href="[^"]*\.mp3"/, "no bare .mp3 link");
@@ -574,14 +576,21 @@ test("Coaches C2/C5: a lagging record says its day, the lead's row says why ther
   // The 2026-10-18 capture is from 00:15 Pacific: every record is through the day before, so the current kind is
   // the served Lisa Park row read as of her own `through` day.
   assert.ok(lag.length >= 1, "the capture has a lagging record");
-  for (const c of lag) assert.match(row(c.name), new RegExp(`${c.record.confirmed} of ${c.record.n}<br><span class="ck-small">through [A-Z][a-z]+ \\d+</span>`), c.name);
-  for (const c of current) assert.doesNotMatch(row(c.name), /through/, c.name);
+  // Red team round 3 (A-25): the record cell is the count alone; the lagging days are ONE note under the list,
+  // each day naming its coaches, never an orphan "through October 14" line in a cell.
+  const note = (h) => (/<\/ul><p class="ck-small">(Counted through [^<]+|Every record above is counted through [^<]+)<\/p>/.exec(h) || [])[1] || "";
+  for (const c of lag) {
+    assert.match(row(c.name), new RegExp(`ck-coach__record">${c.record.confirmed} of ${c.record.n}</span>`), c.name);
+    assert.ok(note(html).includes(c.name), `${c.name} is named in the lag note`);
+  }
+  assert.doesNotMatch(html.split("</ul>")[0], /through/, "no lag line inside the list");
+  for (const c of current) assert.ok(!note(html).includes(c.name), c.name);
   const lisa = COACHES.coaches.find((c) => c.name === "Lisa Park");
-  const onHerDay = P.teamHTML(COACHES, "", "", { asOf: lisa.record.through }).split("<li>").find((li) => li.includes("Lisa Park"));
-  assert.doesNotMatch(onHerDay, /through/, "a record through the page's day carries no lag note");
+  const onHerDay = P.teamHTML(COACHES, "", "", { asOf: lisa.record.through });
+  assert.ok(!note(onHerDay).includes("Lisa Park"), "a record through the page's day is not named in the lag note");
   assert.match(row("Eli Marsh"), /ck-coach__job">Lead, the day's plan; runs the program, so no checked calls<\/span><span class="ck-coach__record">none<\/span>/);
   assert.doesNotMatch(row("Amara Patel").split("</li>")[0], /sitting out/i, "not in the row");
-  assert.match(html, /<\/ul><p class="ck-small">Amara Patel is sitting out: no sensor since August 27\.<\/p>$/, "one line under the list");
+  assert.match(html, /<p class="ck-small">Amara Patel is sitting out: no glucose monitor reading since August 27\.<\/p>$/, "one line under the list");
   assert.doesNotMatch(html, /ck-meter/);
   assert.doesNotMatch(P.teamHTML(COACHES), /through/, "no edition day: no lag claim");
 });
@@ -903,4 +912,105 @@ test("round 2 (coaches, item 8): until the served sentence lands, the big record
   const served = { ...B.record, data: { ...B.record.data, comparison_text: "Too few checked calls yet to compare the coaches with a simple guess.", baseline: { text: "A guess that every call has a 42% chance of coming true does about as well." } } };
   assert.match(P.recordBigHTML(served), /<p>Too few checked calls yet to compare the coaches with a simple guess\.<\/p><details class="ck-small"><summary>The exact rate<\/summary>/);
   assert.doesNotMatch(P.recordBigHTML({ ...B.record, data: { ...B.record.data, brier_skill: null, baseline: null } }), /The exact rate/, "no skill and no served baseline: no fold");
+});
+
+// ── red team round 3 (2026-10-18, the verified site findings; Refs #4580 #4586) ──────────────────
+// The capture is from 00:15 Pacific on October 18, before that day's Strava WeightTraining was served, so the
+// strength-only day below is the captured row shape with the live day's served value (41 minutes) set on it.
+// A recapture after the day is served would make this pin wire-bound.
+test("round 3 B-06/B-02/B-11: a strength session the strap recorded is training on the day page, never 'no training'", () => {
+  const live = structuredClone(SRC);
+  const day = live.training.daily_modality_minutes_30d.find((r) => r.date === "2026-10-18");
+  Object.assign(day, { strength_min: 41, total_min: 41 });
+  assert.ok(!live.workouts.workouts.some((w) => w.date === "2026-10-18"), "no lifting session logged that day");
+  const html = D.dayLiftsHTML("2026-10-18", live, "/next/v8/");
+  assert.equal(html, '<p class="ck-soft">No lifting logged that day.</p><p class="ck-soft">Also that day: 41 minutes of strength.</p>');
+  // the trend counts the same minutes the day page now names
+  const pts = D.seriesOf("training", live, "2026-10-18");
+  assert.equal(pts[pts.length - 1].value, 41);
+  // On a day with a logged session the strength minutes ARE the session: never said twice.
+  const lifted = live.training.daily_modality_minutes_30d.find((r) => r.strength_min > 0 && live.workouts.workouts.some((w) => w.date === r.date && (w.exercises || []).length));
+  assert.ok(lifted, "the capture has a lifting day");
+  assert.doesNotMatch(D.dayLiftsHTML(lifted.date, live, "/next/v8/"), /minutes of strength/);
+});
+
+test("round 3 B-12: a running count's partial today is said as today so far, outside the lowest and highest", () => {
+  const write = (v) => `${v} minutes`;
+  const pts = [{ date: "2026-10-16", value: 158 }, { date: "2026-10-17", value: 168 }, { date: "2026-10-18", value: 41 }];
+  assert.equal(D.trendSentence(pts, write, { today: "2026-10-18" }), "2 readings from October 16 to October 17. Lowest 158 minutes, highest 168 minutes, average 163 minutes. Today so far: 41 minutes.");
+  assert.match(D.trendSentence(pts, write), /Lowest 41 minutes/, "no today named: every reading counts, as before");
+});
+
+test("round 3 B-10: the trend index says whose step count it prints", () => {
+  const src = { pulse: load("pulse_history"), nutrition: load("nutrition_overview"), training: load("training_overview") };
+  assert.match(D.trendIndexHTML("/next/v8/", src, EDITION.as_of), />Steps \(wrist strap, else phone\) · [\d,]+ <span>/);
+  assert.doesNotMatch(D.MEASURES.steps.about, /as my phone and watch counted them/, "the old line named the wrong device first");
+});
+
+test("round 3 B-07: the week's silence line names its own record, not the journal a coach counts from", () => {
+  const html = P.weekSlots(EDITION, B, "/next/v8/")["ck-words-absent"];
+  assert.equal(B.his_words.state, "stale");
+  assert.match(html, /^Nothing new in his own words since [A-Z][a-z]+day, [A-Z][a-z]+ \d+\. Counted from his replies and his notes on the plan, not the journal\.$/);
+  assert.equal(P.wordsSourceNote({ source: "/api/journal" }), "", "another record is not named as this one");
+  const fresh = { ...B, his_words: { state: "ok", source: "/api/owner_words", data: { text: "x", date: "2026-10-18" }, absent_text: "" } };
+  assert.equal(P.weekSlots(EDITION, fresh, "/next/v8/")["ck-words-absent"], null, "fresh words: no silence line");
+});
+
+test("round 3 A-12: Start's served numbers sit under the approved opening", () => {
+  assert.match(shell("start"), /whether they were right\.<\/p>\s*<p class="ck-soft" id="ck-start-line"><\/p>/);
+  const t = B.today.data;
+  const line = P.startNumbersLine(t, EDITION);
+  assert.match(line, new RegExp(`^From ${t.start_weight_lbs.toFixed(1).replace(".", "\\.")} lb toward ${Number(t.goal_weight_lbs)}, since [A-Z][a-z]+ \\d+\\. (Day \\d+|On [A-Z][a-z]+ \\d+): ${t.weight_lbs.toFixed(1).replace(".", "\\.")} lb\\.$`));
+  assert.equal(P.startNumbersLine({ ...t, date: EDITION.as_of }, { ...EDITION, day_n: 43 }).endsWith(`Day 43: ${t.weight_lbs.toFixed(1)} lb.`), true);
+  assert.equal(P.startNumbersLine({}, EDITION), "", "nothing served: no line");
+});
+
+test("round 3 A-17: under a chapter with no episode, the weeks without one are said", () => {
+  const eps = { episodes: [{ url: "/panelcast/wk4.mp3", title: "EP4", week: 4, date: "2026-10-01", guest_name: "Marcus Webb", duration_sec: 420 }] };
+  assert.equal(P.newestEpisode(eps, { chapterWeek: 6 }).caption, "No episode yet for weeks 5 and 6; the newest, for week 4: Marcus Webb · 7 min.");
+  assert.equal(P.newestEpisode(eps, { chapterWeek: 6, held: true }).caption, "No episode yet for week 5; the newest, for week 4: Marcus Webb · 7 min.");
+  assert.equal(P.newestEpisode(eps, { chapterWeek: 4 }).caption, "The newest episode, for week 4: Marcus Webb · 7 min.");
+  assert.equal(P.newestEpisode(eps).caption, "The newest episode, for week 4: Marcus Webb · 7 min.");
+});
+
+test("round 3 A-11: an old-format stats line is never printed as a 'Label:' fragment", () => {
+  const week6 = POSTS.posts.find((p) => /^Weight:/.test(String(p.stats_line || "")));
+  if (week6) assert.match(P.chapterStatLine(week6), /^\d+(\.\d)? lb at the chapter\.$/, "the captured week 6 line");
+  assert.equal(P.chapterStatLine({ label: "Week 6", stats_line: "Weight: 305.4 lbs | Week Grade: avg 70 | T0 Streak: 1 days" }), "305.4 lb at the chapter.");
+  assert.equal(P.chapterStatLine({ label: "Week 7", stats_line: "Week Grade: avg 70" }), "", "any other labelled fragment is not printed");
+  assert.doesNotMatch(P.recapHTML(P.postsInOrder(POSTS)), /\b[A-Z][a-z]+( [A-Z][a-z]+)?: \d/);
+});
+
+test("round 3 A-15/A-27: Story's frame is the owner-approved premise word for word; the draft footers stay", () => {
+  const premise = /<p class="ck-premise">([^<]+)<\/p>/.exec(shell(""))[1];
+  assert.equal(P.STORY_FRAME, premise);
+  for (const page of ["story", "coaches", "week", "day", "trend"]) assert.match(shell(page), /A first-person line with no date on it is draft wording/, `${page}: the footer is his decision`);
+});
+
+test("round 3 copy: the podcast line, the coaches' door, Claude on the front, the start's record words, the chart's lines", () => {
+  assert.match(shell("story"), /When a chapter publishes, the AI that wrote it interviews one of the coaches about it\./);
+  assert.doesNotMatch(shell("story"), /Each week the AI that writes the chapter/);
+  assert.match(shell("coaches"), /<p id="ck-verdicts-more"><a class="ck-link" href="\/next\/v8\/call\/">Every prediction, right and wrong<\/a><\/p>/);
+  assert.match(shell(""), /software built with Claude/);
+  assert.doesNotMatch(shell("start"), /from the record\./);
+  assert.match(P.chartFrameLine(327.3, 185), /^The top line is 327\.3 lb, the start; the dashed line is 185 lb, the goal\.$/);
+});
+
+test("round 3 B-19/A-07: the allowed distance in plain words, with its count when the count fits its window", () => {
+  const call = { kind: "number", tolerance: { text: "14.8", statistic: "one standard deviation of his readings over the 30 days before the call", window_days: 30, n: 28 } };
+  assert.equal(V.toleranceNote(call), "The allowed distance is the usual spread of his readings over the 30 days before the call (one standard deviation, 28 readings).");
+  assert.equal(V.toleranceNote({ ...call, tolerance: { ...call.tolerance, n: 31 } }), "The allowed distance is the usual spread of his readings over the 30 days before the call (one standard deviation).", "a count past its window is not printed beside it");
+  assert.equal(V.sharedToleranceNote([call, { ...call, tolerance: { ...call.tolerance, n: 29 } }]), "Each allowed distance is the usual spread of his readings over the 30 days before the call (one standard deviation, 28 and 29 readings).");
+});
+
+test("round 3 B-26/B-28: the tier's one-step cap is said beside a forecast past a higher line; a month of ordinary days is not a forecast", () => {
+  const rc = { ...load("receipts"), tier: 1, month_to_date_usd: 136.96, projected_month_end_usd: 188.05 };
+  const html = BU.costHTML(rc);
+  const t1 = (rc.ceiling_usd * 55) / 75;
+  const t2 = (rc.ceiling_usd * 65) / 75;
+  assert.ok(188.05 >= t2, "the forecast is past tier 2's line");
+  assert.match(html, new RegExp(`The forecast is past tier 2’s line of \\$${t2.toFixed(2).replace(".", "\\.")}, and the tier is still 1: a forecast can raise the tier only one step above what has actually been spent\\. Tier 2 needs \\$${t1.toFixed(2).replace(".", "\\.")} actually spent; \\$136\\.96 is spent so far\\.`));
+  assert.doesNotMatch(BU.costHTML({ ...rc, month_to_date_usd: t1 + 1, tier: 2 }), /and the tier is still/, "the tier the forecast implies: no cap sentence");
+  assert.match(html, /days like it come to \$[\d,.]+, (under|above) the ceiling; that is not a forecast\./);
+  assert.match(shell("built"), /A forecast can raise the tier only one step above what has actually been spent\./);
 });

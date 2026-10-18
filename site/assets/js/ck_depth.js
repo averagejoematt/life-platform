@@ -42,7 +42,7 @@ const shift = (iso, days) => new Date(Date.parse(`${iso}T12:00:00Z`) + days * 86
 // key -> its name, unit, where its daily values come from and how a value is written.
 export const MEASURES = {
   weight: { name: "Weight", unit: "lb", write: (v) => `${v.toFixed(1)} lb`, about: "Every weigh-in since the start." },
-  steps: { name: "Steps", unit: "steps", write: (v) => whole(v), about: "Steps as my phone and watch counted them. A day they were not carried reads low, so some days here are lower than the training recorded suggests." },
+  steps: { name: "Steps", unit: "steps", write: (v) => whole(v), about: "The wrist strap’s step count, or the phone and watch’s on a day the strap counted none. A day nothing was worn or carried reads low, so some days here are lower than the training recorded suggests.", source: "wrist strap, else phone" },
   sleep: { name: "Sleep", unit: "hours", write: (v) => `${trim1(v)} hours`, about: "Hours asleep each night." },
   // One unit for recovery on every kit page (site-to-A round 1, re-graded 2026-10-18): the unit the
   // route serves beside the score — " out of 100" (prediction_reason.MEASURE_UNITS, PR #4964) — so the
@@ -226,9 +226,15 @@ export function barChartHTML(points, write, name, { target = null, targetWords =
   const key = [target !== null ? `Dashed line: ${targetWords || write(target)}. Dark bars are days at or above it.` : "", line ? "The line is the average of the seven days ending on that day." : ""].filter(Boolean).join(" ");
   return `<svg class="ck-chart" viewBox="0 0 640 164" role="img" aria-label="${esc(aria)}">${bars}${rule}${line}</svg><div class="ck-ends"><span>${esc(shortDay(first.date))}</span><span>${esc(`${shortDay(last.date)} · ${write(last.value)}`)}</span></div>${key ? `<p class="ck-small">${esc(key)}</p>` : ""}`;
 }
-export function trendSentence(points, write, { average = true, floor = null, floorWords = "" } = {}) {
-  const pts = points || [];
-  if (!pts.length) return "";
+// `today` (a running daily count only): today's reading is a day still in progress, so it is
+// left out of the lowest, highest, average and floor count and said on its own as "today so far"
+// (red team round 3, B-12: a partial Sunday's 41 minutes was printed as the 30 days' lowest).
+export function trendSentence(points, write, { average = true, floor = null, floorWords = "", today = "" } = {}) {
+  const all = points || [];
+  if (!all.length) return "";
+  const partial = isDay(today) && all.length > 2 && all[all.length - 1].date === today ? all[all.length - 1] : null;
+  if (partial) return `${trendSentence(all.slice(0, -1), write, { average, floor, floorWords })} Today so far: ${write(partial.value)}.`;
+  const pts = all;
   const values = pts.map((p) => p.value);
   const [lo, hi] = [Math.min(...values), Math.max(...values)];
   if (pts.length === 1) return `One reading so far: ${write(pts[0].value)} on ${shortDay(pts[0].date)}.`;
@@ -275,8 +281,15 @@ export function dayFactsHTML(iso, src, base, today = "") {
 export function dayLiftsHTML(iso, src, base) {
   const session = (src.workouts && src.workouts.workouts ? src.workouts.workouts : []).find((w) => w && w.date === iso);
   const minutes = byDate(src.training && src.training.daily_modality_minutes_30d)[iso];
+  const lifted = !!(session && (session.exercises || []).length);
+  // The served modality keys, the edition's _MODALITY_WORDS list (site_api_edition.py). Strength
+  // minutes are named only on a day with no logged lifting session: a strength session the
+  // wrist strap recorded (Strava WeightTraining) is training the day page must not deny
+  // (red team round 3, B-06/B-02/B-11 — the week and the trend counted 41 minutes the day
+  // page called "no training"); on a lifting day those minutes are the session itself.
+  const KEYS = [["strength_min", "strength"], ["walking_min", "walking"], ["cycling_min", "cycling"], ["hiking_min", "hiking"], ["soccer_min", "soccer"], ["stretching_min", "stretching"], ["breathwork_min", "breathwork"], ["other_min", "other training"]];
   const other = minutes
-    ? [["walking_min", "walking"], ["cycling_min", "cycling"], ["hiking_min", "hiking"], ["soccer_min", "soccer"], ["stretching_min", "stretching"]]
+    ? KEYS.filter(([k]) => !(lifted && k === "strength_min"))
         .filter(([k]) => num(minutes[k]) && minutes[k] > 0)
         .map(([k, word]) => `${whole(minutes[k])} minutes of ${word}`)
     : [];
@@ -284,7 +297,7 @@ export function dayLiftsHTML(iso, src, base) {
   // "What I lifted." over a walk alone read as a heading over nothing (#4580 D1): the absence
   // is said first, then what else the day recorded. The walking minutes are the served
   // training_overview.daily_modality_minutes_30d[date].walking_min, the field the front reads too.
-  if (!session || !(session.exercises || []).length) return otherLine ? `${soft("No lifting logged that day.")}${otherLine}` : soft("No training was recorded on this day.");
+  if (!lifted) return otherLine ? `${soft("No lifting logged that day.")}${otherLine}` : soft("No training was recorded on this day.");
   const named = session.exercises.filter((e) => e && e.name);
   const worked = named.filter((e) => (e.sets || []).some(isWork));
   // Timed or distance work (the bike, stretching, a carry) has no reps: it is named with its
@@ -452,7 +465,10 @@ export function trendIndexHTML(base, src = null, today = "") {
   const row = (m) => {
     const pts = src ? seriesOf(m, src, today) : [];
     const last = pts[pts.length - 1];
-    return link(trendHref(base, m), last ? `${MEASURES[m].name} · ${writerFor(m, src)(last.value)}` : MEASURES[m].name, last ? shortDay(last.date) : "");
+    // A measure two devices can count names whose count it is (red team round 3, B-10: "Steps ·
+    // 17,866" was the strap's count while the phone's that day was 13,856, and nothing said which).
+    const name = MEASURES[m].source ? `${MEASURES[m].name} (${MEASURES[m].source})` : MEASURES[m].name;
+    return link(trendHref(base, m), last ? `${name} · ${writerFor(m, src)(last.value)}` : name, last ? shortDay(last.date) : "");
   };
   return TREND_AREAS.map((a) => `<p class="ck-label">${esc(a.name)}</p><ul class="ck-rows ck-rows--more">${a.measures.map(row).join("")}</ul>`).join("");
 }
@@ -559,7 +575,7 @@ async function mountTrend(base) {
     points = seriesOf(measure, src, today);
     ({ name, about } = MEASURES[measure]);
     write = writerFor(measure, src);
-    sentenceOpts = { average: COUNTS.has(measure) };
+    sentenceOpts = { average: COUNTS.has(measure), today: COUNTS.has(measure) ? today : "" };
     if (measure === "protein") {
       const floor = num(src.nutrition && src.nutrition.nutrition && src.nutrition.nutrition.protein_floor_g);
       if (floor !== null) sentenceOpts = { ...sentenceOpts, floor, floorWords: `my ${whole(floor)} g floor` };

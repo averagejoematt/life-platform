@@ -188,7 +188,7 @@ export function costHTML(receipts) {
   if (usual) {
     out.push(
       para(
-        `An ordinary day costs ${usd(usual.usd)}, AI included: the middle day of the ${whole(usual.days)} days to ${usual.to}. ${whole(usual.monthDays)} days like it come to ${usd(usual.month)}, ${side(usual.month)}.`,
+        `An ordinary day costs ${usd(usual.usd)}, AI included: the middle day of the ${whole(usual.days)} days to ${usual.to}. ${whole(usual.monthDays)} days like it come to ${usd(usual.month)}, ${side(usual.month)}; that is not a forecast.`,
       ),
     );
   }
@@ -223,6 +223,20 @@ export function costHTML(receipts) {
     if (tier === 0 && forecast >= t1) {
       const why = early ? `Nothing is paused yet because in the first ${GOVERNOR.earlyDays} days of a month only money actually spent can raise the tier, and ${usd(mtd)} is under tier 1’s line of ${usd(t1)}. ` : "";
       more.push(para(`${why}After day ${GOVERNOR.earlyDays} a forecast this high starts tier 1. A forecast can lift the tier only one step above what the money actually spent supports: tier 2 needs ${usd(t1)} actually spent and tier 3 needs ${usd(t2)}.`));
+    } else if (tier !== null && tier >= 1 && tier < 3) {
+      // Red team round 3 (B-26): a forecast past a higher tier's line, beside a lower printed tier,
+      // read as a contradiction. The tier is right — the governor caps it one step above what actual
+      // spend supports (cost_governor_lambda._decide_tier) — so the cap is said with the figures.
+      const lines = GOVERNOR.shares.map((share) => ceiling * share);
+      const implied = lines.filter((line) => forecast >= line).length;
+      const needs = lines[tier - 1];
+      if (implied > tier && mtd < needs) {
+        more.push(
+          para(
+            `The forecast is past tier ${implied}’s line of ${usd(lines[implied - 1])}, and the tier is still ${tier}: a forecast can raise the tier only one step above what has actually been spent. Tier ${tier + 1} needs ${usd(needs)} actually spent; ${usd(mtd)} is spent so far.`,
+          ),
+        );
+      }
     }
   }
   out.push(para(BUILD_CAP));

@@ -54,11 +54,30 @@ export function toleranceText(call) {
 /** What the allowed distance is, in the route's words: "The allowed distance is one standard
  *  deviation of his readings over the 30 days before the call." "" when not served —
  *  the number in the tag still stands, and no wording is guessed. */
+// Red team round 3 (A-07/A-28/B-19): the served statistic in plain words first, the term second,
+// with the count of readings it was computed from (`tolerance.n`, served per call and never
+// printed): "the usual spread of his readings over the 30 days before the call (one standard
+// deviation, 29 readings)". A statistic in other words is kept as served, with its count.
+const RE_SD = /^one standard deviation of (.+)$/;
+const readingsWord = (n) => `${n} ${n === 1 ? "reading" : "readings"}`;
+export function plainStatistic(st, nWords = "") {
+  const m = RE_SD.exec(st);
+  if (m) return `the usual spread of ${m[1]} (one standard deviation${nWords ? `, ${nWords}` : ""})`;
+  return nWords ? `${st} (${nWords})` : st;
+}
+// A count larger than the window's days is not printed beside "over the 30 days": the window and
+// the count disagree upstream (B-16, the route's anchor), and the page does not print a pair that
+// reads as an error. The count returns once the route serves one that fits its window.
+const servedN = (t) => {
+  const n = t && typeof t.n === "number" && Number.isFinite(t.n) && t.n > 0 ? Math.round(t.n) : null;
+  const days = t && typeof t.window_days === "number" ? t.window_days : null;
+  return n !== null && (days === null || n <= days) ? n : null;
+};
 export function toleranceNote(call) {
   const t = call && call.tolerance;
   const st = t && typeof t.statistic === "string" ? t.statistic.trim().replace(/[.\s]+$/, "") : "";
   if (!st) return "";
-  if (call.kind === "number") return `The allowed distance is ${st}.`;
+  if (call.kind === "number") return `The allowed distance is ${plainStatistic(st, servedN(t) ? readingsWord(servedN(t)) : "")}.`;
   // A window-graded direction call (#4617): its band is said here, once, with what it is.
   const n = typeof t.text === "string" ? t.text.trim() : "";
   return call.kind === "direction" && n ? `It counted as a move only beyond ${n} either way, ${st}.` : "";
@@ -154,7 +173,9 @@ export function ruleless(n) {
 export function sharedToleranceNote(calls) {
   const stats = (calls || []).filter((c) => c && c.kind === "number").map((c) => (c.tolerance && typeof c.tolerance.statistic === "string" ? c.tolerance.statistic.trim() : ""));
   if (stats.length < 2 || !stats[0] || stats.some((x) => x !== stats[0])) return "";
-  return `Each allowed distance is ${stats[0].replace(/[.\s]+$/, "")}.`;
+  const ns = [...new Set((calls || []).filter((c) => c && c.kind === "number").map((c) => servedN(c.tolerance)))];
+  const nWords = ns.some((n) => n === null) ? "" : ns.length === 1 ? `${readingsWord(ns[0])} each` : `${ns.slice(0, -1).join(", ")} and ${ns[ns.length - 1]} readings`;
+  return `Each allowed distance is ${plainStatistic(stats[0].replace(/[.\s]+$/, ""), nWords)}.`;
 }
 
 /** THE card for one settled call — the house rule (#4808), the same on the front page, the

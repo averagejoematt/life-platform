@@ -160,7 +160,9 @@ test("macro share is worked from the logged grams and needs all three", () => {
 });
 
 test("the steps trend says how steps are counted and that some days read low", () => {
-  assert.match(D.MEASURES.steps.about, /A day they were not carried reads low/);
+  assert.match(D.MEASURES.steps.about, /A day nothing was worn or carried reads low/);
+  // Red team round 3 (B-10): whose count it is — the strap's first (METRIC_TRUTH steps), the phone's after.
+  assert.match(D.MEASURES.steps.about, /^The wrist strap’s step count, or the phone and watch’s/);
 });
 
 test("a measure name from the address bar finds only real measures", () => {

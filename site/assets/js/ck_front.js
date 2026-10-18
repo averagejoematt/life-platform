@@ -405,7 +405,7 @@ export function quotesHTML(chapter, transcript, base = "/") {
   const out = [];
   const line = firstSentences(c.dek, 200);
   const week = c.week_label ? `${c.week_label} · ` : "";
-  out.push(`<p class="ck-small">${esc(`${week}“${c.title}”, the chapter. Written by AI from the record on ${shortDay(c.date)}; Matthew reads each chapter before it publishes.`)}</p>`);
+  out.push(`<p class="ck-small">${esc(`${week}“${c.title}”, the chapter, dated ${shortDay(c.date)}. Written by AI from what the devices and logs recorded; Matthew reads each chapter before it publishes.`)}</p>`);
   if (line) out.push(`<p class="ck-quote ck-quote--chapter">${esc(line)}</p>`);
   const read = c.url ? `<a class="ck-btn" href="${esc(c.url)}">Read${num(c.read_minutes) !== null ? ` · ${c.read_minutes} min` : ""}</a>` : "";
   const listen = hasPod ? `<a class="ck-btn ck-btn--ghost" href="${esc(base)}story/">Listen${num(pod.data.duration_minutes) !== null ? ` · ${pod.data.duration_minutes} min` : ""}</a>` : "";
