@@ -1018,8 +1018,23 @@ def commit_status(ir: Any) -> str:
         return NOT_RED_TEAMED
     paused = " (model paused — deterministic layer only)" if rec.get("model_ran") is False else ""
     return f"{rec.get('engine', CRITICS_VERSION)}{paused}: " + ", ".join(
-        f"{_SHORT.get(v['critic'], v['critic'])} {v['verdict']}" + (" (owner-overridden)" if is_overridden(v) else "") for v in verdicts
+        f"{_SHORT.get(v['critic'], v['critic'])} {display_verdict(v, rec.get('changes'))}"
+        + (" (owner-overridden)" if is_overridden(v) else "")
+        for v in verdicts
     )
+
+
+def display_verdict(v: dict[str, Any], changes: list[dict[str, Any]] | None) -> str:
+    """The verdict word the Hevy note prints (#5008 C1). A `change` whose every recorded change landed
+    `applied: false` (e.g. "hold: nothing to trim") changed NOTHING in the routine — it is a FLAG for
+    the coach, not a CHANGE. No change records at all (apply never ran) keeps the stored verdict."""
+    verdict = str(v.get("verdict") or "")
+    if verdict != "change":
+        return verdict
+    mine = [c for c in changes or [] if c.get("critic") == v.get("critic")]
+    if mine and not any(c.get("applied") for c in mine):
+        return "flag"
+    return verdict
 
 
 def notes_block(ir: Any) -> str:
@@ -1035,7 +1050,8 @@ def notes_block(ir: Any) -> str:
         paused = " (model paused)" if isinstance(v.get("model"), dict) and v["model"].get("paused") else ""
         reason = (v.get("reason") or "").replace("\n", " ")
         over = " OVERRIDDEN BY OWNER" if is_overridden(v) else ""
-        lines.append(f"- {_SHORT.get(v['critic'], v['critic'])} {v['verdict'].upper()}{over}{paused}:{num}{prov} {reason}"[:300])
+        word = display_verdict(v, rec.get("changes")).upper()
+        lines.append(f"- {_SHORT.get(v['critic'], v['critic'])} {word}{over}{paused}:{num}{prov} {reason}"[:300])
     applied = [c for c in rec.get("changes", []) if c.get("applied")]
     if applied:
         lines.append("applied: " + "; ".join(f"{c['field']} -> {c['to']}" for c in applied))

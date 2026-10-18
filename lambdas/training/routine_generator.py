@@ -405,6 +405,27 @@ def _get_field(s: Any, name: str, default: Any = None) -> Any:
     return s.get(name, default) if isinstance(s, dict) else getattr(s, name, default)
 
 
+def floor_rule_label(floor: dict[str, Any]) -> str:
+    """Which rule set this floor's load, in a few words (#5008 C3) — the correction line used to say
+    only "(the floor)" even when the prescription HELD an achieved load. Reads the floor's own
+    record; it derives no number and changes none."""
+    r = (floor or {}).get("ramp") or {}
+    basis = (floor or {}).get("basis") or {}
+    date = basis.get("date")
+    hold = r.get("hold") or {}
+    if hold.get("applies"):
+        a = hold.get("achieved") or {}
+        return f"held from the {a.get('date') or date} performance (the achieved load is never undercut)"
+    if r:
+        week = r.get("week")
+        return f"week {week} ramp from the {date} anchor" if week and date else "the entry ramp"
+    if floor.get("layoff_reason"):
+        return f"best achieved load ({date}) less the {floor.get('discount_pct')}% layoff discount"
+    if date:
+        return f"best achieved load, {date}"
+    return "the floor"
+
+
 def apply_prescription_floor(sets: list[Any], floor: dict[str, Any]) -> list[str]:
     """Raise every working set to the floor, IN PLACE. Returns one line per correction.
 
@@ -418,6 +439,7 @@ def apply_prescription_floor(sets: list[Any], floor: dict[str, Any]) -> list[str
     if not floor_kg:
         return corrections
     floor_kg = float(floor_kg)
+    rule = floor_rule_label(floor)
     for i, s in enumerate(sets or []):
         if str(_get_field(s, "type", "normal") or "normal").lower() == "warmup":
             continue
@@ -426,9 +448,9 @@ def apply_prescription_floor(sets: list[Any], floor: dict[str, Any]) -> list[str
         current = _get_field(s, "weight_kg")
         if current is None:
             _set_field(s, "weight_kg", floor_kg)
-            corrections.append(f"set {i + 1}: no load prescribed -> {_fmt_load(floor_kg)} (the floor)")
+            corrections.append(f"set {i + 1}: no load prescribed -> {_fmt_load(floor_kg)} (the floor: {rule})")
         elif float(current) < floor_kg - 1e-6:
-            corrections.append(f"set {i + 1}: {_fmt_load(float(current))} -> {_fmt_load(floor_kg)} (below the floor)")
+            corrections.append(f"set {i + 1}: {_fmt_load(float(current))} -> {_fmt_load(floor_kg)} (below the floor: {rule})")
             _set_field(s, "weight_kg", floor_kg)
     return corrections
 
