@@ -65,6 +65,7 @@ from health.lab_units import (  # noqa: E402
     DEXA_REQUIRED,
     LAB_FLAGS,
     LAB_UNITS,
+    canonical_marker,
     canonical_unit,
     dexa_unit_for,
     marker_key,
@@ -242,7 +243,7 @@ def read_lab_rows(path: str) -> Tuple[List[Dict[str, Any]], str]:
 
 def validate_marker(row: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
     """One report row -> (marker_key, marker object in the SCHEMA.md shape). Refuses off-schema input."""
-    key = marker_key(row.get("marker") or row.get("name") or "")
+    key = canonical_marker(marker_key(row.get("marker") or row.get("name") or ""))
     if not key:
         raise Refusal("a row has no marker name")
     if key not in LAB_UNITS:
@@ -304,10 +305,9 @@ def build_labs_item(
             raise Refusal(f"{key}: listed twice in the report")
         biomarkers[key] = entry
     if previous:
-        prev_markers = labs_schema.biomarker_map(previous)
         prev_date = str(previous.get("draw_date") or previous.get("sk", "")[5:])
         for key, entry in biomarkers.items():
-            prev_num = labs_schema.marker_numeric(prev_markers.get(key))
+            prev_num = labs_schema.marker_numeric(labs_schema.biomarker_entry(previous, key))
             if prev_num is not None:
                 entry["previous_value"] = Decimal(str(prev_num))
                 entry["previous_date"] = prev_date

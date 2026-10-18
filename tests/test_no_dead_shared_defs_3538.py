@@ -89,6 +89,30 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
+    "lambdas/training/workout_identity.py:identity_totals": (
+        "#4973's one-workout-identity resolver, landed fixture-tested and deliberately wired into no live "
+        "reader: no Apple Watch workout exists in the store yet (#4968 configures the watch), and the one "
+        "reader that already de-dups workouts in time (training/walking_volume.py, the #4068 rule) keeps "
+        "its ruled partial-overlap arithmetic and is cross-checked against this resolver in "
+        "tests/test_workout_identity_4973.py instead. The first live caller is #4973 box 1 (full Apple "
+        "workout capture); delete this entry when it lands."
+    ),
+    "lambdas/training/workout_identity.py:public_projection": (
+        "#4973's one-workout-identity resolver, landed fixture-tested and deliberately wired into no live "
+        "reader: no Apple Watch workout exists in the store yet (#4968 configures the watch), and the one "
+        "reader that already de-dups workouts in time (training/walking_volume.py, the #4068 rule) keeps "
+        "its ruled partial-overlap arithmetic and is cross-checked against this resolver in "
+        "tests/test_workout_identity_4973.py instead. The first live caller is #4973 box 1 (full Apple "
+        "workout capture); delete this entry when it lands."
+    ),
+    "lambdas/training/workout_identity.py:resolve_workout_identities": (
+        "#4973's one-workout-identity resolver, landed fixture-tested and deliberately wired into no live "
+        "reader: no Apple Watch workout exists in the store yet (#4968 configures the watch), and the one "
+        "reader that already de-dups workouts in time (training/walking_volume.py, the #4068 rule) keeps "
+        "its ruled partial-overlap arithmetic and is cross-checked against this resolver in "
+        "tests/test_workout_identity_4973.py instead. The first live caller is #4973 box 1 (full Apple "
+        "workout capture); delete this entry when it lands."
+    ),
     "lambdas/ai/ai_calls.py:call_training_coach_v2": (
         "one seat of a symmetric ADR-153 coach family (sleep / nutrition / training / mind, "
         "each a 3-line `_run_coach_v2_pipeline(<seat>, ...)` wrapper). The daily-brief tests "

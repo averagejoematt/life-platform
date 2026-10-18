@@ -6,7 +6,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
-from health import tdee as tdee_core  # ADR-152 / #2310: THE one TDEE definition
+from health import (
+    hr_regime,  # #4999: THE dated HR regime markers (re-baselining window, post-marker baselines, AF days)
+    tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
+)
 from training import training_load  # #4075: the ONE load-provenance predicate for the TSB label
 
 from mcp.config import logger
@@ -286,6 +289,7 @@ def tool_get_readiness_score(args):
             "n_days_7d": int(_n7) if _n7 is not None else None,
             "n_days_30d": int(_n30) if _n30 is not None else None,
             "source": "pre_computed_metrics",
+            "baseline_basis": decimal_to_float(_cm.get("hrv_30d_basis")),  # #4999: cut at an HR regime marker, AF days out
         }
         if _n7 is None or _n30 is None:
             _hrv_raw["n_note"] = (
@@ -298,10 +302,8 @@ def tool_get_readiness_score(args):
             "raw": _hrv_raw,
         }
     else:
-        # Fallback: live 30-day Whoop query (pre-compute record missing)
-        whoop_30d = query_source("whoop", d30_start, end_date)
-        hrv_30d_vals = [float(w["hrv"]) for w in whoop_30d if w.get("hrv") is not None]
-        hrv_7d_vals = [float(w["hrv"]) for w in whoop_recent if w.get("hrv") is not None]
+        # Fallback: live 30-day Whoop query (pre-compute record missing) — #4999: post-marker, AF days out.
+        hrv_30d_vals, hrv_7d_vals, _hrv_30d_basis = _live_hrv_baselines(d7_start, d30_start, end_date, _end_dt)
         if len(hrv_30d_vals) >= 7 and hrv_7d_vals:
             baseline = sum(hrv_30d_vals) / len(hrv_30d_vals)
             recent7 = sum(hrv_7d_vals) / len(hrv_7d_vals)
@@ -319,6 +321,7 @@ def tool_get_readiness_score(args):
                     "trend_direction": "above_baseline" if trend_pct > 3 else ("below_baseline" if trend_pct < -3 else "at_baseline"),
                     "n_days_30d": len(hrv_30d_vals),
                     "n_days_7d": len(hrv_7d_vals),
+                    "baseline_basis": _hrv_30d_basis,
                     "source": "live_whoop_query",
                 },
             }
@@ -417,6 +420,9 @@ def tool_get_readiness_score(args):
     # not a cross-check.
     device_agreement = _whoop_vs_apple_agreement(components.get("whoop_recovery"), end_date, d7_start)
 
+    if (_regime := hr_regime.regime_status(end_date)) is not None:  # #4999: HR regime marker — re-baselining, not a tier
+        return _rebaselining_result(end_date, components, device_agreement, _regime)
+
     # ── Weighted aggregate ────────────────────────────────────────────────────
     total_weight = sum(c["weight"] for c in components.values())
 
@@ -426,13 +432,7 @@ def tool_get_readiness_score(args):
     raw_score = sum(c["score"] * c["weight"] for c in components.values()) / total_weight
     readiness_score = round(raw_score, 1)
 
-    # Label
-    if readiness_score >= 70:
-        label = "GREEN"
-    elif readiness_score >= 40:
-        label = "YELLOW"
-    else:
-        label = "RED"
+    label = _readiness_label(readiness_score)
 
     # ── Recommendation ────────────────────────────────────────────────────────
     missing = []
@@ -545,6 +545,59 @@ def tool_get_readiness_score(args):
                 "score above may be elapsed time rather than model drift."
             )
     return result
+
+
+def _readiness_label(readiness_score):
+    """The live tool's traffic light: GREEN >= 70, YELLOW >= 40, else RED."""
+    if readiness_score >= 70:
+        return "GREEN"
+    if readiness_score >= 40:
+        return "YELLOW"
+    return "RED"
+
+
+def _live_hrv_baselines(d7_start, d30_start, end_date, end_dt):
+    """(30d values, 7d values, 30d basis) from a live Whoop read, through the same post-marker,
+    AF-day-excluded baseline the pre-compute stores (health.hr_regime, #4999)."""
+    whoop_30d = query_source("whoop", d30_start, end_date)
+    d60_start = (end_dt - timedelta(days=59)).strftime("%Y-%m-%d")
+    excluded = hr_regime.af_days(query_source("eightsleep", d60_start, end_date), query_source("withings", d30_start, end_date))
+    hrv_30d_vals, basis = hr_regime.baseline_values(whoop_30d, "hrv", d30_start, end_date, excluded)
+    hrv_7d_vals, _ = hr_regime.baseline_values(whoop_30d, "hrv", d7_start, end_date, excluded)
+    return hrv_30d_vals, hrv_7d_vals, basis
+
+
+# The readiness components computed from heart rate (#4999) — named by this tool's keys.
+_HR_DERIVED_READINESS_KEYS = ("whoop_recovery", "hrv_trend")
+
+
+def _rebaselining_result(end_date, components, device_agreement, regime):
+    """`get_readiness_score` inside an HR regime marker's re-baselining window (#4999).
+
+    No score, no tier. The HR-derived components are reported as re-baselining beside the raw
+    values they would have scored (the owner can still read them); the non-HR components keep
+    their own scores but are not combined into a label.
+    """
+    held = {}
+    for k in _HR_DERIVED_READINESS_KEYS:
+        c = components.pop(k, None)
+        if c is not None:
+            held[k] = {"state": hr_regime.REBASELINING, "weight": c["weight"], "raw": c.get("raw")}
+        else:
+            held[k] = {"state": hr_regime.REBASELINING}
+    return {
+        "date": end_date,
+        "requested_date": end_date,
+        "readiness_score": None,
+        "label": "RE-BASELINING",
+        "recommendation": regime["note"],
+        "hr_regime": regime,
+        "rebaselining_components": held,
+        "components": components,
+        "components_note": "Non-HR components are shown for reference only; they are not combined into a tier while HR is re-baselining.",
+        "device_agreement": device_agreement,
+        "_disclaimer": "For personal health tracking only. Not medical advice. Consult a qualified healthcare provider before making health decisions based on this data.",
+    }
 
 
 def tool_get_weight_loss_progress(args):

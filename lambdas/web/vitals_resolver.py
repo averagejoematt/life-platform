@@ -11,8 +11,14 @@ Canonical semantics:
   actually populated ("latest finalized" — the newest record can be unscored
   until the night's sleep syncs). The three move together from one morning's
   reading; a color is never served without a number behind it (ADR-104).
-- sleep comes from the newest whoop record carrying sleep_duration_hours
-  (sleep finalizes separately from recovery).
+- sleep comes from the newest record carrying the day's sleep (sleep finalizes
+  separately from recovery).
+- #4975: WHICH source and field answer hrv / rhr / sleep is the registry's
+  METRIC_TRUTH facet (`hrv_ms`, `rhr_bpm`, `sleep_hours`), read through
+  common.metric_truth.resolve — this module no longer names a field for them.
+  All three are Whoop-only on mode "primary" today (the owner's mean vs
+  primary/backup ruling is #4975 gate:owner); recovery_score itself has no
+  second source and stays the Whoop record's own field.
 - steps come from common.metric_truth (#4630: the registry METRIC_TRUTH facet —
   Whoop's step_count, else Apple Health, else Garmin), within the last ~2 days only — older step counts aren't "current".
 - No genesis clamp and no phase filter: the latest reading is the latest
@@ -31,7 +37,7 @@ Canonical semantics:
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
-from common.metric_truth import STEPS, resolve_by_date, steps_sources  # #4630: the ONE steps resolver
+from common.metric_truth import STEPS, resolve, resolve_by_date, sources_for, steps_sources  # #4630/#4975: the ONE resolver
 from common.pacific_time import PACIFIC  # #1964: THE Pacific frame — never a local ZoneInfo
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from ingestion.source_registry import day_key_frame_for  # #3257: which calendar a source's DATE# key names
@@ -64,6 +70,19 @@ def _num(record, field):
         return f if f != 0.0 else None
     except (TypeError, ValueError):
         return None
+
+
+# #4975: the METRIC_TRUTH facets this module serves (registry keys → the vitals output names).
+HRV, RHR, SLEEP = "hrv_ms", "rhr_bpm", "sleep_hours"
+
+
+def _truth(metric, rows):
+    """`metric` resolved through the registry facet from `{source: row}`, honest-null.
+
+    0 is None here, as `_num` always made it: a current vital of 0 is an absent reading,
+    never a number to serve (ADR-104)."""
+    v = resolve(metric, rows).value
+    return v if v else None
 
 
 def _sk_date(record):
@@ -168,32 +187,41 @@ def resolve_vitals(table, user_prefix, now=None):
         "steps_as_of_frame": None,
     }
 
-    try:
-        whoop = _daily_records(table, user_prefix, "whoop", start, end, limit=LOOKBACK_DAYS + 10)
-    except Exception:
-        whoop = []
+    # #4975: every source a vitals facet names is fetched once (whoop alone today).
+    daily: dict = {}
+    for source in dict.fromkeys(("whoop",) + sources_for(HRV) + sources_for(RHR) + sources_for(SLEEP)):
+        try:
+            daily[source] = _daily_records(table, user_prefix, source, start, end, limit=LOOKBACK_DAYS + 10)
+        except Exception:
+            daily[source] = []
+    by_day: dict = {}
+    for source, recs in daily.items():
+        for rec in recs:
+            by_day.setdefault(_sk_date(rec), {}).setdefault(source, rec)  # newest-first: first row per day wins
+    whoop = daily["whoop"]
 
-    # Latest FINALIZED recovery record — recovery/hrv/rhr move together from it.
+    # Latest FINALIZED recovery record — recovery/hrv/rhr move together from that morning.
     for rec in whoop:
         if not reached_in_pacific(_sk_date(rec), pt_today):
             continue
         r = _num(rec, "recovery_score")
         if r is not None:
+            day_rows = by_day.get(_sk_date(rec), {})
             out["recovery_pct"] = r
             out["recovery_status"] = recovery_status(r)
-            out["hrv_ms"] = _num(rec, "hrv")
-            out["rhr_bpm"] = _num(rec, "resting_heart_rate")
+            out["hrv_ms"] = _truth(HRV, day_rows)
+            out["rhr_bpm"] = _truth(RHR, day_rows)
             out["recovery_as_of"] = _sk_date(rec)
             break
 
-    # Sleep finalizes separately — newest record that carries it.
-    for rec in whoop:
-        if not reached_in_pacific(_sk_date(rec), pt_today):
+    # Sleep finalizes separately — newest day the sleep facet resolves.
+    for day in sorted((d for d in by_day if d), reverse=True):
+        if not reached_in_pacific(day, pt_today):
             continue
-        s = _num(rec, "sleep_duration_hours")
+        s = _truth(SLEEP, by_day[day])
         if s is not None:
             out["sleep_hours"] = s
-            out["sleep_as_of"] = _sk_date(rec)
+            out["sleep_as_of"] = day
             break
 
     # #4630: steps through the ONE resolver (registry METRIC_TRUTH facet — Whoop's

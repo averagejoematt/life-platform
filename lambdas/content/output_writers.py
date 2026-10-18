@@ -81,6 +81,8 @@ def _safe_float(rec, field, default=None):
 
 from common.digest_utils import d2f as _d2f, dedup_activities_multidevice as _dedup_activities  # shared bundled helpers (#970, #2816)
 
+from content.dexa_fields import dexa_body_comp  # live DEXA field names (epic #4625)
+
 
 def _get_current_phase(profile, current_weight_lbs):
     phases = profile.get("weight_loss_phases", [])
@@ -710,17 +712,7 @@ def write_clinical_json(data, profile, yesterday):
             )
             if resp.get("Items"):
                 dexa = resp["Items"][0]
-                bc = dexa.get("body_composition", {})
-                bd = dexa.get("bone_density", {})
-                body_comp = {
-                    "scan_date": dexa.get("scan_date"),
-                    "body_fat_pct": _d2f(bc.get("body_fat_pct")),
-                    "ffmi": _d2f(dexa.get("interpretations", {}).get("ffmi")),
-                    "lean_mass_lbs": _d2f(bc.get("lean_mass_lbs")),
-                    "fat_mass_lbs": _d2f(bc.get("fat_mass_lbs")),
-                    "visceral_fat_area": _d2f(bc.get("visceral_fat_g")),
-                    "bmd": _d2f(bd.get("t_score")),
-                }
+                body_comp = dexa_body_comp(dexa)
         except Exception as e:
             print("[WARN] Clinical: DEXA query failed: " + str(e))
 
