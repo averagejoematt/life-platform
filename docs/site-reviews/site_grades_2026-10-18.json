@@ -1,0 +1,564 @@
+{
+  "_comment": "Site review 2026-10-18 (#4580): the eight round-1 graders' per-page letters exactly as their files hold them, the two after-round-1 graders (render a673b6eeb), the per-page screen counts before/after round 1, and the verifier counts. Internal self-assessment (REVIEW_METHODOLOGY.md ER-05). Narrative: docs/site-reviews/SITE_REVIEW_2026-10-18.md",
+  "captured_at": "2026-10-17T23:33:25+00:00",
+  "viewport": "390x844",
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "render_round0": "render_2026-10-18 (main 385917e0e, fixtures tests/fixtures/kit_pages_4586)",
+  "render_round1": "render_round1_2026-10-18 (a673b6eeb, integration PR #4988)",
+  "round1": {
+    "G1": {
+      "front": "B",
+      "start": "B",
+      "story": "B",
+      "coaches": "B",
+      "week": "B",
+      "day": "C",
+      "trend": "C",
+      "call": "B",
+      "coach": "B",
+      "sheet": "B",
+      "built": "B",
+      "appendix": "C"
+    },
+    "G2": {
+      "front": "B",
+      "start": "B",
+      "story": "B",
+      "coaches": "B",
+      "week": "B",
+      "day": "C",
+      "trend": "B",
+      "call": "B",
+      "coach": "B",
+      "sheet": "C",
+      "built": "C",
+      "appendix": "B"
+    },
+    "G3": {
+      "front": "B",
+      "start": "B",
+      "story": "A",
+      "coaches": "B",
+      "week": "B",
+      "day": "B",
+      "trend": "A",
+      "call": "B",
+      "coach": "B",
+      "sheet": "B",
+      "built": "B",
+      "appendix": "B"
+    },
+    "G3_dark": {
+      "front": "B",
+      "start": "B",
+      "story": "A",
+      "coaches": "B",
+      "week": "B",
+      "day": "B",
+      "trend": "A",
+      "call": "B",
+      "coach": "B",
+      "sheet": "B",
+      "built": "B",
+      "appendix": "B"
+    },
+    "G4_a11y": {
+      "front": "B",
+      "start": "B",
+      "story": "B",
+      "coaches": "B",
+      "week": "B",
+      "day": "B",
+      "trend": "B",
+      "call": "B",
+      "coach": "B",
+      "sheet": "B",
+      "built": "B",
+      "appendix": "B"
+    },
+    "G4_security": {
+      "front": "A",
+      "start": "A",
+      "story": "A",
+      "coaches": "A",
+      "week": "A",
+      "day": "A",
+      "trend": "A",
+      "call": "A",
+      "coach": "A",
+      "sheet": "A",
+      "built": "A",
+      "appendix": "A"
+    },
+    "G5": {
+      "front": "C",
+      "start": "B",
+      "story": "C",
+      "coaches": "B",
+      "week": "A",
+      "day": "B",
+      "trend": "A",
+      "call": "B",
+      "coach": "A",
+      "sheet": "B",
+      "built": "B",
+      "appendix": "A"
+    },
+    "G6": {
+      "front": "C",
+      "start": "C",
+      "story": "C",
+      "coaches": "B-",
+      "week": "C",
+      "day": "B-",
+      "trend": "C",
+      "call": "B",
+      "coach": "C",
+      "sheet": "B-",
+      "built": "B-",
+      "appendix": "B-"
+    },
+    "G7": {
+      "front": "B",
+      "start": "B",
+      "story": "B",
+      "coaches": "A",
+      "week": "B",
+      "day": "B",
+      "trend": "C",
+      "call": "B",
+      "coach": "C",
+      "sheet": "C",
+      "built": "A",
+      "appendix": "C"
+    },
+    "G8": {
+      "front": "B",
+      "start": "B",
+      "story": "A",
+      "coaches": "B",
+      "week": "B",
+      "day": "C",
+      "trend": "C",
+      "call": "B",
+      "coach": "n/m",
+      "sheet": "B",
+      "built": "C",
+      "appendix": "C"
+    }
+  },
+  "after_round1": {
+    "G9": {
+      "front": {
+        "clarity": "B",
+        "truth": "B",
+        "calm": "B",
+        "voice": "B (capped: premise is a draft)"
+      },
+      "start": {
+        "clarity": "A",
+        "truth": "C",
+        "calm": "A",
+        "voice": "B (capped: premise is a draft)"
+      },
+      "story": {
+        "clarity": "B",
+        "truth": "B",
+        "calm": "B",
+        "voice": "B"
+      },
+      "coaches": {
+        "clarity": "B",
+        "truth": "B",
+        "calm": "B",
+        "voice": "B"
+      },
+      "week": {
+        "clarity": "B",
+        "truth": "A",
+        "calm": "A",
+        "voice": "B"
+      },
+      "day": {
+        "clarity": "B",
+        "truth": "C",
+        "calm": "A",
+        "voice": "C"
+      },
+      "trend": {
+        "clarity": "B",
+        "truth": "A",
+        "calm": "A",
+        "voice": "A"
+      },
+      "call": {
+        "clarity": "C",
+        "truth": "B",
+        "calm": "B",
+        "voice": "B"
+      },
+      "coach": {
+        "clarity": "B",
+        "truth": "A",
+        "calm": "A",
+        "voice": "A"
+      },
+      "sheet": {
+        "clarity": "B",
+        "truth": "C",
+        "calm": "A",
+        "voice": "B"
+      },
+      "built": {
+        "clarity": "A",
+        "truth": "C",
+        "calm": "B",
+        "voice": "B"
+      },
+      "appendix": {
+        "clarity": "A",
+        "truth": "A",
+        "calm": "B",
+        "voice": "A"
+      }
+    },
+    "G10": {
+      "front": {
+        "design": "B",
+        "design_dark": "B",
+        "a11y": "B",
+        "numbers": "B",
+        "north_star": "B"
+      },
+      "start": {
+        "design": "C",
+        "design_dark": "C",
+        "a11y": "B",
+        "numbers": "C",
+        "north_star": "B"
+      },
+      "story": {
+        "design": "B",
+        "design_dark": "B",
+        "a11y": "B",
+        "numbers": "B",
+        "north_star": "B"
+      },
+      "coaches": {
+        "design": "B",
+        "design_dark": "B",
+        "a11y": "B",
+        "numbers": "A",
+        "north_star": "A"
+      },
+      "week": {
+        "design": "B",
+        "design_dark": "B",
+        "a11y": "B",
+        "numbers": "A",
+        "north_star": "B"
+      },
+      "day": {
+        "design": "B",
+        "design_dark": "B",
+        "a11y": "B",
+        "numbers": "C",
+        "north_star": "B"
+      },
+      "trend": {
+        "design": "B",
+        "design_dark": "B",
+        "a11y": "B",
+        "numbers": "B",
+        "north_star": "B"
+      },
+      "call": {
+        "design": "A",
+        "design_dark": "A",
+        "a11y": "B",
+        "numbers": "B",
+        "north_star": "A"
+      },
+      "coach": {
+        "design": "B",
+        "design_dark": "B",
+        "a11y": "B",
+        "numbers": "A",
+        "north_star": "B"
+      },
+      "sheet": {
+        "design": "B",
+        "design_dark": "B",
+        "a11y": "B",
+        "numbers": "B",
+        "north_star": "B"
+      },
+      "built": {
+        "design": "B",
+        "design_dark": "B",
+        "a11y": "B",
+        "numbers": "B",
+        "north_star": "B"
+      },
+      "appendix": {
+        "design": "B",
+        "design_dark": "B",
+        "a11y": "B",
+        "numbers": "A",
+        "north_star": "B"
+      }
+    }
+  },
+  "screens": {
+    "front": {
+      "before": 3.65,
+      "after": 3.81
+    },
+    "start": {
+      "before": 3.49,
+      "after": 3.71
+    },
+    "story": {
+      "before": 2.89,
+      "after": 3.41
+    },
+    "coaches": {
+      "before": 3.68,
+      "after": 3.77
+    },
+    "week": {
+      "before": 2.66,
+      "after": 2.57
+    },
+    "day": {
+      "before": 2.26,
+      "after": 2.42
+    },
+    "trend": {
+      "before": 1.55,
+      "after": 1.59
+    },
+    "call": {
+      "before": 3.92,
+      "after": 3.43
+    },
+    "coach": {
+      "before": 1.0,
+      "after": 1.38
+    },
+    "sheet": {
+      "before": 3.47,
+      "after": 3.14
+    },
+    "built": {
+      "before": 6.54,
+      "after": 5.5
+    },
+    "appendix": {
+      "before": 9.35,
+      "after": 9.88
+    }
+  },
+  "verified": {
+    "front": {
+      "confirmed": 18,
+      "refuted": 3
+    },
+    "start": {
+      "confirmed": 9,
+      "refuted": 15
+    },
+    "story": {
+      "confirmed": 10,
+      "refuted": 13
+    },
+    "coaches": {
+      "confirmed": 7,
+      "refuted": 13
+    },
+    "week": {
+      "confirmed": 9,
+      "refuted": 10
+    },
+    "day": {
+      "confirmed": 6,
+      "refuted": 15
+    },
+    "trend": {
+      "confirmed": 12,
+      "refuted": 4
+    },
+    "call": {
+      "confirmed": 17,
+      "refuted": 3
+    },
+    "coach": {
+      "confirmed": 8,
+      "refuted": 2
+    },
+    "sheet": {
+      "confirmed": 19,
+      "refuted": 1
+    },
+    "built": {
+      "confirmed": 18,
+      "refuted": 3
+    },
+    "appendix": {
+      "confirmed": 11,
+      "refuted": 3
+    }
+  },
+  "verified_totals": {
+    "raw_grader_findings": 363,
+    "confirmed_canonical": 144,
+    "refuted_entries": 85
+  },
+  "notes": {
+    "G5_vacuous": [
+      "trend",
+      "coach"
+    ],
+    "G7_adjectives": {
+      "front": {
+        "interest": "B",
+        "returnability": "B",
+        "elite": "B",
+        "2026-forward": "B",
+        "coherent": "B",
+        "honest": "A",
+        "legible": "A"
+      },
+      "start": {
+        "interest": "B",
+        "returnability": "C",
+        "elite": "B",
+        "2026-forward": "B",
+        "coherent": "B",
+        "honest": "B",
+        "legible": "A"
+      },
+      "story": {
+        "interest": "B",
+        "returnability": "B",
+        "elite": "B",
+        "2026-forward": "B",
+        "coherent": "B",
+        "honest": "A",
+        "legible": "C"
+      },
+      "coaches": {
+        "interest": "A",
+        "returnability": "C",
+        "elite": "A",
+        "2026-forward": "A",
+        "coherent": "A",
+        "honest": "A",
+        "legible": "A"
+      },
+      "week": {
+        "interest": "B",
+        "returnability": "B",
+        "elite": "B",
+        "2026-forward": "B",
+        "coherent": "B",
+        "honest": "A",
+        "legible": "B"
+      },
+      "day": {
+        "interest": "B",
+        "returnability": "B",
+        "elite": "B",
+        "2026-forward": "B",
+        "coherent": "C",
+        "honest": "A",
+        "legible": "B"
+      },
+      "trend": {
+        "interest": "C",
+        "returnability": "C",
+        "elite": "C",
+        "2026-forward": "C",
+        "coherent": "B",
+        "honest": "B",
+        "legible": "B"
+      },
+      "call": {
+        "interest": "B",
+        "returnability": "B",
+        "elite": "B",
+        "2026-forward": "B",
+        "coherent": "A",
+        "honest": "A",
+        "legible": "A"
+      },
+      "coach": {
+        "interest": "C",
+        "returnability": "C",
+        "elite": "B",
+        "2026-forward": "B",
+        "coherent": "B",
+        "honest": "B",
+        "legible": "B"
+      },
+      "sheet": {
+        "interest": "B",
+        "returnability": "B",
+        "elite": "C",
+        "2026-forward": "C",
+        "coherent": "B",
+        "honest": "A",
+        "legible": "B"
+      },
+      "built": {
+        "interest": "A",
+        "returnability": "B",
+        "elite": "A",
+        "2026-forward": "A",
+        "coherent": "B",
+        "honest": "A",
+        "legible": "A"
+      },
+      "appendix": {
+        "interest": "C",
+        "returnability": "C",
+        "elite": "B",
+        "2026-forward": "C",
+        "coherent": "B",
+        "honest": "A",
+        "legible": "B"
+      }
+    },
+    "G8_v7_grade": {
+      "front": "B",
+      "start": "A (Who he is)",
+      "story": "B (This week)",
+      "coaches": "C",
+      "week": "n/a",
+      "day": "A (Today)",
+      "trend": "C (His numbers, loosely)",
+      "call": "n/a",
+      "coach": "n/a",
+      "sheet": "n/a",
+      "built": "B (Under the hood)",
+      "appendix": "n/a"
+    },
+    "G8_delta_vs_v7": {
+      "front": "0",
+      "start": "-1",
+      "story": "+1",
+      "coaches": "+1",
+      "week": "fresh",
+      "day": "-2",
+      "trend": "0",
+      "call": "fresh",
+      "coach": "unmeasured",
+      "sheet": "fresh",
+      "built": "-1",
+      "appendix": "fresh"
+    }
+  }
+}
