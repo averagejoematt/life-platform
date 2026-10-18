@@ -1026,6 +1026,17 @@ def nutrition_overview(*, _g) -> dict:
     )
 
 
+def _closed_habit_days(rows, today):
+    """Habitify day rows from days that have CLOSED (#4624 backlog row).
+
+    The writer's `completion_pct` is pending-aware: on an open day the habits still pending are
+    taken out of the denominator, so 0.40 here stands against a strict 0.23 on the day it was checked.
+    That is correct for today's dashboard and wrong as a point in a trend, where the open day is
+    always the newest value and moves the last-third average. The trend reads closed days only.
+    """
+    return [r for r in rows if str(r.get("date") or r.get("sk", "")).replace("DATE#", "") < today]
+
+
 def deficit_sustainability(*, _g) -> dict:
     """
     GET /api/deficit_sustainability — RQA-05. Port of the MCP get_deficit_sustainability
@@ -1097,7 +1108,7 @@ def deficit_sustainability(*, _g) -> dict:
         return sorted(_query_source(source_id, start, today), key=lambda x: x.get("sk", ""))
 
     whoop = _by_day("whoop")
-    habit = _by_day("habitify")
+    habit = _closed_habit_days(_by_day("habitify"), today)  # #4624: an open day's pending-aware pct is not a trend point
     strava = _by_day("strava")
     hevy = _by_day("hevy")
 

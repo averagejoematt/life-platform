@@ -64,9 +64,12 @@ def _row(monkeypatch, eight, whoop):
 def test_non_detect_night_serves_whoop_efficiency_beside_whoop_hours_and_score(monkeypatch):
     row = _row(monkeypatch, _EIGHT, _WHOOP)
     assert (row["hours"], row["sleep_score"], row["efficiency"]) == (8.6, 83.0, 84.8)
-    # the raw vendor figures stay, labelled, in the nested per-device block
-    assert row["eightsleep"]["sleep_efficiency_pct"] == 16.9
-    assert row["eightsleep"]["total_sleep_hours"] == 1.7
+    # second cause: the nested block carries NO Eight Sleep measurement on a discounted night
+    es = row["eightsleep"]
+    for k in ("sleep_efficiency_pct", "total_sleep_hours", "deep_hours", "rem_hours", "light_hours", "sleep_score"):
+        assert k not in es, k
+    assert es["discounted"] is True and es["night_of"] and es["vendor_incomplete"] is False
+    assert row["whoop"]["total_sleep_hours"] == 8.6
 
 
 def test_non_detect_night_without_whoop_efficiency_is_honestly_absent(monkeypatch):
@@ -77,3 +80,10 @@ def test_non_detect_night_without_whoop_efficiency_is_honestly_absent(monkeypatc
 def test_a_real_night_keeps_eight_sleep_efficiency(monkeypatch):
     eight = dict(_EIGHT, sleep_score=78, sleep_efficiency_pct=91.0, sleep_duration_hours=7.9)
     assert _row(monkeypatch, eight, _WHOOP)["efficiency"] == 91.0
+
+
+def test_a_real_night_keeps_the_nested_eight_sleep_figures(monkeypatch):
+    eight = dict(_EIGHT, sleep_score=78, sleep_efficiency_pct=91.0, sleep_duration_hours=7.9)
+    es = _row(monkeypatch, eight, _WHOOP)["eightsleep"]
+    assert (es["total_sleep_hours"], es["sleep_efficiency_pct"]) == (7.9, 91.0)
+    assert "discounted" not in es

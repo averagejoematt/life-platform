@@ -152,22 +152,30 @@ def derive_training_context(loaded_lifting_streak, deficit_state, target_date, t
 # ──────────────────────────────────────────────────────────────────────────────
 # Branch construction (brief §3) — subtract-only ceiling
 # ──────────────────────────────────────────────────────────────────────────────
-def build_top_set_branches(base_rpe, training_context):
+def build_top_set_branches(base_rpe, training_context, green_withheld=None):
     """GREEN/YELLOW/RED top-set RPE branches for a primary lift. Subtract-only.
 
     YELLOW is the baseline (base_rpe). GREEN is the ceiling = base + bonus, UNLESS the
     week-position/deficit/tissue context collapses it to quality (== base). RED is the
     floor. Invariant (tested): green >= yellow >= red, and green never exceeds the
     authored ceiling (base + bonus).
+
+    #5000: `green_withheld` (the reason, e.g. the tripped `protein_floor_missed` tripwire — #4503
+    OD5) collapses GREEN to the YELLOW cap and marks it withheld, so the rendered line omits the
+    🟢 branch and the stashed ceiling `intensity_prescription` grades against is the plan's.
     """
     quality = bool(training_context and training_context.get("green_ceiling_quality"))
-    green_rpe = base_rpe if quality else base_rpe + RPE_GREEN_BONUS
+    green_rpe = base_rpe if (quality or green_withheld) else base_rpe + RPE_GREEN_BONUS
     red_rpe = max(base_rpe - RPE_RED_SUBTRACT, 1)
-    return {
-        "green": {
+    if green_withheld:
+        green = {"rpe_cap": green_rpe, "withheld": str(green_withheld), "cue": f"no 🟢 this week ({green_withheld})"}
+    else:
+        green = {
             "rpe_cap": green_rpe,
             "cue": (f"top set RPE {green_rpe}" if not quality else f"top set RPE {green_rpe} (quality — hold load, sharpen execution)"),
-        },
+        }
+    return {
+        "green": green,
         "yellow": {"rpe_cap": base_rpe, "cue": f"top set RPE {base_rpe} (the plan)"},
         "red": {"rpe_cap": red_rpe, "cue": f"cut the top set — RPE {red_rpe} cap, or convert to technique"},
     }
@@ -180,9 +188,13 @@ def render_branch_block(branches):
     """
     if not branches:
         return ""
+    if branches.get("gate_cue"):  # #5000: a standing constraint's ECG + feel gate — no band-keyed branch at all
+        return str(branches["gate_cue"])
     g = branches.get("green", {}).get("cue", "")
     y = branches.get("yellow", {}).get("cue", "")
     r = branches.get("red", {}).get("cue", "")
+    if branches.get("green", {}).get("withheld"):  # #5000: the tripwire withholds the 🟢 branch (OD5)
+        return f"🟡 {y} · 🔴 {r} · {LOWER_OF_RULE}"
     return f"🟢 {g} · 🟡 {y} · 🔴 {r} · {LOWER_OF_RULE}"
 
 
@@ -204,19 +216,27 @@ def render_loaded_streak_line(training_context):
     return f"Loaded lifting: {n} day{'' if n == 1 else 's'} in a row before this session (walk and cardio days are not counted)."
 
 
-def render_session_block(training_context, inputs_current_through=None):
+def render_session_block(training_context, inputs_current_through=None, green_withheld=None):
     """The always-present session-level adaptive block written into routine.notes.
 
     This is the safe default and the rubric in one place: it states the bands, the
     YELLOW default, the lower-of-band/feel rule, and any week-position ceiling. Present
     on EVERY adaptive routine so the session self-adapts at 5am regardless of whether
     any per-exercise branch was detected (brief §5/E1,E2,E11).
+
+    #5000: `green_withheld` (a tripped tripwire's reason) replaces the 🟢 branch with the
+    plan as written — the band above YELLOW does YELLOW that week (#4503 OD5).
     """
     gmin = BAND_THRESHOLDS["green_min"]
     ymin = BAND_THRESHOLDS["yellow_min"]
+    top = (
+        f"{gmin}-100: no 🟢 this week ({green_withheld}) — do 🟡, the plan as written"
+        if green_withheld
+        else f"🟢 {gmin}-100: take the ceiling (top-set bonus, optional work ON, intervals if conditioning)"
+    )
     lines = [
         "— ADAPT BY WAKE RECOVERY —",
-        f"🟢 {gmin}-100: take the ceiling (top-set bonus, optional work ON, intervals if conditioning)",
+        top,
         f"🟡 {ymin}-{gmin - 1}: the plan as written (DEFAULT — {DEFAULT_NOTE})",
         f"🔴 1-{ymin - 1}: floor — cut top sets, optional work OFF, Z2/mobility, or rest",
         f"Rule: {LOWER_OF_RULE} — feel can downgrade a branch, never upgrade it.",

@@ -3342,6 +3342,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/ingestion/watch_presence.py",
+      "partition": "apple_health",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/ingestion/whoop_cycle_day.py",
@@ -7697,12 +7704,12 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 747,
+      "edges": 748,
       "lambdas": 108,
       "mcp_tool_modules": 36,
       "mcp_tools": 88,
       "partitions": 116,
-      "privacy_fields_owner_only": 35,
+      "privacy_fields_owner_only": 38,
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 18,
       "privacy_sources_owner_published": 3,
@@ -7712,8 +7719,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 364,
-        "sites_resolved": 941,
-        "sites_total": 1305
+        "sites_resolved": 942,
+        "sites_total": 1306
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -7763,6 +7770,11 @@
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "Health Auto Export webhook, near-real-time",
+      "owner_only_fields": [
+        "breathing_disturbances_apple",
+        "spo2_pct_apple",
+        "wrist_temp_sleep_c_apple"
+      ],
       "privacy_tier": "public",
       "stale_hours": null
     },
@@ -8435,6 +8447,18 @@
     },
     "default": "public \u2014 an unlisted source/field is TIER_PUBLIC by omission (field_tiers.py's stated rule)",
     "fields": {
+      "apple_health": {
+        "breathing_disturbances_apple": "owner_only",
+        "cardio_recovery_bpm_apple": "internal",
+        "hrv_sdnn_apple": "internal",
+        "respiratory_rate_apple": "internal",
+        "resting_heart_rate_apple": "internal",
+        "spo2_pct_apple": "owner_only",
+        "walking_heart_rate_avg": "internal",
+        "walking_steadiness_pct": "internal",
+        "watch_last_reading_epoch_apple": "internal",
+        "wrist_temp_sleep_c_apple": "owner_only"
+      },
       "reading": {
         "moodSnapshot": "owner_only",
         "retentionScore": "owner_only"

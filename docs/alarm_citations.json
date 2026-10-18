@@ -84,17 +84,17 @@
   },
   "qa-smoke-failures": {
     "added": "2026-10-12",
-    "cause": "story_season:episode_or_hold,story_season:ledger_advanced",
     "cause_observed": "2026-10-18",
-    "citation": "#4536 (episode_or_hold: weeks 5 AND 6 Panel episodes HELD on the body-number safety class 2026-10-18 — the owner flag lifts the audit, not the safety class; his call: retire or regenerate) and #4533 (ledger_advanced: week 6 was approved and sent 2026-10-18T04:29Z but has no LEDGER#2026-10-13 row — the ledger predates the week-6 draft; the 2026-10-21 15:00Z installment writes the next row, or a backfill of wk6's ledger row closes it sooner) · Prior entry (2026-10-18T07:55Z): #4536 — the only FAIL in the 2026-10-16 18:30Z run (request eeffea60, CAUSE fail 6eea130d) is [content_truth] Data Freshness / story_season:episode_or_hold: 'HELD more than 7 days: week 5 held since 2026-10-09T18:00:49Z …",
+    "citation": "self-clearing: both causes were cured 2026-10-18 — story_season:episode_or_hold (weeks 5 and 6 of the Panel retired by name on the owner's pasted ruling, 20:04Z, #4536) and story_season:ledger_advanced (the week-6 LEDGER#2026-10-13 row backfilled 18:0xZ, #4533); the forced qa-smoke run at ~20:1xZ read failed: 0 and an EMPTY cause list, so this entry declares no cause; the alarm goes OK on the next evaluation of its FailCount; prune 72 h after OK · Prior entry (2026-10-18T07:55Z): #4536 (episode_or_hold: weeks 5 AND 6 Panel episodes HELD on the body-number safety class) and #4533 (ledger_advanced: week 6 approved and sent 04:29Z but no LEDGER#2026-10-13 row).",
     "updated": "2026-10-18",
     "note": "Prior episode (added 2026-10-12, cause dashboard:date, observed 2026-10-11T18:31Z): the only FAIL in the 2026-10-11 run was Score Sanity / dashboard:date 'Stale date — expected 2026-10-10, got 2026-10-09' (issue 4847, closed 2026-10-14 after PR 4858); ALARM→OK 2026-10-12T18:32Z. History only — a different cause on the same count-aggregated alarm."
   },
   "qa-smoke-warnings": {
     "added": "2026-10-04",
     "cause_observed": "2026-10-18",
-    "citation": "#4935 — self-clearing: the five orphan routine drafts were archived 2026-10-18 (03:33Z ×2, 04:3xZ ×3, manage_hevy_routine on the owner's word); the live run after them carries NO warn cause (an empty cause list, so this entry declares none), so the alarm goes OK at its next evaluation — the 2026-10-18 18:30Z run is the proof read on #4935; prune this entry 72 h after OK · Prior entry (2026-10-18T07:55Z): #4935 — the mandatory issue-or-fix tracker (issue 2378: red since 2026-10-02T18:32Z, filed 2026-10-17T03:01Z). The 2026-10-17 18:30Z run (request 7702240e, CAUSE warn 6839bf91) named ONE live cause: data:orphan_routine_drafts.",
-    "updated": "2026-10-18"
+    "citation": "#4935 — the 2026-10-18 18:30Z run (CAUSE warn c28c8975) names ONE live cause: reader_truth:confirm + reader_truth:verdict on finding fcd7d5 — /api/sleep_detail's sleep_trend row for 2026-09-19 carries Eight Sleep 1.7 h / 16.9 % beside Whoop 8.6 h / score 83 although the payload says flagged nights are left out; this is #4935's own second cause (its title names it), the orphan-draft cause is gone (the five drafts archived 10-18 03:33Z–04:3xZ, box 4 ticks) and supplement_join_liveness no longer fires. A reader fix lane (the trend rows apply the headline's discount rule) runs 2026-10-18 20:5xZ; the alarm goes OK on the first 18:30Z run after its deploy; prune 72 h after OK · Prior entry (2026-10-18T07:55Z): #4935 — self-clearing after the five orphan routine drafts were archived.",
+    "updated": "2026-10-18",
+    "cause": "reader_truth:verdict"
   },
   "site-api-invocation-spike": {
     "citation": "2026-08-24 session note — self-inflicted QA traffic",

@@ -5,6 +5,7 @@ Training tools: load, PRs, correlation, seasonal, periodization, recommendation,
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from training import (
     training_load,  # #4075: the ONE load model (computed_metrics' TSB)
@@ -270,7 +271,7 @@ def _get_training_periodization(args):
         return round(sum(v) / len(v), 2) if v else None
 
     profile = get_profile()
-    max_hr = float(profile.get("max_heart_rate", 190))
+    max_hr = max_hr_from_profile(profile)
 
     # ── 1. Fetch training data ───────────────────────────────────────────────
     strava_items = query_source("strava", start_date, end_date)
@@ -652,7 +653,7 @@ def _get_training_recommendation(args):
         return max(lo, min(hi, v))
 
     profile = get_profile()
-    max_hr = float(profile.get("max_heart_rate", 190))
+    max_hr = max_hr_from_profile(profile)
 
     # ── 1. Readiness signals ─────────────────────────────────────────────────
     readiness = {}

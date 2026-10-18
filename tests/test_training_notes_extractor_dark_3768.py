@@ -119,6 +119,13 @@ def test_freshness_checker_folds_in_the_derived_layer_health():
     handler = next((n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "lambda_handler"), None)
     assert handler is not None
     seg = ast.get_source_segment(src, handler) or ""
+    # #4970: the derived-layer block moved into `_append_derived_layer_findings` (the #4880
+    # length guard). A module-level helper the handler CALLS is still "inside the handler"
+    # for this pin's purpose (it runs on every invocation), so follow exactly those calls.
+    called = {n.func.id for n in ast.walk(handler) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+    for fn in tree.body:
+        if isinstance(fn, ast.FunctionDef) and fn.name in called and "training_notes_health" in (ast.get_source_segment(src, fn) or ""):
+            seg = ast.get_source_segment(src, fn) or ""
     assert "training_notes_health" in seg, "the health check is not inside lambda_handler — it would never run"
     idx = seg.index("training_notes_health")
     assert (

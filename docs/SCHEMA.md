@@ -315,7 +315,7 @@ Daily records (`sk = DATE#YYYY-MM-DD`) + workout sub-items (`sk = DATE#YYYY-MM-D
 | `cycle_end` | string | The cycle's `end` as the vendor sent it; **absent while the cycle is still open** (the vendor sends `null`), so a missing `cycle_end` beside a `cycle_start` marks a cycle still accruing strain/steps (#5002) |
 | `sleep_start` | string | ISO timestamp |
 | `sleep_end` | string | ISO timestamp |
-| `sleep_onset_minutes` | number | Minutes from midnight to sleep onset |
+| `sleep_onset_minutes` | number | Minutes after **UTC** midnight of the sleep-onset instant (`sleep_start` read as UTC, #4624) — not Pacific clock time: 21:44 PT is 04:44 UTC = 284. Read only by the `sleep_onset_consistency_7d` std-dev (midnight-wrapped), so the frame cancels there; convert before showing it as a clock time |
 | `sleep_onset_consistency_7d` | number | 7-day onset consistency (std dev) |
 | `nap_count` | number | Number of nap sessions (only present when ≥1 nap) |
 | `nap_duration_hours` | number | Total nap sleep (hours, in-bed minus awake) |
@@ -518,6 +518,39 @@ Note: Caffeine SOT moved from MacroFactor to Apple Health as of v2.28.0. Logged 
 | `spo2_pct_apple` | number | SpO2 from Apple Watch only (%) |
 
 Note: Tier 2 fields are suffixed with `_apple` to avoid colliding with SOT fields from Whoop/Eight Sleep/Garmin. Readings from non-Apple devices (Eight Sleep, Whoop, MacroFactor) are filtered out at ingestion time. Use for cross-device validation via `get_device_agreement`.
+
+**Apple Watch daily metrics (webhook — #4970, the Ultra 4 from 2026-10-16; ADR-154 steps 2, 3 and 6):**
+
+Field names are fixed here so #4969's raw-capture diff and #4971/#4972 build on them. Every field below is written by the HAE webhook (`lambdas/ingestion/health_auto_export_lambda.py`; the watch entries are `WATCH_METRIC_DEFS` in its sibling `health_auto_export_watch.py`), with the privacy tier declared in `lambdas/privacy/field_tiers.py` (`apple_health`) before the first watch reading merges. **Tier** uses the governance scale: *public* (unlisted, TIER_PUBLIC by omission), *Tier 1 internal* (owner tooling and AI context, never published), *Tier 2 owner-only* (never a public surface, never quoted into an AI narrative). **Source filter:** "Apple device" = the webhook's Tier-2 `is_apple_device()` filter (iPhone or Watch source names); a vendor mirror (WHOOP, Withings) writing the same HealthKit type is dropped, so nothing here overwrites or averages with Whoop or Eight Sleep (capture-all per source; any combining is the read-side `METRIC_TRUTH` resolver, #4630/#4975). **Summarize:** the HAE automation should send raw samples (summarize OFF) for every field here: each is deduped by reading timestamp in a `_rd_<field>` map (the day value is the map's mean for averages, its sum for the additive fields), so a summarized daily point is also correct on its own, but switching mid-day between the two double-counts the additive ones.
+
+| Field | HAE metric | Unit · day value | Tier | Source filter | Absence semantics (ADR-104) |
+|-------|-----------|------------------|------|---------------|-----------------------------|
+| `wrist_temp_sleep_c_apple` | Apple Sleeping Wrist Temperature | °C (degF converted on write) · mean of the night's samples | Tier 2 owner-only | Apple device | Absent = no sleep-tracked night with a Sleep Focus (not worn, or charging overnight). A 0 is a failed measurement, dropped as absent. The deviation from a 28-day baseline is a read-side derivation, never stored as a fact here |
+| `respiratory_rate_apple` | Respiratory Rate | breaths/min · mean | Tier 1 internal | Apple device (WHOOP's mirror dropped) | Absent = no sleep-tracked night; 0 dropped as absent |
+| `spo2_pct_apple` | Blood Oxygen Saturation | % · mean | Tier 2 owner-only | Apple device (WHOOP and Withings mirrors dropped) | Absent = no background or spot reading that day; 0 dropped as absent (the Withings SpO2 precedent, #2782) |
+| `breathing_disturbances_apple` | Breathing Disturbances | events/hr · mean of the nights in the UTC day | Tier 2 owner-only (sleep-apnea screen, diagnostic-class) | Apple device | Absent = no sleep-tracked night. **0 IS a reading** (no disturbances), never dropped |
+| `cardio_recovery_bpm_apple` | Cardio Recovery | bpm drop at 1 min · mean of the day's workouts | Tier 1 internal | Apple device | Absent = no qualifying workout that day (normal on a rest day, never a 0); 0 dropped as absent |
+| `daylight_minutes_apple` | Time in Daylight | min · sum over unique timestamps | public | Apple device | Absent = no watch reading delivered for the day; 0 on a worn day is a real reading. A reader may read absence as 0 only on a day whose `watch_last_reading_epoch_apple` shows the watch was worn |
+| `environmental_audio_db_apple` | Environmental Audio Exposure | dBASPL · sample mean (not a time-weighted Leq) | public | Apple device | Absent = no exposure samples that day |
+| `exercise_minutes_apple` | Apple Exercise Time | min · sum over unique timestamps | public | Apple device | Absent = no watch reading delivered for the day, which is unknown, not 0, unless `watch_last_reading_epoch_apple` shows the watch was worn |
+| `stand_minutes_apple` | Apple Stand Time | min · sum over unique timestamps | public | Apple device | Absent = no watch reading delivered for the day, which is unknown, not 0, unless `watch_last_reading_epoch_apple` shows the watch was worn |
+| `stand_hours_apple` | Apple Stand Hour | hours stood · sum over unique timestamps | public | Apple device | Absent = no watch reading delivered for the day, which is unknown, not 0, unless `watch_last_reading_epoch_apple` shows the watch was worn |
+| `watch_last_reading_epoch_apple` | (derived: any watch-sourced reading, every metric, mapped or not) | epoch seconds, UTC · GREATEST-on-merge | Tier 1 internal | source names an Apple Watch (`ingestion.watch_presence.is_watch_source`, NO-BREAK SPACE-normalised); a reading with no source never counts | The dead-man's presence stamp. Absent on a day with no watch-sourced reading; the `watch` registry dead-man (36 h) reads the newest one |
+
+The watch also lights up fields mapped before it existed. They keep the names they have carried since the 2026-06-20 mapping (the historical XML import's rows use the same unsuffixed `vo2max` / `walking_heart_rate_avg` / `walking_steadiness_pct`), because a rename would split one metric's history across two names. The `apple_health` partition already names the source. Since #4970 the averaged ones take the same timestamp-keyed day mean, and the physiological ones drop a 0 as absent:
+
+| Field | Tier | Absence semantics |
+|-------|------|-------------------|
+| `hrv_sdnn_apple` | Tier 1 internal (SDNN; Whoop's `hrv` is RMSSD, so the two are never averaged as-is) | Absent = watch not worn overnight or no background sample; 0 dropped |
+| `resting_heart_rate_apple` | Tier 1 internal | Absent = not enough worn rest time for Apple to compute one; 0 dropped |
+| `walking_heart_rate_avg` | Tier 1 internal | Absent = no qualifying walk that day; 0 dropped |
+| `vo2max` | public | Estimate only after an outdoor walk, run or hike with GPS. Absent on most days, which is normal; the `watch_fitness` liveness bar is 14 days; 0 dropped |
+| `walking_steadiness_pct` | Tier 1 internal (fall-risk class) | A weekly estimate. Absent on most days; 14-day bar |
+| `physical_effort` | public | Absent = no activity samples (sedentary or not worn) |
+
+**Freshness (registry `apple_health.hae_datatypes`):** `watch_overnight_vitals` (2 d), `watch_heart` (2 d), `watch_activity` (2 d) and `watch_fitness` (14 d) are day-level liveness groups: they narrate and never alarm. `watch` carries the one alarming bar, `dead_man: {field: watch_last_reading_epoch_apple, stale_hours: 36}`. The freshness checker (`ingestion.watch_presence.check_dead_men`) folds a stale or unreadable dead-man into `StaleSourceCount`, the metric the existing `slo-source-freshness` alarm watches (`to_digest=True`: it reaches the daily digest). The checker runs daily, so it fires on the first run after the 36 h mark (60 h at the latest). `get_freshness_status` reports the same rows as `device_dead_men`.
+
+**Not here, by lane:** Apple sleep stages (`sleep_*_apple`) are #4971's. ECG results, heart-rate notifications, AFib burden and the medication log are #4972's (event-class rhythm data, owner-only). Workouts are #4973's.
 
 **Apple sleep fields (webhook `sleep_analysis` — Apple devices only, #4971, epic #4967):**
 
@@ -1820,7 +1853,7 @@ a re-run would version (no writes, no model calls).
 | `timezone` | User timezone string |
 | `day_grade_weights` | object | Per-component weights for day grade (sleep_quality, recovery, etc.) |
 | `mvp_habits` | list | Habit names tracked in MVP scorecard (legacy, superseded by habit_registry) |
-| `habit_registry` | map | 65-habit registry with tier/category/mechanism/synergy metadata (v2.47.0). Optional per-entry `habitify_names` (list): every name the habit has carried in Habitify — a renamed habit resolves through it, and a registry habit the day's Habitify row does not name is UNOBSERVED, never a miss (#4362, `scoring_engine.habitify_reading`) |
+| `habit_registry` | map | 65-habit registry with tier/category/mechanism/synergy metadata (v2.47.0). Optional per-entry `habitify_names` (list): every name the habit has carried in Habitify — a renamed habit resolves through it, and a registry habit the day's Habitify row does not name is UNOBSERVED, never a miss (#4362, `scoring_engine.habitify_reading`). Optional per-entry `paused_since` (ISO date, #5007): from that day on the habit is NOT SCHEDULED (the `paused` source shape) — not a miss, not in the habit-reflection queue or the skipped-habits nag, out of scores, streaks and completion denominators, reported as `paused`; earlier days read as before. Set by `scripts/apply_habit_pause.py` (owner-run; Habitify is never edited); read via `common/habit_pause.py` |
 | `weight_loss_phases` | list | Phase objects with start_lbs, end_lbs, weekly_target_lbs |
 | `demo_mode_rules` | object | Rules for demo/share sanitization (see below) |
 | `source_of_truth` | object | Per-domain SOT overrides (see below) |

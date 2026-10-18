@@ -164,6 +164,27 @@ The owner's bar is ~3.5 screens for a reader page (the 2026-10-03 clean-look rul
 
 **Still on the fix list for round 2** (verified by the fresh pair, no lane yet): the built approval sentence; the start chapter-row measure; the call page's 178-vs-183; the "simple guess" defined once on coaches; the week page's faster-than-planned dot; the EP5 row's separator; the story accent badge gated on freshness (`chapter.state` is "stale" at 11 days); the coach record column wrap at 390 px.
 
+## Round 3 — live pages after the owner's "approve" (graded 2026-10-18 20:45–21:00Z, Session BY)
+
+Two independent graders read the LIVE pages (not fixtures) after PR #5012 removed the draft marks on front and Start here; a verifier reproduced every finding against the served JSON, the stored rows and the SSM budget parameters. Letters are each grader's own; the verifier changes verdicts, not letters.
+
+| page | round 2 (voice · truth) | round 3 | verifier's reading |
+|---|---|---|---|
+| front | B (voice capped) | **B** (voice) | the approved premise is first person, the rest of the page third person — one narrator per page is the owner's call (A-01) |
+| start | B | **B+** (voice) | same narrator flip (A-09); the Week 6 row grammar and "the record" ×3 are copy fixes |
+| story | B | **B−** (voice) | four narrators in five lines; `STORY_FRAME` becomes the approved sentence word for word; the draft footer stays until his word |
+| coaches | B | **B** (voice) | h1 "Every call checked." above an empty record; the narrator flip (A-22) |
+| week | A (truth) | **B** | the lead read's "starting weight of 302.2" is the current weight (B-01, partial: one wrong fact, not four); the stored read also says "a previous cycle" (A-X1, the no-cycle ruling) |
+| day | C | **C** | `ck_depth.js` leaves `strength_min` out of its key list, so Strava WeightTraining minutes are "no training" (B-06/B-02/B-11) |
+| trend | A | **B** | same `strength_min` class |
+| call | B | **B** | the deep-sleep bet's 16.4 % is Eight Sleep Oct 9–15 with no device or window named (B-14) |
+| coach | A | **A** | reproduces |
+| sheet | C | **C** | the Food score reads `protein`/`calories` but the row carries `total_protein_g`/`total_calories_kcal` — four components score 0 as "absent" (B-22, ADR-104's own field-mapping class) |
+| built | C | **B** | tier 1 is right (the governor's one-step cap); the page never states the cap beside its "tier 2 from about 87 %" line (B-26) |
+| appendix | A | **A** | reproduces (75/75 links) |
+
+Verifier counts over 61 findings: **46 confirmed** (12 of them "the number reproduces"), 9 partial, 6 refuted. Confirmed high: B-22, B-06, B-14, A-X1 (code), and A-01/A-09/A-22 (the narrator — a ruling). Two fixer lanes took the code set (site renderer + copy; the Lambda-side engine fields, the analyzer's grounding gate, the audience guard's cycle class, the bet source/window). Files: `red_team_2026-10-18_r3_graderA.json`, `red_team_2026-10-18_r3_graderB.json`, `red_team_2026-10-18_r3_verified.json`. ER-05 holds: internal self-assessment, grader ≠ author ≠ verifier; the five real readers are his (#4587).
+
 ## Carried forward from the 2026-06-21 review
 
 R-01…R-08 of the June pass graded a site that no longer exists (the four-door v4). None is reopened here; the class behind R-04 (one quantity, two roundings one tap apart) is the class behind this review's top defect, and the cross-page number check is now a grader's whole lens (G5, then G10 numbers) rather than a tolerance in `qa/site_review_bindings.py`.

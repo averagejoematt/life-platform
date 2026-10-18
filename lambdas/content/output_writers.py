@@ -21,6 +21,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET  # ADR-058
+from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.metric_truth import steps_series  # #4630: the ONE steps resolver
 from common.pacific_time import PACIFIC
 
@@ -520,7 +521,7 @@ def write_dashboard_json(
         try:
             week_start = today - timedelta(days=today.weekday())
             strava_week = _fetch_range("strava", week_start.isoformat(), yesterday)
-            max_hr = profile.get("max_heart_rate", 184)
+            max_hr = max_hr_from_profile(profile)
             z2_lo = max_hr * 0.60
             z2_hi = max_hr * 0.70
             z2_total = 0.0
@@ -773,7 +774,7 @@ def write_clinical_json(data, profile, yesterday):
         strava_28d = _fetch_range("strava", (today - timedelta(days=28)).isoformat(), yesterday)
         apple_28d = _fetch_range("apple_health", (today - timedelta(days=28)).isoformat(), yesterday)
 
-        max_hr = profile.get("max_heart_rate", 184)
+        max_hr = max_hr_from_profile(profile)
         z2_lo = max_hr * 0.60
         z2_hi = max_hr * 0.70
         total_sessions = 0

@@ -918,7 +918,7 @@ def constraint_block(
         # #4387 — the walking total cannot say "yesterday was 2¾ h on foot". These rows can: one
         # per activity over the 3 days through target − 1, each flagged against the walking
         # redlines, with the session's cardio modality picked FROM them (`cardio_pick`).
-        "recent_aerobic": _recent_aerobic_view(recent_aerobic, session.get("archetype"), states.get("recent_aerobic")),
+        "recent_aerobic": _recent_aerobic_view(recent_aerobic, session.get("archetype"), states.get("recent_aerobic"), date),
         # v3.3 ruling "B" (#4161): the SERVED target is gated by protein adherence — `rate_target.protein_gate` says which
         "rate_target": owner_redlines.rate_target_lb_per_wk(
             weight_lb,
@@ -1067,10 +1067,13 @@ def constraint_block(
     }
 
 
-def _recent_aerobic_view(block: dict[str, Any] | None, archetype: Any, state: dict[str, Any] | None) -> dict[str, Any]:
-    """`constraint_block.recent_aerobic`: the block as read, plus the cardio pick for the served session (#4387)."""
+def _recent_aerobic_view(
+    block: dict[str, Any] | None, archetype: Any, state: dict[str, Any] | None, target_date: str | None = None
+) -> dict[str, Any]:
+    """`constraint_block.recent_aerobic`: the block as read, plus the cardio pick for the served session (#4387);
+    #5000: on a day a standing constraint forbids HR prescriptions, the pick carries the talk test instead."""
     base = dict(block) if block else {"state": (state or {}).get("state") or "unknown", "rows": [], "input_state": state}
-    base["cardio_pick"] = recent_aerobic.cardio_pick(block, archetype)
+    base["cardio_pick"] = recent_aerobic.cardio_pick(block, archetype, target_date)
     return base
 
 

@@ -78,6 +78,10 @@ ROW_MAP: list[dict] = [
             ("field", "withings", "temperature_c"),
             ("field", "withings", "body_temperature_c"),
             ("field", "withings", "skin_temperature_c"),
+            # #4970: the Apple Watch's overnight vitals, under the same raw-biometrics row
+            ("field", "apple_health", "spo2_pct_apple"),
+            ("field", "apple_health", "wrist_temp_sleep_c_apple"),
+            ("field", "apple_health", "breathing_disturbances_apple"),
             # #4971: the Apple Watch's own night — derived from the writer's field tuple.
             *(("field", "apple_health", f) for f in (*_apple_sleep.APPLE_SLEEP_FIELDS, _apple_sleep.RD_FIELD)),
         ],

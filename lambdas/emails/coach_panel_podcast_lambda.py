@@ -33,6 +33,7 @@ from common import media_tombstone  # #4365: a restart tombstone is not a publis
 from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
+from content import body_numbers  # #4993: ONE body-number detector with the story desk
 from experiment import er03_gate
 from experiment.phase_filter import with_phase_filter
 
@@ -259,7 +260,6 @@ def _blocked_vice_terms() -> list:
     return [t.lower() for t in (cf.get("blocked_vice_keywords") or [])] + [v.lower() for v in (cf.get("blocked_vices") or [])]
 
 
-_BODY_NUM_RE = re.compile(r"\b\d{2,3}(?:\.\d+)?\s?(?:lb|lbs|pound|pounds|kg|kilo|kilos|kilograms)\b", re.I)
 _GRIEF_RE = re.compile(
     r"\b(?:grief|grieving|died|passed away|funeral|cancer|terminal|hospice|"
     r"my (?:mom|mum|dad|mother|father|parent|parents|wife|husband|girlfriend|boyfriend|partner|brother|sister|son|daughter|family))\b",
@@ -286,7 +286,7 @@ def _safety_gate(text: str) -> list:
         if term and re.search(rf"\b{re.escape(term)}\b", low):
             reasons.append(f"blocked-vice:{term}")
             break
-    if _BODY_NUM_RE.search(t):
+    if body_numbers.BODY_NUM_RE.search(t):  # the desk's detector (#4993)
         reasons.append("body-number")
     if _GRIEF_RE.search(t):
         reasons.append("grief/family/named-person")

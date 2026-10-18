@@ -12,11 +12,14 @@ Three things are pinned here:
    directly. A line that matches a read pattern either lives in an exempt file (a writer, a
    per-source liveness check, the resolver/registry themselves) or carries a
    `# steps-truth: <reason>` marker naming why the value it reads is already resolved.
-3. Box 5: `get_sot()` and the static SOT map no longer state a truth for steps.
+3. Box 5: `get_sot()` and the static SOT map no longer state a truth for steps — and (#4975)
+   no hand-written `*SOURCE_OF_TRUTH*` table states a source by literal for any METRIC_TRUTH
+   metric or the domains the registry now owns (physiology, sleep).
 """
 
 # premerge-gate: sweeps lambdas/ and mcp/ for a direct read of a steps field (the #4630 reader guard)
 
+import ast
 import os
 import re
 import sys
@@ -220,6 +223,71 @@ def test_static_sot_map_has_no_steps():
     from mcp import config
 
     assert "steps" not in config.SOURCE_OF_TRUTH
+
+
+# ── #4975: no hand-written SOT table restates a METRIC_TRUTH owner (box 5, widened) ──
+
+# Domains / metric names whose owner the registry now states. A literal source for one of these
+# in a hand-written SOT table is a second statement of the truth.
+REGISTRY_OWNED = frozenset(reg.METRIC_TRUTH) | {"physiology", "sleep", "sleep_duration", "hrv", "rhr", "resting_heart_rate"}
+
+
+def _sot_offenders(sources: dict[str, str]):
+    out = []
+    for rel, src in sources.items():
+        try:
+            tree = ast.parse(src)
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            targets = []
+            if isinstance(node, ast.Assign):
+                targets, value = node.targets, node.value
+            elif isinstance(node, ast.AnnAssign) and node.value is not None:
+                targets, value = [node.target], node.value
+            else:
+                continue
+            names = [t.id for t in targets if isinstance(t, ast.Name)]
+            if not any("SOURCE_OF_TRUTH" in n.upper() for n in names) or not isinstance(value, ast.Dict):
+                continue
+            for k, v in zip(value.keys, value.values):
+                if isinstance(k, ast.Constant) and k.value in REGISTRY_OWNED and isinstance(v, ast.Constant) and isinstance(v.value, str):
+                    out.append(f"{rel}:{k.lineno}: {k.value!r}: {v.value!r}")
+    return out
+
+
+def _sot_tree_sources():
+    out = {}
+    for top in ("lambdas", "mcp"):
+        for dirpath, _dirs, files in os.walk(os.path.join(ROOT, top)):
+            if "__pycache__" in dirpath:
+                continue
+            for fn in files:
+                if fn.endswith(".py"):
+                    path = os.path.join(dirpath, fn)
+                    with open(path, encoding="utf-8") as fh:
+                        out[os.path.relpath(path, ROOT)] = fh.read()
+    return out
+
+
+def test_no_hand_written_sot_table_restates_a_registry_owner():
+    offenders = _sot_offenders(_sot_tree_sources())
+    assert not offenders, (
+        "a SOURCE_OF_TRUTH table names a source by literal for a metric/domain the METRIC_TRUTH facet owns — "
+        "read it from ingestion.source_registry.metric_truth(...) instead:\n  " + "\n  ".join(offenders)
+    )
+
+
+def test_sot_guard_can_fail():
+    """Mutation proof: the two retired literals, planted back, are caught (Assign and AnnAssign);
+    the derived form passes."""
+    planted = {
+        "x.py": '_SOURCE_OF_TRUTH = {"hrv": "whoop", "weight": "withings"}\n',
+        "y.py": 'D_SOURCE_OF_TRUTH: dict = {"sleep": "whoop"}\n',
+        "z.py": 'S_SOURCE_OF_TRUTH = {"sleep": metric_truth("sleep_hours")["truth_source"]}\n',
+    }
+    got = _sot_offenders(planted)
+    assert got == ["x.py:1: 'hrv': 'whoop'", "y.py:1: 'sleep': 'whoop'"], got
 
 
 # ── the writer ⇄ facet seam (#2847): the field the facet reads is the field the writer writes ──
