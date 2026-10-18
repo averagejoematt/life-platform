@@ -517,7 +517,13 @@ class TestManualSourcesAnswerTheCaptureChannelQuestion:
         change no reader-facing behaviour — macrofactor is still not nudge-eligible."""
         assert "macrofactor" not in reg.manual_capture_sources()
         assert "labs" not in reg.manual_capture_sources()
-        assert set(reg.manual_capture_sources()) == {"apple_health", "measurements", "progress_photos", "food_delivery", "notion"}
+        assert set(reg.manual_capture_sources(include_paused=True)) == {
+            "apple_health",
+            "measurements",
+            "progress_photos",
+            "food_delivery",
+            "notion",
+        }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
