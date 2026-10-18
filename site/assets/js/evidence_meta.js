@@ -367,12 +367,11 @@ export function renderVerify(d) {
   if (!d || d.status === "unavailable") {
     return sec("Cross-device agreement — the credibility signal", empty(d && d.reason ? d.reason : "No overlapping device data recorded yet.")) + links + sample + methodLink + note("Nothing here is fabricated to fill a gap — an empty section says so.");
   }
-  const rhr = d.rhr_agreement;
-  const headFigs = figs([
-    d.period && fig(d.period.overlapping_days, "nights both devices recorded"),
-    d.combined_agreement_rate_pct != null && fig(d.combined_agreement_rate_pct + "%", "agreement rate"),
-    rhr && fig(rhr.flagged_days, "nights flagged (RHR diff >6bpm)"),
-  ]);
+  // #5042: the comparison is the Apple WATCH era only (the producer floors it at the
+  // registry's first watch day) — every heading names that start, and below the agreement
+  // study's floor (#4974, 30 nights) the page shows the nights but no verdict.
+  const watchFrom = d.watch_era && d.watch_era.start ? d.watch_era.start : null;
+  const watchLabel = watchFrom ? `Apple Watch (from ${esc(watchFrom)})` : "Apple Watch";
   const rows = (d.daily || []).slice(0, 30).map((r) => {
     const flagged = r.rhr_agreement === "flag" || r.hrv_agreement === "flag";
     return `<tr class="${flagged ? "rd-flag" : ""}"><td class="rd-name">${esc(r.date)}</td><td class="num">${r.whoop_rhr_bpm != null ? fmt(r.whoop_rhr_bpm) : "—"}</td><td class="num">${r.apple_rhr_bpm != null ? fmt(r.apple_rhr_bpm) : "—"}</td><td class="num">${r.rhr_abs_diff_bpm != null ? fmt(r.rhr_abs_diff_bpm) : "—"}</td><td>${esc(r.rhr_agreement || "—")}</td></tr>`;
@@ -383,15 +382,30 @@ export function renderVerify(d) {
   // site_api_phase_frame.archival_frame call, off the window's newest night) adds
   // the same "previous cycle" framing every other cross-phase surface uses.
   const period = d.period ? ` — ${esc(d.period.start)} to ${esc(d.period.end)}` : "";
-  const table = rows ? sec(`Whoop vs Apple Watch, night by night (resting heart rate, bpm)${period}`, `<table class="rd-tbl"><thead><tr><th>date</th><th>Whoop</th><th>Apple Watch</th><th>diff</th><th>agreement</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
+  const table = rows ? sec(`Whoop vs ${watchLabel}, night by night (resting heart rate, bpm)${period}`, `<table class="rd-tbl"><thead><tr><th>date</th><th>Whoop</th><th>Apple Watch</th><th>diff</th><th>agreement</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
   // #4976: HRV is not compared (Whoop RMSSD vs Apple SDNN) — the producer says so, the page repeats it.
   const hrvNote = d.hrv_note ? `<p class="rd-meta label">${esc(d.hrv_note)}</p>` : "";
+  const nNights = d.n_nights != null ? d.n_nights : (d.period ? d.period.overlapping_days : 0);
+  if (d.status === "too_few_nights") {
+    const minN = d.min_nights || 30;
+    return sec("Cross-device agreement — the credibility signal", figs([fig(nNights, `nights Whoop and the ${watchLabel} both recorded`)]) +
+        empty(`Too few nights to compare yet — ${nNights} of the ${minN} the agreement study needs. The comparison starts when the Apple Watch did${watchFrom ? ` (${esc(watchFrom)})` : ""}; earlier Apple Health heart-rate readings came from other devices, so they are left out rather than padded in.`) +
+        hrvNote) +
+      table + links + sample + methodLink +
+      note("Nothing is graded until the study's minimum is reached — the nights above are raw readings, not a finding.");
+  }
+  const rhr = d.rhr_agreement;
+  const headFigs = figs([
+    d.period && fig(nNights, `nights Whoop and the ${watchLabel} both recorded`),
+    d.combined_agreement_rate_pct != null && fig(d.combined_agreement_rate_pct + "%", "agreement rate"),
+    rhr && fig(rhr.flagged_days, "nights flagged (RHR diff >6bpm)"),
+  ]);
   const archivalNote = d.archival && d.archival.pre_cycle
     ? `<p class="rd-meta label">${esc(_dayFrame(d.archival.label))} — the comparison window itself.</p>`
     : "";
   const agreeDays = rhr ? rhr.agree_days : 0, minorDays = rhr ? rhr.minor_days : 0, flagDays = rhr ? rhr.flagged_days : 0;
   return sec("Cross-device agreement — the credibility signal", headFigs +
-      `<p class="rd-prose">Whoop and the Apple Watch are two independently-made sensors, worn the same nights, that were never designed to talk to each other. Across every overlapping night on record: ${esc(agreeDays)} agreed within 3bpm, ${esc(minorDays)} were within 6bpm, and ${esc(flagDays)} disagreed enough to flag. That specific, correlated-but-imperfect pattern is what two real pieces of hardware produce — synthetic or copy-pasted numbers don't misbehave this particular way.</p>` +
+      `<p class="rd-prose">Whoop and the Apple Watch are two independently-made sensors, worn the same nights, that were never designed to talk to each other. Across every overlapping night since the watch arrived${watchFrom ? ` (${esc(watchFrom)})` : ""}: ${esc(agreeDays)} agreed within 3bpm, ${esc(minorDays)} were within 6bpm, and ${esc(flagDays)} disagreed enough to flag. That specific, correlated-but-imperfect pattern is what two real pieces of hardware produce — synthetic or copy-pasted numbers don't misbehave this particular way.</p>` +
       hrvNote + archivalNote) +
     table + links + sample + methodLink +
     note(d.interpretation || "Cross-device resting-heart-rate comparison, thresholded from real inter-device variance — not a claim either sensor is 'right.'");

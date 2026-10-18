@@ -210,7 +210,10 @@ class TestDeviceAgreementArchivalFraming:
         def _query_source(source, start, end, include_pilot=False):
             return [{"date": last_night, "resting_heart_rate": 60.0, "resting_heart_rate_apple": 58.0}]
 
-        resp = freshness.device_agreement(_g={"_query_source": _query_source, "EXPERIMENT_START": genesis})
+        # #5042: the window is floored at the watch era; open it to the fixture's night.
+        resp = freshness.device_agreement(
+            _g={"_query_source": _query_source, "EXPERIMENT_START": genesis, "APPLE_WATCH_FIRST_DAY": last_night}
+        )
         assert resp["statusCode"] == 200, resp
         body = json.loads(resp["body"])
         assert body["archival"]["pre_cycle"] is True
@@ -223,7 +226,9 @@ class TestDeviceAgreementArchivalFraming:
         def _query_source(source, start, end, include_pilot=False):
             return [{"date": recent_night, "resting_heart_rate": 60.0, "resting_heart_rate_apple": 58.0}]
 
-        resp = freshness.device_agreement(_g={"_query_source": _query_source, "EXPERIMENT_START": genesis})
+        resp = freshness.device_agreement(
+            _g={"_query_source": _query_source, "EXPERIMENT_START": genesis, "APPLE_WATCH_FIRST_DAY": recent_night}
+        )
         body = json.loads(resp["body"])
         assert body["archival"] is None, body["archival"]
 

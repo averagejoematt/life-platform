@@ -12,17 +12,17 @@ from common.pacific_time import (  # #1964/#3257: THE one Pacific frame + parser
 )
 from experiment.phase_filter import singleton_visible, with_phase_filter
 from health import instrument_presence  # #4217: the ONE liveness derivation — the coach absence gate reads these same functions
-from ingestion.source_registry import availability_facet, caveated_source_ids  # #3615/#3516: one absence story
+from ingestion.source_registry import SOURCE_REGISTRY, availability_facet, caveated_source_ids  # #3615/#3516: one absence story
 
 from web.site_api_common import USER_PREFIX, _decimal_to_float, _error, _ok, logger
 from web.site_api_phase_frame import archival_frame  # #2957 — cross-phase framing
 
-_DEVICE_AGREEMENT_START = "2020-01-01"  # generous floor; predates any real device data
-
-
 _APPLE_RHR_FIELD = "resting_heart_rate_apple"  # health_auto_export_lambda tier-2 field (Apple Watch only)
 _DEVICE_AGREEMENT_HRV_NOTE = "HRV is not compared: Whoop reports RMSSD and Apple reports SDNN — two different statistics."
 _DEVICE_AGREEMENT_DAILY_CAP = 90  # most-recent N overlap days in the payload; aggregates cover the full window
+# #5042: the agreement study's floor (#4974 — 30 dual-wear nights). Below it the payload states
+# n and the era start and returns no verdict: a 100% agreement rate over 3 nights is not a finding.
+_DEVICE_AGREEMENT_MIN_NIGHTS = 30
 
 
 _PRESENCE_LOUD = {"light", "quiet", "dark"}
@@ -357,18 +357,32 @@ def device_agreement(*, _g) -> dict:
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
     _query_source = _g["_query_source"]
     EXPERIMENT_START = _g["EXPERIMENT_START"]
+    # #5042: the WATCH era only. The stored apple_health rows carry no device, and before the
+    # watch the partition's resting HR came from other writers (Whoop's own app among them —
+    # the live 83-night window agreed 100%, Whoop against itself). The era start is the
+    # registry's `watch_first_day` facet; `_g` may override it (tests only).
+    era = SOURCE_REGISTRY["apple_health"]["watch_first_day"]
+    watch_start = _g.get("APPLE_WATCH_FIRST_DAY") or era["date"]
+    watch_era = {"start": watch_start, "determined_by": era["determined_by"]}
     today = datetime.now(PT).strftime("%Y-%m-%d")
     try:
-        whoop_items = _query_source("whoop", _DEVICE_AGREEMENT_START, today, include_pilot=True)
-        apple_items = _query_source("apple_health", _DEVICE_AGREEMENT_START, today, include_pilot=True)
+        whoop_items = _query_source("whoop", watch_start, today, include_pilot=True)
+        apple_items = _query_source("apple_health", watch_start, today, include_pilot=True)
     except Exception as e:
         logger.error(f"[site_api] /api/device_agreement query failed: {e}")
         return _error(500, "device agreement unavailable")
 
     # Day-summary records only — Whoop workout sub-items (sk DATE#...#WORKOUT#...)
     # never carry resting_heart_rate/hrv, so this filter drops them for free.
-    whoop_by_date = {i["date"]: i for i in whoop_items if i.get("date") and i.get("resting_heart_rate") is not None}
-    apple_by_date = {i["date"]: i for i in apple_items if i.get("date") and i.get(_APPLE_RHR_FIELD) is not None}
+    # The date floor is applied HERE too, not only in the query, so a reader that hands back
+    # rows outside the window (or a future caller with a wider query) still cannot let a
+    # phone-era night in.
+    whoop_by_date = {
+        i["date"]: i for i in whoop_items if i.get("date") and i["date"] >= watch_start and i.get("resting_heart_rate") is not None
+    }
+    apple_by_date = {
+        i["date"]: i for i in apple_items if i.get("date") and i["date"] >= watch_start and i.get(_APPLE_RHR_FIELD) is not None
+    }
     apple_first_date = min(apple_by_date, default=None)
 
     all_dates = sorted(set(whoop_by_date) & set(apple_by_date))
@@ -378,8 +392,11 @@ def device_agreement(*, _g) -> dict:
             {
                 "status": "unavailable",
                 "devices": ["Whoop", "Apple Watch"],
-                "reason": "No overlapping Whoop + Apple Watch resting-heart-rate nights recorded yet.",
+                "reason": f"No overlapping Whoop + Apple Watch resting-heart-rate nights recorded yet (the watch from {watch_start}).",
                 "apple_first_date": apple_first_date,
+                "n_nights": 0,
+                "min_nights": _DEVICE_AGREEMENT_MIN_NIGHTS,
+                "watch_era": watch_era,
                 "hrv_note": _DEVICE_AGREEMENT_HRV_NOTE,
             },
             cache_seconds=3600,
@@ -415,10 +432,14 @@ def device_agreement(*, _g) -> dict:
 
     n = len(all_dates)
     rhr_days = rhr_agree + rhr_minor + rhr_flag
-    rhr_rate = round(rhr_agree / rhr_days * 100, 1) if rhr_days else None
+    too_few = n < _DEVICE_AGREEMENT_MIN_NIGHTS
+    # #5042: below the study's floor there is no rate and no verdict — only the nights.
+    rhr_rate = round(rhr_agree / rhr_days * 100, 1) if rhr_days and not too_few else None
     combined = rhr_rate
 
-    if combined is None:
+    if too_few:
+        confidence = None
+    elif combined is None:
         confidence = "UNKNOWN — insufficient overlapping data"
     elif combined >= 80:
         confidence = "HIGH — devices closely agree; composite readiness score is reliable"
@@ -433,8 +454,17 @@ def device_agreement(*, _g) -> dict:
 
     return _ok(
         {
-            "status": "ok",
+            "status": "too_few_nights" if too_few else "ok",
             "period": {"start": all_dates[0], "end": all_dates[-1], "overlapping_days": n},
+            "n_nights": n,
+            "min_nights": _DEVICE_AGREEMENT_MIN_NIGHTS,
+            "watch_era": watch_era,
+            "too_few_reason": (
+                f"Too few nights to compare yet: {n} of the {_DEVICE_AGREEMENT_MIN_NIGHTS} the agreement study needs, "
+                f"the Apple Watch from {watch_start}."
+                if too_few
+                else None
+            ),
             "devices": ["Whoop", "Apple Watch"],
             "hrv_agreement": None,
             "hrv_note": _DEVICE_AGREEMENT_HRV_NOTE,
@@ -446,7 +476,7 @@ def device_agreement(*, _g) -> dict:
                     "agreement_rate_pct": rhr_rate,
                     "threshold_note": "Agree: <=3bpm delta; minor: 3-6bpm; flag: >6bpm",
                 }
-                if rhr_days
+                if rhr_days and not too_few
                 else None
             ),
             "device_confidence": confidence,
