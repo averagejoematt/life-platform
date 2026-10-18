@@ -1583,6 +1583,11 @@ def _cdk_scheduled_lambda_names(stacks_dir=None):
 
     stacks_dir = stacks_dir or os.path.join(ROOT, "cdk", "stacks")
     scheduled = set()
+    # #4284: the factory takes no schedule= any more — it attaches the function's row from
+    # config/schedules.json (key == function name), so a factory row IS pattern 1.
+    import schedule_rows as _schedule_rows
+
+    _factory_rows = {k for k in _schedule_rows.rows() if "#" not in k}
 
     def _is_create_platform_lambda_call(node):
         return isinstance(node, _ast.Call) and (
@@ -1640,7 +1645,7 @@ def _cdk_scheduled_lambda_names(stacks_dir=None):
                 fn_name = _resolve_function_name(node.value)
                 if not fn_name:
                     continue
-                if _has_non_none_kwarg(node.value, "schedule"):
+                if _has_non_none_kwarg(node.value, "schedule") or fn_name in _factory_rows:
                     scheduled.add(fn_name)
                 for target in node.targets:
                     if isinstance(target, _ast.Name):
@@ -1649,7 +1654,7 @@ def _cdk_scheduled_lambda_names(stacks_dir=None):
                 # Not assigned to a simple Name (e.g. passed straight into
                 # another expression) — schedule= still counts directly.
                 fn_name = _resolve_function_name(node)
-                if fn_name and _has_non_none_kwarg(node, "schedule"):
+                if fn_name and (_has_non_none_kwarg(node, "schedule") or fn_name in _factory_rows):
                     scheduled.add(fn_name)
 
         # Pass 2: manual add_target(targets.LambdaFunction(<var>)) calls.

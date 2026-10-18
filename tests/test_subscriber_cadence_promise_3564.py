@@ -32,6 +32,7 @@ import sys
 from datetime import date, datetime
 
 import pytest
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
@@ -49,11 +50,7 @@ def _stack_src():
 def _cdk_schedule(construct_id: str) -> str:
     """The `schedule=` cron literal on a construct, read from the CDK source —
     the same idiom tests/test_onboarding_schedule_docstring.py (#1257) uses."""
-    src = _stack_src()
-    idx = src.index(f'"{construct_id}"')
-    m = re.search(r'schedule="(cron\([^"]+\))"', src[idx:])
-    assert m, f"no schedule= cron found after the {construct_id} construct in email_stack.py"
-    return m.group(1)
+    return schedule_rows.expr_after_construct(_stack_src(), construct_id)  # #4284: the table row
 
 
 # ── MIRROR: the registry is the stack ─────────────────────────────────────────

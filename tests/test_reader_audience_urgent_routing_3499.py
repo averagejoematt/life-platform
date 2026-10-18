@@ -71,6 +71,7 @@ import re
 import sys
 
 import pytest
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 CDK_DIR = os.path.join(ROOT, "cdk")
@@ -370,9 +371,9 @@ def _canary_cron() -> tuple[int, frozenset[int]]:
         ids = [a.value for a in node.args if isinstance(a, ast.Constant) and isinstance(a.value, str)]
         if "AiQualityCanary" not in ids:
             continue
-        sched = next((k.value for k in node.keywords if k.arg == "schedule"), None)
-        assert isinstance(sched, ast.Constant), "AiQualityCanary's schedule= is not a literal — re-point this derivation"
-        expr = sched.value
+        fn = next((k.value.value for k in node.keywords if k.arg == "function_name" and isinstance(k.value, ast.Constant)), None)
+        assert fn, "AiQualityCanary's function_name= is not a literal — re-point this derivation"
+        expr = schedule_rows.expr(fn)  # #4284: the factory's schedule is the function's table row
         assert expr.startswith("cron(") and expr.endswith(")"), f"unexpected schedule form {expr!r}"
         minute, hour, _dom, _mon, dow, *_ = expr[5:-1].split()
         return int(hour) * 60 + int(minute), _dow_set(dow)

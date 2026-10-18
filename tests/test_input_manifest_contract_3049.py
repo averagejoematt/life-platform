@@ -68,6 +68,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
@@ -733,13 +734,8 @@ def test_no_new_event_wiring_in_compute_stack():
     src = open(_COMPUTE_STACK, encoding="utf-8").read()
     for forbidden in ("EventPattern", "event_pattern", "on_cloud_trail_event", "add_event_source"):
         assert forbidden not in src, f"#3049 scope guard: {forbidden} appeared in compute_stack.py"
-    tree = ast.parse(src)
+    # #4284: the compute schedules are config/schedules.json rows on the compute stack.
     scheduled = [
-        n
-        for n in ast.walk(tree)
-        if isinstance(n, ast.keyword)
-        and n.arg == "schedule"
-        and isinstance(n.value, ast.Constant)
-        and str(n.value.value).startswith("cron(")
+        k for k, row in schedule_rows.rows().items() if row["stack"] == "LifePlatformCompute" and row["expression"].startswith("cron(")
     ]
     assert len(scheduled) >= len(EXPECTED_COMPUTE_IDS), "compute Lambdas lost their cron schedules"

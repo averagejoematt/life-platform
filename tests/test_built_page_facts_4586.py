@@ -82,8 +82,11 @@ def built_page_findings(page: str, module: str) -> list[str]:
             )
     if "tier = min(projected_tier, actual_tier)" not in gov:
         out.append("the governor no longer holds the tier to actual spend in the early-month window — the page says it does")
-    stack = (ROOT / "cdk" / "stacks" / "operational_stack.py").read_text(encoding="utf-8")
-    cadence = re.search(r'schedule="cron\(0 0/(\d+) \* \* \? \*\)",\s*# every \d+h[^\n]*Cost Explorer', stack)
+    # #4284: the governor's schedule is its config/schedules.json row.
+    gov_expr = json.loads((ROOT / "config" / "schedules.json").read_text(encoding="utf-8"))["schedules"]["life-platform-cost-governor"][
+        "expression"
+    ]
+    cadence = re.fullmatch(r"cron\(0 0/(\d+) \* \* \? \*\)", gov_expr)
     if not cadence or f"every {cadence.group(1)} hours" not in text:
         out.append(
             f"the page's forecast cadence does not match the cost governor's schedule ({cadence.group(1) if cadence else 'not found'}h)"

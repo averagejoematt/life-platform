@@ -13,6 +13,8 @@ Non-vacuous: the pre-#1257 docstring said cron(0 16) — this test fails on that
 import os
 import re
 
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _LAMBDA = os.path.join(_ROOT, "lambdas", "web", "subscriber_onboarding_lambda.py")
 _CDK = os.path.join(_ROOT, "cdk", "stacks", "email_stack.py")
@@ -25,12 +27,9 @@ def _read(path):
 
 def _cdk_onboarding_cron():
     """The schedule= cron on the CDK SubscriberOnboarding rule (the source of truth)."""
-    src = _read(_CDK)
-    # Find the SubscriberOnboarding construct id, then the next schedule="cron(...)".
-    idx = src.index('"SubscriberOnboarding"')
-    m = re.search(r'schedule="(cron\([^"]+\))"', src[idx:])
-    assert m, "could not locate the SubscriberOnboarding schedule= cron in email_stack.py"
-    return m.group(1)
+    # #4284: the schedule is the subscriber-onboarding row of config/schedules.json.
+    assert '"SubscriberOnboarding"' in _read(_CDK)
+    return schedule_rows.expr("subscriber-onboarding")
 
 
 def test_onboarding_docstring_matches_cdk_schedule():

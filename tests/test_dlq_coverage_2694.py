@@ -32,6 +32,7 @@ import os
 from datetime import date, datetime
 
 import pytest
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
 
 # #416/ADR-117: this is exactly the "wiring silently broken" class the
 # deploy-critical lane exists to catch before it reaches a live deploy.
@@ -83,9 +84,8 @@ def scheduled_lambda_dlq_status() -> dict:
         fn_kw = _kw(node, "function_name")
         if not isinstance(fn_kw, ast.Constant):
             continue
-        sched = _kw(node, "schedule")
-        if sched is None or (isinstance(sched, ast.Constant) and sched.value is None):
-            continue  # not scheduled — out of this guard's scope
+        if fn_kw.value not in schedule_rows.rows():
+            continue  # #4284: no factory row in config/schedules.json — not scheduled, out of this guard's scope
         dlq_kw = _kw(node, "dlq")
         has_dlq = dlq_kw is not None and not (isinstance(dlq_kw, ast.Constant) and dlq_kw.value is None)
         out[fn_kw.value] = (has_dlq, node.lineno)

@@ -45,6 +45,8 @@ import os
 import re
 import sys
 
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
+
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("USER_ID", "matthew")
@@ -306,9 +308,7 @@ class TestTheReadIsOnePerInvocation:
 
 def _cron(function_name):
     """The `schedule=` literal of a named lambda in the compute stack."""
-    src = open(os.path.join(_REPO, "cdk", "stacks", "compute_stack.py"), encoding="utf-8").read()
-    at = src.index(f'function_name="{function_name}"')
-    m = re.search(r'schedule="cron\(([^)]*)\)"', src[at:])
+    m = re.fullmatch(r"cron\(([^)]*)\)", schedule_rows.expr(function_name))  # #4284: the table row
     assert m, f"{function_name} has no schedule literal"
     minute, hour = m.group(1).split()[:2]
     return int(hour) * 60 + int(minute)

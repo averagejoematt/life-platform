@@ -77,6 +77,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import json
 import os
 import re
 import sys
@@ -613,6 +614,13 @@ def instrument_sites(source: str, path: str = "") -> list:
     a CloudWatch alarm construct. Plus the scheduled job, whose first output is by
     definition not the merge. Syntactic and therefore wrong in both directions — which is
     exactly why this leg advises and the declared/labelled legs block."""
+    if path and str(path).endswith("schedules.json"):
+        # #4284: every schedule is a row of config/schedules.json — a row IS a scheduled job.
+        try:
+            rows = json.loads(source or "{}").get("schedules", {})
+        except ValueError:
+            return []
+        return [("scheduled-job", 0, f"{path} {key}: {row.get('expression')!r}") for key, row in sorted(rows.items())]
     try:
         tree = ast.parse(source or "")
     except SyntaxError:
@@ -637,6 +645,8 @@ def instrument_sites(source: str, path: str = "") -> list:
             for kw in node.keywords:
                 if kw.arg == "schedule" and isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
                     sites.append(("scheduled-job", node.lineno, f"schedule={kw.value.value!r}"))
+                elif kw.arg == "schedule" and isinstance(kw.value, ast.Call) and _call_name(kw.value) == "table_schedule":
+                    sites.append(("scheduled-job", node.lineno, f"schedule={ast.unparse(kw.value)}"))
                 elif kw.arg == "chronic" and isinstance(kw.value, ast.Constant) and kw.value.value is True:
                     sites.append(("chronic-check", node.lineno, "chronic=True check result"))
     if path:

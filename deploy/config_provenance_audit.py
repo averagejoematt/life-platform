@@ -155,6 +155,26 @@ def _cron_period_seconds(fields: dict) -> int | None:
     return None
 
 
+def _table_fields(sched, repo):
+    """`table_schedule("<key>")` (#4284) -> the cron field map of that config/schedules.json row,
+    with wildcard fields omitted (the `Schedule.cron(...)` kwarg shape), or None for any other call."""
+    func = sched.func
+    if getattr(func, "id", getattr(func, "attr", "")) != "table_schedule":
+        return None
+    if not (sched.args and isinstance(sched.args[0], ast.Constant) and isinstance(sched.args[0].value, str)):
+        return None
+    try:
+        with open(os.path.join(repo, "config", "schedules.json"), encoding="utf-8") as fh:
+            expr = json.load(fh)["schedules"][sched.args[0].value]["expression"]
+    except (OSError, KeyError, ValueError):
+        return None
+    if not expr.startswith("cron("):
+        return None
+    parts = expr[5:-1].split()
+    names = ("minute", "hour", "day", "month", "week_day", "year")
+    return {k: v for k, v in zip(names, parts) if k in ("minute", "hour") or v not in ("*", "?")}
+
+
 def declared_cadence(repo="."):
     """{config key: (seconds, "cdk/stacks/x.py")} from rule DESCRIPTIONS naming the key."""
     out: dict[str, tuple[int, str]] = {}
@@ -188,7 +208,9 @@ def declared_cadence(repo="."):
                 sched = kwargs.get("schedule")
                 if not isinstance(sched, ast.Call):
                     continue
-                fields = {k.arg: k.value.value for k in sched.keywords if isinstance(k.value, ast.Constant)}
+                fields = _table_fields(sched, repo)
+                if fields is None:
+                    fields = {k.arg: k.value.value for k in sched.keywords if isinstance(k.value, ast.Constant)}
                 period = _cron_period_seconds(fields)
                 if period is None:
                     continue

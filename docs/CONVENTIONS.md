@@ -86,12 +86,16 @@ requires already knowing which symbol to look for.
 
 ### 1b. Schedules are fixed UTC — with ONE zoned exception (#4284)
 
-Every `schedule=` in `cdk/stacks/` is an `events.Rule` cron in fixed UTC. The one exception is
-`daily-brief`: `create_platform_lambda(..., schedule="cron(0 10 * * ? *)", schedule_timezone="America/Los_Angeles")`
+Every schedule is a row of **`config/schedules.json`, the one schedule table** (#4284): function name (or
+`<function>#<ConstructId>` for a rule built beside the factory) → expression, zone where zoned, the
+reader/internal split, a one-line purpose and the stack. `create_platform_lambda` reads its function's row by
+`function_name`; no stack carries a `cron(`/`rate(` literal (`tests/test_schedule_table_4284.py`). A row is an
+`events.Rule` cron in fixed UTC. The one exception is
+`daily-brief`: its row carries `"timezone": "America/Los_Angeles"` on `cron(0 10 * * ? *)`, so the factory
 creates an EventBridge **Scheduler** schedule (`AWS::Scheduler::Schedule` + one invoke-only role) instead of a
 rule, so the brief keeps its Pacific wall-clock time across the DST change (owner ruling, docket #4644 Q42):
 17:00 UTC until 2026-11-01, 18:00 UTC after. A zoned `schedule=` reads as wall-clock in that zone, NOT UTC
-(`docs/DEPENDENCY_GRAPH.md` marks it). Generalising this to the other crons is a follow-up row on #4284.
+(`docs/DEPENDENCY_GRAPH.md` marks it). Moving another `facing: reader` row onto a zone is a CDK change with additive IAM (one Scheduler role each) — owner-applied, a follow-up row on #4284.
 Producers the brief reads must stay at or before 16:55 UTC; consumers that follow it run at 19:00 UTC or later.
 
 ## 2. Deploy from `main`, not the worktree branch

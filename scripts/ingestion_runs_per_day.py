@@ -80,29 +80,30 @@ def _resolve(node: ast.AST, consts: dict) -> str | None:
     return None
 
 
+def _schedule_table():
+    """cdk/stacks/schedule_table.py by path (stdlib only) — the ONE schedule table (#4284)."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("_schedule_table_for_runs", os.path.join(ROOT, "cdk", "stacks", "schedule_table.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
 def own_schedules() -> dict:
-    tree = ast.parse(open(STACK, encoding="utf-8").read())
-    consts = _consts(tree)
+    """{function: {schedule, own runs/day}} for every ingestion-stack function's factory schedule (#4284: the table row)."""
     out = {}
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
+    for key, row in sorted(_schedule_table().load().items()):
+        if "#" in key or row["stack"] != "LifePlatformIngestion":
             continue
-        kws = {k.arg: k.value for k in node.keywords}
-        if "function_name" in kws and "schedule" in kws:
-            fn = _resolve(kws["function_name"], consts)
-            sched = _resolve(kws["schedule"], consts)
-            if fn and sched:
-                out[fn] = {"schedule": sched, "own": runs_per_day_expr(sched)}
+        out[row["function"]] = {"schedule": row["expression"], "own": runs_per_day_expr(row["expression"])}
     return out
 
 
 def site_stats_extra() -> dict:
     src = open(REFRESH, encoding="utf-8").read()
     names = ast.literal_eval(re.search(r"INGESTION_LAMBDAS\s*=\s*(\[.*?\])", src, re.S).group(1))
-    ops = open(OPS_STACK, encoding="utf-8").read()
-    rules = int(
-        len(ast.literal_eval(re.search(r"for utc_hour, label in (\[.*?\]):", ops, re.S).group(1)))
-    )  # the SiteStatsRefresh cron rules
+    rules = sum(1 for row in _schedule_table().load().values() if row["function"] == "site-stats-refresh" and row.get("enabled", True))
     return {n: rules for n in names}
 
 

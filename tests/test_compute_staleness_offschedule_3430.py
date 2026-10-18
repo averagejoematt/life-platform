@@ -41,6 +41,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 sys.path.insert(0, str(ROOT / "lambdas" / "emails"))
@@ -187,9 +189,7 @@ class TestTheComputeCronConstantCannotDrift:
     """#2003's rule: a schedule restated outside its registry must be pinned to it."""
 
     def test_the_deadline_constants_match_daily_metrics_computes_cdk_cron(self):
-        src = COMPUTE_STACK.read_text()
-        block = src[src.index('function_name="daily-metrics-compute"') :]
-        m = re.search(r'schedule="cron\((\d+) (\d+) ', block)
+        m = re.match(r"cron\((\d+) (\d+) ", schedule_rows.expr("daily-metrics-compute"))  # #4284: the table row
         assert m, "could not read daily-metrics-compute's schedule= from cdk/stacks/compute_stack.py"
         minute, hour = int(m.group(1)), int(m.group(2))
         assert (hour, minute) == (
@@ -204,17 +204,16 @@ class TestTheComputeCronConstantCannotDrift:
     def test_the_deadline_is_earlier_than_the_daily_briefs_own_schedule(self):
         # If it were not, the scheduled brief itself would stop emitting and the
         # alarm would go dark — the failure mode this gate must never cause.
-        email_src = (ROOT / "cdk" / "stacks" / "email_stack.py").read_text()
-        block = email_src[email_src.index('function_name="daily-brief"') :]
-        m = re.search(r'schedule="cron\((\d+) (\d+) ', block)
+        row = schedule_rows.rows()["daily-brief"]  # #4284: the table row
+        m = re.match(r"cron\((\d+) (\d+) ", row["expression"])
         assert m, "could not read daily-brief's schedule= from cdk/stacks/email_stack.py"
         brief_minute, brief_hour = int(m.group(1)), int(m.group(2))
-        tz = re.search(r'schedule_timezone="([^"]+)"', block.split("create_platform_lambda(")[0])
+        tz = row.get("timezone")
         if tz:  # #4284: a zoned schedule — the EARLIEST UTC instant it can fire at (PDT) is the strict bound
             from datetime import datetime, timezone
             from zoneinfo import ZoneInfo
 
-            zone = ZoneInfo(tz.group(1))
+            zone = ZoneInfo(tz)
             brief_hour = min(datetime(2026, mo, 15, brief_hour, brief_minute, tzinfo=zone).astimezone(timezone.utc).hour for mo in (7, 12))
         assert (brief_hour, brief_minute) > (
             brief.COMPUTE_DEADLINE_UTC_HOUR,

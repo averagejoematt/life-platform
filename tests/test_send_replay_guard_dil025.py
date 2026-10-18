@@ -85,6 +85,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
 from common.pacific_time import pacific_now  # #2817: the senders name the PACIFIC day
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -200,8 +201,8 @@ class TestTheReplayVectorIsReal:
         """THE gap DIL-025 names. #2860's lease is 1200s; the consumer runs
         every 6 hours. A lease cannot cover a redrive, so a durable record is
         the only thing that can."""
-        src = OPERATIONAL_STACK.read_text(encoding="utf-8")
-        assert "rate(6 hours)" in src, "dlq-consumer cadence changed — re-derive the window in docs/IDEMPOTENCY.md"
+        src = schedule_rows.expr("life-platform-dlq-consumer")  # #4284: the table row
+        assert src == "rate(6 hours)", "dlq-consumer cadence changed — re-derive the window in docs/IDEMPOTENCY.md"
         assert lock.DAILY_BRIEF_LOCK_TTL_SECONDS < 6 * 3600
 
 

@@ -22,6 +22,7 @@ import re
 from pathlib import Path
 
 import pytest
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
 from ingestion import source_registry as reg
 from operational import pipeline_health_check_lambda as phc
 
@@ -61,7 +62,8 @@ def _ingestion_stack_functions() -> dict[str, dict]:
         src = re.search(r'source_file="([^"]+)"', call)
         code_lines = [ln for ln in call.splitlines() if not ln.strip().startswith("#")]
         out[name.group(1)] = {
-            "scheduled": any(re.match(r"\s*schedule=", ln) for ln in code_lines),
+            # #4284: scheduled == the function has a factory row in config/schedules.json
+            "scheduled": name.group(1) in schedule_rows.rows() or any(re.match(r"\s*schedule=", ln) for ln in code_lines),
             "source_file": src.group(1) if src else "",
         }
     return out

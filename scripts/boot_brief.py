@@ -122,15 +122,48 @@ def _zoned_utc(local_hhmm: str, tz: str, now: _dt.datetime) -> str:
     return wall.astimezone(_dt.timezone.utc).strftime("%H:%M")
 
 
-def next_runs(model: dict, now: _dt.datetime, n: int = 3) -> list[dict]:
+def _hhmm_of(expr: str) -> str | None:
+    """`HH:MM` of a fixed-time `cron(M H …)` (numeric minute + hour), else None — the model's rule."""
+    if not expr.startswith("cron("):
+        return None
+    fields = expr[5:-1].split()
+    if len(fields) < 2 or not (fields[0].isdigit() and fields[1].isdigit()):
+        return None
+    return f"{int(fields[1]):02d}:{int(fields[0]):02d}"
+
+
+def table_schedule_rows(path: pathlib.Path | None = None) -> list[dict]:
+    """The schedule plane straight from config/schedules.json, THE schedule table (#4284), in the
+    model's row shape. Disabled rows are dropped: a rule that never fires is not a next run."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("_schedule_table_for_boot", ROOT / "cdk" / "stacks" / "schedule_table.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    rows: list[dict] = []
+    for key, row in sorted(mod.load(str(path) if path else None).items()):
+        if row.get("enabled", True) is False:
+            continue
+        out = {"lambda": row["function"], "key": key, "expr": row["expression"], "utc": _hhmm_of(row["expression"])}
+        if row.get("timezone"):
+            out.update({"tz": row["timezone"], "local": out["utc"], "utc": None})
+        rows.append(out)
+    return rows
+
+
+def next_runs(model: dict, now: _dt.datetime, n: int = 3, rows: list[dict] | None = None) -> list[dict]:
     """The next `n` fixed-time schedule rows after `now` (UTC), wrapping past midnight.
     Day-of-week/month fields are NOT evaluated — this is 'what the clock says next', and
-    it says so; a MON-only cron shows on a Tuesday with its expr visible."""
-    rows = [r for r in model.get("schedules", []) if r.get("utc")]
+    it says so; a MON-only cron shows on a Tuesday with its expr visible.
+
+    #4284: `rows` is the schedule plane to read — `facts()` passes the schedule table's
+    (`table_schedule_rows()`); None reads the model's plane (the generator's copy of the same table)."""
+    plane = rows if rows is not None else model.get("schedules", [])
+    rows = [r for r in plane if r.get("utc")]
     # #4284: a zoned row (tz + local wall-clock, utc None in the model) resolves to a UTC
     # clock under THIS `now` — the only place the brief may do that, because `now` is the
     # caller's instant (frozen in tests), not a value pinned into the generated model.
-    for r in model.get("schedules", []):
+    for r in plane:
         if not r.get("utc") and r.get("tz") and r.get("local"):
             rows.append({**r, "utc": _zoned_utc(r["local"], r["tz"], now)})
     if not rows:
@@ -191,7 +224,11 @@ def facts(model: dict, now: _dt.datetime | None = None) -> dict:
     out: dict = {}
     for fact in BOOT_CONTRACT:
         if fact.path == "derived:next_runs":
-            out[fact.key] = next_runs(model, now)
+            try:
+                table_rows = table_schedule_rows()  # #4284: the next-runs line reads THE schedule table
+            except Exception:  # fail-soft: a SessionStart brief that raises kills every session's hook
+                table_rows = None
+            out[fact.key] = next_runs(model, now, rows=table_rows)
         else:
             out[fact.key] = resolve(model, fact.path)
     out["_consistency"] = consistency(model)
