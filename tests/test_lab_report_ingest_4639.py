@@ -34,7 +34,7 @@ import ingest_lab_report as ing  # noqa: E402
 from health import lab_units, labs_schema  # noqa: E402
 from ingestion.source_registry import SOURCE_REGISTRY  # noqa: E402
 
-NOW = "2026-10-17T20:00:00+00:00"
+STAMP = "2026-10-17T20:00:00+00:00"
 
 # The per-marker CSV shape: marker,value,unit,ref_text,flag[,category,panel,note]. Placeholder values.
 LAB_ROWS = [
@@ -89,7 +89,7 @@ def _labs_item(rows=LAB_ROWS, documents=(), previous=None, **kw):
         extraction_method="csv",
         reviewer="matthew",
         previous=previous,
-        now=NOW,
+        now=STAMP,
         **kw,
     )
 
@@ -214,7 +214,7 @@ def test_the_dexa_row_carries_the_leaves_the_readers_read_and_every_number_is_de
         unavailable_reason="placeholder",
         extraction_method="csv",
         reviewer="matthew",
-        now=NOW,
+        now=STAMP,
     )
     assert item["pk"] == "USER#matthew#SOURCE#dexa" and item["sk"] == "DATE#2026-11-01" and item["scan_type"] == "dexa"
     bc = item["body_composition"]
@@ -235,7 +235,7 @@ def test_every_row_carries_provenance_and_the_document_key_comes_from_the_regist
     prov = item["provenance"]
     assert prov["documents"][0]["s3_key"] == docs[0]["s3_key"] and "local" not in prov["documents"][0]
     assert prov["lab"] == "function_health" and prov["drawn_date"] == "2026-10-20" and prov["reviewer"] == "matthew"
-    assert prov["extraction_method"].startswith("csv via scripts/ingest_lab_report.py") and prov["ingested_at"] == NOW
+    assert prov["extraction_method"].startswith("csv via scripts/ingest_lab_report.py") and prov["ingested_at"] == STAMP
     assert "documents_unavailable_reason" not in prov
     # MUTATION: move the registry facet and the key follows — the script reads the facet, it does not construct keys.
     monkeypatch.setitem(SOURCE_REGISTRY["labs"]["raw_layout"], "prefix", "raw/elsewhere/labs")
