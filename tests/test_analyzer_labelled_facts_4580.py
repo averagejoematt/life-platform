@@ -36,8 +36,10 @@ import ai_expert_analyzer_lambda as az  # noqa: E402
 from ai import grounded_generation as gg  # noqa: E402
 from coach import audience_guard  # noqa: E402
 from common import retry_utils  # noqa: E402
+from fakes import FakeDdbTable  # noqa: E402
 from intelligence import labelled_facts as lf  # noqa: E402
 from test_analyzer_gate_all_paths_2421 import FakeModel, FakeTable  # noqa: E402
+from web import site_api_coach_stance as stance  # noqa: E402
 
 LEAD_READ_2026_10_18 = (
     "I'm watching Matthew execute at a steady clip: 54 logged training sessions in thirty days, consistent daily movement, "
@@ -194,3 +196,23 @@ def test_reader_check_control_owner_read_priority_is_not_a_reader_surface(table,
     model(_synth(CYCLE_REF, CLEAN))
     out = az.generate_synthesis({"sleep": "s", "training": "t"})
     assert out is not None and out["weekly_priority"] == CYCLE_REF
+
+
+# ── the serve side: the stored read is withheld the moment site-api deploys ───
+def _served_digest(**fields):
+    row = {"pk": "USER#matthew#SOURCE#ai_analysis", "sk": "EXPERT#integrator", "generated_at": "2026-10-18T04:38:17Z", **fields}
+    return stance._integrator_digest(_g={"table": FakeDdbTable(rows=[row])})
+
+
+def test_the_stored_read_is_not_served_to_readers():
+    """/api/weekly_priority, /api/coaching-dashboard, /api/coach_analysis and /api/edition's lead_read all read
+    `analysis` off this one chokepoint; the stored 2026-10-18 read (and the owner-read analysis beside it, which may
+    name the cycle) must not reach them."""
+    owner_read = "You stalled in the final phase of the previous cycle; this week, restart the food log."
+    item = _served_digest(public_summary=LEAD_READ_2026_10_18, analysis=owner_read)
+    assert item["analysis"] is None
+
+
+def test_serve_side_control_a_clean_read_still_serves():
+    fixed = LEAD_READ_2026_10_18.replace(" after a previous cycle that stalled in the final phase", "")
+    assert _served_digest(public_summary=fixed, analysis="You logged well.")["analysis"] == fixed
