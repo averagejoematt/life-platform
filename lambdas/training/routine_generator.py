@@ -884,13 +884,17 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
         layoff_days=int(week_cfg.get("re_entry_days_threshold", LAYOFF_DAYS_DEFAULT)),
         rationale=rationale,
     )
+    # #5049: warm-up sets before the working sets of a qualifying compound — after the floor, so they climb to its load
+    from training import warmup_sets
+
+    warmups = warmup_sets.attach_and_note(exercises, catalog.get("movements") or {}, rationale)
 
     caps = {
         "total_sets": week_cfg["session_set_ceiling"],
         "session_minutes": week_cfg["session_minutes_ceiling"],
         "weekly_volume_per_muscle": week_cfg["weekly_volume_cap_per_muscle"],
     }
-    total_sets = sum(len(e.sets) for e in exercises)
+    total_sets = sum(warmup_sets.working_set_count(e.sets) for e in exercises)  # #5049: the ceiling counts working sets
     assert total_sets <= caps["total_sets"], f"BUG: total_sets {total_sets} > cap {caps['total_sets']}"
     est_minutes = total_sets * 3 + len(exercises) * 2
     assert est_minutes <= caps["session_minutes"], f"BUG: est_minutes {est_minutes} > cap {caps['session_minutes']}"
@@ -909,7 +913,7 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
         status="draft",
         exercises=exercises,
         budget_used=budget_used,
-        inputs_snapshot=_build_inputs_snapshot(inputs, landmarks, catalog) | {"load_floors": load_floors},
+        inputs_snapshot=_build_inputs_snapshot(inputs, landmarks, catalog) | {"load_floors": load_floors, "warmups": warmups},
         rationale=rationale,
         caps=caps,
     )

@@ -58,6 +58,11 @@ COMMITTED_LOWER_HEAVY = [
 ]
 
 
+def _ws(block):
+    """The block's WORKING sets — #5049 prepends `warmup` sets to a qualifying compound."""
+    return [s for s in block.sets if s.type != "warmup"]
+
+
 def _rx(role, **kw):
     return program_structure.session_prescription_for_role(role, catalog_movements=CATALOG["movements"], **kw)
 
@@ -295,13 +300,13 @@ def test_generator_back_offs_sit_10_percent_under_the_ramped_top_set():
         ideal = routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date="2026-09-25", block_workouts=[]))[0]
     squat = ideal.exercises[0]
     assert squat.movement_key == "squat_barbell"
-    top = squat.sets[0].weight_kg
+    top = _ws(squat)[0].weight_kg
     # week 1 of the entry ramp would be 60 % of the band e1RM (#4388): 200 lb x (1 + 8/30) x 0.60 -> 150 lb.
     # #4408: 200 lb x 8 five days earlier, at this band, this cycle, no layoff, clears the 4–6 top set's rep
     # floor — nothing to re-enter from, so the achieved load is HELD and the ramp never goes under it
     assert top == pytest.approx(200 * 0.45359237)
     assert ideal.inputs_snapshot["load_floors"]["movements"]["squat_barbell"]["ramp"]["hold"]["applies"] is True
-    assert [s.weight_kg for s in squat.sets[1:]] == [routine_generator._floor_half_kg(top * 0.9)] * 2
+    assert [s.weight_kg for s in _ws(squat)[1:]] == [routine_generator._floor_half_kg(top * 0.9)] * 2
     assert any("back-offs at 90%" in r for r in ideal.rationale)
     assert "HEAVY: 1 top set of 4–6 @ RPE 7–8" in squat.notes
 

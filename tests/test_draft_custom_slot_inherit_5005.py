@@ -138,7 +138,8 @@ def test_the_engine_draft_regenerated_from_the_wire_is_the_upper_volume_slot_at_
     ideal = _engine_ideal()
     assert ideal.inputs_snapshot["calendar"]["session_role"] == "upper_volume"
     bench = next(b for b in ideal.exercises if b.movement_key == BENCH)
-    assert bench.rationale_tag == "anchor:bench:volume" and bench.sets[0].weight_kg == pytest.approx(BENCH_ENGINE_KG)
+    first_working = next(s for s in bench.sets if s.type != "warmup")  # #5049: the climb precedes it
+    assert bench.rationale_tag == "anchor:bench:volume" and first_working.weight_kg == pytest.approx(BENCH_ENGINE_KG)
 
 
 # ── 3 + 4. the stamped custom draft is gated on the engine's floors; off-program stays custom ──

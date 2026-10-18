@@ -214,7 +214,9 @@ def test_draft_custom_builds_ir_lb_to_kg_count_and_supersets():
 
     # lbs -> kg conversion on the bench's first set (155 lb)
     bench = ir.exercises[0]
-    assert bench.sets[0].weight_kg == round(155 * 0.45359237, 4)
+    first_working = next(st for st in bench.sets if st.type != "warmup")  # #5049 prepends the climb
+    assert first_working.weight_kg == round(155 * 0.45359237, 4)
+    assert out["warmup_sets"] == 3 and [st.type for st in bench.sets[:3]] == ["warmup"] * 3
     assert bench.rest_seconds == 165
 
     # count expansion: incline authored as one set x3 -> 3 Set objects

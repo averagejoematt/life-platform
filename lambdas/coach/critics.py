@@ -164,7 +164,9 @@ def draft_summary(ir: Any) -> dict[str, Any]:
         "routine_id": getattr(ir, "routine_id", None),
         "target_date": getattr(ir, "target_date", None),
         "archetype": getattr(ir, "archetype", None),
-        "total_sets": sum(e["n_sets"] for e in exercises),
+        # #5049: WORKING sets — the −30 % cut and the session ceilings are about hard sets, and a programmed
+        # warm-up is the climb to the first one, never a set a cut may take
+        "total_sets": sum(e["n_working_sets"] for e in exercises),
         "exercises": exercises,
     }
 

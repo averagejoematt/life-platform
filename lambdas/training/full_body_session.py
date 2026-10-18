@@ -24,7 +24,7 @@ from __future__ import annotations
 import functools
 from typing import Any
 
-from training import in_block_variant, load_ramp, program_structure, routine_generator as _rg
+from training import in_block_variant, load_ramp, program_structure, routine_generator as _rg, warmup_sets
 from training.routine_generator import (
     LAYOFF_DAYS_DEFAULT,
     GeneratorInputs,
@@ -137,6 +137,15 @@ def _apply_back_offs(
     return lines
 
 
+def _back_offs_then_warmups(
+    blocks: list[ExerciseBlock], used: list[dict[str, Any]], rationale: list[str], load_floors: dict[str, Any], movements: dict[str, Any]
+) -> dict[str, Any]:
+    """The last two passes over a block's sets, in this order: §3's back-offs, then #5049's warm-up
+    climb — prepended after every load pass, so it climbs to the load the block finally carries."""
+    load_floors["back_offs"] = _apply_back_offs(blocks, used, rationale, load_floors)
+    return warmup_sets.attach_and_note(blocks, movements, rationale)
+
+
 def full_body_routines(
     inputs: GeneratorInputs,
     day_entry: dict[str, Any],
@@ -229,14 +238,14 @@ def full_body_routines(
         floor_fn=functools.partial(load_ramp.v03_floor, week=ramp_week),  # #4107: the ONE v0.3 load path
     )
     load_floors["load_rule"] = {"rule": "v0.3 §3 entry ramp", "week": ramp_week, "params": ramp_p}
-    load_floors["back_offs"] = _apply_back_offs(blocks, used, rationale, load_floors)
+    warmups = _back_offs_then_warmups(blocks, used, rationale, load_floors, load_catalog.get("movements") or {})
 
     caps = {
         "total_sets": week_cfg["session_set_ceiling"],
         "session_minutes": week_cfg["session_minutes_ceiling"],
         "weekly_volume_per_muscle": week_cfg["weekly_volume_cap_per_muscle"],
     }
-    total_sets = sum(len(b.sets) for b in blocks)
+    total_sets = sum(warmup_sets.working_set_count(b.sets) for b in blocks)
     assert total_sets <= caps["total_sets"], f"BUG: total_sets {total_sets} > cap {caps['total_sets']}"
     est_minutes = total_sets * 3 + len(blocks) * 2
     assert est_minutes <= caps["session_minutes"], f"BUG: est_minutes {est_minutes} > cap {caps['session_minutes']}"
@@ -244,8 +253,8 @@ def full_body_routines(
     budget_used: dict[str, int] = {}
     for b in blocks:
         muscle = catalog.get("movements", {}).get(b.movement_key, {}).get("primary_muscle") or "unknown"
-        budget_used[muscle] = budget_used.get(muscle, 0) + len(b.sets)
-    rationale.append(f"{total_sets} sets over {len(blocks)} movements (~{est_minutes} min)")
+        budget_used[muscle] = budget_used.get(muscle, 0) + warmup_sets.working_set_count(b.sets)
+    rationale.append(f"{total_sets} sets over {len(blocks)} movements (~{est_minutes} min) + {warmups['warmup_sets']} warm-up set(s)")
 
     label = rx["role_label"]
     week_tag = f" — W{day_entry['week']}" if day_entry.get("week") else ""
@@ -272,7 +281,7 @@ def full_body_routines(
         exercises=blocks,
         budget_used=budget_used,
         inputs_snapshot=_build_inputs_snapshot(inputs, landmarks, catalog)
-        | {"load_floors": load_floors, "session_prescription": rx, "calendar": calendar_snapshot},
+        | {"load_floors": load_floors, "session_prescription": rx, "calendar": calendar_snapshot, "warmups": warmups},
         rationale=rationale,
         caps=caps,
     )
