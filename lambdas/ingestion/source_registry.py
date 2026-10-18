@@ -346,6 +346,10 @@ DEFAULT_STALE_HOURS = 48
 #                  BP/State of Mind) vs the passive device streams (steps/workouts)
 #                  — only the manual ones are nudge-eligible. Read by
 #                  hae_datatype_thresholds().
+#                  `dead_man` (#4970) {field, stale_hours} is the one ALARMING bar on a
+#                  sub-datatype: `field` holds an instant (epoch seconds), and older
+#                  than `stale_hours` counts toward StaleSourceCount. Read by
+#                  ingestion.watch_presence.check_dead_men(); today only `watch`.
 #                  `evidence_for` (#3294) is the SUB-datatype's answer to the same
 #                  question the source-level facet asks, and apple_health is the one
 #                  source that needs both: every HAE stream shares ONE partition, so a
@@ -921,6 +925,76 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
                 "stale_days": 2,
                 "manual": False,
                 "evidence_for": ("steps",),
+            },
+            # ── #4970: the Apple Watch (Ultra 4, worn day and night from 2026-10-16) ──
+            # The watch writes into this SAME partition, so the phone's steps/water keep
+            # the partition "fresh" whether or not the watch is alive. Four day-level
+            # liveness groups (behavioural bars: they narrate, never alarm) plus ONE
+            # dead-man that DOES alarm (digest route). Field semantics, tiers and absence rules:
+            # docs/SCHEMA.md "Apple Watch daily metrics (#4970)".
+            #
+            # The dead-man. `dead_man` = {field, stale_hours}: the newest watch-sourced
+            # reading instant (any metric, `watch_last_reading_epoch_apple`, written
+            # GREATEST-on-merge by the webhook) older than `stale_hours` is a silent watch
+            # — dead battery, revoked Health access, a stuck background sync. 36 h is the
+            # owner's bar (#4970): a full night plus a full day with no watch sample at all
+            # is never "he took it off for a shower". Read by
+            # ingestion.watch_presence.check_dead_men(); the freshness checker folds a
+            # not-ok row into StaleSourceCount, the metric slo-source-freshness (to_digest=True)
+            # alarms on — the daily digest route; no hand-built alarm, no new schedule. Resolution is the checker's
+            # daily cadence: it fires on the first run after the 36 h mark (<= 60 h worst case).
+            {
+                "key": "watch",
+                "label": "Apple Watch (any watch-sourced reading)",
+                "fields": ["watch_last_reading_epoch_apple"],
+                "stale_days": 2,
+                "manual": False,
+                "dead_man": {"field": "watch_last_reading_epoch_apple", "stale_hours": 36},
+            },
+            # Overnight vitals: written once per sleep by the watch (wrist temperature needs
+            # a Sleep Focus; breathing disturbances need sleep tracking). The watch is worn
+            # nightly (owner ruling 2026-10-17), so two dark days means a missed capture.
+            {
+                "key": "watch_overnight_vitals",
+                "label": "Apple Watch overnight vitals",
+                "fields": ["wrist_temp_sleep_c_apple", "respiratory_rate_apple", "spo2_pct_apple", "breathing_disturbances_apple"],
+                "stale_days": 2,
+                "manual": False,
+            },
+            # Heart: HRV (SDNN) and resting HR arrive daily from a worn watch; walking HR
+            # and cardio recovery ride walks/workouts, so the any-of set stays live on a
+            # rest day through the first two.
+            {
+                "key": "watch_heart",
+                "label": "Apple Watch heart (HRV / resting / walking HR / cardio recovery)",
+                "fields": ["hrv_sdnn_apple", "resting_heart_rate_apple", "walking_heart_rate_avg", "cardio_recovery_bpm_apple"],
+                "stale_days": 2,
+                "manual": False,
+            },
+            # Activity rings + exposure: every worn waking day carries stand hours at least.
+            {
+                "key": "watch_activity",
+                "label": "Apple Watch activity (exercise / stand / effort / daylight / audio)",
+                "fields": [
+                    "exercise_minutes_apple",
+                    "stand_minutes_apple",
+                    "stand_hours_apple",
+                    "physical_effort",
+                    "daylight_minutes_apple",
+                    "environmental_audio_db_apple",
+                ],
+                "stale_days": 2,
+                "manual": False,
+            },
+            # Fitness estimates: VO2 max needs an outdoor walk/run/hike with GPS and
+            # walking steadiness is a weekly estimate — a fortnight dark means the
+            # estimate stopped, not a missed day.
+            {
+                "key": "watch_fitness",
+                "label": "Apple Watch fitness estimates (VO2 max / walking steadiness)",
+                "fields": ["vo2max", "walking_steadiness_pct"],
+                "stale_days": 14,
+                "manual": False,
             },
         ],
         # #4638: stated default (owner ruling pending). The webhook path is append-only by design:
@@ -2611,7 +2685,7 @@ def engagement_primary_channel() -> str:
 # ── #746: manual-source reliability — staleness surfaced kindly ────────────────
 
 
-def manual_capture_sources(channel: str = None) -> dict:
+def manual_capture_sources(channel: str = None, include_paused: bool = False) -> dict:
     """{key: {label, channel, stale_hours}} for the manual-capture sources — the
     HAE / Notion / MCP-conversation channels Matthew fills by hand (#746,
     Matthew's decision).
@@ -2621,11 +2695,19 @@ def manual_capture_sources(channel: str = None) -> dict:
     automatic pipe (worn device, scheduled pull) has no capture_channel, so a
     device outage — a dead Whoop token the nudge can't fix — is structurally
     excluded from both surfaces. Pass `channel` to filter to one lane
-    ('hae' | 'notion' | 'mcp'). `stale_hours` falls back to the registry default."""
+    ('hae' | 'notion' | 'mcp'). `stale_hours` falls back to the registry default.
+
+    #5006: a source with `paused: True` (ADR-074 posture) is OFF BY DESIGN, so it is
+    excluded unless `include_paused=True` — a paused channel must never be named the
+    "longest-dark manual channel" in a coach check-in question, get a "gone quiet"
+    nudge, or wear the public "dark N days" stamp. Un-pausing returns it with no
+    other change."""
     out = {}
     for k, v in SOURCE_REGISTRY.items():
         ch = v.get("capture_channel")
         if not ch or (channel and ch != channel):
+            continue
+        if v.get("paused") and not include_paused:
             continue
         sh = v.get("stale_hours")
         out[k] = {"label": v["label"], "channel": ch, "stale_hours": sh if sh is not None else DEFAULT_STALE_HOURS}
@@ -2774,6 +2856,19 @@ METRIC_TRUTH: dict[str, dict[str, Any]] = {
         "min_by_source": {"whoop": 1, "apple_health": 1, "garmin": 1000},
         "overlap_rule": "first_positive_else_first_zero",
         "ruling": "#4644 Q4 (recommended: 'yes — Whoop when both devices have a count') — pending the owner",
+    },
+    # vo2_max (#4976): the Apple Watch's estimate from now on, Garmin's stored estimates for the
+    # history before it (the direct Garmin feed is retired, #4640 — its rows stay and stay
+    # readable). The two are different vendors' estimators, so a reader that draws an arc across
+    # both carries each point's `source` and says when the arc spans more than one device.
+    "vo2_max": {
+        "truth_source": "apple_health",
+        "unit": "ml/kg/min",
+        "fallback_order": ("apple_health", "garmin"),
+        "field_by_source": {"apple_health": "vo2max", "garmin": "vo2_max"},
+        "min_by_source": {"apple_health": 10, "garmin": 10},
+        "overlap_rule": "first_positive_else_first_zero",
+        "ruling": "#4976 + owner ruling 2026-10-17 (a): keep Whoop and the Apple Watch; Garmin's feed is retired (#4640)",
     },
 }
 

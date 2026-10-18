@@ -28,6 +28,8 @@ from emails.freshness_checker_lambda import (  # noqa: E402
 )
 
 NOW = datetime(2026, 7, 5, tzinfo=timezone.utc)
+# #4970: the Apple Watch's day-level liveness groups + its dead-man entry.
+WATCH_DATATYPES_4970 = {"watch", "watch_overnight_vitals", "watch_heart", "watch_activity", "watch_fitness"}
 
 
 def _rec(date, **fields):
@@ -65,7 +67,7 @@ class TestDatatypeLiveness:
 
     def test_all_datatypes_present_in_output(self):
         out = compute_datatype_liveness([], NOW)
-        assert {d["key"] for d in out} == {"cgm", "blood_pressure", "state_of_mind", "workouts", "water", "steps"}
+        assert {d["key"] for d in out} == {"cgm", "blood_pressure", "state_of_mind", "workouts", "water", "steps"} | WATCH_DATATYPES_4970
 
 
 class _FakeHaeTable:
@@ -96,8 +98,19 @@ def _window_without_bp():
     """A healthy 45-day-ish window: steps/water present, NO BP/SoM anywhere —
     the exact live shape measured 2026-08-02 (window bottomed out mid-June while
     BP's true last record sat at 2026-04-10)."""
+    # #4970: the newest record also carries one field of each Apple Watch datatype, so
+    # those resolve in the window too and BP stays the ONE deep-scan this pins.
+    watch = {
+        "watch_last_reading_epoch_apple": 1783000000,
+        "spo2_pct_apple": 96,
+        "hrv_sdnn_apple": 40,
+        "stand_hours_apple": 10,
+        "vo2max": 40,
+    }
     return [
-        _rec("2026-07-04", steps=8000, water_intake_ml=500, blood_glucose_avg=100, recovery_workout_minutes=20, som_avg_valence=0.5)
+        _rec(
+            "2026-07-04", steps=8000, water_intake_ml=500, blood_glucose_avg=100, recovery_workout_minutes=20, som_avg_valence=0.5, **watch
+        )
     ] + [_rec(f"2026-06-{d:02d}", steps=7000) for d in range(30, 15, -1)]
 
 

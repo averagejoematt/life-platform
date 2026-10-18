@@ -81,6 +81,7 @@ from common import (
     met_energy,  # #4158: the ONE walk-pace/cardio-modality classification
 )
 from common.hevy_schema import SET_DURATION_FIELD  # #4158: the ONE stored-set duration key
+from common.max_hr import DEFAULT_MAX_HR  # #4624: the ONE fallback max HR
 from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive == UTC)
 
 # ~200 W FTP → 720 kJ/h at threshold = 100 TSS-like points.
@@ -103,7 +104,7 @@ THRESHOLD_HR = 165.0
 # The owner's MEASURED max HR: `USER#matthew / PROFILE#v1 .max_heart_rate` = 183
 # (read 2026-09-23). The load model is pure and has no profile access, so the value is
 # carried here and cited, not invented; if the profile moves, move this with it.
-MAX_HR = 183.0
+MAX_HR = float(DEFAULT_MAX_HR)  # #4624: the same value every reader's profile-miss fallback uses
 # Zone 1's upper bound as a fraction of max HR — the platform's ONE zone table
 # (`mcp/helpers.HR_ZONE_BOUNDS`, #2221; mirrored by `web/site_api_autonomic._ZONE_BOUNDS`).
 # `tests/test_training_load.py` asserts the three agree, so this cannot drift silently.

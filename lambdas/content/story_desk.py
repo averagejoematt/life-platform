@@ -24,6 +24,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from ai import structured_json  # the shared JSON seam (#4276)
 from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+from common import journal_silence  # the one journal-silence pattern the daily coach gate also reads (#4583)
 
 DESK_MODEL = model_for("story.desk")
 
@@ -214,7 +215,7 @@ def absence_lead_findings(budget: Dict[str, Any], dossier: Dict[str, Any]) -> Li
       and whose figures are all in the dossier — the consequence the absence had."""
     lead = budget.get("lead") or {}
     subject = _subject(lead)
-    if _JOURNAL.search(subject):
+    if _JOURNAL.search(subject) or journal_silence.mentions_journal_silence(subject):
         return [
             f"lead {lead.get('thread_id')!r} is about the journal — journal presence is never a lead (off the record, no data "
             "consequence); lead on what the data shows"
@@ -227,7 +228,7 @@ def absence_lead_findings(budget: Dict[str, Any], dossier: Dict[str, Any]) -> Li
     allowed = story_checks.allowed_numbers(dossier)
     for ev in lead.get("evidence") or []:
         ev = str(ev)
-        if _ABSENCE.search(ev) or _JOURNAL.search(ev):
+        if _ABSENCE.search(ev) or _JOURNAL.search(ev) or journal_silence.mentions_journal_silence(ev):
             continue
         # a measured figure (not a small count of days, which restates the absence) and every figure from the dossier
         measured = story_checks.ungrounded_numbers(ev, set())

@@ -357,7 +357,6 @@ _V3_NEW_TRIPWIRES = {
     "loss_acceptable",
     "loss_excessive_clean",
     "loss_excessive_flagged",
-    "rate_ceiling",
     "loss_insufficient_adherent",
     "loss_insufficient_nonadherent",
     "under_floor",
@@ -389,12 +388,15 @@ def test_v3_new_tripwires_are_reported_as_unevaluated_by_name():
     } <= unevaluated
     # #4081: self_added_volume is computed by the engine now (from adherence's set counts).
     assert "self_added_volume" not in unevaluated
+    # #5001: rate_ceiling is computed by the engine now (over mcp.shared_quantities.loss_rate_lb_wk).
+    assert "rate_ceiling" not in unevaluated and "rate_ceiling" in ids
     assert [t["id"] for t in owner_redlines.engine_evaluated_tripwires()] == [
         "anchor_lift_strength_drop",
         "protein_floor_missed",
         "readiness_floor",
         "pain_flag_named_site",
         "weight_stall_with_adherence",
+        "rate_ceiling",  # #5001: over mcp.shared_quantities.loss_rate_lb_wk
         "walking_collapse",  # #4387: report-only, from training.recent_aerobic
         "walking_overshoot",  # #4387: report-only
         "self_added_volume",

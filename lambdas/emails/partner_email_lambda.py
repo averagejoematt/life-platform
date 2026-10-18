@@ -45,6 +45,7 @@ from common.constants import (
     PLAN_DAILY_CALORIES_TARGET,
     PLAN_DAILY_PROTEIN_MIN_G,
 )  # ADR-058
+from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
@@ -263,7 +264,7 @@ def gather_all():
     # ── Training ──
     total_acts = 0
     zone2_mins = 0
-    max_hr = profile.get("max_heart_rate", 186)
+    max_hr = max_hr_from_profile(profile)
     z2_low, z2_high = max_hr * 0.60, max_hr * 0.70
     for r in raw["strava"].values():
         for a in r.get("activities", []):

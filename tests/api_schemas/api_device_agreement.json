@@ -22,6 +22,9 @@
         },
         "type": "object"
       },
+      "apple_first_date": {
+        "type": "string"
+      },
       "archival": {
         "keys": {
           "cycle": {
@@ -48,11 +51,11 @@
       "daily": {
         "items": {
           "keys": {
+            "apple_rhr_bpm": {
+              "type": "number"
+            },
             "date": {
               "type": "string"
-            },
-            "garmin_rhr_bpm": {
-              "type": "number"
             },
             "rhr_abs_diff_bpm": {
               "type": "number"
@@ -71,6 +74,13 @@
       },
       "device_confidence": {
         "type": "string"
+      },
+      "devices": {
+        "items": {
+          "type": "string"
+        },
+        "length_sample": 2,
+        "type": "array"
       },
       "flagged_disagreement_days": {
         "items": {
@@ -91,14 +101,11 @@
         "length_sample": 90,
         "type": "array"
       },
-      "garmin_last_date": {
-        "type": "string"
-      },
-      "garmin_paused": {
-        "type": "boolean"
-      },
       "hrv_agreement": {
         "type": "null"
+      },
+      "hrv_note": {
+        "type": "string"
       },
       "interpretation": {
         "type": "string"

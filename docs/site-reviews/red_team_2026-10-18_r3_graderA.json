@@ -1,0 +1,312 @@
+{
+  "grader": "A-voice",
+  "lens": "voice · clarity · calm, read live on 2026-10-18 (Playwright 390×844, networkidle, disclosures opened; curl for the static HTML and the served /api/edition, /api/coaches, /api/calls, /journal/posts.json, /panelcast/episodes.json)",
+  "graded_at": "2026-10-18T20:48:02Z",
+  "round2_reference": "G9 voice: front B (capped), start B (capped), story B, coaches B",
+  "summary": {
+    "front": "B",
+    "start": "B+",
+    "story": "B-",
+    "coaches": "B"
+  },
+  "cross_page": [
+    "The one fix that moves all four toward A is one narrator per page: the owner's approved sentences are first person; every other static line and the renderer's forced 'called Matthew’s' are third person.",
+    "The draft-marker footer ('Preview. A first-person line with no date…') is gone from front and start but still served on story, coaches, week, day and trend, where it now labels the approved sentence as draft.",
+    "No cycle, attempt or reset count on any of the four pages; no 'Dr.'; no AI-slop tics in the static copy beyond the period-fragment headings, which are a consistent house style and were not graded down. The served lead_read on the week page says 'after a previous cycle that stalled in the final phase' — outside this grader's four pages, flagged for the week grader."
+  ],
+  "pages": [
+    {
+      "path": "/next/v8/",
+      "grade": "B",
+      "round2_voice": "B (capped)",
+      "verdict": "Not A. The draft marks are gone and the owner's premise sentence is a real first-person voice. But the page holds that voice for exactly one paragraph: from the next section on it speaks about him ('called Matthew's', 'what he lifted', 'In his own words', 'once Matthew approves it'). A page with two narrators is not a voice. The coaches section is a null state, the record is said three times before the Today block, and the mark carries two captions.",
+      "findings": [
+        {
+          "id": "A-01",
+          "severity": "high",
+          "fixture_bound": false,
+          "claim": "The page changes narrator after the premise: first person for one paragraph, third person for the rest.",
+          "evidence": "'I’m Matthew. I’m trying to get from 327 pounds to 185 …' then 'Lisa Park called Matthew’s morning recovery score (his wrist strap’s morning score out of 100)', 'what he lifted, slept and ate', 'In his own words', 'A new chapter and podcast most weeks, each once Matthew approves it'",
+          "rule": "voice: one narrator per page (D4 class, round 1); the cafe test is him telling the story",
+          "fix": "Pick first person for every static line on the four pages, and gloss served third-person sentences inside a frame the page owns. Static: 'what I lifted, slept and ate' · 'In my own words' · 'A new chapter and podcast most weeks — I read each one before it goes out — and the numbers every Sunday.' Served call sentences: change `matthewsCall` in ck_verdict to render 'called my weight' / 'my morning recovery score' when the page is first person (data-ck-voice=\"me\"), keeping 'Matthew’s' only on pages that are about a coach."
+        },
+        {
+          "id": "A-02",
+          "severity": "high",
+          "fixture_bound": false,
+          "claim": "The coaches section is an empty room: a label, a heading and an absence, while the served edition carries a coach line for today.",
+          "evidence": "'The AI / The coaches. / No open bet between them this week. / The coaches and their record' — the served `coach_lines` block for 2026-10-18 holds Nathan Reeves: 'Marcus Webb called the protein collapse — he was right. But I'd push back on what follows…'",
+          "rule": "one idea per section; the front's F2 (round 1) was 'no coach voice on the front while the day page carried one'; honest, result-neutral framing",
+          "fix": "When there is no open bet, print the newest served coach line as the section ('The latest line · Nathan Reeves, mind and habits' + the quote) and the record link under it; only when there is neither line nor bet, drop the section entirely rather than heading an absence. The ck_front comment at line 440 says the fallback is 'the newest line that coach said' — the live page is not doing it."
+        },
+        {
+          "id": "A-03",
+          "severity": "medium",
+          "fixture_bound": false,
+          "claim": "The coaches' failure is told three times in the first two screens and their purpose never once.",
+          "evidence": "'78 of 191 checked calls right. The coaches do not beat a simple guess yet.' (screen 1) · 'The coaches. / No open bet' (screen 2) · 'Graded by code / The clearest miss so far.' (screen 2–3)",
+          "rule": "one idea per section; result-neutral framing; a calm page says a thing once",
+          "fix": "Keep the record sentence in the premise block (it is the honest headline) and fold the miss into the coaches section as its second line ('Their clearest miss: Lisa Park called my recovery at 66; it came in at 24. The whole call'), so the coaches occupy one section with one idea: here is what they say today, here is how often they are right."
+        },
+        {
+          "id": "A-04",
+          "severity": "medium",
+          "fixture_bound": false,
+          "claim": "The daily mark carries two captions that say the same thing in two registers, one of them a legend keyed to a colour.",
+          "evidence": "'Each column runs from 327.3 lb, the start, at the top to 185 lb, the goal, at the floor.' then 'One column a day for four weeks: green is gone, grey is left to 185, a gap is a day with no weigh-in.'",
+          "rule": "one idea per section; no jargon a stranger cannot read ('at the floor'); a colour must not be the only carrier of meaning; the mark itself is unapproved (#4646)",
+          "fix": "One caption: 'One column a day for the last four weeks, from 327.3 lb at the top down to 185 at the bottom. The filled part is what is gone; a gap is a day with no weigh-in.' If the owner says no to the mark, the caption goes with it."
+        },
+        {
+          "id": "A-05",
+          "severity": "medium",
+          "fixture_bound": false,
+          "claim": "A 'one tap away' row that is not a tap and announces only an absence.",
+          "evidence": "'In his own words / Nothing new since Wednesday, September 23.' — the row is the only entry in the list with no link (not in the page's anchor list); the served `his_words` text is a chat message ('Yes lets switch to this - i like it…'), which is why it is held",
+          "rule": "a door leads somewhere; honest framing without dwelling on silence; clarity",
+          "fix": "Either drop the row until there is a dated entry, or make it a door: 'In my own words → The journal, last entry September 23.' linking /journal/. Do not list a non-door in 'The rest, one tap away.'"
+        },
+        {
+          "id": "A-06",
+          "severity": "medium",
+          "fixture_bound": false,
+          "claim": "The front never names Claude, so the cafe pitch ('how he used Claude') has no landing line on the page he will share.",
+          "evidence": "The only mention is on Start: 'the AI coaches I built with Claude'. The front says 'A team of AI coaches I built' and 'The AI, what it costs, what a human approves'.",
+          "rule": "the cafe test: who he is, what he is doing, whether it is working, how the AI works and what he built with Claude, in one throughline",
+          "fix": "Leave the approved premise sentence alone. Put it in the section the AI owns: label 'The AI' → first line 'Eight coaches, software I built with Claude. One job each; code checks every call.' and in Go deeper: 'How it’s built — the AI, what it costs, what I built with Claude and what I approve by hand.'"
+        },
+        {
+          "id": "A-07",
+          "severity": "low",
+          "fixture_bound": false,
+          "claim": "The miss card explains its tolerance in statistics vocabulary.",
+          "evidence": "'Wrong · not within 17.9 out of 100 either way' · 'The allowed distance is one standard deviation of his readings over the 30 days before the call.'",
+          "rule": "no jargon a stranger cannot read; the number must be sayable",
+          "fix": "'Wrong · off by 42, with 18 allowed' and 'A call is allowed to miss by about as much as the number normally swings in a month (its usual spread over the 30 days before).' Keep 'standard deviation' on the call page, not the front."
+        },
+        {
+          "id": "A-08",
+          "severity": "low",
+          "fixture_bound": false,
+          "claim": "A vendor exercise label is printed raw in the Planned row.",
+          "evidence": "'Planned · Bench Press (Barbell), Dumbbell Row and 7 more.'",
+          "rule": "plain words; the machine vocabulary never",
+          "fix": "Render Hevy's 'X (Barbell)' as 'barbell X': 'Planned · barbell bench press, dumbbell row and 7 more.'"
+        }
+      ]
+    },
+    {
+      "path": "/next/v8/start/",
+      "grade": "B+",
+      "round2_voice": "B (capped)",
+      "verdict": "Closest to A of the four. The owner's opening is the best sentence on the site and the page keeps his voice through 'I read each one', 'They are software I built with Claude', 'These are my numbers for my body'. It is not A because the chapter rows and the weight section slip into 'he'/'his', the Week 6 row breaks the row grammar, 'the record' is used as a term of art three times without being said plainly, and the follow box is in the site's voice, not his.",
+      "findings": [
+        {
+          "id": "A-09",
+          "severity": "high",
+          "fixture_bound": false,
+          "claim": "The page flips to third person inside its own sections after a first-person opening.",
+          "evidence": "'I’m Matthew. The weight was never really about food…' then 'Who he was before the record.' · 'His weight at every weigh-in: 327.3 lb on September 6, 302.2 on October 18.' · 'The chapters are written by AI from the record. I read each one before it publishes.' then eight lines later 'it publishes once Matthew approves it.'",
+          "rule": "one narrator per page; the same fact ('I read each one' / 'once Matthew approves it') is said in two persons on one screen",
+          "fix": "'Who I was before any of this was measured.' · 'My weight at every weigh-in: 327.3 lb on September 6, 302.2 today.' · 'The next draft is due Wednesday, October 21; it goes out once I have read it.' · Follow box as A-01."
+        },
+        {
+          "id": "A-10",
+          "severity": "medium",
+          "fixture_bound": false,
+          "claim": "'the record' is used as a name for the data, three times, without once being said plainly.",
+          "evidence": "'Who he was before the record.' · 'The chapters are written by AI from the record.' · the chapter title 'The Plan, On the Record'",
+          "rule": "no jargon a stranger cannot read; the machine vocabulary never (SITE_MAP order rule)",
+          "fix": "Say what it is the first time: 'The chapters are written by AI from what my devices and logs recorded that week. I read each one before it publishes.' and 'Who I was before any of it was measured.' The published chapter title stays."
+        },
+        {
+          "id": "A-11",
+          "severity": "medium",
+          "fixture_bound": false,
+          "claim": "The latest chapter row breaks the grammar of the seven rows above it.",
+          "evidence": "'Week 5 / Park's Blind Spot / Day 25 to Day 31 · 308.9 lb, down 3.5 that week · 4 training sessions.' then 'Week 6 / The Quiet Accumulation / Weight: 305.4 lb.'",
+          "rule": "clarity: one row shape per list; a label-colon ('Weight:') is form-field voice, not prose",
+          "fix": "Render Week 6 from the same fields as the others: 'Day 32 to Day 38 · 305.4 lb, down 3.5 that week · N training sessions.' If the week's stats line is not served yet, print '305.4 lb at the chapter' with no 'Weight:' label."
+        },
+        {
+          "id": "A-12",
+          "severity": "medium",
+          "fixture_bound": false,
+          "claim": "Start never states the goal in words; a reader who lands here from a share learns 185 only from a chart caption.",
+          "evidence": "The opening: 'measuring the whole thing out loud…'. The first '185' on the page is 'the dashed rule is 185 lb, the goal.' at screen 2.5.",
+          "rule": "the cafe test (who, what he is trying to do, is it working) on the page built for the cold reader; the SITE_MAP door line says Start answers 'where the weight started and is'",
+          "fix": "Keep the approved opening untouched and add the one number under it as a ck-small line: 'From 327 pounds toward 185, since September 6. Day 43: 302.2.' — the same figures the front prints, so the two doors agree."
+        },
+        {
+          "id": "A-13",
+          "severity": "low",
+          "fixture_bound": false,
+          "claim": "Typographer's 'rule' in a caption for a stranger.",
+          "evidence": "'The top rule is 327.3 lb, the start; the dashed rule is 185 lb, the goal.'",
+          "rule": "plain words; 'rule' reads as a regulation to a cold reader",
+          "fix": "'The top line is where it started, 327.3 lb; the dashed line is the goal, 185.'"
+        },
+        {
+          "id": "A-14",
+          "severity": "low",
+          "fixture_bound": false,
+          "claim": "The simple-guess gloss is statistics in disguise.",
+          "evidence": "'The exact rate — A guess that every call has a 41% chance of coming true does about as well.'",
+          "rule": "no jargon a stranger cannot read; the one sayable guess sentence (round 1 F4) should be sayable",
+          "fix": "'So far 41 in 100 calls have come true. Someone who knew only that, and nothing about the day, would score about the same as the coaches.' (shared with front and coaches; serve it once from `record.baseline.text`)."
+        }
+      ]
+    },
+    {
+      "path": "/next/v8/story/",
+      "grade": "B-",
+      "round2_voice": "B",
+      "verdict": "Below round 2 on voice. The lead stacks four narrators in five lines (the chapter's title, Matthew's 'I', the site's 'Matthew reads', the AI's 'the platform flagged'); the podcast is two chapters behind the story with no sentence saying so and a claim ('Each week') its own list contradicts; and the preview footer still marks any undated first-person line as draft, which on this page is the sentence the owner approved today.",
+      "findings": [
+        {
+          "id": "A-15",
+          "severity": "high",
+          "fixture_bound": false,
+          "claim": "The draft marker the approval was meant to remove is still served, and it now labels the approved sentence.",
+          "evidence": "Footer: 'Preview. A first-person line with no date on it is draft wording Matthew has not rewritten yet.' — the page's only undated first-person line is 'I’m trying to get from 327 pounds to 185, in public. A team of AI coaches I built predicts how it will go, and code checks every call.' (static in story.html line 75; also live on coaches, week, day, trend)",
+          "rule": "voice was capped B by the draft marks; a mark that contradicts the approval is worse than the mark",
+          "fix": "Remove the footer paragraph from story.html, coaches.html, week.html, day.html and trend.html (it is static, in the kit footer). If a page still carries an unapproved first-person line, mark that line, not the page."
+        },
+        {
+          "id": "A-16",
+          "severity": "high",
+          "fixture_bound": false,
+          "claim": "Four voices in the first five lines.",
+          "evidence": "'New this week · Week 6' / 'The Quiet Accumulation' / 'I’m trying to get from 327 pounds to 185, in public…' / 'Written by AI from the record on October 13. Matthew reads each chapter before it publishes.' / 'The Monday afternoon walk covered 5.4 miles… at an average heart rate that the platform flagged as genuine cardiovascular work rather than a stroll.'",
+          "rule": "one idea per section; one narrator; a cold reader cannot tell whose sentence is whose",
+          "fix": "Order the lead as frame → chapter → provenance: label 'The story, week by week' · the premise sentence as the standfirst above the badge · badge + title · the dek · one ck-small line after the dek: 'Written by AI from the week’s data on October 13; I read each chapter before it goes out.' That puts the human first, the chapter second, the mechanism third."
+        },
+        {
+          "id": "A-17",
+          "severity": "high",
+          "fixture_bound": false,
+          "claim": "The podcast is two chapters behind the story and nothing says so.",
+          "evidence": "Under the Week 6 chapter: 'The newest episode, for week 4: Marcus Webb · 7 min.' Then 'Every episode.' ends at 'EP4 · The Body Answers Back · … · October 1 (playing above)'. The served chapter block says `podcast: absent` for week 6 and the week-5 episode is held.",
+          "rule": "honest framing: an absence is said, not left to be noticed; clarity for friends and family ('is it working')",
+          "fix": "Print the gap once, in the lead: 'No episode yet for weeks 5 and 6; the newest, for week 4: Marcus Webb · 7 min.' and in the list head: 'Every episode — weeks 5 and 6 have none yet.' Bind it to the served held/absent state, not date arithmetic (ST3)."
+        },
+        {
+          "id": "A-18",
+          "severity": "medium",
+          "fixture_bound": false,
+          "claim": "'Each week' is contradicted by the page's own list.",
+          "evidence": "'Each week the AI that writes the chapter interviews one of the AI coaches about it.' above a list whose newest entry is October 1, seventeen days before the page date.",
+          "rule": "honest, result-neutral framing; no sentence the same screen refutes",
+          "fix": "'When a chapter publishes, the AI that wrote it interviews one of the coaches about it. The voices are generated.'"
+        },
+        {
+          "id": "A-19",
+          "severity": "medium",
+          "fixture_bound": false,
+          "claim": "The served dek speaks in the engine's voice.",
+          "evidence": "'…at an average heart rate that the platform flagged as genuine cardiovascular work rather than a stroll.'",
+          "rule": "no jargon ('the platform flagged'); AI-slop tic (the 'X rather than Y' flourish); the dek is served, so this is an upstream style fix (round 1 ST5, owner lane)",
+          "fix": "Chronicle style note for the dek: never name 'the platform' or 'the system'; say the thing: '…at a heart rate that counts as real cardio, not a stroll.' The page prints the dek as served, so the fix is in the chronicle prompt, not the renderer."
+        },
+        {
+          "id": "A-20",
+          "severity": "medium",
+          "fixture_bound": false,
+          "claim": "The story page has no story sentence: the trajectory lives only in a column of weights.",
+          "evidence": "'Every chapter, newest first. / The weight at each chapter, back to the start.' then eight rows '305.4 lb … 327.3 lb, the start'",
+          "rule": "the cafe test for friends and family: is it working, in one line; one idea per section",
+          "fix": "One line under the h2, computed from the served rows: 'Six chapters in: 327.3 lb at the first, 305.4 at the latest, 302.2 today.' Then the list."
+        },
+        {
+          "id": "A-21",
+          "severity": "low",
+          "fixture_bound": false,
+          "claim": "The provenance line is in the site's voice on a page whose standfirst is his.",
+          "evidence": "'Written by AI from the record on October 13. Matthew reads each chapter before it publishes.'",
+          "rule": "one narrator per page",
+          "fix": "'Written by AI from the week’s data on October 13. I read each chapter before it goes out.'"
+        }
+      ]
+    },
+    {
+      "path": "/next/v8/coaches/",
+      "grade": "B",
+      "round2_voice": "B",
+      "verdict": "Held at B. The three-step section is the clearest writing on the site and 'No coach marks its own work' is an A sentence. It is not A because the page opens in his voice ('I built', 'my scale', 'write to me') and grades in the site's ('Matthew’s weight', 'his readings'); the h1 claims every call is checked while the first row says the lead has none; the two disclosures that carry the honest caveats are written in engine vocabulary; and the preview footer marks his approved line as draft.",
+      "findings": [
+        {
+          "id": "A-22",
+          "severity": "high",
+          "fixture_bound": false,
+          "claim": "Two narrators on one page.",
+          "evidence": "'They are software I built with Claude, not people.' · 'My scale, wrist strap, bed sensor and food log record the day.' · 'write to me' — then 'Henning Brandt called Matthew’s weight at about 307.2 lb.' · 'one standard deviation of his readings'",
+          "rule": "one narrator per page (D4 class); the renderer forces the flip (`matthewsCall` rewrites served 'called his' to 'called Matthew’s' on every page)",
+          "fix": "On first-person pages render 'called my weight' / 'my morning recovery score' and 'my readings'; keep 'Matthew’s' on the coach and call pages, which are about the coach. One helper with a voice argument, set from a data-ck-voice attribute on the page."
+        },
+        {
+          "id": "A-23",
+          "severity": "high",
+          "fixture_bound": false,
+          "claim": "The headline overclaims and the first row under it says so.",
+          "evidence": "h1 'AI coaches. One job each. Every call checked.' then 'Eli Marsh / Lead, the day's plan; runs the program, so no checked calls / none' and, in a closed disclosure, 'Not all of them are formal predictions… 111 read out of the coaches' running commentary and 59 conditional or hedged sentences.'",
+          "rule": "honest framing (ADR-104); a cold reader learns on screen 2 that 'every call' means 'every sentence code could read as a call'; C4 (round 1) put the same caveat in small grey type",
+          "fix": "h1: 'AI coaches. One job each. Every prediction checked by code.' Eli's row: 'Lead. Sets the day's plan and makes no predictions, so nothing to check.' with '—' for the record, not 'none'. Move one sentence of the caveat out of the disclosure, under the count: 'Only 11 were written down as predictions in advance; the rest are predictions code found in their daily notes.'"
+        },
+        {
+          "id": "A-24",
+          "severity": "medium",
+          "fixture_bound": false,
+          "claim": "The two disclosures are written in engine vocabulary.",
+          "evidence": "'A guess that every call has a 41% chance of coming true does about as well. Counting how sure each call was, they come out slightly behind that guess.' · 'Of the 191: 11 sealed before day one, 10 sides of bets between two coaches, 111 read out of the coaches' running commentary and 59 conditional or hedged sentences.'",
+          "rule": "no jargon a stranger cannot read ('sealed', 'sides of bets', 'read out of', 'how sure each call was' as a stand-in for Brier)",
+          "fix": "'So far 41 in 100 calls have come true. Someone who knew only that would score about the same as the coaches; weighing how confident each call was, the coaches come out slightly behind.' and 'Only 11 were written down as predictions before day one. 10 are the two sides of a bet between coaches. 111 are predictions code found inside the coaches’ daily notes, and 59 are if-then or hedged sentences.'"
+        },
+        {
+          "id": "A-25",
+          "severity": "medium",
+          "fixture_bound": false,
+          "claim": "An orphan date line under three records with no verb and no explanation.",
+          "evidence": "'Nathan Reeves / Mind and habits / 8 of 20 / through October 14' · 'James Okafor … 9 of 12 / through October 17' · 'Amara Patel … 1 of 7 / through October 16'",
+          "rule": "clarity: a lagging record must say it lags (round 1 'lagging records say their day'); a fragment is not a sentence",
+          "fix": "'8 of 20, counted through October 14' on one line with the record, or a single note under the list: 'Three records are counted through an earlier day because their newest calls have not settled yet.'"
+        },
+        {
+          "id": "A-26",
+          "severity": "medium",
+          "fixture_bound": false,
+          "claim": "The sitting-out note does not say what is missing or why the record still counts.",
+          "evidence": "'Amara Patel is sitting out: no sensor since August 27, before day one, so the calls counted here were checked on other readings.'",
+          "rule": "plain words; a stranger does not know which sensor a blood-sugar coach needs or what 'other readings' are",
+          "fix": "'Amara Patel, the blood-sugar coach, has had no glucose monitor to read since August 27, before day one. Her 7 calls were about other numbers, so they still count.'"
+        },
+        {
+          "id": "A-27",
+          "severity": "medium",
+          "fixture_bound": false,
+          "claim": "The draft-marker footer is live on this page and labels the approved first-person lines.",
+          "evidence": "'Preview. A first-person line with no date on it is draft wording Matthew has not rewritten yet.' under 'They are software I built with Claude, not people.'",
+          "rule": "voice was capped B by the draft marks; the mark now contradicts the approval",
+          "fix": "Remove the paragraph from coaches.html (see A-15)."
+        },
+        {
+          "id": "A-28",
+          "severity": "low",
+          "fixture_bound": false,
+          "claim": "The tolerance note is statistics vocabulary on a reader page.",
+          "evidence": "'Each allowed distance is one standard deviation of his readings over the 30 days before the call.'",
+          "rule": "no jargon a stranger cannot read; the call page is where 'standard deviation' belongs",
+          "fix": "'A call is allowed to miss by about as much as that number normally swings in a month (its usual spread over the 30 days before). The exact rule is on each call’s page.'"
+        },
+        {
+          "id": "A-29",
+          "severity": "low",
+          "fixture_bound": false,
+          "claim": "'Every prediction, right and wrong' leads out of the kit into the earlier design.",
+          "evidence": "'Every prediction, right and wrong' → /coaching/scorecard/ (v5 chrome)",
+          "rule": "clarity and calm: a kit page's doors land on kit pages; the appendix is the one footnote door to the old design",
+          "fix": "Point it at /next/v8/call/ (the settled-calls index the front already uses: 'Every settled call') or say where it goes: 'Every prediction, on the earlier design.'"
+        }
+      ]
+    }
+  ]
+}

@@ -1,11 +1,14 @@
-"""#735 — /verify/ page: GET /api/device_agreement (Whoop vs Garmin cross-device
-agreement on HRV + RHR — the "two devices disagreeing slightly" credibility signal).
+"""#735 — /verify/ page: GET /api/device_agreement (Whoop vs Apple Watch cross-device
+agreement on resting HR — the "two devices disagreeing slightly" credibility signal).
 
-Pins: agree/minor/flag thresholds (RHR <=3/6bpm, HRV <=10/20ms — inherited from
-the former mcp tool_get_device_agreement, pruned by #395), workout sub-items
-never corrupt the day-summary comparison (no resting_heart_rate field), an empty
-overlap returns a shaped "unavailable" 200 (ADR-104 honest-gaps semantics, never a
-500 or a silently-empty table), and a live Garmin pause is surfaced honestly.
+#4976: re-pointed from Garmin (feed retired, #4640) to the Apple Watch. HRV is never
+compared — Whoop RMSSD vs Apple SDNN are different statistics.
+
+Pins: agree/minor/flag thresholds (RHR <=3/6bpm — inherited from the former mcp
+tool_get_device_agreement, pruned by #395), workout sub-items never corrupt the
+day-summary comparison (no resting_heart_rate field), an empty overlap returns a
+shaped "unavailable" 200 (ADR-104 honest-gaps semantics, never a 500 or a
+silently-empty table), and garmin rows are never read.
 
 Offline — `_query_source` (the shared DDB helper handle_device_agreement calls) is
 monkeypatched directly, same pattern as tests/test_historical_window.py.
@@ -28,13 +31,13 @@ def _fake_query_source(per_source):
 
 
 def test_no_overlap_returns_shaped_unavailable_200(monkeypatch):
-    monkeypatch.setattr(sad, "_query_source", _fake_query_source({"whoop": [], "garmin": []}))
+    monkeypatch.setattr(sad, "_query_source", _fake_query_source({"whoop": [], "apple_health": []}))
     resp = sad.handle_device_agreement()
     assert resp["statusCode"] == 200  # never a 500, never a silent empty table
     body = json.loads(resp["body"])
     assert body["status"] == "unavailable"
-    assert body["reason"]
-    assert body["garmin_last_date"] is None
+    assert body["reason"] and "Apple Watch" in body["reason"]
+    assert body["apple_first_date"] is None
 
 
 def test_rhr_agreement_thresholds_and_flagging(monkeypatch):
@@ -44,29 +47,30 @@ def test_rhr_agreement_thresholds_and_flagging(monkeypatch):
         _fake_query_source(
             {
                 "whoop": [
-                    {"date": "2026-06-13", "resting_heart_rate": 60},  # |60-61|=1 -> agree
-                    {"date": "2026-06-14", "resting_heart_rate": 65},  # |65-78|=13 -> flag
-                    {"date": "2026-06-15", "resting_heart_rate": 61},  # |61-56|=5 -> minor
+                    {"date": "2026-10-13", "resting_heart_rate": 60},  # |60-61|=1 -> agree
+                    {"date": "2026-10-14", "resting_heart_rate": 65},  # |65-78|=13 -> flag
+                    {"date": "2026-10-15", "resting_heart_rate": 61},  # |61-56|=5 -> minor
                 ],
-                "garmin": [
-                    {"date": "2026-06-13", "resting_heart_rate": 61},
-                    {"date": "2026-06-14", "resting_heart_rate": 78},
-                    {"date": "2026-06-15", "resting_heart_rate": 56},
+                "apple_health": [
+                    {"date": "2026-10-13", "resting_heart_rate_apple": 61},
+                    {"date": "2026-10-14", "resting_heart_rate_apple": 78},
+                    {"date": "2026-10-15", "resting_heart_rate_apple": 56},
                 ],
             }
         ),
     )
     body = json.loads(sad.handle_device_agreement()["body"])
     assert body["status"] == "ok"
-    assert body["period"] == {"start": "2026-06-13", "end": "2026-06-15", "overlapping_days": 3}
+    assert body["devices"] == ["Whoop", "Apple Watch"]
+    assert body["period"] == {"start": "2026-10-13", "end": "2026-10-15", "overlapping_days": 3}
     rhr = body["rhr_agreement"]
     assert (rhr["agree_days"], rhr["minor_days"], rhr["flagged_days"]) == (1, 1, 1)
     assert rhr["agreement_rate_pct"] == round(1 / 3 * 100, 1)
     flagged = body["flagged_disagreement_days"]
-    assert flagged and flagged[0]["date"] == "2026-06-14"
+    assert flagged and flagged[0]["date"] == "2026-10-14"
     # newest-first ordering
-    assert [r["date"] for r in body["daily"]] == ["2026-06-15", "2026-06-14", "2026-06-13"]
-    # HRV never present in this fixture -> null, not a fabricated zero
+    assert [r["date"] for r in body["daily"]] == ["2026-10-15", "2026-10-14", "2026-10-13"]
+    assert body["daily"][0]["apple_rhr_bpm"] == 56.0
     assert body["hrv_agreement"] is None
 
 
@@ -80,10 +84,10 @@ def test_workout_subitems_never_corrupt_the_comparison(monkeypatch):
         _fake_query_source(
             {
                 "whoop": [
-                    {"date": "2026-06-15", "resting_heart_rate": 61, "hrv": 42.34},
-                    {"date": "2026-06-15", "sport_name": "run", "average_heart_rate": 140},  # workout sub-item
+                    {"date": "2026-10-15", "resting_heart_rate": 61, "hrv": 42.34},
+                    {"date": "2026-10-15", "sport_name": "run", "average_heart_rate": 140},  # workout sub-item
                 ],
-                "garmin": [{"date": "2026-06-15", "resting_heart_rate": 56}],
+                "apple_health": [{"date": "2026-10-15", "resting_heart_rate_apple": 56}],
             }
         ),
     )
@@ -92,37 +96,43 @@ def test_workout_subitems_never_corrupt_the_comparison(monkeypatch):
     assert body["daily"][0]["whoop_rhr_bpm"] == 61.0
 
 
-def test_hrv_agreement_when_both_devices_report_it(monkeypatch):
+def test_hrv_is_never_compared_across_rmssd_and_sdnn(monkeypatch):
+    """Whoop's `hrv` is RMSSD, Apple's `hrv_sdnn_apple` is SDNN — a delta between them
+    is a unit error. Even with both present, no HRV agreement is computed, and the
+    payload says why."""
     monkeypatch.setattr(
         sad,
         "_query_source",
         _fake_query_source(
             {
-                "whoop": [{"date": "2026-06-15", "resting_heart_rate": 61, "hrv": 42.0}],
-                "garmin": [{"date": "2026-06-15", "resting_heart_rate": 56, "hrv_last_night": 30.0}],  # |42-30|=12 -> minor
+                "whoop": [{"date": "2026-10-15", "resting_heart_rate": 61, "hrv": 42.0}],
+                "apple_health": [{"date": "2026-10-15", "resting_heart_rate_apple": 56, "hrv_sdnn_apple": 30.0}],
             }
         ),
     )
     body = json.loads(sad.handle_device_agreement()["body"])
-    hrv = body["hrv_agreement"]
-    assert hrv is not None
-    assert hrv["minor_days"] == 1 and hrv["agree_days"] == 0 and hrv["flagged_days"] == 0
+    assert body["hrv_agreement"] is None
+    assert "RMSSD" in body["hrv_note"] and "SDNN" in body["hrv_note"]
+    assert "hrv_abs_diff_ms" not in body["daily"][0]
 
 
-def test_garmin_paused_flag_reflects_real_last_date(monkeypatch):
-    monkeypatch.setattr(
-        sad,
-        "_query_source",
-        _fake_query_source(
-            {
-                "whoop": [{"date": "2026-06-15", "resting_heart_rate": 61}, {"date": "2026-07-05", "resting_heart_rate": 60}],
-                "garmin": [{"date": "2026-06-15", "resting_heart_rate": 56}],
-            }
-        ),
-    )
+def test_garmin_rows_are_never_read(monkeypatch):
+    """#4976: garmin rows stay in the table but are not the second wrist any more. A
+    Garmin-only overlap is no overlap, and the garmin partition is never queried.
+    (Mutation control: point the endpoint back at garmin and both assertions move.)"""
+    asked = []
+
+    def fn(source, start, end, include_pilot=False):
+        asked.append(source)
+        return {
+            "whoop": [{"date": "2026-06-15", "resting_heart_rate": 61}],
+            "garmin": [{"date": "2026-06-15", "resting_heart_rate": 56, "hrv_last_night": 40}],
+        }.get(source, [])
+
+    monkeypatch.setattr(sad, "_query_source", fn)
     body = json.loads(sad.handle_device_agreement()["body"])
-    assert body["garmin_last_date"] == "2026-06-15"
-    assert body["garmin_paused"] is True
+    assert "garmin" not in asked
+    assert body["status"] == "unavailable"
 
 
 def test_route_wired_into_site_api_lambda():

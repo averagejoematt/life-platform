@@ -26,7 +26,9 @@ from, else by the Pacific day) and stores the per-movement `programmed_sets` /
 those stored counts and does no set counting of its own — a second counter would be a second
 answer (derivation guard). Two consequences it inherits and states:
 
-  * both sides count every logged set, warm-ups included, exactly as adherence does;
+  * adherence's own counts include warm-ups on both sides (#3714); since #5008 it also stores the working-set twins
+    (`programmed_working_sets` / `performed_working_sets`) and THIS report reads those — a warm-up is not added volume.
+    Rows ingested before #5008 carry only the inclusive counts and are read as they were;
   * a performed exercise the routine did not name is `adherence.extra` — it is reported as
     evidence but never counted as added volume here, because a swap (the #3929 alias class)
     and a treadmill block both land in `extra` and a template id alone cannot tell them apart.
@@ -100,15 +102,35 @@ def window_start(end_date: str, weeks: int = LOOKBACK_WEEKS) -> str | None:
     return (d - timedelta(days=d.weekday() + 7 * weeks)).isoformat()
 
 
+def _catalog_movements() -> dict[str, Any]:
+    try:
+        from health.adherence_calc import _load_catalog
+
+        return (_load_catalog() or {}).get("movements", {}) or {}
+    except Exception:  # noqa: BLE001 — a label is never worth a failed report
+        return {}
+
+
 def _label(movement_key: str, row: dict[str, Any]) -> str:
-    """A readable name for an adherence movement key (`tmpl:<id>` resolves through the row's own exercises)."""
+    """A readable name for an adherence movement key — ALWAYS the Hevy title when one is known (#5008 C4).
+
+    The 10-16 report mixed namespaces: a chat-authored `tmpl:<id>` key printed its title ("Squat (Barbell)")
+    beside catalog keys printed raw (`leg_press`). `tmpl:<id>` resolves through the row's own exercises, then
+    the catalog's `hevy_template_id_hint`; a catalog key resolves to its catalog title; only a key with no
+    title anywhere is printed as the key."""
     key = str(movement_key or "")
+    movements = _catalog_movements()
     if key.startswith("tmpl:"):
         tid = key[5:]
         for ex in row.get("exercises") or []:
             if str(ex.get("template_id") or "") == tid:  # the normalized row shape (adherence_calc reads the raw one)
                 return str(ex.get("name") or ex.get("title") or key)
-    return key
+        for entry in movements.values():
+            if str((entry or {}).get("hevy_template_id_hint") or "").upper() == tid.upper() and (entry or {}).get("title"):
+                return str(entry["title"])
+        return key
+    title = (movements.get(key) or {}).get("title")
+    return str(title) if title else key
 
 
 def _week(start: Any, end_date: Any, end_day_complete: bool = False) -> dict[str, Any]:
@@ -136,7 +158,10 @@ def _week(start: Any, end_date: Any, end_day_complete: bool = False) -> dict[str
 def _movement_adds(adh: dict[str, Any], row: dict[str, Any], day: Any, bucket: dict[str, Any], **extra: Any) -> None:
     """Accumulate one matched session's per-movement programmed/performed counts into `bucket`."""
     for m in adh["movements"]:
-        prog, perf = _int(m.get("programmed_sets")), _int(m.get("performed_sets"))
+        # #5008 C4: working sets when the row carries them (adherence stores both since #5008); older rows
+        # carry only the warm-up-inclusive counts and fall back to them, unchanged
+        prog = _int(m["programmed_working_sets"] if "programmed_working_sets" in m else m.get("programmed_sets"))
+        perf = _int(m["performed_working_sets"] if "performed_working_sets" in m else m.get("performed_sets"))
         bucket["programmed_sets"] += prog
         bucket["performed_sets"] += perf
         if perf > prog:

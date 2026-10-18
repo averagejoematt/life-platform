@@ -405,11 +405,14 @@ def is_lower(archetype: Any) -> bool:
     return str(archetype or "").strip().lower() in ("lower", "legs", "lower-heavy", "lower-volume")
 
 
-def cardio_pick(block: dict[str, Any] | None, archetype: Any) -> dict[str, Any]:
+def cardio_pick(block: dict[str, Any] | None, archetype: Any, target_date: str | None = None) -> dict[str, Any]:
     """The cardio modality for a session — picked from the block, never copied from the last session.
 
     A lower session, a heavy walking weekend, or an unread block gets cycling (recumbent, the
-    program's knee-sparing substitute); the treadmill only when the legs are fresh."""
+    program's knee-sparing substitute); the treadmill only when the legs are fresh.
+
+    #5000: with `target_date`, a standing constraint that forbids HR prescriptions on that day
+    (`training.standing_constraints`) drops the HR ceiling/target and writes the talk test instead."""
     loaded, why = legs_loaded(block)
     if is_lower(archetype):
         modality, reason = "cycling", f"a lower session — the legs are already the session's work ({why})"
@@ -419,7 +422,7 @@ def cardio_pick(block: dict[str, Any] | None, archetype: Any) -> dict[str, Any]:
         modality, reason = "cycling", why
     else:
         modality, reason = "treadmill", f"the legs are fresh: {why}"
-    return {
+    pick = {
         "movement_key": modality,
         "modality": "cycling (recumbent)" if modality == "cycling" else "treadmill",
         "hr_ceiling_bpm": HR_CEILING_BPM,
@@ -427,6 +430,11 @@ def cardio_pick(block: dict[str, Any] | None, archetype: Any) -> dict[str, Any]:
         "reason": reason,
         "rule": "lower session or loaded legs -> cycling; treadmill only when the legs are fresh (#4387)",
     }
+    if target_date is None:
+        return pick
+    from training import standing_constraints
+
+    return standing_constraints.talk_test_pick(pick, standing_constraints.active_constraint(target_date))
 
 
 def _standalone_half(block: dict[str, Any]) -> tuple[str, str]:

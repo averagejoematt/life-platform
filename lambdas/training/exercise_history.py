@@ -36,6 +36,8 @@ import boto3
 from boto3.dynamodb.conditions import Key
 from common.pacific_time import pacific_today  # #2798: hevy DATE# keys name Pacific days
 
+from training.pinned_setup import split_setup  # #5010: owner-marked setup lines
+
 logger = logging.getLogger("exercise_history")
 
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
@@ -189,12 +191,16 @@ def load_history_indexes(
                 block_seconds = block_secs_by_pos.get(pos, 0.0)
                 if block_seconds > 0:
                     block_meters = sum(_to_float(s.get("distance_m")) for s in sets_raw)
+                    # #5010: owner-marked setup lines ("📌 seat 7, level 11 warm-up") are not this
+                    # ride's level — the cardio cue parses the session text only; setup is tagged.
+                    ride_note, setup_note = split_setup(ex.get("notes") or ex.get("note") or "")
                     cardio.setdefault(tid, []).append(
                         {
                             "date": workout_date,
                             "name": ex.get("name") or "",
                             # the live wire field is `notes`, plural, on the EXERCISE
-                            "note": (ex.get("notes") or ex.get("note") or "") or "",
+                            "note": ride_note,
+                            **({"setup_note": setup_note} if setup_note else {}),
                             "duration_sec": block_seconds,
                             "distance_m": block_meters if block_meters > 0 else None,
                             "session_start": item.get("start_time"),

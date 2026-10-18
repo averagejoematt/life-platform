@@ -126,6 +126,62 @@ CONSUMERS: dict[tuple[str, str], dict] = {
         "The ingester (#4642): stores a {timestamp, attrib} list for the day's groups, "
         "capture only. Writer-only footprint; owner-only in FIELD_TIERS, no reader.",
     ),
+    ("lambdas/ingestion/health_auto_export_lambda.py", "spo2_pct_apple"): _d(
+        SAW,
+        "The HAE webhook (#4970 tiering of a pre-existing map entry): maps HealthKit "
+        "blood_oxygen_saturation from Apple devices only, and lists the field in its "
+        "zero-is-absent and timestamp-mean sets. Writer-only footprint; no reader yet.",
+    ),
+    ("lambdas/ingestion/health_auto_export_units.py", "wrist_temp_sleep_c_apple"): _d(
+        SAW,
+        "The webhook's day-field units sibling (#4970): passes the reported wrist-temperature "
+        "unit to the Celsius conversion during the per-day derivation pass. Writer-only.",
+    ),
+    ("lambdas/ingestion/health_auto_export_watch.py", "wrist_temp_sleep_c_apple"): _d(
+        SAW,
+        "The webhook's watch-map sibling (#4970): maps Apple Sleeping Wrist Temperature, "
+        "lists it in the mean/zero-absent sets and converts degF to Celsius on write.",
+    ),
+    ("lambdas/ingestion/health_auto_export_watch.py", "breathing_disturbances_apple"): _d(
+        SAW,
+        "The webhook's watch-map sibling (#4970): maps the nightly Breathing Disturbances "
+        "rate (sleep-apnea screen, diagnostic-class) into the timestamp-mean set.",
+    ),
+    ("lambdas/ingestion/health_auto_export_watch.py", "spo2_pct_apple"): _d(
+        SAW,
+        "The webhook's watch-map sibling (#4970): names the pre-existing SpO2 field in the "
+        "timestamp-mean and zero-is-absent sets; the mapping itself stays in the webhook.",
+    ),
+    ("lambdas/ingestion/ingestion_validator.py", "spo2_pct_apple"): _d(
+        SAW,
+        "The merge validator (#4970): a WARNING-only plausibility band (70-100%) checked "
+        "on the HAE fragment before it merges. Reads the value, logs, never publishes.",
+    ),
+    ("lambdas/ingestion/ingestion_validator.py", "wrist_temp_sleep_c_apple"): _d(
+        SAW,
+        "The merge validator (#4970): a WARNING-only 30-42 C band on the converted wrist "
+        "temperature, so a degF value that escaped conversion is logged, not dropped.",
+    ),
+    ("lambdas/ingestion/ingestion_validator.py", "breathing_disturbances_apple"): _d(
+        SAW,
+        "The merge validator (#4970): a WARNING-only 0-60 events/hr band; the value is "
+        "compared and logged inside ingestion, never surfaced.",
+    ),
+    ("lambdas/ingestion/source_registry.py", "spo2_pct_apple"): _d(
+        EXCLUDED,
+        "Not a value read: the #4970 hae_datatypes 'watch_overnight_vitals' entry names "
+        "the field as a liveness presence signal (any-of), never its value.",
+    ),
+    ("lambdas/ingestion/source_registry.py", "wrist_temp_sleep_c_apple"): _d(
+        EXCLUDED,
+        "Not a value read: a presence-signal name in the #4970 overnight-vitals "
+        "hae_datatypes entry; the freshness checker tests `is not None` only.",
+    ),
+    ("lambdas/ingestion/source_registry.py", "breathing_disturbances_apple"): _d(
+        EXCLUDED,
+        "Not a value read: a presence-signal name in the #4970 overnight-vitals "
+        "hae_datatypes entry, the same any-of liveness set as the two above.",
+    ),
     # NOTE — `mcp/tools_data.py` is deliberately ABSENT. It was the #2809 leak site and
     # it carried a hand-written `TIER2_STRIP_FIELDS` literal naming all three fields.
     # #2803 made it derive from `field_tiers.strip_map()`, so it no longer names any of
@@ -176,6 +232,11 @@ CONSUMERS: dict[tuple[str, str], dict] = {
         "Computes its OWN Mifflin-St Jeor BMR (ADR-152) and names the output "
         "bmr_kcal. Cross-name collision with the withings device field, not a read "
         "of it — this module never touches withings rows.",
+    ),
+    ("mcp/tools_health.py", "skin_temp_celsius"): _d(
+        SAW,
+        "#4978: the owner MCP readiness tool scores the night's Whoop skin temperature against his own "
+        "30-night baseline (overnight_physiology) and returns the deviation on the owner's own surface only.",
     ),
     ("mcp/tools_health.py", "bmr_kcal"): _d(
         SAW,

@@ -404,6 +404,15 @@ def _as_prescribed(sets_pct: float, intensity: dict[str, Any], movements: list[d
     return {"verdict": "yes", "reasons": []}
 
 
+def _working(sets: Any) -> int:
+    """Count of non-warm-up sets, on IR `Set`s or performed-set dicts (#5008 C4)."""
+    n = 0
+    for st in sets or []:
+        t = st.get("type") if isinstance(st, dict) else getattr(st, "type", None)
+        n += 0 if str(t or "").strip().lower() == "warmup" else 1
+    return n
+
+
 def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str, Any]:
     catalog = _load_catalog()
     cache = _load_template_cache()
@@ -427,12 +436,15 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
             # #4073 — the routine's own words named no ceiling; fall back to the program's
             # class-level default (accessory / anchor pattern) before calling it ungraded.
             ceiling = _program_default_ceiling(ex.movement_key, catalog, alias_titles)
-        programmed.append({"movement_key": ex.movement_key, "template_id": tid, "sets": sets, "ceiling": ceiling})
+        programmed.append(
+            {"movement_key": ex.movement_key, "template_id": tid, "sets": sets, "working_sets": _working(ex.sets), "ceiling": ceiling}
+        )
         if tid:
             template_to_key[tid] = ex.movement_key
 
     performed_by_tid: dict[str, int] = {}
     performed_sets_by_tid: dict[str, list[dict[str, Any]]] = {}
+    performed_working_by_tid: dict[str, int] = {}
     for ex in performed.get("exercises", []):
         tid = ex.get("exercise_template_id")
         if not tid:
@@ -441,6 +453,7 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
         ex_sets = ex.get("sets", []) or []
         performed_by_tid[tid] = performed_by_tid.get(tid, 0) + len(ex_sets)
         performed_sets_by_tid.setdefault(tid, []).extend(ex_sets)
+        performed_working_by_tid[tid] = performed_working_by_tid.get(tid, 0) + _working(ex_sets)
 
     movements: list[dict[str, Any]] = []
     per_muscle_programmed: dict[str, int] = {}
@@ -455,6 +468,10 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
                 "movement_key": p["movement_key"],
                 "programmed_sets": p["sets"],
                 "performed_sets": performed_sets,
+                # #5008 C4: the counts above include warm-ups (#3714, unchanged); these are the working-set twins the
+                # self-added-volume report reads, so a warm-up is never "programmed" or "added" volume
+                "programmed_working_sets": p["working_sets"],
+                "performed_working_sets": performed_working_by_tid.get(p["template_id"], 0),
                 "pct": pct,
                 "intensity": intensity,
             }

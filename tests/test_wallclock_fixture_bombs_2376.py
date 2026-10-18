@@ -78,6 +78,14 @@ _LAMBDAS = _REPO / "lambdas"
 # files also use the constant for date arithmetic / row-building / assertion
 # text, which is what keeps them in the scan.
 EXEMPT_DATED_FIXTURE_FILES: dict[str, str] = {
+    "test_watch_metrics_registry_4970.py": (
+        "NOW is passed EXPLICITLY to every dead-man call (evaluate/check_dead_men(table, NOW)) and the "
+        "expected ages are derived from it (NOW.timestamp() - h*3600); source_registry is read only for "
+        "its facets and health_auto_export_lambda only through pure functions (process_generic_metrics, "
+        "merge_day_to_dynamo with a fake table), never its handler. The two freshness-checker handler "
+        "tests seed their stamps from the handler's own pacific_now() (40 h / 2 h before it), so the "
+        "fixture and the handler clock cannot desync at a day boundary"
+    ),
     "test_producer_census_4034.py": (
         "every grading call receives NOW explicitly (grade/summarize/check_producer_census(now=NOW)); "
         "source_registry is imported only for a facet read (SOURCE_REGISTRY[src]['paused']), never a handler. "
