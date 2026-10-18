@@ -964,7 +964,16 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
                 "fields": ["watch_last_reading_epoch_apple"],
                 "stale_days": 2,
                 "manual": False,
-                "dead_man": {"field": "watch_last_reading_epoch_apple", "stale_hours": 36},
+                "dead_man": {
+                    "field": "watch_last_reading_epoch_apple",
+                    "stale_hours": 36,
+                    # Bootstrap grace (#4970 regression): the presence stamp only exists from the
+                    # webhook deploy (2026-10-18 ~21:25Z), so until the first watch payload lands
+                    # "no stamp" means "not armed yet", not "dead watch" — it paged the slo alarm
+                    # at 21:34Z on a healthy watch. After this instant, no stamp in the lookback
+                    # is a stale dead-man again.
+                    "armed_after": "2026-10-20T00:00:00+00:00",
+                },
             },
             # Overnight vitals: written once per sleep by the watch (wrist temperature needs
             # a Sleep Focus; breathing disturbances need sleep tracking). The watch is worn
