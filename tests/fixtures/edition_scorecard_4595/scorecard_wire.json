@@ -110,7 +110,7 @@
      "verdict": "not_yet",
      "verdict_text": "The coaches do not beat a simple guess yet",
      "text": "Counted across all 183 calls checked to date, not this week's alone.",
-     "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
+     "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that gives every call the same chance of coming true — the share of checked calls that have so far. Going well when they beat it. Fewer than 30 checked calls is not enough data."
     }
    }
   },

@@ -61,6 +61,9 @@ from coach.persona_registry import plain_name as _registry_plain_name
 from common import subscriber_cadence as sc
 from common.pacific_time import day_in_words, pacific_date_of, pacific_day_n, parse_day_key, parse_iso_utc
 
+from web import record_words
+from web.prediction_reason import measure_unit
+
 #: The block order. The last four (#4582 box 1, the front page makes one data request) are
 #: what the front page and the week page read from their own routes until then: the last
 #: seven days of coach lines, the settled calls, the character sheet's level and the lead
@@ -316,16 +319,33 @@ def _podcast_part(panelcast: dict | None, week: Any, persona_of: Callable[[str],
     return _block("ok", ep.get("date"), src, "No podcast episode for this chapter yet.", data)
 
 
-def _chapter(journal: dict | None, panelcast: dict | None, today: str, persona_of) -> dict:
+def _held_chapter(journal: dict) -> dict | None:
+    """The manifest's ``pending`` marker (emails/chronicle_store._set_chronicle_pending): the week a draft
+    was generated and withheld, with the writer's reason. A publish clears it. None when no draft is held —
+    a page says a chapter is waiting ONLY when this is served (round 1: "Week 6 is waiting for Matthew's
+    approval" was inferred from dates, and happened to be true)."""
+    held = journal.get("pending")
+    if not isinstance(held, dict) or not held.get("week"):
+        return None
+    return {"week": held.get("week"), "reason": held.get("reason"), "display": held.get("display"), "noted_at": held.get("noted_at")}
+
+
+def _chapter(journal: dict | None, panelcast: dict | None, today: str, persona_of, cadence: dict | None = None) -> dict:
     src = [SOURCES["journal"], SOURCES["panelcast"]]
     if journal is None:
         return _unavailable(src, "The latest chapter")
     posts = _published_posts(journal, today)
+    next_due = ((cadence or {}).get("chronicle") or {}).get("next_date") if cadence else None
     if not posts:
-        return _block("absent", None, src, "No chapter has been published yet.")
+        return _block("absent", None, src, "No chapter has been published yet.", None, held=_held_chapter(journal), next_due=next_due)
     post = max(posts, key=lambda p: (str(p["date"]), p.get("sequence") or 0))
     words = post.get("word_count")
     data = {
+        # #4580 round 1: the chronicle's own state, served — a published latest, a held draft (or None),
+        # the next draft's date (from /api/content_cadence; None when its read failed).
+        "latest": {"week": post.get("week"), "label": post.get("label"), "date": post["date"], "status": "published"},
+        "held": _held_chapter(journal),
+        "next_due": next_due,
         "title": post["title"],
         "date": post["date"],
         "week_label": post.get("label"),
@@ -467,7 +487,7 @@ def _training_minutes(rows: Any, today: str) -> dict:
 
 
 def _measure(
-    src: Any, what: str, body: dict | None, days: list, values: dict | None, sentence: Callable[[list], str | None], bar=None
+    src: Any, what: str, body: dict | None, days: list, values: dict | None, sentence: Callable[[list], str | None], bar=None, unit=None
 ) -> dict:
     if body is None:
         return _unavailable(src, what)
@@ -475,7 +495,7 @@ def _measure(
     seen = [d for d, v in zip(days, series) if v is not None]
     if not seen:
         return _block("absent", None, src, f"{what} has no reading in these seven days.")
-    data = {"values": series, "text": sentence(series)}
+    data = {"values": series, "text": sentence(series), "unit": unit}
     if bar is not None:
         data["met"] = [None if v is None else bool(bar(v)) for v in series]
     return _block("ok", seen[-1], src, f"{what} has no reading in these seven days.", data)
@@ -505,25 +525,38 @@ def _day_detail(day: str, pulse_row: dict | None, training_row: dict | None, foo
     # Steps are deliberately not a fact on the front page's day: the count reads low on days
     # the phone is not carried, so it is shown only on its own trend page, with that caveat.
     weight, hours, recovery = _num(p.get("weight_lbs")), _num(p.get("sleep_hours")), _num(p.get("recovery_pct"))
+    # #4580 round 1: every fact carries its number and its unit (web/prediction_reason.measure_unit), so a page
+    # prints the served unit — "62 out of 100" on every page, never "62%" on one and "62 points" on another.
     if weight is not None:
-        facts.append({"label": "Weight", "text": f"{weight:.1f} lb"})
+        facts.append({"label": "Weight", "text": f"{weight:.1f} lb", "value": weight, "unit": measure_unit("weight")})
         summary.append(f"{weight:.1f} lb")
     total = _num(t.get("total_min"))
     if total:
         kinds = [f"{_fmt_num(t[k])} minutes of {word}" for k, word in _MODALITY_WORDS if _num(t.get(k))]
-        facts.append({"label": "Training", "text": "; ".join(kinds) or f"{_fmt_num(total)} minutes"})
+        fact = {
+            "label": "Training",
+            "text": "; ".join(kinds) or f"{_fmt_num(total)} minutes",
+            "value": total,
+            "unit": measure_unit("training"),
+        }
+        if is_today:
+            fact["settled"] = False  # the day is still being recorded; a later read may carry more
+        facts.append(fact)
         summary.append("trained")
     elif training_row is not None and not is_today:
-        facts.append({"label": "Training", "text": "No training recorded."})
+        facts.append({"label": "Training", "text": "No training recorded.", "value": 0, "unit": measure_unit("training")})
         summary.append("no training recorded")
     if hours is not None:
         rec = f"; recovery {_fmt_num(recovery)} out of 100" if recovery is not None else ""
-        facts.append({"label": "Sleep", "text": f"{_fmt_num(hours)} hours{rec}"})
+        fact = {"label": "Sleep", "text": f"{_fmt_num(hours)} hours{rec}", "value": hours, "unit": measure_unit("sleep")}
+        if recovery is not None:
+            fact["recovery"] = {"value": recovery, "unit": measure_unit("recovery")}
+        facts.append(fact)
         summary.append(f"slept {_fmt_num(hours)} h")
     protein, calories = _num(f.get("protein_g")), _num(f.get("calories"))
     if protein is not None:
         kcal = f", {int(calories):,} kcal" if calories is not None else ""
-        facts.append({"label": "Food", "text": f"{_fmt_num(protein)} g protein{kcal}"})
+        facts.append({"label": "Food", "text": f"{_fmt_num(protein)} g protein{kcal}", "value": protein, "unit": measure_unit("protein")})
     return {"date": day, "summary": " · ".join(summary) or "Nothing recorded yet.", "facts": facts}
 
 
@@ -559,7 +592,9 @@ def _week(b: dict, today: str) -> dict:
         return floor is not None and x >= floor
 
     parts = {
-        "weight": _measure(SOURCES["pulse"], "The weight", pulse, days, _by_date(history, "weight_lbs"), weight_text),
+        "weight": _measure(
+            SOURCES["pulse"], "The weight", pulse, days, _by_date(history, "weight_lbs"), weight_text, unit=measure_unit("weight")
+        ),
         "training": _measure(
             SOURCES["training"],
             "Training",
@@ -568,6 +603,7 @@ def _week(b: dict, today: str) -> dict:
             _training_minutes((training or {}).get("daily_modality_minutes_30d"), today),
             count_text("Trained", trained),
             trained,
+            measure_unit("training"),
         ),
         "sleep": _measure(
             SOURCES["pulse"],
@@ -577,6 +613,7 @@ def _week(b: dict, today: str) -> dict:
             _by_date(history, "sleep_hours"),
             count_text(f"Slept {_fmt_num(SLEEP_BAR_HOURS)} hours or more", slept),
             slept,
+            measure_unit("sleep"),
         ),
         "food": _measure(
             SOURCES["nutrition"],
@@ -586,6 +623,7 @@ def _week(b: dict, today: str) -> dict:
             _by_date((nutrition or {}).get("nutrition_trend"), "protein_g"),
             count_text(f"At or above {_fmt_num(floor)} g protein", fed),
             fed,
+            measure_unit("protein"),
         ),
     }
     src = [SOURCES["pulse"], SOURCES["training"], SOURCES["nutrition"]]
@@ -604,133 +642,13 @@ def _week(b: dict, today: str) -> dict:
     return _block("ok", today, src, "Nothing is recorded in these seven days.", data)
 
 
-# ── the whole-life rows (#4586) ─────────────────────────────────────────────────
-# One served FACT per area, each a door to its own page. No verdict on any row: whether an
-# area is "going well" is decided by the scorecard's written rules (#4595, web/edition_scorecard.py). A row whose source failed is `unavailable`; one with nothing to say is `absent`;
-# one whose fact is older than LIFE_STALE_DAYS says which day it is from.
+# ── the whole-life rows (#4586) live in web/edition_life_rows.py (module-size ceiling, #1665) ──
 LIFE_ORDER = ("body", "training", "sleep", "food", "habits", "supplements", "experiments", "mind")
 LIFE_STALE_DAYS = 2
-_RUNNING = {"active", "running", "in_progress"}
 
 
 def _num(value: Any) -> float | None:
     return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
-
-
-def _row(src: Any, what: str, body: dict | None, build: Callable[[dict], tuple | None], nothing: str, today: str) -> dict:
-    """One whole-life row. ``build(body)`` returns ``(text, as_of)`` or None for nothing to say."""
-    if body is None:
-        return _unavailable(src, what)
-    made = build(body)
-    if not made:
-        return _block("absent", None, src, nothing)
-    text, as_of = made
-    age = _days_between(as_of, today) if as_of else None
-    if age is not None and age > LIFE_STALE_DAYS:
-        return _block("stale", as_of, src, f"Nothing newer than {day_in_words(as_of)}.", {"text": text})
-    return _block("ok", as_of or today, src, nothing, {"text": text})
-
-
-def _life_body(body: dict) -> tuple | None:
-    j = body.get("journey") or {}
-    lost, left, goal = _num(j.get("lost_lbs")), _num(j.get("remaining_lbs")), _num(j.get("goal_weight_lbs"))
-    if j.get("pre_start") or lost is None or left is None or goal is None:
-        return None
-    way = "down" if lost >= 0 else "up"
-    return f"{_fmt_num(abs(lost))} lb {way} so far; {_fmt_num(left)} lb to go to reach {_fmt_num(goal)}.", j.get("last_weighin_date")
-
-
-def _life_training(today: str) -> Callable[[dict], tuple | None]:
-    def build(body: dict) -> tuple | None:
-        names = [str(e.get("name")) for e in body.get("exercises") or [] if isinstance(e, dict) and e.get("name")]
-        if body.get("state") != "served" or str(body.get("date") or "") != today or not names:
-            return None
-        rest = len(names) - 2
-        more = f" and {rest} more" if rest > 0 else ""
-        return f"Planned for today: {', '.join(names[:2])}{more}.", today
-
-    return build
-
-
-def _life_sleep(body: dict) -> tuple | None:
-    d = body.get("sleep_detail") or {}
-    hours, recovery, night = _num(d.get("total_sleep_hours")), _num(d.get("recovery_score")), d.get("night_of")
-    if hours is None or not parse_day_key(str(night or "")):
-        return None
-    rec = f"; recovery {_fmt_num(recovery)} out of 100" if recovery is not None else ""
-    # The night of the 3rd is the sleep he woke from on the 4th: the row is about that morning.
-    return f"Slept {_fmt_num(hours)} hours on the night of {day_in_words(night)}{rec}.", d.get("as_of_date") or night
-
-
-def _life_food(body: dict) -> tuple | None:
-    n = body.get("nutrition") or {}
-    hit, logged, floor = _num(n.get("protein_floor_hit_days")), _num(n.get("days_logged")), _num(n.get("protein_floor_g"))
-    if hit is None or not logged or floor is None:
-        return None
-    return f"At or above the {_fmt_num(floor)} g protein floor on {int(hit)} of {int(logged)} logged days.", n.get("latest_date")
-
-
-def _life_habits(body: dict) -> tuple | None:
-    h = body.get("habit_streaks") or {}
-    done, total, day = _num(h.get("tier0_done")), _num(h.get("tier0_total")), h.get("as_of_date")
-    if done is None or not total or not parse_day_key(str(day or "")):
-        return None
-    return f"{int(done)} of {int(total)} daily habits kept on {day_in_words(day)}.", day
-
-
-def _life_supplements(body: dict) -> tuple | None:
-    count = sum(len((g or {}).get("items") or []) for g in (body.get("groups") or {}).values() if isinstance(g, dict))
-    if not count:
-        return None
-    return f"{count} in the daily stack.", body.get("as_of_date")
-
-
-def _life_experiments(today: str) -> Callable[[dict], tuple | None]:
-    def build(body: dict) -> tuple | None:
-        rows = [e for e in body.get("experiments") or [] if isinstance(e, dict)]
-        if not rows:
-            return None
-        running = [str(e.get("name")) for e in rows if e.get("status") in _RUNNING and e.get("name")]
-        ready = sum(1 for e in rows if e.get("status") == "available")
-        if running:
-            more = f" and {len(running) - 1} more" if len(running) > 1 else ""
-            return f"Running now: {running[0]}{more}.", today
-        return f"None running right now; {ready} ready to start.", today
-
-    return build
-
-
-def _life_mind(his_words: dict) -> dict:
-    src = his_words.get("source")
-    if his_words.get("state") == "unavailable":
-        return _unavailable(src, "His own words")
-    day = his_words.get("as_of")
-    if his_words.get("state") == "ok" and day:
-        return _block("ok", day, src, "Nothing in his own words yet.", {"text": f"His latest words are from {day_in_words(day)}."})
-    return _block(his_words.get("state") or "absent", day, src, his_words.get("absent_text") or "Nothing in his own words yet.")
-
-
-def _life(b: dict, his_words: dict, today: str) -> dict:
-    parts = {
-        "body": _row(SOURCES["journey"], "The weight so far", b["journey"], _life_body, "No weigh-in yet.", today),
-        "training": _row(
-            SOURCES["session"], "Today's session", b["session"], _life_training(today), "No session is planned for today.", today
-        ),
-        "sleep": _row(SOURCES["sleep"], "Last night's sleep", b["sleep"], _life_sleep, "No sleep has been recorded yet.", today),
-        "food": _row(SOURCES["nutrition"], "The food log", b["nutrition"], _life_food, "No food has been logged yet.", today),
-        "habits": _row(SOURCES["habits"], "The daily habits", b["habits"], _life_habits, "No habits have been recorded yet.", today),
-        "supplements": _row(
-            SOURCES["supplements"], "The supplement stack", b["supplements"], _life_supplements, "No supplements are listed.", today
-        ),
-        "experiments": _row(
-            SOURCES["experiments"], "The experiments", b["experiments"], _life_experiments(today), "No experiments are listed.", today
-        ),
-        "mind": _life_mind(his_words),
-    }
-    src = sorted({str(x) for p in parts.values() for x in (p["source"] if isinstance(p["source"], list) else [p["source"]]) if x})
-    if all(p["state"] == "unavailable" for p in parts.values()):
-        return _unavailable(src, "How the whole thing is going")
-    return _block("ok", today, src, "Nothing is recorded yet.", {"order": list(LIFE_ORDER), "rows": parts})
 
 
 def _coach_moves(moves: Any, today: str, persona_of) -> dict | None:
@@ -843,12 +761,6 @@ def _record(predictions: dict | None, calibration: dict | None, today: str) -> d
     skill = coaches_stratum.get("brier_skill")
     known = isinstance(skill, (int, float))
     beats = bool(known and skill > 0)
-    if not known:
-        comparison = "Too few checked calls yet to compare them with a simple guess."
-    elif beats:
-        comparison = "So far they beat a simple guess."
-    else:
-        comparison = "So far they do not beat a simple guess."
     data = {
         "right": right,
         "decided": decided,
@@ -857,7 +769,9 @@ def _record(predictions: dict | None, calibration: dict | None, today: str) -> d
         "counted": overall.get("counted"),
         "counted_text": overall.get("counted_text"),
         "beats_simple_guess": beats,
-        "comparison_text": comparison,
+        # #4580 round 1: the ONE sentence (web/record_words.py) and the exact rate behind it as a field.
+        "comparison_text": record_words.guess_sentence(beats if known else None),
+        "baseline": record_words.baseline(right, decided, beats if known else None),
         "brier_skill": skill if known else None,
         "skill_n": coaches_stratum.get("n"),
     }
@@ -976,6 +890,7 @@ def compose(
     """
     # The scorecard's rules live in their own module (#4595), which reads this one's helpers:
     # imported here, once this module is whole, so neither import is circular.
+    from web.edition_life_rows import life_rows as _life
     from web.edition_page_reads import calls_block, lead_read_block, moves_block, sheet_block
     from web.edition_scorecard import scorecard as _scorecard
 
@@ -985,7 +900,7 @@ def compose(
     record = _record(b["predictions"], b["calibration"], today)
     blocks = {
         "premise": _premise(today),
-        "chapter": _chapter(b["journal"], b["panelcast"], today, persona_of),
+        "chapter": _chapter(b["journal"], b["panelcast"], today, persona_of, b["cadence"]),
         "next": _next(b["cadence"], b["docket"], today, persona_of, metric_words),
         "today": _today(b["journey"], today),
         "week": _week(b, today),
