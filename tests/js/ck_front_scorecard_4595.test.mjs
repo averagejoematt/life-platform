@@ -67,7 +67,7 @@ test("what went right is the filled dots, never a second list from another sourc
   const plain = text(html);
   assert.doesNotMatch(plain, /What went right this week|The engine/);
   assert.ok(!plain.includes(`Matthew ${SC.data.went_right.matthew.text}`), "the party-keyed row is gone");
-  const earned = SC.data.order.filter((k) => ["going_well", "faster_than_planned"].includes(SC.data.rows[k].data.verdict)).length;
+  const earned = SC.data.order.filter((k) => SC.data.rows[k].data.verdict === "going_well").length;
   assert.equal((html.match(/class="ck-dot"/g) || []).length, earned, "one filled dot per row that earned it");
   assert.match(plain, /A filled dot is an area going well this week\./);
   const both = clone(SC);
@@ -75,10 +75,10 @@ test("what went right is the filled dots, never a second list from another sourc
   assert.doesNotMatch(text(F.scorecardHTML(both)), /The engine/);
 });
 
-test("the mark is filled for a row that earned it — going well or faster than planned — and the page can drop the kicker (round 8)", () => {
+test("the mark is filled for a row that earned it — going well, and only that (site-to-A round 2) — and the page can drop the kicker (round 8)", () => {
   const html = F.scorecardHTML(SC, "/next/v8/");
   const row = (name) => html.split("<li>").find((li) => li.includes(`>${name}</a>`) || li.includes(`>${name}</span>`));
-  const earned = (key) => ["going_well", "faster_than_planned"].includes(SC.data.rows[key].data.verdict);
+  const earned = (key) => SC.data.rows[key].data.verdict === "going_well";
   for (const [name, key] of [["Body", "body"], ["Sleep", "sleep"], ["Training", "training"]]) {
     const dot = earned(key) ? "ck-dot" : "ck-dot ck-dot--off";
     assert.ok(row(name).includes(`<i class="${dot}" aria-hidden="true"></i><b>${SC.data.rows[key].data.verdict_text}.</b>`), `${key}: the mark follows the verdict`);

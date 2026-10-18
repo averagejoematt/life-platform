@@ -67,9 +67,9 @@ export function areaSentence(p) {
   const level = num(p.level);
   const score = num(p.raw_score);
   if (level === null || score === null) return "Not served right now.";
-  // An area held for thin coverage has a score built from a sliver of its inputs; printing
-  // it beside a fully measured area's score reads as a contradiction.
-  if (p.coverage_hold) return "Too little of this area is measured to score it yet.";
+  // An area held for thin coverage prints its score like every other row (round 2, sheet:
+  // "left out", "still counts" and "too little to score yet" sat within one screen); that it is
+  // thinly measured and still counts is said once, beside the level (levelHTML).
   const d = num(p.score_delta);
   const move = d === null || Math.abs(d) < 0.05 ? "level on the day" : d > 0 ? `up ${d.toFixed(1)} on the day` : `down ${(-d).toFixed(1)} on the day`;
   return `Score ${score.toFixed(1)} of 100, ${move}.`;
@@ -120,14 +120,19 @@ export function areasHTML(body) {
     })
     .join("")}</ul>`;
 }
-// An area held for thin data is still averaged into the level (character.composite_note
-// excludes only the uninstrumented area). The page says so beside the level; taking a held
-// area out of the composite is an engine change and the owner's call (#4580 round 1, sheet-3).
-export function compositeNote(body) {
-  const held = ((body && body.pillars) || []).filter((p) => p && p.name && p.coverage_hold && !p.not_instrumented).map((p) => AREAS[p.name] || p.name);
-  if (!held.length) return "";
-  const names = listWords(held);
-  return `${names} ${held.length > 1 ? "are" : "is"} on hold for thin data, yet ${held.length > 1 ? "their scores" : "its score"} still count${held.length > 1 ? "" : "s"} toward the level.`;
+// Which areas count toward the level, said ONCE, beside the level (round 2, sheet): an area with
+// nothing measuring it is left out of the mean; an area held for thin data is still averaged in
+// (character.composite_note excludes only the uninstrumented area — taking a held area out of the
+// composite is an engine change and the owner's call, #4580 round 1, sheet-3). Both by name.
+export function countsNote(body) {
+  const pillars = ((body && body.pillars) || []).filter((p) => p && p.name);
+  const name = (p) => AREAS[p.name] || p.name;
+  const out = pillars.filter((p) => p.not_instrumented).map(name);
+  const thin = pillars.filter((p) => p.coverage_hold && !p.not_instrumented).map(name);
+  const parts = [];
+  if (out.length) parts.push(`${listWords(out)} ${out.length > 1 ? "have" : "has"} nothing measuring ${out.length > 1 ? "them" : "it"} and ${out.length > 1 ? "are" : "is"} left out`);
+  if (thin.length) parts.push(`${listWords(thin)} ${thin.length > 1 ? "are" : "is"} measured thinly and still count${thin.length > 1 ? "" : "s"}`);
+  return parts.length ? `${parts.join("; ")}.` : "";
 }
 // The one level, with how many areas it was worked out from and the day it is for.
 export function levelHTML(body) {
@@ -135,7 +140,8 @@ export function levelHTML(body) {
   if (!c || num(c.level) === null) return soft("The level is not served right now.");
   const day = dayInWords(c.as_of_date);
   const [n, of] = [num(c.composite_pillar_count), num(c.composite_pillar_total)];
-  const from = n !== null && of !== null ? `Worked out from ${n} of ${of} areas${n < of ? "; an area with nothing measuring it is left out, not counted as average" : ""}.` : "";
+  const note = countsNote(body);
+  const from = n !== null && of !== null ? `Worked out from ${n} of ${of} areas${note ? `: ${note}` : "."}` : note;
   // "Level 12 on Friday, October 16" (site-to-A round 1: it read "12 level on Friday, October 16").
   return `<div class="ck-today"><p class="ck-big"><span>Level </span>${esc(whole(c.level))}<span>${day ? ` on ${esc(day)}` : ""}</span></p>${soft(from)}</div>`;
 }
@@ -184,7 +190,6 @@ export async function mount() {
   fill("ck-level", levelHTML(character));
   fill("ck-areas", areasHTML(character));
   fill("ck-badges", badgesHTML(achievements));
-  fill("ck-sheet-note", small(compositeNote(character)));
   // The late-sources caveat sits under the areas, not stacked under the level with the hold note.
   const note = character && character.input_manifest && character.input_manifest.complete === false ? "Some sources were late when this was worked out, so today’s numbers may move." : "";
   fill("ck-sheet-late", small(note));

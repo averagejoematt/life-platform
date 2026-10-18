@@ -37,6 +37,7 @@ export const NO_RULE = "The rule this call was checked by is not served, so it i
 const LIST_FIRST = 8; // rows shown before the rest fold under one disclosure
 
 const soft = (t) => (t ? `<p class="ck-soft">${esc(t)}</p>` : "");
+const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const shortDay = (iso) => dayInWords(iso, { weekday: false });
 const isCall = (c) => c && typeof c.id === "string" && c.called_short && c.happened_short && c.settled_date;
 
@@ -342,7 +343,25 @@ export function nextCallHTML(callsBody) {
 // A row opens the call's page, which then returns here by name (#4675).
 const row = (base) => (c) =>
   `<li><a href="${esc(withFrom(callHref(base, c.id), "calls"))}">${esc(`${shortDay(c.settled_date)}: ${calledShortWithUnit(c)}`)} <span>${esc(c.kind === "bet" ? c.verdict_text || "Settled" : callVerdictText(c) || "Not shown as right or wrong: its rule is not served.")}</span></a></li>`;
-export function listHTML(callsBody, base) {
+// Round 2 (call, G9/G10): 8 listed + 55 earlier + 115 without a page was 178 against the 183
+// every other page prints. The five are the bets: one page each here, two sides each in the
+// record (record.counted.bet counts sides). So the sum is printed from served fields — the list's
+// count, its bets, `excluded.count` and the record's `decided` — and only when they add up; when
+// they do not, the line says how many of the record's calls this page accounts for and no more.
+// Never two totals.
+export function countsLine(callsBody, decided) {
+  const calls = callsOf(callsBody);
+  const shown = num(callsBody && callsBody.count) !== null ? callsBody.count : calls.length;
+  const bets = calls.filter((c) => c && c.kind === "bet").length;
+  const out = num(callsBody && callsBody.excluded && callsBody.excluded.count) !== null ? callsBody.excluded.count : 0;
+  if (num(decided) === null || !shown) return "";
+  if (shown + bets + out === decided) {
+    const betWords = bets ? `, ${bets} of them ${bets === 1 ? "a bet the record counts" : "bets the record counts"} once for each coach` : "";
+    return `${decided} checked calls in all: ${shown} with a page here${betWords}${out ? `, and ${out} without` : ""}.`;
+  }
+  return `${shown + out} of the ${decided} checked calls are accounted for on this page; the rest count in the record only.`;
+}
+export function listHTML(callsBody, base, { decided = null } = {}) {
   const calls = callsOf(callsBody);
   if (!calls.length) return "";
   const first = calls.slice(0, LIST_FIRST).map(row(base)).join("");
@@ -351,7 +370,8 @@ export function listHTML(callsBody, base) {
     ? `<details><summary>${rest.length} earlier ${rest.length === 1 ? "call" : "calls"}</summary><ul class="ck-rows ck-rows--more ck-rows--calls">${rest.map(row(base)).join("")}</ul></details>`
     : "";
   const out = callsBody.excluded && callsBody.excluded.text ? soft(callsBody.excluded.text) : "";
-  return `<ul class="ck-rows ck-rows--more ck-rows--calls">${first}</ul>${older}${out}`;
+  const sum = countsLine(callsBody, decided);
+  return `<ul class="ck-rows ck-rows--more ck-rows--calls">${first}</ul>${older}${out}${sum ? `<p class="ck-small">${esc(sum)}</p>` : ""}`;
 }
 
 // The page's own title and link-card text, from the call.
@@ -387,7 +407,10 @@ export async function mount() {
   // Back goes to the page named by `from=`, by name; without it, the front page (#4675).
   const from = params.get("from") || "";
   setBack(backFor(from, base));
-  const body = await tryJSON("/api/calls");
+  const [body, edition] = await Promise.all([tryJSON("/api/calls"), tryJSON("/api/edition")]);
+  // The record's total, for the counts line under the list (round 2): the edition's record block.
+  const rec = edition && edition.blocks && edition.blocks.record;
+  const decided = rec && (rec.state === "ok" || rec.state === "stale") && rec.data ? num(rec.data.decided) : null;
   setBack(backFor(from, base, callNames(body)));
   const calls = callsOf(body);
   const call = id ? findCall(body, id) : calls[0];
@@ -397,7 +420,7 @@ export async function mount() {
     fill("ck-title", id && calls.length ? "Not a settled call" : "A coach’s call, checked");
     fill("ck-call", soft(calls.length ? NO_SUCH_CALL : (body && body.absent_text) || NOT_SERVED));
     drop("ck-outcome-section", "ck-record-section");
-    fill("ck-list", listHTML(body, base));
+    fill("ck-list", listHTML(body, base, { decided }));
     if (!calls.length) drop("ck-list-section");
     document.body.dataset.ckReady = "1";
     return;
@@ -415,7 +438,7 @@ export async function mount() {
     drop("ck-list-section");
     fill("ck-all", `<a class="ck-link" href="${esc(base)}call/">Every settled call, newest first</a>`);
   } else {
-    fill("ck-list", listHTML(body, base));
+    fill("ck-list", listHTML(body, base, { decided }));
     drop("ck-all");
   }
   document.body.dataset.ckReady = "1";

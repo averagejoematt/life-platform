@@ -204,7 +204,11 @@ export function chapterHTML(block, nextBlock, { heading = "h1", player = true, l
   const age = (Date.parse(`${asOf}T12:00:00Z`) - Date.parse(`${c.date}T12:00:00Z`)) / 86400000;
   const fresh = block.state === "ok" && (!asOf || (Number.isFinite(age) && age <= CHAPTER_DAYS));
   const written = shortDay(c.date);
-  const badge = fresh ? `New this week${week ? ` · ${week}` : ""}` : `Latest chapter${week ? ` · ${week}` : ""}${written ? ` (written ${written})` : ""}`;
+  // Round 2 (story, G10): the kit's accent badge is "New this week" only; a chapter the edition
+  // marks stale, or older than a week, takes the neutral label, so green never claims newness.
+  const badge = fresh
+    ? `<span class="ck-badge">${esc(`New this week${week ? ` · ${week}` : ""}`)}</span>`
+    : `<span class="ck-label">${esc(`Latest chapter${week ? ` · ${week}` : ""}${written ? ` (written ${written})` : ""}`)}</span>`;
   const read = c.url ? `<a class="ck-btn" href="${esc(c.url)}">Read${num(c.read_minutes) !== null ? ` · ${c.read_minutes} min` : ""}</a>` : "";
   const pod = c.podcast;
   const hasPod = usable(pod) && pod.data.mp3_url;
@@ -218,7 +222,7 @@ export function chapterHTML(block, nextBlock, { heading = "h1", player = true, l
   // The front page runs one sentence of the chapter's own summary; Story runs it whole.
   const dek = player ? teaserText(c.dek) : summarySentence(c.dek) || c.dek;
   return [
-    `<span class="ck-badge">${esc(badge)}</span>`,
+    badge,
     `<${heading}>${esc(c.title)}</${heading}>`,
     // Story opens on a chapter title, so one sentence says what the site is before the chapter does.
     frame ? `<p class="ck-soft">${esc(frame)}</p>` : "",
@@ -365,14 +369,19 @@ export function recordBigHTML(block) {
   }
   const d = block.data;
   if (!String(d.comparison_text || "").trim()) return soft(comparisonText(null));
-  const cmp = guessClause(d);
+  // Round 2 (coaches, G9): the front, week and call pages call the baseline "a simple guess";
+  // this page said "a guess that every call has a 42% chance" under the same words with no bridge.
+  // Until lane E's `comparison_text` lands, the one sentence here is the same as the front's
+  // (guessSentence), and the exact rate with the skill clause sits one tap deeper, as on the front.
+  const cmp = exactRateText(d);
   // The track's fill is the neutral grey, not the accent (#4580 C3): green means earned, and a
   // green bar beside "they do not beat a simple guess" claimed a win the sentence denies.
   const track =
     d.decided >= MIN_PERCENT_N
       ? `<div class="ck-track" role="img" aria-label="${d.right} of ${d.decided} checked calls right"><i style="width:${Math.round((100 * d.right) / d.decided)}%;background:var(--ck-faint)"></i></div>`
       : "";
-  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span> of ${d.decided} checked calls</span></p>${track}<p>${esc(skillClause(d) ? `${cmp} ${skillClause(d)}` : cmp)}</p>${countedHTML(d)}</div>`;
+  const exact = /no comparison/.test(cmp) ? "" : `<details class="ck-small"><summary>The exact rate</summary><p>${esc(skillClause(d) ? `${cmp} ${skillClause(d)}` : cmp)}</p></details>`;
+  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span> of ${d.decided} checked calls</span></p>${track}<p>${esc(guessSentence(d))}</p>${exact}${countedHTML(d)}</div>`;
 }
 
 // ── the bet card ───────────────────────────────────────────────────────────────
@@ -468,62 +477,39 @@ export const postsInOrder = (journal) => ((journal && journal.posts) || []).filt
 // from a stat line to a narrative em-dash chain). A week is its code-rendered stats line, in lb,
 // its change in words; a prologue is "Before day one." The chapters' own sentences are one tap
 // away on Story.
-// Round 2: the week's change is computed here, by `weekChange`, from the two ROUNDED weights the
-// list prints (this row's and the row above's) — never the served "(-3.5 this week)", which came
-// from unrounded readings and disagreed with the printed weights by 0.1.
-export const weekChange = (prevShown, nowShown) => {
-  if (!prevShown || !nowShown) return "";
-  const d = Number((Number(prevShown) - Number(nowShown)).toFixed(1));
-  if (!Number.isFinite(d)) return "";
-  return d === 0 ? "the same as the week before" : `${d > 0 ? "down" : "up"} ${Math.abs(d).toFixed(1)} this week`;
-};
+// Site-to-A round 2 (start, G9/G10): the row prints the chapter's OWN numbers — the weight and the
+// change its served stats line carries ("(-3.5 this week)" → "down 3.5 that week"), with the window
+// the line names ("Day 25 to Day 31"). Round 1 recomputed the change from the weigh-ins inside the
+// window, which skipped every week-boundary drop, so the captions (0.8, 2.3, 3.1, 2.5) failed the
+// reader's own subtraction of the printed weights on three rows of four. One number per row, no
+// second computation: the change is the chapter's, as written on its date.
 // Site-to-A round 1 (start:S6): each prologue says what it is, not one shared line.
 const PROLOGUE_LINES = [
   [/Part I\b(?! ?I)/, "Who he was before the record."],
   [/Part II\b/, "The plan, written before day one."],
 ];
 export const prologueLine = (p) => (PROLOGUE_LINES.find(([rx]) => rx.test(String(p.label || ""))) || [null, "Before day one."])[1];
-// The weigh-ins inside a chapter's own window (start:S9, item 7): "Day A to Day B" from the
-// served stats line, Day 1 = the start date, against the timeline's readings. The change the row
-// prints is the window's first reading against its last — never a reading from before the window
-// (week 2's "down 8.4 this week" was Day 1's 327.3 against Day 10). "" with fewer than two.
-const dayWindow = (statsLine) => {
-  const m = /Day (\d+) to Day (\d+)/.exec(String(statsLine || ""));
-  return m ? [Number(m[1]), Number(m[2])] : null;
+const SERVED_CHANGE = /\s*\(([-−+]?)(\d+(?:\.\d+)?) this week\)/;
+export const servedChange = (statsLine) => {
+  const m = SERVED_CHANGE.exec(String(statsLine || ""));
+  if (!m) return "";
+  const n = Number(m[2]);
+  if (!Number.isFinite(n)) return "";
+  if (n === 0) return "the same as the week before";
+  return `${m[1] === "-" || m[1] === "−" ? "down" : "up"} ${n.toFixed(1)} that week`;
 };
-const isoPlus = (iso, days) => {
-  const t = Date.parse(`${iso}T12:00:00Z`);
-  return Number.isFinite(t) ? new Date(t + days * 86400000).toISOString().slice(0, 10) : "";
-};
-export function windowChange(statsLine, weights, startDate) {
-  const w = dayWindow(statsLine);
-  if (!w || !startDate || !Array.isArray(weights)) return "";
-  const [from, to] = [isoPlus(startDate, w[0] - 1), isoPlus(startDate, w[1] - 1)];
-  const inside = weights.filter((r) => r && typeof r.date === "string" && num(r.lbs) !== null && r.date >= from && r.date <= to).sort((a, b) => a.date.localeCompare(b.date));
-  if (inside.length < 2) return "";
-  const d = Number((inside[0].lbs - inside[inside.length - 1].lbs).toFixed(1));
-  return d === 0 ? "the same across that week" : `${d > 0 ? "down" : "up"} ${Math.abs(d).toFixed(1)} that week`;
-}
-export function chapterStatLine(p, prevShown = "") {
+export function chapterStatLine(p) {
   if (isPrologue(p)) return prologueLine(p);
   const raw = lbText(String((p && p.stats_line) || "").split("|")[0].trim());
   if (!raw) return "";
-  const change = weekChange(prevShown, _weightOf(p.stats_line));
-  const line = raw.replace(/\s*\([-−+]?\d+(?:\.\d+)? this week\)/, change ? `, ${change}` : "");
+  const change = servedChange(raw);
+  const line = raw.replace(SERVED_CHANGE, change ? `, ${change}` : "");
   return /[.!?]$/.test(line) ? line : `${line}.`;
 }
 // Site-to-A round 1: the rows are the kit's chapter rows (start:S8), each title a door to its
-// chapter (start:S4), and a week's change is its own window's (`weights` + `startDate`, item 7);
-// without the timeline the row prints the weight and no change — never a delta across windows.
-export function recapHTML(posts, { weights = null, startDate = "" } = {}) {
-  const rows = (posts || [])
-    .map((p) => {
-      let line = chapterStatLine(p, "");
-      const change = isPrologue(p) ? "" : windowChange(p.stats_line, weights, startDate);
-      if (change) line = line.replace(new RegExp(`(${_weightOf(p.stats_line)} ${LB})(?=[ .·])`), `$1, ${change}`);
-      return { p, line };
-    })
-    .filter((r) => r.p.title && r.line);
+// chapter (start:S4). Round 2: the change on a row is the chapter's own (chapterStatLine).
+export function recapHTML(posts) {
+  const rows = (posts || []).map((p) => ({ p, line: chapterStatLine(p) })).filter((r) => r.p.title && r.line);
   if (!rows.length) return "";
   return `<ul class="ck-rows ck-rows--chapters">${rows
     .map(({ p, line }) => {
@@ -560,8 +546,12 @@ export function episodeRowsHTML(episodes, { playing = "" } = {}) {
 // (site-to-A round 1: the chart scaled between the series' own min and max and filled to the
 // floor, so the same drop that is a sliver on the front page's mark filled most of this frame).
 // No fill: the line is a level, and a fill would make the latest reading look like nothing.
-// With no start or goal served, the frame is the series' own range, as a line alone. Both ends
-// of the frame are labelled inside it; the ends of the line are labelled under it.
+// With no start or goal served, the frame is the series' own range, as a line alone. The ends of
+// the line are labelled under it, and the frame's two rules in one text line under those (round 2:
+// labels inside the drawing scaled with the viewBox and rendered at about 6 px on a phone).
+// "The top rule is 327.3 lb, the start; the dashed rule is 185 lb, the goal." — one line, so the
+// near-flat trace reads against the whole distance, not as a chart that failed to move.
+export const chartFrameLine = (start, goal) => `The top rule is ${trim1(start)} lb, the start; the dashed rule is ${trim1(goal)} lb, the goal.`;
 export function chartHTML(weights, { sentence: withSentence = true, start = null, goal = null } = {}) {
   const pts = (weights || []).filter((w) => w && w.date && num(w.lbs) !== null).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   if (pts.length < 2) return "";
@@ -580,14 +570,14 @@ export function chartHTML(weights, { sentence: withSentence = true, start = null
   const frameWords = framed ? `, in the frame from the start weight of ${trim1(start)} to the goal of ${trim1(goal)}` : "";
   const aria = `Weight from ${fmt1(first.lbs)} pounds on ${shortDay(first.date)} to ${fmt1(last.lbs)} on ${shortDay(last.date)}, ${pts.length} weigh-ins${frameWords}`;
   const sentence = `His weight at every weigh-in: ${fmt1(first.lbs)} lb on ${shortDay(first.date)}, ${fmt1(last.lbs)} on ${shortDay(last.date)}.`;
-  // The frame's two ends, inside the drawing: the start along the top rule, the goal along the floor.
+  // The frame's two ends as rules in the drawing — the start along the top, the goal dashed along
+  // the floor — and their names in the kit's text row under the dates, never as text in the SVG.
   const rules = framed
     ? `<line class="ck-chart__rule" x1="8" x2="632" y1="${y(start).toFixed(1)}" y2="${y(start).toFixed(1)}" stroke="currentColor" stroke-opacity="0.25" stroke-width="1"/>` +
-      `<line class="ck-chart__rule" x1="8" x2="632" y1="${y(goal).toFixed(1)}" y2="${y(goal).toFixed(1)}" stroke="currentColor" stroke-opacity="0.25" stroke-width="1" stroke-dasharray="5 5"/>` +
-      `<text x="8" y="${(y(start) - 6).toFixed(1)}">${esc(`${trim1(start)} lb, the start`)}</text>` +
-      `<text x="8" y="${(y(goal) - 6).toFixed(1)}">${esc(`${trim1(goal)} lb, the goal`)}</text>`
+      `<line class="ck-chart__rule" x1="8" x2="632" y1="${y(goal).toFixed(1)}" y2="${y(goal).toFixed(1)}" stroke="currentColor" stroke-opacity="0.25" stroke-width="1" stroke-dasharray="5 5"/>`
     : "";
-  return `${withSentence ? `<p class="ck-soft">${esc(sentence)}</p>` : ""}<svg class="ck-chart" viewBox="0 0 640 ${framed ? 172 : 164}" role="img" aria-label="${esc(aria)}">${rules}<polyline class="ck-chart__line" points="${line}"/><circle class="ck-chart__now" cx="${x(last).toFixed(1)}" cy="${y(last.lbs).toFixed(1)}" r="5"/></svg><div class="ck-ends"><span>${esc(`${shortDay(first.date)} · ${fmt1(first.lbs)}`)}</span><span>${esc(`${shortDay(last.date)} · ${fmt1(last.lbs)}`)}</span></div>`;
+  const frameEnds = framed ? `<div class="ck-ends"><span>${esc(chartFrameLine(start, goal))}</span></div>` : "";
+  return `${withSentence ? `<p class="ck-soft">${esc(sentence)}</p>` : ""}<svg class="ck-chart" viewBox="0 0 640 ${framed ? 172 : 164}" role="img" aria-label="${esc(aria)}">${rules}<polyline class="ck-chart__line" points="${line}"/><circle class="ck-chart__now" cx="${x(last).toFixed(1)}" cy="${y(last.lbs).toFixed(1)}" r="5"/></svg><div class="ck-ends"><span>${esc(`${shortDay(first.date)} · ${fmt1(first.lbs)}`)}</span><span>${esc(`${shortDay(last.date)} · ${fmt1(last.lbs)}`)}</span></div>${frameEnds}`;
 }
 
 // ── the team ───────────────────────────────────────────────────────────────────
@@ -963,12 +953,9 @@ async function mountWeek(edition, b) {
 
 async function mountStart(edition, b) {
   const [journal, timeline] = await Promise.all([tryJSON("/journal/posts.json"), tryJSON("/api/timeline")]);
-  // The recap's windows read the timeline's full run of weigh-ins (a week's window is older than the
-  // edition's 28-day series); Day 1 is the edition's start date.
   const allWeights = timeline && timeline.timeline && timeline.timeline.weights;
   const t = usable(b.today) ? b.today.data : {};
-  const startDate = t.start_date || (timeline && timeline.timeline && timeline.timeline.journey_start) || "";
-  fill("ck-recap", recapHTML(postsInOrder(journal), { weights: allWeights, startDate }) || soft("The chapters are not served right now."));
+  fill("ck-recap", recapHTML(postsInOrder(journal)) || soft("The chapters are not served right now."));
   // The same series the front page's mark draws (the edition's weigh-ins) in the same frame (start
   // to goal); the timeline's weights stand in when the edition's week block is not served.
   const weights = usable(b.week) && Array.isArray(b.week.data.weight_series) ? b.week.data.weight_series : allWeights;

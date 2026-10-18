@@ -79,11 +79,13 @@ export function markHTML(series, todayIso, start, goal, { width = 640, height = 
     .join("");
   return `<svg class="ck-mark" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(markSentence(cells, start, goal))}">${rects}</svg>${markEndsHTML(start, goal)}`;
 }
-// The mark's two ends, named under it (site-to-A round 1, front:F15): the start weight at the
-// left, the goal at the right — the floor the grey stands for. "" without both numbers.
+// The mark's two ends, named under it in ONE line (site-to-A round 1, front:F15; round 2, G10:
+// a left-hand "at the start" and a right-hand "the goal" read as a time axis on a drawing whose
+// scale is vertical). The top of every column is the start weight, the floor is the goal — the
+// grey the legend names. "" without both numbers.
 export function markEndsHTML(start, goal) {
   if (num(start) === null || num(goal) === null || start <= goal) return "";
-  return `<div class="ck-ends"><span>${esc(`${fmt1(start)} lb at the start`)}</span><span>${esc(`${String(Number(goal.toFixed(1)))} lb, the goal`)}</span></div>`;
+  return `<div class="ck-ends"><span>${esc(`Each column runs from ${fmt1(start)} lb, the start, at the top to ${String(Number(goal.toFixed(1)))} lb, the goal, at the floor.`)}</span></div>`;
 }
 // "312.1 lb · Day 29 · 15.2 down, 127.1 to go to 185" — the mark's one line of numbers,
 // the weight in bold. Returns HTML.
@@ -305,8 +307,13 @@ export function scorecardRows(block) {
 // The rule under a row is its judgment, not its floor: the "not enough data" clause is a
 // grader's detail (round 8b: "a rulebook where a scoreboard should be").
 export const shortRule = (rule) => String(rule || "").replace(/\s*(?:Fewer than|When the)[^.]*not enough data\.?\s*$/, "").trim();
-// A row that earned its mark: going well, or ahead of the plan. Both take the filled dot.
-const EARNED = new Set(["going_well", "faster_than_planned"]);
+// A row that earned its mark takes the filled dot: going well, and only that. "Faster than
+// planned" is the rule's rate flag (it parts from going_well at 2.5 lb a week), not a win, so it
+// takes the hollow dot and the legend says why (round 2, G9/G10: a filled accent dot under a
+// legend that says filled = going well carried the claim "good" on a week the rule flagged).
+const EARNED = new Set(["going_well"]);
+const FLAGGED = "faster_than_planned";
+export const HOLLOW_FLAG_LINE = "A hollow dot beside “faster than planned” is a flag, not a win.";
 const TO_DATE = /not this week['’]s alone/;
 export function scorecardHTML(block, base = "/", { label = true, aiText = "" } = {}) {
   const rows = scorecardRows(block);
@@ -347,7 +354,7 @@ export function scorecardHTML(block, base = "/", { label = true, aiText = "" } =
   return [
     label ? `<p class="ck-label">How the whole thing is going</p>` : "",
     `<ul class="ck-rows">${items}</ul>`,
-    small([items.includes('class="ck-dot"') ? "A filled dot is an area going well this week." : "", rules].filter(Boolean).join(" ")),
+    small([items.includes('class="ck-dot"') ? "A filled dot is an area going well this week." : "", rows.some(({ row }) => usable(row) && row.data.verdict === FLAGGED) ? HOLLOW_FLAG_LINE : "", rules].filter(Boolean).join(" ")),
   ].join("");
 }
 // The first sentences of a text, up to `max` characters, never cut mid-sentence.
