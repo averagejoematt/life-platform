@@ -95,7 +95,7 @@ v1.2.0 — Structured logging + auth resilience (RCA corrective actions)
 v1.1.0 — Three-tier source filtering + expanded metrics
   - Tier 1 (Apple-exclusive): activity, gait, energy, audio — all readings ingested
   - Tier 2 (cross-device): HR, HRV, RHR, respiratory, SpO2 — filtered to Apple Watch only
-  - Tier 3 (skip): nutrition (MacroFactor SOT), sleep (Eight Sleep SOT), body (Withings SOT)
+  - Tier 3 (skip): nutrition (MacroFactor SOT), sleep (Eight Sleep SOT; Apple's own night since #4971 → sleep_*_apple), body (Withings SOT)
   - Derived: total_calories_burned = active + basal
   - New fields: gait metrics, headphone_audio_exposure_db, *_apple suffixed cross-ref fields
   - Source detection via device name substring matching
@@ -147,6 +147,7 @@ except ImportError:
 from ingestion import (
     health_auto_export_additive as _additive,  # #4628: the archived day sum
     health_auto_export_archive as _archive,
+    health_auto_export_sleep as _sleep,  # #4971: Apple's own night, sleep_*_apple fields
 )
 
 
@@ -595,14 +596,15 @@ for names, config in _METRIC_DEFS:
 
 
 # ── Tier 3: Skip entirely (SOT covered by dedicated pipelines) ───────────
-# sleep_analysis   → Eight Sleep is SOT for sleep
+# sleep_analysis   → skipped HERE only: health_auto_export_sleep.py stores Apple's own
+#                    night as sleep_*_apple fields (#4971); Whoop/Eight Sleep rows dropped
 # All nutrition    → MacroFactor is SOT for nutrition
 # body_mass/fat   → Withings is SOT for body composition
 SKIP_METRICS = {
     # Glucose handled separately
     "Blood Glucose",
     "blood_glucose",
-    # Sleep — Eight Sleep is SOT
+    # Sleep — not generic-aggregated; Apple's night goes to health_auto_export_sleep (#4971)
     "sleep_analysis",
     "Sleep Analysis",
     # Body comp — Withings is primary, but accept body_mass from HAE as fallback
@@ -1559,16 +1561,13 @@ def lambda_handler(event, context):
     # ── Process other metrics ──
     other_daily, other_timestamps, source_audit = process_generic_metrics(metrics)
     archived = _additive.apply_archived_sums(other_daily, metrics, METRIC_MAP, parse_date_str, s3_client, S3_BUCKET)
-    other_days = 0
     for date_str, fields in other_daily.items():
         merge_day_to_dynamo(date_str, fields, reading_timestamps=other_timestamps.get(date_str), archived=archived.get(date_str, ()))
-        other_days += 1
-
+    other_days = len(other_daily)
     if other_days:
-        fields_written = set()
-        for fields in other_daily.values():
-            fields_written.update(fields.keys())
-        logger.info(f"Other metrics: {other_days} days updated, fields: {sorted(fields_written)}")
+        logger.info(f"Other metrics: {other_days} days updated, fields: {sorted(set().union(*other_daily.values()))}")
+    # #4971: sleep_analysis skips the generic path (SKIP_METRICS) and lands here, Apple devices only.
+    sleep_nights = _sleep.write_apple_sleep(metrics, table, PK, is_apple_device)
 
     # ── Process blood pressure individual readings (v1.4.0 + v1.4.1 combined format) ──
     bp_readings_new = 0
@@ -1691,6 +1690,7 @@ def lambda_handler(event, context):
         "glucose_days_updated": glucose_days,
         "glucose_new_readings": glucose_readings_new,
         "other_metric_days": other_days,
+        "apple_sleep_nights": sleep_nights,
         "som_entries_new": som_entries_new,
         "som_days_updated": som_days,
         "workout_days": workout_days,

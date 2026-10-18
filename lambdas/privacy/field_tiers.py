@@ -147,6 +147,26 @@ FIELD_TIERS: dict[str, dict[str, int]] = {
         "time_awake_hours": TIER_OWNER_ONLY,
         "sleep_consistency_percentage": TIER_OWNER_ONLY,
     },
+    "apple_health": {
+        # ── #4971: the Apple Watch's own night (ingestion/health_auto_export_sleep.py
+        #    APPLE_SLEEP_FIELDS). Owner-only like Whoop's unpublished sleep fields
+        #    (time_awake_hours): raw biometrics no public surface serves, declared before
+        #    the first watch night lands (ADR-154 step 3). Publication is a new ADR-155 stamp. ──
+        "sleep_total_hours_apple": TIER_OWNER_ONLY,
+        "sleep_in_bed_hours_apple": TIER_OWNER_ONLY,
+        "sleep_core_min_apple": TIER_OWNER_ONLY,
+        "sleep_deep_min_apple": TIER_OWNER_ONLY,
+        "sleep_rem_min_apple": TIER_OWNER_ONLY,
+        "sleep_awake_min_apple": TIER_OWNER_ONLY,
+        "sleep_unspecified_min_apple": TIER_OWNER_ONLY,
+        "sleep_start_apple": TIER_OWNER_ONLY,
+        "sleep_end_apple": TIER_OWNER_ONLY,
+        "sleep_in_bed_start_apple": TIER_OWNER_ONLY,
+        "sleep_in_bed_end_apple": TIER_OWNER_ONLY,
+        "sleep_source_apple": TIER_OWNER_ONLY,
+        "sleep_record_kind_apple": TIER_OWNER_ONLY,
+        "_rd_sleep_apple": TIER_OWNER_ONLY,
+    },
     # ADR-097 reading keyspace (BOOK#/READING# pks — a pseudo-source, see SOURCE_TIERS
     # note). The two named private fields from DATA_GOVERNANCE's reading row that exist
     # as literal item attributes; the rest of the row (RECALL# records, calibration
