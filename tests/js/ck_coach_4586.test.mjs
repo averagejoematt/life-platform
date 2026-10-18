@@ -244,9 +244,12 @@ test("the record is a count beside the comparison, never a percentage and never 
   assert.ok(tr.comparison.sentence.trim().length > 20 && tr.comparison.sentence.endsWith("."));
   const named = (p) => p.report_card.track_record.comparison.sentence.replace(/^Across (\d+) checked calls\b/, (all, k) => (Number(k) === p.report_card.track_record.record.n ? `Across ${p.name}’s ${k} checked calls` : all));
   assert.ok(html.includes(named(SLEEP).replace(/&/g, "&amp;")), "the served comparison is printed");
-  assert.match(html, /The simple guess is that nothing changes from the last reading\./);
+  assert.match(html, /(The simple guess is that nothing changes from the last reading\.|a guess that nothing changes)/);
   assert.match(html, /Lisa Park’s calls alone through [A-Z][a-z]+ \d+\./);
-  assert.equal((html.match(/The simple guess is/g) || []).length, 1);
+  // The guess is named once: by the served comparison when it already says "a guess that nothing changes", else by the sentence.
+  const namedInline = /\bguess that nothing changes\b/i.test(named(SLEEP));
+  assert.equal((html.match(/The simple guess is/g) || []).length, namedInline ? 0 : 1);
+  assert.equal(C.withGuessNamed("They were right."), `They were right. ${C.SIMPLE_GUESS}`);
   assert.ok(C.recordHTML(PHYSICAL).includes(named(PHYSICAL).replace(/&/g, "&amp;")), "the served comparison is printed, never rewritten into another coach's count");
   const other = structuredClone(SLEEP);
   other.report_card.track_record.comparison.sentence = "Across 131 checked calls, so far they do not beat a simple guess.";
