@@ -123,43 +123,53 @@ export const weekNumberOf = (label) => {
   return m ? Number(m[1]) : null;
 };
 // THE HELD STATE (red team 2026-10-17: on day 42 Story showed week 5 as "the latest chapter" with
-// "next chapter due Wednesday" and no word about week 6). A chapter publishes only after Matthew
-// approves it, so a week can be written and waiting. What the page can read: the chronicle's own
-// hold marker on /journal/posts.json (`pending`: {week, reason}, written by
-// emails/chronicle_store.held_week), and the edition's day against the latest chapter's date.
-//   - the marker names a later week: "Week N is held before publishing."
-//   - no marker, but the latest chapter is more than a week older than the edition's day: the
-//     next week has not published. One calm line; it never claims a draft exists, because no
-//     served field says one does.
-// "" when the latest chapter is current.
+// no word about week 6). A chapter publishes only after Matthew approves it, so a week can be
+// written and waiting — but whether one IS waiting is a fact only the chronicle can state. What the
+// page reads, in order (site-to-A round 1: the line was week arithmetic from the latest chapter's
+// date, and said "Week 6 is waiting for Matthew’s approval" on the night week 6 published):
+//   - the served chronicle status, when the route carries it: `chronicle.latest.status` on the
+//     edition, the journal or the chapter block (lane E of #4580 adds it; bound here defensively —
+//     absent, the page falls back to the next rule). A status that says held/pending/awaiting
+//     approval prints the held line, naming the week when the status names one; "published"
+//     and anything unrecognised print nothing.
+//   - the chronicle's own hold marker on /journal/posts.json (`pending`: {week, reason}, written
+//     by emails/chronicle_store.held_week): "Week N is held before publishing."
+//   - nothing. The latest published chapter and its date are already on the page ("Latest
+//     chapter · Week 5 (written October 6)"); no held week is ever inferred from the calendar.
+// `nextBlock` is kept for the draft's due date beside a served held line.
 export const CHAPTER_DAYS = 7;
-// Round 3: the line says WHICH weeks — the overdue one(s) and the one whose draft comes next —
-// from one week arithmetic: whole chapter-weeks since the latest chapter's date.
+const HELD_STATUS = new Set(["held", "pending", "waiting", "awaiting_approval", "waiting_approval", "held_for_review", "drafted", "draft"]);
+// The served status, from whichever document carries it: {status, week} or null.
+export function chronicleStatus(edition, journal, block) {
+  for (const doc of [edition, journal, block && block.data]) {
+    const latest = doc && doc.chronicle && doc.chronicle.latest;
+    const raw = latest && (typeof latest.status === "string" ? latest.status : latest.status && typeof latest.status.state === "string" ? latest.status.state : "");
+    if (raw) return { status: raw.trim().toLowerCase(), week: num(latest.week) !== null ? latest.week : num(latest.status && latest.status.week) !== null ? latest.status.week : null };
+  }
+  return null;
+}
 export function heldChapterLine(block, edition, journal, nextBlock = null) {
   if (!usable(block)) return "";
   const n = weekNumberOf(block.data.week_label);
   if (n === null) return "";
+  const ch = nextBlock && nextBlock.data && nextBlock.data.chapter;
+  const due = usable(ch) ? dayInWords(ch.data.date) : "";
+  const served = chronicleStatus(edition, journal, block);
+  if (served) {
+    if (!HELD_STATUS.has(served.status)) return "";
+    const which = served.week !== null && served.week > n ? `Week ${served.week}` : "The next chapter";
+    return due ? `${which} is written and held before publishing; its draft was due ${due}.` : `${which} is written and held before publishing.`;
+  }
   const p = journal && journal.pending;
   if (p && num(p.week) !== null && p.week > n) return `Week ${p.week} is held before publishing.`;
-  const [t0, t1] = [Date.parse(`${block.data.date}T12:00:00Z`), Date.parse(`${(edition && edition.as_of) || ""}T12:00:00Z`)];
-  if (!Number.isFinite(t0) || !Number.isFinite(t1) || (t1 - t0) / 86400000 <= CHAPTER_DAYS) return "";
-  const k = Math.floor((t1 - t0) / 86400000 / CHAPTER_DAYS);
-  const held = k === 1 ? `Week ${n + 1} is waiting for Matthew’s approval` : `Weeks ${n + 1} to ${n + k} are waiting for Matthew’s approval`;
-  const ch = nextBlock && nextBlock.data && nextBlock.data.chapter;
-  const day = usable(ch) ? dayInWords(ch.data.date) : "";
-  return day ? `${held}; week ${n + k + 1}’s draft is due ${day}.` : `${held}.`;
+  return "";
 }
-// The chapter's teaser, with the two claims a reader can check against the page made to agree with
-// it (red team 2026-10-17). "crossed 310 pounds" says which way only through the chapter's own
-// weight: below it, "went below"; above it, "went above". "N pounds gone" is recomputed with
-// poundsDown from the start weight and the chapter's weight — the two numbers the page prints.
-// Without the chapter's weight the teaser is printed as served.
-export function teaserText(dek, { chapterLb = null, startLb = null } = {}) {
-  let t = String(dek || "");
-  if (num(chapterLb) === null) return t;
-  t = t.replace(/\bcrossed (\d+(?:\.\d+)?) (pounds|lb|lbs)\b/g, (m, n, unit) => (chapterLb < Number(n) ? `went below ${n} ${unit}` : chapterLb > Number(n) ? `went above ${n} ${unit}` : m));
-  const down = poundsDown(startLb, chapterLb);
-  return down ? t.replace(/\b\d+(?:\.\d+)? pounds gone\b/g, `${down} pounds gone`) : t;
+// The chapter's teaser is the chapter's own dek, printed as served (site-to-A round 1: a rewrite
+// turned "crossed 310 pounds … 18.5 pounds gone" into "went below 310 … 18.4" from rounded values,
+// editing a quoted sentence of the chapter). The chapter's words are the chapter's; nothing is
+// recomputed here. `teaserText` stays as the one door the Story lead prints the dek through.
+export function teaserText(dek) {
+  return String(dek || "");
 }
 // "Next chapter due <day>." — or, when the cadence says the date is a draft and not a promise,
 // what actually happens on it.
@@ -169,7 +179,7 @@ export function nextChapterLine(nextBlock) {
   if (!day) return (ch && ch.state !== "ok" && ch.absent_text) || "";
   return ch.data.drafted_not_promised ? `The next draft is due ${day}; it publishes once Matthew approves it.` : `Next chapter due ${day}.`;
 }
-export function chapterHTML(block, nextBlock, { heading = "h1", player = true, listenHref = "", held = "", podcastHeld: podHeld = false, teaser = null, asOf = "" } = {}) {
+export function chapterHTML(block, nextBlock, { heading = "h1", player = true, listenHref = "", held = "", podcastHeld: podHeld = false, asOf = "" } = {}) {
   if (!usable(block)) return absent(block, "The latest chapter is not served right now.");
   const c = block.data;
   // "New this week" only while the chapter is under a week old on the edition's day (round 2:
@@ -188,9 +198,9 @@ export function chapterHTML(block, nextBlock, { heading = "h1", player = true, l
       : "";
   // With the held line printed, the next date is said plainly: the approval is already said once.
   // The held line names the next draft itself; then the next-date line is not repeated.
-  const nextLine = held ? (/draft is due/.test(held) ? "" : nextChapterLine(nextBlock).replace(/; it publishes once Matthew approves it\.$/, ".")) : nextChapterLine(nextBlock);
+  const nextLine = held ? (/draft (?:is|was) due/.test(held) ? "" : nextChapterLine(nextBlock).replace(/; it publishes once Matthew approves it\.$/, ".")) : nextChapterLine(nextBlock);
   // The front page runs one sentence of the chapter's own summary; Story runs it whole.
-  const dek = player ? teaserText(c.dek, teaser || {}) : summarySentence(c.dek) || c.dek;
+  const dek = player ? teaserText(c.dek) : summarySentence(c.dek) || c.dek;
   return [
     `<span class="ck-badge">${esc(badge)}</span>`,
     `<${heading}>${esc(c.title)}</${heading}>`,
@@ -443,22 +453,39 @@ export function episodeRowsHTML(episodes) {
 }
 
 // ── the weight chart ───────────────────────────────────────────────────────────
-// One line, the last point labelled, and the sentence above it says what it shows.
-export function chartHTML(weights, { sentence: withSentence = true } = {}) {
+// One line in the frame the front page's mark uses — the top is the start weight, the floor the
+// goal — so a 25 lb drop is 25 of the 142 lb to go, not a line falling to the bottom of its box
+// (site-to-A round 1: the chart scaled between the series' own min and max and filled to the
+// floor, so the same drop that is a sliver on the front page's mark filled most of this frame).
+// No fill: the line is a level, and a fill would make the latest reading look like nothing.
+// With no start or goal served, the frame is the series' own range, as a line alone. Both ends
+// of the frame are labelled inside it; the ends of the line are labelled under it.
+export function chartHTML(weights, { sentence: withSentence = true, start = null, goal = null } = {}) {
   const pts = (weights || []).filter((w) => w && w.date && num(w.lbs) !== null).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   if (pts.length < 2) return "";
   const t = (iso) => Date.parse(`${iso}T12:00:00Z`);
   const [t0, t1] = [t(pts[0].date), t(pts[pts.length - 1].date)];
-  const lo = Math.min(...pts.map((p) => p.lbs));
-  const hi = Math.max(...pts.map((p) => p.lbs));
+  const seriesLo = Math.min(...pts.map((p) => p.lbs));
+  const seriesHi = Math.max(...pts.map((p) => p.lbs));
+  const framed = num(start) !== null && num(goal) !== null && start > goal;
+  const hi = framed ? Math.max(start, seriesHi) : seriesHi;
+  const lo = framed ? Math.min(goal, seriesLo) : seriesLo;
   const x = (p) => 8 + (624 * (t(p.date) - t0)) / (t1 - t0 || 1);
-  const y = (p) => 20 + (122 * (hi - p.lbs)) / (hi - lo || 1);
-  const line = pts.map((p) => `${x(p).toFixed(1)},${y(p).toFixed(1)}`).join(" ");
+  const y = (lbs) => 20 + (122 * (hi - lbs)) / (hi - lo || 1);
+  const line = pts.map((p) => `${x(p).toFixed(1)},${y(p.lbs).toFixed(1)}`).join(" ");
   const first = pts[0];
   const last = pts[pts.length - 1];
-  const aria = `Weight from ${fmt1(first.lbs)} pounds on ${shortDay(first.date)} to ${fmt1(last.lbs)} on ${shortDay(last.date)}, ${pts.length} weigh-ins`;
+  const frameWords = framed ? `, in the frame from the start weight of ${trim1(start)} to the goal of ${trim1(goal)}` : "";
+  const aria = `Weight from ${fmt1(first.lbs)} pounds on ${shortDay(first.date)} to ${fmt1(last.lbs)} on ${shortDay(last.date)}, ${pts.length} weigh-ins${frameWords}`;
   const sentence = `His weight at every weigh-in: ${fmt1(first.lbs)} lb on ${shortDay(first.date)}, ${fmt1(last.lbs)} on ${shortDay(last.date)}.`;
-  return `${withSentence ? `<p class="ck-soft">${esc(sentence)}</p>` : ""}<svg class="ck-chart" viewBox="0 0 640 196" role="img" aria-label="${esc(aria)}"><polygon class="ck-chart__area" points="8.0,164 ${line} 632.0,164"/><polyline class="ck-chart__line" points="${line}"/><circle class="ck-chart__now" cx="${x(last).toFixed(1)}" cy="${y(last).toFixed(1)}" r="5"/></svg><div class="ck-ends"><span>${esc(`${shortDay(first.date)} · ${fmt1(first.lbs)}`)}</span><span>${esc(`${shortDay(last.date)} · ${fmt1(last.lbs)}`)}</span></div>`;
+  // The frame's two ends, inside the drawing: the start along the top rule, the goal along the floor.
+  const rules = framed
+    ? `<line class="ck-chart__rule" x1="8" x2="632" y1="${y(start).toFixed(1)}" y2="${y(start).toFixed(1)}" stroke="currentColor" stroke-opacity="0.25" stroke-width="1"/>` +
+      `<line class="ck-chart__rule" x1="8" x2="632" y1="${y(goal).toFixed(1)}" y2="${y(goal).toFixed(1)}" stroke="currentColor" stroke-opacity="0.25" stroke-width="1" stroke-dasharray="5 5"/>` +
+      `<text x="8" y="${(y(start) - 6).toFixed(1)}">${esc(`${trim1(start)} lb, the start`)}</text>` +
+      `<text x="8" y="${(y(goal) - 6).toFixed(1)}">${esc(`${trim1(goal)} lb, the goal`)}</text>`
+    : "";
+  return `${withSentence ? `<p class="ck-soft">${esc(sentence)}</p>` : ""}<svg class="ck-chart" viewBox="0 0 640 ${framed ? 172 : 164}" role="img" aria-label="${esc(aria)}">${rules}<polyline class="ck-chart__line" points="${line}"/><circle class="ck-chart__now" cx="${x(last).toFixed(1)}" cy="${y(last.lbs).toFixed(1)}" r="5"/></svg><div class="ck-ends"><span>${esc(`${shortDay(first.date)} · ${fmt1(first.lbs)}`)}</span><span>${esc(`${shortDay(last.date)} · ${fmt1(last.lbs)}`)}</span></div>`;
 }
 
 // ── the team ───────────────────────────────────────────────────────────────────
@@ -761,7 +788,11 @@ async function mountWeek(edition, b) {
 async function mountStart(edition, b) {
   const [journal, timeline] = await Promise.all([tryJSON("/journal/posts.json"), tryJSON("/api/timeline")]);
   fill("ck-recap", recapHTML(postsInOrder(journal)) || soft("The chapters are not served right now."));
-  fill("ck-chart", chartHTML(timeline && timeline.timeline && timeline.timeline.weights) || soft("The weigh-ins are not served right now."));
+  // The same series the front page's mark draws (the edition's weigh-ins) in the same frame (start
+  // to goal); the timeline's weights stand in when the edition's week block is not served.
+  const weights = usable(b.week) && Array.isArray(b.week.data.weight_series) ? b.week.data.weight_series : timeline && timeline.timeline && timeline.timeline.weights;
+  const t = usable(b.today) ? b.today.data : {};
+  fill("ck-chart", chartHTML(weights, { start: t.start_weight_lbs, goal: t.goal_weight_lbs }) || soft("The weigh-ins are not served right now."));
   // Nothing waiting to settle is not a section's content: with no bet, the next chapter's line alone.
   const bet = coachesBetHTML(b.next, null);
   fill("ck-open", `${bet === null ? "" : bet}${small(chapterNextLine(b.next))}`);
@@ -773,16 +804,13 @@ const chapterNextLine = (nextBlock) => {
 };
 
 const startLbOf = (b) => (usable(b.today) ? num(b.today.data.start_weight_lbs) : null);
-// Story's lead: the latest chapter, its held state, the podcast's hold and the teaser made to
-// agree with the rows below it. Pure, for tests/js/ck_red_team_4586.test.mjs.
+// Story's lead: the latest chapter, its served held state and the podcast's hold; the teaser is
+// the chapter's dek as served. Pure, for tests/js/ck_red_team_4586.test.mjs.
 export function storyChapterHTML(edition, b, journal, episodes) {
   const c = usable(b.chapter) ? b.chapter.data : null;
-  const post = c ? postsInOrder(journal).find((p) => p.url === c.url) : null;
-  const chapterLb = post && _weightOf(post.stats_line) ? Number(_weightOf(post.stats_line)) : null;
   return chapterHTML(b.chapter, b.next, {
     held: heldChapterLine(b.chapter, edition, journal, b.next),
     podcastHeld: c ? podcastHeld(episodes, weekNumberOf(c.week_label)) : false,
-    teaser: { chapterLb, startLb: startLbOf(b) },
     asOf: (edition && edition.as_of) || "",
   });
 }
