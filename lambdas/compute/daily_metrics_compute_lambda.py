@@ -62,6 +62,7 @@ from health import (
     achievement_rules,  # #1624: the ONE place badge thresholds live (shared with site_api_vitals)
     flourishing,  # #1843: entry_channel() — single source of truth for video_diary/solo_recording provenance
     habit_streaks,  # #4362: THE streak scan, shared with the daily brief
+    hr_regime,  # #4999: THE dated HR regime markers — re-baselining window, post-marker baselines, AF-day exclusion
     milestone_ledger,  # #1626: the durable MILESTONE# event ledger (write-once, global cooldown)
     nutrition_logging,  # #4343: THE protein-intake derivation /api/nutrition_overview serves
     personal_baselines,  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
@@ -458,6 +459,10 @@ def compute_readiness(data, baselines=None):
     # Sleep is 25% (not 30%) to stay aligned with the live MCP get_readiness_score model
     # so the tool's _precomputed_cross_check is a true drift detector — on the typical day
     # (no overnight-physiology component — the live tool's 5% leg since #4978) the weights are identical.
+    # #4999: inside an HR regime marker's window (hr_regime) the HR inputs draw no tier — no score,
+    # colour "gray" (the stored no-tier value every colour map knows), HR components re-baselining.
+    if hr_regime.is_rebaselining(data.get("date")):
+        return None, "gray", [{"key": k, "state": hr_regime.REBASELINING} for k in ("recovery", "hrv_trend")]
     components = []
     whoop_today = data.get("whoop_today")
     whoop_yest = data.get("whoop")
@@ -606,6 +611,7 @@ def store_computed_metrics(
     # show an honest breakdown instead of borrowing the day-grade component set.
     if readiness_components:
         item["readiness_components"] = _deep_dec(readiness_components)
+    item.update(_deep_dec(hr_regime.computed_row_fields(date_str, (vitals or {}).get("hrv_basis"))))  # #4999
     for field, val in [
         ("tsb", tsb),
         ("ctl", ctl),  # Banister fitness (>=0) — stored so consumers stop reverse-engineering it from tsb
@@ -961,14 +967,11 @@ def assemble_data(yesterday_str, profile):
             strava["total_moving_time_seconds"] = sum(float(a.get("moving_time_seconds") or 0) for a in strava["activities"])
             logger.info(f"Dedup: {orig} → {deduped} Strava activities")
 
-    # HRV averages
-    hrv_7d_recs = fetch_range("whoop", (today - timedelta(days=7)).isoformat(), yesterday_str)
+    # HRV averages. #4999: never across an HR regime marker (cut to the day after it, with its n),
+    # never over an AF day (health.hr_regime.af_days — the device field is reduced to "excluded").
     hrv_30d_recs = fetch_range("whoop", (today - timedelta(days=30)).isoformat(), yesterday_str)
-    # #2221: key-presence, not value — an explicit NULL hrv cell raised TypeError.
-    # Same defect as daily_brief_lambda's; fixed on both readers, not just the one
-    # the issue named.
-    hrv_7d_vals = [v for v in (safe_float(r, "hrv") for r in hrv_7d_recs) if v is not None]
-    hrv_30d_vals = [v for v in (safe_float(r, "hrv") for r in hrv_30d_recs) if v is not None]
+    _bl = hr_regime.trailing_baselines(hrv_30d_recs, ("hrv",), today, yesterday_str, fetch_range=fetch_range)
+    (hrv_7d_vals, hrv_7d_basis), (hrv_30d_vals, hrv_30d_basis) = _bl[("hrv", 7)], _bl[("hrv", 30)]
     hrv_7d_avg = avg(hrv_7d_vals)
     hrv_30d_avg = avg(hrv_30d_vals)
 
@@ -1084,6 +1087,7 @@ def assemble_data(yesterday_str, profile):
             "hrv_30d": hrv_30d_avg,
             "hrv_yesterday": safe_float(whoop, "hrv"),
         },
+        "hrv_basis": {"hrv_7d_basis": hrv_7d_basis, "hrv_30d_basis": hrv_30d_basis},  # #4999: n, since, truncation, excluded count
         "tsb": tsb,
         "ctl": ctl,
         "atl": atl,
@@ -1273,7 +1277,7 @@ def lambda_handler(event, context):
         weight_traj=data.get("weight_traj"),
         readiness_components=readiness_components,
         diary_sessions=data.get("diary_sessions"),
-        vitals={k: data.get(k) for k in VITAL_FIELDS + ("protein_g_avg_since",)},
+        vitals={k: data.get(k) for k in VITAL_FIELDS + ("protein_g_avg_since", "hrv_basis")},
     )
 
     if day_grade_score is not None:

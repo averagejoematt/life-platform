@@ -535,16 +535,7 @@ def tool_plan_next_session(args):
 
     readiness, status["recovery_tier"] = _read("recovery_tier", tool_get_readiness_score, {"date": target_date})
     readiness = readiness or {}
-    recovery_tier = _recovery_tier(readiness)
-    if recovery_tier is None and status["recovery_tier"]["state"] != READ_FAILED:
-        status["recovery_tier"] = (
-            st(ABSENT, "get_readiness_score returned no score for the day")
-            if (not readiness or any(k in readiness for k in _READINESS_SCORE_KEYS))
-            else st(
-                READ_FAILED,
-                error=f"InputShapeError: get_readiness_score carried none of {list(_READINESS_SCORE_KEYS)} (keys: {sorted(readiness)[:12]})",
-            )
-        )
+    recovery_tier, status["recovery_tier"] = _recovery_tier_and_status(readiness, status["recovery_tier"], st)
 
     acwr, status["acwr_flag"] = _read("acwr_flag", tool_get_acwr_status, {})
     acwr = acwr or {}
@@ -1112,14 +1103,48 @@ _READINESS_SCORE_KEYS = ("readiness_score", "score", "recovery_score")
 _VOLUME_TABLE_KEYS = ("muscle_volume", "muscle_sets", "by_muscle")
 
 
+def _recovery_tier_and_status(readiness: dict, read_status: dict[str, Any], st) -> tuple[str | None, dict[str, Any]]:
+    """The recovery tier and its input status from a `get_readiness_score` read (#4072, #4999)."""
+    from training.plan_engine import ABSENT, MEASURED, READ_FAILED
+
+    recovery_tier = _recovery_tier(readiness)
+    if recovery_tier == "re-baselining" and read_status["state"] != READ_FAILED:
+        # #4999: a measured state, not a tier — the HR regime marker's window is open.
+        note = (readiness.get("hr_regime") or {}).get("note") or "HR-derived tiers are re-baselining after an HR regime marker"
+        return recovery_tier, st(MEASURED, note)
+    if recovery_tier is None and read_status["state"] != READ_FAILED:
+        read_status = (
+            st(ABSENT, "get_readiness_score returned no score for the day")
+            if (not readiness or any(k in readiness for k in _READINESS_SCORE_KEYS))
+            else st(
+                READ_FAILED,
+                error=f"InputShapeError: get_readiness_score carried none of {list(_READINESS_SCORE_KEYS)} (keys: {sorted(readiness)[:12]})",
+            )
+        )
+    return recovery_tier, read_status
+
+
 def _recovery_tier(readiness: dict) -> str | None:
-    """GREEN / YELLOW / RED from the readiness score, in the authoring spec's bands.
+    """GREEN / YELLOW / RED from the readiness score, in the authoring spec's bands — or
+    `"re-baselining"` inside an HR regime marker's window (#4999).
 
     `get_readiness_score` returns a 0-100 `score`, not a tier; the recovery-adaptive
     authoring spec (SPEC_RECOVERY_ADAPTIVE_AUTHORING_2026-06-21) is what maps a number to
     a branch. Doing the mapping here keeps the engine's input in the vocabulary the
     cues are written in.
     """
+    # #4999: inside an HR regime marker's re-baselining window there is no tier to read — the
+    # readiness tool says so (`hr_regime` / label RE-BASELINING), and the requested date is
+    # checked against the registry too, so a readiness payload that lost the block cannot
+    # smuggle Whoop's tier back in. Returns the state string, never green/yellow/red.
+    from health import hr_regime
+
+    if (
+        (readiness.get("hr_regime") or {}).get("state") == hr_regime.REBASELINING
+        or str(readiness.get("label") or "").upper() == "RE-BASELINING"
+        or hr_regime.is_rebaselining(readiness.get("requested_date") or readiness.get("date"))
+    ):
+        return hr_regime.REBASELINING
     # LIVE SHAPE (2026-09-20): get_readiness_score returns `readiness_score`; the two names read
     # before it were guesses and the tier came back None on a GREEN 80.1 day.
     score = readiness.get("readiness_score")

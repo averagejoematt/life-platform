@@ -11,6 +11,7 @@ re-imports every name, so callers and tests keep one import surface.
 from common.digest_utils import safe_float
 from common.pacific_time import parse_iso_utc
 from common.platform_logger import get_logger
+from health import hr_regime  # #4999: THE dated HR regime markers
 from training import training_load  # shared TSS-like load model (#490)
 
 logger = get_logger("daily-brief")
@@ -202,6 +203,10 @@ def dedup_activities(activities):
 def compute_readiness(data):
     # Sleep 25% (not 30%) to stay aligned with daily_metrics_compute.compute_readiness
     # and the live MCP get_readiness_score model — keep all three in sync.
+    # #4999: inside an HR regime marker's re-baselining window the HR-derived inputs draw no
+    # tier — the same gate daily_metrics_compute.compute_readiness applies ("gray", no score).
+    if hr_regime.is_rebaselining(data.get("date")):
+        return None, "gray"
     components = []
     # Phase-3: the ONE chosen whoop (today-if-finalized else yesterday), so readiness
     # uses the same recovery the vitals block and narrative show (no 30-vs-86 split).
