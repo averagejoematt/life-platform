@@ -174,7 +174,7 @@ FUNCTION_LENGTH_COUNTS = {
     "mcp/tools_health.py::_get_hydration_score": 177,
     "mcp/tools_health.py::tool_get_readiness_score": 284,
     "mcp/tools_health.py::tool_get_weight_loss_progress": 183,
-    "mcp/tools_hevy_routine.py::_action_draft_custom": 169,
+    "mcp/tools_hevy_routine.py::_action_draft_custom": 163,
     "mcp/tools_journal.py::tool_mark_journal_quote": 161,
     "mcp/tools_labs.py::tool_get_freshness_status": 252,
     "mcp/tools_lifestyle.py::_get_state_of_mind_trend": 176,

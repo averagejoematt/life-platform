@@ -38,6 +38,7 @@ from common.repo_config import config_dir
 
 from training import program_conflicts, program_structure  # #3755 the program as data; #4080 its catalog_gaps() audit
 from training.band_reference import band_key  # #3927: ONE definition of a bodyweight band
+from training.cardio_cues import attach_cardio_cues  # #3700/#5048: the cardio note pass, re-exported for its callers
 from training.movement_catalog import generator_eligible  # #4108: the ONE auto-programming rule
 from training.program_seam import resolve_week_grid  # #3755: ONE source for the week grid
 from training.routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
@@ -573,74 +574,6 @@ def _build_exercise_note(
     facts = history_facts(template_id, history_index, cardio_index=cardio_index, whoop_index=whoop_index)
     history_cue = render_history_cue(facts, weight_index=weight_index)
     return pick_note(history_cue, ai_comment=None, mode=notes_mode)
-
-
-def attach_cardio_cues(
-    spec: Any,
-    catalog: dict[str, Any] | None = None,
-    cardio_index: dict[str, list] | None = None,
-    whoop_index: dict[str, list] | None = None,
-) -> int:
-    """Stamp the deterministic cardio cue onto every cardio block of a RoutineSpec (#3700).
-
-    Returns how many blocks were stamped. Idempotent: a block whose note already opens
-    with "Last:" is left alone, so re-drafting a routine never stacks cues.
-
-    WHY THIS EXISTS SEPARATELY from `_build_exercise_note`. That function is the ADR-068
-    path and now carries cardio too — but `generate_routines`'s selector budgets by
-    LANDMARK MUSCLE (`config/training_landmarks.json` names eleven, none of them cardio),
-    so it never picks a bike. Matthew's real routines get their `cycling` block through
-    `draft_custom`, which builds its blocks from arguments and never reaches
-    `_build_exercise_note`. This is the one call that path needs — it loads its own
-    indexes, fails soft, and takes no plumbing.
-
-    Indexes are loaded here only when not supplied; a failed load leaves every note
-    untouched rather than emptying one.
-    """
-    exercises = list(getattr(spec, "exercises", None) or [])
-    if not exercises:
-        return 0
-    if catalog is None:
-        try:
-            catalog = _load_json("movement_catalog.json")
-        except Exception as e:  # pragma: no cover - config read
-            logger.warning(f"cardio cue: catalog load failed ({e}); notes untouched")
-            return 0
-    if cardio_index is None:
-        try:
-            from training.exercise_history import DEFAULT_LOOKBACK_DAYS, FLOOR_LOOKBACK_DAYS, load_history_indexes
-
-            cardio_index = load_history_indexes(lookback_days=max(DEFAULT_LOOKBACK_DAYS, FLOOR_LOOKBACK_DAYS))[1]
-        except Exception as e:
-            logger.warning(f"cardio cue: history load failed ({e}); notes untouched")
-            return 0
-    if whoop_index is None:
-        try:
-            from training.exercise_history import load_whoop_workout_index
-
-            whoop_index = load_whoop_workout_index()
-        except Exception as e:
-            logger.warning(f"cardio cue: whoop load failed ({e}); cue renders without HR-at-level: {e}")
-            whoop_index = {}
-
-    from training.cardio_progression import cardio_cue
-
-    movements = (catalog or {}).get("movements", {})
-    stamped = 0
-    for ex in exercises:
-        key = str(getattr(ex, "movement_key", "") or "")
-        tid = movements.get(key, {}).get("hevy_template_id_hint") or (key[5:] if key.startswith("tmpl:") else None)
-        if not tid or not (cardio_index or {}).get(tid):
-            continue
-        cue = cardio_cue(tid, cardio_index, whoop_index)
-        if not cue:
-            continue
-        existing = (getattr(ex, "notes", "") or "").strip()
-        if existing.startswith("Last:"):
-            continue  # already carries a cue — never stack
-        ex.notes = f"{cue} — {existing}" if existing else cue
-        stamped += 1
-    return stamped
 
 
 def _enforce_load_floors(

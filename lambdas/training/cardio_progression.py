@@ -596,19 +596,6 @@ def render_cardio_cue(facts: dict[str, Any], verdict: dict[str, Any] | None = No
     return cue
 
 
-def cardio_cue(
-    template_id: str | None,
-    cardio_index: dict[str, list[dict[str, Any]]] | None,
-    whoop_index: dict[str, list[dict[str, Any]]] | None = None,
-) -> str:
-    """facts -> verdict -> cue, in one call. The routine generator's entry point."""
-    facts = cardio_facts(template_id, cardio_index, whoop_index)
-    if facts.get("sessions_count", 0) == 0:
-        return ""
-    verdict = level_verdict(facts.get("series"), facts.get("last_level"))
-    return render_cardio_cue(facts, verdict)
-
-
 def _today() -> date:  # pragma: no cover - trivial seam kept for symmetry with exercise_history
     from common.pacific_time import pacific_today
 

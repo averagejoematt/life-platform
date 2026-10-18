@@ -1,0 +1,121 @@
+{
+ "_source": "read-only DynamoDB 2026-10-18: USER#matthew#ROUTINE#014e1142aaad30b3b3b1fb5e90046dc2 VERSION#current (cycling block), the D8F7F851 cycling sessions before 2026-10-18 via exercise_history.load_history_indexes, and shared_quantities.recent_aerobic_layer('2026-10-18') totals",
+ "target_date": "2026-10-18",
+ "archetype": "push",
+ "minutes": 20,
+ "live_note": "Last: level 11, 10.60 mi in 45:30 (14.0 mph) — 16 Oct [\"Level 11 flat\"] · his calibration: L9-10 is easy (25 Jun) — Recumbent, 20 min, talk test — full sentences throughout. No HR target. Not the treadmill: 168-min walk yesterday, week already 1.7 h over the ramp. Builds aerobic base without loading feet. Optional if in AF.",
+ "cycling_sessions": [
+  {
+   "date": "2026-10-16",
+   "name": "Cycling",
+   "note": "Level 11 flat",
+   "duration_sec": 2730.0,
+   "distance_m": 17059.0,
+   "session_start": "2026-10-16T22:22:35+00:00",
+   "session_end": "2026-10-17T01:00:29+00:00"
+  },
+  {
+   "date": "2026-10-15",
+   "name": "Cycling",
+   "note": "Level 11 flat",
+   "duration_sec": 1800.0,
+   "distance_m": 10783.0,
+   "session_start": "2026-10-15T23:52:44+00:00",
+   "session_end": "2026-10-16T02:03:27+00:00"
+  },
+  {
+   "date": "2026-10-13",
+   "name": "Cycling",
+   "note": "Level 11 flat",
+   "duration_sec": 1620.0,
+   "distance_m": 9656.0,
+   "session_start": "2026-10-14T00:09:32+00:00",
+   "session_end": "2026-10-14T01:48:32+00:00"
+  },
+  {
+   "date": "2026-10-11",
+   "name": "Cycling",
+   "note": "Level 11 flat",
+   "duration_sec": 2830.0,
+   "distance_m": 16093.0,
+   "session_start": "2026-10-11T19:09:01+00:00",
+   "session_end": "2026-10-11T21:52:50+00:00"
+  },
+  {
+   "date": "2026-10-09",
+   "name": "Cycling",
+   "note": "Level 11 flat",
+   "duration_sec": 3000.0,
+   "distance_m": 18588.0,
+   "session_start": "2026-10-09T22:31:13+00:00",
+   "session_end": "2026-10-10T01:08:25+00:00"
+  },
+  {
+   "date": "2026-10-06",
+   "name": "Cycling",
+   "note": "Level 12 flat",
+   "duration_sec": 3000.0,
+   "distance_m": 19038.0,
+   "session_start": "2026-10-06T22:44:33+00:00",
+   "session_end": "2026-10-07T01:05:22+00:00"
+  },
+  {
+   "date": "2026-10-04",
+   "name": "Cycling",
+   "note": "Level 12 flat",
+   "duration_sec": 2400.0,
+   "distance_m": 15208.0,
+   "session_start": "2026-10-04T20:29:38+00:00",
+   "session_end": "2026-10-04T22:56:00+00:00"
+  },
+  {
+   "date": "2026-10-02",
+   "name": "Cycling",
+   "note": "Level 12 flat",
+   "duration_sec": 3000.0,
+   "distance_m": 18990.0,
+   "session_start": "2026-10-02T22:01:50+00:00",
+   "session_end": "2026-10-03T00:36:55+00:00"
+  },
+  {
+   "date": "2026-10-01",
+   "name": "Cycling",
+   "note": "Level 12 flat",
+   "duration_sec": 3000.0,
+   "distance_m": 18829.0,
+   "session_start": "2026-10-01T22:06:07+00:00",
+   "session_end": "2026-10-02T00:23:34+00:00"
+  },
+  {
+   "date": "2026-06-25",
+   "name": "Cycling",
+   "note": "L9-10 i think is easy",
+   "duration_sec": 2400.0,
+   "distance_m": 15192.0,
+   "session_start": "2026-06-25T12:19:27+00:00",
+   "session_end": "2026-06-25T14:25:25+00:00"
+  }
+ ],
+ "recent_aerobic": {
+  "state": "read",
+  "totals": {
+   "weight_bearing_hr_48h": 2.8,
+   "week_to_date": {
+    "start": "2026-10-12",
+    "end": "2026-10-17",
+    "hours": 9.13,
+    "prior_week": {
+     "start": "2026-10-05",
+     "end": "2026-10-11",
+     "hours": 6.39
+    },
+    "ramp_hr_per_wk_max": 1.0,
+    "ramp_ceiling_hr": 7.39,
+    "target_hr_wk": 12.0,
+    "over_ramp": true,
+    "over_target": false
+   }
+  }
+ },
+ "_privacy": "public repo: only the October rides (+ the 2026-06-25 calibration ride) are kept, and two notes are trimmed to their level/calibration clause (2026-10-13, 2026-06-25) — the parsed level and the calibration anchor are unchanged"
+}

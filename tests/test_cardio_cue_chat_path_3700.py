@@ -47,8 +47,10 @@ from unittest.mock import MagicMock, patch
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
+os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 
 from training import (  # noqa: E402
+    cardio_note as cn,
     cardio_progression as cp,
     exercise_history as eh,
 )
@@ -147,6 +149,7 @@ def _draft_custom(exercises: list[dict[str, Any]], **extra: Any):
         patch("training.routine_repo.draft_versioned", side_effect=lambda ir: captured.setdefault("ir", ir)),
         patch.object(eh, "load_history_indexes", return_value=(hist, cardio)),
         patch.object(eh, "load_whoop_workout_index", return_value=whoop),
+        patch("mcp.shared_quantities.recent_aerobic_layer", return_value=None),  # #5048: unread week -> flat, no I/O
     ):
         out = t.tool_manage_hevy_routine(args)
     return out, captured.get("ir")
@@ -155,10 +158,11 @@ def _draft_custom(exercises: list[dict[str, Any]], **extra: Any):
 # ── residual 1: the chat path reaches the cue ─────────────────────────────────────────
 
 
-def test_a_chat_drafted_cycling_block_carries_the_SAME_cue_the_cron_path_stamps():
+def test_a_chat_drafted_cycling_block_carries_the_SAME_note_the_cron_path_stamps():
     """The whole residual, stated as one equality: the note a chat-authored cycling block
-    gets must be byte-identical to what `cardio_cue` renders for the cron path. Two paths
-    that "both have a cue" but disagree on its content is the next defect, not the fix.
+    gets must be byte-identical to what the one composer (`training.cardio_note.compose`,
+    #5048) writes from the same history. Two paths that "both have a cue" but disagree on
+    its content is the next defect, not the fix.
 
     Mutation control: delete the `attach_cardio_cues(ir)` call in `_action_draft_custom` —
     the block's note is '' and this reds on the first assertion.
@@ -173,8 +177,21 @@ def test_a_chat_drafted_cycling_block_carries_the_SAME_cue_the_cron_path_stamps(
     )
     assert out["status"] == "drafted_custom"
     bike = next(b for b in ir.exercises if b.movement_key == "cycling")
-    assert bike.notes == cp.cardio_cue(CYCLING_TID, cardio, whoop)
-    assert bike.notes.startswith("Last: level 15, 10.70 mi in 45:00 (14.3 mph)")
+    facts = cp.cardio_facts(CYCLING_TID, cardio, whoop)
+    want, _ = cn.compose(
+        movement_key="cycling",
+        minutes=45,
+        target_date="2026-09-20",
+        archetype="push",
+        facts=facts,
+        verdict=cp.level_verdict(facts["series"], facts["last_level"]),
+        prior_week_shapes=cn.week_shapes(cardio[CYCLING_TID], "2026-09-14", "2026-09-20"),
+        hr_ceiling_bpm=120,
+    )
+    assert bike.notes == want
+    # the level is still DERIVED from the last ride (level 15, 19 Sep) — the "Last: …" sentence is not printed
+    assert bike.notes.startswith("Recumbent bike · 45 min · level 15 ")
+    assert "Last:" not in bike.notes
     # the strength block is untouched — the cardio arm never reaches a barbell
     assert next(b for b in ir.exercises if b.movement_key == "barbell_bench_press").notes == ""
     assert out["cardio_cues"] == 1
@@ -191,25 +208,27 @@ def test_a_chat_drafted_treadmill_block_gets_its_OWN_shape_not_the_bikes():
     """
     out, ir = _draft_custom([{"movement_key": "treadmill", "sets": [{"duration_seconds": 3600}]}])
     tread = next(b for b in ir.exercises if b.movement_key == "treadmill")
-    assert tread.notes.startswith("Last: 2.99 mi in 1:00:00 (3.0 mph)")
-    assert '["0.5 incline 3mph"]' in tread.notes  # his own words, verbatim
+    assert tread.notes.split("\n")[0] == "Treadmill · 60 min · flat · talk-test pace, full sentences, average HR ≤ 120 bpm"
+    assert cn.LINE1_RE.match(tread.notes.split("\n")[0])
     assert "level" not in tread.notes.lower()  # no level exists in his treadmill notes; none may be implied
     assert out["cardio_cues"] == 1
 
 
-def test_the_authors_own_note_survives_in_front_of_the_cue():
-    """A chat-authored block often carries the coach's instruction for the day. The
-    baseline rides IN FRONT of it; it never replaces it.
+def test_the_authors_own_note_is_replaced_by_the_prescription_and_kept_on_the_snapshot():
+    """#5048 reverses #3700's "the author's note rides behind the cue": the stacked prose WAS the
+    noise the owner could not act on. The prescription replaces it, and the replaced words are kept
+    on `inputs_snapshot["cardio_notes_replaced"]` so nothing is silently lost.
 
-    Mutation control: assign `ex.notes = cue` unconditionally in `attach_cardio_cues` —
-    the authored instruction is destroyed and this reds.
+    Mutation control: drop the `replaced.append(...)` in `attach_cardio_cues` — the authored text
+    vanishes from the record and this reds.
     """
     _, ir = _draft_custom(
         [{"movement_key": "cycling", "notes": "Level 10 flat, 40 min, hold 115-120 bpm", "sets": [{"duration_seconds": 2400}]}]
     )
     bike = ir.exercises[0]
-    assert bike.notes.startswith("Last: level 15,")
-    assert bike.notes.endswith("— Level 10 flat, 40 min, hold 115-120 bpm")
+    assert bike.notes.startswith("Recumbent bike · 40 min · level 15 ")
+    assert "hold 115-120 bpm" not in bike.notes
+    assert ir.inputs_snapshot["cardio_notes_replaced"] == [{"movement_key": "cycling", "notes": "Level 10 flat, 40 min, hold 115-120 bpm"}]
 
 
 def test_the_cue_is_on_the_PERSISTED_draft_because_that_is_what_commit_pushes():
@@ -231,6 +250,7 @@ def test_the_cue_is_on_the_PERSISTED_draft_because_that_is_what_commit_pushes():
         patch("training.routine_repo.draft_versioned", side_effect=_capture),
         patch.object(eh, "load_history_indexes", return_value=({}, cardio)),
         patch.object(eh, "load_whoop_workout_index", return_value=_whoop_index()),
+        patch("mcp.shared_quantities.recent_aerobic_layer", return_value=None),
     ):
         t.tool_manage_hevy_routine(
             {
@@ -240,7 +260,7 @@ def test_the_cue_is_on_the_PERSISTED_draft_because_that_is_what_commit_pushes():
                 "exercises": [{"movement_key": "cycling", "sets": [{"duration_seconds": 2700}]}],
             }
         )
-    assert persisted["notes"][0].startswith("Last: level 15,")
+    assert persisted["notes"][0].startswith("Recumbent bike · 45 min · level 15 ")
 
 
 def test_a_strength_only_chat_draft_reports_zero_rather_than_omitting_the_count():
@@ -266,6 +286,8 @@ def test_a_history_load_failure_never_costs_the_chat_draft():
     with (
         patch("training.routine_repo.draft_versioned", side_effect=lambda ir: captured.setdefault("ir", ir)),
         patch.object(eh, "load_history_indexes", side_effect=RuntimeError("ddb down")),
+        patch.object(eh, "load_whoop_workout_index", return_value={}),
+        patch("mcp.shared_quantities.recent_aerobic_layer", return_value=None),
     ):
         out = t.tool_manage_hevy_routine(
             {
@@ -277,7 +299,7 @@ def test_a_history_load_failure_never_costs_the_chat_draft():
         )
     assert out["status"] == "drafted_custom"
     assert out["cardio_cues"] == 0
-    assert captured["ir"].exercises[0].notes == "easy flush"
+    assert captured["ir"].exercises[0].notes == "easy flush"  # no level can be derived, so the authored note stands
 
 
 # ── residual 2: the n-floor, seen refusing on a planted real ride ─────────────────────
@@ -367,6 +389,7 @@ def test_the_chat_path_inherits_the_refusal_rather_than_re_deciding_it():
     indexes = _indexes([_ride("2026-09-07", "Level 9 - 5.6 miles", 1800.0, 9012.0)])
     _, ir = _draft_custom([{"movement_key": "cycling", "sets": [{"duration_seconds": 1800}]}], indexes=indexes)
     note = ir.exercises[0].notes
-    assert note.startswith("Last: level 9, 5.60 mi in 30:00 (11.2 mph)")
-    for banned in CLAIM_WORDS:
+    assert note.startswith("Recumbent bike · 30 min · level 9 flat")  # held at the ride's level, never raised at n=1
+    # "hold level 9" is now the recovery instruction (#5048), not a progress claim — every other claim word stays banned
+    for banned in [w for w in CLAIM_WORDS if w != "hold level"]:
         assert banned not in note.lower(), (banned, note)
