@@ -26,6 +26,7 @@ from decimal import Decimal
 import pytest
 from common.constants import EXPERIMENT_START_DATE  # #3728: the cycle genesis the scope fields name
 from content import output_writers as ow
+from content.dexa_fields import dexa_body_comp
 
 # ==============================================================================
 # FIXED CLOCK
@@ -1062,7 +1063,7 @@ def test_write_clinical_json_body_comp_from_the_latest_dexa_scan():
 
 def test_dexa_body_comp_older_scan_has_no_indices_and_ffmi_is_null_not_invented():
     # The 2025-05-10 live row: `bone.{t_score,z_score}` and `interpretations.{strengths,goals_6mo}` — no `indices`.
-    bc = ow._dexa_body_comp(
+    bc = dexa_body_comp(
         {
             "scan_date": "2025-05-10",
             "body_composition": {"body_fat_pct": 30.0, "lean_mass_lb": 180.0, "fat_mass_lb": 90.0},
@@ -1075,7 +1076,7 @@ def test_dexa_body_comp_older_scan_has_no_indices_and_ffmi_is_null_not_invented(
 
 
 def test_dexa_body_comp_does_not_read_the_retired_names_no_live_row_holds():
-    bc = ow._dexa_body_comp(
+    bc = dexa_body_comp(
         {
             "scan_date": "2026-01-01",
             "body_composition": {"lean_mass_lbs": 1.0, "fat_mass_lbs": 2.0},

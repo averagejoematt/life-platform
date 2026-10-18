@@ -80,6 +80,8 @@ def _safe_float(rec, field, default=None):
 
 from common.digest_utils import d2f as _d2f, dedup_activities_multidevice as _dedup_activities  # shared bundled helpers (#970, #2816)
 
+from content.dexa_fields import dexa_body_comp  # live DEXA field names (epic #4625)
+
 
 def _get_current_phase(profile, current_weight_lbs):
     phases = profile.get("weight_loss_phases", [])
@@ -654,27 +656,6 @@ def _steps_28d(whoop_30d, apple_28d, today):
     return steps_series({"whoop": whoop_28d, "apple_health": apple_28d})
 
 
-def _dexa_body_comp(dexa):
-    """The clinical.json `body_comp` block off a DEXA scan row, read from the LIVE field names.
-
-    The live rows (`SOURCE#dexa`, SCHEMA.md) hold `body_composition.{lean_mass_lb, fat_mass_lb,
-    visceral_fat_g}`, `bone.t_score` and — on the newer scan only — `indices.ffmi_kg_m2`. This reader
-    once looked for `bone_density`, `interpretations.ffmi` and `*_lbs`, none of which any row holds
-    (epic #4625), so every figure but body fat read null. A field the scan does not hold is None —
-    never a fabricated 0 and never a neighbour's value (the 2025 scan has no FFMI).
-    """
-    bc = dexa.get("body_composition") or {}
-    return {
-        "scan_date": dexa.get("scan_date"),
-        "body_fat_pct": _d2f(bc.get("body_fat_pct")),
-        "ffmi": _d2f((dexa.get("indices") or {}).get("ffmi_kg_m2")),
-        "lean_mass_lbs": _d2f(bc.get("lean_mass_lb")),
-        "fat_mass_lbs": _d2f(bc.get("fat_mass_lb")),
-        "visceral_fat_g": _d2f(bc.get("visceral_fat_g")),
-        "bmd_t_score": _d2f((dexa.get("bone") or {}).get("t_score")),
-    }
-
-
 def write_clinical_json(data, profile, yesterday):
     """Write dashboard/clinical.json to S3 for the clinical summary view."""
     try:
@@ -730,7 +711,7 @@ def write_clinical_json(data, profile, yesterday):
             )
             if resp.get("Items"):
                 dexa = resp["Items"][0]
-                body_comp = _dexa_body_comp(dexa)
+                body_comp = dexa_body_comp(dexa)
         except Exception as e:
             print("[WARN] Clinical: DEXA query failed: " + str(e))
 
