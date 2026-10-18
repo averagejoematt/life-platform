@@ -485,6 +485,7 @@ Note: the XML import path (`apple_health_lambda.py` `QUANTITY_RECORDS`) writes m
 | `walking_step_length_in` | number | Average step length (inches) — earliest aging gait marker |
 | `walking_asymmetry_pct` | number | Left/right gait asymmetry (%) — injury/compensation indicator |
 | `walking_double_support_pct` | number | Double support time (%) — balance/fall risk proxy |
+| `_rd_walking_speed_mph`, `_rd_walking_step_length_in`, `_rd_walking_double_support_pct`, `_rd_walking_asymmetry_pct` | map | Reading-level map {timestamp: quantity} (#4628) — the gait day value is the MEAN of this merged map, so an incremental sync no longer overwrites the day with its own average |
 
 Note: Gait metrics are Apple Watch exclusive. Walking speed <1.0 m/s (2.24 mph) is a clinical flag. Sustained asymmetry >3-4% indicates compensation for pain/injury. These fields are available from v1.1.0 of the webhook Lambda.
 

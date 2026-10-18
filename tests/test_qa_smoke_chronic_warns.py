@@ -127,6 +127,12 @@ SANCTIONED_CHRONIC_SITES = {
     # single night with zero marginal information, which is exactly the ADR-105 condition
     # this flag exists for. Un-chronic the branch when the ruling lands.
     ("week_agreement_qa.py", "check_absence_agreement"),
+    # #4628, class (b) — the Apple Health additive integrity read's SHORTFALL branch, pinned
+    # to the filed #4628. Today's writer keeps the largest sync, not the day, so the
+    # shortfall recurs every night until the writer fix lands, and that fix waits on the
+    # storage-shape ruling (#4644 Q2/Q3). The unreadable-archive and not-evaluable
+    # branches stay alarmed. Un-chronic (make it a FAIL) in the writer-fix PR.
+    ("hae_additive_integrity_qa.py", "check_hae_additive_integrity"),
 }
 
 
