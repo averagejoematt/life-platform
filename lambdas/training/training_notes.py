@@ -38,6 +38,8 @@ from typing import Any
 
 from common.pacific_time import pacific_today  # #2798: workout DATE# keys name Pacific days
 
+from training.pinned_setup import is_setup_only, split_setup  # #5010: owner-marked setup lines
+
 # The head-key scheme lives in ONE module (#3918) and is re-exported here, so every
 # existing `training_notes.<helper>` caller — and every monkeypatch of one — is unchanged.
 from training.training_notes_keys import (  # noqa: F401
@@ -616,14 +618,18 @@ def extract_signals(note_text: str, llm_fn=None, date=None, user: str = "matthew
     Returns the signal record body (no pk/sk — the writer keys it by exercise).
     """
     raw = note_text or ""
-    det = deterministic_pass(raw, date=date, user=user)
+    # #5010: owner-marked setup lines (a Hevy pinned note copied into the session, if Hevy
+    # does that) never reach the session parsers — "seat 5 / level 11" is not today's level.
+    # Pain is still read over the WHOLE raw note: the floor is never narrowed (Invariant 5).
+    session, setup = split_setup(raw)
+    det = deterministic_pass(session, date=date, user=user)
     pain_det = pain_lexicon_hit(raw)
     llm: list[dict[str, Any]] = []
     degraded, used_llm = False, False
     degraded_reason = None
-    if llm_fn is not None:
+    if llm_fn is not None and session:
         try:
-            llm = llm_fn(raw, TAXONOMY) or []
+            llm = llm_fn(session, TAXONOMY) or []
             used_llm = True
         except Exception as e:  # noqa: BLE001
             degraded = True  # keep deterministic, never drop (Invariant 4)
@@ -639,7 +645,11 @@ def extract_signals(note_text: str, llm_fn=None, date=None, user: str = "matthew
             logger.warning("training_notes llm degraded: %s", degraded_reason)
     signals, pain_flag = merge_signals(det, llm, pain_det)
     extracted_by = "hybrid" if (used_llm and det) else ("haiku" if used_llm else "deterministic")
+    # The two tag fields exist ONLY when a marked line is present, so every untagged note's
+    # record — and its extraction fingerprint — is byte-identical to before #5010.
+    tags = {"setup_raw": setup, "setup_only": not session} if setup else {}
     return {
+        **tags,
         "note_raw": raw,  # verbatim, never mutated (Invariant 1/3)
         "note_hash": note_hash(raw),
         "signals": signals,
@@ -695,6 +705,16 @@ def build_workout_note_items(date, workout_uid, exercises, user="matthew", now_i
     return items
 
 
+def _setup_only_occurrences(exercises) -> dict:
+    """{template_id: {occurrence, …}} for the exercises whose note is ONLY marked setup text."""
+    out: dict[str, set] = {}
+    for ex, occ in zip(exercises or [], occurrence_indices(exercises)):
+        if is_setup_only(ex.get("notes")):
+            tid, _ = normalize_exercise_key(ex)
+            out.setdefault(tid, set()).add(occ)
+    return out
+
+
 def training_notes_health(table, lookback_days=14, user="matthew") -> dict:
     """Silent-failure guard (brief §8): are recent NON-EMPTY notes producing real records,
     or is the extractor dark? Flags when noted sessions have no projection record
@@ -733,10 +753,20 @@ def training_notes_health(table, lookback_days=14, user="matthew") -> dict:
     except Exception as e:  # noqa: BLE001
         return {"checked": False, "error": str(e)}
 
+    setup_only = 0
     for w in wresp.get("Items", []):
         wdate = w.get("date")
         wid = workout_id_of_raw_row(w)
-        for tid, occs in noted_occurrences_by_template(w.get("exercises", []) or []).items():
+        exs = w.get("exercises", []) or []
+        setup_occs = _setup_only_occurrences(exs)
+        for tid, all_occs in noted_occurrences_by_template(exs).items():
+            # #5010: a note that is ONLY owner-marked setup text is the same standing text
+            # every session; counting it would make every logged session "noted".
+            skip = setup_occs.get(tid, set())
+            occs = [o for o in all_occs if o not in skip]
+            setup_only += len(all_occs) - len(occs)
+            if not occs:
+                continue
             noted += len(occs)
             try:
                 r = table.query(
@@ -744,7 +774,7 @@ def training_notes_health(table, lookback_days=14, user="matthew") -> dict:
                     ProjectionExpression="#s, degraded, degraded_reason",
                     ExpressionAttributeNames={"#s": "sk"},
                 )
-                found = dedupe_head_rows(r.get("Items", []))
+                found = {o: row for o, row in dedupe_head_rows(r.get("Items", [])).items() if o not in skip}
             except Exception:  # noqa: BLE001
                 missing += len(occs)
                 continue
@@ -773,6 +803,7 @@ def training_notes_health(table, lookback_days=14, user="matthew") -> dict:
         "checked": True,
         "lookback_days": lookback_days,
         "noted_exercise_sessions": noted,
+        "setup_only_notes_excluded": setup_only,  # #5010: owner-marked setup text, not a session note
         "records_found": have_record,
         "degraded": degraded,
         "degraded_reasons": reasons,  # #3699: {code: count}; `unrecorded` = written before the reason field existed
