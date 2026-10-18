@@ -134,6 +134,9 @@ export function renderZone2(d) {
   const sports = Array.isArray(d.sport_breakdown) ? d.sport_breakdown : [];
   const s = d.summary || {};
   const parts = [];
+  // #5029: Zone 2 is counted in heart-rate zones — inside an HR regime marker's window the
+  // API attaches `hr_regime` and the panel says re-baselining; no good/bad label is drawn.
+  if (d.hr_regime) parts.push(`<p class="rd-meta label">${esc(d.hr_regime.note || "Heart-rate-derived numbers are re-baselining.")}</p>`);
 
   // Altitude 1 — this week vs the 150-min reference (targetSpine reuse).
   //

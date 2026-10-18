@@ -39,6 +39,7 @@ from common.pacific_time import (  # #1964/#1955/#3609 — the canonical frame, 
 )
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.phase_filter import with_phase_filter
+from health import hr_regime as _hr_regime  # #5029: THE dated HR regime markers
 
 from web.bundle_counts import load_bundle_counts
 from web.platform_counts import DISCOVERED_COUNTS
@@ -1194,3 +1195,21 @@ def prereg_amendments(genesis: str) -> list:
             }
         )
     return out
+
+
+def hr_regime_public(as_of: str) -> dict | None:
+    """#5029: the reader-facing reduction of `health.hr_regime.regime_status(as_of)`, else None.
+
+    A site payload that serves a heart-rate-derived figure (Zone 2 minutes, HRV, RHR, recovery)
+    attaches this while a regime marker's re-baselining window is active, and the front-end
+    draws no good/bad colour from that figure. Only the state, the window's last day and the
+    components are published — never the marker's kind, its memory reference or its note."""
+    st = _hr_regime.regime_status(as_of)
+    if st is None:
+        return None
+    return {
+        "state": st["state"],
+        "through": st["window_end"],
+        "components": sorted(st["components"]),
+        "note": f"Heart-rate-derived numbers are re-baselining through {st['window_end']}: no good/bad label is drawn from them.",
+    }

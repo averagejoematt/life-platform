@@ -32,6 +32,7 @@ from web.site_api_common import (
     _error,
     _ok,
     _query_source,
+    hr_regime_public,
     logger,
 )
 
@@ -364,6 +365,7 @@ def _compute_zone2_breakdown(
         "period": {"start_date": sessions[0]["date"], "end_date": last_activity_date, "weeks_analyzed": n_weeks},
         "weekly_target_min": weekly_target_min,
         "pacific_today": pt_today,  # #3286: the frame the week boundary was drawn in, stated
+        "hr_regime": hr_regime_public(pt_today),  # #5029: HR-zone minutes re-baseline inside a marker's window
         "current_week": current_week,
         "latest_active_week": weeks[-1] if weeks else None,
         "weeks": weeks,

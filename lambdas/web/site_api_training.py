@@ -29,6 +29,7 @@ from web.site_api_common import (
     _error,
     _ok,
     _window_span,
+    hr_regime_public,
     logger,
 )
 
@@ -632,6 +633,9 @@ def training_overview(*, _g) -> dict:
                 # (a capped 100 hid that it was an average at all); z2_trailing_7d_min is
                 # the current week — the number that goes quiet when training stops.
                 "z2_pct": z2_pct,
+                # #5029: Zone 2 minutes are counted in heart-rate zones — inside an HR regime
+                # marker's window the front-end labels them re-baselining, never a colour claim.
+                "hr_regime": hr_regime_public(today),
                 "z2_trailing_7d_min": round(z2_trailing_7d),
                 # #4627: the window the trailing figure covers (7 dates) and what it is.
                 "z2_trailing_7d_window": {k: z2_7d[k] for k in ("start_date", "end_date", "dates", "zone_2_minutes", "by_source")},

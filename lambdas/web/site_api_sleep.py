@@ -28,9 +28,15 @@ from web.site_api_common import (
     PT,
     _ok,
     _window_span,
+    hr_regime_public,
     logger,
     night_of_for,
 )
+
+
+def _rounded(rec, field, ndigits):
+    """`round(float(rec[field]), ndigits)` when the field is truthy, else None (the sleep_detail rule)."""
+    return round(float(rec.get(field, 0)), ndigits) if rec.get(field) else None
 
 
 def _sane_sleep_score(raw, hours, whoop_quality):
@@ -808,13 +814,13 @@ def sleep_detail(*, _g) -> dict:
                 # #495/M-9: when the recovery/HRV/RHR trio above comes from a different
                 # night than the Eight Sleep record, this carries that night's date (else null).
                 "recovery_night_of": recovery_night_of,
-                "hrv": round(float(whoop_recovery_rec.get("hrv", 0)), 1) if whoop_recovery_rec.get("hrv") else None,
-                "rhr": (
-                    round(float(whoop_recovery_rec.get("resting_heart_rate", 0)), 0)
-                    if whoop_recovery_rec.get("resting_heart_rate")
-                    else None
-                ),
+                "hrv": _rounded(whoop_recovery_rec, "hrv", 1),
+                "rhr": _rounded(whoop_recovery_rec, "resting_heart_rate", 0),
                 "score_status": score_status,
+                # #5029: the recovery / HRV / RHR above are heart-rate-derived — inside an HR regime
+                # marker's window they carry this block and no good/bad label (score_status is the
+                # sleep score's, not theirs).
+                "hr_regime": hr_regime_public(today),
                 "deep_pct": round(float(latest.get("deep_pct", 0)), 1) if latest.get("deep_pct") else None,
                 "rem_pct": round(float(latest.get("rem_pct", 0)), 1) if latest.get("rem_pct") else None,
                 "light_pct": round(float(latest.get("light_pct", 0)), 1) if latest.get("light_pct") else None,

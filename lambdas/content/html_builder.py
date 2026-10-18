@@ -16,6 +16,8 @@ from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.pacific_time import day_in_words, shift_day_key  # #4182: dates in words, one PT spelling
 from health.scoring_engine import habitify_reading  # #4362
 
+from content import brief_hr_regime  # #5029: the brief's reading of the HR regime markers
+
 _HAS_CONFIDENCE = True
 
 # ==============================================================================
@@ -473,7 +475,7 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
 
     Returns the HTML fragment for these sections; behavior-preserving extraction.
     """
-    out = ""
+    out, hr_rebase = "", brief_hr_regime.rebaselining(data)  # #5029: HR-derived labels withheld in the window
     # --- Scorecard ---
     try:
         out += "<!-- S:scorecard -->"
@@ -495,19 +497,7 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
         ]
 
         for label, score, emoji in score_items:
-            if score is None:
-                color = "#475569"
-                score_txt = "—"
-            elif score >= 80:
-                color = "#22c55e"
-                score_txt = str(score)
-            elif score >= 60:
-                color = "#f59e0b"
-                score_txt = str(score)
-            else:
-                color = "#ef4444"
-                score_txt = str(score)
-
+            color, score_txt = brief_hr_regime.score_tile(label, score, hr_rebase)
             out += (
                 '<div style="background:#1e293b;border-radius:8px;padding:10px;text-align:center;">'
                 '<p style="font-size:16px;margin:0;">' + emoji + "</p>"
@@ -608,6 +598,7 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
                 + str(round(hrv_val))
                 + "ms yesterday · "
                 + trend_s
+                + brief_hr_regime.hrv_line_suffix(hr_rebase)
                 + "</span></p>"
             )
 
@@ -696,48 +687,9 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
     except Exception as _e:
         out += _section_error_html("Scorecard", _e)
 
-    # --- Readiness Signal ---
+    # --- Readiness Signal --- (#5029: RE-BASELINING inside an HR regime marker's window)
     try:
-        out += "<!-- S:readiness -->"
-        r_colors = {"green": "#22c55e", "yellow": "#f59e0b", "red": "#ef4444", "gray": "#64748b"}
-        r_labels = {"green": "GO", "yellow": "MODERATE", "red": "EASY DAY", "gray": "NO DATA"}
-        r_emojis = {"green": "🟢", "yellow": "🟡", "red": "🔴", "gray": "⚪"}
-        r_recs = {
-            "green": "System is ready. Hard training or high-focus work OK.",
-            "yellow": "Moderate effort day. Zone 2 or moderate strength.",
-            "red": "Recovery day. Walk, stretch, or easy Zone 2 only.",
-            "gray": "No readiness data available.",
-        }
-        r_col = r_colors.get(readiness_colour, "#64748b")
-        out += (
-            '<div style="background:#1e293b;padding:16px 24px;border-bottom:1px solid #2d2d5e;">'
-            '<div style="display:flex;align-items:center;gap:12px;">'
-            '<div style="background:rgba(0,0,0,0.3);border-radius:50%;width:48px;height:48px;'
-            'display:flex;align-items:center;justify-content:center;font-size:24px;">' + r_emojis.get(readiness_colour, "⚪") + "</div>"
-            '<div><p style="color:#94a3b8;font-size:10px;margin:0;font-weight:700;">READINESS SIGNAL</p>'
-            '<p style="color:' + r_col + ';font-size:20px;font-weight:700;margin:2px 0;">' + r_labels.get(readiness_colour, "—") + "</p>"
-            '<p style="color:#64748b;font-size:11px;margin:0;">' + r_recs.get(readiness_colour, "") + "</p>"
-            "</div></div>"
-        )
-
-        whoop = data.get("whoop") or {}
-        recovery = safe_float(whoop, "recovery_score")
-        strain = safe_float(whoop, "strain")
-        rhr = safe_float(whoop, "resting_heart_rate")
-        if recovery or strain or rhr:
-            out += '<div style="margin-top:10px;display:flex;gap:16px;">'
-            for r_label, r_val in [
-                ("Recovery", str(round(recovery)) + "%" if recovery else "—"),
-                ("Strain", str(round(strain, 1)) if strain else "—"),
-                ("RHR", str(round(rhr)) + " bpm" if rhr else "—"),
-            ]:
-                out += (
-                    '<div><p style="color:#e2e8f0;font-size:14px;font-weight:600;margin:0;">' + r_val + "</p>"
-                    '<p style="color:#475569;font-size:9px;margin:0;">' + r_label + "</p></div>"
-                )
-            out += "</div>"
-
-        out += "</div><!-- /S:readiness -->"
+        out += brief_hr_regime.readiness_signal_html(data, readiness_colour)
     except Exception as _e:
         out += _section_error_html("Readiness", _e)
 
@@ -943,7 +895,7 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
             acwr_reason = str(computed_metrics.get("acwr_alert_reason", ""))
             if acwr_val is not None:
                 _av = float(acwr_val)
-                acwr_color = "#ef4444" if acwr_alert else "#f59e0b" if _av > 1.3 or _av < 0.8 else "#22c55e"
+                acwr_color = brief_hr_regime.acwr_colour(_av, acwr_alert, data)  # #5029: no green inside the window
                 zone_label = acwr_zone.upper() if acwr_zone else ""
                 out += (
                     '<p style="color:#475569;font-size:10px;margin:4px 0 0;">'
