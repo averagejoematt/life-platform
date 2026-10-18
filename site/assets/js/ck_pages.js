@@ -311,6 +311,32 @@ export function recordLine(block) {
   if (!usable(block) || !block.data.count_text || !String(block.data.comparison_text || "").trim()) return "";
   return `${String(block.data.count_text).trim()} ${guessClause(block.data)}`;
 }
+// Site-to-A round 1 (front:F4, item 3): on the front page and Start the comparison is ONE sayable
+// sentence — the served `baseline` sentence when the edition carries it (lane E: a string, or
+// {text}), else "The coaches do not beat a simple guess yet." from the served verdict — and the
+// exact rate (guessClause) sits one tap deeper, under a <details>. Coaches keeps the precise clause.
+export function guessSentence(d) {
+  // Lane E (lambdas/web/record_words.py) serves the one sentence as `comparison_text`; the capture's older
+  // "So far they do not beat a simple guess." is the same verdict in the unsayable form, so it is re-said.
+  const served = String((d && d.comparison_text) || "").trim();
+  if (served && !/^So far they/.test(served)) return served;
+  if (num(d && d.brier_skill) === null) return "There is no comparison with a guess yet.";
+  return d.beats_simple_guess === true ? "The coaches beat a simple guess." : "The coaches do not beat a simple guess yet.";
+}
+// The exact rate for the tap: lane E's `baseline.text` when served, else the clause computed here.
+export const exactRateText = (d) => (d && d.baseline && typeof d.baseline.text === "string" && d.baseline.text.trim()) || guessClause(d);
+// The record as the front page and Start print it: the count (a door to the coaches when `href`
+// is given — on the count only, never the whole sentence underlined, front:F5), the one guess
+// sentence, and the exact rate folded. A failed block is its own sentence, bare.
+export function recordHTML(block, { href = "" } = {}) {
+  if (!recordLine(block)) return esc((block && block.absent_text) || "");
+  const d = block.data;
+  const count = String(d.count_text).trim();
+  const lead = href ? `<a class="ck-link" href="${esc(href)}">${esc(count)}</a>` : esc(count);
+  const exact = exactRateText(d);
+  const fold = exact && !/no comparison/.test(exact) ? `<details class="ck-small"><summary>The exact rate</summary><p>${esc(exact)}</p></details>` : "";
+  return `${lead} ${esc(guessSentence(d))}${fold}`;
+}
 // The breakdown on Coaches, after one plain sentence that says why there is one: "Not all of
 // them are formal predictions. Of the 183: 11 sealed before day one, …". The served sentence's
 // own "Counted:" lead is dropped; its figures are printed as served.
@@ -451,24 +477,60 @@ export const weekChange = (prevShown, nowShown) => {
   if (!Number.isFinite(d)) return "";
   return d === 0 ? "the same as the week before" : `${d > 0 ? "down" : "up"} ${Math.abs(d).toFixed(1)} this week`;
 };
+// Site-to-A round 1 (start:S6): each prologue says what it is, not one shared line.
+const PROLOGUE_LINES = [
+  [/Part I\b(?! ?I)/, "Who he was before the record."],
+  [/Part II\b/, "The plan, written before day one."],
+];
+export const prologueLine = (p) => (PROLOGUE_LINES.find(([rx]) => rx.test(String(p.label || ""))) || [null, "Before day one."])[1];
+// The weigh-ins inside a chapter's own window (start:S9, item 7): "Day A to Day B" from the
+// served stats line, Day 1 = the start date, against the timeline's readings. The change the row
+// prints is the window's first reading against its last — never a reading from before the window
+// (week 2's "down 8.4 this week" was Day 1's 327.3 against Day 10). "" with fewer than two.
+const dayWindow = (statsLine) => {
+  const m = /Day (\d+) to Day (\d+)/.exec(String(statsLine || ""));
+  return m ? [Number(m[1]), Number(m[2])] : null;
+};
+const isoPlus = (iso, days) => {
+  const t = Date.parse(`${iso}T12:00:00Z`);
+  return Number.isFinite(t) ? new Date(t + days * 86400000).toISOString().slice(0, 10) : "";
+};
+export function windowChange(statsLine, weights, startDate) {
+  const w = dayWindow(statsLine);
+  if (!w || !startDate || !Array.isArray(weights)) return "";
+  const [from, to] = [isoPlus(startDate, w[0] - 1), isoPlus(startDate, w[1] - 1)];
+  const inside = weights.filter((r) => r && typeof r.date === "string" && num(r.lbs) !== null && r.date >= from && r.date <= to).sort((a, b) => a.date.localeCompare(b.date));
+  if (inside.length < 2) return "";
+  const d = Number((inside[0].lbs - inside[inside.length - 1].lbs).toFixed(1));
+  return d === 0 ? "the same across that week" : `${d > 0 ? "down" : "up"} ${Math.abs(d).toFixed(1)} that week`;
+}
 export function chapterStatLine(p, prevShown = "") {
-  if (isPrologue(p)) return "Before day one.";
+  if (isPrologue(p)) return prologueLine(p);
   const raw = lbText(String((p && p.stats_line) || "").split("|")[0].trim());
   if (!raw) return "";
   const change = weekChange(prevShown, _weightOf(p.stats_line));
   const line = raw.replace(/\s*\([-−+]?\d+(?:\.\d+)? this week\)/, change ? `, ${change}` : "");
   return /[.!?]$/.test(line) ? line : `${line}.`;
 }
-export function recapHTML(posts) {
-  let prev = "";
-  const rows = (posts || []).map((p) => {
-    const line = chapterStatLine(p, isPrologue(p) ? "" : prev);
-    if (!isPrologue(p)) prev = _weightOf(p.stats_line) || prev;
-    return { p, line };
-  }).filter((r) => r.p.title && r.line);
+// Site-to-A round 1: the rows are the kit's chapter rows (start:S8), each title a door to its
+// chapter (start:S4), and a week's change is its own window's (`weights` + `startDate`, item 7);
+// without the timeline the row prints the weight and no change — never a delta across windows.
+export function recapHTML(posts, { weights = null, startDate = "" } = {}) {
+  const rows = (posts || [])
+    .map((p) => {
+      let line = chapterStatLine(p, "");
+      const change = isPrologue(p) ? "" : windowChange(p.stats_line, weights, startDate);
+      if (change) line = line.replace(new RegExp(`(${_weightOf(p.stats_line)} ${LB})(?=[ .·])`), `$1, ${change}`);
+      return { p, line };
+    })
+    .filter((r) => r.p.title && r.line);
   if (!rows.length) return "";
-  return `<ul class="ck-coach">${rows
-    .map(({ p, line }) => `<li><span class="ck-coach__who">${esc([String(p.label || "").replace(/^Prologue.*$/, "Start"), p.title].filter(Boolean).join(" · "))}</span><span>${esc(line)}</span></li>`)
+  return `<ul class="ck-rows ck-rows--chapters">${rows
+    .map(({ p, line }) => {
+      const key = String(p.label || "").replace(/^Prologue.*$/, "Start");
+      const title = p.url ? `<a href="${esc(p.url)}">${esc(p.title)}</a>` : `<span>${esc(p.title)}</span>`;
+      return `<li><span class="ck-rows__key">${esc(key)}</span><span>${title}<br><span class="ck-small">${esc(line)}</span></span></li>`;
+    })
     .join("")}</ul>`;
 }
 
@@ -674,9 +736,16 @@ export function frontSlots(edition, b, base = "/") {
   const t = usable(b.today) ? b.today.data : {};
   // His words lead when they are fresh. Silence is not a headline: the plain sentence that
   // there is nothing new sits at the foot of the page instead.
+  // Site-to-A round 1 (front:F16): with no fresh words the row has no door — the page it went to
+  // ended on the same absence sentence — and the sentence keeps its own date.
   const words = hisWordsFresh(b.his_words)
     ? { "ck-words": hisWordsHTML(b.his_words) }
-    : { "ck-words": null, "ck-words-absent": esc(String((b.his_words && b.his_words.absent_text) || "").replace(/ in his own words\b/i, "")) };
+    : {
+        "ck-words": null,
+        // The row keeps its key (a plain span, no door) and its sentence slot; the slot is filled after the row.
+        "ck-words-row": '<span class="ck-rows__key">In his own words</span><span id="ck-words-absent"></span>',
+        "ck-words-absent": esc(String((b.his_words && b.his_words.absent_text) || "").replace(/ in his own words\b/i, "")),
+      };
   // Fresh words lead the page; then the "In his own words" row under Go deeper is not drawn.
   if (hisWordsFresh(b.his_words)) words["ck-words-row"] = null;
   const span = F.weekSpan(b.week);
@@ -685,7 +754,7 @@ export function frontSlots(edition, b, base = "/") {
     // there is a fresh one.
     // Round 8b: every number on the first screen is a door — the record to the coaches, the
     // weight to its trend. A failed block prints its own sentence, with no door.
-    "ck-record": recordLine(b.record) ? `<a href="${esc(base)}coaches/">${esc(recordLine(b.record))}</a>` : esc((b.record && b.record.absent_text) || ""),
+    "ck-record": recordHTML(b.record, { href: `${base}coaches/` }),
     // No weigh-in in the window draws no picture; the slot then says so (#4586 box 2).
     "ck-mark": F.markHTML(usable(b.week) ? b.week.data.weight_series : null, e.as_of, t.start_weight_lbs, t.goal_weight_lbs) || soft(usable(b.week) ? "No weigh-in in the last 28 days." : (b.week && b.week.absent_text) || "The weigh-ins are not served right now."),
     "ck-mark-caption": F.markCaption(b.today, e) ? `<a href="${esc(base)}trend/?m=weight">${F.markCaption(b.today, e)}</a>` : esc((b.today && b.today.absent_text) || ""),
@@ -699,9 +768,21 @@ export function frontSlots(edition, b, base = "/") {
     "ck-coach-lines": F.coachTodayHTML(b.coach_lines),
     // Go deeper: the week is one row (its own page, /week/), the chapter one row.
     "ck-week-span": esc(span ? `How the whole thing is going · ${span}` : "How the whole thing is going"),
-    "ck-chapter-row": F.chapterRowHTML(b.chapter),
+    "ck-chapter-row": F.chapterRowHTML(latestChapterBlock(b)),
     "ck-follow-line": esc(F.followLine(b.next)),
   };
+}
+// The latest chapter for the front page's row: the chapter block, which is the latest published
+// chapter, with lane E's `data.latest` {week, label, date, status} bound over its label and date
+// when served. Defensive — an unserved field changes nothing.
+export function latestChapterBlock(b) {
+  if (!usable(b.chapter)) return b.chapter;
+  const latest = b.chapter.data.latest;
+  if (!latest || typeof latest !== "object") return b.chapter;
+  const data = { ...b.chapter.data };
+  if (typeof latest.label === "string" && latest.label.trim()) data.week_label = latest.label.trim();
+  if (typeof latest.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(latest.date)) data.date = latest.date;
+  return { ...b.chapter, data };
 }
 // The week page (round 8): the band that used to sit under Today on the front page, whole.
 // "Next: the chapter draft Wednesday, October 21; the numbers every Sunday." — the day the next
@@ -775,18 +856,26 @@ export function frontReadSlots(edition, b, base = "/") {
   // The argument: the open bet (two coaches, opposite sides, a date) with the live number
   // against it; failing a bet, the newest exchange, from the served moves.
   const pick = F.pickArgument(moves, b.next);
-  out["ck-argue-label"] = esc(F.argumentLabel(pick));
+  // The quiet section's label is "The AI" over the heading "The coaches." — not the same words twice.
+  out["ck-argue-label"] = esc(pick ? F.argumentLabel(pick) : "The AI");
   // Round 4: with no bet and no exchange, the newest dated line that passes the plain-language
   // rule (any coach, newest first) keeps the coaches' voice on a quiet day; only with none does
   // the section say there is no open bet.
   const quiet = pick ? "" : F.lastHeardHTML(moves, [], base);
+  // Site-to-A round 1 (front:F2, item 2): with no bet and no exchange the section is still "The
+  // coaches" — the newest line the front may quote leads it when there is one, and the null bet
+  // is one quiet sentence under it, never the heading the reader meets first.
+  const noBet = !pick && b.next.state !== "unavailable" && !usable(b.next.data && b.next.data.bet) ? soft("No open bet between them this week.") : "";
   if (quiet) {
-    out["ck-argue-heading"] = esc("The latest from the coaches.");
-    out["ck-argument"] = quiet;
+    out["ck-argue-heading"] = esc("The coaches.");
+    out["ck-argument"] = `${quiet}${noBet}`;
   } else if (!pick && b.moves.state === "unavailable") {
     // A failed read is not "nothing in dispute": the section says the lines are not served.
     out["ck-argue-heading"] = esc("What they are arguing about.");
     out["ck-argument"] = soft(b.moves.absent_text);
+  } else if (!pick) {
+    out["ck-argue-heading"] = esc("The coaches.");
+    out["ck-argument"] = noBet || soft("Nothing from the coaches this week is one the front page may quote.");
   } else {
     out["ck-argue-heading"] = esc(F.argumentHeading(pick));
     out["ck-argument"] = F.argumentHTML(pick, base);
@@ -831,7 +920,8 @@ export function frontReadSlots(edition, b, base = "/") {
   const everyDoor = `<a class="ck-link" href="${esc(base)}call/">Every settled call</a>`;
   const last = lastCallHTML(calls, base, e.as_of, F.SHORT_JOBS, { moreDoor: everyDoor, since: weekFrom });
   if (last) {
-    const heading = { recent: "The clearest miss this week.", wrong: "The clearest miss so far.", right: "The tightest right call so far." }[kind] || "The latest checked call.";
+    // front:F3: the week is the week the call was CHECKED in; the card carries the call's own dates.
+    const heading = { recent: "The clearest miss checked this week.", wrong: "The clearest miss so far.", right: "The tightest right call so far." }[kind] || "The latest checked call.";
     out["ck-miss-heading"] = esc(heading);
     out["ck-call"] = last.includes(everyDoor) ? last : `${last}<p>${everyDoor}</p>`;
   } else {
@@ -873,20 +963,33 @@ async function mountWeek(edition, b) {
 
 async function mountStart(edition, b) {
   const [journal, timeline] = await Promise.all([tryJSON("/journal/posts.json"), tryJSON("/api/timeline")]);
-  fill("ck-recap", recapHTML(postsInOrder(journal)) || soft("The chapters are not served right now."));
+  // The recap's windows read the timeline's full run of weigh-ins (a week's window is older than the
+  // edition's 28-day series); Day 1 is the edition's start date.
+  const allWeights = timeline && timeline.timeline && timeline.timeline.weights;
+  const t = usable(b.today) ? b.today.data : {};
+  const startDate = t.start_date || (timeline && timeline.timeline && timeline.timeline.journey_start) || "";
+  fill("ck-recap", recapHTML(postsInOrder(journal), { weights: allWeights, startDate }) || soft("The chapters are not served right now."));
   // The same series the front page's mark draws (the edition's weigh-ins) in the same frame (start
   // to goal); the timeline's weights stand in when the edition's week block is not served.
-  const weights = usable(b.week) && Array.isArray(b.week.data.weight_series) ? b.week.data.weight_series : timeline && timeline.timeline && timeline.timeline.weights;
-  const t = usable(b.today) ? b.today.data : {};
+  const weights = usable(b.week) && Array.isArray(b.week.data.weight_series) ? b.week.data.weight_series : allWeights;
   fill("ck-chart", chartHTML(weights, { start: t.start_weight_lbs, goal: t.goal_weight_lbs }) || soft("The weigh-ins are not served right now."));
-  // Nothing waiting to settle is not a section's content: with no bet, the next chapter's line alone.
+  // Site-to-A round 1 (start:S1/S3): the next chapter's date is the chapter list's tail; an open
+  // bet sits with the coaches; nothing waiting to settle draws nothing.
+  const open = chapterNextLine(b.next, b.chapter);
+  if (open) fill("ck-open", esc(open));
+  else document.getElementById("ck-open")?.remove();
   const bet = coachesBetHTML(b.next, null);
-  fill("ck-open", `${bet === null ? "" : bet}${small(chapterNextLine(b.next))}`);
-  fill("ck-record", esc(recordLine(b.record) || (b.record && b.record.absent_text) || ""));
+  if (bet === null) document.getElementById("ck-bet")?.remove();
+  else fill("ck-bet", bet);
+  fill("ck-record", recordHTML(b.record));
+  fill("ck-follow-line", esc(F.followLine(b.next)));
 }
-const chapterNextLine = (nextBlock) => {
+const chapterNextLine = (nextBlock, chapterBlock = null) => {
   const ch = nextBlock && nextBlock.data && nextBlock.data.chapter;
-  return usable(ch) && dayInWords(ch.data.date) ? nextChapterLine(nextBlock).replace(/^Next chapter due/, "The next chapter is due") : "";
+  if (usable(ch) && dayInWords(ch.data.date)) return nextChapterLine(nextBlock).replace(/^Next chapter due/, "The next chapter is due");
+  // Lane E: the chapter block's own `next_due` (from the cadence) when the next block has no date.
+  const due = usable(chapterBlock) && typeof chapterBlock.data.next_due === "string" ? dayInWords(chapterBlock.data.next_due) : "";
+  return due ? `The next draft is due ${due}.` : "";
 };
 
 const startLbOf = (b) => (usable(b.today) ? num(b.today.data.start_weight_lbs) : null);
