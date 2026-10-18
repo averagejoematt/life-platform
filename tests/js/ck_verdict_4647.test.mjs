@@ -61,7 +61,8 @@ test("the rule is lifted from the served sentence, per kind of call", () => {
   // The capture's direction call is graded across its own window (#4617); the legacy trend sentence is built from it.
   assert.match(V.ruleFor(byId("labs-20260906-d2deb9b27d"), true), /^by the change from [A-Z][a-z]+ \d+ to [A-Z][a-z]+ \d+$/);
   assert.equal(V.ruleFor(legacyTrend(), true), "by the trend in his most recent readings");
-  assert.equal(V.ruleFor(byId("bet-20260930-994b3d89f6"), true), "on whether his morning recovery score would be below 70 on September 30");
+  // Lane E of #4580 (deployed 2026-10-18): the served bet sentence carries the score's unit.
+  assert.equal(V.ruleFor(byId("bet-20260930-994b3d89f6"), true), "on whether his morning recovery score would be below 70 out of 100 on September 30");
   const mute = { ...clone(number), called: "Henning Brandt called it.", tolerance: null };
   assert.equal(V.ruleFor(mute, true), "", "a call with no served rule yields none, never a guess");
   // #4808: the allowed distance is served once, in `tolerance`; a route from before it wrote the

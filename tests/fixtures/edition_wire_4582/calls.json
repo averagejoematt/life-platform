@@ -1,15 +1,15 @@
 {
  "_meta": {
-  "generated_at": "2026-10-17T23:29:15.610080+00:00",
-  "served_at": "2026-10-17T23:29:15.610080+00:00",
+  "generated_at": "2026-10-18T07:15:17.169176+00:00",
+  "served_at": "2026-10-18T07:15:17.169176+00:00",
   "cache_seconds": 300,
-  "request_id": "c035393679134049"
+  "request_id": "d00cdb0c0e4c4080"
  },
  "state": "ok",
  "as_of": "2026-10-17",
  "source": "/api/calls",
  "absent_text": "No call has been checked against the data yet.",
- "today": "2026-10-17",
+ "today": "2026-10-18",
  "count": 63,
  "calls": [
   {
@@ -21,13 +21,16 @@
    "logged_date": "2026-10-15",
    "sealed": false,
    "settled_date": "2026-10-17",
+   "observed_on": "2026-10-16",
+   "observed_on_text": "Friday, October 16",
    "called": "Max Reyes called his weight at about 304.5 lb for October 16.",
    "called_short": "Max Reyes called his weight at about 304.5 lb.",
    "happened": "His weight came in at 304 lb against a call of 304.5 lb.",
    "happened_short": "It came in at 304 lb.",
    "actual": {
     "value": 304.03,
-    "text": "304 lb"
+    "text": "304 lb",
+    "unit": " lb"
    },
    "tolerance": {
     "value": 3.9712,
@@ -70,13 +73,16 @@
    "logged_date": "2026-10-15",
    "sealed": false,
    "settled_date": "2026-10-16",
+   "observed_on": "2026-10-16",
+   "observed_on_text": "Friday, October 16",
    "called": "James Okafor called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 68 for October 16.",
    "called_short": "James Okafor called his morning recovery score at about 68.",
    "happened": "His morning recovery score came in at 70 against a call of 68.",
    "happened_short": "It came in at 70.",
    "actual": {
     "value": 70.0,
-    "text": "70"
+    "text": "70",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 14.75,
@@ -119,13 +125,16 @@
    "logged_date": "2026-10-15",
    "sealed": false,
    "settled_date": "2026-10-16",
+   "observed_on": "2026-10-16",
+   "observed_on_text": "Friday, October 16",
    "called": "Henning Brandt called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 68 for October 16.",
    "called_short": "Henning Brandt called his morning recovery score at about 68.",
    "happened": "His morning recovery score came in at 70 against a call of 68.",
    "happened_short": "It came in at 70.",
    "actual": {
     "value": 70.0,
-    "text": "70"
+    "text": "70",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 14.75,
@@ -185,13 +194,16 @@
    "logged_date": "2026-10-02",
    "sealed": false,
    "settled_date": "2026-10-16",
-   "called": "Lisa Park and Max Reyes bet on one question, fixed the day the bet opened: whether the 7-day average of his deep-sleep share (the part of the night spent in deep sleep, as a percentage) would be at or above 26 on October 16. Lisa Park said no; Max Reyes said yes.",
-   "called_short": "Lisa Park and Max Reyes bet on whether the 7-day average of his deep-sleep share would be at or above 26 on October 16.",
-   "happened": "It came in at 16.4.",
-   "happened_short": "It came in at 16.4.",
+   "observed_on": "2026-10-16",
+   "observed_on_text": "Friday, October 16",
+   "called": "Lisa Park and Max Reyes bet on one question, fixed the day the bet opened: whether the 7-day average of his deep-sleep share (the part of the night spent in deep sleep, as a percentage) would be at or above 26% on October 16. Lisa Park said no; Max Reyes said yes.",
+   "called_short": "Lisa Park and Max Reyes bet on whether the 7-day average of his deep-sleep share would be at or above 26% on October 16.",
+   "happened": "It came in at 16.4%.",
+   "happened_short": "It came in at 16.4%.",
    "actual": {
     "value": 16.357142857142858,
-    "text": "16.4"
+    "text": "16.4%",
+    "unit": "%"
    },
    "verdict": "right",
    "verdict_text": "Lisa Park was right; Max Reyes was wrong.",
@@ -229,7 +241,7 @@
      }
     }
    ],
-   "title": "Lisa Park and Max Reyes bet on whether the 7-day average of his deep-sleep share would be at or above 26: Lisa Park was right"
+   "title": "Lisa Park and Max Reyes bet on whether the 7-day average of his deep-sleep share would be at or above 26%: Lisa Park was right"
   },
   {
    "id": "bet-20261012-e44d5122d7",
@@ -257,13 +269,16 @@
    "logged_date": "2026-09-28",
    "sealed": false,
    "settled_date": "2026-10-12",
+   "observed_on": "2026-10-12",
+   "observed_on_text": "Monday, October 12",
    "called": "Nathan Reeves and Marcus Webb bet on one question, fixed the day the bet opened: whether the 7-day average of his protein eaten would be at or above 190 g on October 12. Nathan Reeves said no; Marcus Webb said yes.",
    "called_short": "Nathan Reeves and Marcus Webb bet on whether the 7-day average of his protein eaten would be at or above 190 g on October 12.",
    "happened": "It came in at 158.2 g.",
    "happened_short": "It came in at 158.2 g.",
    "actual": {
     "value": 158.2,
-    "text": "158.2 g"
+    "text": "158.2 g",
+    "unit": " g"
    },
    "verdict": "right",
    "verdict_text": "Nathan Reeves was right; Marcus Webb was wrong.",
@@ -312,13 +327,16 @@
    "logged_date": "2026-09-26",
    "sealed": false,
    "settled_date": "2026-10-11",
+   "observed_on": "2026-09-27",
+   "observed_on_text": "Sunday, September 27",
    "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 85 for September 27.",
    "called_short": "Lisa Park called his morning recovery score at about 85.",
    "happened": "His morning recovery score came in at 89 against a call of 85.",
    "happened_short": "It came in at 89.",
    "actual": {
     "value": 89.0,
-    "text": "89"
+    "text": "89",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 21.308,
@@ -361,13 +379,16 @@
    "logged_date": "2026-10-02",
    "sealed": false,
    "settled_date": "2026-10-11",
+   "observed_on": "2026-10-03",
+   "observed_on_text": "Saturday, October 3",
    "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 76 for October 3.",
    "called_short": "Max Reyes called his morning recovery score at about 76.",
    "happened": "His morning recovery score came in at 98 against a call of 76.",
    "happened_short": "It came in at 98.",
    "actual": {
     "value": 98.0,
-    "text": "98"
+    "text": "98",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 17.8725,
@@ -410,13 +431,16 @@
    "logged_date": "2026-09-26",
    "sealed": false,
    "settled_date": "2026-10-11",
+   "observed_on": "2026-09-27",
+   "observed_on_text": "Sunday, September 27",
    "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 85 for September 27.",
    "called_short": "Max Reyes called his morning recovery score at about 85.",
    "happened": "His morning recovery score came in at 89 against a call of 85.",
    "happened_short": "It came in at 89.",
    "actual": {
     "value": 89.0,
-    "text": "89"
+    "text": "89",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 21.308,
@@ -459,13 +483,16 @@
    "logged_date": "2026-09-12",
    "sealed": false,
    "settled_date": "2026-10-11",
+   "observed_on": "2026-09-13",
+   "observed_on_text": "Sunday, September 13",
    "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 54.7 for September 13.",
    "called_short": "Max Reyes called his morning recovery score at about 54.7.",
    "happened": "His morning recovery score came in at 73 against a call of 54.7.",
    "happened_short": "It came in at 73.",
    "actual": {
     "value": 73.0,
-    "text": "73"
+    "text": "73",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 18.2532,
@@ -508,13 +535,16 @@
    "logged_date": "2026-09-24",
    "sealed": false,
    "settled_date": "2026-10-11",
+   "observed_on": "2026-09-25",
+   "observed_on_text": "Friday, September 25",
    "called": "James Okafor called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 85 for September 25.",
    "called_short": "James Okafor called his morning recovery score at about 85.",
    "happened": "His morning recovery score came in at 99 against a call of 85.",
    "happened_short": "It came in at 99.",
    "actual": {
     "value": 99.0,
-    "text": "99"
+    "text": "99",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 20.7078,
@@ -557,13 +587,16 @@
    "logged_date": "2026-09-21",
    "sealed": false,
    "settled_date": "2026-10-11",
+   "observed_on": "2026-09-22",
+   "observed_on_text": "Tuesday, September 22",
    "called": "James Okafor called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 91 for September 22.",
    "called_short": "James Okafor called his morning recovery score at about 91.",
    "happened": "His morning recovery score came in at 78 against a call of 91.",
    "happened_short": "It came in at 78.",
    "actual": {
     "value": 78.0,
-    "text": "78"
+    "text": "78",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 23.7331,
@@ -606,13 +639,16 @@
    "logged_date": "2026-09-15",
    "sealed": false,
    "settled_date": "2026-10-11",
+   "observed_on": "2026-09-16",
+   "observed_on_text": "Wednesday, September 16",
    "called": "Henning Brandt called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 64 for September 16.",
    "called_short": "Henning Brandt called his morning recovery score at about 64.",
    "happened": "His morning recovery score came in at 92 against a call of 64.",
    "happened_short": "It came in at 92.",
    "actual": {
     "value": 92.0,
-    "text": "92"
+    "text": "92",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 19.2925,
@@ -655,13 +691,16 @@
    "logged_date": "2026-10-03",
    "sealed": false,
    "settled_date": "2026-10-10",
+   "observed_on": "2026-10-04",
+   "observed_on_text": "Sunday, October 4",
    "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 91 for October 4.",
    "called_short": "Lisa Park called his morning recovery score at about 91.",
    "happened": "His morning recovery score came in at 98 against a call of 91.",
    "happened_short": "It came in at 98.",
    "actual": {
     "value": 98.0,
-    "text": "98"
+    "text": "98",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 18.3648,
@@ -704,13 +743,16 @@
    "logged_date": "2026-10-02",
    "sealed": false,
    "settled_date": "2026-10-10",
+   "observed_on": "2026-10-03",
+   "observed_on_text": "Saturday, October 3",
    "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 76 for October 3.",
    "called_short": "Lisa Park called his morning recovery score at about 76.",
    "happened": "His morning recovery score came in at 98 against a call of 76.",
    "happened_short": "It came in at 98.",
    "actual": {
     "value": 98.0,
-    "text": "98"
+    "text": "98",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 17.8725,
@@ -753,13 +795,16 @@
    "logged_date": "2026-10-02",
    "sealed": false,
    "settled_date": "2026-10-10",
+   "observed_on": "2026-10-03",
+   "observed_on_text": "Saturday, October 3",
    "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 65 for October 3.",
    "called_short": "Lisa Park called his morning recovery score at about 65.",
    "happened": "His morning recovery score came in at 98 against a call of 65.",
    "happened_short": "It came in at 98.",
    "actual": {
     "value": 98.0,
-    "text": "98"
+    "text": "98",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 17.8725,
@@ -802,13 +847,16 @@
    "logged_date": "2026-10-01",
    "sealed": false,
    "settled_date": "2026-10-10",
+   "observed_on": "2026-10-02",
+   "observed_on_text": "Friday, October 2",
    "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 65 for October 2.",
    "called_short": "Lisa Park called his morning recovery score at about 65.",
    "happened": "His morning recovery score came in at 98 against a call of 65.",
    "happened_short": "It came in at 98.",
    "actual": {
     "value": 98.0,
-    "text": "98"
+    "text": "98",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 17.3031,
@@ -851,13 +899,16 @@
    "logged_date": "2026-10-02",
    "sealed": false,
    "settled_date": "2026-10-10",
+   "observed_on": "2026-10-03",
+   "observed_on_text": "Saturday, October 3",
    "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 65 for October 3.",
    "called_short": "Max Reyes called his morning recovery score at about 65.",
    "happened": "His morning recovery score came in at 98 against a call of 65.",
    "happened_short": "It came in at 98.",
    "actual": {
     "value": 98.0,
-    "text": "98"
+    "text": "98",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 17.5951,
@@ -900,13 +951,16 @@
    "logged_date": "2026-09-22",
    "sealed": false,
    "settled_date": "2026-10-10",
+   "observed_on": "2026-09-23",
+   "observed_on_text": "Wednesday, September 23",
    "called": "Max Reyes called his weight at about 315 lb for September 23.",
    "called_short": "Max Reyes called his weight at about 315 lb.",
    "happened": "His weight came in at 315.4 lb against a call of 315 lb.",
    "happened_short": "It came in at 315.4 lb.",
    "actual": {
     "value": 315.43,
-    "text": "315.4 lb"
+    "text": "315.4 lb",
+    "unit": " lb"
    },
    "tolerance": {
     "value": 5.1527,
@@ -949,13 +1003,16 @@
    "logged_date": "2026-10-01",
    "sealed": false,
    "settled_date": "2026-10-10",
+   "observed_on": "2026-10-02",
+   "observed_on_text": "Friday, October 2",
    "called": "Nathan Reeves called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 65 for October 2.",
    "called_short": "Nathan Reeves called his morning recovery score at about 65.",
    "happened": "His morning recovery score came in at 98 against a call of 65.",
    "happened_short": "It came in at 98.",
    "actual": {
     "value": 98.0,
-    "text": "98"
+    "text": "98",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 17.3031,
@@ -998,13 +1055,16 @@
    "logged_date": "2026-10-08",
    "sealed": false,
    "settled_date": "2026-10-10",
+   "observed_on": "2026-10-09",
+   "observed_on_text": "Friday, October 9",
    "called": "Henning Brandt called his weight at about 307.2 lb for October 9.",
    "called_short": "Henning Brandt called his weight at about 307.2 lb.",
    "happened": "His weight came in at 306.1 lb against a call of 307.2 lb.",
    "happened_short": "It came in at 306.1 lb.",
    "actual": {
     "value": 306.13,
-    "text": "306.1 lb"
+    "text": "306.1 lb",
+    "unit": " lb"
    },
    "tolerance": {
     "value": 3.1713,
@@ -1047,13 +1107,16 @@
    "logged_date": "2026-09-25",
    "sealed": false,
    "settled_date": "2026-10-09",
+   "observed_on": "2026-09-26",
+   "observed_on_text": "Saturday, September 26",
    "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 89 for September 26.",
    "called_short": "Lisa Park called his morning recovery score at about 89.",
    "happened": "His morning recovery score came in at 77 against a call of 89.",
    "happened_short": "It came in at 77.",
    "actual": {
     "value": 77.0,
-    "text": "77"
+    "text": "77",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 21.4664,
@@ -1096,13 +1159,16 @@
    "logged_date": "2026-09-23",
    "sealed": false,
    "settled_date": "2026-10-07",
+   "observed_on": "2026-09-24",
+   "observed_on_text": "Thursday, September 24",
    "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 84 for September 24.",
    "called_short": "Lisa Park called his morning recovery score at about 84.",
    "happened": "His morning recovery score came in at 86 against a call of 84.",
    "happened_short": "It came in at 86.",
    "actual": {
     "value": 86.0,
-    "text": "86"
+    "text": "86",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 20.8524,
@@ -1162,13 +1228,16 @@
    "logged_date": "2026-09-23",
    "sealed": false,
    "settled_date": "2026-10-07",
-   "called": "Lisa Park and Nathan Reeves bet on one question, fixed the day the bet opened: whether the 7-day average of his morning recovery score (his wrist strap\u2019s morning score out of 100) would be at or above 80 on October 7. Lisa Park said yes; Nathan Reeves said no.",
-   "called_short": "Lisa Park and Nathan Reeves bet on whether the 7-day average of his morning recovery score would be at or above 80 on October 7.",
-   "happened": "It came in at 87.6.",
-   "happened_short": "It came in at 87.6.",
+   "observed_on": "2026-10-07",
+   "observed_on_text": "Wednesday, October 7",
+   "called": "Lisa Park and Nathan Reeves bet on one question, fixed the day the bet opened: whether the 7-day average of his morning recovery score (his wrist strap\u2019s morning score out of 100) would be at or above 80 out of 100 on October 7. Lisa Park said yes; Nathan Reeves said no.",
+   "called_short": "Lisa Park and Nathan Reeves bet on whether the 7-day average of his morning recovery score would be at or above 80 out of 100 on October 7.",
+   "happened": "It came in at 87.6 out of 100.",
+   "happened_short": "It came in at 87.6 out of 100.",
    "actual": {
     "value": 87.57142857142857,
-    "text": "87.6"
+    "text": "87.6 out of 100",
+    "unit": " out of 100"
    },
    "verdict": "right",
    "verdict_text": "Lisa Park was right; Nathan Reeves was wrong.",
@@ -1206,7 +1275,7 @@
      }
     }
    ],
-   "title": "Lisa Park and Nathan Reeves bet on whether the 7-day average of his morning recovery score would be at or above 80: Lisa Park was right"
+   "title": "Lisa Park and Nathan Reeves bet on whether the 7-day average of his morning recovery score would be at or above 80 out of 100: Lisa Park was right"
   },
   {
    "id": "physical-20260922-f98450a959",
@@ -1217,13 +1286,16 @@
    "logged_date": "2026-09-22",
    "sealed": false,
    "settled_date": "2026-10-06",
+   "observed_on": "2026-09-23",
+   "observed_on_text": "Wednesday, September 23",
    "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 86 for September 23.",
    "called_short": "Max Reyes called his morning recovery score at about 86.",
    "happened": "His morning recovery score came in at 80 against a call of 86.",
    "happened_short": "It came in at 80.",
    "actual": {
     "value": 80.0,
-    "text": "80"
+    "text": "80",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 22.3731,
@@ -1266,13 +1338,16 @@
    "logged_date": "2026-09-22",
    "sealed": false,
    "settled_date": "2026-10-06",
+   "observed_on": "2026-09-23",
+   "observed_on_text": "Wednesday, September 23",
    "called": "James Okafor called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 86 for September 23.",
    "called_short": "James Okafor called his morning recovery score at about 86.",
    "happened": "His morning recovery score came in at 80 against a call of 86.",
    "happened_short": "It came in at 80.",
    "actual": {
     "value": 80.0,
-    "text": "80"
+    "text": "80",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 22.3731,
@@ -1332,13 +1407,16 @@
    "logged_date": "2026-09-28",
    "sealed": false,
    "settled_date": "2026-10-05",
-   "called": "Max Reyes and Lisa Park bet on one question, fixed the day the bet opened: whether the 7-day average of his morning recovery score (his wrist strap\u2019s morning score out of 100) would be at or above 81.6 on October 5. Max Reyes said no; Lisa Park said yes.",
-   "called_short": "Max Reyes and Lisa Park bet on whether the 7-day average of his morning recovery score would be at or above 81.6 on October 5.",
-   "happened": "It came in at 81.",
-   "happened_short": "It came in at 81.",
+   "observed_on": "2026-10-05",
+   "observed_on_text": "Monday, October 5",
+   "called": "Max Reyes and Lisa Park bet on one question, fixed the day the bet opened: whether the 7-day average of his morning recovery score (his wrist strap\u2019s morning score out of 100) would be at or above 81.6 out of 100 on October 5. Max Reyes said no; Lisa Park said yes.",
+   "called_short": "Max Reyes and Lisa Park bet on whether the 7-day average of his morning recovery score would be at or above 81.6 out of 100 on October 5.",
+   "happened": "It came in at 81 out of 100.",
+   "happened_short": "It came in at 81 out of 100.",
    "actual": {
     "value": 81.0,
-    "text": "81"
+    "text": "81 out of 100",
+    "unit": " out of 100"
    },
    "verdict": "right",
    "verdict_text": "Max Reyes was right; Lisa Park was wrong.",
@@ -1376,7 +1454,7 @@
      }
     }
    ],
-   "title": "Max Reyes and Lisa Park bet on whether the 7-day average of his morning recovery score would be at or above 81.6: Max Reyes was right"
+   "title": "Max Reyes and Lisa Park bet on whether the 7-day average of his morning recovery score would be at or above 81.6 out of 100: Max Reyes was right"
   },
   {
    "id": "physical-20260906-297ccf261a",
@@ -1387,6 +1465,8 @@
    "logged_date": "2026-09-05",
    "sealed": true,
    "settled_date": "2026-10-04",
+   "observed_on": "2026-09-20",
+   "observed_on_text": "Sunday, September 20",
    "called": "Max Reyes called his weight to go down, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
    "called_short": "Max Reyes called his weight to go down.",
    "happened": "Weight went down from 327.3 lb on September 6 to 316.9 lb on September 20, as called.",
@@ -1433,6 +1513,8 @@
    "logged_date": "2026-09-05",
    "sealed": true,
    "settled_date": "2026-10-04",
+   "observed_on": "2026-09-20",
+   "observed_on_text": "Sunday, September 20",
    "called": "Marcus Webb called his weight to go down, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
    "called_short": "Marcus Webb called his weight to go down.",
    "happened": "Weight went down from 327.3 lb on September 6 to 316.9 lb on September 20, as called.",
@@ -1479,13 +1561,16 @@
    "logged_date": "2026-09-19",
    "sealed": false,
    "settled_date": "2026-10-03",
+   "observed_on": "2026-09-20",
+   "observed_on_text": "Sunday, September 20",
    "called": "Henning Brandt called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 84 for September 20.",
    "called_short": "Henning Brandt called his morning recovery score at about 84.",
    "happened": "His morning recovery score came in at 97 against a call of 84.",
    "happened_short": "It came in at 97.",
    "actual": {
     "value": 97.0,
-    "text": "97"
+    "text": "97",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 22.4603,
@@ -1528,13 +1613,16 @@
    "logged_date": "2026-09-25",
    "sealed": false,
    "settled_date": "2026-10-02",
+   "observed_on": "2026-09-26",
+   "observed_on_text": "Saturday, September 26",
    "called": "Lisa Park called his sleep time at about 7.8 hours for September 26.",
    "called_short": "Lisa Park called his sleep time at about 7.8 hours.",
    "happened": "His sleep time came in at 8.6 hours against a call of 7.8 hours.",
    "happened_short": "It came in at 8.6 hours.",
    "actual": {
     "value": 8.61,
-    "text": "8.6 hours"
+    "text": "8.6 hours",
+    "unit": " hours"
    },
    "tolerance": {
     "value": 1.2107,
@@ -1577,13 +1665,16 @@
    "logged_date": "2026-09-23",
    "sealed": false,
    "settled_date": "2026-09-30",
+   "observed_on": "2026-09-24",
+   "observed_on_text": "Thursday, September 24",
    "called": "Lisa Park called his sleep time at about 7.4 hours for September 24.",
    "called_short": "Lisa Park called his sleep time at about 7.4 hours.",
    "happened": "His sleep time came in at 6.7 hours against a call of 7.4 hours.",
    "happened_short": "It came in at 6.7 hours.",
    "actual": {
     "value": 6.69,
-    "text": "6.7 hours"
+    "text": "6.7 hours",
+    "unit": " hours"
    },
    "tolerance": {
     "value": 1.1787,
@@ -1657,13 +1748,16 @@
    "logged_date": "2026-09-23",
    "sealed": false,
    "settled_date": "2026-09-30",
-   "called": "Marcus Webb and Amara Patel bet on one question, fixed the day the bet opened: whether his morning recovery score (his wrist strap\u2019s morning score out of 100) would be below 70 on September 30. Marcus Webb said yes; Amara Patel said no.",
-   "called_short": "Marcus Webb and Amara Patel bet on whether his morning recovery score would be below 70 on September 30.",
-   "happened": "It came in at 59.",
-   "happened_short": "It came in at 59.",
+   "observed_on": "2026-09-30",
+   "observed_on_text": "Wednesday, September 30",
+   "called": "Marcus Webb and Amara Patel bet on one question, fixed the day the bet opened: whether his morning recovery score (his wrist strap\u2019s morning score out of 100) would be below 70 out of 100 on September 30. Marcus Webb said yes; Amara Patel said no.",
+   "called_short": "Marcus Webb and Amara Patel bet on whether his morning recovery score would be below 70 out of 100 on September 30.",
+   "happened": "It came in at 59 out of 100.",
+   "happened_short": "It came in at 59 out of 100.",
    "actual": {
     "value": 59.0,
-    "text": "59"
+    "text": "59 out of 100",
+    "unit": " out of 100"
    },
    "verdict": "right",
    "verdict_text": "Marcus Webb was right; Amara Patel was wrong.",
@@ -1701,7 +1795,7 @@
      }
     }
    ],
-   "title": "Marcus Webb and Amara Patel bet on whether his morning recovery score would be below 70: Marcus Webb was right"
+   "title": "Marcus Webb and Amara Patel bet on whether his morning recovery score would be below 70 out of 100: Marcus Webb was right"
   },
   {
    "id": "mind-20260914-7fc4b43947",
@@ -1712,13 +1806,16 @@
    "logged_date": "2026-09-14",
    "sealed": false,
    "settled_date": "2026-09-28",
+   "observed_on": "2026-09-15",
+   "observed_on_text": "Tuesday, September 15",
    "called": "Nathan Reeves called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 59 for September 15.",
    "called_short": "Nathan Reeves called his morning recovery score at about 59.",
    "happened": "His morning recovery score came in at 82 against a call of 59.",
    "happened_short": "It came in at 82.",
    "actual": {
     "value": 82.0,
-    "text": "82"
+    "text": "82",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 18.5929,
@@ -1761,13 +1858,16 @@
    "logged_date": "2026-09-14",
    "sealed": false,
    "settled_date": "2026-09-28",
+   "observed_on": "2026-09-15",
+   "observed_on_text": "Tuesday, September 15",
    "called": "Amara Patel called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 59 for September 15.",
    "called_short": "Amara Patel called his morning recovery score at about 59.",
    "happened": "His morning recovery score came in at 82 against a call of 59.",
    "happened_short": "It came in at 82.",
    "actual": {
     "value": 82.0,
-    "text": "82"
+    "text": "82",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 18.5929,
@@ -1810,13 +1910,16 @@
    "logged_date": "2026-09-13",
    "sealed": false,
    "settled_date": "2026-09-27",
+   "observed_on": "2026-09-14",
+   "observed_on_text": "Monday, September 14",
    "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 58 for September 14.",
    "called_short": "Max Reyes called his morning recovery score at about 58.",
    "happened": "His morning recovery score came in at 63 against a call of 58.",
    "happened_short": "It came in at 63.",
    "actual": {
     "value": 63.0,
-    "text": "63"
+    "text": "63",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 18.6473,
@@ -1859,6 +1962,8 @@
    "logged_date": "2026-09-05",
    "sealed": true,
    "settled_date": "2026-09-27",
+   "observed_on": "2026-09-20",
+   "observed_on_text": "Sunday, September 20",
    "called": "James Okafor called his resting heart rate to go down, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
    "called_short": "James Okafor called his resting heart rate to go down.",
    "happened": "Resting heart rate went down from 65 on September 6 to 53 on September 20, as called.",
@@ -1905,6 +2010,8 @@
    "logged_date": "2026-09-05",
    "sealed": true,
    "settled_date": "2026-09-27",
+   "observed_on": "2026-09-20",
+   "observed_on_text": "Sunday, September 20",
    "called": "Henning Brandt called his daily steps to go up, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
    "called_short": "Henning Brandt called his daily steps to go up.",
    "happened": "Daily steps went down from 9654 on September 6 to 1139.3 on September 20 \u2014 the call was for it to go up.",
@@ -1951,13 +2058,16 @@
    "logged_date": "2026-09-12",
    "sealed": false,
    "settled_date": "2026-09-26",
+   "observed_on": "2026-09-13",
+   "observed_on_text": "Sunday, September 13",
    "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 53 for September 13.",
    "called_short": "Lisa Park called his morning recovery score at about 53.",
    "happened": "His morning recovery score came in at 73 against a call of 53.",
    "happened_short": "It came in at 73.",
    "actual": {
     "value": 73.0,
-    "text": "73"
+    "text": "73",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 18.2532,
@@ -2000,13 +2110,16 @@
    "logged_date": "2026-09-11",
    "sealed": false,
    "settled_date": "2026-09-25",
+   "observed_on": "2026-09-12",
+   "observed_on_text": "Saturday, September 12",
    "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 53 for September 12.",
    "called_short": "Lisa Park called his morning recovery score at about 53.",
    "happened": "His morning recovery score came in at 59 against a call of 53.",
    "happened_short": "It came in at 59.",
    "actual": {
     "value": 59.0,
-    "text": "59"
+    "text": "59",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 18.6158,
@@ -2049,13 +2162,16 @@
    "logged_date": "2026-09-11",
    "sealed": false,
    "settled_date": "2026-09-25",
+   "observed_on": "2026-09-12",
+   "observed_on_text": "Saturday, September 12",
    "called": "Nathan Reeves called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 53 for September 12.",
    "called_short": "Nathan Reeves called his morning recovery score at about 53.",
    "happened": "His morning recovery score came in at 59 against a call of 53.",
    "happened_short": "It came in at 59.",
    "actual": {
     "value": 59.0,
-    "text": "59"
+    "text": "59",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 18.6158,
@@ -2098,13 +2214,16 @@
    "logged_date": "2026-09-11",
    "sealed": false,
    "settled_date": "2026-09-25",
+   "observed_on": "2026-09-12",
+   "observed_on_text": "Saturday, September 12",
    "called": "Amara Patel called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 53 for September 12.",
    "called_short": "Amara Patel called his morning recovery score at about 53.",
    "happened": "His morning recovery score came in at 59 against a call of 53.",
    "happened_short": "It came in at 59.",
    "actual": {
     "value": 59.0,
-    "text": "59"
+    "text": "59",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 18.6158,
@@ -2147,13 +2266,16 @@
    "logged_date": "2026-09-17",
    "sealed": false,
    "settled_date": "2026-09-24",
+   "observed_on": "2026-09-18",
+   "observed_on_text": "Friday, September 18",
    "called": "Lisa Park called his sleep time at about 7.3 hours for September 18.",
    "called_short": "Lisa Park called his sleep time at about 7.3 hours.",
    "happened": "His sleep time came in at 7.9 hours against a call of 7.3 hours.",
    "happened_short": "It came in at 7.9 hours.",
    "actual": {
     "value": 7.91,
-    "text": "7.9 hours"
+    "text": "7.9 hours",
+    "unit": " hours"
    },
    "tolerance": {
     "value": 1.2521,
@@ -2196,13 +2318,16 @@
    "logged_date": "2026-09-10",
    "sealed": false,
    "settled_date": "2026-09-24",
+   "observed_on": "2026-09-11",
+   "observed_on_text": "Friday, September 11",
    "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 66 for September 11.",
    "called_short": "Lisa Park called his morning recovery score at about 66.",
    "happened": "His morning recovery score came in at 24 against a call of 66.",
    "happened_short": "It came in at 24.",
    "actual": {
     "value": 24.0,
-    "text": "24"
+    "text": "24",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 17.9488,
@@ -2245,13 +2370,16 @@
    "logged_date": "2026-09-10",
    "sealed": false,
    "settled_date": "2026-09-24",
+   "observed_on": "2026-09-11",
+   "observed_on_text": "Friday, September 11",
    "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 60 for September 11.",
    "called_short": "Max Reyes called his morning recovery score at about 60.",
    "happened": "His morning recovery score came in at 24 against a call of 60.",
    "happened_short": "It came in at 24.",
    "actual": {
     "value": 24.0,
-    "text": "24"
+    "text": "24",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 17.9488,
@@ -2294,13 +2422,16 @@
    "logged_date": "2026-09-10",
    "sealed": false,
    "settled_date": "2026-09-24",
+   "observed_on": "2026-09-11",
+   "observed_on_text": "Friday, September 11",
    "called": "Nathan Reeves called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 60 for September 11.",
    "called_short": "Nathan Reeves called his morning recovery score at about 60.",
    "happened": "His morning recovery score came in at 24 against a call of 60.",
    "happened_short": "It came in at 24.",
    "actual": {
     "value": 24.0,
-    "text": "24"
+    "text": "24",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 17.9488,
@@ -2343,13 +2474,16 @@
    "logged_date": "2026-09-09",
    "sealed": false,
    "settled_date": "2026-09-23",
+   "observed_on": "2026-09-10",
+   "observed_on_text": "Thursday, September 10",
    "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 66 for September 10.",
    "called_short": "Lisa Park called his morning recovery score at about 66.",
    "happened": "His morning recovery score came in at 44 against a call of 66.",
    "happened_short": "It came in at 44.",
    "actual": {
     "value": 44.0,
-    "text": "44"
+    "text": "44",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 17.9239,
@@ -2392,13 +2526,16 @@
    "logged_date": "2026-09-09",
    "sealed": false,
    "settled_date": "2026-09-23",
+   "observed_on": "2026-09-10",
+   "observed_on_text": "Thursday, September 10",
    "called": "Amara Patel called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 66 for September 10.",
    "called_short": "Amara Patel called his morning recovery score at about 66.",
    "happened": "His morning recovery score came in at 44 against a call of 66.",
    "happened_short": "It came in at 44.",
    "actual": {
     "value": 44.0,
-    "text": "44"
+    "text": "44",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 17.9239,
@@ -2441,13 +2578,16 @@
    "logged_date": "2026-09-08",
    "sealed": false,
    "settled_date": "2026-09-22",
+   "observed_on": "2026-09-09",
+   "observed_on_text": "Wednesday, September 9",
    "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 61 for September 9.",
    "called_short": "Lisa Park called his morning recovery score at about 61.",
    "happened": "His morning recovery score came in at 64 against a call of 61.",
    "happened_short": "It came in at 64.",
    "actual": {
     "value": 64.0,
-    "text": "64"
+    "text": "64",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 17.6379,
@@ -2490,13 +2630,16 @@
    "logged_date": "2026-09-08",
    "sealed": false,
    "settled_date": "2026-09-22",
+   "observed_on": "2026-09-09",
+   "observed_on_text": "Wednesday, September 9",
    "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 61 for September 9.",
    "called_short": "Max Reyes called his morning recovery score at about 61.",
    "happened": "His morning recovery score came in at 64 against a call of 61.",
    "happened_short": "It came in at 64.",
    "actual": {
     "value": 64.0,
-    "text": "64"
+    "text": "64",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 17.6379,
@@ -2539,13 +2682,16 @@
    "logged_date": "2026-09-08",
    "sealed": false,
    "settled_date": "2026-09-22",
+   "observed_on": "2026-09-09",
+   "observed_on_text": "Wednesday, September 9",
    "called": "Henning Brandt called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 61 for September 9.",
    "called_short": "Henning Brandt called his morning recovery score at about 61.",
    "happened": "His morning recovery score came in at 64 against a call of 61.",
    "happened_short": "It came in at 64.",
    "actual": {
     "value": 64.0,
-    "text": "64"
+    "text": "64",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 17.6379,
@@ -2588,13 +2734,16 @@
    "logged_date": "2026-09-07",
    "sealed": false,
    "settled_date": "2026-09-21",
+   "observed_on": "2026-09-08",
+   "observed_on_text": "Tuesday, September 8",
    "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 61 for September 8.",
    "called_short": "Lisa Park called his morning recovery score at about 61.",
    "happened": "His morning recovery score came in at 67 against a call of 61.",
    "happened_short": "It came in at 67.",
    "actual": {
     "value": 67.0,
-    "text": "67"
+    "text": "67",
+    "unit": " out of 100"
    },
    "tolerance": {
     "value": 17.9029,
@@ -2637,6 +2786,8 @@
    "logged_date": "2026-09-05",
    "sealed": true,
    "settled_date": "2026-09-20",
+   "observed_on": "2026-09-20",
+   "observed_on_text": "Sunday, September 20",
    "called": "Lisa Park called his sleep time to go up, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
    "called_short": "Lisa Park called his sleep time to go up.",
    "happened": "Sleep time held flat, from 7.9 hours on September 6 to 7.5 hours on September 20 \u2014 the call was for it to go up.",
@@ -2683,6 +2834,8 @@
    "logged_date": "2026-09-05",
    "sealed": true,
    "settled_date": "2026-09-20",
+   "observed_on": "2026-09-20",
+   "observed_on_text": "Sunday, September 20",
    "called": "Lisa Park called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
    "called_short": "Lisa Park called the 7-day average of his heart-rate variability to go up.",
    "happened": "Heart-rate variability (7-day average) went up from an average of 33.2 over its first 7 readings (from September 6) to 43.4 over its last 7 (to September 20), as called.",
@@ -2729,6 +2882,8 @@
    "logged_date": "2026-09-05",
    "sealed": true,
    "settled_date": "2026-09-20",
+   "observed_on": "2026-09-20",
+   "observed_on_text": "Sunday, September 20",
    "called": "Nathan Reeves called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
    "called_short": "Nathan Reeves called the 7-day average of his heart-rate variability to go up.",
    "happened": "Heart-rate variability (7-day average) went up from an average of 33.2 over its first 7 readings (from September 6) to 43.4 over its last 7 (to September 20), as called.",
@@ -2775,6 +2930,8 @@
    "logged_date": "2026-09-05",
    "sealed": true,
    "settled_date": "2026-09-20",
+   "observed_on": "2026-09-20",
+   "observed_on_text": "Sunday, September 20",
    "called": "James Okafor called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
    "called_short": "James Okafor called the 7-day average of his heart-rate variability to go up.",
    "happened": "Heart-rate variability (7-day average) went up from an average of 33.2 over its first 7 readings (from September 6) to 43.4 over its last 7 (to September 20), as called.",
@@ -2821,6 +2978,8 @@
    "logged_date": "2026-09-05",
    "sealed": true,
    "settled_date": "2026-09-20",
+   "observed_on": "2026-09-20",
+   "observed_on_text": "Sunday, September 20",
    "called": "Henning Brandt called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
    "called_short": "Henning Brandt called the 7-day average of his heart-rate variability to go up.",
    "happened": "Heart-rate variability (7-day average) went up from an average of 33.2 over its first 7 readings (from September 6) to 43.4 over its last 7 (to September 20), as called.",
@@ -2867,13 +3026,16 @@
    "logged_date": "2026-09-12",
    "sealed": false,
    "settled_date": "2026-09-19",
+   "observed_on": "2026-09-13",
+   "observed_on_text": "Sunday, September 13",
    "called": "Lisa Park called his sleep time at about 7.2 hours for September 13.",
    "called_short": "Lisa Park called his sleep time at about 7.2 hours.",
    "happened": "His sleep time came in at 9 hours against a call of 7.2 hours.",
    "happened_short": "It came in at 9 hours.",
    "actual": {
     "value": 8.98,
-    "text": "9 hours"
+    "text": "9 hours",
+    "unit": " hours"
    },
    "tolerance": {
     "value": 1.2395,
@@ -2916,13 +3078,16 @@
    "logged_date": "2026-09-11",
    "sealed": false,
    "settled_date": "2026-09-18",
+   "observed_on": "2026-09-12",
+   "observed_on_text": "Saturday, September 12",
    "called": "Lisa Park called his sleep time at about 7.2 hours for September 12.",
    "called_short": "Lisa Park called his sleep time at about 7.2 hours.",
    "happened": "His sleep time came in at 8.8 hours against a call of 7.2 hours.",
    "happened_short": "It came in at 8.8 hours.",
    "actual": {
     "value": 8.76,
-    "text": "8.8 hours"
+    "text": "8.8 hours",
+    "unit": " hours"
    },
    "tolerance": {
     "value": 1.2273,
@@ -2965,13 +3130,16 @@
    "logged_date": "2026-09-10",
    "sealed": false,
    "settled_date": "2026-09-17",
+   "observed_on": "2026-09-11",
+   "observed_on_text": "Friday, September 11",
    "called": "Lisa Park called his sleep time at about 7.1 hours for September 11.",
    "called_short": "Lisa Park called his sleep time at about 7.1 hours.",
    "happened": "His sleep time came in at 4.7 hours against a call of 7.1 hours.",
    "happened_short": "It came in at 4.7 hours.",
    "actual": {
     "value": 4.7,
-    "text": "4.7 hours"
+    "text": "4.7 hours",
+    "unit": " hours"
    },
    "tolerance": {
     "value": 1.1708,
@@ -3014,13 +3182,16 @@
    "logged_date": "2026-09-09",
    "sealed": false,
    "settled_date": "2026-09-16",
+   "observed_on": "2026-09-10",
+   "observed_on_text": "Thursday, September 10",
    "called": "Lisa Park called his sleep time at about 7 hours for September 10.",
    "called_short": "Lisa Park called his sleep time at about 7 hours.",
    "happened": "His sleep time came in at 7.5 hours against a call of 7 hours.",
    "happened_short": "It came in at 7.5 hours.",
    "actual": {
     "value": 7.46,
-    "text": "7.5 hours"
+    "text": "7.5 hours",
+    "unit": " hours"
    },
    "tolerance": {
     "value": 1.1708,
@@ -3063,13 +3234,16 @@
    "logged_date": "2026-09-08",
    "sealed": false,
    "settled_date": "2026-09-15",
+   "observed_on": "2026-09-09",
+   "observed_on_text": "Wednesday, September 9",
    "called": "Lisa Park called his sleep time at about 7.1 hours for September 9.",
    "called_short": "Lisa Park called his sleep time at about 7.1 hours.",
    "happened": "His sleep time came in at 6.5 hours against a call of 7.1 hours.",
    "happened_short": "It came in at 6.5 hours.",
    "actual": {
     "value": 6.48,
-    "text": "6.5 hours"
+    "text": "6.5 hours",
+    "unit": " hours"
    },
    "tolerance": {
     "value": 1.182,
@@ -3112,13 +3286,16 @@
    "logged_date": "2026-09-08",
    "sealed": false,
    "settled_date": "2026-09-15",
+   "observed_on": "2026-09-09",
+   "observed_on_text": "Wednesday, September 9",
    "called": "Henning Brandt called his sleep time at about 7.1 hours for September 9.",
    "called_short": "Henning Brandt called his sleep time at about 7.1 hours.",
    "happened": "His sleep time came in at 6.5 hours against a call of 7.1 hours.",
    "happened_short": "It came in at 6.5 hours.",
    "actual": {
     "value": 6.48,
-    "text": "6.5 hours"
+    "text": "6.5 hours",
+    "unit": " hours"
    },
    "tolerance": {
     "value": 1.182,
@@ -3161,13 +3338,16 @@
    "logged_date": "2026-09-06",
    "sealed": false,
    "settled_date": "2026-09-13",
+   "observed_on": "2026-09-07",
+   "observed_on_text": "Monday, September 7",
    "called": "Henning Brandt called his sleep time at about 7 hours for September 7.",
    "called_short": "Henning Brandt called his sleep time at about 7 hours.",
    "happened": "His sleep time came in at 8.4 hours against a call of 7 hours.",
    "happened_short": "It came in at 8.4 hours.",
    "actual": {
     "value": 8.37,
-    "text": "8.4 hours"
+    "text": "8.4 hours",
+    "unit": " hours"
    },
    "tolerance": {
     "value": 1.2082,

@@ -1,6 +1,20 @@
 {
  "posts": [
   {
+   "week": 6,
+   "label": "Week 6",
+   "sequence": 9,
+   "title": "The Quiet Accumulation",
+   "date": "2026-10-13",
+   "stats_line": "Weight: 305.4 lbs | Week Grade: avg 70 | T0 Streak: 1 days",
+   "url": "/journal/posts/week-09/",
+   "excerpt": "The Monday afternoon walk covered 5.4 miles in just under two hours, through 50-degree Seattle air, at an average heart rate that the platform flagged as genuine cardiovascular work rather than a stroll. Matthew\u2026",
+   "word_count": 1400,
+   "has_board_interview": true,
+   "image_url": "/assets/images/editorial/chronicle-week-09.jpg",
+   "image_credit": "Photo by Andrew Longanecker on Pexels"
+  },
+  {
    "week": 5,
    "label": "Week 5",
    "sequence": 8,
@@ -8,8 +22,8 @@
    "date": "2026-10-06",
    "stats_line": "Day 25 to Day 31 \u00b7 308.9 lbs (-3.5 this week) \u00b7 4 training sessions",
    "url": "/journal/posts/week-08/",
-   "excerpt": "*After 23 consecutive training days, three rest days this week sent recovery to 98% four mornings in a row \u2014 a season high \u2014 while the scale crossed 310 pounds for the first time, suggesting 18.5 pounds gone\u2026",
-   "word_count": 1262,
+   "excerpt": "*After 23 consecutive training days, three rest days this week sent recovery to 98% four mornings in a row \u2014 a season high \u2014 while the scale crossed 310 pounds for the first time, suggesting 18.5 pounds gone in 31 days at a pace the platform still flags as a lean-mass risk.*\n\n*Day 31 \u00b7 327.3 \u2192\u2026",
+   "word_count": 1262.0,
    "has_board_interview": true,
    "image_url": "/assets/images/editorial/chronicle-week-08.jpg",
    "image_credit": "Photo by Adrien Olichon on Pexels"
@@ -22,7 +36,7 @@
    "date": "2026-09-29",
    "stats_line": "Day 18 to Day 24 \u00b7 312.3 lbs (-2.6 this week) \u00b7 7 training sessions",
    "url": "/journal/posts/week-07/",
-   "excerpt": "*He has trained every day for 23 days straight \u2014 his deliberate choice \u2014 and by Tuesday his recovery score had fallen to 54%, a sign that the body is starting to answer back. He is down 15 pounds total, and the streak is the question that will define the coming week.*\u2026",
+   "excerpt": "*He has trained every day for 23 days straight \u2014 his deliberate choice \u2014 and by Tuesday his recovery score had fallen to 54%, a sign that the body is starting to answer back. He is down 15 pounds total, but the pace flag is live and the streak is the question that will define the coming week.*\u2026",
    "word_count": 1086.0,
    "has_board_interview": true,
    "image_url": "",
@@ -99,5 +113,5 @@
    "image_credit": ""
   }
  ],
- "updated_at": "2026-10-07T15:08:26.608389+00:00"
+ "updated_at": "2026-10-14T15:04:39.632870+00:00"
 }

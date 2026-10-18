@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-17T22:51:39.076289+00:00",
-  "served_at": "2026-10-17T22:51:39.076289+00:00",
+  "generated_at": "2026-10-18T07:02:37.936916+00:00",
+  "served_at": "2026-10-18T07:02:37.936916+00:00",
   "cache_seconds": 3600,
-  "request_id": "9a79762b1a0949df"
+  "request_id": "0ff2f8be7b104937"
  },
  "journey": {
   "start_weight_lbs": 327.3,
@@ -13,20 +13,20 @@
   "remaining_lbs": 117.2,
   "progress_pct": 17.6,
   "weighin_count": 33,
-  "weekly_rate_lbs": -3.28,
-  "weekly_rate_ci_low": -3.47,
+  "weekly_rate_lbs": -3.36,
+  "weekly_rate_ci_low": -3.51,
   "weekly_rate_ci_high": -3.03,
   "projection_confidence": 0.8,
   "rate_provisional": false,
-  "weighin_span_days": 28,
-  "projected_goal_date": "2027-06-24",
-  "projected_goal_date_earliest": "2027-06-10",
+  "weighin_span_days": 27,
+  "projected_goal_date": "2027-06-19",
+  "projected_goal_date_earliest": "2027-06-08",
   "projected_goal_date_latest": "2027-07-15",
-  "days_to_goal": 250,
+  "days_to_goal": 244,
   "started_date": "2026-09-06",
   "last_weighin_date": "2026-10-17",
-  "day_n": 42,
-  "week_n": 6,
+  "day_n": 43,
+  "week_n": 7,
   "height_inches": 69.0,
   "pre_start": false
  }

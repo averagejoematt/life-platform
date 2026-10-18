@@ -104,7 +104,7 @@ test("the sentence gives count and range, an average only when asked, and days a
 
 test("the newest week of readings is on the page and the rest is one tap away", () => {
   const rows = D.recentRowsHTML(D.seriesOf("steps", SRC), D.MEASURES.steps.write, BASE, 3);
-  assert.match(rows, /href="\/next\/v8\/day\/\?d=2026-10-03">Oct 3 · Saturday · 9,913 </);
+  assert.match(rows, /href="\/next\/v8\/day\/\?d=2026-10-03">Oct 3 · Saturday · 24,816 </);
   assert.match(rows, /<details><summary>The \d+ earlier readings<\/summary>/);
   assert.equal((rows.split("<details>")[0].match(/<li>/g) || []).length, 3);
   const lift = D.recentRowsHTML(D.liftSeries(SRC.workouts.workouts, "Bench Press (Barbell)"), (v) => `${v} lb`, BASE);

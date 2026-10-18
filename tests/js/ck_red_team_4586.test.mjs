@@ -21,6 +21,7 @@ const EDITION = load("edition");
 const B = EDITION.blocks;
 const POSTS = load("posts");
 const later = (iso, days) => new Date(Date.parse(`${iso}T12:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
+const inWords = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
 const chapter = { ...B.chapter, state: "stale" };
 const latestDate = chapter.data.date;
 const n = P.weekNumberOf(chapter.data.week_label);
@@ -165,12 +166,16 @@ test("Coaches: one rule for every row — the count, no bar; the lead says no ch
 
 test("Story on the capture's own day: the latest chapter and its date, the next date ahead, and no inferred held week", () => {
   const html = P.storyChapterHTML(EDITION, B, POSTS, load("episodes"));
-  assert.match(html, new RegExp(`Latest chapter · Week ${n} \\(written [A-Z][a-z]+ \\d+\\)`), "the dated fact the served data supports");
-  assert.doesNotMatch(html, new RegExp(`Week ${n + 1}|waiting for Matthew’s approval|held before publishing`), "no held week is inferred (week 6 published 2026-10-18T04:29Z)");
+  // The 2026-10-18 capture: week 6 is served `ok` with `latest.status` "published", five days after it was written,
+  // so the accent badge is right on the capture's own day; the written date is the byline's.
+  assert.match(html, new RegExp(`New this week · Week ${n}`), "the served chapter is fresh on the capture's day");
+  assert.match(html, new RegExp(`Written by AI from the record on ${inWords(latestDate)}\\.`), "the dated fact the served data supports");
+  assert.doesNotMatch(html, new RegExp(`Week ${n + 1}|waiting for Matthew’s approval|waiting for approval|held before publishing`), "no held week is inferred (week 6 published 2026-10-18T04:29Z)");
+  assert.equal(B.chapter.data.latest.status, "published", "the held line binds chronicle.latest.status, which is published");
   assert.match(html, /The next draft is due [A-Z][a-z]+day, [A-Z][a-z]+ \d+; it publishes once Matthew approves it\./);
   const due = B.next.data.chapter.data.date;
   assert.ok(due > EDITION.as_of, `${due} is after ${EDITION.as_of}`);
-  assert.doesNotMatch(html, /New this week/);
+  assert.doesNotMatch(P.storyChapterHTML({ ...EDITION, as_of: later(latestDate, 11) }, B, POSTS, load("episodes")), /New this week/, "eleven days on, the badge is gone");
 });
 
 // ── round 3 ─────────────────────────────────────────────────────────────────────
@@ -245,11 +250,12 @@ test("item 3: one sayable guess sentence on the front and Start, the exact rate 
   assert.match(html, /^<a class="ck-link" href="\/next\/v8\/coaches\/">76 of 183 checked calls right\.<\/a> The coaches do not beat a simple guess yet\.<details class="ck-small"><summary>The exact rate<\/summary><p>A guess that every call has a 42% chance of coming true does about as well\.<\/p><\/details>$/);
   assert.equal(P.frontSlots(EDITION, B, "/next/v8/")["ck-record"], html);
   assert.equal(P.recordHTML(B.record).startsWith("76 of 183 checked calls right. The coaches"), true, "Start: no door on the count, the page has its own");
-  assert.equal(P.guessSentence({ ...B.record.data, beats_simple_guess: true }), "The coaches beat a simple guess.");
-  assert.equal(P.guessSentence({ ...B.record.data, brier_skill: null }), "There is no comparison with a guess yet.");
+  assert.equal(P.guessSentence({ ...B.record.data, comparison_text: "", beats_simple_guess: true }), "The coaches beat a simple guess.");
+  assert.equal(P.guessSentence({ ...B.record.data, comparison_text: "", brier_skill: null }), "There is no comparison with a guess yet.");
   // Lane E's served shapes (lambdas/web/record_words.py): comparison_text is the one sentence, baseline.text the exact rate.
   assert.equal(P.guessSentence({ ...B.record.data, comparison_text: "Too few checked calls yet to compare the coaches with a simple guess." }), "Too few checked calls yet to compare the coaches with a simple guess.", "lane E's served sentence wins");
-  assert.equal(P.guessSentence(B.record.data), "The coaches do not beat a simple guess yet.", "the capture's older 'So far they…' form is re-said");
+  assert.equal(P.guessSentence(B.record.data), B.record.data.comparison_text, "the 2026-10-18 capture serves lane E's sentence, and it is printed as served");
+  assert.equal(P.guessSentence({ ...B.record.data, comparison_text: "So far they do not beat a simple guess." }), "The coaches do not beat a simple guess yet.", "the pre-deploy 'So far they…' form is re-said");
   const served = { ...B.record.data, comparison_text: "The coaches do not beat a simple guess yet.", baseline: { rule: "base_rate", rate: 0.415, rate_pct: 42, text: "A guess that every call has a 42% chance of coming true does about as well." } };
   assert.match(P.recordHTML({ ...B.record, data: served }), /<details class="ck-small"><summary>The exact rate<\/summary><p>A guess that every call has a 42% chance of coming true does about as well\.<\/p><\/details>$/);
   assert.equal(P.exactRateText({ ...B.record.data, baseline: { rate: 0.42 } }), P.guessClause(B.record.data), "a baseline with no text: the clause computed here");
@@ -261,7 +267,10 @@ test("item 4: Go deeper leads with the latest chapter — chronicle.latest when 
   const front = shell("");
   const deeper = /<ul class="ck-rows ck-rows--deeper">\s*<li id="ck-chapter-row">/.test(front);
   assert.ok(deeper, "the chapter row is the first row");
-  assert.equal(P.latestChapterBlock(B), B.chapter, "no served latest: the chapter block as today");
+  const unserved = { ...B, chapter: { ...B.chapter, data: { ...B.chapter.data, latest: null } } };
+  assert.equal(P.latestChapterBlock(unserved), unserved.chapter, "no served latest: the chapter block as today");
+  assert.deepEqual(B.chapter.data.latest, { week: 6, label: "Week 6", date: "2026-10-13", status: "published" }, "the 2026-10-18 capture serves chronicle.latest");
+  assert.equal(P.latestChapterBlock(B).data.date, B.chapter.data.latest.date, "the served latest's date leads");
   // Lane E: chapter.data.latest {week, label, date, status} over the block's own label and date.
   const latest = { week: 6, label: "Week 6", date: "2026-10-13", status: "published" };
   const served = { ...B, chapter: { ...B.chapter, data: { ...B.chapter.data, title: "The Quiet Accumulation", url: "/journal/posts/week-09/", read_minutes: 7, latest, held: null, next_due: "2026-10-21" } } };
@@ -377,12 +386,17 @@ test("one quantity, one unit: recovery is a percentage on the day line, the tren
 });
 
 test("Week: a row with too little data takes the hollow dot and says so; every scored row has a dot", () => {
-  const html = F.scorecardHTML(B.scorecard, "/next/v8/");
+  // The 2026-10-17 capture served a thin Food row ("2 days logged; 5 are needed."); the 2026-10-18 capture's Food row
+  // is scored (not_yet), so the thin case is that served shape planted on the same row, and the served card has no hollow dot.
+  assert.equal(B.scorecard.data.rows.food.data.verdict, "not_yet", "this capture's Food row is scored");
+  assert.equal((F.scorecardHTML(B.scorecard, "/next/v8/").match(/ck-dot--none/g) || []).length, 0, "no thin row on the served card");
+  const foodRow = B.scorecard.data.rows.food;
+  const thin = { ...B.scorecard, data: { ...B.scorecard.data, rows: { ...B.scorecard.data.rows, food: { ...foodRow, data: { ...foodRow.data, verdict: "not_enough_data", verdict_text: "Too few days logged", text: "2 days logged; 5 are needed." } } } } };
+  const html = F.scorecardHTML(thin, "/next/v8/");
   const food = /<li><a class="ck-rows__key" href="[^"]*">Food<\/a><span>(.*?)<\/span><\/li>/.exec(html);
   assert.ok(food, "the Food row");
-  assert.equal(B.scorecard.data.rows.food.data.verdict, "not_enough_data", "the capture's Food row is the thin one");
   assert.match(food[1], /^<i class="ck-dot ck-dot--off ck-dot--none" aria-hidden="true"><\/i><b>Too few days logged\.<\/b> 2 days logged; 5 are needed\. <span class="ck-small">Not enough data for a verdict\.<\/span>/);
-  const rows = F.scorecardRows(B.scorecard).filter(({ row }) => row.state === "ok" && row.data && row.data.verdict_text);
+  const rows = F.scorecardRows(thin).filter(({ row }) => row.state === "ok" && row.data && row.data.verdict_text);
   assert.equal((html.match(/<i class="ck-dot/g) || []).length, rows.length, "one dot per scored row, the thin one included");
   assert.equal((html.match(/ck-dot--none/g) || []).length, 1);
 });
@@ -398,7 +412,7 @@ test("Trend index: each row carries its latest served reading and the day, and t
     assert.ok(last, `${key} has a served reading`);
     assert.ok(html.includes(`>${m.name} · ${m.write(last.value)} <span>${new Date(`${last.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" })} `), `${key}: its latest value and day`);
   }
-  assert.match(D.trendIndexDay(src), /^Saturday, October 17 · Day 42$/);
+  assert.match(D.trendIndexDay(src), /^Sunday, October 18 · Day 43$/);
   assert.equal(D.trendIndexDay({}), "");
   assert.doesNotMatch(D.trendIndexHTML("/next/v8/"), / · /, "with no bodies, the names alone");
   assert.doesNotMatch(html, /\d{4}-\d{2}-\d{2}|undefined|NaN/);
@@ -515,9 +529,14 @@ test("Coaches C2/C5: a lagging record says its day, the lead's row says why ther
   const row = (name) => html.split("<li>").find((li) => li.includes(name));
   const lag = COACHES.coaches.filter((c) => c.record && c.record.through < EDITION.as_of);
   const current = COACHES.coaches.filter((c) => c.record && c.record.through === EDITION.as_of);
-  assert.ok(lag.length >= 1 && current.length >= 1, "the capture has both kinds");
+  // The 2026-10-18 capture is from 00:15 Pacific: every record is through the day before, so the current kind is
+  // the served Lisa Park row read as of her own `through` day.
+  assert.ok(lag.length >= 1, "the capture has a lagging record");
   for (const c of lag) assert.match(row(c.name), new RegExp(`${c.record.confirmed} of ${c.record.n}<br><span class="ck-small">through [A-Z][a-z]+ \\d+</span>`), c.name);
   for (const c of current) assert.doesNotMatch(row(c.name), /through/, c.name);
+  const lisa = COACHES.coaches.find((c) => c.name === "Lisa Park");
+  const onHerDay = P.teamHTML(COACHES, "", "", { asOf: lisa.record.through }).split("<li>").find((li) => li.includes("Lisa Park"));
+  assert.doesNotMatch(onHerDay, /through/, "a record through the page's day carries no lag note");
   assert.match(row("Eli Marsh"), /ck-coach__job">Lead, the day's plan; runs the program, so no checked calls<\/span><span class="ck-coach__record">none<\/span>/);
   assert.doesNotMatch(row("Amara Patel").split("</li>")[0], /sitting out/i, "not in the row");
   assert.match(html, /<\/ul><p class="ck-small">Amara Patel is sitting out: no sensor since August 27\.<\/p>$/, "one line under the list");
@@ -569,26 +588,31 @@ test("Week W4: the page ends on a dated next line from the served next block, el
 });
 
 test("Day D1: no lifts and a walk say the absence first, and the walk is the served modality minutes", () => {
-  const iso = EDITION.as_of;
-  const row = SRC.training.daily_modality_minutes_30d.find((r) => r.date === iso);
-  assert.ok(row && row.walking_min > 0 && !SRC.workouts.workouts.some((w) => w.date === iso), "the capture's day has a walk and no session");
+  // The capture is from 00:15 Pacific: its own day has no minutes yet, so the day is the newest served row with a walk and no session.
+  const row = [...SRC.training.daily_modality_minutes_30d].reverse().find((r) => r.walking_min > 0 && !SRC.workouts.workouts.some((w) => w.date === r.date));
+  assert.ok(row, "the capture has a day with a walk and no session");
+  const iso = row.date;
   const html = D.dayLiftsHTML(iso, SRC, "/next/v8/");
   assert.equal(html, `<p class="ck-soft">No lifting logged that day.</p><p class="ck-soft">Also that day: ${row.walking_min} minutes of walking.</p>`);
   assert.match(D.dayLiftsHTML("2026-01-01", SRC, "/next/v8/"), /^<p class="ck-soft">No training was recorded on this day\.<\/p>$/);
 });
 
 test("Day D2: the checked call carries the day of its reading — observed_on when served, the served sentence's day until then", () => {
-  const call = CALLS.calls.find((c) => c.settled_date === EDITION.as_of && c.kind === "number");
-  assert.ok(call, "a number call settled on the capture's day");
-  assert.match(D.daySettledHTML(EDITION.as_of, CALLS, "/next/v8/"), /Graded on the reading for [A-Z][a-z]+ \d+\./);
+  // The capture is from 00:15 Pacific: nothing settled on its own day yet, so the day is the newest settled number call's.
+  const call = CALLS.calls.filter((c) => c.kind === "number").sort((a, b) => (a.settled_date < b.settled_date ? 1 : -1))[0];
+  assert.ok(call && call.observed_on_text, "a settled number call in the capture, with lane E's observed_on_text served");
+  assert.match(D.daySettledHTML(call.settled_date, CALLS, "/next/v8/"), /Graded on [A-Z][a-z]+day’s reading, [A-Z][a-z]+ \d+\./, "the served observed_on day");
   assert.equal(D.observedOnText({ ...call, observed_on: "2026-10-16" }), "Graded on Friday’s reading, October 16.");
   assert.equal(D.observedOnText({ ...call, observed_on: null, observed_on_text: "Friday, October 16" }), "Graded on Friday’s reading, October 16.", "lane E's served words");
-  assert.equal(D.observedOnText({ ...call, called: "Max Reyes called his weight at about 304.5 lb.", observed_on: null }), "");
+  assert.equal(D.observedOnText({ ...call, called: "Max Reyes called his weight at about 304.5 lb.", observed_on: null, observed_on_text: null }), "", "nothing served and no day in the sentence: no line");
 });
 
 test("Day D3: a 'call' with no date and no number in it is labelled a note", () => {
-  const moves = load("coach_moves_2026-10-17");
-  const html = D.daySaidHTML(EDITION.as_of, moves, "/next/v8/");
+  // The 2026-10-17 day file carried Nathan Reeves's dateless, numberless 'call'; the 2026-10-18 pass no longer captures
+  // that day (the script writes the gate's days and the newest), so the case is that line planted on a captured day.
+  const captured = load("coach_moves_2026-10-07");
+  const moves = { ...captured, lines: [{ ...captured.lines[0], coach_id: "mind_coach", coach: "Nathan Reeves", move: "call", move_label: "A call", text: "I expect the silence continues until he names what he's avoiding." }] };
+  const html = D.daySaidHTML("2026-10-07", moves, "/next/v8/");
   assert.match(html, /Nathan Reeves<\/a> · A note<\/span>/);
   assert.doesNotMatch(html, /· A call/);
   assert.equal(D.datedCall("Weight will be around 304.5 pounds tomorrow morning"), true);
@@ -596,7 +620,7 @@ test("Day D3: a 'call' with no date and no number in it is labelled a note", () 
   assert.equal(D.datedCall("I expect the silence continues until he names what he's avoiding."), false);
   assert.equal(D.datedCall("Protein will rise next week."), false, "a date word with no number is not a checkable call");
   const dated = { ...moves, lines: [{ ...moves.lines[0], text: "Weight will be around 304.5 pounds tomorrow morning" }] };
-  assert.match(D.daySaidHTML(EDITION.as_of, dated, "/next/v8/"), /· A call<\/span>/);
+  assert.match(D.daySaidHTML("2026-10-07", dated, "/next/v8/"), /· A call<\/span>/);
 });
 
 // ── site-to-A round 1, lane D (2026-10-18): the sheet, how it's built, the appendix, a call, a coach ──
@@ -748,8 +772,10 @@ test("Appendix: an earlier version of a v8 page says so, and a codename is small
 
 test("Call: a bet's short sentence carries the unit its long sentence names; a short sentence with no unit in the long one is left alone", () => {
   const bet = load("calls").calls.find((c) => c.id.startsWith("bet-20261016"));
-  assert.ok(bet && /as a percentage/.test(bet.called) && /at or above 26 on/.test(bet.called_short), "the capture's bet drops the unit on the short form");
-  assert.equal(C.calledShortWithUnit(bet), bet.called_short.replace("at or above 26 on", "at or above 26% on"));
+  // Lane E's deploy (2026-10-18): the served short sentence carries the unit; the pre-deploy form that dropped it is the mutation.
+  assert.ok(bet && /as a percentage/.test(bet.called) && /at or above 26% on/.test(bet.called_short), "the capture's bet carries the unit on the short form");
+  assert.equal(C.calledShortWithUnit(bet), bet.called_short, "a served unit is not doubled");
+  assert.equal(C.calledShortWithUnit({ ...bet, called_short: bet.called_short.replace("at or above 26% on", "at or above 26 on") }), bet.called_short, "the dropped unit is restored from the long sentence");
   assert.equal(C.calledShortWithUnit({ called_short: "X bet on whether it would be at or above 26 on October 16.", called: "X bet on whether the share would be at or above 26 on October 16." }), "X bet on whether it would be at or above 26 on October 16.", "no unit named, none invented");
   assert.equal(C.calledShortWithUnit({ called_short: "at or above 190 g on October 16.", called: "(in grams) at or above 190 g" }), "at or above 190 g on October 16.", "a unit already there is not doubled");
   assert.equal(C.calledShortWithUnit({ called_short: "below 305 by October 20.", called: "his weight (in pounds) below 305" }), "below 305 lb by October 20.");
@@ -797,13 +823,13 @@ test("round 2 (week, item 4): 'faster than planned' takes the hollow dot and its
 
 test("round 2 (story, item 5): a stale chapter takes the neutral label, never the accent badge", () => {
   const stale = P.chapterHTML({ ...B.chapter, state: "stale" }, B.next, { asOf: EDITION.as_of });
-  assert.match(stale, /^<span class="ck-label">Latest chapter · Week 5 \(written October 6\)<\/span><h1>/);
+  assert.match(stale, /^<span class="ck-label">Latest chapter · Week 6 \(written October 13\)<\/span><h1>/);
   assert.doesNotMatch(stale, /ck-badge/);
   const old = P.chapterHTML(B.chapter, B.next, { asOf: later(B.chapter.data.date, 11) });
   assert.match(old, /^<span class="ck-label">Latest chapter/, "ok but eleven days old: the same neutral label");
   assert.doesNotMatch(old, /ck-badge/);
   const fresh = P.chapterHTML({ ...B.chapter, state: "ok" }, B.next, { asOf: later(B.chapter.data.date, 3) });
-  assert.match(fresh, /^<span class="ck-badge">New this week · Week 5<\/span><h1>/, "fresh: the accent badge, as before");
+  assert.match(fresh, /^<span class="ck-badge">New this week · Week 6<\/span><h1>/, "fresh: the accent badge, as before");
   assert.doesNotMatch(P.storyChapterHTML({ ...EDITION, as_of: later(B.chapter.data.date, 11) }, { ...B, chapter: { ...B.chapter, state: "stale" } }, POSTS, load("episodes")), /ck-badge/);
 });
 
@@ -834,5 +860,5 @@ test("round 2 (coaches, item 8): until the served sentence lands, the big record
   // Lane E's served sentence wins here as it does on the front; its baseline text is the exact rate.
   const served = { ...B.record, data: { ...B.record.data, comparison_text: "Too few checked calls yet to compare the coaches with a simple guess.", baseline: { text: "A guess that every call has a 42% chance of coming true does about as well." } } };
   assert.match(P.recordBigHTML(served), /<p>Too few checked calls yet to compare the coaches with a simple guess\.<\/p><details class="ck-small"><summary>The exact rate<\/summary>/);
-  assert.doesNotMatch(P.recordBigHTML({ ...B.record, data: { ...B.record.data, brier_skill: null } }), /The exact rate/, "no skill served: no fold");
+  assert.doesNotMatch(P.recordBigHTML({ ...B.record, data: { ...B.record.data, brier_skill: null, baseline: null } }), /The exact rate/, "no skill and no served baseline: no fold");
 });

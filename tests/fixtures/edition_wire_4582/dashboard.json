@@ -1,18 +1,18 @@
 {
  "_meta": {
   "generated_at": "2026-10-05T17:01:57.021488+00:00",
-  "served_at": "2026-10-17T23:29:17.446356+00:00",
+  "served_at": "2026-10-18T07:15:21.651292+00:00",
   "cache_seconds": 300,
   "content_as_of": "2026-10-05T17:01:57.021488+00:00",
-  "request_id": "467d227e290c43e0"
+  "request_id": "3be97933e0414091"
  },
  "weekly_priority": {
-  "text": null,
+  "text": "I'm watching Matthew execute at a steady clip: 54 logged training sessions in thirty days, consistent daily movement, and a weight loss rate holding at 3.3 pounds per week from his starting weight of 302.2 pounds on day 42. The structural adherence is working. What I'm tracking closely now is the gap between doing and logging\u2014his food logs stopped four days ago, and his journal entries have been silent for forty days. The wearables are still reporting (sleep locked, recovery stable), so the passive data shows the machine is humming, but without active logging, I can't see the decision-making underneath. For a twelve-month recomposition after a previous cycle that stalled in the final phase, that visibility is the early warning system. I've asked him to restart one of those two channels this week\u2014food log or journal entry\u2014because the goal isn't perfection in logging, it's seeing what's real so we can adjust before the momentum quiets.",
   "coach_name": "Eli Marsh",
   "coach_title": "Principal Investigator \u2014 Program Lead",
-  "generated_at": null,
-  "as_of_day_n": null,
-  "data_through": null
+  "generated_at": "2026-10-18T04:38:17.763733+00:00",
+  "as_of_day_n": 42,
+  "data_through": "2026-10-17"
  },
  "lead_daily": {
   "text": "Matthew has lost 23.3 pounds since Sunday, September 6, settling into a weekly loss rate of 3.2 pounds per week, likely between 3.0 and 3.4. His latest weigh-in on Friday, October 16 shows 304.0 pounds. His recovery score this morning is 60, with a heart-rate variability of 45 milliseconds, resting heart rate of 56 beats per minute, and 7.4 hours of sleep last night.",
@@ -467,7 +467,7 @@
  "predictions": [],
  "content_day_span": {
   "oldest_day_n": 30,
-  "newest_day_n": 40,
+  "newest_day_n": 42,
   "mixed": true
  },
  "regeneration_paused": false

@@ -1,12 +1,12 @@
 {
  "_meta": {
-  "generated_at": "2026-10-17T23:29:06.329302+00:00",
-  "served_at": "2026-10-17T23:29:06.329302+00:00",
+  "generated_at": "2026-10-18T07:14:58.739104+00:00",
+  "served_at": "2026-10-18T07:14:58.739104+00:00",
   "cache_seconds": 300,
-  "request_id": "455dad668a734b99"
+  "request_id": "b98a3851072943cb"
  },
- "as_of": "2026-10-17",
- "day_n": 42,
+ "as_of": "2026-10-18",
+ "day_n": 43,
  "order": [
   "premise",
   "chapter",
@@ -28,7 +28,7 @@
  "blocks": {
   "premise": {
    "state": "ok",
-   "as_of": "2026-10-17",
+   "as_of": "2026-10-18",
    "source": "static",
    "absent_text": "The introduction is not served right now.",
    "data": {
@@ -36,21 +36,29 @@
    }
   },
   "chapter": {
-   "state": "stale",
-   "as_of": "2026-10-06",
+   "state": "ok",
+   "as_of": "2026-10-13",
    "source": [
     "/journal/posts.json",
     "/panelcast/episodes.json"
    ],
-   "absent_text": "No new chapter since Tuesday, October 6.",
+   "absent_text": "No chapter has been published yet.",
    "data": {
-    "title": "Park's Blind Spot",
-    "date": "2026-10-06",
-    "week_label": "Week 5",
-    "dek": "After 23 consecutive training days, three rest days this week sent recovery to 98% four mornings in a row \u2014 a season high \u2014 while the scale crossed 310 pounds for the first time, suggesting 18.5 pounds gone\u2026",
-    "url": "/journal/posts/week-08/",
-    "word_count": 1262,
-    "read_minutes": 6,
+    "latest": {
+     "week": 6,
+     "label": "Week 6",
+     "date": "2026-10-13",
+     "status": "published"
+    },
+    "held": null,
+    "next_due": "2026-10-21",
+    "title": "The Quiet Accumulation",
+    "date": "2026-10-13",
+    "week_label": "Week 6",
+    "dek": "The Monday afternoon walk covered 5.4 miles in just under two hours, through 50-degree Seattle air, at an average heart rate that the platform flagged as genuine cardiovascular work rather than a stroll.",
+    "url": "/journal/posts/week-09/",
+    "word_count": 1400,
+    "read_minutes": 7,
     "podcast": {
      "state": "absent",
      "as_of": null,
@@ -62,7 +70,7 @@
   },
   "next": {
    "state": "ok",
-   "as_of": "2026-10-17",
+   "as_of": "2026-10-18",
    "source": [
     "/api/content_cadence",
     "/api/coach_docket"
@@ -104,7 +112,7 @@
   },
   "week": {
    "state": "ok",
-   "as_of": "2026-10-17",
+   "as_of": "2026-10-18",
    "source": [
     "/api/pulse_history",
     "/api/training_overview",
@@ -113,13 +121,13 @@
    "absent_text": "Nothing is recorded in these seven days.",
    "data": {
     "days": [
-     "2026-10-11",
      "2026-10-12",
      "2026-10-13",
      "2026-10-14",
      "2026-10-15",
      "2026-10-16",
-     "2026-10-17"
+     "2026-10-17",
+     "2026-10-18"
     ],
     "order": [
      "weight",
@@ -135,15 +143,16 @@
       "absent_text": "The weight has no reading in these seven days.",
       "data": {
        "values": [
-        null,
         308.3,
         305.4,
         305.6,
         304.5,
         304.0,
-        302.2
+        302.2,
+        null
        ],
-       "text": "302.2 lb, down 6.1 across 6 weigh-ins."
+       "text": "302.2 lb, down 6.1 across 6 weigh-ins.",
+       "unit": " lb"
       }
      },
      "training": {
@@ -153,15 +162,16 @@
       "absent_text": "Training has no reading in these seven days.",
       "data": {
        "values": [
-        164.0,
         109.0,
         99.0,
         168.0,
         131.0,
         158.0,
-        168.0
+        168.0,
+        null
        ],
-       "text": "Trained on 7 of 7 days recorded.",
+       "text": "Trained on 6 of 6 days recorded.",
+       "unit": " minutes",
        "met": [
         true,
         true,
@@ -169,7 +179,7 @@
         true,
         true,
         true,
-        true
+        null
        ]
       }
      },
@@ -180,15 +190,16 @@
       "absent_text": "Sleep has no reading in these seven days.",
       "data": {
        "values": [
-        8.1,
         9.6,
         8.5,
         9.1,
         8.1,
         8.3,
-        8.8
+        8.8,
+        null
        ],
-       "text": "Slept 7 hours or more on 7 of 7 days recorded.",
+       "text": "Slept 7 hours or more on 6 of 6 days recorded.",
+       "unit": " hours",
        "met": [
         true,
         true,
@@ -196,33 +207,34 @@
         true,
         true,
         true,
-        true
+        null
        ]
       }
      },
      "food": {
       "state": "ok",
-      "as_of": "2026-10-12",
+      "as_of": "2026-10-17",
       "source": "/api/nutrition_overview",
       "absent_text": "The food log has no reading in these seven days.",
       "data": {
        "values": [
-        173.0,
         155.0,
-        null,
-        null,
-        null,
-        null,
+        166.0,
+        152.0,
+        98.0,
+        166.0,
+        133.0,
         null
        ],
-       "text": "At or above 170 g protein on 1 of 2 days recorded.",
+       "text": "At or above 170 g protein on 0 of 6 days recorded.",
+       "unit": " g",
        "met": [
-        true,
         false,
-        null,
-        null,
-        null,
-        null,
+        false,
+        false,
+        false,
+        false,
+        false,
         null
        ]
       }
@@ -230,20 +242,41 @@
     },
     "detail": [
      {
+      "date": "2026-10-18",
+      "summary": "Nothing recorded yet.",
+      "facts": []
+     },
+     {
       "date": "2026-10-17",
       "summary": "302.2 lb \u00b7 trained \u00b7 slept 8.8 h",
       "facts": [
        {
         "label": "Weight",
-        "text": "302.2 lb"
+        "text": "302.2 lb",
+        "value": 302.2,
+        "unit": " lb"
        },
        {
         "label": "Training",
-        "text": "168 minutes of walking"
+        "text": "168 minutes of walking",
+        "value": 168.0,
+        "unit": " minutes"
        },
        {
         "label": "Sleep",
-        "text": "8.8 hours; recovery 62 out of 100"
+        "text": "8.8 hours; recovery 62 out of 100",
+        "value": 8.8,
+        "unit": " hours",
+        "recovery": {
+         "value": 62.0,
+         "unit": " out of 100"
+        }
+       },
+       {
+        "label": "Food",
+        "text": "133 g protein, 1,561 kcal",
+        "value": 133.0,
+        "unit": " g"
        }
       ]
      },
@@ -253,15 +286,31 @@
       "facts": [
        {
         "label": "Weight",
-        "text": "304.0 lb"
+        "text": "304.0 lb",
+        "value": 304.0,
+        "unit": " lb"
        },
        {
         "label": "Training",
-        "text": "158 minutes of strength"
+        "text": "158 minutes of strength",
+        "value": 158.0,
+        "unit": " minutes"
        },
        {
         "label": "Sleep",
-        "text": "8.3 hours; recovery 70 out of 100"
+        "text": "8.3 hours; recovery 70 out of 100",
+        "value": 8.3,
+        "unit": " hours",
+        "recovery": {
+         "value": 70.0,
+         "unit": " out of 100"
+        }
+       },
+       {
+        "label": "Food",
+        "text": "166 g protein, 1,460 kcal",
+        "value": 166.0,
+        "unit": " g"
        }
       ]
      },
@@ -271,15 +320,31 @@
       "facts": [
        {
         "label": "Weight",
-        "text": "304.5 lb"
+        "text": "304.5 lb",
+        "value": 304.5,
+        "unit": " lb"
        },
        {
         "label": "Training",
-        "text": "131 minutes of strength"
+        "text": "131 minutes of strength",
+        "value": 131.0,
+        "unit": " minutes"
        },
        {
         "label": "Sleep",
-        "text": "8.1 hours; recovery 59 out of 100"
+        "text": "8.1 hours; recovery 59 out of 100",
+        "value": 8.1,
+        "unit": " hours",
+        "recovery": {
+         "value": 59.0,
+         "unit": " out of 100"
+        }
+       },
+       {
+        "label": "Food",
+        "text": "98 g protein, 873 kcal",
+        "value": 98.0,
+        "unit": " g"
        }
       ]
      },
@@ -289,15 +354,31 @@
       "facts": [
        {
         "label": "Weight",
-        "text": "305.6 lb"
+        "text": "305.6 lb",
+        "value": 305.6,
+        "unit": " lb"
        },
        {
         "label": "Training",
-        "text": "168 minutes of walking"
+        "text": "168 minutes of walking",
+        "value": 168.0,
+        "unit": " minutes"
        },
        {
         "label": "Sleep",
-        "text": "9.1 hours; recovery 75 out of 100"
+        "text": "9.1 hours; recovery 75 out of 100",
+        "value": 9.1,
+        "unit": " hours",
+        "recovery": {
+         "value": 75.0,
+         "unit": " out of 100"
+        }
+       },
+       {
+        "label": "Food",
+        "text": "152 g protein, 1,311 kcal",
+        "value": 152.0,
+        "unit": " g"
        }
       ]
      },
@@ -307,15 +388,31 @@
       "facts": [
        {
         "label": "Weight",
-        "text": "305.4 lb"
+        "text": "305.4 lb",
+        "value": 305.4,
+        "unit": " lb"
        },
        {
         "label": "Training",
-        "text": "99 minutes of strength"
+        "text": "99 minutes of strength",
+        "value": 99.0,
+        "unit": " minutes"
        },
        {
         "label": "Sleep",
-        "text": "8.5 hours; recovery 79 out of 100"
+        "text": "8.5 hours; recovery 79 out of 100",
+        "value": 8.5,
+        "unit": " hours",
+        "recovery": {
+         "value": 79.0,
+         "unit": " out of 100"
+        }
+       },
+       {
+        "label": "Food",
+        "text": "166 g protein, 1,579 kcal",
+        "value": 166.0,
+        "unit": " g"
        }
       ]
      },
@@ -325,37 +422,31 @@
       "facts": [
        {
         "label": "Weight",
-        "text": "308.3 lb"
+        "text": "308.3 lb",
+        "value": 308.3,
+        "unit": " lb"
        },
        {
         "label": "Training",
-        "text": "109 minutes of walking"
+        "text": "109 minutes of walking",
+        "value": 109.0,
+        "unit": " minutes"
        },
        {
         "label": "Sleep",
-        "text": "9.6 hours; recovery 67 out of 100"
+        "text": "9.6 hours; recovery 67 out of 100",
+        "value": 9.6,
+        "unit": " hours",
+        "recovery": {
+         "value": 67.0,
+         "unit": " out of 100"
+        }
        },
        {
         "label": "Food",
-        "text": "155 g protein, 1,286 kcal"
-       }
-      ]
-     },
-     {
-      "date": "2026-10-11",
-      "summary": "trained \u00b7 slept 8.1 h",
-      "facts": [
-       {
-        "label": "Training",
-        "text": "164 minutes of strength"
-       },
-       {
-        "label": "Sleep",
-        "text": "8.1 hours; recovery 88 out of 100"
-       },
-       {
-        "label": "Food",
-        "text": "173 g protein, 1,512 kcal"
+        "text": "155 g protein, 1,286 kcal",
+        "value": 155.0,
+        "unit": " g"
        }
       ]
      }
@@ -498,13 +589,14 @@
   },
   "life": {
    "state": "ok",
-   "as_of": "2026-10-17",
+   "as_of": "2026-10-18",
    "source": [
     "/api/decisions",
     "/api/experiments",
     "/api/habit_streaks",
     "/api/journey",
     "/api/nutrition_overview",
+    "/api/pulse_history",
     "/api/session",
     "/api/sleep_detail",
     "/api/supplements"
@@ -533,7 +625,7 @@
      },
      "training": {
       "state": "ok",
-      "as_of": "2026-10-17",
+      "as_of": "2026-10-18",
       "source": "/api/session",
       "absent_text": "No session is planned for today.",
       "data": {
@@ -543,19 +635,31 @@
      "sleep": {
       "state": "ok",
       "as_of": "2026-10-17",
-      "source": "/api/sleep_detail",
+      "source": [
+       "/api/pulse_history",
+       "/api/sleep_detail"
+      ],
       "absent_text": "No sleep has been recorded yet.",
       "data": {
-       "text": "Slept 5.3 hours on the night of Friday, October 16; recovery 62 out of 100."
+       "text": "Slept 8.8 hours on the night of Friday, October 16; recovery 62 out of 100.",
+       "hours": 8.8,
+       "unit": " hours",
+       "recovery": {
+        "value": 62.0,
+        "unit": " out of 100"
+       },
+       "night_of": "2026-10-16",
+       "wake_date": "2026-10-17",
+       "read_from": "/api/pulse_history"
       }
      },
      "food": {
-      "state": "stale",
-      "as_of": "2026-10-12",
+      "state": "ok",
+      "as_of": "2026-10-17",
       "source": "/api/nutrition_overview",
-      "absent_text": "Nothing newer than Monday, October 12.",
+      "absent_text": "No food has been logged yet.",
       "data": {
-       "text": "At or above the 170 g protein floor on 8 of 25 logged days."
+       "text": "At or above the 170 g protein floor on 7 of 29 logged days."
       }
      },
      "habits": {
@@ -578,7 +682,7 @@
      },
      "experiments": {
       "state": "ok",
-      "as_of": "2026-10-17",
+      "as_of": "2026-10-18",
       "source": "/api/experiments",
       "absent_text": "No experiments are listed.",
       "data": {
@@ -653,7 +757,7 @@
   },
   "scorecard": {
    "state": "ok",
-   "as_of": "2026-10-17",
+   "as_of": "2026-10-18",
    "source": [
     "/api/calibration",
     "/api/decisions",
@@ -684,59 +788,59 @@
     "rows": {
      "body": {
       "state": "ok",
-      "as_of": "2026-10-17",
+      "as_of": "2026-10-18",
       "source": "/api/pulse_history",
       "absent_text": "Body has no verdict this week.",
       "data": {
        "name": "Body",
        "verdict": "faster_than_planned",
        "verdict_text": "Weight down faster than planned",
-       "text": "Seven-day average 305.0 lb, down 3.6 lb from the seven days before.",
+       "text": "Seven-day average 305.0 lb, down 3 lb from the seven days before.",
        "rule": "The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; faster than planned when it fell more than 2.5 lb in the week. Fewer than 3 weigh-ins in either week is not enough data."
       }
      },
      "training": {
       "state": "ok",
-      "as_of": "2026-10-17",
+      "as_of": "2026-10-18",
       "source": "/api/training_overview",
       "absent_text": "Training has no verdict this week.",
       "data": {
        "name": "Training",
-       "verdict": "not_yet",
-       "verdict_text": "No rest day",
-       "text": "Trained on 7 of 7 days recorded.",
+       "verdict": "going_well",
+       "verdict_text": "Trained, with a rest day",
+       "text": "Trained on 6 of 6 days recorded.",
        "rule": "Days trained in the last seven. Going well at 4 to 6, so at least one rest day. Fewer than 5 days recorded is not enough data."
       }
      },
      "sleep": {
       "state": "ok",
-      "as_of": "2026-10-17",
+      "as_of": "2026-10-18",
       "source": "/api/pulse_history",
       "absent_text": "Sleep has no verdict this week.",
       "data": {
        "name": "Sleep",
        "verdict": "going_well",
        "verdict_text": "5 or more long nights",
-       "text": "7 hours or more on 7 of 7 nights recorded.",
+       "text": "7 hours or more on 6 of 6 nights recorded.",
        "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
       }
      },
      "food": {
       "state": "ok",
-      "as_of": "2026-10-17",
+      "as_of": "2026-10-18",
       "source": "/api/nutrition_overview",
       "absent_text": "Food has no verdict this week.",
       "data": {
        "name": "Food",
-       "verdict": "not_enough_data",
-       "verdict_text": "Too few days logged",
-       "text": "2 days logged; 5 are needed.",
+       "verdict": "not_yet",
+       "verdict_text": "Protein under the floor too often",
+       "text": "At or above the 170 g protein floor on 0 of 6 logged days.",
        "rule": "Logged days at or above the plan's protein floor in the last seven. Going well at 5. Fewer than 5 logged days is not enough data."
       }
      },
      "mind": {
       "state": "ok",
-      "as_of": "2026-10-17",
+      "as_of": "2026-10-18",
       "source": [
        "/api/owner_words",
        "/api/decisions"
@@ -752,7 +856,7 @@
      },
      "ai": {
       "state": "ok",
-      "as_of": "2026-10-17",
+      "as_of": "2026-10-18",
       "source": [
        "/api/predictions",
        "/api/calibration"
@@ -763,15 +867,15 @@
        "verdict": "not_yet",
        "verdict_text": "The coaches do not beat a simple guess yet",
        "text": "Counted across all 183 calls checked to date, not this week's alone.",
-       "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
+       "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that gives every call the same chance of coming true \u2014 the share of checked calls that have so far. Going well when they beat it. Fewer than 30 checked calls is not enough data."
       }
      }
     },
     "went_right": {
      "matthew": {
-      "area": "sleep",
-      "text": "Sleep: 7 hours or more on 7 of 7 nights recorded.",
-      "source": "/api/pulse_history"
+      "area": "training",
+      "text": "Training: Trained on 6 of 6 days recorded.",
+      "source": "/api/training_overview"
      },
      "engine": {
       "area": null,
@@ -786,8 +890,8 @@
      "not_enough_data": "Not enough data"
     },
     "window": {
-     "from": "2026-10-11",
-     "to": "2026-10-17"
+     "from": "2026-10-12",
+     "to": "2026-10-18"
     },
     "rules_set": "2026-10-09",
     "rules_set_text": "The rules were set on Friday, October 9."
@@ -795,7 +899,7 @@
   },
   "record": {
    "state": "ok",
-   "as_of": "2026-10-17",
+   "as_of": "2026-10-18",
    "source": [
     "/api/predictions",
     "/api/calibration"
@@ -825,7 +929,13 @@
     },
     "counted_text": "Counted: 11 sealed before day one, 10 sides of bets between two coaches, 106 read out of the coaches' running commentary and 56 conditional or hedged sentences.",
     "beats_simple_guess": false,
-    "comparison_text": "So far they do not beat a simple guess.",
+    "comparison_text": "The coaches do not beat a simple guess yet.",
+    "baseline": {
+     "rule": "base_rate",
+     "rate": 0.415,
+     "rate_pct": 42,
+     "text": "A guess that every call has a 42% chance of coming true does about as well."
+    },
     "brier_skill": -0.0087,
     "skill_n": 183
    }
@@ -843,7 +953,7 @@
   },
   "catch_up": {
    "state": "ok",
-   "as_of": "2026-10-06",
+   "as_of": "2026-10-13",
    "source": "/journal/posts.json",
    "absent_text": "No chapters yet.",
    "data": {
@@ -889,13 +999,19 @@
       "title": "Park's Blind Spot",
       "url": "/journal/posts/week-08/",
       "date": "2026-10-06"
+     },
+     {
+      "label": "Week 6",
+      "title": "The Quiet Accumulation",
+      "url": "/journal/posts/week-09/",
+      "date": "2026-10-13"
      }
     ]
    }
   },
   "follow": {
    "state": "ok",
-   "as_of": "2026-10-17",
+   "as_of": "2026-10-18",
    "source": [
     "common.subscriber_cadence",
     "/api/content_cadence"
@@ -933,10 +1049,24 @@
     "days": [
      {
       "_meta": {
-       "generated_at": "2026-10-17T23:29:03.648046+00:00",
-       "served_at": "2026-10-17T23:29:03.648046+00:00",
+       "generated_at": "2026-10-18T07:14:56.610388+00:00",
+       "served_at": "2026-10-18T07:14:56.610388+00:00",
        "cache_seconds": 300,
-       "request_id": "455dad668a734b99"
+       "request_id": "b98a3851072943cb"
+      },
+      "state": "absent",
+      "date": "2026-10-18",
+      "source": "/api/coach_moves",
+      "absent_text": "No coach line is recorded for Sunday, October 18.",
+      "lines": [],
+      "absent": []
+     },
+     {
+      "_meta": {
+       "generated_at": "2026-10-18T07:14:56.732217+00:00",
+       "served_at": "2026-10-18T07:14:56.732217+00:00",
+       "cache_seconds": 300,
+       "request_id": "b98a3851072943cb"
       },
       "state": "ok",
       "date": "2026-10-17",
@@ -988,10 +1118,10 @@
      },
      {
       "_meta": {
-       "generated_at": "2026-10-17T23:29:03.851416+00:00",
-       "served_at": "2026-10-17T23:29:03.851416+00:00",
+       "generated_at": "2026-10-18T07:14:56.832156+00:00",
+       "served_at": "2026-10-18T07:14:56.832156+00:00",
        "cache_seconds": 300,
-       "request_id": "455dad668a734b99"
+       "request_id": "b98a3851072943cb"
       },
       "state": "ok",
       "date": "2026-10-16",
@@ -1043,10 +1173,10 @@
      },
      {
       "_meta": {
-       "generated_at": "2026-10-17T23:29:04.045582+00:00",
-       "served_at": "2026-10-17T23:29:04.045582+00:00",
+       "generated_at": "2026-10-18T07:14:56.926528+00:00",
+       "served_at": "2026-10-18T07:14:56.926528+00:00",
        "cache_seconds": 300,
-       "request_id": "455dad668a734b99"
+       "request_id": "b98a3851072943cb"
       },
       "state": "absent",
       "date": "2026-10-15",
@@ -1093,10 +1223,10 @@
      },
      {
       "_meta": {
-       "generated_at": "2026-10-17T23:29:04.115916+00:00",
-       "served_at": "2026-10-17T23:29:04.115916+00:00",
+       "generated_at": "2026-10-18T07:14:57.246886+00:00",
+       "served_at": "2026-10-18T07:14:57.246886+00:00",
        "cache_seconds": 300,
-       "request_id": "455dad668a734b99"
+       "request_id": "b98a3851072943cb"
       },
       "state": "ok",
       "date": "2026-10-14",
@@ -1148,10 +1278,10 @@
      },
      {
       "_meta": {
-       "generated_at": "2026-10-17T23:29:04.411870+00:00",
-       "served_at": "2026-10-17T23:29:04.411870+00:00",
+       "generated_at": "2026-10-18T07:14:57.411898+00:00",
+       "served_at": "2026-10-18T07:14:57.411898+00:00",
        "cache_seconds": 300,
-       "request_id": "455dad668a734b99"
+       "request_id": "b98a3851072943cb"
       },
       "state": "ok",
       "date": "2026-10-13",
@@ -1207,10 +1337,10 @@
      },
      {
       "_meta": {
-       "generated_at": "2026-10-17T23:29:04.506719+00:00",
-       "served_at": "2026-10-17T23:29:04.506719+00:00",
+       "generated_at": "2026-10-18T07:14:57.492864+00:00",
+       "served_at": "2026-10-18T07:14:57.492864+00:00",
        "cache_seconds": 300,
-       "request_id": "455dad668a734b99"
+       "request_id": "b98a3851072943cb"
       },
       "state": "ok",
       "date": "2026-10-12",
@@ -1259,69 +1389,6 @@
         "reason": "This coach had nothing new to add."
        }
       ]
-     },
-     {
-      "_meta": {
-       "generated_at": "2026-10-17T23:29:04.565076+00:00",
-       "served_at": "2026-10-17T23:29:04.565076+00:00",
-       "cache_seconds": 300,
-       "request_id": "455dad668a734b99"
-      },
-      "state": "ok",
-      "date": "2026-10-11",
-      "source": "/api/coach_moves",
-      "absent_text": "No coach line is recorded for Sunday, October 11.",
-      "lines": [
-       {
-        "coach_id": "nutrition_coach",
-        "coach": "Marcus Webb",
-        "move": "reaction",
-        "move_label": "On a result",
-        "text": "Lisa's protein prediction came true, yet Matthew's 28-day average still sits below the 170g floor \u2014 so far, activation hasn't closed the dinner gap I keep flagging. I expect that gap to matter more now, not less.",
-        "replies_to": null,
-        "bet_settles": null
-       },
-       {
-        "coach_id": "sleep_coach",
-        "coach": "Lisa Park",
-        "move": "reply",
-        "move_label": "A reply",
-        "text": "Marcus Webb is right that the dinner gap persists, and I'll go further: I was wrong about the mechanism \u2014 protein escalation held, yet deep sleep didn't improve, which means, for now, I can't claim that gap is the only thing standing between Matthew and better recovery.",
-        "replies_to": "Marcus Webb",
-        "bet_settles": null
-       },
-       {
-        "coach_id": "labs_coach",
-        "coach": "James Okafor",
-        "move": "question",
-        "move_label": "A question for Matthew",
-        "text": "My read is that the two items blocking real progress \u2014 a lab draw and a symptom check-in \u2014 are still unscheduled, for now; has Matthew taken any steps this week to get either one booked?",
-        "replies_to": null,
-        "bet_settles": null
-       }
-      ],
-      "absent": [
-       {
-        "coach": "glucose_coach",
-        "state": "absent",
-        "reason": "No new readings have reached this coach's area, so there is nothing new to read."
-       },
-       {
-        "coach": "mind_coach",
-        "state": "absent",
-        "reason": "This coach had nothing new to add."
-       },
-       {
-        "coach": "physical_coach",
-        "state": "absent",
-        "reason": "This coach had nothing new to add."
-       },
-       {
-        "coach": "explorer_coach",
-        "state": "absent",
-        "reason": "This coach had nothing new to add."
-       }
-      ]
      }
     ]
    }
@@ -1346,7 +1413,8 @@
       "verdict_text": "Max Reyes was right.",
       "actual": {
        "value": 304.03,
-       "text": "304 lb"
+       "text": "304 lb",
+       "unit": " lb"
       },
       "tolerance": {
        "value": 3.9712,
@@ -1375,7 +1443,8 @@
       "verdict_text": "James Okafor was right.",
       "actual": {
        "value": 70.0,
-       "text": "70"
+       "text": "70",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 14.75,
@@ -1404,7 +1473,8 @@
       "verdict_text": "Henning Brandt was right.",
       "actual": {
        "value": 70.0,
-       "text": "70"
+       "text": "70",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 14.75,
@@ -1425,15 +1495,16 @@
       "kind": "bet",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park and Max Reyes bet on one question, fixed the day the bet opened: whether the 7-day average of his deep-sleep share (the part of the night spent in deep sleep, as a percentage) would be at or above 26 on October 16. Lisa Park said no; Max Reyes said yes.",
-      "called_short": "Lisa Park and Max Reyes bet on whether the 7-day average of his deep-sleep share would be at or above 26 on October 16.",
-      "happened_short": "It came in at 16.4.",
+      "called": "Lisa Park and Max Reyes bet on one question, fixed the day the bet opened: whether the 7-day average of his deep-sleep share (the part of the night spent in deep sleep, as a percentage) would be at or above 26% on October 16. Lisa Park said no; Max Reyes said yes.",
+      "called_short": "Lisa Park and Max Reyes bet on whether the 7-day average of his deep-sleep share would be at or above 26% on October 16.",
+      "happened_short": "It came in at 16.4%.",
       "settled_date": "2026-10-16",
       "verdict": "right",
       "verdict_text": "Lisa Park was right; Max Reyes was wrong.",
       "actual": {
        "value": 16.357142857142858,
-       "text": "16.4"
+       "text": "16.4%",
+       "unit": "%"
       },
       "simple_guess": {
        "state": "scored",
@@ -1455,7 +1526,8 @@
       "verdict_text": "Nathan Reeves was right; Marcus Webb was wrong.",
       "actual": {
        "value": 158.2,
-       "text": "158.2 g"
+       "text": "158.2 g",
+       "unit": " g"
       },
       "simple_guess": {
        "state": "scored",
@@ -1477,7 +1549,8 @@
       "verdict_text": "Lisa Park was right.",
       "actual": {
        "value": 89.0,
-       "text": "89"
+       "text": "89",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 21.308,
@@ -1506,7 +1579,8 @@
       "verdict_text": "Max Reyes was wrong.",
       "actual": {
        "value": 98.0,
-       "text": "98"
+       "text": "98",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 17.8725,
@@ -1535,7 +1609,8 @@
       "verdict_text": "Max Reyes was right.",
       "actual": {
        "value": 89.0,
-       "text": "89"
+       "text": "89",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 21.308,
@@ -1564,7 +1639,8 @@
       "verdict_text": "Max Reyes was wrong.",
       "actual": {
        "value": 73.0,
-       "text": "73"
+       "text": "73",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 18.2532,
@@ -1593,7 +1669,8 @@
       "verdict_text": "James Okafor was right.",
       "actual": {
        "value": 99.0,
-       "text": "99"
+       "text": "99",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 20.7078,
@@ -1622,7 +1699,8 @@
       "verdict_text": "James Okafor was right.",
       "actual": {
        "value": 78.0,
-       "text": "78"
+       "text": "78",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 23.7331,
@@ -1651,7 +1729,8 @@
       "verdict_text": "Henning Brandt was wrong.",
       "actual": {
        "value": 92.0,
-       "text": "92"
+       "text": "92",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 19.2925,
@@ -1680,7 +1759,8 @@
       "verdict_text": "Lisa Park was right.",
       "actual": {
        "value": 98.0,
-       "text": "98"
+       "text": "98",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 18.3648,
@@ -1709,7 +1789,8 @@
       "verdict_text": "Lisa Park was wrong.",
       "actual": {
        "value": 98.0,
-       "text": "98"
+       "text": "98",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 17.8725,
@@ -1738,7 +1819,8 @@
       "verdict_text": "Lisa Park was wrong.",
       "actual": {
        "value": 98.0,
-       "text": "98"
+       "text": "98",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 17.8725,
@@ -1767,7 +1849,8 @@
       "verdict_text": "Lisa Park was wrong.",
       "actual": {
        "value": 98.0,
-       "text": "98"
+       "text": "98",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 17.3031,
@@ -1796,7 +1879,8 @@
       "verdict_text": "Max Reyes was wrong.",
       "actual": {
        "value": 98.0,
-       "text": "98"
+       "text": "98",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 17.5951,
@@ -1825,7 +1909,8 @@
       "verdict_text": "Max Reyes was right.",
       "actual": {
        "value": 315.43,
-       "text": "315.4 lb"
+       "text": "315.4 lb",
+       "unit": " lb"
       },
       "tolerance": {
        "value": 5.1527,
@@ -1854,7 +1939,8 @@
       "verdict_text": "Nathan Reeves was wrong.",
       "actual": {
        "value": 98.0,
-       "text": "98"
+       "text": "98",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 17.3031,
@@ -1883,7 +1969,8 @@
       "verdict_text": "Henning Brandt was right.",
       "actual": {
        "value": 306.13,
-       "text": "306.1 lb"
+       "text": "306.1 lb",
+       "unit": " lb"
       },
       "tolerance": {
        "value": 3.1713,
@@ -1912,7 +1999,8 @@
       "verdict_text": "Lisa Park was right.",
       "actual": {
        "value": 77.0,
-       "text": "77"
+       "text": "77",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 21.4664,
@@ -1941,7 +2029,8 @@
       "verdict_text": "Lisa Park was right.",
       "actual": {
        "value": 86.0,
-       "text": "86"
+       "text": "86",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 20.8524,
@@ -1962,15 +2051,16 @@
       "kind": "bet",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park and Nathan Reeves bet on one question, fixed the day the bet opened: whether the 7-day average of his morning recovery score (his wrist strap\u2019s morning score out of 100) would be at or above 80 on October 7. Lisa Park said yes; Nathan Reeves said no.",
-      "called_short": "Lisa Park and Nathan Reeves bet on whether the 7-day average of his morning recovery score would be at or above 80 on October 7.",
-      "happened_short": "It came in at 87.6.",
+      "called": "Lisa Park and Nathan Reeves bet on one question, fixed the day the bet opened: whether the 7-day average of his morning recovery score (his wrist strap\u2019s morning score out of 100) would be at or above 80 out of 100 on October 7. Lisa Park said yes; Nathan Reeves said no.",
+      "called_short": "Lisa Park and Nathan Reeves bet on whether the 7-day average of his morning recovery score would be at or above 80 out of 100 on October 7.",
+      "happened_short": "It came in at 87.6 out of 100.",
       "settled_date": "2026-10-07",
       "verdict": "right",
       "verdict_text": "Lisa Park was right; Nathan Reeves was wrong.",
       "actual": {
        "value": 87.57142857142857,
-       "text": "87.6"
+       "text": "87.6 out of 100",
+       "unit": " out of 100"
       },
       "simple_guess": {
        "state": "scored",
@@ -1992,7 +2082,8 @@
       "verdict_text": "Max Reyes was right.",
       "actual": {
        "value": 80.0,
-       "text": "80"
+       "text": "80",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 22.3731,
@@ -2021,7 +2112,8 @@
       "verdict_text": "James Okafor was right.",
       "actual": {
        "value": 80.0,
-       "text": "80"
+       "text": "80",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 22.3731,
@@ -2042,15 +2134,16 @@
       "kind": "bet",
       "coach_id": "physical",
       "coach_name": "Max Reyes",
-      "called": "Max Reyes and Lisa Park bet on one question, fixed the day the bet opened: whether the 7-day average of his morning recovery score (his wrist strap\u2019s morning score out of 100) would be at or above 81.6 on October 5. Max Reyes said no; Lisa Park said yes.",
-      "called_short": "Max Reyes and Lisa Park bet on whether the 7-day average of his morning recovery score would be at or above 81.6 on October 5.",
-      "happened_short": "It came in at 81.",
+      "called": "Max Reyes and Lisa Park bet on one question, fixed the day the bet opened: whether the 7-day average of his morning recovery score (his wrist strap\u2019s morning score out of 100) would be at or above 81.6 out of 100 on October 5. Max Reyes said no; Lisa Park said yes.",
+      "called_short": "Max Reyes and Lisa Park bet on whether the 7-day average of his morning recovery score would be at or above 81.6 out of 100 on October 5.",
+      "happened_short": "It came in at 81 out of 100.",
       "settled_date": "2026-10-05",
       "verdict": "right",
       "verdict_text": "Max Reyes was right; Lisa Park was wrong.",
       "actual": {
        "value": 81.0,
-       "text": "81"
+       "text": "81 out of 100",
+       "unit": " out of 100"
       },
       "simple_guess": {
        "state": "scored",
@@ -2124,7 +2217,8 @@
       "verdict_text": "Henning Brandt was right.",
       "actual": {
        "value": 97.0,
-       "text": "97"
+       "text": "97",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 22.4603,
@@ -2153,7 +2247,8 @@
       "verdict_text": "Lisa Park was right.",
       "actual": {
        "value": 8.61,
-       "text": "8.6 hours"
+       "text": "8.6 hours",
+       "unit": " hours"
       },
       "tolerance": {
        "value": 1.2107,
@@ -2182,7 +2277,8 @@
       "verdict_text": "Lisa Park was right.",
       "actual": {
        "value": 6.69,
-       "text": "6.7 hours"
+       "text": "6.7 hours",
+       "unit": " hours"
       },
       "tolerance": {
        "value": 1.1787,
@@ -2203,15 +2299,16 @@
       "kind": "bet",
       "coach_id": "nutrition",
       "coach_name": "Marcus Webb",
-      "called": "Marcus Webb and Amara Patel bet on one question, fixed the day the bet opened: whether his morning recovery score (his wrist strap\u2019s morning score out of 100) would be below 70 on September 30. Marcus Webb said yes; Amara Patel said no.",
-      "called_short": "Marcus Webb and Amara Patel bet on whether his morning recovery score would be below 70 on September 30.",
-      "happened_short": "It came in at 59.",
+      "called": "Marcus Webb and Amara Patel bet on one question, fixed the day the bet opened: whether his morning recovery score (his wrist strap\u2019s morning score out of 100) would be below 70 out of 100 on September 30. Marcus Webb said yes; Amara Patel said no.",
+      "called_short": "Marcus Webb and Amara Patel bet on whether his morning recovery score would be below 70 out of 100 on September 30.",
+      "happened_short": "It came in at 59 out of 100.",
       "settled_date": "2026-09-30",
       "verdict": "right",
       "verdict_text": "Marcus Webb was right; Amara Patel was wrong.",
       "actual": {
        "value": 59.0,
-       "text": "59"
+       "text": "59 out of 100",
+       "unit": " out of 100"
       },
       "simple_guess": {
        "state": "scored",
@@ -2233,7 +2330,8 @@
       "verdict_text": "Nathan Reeves was wrong.",
       "actual": {
        "value": 82.0,
-       "text": "82"
+       "text": "82",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 18.5929,
@@ -2262,7 +2360,8 @@
       "verdict_text": "Amara Patel was wrong.",
       "actual": {
        "value": 82.0,
-       "text": "82"
+       "text": "82",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 18.5929,
@@ -2291,7 +2390,8 @@
       "verdict_text": "Max Reyes was right.",
       "actual": {
        "value": 63.0,
-       "text": "63"
+       "text": "63",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 18.6473,
@@ -2372,7 +2472,8 @@
       "verdict_text": "Lisa Park was wrong.",
       "actual": {
        "value": 73.0,
-       "text": "73"
+       "text": "73",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 18.2532,
@@ -2401,7 +2502,8 @@
       "verdict_text": "Lisa Park was right.",
       "actual": {
        "value": 59.0,
-       "text": "59"
+       "text": "59",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 18.6158,
@@ -2430,7 +2532,8 @@
       "verdict_text": "Nathan Reeves was right.",
       "actual": {
        "value": 59.0,
-       "text": "59"
+       "text": "59",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 18.6158,
@@ -2459,7 +2562,8 @@
       "verdict_text": "Amara Patel was right.",
       "actual": {
        "value": 59.0,
-       "text": "59"
+       "text": "59",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 18.6158,
@@ -2488,7 +2592,8 @@
       "verdict_text": "Lisa Park was right.",
       "actual": {
        "value": 7.91,
-       "text": "7.9 hours"
+       "text": "7.9 hours",
+       "unit": " hours"
       },
       "tolerance": {
        "value": 1.2521,
@@ -2517,7 +2622,8 @@
       "verdict_text": "Lisa Park was wrong.",
       "actual": {
        "value": 24.0,
-       "text": "24"
+       "text": "24",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 17.9488,
@@ -2546,7 +2652,8 @@
       "verdict_text": "Max Reyes was wrong.",
       "actual": {
        "value": 24.0,
-       "text": "24"
+       "text": "24",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 17.9488,
@@ -2575,7 +2682,8 @@
       "verdict_text": "Nathan Reeves was wrong.",
       "actual": {
        "value": 24.0,
-       "text": "24"
+       "text": "24",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 17.9488,
@@ -2604,7 +2712,8 @@
       "verdict_text": "Lisa Park was wrong.",
       "actual": {
        "value": 44.0,
-       "text": "44"
+       "text": "44",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 17.9239,
@@ -2633,7 +2742,8 @@
       "verdict_text": "Amara Patel was wrong.",
       "actual": {
        "value": 44.0,
-       "text": "44"
+       "text": "44",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 17.9239,
@@ -2662,7 +2772,8 @@
       "verdict_text": "Lisa Park was right.",
       "actual": {
        "value": 64.0,
-       "text": "64"
+       "text": "64",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 17.6379,
@@ -2691,7 +2802,8 @@
       "verdict_text": "Max Reyes was right.",
       "actual": {
        "value": 64.0,
-       "text": "64"
+       "text": "64",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 17.6379,
@@ -2720,7 +2832,8 @@
       "verdict_text": "Henning Brandt was right.",
       "actual": {
        "value": 64.0,
-       "text": "64"
+       "text": "64",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 17.6379,
@@ -2749,7 +2862,8 @@
       "verdict_text": "Lisa Park was right.",
       "actual": {
        "value": 67.0,
-       "text": "67"
+       "text": "67",
+       "unit": " out of 100"
       },
       "tolerance": {
        "value": 17.9029,
@@ -2908,7 +3022,8 @@
       "verdict_text": "Lisa Park was wrong.",
       "actual": {
        "value": 8.98,
-       "text": "9 hours"
+       "text": "9 hours",
+       "unit": " hours"
       },
       "tolerance": {
        "value": 1.2395,
@@ -2937,7 +3052,8 @@
       "verdict_text": "Lisa Park was wrong.",
       "actual": {
        "value": 8.76,
-       "text": "8.8 hours"
+       "text": "8.8 hours",
+       "unit": " hours"
       },
       "tolerance": {
        "value": 1.2273,
@@ -2966,7 +3082,8 @@
       "verdict_text": "Lisa Park was wrong.",
       "actual": {
        "value": 4.7,
-       "text": "4.7 hours"
+       "text": "4.7 hours",
+       "unit": " hours"
       },
       "tolerance": {
        "value": 1.1708,
@@ -2995,7 +3112,8 @@
       "verdict_text": "Lisa Park was right.",
       "actual": {
        "value": 7.46,
-       "text": "7.5 hours"
+       "text": "7.5 hours",
+       "unit": " hours"
       },
       "tolerance": {
        "value": 1.1708,
@@ -3024,7 +3142,8 @@
       "verdict_text": "Lisa Park was right.",
       "actual": {
        "value": 6.48,
-       "text": "6.5 hours"
+       "text": "6.5 hours",
+       "unit": " hours"
       },
       "tolerance": {
        "value": 1.182,
@@ -3053,7 +3172,8 @@
       "verdict_text": "Henning Brandt was right.",
       "actual": {
        "value": 6.48,
-       "text": "6.5 hours"
+       "text": "6.5 hours",
+       "unit": " hours"
       },
       "tolerance": {
        "value": 1.182,
@@ -3082,7 +3202,8 @@
       "verdict_text": "Henning Brandt was wrong.",
       "actual": {
        "value": 8.37,
-       "text": "8.4 hours"
+       "text": "8.4 hours",
+       "unit": " hours"
       },
       "tolerance": {
        "value": 1.2082,
@@ -3115,11 +3236,15 @@
    }
   },
   "lead_read": {
-   "state": "absent",
-   "as_of": null,
+   "state": "ok",
+   "as_of": "2026-10-17",
    "source": "/api/weekly_priority",
    "absent_text": "No weekly read from the lead coach yet.",
-   "data": null
+   "data": {
+    "weekly_priority": "I'm watching Matthew execute at a steady clip: 54 logged training sessions in thirty days, consistent daily movement, and a weight loss rate holding at 3.3 pounds per week from his starting weight of 302.2 pounds on day 42. The structural adherence is working. What I'm tracking closely now is the gap between doing and logging\u2014his food logs stopped four days ago, and his journal entries have been silent for forty days. The wearables are still reporting (sleep locked, recovery stable), so the passive data shows the machine is humming, but without active logging, I can't see the decision-making underneath. For a twelve-month recomposition after a previous cycle that stalled in the final phase, that visibility is the early warning system. I've asked him to restart one of those two channels this week\u2014food log or journal entry\u2014because the goal isn't perfection in logging, it's seeing what's real so we can adjust before the momentum quiets.",
+    "data_through": "2026-10-17",
+    "coach_name": "Eli Marsh"
+   }
   }
  }
 }
