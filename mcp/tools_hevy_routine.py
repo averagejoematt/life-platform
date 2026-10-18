@@ -206,30 +206,38 @@ def _gather_training_context(target_date: str) -> dict[str, Any]:
     return derive_training_context(loaded_streak, deficit_state, target_date)
 
 
-def _apply_recovery_adaptation(ir: Any, ctx: dict[str, Any], inputs_current_through: str | None) -> dict[str, Any]:
+def _apply_recovery_adaptation(
+    ir: Any, ctx: dict[str, Any], inputs_current_through: str | None, constraint: dict | None = None, green_withheld: str | None = None
+) -> dict[str, Any]:
     """Write the always-present session block + per-lift top-set branches into the IR.
 
     Tier-agnostic (brief §2.1): the routine carries GREEN/YELLOW/RED in its notes; the
     morning selects one. Renders into EXERCISE notes (#3938: Hevy has no routine-level notes
     field — the compiler now places the WHY line ahead of this block on exercises[0]). Stashes structured branches in the
     existing inputs_snapshot so no layer-resident IR schema bump is needed for v1.
+
+    #5000: an active standing constraint (`constraint`) replaces the band block with the ECG + feel
+    gate (`mcp.draft_constraint_gate.apply_gate`); `green_withheld` (a tripped `protein_floor_missed`)
+    omits the 🟢 branch on either path.
     """
     from mcp.recovery_authoring import RPE_BASE_YELLOW, build_top_set_branches, render_branch_block, render_session_block
 
     if not getattr(ir, "exercises", None):
         return {}
 
-    session_block = render_session_block(ctx, inputs_current_through)
-    first = ir.exercises[0]
-    first.notes = (session_block + ("\n\n" + first.notes if first.notes else "")).strip()
+    if constraint:
+        from mcp.draft_constraint_gate import apply_gate
 
-    structured: dict[str, Any] = {"session": ctx, "exercises": {}}
-    primaries = [ex for ex in ir.exercises if getattr(ex, "skill_tier", 1) >= 2][:2]
-    for ex in primaries:
-        branches = build_top_set_branches(RPE_BASE_YELLOW, ctx)
-        line = render_branch_block(branches)
-        ex.notes = ((ex.notes + "\n") if ex.notes else "") + line
-        structured["exercises"][ex.movement_key] = branches
+        structured = apply_gate(ir, ctx, inputs_current_through, constraint, green_withheld)
+    else:
+        session_block = render_session_block(ctx, inputs_current_through, green_withheld)
+        first = ir.exercises[0]
+        first.notes = (session_block + ("\n\n" + first.notes if first.notes else "")).strip()
+        structured = {"session": ctx, "exercises": {}}
+        for ex in [ex for ex in ir.exercises if getattr(ex, "skill_tier", 1) >= 2][:2]:
+            branches = build_top_set_branches(RPE_BASE_YELLOW, ctx, green_withheld)
+            ex.notes = ((ex.notes + "\n") if ex.notes else "") + render_branch_block(branches)
+            structured["exercises"][ex.movement_key] = branches
 
     ir.inputs_snapshot = {
         **(getattr(ir, "inputs_snapshot", None) or {}),
@@ -267,8 +275,11 @@ def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
     # Tier-agnostic adaptation: the ideal routine becomes the self-adapting carrier.
     ctx = _gather_training_context(target_date)
     inputs_current_through = gate.get("data_current_through")
-    adaptation = _apply_recovery_adaptation(ideal, ctx, inputs_current_through) if ideal else {}
+    # #5000: the standing constraint, the 🟢 tripwire and the cardio block — each read fail-soft and named
+    from mcp.draft_constraint_gate import gate_draft
 
+    gated = gate_draft(ideal, inputs.target_date, lambda c, w: _apply_recovery_adaptation(ideal, ctx, inputs_current_through, c, w))
+    adaptation = gated.pop("adaptation")
     for ir in routines:
         draft_versioned(ir)
     return {
@@ -286,6 +297,7 @@ def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
             "green_ceiling_quality": ctx.get("green_ceiling_quality"),
             "branched_lifts": list(adaptation.get("exercises", {}).keys()),
         },
+        **gated,
         "note": "Use action=dry_run before action=commit. Commit requires explicit routine_id.",
     }
 

@@ -1,0 +1,217 @@
+"""draft_constraint_gate.py — the draft obeys the standing constraint and the 🟢 tripwire (#5000).
+
+The 2026-10-18 draft (`2167c0e68e25f311d46f1015cbefc047`) shipped three defects against the
+owner's hand-built routine (`014e1142aaad30b3b3b1fb5e90046dc2`):
+
+  1. Whoop-band tier cues on the first exercise, though the standing constraint of 2026-10-10
+     (the HR regime change) invalidates every HR-derived tier — the gate is that morning's ECG
+     plus feel;
+  2. the 🟢 branch printed although `protein_floor_missed` was tripped 6 of 7 — and that
+     tripwire's action withholds the 🟢 block for the week (#4503 OD5, `training.green_block`);
+  3. `cardio_pick` computed (recumbent cycling) but no cardio block in the draft, and the pick
+     carried an HR ceiling and target the constraint forbids.
+
+This module is the draft path's I/O for all three, each fail-soft and NAMED when it fails — a
+failed read never costs the draft and never reads as "no constraint" or "tripwire clear":
+
+  * `read_standing_constraint` — THE reader: `training.standing_constraints.active_constraint`
+    (the code registry, the part the draft acts on) plus the stop list, read verbatim from the
+    platform-memory row the registry entry names;
+  * `protein_tripwire` — the `protein_floor_missed` state over THE protein-gate window
+    (`mcp.tools_plan._protein_days_7d`, the count the critics read) against the owner's threshold;
+  * `cardio_block` — the pick as an `ExerciseBlock`, appended to the ideal routine;
+  * `apply_gate` — the ECG + feel gate in place of the band cues when a constraint is active.
+
+Nothing here changes the v0.4 structure (split, order, templates, accessories, loads): the gate
+only writes NOTES and caps RPE at or below the plan's own ceiling, and the cardio block is
+appended after the last lift.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any, Callable
+
+logger = logging.getLogger("draft_constraint_gate")
+
+GREEN_TRIPWIRE = "protein_floor_missed"
+
+
+def _read_memory_summary(memory_sk: str) -> str | None:
+    """The one platform-memory row's summary by its exact key (a Query, so a tombstoned or
+    soft-deleted note reads as absent). None when the row is not there."""
+    from boto3.dynamodb.conditions import Attr, Key
+
+    from mcp.tools_memory import _DELETED_AT_FIELD, _get_table, _memory_pk
+
+    resp = _get_table().query(
+        KeyConditionExpression=Key("pk").eq(_memory_pk()) & Key("sk").eq(memory_sk),
+        FilterExpression=Attr(_DELETED_AT_FIELD).not_exists() & Attr("tombstone").not_exists(),
+    )
+    items = resp.get("Items") or []
+    return str(items[0].get("summary") or "") if items else None
+
+
+def read_standing_constraint(target_date: str, memory_reader: Callable[[str], str | None] | None = None) -> dict[str, Any] | None:
+    """The active standing constraint for `target_date`, with its stop list — or None when none is active.
+
+    `memory_read` is `ok` | `missing` | `failed:<ExceptionType>`; on anything but `ok` the stop list
+    is None and the gate says, in the routine, that it could not be read."""
+    from training import standing_constraints
+
+    c = standing_constraints.active_constraint(target_date)
+    if c is None:
+        return None
+    reader = memory_reader or _read_memory_summary
+    stop_list, state = None, "missing"
+    try:
+        summary = reader(c["memory_sk"])
+        if summary:
+            stop_list = standing_constraints.stop_list_from(summary, c["stop_list_rule"])
+            state = "ok" if stop_list else "missing"
+    except Exception as e:  # noqa: BLE001 — named on the record, never a lost draft
+        logger.warning("standing constraint: memory read failed: %s", e)
+        state = f"failed:{type(e).__name__}"
+    return {**c, "stop_list": stop_list, "memory_read": state}
+
+
+def protein_tripwire(target_date: str, reader: Callable[[str], tuple[int | None, int | None]] | None = None) -> dict[str, Any]:
+    """`protein_floor_missed` for the draft: tripped | clear | unknown, with the counts."""
+    from training import owner_redlines
+
+    t = next(x for x in owner_redlines.TRIPWIRES if x["id"] == GREEN_TRIPWIRE)
+    try:
+        if reader is None:
+            from mcp.tools_plan import _protein_days_7d as reader
+        missed, measured = reader(target_date)
+    except Exception as e:  # noqa: BLE001 — unknown, never clear
+        logger.warning("green block: protein read failed: %s", e)
+        return {"id": GREEN_TRIPWIRE, "state": "unknown", "detail": f"protein read failed ({type(e).__name__})"}
+    if missed is None:
+        return {"id": GREEN_TRIPWIRE, "state": "unknown", "detail": "no intake rollup for the trailing 7 days"}
+    tripped = int(missed) >= int(t["threshold_days"])
+    return {
+        "id": GREEN_TRIPWIRE,
+        "state": "tripped" if tripped else "clear",
+        "missed": int(missed),
+        "measured": measured,
+        "threshold_days": int(t["threshold_days"]),
+        "provenance": t["provenance"],
+    }
+
+
+def green_withheld_reason(trip: dict[str, Any]) -> str | None:
+    """The words the routine carries when the tripwire withholds 🟢, or None when it does not (#4503 OD5)."""
+    from training import green_block
+
+    if trip.get("id") in green_block.GREEN_BLOCKED_BY and trip.get("state") == "tripped":
+        return f"protein floor missed {trip['missed']} of 7"
+    return None
+
+
+def cardio_block(target_date: str, archetype: str, constraint: dict[str, Any] | None, layer: Any = None) -> tuple[Any, dict[str, Any]]:
+    """(ExerciseBlock | None, pick) — `recent_aerobic.cardio_pick` as the routine's cardio block.
+
+    Under a constraint that forbids HR prescriptions the pick carries no HR field and the note
+    writes the talk test; otherwise the note states the pick's HR ceiling and target."""
+    from training import recent_aerobic, standing_constraints
+    from training.routine_ir import ExerciseBlock, Set
+
+    try:
+        if layer is None:
+            from mcp import shared_quantities
+
+            layer = shared_quantities.recent_aerobic_layer(target_date)
+        pick = recent_aerobic.cardio_pick(layer, archetype, target_date)
+    except Exception as e:  # noqa: BLE001 — named, never a lost draft
+        logger.warning("cardio block: pick failed: %s", e)
+        return None, {"state": "failed", "error": type(e).__name__}
+    minutes = standing_constraints.CARDIO_BLOCK_MINUTES
+    head = "Recumbent" if pick["movement_key"] == "cycling" else pick["modality"].capitalize()
+    if "intensity" in pick:
+        how = pick["intensity"]
+    else:
+        how = f"HR avg ≤ {pick['hr_ceiling_bpm']} bpm, target {pick['hr_target_bpm']}."
+    notes = f"{head}, {minutes} min, {how} {pick['reason'][:1].upper() + pick['reason'][1:]}."
+    if constraint:
+        notes += " Optional if the ECG is not sinus."
+    block = ExerciseBlock(
+        movement_key=pick["movement_key"],
+        sets=[Set(duration_seconds=minutes * 60)],
+        notes=notes,
+        rationale_tag=f"cardio:{pick['movement_key']}:pick",
+    )
+    return block, pick
+
+
+def _is_accessory(ex: Any) -> bool:
+    return str(getattr(ex, "rationale_tag", "") or "").split(":")[0] == "accessory"
+
+
+def apply_gate(
+    ir: Any, ctx: dict[str, Any], inputs_current_through: str | None, constraint: dict[str, Any], green_withheld: str | None
+) -> dict:
+    """The ECG + feel gate in place of the Whoop-band block (#5000). Writes notes only.
+
+    First exercise: the gate (sinus → the plan, ≤ RPE 8; not sinus → ≤ RPE 7, accessories and
+    cardio optional; the 🟢 withheld line when tripped; the stop list), then the subtract-only load
+    rule. Primaries: the gate cue instead of the 🟢/🟡/🔴 line. Accessories: optional when not sinus.
+    The stashed branches carry the sinus cap as the ceiling, so adherence grades against ≤ RPE 8."""
+    from training import standing_constraints
+
+    from mcp.recovery_authoring import SUBTRACT_ONLY_RULE, render_loaded_streak_line
+
+    lines = standing_constraints.gate_lines(constraint, constraint.get("stop_list"), green_withheld)
+    lines.append(f"Load: {SUBTRACT_ONLY_RULE}")
+    streak_line = render_loaded_streak_line(ctx)
+    if streak_line:
+        lines.append(streak_line)
+    if inputs_current_through:
+        lines.append(f"inputs_current_through: {inputs_current_through}")
+    first = ir.exercises[0]
+    first.notes = ("\n".join(lines) + ("\n\n" + first.notes if first.notes else "")).strip()
+
+    g = constraint["gate"]
+    cue = standing_constraints.gate_cue(constraint)
+    structured: dict[str, Any] = {"session": ctx, "gate": constraint["id"], "exercises": {}}
+    for ex in [e for e in ir.exercises if getattr(e, "skill_tier", 1) >= 2][:2]:
+        ex.notes = ((ex.notes + "\n") if ex.notes else "") + cue
+        structured["exercises"][ex.movement_key] = {
+            "gate_cue": cue,
+            "green": {
+                "rpe_cap": g["sinus_rpe_cap"],
+                "cue": "sinus rhythm + feel fine",
+                **({"withheld": green_withheld} if green_withheld else {}),
+            },
+            "yellow": {"rpe_cap": g["sinus_rpe_cap"], "cue": "sinus rhythm + feel fine"},
+            "red": {"rpe_cap": g["not_sinus_rpe_cap"], "cue": "ECG not sinus, or feel off"},
+        }
+    if "accessory" in g["optional_when_not_sinus"]:
+        for ex in ir.exercises:
+            if _is_accessory(ex):
+                ex.notes = ((ex.notes + "\n") if ex.notes else "") + "Optional if the ECG is not sinus."
+    return structured
+
+
+def gate_draft(ideal: Any, target_date: str, adapt: Callable[[dict[str, Any] | None, str | None], dict]) -> dict[str, Any]:
+    """`_action_draft`'s #5000 step on the ideal routine: read the constraint and the tripwire, run the
+    adaptation (`adapt(constraint, green_withheld)`), append the cardio block, stamp the reads on the
+    snapshot. Returns the payload keys plus `adaptation` (the structured branches). No ideal → no-op."""
+    if ideal is None:
+        return {"adaptation": {}, "standing_constraint": None, "green_block": None, "cardio_block": None}
+    constraint = read_standing_constraint(target_date)
+    protein = protein_tripwire(target_date)
+    withheld = green_withheld_reason(protein)
+    adaptation = adapt(constraint, withheld)
+    cardio, pick = cardio_block(target_date, getattr(ideal, "archetype", "") or "", constraint)
+    if cardio is not None:
+        ideal.exercises.append(cardio)
+    summary = {k: constraint.get(k) for k in ("id", "active_from", "memory_read")} if constraint else None
+    green = {**protein, "withheld": bool(withheld)}
+    ideal.inputs_snapshot = {**(ideal.inputs_snapshot or {}), "standing_constraint": summary, "green_block": green, "cardio_pick": pick}
+    return {
+        "adaptation": adaptation,
+        "standing_constraint": summary,
+        "green_block": green,
+        "cardio_block": {"appended": cardio is not None, "pick": pick},
+    }

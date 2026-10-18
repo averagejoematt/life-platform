@@ -31,13 +31,15 @@ def draft_cardio_warnings(blocks: list[Any], archetype: str, target_date: str) -
     try:
         from mcp import shared_quantities
 
-        pick = recent_aerobic.cardio_pick(shared_quantities.recent_aerobic_layer(target_date), archetype)
+        pick = recent_aerobic.cardio_pick(shared_quantities.recent_aerobic_layer(target_date), archetype, target_date)
     except Exception as e:  # noqa: BLE001 — named, never a lost draft
         return [f"cardio: the recent-aerobic pick could not be computed ({type(e).__name__}) — the modality is unchecked (#4387)"]
     if pick["movement_key"] == "treadmill":
         return []
+    # #5000: under a standing constraint the pick carries the talk test, never an HR number
+    how = pick.get("intensity") or f"HR avg ≤ {pick['hr_ceiling_bpm']} bpm, target {pick['hr_target_bpm']}"
     return [
-        f"cardio: {b.movement_key} drafted, but the pick from the last 3 days is {pick['modality']} (HR avg ≤ {pick['hr_ceiling_bpm']} bpm, target {pick['hr_target_bpm']}) — "
+        f"cardio: {b.movement_key} drafted, but the pick from the last 3 days is {pick['modality']} ({how}) — "
         f"{pick['reason']}. Stage 2's joints_tendons critic swaps it when the legs are loaded (#4387)."
         for b in timed_wb
     ]
