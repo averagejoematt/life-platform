@@ -7725,9 +7725,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 364,
+        "sites_dynamic": 363,
         "sites_resolved": 939,
-        "sites_total": 1303
+        "sites_total": 1302
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -7889,9 +7889,12 @@
       "privacy_tier": "public"
     },
     "dexa": {
+      "category": "Clinical",
       "class": "cross_phase",
-      "ingestion": false,
-      "privacy_tier": "owner_published"
+      "ingestion": true,
+      "method": "Manual upload of the scan report after each visit (~12-month cadence) via scripts/ingest_lab_report.py",
+      "privacy_tier": "owner_published",
+      "stale_hours": 8640
     },
     "diary_claims": {
       "class": "experiment_scoped",
@@ -8095,7 +8098,7 @@
       "category": "Clinical",
       "class": "cross_phase",
       "ingestion": true,
-      "method": "Manual upload of the lab PDF/report after each draw (~6-month cadence)",
+      "method": "Manual upload of the lab PDF/report after each draw (~6-month cadence) via scripts/ingest_lab_report.py",
       "privacy_tier": "owner_published",
       "stale_hours": 4320
     },
