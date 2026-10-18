@@ -580,38 +580,52 @@ def attach_cardio_cues(
     catalog: dict[str, Any] | None = None,
     cardio_index: dict[str, list] | None = None,
     whoop_index: dict[str, list] | None = None,
+    aerobic_block: dict[str, Any] | None = None,
 ) -> int:
-    """Stamp the deterministic cardio cue onto every cardio block of a RoutineSpec (#3700).
+    """Write the prescription-first note onto every cardio block of a RoutineSpec (#3700, #5048).
 
-    Returns how many blocks were stamped. Idempotent: a block whose note already opens
-    with "Last:" is left alone, so re-drafting a routine never stacks cues.
+    Returns how many blocks were written. The note is `training.cardio_note.compose`'s: line 1 the
+    prescription in one fixed grammar (machine · minutes · level N shape · effort rule), line 2 the
+    recovery answer and at most one sentence of why. The level is still derived from his history
+    (`cardio_progression.cardio_facts` + `level_verdict`: the last ride's level, else his calibration
+    note); the "Last: …" sentence and the calibration quote are no longer printed (#5048).
 
-    WHY THIS EXISTS SEPARATELY from `_build_exercise_note`. That function is the ADR-068
-    path and now carries cardio too — but `generate_routines`'s selector budgets by
-    LANDMARK MUSCLE (`config/training_landmarks.json` names eleven, none of them cardio),
-    so it never picks a bike. Matthew's real routines get their `cycling` block through
-    `draft_custom`, which builds its blocks from arguments and never reaches
-    `_build_exercise_note`. This is the one call that path needs — it loads its own
-    indexes, fails soft, and takes no plumbing.
+    A note that is not already a composed note (a chat author's prose) is REPLACED, and the replaced
+    text is kept on `spec.inputs_snapshot["cardio_notes_replaced"]` so nothing is silently lost.
+    Idempotent: a re-draft recomposes from the same inputs.
 
-    Indexes are loaded here only when not supplied; a failed load leaves every note
-    untouched rather than emptying one.
+    `aerobic_block` is `constraint_block.recent_aerobic` (`mcp.shared_quantities.recent_aerobic_layer`)
+    when the caller has it: the ramp state that allows a harder shape and the why line. None = unread,
+    so the shape stays flat.
+
+    WHY THIS EXISTS SEPARATELY from `_build_exercise_note`. `generate_routines`'s selector budgets by
+    LANDMARK MUSCLE and never picks a bike; Matthew's real cycling blocks arrive through `draft_custom`
+    and the #5000 gate path, which build blocks from arguments. This is the one call those paths need —
+    it loads its own indexes and fails soft: a failed history load leaves every note untouched.
     """
     exercises = list(getattr(spec, "exercises", None) or [])
     if not exercises:
         return 0
+    from training import cardio_note
+
     if catalog is None:
         try:
             catalog = _load_json("movement_catalog.json")
         except Exception as e:  # pragma: no cover - config read
             logger.warning(f"cardio cue: catalog load failed ({e}); notes untouched")
             return 0
+    movements = (catalog or {}).get("movements", {})
+    targets = [ex for ex in exercises if cardio_note.machine_for(str(getattr(ex, "movement_key", "") or ""))]
+    targets = [ex for ex in targets if sum(int(getattr(s, "duration_seconds", 0) or 0) for s in getattr(ex, "sets", None) or [])]
+    if not targets:
+        return 0
     if cardio_index is None:
         try:
             from training.exercise_history import DEFAULT_LOOKBACK_DAYS, FLOOR_LOOKBACK_DAYS, load_history_indexes
 
             cardio_index = load_history_indexes(lookback_days=max(DEFAULT_LOOKBACK_DAYS, FLOOR_LOOKBACK_DAYS))[1]
         except Exception as e:
+            # the level cannot be derived, so the note is not rewritten: an authored note beats a level-less guess
             logger.warning(f"cardio cue: history load failed ({e}); notes untouched")
             return 0
     if whoop_index is None:
@@ -623,23 +637,50 @@ def attach_cardio_cues(
             logger.warning(f"cardio cue: whoop load failed ({e}); cue renders without HR-at-level: {e}")
             whoop_index = {}
 
-    from training.cardio_progression import cardio_cue
+    from common.pacific_time import parse_day_key
 
-    movements = (catalog or {}).get("movements", {})
+    from training import recent_aerobic, standing_constraints
+    from training.cardio_progression import cardio_facts, level_verdict
+
+    target_date = str(getattr(spec, "target_date", "") or "")[:10]
+    day = parse_day_key(target_date)
+    week_start = (day.fromordinal(day.toordinal() - day.weekday())).isoformat() if day else target_date
+    constraint = standing_constraints.active_constraint(target_date) if target_date else None
+    archetype = getattr(spec, "archetype", "") or ""
+    replaced: list[dict[str, Any]] = []
+    audits: list[dict[str, Any]] = []
     stamped = 0
-    for ex in exercises:
+    for ex in targets:
         key = str(getattr(ex, "movement_key", "") or "")
         tid = movements.get(key, {}).get("hevy_template_id_hint") or (key[5:] if key.startswith("tmpl:") else None)
-        if not tid or not (cardio_index or {}).get(tid):
-            continue
-        cue = cardio_cue(tid, cardio_index, whoop_index)
-        if not cue:
-            continue
+        sessions = (cardio_index or {}).get(tid or "") or []
+        facts = cardio_facts(tid, cardio_index, whoop_index) if sessions else {}
+        verdict = level_verdict(facts.get("series"), facts.get("last_level")) if sessions else None
+        minutes = round(sum(int(getattr(s, "duration_seconds", 0) or 0) for s in ex.sets) / 60)
+        note, audit = cardio_note.compose(
+            movement_key=key,
+            minutes=minutes,
+            target_date=target_date,
+            archetype=archetype,
+            facts=facts,
+            verdict=verdict,
+            aerobic_block=aerobic_block,
+            prior_week_shapes=cardio_note.week_shapes(sessions, week_start, target_date),
+            constraint=constraint,
+            hr_ceiling_bpm=None if constraint else recent_aerobic.HR_CEILING_BPM,
+        )
         existing = (getattr(ex, "notes", "") or "").strip()
-        if existing.startswith("Last:"):
-            continue  # already carries a cue — never stack
-        ex.notes = f"{cue} — {existing}" if existing else cue
+        if existing and not cardio_note.is_composed(existing) and existing != note:
+            replaced.append({"movement_key": key, "notes": existing})
+        ex.notes = note
+        audits.append({"movement_key": key, **audit})
         stamped += 1
+    snap = getattr(spec, "inputs_snapshot", None)
+    if isinstance(snap, dict) or snap is None:
+        try:
+            spec.inputs_snapshot = {**(snap or {}), "cardio_notes": audits, **({"cardio_notes_replaced": replaced} if replaced else {})}
+        except AttributeError:  # pragma: no cover - a spec without the field
+            pass
     return stamped
 
 

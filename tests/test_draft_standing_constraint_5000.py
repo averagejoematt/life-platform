@@ -168,7 +168,7 @@ def test_the_cardio_pick_is_appended_with_the_talk_test_and_no_hr_fields(monkeyp
     cardio = ir.exercises[-1]
     want = HAND["cardio"]
     assert cardio.movement_key == want["movement_key"] and [s.duration_seconds for s in cardio.sets] == [want["minutes"] * 60]
-    assert "Recumbent" in cardio.notes and "talk test" in cardio.notes and "No HR target." in cardio.notes
+    assert "Recumbent" in cardio.notes and "talk test" in cardio.notes and "no HR target" in cardio.notes
     assert "bpm" not in cardio.notes
     assert not set(sc.HR_PICK_FIELDS) & set(pick) and pick["hr_fields_dropped_by"] == "hr_regime_change_2026_10_10"
     # the served stage-1 pick is the same constrained pick
@@ -185,6 +185,10 @@ def test_redrafting_2026_10_18_is_equivalent_to_the_hand_built_routine(monkeypat
     lifted = [e for e in HAND["exercises"] if not e.get("_note")]
     assert [(e.movement_key, len(e.sets)) for e in ir.exercises] == [(e["movement_key"], e["sets"]) for e in lifted]
     optional = {e.movement_key for e in ir.exercises if "Optional if the ECG is not sinus." in e.notes}
+    # #5048: cardio's "optional if not sinus" lives only in the gate's own line, never repeated on the block
+    if "accessories and cardio optional" in ir.exercises[0].notes:
+        optional |= {e.movement_key for e in ir.exercises if e.rationale_tag.startswith("cardio:")}
+    assert not [e for e in ir.exercises if e.rationale_tag.startswith("cardio:") and "Optional" in e.notes]
     assert {e["movement_key"] for e in lifted if e.get("optional_if_not_sinus")} <= optional
     allowed = {e["movement_key"] for e in DRAFT["exercises"] if e["rationale_tag"].startswith("accessory:")} | {"cycling"}
     assert optional <= allowed
