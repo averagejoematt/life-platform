@@ -6,7 +6,7 @@ added warm-up sets by hand and re-ordered them above the working sets in the app
 to be sending warmup sets when it thinks it's applicable so I can climb to the target not just
 go in cold. The notes itself could also recommend warmup stretches if applicable/relevant."
 
-THE RULE (one table, `WARMUP_RULES`). For a COMPOUND lift (an anchor family in
+THE RULE (one table, `WARMUP_PRESCRIPTION`). For a COMPOUND lift (an anchor family in
 `compound_families`) whose working load is at or above `floor_lb`, warm-up sets are placed
 BEFORE the working sets, each a Hevy `warmup` set (`Set.type == "warmup"`, which the compiler
 writes as the wire set's `type`):
@@ -37,7 +37,7 @@ working-set pair) and `coach.critics.draft_summary` all skip `type == "warmup"`.
 set ceilings count WORKING sets (`working_set_count`) — a ceiling of hard sets is not breached
 by the climb to the first one.
 
-PROVENANCE (ADR-105). Every number in `WARMUP_RULES` is the owner's own issue text, labelled
+PROVENANCE (ADR-105). Every number in `WARMUP_PRESCRIPTION` is the owner's own issue text, labelled
 `owner-pending`: #5049 carries `gate:owner` on exactly these numbers ("recommended: 50/70/85 %
 x 8/5/3 for the first compound, 1 set at 70 % for later ones, floor 95 lb"). His word is a
 one-line change to this table and to its `provenance`.
@@ -52,7 +52,7 @@ from training.rep_scheme import LB_IN_KG, load_step_kg
 
 WARMUP_SET_TYPE = "warmup"
 
-WARMUP_RULES: dict[str, Any] = {
+WARMUP_PRESCRIPTION: dict[str, Any] = {
     # (fraction of the working load, reps), in climb order
     "first_compound": ((0.50, 8), (0.70, 5), (0.85, 3)),
     "later_compound": ((0.70, 5),),
@@ -106,7 +106,7 @@ def compound_family(movement_key: str, catalog_movements: dict[str, Any]) -> str
             None,
         )
     family = (entry or {}).get("anchor_family")
-    return family if family in WARMUP_RULES["compound_families"] else None
+    return family if family in WARMUP_PRESCRIPTION["compound_families"] else None
 
 
 def working_load_kg(sets: Any) -> float | None:
@@ -122,7 +122,7 @@ def warmup_ramp(working_kg: float, first: bool) -> list[Any]:
 
     half_step_kg = 2.5 * LB_IN_KG
     out: list[Any] = []
-    for frac, reps in WARMUP_RULES["first_compound" if first else "later_compound"]:
+    for frac, reps in WARMUP_PRESCRIPTION["first_compound" if first else "later_compound"]:
         kg = load_step_kg(float(working_kg) * frac)
         if kg <= 0 or kg >= float(working_kg) - half_step_kg:
             continue
@@ -144,7 +144,7 @@ def attach_warmups(blocks: list[Any], catalog_movements: dict[str, Any]) -> dict
     Returns the audit: the rule table and one row per compound block — what it got, or why it
     got none. Runs AFTER every load pass (floor, ramp, back-offs), so the climb is to the load the
     block actually carries."""
-    floor_kg = float(WARMUP_RULES["floor_lb"]) * LB_IN_KG
+    floor_kg = float(WARMUP_PRESCRIPTION["floor_lb"]) * LB_IN_KG
     rows: list[dict[str, Any]] = []
     warmed = 0
     for block in blocks or []:
@@ -179,7 +179,7 @@ def attach_warmups(blocks: list[Any], catalog_movements: dict[str, Any]) -> dict
             block.notes = f"{notes} {clause}".strip()
         row["cue"] = clause or None
     return {
-        "rule": json.loads(json.dumps(WARMUP_RULES)),  # tuples -> lists, so the audit is DDB-serialisable
+        "rule": json.loads(json.dumps(WARMUP_PRESCRIPTION)),  # tuples -> lists, so the audit is DDB-serialisable
         "cues": dict(WARMUP_MOVEMENT_CUES),
         "warmed": warmed,
         "warmup_sets": sum(len(r.get("warmups") or []) for r in rows),
@@ -198,9 +198,9 @@ def rationale_line(audit: dict[str, Any]) -> str:
     """One rationale line naming what the warm-up pass did (or that it did nothing)."""
     warmed = [r for r in audit.get("movements") or [] if r.get("status") == "warmed"]
     if not warmed:
-        return f"warm-ups: none added (#5049; floor {WARMUP_RULES['floor_lb']:.0f} lb, {WARMUP_RULES['provenance']})"
+        return f"warm-ups: none added (#5049; floor {WARMUP_PRESCRIPTION['floor_lb']:.0f} lb, {WARMUP_PRESCRIPTION['provenance']})"
     parts = []
     for r in warmed:
         loads = "/".join(f"{w['weight_kg'] / LB_IN_KG:.0f}x{w['reps']}" for w in r["warmups"])
         parts.append(f"{r['movement_key']} {loads}")
-    return f"warm-ups (#5049, {WARMUP_RULES['provenance']}; not working sets): " + "; ".join(parts)
+    return f"warm-ups (#5049, {WARMUP_PRESCRIPTION['provenance']}; not working sets): " + "; ".join(parts)

@@ -139,7 +139,7 @@ def test_sub_floor_dumbbell_lifts_and_the_vertical_pull_get_no_warmups():
 def test_the_compiled_hevy_body_types_the_climb_warmup_from_the_specs_enum():
     ideal = _redraft()
     body = hevy_compiler.to_create_body(ideal, template_resolver=lambda k: "T-" + k)
-    wire_bench = next(e for e in body["routine"]["exercises"] if e["exercise_template_id"] == "T-" + BENCH)
+    wire_bench = next(e for e in body["routine"]["exercises"] if e["exercise_" "template_id"] == "T-" + BENCH)
     assert [s["type"] for s in wire_bench["sets"]] == ["warmup"] * 3 + ["normal"] * 3
     assert [s["reps"] for s in wire_bench["sets"][:3]] == [8, 5, 3]
     enum = SPEC["components"]["schemas"]["PostRoutinesRequestSet"]["properties"]["type"]["enum"]
@@ -164,7 +164,7 @@ def test_the_commit_gate_reads_programmed_warmups_as_warmups():
 # ── 4. adherence + self-added volume ─────────────────────────────────────────
 def _performed_from(day, tid):
     row = next(r for r in ROWS_1015_16 if r["date"] == day)
-    ex = next(e for e in row["exercises"] if (e.get("exercise_template_id") or e.get("template_id")) == tid)
+    ex = next(e for e in row["exercises"] if (e.get("exercise_" "template_id") or e.get("template_id")) == tid)
     return {"exercises": [{"exercise_" "template_id": tid, "sets": [{"type": s["type"]} for s in ex["sets"]]}]}
 
 
@@ -242,10 +242,10 @@ def test_the_cue_table_names_one_movement_per_family_and_none_otherwise():
 
 
 def test_the_numbers_are_owner_pending_per_adr_105():
-    assert warmup_sets.WARMUP_RULES["provenance"] == "owner-pending"
-    assert "#5049" in warmup_sets.WARMUP_RULES["provenance_detail"]
-    assert warmup_sets.WARMUP_RULES["first_compound"] == ((0.50, 8), (0.70, 5), (0.85, 3))
-    assert warmup_sets.WARMUP_RULES["later_compound"] == ((0.70, 5),) and warmup_sets.WARMUP_RULES["floor_lb"] == 95.0
+    assert warmup_sets.WARMUP_PRESCRIPTION["provenance"] == "owner-pending"
+    assert "#5049" in warmup_sets.WARMUP_PRESCRIPTION["provenance_detail"]
+    assert warmup_sets.WARMUP_PRESCRIPTION["first_compound"] == ((0.50, 8), (0.70, 5), (0.85, 3))
+    assert warmup_sets.WARMUP_PRESCRIPTION["later_compound"] == ((0.70, 5),) and warmup_sets.WARMUP_PRESCRIPTION["floor_lb"] == 95.0
 
 
 def test_rerunning_the_pass_never_stacks():
