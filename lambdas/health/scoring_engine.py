@@ -21,6 +21,7 @@ from datetime import datetime
 from typing import Any, Iterable, Optional, Union
 
 from common.constants import PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
+from common.habit_pause import is_paused_on  # #5007: a paused habit is not scheduled
 from training.owner_redlines import REDLINES  # ADR-163: the walking floor the movement target defaults from
 from training.walking_volume import WALKING_VOLUME_VERSION, walking_minutes_for_day  # ADR-163: the ONE walking definition
 
@@ -229,7 +230,11 @@ def score_movement(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
 
 
 def habitify_reading(
-    habits_map: dict[str, Any], name: str, meta: Optional[dict[str, Any]] = None, statuses: Optional[dict[str, Any]] = None
+    habits_map: dict[str, Any],
+    name: str,
+    meta: Optional[dict[str, Any]] = None,
+    statuses: Optional[dict[str, Any]] = None,
+    date_str: Optional[str] = None,
 ) -> Optional[float]:
     """The day's Habitify value for registry habit `name`, or None when the day never names it.
 
@@ -249,7 +254,13 @@ def habitify_reading(
     habit id first (the registry entry's `habitify_id`), then names, then the ingest-derived
     `aliases` on each entry — so a habit renamed after ids were stored still resolves with
     no registry edit (`health.habit_identity`). Without `statuses` it is the #4362 lookup.
+
+    #5007: pass `date_str` and a habit whose registry entry carries `paused_since` on or
+    before that day is NOT SCHEDULED — None (unobserved), never a miss. Without `date_str`
+    the lookup is date-blind, as before.
     """
+    if date_str and is_paused_on(meta, date_str):
+        return None
     hit = day_name_for(habits_map, statuses, name, meta)
     if hit is None:
         return None
@@ -313,6 +324,7 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
 
     habitify_7d = data.get("habitify_7d") or []
     unobserved: list[str] = []
+    paused: list[str] = []
     type_drift: list[str] = []
 
     for habit_name, meta in registry.items():
@@ -331,7 +343,10 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
             strava = data.get("strava") or {}
             if not strava.get("activities"):
                 continue
-        reading = habitify_reading(habits_map, habit_name, meta, statuses)
+        reading = habitify_reading(habits_map, habit_name, meta, statuses, date_str)
+        if reading is None and is_paused_on(meta, date_str):
+            paused.append(habit_name)  # #5007: not scheduled — reported as paused, never missed
+            continue
         if reading is None:
             # #4362: unobserved (renamed/archived upstream, or not on today's journal) —
             # named in the details so the drift is visible, never scored as a miss.
@@ -350,7 +365,7 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
             for day_rec in habitify_7d[-6:]:
                 day_habits = day_rec.get("habits", {}) if isinstance(day_rec, dict) else {}
                 day_statuses = day_rec.get("habit_statuses") if isinstance(day_rec, dict) else None
-                d = habitify_reading(day_habits, habit_name, meta, day_statuses)
+                d = habitify_reading(day_habits, habit_name, meta, day_statuses, (day_rec.get("sk") or "").replace("DATE#", ""))
                 if d is not None and d >= 1:
                     week_count += 1
             freq_score = min(100.0, round(week_count / max(target_freq, 1) * 100))
@@ -393,6 +408,8 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
     }
     if unobserved:
         details["unobserved"] = unobserved
+    if paused:
+        details["paused"] = paused
     if type_drift:
         details["registry_type_drift"] = sorted(set(type_drift))
     return composite, details

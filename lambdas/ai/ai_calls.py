@@ -676,7 +676,9 @@ def _missed_registry_habits(registry, habitify):
     for h_name, meta in (registry or {}).items():
         if meta.get("status") != "active":
             continue
-        done = habitify_reading(h_map, h_name, meta, statuses)
+        done = habitify_reading(
+            h_map, h_name, meta, statuses, (habitify.get("sk") or "").replace("DATE#", "") or habitify.get("date")
+        )  # #5007
         if done is not None and done < 1:
             out.append((h_name, meta))
     return out

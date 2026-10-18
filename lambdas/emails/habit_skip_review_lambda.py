@@ -43,6 +43,7 @@ from datetime import datetime, timezone
 
 import boto3
 from common import digest_utils  # the shared paginated, phase-scoped DATE# range read (#970)
+from common.habit_pause import is_name_paused_on  # #5007
 from common.pacific_time import pacific_today, parse_day_key, shift_day_key
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
@@ -88,10 +89,11 @@ def _is_daily(hs: dict) -> bool:
     return periodicity in (None, "", DAILY)
 
 
-def collect_skips(records: dict, dates: list[str]) -> list[tuple[str, list[str]]]:
+def collect_skips(records: dict, dates: list[str], registry: dict | None = None) -> list[tuple[str, list[str]]]:
     """[(date, [habit, ...]), ...] — oldest first, only dates with at least one skip.
 
-    `records` is {date: record} as returned by digest_utils.query_range.
+    `records` is {date: record} as returned by digest_utils.query_range. #5007: a habit whose
+    registry entry is paused on that day is not scheduled, so it is never a skip to settle.
     """
     out = []
     for d in dates:
@@ -99,7 +101,11 @@ def collect_skips(records: dict, dates: list[str]) -> list[tuple[str, list[str]]
         statuses = rec.get("habit_statuses") or {}
         if not isinstance(statuses, dict):
             continue
-        names = sorted(name for name, hs in statuses.items() if isinstance(hs, dict) and hs.get("status") == SKIPPED and _is_daily(hs))
+        names = sorted(
+            name
+            for name, hs in statuses.items()
+            if isinstance(hs, dict) and hs.get("status") == SKIPPED and _is_daily(hs) and not is_name_paused_on(registry, name, d)
+        )
         if names:
             out.append((d, names))
     return out
@@ -167,12 +173,22 @@ def lambda_handler(event: dict, context) -> dict:
         raise
 
 
+def _load_registry(table) -> dict:
+    """The profile's habit_registry (read-only); fail-open to {} — nothing is paused then."""
+    try:
+        item = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"}).get("Item") or {}
+        return item.get("habit_registry") or {}
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[habit-skip-review] profile read failed (%s) — nothing treated as paused", type(e).__name__)
+        return {}
+
+
 def _run(event: dict, context, table=None, ses=None) -> dict:
     dry_run = is_dry_run(event)
     dates = window_dates(event.get("today") if isinstance(event, dict) else None)
     table = table or boto3.resource("dynamodb", region_name=REGION).Table(TABLE_NAME)
     records = digest_utils.query_range(table, SOURCE, dates[0], dates[-1], user_id=USER_ID)
-    queue = collect_skips(records, dates)
+    queue = collect_skips(records, dates, _load_registry(table))
     n_days = len(queue)
     n_habits = sum(len(names) for _, names in queue)
     logger.info(
