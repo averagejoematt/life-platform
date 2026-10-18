@@ -20,6 +20,7 @@
 // cannot be read is never shown as right or wrong: the tag is "", the card is "", and the
 // pickers skip it and say how many they skipped (`ruleless`).
 import { esc } from "/assets/js/evidence_shared.js";
+import { RECOVERY_UNIT } from "/assets/js/ck_terms.js";
 
 const MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December";
 const RE_WITHIN = /counts as right within (.+?) either way/;
@@ -68,16 +69,18 @@ export function toleranceNote(call) {
  *  takes the SERVED unit when the route names one (`tolerance.unit`, then the call's own `unit` —
  *  lane E of #4580 adds them; absent, nothing breaks), else the unit of the measure the call's
  *  own served sentence names — only measures listed here, each one a score whose unit is not a
- *  guess. Site-to-A round 1: recovery is a percentage on every kit page (the day's "recovery 62%",
- *  the trend, this card), so a bare recovery distance is "17.9%" — one quantity, one unit, where it
- *  was "points" here, "%" there and "out of 100" on the trend. Anything else: null, and the rule
+ *  guess. Re-graded 2026-10-18: recovery is "out of 100" on every kit page — the unit the route
+ *  serves beside the score (`actual.unit`, the day's "recovery 62 out of 100", the trend), so a bare
+ *  recovery distance is "17.9 out of 100" — one quantity, one unit, where it was "points" here, "%"
+ *  on the band and "out of 100" in the served sentence. Anything else: null, and the rule
  *  is said without the number ("not within the allowed distance") rather than with a unit invented. */
-const SCORE_UNITS = [[/\brecovery score\b/i, "%"]];
+const SCORE_UNITS = [[/\brecovery score\b/i, RECOVERY_UNIT]];
 const withUnit = (tol, unit) => (unit === "%" ? `${tol}%` : `${tol} ${unit}`);
 export function servedUnit(call) {
   const t = call && call.tolerance;
-  const u = (t && typeof t.unit === "string" && t.unit.trim()) || (call && typeof call.unit === "string" && call.unit.trim()) || "";
-  return u;
+  const a = call && call.actual;
+  const str = (v) => (typeof v === "string" ? v.trim() : "");
+  return str(t && t.unit) || str(call && call.unit) || str(a && a.unit) || "";
 }
 export function toleranceWithUnit(call) {
   const tol = toleranceText(call);

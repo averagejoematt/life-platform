@@ -24,6 +24,8 @@ import { tryJSON, esc, fmtShort } from "/assets/js/evidence_shared.js";
 import { dayInWords } from "/assets/js/entry_age.js";
 import { callHref, callsOf, withFrom, backFor, setBack } from "/assets/js/ck_call.js";
 import { callCardHTML, hasRule, ruleless, gradedOnText } from "/assets/js/ck_verdict.js";
+import { RECOVERY_UNIT } from "/assets/js/ck_terms.js";
+export { RECOVERY_UNIT };
 
 const LB_PER_KG = 2.20462;
 const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
@@ -42,8 +44,11 @@ export const MEASURES = {
   weight: { name: "Weight", unit: "lb", write: (v) => `${v.toFixed(1)} lb`, about: "Every weigh-in since the start." },
   steps: { name: "Steps", unit: "steps", write: (v) => whole(v), about: "Steps as my phone and watch counted them. A day they were not carried reads low, so some days here are lower than the training recorded suggests." },
   sleep: { name: "Sleep", unit: "hours", write: (v) => `${trim1(v)} hours`, about: "Hours asleep each night." },
-  // One unit for recovery on every kit page (site-to-A round 1): a percentage, as the day line prints it.
-  recovery: { name: "Recovery", unit: "%", write: (v) => `${whole(v)}%`, about: "My wrist strap’s morning score, as a percentage." },
+  // One unit for recovery on every kit page (site-to-A round 1, re-graded 2026-10-18): the unit the
+  // route serves beside the score — " out of 100" (prediction_reason.MEASURE_UNITS, PR #4964) — so the
+  // front band, the day page, the trend and the call card all print "62 out of 100", as the served
+  // call sentences already do ("below 70 out of 100"). RECOVERY_UNIT is the one fallback when none is served.
+  recovery: { name: "Recovery", unit: RECOVERY_UNIT, write: (v) => `${whole(v)} ${RECOVERY_UNIT}`, about: "My wrist strap’s morning score out of 100." },
   protein: { name: "Protein", unit: "g", write: (v) => `${whole(v)} g`, about: "Grams of protein logged each day." },
   calories: { name: "Calories", unit: "kcal", write: (v) => `${whole(v)} kcal`, about: "Calories logged each day." },
   carbs: { name: "Carbs", unit: "g", write: (v) => `${whole(v)} g`, about: "Grams of carbohydrate logged each day." },
@@ -55,13 +60,28 @@ export const MEASURES = {
 export const isMeasure = (m) => Object.prototype.hasOwnProperty.call(MEASURES, String(m));
 // The field each measure is read from, so a served unit can be looked up by it.
 const FIELD_OF = { weight: "weight_lbs", steps: "steps", sleep: "sleep_hours", recovery: "recovery_pct", protein: "protein_g", calories: "calories", carbs: "carbs_g", fat: "fat_g", training: "total_min" };
-/** The unit the route serves for a measure's field (`units: {field: unit}` on any served body —
- *  lane E of #4580 adds it; absent, the measure's own unit stands). "" when none is served. */
+/** The unit the route serves for a measure (lane E of #4580): `units: {field: unit}` on any served
+ *  body, or the `unit` beside the measure on the edition's week (`measures[measure].data.unit`,
+ *  served with its leading space — " lb", " out of 100"). Absent, the measure's own unit stands.
+ *  "" when none is served. */
 export function servedUnit(measure, src) {
   const field = FIELD_OF[measure];
+  const str = (v) => (typeof v === "string" ? v.trim() : "");
   for (const body of Object.values(src || {})) {
-    const u = body && body.units && typeof body.units[field] === "string" ? body.units[field].trim() : "";
+    if (!body) continue;
+    const u = str(body.units && body.units[field]);
     if (u) return u;
+    const week = body.week && body.week.data ? body.week.data : body;
+    const m = week.measures && week.measures[measure];
+    const w = str(m && m.data && m.data.unit);
+    if (w) return w;
+    // Recovery is not a week measure: its unit rides beside the Sleep fact (`detail[].facts[].recovery.unit`).
+    if (measure === "recovery" && Array.isArray(week.detail)) {
+      for (const d of week.detail) for (const f of (d && d.facts) || []) {
+        const r = str(f && f.recovery && f.recovery.unit);
+        if (r) return r;
+      }
+    }
   }
   return "";
 }
@@ -246,7 +266,7 @@ export function dayFactsHTML(iso, src, base, today = "") {
   const p = byDate(src.pulse && src.pulse.pulse_history)[iso] || {};
   const row = (measure, value, note = "") => {
     const m = MEASURES[measure];
-    return num(value) === null ? "" : `<li><a href="${esc(trendHref(base, measure, "", iso))}">${esc(`${m.name}: ${m.write(value)}${note}`)} <span aria-hidden="true">→</span></a></li>`;
+    return num(value) === null ? "" : `<li><a href="${esc(trendHref(base, measure, "", iso))}">${esc(`${m.name}: ${writerFor(measure, src)(value)}${note}`)} <span aria-hidden="true">→</span></a></li>`;
   };
   const rows = [row("weight", p.weight_lbs), row("sleep", p.sleep_hours), row("recovery", p.recovery_pct)].join(""); // step counts are left out: the stored day totals are unreliable (#4628)
   return rows ? `<ul class="ck-rows ck-rows--more">${rows}</ul>` : soft("Nothing was measured on this day.");
@@ -296,7 +316,7 @@ export function dayFoodHTML(iso, src, base) {
   const floor = num(src.nutrition && src.nutrition.nutrition && src.nutrition.nutrition.protein_floor_g);
   const row = (measure, value, note = "") => {
     const m = MEASURES[measure];
-    return num(value) === null ? "" : `<li><a href="${esc(trendHref(base, measure, "", iso))}">${esc(`${m.name}: ${m.write(value)}${note}`)} <span aria-hidden="true">→</span></a></li>`;
+    return num(value) === null ? "" : `<li><a href="${esc(trendHref(base, measure, "", iso))}">${esc(`${m.name}: ${writerFor(measure, src)(value)}${note}`)} <span aria-hidden="true">→</span></a></li>`;
   };
   const versus = floor !== null && num(f.protein_g) !== null ? (f.protein_g >= floor ? `, at or above the ${whole(floor)} g floor` : `, under the ${whole(floor)} g floor`) : "";
   return `<ul class="ck-rows ck-rows--more">${row("calories", f.calories)}${row("protein", f.protein_g, versus)}${row("carbs", f.carbs_g)}${row("fat", f.fat_g)}</ul>${soft(macroShare(f))}`;

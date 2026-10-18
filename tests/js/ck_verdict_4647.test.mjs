@@ -51,9 +51,9 @@ function bareRows(html) {
 test("the rule is lifted from the served sentence, per kind of call", () => {
   const number = byId("explorer-20260919-aecd9fef2c");
   assert.equal(V.toleranceText(number), "22.5");
-  // Site-to-A round 1: recovery is a percentage on every kit page, so its bare distance is "%" here too.
-  assert.equal(V.ruleFor(number, true), "within 22.5% either way", "a score's bare allowed distance takes the score's unit");
-  assert.equal(V.ruleFor(byId("mind-20260914-7fc4b43947"), false), "not within 18.6% either way");
+  // Re-grade 2026-10-18: recovery is "out of 100" on every kit page (the served unit), so its bare distance is too.
+  assert.equal(V.ruleFor(number, true), "within 22.5 out of 100 either way", "a score's bare allowed distance takes the score's unit (out of 100, as served — re-grade 2026-10-18)");
+  assert.equal(V.ruleFor(byId("mind-20260914-7fc4b43947"), false), "not within 18.6 out of 100 either way");
   // A served unit (lane E of #4580: `tolerance.unit`, then the call's `unit`) wins over the sentence's measure.
   assert.equal(V.ruleFor({ ...number, tolerance: { ...number.tolerance, unit: "points" } }, true), "within 22.5 points either way");
   assert.equal(V.ruleFor({ ...number, unit: "lb" }, true), "within 22.5 lb either way");
@@ -69,7 +69,8 @@ test("the rule is lifted from the served sentence, per kind of call", () => {
   // number into the sentence, and that is still read when `tolerance` is absent.
   assert.equal(number.tolerance.text, "22.5");
   assert.doesNotMatch(number.called, /either way/, "the sentence no longer carries it");
-  const old = { ...clone(number), tolerance: undefined, called: "Henning Brandt called it at about 83.7. A call like this counts as right within 22.5 either way, his usual day-to-day swing." };
+  // `actual.unit` is served since lane E and is read as the call's unit (re-grade 2026-10-18), so the unitless case drops it too.
+  const old = { ...clone(number), tolerance: undefined, actual: { ...number.actual, unit: undefined }, called: "Henning Brandt called it at about 83.7. A call like this counts as right within 22.5 either way, his usual day-to-day swing." };
   assert.equal(V.ruleFor(old, true), "within the allowed distance", "a bare number on a measure with no known unit is never printed unitless");
   assert.equal(V.ruleFor(null, true), "");
 });
@@ -192,10 +193,10 @@ test("the four pages print the same call in one order: the rule in the tag, the 
       const m = ORDER.exec(html);
       assert.ok(m, `${call.id} on the ${page} page is not in the house order:\n${html}`);
       assert.equal(m[1], call.verdict === "right" ? "Right" : "Wrong", `${page}: the tag is the call's verdict`);
-      assert.equal(m[3], `${call.tolerance.text}%`, `${page}: the tag carries the served allowed distance, with the score's unit`);
+      assert.equal(m[3], `${call.tolerance.text} out of 100`, `${page}: the tag carries the served allowed distance, with the score's unit`);
       assert.equal(m[5], call.happened_short, `${page}: the result is the bold part`);
       assert.equal(m[6], call.tolerance.statistic, `${page}: what the distance is, in the route's words`);
-      assert.equal(html.split(`within ${call.tolerance.text}% either way`).length - 1, 1, `${page}: the allowed distance is printed once`);
+      assert.equal(html.split(`within ${call.tolerance.text} out of 100 either way`).length - 1, 1, `${page}: the allowed distance is printed once`);
       assert.doesNotMatch(html, /either way, his usual day-to-day swing|day-to-day swing/, `${page}: the old unnamed "swing"`);
       // a score out of 100 is a whole number on every page (#4808 box 2)
       // — unless the printed figures need a decimal for a reader's own check to agree with the
@@ -273,7 +274,7 @@ test("a direction call graded across its own window (#4617) has a rule, and its 
 // a bare number takes the unit of the score its sentence names; with neither, no number is printed.
 test("every miss card's allowed distance carries a unit, or no number at all", () => {
   const recovery = BODY.calls.find((c) => c.kind === "number" && /recovery score/.test(c.called) && c.verdict === "wrong");
-  assert.match(V.ruleFor(recovery, false), /^not within \d+(\.\d+)?% either way$/);
+  assert.match(V.ruleFor(recovery, false), /^not within \d+(\.\d+)? out of 100 either way$/);
   const lb = { kind: "number", verdict: "wrong", called: "Max Reyes called his weight at about 304.5 lb for October 16.", tolerance: { text: "4 lb" } };
   assert.equal(V.ruleFor(lb, false), "not within 4 lb either way");
   const unknown = { kind: "number", verdict: "wrong", called: "A coach called his something at about 12.", tolerance: { text: "3.1" } };

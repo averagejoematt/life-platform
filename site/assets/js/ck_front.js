@@ -22,7 +22,7 @@
 // and dated), no count of earlier starts, no "Dr.", no percentage on fewer than 20 items.
 import { esc } from "/assets/js/evidence_shared.js";
 import { dayInWords } from "/assets/js/entry_age.js";
-import { TERMS } from "/assets/js/ck_terms.js";
+import { TERMS, RECOVERY_UNIT } from "/assets/js/ck_terms.js";
 
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const fmt1 = (v) => (num(v) === null ? "" : v.toFixed(1));
@@ -125,10 +125,16 @@ export function morningLine(week, todayIso) {
   }
   return `${fmt1(now)} lb.`;
 }
-const RECOVERY_GLOSS = "Recovery is the wrist strap’s morning score, as a percentage.";
-// THE recovery display (round 3): the score is served on a 0-100 scale and the chapters write it
-// "98%", so every kit page prints it that way — one helper over the served day text.
-export const recoveryShown = (text) => String(text || "").replace(/\brecovery (\d+(?:\.\d+)?) out of 100\b/gi, (m, n) => `recovery ${n}%`);
+const RECOVERY_GLOSS = "Recovery is the wrist strap’s morning score out of 100.";
+// THE recovery display (round 3, re-graded 2026-10-18): the score is printed with the unit the route
+// serves beside it (`facts[].recovery.unit`, lane E of #4580) — " out of 100" — and with RECOVERY_UNIT
+// when none is served, so the band, the day page, the trend and the call card say "62 out of 100".
+// One helper over the served day text: whatever unit the text carries is replaced by the served one.
+const RE_RECOVERY = /\brecovery (\d+(?:\.\d+)?)(?:%| out of 100| points)?(?=[\s.,;:]|$)/gi;
+export const recoveryShown = (text, unit = "") => {
+  const u = String(unit || "").trim() || RECOVERY_UNIT;
+  return String(text || "").replace(RE_RECOVERY, (m, n) => (u === "%" ? `recovery ${n}%` : `recovery ${n} ${u}`));
+};
 // One day's facts as one line: "241 minutes of walking · 8.8 hours of sleep; recovery 98
 // out of 100 · 153 g protein, 1,732 kcal, under the protein floor". Step counts are left
 // out: the served counts are unreliable (a caveat sits on their trend page).
@@ -136,9 +142,10 @@ export function factLine(facts, { skip = [], floorMet = null } = {}) {
   return (facts || [])
     .filter((f) => f && f.label && f.text && f.label !== "Steps" && !skip.includes(f.label))
     .map((f) => {
-      if (f.label === "Sleep") return `slept ${recoveryShown(f.text.replace(/^(\d[\d.]*) hours/, "$1 hours"))}`;
+      const unit = f.recovery && typeof f.recovery.unit === "string" ? f.recovery.unit : "";
+      if (f.label === "Sleep") return `slept ${recoveryShown(f.text.replace(/^(\d[\d.]*) hours/, "$1 hours"), unit)}`;
       if (f.label === "Food" && floorMet !== null) return `${f.text}, ${floorMet ? "at or above" : "under"} the protein target`;
-      return recoveryShown(f.text);
+      return recoveryShown(f.text, unit);
     })
     .join(" · ");
 }
