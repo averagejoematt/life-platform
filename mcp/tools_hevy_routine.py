@@ -43,8 +43,6 @@ from typing import Any
 from common.pacific_time import pacific_today  # #2798: target_date is a Pacific-day WRITE KEY
 from training import commit_binding  # #4066: the commit is bound to the red-teamed routine
 
-# #3971: the subtract-only rule as a GATE on this path rather than a discipline. Its own
-# module for the same reason — this file sits at the ratchet's ceiling.
 from mcp.hevy_prescription_gate import prescription_gate, refusal as _gate_refusal, summary as _gate_summary
 
 # #3670: everything the commit result must report honestly lives in its own module
@@ -56,6 +54,10 @@ from mcp.hevy_routine_commit_report import (
     ensure_folder as _ensure_folder,
     folder_title_for as _folder_title_for,
 )
+
+# #3971: the subtract-only rule as a GATE on this path rather than a discipline. Its own
+# module for the same reason — this file sits at the ratchet's ceiling.
+from mcp.plan_cardio_pick import attach_custom_cardio_notes  # #3700/#5048: the chat path's cardio note pass
 from mcp.utils import mcp_error
 
 logger = logging.getLogger("tools_hevy_routine")
@@ -641,37 +643,6 @@ _CUSTOM_RATIONALE = [
 ]
 
 
-def _attach_custom_cardio_notes(ir: Any, target_date: str) -> int:
-    """#3700/#5048: `attach_cardio_cues` on a `draft_custom` routine. Returns how many cardio notes were written.
-
-    `generate_routines` calls `attach_cardio_cues` at the end of its build; `draft_custom` builds its blocks
-    straight from the caller's arguments and never reaches it, so this is the one call that path needs.
-    It runs AFTER `_new_routine_id` (the id is content-derived — a routine must not get a new id because
-    his history moved) and BEFORE `draft_versioned`, so `dry_run`/`commit` push the bytes this reports.
-    The note is the prescription-first composed note (`training.cardio_note`): it REPLACES an authored
-    cardio note (kept on the snapshot) and recomposes identically on a re-draft, so it never stacks.
-    Fail-soft twice over: `attach_cardio_cues` returns 0 with every note untouched on an index-load
-    failure, and the guard here means no cue path can cost a draft. The count is REPORTED, never assumed:
-    0 on a routine with no cardio block is the honest answer."""
-    try:
-        from training import cardio_note
-        from training.routine_generator import attach_cardio_cues
-
-        layer = None
-        if any(cardio_note.machine_for(b.movement_key) for b in ir.exercises):
-            # the week's walking load decides whether a harder shape is allowed, and writes the why line
-            try:
-                from mcp import shared_quantities
-
-                layer = shared_quantities.recent_aerobic_layer(target_date)
-            except Exception as e:  # noqa: BLE001 — unread: the ride stays flat
-                logger.warning(f"draft_custom: recent-aerobic read failed ({e}); the cardio shape stays flat")
-        return attach_cardio_cues(ir, aerobic_block=layer)
-    except Exception as e:  # noqa: BLE001
-        logger.warning(f"draft_custom: cardio cue pass failed ({e}); notes untouched")
-        return 0
-
-
 def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     """Author an IR from an explicit exercise/set/weight list (ADR-069).
 
@@ -836,7 +807,7 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     )
     # #3700/#5048 — the chat path gets the SAME prescription-first cardio note the cron path stamps,
     # AFTER `_new_routine_id` and BEFORE `draft_versioned`, so the persisted draft carries it.
-    cardio_cues = _attach_custom_cardio_notes(ir, target_date)
+    cardio_cues = attach_custom_cardio_notes(ir, target_date)
     ir.inputs_snapshot["cardio_cues"] = cardio_cues
     # #5005: a program-session date re-tags the blocks with the slot's intensity, so the commit gate checks the engine's floors
     from mcp.draft_custom_session import stamp_program_slot
