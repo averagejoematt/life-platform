@@ -10,6 +10,7 @@ Used by: daily_brief_lambda.py (import, not standalone)
 
 from common.platform_logger import get_logger
 
+from health.lab_units import canonical_marker
 from health.labs_schema import biomarker_map, is_draw_record, marker_numeric
 
 # #3283 box 3, second finding: the first fix logged the parsed-count via a bare
@@ -112,7 +113,7 @@ def build_labs_coaching_context(table, user_prefix):
                 val = marker_numeric(entry)
                 if val is not None:
                     # Normalize key to lowercase; first (newest) sighting wins.
-                    marker_values.setdefault(key.lower().replace(" ", "_"), val)
+                    marker_values.setdefault(canonical_marker(key.lower().replace(" ", "_")), val)
 
         # Apply coaching rules
         coaching_lines = []

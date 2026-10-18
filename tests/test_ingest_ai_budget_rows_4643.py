@@ -289,7 +289,7 @@ def test_activity_enrichment_records_health_on_success_and_on_a_raise(monkeypatc
 
 def test_activity_enrichment_a_malformed_row_fails_the_run(monkeypatch):
     mod, rec = _load("ingestion.enrichment_lambda", monkeypatch, _FakeTable())
-    monkeypatch.setattr(mod, "enrich_date_range", lambda s, e: {"enriched": 0, "skipped": 0, "malformed": 1, "days_processed": 1})
+    monkeypatch.setattr(mod, "enrich_date_range", lambda s, e, *_a: {"enriched": 0, "skipped": 0, "malformed": 1, "days_processed": 1})
     mod.lambda_handler({}, None)
     assert rec.calls == [{"source": "activity_enrichment", "attempted": True, "succeeded": False, "error_class": "parse"}]
 

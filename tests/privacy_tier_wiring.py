@@ -260,9 +260,9 @@ CONSUMERS: dict[tuple[str, str], dict] = {
     # fat_mass_lbs: cross-source collision — both mentions read the DEXA report's
     # body_composition dict (source `dexa`, TIER_OWNER_PUBLISHED source-level per
     # ADR-155), never a withings row. The withings stamp governs withings rows.
-    ("lambdas/content/output_writers.py", "fat_mass_lbs"): _d(
+    ("lambdas/content/dexa_fields.py", "fat_mass_lbs"): _d(
         EXCLUDED,
-        "AI/content family, but the read is bc.get('fat_mass_lbs') on the dexa "
+        "AI/content family, but the key is built off bc.get('fat_mass_lb') on the dexa "
         "partition's body_composition dict — a TIER_OWNER_PUBLISHED source "
         "(ADR-155), not a withings row. Cross-source name collision; this module "
         "does not read the governed withings field.",

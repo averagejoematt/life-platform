@@ -142,7 +142,9 @@ _GENOME_LAB_XREF = {
     "vitamin_d_25oh": ["VDR", "GC", "CYP2R1"],
     "homocysteine": ["MTHFR", "MTRR"],
     "ferritin": ["HFE"],
+    # one analyte, two stored spellings (health.lab_units.MARKER_ALIASES; mcp carries no health import)
     "crp_hs": ["CRP", "IL6"],
+    "hs_crp": ["CRP", "IL6"],
     "folate": ["MTHFR", "MTRR"],
     "vitamin_b12": ["MTHFR", "MTRR"],
     "omega_3_index": ["FADS2"],
