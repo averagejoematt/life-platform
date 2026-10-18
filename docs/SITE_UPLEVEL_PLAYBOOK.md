@@ -1,6 +1,6 @@
 # Site Uplevel Playbook
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-18 (#4580 / #4588 — the front-page cut-over section carried onto main from the rehearsal's docs commit `2d749c6d4`, extended with the 2026-10-18 rulings: the Thursday 2026-10-22 go, the reference-copy step, the appendix-as-footnote reach rule and the static `og:image`. Prior verify 2026-10-17: the deploy surface and JS harness sections re-read against the tree.)
 
 > **How to redesign or uplevel the site well** — the method and the hard-won lessons, so the
 > next Claude inherits the playbook, not just the state. Start from
@@ -139,6 +139,78 @@ suite with `node --test` from the repo root (auto-discovers everything under `te
 3. **CloudFront redirects** — apply `deploy/generated/v4_redirects_function.js` to dist `E3S424OXQZ8NBE` (update-function → publish).
 4. **Narrative lambdas** — `bash deploy/deploy_fleet.sh` (the one-bundle path above).
 5. Reconcile `main` — open a PR from the worktree branch so `main` matches what's live.
+
+## The front-page cut-over (#4588, epic #4580)
+
+The living front page goes live as **one commit**: the four kit pages of epic #4580 (front page,
+Start here, Story, Coaches) copied from `/next/v8/` to `/`, `/start/`, `/story/` and `/coaches/`.
+Their deep links stay on `/next/v8/` (`data-ck-base`); the other eight kit pages keep their
+`/next/v8/` paths until a later cut-over (the door table is `SITE_MAP_AND_INTENT.md`). No page is
+renamed, and no redirect is added. Every other page stays as it is. The rehearsal is the HELD draft
+PR #4928 on #4588.
+
+**When it merges — the Thursday rule and the freeze.** Only on the owner's go, recorded on #4588
+(given 2026-10-18 for **Thursday 2026-10-22, morning PT**, provided five readers are recorded on
+#4587 by Wednesday noon and the rebuilt rehearsal is green). A cut-over merges on a **Thursday**,
+never inside the **Tuesday-evening to Wednesday-noon PT merge freeze** around the weekly chapter and
+email: the chapter and podcast publish into that window, and a site deploy that auto-rolls back there
+reverts the chapter's page with it. Thursday leaves the week's publish behind it and three weekdays
+ahead to watch the live page. If a Thursday is missed, the next Thursday — never a Friday.
+
+- **Every existing URL still resolves.** `tests/test_v4_redirects_function.py::test_every_existing_url_still_resolves_4588`
+  checks this offline. Every site/ page, every sitemap URL and every old URL the edge 301s must end on a served
+  file, and no page under site/ may sit behind a 301. `/start/` (301 to `/`) and `/coaches/` (301 to
+  `/method/board/`) were 301 sources, so the cut-over drops those two 301s in
+  `scripts/v4_migration_inventory.py::SCAN_SKIP_URLS`. It then regenerates `redirects.map` and
+  `deploy/generated/v4_redirects_function.js`. Both URLs keep answering 200, now with the new page. The edge
+  function is published by hand (Deploy surface, step 3). Until it is, the two new pages are unreachable and
+  the two old 301s still answer.
+- **The replaced layout is kept as a reference page (owner ruling 2026-10-18, standing for every
+  cut-over).** Before the four files are overwritten, the cut-over commit copies each layout it
+  replaces — the v5 home first — to a served, `noindex`, out-of-navigation reference page with the
+  last live sha in its head comment (`<!-- reference copy of / at <sha>, replaced 2026-10-22 -->`),
+  and adds it to the footnote appendix (`/next/v8/appendix/`). The path convention is
+  `/reference/<date>-<slug>/` (`/reference/2026-10-22-home-v5/`), never under `/legacy/`, which is
+  never linked from the UI. Nothing is deleted: the ~87 pages the kit does not replace stay served
+  at their URLs and listed in the appendix.
+- **The appendix is a footnote, not navigation (owner ruling 2026-10-18).** The kit footer links
+  `/next/v8/appendix/`, which lists every off-path page, so a naive walk from `/` reaches ~87 pages.
+  `tests/test_site_nav_reach_ratchet.py` counts with the appendix excluded; `NAV_REACH_CEILING`
+  (`ledgers/site_vocabulary_residue.py`, 24 today) is lowered to what the rebuilt rehearsal
+  measures, never raised. The pages the appendix lists carry no nav weight.
+- **`og:image` is a static wordmark card** until the daily mark is ruled (#4586's `ck-mark`); the
+  front page ships no data-driven unfurl image before then. A shared link must still unfurl — the
+  rehearsal's "no `og:` tags" gap closes on the wordmark card, not on the mark.
+- **The deploy builders leave a kit page alone.** `v4_build_home_proof.py` would otherwise exit 2
+  (no proof anchor), and that blocks the sync. `v4_build_dispatches.py` would otherwise overwrite `/story/`
+  with the v4 hub and silently undo the cut-over on its first deploy. Both now ask
+  `v4_apply_chrome.is_kit_page()` first.
+- **The rollback** reverts the one squash commit, deploys the site, then re-publishes the edge function:
+  ```bash
+  git fetch origin && git switch -c revert-4588-cutover origin/main
+  git revert --no-edit <the cut-over's squash sha on main>   # restores every live file byte-identical
+  git push -u origin revert-4588-cutover && gh pr create --fill   # merged by the driver; site-deploy runs on merge
+  gh workflow run site-deploy.yml --ref main                   # or dispatch it by hand once the revert is on main
+  # then re-publish deploy/generated/v4_redirects_function.js to E3S424OXQZ8NBE (Deploy surface, step 3)
+  ```
+  The quickest path to the old site is `bash deploy/rollback_site.sh <pre-cut-over sha>`. It restores
+  site/ only. The revert above is the full rollback. Rehearsed 2026-10-15 on the lane: the revert of
+  the cut-over commit left `git diff --stat` against the pre-cut-over tree empty.
+- **If the AI visual check is paused by the budget tier, the cut-over waits.** `visual_ai_qa` sits in
+  `budget_guard`'s operator-truth band (cutoff 3). It runs at tiers 0–2 and stops only at tier 3. There it
+  prints SKIPPED-BY-BUDGET and the visual-QA job stays green on the Playwright sweep alone (CONVENTIONS
+  §4b; the "cutoff tier 1" in §4b's budget bullet predates ADR-125's 2026-08-03 amendment). The cut-over
+  does not ship on that Playwright-only gate, for three reasons:
+  1. The four pages' Playwright checks in `qa/qa_manifest.py` are structural by construction. They assert
+     elements in the static shell, so a green says nothing about whether the dated edition rendered.
+  2. A tier-3 month is also when the edition's AI-written lines are paused. The front page would open in
+     its degraded state.
+  3. A missed Thursday costs one week, and the go on #4588 carries to the next Thursday.
+  So read SSM `/life-platform/budget-tier` before the merge. At tier 3, hold to the next Thursday.
+- **Live proof** (the box #4588 closes on, never the merge): on the Thursday,
+  `curl -s https://averagejoematt.com/ | grep -c 'data-ck-page="front"'` → 1, and `/start/`, `/story/`
+  and `/coaches/` each answering 200 with their kit page; `/reference/2026-10-22-home-v5/` answering
+  200 with `noindex`; the site-deploy run green and not auto-rolled back.
 
 ## Measurement pipeline — traffic digest (infra; Matthew runs the deploy)
 
