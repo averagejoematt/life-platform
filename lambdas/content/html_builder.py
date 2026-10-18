@@ -770,9 +770,7 @@ def _habits_deep_dive(data, profile):
                 continue
             out += '<p style="color:' + tier_color + ';font-size:9px;margin:8px 0 4px;font-weight:700;">' + tier_label + "</p>"
             for h_name, meta in sorted(tier_habits, key=lambda x: x[0]):
-                done = habitify_reading(
-                    h_map, h_name, meta, h_statuses, habitify.get("date")
-                )  # #4362/#4632: by vendor id, names as aliases
+                done = habitify_reading(h_map, h_name, meta, h_statuses, habitify.get("date"))  # #4362/#4632/#5007
                 completed = done is not None and done >= 1
                 icon = "✅" if completed else ("·" if done is None else "❌")
                 why = meta.get("why_matthew", "")
