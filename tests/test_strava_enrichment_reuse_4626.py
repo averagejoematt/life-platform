@@ -67,3 +67,18 @@ def test_stored_enrichment_read_failure_is_soft(monkeypatch):
 
     monkeypatch.setattr(strava.boto3, "resource", lambda *a, **k: Boom())
     assert strava._stored_enrichment(DAY) == {}
+
+
+def test_reader_parses_exactly_what_normalize_writes(monkeypatch):
+    """The seam: _stored_enrichment (reader) vs _normalize (writer) on the REAL row shape."""
+    raw = {"id": 99, "elapsed_time": 1800, "has_heartrate": True}
+    zones = {"zone1_seconds": 5, "zone2_seconds": 600, "zone10_seconds": 1}
+    row = strava._normalize(raw, zones, {"hr_peak": 170})
+
+    class Tbl:
+        def get_item(self, Key):
+            return {"Item": {"activities": [row]}}
+
+    monkeypatch.setattr(strava.boto3, "resource", lambda *a, **k: type("R", (), {"Table": lambda s, n: Tbl()})())
+    got = strava._stored_enrichment(DAY)["99"]
+    assert got == {"zones": zones, "hr_recovery": {"hr_peak": 170}, "elapsed": 1800}
