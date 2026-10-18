@@ -34,6 +34,7 @@ loses both.
 from datetime import datetime, timedelta
 
 from common.pacific_time import pacific_now  # #2811: THE Pacific day helper
+from ingestion.source_registry import due_months  # #4639: the episodic set is the registry's cadence_months set
 
 # Inventory window (days). Daily-cadence sources are bounded by recency: "how much of
 # the body has been measured LATELY" is the question a maturity threshold asks of a
@@ -59,8 +60,10 @@ _INVENTORY_WINDOW_DAYS = 90
 # This is a cadence fact, not a phase fact: `phase_taxonomy` already answers "does a
 # restart wipe this" (#2109, applied in `build_data_inventory`) and cannot answer "how
 # often does it arrive". Keyed by PARTITION so a label aliasing an existing partition
-# inherits it.
-_EPISODIC_PARTITIONS = frozenset({"labs", "dexa"})
+# inherits it. DERIVED (#4639): the episodic set IS the registry's `cadence_months`
+# set — `due_months()` is the one place a months-scale cadence is declared, so a source
+# that joins it (dexa did in #4639) joins this window rule without a second edit here.
+_EPISODIC_PARTITIONS = frozenset(due_months())
 
 
 def inventory_window_start(partition: str, now=None) -> str:
