@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 from health.sensor_absence import carry_forward_ok  # #3204: may a value be republished as current?
@@ -415,7 +416,7 @@ def refresh_dashboard(profile, yesterday, today):
         week_start = today - timedelta(days=today.weekday())
         strava_week = fetch_range("strava", week_start.isoformat(), today.isoformat())
         if strava_week:
-            max_hr = profile.get("max_heart_rate", 184)
+            max_hr = max_hr_from_profile(profile)
             z2_lo = max_hr * 0.60
             z2_hi = max_hr * 0.70
             z2_total = 0.0

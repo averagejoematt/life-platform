@@ -315,7 +315,7 @@ Daily records (`sk = DATE#YYYY-MM-DD`) + workout sub-items (`sk = DATE#YYYY-MM-D
 | `cycle_end` | string | The cycle's `end` as the vendor sent it; **absent while the cycle is still open** (the vendor sends `null`), so a missing `cycle_end` beside a `cycle_start` marks a cycle still accruing strain/steps (#5002) |
 | `sleep_start` | string | ISO timestamp |
 | `sleep_end` | string | ISO timestamp |
-| `sleep_onset_minutes` | number | Minutes from midnight to sleep onset |
+| `sleep_onset_minutes` | number | Minutes after **UTC** midnight of the sleep-onset instant (`sleep_start` read as UTC, #4624) — not Pacific clock time: 21:44 PT is 04:44 UTC = 284. Read only by the `sleep_onset_consistency_7d` std-dev (midnight-wrapped), so the frame cancels there; convert before showing it as a clock time |
 | `sleep_onset_consistency_7d` | number | 7-day onset consistency (std dev) |
 | `nap_count` | number | Number of nap sessions (only present when ≥1 nap) |
 | `nap_duration_hours` | number | Total nap sleep (hours, in-bed minus awake) |
