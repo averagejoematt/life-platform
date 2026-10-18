@@ -223,3 +223,60 @@ def rate_target_lb_per_wk(
         "owner_to_resolve": band.get("owner_to_resolve"),
         "resolution": band.get("resolution"),
     }
+
+
+def _tripwire(tid: str) -> dict[str, Any]:
+    from training import owner_redlines
+
+    return next(t for t in owner_redlines.TRIPWIRES if t["id"] == tid)
+
+
+def rate_ceiling_check(loss_rate: dict[str, Any] | None, weight_lb: float | None) -> dict[str, Any]:
+    """THE `rate_ceiling` evaluation (#5001) — the plan engine's tripwire row and the rate advocate both read it.
+
+    `loss_rate` is `mcp.shared_quantities.loss_rate_lb_wk` (positive = losing). The threshold is the schedule
+    step's `cap` at `weight_lb` (owner: his schedule, approved 2026-09-21), never above the tripwire's own
+    absolute `threshold_lb_wk` — the stricter of the two, so evaluating can only tighten. States: `tripped` /
+    `clear`; `not_yet_active` through the tripwire's `after_week`; `unknown` for no rate or a provisional
+    one (#4068: reported, never argued from). It was `evaluated_by_engine: False` until #5001: on 2026-10-18
+    a 4.12 lb/wk trend over a 4.0 cap reached the advocate as an unevaluated row and it approved."""
+    tw = _tripwire("rate_ceiling")
+    absolute = float(tw["threshold_lb_wk"])
+    step = rate_schedule_step(weight_lb) if weight_lb else None
+    band_cap = float(step["cap"]) if step else None
+    threshold = min(absolute, band_cap) if band_cap is not None else absolute
+    q = loss_rate or {}
+    value, week = _num(q.get("value")), q.get("experiment_week")
+    out: dict[str, Any] = {
+        "observed_lb_wk": value,
+        "threshold_lb_wk": threshold,
+        "band_cap_lb_wk": band_cap,
+        "band_above_lb": step["above_lb"] if step else None,
+        "absolute_ceiling_lb_wk": absolute,
+        "threshold_provenance": (
+            "owner (rate_schedule_lb_wk step cap at his current weight — his schedule, approved 2026-09-21)"
+            if band_cap is not None and band_cap <= absolute
+            else f"{tw['provenance']} (rate_ceiling.threshold_lb_wk — no weight, so no band cap)"
+        ),
+        "window": q.get("window"),
+        "n_weigh_ins": q.get("n_weigh_ins"),
+        "method": q.get("method"),
+        "source": q.get("source"),
+        "provisional": q.get("provisional"),
+    }
+    if value is None:
+        return {**out, "state": "unknown", "detail": f"no loss rate measured — {q.get('reason') or 'the shared quantity was not supplied'}"}
+    head = f"{value} lb/wk over {q.get('window_days')} d (n={q.get('n_weigh_ins')} weigh-ins, {q.get('source')})"
+    verdict = "tripped" if value > threshold else "clear"
+    if q.get("provisional"):
+        return {**out, "state": "unknown", "state_if_firm": verdict, "detail": f"{head} is PROVISIONAL — {q.get('reason')}"}
+    if week is not None and week <= int(tw["after_week"]):
+        return {
+            **out,
+            "state": "not_yet_active",
+            "state_if_active": verdict,
+            "detail": f"{head} in week {week} (after week {tw['after_week']})",
+        }
+    word = ">" if verdict == "tripped" else "<="
+    cap_word = f"the {threshold} lb/wk cap above {out['band_above_lb']} lb" if band_cap is not None else f"the {threshold} lb/wk ceiling"
+    return {**out, "state": verdict, "detail": f"{head} {word} {cap_word}"}

@@ -83,7 +83,7 @@ from typing import Any, Callable
 
 from health import deficit_disclosures
 
-from training import owner_redlines, program_structure, recent_aerobic, self_added_volume, training_context_registry
+from training import owner_redlines, program_structure, recent_aerobic, redline_rate, self_added_volume, training_context_registry
 
 ENGINE_VERSION = "plan-engine@1.10.0"  # #4503 OD7: walking_collapse counts standalone walks + carries the named-human actuator mark
 # plan-engine@1.9.0 (#4387): recent_aerobic per activity; walking_collapse + walking_overshoot evaluated, report-only
@@ -128,6 +128,7 @@ ENGINE_INPUTS = (
     "training_memory_constraints",
     "dxa_scans",  # #4166: the protein gate's body-fat tier
     "recent_aerobic",  # #4387: per-activity aerobic load, 3 days through target − 1
+    "loss_rate",  # #5001: THE stated loss rate (`mcp.shared_quantities.loss_rate_lb_wk`) — the rate_ceiling input
 )
 _TRIPWIRE_INPUT = {
     "protein_floor_missed": "protein_days_missed_7d",
@@ -138,6 +139,7 @@ _TRIPWIRE_INPUT = {
     "self_added_volume": "hevy_workouts_prescription_window",
     "walking_collapse": "recent_aerobic",
     "walking_overshoot": "recent_aerobic",
+    "rate_ceiling": "loss_rate",
 }
 
 
@@ -309,6 +311,27 @@ def _pain_read_failed(scope: dict[str, Any] | None, layer_status: str | None, in
     return layer_status in (None, "dark", "unknown") and (input_states.get("pain_layer_status") or {}).get("state") == READ_FAILED
 
 
+# _tripwire_states — two rules kept as a comment (the #4880 function-length ratchet charges a docstring, #5001):
+#
+# #4051 closes the hole under the `unknown` and `dismissed_by_owner` rules of the docstring: a `clear` (or `unknown`) pain row is only
+# honest if something was actually LOOKED at, and stage 1 was looking at nothing — its
+# flag input came from a draft's exercise list, so with no draft the set was empty and the
+# row read `clear` over a live, flagged, owner-dismissed site. `pain_evidence_scope` is
+# the caller's statement of WHAT it examined (which movements, over which window, across
+# which phases); when it says nothing was examined the row is `unknown` with
+# `evidence: none — <reason>`, never `clear`. Two ordering rules follow from it:
+#   * flags are evaluated BEFORE the layer-health check, so a degraded or dark layer can
+#     no longer erase a flag that is on the record (it only qualifies absence);
+#   * a scope that was read, with movements in it and no flags, is the ONLY thing that
+#     earns `clear`.
+# `pain_evidence_scope=None` means the caller did not state a scope — the pre-#4051
+# behaviour, kept for the pure-function callers that inject flags directly.
+#
+# #4072: `unknown` is reserved for an input that was ABSENT (or never read). An input whose
+# read FAILED makes its row `read_failed`, with the error class — on 2026-09-15..18 the
+# owner was told recovery, volume and protein were "unknown" while every source was fresh,
+# and a reader cannot act on the difference between "no data" and "the read broke" if the
+# block will not say which one it was. Every row carries its input's `input_state`.
 def _tripwire_states(
     *,
     protein_days_missed_7d: int | None,
@@ -327,6 +350,8 @@ def _tripwire_states(
     date: str | None = None,
     week: int | None = None,
     recent_aerobic_block: dict[str, Any] | None = None,
+    loss_rate: dict[str, Any] | None = None,
+    weight_lb: float | None = None,
 ) -> list[dict[str, Any]]:
     """Evaluate each owner tripwire against the inputs, or say why it could not be read.
 
@@ -338,29 +363,14 @@ def _tripwire_states(
     `dismissed_by_owner` with his date and his words, never `clear`. An absence and an
     override are different facts, and only one of them has a human behind it.
 
-    #4051 closes the hole under both of those: a `clear` (or `unknown`) pain row is only
-    honest if something was actually LOOKED at, and stage 1 was looking at nothing — its
-    flag input came from a draft's exercise list, so with no draft the set was empty and the
-    row read `clear` over a live, flagged, owner-dismissed site. `pain_evidence_scope` is
-    the caller's statement of WHAT it examined (which movements, over which window, across
-    which phases); when it says nothing was examined the row is `unknown` with
-    `evidence: none — <reason>`, never `clear`. Two ordering rules follow from it:
-      * flags are evaluated BEFORE the layer-health check, so a degraded or dark layer can
-        no longer erase a flag that is on the record (it only qualifies absence);
-      * a scope that was read, with movements in it and no flags, is the ONLY thing that
-        earns `clear`.
-    `pain_evidence_scope=None` means the caller did not state a scope — the pre-#4051
-    behaviour, kept for the pure-function callers that inject flags directly.
-
-    #4072: `unknown` is reserved for an input that was ABSENT (or never read). An input whose
-    read FAILED makes its row `read_failed`, with the error class — on 2026-09-15..18 the
-    owner was told recovery, volume and protein were "unknown" while every source was fresh,
-    and a reader cannot act on the difference between "no data" and "the read broke" if the
-    block will not say which one it was. Every row carries its input's `input_state`.
+    #4051 (the pain row's evidence scope) and #4072 (`read_failed` vs `unknown`): the comment above the def.
 
     #4098: every tripwire that declares `not_before_week` reads `not_yet_active (week N < M)`
     until the session sequence's `week` reaches M — whatever its input says, which rides along
     as `state_if_active` so the gate never hides the number.
+
+    #5001: `rate_ceiling` is read over `loss_rate` (`mcp.shared_quantities.loss_rate_lb_wk`) at `weight_lb` by
+    `redline_rate.rate_ceiling_check` — the one evaluation the rate advocate also reads; the row carries it as `evidence`.
     """
     input_states = input_states or {}
     by_id = {t["id"]: t for t in owner_redlines.engine_evaluated_tripwires()}  # the v2 additions are named, not computed
@@ -615,6 +625,14 @@ def _tripwire_states(
             row["standalone_walks"] = ((recent_aerobic_block or {}).get("totals") or {}).get("standalone_walks")
             row["actuator"] = recent_aerobic.collapse_actuator(row["state"], None)
         out.append(row)
+    # #5001 — rate_ceiling over THE stated loss rate; the advocate reads the same `rate_ceiling_check`.
+    rc = redline_rate.rate_ceiling_check(loss_rate, weight_lb)
+    rc_row = (
+        _missing("rate_ceiling", rc["detail"])
+        if loss_rate is None
+        else _row("rate_ceiling", rc["state"], rc["observed_lb_wk"], rc["detail"])
+    )
+    out.append({**rc_row, "evidence": rc})
     # #4098: the week gate, applied to EVERY row whose tripwire declares `not_before_week` —
     # never per-tripwire, so a new declaration is read the day it is written.
     for row in out:
@@ -666,6 +684,37 @@ def _scheduled_session(
     return out
 
 
+def _walking_block(walk_hr_wk_now: float | None, failed_reads: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """The walking block — the largest lever, read FIRST (see the module docstring); extracted from
+    `constraint_block` (#5001, the #4880 function-length ratchet). A failed read is not a zero (#4072)."""
+    walking_floor = owner_redlines.REDLINES["walking_floor_hr_wk"]
+    if walk_hr_wk_now is None and "walk_hr_wk_now" in failed_reads:
+        walking = {
+            "state": READ_FAILED,
+            "floor_hr_wk": walking_floor["value"],
+            "error": failed_reads["walk_hr_wk_now"].get("error"),
+            "detail": "the walking-volume read FAILED — the largest lever on the board is unread, which is not the same as zero (#4072)",
+        }
+    elif walk_hr_wk_now is None:
+        walking = {
+            "state": "unknown",
+            "floor_hr_wk": walking_floor["value"],
+            "detail": "no walking volume available for the trailing window — the largest lever on the board is unmeasured",
+        }
+    else:
+        gap = round(walking_floor["value"] - walk_hr_wk_now, 2)
+        walking = {
+            "state": "below_floor" if gap > 0 else "at_or_above_floor",
+            "now_hr_wk": walk_hr_wk_now,
+            "floor_hr_wk": walking_floor["value"],
+            "gap_hr_wk": max(gap, 0),
+            "pct_of_floor": round(100 * walk_hr_wk_now / walking_floor["value"], 1) if walking_floor["value"] else None,
+            "provenance": walking_floor["provenance"],
+            "detail": walking_floor["note"],
+        }
+    return walking
+
+
 def constraint_block(
     *,
     date: str,
@@ -699,6 +748,7 @@ def constraint_block(
     training_memory_constraints: list[dict[str, Any]] | None = None,
     input_status: dict[str, dict[str, Any]] | None = None,
     recent_aerobic: dict[str, Any] | None = None,
+    loss_rate: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The deterministic inputs to tomorrow's session. No model, no I/O, no hidden state.
 
@@ -736,38 +786,15 @@ def constraint_block(
             "training_memory_constraints": training_memory_constraints,
             "dxa_scans": dxa_scans,
             "recent_aerobic": recent_aerobic,
+            "loss_rate": loss_rate,
         },
         input_status,
     )
     failed_reads = {k: v for k, v in states.items() if v["state"] == READ_FAILED}
     redlines = owner_redlines.summary()
-    walking_floor = owner_redlines.REDLINES["walking_floor_hr_wk"]
 
     # FIRST, deliberately. See the module docstring.
-    if walk_hr_wk_now is None and "walk_hr_wk_now" in failed_reads:
-        walking = {
-            "state": READ_FAILED,
-            "floor_hr_wk": walking_floor["value"],
-            "error": failed_reads["walk_hr_wk_now"].get("error"),
-            "detail": "the walking-volume read FAILED — the largest lever on the board is unread, which is not the same as zero (#4072)",
-        }
-    elif walk_hr_wk_now is None:
-        walking = {
-            "state": "unknown",
-            "floor_hr_wk": walking_floor["value"],
-            "detail": "no walking volume available for the trailing window — the largest lever on the board is unmeasured",
-        }
-    else:
-        gap = round(walking_floor["value"] - walk_hr_wk_now, 2)
-        walking = {
-            "state": "below_floor" if gap > 0 else "at_or_above_floor",
-            "now_hr_wk": walk_hr_wk_now,
-            "floor_hr_wk": walking_floor["value"],
-            "gap_hr_wk": max(gap, 0),
-            "pct_of_floor": round(100 * walk_hr_wk_now / walking_floor["value"], 1) if walking_floor["value"] else None,
-            "provenance": walking_floor["provenance"],
-            "detail": walking_floor["note"],
-        }
+    walking = _walking_block(walk_hr_wk_now, failed_reads)
 
     # What the weight-matched reference can and cannot support. These sentences are the
     # SKILL.md §4 rules moved into code, so they cannot be skipped by a caller in a hurry.
@@ -832,6 +859,8 @@ def constraint_block(
         date=date,
         week=week,
         recent_aerobic_block=recent_aerobic,
+        loss_rate=loss_rate,
+        weight_lb=weight_lb,
     )
     tripped = [t["id"] for t in tripwires if t["state"] == "tripped"]
     unknown = [t["id"] for t in tripwires if t["state"] == "unknown"]
@@ -898,6 +927,8 @@ def constraint_block(
             protein_window_days=protein_window,
             dxa_scans=dxa_scans,  # #4166: the gate's mode scales with the latest DXA's body fat
         ),
+        # #5001: THE stated loss rate (method, window, n, source, the partition rows) — the rate_ceiling row's input
+        "shared_quantities": {"loss_rate_lb_wk": loss_rate},
         # #3753 v3: tripwires the engine does not yet compute are NAMED here, never silent (ADR-105).
         "unevaluated_tripwires": owner_redlines.unevaluated_tripwires(),
         "recovery_tier": recovery_tier,

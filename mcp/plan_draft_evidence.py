@@ -206,10 +206,12 @@ def _workout_dates(start: str, end: str) -> list[str]:
     return sorted({(w.get("date") or "")[:10] for w in res.get("workouts") or [] if w.get("date")})
 
 
-def _loss_rate_of(reference: dict[str, Any] | None) -> tuple[float | None, bool | None]:
-    """(rate lb/wk, provisional) from the reference's `loss_rate` block (#4068). A reference
-    without the block (inapplicable, or an older payload) yields its bare rate, provisional
-    unknown."""
+def _loss_rate_of(reference: dict[str, Any] | None, quantity: dict[str, Any] | None = None) -> tuple[float | None, bool | None]:
+    """(rate lb/wk, provisional) — `quantity` first: the constraint block's `shared_quantities.loss_rate_lb_wk`
+    (#5001, the rate its rate_ceiling row read); else the reference's `loss_rate` block (#4068). A reference
+    without the block (inapplicable, or an older payload) yields its bare rate, provisional unknown."""
+    if isinstance(quantity, dict) and "value" in quantity:
+        return quantity.get("value"), quantity.get("provisional")
     block = (reference or {}).get("loss_rate")
     if isinstance(block, dict):
         return block.get("rate_lb_wk"), block.get("provisional")
