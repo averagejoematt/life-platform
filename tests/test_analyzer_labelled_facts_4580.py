@@ -36,7 +36,7 @@ import ai_expert_analyzer_lambda as az  # noqa: E402
 from ai import grounded_generation as gg  # noqa: E402
 from coach import audience_guard  # noqa: E402
 from common import retry_utils  # noqa: E402
-from intelligence import labelled_facts_gate as lf  # noqa: E402
+from intelligence import labelled_facts as lf  # noqa: E402
 from test_analyzer_gate_all_paths_2421 import FakeModel, FakeTable  # noqa: E402
 
 LEAD_READ_2026_10_18 = (

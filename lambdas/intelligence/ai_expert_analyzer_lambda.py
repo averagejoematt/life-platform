@@ -167,7 +167,7 @@ from common.constants import (
 )
 from health.pillar_absence import absence_gate_map, nutrition_absence_facts  # #2756
 
-from intelligence import labelled_facts_gate as _lf  # #4580 B-01/A-X1: labelled-fact + reader-surface findings
+from intelligence import labelled_facts as _lf  # #4580 B-01/A-X1: labelled-fact + reader-surface findings
 
 _CANON_FACTS_CACHE: dict[str, Any] = {}
 
@@ -1012,17 +1012,7 @@ def _presence_logs(gen_date_iso):
 
 
 def _gate_prose(
-    label,
-    text,
-    prompt,
-    api_key,
-    *,
-    shared_system=None,
-    extra_sources=(),
-    available_logs=None,
-    absence=None,
-    extract=None,
-    reader_findings=None,
+    label, text, prompt, api_key, *, shared_system=None, extra_sources=(), available_logs=None, absence=None, extract=None, reader=None
 ):
     """The module's ONE grounding chokepoint (#2421) — every model call routes here.
 
@@ -1040,10 +1030,6 @@ def _gate_prose(
     `extract` maps a raw rewrite back to reader text for the JSON-shaped callers, which
     also use it to capture the re-parsed record. Returns grounded text, or "" to hold.
 
-    #4580 B-01: the labelled facts are checked too — the starting weight (`baseline_lbs`), the served 30-day
-    session count, the food-log lag and the journal gap (`labelled_facts_gate`); the current weight already is
-    (`served_fact_findings`). `reader_findings(text)` adds a reader-bound field's own findings (the cycle/attempt/
-    reset class, A-X1) — passed only for a public field, never for the owner-read analysis.
     """
     facts = _load_canonical_facts()
     allowed = _gg.allowed_numbers(prompt, shared_system, facts, *extra_sources)
@@ -1055,14 +1041,14 @@ def _gate_prose(
         {**facts, "date": gen_date_iso}, table=table, today=gen_date_iso
     )  # #4185: cited protein/days-logged/gap + weight/rate (the canonical trajectory) vs served
 
-    _labelled = _lf.labelled_facts(
-        gen_date_iso, _served, query_source=_query_source, engagement=_load_engagement_signal, floor=EXPERIMENT_START
-    )
+    # #4580 B-01: the labelled facts are checked too — the starting weight (`baseline_lbs`), the served 30-day session
+    # count, the food-log lag, the journal gap (`labelled_facts`); the current weight already is (`served_fact_findings`).
+    # `reader(text)` adds a reader-bound field's own findings (A-X1) — passed for a public field, never the owner-read analysis.
+    _labelled = _lf.labelled_facts(gen_date_iso, _served, _query_source, _load_engagement_signal, EXPERIMENT_START)
 
     def _findings_fn(_t):
-        _extra = _lf.labelled_fact_findings(_t, _labelled) + (reader_findings(_t) if reader_findings is not None else [])
         return (
-            _extra
+            _lf.labelled_fact_findings(_t, _labelled, reader)
             + _ci.served_fact_findings(_t, _served)
             + _gg.grounding_findings(
                 _t,
@@ -1482,15 +1468,9 @@ def generate_synthesis(all_coach_outputs):
 
     # #2421/#3018: the Chair's weekly priority AND public_summary — same call, graded together.
     _synth_partial = {"cross_domain_notes": {}, "disagreements": []}
-    synthesis = _gate_json_record(
-        "weekly_priority",
-        synthesis,
-        ("weekly_priority", "public_summary"),
-        _synth_partial,
-        prompt,
-        api_key,
-        reader_keys=("public_summary",),
-    )  # #4580 A-X1: the public_summary is a reader surface — a cycle/attempt/reset reference gets one rewrite, then HOLDS
+    # #4580 A-X1: the public_summary is a reader surface — a cycle/attempt/reset reference gets one rewrite, then HOLDS
+    _keys = ("weekly_priority", "public_summary")
+    synthesis = _gate_json_record("weekly_priority", synthesis, _keys, _synth_partial, prompt, api_key, reader_keys=_keys[1:])
     if synthesis is None:  # #4703: the hold renews the prior record it promises keeps serving
         return _held.renew_held(table, CACHE_PK, "EXPERT#integrator", _held.WEEKLY_TTL_DAYS)
 

@@ -370,6 +370,14 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "writes enriched_name/enriched_at. Pinned on the real row shape by tests/test_strava_enrichment_reuse_4626.py::"
         "test_reader_parses_exactly_what_normalize_writes; a stale or missing field degrades to the vendor call.",
     ),
+    "strava::lambdas/intelligence/labelled_facts.py::read": (
+        "2026-10-18",
+        "#4580 B-01: the analyzer's served 30-day workout count reads the strava day rows ONLY through "
+        "`web.site_api_training._flatten_day_activities` + `_dedup_whoop` — imported, not re-derived — the same two "
+        "functions /api/training_overview's `workouts_30d` is computed with, so this reader cannot disagree with that "
+        "consumer about the row shape; it counts activities and reads no field of its own. A drift in the strava writer "
+        "moves both counts together. tests/test_analyzer_labelled_facts_4580.py pins the gate on the count.",
+    ),
     "whoop::lambdas/ingestion/whoop_cycle_day.py::read": (
         "2026-10-18",
         "#5002: the cycle-id guard reads back ONLY `sk` and `cycle_id` of the neighbouring whoop day rows. Both sides of "

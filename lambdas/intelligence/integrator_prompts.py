@@ -34,7 +34,7 @@ chokepoint (#2972's shape, pointed at the producer #2972 didn't reach).
 
 import logging
 
-from intelligence import labelled_facts_gate as _lf  # #4580 A-X1: the reader-surface (cycle/attempt/reset) findings
+from intelligence import labelled_facts as _lf  # #4580 A-X1: the reader-surface (cycle/attempt/reset) findings
 
 logger = logging.getLogger(__name__)
 
@@ -220,7 +220,7 @@ def gate_json_record(label, parsed, key, partial, prompt, api_key, *, gate_prose
         rec = parsed if _t == joined else (fresh.get("parsed") or {})
         return [f for k in reader_keys for f in _lf.reader_surface_findings(str(rec.get(k) or ""))]
 
-    _kw = {"reader_findings": _reader} if reader_keys else {}
+    _kw = {"reader": _reader} if reader_keys else {}
     text = gate_prose(label, joined, prompt, api_key, extract=_extract, **_kw)
     if not text:
         logger.warning("%s HELD by the grounding gate (#2421/#2391) — prior cached record keeps serving", label)

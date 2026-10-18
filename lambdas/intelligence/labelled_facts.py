@@ -1,4 +1,4 @@
-"""labelled_facts_gate — labelled-fact checks for the weekly analyzer's grounding gate (#4580 B-01).
+"""labelled_facts — labelled-fact checks for the weekly analyzer's grounding gate (#4580 B-01).
 
 The allow-list half of the gate (`grounded_generation.fabricated_numbers`) asks only "is this number anywhere
 in the input?". The lead read of 2026-10-18 shows what that misses: "his starting weight of 302.2 pounds"
@@ -90,11 +90,12 @@ def _finding(metric, cited, canonical, detail, excerpt):
     return {"type": "contradiction", "metric": metric, "cited": cited, "canonical": canonical, "detail": detail, "excerpt": excerpt[:200]}
 
 
-def labelled_fact_findings(text: str, facts: Optional[dict]) -> list:
-    """Every session-count / food-log-gap / journal-gap figure in `text` that disagrees with the labelled `facts`."""
+def labelled_fact_findings(text: str, facts: Optional[dict], reader=None) -> list:
+    """Every session-count / food-log-gap / journal-gap figure in `text` that disagrees with the labelled `facts`,
+    plus `reader(text)`'s findings when the caller grades a reader-bound field (the analyzer's `_gate_prose`)."""
+    out = list(reader(text)) if reader is not None and text else []
     if not text or not facts:
-        return []
-    out = []
+        return out
     sessions = facts.get("sessions_30d")
     if sessions is not None:
         for m in _SESSIONS.finditer(text):
@@ -152,7 +153,7 @@ def _journal_gap(signal: Optional[dict]) -> Optional[int]:
     return None
 
 
-def labelled_facts(gen_date_iso: str, served: Optional[dict], *, query_source, engagement, floor: str) -> dict:
+def labelled_facts(gen_date_iso: str, served: Optional[dict], query_source, engagement, floor: str) -> dict:
     """The facts `labelled_fact_findings` checks against; None = unknown (a skip). Read per gate call — a few cheap
     reads per run, and no warm-container cache that could hand one run's facts to the next."""
     out = {"sessions_30d": None, "food_lag_days": ((served or {}).get("nutrition") or {}).get("lag_days"), "journal_gap_days": None}
