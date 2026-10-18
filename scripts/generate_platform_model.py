@@ -1084,9 +1084,7 @@ def render_doc(model: dict) -> str:
         f"- Privacy: {counts.get('privacy_sources_owner_only', 0)} owner-only + {counts.get('privacy_sources_owner_published', 0)} owner-published sources; "
         f"{counts.get('privacy_fields_owner_only', 0)} owner-only + {counts.get('privacy_fields_owner_published', 0)} owner-published fields — non-default entries only"
     )
-    add(
-        f"- Schedules: {counts.get('schedules', 0)} (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not, a zoned row carries its zone + wall-clock (#4284)"
-    )
+    add(f"- Schedules: {counts.get('schedules', 0)} (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)")
     non_census = model["meta"].get("non_census_families", [])
     if non_census:
         add(
