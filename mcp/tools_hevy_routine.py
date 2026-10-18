@@ -215,11 +215,10 @@ def _apply_recovery_adaptation(
     morning selects one. Renders into EXERCISE notes (#3938: Hevy has no routine-level notes
     field — the compiler now places the WHY line ahead of this block on exercises[0]). Stashes structured branches in the
     existing inputs_snapshot so no layer-resident IR schema bump is needed for v1.
-
-    #5000: an active standing constraint (`constraint`) replaces the band block with the ECG + feel
-    gate (`mcp.draft_standing_constraint.apply_gate`); `green_withheld` (a tripped `protein_floor_missed`)
-    omits the 🟢 branch on either path.
     """
+    # #5000: an active standing constraint (`constraint`) replaces the band block with the ECG + feel
+    # gate (`mcp.draft_standing_constraint.apply_gate`); `green_withheld` (a tripped `protein_floor_missed`)
+    # omits the 🟢 branch on either path.
     from mcp.recovery_authoring import RPE_BASE_YELLOW, build_top_set_branches, render_branch_block, render_session_block
 
     if not getattr(ir, "exercises", None):
