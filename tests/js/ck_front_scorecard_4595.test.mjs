@@ -23,9 +23,12 @@ test("every row prints its verdict in words beside its own sentence, in the serv
   const html = F.scorecardHTML(SC, "/next/v8/");
   const plain = text(html);
   let at = -1;
+  // Site-to-A round 1 (#4580 W3): the AI row's "to date, not this week's alone" is said once, by
+  // the rule under the row, so the row's own copy of the clause is not printed.
+  const rowLine = (r) => (/not this week's alone/.test(r.rule || "") && /not this week's alone/.test(r.text || "") ? `${r.name} ${r.verdict_text}.` : `${r.name} ${r.verdict_text}. ${r.text}`);
   for (const key of SC.data.order) {
     const r = SC.data.rows[key].data;
-    const line = `${r.name} ${r.verdict_text}. ${r.text}`;
+    const line = rowLine(r);
     const i = plain.indexOf(line);
     assert.ok(i > at, `row ${key} missing or out of order: ${line}`);
     at = i;
@@ -41,12 +44,14 @@ test("every row prints its verdict in words beside its own sentence, in the serv
   // The AI row says its count is to date, and its rule says so too.
   const ai = SC.data.rows.ai.data;
   assert.match(ai.text, /^Counted across all \d+ calls checked to date, not this week's alone\.$/);
-  assert.ok(plain.includes(`The AI ${ai.verdict_text}. ${ai.text}`));
+  assert.ok(plain.includes(`The AI ${ai.verdict_text}.`));
+  assert.equal(plain.split("not this week's alone").length - 1, 1, "the clause is said once, under the row");
 });
 
 test("the rules and the day they were set are printed with the rows", () => {
   const plain = text(F.scorecardHTML(SC));
-  assert.ok(plain.includes(SC.data.rules_set_text), "the day the rules were set is missing");
+  // #4580 W8: the served sentence is given its antecedent on the page ("in grey"), its day unchanged.
+  assert.ok(plain.includes(SC.data.rules_set_text.replace(/^The rules were set on/, "The rules in grey were written down on")), "the day the rules were set is missing");
   for (const key of SC.data.order) assert.ok(plain.includes(F.shortRule(SC.data.rows[key].data.rule)), `the ${key} rule is missing`);
   assert.equal(F.shortRule("Days trained in the last seven. Going well at 4 to 6, so at least one rest day. Fewer than 5 days recorded is not enough data."), "Days trained in the last seven. Going well at 4 to 6, so at least one rest day.");
   assert.equal(F.shortRule("Going well at 3. When the 10 newest entries all fall inside the week, the count is not enough data."), "Going well at 3.");
@@ -54,16 +59,20 @@ test("the rules and the day they were set are printed with the rows", () => {
   assert.doesNotMatch(F.scorecardHTML(SC), /\b20\d\d-\d\d-\d\d\b/, "an ISO date reached the page");
 });
 
-test("what went right prints a line for each party with something to show, and no 'nothing' row (round 8)", () => {
-  const plain = text(F.scorecardHTML(SC));
-  assert.ok(plain.includes(`What went right this week Matthew ${SC.data.went_right.matthew.text}`));
-  assert.doesNotMatch(plain, /The engine Nothing this week\./);
+test("what went right is the filled dots, never a second list from another source (#4580 W2)", () => {
+  // The served went_right is built upstream from GOING_WELL alone while the filled dot also marks
+  // "faster than planned", so a list from it disagreed with the dots on the same page; and its
+  // "Matthew" row repeated the Sleep row word for word. It is not printed.
+  const html = F.scorecardHTML(SC);
+  const plain = text(html);
+  assert.doesNotMatch(plain, /What went right this week|The engine/);
+  assert.ok(!plain.includes(`Matthew ${SC.data.went_right.matthew.text}`), "the party-keyed row is gone");
+  const earned = SC.data.order.filter((k) => ["going_well", "faster_than_planned"].includes(SC.data.rows[k].data.verdict)).length;
+  assert.equal((html.match(/class="ck-dot"/g) || []).length, earned, "one filled dot per row that earned it");
+  assert.match(plain, /A filled dot is an area going well this week\./);
   const both = clone(SC);
   both.data.went_right.engine = { area: "ai", text: "The coaches beat the simple guess on three calls.", source: "/api/calibration" };
-  assert.match(text(F.scorecardHTML(both)), /The engine The coaches beat the simple guess on three calls\./);
-  const neither = clone(SC);
-  neither.data.went_right = { matthew: { text: "Nothing this week." }, engine: { text: "Nothing this week." } };
-  assert.doesNotMatch(text(F.scorecardHTML(neither)), /What went right this week/);
+  assert.doesNotMatch(text(F.scorecardHTML(both)), /The engine/);
 });
 
 test("the mark is filled for a row that earned it — going well or faster than planned — and the page can drop the kicker (round 8)", () => {
