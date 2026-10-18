@@ -80,6 +80,8 @@ import os
 import re
 from pathlib import Path
 
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
+
 REPO = Path(__file__).resolve().parent.parent
 
 # ── The public surfaces this registry is responsible for ─────────────────────
@@ -413,8 +415,8 @@ def _sweep_cadence_days() -> int | None:
     idx = stack.find("subscriber_retention_sweep")
     if idx < 0:
         return None
-    window = stack[max(0, idx - 1500) : idx]
-    crons = re.findall(r"cron\(([^)]*)\)", window)
+    # #4284: the rule's clock is its config/schedules.json row.
+    crons = [schedule_rows.expr("life-platform-delete-user-data#SubscriberRetentionSweep")[len("cron(") : -1]]
     if not crons:
         return None
     fields = crons[-1].split()

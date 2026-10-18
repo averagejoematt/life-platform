@@ -95,101 +95,27 @@ def _kw(node: ast.Call, name: str):
     return None
 
 
+def _schedule_rows() -> dict:
+    """config/schedules.json via its stdlib reader (#4284) — THE schedule table every stack reads."""
+    import importlib.util
+
+    path = os.path.join(CDK_STACKS_DIR, "schedule_table.py")
+    spec = importlib.util.spec_from_file_location("_schedule_table_for_heartbeat", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.load()
+
+
 def scheduled_lambdas() -> dict:
-    """Return {function_name: "stack_file:line"} for every scheduled Lambda."""
+    """Return {function_name: "config/schedules.json[<key>]"} for every Lambda with an ENABLED schedule.
+
+    #4284: read from the schedule table, not the stack AST — no stack carries a schedule literal
+    any more, and the factory attaches every row by function_name. A disabled row (enabled: false)
+    is not a schedule that fires, so it does not enrol its function."""
     out = {}
-    unresolved = []
-    for fname in sorted(os.listdir(CDK_STACKS_DIR)):
-        if not fname.endswith(".py") or fname.startswith("__") or fname in _SKIP_FILES:
-            continue
-        with open(os.path.join(CDK_STACKS_DIR, fname), encoding="utf-8") as f:
-            tree = ast.parse(f.read())
-
-        var_to_fn = {}  # local variable name → function_name
-        rule_enabled = {}  # rule variable name → enabled flag
-
-        # #3161: module-level `NAME = "literal-string"` constants, resolved so a
-        # `function_name=SOME_CONSTANT` kwarg (mcp_stack.py's WARMER_FUNCTION_NAME) is
-        # NOT indistinguishable from a genuinely unresolvable expression. This is the
-        # ONE additional shape taught here — anything else non-Constant still hits the
-        # loud-failure branch below, per this function's own docstring ("a new wiring
-        # pattern? teach scheduled_lambdas() about it — do NOT let it be silently
-        # skipped").
-        const_map = {}
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
-                for t in node.targets:
-                    if isinstance(t, ast.Name):
-                        const_map[t.id] = node.value.value
-
-        # Pass 1: create_platform_lambda calls (scheduled?) + assignments.
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Call) and _is_call_to(node, "create_platform_lambda"):
-                fn_kw = _kw(node, "function_name")
-                if isinstance(fn_kw, ast.Constant) and isinstance(fn_kw.value, str):
-                    fn_name = fn_kw.value
-                elif isinstance(fn_kw, ast.Name) and fn_kw.id in const_map:
-                    fn_name = const_map[fn_kw.id]
-                else:
-                    # #3161: this used to be a silent `continue` — exactly how
-                    # life-platform-mcp-warmer (mcp_stack.py's WARMER_FUNCTION_NAME,
-                    # a Name node the old branch couldn't resolve) went missing from
-                    # every COVERAGE row, every EXEMPT row, and every test failure
-                    # message: structurally invisible, not even flagged as a gap.
-                    unresolved.append(
-                        f"{fname}:{node.lineno} → create_platform_lambda(function_name=<unresolvable: "
-                        f"{ast.dump(fn_kw) if fn_kw is not None else 'missing'}>)"
-                    )
-                    continue
-                node._fn_name = fn_name  # stash for the Assign pass
-                sched = _kw(node, "schedule")
-                if sched is not None and not (isinstance(sched, ast.Constant) and sched.value is None):
-                    out.setdefault(fn_name, f"{fname}:{node.lineno}")
-
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
-                call = node.value
-                if _is_call_to(call, "create_platform_lambda") and hasattr(call, "_fn_name"):
-                    for t in node.targets:
-                        if isinstance(t, ast.Name):
-                            var_to_fn[t.id] = call._fn_name
-                if _is_call_to(call, "Rule"):
-                    en = _kw(call, "enabled")
-                    for t in node.targets:
-                        if isinstance(t, ast.Name):
-                            rule_enabled[t.id] = not (isinstance(en, ast.Constant) and en.value is False)
-
-        # Pass 2: explicit rule.add_target(targets.LambdaFunction(<var>)) chains.
-        for node in ast.walk(tree):
-            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "add_target"):
-                continue
-            base = node.func.value
-            if isinstance(base, ast.Name):
-                enabled = rule_enabled.get(base.id, True)
-            elif isinstance(base, ast.Call) and _is_call_to(base, "Rule"):
-                en = _kw(base, "enabled")
-                enabled = not (isinstance(en, ast.Constant) and en.value is False)
-            else:
-                enabled = True
-            if not enabled:
-                continue
-            target_var = None
-            for sub in ast.walk(node):
-                if isinstance(sub, ast.Call) and _is_call_to(sub, "LambdaFunction") and sub.args and isinstance(sub.args[0], ast.Name):
-                    target_var = sub.args[0].id
-            if target_var is None:
-                continue
-            fn_name = var_to_fn.get(target_var)
-            if fn_name is None:
-                unresolved.append(f"{fname}:{node.lineno} → add_target({target_var})")
-            else:
-                out.setdefault(fn_name, f"{fname}:{node.lineno}")
-
-    assert not unresolved, (
-        "Scheduled-rule targets the enumerator could not resolve to a function_name "
-        "(a new wiring pattern? teach scheduled_lambdas() about it — do NOT let it "
-        "be silently skipped):\n  " + "\n  ".join(unresolved)
-    )
+    for key, row in sorted(_schedule_rows().items()):
+        if row.get("enabled", True):
+            out.setdefault(row["function"], f"config/schedules.json[{key}]")
     return out
 
 
@@ -553,12 +479,12 @@ def _schedule_expression(node, env):
 
 
 def scheduled_lambda_cadences() -> dict:
-    """{function_name: (fires_per_day, ["<expr>  cdk/stacks/<file>:<line>", ...])}.
+    """{function_name: (fires_per_day, ["<expr>  config/schedules.json[<key>]", ...])}.
 
     SUMS every enabled schedule pointed at the same function — a Lambda with
     two rules runs at the sum of their rates, which is exactly the fact the
     canary's waiver got wrong (it named one of its two rules, and not the
-    fast one).
+    fast one). #4284: the rows are the schedule table's.
 
     NOTE ON THE CANARY, stated so the number here is not mistaken for the whole
     truth: only ONE of its two rules is CDK-owned. The `rate(15 minutes)` rule
@@ -568,76 +494,13 @@ def scheduled_lambda_cadences() -> dict:
     canary's exemption is retired below in favour of a real alarm.
     """
     out = {}
-    for fname in sorted(os.listdir(CDK_STACKS_DIR)):
-        if not fname.endswith(".py") or fname.startswith("__") or fname in _SKIP_FILES:
-            continue
-        path = os.path.join(CDK_STACKS_DIR, fname)
-        with open(path, encoding="utf-8") as f:
-            tree = ast.parse(f.read())
-
-        const_map = {}
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
-                for t in node.targets:
-                    if isinstance(t, ast.Name):
-                        const_map[t.id] = node.value.value
-
-        def _fn_of(call):
-            fn_kw = _kw(call, "function_name")
-            if isinstance(fn_kw, ast.Constant) and isinstance(fn_kw.value, str):
-                return fn_kw.value
-            if isinstance(fn_kw, ast.Name):
-                return const_map.get(fn_kw.id)
-            return None
-
-        var_to_fn = {}
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call) and _is_call_to(node.value, "create_platform_lambda"):
-                name = _fn_of(node.value)
-                if name:
-                    for t in node.targets:
-                        if isinstance(t, ast.Name):
-                            var_to_fn[t.id] = name
-
-        # One ordered pass. `rule = events.Rule(...)` then `rule.add_target(...)`
-        # is the shape every stack uses, and _walk_env replays it once per loop
-        # iteration, so a rule var re-bound in a loop is read per iteration.
-        rule_state = {}
-        for node, env in _walk_env(tree, dict(const_map)):
-            if isinstance(node, ast.Call) and _is_call_to(node, "create_platform_lambda"):
-                name = _fn_of(node)
-                sched = _kw(node, "schedule")
-                if name and sched is not None and not (isinstance(sched, ast.Constant) and sched.value is None):
-                    expr = _schedule_expression(sched, env)
-                    out.setdefault(name, []).append((expr, f"{fname}:{node.lineno}"))
-            elif isinstance(node, ast.Assign) and isinstance(node.value, ast.Call) and _is_call_to(node.value, "Rule"):
-                call = node.value
-                en = _kw(call, "enabled")
-                enabled = not (isinstance(en, ast.Constant) and en.value is False)
-                sched = _kw(call, "schedule")
-                expr = _schedule_expression(sched, env) if sched is not None else None
-                for t in node.targets:
-                    if isinstance(t, ast.Name):
-                        rule_state[t.id] = (expr, enabled, call.lineno)
-            elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "add_target":
-                base = node.func.value
-                if not (isinstance(base, ast.Name) and base.id in rule_state):
-                    continue
-                expr, enabled, lineno = rule_state[base.id]
-                if not enabled:
-                    continue
-                target = None
-                for sub in ast.walk(node):
-                    if isinstance(sub, ast.Call) and _is_call_to(sub, "LambdaFunction") and sub.args and isinstance(sub.args[0], ast.Name):
-                        target = sub.args[0].id
-                name = var_to_fn.get(target) if target else None
-                if name:
-                    out.setdefault(name, []).append((expr, f"{fname}:{lineno}"))
-
+    for key, row in sorted(_schedule_rows().items()):
+        if row.get("enabled", True):
+            out.setdefault(row["function"], []).append((row["expression"], f"config/schedules.json[{key}]"))
     resolved = {}
     for name, entries in out.items():
         rates = [schedule_fires_per_day(e) if e else None for e, _ in entries]
-        sites = [f"{e!r}  cdk/stacks/{site}" for e, site in entries]
+        sites = [f"{e!r}  {site}" for e, site in entries]
         resolved[name] = (None if any(r is None for r in rates) else sum(rates), sites)
     return resolved
 
@@ -1489,9 +1352,11 @@ def test_story_questions_rule_and_its_deadman_keep_one_clock():
     ]
     assert len(rules) == 1, f"expected exactly one StoryQuestionsMonday rule in email_stack.py, found {len(rules)}"
     assert not (isinstance(_kw(rules[0], "enabled"), ast.Constant) and _kw(rules[0], "enabled").value is False)
-    cron = _kw(rules[0], "schedule")
-    assert isinstance(cron, ast.Call) and _is_call_to(cron, "cron"), "StoryQuestionsMonday is no longer a Schedule.cron(...)"
-    got = {kw.arg: kw.value.value for kw in cron.keywords if isinstance(kw.value, ast.Constant)}
+    # #4284: the rule's clock is its config/schedules.json row, which the stack reads by key.
+    row = _schedule_rows()["wednesday-chronicle#StoryQuestionsMonday"]
+    assert row.get("enabled", True), "the StoryQuestionsMonday row is disabled in config/schedules.json"
+    fields = row["expression"][len("cron(") : -1].split()
+    got = {"minute": fields[0], "hour": fields[1], "week_day": fields[4]}
     want = {"minute": str(ssq.QUESTIONS_MINUTE_UTC), "hour": str(ssq.QUESTIONS_HOUR_UTC), "week_day": ssq.QUESTIONS_WEEKDAY}
     assert got == want, f"StoryQuestionsMonday fires at {got}; story_season_qa expects a send at {want}"
     payloads = [

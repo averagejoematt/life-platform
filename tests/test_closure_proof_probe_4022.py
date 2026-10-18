@@ -31,6 +31,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "lambdas"))
@@ -529,6 +530,6 @@ def test_the_nightly_rule_delivers_eventbridges_own_event():
     src = (REPO / "cdk" / "stacks" / "operational_stack.py").read_text()
     start = src.index('function_name="life-platform-qa-smoke"')
     block = src[start : src.index("create_platform_lambda(", start)]
-    assert 'schedule="cron(30 18 ? * * *)"' in block
+    assert schedule_rows.expr("life-platform-qa-smoke") == "cron(30 18 ? * * *)"  # #4284: the table row
     assert "schedule_input" not in block
     assert leg.is_scheduled({"source": "aws.events", "detail-type": "Scheduled Event"})

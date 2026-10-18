@@ -1,0 +1,693 @@
+{
+  "_doc": "THE schedule table (#4284): every EventBridge schedule the CDK app creates. Key = the AWS function name for the create_platform_lambda schedule (the factory reads it by function_name), or '<function>#<ConstructId>' for a rule built beside the factory (lambda_helpers.table_schedule). `expression` is fixed UTC unless `timezone` is set, in which case it is wall-clock time in that zone on an EventBridge Scheduler schedule (CONVENTIONS 1b). `facing` records the reader/internal split; `stack` is the CloudFormation stack the factory asserts at synth. Reader: cdk/stacks/schedule_table.py; guard: tests/test_schedule_table_4284.py.",
+  "schedules": {
+    "activity-enrichment": {
+      "function": "activity-enrichment",
+      "stack": "LifePlatformIngestion",
+      "expression": "cron(30 15 * * ? *)",
+      "facing": "internal",
+      "purpose": "Life Platform — Nightly Activity Enrichment Lambda"
+    },
+    "acwr-compute": {
+      "function": "acwr-compute",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(55 16 * * ? *)",
+      "facing": "internal",
+      "purpose": "ACWR Compute Lambda — v2.0.0"
+    },
+    "adaptive-mode-compute": {
+      "function": "adaptive-mode-compute",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(35 16 * * ? *)",
+      "facing": "internal",
+      "purpose": "Feature #50: Adaptive Email Frequency"
+    },
+    "ai-expert-analyzer": {
+      "function": "ai-expert-analyzer",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 14 ? * MON *)",
+      "facing": "internal",
+      "purpose": "AI Expert Analyzer Lambda — Observatory Intelligence Pipeline"
+    },
+    "ai-review-pack": {
+      "function": "ai-review-pack",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(0 18 ? * SUN *)",
+      "facing": "internal",
+      "purpose": "Weekly AI review-pack email (#1442, QA strategy D3)."
+    },
+    "anomaly-detector": {
+      "function": "anomaly-detector",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(5 15 * * ? *)",
+      "facing": "internal",
+      "purpose": "Anomaly Detector Lambda — v2.5.0 (TB7-21: raise Z-floor to 2.0, reduce single-day FP rate)"
+    },
+    "between-chronicle": {
+      "function": "between-chronicle",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(0 17 ? * SUN *)",
+      "facing": "reader",
+      "purpose": "#398: the machine's between-chronicle note."
+    },
+    "challenge-generator": {
+      "function": "challenge-generator",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 22 ? * SUN *)",
+      "facing": "internal",
+      "purpose": "AI-Powered Challenge Generation Pipeline"
+    },
+    "character-sheet-compute": {
+      "function": "character-sheet-compute",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(30 16 * * ? *)",
+      "facing": "internal",
+      "purpose": "Character Sheet Compute Lambda — v1.1.0"
+    },
+    "chronicle-approve": {
+      "function": "chronicle-approve",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(0 18 * * ? *)",
+      "facing": "internal",
+      "purpose": "Chronicle Approve Lambda — v1.0.0 (FEAT-12)"
+    },
+    "chronicle-email-sender": {
+      "function": "chronicle-email-sender",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(10 15 ? * WED *)",
+      "facing": "reader",
+      "purpose": "Chronicle Email Sender Lambda — v1.0.0 (BS-03)"
+    },
+    "circadian-compliance": {
+      "function": "circadian-compliance",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 2 * * ? *)",
+      "facing": "internal",
+      "purpose": "Circadian Compliance Score Lambda — v1.0.0"
+    },
+    "coach-daily-reflection": {
+      "function": "coach-daily-reflection",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 19 * * ? *)",
+      "facing": "internal",
+      "purpose": "CC-08: the one gated new-inference item."
+    },
+    "coach-history-summarizer": {
+      "function": "coach-history-summarizer",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 17 ? * SUN *)",
+      "facing": "internal",
+      "purpose": "Coach Intelligence: Weekly History Compressor"
+    },
+    "coach-memoir": {
+      "function": "coach-memoir",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 15 1 1,4,7,10 ? *)",
+      "facing": "internal",
+      "purpose": "#553: quarterly in-voice coach retrospectives."
+    },
+    "coach-nudge": {
+      "function": "coach-nudge",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(10 0-5,15-23 * * ? *)",
+      "facing": "reader",
+      "purpose": "the delivery/IO shell for proactive coach nudges (#1382)."
+    },
+    "coach-panel-podcast#PanelHoldSweep": {
+      "function": "coach-panel-podcast",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(0 18 ? * MON,WED *)",
+      "facing": "internal",
+      "purpose": "SS-02: retry a soft (quality) Panel HOLD on the current week after the review window"
+    },
+    "coach-prediction-evaluator": {
+      "function": "coach-prediction-evaluator",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 16 * * ? *)",
+      "facing": "internal",
+      "purpose": "Scheduled Daily Coach Prediction Evaluator"
+    },
+    "coach-vision": {
+      "function": "coach-vision",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 17 ? * MON *)",
+      "facing": "internal",
+      "purpose": "the Monday coach-vision run over the progress photos (#3759)."
+    },
+    "daily-brief": {
+      "function": "daily-brief",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(0 10 * * ? *)",
+      "timezone": "America/Los_Angeles",
+      "facing": "reader",
+      "purpose": "The morning brief, 10:00 AM Pacific all year (the one zoned schedule, docket #4644 Q42)"
+    },
+    "daily-debrief": {
+      "function": "daily-debrief",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(0 19 * * ? *)",
+      "facing": "reader",
+      "purpose": "the daily ~2-minute \"state of Matthew\" audio debrief (#734, epic #721)."
+    },
+    "daily-insight-compute": {
+      "function": "daily-insight-compute",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(45 16 * * ? *)",
+      "facing": "internal",
+      "purpose": "Daily Insight Compute Lambda — IC-2 v1.3.0"
+    },
+    "daily-metrics-compute#DailyMetricsComputeEvening": {
+      "function": "daily-metrics-compute",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 0 * * ? *)",
+      "facing": "internal",
+      "purpose": "Second daily metrics run (5 PM PT) so late-logged workouts surface the same day (#109)"
+    },
+    "daily-metrics-compute": {
+      "function": "daily-metrics-compute",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(40 16 * * ? *)",
+      "facing": "internal",
+      "purpose": "Daily Metrics Compute Lambda — v1.1.0"
+    },
+    "dashboard-refresh#DashboardRefreshEveningRule": {
+      "function": "dashboard-refresh",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 1 * * ? *)",
+      "facing": "internal",
+      "purpose": "Dashboard refresh — 6:00 PM PT"
+    },
+    "dashboard-refresh": {
+      "function": "dashboard-refresh",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 21 * * ? *)",
+      "facing": "internal",
+      "purpose": "Dashboard Refresh Lambda — Lightweight intraday data updater."
+    },
+    "dropbox-poll": {
+      "function": "dropbox-poll",
+      "stack": "LifePlatformIngestion",
+      "expression": "rate(2 hours)",
+      "facing": "internal",
+      "purpose": "Dropbox Poll Lambda — MacroFactor CSV ingestion via Dropbox API."
+    },
+    "eightsleep-data-ingestion": {
+      "function": "eightsleep-data-ingestion",
+      "stack": "LifePlatformIngestion",
+      "expression": "cron(15 14,16,18,20 * * ? *)",
+      "facing": "internal",
+      "purpose": "Daily Eight Sleep ingestion Lambda."
+    },
+    "episode-detect": {
+      "function": "episode-detect",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 17 ? * SUN *)",
+      "facing": "internal",
+      "purpose": "Episode Detect Lambda — BENCH-1 (Cut Benchmarking & Regain Firewall)."
+    },
+    "evening-nudge": {
+      "function": "evening-nudge",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(0 3 * * ? *)",
+      "facing": "reader",
+      "purpose": "Evening Nudge Lambda — R54"
+    },
+    "failure-pattern-compute": {
+      "function": "failure-pattern-compute",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(50 17 ? * SUN *)",
+      "facing": "internal",
+      "purpose": "IC-4: Failure Pattern Recognition"
+    },
+    "field-notes-generate": {
+      "function": "field-notes-generate",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 18 ? * SUN *)",
+      "facing": "internal",
+      "purpose": "Field Notes Generate Lambda — BL-04 Phase 1"
+    },
+    "forecast-engine": {
+      "function": "forecast-engine",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(50 16 * * ? *)",
+      "facing": "internal",
+      "purpose": "deterministic next-day / next-7-day expectations (#541, ADR-105)."
+    },
+    "habit-skip-review": {
+      "function": "habit-skip-review",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(0 16 ? * SAT *)",
+      "facing": "reader",
+      "purpose": "the Saturday skipped-habits queue (#4622)."
+    },
+    "habitify-data-ingestion": {
+      "function": "habitify-data-ingestion",
+      "stack": "LifePlatformIngestion",
+      "expression": "cron(5 * * * ? *)",
+      "facing": "internal",
+      "purpose": "Habitify ingestion via SIMP-2 framework (P4.1, 2026-05-17)."
+    },
+    "hevy-backfill": {
+      "function": "hevy-backfill",
+      "stack": "LifePlatformIngestion",
+      "expression": "cron(0 * * * ? *)",
+      "facing": "internal",
+      "purpose": "Hourly Hevy workout ingestion via events feed."
+    },
+    "hevy-backfill#HevyReconciliation": {
+      "function": "hevy-backfill",
+      "stack": "LifePlatformIngestion",
+      "expression": "cron(30 18 * * ? *)",
+      "facing": "internal",
+      "purpose": "#4643: compare the Hevy workout count with stored rows — emits MissingActivityCount{hevy}"
+    },
+    "hevy-backfill#HevyTemplateIndexRebuild": {
+      "function": "hevy-backfill",
+      "stack": "LifePlatformIngestion",
+      "expression": "cron(40 13 * * ? *)",
+      "facing": "internal",
+      "purpose": "#3764: republish config/hevy_template_index.json from the live Hevy catalogue"
+    },
+    "hevy-restamp#HevyRestampRule": {
+      "function": "hevy-restamp",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(0 18 * * ? *)",
+      "facing": "internal",
+      "purpose": "#417 TR-05: re-stamps on fresh Whoop recovery (~17:30 UTC refresh); enabled post PR #711 decision 2a."
+    },
+    "hevy-routine-cron#HevyRoutineCronRule": {
+      "function": "hevy-routine-cron",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(30 13 ? * SUN *)",
+      "enabled": false,
+      "facing": "internal",
+      "purpose": "ADR-066 ships disabled; operator enables after Phase 1 use justifies it."
+    },
+    "hypothesis-engine": {
+      "function": "hypothesis-engine",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 19 ? * SUN *)",
+      "facing": "internal",
+      "purpose": "IC-18: Cross-Domain Hypothesis Engine"
+    },
+    "inter-coach-dialogue": {
+      "function": "inter-coach-dialogue",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 18 ? * SUN *)",
+      "facing": "internal",
+      "purpose": "real inter-coach dialogue (#540)."
+    },
+    "journal-analyzer": {
+      "function": "journal-analyzer",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 10 * * ? *)",
+      "facing": "internal",
+      "purpose": "Journal Analyzer Lambda — Phase 2 deterministic aggregator (#506)."
+    },
+    "journal-enrichment": {
+      "function": "journal-enrichment",
+      "stack": "LifePlatformIngestion",
+      "expression": "cron(30 14 * * ? *)",
+      "facing": "internal",
+      "purpose": "Life Platform — Journal Enrichment Lambda"
+    },
+    "life-platform-ai-quality-canary": {
+      "function": "life-platform-ai-quality-canary",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(20 16 ? * MON,WED,FRI *)",
+      "facing": "internal",
+      "purpose": "standing eyes on the public AI (#385)"
+    },
+    "life-platform-alert-digest": {
+      "function": "life-platform-alert-digest",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(0 15 * * ? *)",
+      "facing": "internal",
+      "purpose": "ADR-050: daily-batched alarm digest."
+    },
+    "life-platform-canary": {
+      "function": "life-platform-canary",
+      "stack": "LifePlatformOperational",
+      "expression": "rate(4 hours)",
+      "facing": "internal",
+      "purpose": "REL-4: Synthetic End-to-End Health Check Canary"
+    },
+    "life-platform-coherence-sentinel": {
+      "function": "life-platform-coherence-sentinel",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(45 18 ? * * *)",
+      "facing": "internal",
+      "purpose": "does the intelligence layer still make sense?"
+    },
+    "life-platform-cost-governor": {
+      "function": "life-platform-cost-governor",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(0 0/8 * * ? *)",
+      "facing": "internal",
+      "purpose": "near-real-time AWS spend estimator + budget-tier setter."
+    },
+    "life-platform-data-reconciliation": {
+      "function": "life-platform-data-reconciliation",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(30 7 ? * MON *)",
+      "facing": "internal",
+      "purpose": "DATA-3: Weekly data reconciliation job."
+    },
+    "life-platform-delete-user-data#SubscriberRetentionSweep": {
+      "function": "life-platform-delete-user-data",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(0 8 ? * MON *)",
+      "facing": "internal",
+      "purpose": "#1350: anonymize unsubscribed subscriber emails past the signed 18-month retention window"
+    },
+    "life-platform-dlq-consumer": {
+      "function": "life-platform-dlq-consumer",
+      "stack": "LifePlatformOperational",
+      "expression": "rate(6 hours)",
+      "facing": "internal",
+      "purpose": "REL-2: Dead Letter Queue Consumer"
+    },
+    "life-platform-freshness-checker": {
+      "function": "life-platform-freshness-checker",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(45 16 * * ? *)",
+      "facing": "internal",
+      "purpose": "Freshness Checker Lambda — monitors data source staleness."
+    },
+    "life-platform-mcp-warmer": {
+      "function": "life-platform-mcp-warmer",
+      "stack": "LifePlatformMcp",
+      "expression": "cron(10 17 * * ? *)",
+      "facing": "internal",
+      "purpose": "Keeps the MCP Lambda warm once a day (10:10 AM PT, staggered from the daily brief)"
+    },
+    "life-platform-mcp-warmer#NightlyPredraft": {
+      "function": "life-platform-mcp-warmer",
+      "stack": "LifePlatformMcp",
+      "expression": "cron(0 2 * * ? *)",
+      "facing": "internal",
+      "purpose": "#4084: draft + red-team tomorrow's session (never commits to Hevy)"
+    },
+    "life-platform-permanence": {
+      "function": "life-platform-permanence",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(0 6 * * ? *)",
+      "facing": "internal",
+      "purpose": "The Permanence Contract's nightly run (#1400)."
+    },
+    "life-platform-pip-audit": {
+      "function": "life-platform-pip-audit",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(0 15 ? * MON *)",
+      "facing": "internal",
+      "purpose": "SEC-5: Monthly dependency vulnerability scanning."
+    },
+    "life-platform-qa-smoke": {
+      "function": "life-platform-qa-smoke",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(30 18 ? * * *)",
+      "facing": "internal",
+      "purpose": "Life Platform QA Smoke Test"
+    },
+    "life-platform-traffic-digest": {
+      "function": "life-platform-traffic-digest",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(0 16 ? * MON *)",
+      "facing": "internal",
+      "purpose": "the Monday ops-pack email (traffic + folded ops reports)."
+    },
+    "milestone-digest": {
+      "function": "milestone-digest",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(15 17 * * ? *)",
+      "facing": "reader",
+      "purpose": "Milestone Digest Lambda — #1623 (\"private milestone notes to 5-8 named humans\")"
+    },
+    "monday-compass": {
+      "function": "monday-compass",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(0 15 ? * MON *)",
+      "facing": "reader",
+      "purpose": "Monday Compass Lambda — v1.0.0"
+    },
+    "monthly-digest": {
+      "function": "monthly-digest",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(0 16 ? * 1#1 *)",
+      "facing": "reader",
+      "purpose": "Monthly Coach's Letter Lambda — v1.2.0 (digest_utils consolidation)"
+    },
+    "notion-journal-ingestion": {
+      "function": "notion-journal-ingestion",
+      "stack": "LifePlatformIngestion",
+      "expression": "cron(0 14,21,3 * * ? *)",
+      "facing": "internal",
+      "purpose": "Notion Journal → DynamoDB ingestion Lambda."
+    },
+    "nutrition-review": {
+      "function": "nutrition-review",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(0 17 ? * SAT *)",
+      "facing": "reader",
+      "purpose": "Nutrition Review Lambda — v1.1.0 (Board Centralization)"
+    },
+    "og-image-generator": {
+      "function": "og-image-generator",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(30 19 * * ? *)",
+      "facing": "internal",
+      "purpose": "HP-13: OG Image Generator Lambda"
+    },
+    "partner-weekly-email": {
+      "function": "partner-weekly-email",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(30 17 ? * 1 *)",
+      "facing": "reader",
+      "purpose": "Partner Weekly Email — v1.1.0"
+    },
+    "personal-baselines-compute": {
+      "function": "personal-baselines-compute",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 8 1 * ? *)",
+      "facing": "internal",
+      "purpose": "Personal Baselines Compute Lambda — v1.0.0 (#543, ADR-105 rule 4)"
+    },
+    "pipeline-health-check": {
+      "function": "pipeline-health-check",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(30 2,6,14,18,22 * * ? *)",
+      "facing": "internal",
+      "purpose": "Pipeline Health Check Lambda — active probe of all ingestion pipelines + Phase 3.2"
+    },
+    "pipeline-health-check#PipelineHealthComputeCheck": {
+      "function": "pipeline-health-check",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(58 16 * * ? *)",
+      "facing": "internal",
+      "purpose": "Phase 3.2: verify today's compute records exist before daily-brief"
+    },
+    "pipeline-health-check#PipelineHealthIngestLiveness": {
+      "function": "pipeline-health-check",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(10 17 * * ? *)",
+      "facing": "internal",
+      "purpose": "ER-01: assert each active source's ingestion Lambda ran + 200'd (infra-liveness)"
+    },
+    "reading-recall-sweep": {
+      "function": "reading-recall-sweep",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(0 16 * * ? *)",
+      "facing": "internal",
+      "purpose": "the daily spaced-retrieval sweep (Phase D, spec §7)."
+    },
+    "recap-card-generator": {
+      "function": "recap-card-generator",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(30 19 * * ? *)",
+      "facing": "internal",
+      "purpose": "Day N's card, rendered the morning after Day N (#3741)."
+    },
+    "scenario-explorer": {
+      "function": "scenario-explorer",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(10 12 * * ? *)",
+      "facing": "internal",
+      "purpose": "conditional what-followed distributions (#550, ADR-105)."
+    },
+    "site-stats-refresh#SiteStatsRefresh12pmPT": {
+      "function": "site-stats-refresh",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(0 19 * * ? *)",
+      "facing": "internal",
+      "purpose": "Site stats refresh for averagejoematt.com — the 12:00 PDT slot of four"
+    },
+    "site-stats-refresh#SiteStatsRefresh4pmPT": {
+      "function": "site-stats-refresh",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(0 23 * * ? *)",
+      "facing": "internal",
+      "purpose": "Site stats refresh for averagejoematt.com — the 16:00 PDT slot of four"
+    },
+    "site-stats-refresh#SiteStatsRefresh8amPT": {
+      "function": "site-stats-refresh",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(0 15 * * ? *)",
+      "facing": "internal",
+      "purpose": "Site stats refresh for averagejoematt.com — the 08:00 PDT slot of four"
+    },
+    "site-stats-refresh#SiteStatsRefresh8pmPT": {
+      "function": "site-stats-refresh",
+      "stack": "LifePlatformOperational",
+      "expression": "cron(0 3 * * ? *)",
+      "facing": "internal",
+      "purpose": "Site stats refresh for averagejoematt.com — the 20:00 PDT slot of four"
+    },
+    "social-enrichment": {
+      "function": "social-enrichment",
+      "stack": "LifePlatformIngestion",
+      "expression": "cron(45 14 * * ? *)",
+      "facing": "internal",
+      "purpose": "Life Platform — Social Post Enrichment Lambda (#1671, epic #1668 — The Social Membrane)"
+    },
+    "state-of-matthew": {
+      "function": "state-of-matthew",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(30 19 ? * SUN *)",
+      "facing": "internal",
+      "purpose": "\"State of Matthew\" weekly model brief (#552, epic #528)."
+    },
+    "strava-data-ingestion": {
+      "function": "strava-data-ingestion",
+      "stack": "LifePlatformIngestion",
+      "expression": "cron(10 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+      "facing": "internal",
+      "purpose": "Strava ingestion via SIMP-2 framework (P4.1, 2026-05-17)."
+    },
+    "strava-data-ingestion#StravaReconciliation": {
+      "function": "strava-data-ingestion",
+      "stack": "LifePlatformIngestion",
+      "expression": "cron(20 17 * * ? *)",
+      "facing": "internal",
+      "purpose": "DI-2: diff stored Strava activities vs the Strava API (trailing 14d) — emits MissingActivityCount"
+    },
+    "subscriber-onboarding": {
+      "function": "subscriber-onboarding",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(5 17 * * ? *)",
+      "facing": "reader",
+      "purpose": "Subscriber Onboarding Lambda — Day 2 Bridge Email"
+    },
+    "telegram-coach-worker#TelegramEventOutbound": {
+      "function": "telegram-coach-worker",
+      "stack": "LifePlatformServe",
+      "expression": "cron(0 16 * * ? *)",
+      "facing": "reader",
+      "purpose": "Daily event-triggered coach outbound sweep (celebration + soft concern; dark until the coaches' bots are registered)"
+    },
+    "telegram-coach-worker#TelegramMorningCheckin": {
+      "function": "telegram-coach-worker",
+      "stack": "LifePlatformServe",
+      "expression": "cron(15 17 ? * MON-FRI *)",
+      "facing": "reader",
+      "purpose": "Weekday morning check-in from the program lead (dark until his Telegram bot is registered)"
+    },
+    "todoist-data-ingestion": {
+      "function": "todoist-data-ingestion",
+      "stack": "LifePlatformIngestion",
+      "expression": "cron(0 14 * * ? *)",
+      "facing": "internal",
+      "purpose": "Todoist ingestion via SIMP-2 framework (P4.1, 2026-05-17)."
+    },
+    "voice-fidelity-harness": {
+      "function": "voice-fidelity-harness",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 15 1 * ? *)",
+      "facing": "internal",
+      "purpose": "the blind voice-fidelity harness (#545, epic #526)."
+    },
+    "weather-data-ingestion": {
+      "function": "weather-data-ingestion",
+      "stack": "LifePlatformIngestion",
+      "expression": "cron(0 14,2 * * ? *)",
+      "facing": "internal",
+      "purpose": "SIMP-2: Weather ingestion via shared ingestion framework."
+    },
+    "wednesday-chronicle#OwnerWordsQuestionTuesday": {
+      "function": "wednesday-chronicle",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(0 1 ? * WED *)",
+      "facing": "reader",
+      "purpose": "#4584: the Tuesday-evening-PT question whose verbatim reply leads Wednesday's edition (optional)"
+    },
+    "wednesday-chronicle#StoryQuestionsMonday": {
+      "function": "wednesday-chronicle",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(0 16 ? * MON *)",
+      "facing": "reader",
+      "purpose": "#4546: the Story Desk's weekly reply-by-email questions (optional; no reply is a normal week)"
+    },
+    "wednesday-chronicle": {
+      "function": "wednesday-chronicle",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(0 15 ? * WED *)",
+      "facing": "reader",
+      "purpose": "Wednesday Chronicle Lambda — v1.1.0 (Board Centralization)"
+    },
+    "weekly-correlation-compute": {
+      "function": "weekly-correlation-compute",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(30 18 ? * SUN *)",
+      "facing": "internal",
+      "purpose": "Weekly Correlation Compute Lambda — v1.0.0 (R8-LT9)"
+    },
+    "weekly-digest": {
+      "function": "weekly-digest",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(0 16 ? * SUN *)",
+      "facing": "reader",
+      "purpose": "Weekly Digest Lambda — v4.0.0 (Weekly Digest v2)"
+    },
+    "weekly-plate": {
+      "function": "weekly-plate",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(0 2 ? * SAT *)",
+      "facing": "reader",
+      "purpose": "The Weekly Plate Lambda — v1.0.0"
+    },
+    "weekly-signal": {
+      "function": "weekly-signal",
+      "stack": "LifePlatformEmail",
+      "expression": "cron(30 16 ? * SUN *)",
+      "facing": "reader",
+      "purpose": "PB-06: \"The Weekly Signal\" subscriber email."
+    },
+    "whoop-data-ingestion": {
+      "function": "whoop-data-ingestion",
+      "stack": "LifePlatformIngestion",
+      "expression": "cron(0 0,4,12,16,20 * * ? *)",
+      "facing": "internal",
+      "purpose": "Whoop ingestion via SIMP-2 framework (P4.1, 2026-05-17)."
+    },
+    "whoop-data-ingestion#WhoopReconciliation": {
+      "function": "whoop-data-ingestion",
+      "stack": "LifePlatformIngestion",
+      "expression": "cron(20 18 * * ? *)",
+      "facing": "internal",
+      "purpose": "DI-2/TR-07: diff stored Whoop sleeps+workouts vs the Whoop API (trailing 14d) — emits MissingActivityCount{whoop}"
+    },
+    "whoop-data-ingestion#WhoopRecoverySchedule": {
+      "function": "whoop-data-ingestion",
+      "stack": "LifePlatformIngestion",
+      "expression": "cron(30 17 * * ? *)",
+      "facing": "internal",
+      "purpose": "Whoop recovery refresh — 9:30 AM PT"
+    },
+    "withings-data-ingestion": {
+      "function": "withings-data-ingestion",
+      "stack": "LifePlatformIngestion",
+      "expression": "cron(5 14,17,21,0 * * ? *)",
+      "facing": "internal",
+      "purpose": "Withings ingestion via SIMP-2 framework (P4.1, 2026-05-17)."
+    }
+  }
+}

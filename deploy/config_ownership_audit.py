@@ -305,6 +305,13 @@ RULINGS: tuple[Ruling, ...] = (
         "2026-09-07 genesis edit). Read by routine_title/site_api_data; no writer.",
     ),
     Ruling(
+        "config/schedules.json",
+        HAND_OWNED,
+        "#4284: THE schedule table — every EventBridge schedule the CDK app creates. A human edits it in the repo; "
+        "cdk/stacks/schedule_table.py reads it at synth (create_platform_lambda by function name), and "
+        "generate_platform_model.py / boot_brief.py read it for the schedule plane. No Lambda reads or writes it at runtime.",
+    ),
+    Ruling(
         "config/training_week.json",
         HAND_OWNED,
         "Hand-authored schedule shape + session bounds read by routine_generator and mcp/tools_hevy_routine.py. "

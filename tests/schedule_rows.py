@@ -1,0 +1,40 @@
+"""tests/schedule_rows.py — config/schedules.json for the tests (#4284).
+
+Every EventBridge schedule lives in THE schedule table; no stack carries a cron literal. A test
+that used to regex a `schedule="cron(...)"` out of a stack file reads the row here instead, through
+the same stdlib reader the CDK factory uses (cdk/stacks/schedule_table.py)."""
+
+import importlib.util
+import pathlib
+
+_READER = pathlib.Path(__file__).resolve().parent.parent / "cdk" / "stacks" / "schedule_table.py"
+
+
+def _reader():
+    spec = importlib.util.spec_from_file_location("_schedule_table_for_tests", _READER)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def rows() -> dict:
+    """key -> row, every schedule in the table."""
+    return _reader().load()
+
+
+def expr(key: str) -> str:
+    """The expression for `key` (a function name, or '<function>#<ConstructId>')."""
+    return _reader().entry(key)["expression"]
+
+
+def expr_after_construct(stack_src: str, construct_id: str) -> str:
+    """The table expression for the construct named `construct_id` in a stack's source: the
+    factory row of the `function_name=` it builds, or the `table_schedule("<key>")` row it reads —
+    whichever the construct declares first. Replaces the old `schedule="cron(...)"` regex."""
+    import re
+
+    seg = stack_src[stack_src.index(f'"{construct_id}"') :][:1500]
+    hits = [(m.start(), m.group(1)) for m in re.finditer(r'table_schedule\("([^"]+)"\)', seg)]
+    hits += [(m.start(), m.group(1)) for m in re.finditer(r'function_name="([^"]+)"', seg) if m.group(1) in rows()]
+    assert hits, f"construct {construct_id!r} reads no config/schedules.json row"
+    return expr(min(hits)[1])

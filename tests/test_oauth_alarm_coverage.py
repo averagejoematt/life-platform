@@ -32,6 +32,8 @@ import os
 import re
 import sys
 
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
+
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
@@ -373,12 +375,9 @@ def _max_gap_hours(hours):
     return max((hs[(i + 1) % len(hs)] - h) % 24 or 24 for i, h in enumerate(hs))
 
 
-def _stack_hours_constant(name):
-    path = os.path.join(_REPO, "cdk", "stacks", "ingestion_stack.py")
-    for n in ast.parse(open(path, encoding="utf-8").read()).body:
-        if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name for t in n.targets):
-            return ast.literal_eval(n.value)
-    raise AssertionError(f"{name} not found in ingestion_stack.py")
+def _table_hours(function_name):
+    """The hour field of a function's config/schedules.json row (#4284)."""
+    return schedule_rows.expr(function_name)[len("cron(") : -1].split()[1]
 
 
 def test_aggregate_alarm_window_exceeds_sparsest_hourly_emitters():
@@ -390,13 +389,12 @@ def test_aggregate_alarm_window_exceeds_sparsest_hourly_emitters():
     (not hand-typed), else the alarm flaps ALARM/OK between runs. Eight Sleep's
     18 h burst gap and the daily sources are covered by per-source alarms, not this
     window. Recovery clears up to one window (15 h) after the last 0."""
-    stack_src = open(os.path.join(_REPO, "cdk", "stacks", "ingestion_stack.py"), encoding="utf-8").read()
-    m = re.search(r'function_name="dropbox-poll".*?schedule="rate\((\d+) hours?\)"', stack_src, re.S)
+    m = re.fullmatch(r"rate\((\d+) hours?\)", schedule_rows.expr("dropbox-poll"))  # #4284: the table row
     assert m, "dropbox-poll rate(N hours) schedule not found in ingestion_stack.py"
     gaps = {
         "dropbox": int(m.group(1)),
-        "notion": _max_gap_hours(_stack_hours_constant("NOTION_HOURS")),
-        "withings": _max_gap_hours(_stack_hours_constant("WITHINGS_HOURS")),
+        "notion": _max_gap_hours(_table_hours("notion-journal-ingestion")),
+        "withings": _max_gap_hours(_table_hours("withings-data-ingestion")),
     }
     sparsest = max(gaps.values())
     node = _find_alarm_call("ingest-auth-unhealthy-24h")

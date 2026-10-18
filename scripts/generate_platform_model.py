@@ -115,48 +115,22 @@ def _module_str_consts(tree: ast.Module) -> dict[str, str]:
 
 # ── plane 1+2: lambdas + schedules (cdk/stacks/*.py) ─────────────────────────
 
-_SCHEDULE_CRON_FIELDS = ("minute", "hour", "day", "month", "week_day", "year")
 
+def _schedule_table():
+    """cdk/stacks/schedule_table.py by path — stdlib only, the same reader the CDK factory uses (#4284)."""
+    import importlib.util
 
-def _schedule_of(node: ast.AST, consts: dict[str, str]) -> dict | None:
-    """Normalize the three CDK schedule idioms to {expr, resolution}."""
-    direct = _resolve_str(node, consts)
-    if direct is not None:
-        resolution = "constant" if isinstance(node, ast.Constant) else "resolved"
-        if "{" in direct:
-            return {"expr": direct, "resolution": "dynamic"}
-        return {"expr": direct, "resolution": resolution}
-    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-        if node.func.attr == "expression" and node.args:
-            inner = _resolve_str(node.args[0], consts)
-            if inner is not None:
-                res = "constant" if isinstance(node.args[0], ast.Constant) else "resolved"
-                return {"expr": inner, "resolution": ("dynamic" if "{" in inner else res)}
-        if node.func.attr == "cron":
-            fields = {kw.arg: kw.value.value for kw in node.keywords if isinstance(kw.value, ast.Constant)}
-            parts = [
-                str(fields.get("minute", "*")),
-                str(fields.get("hour", "*")),
-                str(fields.get("day", "*")),
-                str(fields.get("month", "*")),
-                str(fields.get("week_day", "?")),
-                str(fields.get("year", "*")),
-            ]
-            return {"expr": f"cron({' '.join(parts)})", "resolution": "constructed"}
-    return {"expr": None, "resolution": "dynamic"}
-
-
-def _rate_or_none(node: ast.AST) -> None:
-    return None
+    spec = importlib.util.spec_from_file_location("_schedule_table_for_model", ROOT / "cdk" / "stacks" / "schedule_table.py")
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def extract_lambdas() -> dict[str, dict]:
     lambdas: dict[str, dict] = {}
     for path in sorted((ROOT / "cdk" / "stacks").glob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
-        consts = _module_str_consts(tree)
-        var_to_lambda: dict[str, str] = {}
-        rule_schedules: dict[str, dict] = {}
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
@@ -184,13 +158,6 @@ def extract_lambdas() -> dict[str, dict]:
                 v = kwargs.get(key)
                 if isinstance(v, ast.Constant) and isinstance(v.value, int):
                     record[field] = v.value
-            sched = kwargs.get("schedule")
-            if sched is not None:
-                entry = _schedule_of(sched, consts)
-                tz = kwargs.get("schedule_timezone")  # #4284: a zoned (EventBridge Scheduler) schedule
-                if isinstance(tz, ast.Constant) and isinstance(tz.value, str) and entry:
-                    entry["tz"] = tz.value
-                record["schedules"].append(entry)
             an = kwargs.get("alarm_name")
             if isinstance(an, ast.Constant) and isinstance(an.value, str):
                 record["declared_alarm"] = an.value
@@ -199,33 +166,23 @@ def extract_lambdas() -> dict[str, dict]:
                 lambdas[name]["duplicate_declaration"] = True
             else:
                 lambdas[name] = record
-        # Secondary schedules: standalone events.Rule(..., schedule=X) wired via
-        # rule.add_target(targets.LambdaFunction(fn_var)) — the whoop recovery-
-        # refresh idiom. Trace both variables through module-level assignments.
-        for node in ast.walk(tree):
-            if not (isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)):
-                continue
-            call = node.value
-            if not isinstance(call, ast.Call):
-                continue
-            kwargs = {kw.arg: kw.value for kw in call.keywords if kw.arg}
-            fn_node = kwargs.get("function_name")
-            if isinstance(fn_node, ast.Constant) and isinstance(fn_node.value, str):
-                var_to_lambda[node.targets[0].id] = fn_node.value
-            func = call.func
-            is_rule = (isinstance(func, ast.Attribute) and func.attr == "Rule") or (isinstance(func, ast.Name) and func.id == "Rule")
-            if is_rule and "schedule" in kwargs:
-                rule_schedules[node.targets[0].id] = _schedule_of(kwargs["schedule"], consts)
-        for node in ast.walk(tree):
-            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "add_target"):
-                continue
-            if not (isinstance(node.func.value, ast.Name) and node.func.value.id in rule_schedules):
-                continue
-            for arg in node.args:
-                if isinstance(arg, ast.Call) and arg.args and isinstance(arg.args[0], ast.Name):
-                    target_lambda = var_to_lambda.get(arg.args[0].id)
-                    if target_lambda and target_lambda in lambdas:
-                        lambdas[target_lambda]["schedules"].append(rule_schedules[node.func.value.id])
+    # #4284: the schedules come from THE schedule table, not from the stack source — no stack
+    # carries a cron literal any more. A row naming a function no stack builds is an orphan
+    # and fails the generation (it would otherwise be a schedule the model shows and AWS lacks).
+    stacks_text = "".join(p.read_text(encoding="utf-8") for p in sorted((ROOT / "cdk" / "stacks").glob("*.py")))
+    for key, row in sorted(_schedule_table().load().items()):
+        if row["function"] not in lambdas:
+            if f'"{row["function"]}"' not in stacks_text:
+                raise ValueError(f"config/schedules.json[{key!r}] names {row['function']!r}, which no cdk/stacks/*.py builds")
+            # Built under a module constant (mcp_stack's WARMER_FUNCTION_NAME) — outside the
+            # lambdas plane, exactly as before #4284; its rows stay out of the schedules plane too.
+            continue
+        entry = {"expr": row["expression"], "resolution": "table", "key": key}
+        if row.get("timezone"):
+            entry["tz"] = row["timezone"]
+        if row.get("enabled") is False:
+            entry["enabled"] = False
+        lambdas[row["function"]]["schedules"].append(entry)
     for record in lambdas.values():
         record["schedules"] = sorted(record["schedules"], key=lambda s: (s["expr"] or "", s["resolution"]))
     return lambdas

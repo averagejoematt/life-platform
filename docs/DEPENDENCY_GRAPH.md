@@ -15,87 +15,87 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 | Lambda | Stack | Schedule (UTC) | Resolution |
 |--------|-------|----------------|------------|
-| `activity-enrichment` | ingestion_stack | `cron(30 15 * * ? *)` | constant |
-| `acwr-compute` | compute_stack | `cron(55 16 * * ? *)` | constant |
-| `adaptive-mode-compute` | compute_stack | `cron(35 16 * * ? *)` | constant |
-| `ai-expert-analyzer` | compute_stack | `cron(0 14 ? * MON *)` | constant |
-| `ai-review-pack` | email_stack | `cron(0 18 ? * SUN *)` | constant |
-| `anomaly-detector` | compute_stack | `cron(5 15 * * ? *)` | constant |
-| `between-chronicle` | email_stack | `cron(0 17 ? * SUN *)` | constant |
-| `challenge-generator` | compute_stack | `cron(0 22 ? * SUN *)` | constant |
-| `character-sheet-compute` | compute_stack | `cron(30 16 * * ? *)` | constant |
-| `chronicle-approve` | email_stack | `cron(0 18 * * ? *)` | constant |
-| `chronicle-email-sender` | email_stack | `cron(10 15 ? * WED *)` | constant |
-| `circadian-compliance` | compute_stack | `cron(0 2 * * ? *)` | constant |
-| `coach-daily-reflection` | compute_stack | `cron(0 19 * * ? *)` | constant |
-| `coach-history-summarizer` | compute_stack | `cron(0 17 ? * SUN *)` | constant |
-| `coach-memoir` | compute_stack | `cron(0 15 1 1,4,7,10 ? *)` | constant |
-| `coach-nudge` | email_stack | `cron(10 0-5,15-23 * * ? *)` | constant |
-| `coach-panel-podcast` | email_stack | `cron(0 18 * * MON,WED *)` | constructed |
-| `coach-prediction-evaluator` | compute_stack | `cron(0 16 * * ? *)` | constant |
-| `coach-vision` | compute_stack | `cron(0 17 ? * MON *)` | constant |
-| `daily-brief` | email_stack | `cron(0 10 * * ? *)` (America/Los_Angeles, not UTC) | constant |
-| `daily-debrief` | email_stack | `cron(0 19 * * ? *)` | constant |
-| `daily-insight-compute` | compute_stack | `cron(45 16 * * ? *)` | constant |
-| `daily-metrics-compute` | compute_stack | `cron(40 16 * * ? *)` | constant |
-| `dashboard-refresh` | compute_stack | `cron(0 1 * * ? *)` + `cron(0 21 * * ? *)` | constant, constant |
-| `dropbox-poll` | ingestion_stack | `rate(2 hours)` | constant |
-| `eightsleep-data-ingestion` | ingestion_stack | `cron(15 14,16,18,20 * * ? *)` | resolved |
-| `episode-detect` | compute_stack | `cron(0 17 ? * SUN *)` | constant |
-| `evening-nudge` | email_stack | `cron(0 3 * * ? *)` | constant |
-| `failure-pattern-compute` | compute_stack | `cron(50 17 ? * SUN *)` | constant |
-| `field-notes-generate` | compute_stack | `cron(0 18 ? * SUN *)` | constant |
-| `forecast-engine` | compute_stack | `cron(50 16 * * ? *)` | constant |
-| `habit-skip-review` | email_stack | `cron(0 16 ? * SAT *)` | constant |
-| `habitify-data-ingestion` | ingestion_stack | `cron(5 * * * ? *)` | resolved |
-| `hevy-backfill` | ingestion_stack | `cron(0 * * * ? *)` + `cron(30 18 * * ? *)` + `cron(40 13 * * ? *)` | constant, constructed, constructed |
-| `hevy-restamp` | operational_stack | `cron(0 18 * * ? *)` | constant |
-| `hevy-routine-cron` | operational_stack | `cron(30 13 ? * SUN *)` | constant |
-| `hypothesis-engine` | compute_stack | `cron(0 19 ? * SUN *)` | constant |
-| `inter-coach-dialogue` | compute_stack | `cron(0 18 ? * SUN *)` | constant |
-| `journal-analyzer` | compute_stack | `cron(0 10 * * ? *)` | constant |
-| `journal-enrichment` | ingestion_stack | `cron(30 14 * * ? *)` | constant |
-| `life-platform-ai-quality-canary` | operational_stack | `cron(20 16 ? * MON,WED,FRI *)` | constant |
-| `life-platform-alert-digest` | operational_stack | `cron(0 15 * * ? *)` | constant |
-| `life-platform-canary` | operational_stack | `rate(4 hours)` | constant |
-| `life-platform-coherence-sentinel` | operational_stack | `cron(45 18 ? * * *)` | constant |
-| `life-platform-cost-governor` | operational_stack | `cron(0 0/8 * * ? *)` | constant |
-| `life-platform-data-reconciliation` | operational_stack | `cron(30 7 ? * MON *)` | constant |
-| `life-platform-delete-user-data` | operational_stack | `cron(0 8 ? * MON *)` | constant |
-| `life-platform-dlq-consumer` | operational_stack | `rate(6 hours)` | constant |
-| `life-platform-freshness-checker` | operational_stack | `cron(45 16 * * ? *)` | constant |
-| `life-platform-permanence` | operational_stack | `cron(0 6 * * ? *)` | constant |
-| `life-platform-pip-audit` | operational_stack | `cron(0 15 ? * MON *)` | constant |
-| `life-platform-qa-smoke` | operational_stack | `cron(30 18 ? * * *)` | constant |
-| `life-platform-traffic-digest` | operational_stack | `cron(0 16 ? * MON *)` | constant |
-| `milestone-digest` | email_stack | `cron(15 17 * * ? *)` | constant |
-| `monday-compass` | email_stack | `cron(0 15 ? * MON *)` | constant |
-| `monthly-digest` | email_stack | `cron(0 16 ? * 1#1 *)` | constant |
-| `notion-journal-ingestion` | ingestion_stack | `cron(0 14,21,3 * * ? *)` | resolved |
-| `nutrition-review` | email_stack | `cron(0 17 ? * SAT *)` | constant |
-| `og-image-generator` | operational_stack | `cron(30 19 * * ? *)` | constant |
-| `partner-weekly-email` | email_stack | `cron(30 17 ? * 1 *)` | constant |
-| `personal-baselines-compute` | compute_stack | `cron(0 8 1 * ? *)` | constant |
-| `pipeline-health-check` | operational_stack | `cron(10 17 * * ? *)` + `cron(30 2,6,14,18,22 * * ? *)` + `cron(58 16 * * ? *)` | constructed, constant, constructed |
-| `reading-recall-sweep` | operational_stack | `cron(0 16 * * ? *)` | constant |
-| `recap-card-generator` | operational_stack | `cron(30 19 * * ? *)` | constant |
-| `scenario-explorer` | compute_stack | `cron(10 12 * * ? *)` | constant |
-| `site-stats-refresh` | operational_stack | `cron(0 * * * ? *)` | constructed |
-| `social-enrichment` | ingestion_stack | `cron(45 14 * * ? *)` | constant |
-| `state-of-matthew` | compute_stack | `cron(30 19 ? * SUN *)` | constant |
-| `strava-data-ingestion` | ingestion_stack | `cron(10 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` + `cron(20 17 * * ? *)` | resolved, constructed |
-| `subscriber-onboarding` | email_stack | `cron(5 17 * * ? *)` | constant |
-| `telegram-coach-worker` | serve_stack | `cron(0 16 * * ? *)` + `cron(15 17 ? * MON-FRI *)` | constant, constant |
-| `todoist-data-ingestion` | ingestion_stack | `cron(0 14 * * ? *)` | constant |
-| `voice-fidelity-harness` | compute_stack | `cron(0 15 1 * ? *)` | constant |
-| `weather-data-ingestion` | ingestion_stack | `cron(0 14,2 * * ? *)` | constant |
-| `wednesday-chronicle` | email_stack | `cron(0 1 * * WED *)` + `cron(0 15 ? * WED *)` + `cron(0 16 * * MON *)` | constructed, constant, constructed |
-| `weekly-correlation-compute` | compute_stack | `cron(30 18 ? * SUN *)` | constant |
-| `weekly-digest` | email_stack | `cron(0 16 ? * SUN *)` | constant |
-| `weekly-plate` | email_stack | `cron(0 2 ? * SAT *)` | constant |
-| `weekly-signal` | email_stack | `cron(30 16 ? * SUN *)` | constant |
-| `whoop-data-ingestion` | ingestion_stack | `cron(0 0,4,12,16,20 * * ? *)` + `cron(20 18 * * ? *)` + `cron(30 17 * * ? *)` | resolved, constructed, constant |
-| `withings-data-ingestion` | ingestion_stack | `cron(5 14,17,21,0 * * ? *)` | resolved |
+| `activity-enrichment` | ingestion_stack | `cron(30 15 * * ? *)` | table |
+| `acwr-compute` | compute_stack | `cron(55 16 * * ? *)` | table |
+| `adaptive-mode-compute` | compute_stack | `cron(35 16 * * ? *)` | table |
+| `ai-expert-analyzer` | compute_stack | `cron(0 14 ? * MON *)` | table |
+| `ai-review-pack` | email_stack | `cron(0 18 ? * SUN *)` | table |
+| `anomaly-detector` | compute_stack | `cron(5 15 * * ? *)` | table |
+| `between-chronicle` | email_stack | `cron(0 17 ? * SUN *)` | table |
+| `challenge-generator` | compute_stack | `cron(0 22 ? * SUN *)` | table |
+| `character-sheet-compute` | compute_stack | `cron(30 16 * * ? *)` | table |
+| `chronicle-approve` | email_stack | `cron(0 18 * * ? *)` | table |
+| `chronicle-email-sender` | email_stack | `cron(10 15 ? * WED *)` | table |
+| `circadian-compliance` | compute_stack | `cron(0 2 * * ? *)` | table |
+| `coach-daily-reflection` | compute_stack | `cron(0 19 * * ? *)` | table |
+| `coach-history-summarizer` | compute_stack | `cron(0 17 ? * SUN *)` | table |
+| `coach-memoir` | compute_stack | `cron(0 15 1 1,4,7,10 ? *)` | table |
+| `coach-nudge` | email_stack | `cron(10 0-5,15-23 * * ? *)` | table |
+| `coach-panel-podcast` | email_stack | `cron(0 18 ? * MON,WED *)` | table |
+| `coach-prediction-evaluator` | compute_stack | `cron(0 16 * * ? *)` | table |
+| `coach-vision` | compute_stack | `cron(0 17 ? * MON *)` | table |
+| `daily-brief` | email_stack | `cron(0 10 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `daily-debrief` | email_stack | `cron(0 19 * * ? *)` | table |
+| `daily-insight-compute` | compute_stack | `cron(45 16 * * ? *)` | table |
+| `daily-metrics-compute` | compute_stack | `cron(0 0 * * ? *)` + `cron(40 16 * * ? *)` | table, table |
+| `dashboard-refresh` | compute_stack | `cron(0 1 * * ? *)` + `cron(0 21 * * ? *)` | table, table |
+| `dropbox-poll` | ingestion_stack | `rate(2 hours)` | table |
+| `eightsleep-data-ingestion` | ingestion_stack | `cron(15 14,16,18,20 * * ? *)` | table |
+| `episode-detect` | compute_stack | `cron(0 17 ? * SUN *)` | table |
+| `evening-nudge` | email_stack | `cron(0 3 * * ? *)` | table |
+| `failure-pattern-compute` | compute_stack | `cron(50 17 ? * SUN *)` | table |
+| `field-notes-generate` | compute_stack | `cron(0 18 ? * SUN *)` | table |
+| `forecast-engine` | compute_stack | `cron(50 16 * * ? *)` | table |
+| `habit-skip-review` | email_stack | `cron(0 16 ? * SAT *)` | table |
+| `habitify-data-ingestion` | ingestion_stack | `cron(5 * * * ? *)` | table |
+| `hevy-backfill` | ingestion_stack | `cron(0 * * * ? *)` + `cron(30 18 * * ? *)` + `cron(40 13 * * ? *)` | table, table, table |
+| `hevy-restamp` | operational_stack | `cron(0 18 * * ? *)` | table |
+| `hevy-routine-cron` | operational_stack | `cron(30 13 ? * SUN *)` | table |
+| `hypothesis-engine` | compute_stack | `cron(0 19 ? * SUN *)` | table |
+| `inter-coach-dialogue` | compute_stack | `cron(0 18 ? * SUN *)` | table |
+| `journal-analyzer` | compute_stack | `cron(0 10 * * ? *)` | table |
+| `journal-enrichment` | ingestion_stack | `cron(30 14 * * ? *)` | table |
+| `life-platform-ai-quality-canary` | operational_stack | `cron(20 16 ? * MON,WED,FRI *)` | table |
+| `life-platform-alert-digest` | operational_stack | `cron(0 15 * * ? *)` | table |
+| `life-platform-canary` | operational_stack | `rate(4 hours)` | table |
+| `life-platform-coherence-sentinel` | operational_stack | `cron(45 18 ? * * *)` | table |
+| `life-platform-cost-governor` | operational_stack | `cron(0 0/8 * * ? *)` | table |
+| `life-platform-data-reconciliation` | operational_stack | `cron(30 7 ? * MON *)` | table |
+| `life-platform-delete-user-data` | operational_stack | `cron(0 8 ? * MON *)` | table |
+| `life-platform-dlq-consumer` | operational_stack | `rate(6 hours)` | table |
+| `life-platform-freshness-checker` | operational_stack | `cron(45 16 * * ? *)` | table |
+| `life-platform-permanence` | operational_stack | `cron(0 6 * * ? *)` | table |
+| `life-platform-pip-audit` | operational_stack | `cron(0 15 ? * MON *)` | table |
+| `life-platform-qa-smoke` | operational_stack | `cron(30 18 ? * * *)` | table |
+| `life-platform-traffic-digest` | operational_stack | `cron(0 16 ? * MON *)` | table |
+| `milestone-digest` | email_stack | `cron(15 17 * * ? *)` | table |
+| `monday-compass` | email_stack | `cron(0 15 ? * MON *)` | table |
+| `monthly-digest` | email_stack | `cron(0 16 ? * 1#1 *)` | table |
+| `notion-journal-ingestion` | ingestion_stack | `cron(0 14,21,3 * * ? *)` | table |
+| `nutrition-review` | email_stack | `cron(0 17 ? * SAT *)` | table |
+| `og-image-generator` | operational_stack | `cron(30 19 * * ? *)` | table |
+| `partner-weekly-email` | email_stack | `cron(30 17 ? * 1 *)` | table |
+| `personal-baselines-compute` | compute_stack | `cron(0 8 1 * ? *)` | table |
+| `pipeline-health-check` | operational_stack | `cron(10 17 * * ? *)` + `cron(30 2,6,14,18,22 * * ? *)` + `cron(58 16 * * ? *)` | table, table, table |
+| `reading-recall-sweep` | operational_stack | `cron(0 16 * * ? *)` | table |
+| `recap-card-generator` | operational_stack | `cron(30 19 * * ? *)` | table |
+| `scenario-explorer` | compute_stack | `cron(10 12 * * ? *)` | table |
+| `site-stats-refresh` | operational_stack | `cron(0 15 * * ? *)` + `cron(0 19 * * ? *)` + `cron(0 23 * * ? *)` + `cron(0 3 * * ? *)` | table, table, table, table |
+| `social-enrichment` | ingestion_stack | `cron(45 14 * * ? *)` | table |
+| `state-of-matthew` | compute_stack | `cron(30 19 ? * SUN *)` | table |
+| `strava-data-ingestion` | ingestion_stack | `cron(10 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` + `cron(20 17 * * ? *)` | table, table |
+| `subscriber-onboarding` | email_stack | `cron(5 17 * * ? *)` | table |
+| `telegram-coach-worker` | serve_stack | `cron(0 16 * * ? *)` + `cron(15 17 ? * MON-FRI *)` | table, table |
+| `todoist-data-ingestion` | ingestion_stack | `cron(0 14 * * ? *)` | table |
+| `voice-fidelity-harness` | compute_stack | `cron(0 15 1 * ? *)` | table |
+| `weather-data-ingestion` | ingestion_stack | `cron(0 14,2 * * ? *)` | table |
+| `wednesday-chronicle` | email_stack | `cron(0 1 ? * WED *)` + `cron(0 15 ? * WED *)` + `cron(0 16 ? * MON *)` | table, table, table |
+| `weekly-correlation-compute` | compute_stack | `cron(30 18 ? * SUN *)` | table |
+| `weekly-digest` | email_stack | `cron(0 16 ? * SUN *)` | table |
+| `weekly-plate` | email_stack | `cron(0 2 ? * SAT *)` | table |
+| `weekly-signal` | email_stack | `cron(30 16 ? * SUN *)` | table |
+| `whoop-data-ingestion` | ingestion_stack | `cron(0 0,4,12,16,20 * * ? *)` + `cron(20 18 * * ? *)` + `cron(30 17 * * ? *)` | table, table, table |
+| `withings-data-ingestion` | ingestion_stack | `cron(5 14,17,21,0 * * ? *)` | table |
 
 **Unscheduled lambdas (27)** — webhook/S3-trigger/invoked-on-demand: `bluesky-social-ingestion`, `chronicle-podcast`, `coach-computation-engine`, `coach-ensemble-digest`, `coach-narrative-orchestrator`, `coach-observatory-renderer`, `coach-quality-gate`, `coach-state-updater`, `elena-state-updater`, `email-subscriber`, `food-delivery-ingestion`, `health-auto-export-webhook`, `inbound-auth-gate`, `insight-email-parser`, `life-platform-data-export`, `life-platform-key-rotator`, `life-platform-og-image`, `life-platform-remediation-dispatcher`, `life-platform-site-api`, `life-platform-site-api-ai`, `macrofactor-data-ingestion`, `mastodon-social-ingestion`, `measurements-ingestion`, `progress-viewer`, `reading-cover-pipeline`, `telegram-webhook`, `youtube-social-ingestion`
 
@@ -548,7 +548,7 @@ Field-level rulings (only non-default fields are declared):
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (108 lambdas total)
 - Alarms: 139 literal-named declarations across three idioms, 4 composite; routing digest 95 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 18 owner-only + 3 owner-published sources; 53 owner-only + 11 owner-published fields — non-default entries only
-- Schedules: 92 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
+- Schedules: 96 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
 
@@ -565,7 +565,7 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 | ai_features | 25 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
 | alarms | 139 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 33 | `deploy/emf_namespace_ledger.py::LEDGER` |
-| schedules | 92 | this model's schedules plane (CDK AST) |
+| schedules | 96 | this model's schedules plane (CDK AST) |
 | secrets | 30 | `tests/test_secret_references.py::KNOWN_SECRETS` |
 
 Scope cut (#3447 leg d, the alarms scope-cut pattern applied to secrets): `secrets` counts CODE REFERENCES (KNOWN_SECRETS, scanned lambdas/+mcp/ source only), never the live billable Secrets Manager estate — the two have already drifted (28 registry vs 26 live, 2026-09-02); a secret referenced only from `deploy/` (e.g. `life-platform/github-billing`, live+billed) is invisible to this count. `scripts/monthly_close.py` emits a read-only registry-vs-estate reconciliation at close.

@@ -33,10 +33,11 @@ import ast
 import copy
 import json
 import os
-import re
 import sys
 import types
 from decimal import Decimal
+
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
@@ -518,12 +519,12 @@ def test_habitify_is_scheduled_every_hour_including_the_pacific_evening():
     is 23:00-04:00 PT — exactly when the owner ticks evening pills and breathwork, so a
     23:30 PT tick sat unread until 05:05 PT. Habitify opts out of the window.
     """
-    src = open(os.path.join(ROOT, "cdk", "stacks", "ingestion_stack.py"), encoding="utf-8").read()
-    assert re.search(r'^HABITIFY_HOURLY = "\*"', src, re.M), "HABITIFY_HOURLY must cover all 24 hours"
-    block = src[src.index('function_name="habitify-data-ingestion"') :][:900]
-    assert "cron(5 {HABITIFY_HOURLY} * * ? *)" in block, "habitify must not be back on INGEST_HOURLY"
-    ingest_hourly = re.search(r'^INGEST_HOURLY = "([\d,]+)"', src, re.M).group(1)
-    assert not {"6", "7", "8", "9", "10", "11"} & set(ingest_hourly.split(",")), "INGEST_HOURLY grew the hole shut — retire HABITIFY_HOURLY"
+    # #4284: both cadences are config/schedules.json rows.
+    assert schedule_rows.expr("habitify-data-ingestion") == "cron(5 * * * ? *)", "habitify must run all 24 hours"
+    ingest_hourly = schedule_rows.expr("strava-data-ingestion")[len("cron(") : -1].split()[1]
+    assert not {"6", "7", "8", "9", "10", "11"} & set(
+        ingest_hourly.split(",")
+    ), "the hourly window grew the hole shut — habitify's opt-out is moot"
 
 
 def test_logs_window_spans_the_whole_ingest_lookback():

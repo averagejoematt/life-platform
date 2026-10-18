@@ -23,6 +23,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
 
 os.environ.setdefault("S3_BUCKET", "test-bucket")
 os.environ.setdefault("USER_ID", "matthew")
@@ -138,7 +139,8 @@ def test_cdk_rule_and_deadman_match_the_job_declaration():
     rules = [c for c in _calls(tree, "Rule") if c.args[1:] and _literal(c.args[1]) == "NightlyPredraft"]
     assert len(rules) == 1, "exactly one NightlyPredraft rule in mcp_stack.py"
     sched = _kw(rules[0], "schedule")
-    assert _literal(sched.args[0]) == npd.JOB["schedule_utc"]
+    # #4284: the rule reads its expression from config/schedules.json by key.
+    assert schedule_rows.expr(_literal(sched.args[0])) == npd.JOB["schedule_utc"]
     assert _kw(rules[0], "enabled") is None, "the rule must ship enabled — a disabled rule is not a schedule"
 
     inputs = [c for c in _calls(tree, "from_object") if _literal(c.args[0]) == npd.JOB["event"]]

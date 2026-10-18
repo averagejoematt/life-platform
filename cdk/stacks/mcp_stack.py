@@ -31,7 +31,7 @@ from aws_cdk import (
 
 from stacks import role_policies as rp
 from stacks.constants import TABLE_NAME  # CONF-01 / #936: one source for the table name (DR cutover)
-from stacks.lambda_helpers import create_platform_lambda
+from stacks.lambda_helpers import create_platform_lambda, table_schedule
 
 REGION = "us-west-2"
 ACCT = "205930651321"
@@ -133,7 +133,7 @@ class McpStack(Stack):
             source_file="mcp_server.py",
             handler="mcp_server.lambda_handler",
             code=mcp_code,
-            schedule="cron(10 17 * * ? *)",  # 10:10 AM PT daily (staggered from daily-brief)
+            # schedule: config/schedules.json (#4284) — 10:10 AM PT daily (staggered from daily-brief)
             timeout_seconds=300,
             memory_mb=768,  # R5: matched to MCP server power-tuned value
             alarm_name="mcp-warmer-error",
@@ -246,7 +246,7 @@ class McpStack(Stack):
         predraft_rule = events.Rule(
             self,
             "NightlyPredraft",
-            schedule=events.Schedule.expression("cron(0 2 * * ? *)"),
+            schedule=table_schedule("life-platform-mcp-warmer#NightlyPredraft"),
             description="#4084: draft + red-team tomorrow's session (never commits to Hevy)",
         )
         predraft_rule.add_target(targets.LambdaFunction(warmer, event=events.RuleTargetInput.from_object({"job": "nightly_predraft"})))

@@ -11,6 +11,8 @@ import json
 import os
 import sys
 
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
+
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("AWS_REGION", "us-west-2")
 
@@ -119,7 +121,7 @@ def test_dry_run_builds_without_sending(monkeypatch):
 def test_cdk_wiring_exists():
     stack = open(os.path.join(_REPO, "cdk/stacks/email_stack.py")).read()
     assert 'function_name="between-chronicle"' in stack
-    assert "cron(0 17 ? * SUN *)" in stack
+    assert schedule_rows.expr("between-chronicle") == "cron(0 17 ? * SUN *)"  # #4284: the table row
     # #2604: role_policies.py is a facade over role_policies_*.py siblings — read the family.
     policies = "".join(open(p).read() for p in sorted(glob.glob(os.path.join(_REPO, "cdk/stacks/role_policies*.py"))))
     assert "def email_between_chronicle" in policies

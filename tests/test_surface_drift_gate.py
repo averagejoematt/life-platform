@@ -221,15 +221,16 @@ def test_the_leg_now_sees_the_whole_live_estate():
     assert stacks, "no CDK stacks found — this test has gone blind"
 
     total = 0
-    string_form = 0
-    for path in stacks:
+    table_form = 0
+    # #4284: the schedules live in config/schedules.json; the leg reads it as one more "stack".
+    for path in stacks + [os.path.join(_REPO, "config", "schedules.json")]:
         with open(path, encoding="utf-8") as f:
             sigs = g.schedule_signatures(f.read())
         total += sum(sigs.values())
-        string_form += sum(n for sig, n in sigs.items() if sig.startswith('schedule="'))
+        table_form += sum(n for sig, n in sigs.items() if sig.startswith("table:"))
 
-    assert total >= 80, f"the CRON leg sees only {total} schedule declarations across {len(stacks)} stacks"
-    assert string_form >= 60, f"only {string_form} string-form schedules visible — the #3781 leg has regressed"
+    assert total >= 80, f"the CRON leg sees only {total} schedule declarations across {len(stacks)} stacks + the table"
+    assert table_form >= 60, f"only {table_form} schedule-table rows visible — the #4284 leg has regressed"
 
 
 def test_a_new_string_form_cron_with_no_monitoring_BLOCKS(monkeypatch):

@@ -14,6 +14,7 @@ integration test runs the real script against the real repo HEAD to confirm
 the gate is actually clean (the state this PR is required to leave main in).
 """
 
+import json
 import os
 import subprocess
 import sys
@@ -463,31 +464,24 @@ def test_hypothesis_cadence_from_real_cdk():
     assert _re.fullmatch(r"(Sun|Mon|Tue|Wed|Thu|Fri|Sat) \d{2}:\d{2} UTC", cadence)
 
 
+def _write_schedule_table(root, expression):
+    """A scratch config/schedules.json carrying only hypothesis-engine's row (#4284)."""
+    (root / "config").mkdir(parents=True)
+    (root / "config" / "schedules.json").write_text(
+        json.dumps({"schedules": {"hypothesis-engine": {"function": "hypothesis-engine", "expression": expression}}}), encoding="utf-8"
+    )
+
+
 def test_hypothesis_cadence_renders_weekly_cron(tmp_path, monkeypatch):
     """cron(30 7 ? * MON *) → 'Mon 07:30 UTC' (zero-padded, day title-cased)."""
-    stacks = tmp_path / "cdk" / "stacks"
-    stacks.mkdir(parents=True)
-    (stacks / "compute_stack.py").write_text(
-        "create_platform_lambda(\n"
-        "    self,\n"
-        '    "HypothesisEngine",\n'
-        '    function_name="hypothesis-engine",\n'
-        '    schedule="cron(30 7 ? * MON *)",\n'
-        ")\n",
-        encoding="utf-8",
-    )
+    _write_schedule_table(tmp_path, "cron(30 7 ? * MON *)")
     monkeypatch.setattr(sync, "ROOT", tmp_path)
     assert sync._auto_discover_hypothesis_cadence() == "Mon 07:30 UTC"
 
 
 def test_hypothesis_cadence_none_when_not_weekly(tmp_path, monkeypatch):
     """A daily cron no longer fits the 'runs weekly (…)' sentence — fall back, don't guess."""
-    stacks = tmp_path / "cdk" / "stacks"
-    stacks.mkdir(parents=True)
-    (stacks / "compute_stack.py").write_text(
-        'create_platform_lambda(self, "HypothesisEngine", function_name="hypothesis-engine", schedule="cron(0 19 * * ? *)")\n',
-        encoding="utf-8",
-    )
+    _write_schedule_table(tmp_path, "cron(0 19 * * ? *)")
     monkeypatch.setattr(sync, "ROOT", tmp_path)
     assert sync._auto_discover_hypothesis_cadence() is None
 

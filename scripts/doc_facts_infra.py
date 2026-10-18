@@ -268,6 +268,7 @@ def cdk_constructs() -> tuple[dict, dict, list[str]]:
     warmer is exactly one of the scheduled, DLQ-less functions this rule must not miss.
     """
     gen = _load_model_gen()
+    table_rows = gen._schedule_table().load()  # #4284: the factory's schedule is its table row
     records: dict[str, dict] = {}
     var_to_name: dict[str, str] = {}
     unresolved: list[str] = []
@@ -285,10 +286,10 @@ def cdk_constructs() -> tuple[dict, dict, list[str]]:
             name = gen._resolve_str(kwargs["function_name"], consts) if "function_name" in kwargs else None
             if not name:
                 continue
-            dlq, sched = kwargs.get("dlq"), kwargs.get("schedule")
+            dlq = kwargs.get("dlq")
             records[name] = {
                 "dlq": dlq is not None and not (isinstance(dlq, ast.Constant) and dlq.value is None),
-                "scheduled": sched is not None and not (isinstance(sched, ast.Constant) and sched.value is None),
+                "scheduled": name in table_rows,
             }
             if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name):
                 var_to_name[f"{path.name}::{node.targets[0].id}"] = name
