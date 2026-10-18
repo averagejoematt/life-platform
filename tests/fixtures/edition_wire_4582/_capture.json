@@ -1,5 +1,5 @@
 {
- "captured_at": "2026-10-13T01:38:57Z",
+ "captured_at": "2026-10-17T23:33:25Z",
  "base": "https://averagejoematt.com",
  "by": "scripts/capture_kit_page_fixtures.py (#4864) \u2014 the same pass as kit_pages_4586; read-only GETs; re-run it, never hand-edit a file",
  "files": {
@@ -14,7 +14,7 @@
   "habits": "/api/habit_streaks",
   "journal": "/journal/posts.json",
   "journey": "/api/journey",
-  "moves": "/api/coach_moves?date=<each of the seven days ending 2026-10-12>",
+  "moves": "/api/coach_moves?date=<each of the seven days ending 2026-10-17>",
   "nutrition": "/api/nutrition_overview",
   "owner_words": "/api/owner_words",
   "panelcast": "/panelcast/episodes.json",

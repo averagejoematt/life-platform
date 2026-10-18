@@ -58,6 +58,33 @@ METRIC_WORDS = {
     "body_fat_pct": "body-fat percentage",
 }
 
+#: The unit each METRIC_WORDS measure is read in, for a number printed beside its words (a bet's
+#: line: "26% or higher", red team 2026-10-17 — "26 or higher" beside a coach's "27.6%"). A score
+#: out of 100 says so. One entry per METRIC_WORDS key (tests/test_bet_question_unit_4586.py).
+METRIC_UNITS = {
+    "hrv": " ms",
+    "recovery_score": " out of 100",
+    "resting_heart_rate": " bpm",
+    "sleep_duration_hours": " hours",
+    "sleep_score": " out of 100",
+    "deep_pct": "%",
+    "rem_pct": "%",
+    "weight_lbs": " lb",
+    "total_calories_kcal": " kcal",
+    "total_protein_g": " g",
+    "steps": " steps",
+    "blood_glucose_avg": " mg/dL",
+    "blood_glucose_std_dev": " mg/dL",
+    "body_fat_pct": "%",
+}
+
+
+def metric_unit(metric: Any) -> str | None:
+    """'deep_pct_7day_avg' -> '%'; None when the measure has no registered unit."""
+    key = str(metric or "").strip()
+    return METRIC_UNITS.get(base_metric(key)) if key else None
+
+
 _SUFFIX_WORDS = {"_7day_avg": "7-day average", "_14day_avg": "14-day average", "_30day_avg": "30-day average"}
 _DIRECTIONS = {"up": "up", "down": "down"}
 _NO_VERDICT = ("inconclusive", "expired")

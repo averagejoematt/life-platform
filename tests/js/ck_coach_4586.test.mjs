@@ -13,7 +13,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const C = await import("../../site/assets/js/ck_coach.js");
-const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit_pages_4586");
+// #4586 round 2: these tests pin the coach pages to the 2026-10-13 capture they were written against
+// (copied verbatim into kit_pages_4586_pinned when kit_pages_4586 was recaptured on 2026-10-17); the
+// kit gate renders the coach pages from the live recapture.
+const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit_pages_4586_pinned");
 const load = (name) => JSON.parse(readFileSync(join(FIX, `${name}.json`), "utf8"));
 const [SLEEP, PHYSICAL, GLUCOSE, LEAD, MIND] = ["sleep_coach", "physical_coach", "glucose_coach", "eli_marsh", "mind_coach"].map((id) => load(`coach_${id}`));
 const DOCKET = load("coach_docket_full");
@@ -241,9 +244,12 @@ test("the record is a count beside the comparison, never a percentage and never 
   assert.ok(tr.comparison.sentence.trim().length > 20 && tr.comparison.sentence.endsWith("."));
   const named = (p) => p.report_card.track_record.comparison.sentence.replace(/^Across (\d+) checked calls\b/, (all, k) => (Number(k) === p.report_card.track_record.record.n ? `Across ${p.name}’s ${k} checked calls` : all));
   assert.ok(html.includes(named(SLEEP).replace(/&/g, "&amp;")), "the served comparison is printed");
-  assert.match(html, /The simple guess is that nothing changes from the last reading\./);
+  assert.match(html, /(The simple guess is that nothing changes from the last reading\.|a guess that nothing changes)/);
   assert.match(html, /Lisa Park’s calls alone through [A-Z][a-z]+ \d+\./);
-  assert.equal((html.match(/The simple guess is/g) || []).length, 1);
+  // The guess is named once: by the served comparison when it already says "a guess that nothing changes", else by the sentence.
+  const namedInline = /\bguess that nothing changes\b/i.test(named(SLEEP));
+  assert.equal((html.match(/The simple guess is/g) || []).length, namedInline ? 0 : 1);
+  assert.equal(C.withGuessNamed("They were right."), `They were right. ${C.SIMPLE_GUESS}`);
   assert.ok(C.recordHTML(PHYSICAL).includes(named(PHYSICAL).replace(/&/g, "&amp;")), "the served comparison is printed, never rewritten into another coach's count");
   const other = structuredClone(SLEEP);
   other.report_card.track_record.comparison.sentence = "Across 131 checked calls, so far they do not beat a simple guess.";

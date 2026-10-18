@@ -16,6 +16,7 @@ const CALL = await import("../../site/assets/js/ck_call.js");
 const COACH = await import("../../site/assets/js/ck_coach.js");
 const DEPTH = await import("../../site/assets/js/ck_depth.js");
 const PAGES = await import("../../site/assets/js/ck_pages.js");
+const V = await import("../../site/assets/js/ck_verdict.js");
 const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit_pages_4586");
 const load = (name) => JSON.parse(readFileSync(join(FIX, `${name}.json`), "utf8"));
 const BODY = load("calls");
@@ -36,7 +37,7 @@ test("each right and wrong card on a coach page opens that call's page, which re
   assert.deepEqual(hrefs(cards[1]), [`/next/v8/call/?id=${wrong.id}&from=coach%3Asleep_coach`]);
   assert.match(cards[0], /ck-verdicts__tag--right">Right · within [^<]+<\/span>/);
   assert.match(cards[1], /<span class="ck-verdicts__tag">Wrong · not within [^<]+<\/span>/);
-  assert.ok(cards[0].includes(right.called_short) && cards[1].includes(wrong.called_short), "each card says the call it opens");
+  assert.ok(cards[0].includes(V.matthewsCall(right.called_short)) && cards[1].includes(V.matthewsCall(wrong.called_short)), "each card says the call it opens");
   // Another coach's calls never stand in for this coach's.
   for (const h of hrefs(html)) assert.match(h, /id=sleep-/);
 });

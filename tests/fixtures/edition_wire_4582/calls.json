@@ -1,17 +1,236 @@
 {
  "_meta": {
-  "generated_at": "2026-10-13T01:38:47.463998+00:00",
-  "served_at": "2026-10-13T01:38:47.463998+00:00",
+  "generated_at": "2026-10-17T23:29:15.610080+00:00",
+  "served_at": "2026-10-17T23:29:15.610080+00:00",
   "cache_seconds": 300,
-  "request_id": "9a6b1e7674814957"
+  "request_id": "c035393679134049"
  },
  "state": "ok",
- "as_of": "2026-10-12",
+ "as_of": "2026-10-17",
  "source": "/api/calls",
  "absent_text": "No call has been checked against the data yet.",
- "today": "2026-10-12",
- "count": 59,
+ "today": "2026-10-17",
+ "count": 63,
  "calls": [
+  {
+   "id": "physical-20261015-fde7c6ed5f",
+   "kind": "number",
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "claim": "Weight will be around 304.5 pounds tomorrow morning",
+   "logged_date": "2026-10-15",
+   "sealed": false,
+   "settled_date": "2026-10-17",
+   "called": "Max Reyes called his weight at about 304.5 lb for October 16.",
+   "called_short": "Max Reyes called his weight at about 304.5 lb.",
+   "happened": "His weight came in at 304 lb against a call of 304.5 lb.",
+   "happened_short": "It came in at 304 lb.",
+   "actual": {
+    "value": 304.03,
+    "text": "304 lb"
+   },
+   "tolerance": {
+    "value": 3.9712,
+    "text": "4 lb",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 29
+   },
+   "verdict": "right",
+   "verdict_text": "Max Reyes was right.",
+   "simple_guess": {
+    "state": "scored",
+    "right": true,
+    "text": "The simple guess was that it would stay at 305.6 lb, the last reading before the call. That guess was also right.",
+    "short": "also right"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 13,
+     "n": 27,
+     "through": "2026-10-17",
+     "text": "Max Reyes: 13 of 27 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": true,
+      "sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+     }
+    }
+   ],
+   "title": "Max Reyes called his weight at about 304.5 lb: right"
+  },
+  {
+   "id": "labs-20261015-5a127046ef",
+   "kind": "number",
+   "coach_id": "labs",
+   "coach_name": "James Okafor",
+   "claim": "Recovery will be at 67.9% tomorrow with an 80% interval of 44.6\u201391.1%",
+   "logged_date": "2026-10-15",
+   "sealed": false,
+   "settled_date": "2026-10-16",
+   "called": "James Okafor called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 68 for October 16.",
+   "called_short": "James Okafor called his morning recovery score at about 68.",
+   "happened": "His morning recovery score came in at 70 against a call of 68.",
+   "happened_short": "It came in at 70.",
+   "actual": {
+    "value": 70.0,
+    "text": "70"
+   },
+   "tolerance": {
+    "value": 14.75,
+    "text": "14.8",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 31
+   },
+   "verdict": "right",
+   "verdict_text": "James Okafor was right.",
+   "simple_guess": {
+    "state": "scored",
+    "right": true,
+    "text": "The simple guess was that it would stay at 75, the last reading before the call. That guess was also right.",
+    "short": "also right"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 9,
+     "n": 12,
+     "through": "2026-10-17",
+     "text": "James Okafor: 9 of 12 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": true,
+      "sentence": "Number calls: on the 4 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 4 times \u2014 level, on too few calls to tell. Direction calls: on the 6 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+     }
+    }
+   ],
+   "title": "James Okafor called his morning recovery score at about 68: right"
+  },
+  {
+   "id": "explorer-20261015-1ec781f472",
+   "kind": "number",
+   "coach_id": "explorer",
+   "coach_name": "Henning Brandt",
+   "claim": "Recovery will be around 67.9% tomorrow morning, consistent with the declining trend rather than a reversal",
+   "logged_date": "2026-10-15",
+   "sealed": false,
+   "settled_date": "2026-10-16",
+   "called": "Henning Brandt called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 68 for October 16.",
+   "called_short": "Henning Brandt called his morning recovery score at about 68.",
+   "happened": "His morning recovery score came in at 70 against a call of 68.",
+   "happened_short": "It came in at 70.",
+   "actual": {
+    "value": 70.0,
+    "text": "70"
+   },
+   "tolerance": {
+    "value": 14.75,
+    "text": "14.8",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 31
+   },
+   "verdict": "right",
+   "verdict_text": "Henning Brandt was right.",
+   "simple_guess": {
+    "state": "scored",
+    "right": true,
+    "text": "The simple guess was that it would stay at 75, the last reading before the call. That guess was also right.",
+    "short": "also right"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 18,
+     "n": 35,
+     "through": "2026-10-17",
+     "text": "Henning Brandt: 18 of 35 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": true,
+      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 26 a guess could also be checked against, the coaches were right 12 times and a guess that nothing changes 3 times \u2014 the coaches did better. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+     }
+    }
+   ],
+   "title": "Henning Brandt called his morning recovery score at about 68: right"
+  },
+  {
+   "id": "bet-20261016-b76d3b26d3",
+   "kind": "bet",
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "claim": "27.6% deep sleep spike on Sept 22 (1.8 SD above baseline) is likely regression-to-mean noise without thermal anchor and subjective context; requires five consecutive same-direction observations to confirm signal",
+   "sides": [
+    {
+     "coach_id": "sleep",
+     "coach_name": "Lisa Park",
+     "claim": "27.6% deep sleep spike on Sept 22 (1.8 SD above baseline) is likely regression-to-mean noise without thermal anchor and subjective context; requires five consecutive same-direction observations to confirm signal",
+     "said": "no",
+     "right": true
+    },
+    {
+     "coach_id": "physical",
+     "coach_name": "Max Reyes",
+     "claim": "Deep sleep decline is occurring simultaneously with recovery climb; opposing vectors suggest internal depletion masked by external scores; deep sleep architecture is high-influence confounder",
+     "said": "yes",
+     "right": false
+    }
+   ],
+   "topic": "Deep sleep spike interpretation: signal vs. noise",
+   "logged_date": "2026-10-02",
+   "sealed": false,
+   "settled_date": "2026-10-16",
+   "called": "Lisa Park and Max Reyes bet on one question, fixed the day the bet opened: whether the 7-day average of his deep-sleep share (the part of the night spent in deep sleep, as a percentage) would be at or above 26 on October 16. Lisa Park said no; Max Reyes said yes.",
+   "called_short": "Lisa Park and Max Reyes bet on whether the 7-day average of his deep-sleep share would be at or above 26 on October 16.",
+   "happened": "It came in at 16.4.",
+   "happened_short": "It came in at 16.4.",
+   "actual": {
+    "value": 16.357142857142858,
+    "text": "16.4"
+   },
+   "verdict": "right",
+   "verdict_text": "Lisa Park was right; Max Reyes was wrong.",
+   "simple_guess": {
+    "state": "scored",
+    "right": true,
+    "text": "The simple guess was that the answer would be the same as on the day before the bet opened. That guess was also right.",
+    "short": "also right"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": true,
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+     }
+    },
+    {
+     "state": "ok",
+     "right": 13,
+     "n": 27,
+     "through": "2026-10-17",
+     "text": "Max Reyes: 13 of 27 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": true,
+      "sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+     }
+    }
+   ],
+   "title": "Lisa Park and Max Reyes bet on whether the 7-day average of his deep-sleep share would be at or above 26: Lisa Park was right"
+  },
   {
    "id": "bet-20261012-e44d5122d7",
    "kind": "bet",
@@ -57,28 +276,28 @@
    "records": [
     {
      "state": "ok",
-     "right": 7,
-     "n": 19,
-     "through": "2026-10-12",
-     "text": "Nathan Reeves: 7 of 19 checked calls right.",
+     "right": 8,
+     "n": 20,
+     "through": "2026-10-14",
+     "text": "Nathan Reeves: 8 of 20 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 7 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     },
     {
      "state": "ok",
      "right": 8,
-     "n": 30,
-     "through": "2026-10-12",
-     "text": "Marcus Webb: 8 of 30 checked calls right.",
+     "n": 36,
+     "through": "2026-10-14",
+     "text": "Marcus Webb: 8 of 36 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right once and a guess that nothing changes 6 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 21 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, but not by a clear margin. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right once and a guess that nothing changes 6 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 27 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 6 times \u2014 the guess was right more often, but not by a clear margin. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -119,15 +338,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -168,15 +387,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 11,
-     "n": 22,
-     "through": "2026-10-11",
-     "text": "Max Reyes: 11 of 22 checked calls right.",
+     "right": 13,
+     "n": 27,
+     "through": "2026-10-17",
+     "text": "Max Reyes: 13 of 27 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -217,15 +436,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 11,
-     "n": 22,
-     "through": "2026-10-11",
-     "text": "Max Reyes: 11 of 22 checked calls right.",
+     "right": 13,
+     "n": 27,
+     "through": "2026-10-17",
+     "text": "Max Reyes: 13 of 27 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -266,15 +485,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 11,
-     "n": 22,
-     "through": "2026-10-11",
-     "text": "Max Reyes: 11 of 22 checked calls right.",
+     "right": 13,
+     "n": 27,
+     "through": "2026-10-17",
+     "text": "Max Reyes: 13 of 27 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -315,15 +534,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 7,
-     "n": 8,
-     "through": "2026-10-11",
-     "text": "James Okafor: 7 of 8 checked calls right.",
+     "right": 9,
+     "n": 12,
+     "through": "2026-10-17",
+     "text": "James Okafor: 9 of 12 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 4 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 4 times \u2014 level, on too few calls to tell. Direction calls: on the 6 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -364,15 +583,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 7,
-     "n": 8,
-     "through": "2026-10-11",
-     "text": "James Okafor: 7 of 8 checked calls right.",
+     "right": 9,
+     "n": 12,
+     "through": "2026-10-17",
+     "text": "James Okafor: 9 of 12 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 4 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 4 times \u2014 level, on too few calls to tell. Direction calls: on the 6 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -413,15 +632,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 14,
-     "n": 28,
-     "through": "2026-10-11",
-     "text": "Henning Brandt: 14 of 28 checked calls right.",
+     "right": 18,
+     "n": 35,
+     "through": "2026-10-17",
+     "text": "Henning Brandt: 18 of 35 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 5 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 20 a guess could also be checked against, the coaches were right 9 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, but not by a clear margin. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 26 a guess could also be checked against, the coaches were right 12 times and a guess that nothing changes 3 times \u2014 the coaches did better. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -462,15 +681,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -511,15 +730,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -560,15 +779,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -609,15 +828,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -658,15 +877,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 11,
-     "n": 22,
-     "through": "2026-10-11",
-     "text": "Max Reyes: 11 of 22 checked calls right.",
+     "right": 13,
+     "n": 27,
+     "through": "2026-10-17",
+     "text": "Max Reyes: 13 of 27 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -707,15 +926,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 11,
-     "n": 22,
-     "through": "2026-10-11",
-     "text": "Max Reyes: 11 of 22 checked calls right.",
+     "right": 13,
+     "n": 27,
+     "through": "2026-10-17",
+     "text": "Max Reyes: 13 of 27 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -756,15 +975,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 7,
-     "n": 19,
-     "through": "2026-10-12",
-     "text": "Nathan Reeves: 7 of 19 checked calls right.",
+     "right": 8,
+     "n": 20,
+     "through": "2026-10-14",
+     "text": "Nathan Reeves: 8 of 20 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 7 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -805,15 +1024,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 14,
-     "n": 28,
-     "through": "2026-10-11",
-     "text": "Henning Brandt: 14 of 28 checked calls right.",
+     "right": 18,
+     "n": 35,
+     "through": "2026-10-17",
+     "text": "Henning Brandt: 18 of 35 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 5 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 20 a guess could also be checked against, the coaches were right 9 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, but not by a clear margin. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 26 a guess could also be checked against, the coaches were right 12 times and a guess that nothing changes 3 times \u2014 the coaches did better. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -854,15 +1073,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -903,15 +1122,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -962,28 +1181,28 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     },
     {
      "state": "ok",
-     "right": 7,
-     "n": 19,
-     "through": "2026-10-12",
-     "text": "Nathan Reeves: 7 of 19 checked calls right.",
+     "right": 8,
+     "n": 20,
+     "through": "2026-10-14",
+     "text": "Nathan Reeves: 8 of 20 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 7 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -1024,15 +1243,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 11,
-     "n": 22,
-     "through": "2026-10-11",
-     "text": "Max Reyes: 11 of 22 checked calls right.",
+     "right": 13,
+     "n": 27,
+     "through": "2026-10-17",
+     "text": "Max Reyes: 13 of 27 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -1073,15 +1292,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 7,
-     "n": 8,
-     "through": "2026-10-11",
-     "text": "James Okafor: 7 of 8 checked calls right.",
+     "right": 9,
+     "n": 12,
+     "through": "2026-10-17",
+     "text": "James Okafor: 9 of 12 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 4 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 4 times \u2014 level, on too few calls to tell. Direction calls: on the 6 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -1132,28 +1351,28 @@
    "records": [
     {
      "state": "ok",
-     "right": 11,
-     "n": 22,
-     "through": "2026-10-11",
-     "text": "Max Reyes: 11 of 22 checked calls right.",
+     "right": 13,
+     "n": 27,
+     "through": "2026-10-17",
+     "text": "Max Reyes: 13 of 27 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     },
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -1191,15 +1410,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 11,
-     "n": 22,
-     "through": "2026-10-11",
-     "text": "Max Reyes: 11 of 22 checked calls right.",
+     "right": 13,
+     "n": 27,
+     "through": "2026-10-17",
+     "text": "Max Reyes: 13 of 27 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -1238,14 +1457,14 @@
     {
      "state": "ok",
      "right": 8,
-     "n": 30,
-     "through": "2026-10-12",
-     "text": "Marcus Webb: 8 of 30 checked calls right.",
+     "n": 36,
+     "through": "2026-10-14",
+     "text": "Marcus Webb: 8 of 36 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right once and a guess that nothing changes 6 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 21 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, but not by a clear margin. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right once and a guess that nothing changes 6 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 27 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 6 times \u2014 the guess was right more often, but not by a clear margin. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -1286,15 +1505,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 14,
-     "n": 28,
-     "through": "2026-10-11",
-     "text": "Henning Brandt: 14 of 28 checked calls right.",
+     "right": 18,
+     "n": 35,
+     "through": "2026-10-17",
+     "text": "Henning Brandt: 18 of 35 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 5 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 20 a guess could also be checked against, the coaches were right 9 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, but not by a clear margin. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 26 a guess could also be checked against, the coaches were right 12 times and a guess that nothing changes 3 times \u2014 the coaches did better. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -1335,15 +1554,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -1384,15 +1603,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -1458,27 +1677,27 @@
     {
      "state": "ok",
      "right": 8,
-     "n": 30,
-     "through": "2026-10-12",
-     "text": "Marcus Webb: 8 of 30 checked calls right.",
+     "n": 36,
+     "through": "2026-10-14",
+     "text": "Marcus Webb: 8 of 36 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right once and a guess that nothing changes 6 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 21 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, but not by a clear margin. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right once and a guess that nothing changes 6 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 27 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 6 times \u2014 the guess was right more often, but not by a clear margin. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     },
     {
      "state": "ok",
      "right": 1,
-     "n": 6,
-     "through": "2026-09-30",
-     "text": "Amara Patel: 1 of 6 checked calls right.",
+     "n": 7,
+     "through": "2026-10-16",
+     "text": "Amara Patel: 1 of 7 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 2 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes once \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -1519,15 +1738,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 7,
-     "n": 19,
-     "through": "2026-10-12",
-     "text": "Nathan Reeves: 7 of 19 checked calls right.",
+     "right": 8,
+     "n": 20,
+     "through": "2026-10-14",
+     "text": "Nathan Reeves: 8 of 20 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 7 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -1569,14 +1788,14 @@
     {
      "state": "ok",
      "right": 1,
-     "n": 6,
-     "through": "2026-09-30",
-     "text": "Amara Patel: 1 of 6 checked calls right.",
+     "n": 7,
+     "through": "2026-10-16",
+     "text": "Amara Patel: 1 of 7 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 2 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes once \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -1617,15 +1836,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 11,
-     "n": 22,
-     "through": "2026-10-11",
-     "text": "Max Reyes: 11 of 22 checked calls right.",
+     "right": 13,
+     "n": 27,
+     "through": "2026-10-17",
+     "text": "Max Reyes: 13 of 27 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -1663,15 +1882,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 7,
-     "n": 8,
-     "through": "2026-10-11",
-     "text": "James Okafor: 7 of 8 checked calls right.",
+     "right": 9,
+     "n": 12,
+     "through": "2026-10-17",
+     "text": "James Okafor: 9 of 12 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 4 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 4 times \u2014 level, on too few calls to tell. Direction calls: on the 6 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -1709,15 +1928,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 14,
-     "n": 28,
-     "through": "2026-10-11",
-     "text": "Henning Brandt: 14 of 28 checked calls right.",
+     "right": 18,
+     "n": 35,
+     "through": "2026-10-17",
+     "text": "Henning Brandt: 18 of 35 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 5 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 20 a guess could also be checked against, the coaches were right 9 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, but not by a clear margin. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 26 a guess could also be checked against, the coaches were right 12 times and a guess that nothing changes 3 times \u2014 the coaches did better. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -1758,15 +1977,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -1807,15 +2026,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -1856,15 +2075,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 7,
-     "n": 19,
-     "through": "2026-10-12",
-     "text": "Nathan Reeves: 7 of 19 checked calls right.",
+     "right": 8,
+     "n": 20,
+     "through": "2026-10-14",
+     "text": "Nathan Reeves: 8 of 20 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 7 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -1906,14 +2125,14 @@
     {
      "state": "ok",
      "right": 1,
-     "n": 6,
-     "through": "2026-09-30",
-     "text": "Amara Patel: 1 of 6 checked calls right.",
+     "n": 7,
+     "through": "2026-10-16",
+     "text": "Amara Patel: 1 of 7 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 2 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes once \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -1954,15 +2173,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -2003,15 +2222,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -2052,15 +2271,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 11,
-     "n": 22,
-     "through": "2026-10-11",
-     "text": "Max Reyes: 11 of 22 checked calls right.",
+     "right": 13,
+     "n": 27,
+     "through": "2026-10-17",
+     "text": "Max Reyes: 13 of 27 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -2101,15 +2320,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 7,
-     "n": 19,
-     "through": "2026-10-12",
-     "text": "Nathan Reeves: 7 of 19 checked calls right.",
+     "right": 8,
+     "n": 20,
+     "through": "2026-10-14",
+     "text": "Nathan Reeves: 8 of 20 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 7 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -2150,15 +2369,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -2200,14 +2419,14 @@
     {
      "state": "ok",
      "right": 1,
-     "n": 6,
-     "through": "2026-09-30",
-     "text": "Amara Patel: 1 of 6 checked calls right.",
+     "n": 7,
+     "through": "2026-10-16",
+     "text": "Amara Patel: 1 of 7 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 2 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes once \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -2248,15 +2467,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -2297,15 +2516,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 11,
-     "n": 22,
-     "through": "2026-10-11",
-     "text": "Max Reyes: 11 of 22 checked calls right.",
+     "right": 13,
+     "n": 27,
+     "through": "2026-10-17",
+     "text": "Max Reyes: 13 of 27 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -2346,15 +2565,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 14,
-     "n": 28,
-     "through": "2026-10-11",
-     "text": "Henning Brandt: 14 of 28 checked calls right.",
+     "right": 18,
+     "n": 35,
+     "through": "2026-10-17",
+     "text": "Henning Brandt: 18 of 35 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 5 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 20 a guess could also be checked against, the coaches were right 9 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, but not by a clear margin. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 26 a guess could also be checked against, the coaches were right 12 times and a guess that nothing changes 3 times \u2014 the coaches did better. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -2395,15 +2614,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -2441,15 +2660,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -2487,15 +2706,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -2533,15 +2752,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 7,
-     "n": 19,
-     "through": "2026-10-12",
-     "text": "Nathan Reeves: 7 of 19 checked calls right.",
+     "right": 8,
+     "n": 20,
+     "through": "2026-10-14",
+     "text": "Nathan Reeves: 8 of 20 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 7 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -2579,15 +2798,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 7,
-     "n": 8,
-     "through": "2026-10-11",
-     "text": "James Okafor: 7 of 8 checked calls right.",
+     "right": 9,
+     "n": 12,
+     "through": "2026-10-17",
+     "text": "James Okafor: 9 of 12 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 4 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 4 times \u2014 level, on too few calls to tell. Direction calls: on the 6 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -2625,15 +2844,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 14,
-     "n": 28,
-     "through": "2026-10-11",
-     "text": "Henning Brandt: 14 of 28 checked calls right.",
+     "right": 18,
+     "n": 35,
+     "through": "2026-10-17",
+     "text": "Henning Brandt: 18 of 35 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 5 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 20 a guess could also be checked against, the coaches were right 9 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, but not by a clear margin. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 26 a guess could also be checked against, the coaches were right 12 times and a guess that nothing changes 3 times \u2014 the coaches did better. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -2674,15 +2893,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -2723,15 +2942,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -2772,15 +2991,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -2821,15 +3040,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -2870,15 +3089,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 17,
-     "n": 41,
-     "through": "2026-10-11",
-     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "right": 19,
+     "n": 46,
+     "through": "2026-10-17",
+     "text": "Lisa Park: 19 of 46 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
+      "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell."
      }
     }
    ],
@@ -2919,15 +3138,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 14,
-     "n": 28,
-     "through": "2026-10-11",
-     "text": "Henning Brandt: 14 of 28 checked calls right.",
+     "right": 18,
+     "n": 35,
+     "through": "2026-10-17",
+     "text": "Henning Brandt: 18 of 35 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 5 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 20 a guess could also be checked against, the coaches were right 9 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, but not by a clear margin. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 26 a guess could also be checked against, the coaches were right 12 times and a guess that nothing changes 3 times \u2014 the coaches did better. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -2968,15 +3187,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 14,
-     "n": 28,
-     "through": "2026-10-11",
-     "text": "Henning Brandt: 14 of 28 checked calls right.",
+     "right": 18,
+     "n": 35,
+     "through": "2026-10-17",
+     "text": "Henning Brandt: 18 of 35 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": true,
-      "sentence": "Number calls: on the 5 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 20 a guess could also be checked against, the coaches were right 9 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, but not by a clear margin. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
+      "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 26 a guess could also be checked against, the coaches were right 12 times and a guess that nothing changes 3 times \u2014 the coaches did better. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell."
      }
     }
    ],
@@ -2984,30 +3203,21 @@
   }
  ],
  "excluded": {
-  "count": 91,
+  "count": 115,
   "reasons": {
-   "a direction read out of commentary, not a call sealed before day one": 79,
-   "graded on a day the sentence does not name": 3,
+   "a direction read out of commentary, not a call sealed before day one": 102,
+   "graded on a day the sentence does not name": 4,
    "the sentence was conditional or hedged": 7,
    "the sentence does not state the number or direction that was graded": 2
   },
-  "text": "91 more checked calls have no page here: the coach\u2019s sentence was conditional, did not state the number or direction that was measured, or was graded on a different day or by a check too coarse to print. They still count in each coach\u2019s record."
+  "text": "115 more checked calls have no page here: the coach\u2019s sentence was conditional, did not state the number or direction that was measured, or was graded on a different day or by a check too coarse to print. They still count in each coach\u2019s record."
  },
  "simple_guess_words": "The simple guess is that nothing changes: the measure stays where it was when the call was made.",
  "next": {
-  "state": "ok",
-  "as_of": "2026-10-16",
+  "state": "absent",
+  "as_of": null,
   "source": "/api/calls",
   "absent_text": "No call or bet has a settle date right now.",
-  "data": {
-   "kind": "bet",
-   "coach_names": [
-    "Max Reyes",
-    "Lisa Park"
-   ],
-   "question": "the bet between Max Reyes and Lisa Park on whether the 7-day average of his deep-sleep share will be at or above 26",
-   "due_date": "2026-10-16",
-   "text": "Next: the bet between Max Reyes and Lisa Park on whether the 7-day average of his deep-sleep share will be at or above 26 settles Friday, October 16."
-  }
+  "data": null
  }
 }

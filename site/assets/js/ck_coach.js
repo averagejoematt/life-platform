@@ -39,6 +39,7 @@ import { tryJSON, esc, fmtShort, todayPT } from "/assets/js/evidence_shared.js";
 import { dayInWords, countWord } from "/assets/js/entry_age.js";
 import { comparisonText } from "/assets/js/coach_comparison.js";
 import { COACH_JOBS } from "/assets/js/ck_pages.js";
+import { TERMS } from "/assets/js/ck_terms.js";
 import { verdictTag, callCardHTML, gradedOnText, hasRule, ruleless, sharedToleranceNote } from "/assets/js/ck_verdict.js";
 import { callsOf, callHref, withFrom, backFor, setBack } from "/assets/js/ck_call.js";
 import { docketQuestion, recentLines, ledgerLine, standingAsk, shortId } from "/assets/js/v7_coaches.js";
@@ -282,6 +283,9 @@ export function ownComparison(p, cmp) {
   return sentence.replace(/^Across (\d+) checked calls\b/, (all, k) => (Number(k) === n ? `Across ${p.name}’s ${k} checked calls` : all));
 }
 export const SIMPLE_GUESS = "The simple guess is that nothing changes from the last reading.";
+// The guess is said once: a comparison that already names it ("a guess that nothing changes")
+// does not get the sentence again (the CI height margin on the coach pages, #4586 round 4).
+export const withGuessNamed = (cmp) => (/\bguess that nothing changes\b/i.test(String(cmp || "")) ? String(cmp) : `${cmp} ${SIMPLE_GUESS}`.trim());
 export function recordHTML(p) {
   if (!p) return soft("The record is not available right now.");
   const t = trackOf(p);
@@ -293,7 +297,7 @@ export function recordHTML(p) {
   const sentence = t.comparison && String(t.comparison.sentence || "").trim();
   if (!sentence) return soft(comparisonText(null));
   const through = isDay(r.through) ? ` through ${shortDay(r.through)}` : "";
-  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${r.confirmed}<span> of ${r.n} checked calls</span></p><p>${esc(ownComparison(p, t.comparison))} ${esc(SIMPLE_GUESS)}</p>${small(`${p.name}’s calls alone${through}. Code checks each call against what happened; no coach does the marking.`)}</div>`;
+  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${r.confirmed}<span> of ${r.n} checked calls</span></p><p>${esc(withGuessNamed(ownComparison(p, t.comparison)))}</p>${small(`${p.name}’s calls alone${through}. Code checks each call against what happened; no coach does the marking.`)}</div>`;
 }
 /** The newest checked call of each kind, in reader words. A line with no rule the page can
  *  print is never a verdict (#4808 — "Marked wrong. The rule that decided it is not available"
@@ -348,7 +352,9 @@ export function verdictsHTML(p, callsBody = null, base = "/next/v8/") {
   const shared = sharedToleranceNote([paged.right, paged.wrong]);
   const pageCard = (call) => {
     const day = shortDay(call.settled_date);
-    const when = `${gradedOnText(call)} ${day ? `Checked ${day}.` : ""}`.trim();
+    // The same dating as the Coaches page (round 3): the day it was graded on; "Checked <day>"
+    // only when the sentence names none — the API gives no reason for a second date.
+    const when = gradedOnText(call) || (day ? `Checked ${day}.` : "");
     return callCardHTML(call, { when, note: !shared, href: withFrom(callHref(base, call.id), `coach:${p.persona_id}`) });
   };
   // The record's own line has no page: the same order — the tag, the line, then the dating.
@@ -409,7 +415,11 @@ export function disagreementsHTML(p, docket, names) {
     const verdict = d.winner && d.loser ? `${nameOf(who, d.winner)} was right. ${nameOf(who, d.loser)} was wrong.${result}` : "It settled with no winner.";
     return `<div class="ck-bet">${small(`Against ${nameOf(who, other)} · settled ${shortDay(d.resolved_date || d.resolution_date)}`)}<p><b>${esc(`The question was: ${q}`)}</b></p><p>${esc(verdict)}</p>${argued(d, pid, who)}</div>`;
   });
-  return `${tally}${openCards.join("")}${settledCards.join("")}`;
+  // The newest settled bet on the page; older ones one tap away (the coach pages' CI height margin,
+  // #4586 round 4 — every bet is still on the page, and each has its own call page).
+  const [newest, ...older] = settledCards;
+  const rest = older.length ? `<details><summary>${esc(older.length === 1 ? "One older settled bet" : `${cap(countWord(older.length))} older settled bets`)}</summary>${older.join("")}</details>` : "";
+  return `${tally}${openCards.join("")}${newest || ""}${rest}`;
 }
 
 // ── how the character is written ───────────────────────────────────────────────
@@ -432,18 +442,9 @@ export function personaHTML(p) {
 // ── the terms ──────────────────────────────────────────────────────────────────
 // A coach's served words use its trade's terms. Each one that appears on the page gets a
 // plain line here; one that does not appear is not listed.
-export const TERMS = [
-  [/\brecovery\b/i, "Recovery", "his wrist strap’s morning score out of 100"],
-  [/\bHRV\b|heart-rate variability/i, "HRV", "heart-rate variability: how much the gap between heartbeats changes overnight, as the wrist strap measures it"],
-  [/deep[- ]sleep|slow-wave/i, "Deep sleep", "also called slow-wave sleep: the share of the night spent in the deepest stage"],
-  [/\bREM\b|dreaming sleep/i, "REM", "the dreaming stage of sleep"],
-  [/\bEWMA\b|running average/i, "Running average", "also written EWMA: an average that counts recent days more than older ones"],
-  [/(seven|7)-(night|day) average/i, "Seven-day average", "the average of the last seven readings"],
-  [/zone 2/i, "Zone 2", "steady, easy cardio, such as a brisk walk"],
-  [/regression[- ]to[- ](the[- ])?mean|mean reversion/i, "Regression to the mean", "an unusual reading tends to be followed by a more ordinary one"],
-  [/\bDEXA\b/i, "DEXA", "a body scan that measures fat, muscle and bone"],
-  [/\bCGM\b/i, "CGM", "a worn sensor that reads blood sugar through the day"],
-];
+// The list lives in ck_terms.js (round 3: the front page bans these terms from its quotes, so the
+// list has one home); re-exported here for the coach page and its tests.
+export { TERMS };
 /** "Deep sleep: also called slow-wave sleep: …" for every known term in a sentence. */
 export const glossLines = (text) => TERMS.filter(([rx]) => rx.test(String(text || ""))).map(([, term, gloss]) => `${term}: ${period(gloss)}`);
 export function termsHTML(html) {

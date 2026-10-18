@@ -1,17 +1,17 @@
 {
  "_meta": {
-  "generated_at": "2026-10-13T01:38:49.230587+00:00",
-  "served_at": "2026-10-13T01:38:49.230587+00:00",
+  "generated_at": "2026-10-17T22:51:38.052798+00:00",
+  "served_at": "2026-10-17T22:51:38.052798+00:00",
   "cache_seconds": 3600,
-  "request_id": "82b6fbd43e4c4fcf"
+  "request_id": "59ac5bbac5ba48ea"
  },
  "data_sources": 20,
  "mcp_tools": 88,
  "lambdas": 108,
  "alarms": 135,
  "cdk_stacks": 10,
- "adrs": 159,
- "test_count": 25573,
+ "adrs": 161,
+ "test_count": 25849,
  "monthly_cost": "~$100",
  "review_count": 19,
  "review_grade": "B+",

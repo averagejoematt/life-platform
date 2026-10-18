@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-13T01:38:49.815575+00:00",
-  "served_at": "2026-10-13T01:38:49.815575+00:00",
+  "generated_at": "2026-10-17T23:29:16.292947+00:00",
+  "served_at": "2026-10-17T23:29:16.292947+00:00",
   "cache_seconds": 300,
-  "request_id": "5d44b367ae874124"
+  "request_id": "800c66dd68514235"
  },
  "state": "ok",
  "date": "2026-10-07",
@@ -38,5 +38,26 @@
    "bet_settles": null
   }
  ],
- "absent": []
+ "absent": [
+  {
+   "coach": "glucose_coach",
+   "state": "absent",
+   "reason": "No new readings have reached this coach's area, so there is nothing new to read."
+  },
+  {
+   "coach": "physical_coach",
+   "state": "absent",
+   "reason": "This coach had nothing new to add."
+  },
+  {
+   "coach": "labs_coach",
+   "state": "absent",
+   "reason": "This coach had nothing new to add."
+  },
+  {
+   "coach": "explorer_coach",
+   "state": "absent",
+   "reason": "This coach had nothing new to add."
+  }
+ ]
 }
