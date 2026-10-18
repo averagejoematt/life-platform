@@ -55,6 +55,7 @@ import os
 import re
 
 from common.text_utils import truncate_at_word
+from content.story_checks import cycle_reference_findings  # #4580 A-X1: THE one cycle/attempt/reset pattern
 
 # The subject's display name, derived from the same USER_ID the writers use —
 # never a second hand-typed copy of it.
@@ -127,7 +128,8 @@ def reader_safe(text, coach_id=None, logger=None):
     published — and the rejection is logged when a logger is supplied, so a
     producer that keeps drifting into second person is visible in the run logs.
     An identifier (`is_machine_token`, #4384) is not text for any audience and
-    returns None too. Falsy input returns None (an absent
+    returns None too, and so does text that counts or refers to an earlier
+    cycle/attempt/reset (#4580, `content.story_checks.cycle_reference_findings`). Falsy input returns None (an absent
     candidate, not a rejection).
     """
     if not text or not str(text).strip():
@@ -142,6 +144,14 @@ def reader_safe(text, coach_id=None, logger=None):
             logger.warning(
                 "public_summary rejected for %s (addresses the owner directly) — the public slot is held empty (#2972)",
                 coach_id or "unknown-coach",
+            )
+        return None
+    # #4580 A-X1 (owner ruling 2026-09-26): no cycle / attempt / reset count OR reference on a reader surface —
+    # the shared Story Desk pattern, so the coaches' public slots and the story door refuse the same phrases.
+    if cycle_reference_findings(text):
+        if logger is not None:
+            logger.warning(
+                "public slot rejected for %s (refers to an earlier cycle/attempt/reset) — held empty (#4580)", coach_id or "unknown-coach"
             )
         return None
     return text

@@ -562,6 +562,42 @@ def _bet_baseline(docket: dict, rows_by_coach: dict) -> Any:
     return None
 
 
+def reading_words(reading: Any) -> str:
+    """#4580 B-14: the device and the days a graded bet's number came from, in words — or "" when the
+    resolved row predates the stamp (``dispute_docket`` writes ``verdict.actual_reading`` since #4580).
+    "Eight Sleep, the 7-day average from October 9 to October 15" / "Whoop, the reading for October 16"."""
+    if not isinstance(reading, dict):
+        return ""
+    label = str(reading.get("source_label") or reading.get("source") or "").strip()
+    start, end = _words(_iso_day(reading.get("start"))), _words(_iso_day(reading.get("end")))
+    if not label or not end:
+        return ""
+    if reading.get("aggregate") == "mean" and start:
+        days = int(float(reading.get("days") or 0)) or None
+        span = f"from {start} to {end}" if start != end else f"on {end}"
+        return f"{label}, the {days}-day average {span}" if days else f"{label}, the average {span}"
+    return f"{label}, the reading for {end}"
+
+
+def _reading_block(reading: Any) -> dict:
+    """The served ``actual.source`` / ``actual.window`` (#4580 B-14) — empty for a pre-stamp row."""
+    words = reading_words(reading)
+    if not words:
+        return {}
+    return {
+        "source": reading.get("source"),
+        "source_label": reading.get("source_label") or reading.get("source"),
+        "window": {
+            "start": _iso_day(reading.get("start")),
+            "end": _iso_day(reading.get("end")),
+            "days": int(float(reading.get("days") or 0)) or None,
+            "aggregate": reading.get("aggregate"),
+            "n": int(float(reading.get("n") or 0)) or None,
+        },
+        "reading_text": words,
+    }
+
+
 def build_bet(docket: dict, names: dict, records: dict, rows_by_coach: dict, dark: list | None = None) -> tuple[dict | None, str | None]:
     """One resolved, graded dispute-docket entry as a page body, or ``(None, why_not)``.
 
@@ -595,6 +631,8 @@ def build_bet(docket: dict, names: dict, records: dict, rows_by_coach: dict, dar
         f"{won} said {yes_no[winner]}; {lost} said {yes_no[loser]}."
     )
     guess = simple_guess(_bet_baseline(docket, rows_by_coach), "yes_no", coach_right=True, metric=criterion.get("metric"))
+    reading = _reading_block(verdict.get("actual_reading"))
+    came_in = f"It came in at {seen} ({reading['reading_text']})." if reading else f"It came in at {seen}."
     return (
         {
             "id": bid,
@@ -621,12 +659,13 @@ def build_bet(docket: dict, names: dict, records: dict, rows_by_coach: dict, dar
             "observed_on_text": _words(day, weekday=True) or None,
             "called": called,
             "called_short": f"{won} and {lost} bet on whether {plain_question} on {_words(day)}.",
-            "happened": f"It came in at {seen}.",
-            "happened_short": f"It came in at {seen}.",
+            "happened": came_in,
+            "happened_short": came_in,
             "actual": {
                 "value": verdict.get("actual_value", docket.get("actual_value")),
                 "text": seen,
                 "unit": prediction_reason.metric_unit(criterion.get("metric")),
+                **reading,  # #4580 B-14: source + window, so a page can say which device and which days
             },
             "verdict": "right",
             "verdict_text": f"{won} was right; {lost} was wrong.",

@@ -89,10 +89,13 @@ def _integrator_digest(*, _g):
         # producer existed. Guard runs on the FULL stored text either way (#2972's
         # truncation-launder lesson): never a truncated slice.
         item = dict(item)
-        public_text = item.get("public_summary")
-        if isinstance(public_text, str) and public_text.strip() and not audience_guard.is_owner_directed(public_text):
-            item["analysis"] = public_text.strip()
-        elif audience_guard.is_owner_directed(item.get("analysis") or ""):
+        # #4580 A-X1: `reader_safe`, not only the second-person check — a stored read that counts or refers to an
+        # earlier cycle/attempt/reset (owner ruling 2026-09-26) is withheld at serve time too, so a row written
+        # before the write-side rule (or one a HOLD keeps serving) never reaches a reader.
+        public_text = audience_guard.reader_safe(item.get("public_summary"))
+        if public_text:
+            item["analysis"] = public_text
+        elif audience_guard.reader_safe(item.get("analysis")) is None:
             item["analysis"] = None
         # #3018 (the issue's named adjacent risk): cross_domain_notes are per-domain
         # sentences from the SAME synthesis call — served on the SAME public endpoints
