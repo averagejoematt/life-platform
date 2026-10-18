@@ -302,7 +302,7 @@ export const shortRule = (rule) => String(rule || "").replace(/\s*(?:Fewer than|
 // A row that earned its mark: going well, or ahead of the plan. Both take the filled dot.
 const EARNED = new Set(["going_well", "faster_than_planned"]);
 const TO_DATE = /not this week['’]s alone/;
-export function scorecardHTML(block, base = "/", { label = true } = {}) {
+export function scorecardHTML(block, base = "/", { label = true, aiText = "" } = {}) {
   const rows = scorecardRows(block);
   if (!rows.length) return soft((block && block.absent_text) || "The scorecard is not served right now.");
   const d = block.data;
@@ -314,14 +314,21 @@ export function scorecardHTML(block, base = "/", { label = true } = {}) {
       const name = (r && r.name) || (d.names && d.names[key]) || key;
       const keyHTML = SCORE_LINKS[key] ? `<a class="ck-rows__key" href="${esc(base)}${SCORE_LINKS[key]}">${esc(name)}</a>` : `<span class="ck-rows__key">${esc(name)}</span>`;
       if (!r || !r.verdict_text) return `<li>${keyHTML}<span>${esc(row.absent_text || "Not served right now.")}</span></li>`;
-      const dot = EARNED.has(r.verdict) ? '<i class="ck-dot" aria-hidden="true"></i>' : r.verdict === "not_enough_data" ? "" : '<i class="ck-dot ck-dot--off" aria-hidden="true"></i>';
+      // Site-to-A round 1: a row with too little data showed no dot at all beside rows that had
+      // one, so the absence read as a missing mark. It takes the kit's hollow dot and says so in
+      // words — an absence shown as an absence, never as a verdict either way.
+      const thin = r.verdict === "not_enough_data";
+      const dot = EARNED.has(r.verdict) ? '<i class="ck-dot" aria-hidden="true"></i>' : `<i class="ck-dot ck-dot--off${thin ? " ck-dot--none" : ""}" aria-hidden="true"></i>`;
+      const thinLabel = thin ? ' <span class="ck-small">Not enough data for a verdict.</span>' : "";
       const rule = r.rule ? `<br><span class="ck-small">${esc(shortRule(r.rule))}</span>` : "";
-      // The AI row (#4580 W3): the engine's shared comparison sentence when it is served on the
-      // row, else the row's verdict; and the "to date, not this week's alone" clause once — the
-      // rule under the row already says it with the yardstick, so the row's own copy is dropped.
-      const verdict = key === "ai" && String(r.comparison_text || "").trim() ? String(r.comparison_text).trim().replace(/\.$/, "") : r.verdict_text;
+      // The AI row (#4580 W3): the engine's shared comparison sentence — served on the row, or the
+      // record block's `comparison_text` the caller passes (lane E writes it once, record_words) —
+      // else the row's verdict; and the "to date, not this week's alone" clause once — the rule
+      // under the row already says it with the yardstick, so the row's own copy is dropped.
+      const shared = key === "ai" ? String(r.comparison_text || aiText || "").trim().replace(/\.$/, "") : "";
+      const verdict = shared || r.verdict_text;
       const text = key === "ai" && TO_DATE.test(String(r.rule || "")) && TO_DATE.test(String(r.text || "")) ? "" : r.text || "";
-      return `<li>${keyHTML}<span>${dot}<b>${esc(verdict)}.</b> ${esc(text)}${rule}</span></li>`;
+      return `<li>${keyHTML}<span>${dot}<b>${esc(verdict)}.</b> ${esc(text)}${thinLabel}${rule}</span></li>`;
     })
     .join("");
   // "What went right this week" is no longer printed (#4580 W2): its "Matthew" row repeated the

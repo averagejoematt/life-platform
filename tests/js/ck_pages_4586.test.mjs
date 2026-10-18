@@ -185,7 +185,7 @@ test("the showcase pair leads with the tightest right call and the clearest miss
   // the coaches page's scorecard door closes that same paragraph (one line given back, 2026-10-11)
   const door = '<a class="ck-link" href="/coaching/scorecard/">Every prediction, right and wrong</a>';
   assert.ok(P.callVerdictsHTML(calls, "/next/v8/", "coaches", { trailer: door }).endsWith(`before the call. ${door}</p>`));
-  assert.match(html, /<span class="ck-verdicts__tag">Wrong · not within [\d.]+ [a-z]*\s?either way<\/span><p>[^<]+ called [^<]+\. <b>It came in at [^<]+\.<\/b><\/p>/);
+  assert.match(html, /<span class="ck-verdicts__tag">Wrong · not within [\d.]+(%| [a-z]+)? either way<\/span><p>[^<]+ called [^<]+\. <b>It came in at [^<]+\.<\/b><\/p>/);
   const ids = [...html.matchAll(/call\/\?id=([a-z0-9-]+)/g)].map((m) => m[1]);
   assert.equal(ids.length, 2, "one door per call");
   for (const id of ids) assert.ok(calls.calls.some((c) => c.id === id), `${id} is a served call`);
