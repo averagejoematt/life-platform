@@ -48,8 +48,8 @@ Where multiple sources measure the same thing:
 |--------|-----|-------------------|------------|
 | **HRV** | Whoop | Garmin (`hrv_last_night`), Eight Sleep (`hrv`), Apple Health (`hrv_sdnn_apple`) | Whoop for coaching; `get_device_agreement` cross-validates |
 | **Resting Heart Rate** | Whoop | Garmin, Eight Sleep, Apple Health | Same cross-validation pattern |
-| **Sleep Duration** | Whoop | Eight Sleep, Garmin | Whoop captures couch/travel sleep |
-| **Sleep Staging** | Whoop | Eight Sleep | Whoop hours → pct via `normalize_whoop_sleep()` |
+| **Sleep Duration** | Whoop | Eight Sleep, Garmin, Apple Watch (`sleep_total_hours_apple`, #4971) | Whoop captures couch/travel sleep; the Apple night is stored beside it and read by no resolver (owner 2026-10-17 "keep both") |
+| **Sleep Staging** | Whoop | Eight Sleep, Apple Watch (`sleep_*_min_apple`, #4971) | Whoop hours → pct via `normalize_whoop_sleep()` |
 | **Steps** | Apple Health | Garmin (watch) | Apple preferred (phone always-on). **DI-1.4 step precedence:** the Garmin watch is the better counter only when its source-state is `live`; a rate-limited/stale Garmin emits sparse partial readings (the "phantom 298" — Garmin 6/15=298 steps used as the daily figure while the Apple ~3,415 avg was truer), so consumers fall back to Apple Health unless Garmin is live. A step count never, on its own, drives a sedentary/under-training verdict (Hevy-join, DI-1.2). `get_daily_metrics(view="movement")` carries `step_data_complete`/`step_coverage_pct`/`step_incomplete_dates` — the apple_health envelope can read "fresh" while the step field itself is missing for a day. |
 | **Active Calories** | Apple Health | Garmin | Apple for TDEE; Garmin retained for training metrics |
 | **Body Composition** | Withings (daily) | DEXA (semi-annual) | Withings for trending; DEXA for absolute accuracy |
@@ -60,7 +60,7 @@ Where multiple sources measure the same thing:
 |------|----------|---------|
 | **Tier 1** (Apple-exclusive) | All readings ingested | Steps, active/basal calories, gait, flights, water, caffeine, body mass (`weight_lbs` fallback, v1.4.2 — Withings API has sync delays) |
 | **Tier 2** (Cross-device) | Filtered to Apple Watch only, `_apple` suffix | HR, RHR, HRV, respiratory rate, SpO2 |
-| **Tier 3** (Skip) | Blocked at ingestion | Nutrition (MacroFactor SOT), sleep analysis (Eight Sleep SOT), body fat % (`body_fat_percentage` — Withings SOT) |
+| **Tier 3** (Skip) | Blocked at ingestion | Nutrition (MacroFactor SOT), sleep analysis from Whoop / Eight Sleep (their own pipelines are SOT — Apple's own night is stored since #4971, see "Apple sleep fields"), body fat % (`body_fat_percentage` — Withings SOT) |
 
 ---
 
@@ -552,6 +552,32 @@ The watch also lights up fields mapped before it existed. They keep the names th
 **Freshness (registry `apple_health.hae_datatypes`):** `watch_overnight_vitals` (2 d), `watch_heart` (2 d), `watch_activity` (2 d) and `watch_fitness` (14 d) are day-level liveness groups: they narrate and never alarm. `watch` carries the one alarming bar, `dead_man: {field: watch_last_reading_epoch_apple, stale_hours: 36}`. The freshness checker (`ingestion.watch_presence.check_dead_men`) folds a stale or unreadable dead-man into `StaleSourceCount`, the metric the existing `slo-source-freshness` alarm watches (`to_digest=True`: it reaches the daily digest). The checker runs daily, so it fires on the first run after the 36 h mark (60 h at the latest). `get_freshness_status` reports the same rows as `device_dead_men`.
 
 **Not here, by lane:** Apple sleep stages (`sleep_*_apple`) are #4971's. ECG results, heart-rate notifications, AFib burden and the medication log are #4972's (event-class rhythm data, owner-only). Workouts are #4973's.
+
+**Apple sleep fields (webhook `sleep_analysis` — Apple devices only, #4971, epic #4967):**
+
+Writer: `lambdas/ingestion/health_auto_export_sleep.py` (`APPLE_SLEEP_FIELDS` is the field set; `tests/test_hae_apple_sleep_4971.py` pins every rule below). Owner ruling 2026-10-17: "keep both [Whoop and Apple Watch], so we can figure out whether we average the result set or determine primary and backup source" — so the watch's night is stored **beside** Whoop's and Eight Sleep's, never on their fields, and **no `METRIC_TRUTH` facet reads it as truth**; the dual-wear agreement study (#4974) reads it next to them. **Privacy: every field below is Tier-2 owner-only** (`lambdas/privacy/field_tiers.py`), like Whoop's unpublished `time_awake_hours` — publishing one is a new ADR-155 stamp.
+
+- **Source filter.** HealthKit carries Whoop's and Eight Sleep's nights too, exported under `sleep_analysis` with `source: "WHOOP"` / `"Eight Sleep"` (live, 2026-10-04/05). A reading is kept only when every `|`-separated part of its source names an Apple device; a blank source is refused.
+- **Day frame.** A night is filed under the morning it **ends**: the UTC day (apple_health's `day_key_frame`, the #3677 keep-UTC ruling) of the wake instant. For a wake before 17:00 PT that is the Pacific wake date; for an onset after 17:00 PT it is the key Whoop files the same night under (#3913). The cost: a wake after 17:00 PDT (16:00 PST) lands on the next day's key. Per-sample exports are grouped into sessions (a gap over 2 h splits) and each session is filed under its last sample's end — so a nap ending the same UTC day is counted in that day (Apple sends no nap flag).
+- **Absence (ADR-104).** No Apple reading → no field, never 0. A stage with no sample is absent. HAE's aggregated export zero-fills, so there a night with core, deep and rem all 0 is **unstaged** and carries no stage fields (awake only if non-zero), and a 0 in-bed or unspecified value is absent; on a staged night a reported 0 is kept. Staleness and the watch dead-man are #4970's.
+- **Re-sends.** Every reading is merged into `_rd_sleep_apple` keyed by its identity (stage, start, end, device; stored wins a collision — the #4628 unique-reading rule) and the night is recomputed from the whole map: stage minutes are the **union** of that stage's intervals, so an overlapping re-send counts once, never summed. A night-summary re-send never adds to another — the fullest (largest total, then in-bed) is the night. Per-sample readings outrank a summary; a field the recomputed night no longer carries is REMOVEd. If the stored map cannot be read the night is skipped, not written payload-only.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `sleep_total_hours_apple` | number | Hours asleep (core + deep + rem + unspecified, as one interval union; aggregated export: `totalSleep`). Absent with no asleep reading |
+| `sleep_in_bed_hours_apple` | number | Hours in bed (union of In Bed samples; aggregated: `inBed`, absent when 0) |
+| `sleep_core_min_apple` | number | Core (light) sleep, minutes |
+| `sleep_deep_min_apple` | number | Deep sleep, minutes |
+| `sleep_rem_min_apple` | number | REM sleep, minutes |
+| `sleep_awake_min_apple` | number | Awake within the session, minutes |
+| `sleep_unspecified_min_apple` | number | Asleep with no stage (HealthKit `asleepUnspecified`; aggregated: `asleep`), minutes |
+| `sleep_start_apple` | string | Sleep onset — the first asleep reading's start, ISO 8601 with the device's own offset |
+| `sleep_end_apple` | string | Wake — the last asleep reading's end, ISO 8601 with the device's offset (its UTC day is the row's `DATE#`) |
+| `sleep_in_bed_start_apple` | string | First In Bed start, ISO 8601 with offset (absent without in-bed data) |
+| `sleep_in_bed_end_apple` | string | Last In Bed end, ISO 8601 with offset |
+| `sleep_source_apple` | string | The device(s) that recorded the night, as HAE names them (`" \| "`-joined when more than one) |
+| `sleep_record_kind_apple` | string | `samples` (per-stage readings) or `summary` (HAE's aggregated night) — which export shape the night was derived from |
+| `_rd_sleep_apple` | map | Every Apple sleep reading delivered for the night, keyed by identity; summaries keep every vendor key (durations in hours, `units_reported` names the unit sent). Capture-all: the fields above are recomputed from it |
 
 **CGM / Blood Glucose fields (webhook):**
 

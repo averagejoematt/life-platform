@@ -386,6 +386,31 @@ for _path, _fields in _WRITER_ONLY.items():
             "port). The writer is where the tier is assigned, not where it leaks.",
         )
 
+# #4971: the Apple Watch's own night. The sleep sibling of the HAE webhook is the one
+# module that names these fields (verified tree-wide 2026-10-18: no reader exists yet —
+# the agreement study #4974 is the first planned one and must get its own entry here).
+for _field in (
+    "sleep_total_hours_apple",
+    "sleep_in_bed_hours_apple",
+    "sleep_core_min_apple",
+    "sleep_deep_min_apple",
+    "sleep_rem_min_apple",
+    "sleep_awake_min_apple",
+    "sleep_unspecified_min_apple",
+    "sleep_start_apple",
+    "sleep_end_apple",
+    "sleep_in_bed_start_apple",
+    "sleep_in_bed_end_apple",
+    "sleep_source_apple",
+    "sleep_record_kind_apple",
+    "_rd_sleep_apple",
+):
+    CONSUMERS[("lambdas/ingestion/health_auto_export_sleep.py", _field)] = _d(
+        SAW,
+        f"The Apple sleep writer (#4971) derives and stores `{_field}` from HAE's "
+        "sleep_analysis, Apple devices only; writer-only footprint, no reader yet.",
+    )
+
 
 # ── The derivation ────────────────────────────────────────────────────────────
 def _scan_dirs() -> tuple[str, ...]:
