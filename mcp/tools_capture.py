@@ -111,6 +111,7 @@ def _habit_reflection_section():
         "window_days": q.get("window_days"),
         "missed_needs_why_count": q.get("missed_needs_why_total", 0),
         "completed_needs_driver_count": q.get("completed_needs_driver_total", 0),
+        "paused_habit_days": q.get("paused_habit_days", 0),  # #5007: not scheduled — reported as paused, never missed
     }
 
 
