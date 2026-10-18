@@ -93,7 +93,8 @@ test("with one upstream failing, each front-page slot prints its block's own sen
 // `ck-argument` prints the moves' sentence only when no open bet stands in for the argument.
 const READ_SLOT_BLOCK = {
   "ck-call": (b) => b.calls,
-  "ck-argument": (b) => (P.frontReadSlots({ as_of: green.as_of }, b, "/")["ck-argue-label"] === "The coaches" ? b.moves : null),
+  // No bet and no exchange: the label is "The AI" (site-to-A round 1) — before it, "The coaches".
+  "ck-argument": (b) => (["The coaches", "The AI"].includes(P.frontReadSlots({ as_of: green.as_of }, b, "/")["ck-argue-label"]) ? b.moves : null),
 };
 const unserved = (b) => !!b && b.state === "unavailable";
 

@@ -253,7 +253,8 @@ test("the miss leads with the week's clearest wrong call when there is one, else
 
 test("the deeper rows: the chapter is one door with its week and its own first sentence; a failed block is its sentence", () => {
   const row = F.chapterRowHTML(B.chapter);
-  const note = F.firstSentences(B.chapter.data.dek, 150) || `The chapter · ${B.chapter.data.read_minutes} min · October 6`;
+  // Site-to-A round 1 (front:F6): the note is the chapter's own date and length, never the dek's claims.
+  const note = `The latest chapter · October 6 · ${B.chapter.data.read_minutes} min`;
   assert.equal(row, `<a class="ck-rows__key" href="/journal/posts/week-08/">Week 5 · “Park's Blind Spot”</a><span>${note.replace(/'/g, "&#39;")}</span>`);
   assert.equal(F.chapterRowHTML({ state: "unavailable", absent_text: "The latest chapter is not served right now.", data: null }), '<p class="ck-soft">The latest chapter is not served right now.</p>');
   const slots = P.frontSlots(edition, B, BASE);
@@ -261,7 +262,8 @@ test("the deeper rows: the chapter is one door with its week and its own first s
   assert.equal(slots["ck-week-span"], `How the whole thing is going · ${WEEK_SPAN}`);
   for (const gone of ["ck-week", "ck-quotes", "ck-lead-read", "ck-sheet-line"]) assert.equal(slots[gone], undefined, `${gone} left the front page`);
   // The first screen's numbers are doors; a failed block prints its sentence with no door.
-  assert.ok(slots["ck-record"].startsWith(`<a href="/next/v8/coaches/">${B.record.data.count_text} A guess that`));
+  // Site-to-A round 1 (front:F5, item 3): the door is on the count alone; the comparison is one sayable sentence.
+  assert.ok(slots["ck-record"].startsWith(`<a class="ck-link" href="/next/v8/coaches/">${B.record.data.count_text}</a> The coaches do not beat a simple guess yet.`));
   assert.ok(slots["ck-mark-caption"].startsWith(`<a href="/next/v8/trend/?m=weight"><b>${B.today.data.weight_lbs.toFixed(1)} lb</b>`));
   const gone = { state: "unavailable", absent_text: "Not served right now.", data: null };
   assert.equal(P.frontSlots(edition, { ...B, record: gone, today: gone }, BASE)["ck-record"], "Not served right now.");

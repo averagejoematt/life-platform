@@ -197,7 +197,8 @@ test("the recap skips an editor's note and never prints a clipped sentence", () 
   const html = P.recapHTML(P.postsInOrder(load("posts")));
   assert.doesNotMatch(html, /Editor/);
   assert.doesNotMatch(html, /…/);
-  assert.match(html, /Week 3 · Storming Mode<\/span><span>Day 11 to Day 17 · 315\.0 lb, down 3\.9 this week · 7 training sessions\.<\/span>/);
+  // Site-to-A round 1: a kit chapter row, the title a door; without the timeline no change is claimed.
+  assert.match(html, /<span class="ck-rows__key">Week 3<\/span><span><a href="\/journal\/posts\/week-06\/">Storming Mode<\/a><br><span class="ck-small">Day 11 to Day 17 · 315\.0 lb · 7 training sessions\.<\/span>/);
   // Red team 2026-10-17: one kind of line per chapter, one unit label, no repeated opening sentence.
   assert.doesNotMatch(html, /\blbs\b|Tomorrow morning/);
   const lines = [...html.matchAll(/<\/span><span>([^<]*)<\/span>/g)].map((m) => m[1]);

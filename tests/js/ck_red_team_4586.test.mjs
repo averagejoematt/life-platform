@@ -92,17 +92,32 @@ test("Coaches: a coach sitting out since before day one says what its counted ca
 // ── round 2 (2026-10-17, the independent re-grade) ──────────────────────────────
 const F = await import("../../site/assets/js/ck_front.js");
 
-test("Start: the week's change is the difference of the two weights the list prints, never the served unrounded one", () => {
-  const html = P.recapHTML(P.postsInOrder(POSTS));
-  const rows = [...html.matchAll(/· (\d+\.\d) lb(?:, (down|up) (\d+\.\d) this week)?/g)].map((m) => ({ w: Number(m[1]), dir: m[2], d: m[3] }));
-  assert.ok(rows.length >= 3);
-  for (let i = 1; i < rows.length; i += 1) {
-    const want = (rows[i - 1].w - rows[i].w).toFixed(1);
-    assert.equal(rows[i].d, Math.abs(Number(want)).toFixed(1), `row ${i}`);
-    assert.equal(rows[i].dir, Number(want) > 0 ? "down" : "up");
+test("Start: a week's change is its own window's first reading against its last, never a reading from before the window (item 7)", () => {
+  const weights = load("timeline").timeline.weights;
+  const startDate = B.today.data.start_date;
+  const html = P.recapHTML(P.postsInOrder(POSTS), { weights, startDate });
+  assert.doesNotMatch(html, /\blbs\b/, "lb everywhere");
+  assert.doesNotMatch(html, /this week/, "a historical row never says 'this week'");
+  for (const p of P.postsInOrder(POSTS)) {
+    const m = /Day (\d+) to Day (\d+)/.exec(p.stats_line || "");
+    if (!m) continue;
+    const day = (n) => new Date(Date.parse(`${startDate}T12:00:00Z`) + (n - 1) * 86400000).toISOString().slice(0, 10);
+    const inside = weights.filter((r) => r.date >= day(Number(m[1])) && r.date <= day(Number(m[2]))).sort((a, b) => a.date.localeCompare(b.date));
+    const want = inside.length < 2 ? "" : `${inside[0].lbs > inside[inside.length - 1].lbs ? "down" : "up"} ${Math.abs(inside[0].lbs - inside[inside.length - 1].lbs).toFixed(1)} that week`;
+    assert.equal(P.windowChange(p.stats_line, weights, startDate), want, p.label);
+    if (want) assert.ok(html.includes(`, ${want}`), `${p.label}: ${want}`);
   }
+  // The specimen: week 2 ("Day 4 to Day 10") used to print Day 1's 327.3 against Day 10 as "down 8.4 this week".
+  const week2 = P.postsInOrder(POSTS).find((p) => /^Week 2/.test(p.label));
+  assert.doesNotMatch(P.windowChange(week2.stats_line, weights, startDate), /8\.4/);
+  assert.equal(P.windowChange(week2.stats_line, null, startDate), "", "no timeline: no change claimed");
   assert.equal(P.weekChange("315.0", "312.3"), "down 2.7 this week");
-  assert.equal(P.weekChange("", "312.3"), "");
+  // Each row is a kit chapter row whose title is a door; each prologue says what it is.
+  assert.match(html, /<ul class="ck-rows ck-rows--chapters">/);
+  assert.match(html, /<a href="\/journal\/posts\/week-05\/">Nine Days and No Rest<\/a>/);
+  assert.match(html, /Who he was before the record\./);
+  assert.match(html, /The plan, written before day one\./);
+  assert.doesNotMatch(html, /Before day one\./, "no prologue falls back to the shared line on the capture");
 });
 
 test("Front: a line in the statistician's jargon, or one with a reader-gate finding, is never quoted", () => {
@@ -166,7 +181,106 @@ test("Front, no bet and no exchange: the newest quotable line keeps the coaches'
   const quietDay = { ...B, moves: { state: "ok", data: { days: [{ state: "ok", date: EDITION.as_of, lines: [{ coach_id: "sleep_coach", coach: "Lisa Park", move: "call", text: "Bedtime moved earlier this week." }] }] } } };
   const out = P.frontReadSlots(EDITION, quietDay, "/next/v8/");
   assert.match(out["ck-argument"], /Bedtime moved earlier this week\./);
-  assert.equal(out["ck-argue-heading"], "The latest from the coaches.");
+  // Site-to-A round 1 (front:F2, item 2): the heading is the section's name; the null bet is one soft line under the voice.
+  assert.equal(out["ck-argue-heading"], "The coaches.");
+  assert.match(out["ck-argument"], /<p class="ck-soft">No open bet between them this week\.<\/p>$/);
   const silent = { ...B, moves: { state: "ok", data: { days: [] } } };
-  assert.equal(P.frontReadSlots(EDITION, silent, "/next/v8/")["ck-argue-heading"], "No open bet between them this week.");
+  const quiet = P.frontReadSlots(EDITION, silent, "/next/v8/");
+  assert.equal(quiet["ck-argue-heading"], "The coaches.");
+  assert.equal(quiet["ck-argument"], '<p class="ck-soft">No open bet between them this week.</p>');
+  // The capture itself: every line in the window is 36-51 words against the 28-word cap and today's is the mind
+  // coach's, so the front has no quotable line — the section still never opens on the null state.
+  const wire = P.frontReadSlots(EDITION, B, "/next/v8/");
+  assert.doesNotMatch(wire["ck-argue-heading"], /^No open bet/);
+  assert.match(wire["ck-argument"], /No open bet between them this week\./);
+  // With a bet open, no null-bet sentence appears anywhere.
+  const bet = { ...B, next: { state: "ok", data: { ...B.next.data, bet: { state: "ok", data: { question: "Will he sleep more?", settle_date: "2026-10-25", sides: [{ coach: "Lisa Park", side: "yes" }, { coach: "Max Reyes", side: "no" }] } } } } };
+  assert.doesNotMatch(P.frontReadSlots(EDITION, bet, "/next/v8/")["ck-argument"] || "", /No open bet/);
+});
+
+// ── site-to-A round 1, lane A: the front page and Start here (#4580, #4590) ──────────────────
+const SITE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "site", "next", "v8");
+const shell = (page) => readFileSync(join(SITE, page, "index.html"), "utf8");
+
+test("item 1: the two premise sentences are the drafts posted on #4590, marked as drafts until his word", () => {
+  const front = shell("");
+  const start = shell("start");
+  assert.match(front, /<p class="ck-premise" data-ck-draft="premise">I’m Matthew\. I’m trying to get from 327 pounds to 185 and to get my life back with it, in public, because I do better when someone is watching\. A team of AI coaches I built predicts how it will go, and code checks every call\.<\/p>/);
+  assert.match(start, /<p class="ck-premise" data-ck-draft="premise">I’m Matthew\. The weight was never really about food, so this is me measuring the whole thing out loud: what my scale, wrist strap, bed sensor and food log record each day, what the AI coaches I built with Claude make of it, and whether they were right\.<\/p>/);
+  for (const html of [front, start]) {
+    const note = /<p class="ck-small">(Preview\. [^<]*)<\/p>\s*<\/div>/.exec(html);
+    assert.ok(note, "the footer keeps its draft note");
+    assert.equal((note[1].match(/[.!?](\s|$)/g) || []).length, 2, `one short sentence after "Preview.": ${note[1]}`);
+    assert.match(note[1], /draft/i);
+  }
+  assert.doesNotMatch(front, /a program grades/, "front:F8 — the grader is code");
+  assert.match(front, /<p class="ck-label">Graded by code<\/p>/);
+});
+
+test("item 3: one sayable guess sentence on the front and Start, the exact rate one tap deeper; a served baseline is printed", () => {
+  const html = P.recordHTML(B.record, { href: "/next/v8/coaches/" });
+  assert.match(html, /^<a class="ck-link" href="\/next\/v8\/coaches\/">76 of 183 checked calls right\.<\/a> The coaches do not beat a simple guess yet\.<details class="ck-small"><summary>The exact rate<\/summary><p>A guess that every call has a 42% chance of coming true does about as well\.<\/p><\/details>$/);
+  assert.equal(P.frontSlots(EDITION, B, "/next/v8/")["ck-record"], html);
+  assert.equal(P.recordHTML(B.record).startsWith("76 of 183 checked calls right. The coaches"), true, "Start: no door on the count, the page has its own");
+  assert.equal(P.guessSentence({ ...B.record.data, beats_simple_guess: true }), "The coaches beat a simple guess.");
+  assert.equal(P.guessSentence({ ...B.record.data, brier_skill: null }), "There is no comparison with a guess yet.");
+  assert.equal(P.guessSentence({ ...B.record.data, baseline: "A guess that nothing changes does about as well." }), "A guess that nothing changes does about as well.", "lane E's served sentence wins");
+  assert.equal(P.guessSentence({ ...B.record.data, baseline: { text: "Served." } }), "Served.");
+  assert.equal(P.guessSentence({ ...B.record.data, baseline: { rate: 0.42 } }), "The coaches do not beat a simple guess yet.", "a baseline with no sentence changes nothing");
+  const failed = { state: "unavailable", absent_text: "The record is not here.", data: null };
+  assert.equal(P.recordHTML(failed, { href: "/x/" }), "The record is not here.");
+});
+
+test("item 4: Go deeper leads with the latest chapter — chronicle.latest when served, else the chapter block; no held claim anywhere", () => {
+  const front = shell("");
+  const deeper = /<ul class="ck-rows ck-rows--deeper">\s*<li id="ck-chapter-row">/.test(front);
+  assert.ok(deeper, "the chapter row is the first row");
+  assert.equal(P.latestChapterBlock(B), B.chapter, "no chronicle block: the chapter block as today");
+  const latest = { title: "The Quiet Accumulation", date: "2026-10-13", url: "/journal/posts/week-09/", week_label: "Week 6", read_minutes: 7, status: "published", next_due: "2026-10-21" };
+  const withChronicle = { ...B, chronicle: { state: "ok", as_of: "2026-10-18", absent_text: "", data: { latest } } };
+  const row = P.frontSlots(EDITION, withChronicle, "/next/v8/")["ck-chapter-row"];
+  assert.match(row, /Week 6 · “The Quiet Accumulation”/);
+  assert.match(row, /The latest chapter · October 13 · 7 min/);
+  assert.equal(P.latestChapterBlock({ ...B, chronicle: { state: "ok", data: { latest: { title: "x" } } } }), B.chapter, "a latest with no url or date is not bound");
+  for (const page of ["", "start"]) assert.doesNotMatch(shell(page), /waiting for approval|held before publishing/);
+  assert.doesNotMatch(shell("start"), /Open now/, "start:S3 — the date is the chapter list's tail, not a section");
+  assert.match(shell("start"), /<div id="ck-recap"><\/div>\s*<p class="ck-small" id="ck-open"><\/p>/);
+});
+
+test("item 5: a settled miss is headed by the week it was checked in; the words row has no door to a page that says nothing new", () => {
+  const slots = P.frontReadSlots(EDITION, B, "/next/v8/");
+  if (/this week/.test(slots["ck-miss-heading"])) assert.equal(slots["ck-miss-heading"], "The clearest miss checked this week.");
+  assert.match(slots["ck-call"], /Settled [A-Z][a-z]+day, [A-Z][a-z]+ \d+/, "the card carries its own date");
+  const front = P.frontSlots(EDITION, B, "/next/v8/");
+  assert.equal(B.his_words.state, "stale", "the capture's words are stale");
+  assert.equal(front["ck-words-row"], '<span class="ck-rows__key">In his own words</span><span id="ck-words-absent"></span>', "the row keeps its key and loses its door");
+  assert.ok(Object.keys(front).indexOf("ck-words-row") < Object.keys(front).indexOf("ck-words-absent"), "the row is filled before its sentence slot");
+  assert.match(front["ck-words-absent"], /^Nothing new since [A-Z][a-z]+day, [A-Z][a-z]+ \d+\.$/, "the sentence keeps its own date");
+  const fresh = { ...B, his_words: { state: "ok", data: { text: "Right now I still feel good.", date: "2026-10-17" } } };
+  assert.equal(P.frontSlots(EDITION, fresh, "/next/v8/")["ck-words-row"], null, "fresh words lead the page; the row goes whole");
+});
+
+test("item 6: Start carries the Follow block, the same markup as the front page, with the feeds beside the button", () => {
+  const block = (html) => /<section class="ck-section ck-follow" id="follow">[\s\S]*?<\/section>/.exec(html)[0];
+  const front = block(shell(""));
+  const start = block(shell("start"));
+  assert.equal(start, front);
+  assert.match(start, /<a class="ck-btn" href="\/subscribe\/">Follow by email<\/a>/);
+  assert.match(start, /href="\/rss\.xml">RSS<\/a>/);
+  assert.match(start, /href="\/panelcast\/feed\.xml">the podcast feed<\/a>/);
+  const main = /<main[\s\S]*<\/main>/.exec(shell("start"))[0];
+  assert.ok(main.trimEnd().endsWith("</section>\n  </main>") && main.lastIndexOf('id="follow"') > main.lastIndexOf('id="ck-recap"'), "after the last section");
+  for (const page of ["", "start"]) assert.match(shell(page), /<link rel="alternate" type="application\/rss\+xml"[^>]*href="\/panelcast\/feed\.xml">/);
+});
+
+test("item 8: the mark names its floor — the start at one end, 185 at the other", () => {
+  const t = B.today.data;
+  const ends = F.markEndsHTML(t.start_weight_lbs, t.goal_weight_lbs);
+  assert.equal(ends, '<div class="ck-ends"><span>327.3 lb at the start</span><span>185 lb, the goal</span></div>');
+  assert.ok(P.frontSlots(EDITION, B, "/next/v8/")["ck-mark"].endsWith(ends));
+  assert.equal(F.markEndsHTML(null, 185), "");
+  assert.equal(F.markEndsHTML(180, 185), "", "a start under the goal names no floor");
+  // front:F5: the caption sits under the mark, then the record — not the record between them.
+  const front = shell("");
+  assert.ok(front.indexOf('id="ck-mark"') < front.indexOf("One column a day") && front.indexOf("One column a day") < front.indexOf('id="ck-record"'));
 });

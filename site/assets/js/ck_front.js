@@ -77,7 +77,13 @@ export function markHTML(series, todayIso, start, goal, { width = 640, height = 
       return `<rect class="ck-mark__left" x="${x}" y="0" width="${w.toFixed(1)}" height="${height}" rx="2"/><rect class="ck-mark__gone" x="${x}" y="0" width="${w.toFixed(1)}" height="${cap.toFixed(1)}" rx="2"/>`;
     })
     .join("");
-  return `<svg class="ck-mark" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(markSentence(cells, start, goal))}">${rects}</svg>`;
+  return `<svg class="ck-mark" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(markSentence(cells, start, goal))}">${rects}</svg>${markEndsHTML(start, goal)}`;
+}
+// The mark's two ends, named under it (site-to-A round 1, front:F15): the start weight at the
+// left, the goal at the right — the floor the grey stands for. "" without both numbers.
+export function markEndsHTML(start, goal) {
+  if (num(start) === null || num(goal) === null || start <= goal) return "";
+  return `<div class="ck-ends"><span>${esc(`${fmt1(start)} lb at the start`)}</span><span>${esc(`${String(Number(goal.toFixed(1)))} lb, the goal`)}</span></div>`;
 }
 // "312.1 lb · Day 29 · 15.2 down, 127.1 to go to 185" — the mark's one line of numbers,
 // the weight in bold. Returns HTML.
@@ -566,8 +572,9 @@ export function chapterRowHTML(chapter) {
   if (!usable(chapter) || !chapter.data.title || !chapter.data.url) return soft((chapter && chapter.absent_text) || "The latest chapter is not served right now.");
   const c = chapter.data;
   const lead = c.week_label ? `${c.week_label} · ` : "";
-  // The note is the chapter's own first sentence (round 8: the one narrative hook on the
-  // site), or what the chapter is and how long it takes when the excerpt has none.
-  const note = firstSentences(c.dek, 150) || [`The chapter`, num(c.read_minutes) !== null ? `${c.read_minutes} min` : "", shortDay(c.date)].filter(Boolean).join(" · ");
+  // Site-to-A round 1 (front:F6): the row leads "Go deeper" and its note is the chapter's own
+  // date and length — the dek's first sentence carried claims ("crossed 310 pounds", "18.5 pounds
+  // gone") that Story has to repair against the page and the front page cannot.
+  const note = ["The latest chapter", shortDay(c.date), num(c.read_minutes) !== null ? `${c.read_minutes} min` : ""].filter(Boolean).join(" · ");
   return `<a class="ck-rows__key" href="${esc(c.url)}">${esc(`${lead}“${c.title}”`)}</a><span>${esc(note)}</span>`;
 }
