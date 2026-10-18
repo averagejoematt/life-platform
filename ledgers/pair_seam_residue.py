@@ -465,6 +465,16 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "2026-09-20",
         _HEVY_WORKED_SET_REASON,
     ),
+    # #4976 (2026-10-18): /api/device_agreement re-pointed from garmin to the Apple Watch. It reads
+    # `date` + `resting_heart_rate_apple` only — the one name health_auto_export_lambda's tier-2
+    # _METRIC_DEFS writes for Apple RHR (freshness_checker writes no such field). A writer-side
+    # rename leaves the reader with NO matching rows, which the endpoint serves as an explicit
+    # 'unavailable' with a reason (tests/test_device_agreement.py::test_no_overlap_returns_shaped_unavailable_200)
+    # — the two sides can disagree only into an honest absence, never into a wrong number.
+    "apple_health::lambdas/web/site_api_freshness.py::read": (
+        "2026-10-18",
+        "reads resting_heart_rate_apple + date only; a writer rename degrades to an explicit 'unavailable', never a wrong value",
+    ),
     "hevy::mcp/tools_nutrition.py::read": (
         "2026-09-20",
         _HEVY_WORKED_SET_REASON,

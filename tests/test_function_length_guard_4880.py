@@ -123,7 +123,7 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/emails/chronicle_email_sender_lambda.py::_build_subscriber_email": 157,
     "lambdas/emails/chronicle_render.py::publish_to_journal": 332,
     "lambdas/emails/coach_panel_podcast_lambda.py::_run_intro": 155,
-    "lambdas/emails/coach_panel_podcast_lambda.py::_run_weekly": 216,
+    "lambdas/emails/coach_panel_podcast_lambda.py::_run_weekly": 212,
     "lambdas/emails/daily_brief_lambda.py::gather_daily_data": 202,
     "lambdas/emails/daily_brief_lambda.py::lambda_handler": 896,
     "lambdas/emails/freshness_checker_lambda.py::lambda_handler": 477,

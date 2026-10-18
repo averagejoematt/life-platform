@@ -298,10 +298,11 @@ def test_latest_readiness_pre492_record_serves_no_components(monkeypatch):
 def test_device_agreement_never_silent_null():
     """M-7: tools_health always explains an absent cross-check."""
     src = open(os.path.join(_REPO, "mcp/tools_health.py")).read()
-    assert 'device_agreement = {"status": "unavailable", "reason": "garmin paused (ADR-074)' in src
-    # registry advertises the CODE's weights (40/5), not the stale 35/10
+    assert '"reason": f"no Apple Watch resting heart rate for the Whoop night' in src
+    # registry advertises the CODE's weights (40/5) — #4978: the 5% leg is overnight physiology, not Body Battery
     reg = open(os.path.join(_REPO, "mcp/registry.py")).read()
-    assert "Whoop recovery (40%)" in reg and "Garmin Body Battery (5%)" in reg
+    assert "Whoop recovery (40%)" in reg and "Overnight physiology (5%)" in reg
+    assert "Body Battery (5%)" not in reg
 
 
 # ==============================================================================

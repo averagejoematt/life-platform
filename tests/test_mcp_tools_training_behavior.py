@@ -819,8 +819,9 @@ def test_recommendation_measured_acwr_override_still_fires_with_no_recovery_sign
 
 
 def test_recommendation_composite_is_the_plain_mean_of_the_present_signals(sources):
-    """Whoop recovery 80, sleep score 70, body battery 60 ⇒ (80+70+60)/3 = 70.0
-    ⇒ GREEN (>= 67). Unweighted mean, hand-derived."""
+    """Whoop recovery 80, sleep score 70 ⇒ (80+70)/2 = 75.0 ⇒ GREEN (>= 67). Unweighted
+    mean, hand-derived. #4976: the stored Garmin Body Battery of 60 is NOT a signal any more
+    (mutation control: restore the garmin read and the mean drops to 70.0)."""
     sources(
         whoop=[_recovery_day(TODAY, recovery=80, hrv=60)],
         eightsleep=[{"date": TODAY, "sleep_score": 70, "sleep_duration_hours": 7.5}],
@@ -830,8 +831,9 @@ def test_recommendation_composite_is_the_plain_mean_of_the_present_signals(sourc
         computed_metrics=[],
     )
     out = call("get_training", {"view": "recommendation", "date": TODAY})
-    assert out["composite_readiness"] == 70.0
+    assert out["composite_readiness"] == 75.0
     assert out["readiness_tier"] == "GREEN"
+    assert "body_battery" not in out["readiness_signals"] and "garmin" not in out["source"]
 
 
 def test_recommendation_composite_carries_the_n_behind_its_average(sources):
@@ -843,21 +845,21 @@ def test_recommendation_composite_carries_the_n_behind_its_average(sources):
     sources(
         whoop=[_recovery_day(TODAY, recovery=70)],
         eightsleep=[{"date": TODAY, "sleep_score": 70}],
-        garmin=[{"date": TODAY, "body_battery_high": 70}],
+        garmin=[{"date": TODAY, "body_battery_high": 70}],  # #4976: stored, never read
         strava=[],
         macrofactor_workouts=[],
         computed_metrics=[],
     )
-    three = call("get_training", {"view": "recommendation", "date": TODAY})
-    assert one["composite_readiness"] == three["composite_readiness"] == 70.0
+    two = call("get_training", {"view": "recommendation", "date": TODAY})
+    assert one["composite_readiness"] == two["composite_readiness"] == 70.0
     # Identical means, different n — and the payload now says so.
-    assert one["composite_readiness_n"] == 1 and three["composite_readiness_n"] == 3
+    assert one["composite_readiness_n"] == 1 and two["composite_readiness_n"] == 2
     assert one["composite_readiness_signals"] == ["whoop_recovery"]
-    assert three["composite_readiness_signals"] == ["whoop_recovery", "sleep_score", "body_battery"]
+    assert two["composite_readiness_signals"] == ["whoop_recovery", "sleep_score"]
     # The signals dict is honest about absence (missing sub-fields are None, never 0).
     present = lambda r: {k for k, v in r["readiness_signals"].items() if v is not None}  # noqa: E731
     assert present(one) == {"whoop_recovery"}
-    assert present(three) == {"whoop_recovery", "sleep_score", "body_battery"}
+    assert present(two) == {"whoop_recovery", "sleep_score"}
 
 
 def test_recommendation_acwr_above_one_point_five_forces_red(sources):
@@ -1210,9 +1212,10 @@ def test_recommendation_red_with_no_rest_history_prescribes_full_rest(sources):
     assert any("Walker" in n for n in out["board_of_directors"])
 
 
-def test_recommendation_short_sleep_and_high_stress_raise_warnings(sources):
-    """Two independent single-signal warnings. Note they are WARNINGS, not tier
-    changes — the rest/params decision stays multi-factor."""
+def test_recommendation_short_sleep_raises_a_warning_and_a_stored_garmin_stress_does_not(sources):
+    """A single-signal WARNING, not a tier change — the rest/params decision stays
+    multi-factor. #4976: the Garmin stress warning is retired with the feed; a stored
+    garmin stress of 61 raises nothing."""
     sources(
         whoop=[_recovery_day(TODAY, recovery=80)],
         eightsleep=[{"date": TODAY, "sleep_score": 80, "sleep_duration_hours": 5.2}],
@@ -1223,7 +1226,7 @@ def test_recommendation_short_sleep_and_high_stress_raise_warnings(sources):
     )
     out = call("get_training", {"view": "recommendation", "date": TODAY})
     assert any("5.2h sleep" in w for w in out["warnings"])
-    assert any("Garmin stress score 61" in w for w in out["warnings"])
+    assert not any("Garmin" in w for w in out["warnings"])
 
 
 def test_recommendation_hrv_warning_compares_today_against_a_mean_that_includes_today(sources):

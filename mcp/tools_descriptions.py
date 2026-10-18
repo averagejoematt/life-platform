@@ -39,7 +39,7 @@ WHAT STAYED INLINE, AND WHY
       REGISTRY; as a constant here it would be an un-literal-evaluable node and the
       catalog would render the placeholder instead of 90.
     * `get_readiness_score` — `tests/test_data_truth_batch.py::test_device_agreement_never_silent_null`
-      asserts the blend weights ("Whoop recovery (40%)", "Garmin Body Battery (5%)") appear
+      asserts the blend weights ("Whoop recovery (40%)", "Overnight physiology (5%)") appear
       in the TEXT of mcp/registry.py, so that the table can never advertise weights the code
       stopped using. That guard reads the file, not the resolved schema, and it is right to:
       the claim it protects is a reader-facing one. Moving the string out would have turned a

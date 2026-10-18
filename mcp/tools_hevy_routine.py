@@ -636,6 +636,12 @@ def _coerce_sets(raw_sets: list[dict[str, Any]] | None) -> list:
     return sets
 
 
+_CUSTOM_RATIONALE = [
+    "custom-authored via chat (action=draft_custom)",
+    "loads + sets are user-specified; the generator did NOT compute them",
+]
+
+
 def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     """Author an IR from an explicit exercise/set/weight list (ADR-069).
 
@@ -795,11 +801,7 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
             "created_exercises": created,
             "force_title": forced,
         },
-        rationale=[
-            "custom-authored via chat (action=draft_custom)",
-            "loads + sets are user-specified; the generator did NOT compute them",
-            f"{len(blocks)} exercises, {total_sets} total sets",
-        ],
+        rationale=_CUSTOM_RATIONALE + [f"{len(blocks)} exercises, {total_sets} total sets"],
         caps={},
     )
     # #3700 — the chat path gets the SAME cardio cue the cron path already stamps.
@@ -825,7 +827,10 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     except Exception as e:  # noqa: BLE001
         logger.warning(f"draft_custom: cardio cue pass failed ({e}); notes untouched")
     ir.inputs_snapshot["cardio_cues"] = cardio_cues
+    # #5005: a program-session date re-tags the blocks with the slot's intensity, so the commit gate checks the engine's floors
+    from mcp.draft_custom_session import stamp_program_slot
 
+    program_slot = stamp_program_slot(ir)
     draft_versioned(ir)
     resp = {
         "status": "drafted_custom",
@@ -835,6 +840,7 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         "exercise_count": len(blocks),
         "total_sets": total_sets,
         "cardio_cues": cardio_cues,
+        "program_slot": program_slot,
         "warnings": warnings,
         "note": "Run action=dry_run with this routine_id to preview the exact Hevy "
         "body, then action=commit to push. Commit requires explicit routine_id.",

@@ -102,7 +102,12 @@
       "ingest_pattern": "manual_entry",
       "behavioral": true,
       "paused": false,
-      "raw_scheme": "date-folder"
+      "raw_scheme": "date-folder",
+      "device": {
+        "product": "DEXA scans",
+        "vendor": "a clinic DEXA scanner",
+        "purchasable": false
+      }
     },
     {
       "id": "habitify",

@@ -246,7 +246,7 @@ def test_every_loaded_session_advances_seven_days_a_week():
     e = served("2026-09-28", rows)
     # #4161: the ORDER never waits (lower-heavy is next); the WEEK does — a 5th session in week 1
     assert (e["week"], e["session_role"], e["session_in_week"], e["advance_blocked_by"]) == (1, LH, 5, "calendar_floor")
-    assert e["spacing"]["loaded_yesterday"] is True and e["spacing"]["loaded_sessions_prior_7d"] == 4
+    assert e["spacing"]["loaded_yesterday"] is True and e["spacing"]["loaded_sessions_prior_in_window"] == 4
     assert len(e["spacing"]["advisories"]) == 1 and "ceiling" in e["spacing"]["advisories"][0]
 
 
@@ -694,3 +694,41 @@ def test_the_engine_the_gate_and_the_served_session_read_the_one_credit_rule():
     assert ideal.archetype == "lower" and ideal.title.startswith("LOWER-VOLUME — W1")
     # the role formula is ONE function: the role a candidate WOULD take is the role the ledger gives it
     assert [session_sequence._role_at(i) for i in range(4)] == [p["session_role"] for p in session_sequence.preview(4)]
+
+
+# ── #5004: the spacing window is 7 days ending on and including the target ───
+# Reproduced 2026-10-18: Hevy rows 10-11, 10-13, 10-15, 10-16 (four in the 8-day span 10-11..10-18) were flagged;
+# every 7-day window holding 10-18 (10-12..10-18) holds 10-13, 10-15, 10-16 + the target = 4, inside 3-4/wk.
+SPACING_DAYS_4 = ("2026-10-11", "2026-10-13", "2026-10-15", "2026-10-16")
+
+
+def _spacing_for(days: tuple[str, ...], target: str = "2026-10-18") -> dict:
+    return session_sequence._spacing([{"date": d} for d in days], target)
+
+
+def test_5004_four_sessions_in_seven_days_ending_target_is_not_over_the_limit():
+    sp = _spacing_for(SPACING_DAYS_4)
+    assert sp["loaded_sessions_in_window"] == 4 and sp["loaded_sessions_prior_in_window"] == 3
+    assert sp["advisories"] == []
+    assert sp["window"] == {"start": "2026-10-12", "end": "2026-10-18", "days": 7, "includes_target": True}
+
+
+def test_5004_a_fifth_session_in_the_window_is_flagged_and_names_the_window():
+    sp = _spacing_for(("2026-10-12",) + SPACING_DAYS_4[1:])
+    assert sp["loaded_sessions_in_window"] == 5
+    assert len(sp["advisories"]) == 1
+    assert "in the 7 days ending 2026-10-18, including this session" in sp["advisories"][0]
+
+
+def test_5004_redline_value_unchanged():
+    assert [owner_redlines.REDLINES["lifting_sessions_per_wk"][k] for k in ("low", "high")] == [3, 4]
+
+
+def test_5004_mutation_control_the_eight_day_count_flags_the_four_session_case():
+    """Restore the pre-fix count (sessions with date >= target-7, plus the target) and the fixture reds."""
+
+    def old_count(days, target):
+        return len([d for d in days if d >= shift_day_key(target, -7)]) + 1
+
+    assert old_count(SPACING_DAYS_4, "2026-10-18") == 5 > owner_redlines.REDLINES["lifting_sessions_per_wk"]["high"]
+    assert _spacing_for(SPACING_DAYS_4)["loaded_sessions_in_window"] != old_count(SPACING_DAYS_4, "2026-10-18")

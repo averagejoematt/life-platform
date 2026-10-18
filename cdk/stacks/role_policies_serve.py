@@ -446,6 +446,16 @@ def mcp_server() -> list[iam.PolicyStatement]:
             resources=_s3("config/*", "raw/matthew/cgm_readings/*", "generated/qa_archive/text/*"),
         ),
         iam.PolicyStatement(
+            # #5009: get_data_freshness (mcp/tools_labs.py) runs the same output-artifact
+            # check as the freshness-checker Lambda, from THIS role. The grant existed only
+            # on the checker's role (role_policies_operational.py), so the MCP tool read
+            # `unknown` / AccessDenied. One exact key, read-only (HeadObject + GetObject
+            # are both authorized by s3:GetObject) — never the prefix.
+            sid="S3ReadMemoryBackupHeartbeat",
+            actions=["s3:GetObject"],
+            resources=_s3("claude-memory-backup/_backup_heartbeat.json"),
+        ),
+        iam.PolicyStatement(
             sid="S3ListCGM",
             # Scoped list for fasting_glucose_validation tool (paginates raw/matthew/cgm_readings/)
             actions=["s3:ListBucket"],

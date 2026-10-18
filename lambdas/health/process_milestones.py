@@ -453,11 +453,10 @@ def zone2_accumulation(zone2_minutes_by_day, today, zone2_source_by_day=None):
     A sum can only be UNDER-counted by missing days, so thin coverage is
     conservative rather than dishonest — the measurement still records how many
     days actually carried data. `zone2_source_by_day` (optional, #1809,
-    {date: "garmin"|"strava"}) discloses which provider each in-window day's
-    minutes came from — Garmin's all-day heartRateZones extractor has produced
-    zero minutes on every live record to date, so this has so far always read as
-    Strava-only coverage; the split is measured live, never hardcoded, so it
-    self-corrects the day Garmin's leg starts populating. Returns
+    {date: source}) discloses which provider each in-window day's minutes came
+    from. Since #4976 the only provider is Strava (Garmin's direct feed is retired,
+    #4640, and its all-day leg never produced a live minute), so the coverage is
+    `strava_days` alone — never an implied second source. Returns
     [(WindowMilestone, measurement), …].
     """
     today = _coerce_today(today)
@@ -465,7 +464,6 @@ def zone2_accumulation(zone2_minutes_by_day, today, zone2_source_by_day=None):
     series = _series_in_window(zone2_minutes_by_day, start, today)
     total = sum(v for _, v in series)
     src = zone2_source_by_day or {}
-    garmin_days = sum(1 for d, _ in series if src.get(d.isoformat()) == "garmin")
     strava_days = sum(1 for d, _ in series if src.get(d.isoformat()) == "strava")
     out = []
     for depth, rung in enumerate(ZONE2_RUNG_MINUTES):
@@ -486,7 +484,7 @@ def zone2_accumulation(zone2_minutes_by_day, today, zone2_source_by_day=None):
             "threshold_minutes": rung,
             # #1809: per-source day counts — honest single-source coverage instead
             # of an implied (and currently false) two-source claim.
-            "source_coverage": {"garmin_days": garmin_days, "strava_days": strava_days},
+            "source_coverage": {"strava_days": strava_days},
             "uncertainty": {"type": "sum_undercount_only", "coverage_days": len(series)},
         }
         out.append((milestone, measurement))
