@@ -12,6 +12,7 @@ from health import (
     tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
     training_output_channel,  # #3754: THE training-output input (daily training load, never Strava kJ)
 )
+from health.protein_floor import met_floor
 
 from mcp.core import (
     get_profile,
@@ -599,7 +600,7 @@ def _get_macro_targets(args):
         carbs = measured(item, "total_carbs_g")
 
         hit_cal = (0.85 <= cal / calorie_target <= 1.10) if (cal is not None and calorie_target) else None
-        hit_prot = (prot >= protein_target * 0.95) if prot is not None else None
+        hit_prot = met_floor(prot, protein_target)  # #5003: strictly at/above the floor - the tripwire's definition
         hit_fiber = (fiber >= _FIBER_TARGET_G) if fiber is not None else None
         for axis, hit in (("calorie", hit_cal), ("protein", hit_prot), ("fiber", hit_fiber)):
             if hit is not None:
