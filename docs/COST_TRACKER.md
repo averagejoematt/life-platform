@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-10-17 (v8.6.0)
+Last updated: 2026-10-18 (v8.6.0)
 
 > The Secrets rate-card row and the `Last updated` line above are **sync-owned literals**
 > (`deploy/sync_doc_metadata.py` RULES): a hand-edit must keep the rule's exact phrasing or

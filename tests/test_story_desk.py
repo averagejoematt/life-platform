@@ -589,7 +589,7 @@ def test_carried_keeps_the_ask_open_counts_the_weeks_and_escalates_after_the_lim
         )
         assert led["asks"][0]["carried_weeks"] == i + 1
     assert led["asks"][0]["status"] == "escalated" and led["asks"][0]["escalated_week"] == 6 + story_ledger.CARRIED_MAX_WEEKS - 1
-    assert story_ledger.open_asks(led) == [] and story_ledger._escalated_asks(led) == led["asks"]
+    assert story_ledger.open_asks(led) == [] and story_ledger.escalated_asks(led) == led["asks"]
     assert story_desk.validate(_budget(), {"roster": []}, led, week=9) == [] or not [
         x for x in story_desk.validate(_budget(), {"roster": []}, led, week=9) if "coach ask" in x
     ]

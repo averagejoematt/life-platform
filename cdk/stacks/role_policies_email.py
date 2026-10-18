@@ -265,6 +265,20 @@ def email_coach_panel_podcast() -> list[iam.PolicyStatement]:
             iam.PolicyStatement(
                 sid="PanelcastHoldsReadDelete", actions=["s3:GetObject", "s3:DeleteObject"], resources=_s3("panelcast-holds/*")
             ),
+            # #4536: the #4449 grant above was still not enough. Without ListBucket S3 answers a
+            # GetObject on a MISSING key with 403 AccessDenied, not 404 NoSuchKey (it will not confirm
+            # or deny existence to a caller who cannot list) — and a week with no hold is the common
+            # case, so every MON/WED sweep logged `[panel] hold read wk<N> FAILED — An error occurred
+            # (AccessDenied) when calling the GetObject operation` (2026-10-18T04:31:07Z, wk6) and
+            # `_read_hold` returned {} as if nothing were held. Bucket-level by necessity (ListBucket
+            # is a bucket action), scoped with `s3:prefix` to the holds prefix — the same shape as
+            # operational's `DedupeList` (HeadObject 404-vs-403) and `S3List` ai-canary-log/* (#3502).
+            iam.PolicyStatement(
+                sid="PanelcastHoldsList",
+                actions=["s3:ListBucket"],
+                resources=[BUCKET_ARN],
+                conditions={"StringLike": {"s3:prefix": ["panelcast-holds/*"]}},
+            ),
             # Loud HOLD + new-episode notify: SNS to life-platform-alerts.
             iam.PolicyStatement(
                 sid="HoldAlertSNS", actions=["sns:Publish"], resources=[f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"]
