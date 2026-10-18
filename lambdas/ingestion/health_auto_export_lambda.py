@@ -121,6 +121,7 @@ try:
     from health import glycemic
 except ImportError:
     glycemic = None
+from health import rhythm_channel as _rhythm  # #4972: the owner-only ECG / HR-notification / medication-log channel
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -144,13 +145,6 @@ except ImportError:
 # not fail-soft: this sibling ships in the same CDK asset as this file (both are
 # under `ingestion/`, staged whole by the bundle), so an ImportError here means
 # the deploy itself is broken, not that an optional feature is missing.
-# #4972: the owner-only heart-rhythm event channel (lambdas/health/rhythm_channel.py).
-# Fail-soft like `glycemic`: an older bundle without it skips the channel, never the webhook.
-try:
-    from health import rhythm_channel as _rhythm_channel
-except ImportError:
-    _rhythm_channel = None
-
 from ingestion import (
     health_auto_export_additive as _additive,  # #4628: the archived day sum
     health_auto_export_archive as _archive,
@@ -1529,20 +1523,6 @@ def lambda_handler(event, context):
         if som_entries_new:
             logger.info(f"State of Mind: {som_entries_new} new entries saved to S3, {som_days} days updated in DynamoDB")
 
-    # ── #4972: owner-only heart-rhythm event channel (ECG / heart-rate notifications /
-    # medication log). Its own data types, so its own block: the rows go to the clinical
-    # partition's `RHYTHM#` prefix via clinical_facts.put_channel_rows — never the
-    # apple_health day row. The result is COUNTS only (it is logged below). A failure is
-    # logged at ERROR and does not drop the rest of the delivery.
-    rhythm_result = {}
-    if _rhythm_channel is not None and _rhythm_channel.has_channel_payload(data):
-        try:
-            rhythm_result = _rhythm_channel.ingest(table, data, user_id=USER_ID)
-            logger.info(f"Rhythm channel: {json.dumps(rhythm_result)}")
-        except Exception as e:  # noqa: BLE001 — one data type never sinks the webhook
-            logger.error(f"rhythm_channel_error: {type(e).__name__}")
-            rhythm_result = {"error": type(e).__name__}
-
     # ── Archive raw payload ──
     s3_key = save_raw_payload(payload)
     logger.info(f"Raw payload archived: s3://{S3_BUCKET}/{s3_key}")
@@ -1555,8 +1535,7 @@ def lambda_handler(event, context):
             glucose_metric = m
             break
 
-    glucose_days = 0
-    glucose_readings_new = 0
+    glucose_days = glucose_readings_new = 0
 
     if glucose_metric:
         glucose_data = glucose_metric.get("data", [])
@@ -1672,9 +1651,7 @@ def lambda_handler(event, context):
                 # (was one level out → broke on the first metric regardless of name)
 
     # ── Process workouts (v1.6.0) ──
-    workout_days = 0
-    workout_new = 0
-    recovery_days = 0
+    workout_days = workout_new = recovery_days = 0
 
     if workouts:
         daily_workouts, workout_daily_agg = process_workouts(workouts)
@@ -1717,7 +1694,7 @@ def lambda_handler(event, context):
         "workout_days": workout_days,
         "workout_new": workout_new,
         "recovery_days": recovery_days,
-        "rhythm_channel": rhythm_result,
+        "rhythm_channel": _rhythm.webhook_ingest(table, data, user_id=USER_ID),  # #4972: counts only, fail-soft
         "metrics_received": [m.get("name") for m in metrics],
         "workouts_received": len(workouts),
         "raw_archive": s3_key,

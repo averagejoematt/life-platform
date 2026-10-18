@@ -340,3 +340,20 @@ def ingest(table, data: Any, *, user_id: str = "matthew", now_iso: Optional[str]
         "skipped": ecg_skipped + notif_skipped + med_skipped,
         "cross_device_same_day": sum(1 for r in ecg_rows if r.get("cross_device_same_day")),
     }
+
+
+def webhook_ingest(table, data: Any, *, user_id: str = "matthew") -> dict:
+    """The Health Auto Export webhook's one call (#4972). The three event types are their own
+    HAE data types, so a delivery without them returns {} untouched; with them, `ingest`
+    writes the RHYTHM# rows and the COUNTS come back (the webhook logs and returns them). A
+    failure is logged at ERROR by exception class only — never a value — and never sinks the
+    rest of the delivery."""
+    if not has_channel_payload(data):
+        return {}
+    try:
+        result = ingest(table, data, user_id=user_id)
+        logger.info("rhythm_channel %s", result)
+        return result
+    except Exception as e:  # noqa: BLE001 — one data type never sinks the webhook
+        logger.error("rhythm_channel_error: %s", type(e).__name__)
+        return {"error": type(e).__name__}
