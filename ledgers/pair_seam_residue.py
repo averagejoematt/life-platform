@@ -363,6 +363,16 @@ _WHOOP_HISTORY_READ_REASON = (
 
 
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
+    "whoop::lambdas/ingestion/whoop_cycle_day.py::read": (
+        "2026-10-18",
+        "#5002: the cycle-id guard reads back ONLY `sk` and `cycle_id` of the neighbouring whoop day rows. Both sides of "
+        "`cycle_id` live in the one module: `whoop_cycle_day.cycle_identity` builds the field `whoop_lambda._extract_cycle` "
+        "writes, and `cycle_id_filed_elsewhere` beside it reads it back. A drift cannot fabricate a row: an unmatched "
+        "name reads as no neighbour holding the id, and the "
+        "start-day rule (`cycle_for_day`) still keeps the prior day's cycle off the row. Pinned two-sided on the "
+        "archived 2026-10-17/18 payloads by tests/test_whoop_cycle_day_dedup_5002.py (guard removed -> 2 red; "
+        "start-day rule removed too -> the 10-18 duplicate is written again).",
+    ),
     "whoop::lambdas/web/site_api_physical.py::read": (
         "2026-10-16",
         "#4630: the weekly physical summary reads whoop rows ONLY to hand them to common.metric_truth's steps resolver, "
