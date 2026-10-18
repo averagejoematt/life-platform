@@ -81,9 +81,12 @@ def protein_tripwire(target_date: str, reader: Callable[[str], tuple[int | None,
 
     t = next(x for x in owner_redlines.TRIPWIRES if x["id"] == GREEN_TRIPWIRE)
     try:
-        if reader is None:
-            from mcp.tools_plan import _protein_days_7d as reader
-        missed, measured = reader(target_date)
+        read = reader
+        if read is None:
+            from mcp.tools_plan import _protein_days_7d
+
+            read = _protein_days_7d
+        missed, measured = read(target_date)
     except Exception as e:  # noqa: BLE001 — unknown, never clear
         logger.warning("green block: protein read failed: %s", e)
         return {"id": GREEN_TRIPWIRE, "state": "unknown", "detail": f"protein read failed ({type(e).__name__})"}
