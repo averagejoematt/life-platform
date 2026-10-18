@@ -1116,7 +1116,10 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 264 -> 265 (2026-10-17, #4632 follow-on merged onto the post-#4604 main): structural::test_habit_identity_4632.py — the AST
         # sweep for a habitify_reading/day_name_for call that drops the day's habit_statuses + the seven reader call sites' rename fixture —
         # arrives PROVEN via STRUCTURAL_HAND_PROOFS (six plants, each 1-2 failed; restored 18 passed). Enters exactly that id, leaves {}.
-        <= 265
+        # Upper bound 265 -> 266 (2026-10-18, #4580 round 1 lane E): structural::test_edition_one_number_4580.py — the one-number /
+        # one-unit / one-sentence contracts over the edition wire — arrives PROVEN via STRUCTURAL_HAND_PROOFS (three plants, each
+        # 1 failed / 6 passed; restored 7 passed). Enters exactly that id, leaves {}.
+        <= 266
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

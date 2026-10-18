@@ -457,6 +457,17 @@ export function termsHTML(html) {
   return `<details><summary>${esc(summary)}</summary><ul class="ck-rows">${rows.join("")}</ul></details>`;
 }
 
+// ── no coach by that name ──────────────────────────────────────────────────────
+// Site-to-A round 1: the not-found state printed one sentence and two home links (the footer's
+// `#ck-back-foot` survived). Now: the sentence, the eight coaches as doors (the roster's names
+// when it is served; the page's own job words for the eight persona ids when it is not), and
+// one way back.
+export function coachListHTML(roster, base = "/next/v8/") {
+  const served = ((roster && roster.coaches) || []).filter((c) => c && isCoachId(c.persona_id) && c.name);
+  const rows = served.length ? served.map((c) => ({ pid: c.persona_id, text: c.name, note: COACH_JOBS[c.persona_id] || "" })) : Object.keys(COACH_JOBS).map((pid) => ({ pid, text: COACH_JOBS[pid], note: "" }));
+  return `<ul class="ck-rows ck-rows--more">${rows.map((r) => `<li><a href="${esc(coachHref(r.pid, base))}">${esc(r.text)} <span>${esc(r.note ? `${r.note} ` : "")}<span aria-hidden="true">→</span></span></a></li>`).join("")}</ul>`;
+}
+
 // ── mount ──────────────────────────────────────────────────────────────────────
 const fill = (id, html) => {
   const el = document.getElementById(id);
@@ -473,17 +484,20 @@ export async function mount() {
   setBack(backFor(from, base));
   const asked = params.get("c") || "";
   const pid = isCoachId(asked) ? asked : "";
+  // The roster is read either way: with no coach named, it is the list of coaches the page offers.
   const [profile, roster, docket, calls] = pid
     ? await Promise.all([tryJSON(`/api/coach/${encodeURIComponent(pid)}`), tryJSON("/api/coaches"), tryJSON("/api/coach_docket"), tryJSON("/api/calls")])
-    : [null, null, null, null];
+    : [null, await tryJSON("/api/coaches"), null, null];
   setBack(backFor(from, base, rosterNames(roster)));
   const p = pid ? coachView(pid, profile, roster) : null;
   if (!p) {
     // No coach named, or a name the roster does not have: one sentence and the way back.
     const known = pid && !(roster && Array.isArray(roster.coaches));
     fill("ck-title", known ? "Not available right now" : "No coach by that name");
-    fill("ck-who", `${soft(known ? "This coach’s page is not available right now." : "This address does not name one of the AI coaches.")}<p><a class="ck-link" href="${esc(base)}coaches/">The AI coaches, and their record</a></p>`);
+    fill("ck-who", `${soft(known ? "This coach’s page is not available right now." : "This address does not name one of the AI coaches.")}${coachListHTML(roster, base)}<p><a class="ck-link" href="${esc(base)}coaches/">The AI coaches, and their record</a></p>`);
     document.querySelectorAll("[data-ck-coach-section]").forEach((el) => el.remove());
+    // One way home: the header's back link. The footer's second home link is not drawn here.
+    document.getElementById("ck-back-foot")?.closest("p")?.remove();
     document.body.dataset.ckReady = "1";
     return;
   }

@@ -136,7 +136,8 @@ export function levelHTML(body) {
   const day = dayInWords(c.as_of_date);
   const [n, of] = [num(c.composite_pillar_count), num(c.composite_pillar_total)];
   const from = n !== null && of !== null ? `Worked out from ${n} of ${of} areas${n < of ? "; an area with nothing measuring it is left out, not counted as average" : ""}.` : "";
-  return `<div class="ck-today"><p class="ck-big">${esc(whole(c.level))}<span> level${day ? ` on ${esc(day)}` : ""}</span></p>${soft(from)}</div>`;
+  // "Level 12 on Friday, October 16" (site-to-A round 1: it read "12 level on Friday, October 16").
+  return `<div class="ck-today"><p class="ck-big"><span>Level </span>${esc(whole(c.level))}<span>${day ? ` on ${esc(day)}` : ""}</span></p>${soft(from)}</div>`;
 }
 // "Level 10 across seven areas" — the front page's one line, a door to this page.
 export function sheetLine(body) {
@@ -148,8 +149,11 @@ export function sheetLine(body) {
   const across = of === null ? "" : n !== null && n < of ? ` across ${words(n)} of ${words(of)} areas of his life` : ` across ${words(of)} areas of his life`;
   return `Level ${whole(c.level)}${across}`;
 }
+// A badge's served words in the page's own units and names (site-to-A round 1): "lb" is the one
+// weight unit on every kit page, and the level is "Level", never "Character Level".
+export const badgeWords = (text) => String(text || "").replace(/\blbs\b/g, "lb").replace(/\bCharacter Level\b/g, "Level");
 export function badgesHTML(body) {
-  const all = ((body && body.achievements) || []).filter((a) => a && a.label);
+  const all = ((body && body.achievements) || []).filter((a) => a && a.label).map((a) => ({ ...a, label: badgeWords(a.label), description: badgeWords(a.description) }));
   if (!all.length) return soft("The badges are not served right now.");
   // An earned badge whose date was never recorded is still earned: it is counted and
   // listed last as "date not recorded", never dropped and never given a made-up date (#4704).

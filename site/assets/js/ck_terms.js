@@ -3,7 +3,8 @@
 // page quotes no line that uses one (ck_front.js plainLanguage, round 3 of the 10-17 red team).
 // One list, two readers: a term added here is glossed on the coach page AND kept off the front.
 export const TERMS = [
-  [/\brecovery\b/i, "Recovery", "his wrist strap’s morning score out of 100"],
+  // One unit for recovery on every kit page (site-to-A round 1): the score is printed as a percentage.
+  [/\brecovery\b/i, "Recovery", "his wrist strap’s morning score, as a percentage"],
   [/\bHRV\b|heart-rate variability/i, "HRV", "heart-rate variability: how much the gap between heartbeats changes overnight, as the wrist strap measures it"],
   [/deep[- ]sleep|slow-wave/i, "Deep sleep", "also called slow-wave sleep: the share of the night spent in the deepest stage"],
   [/\bREM\b|dreaming sleep/i, "REM", "the dreaming stage of sleep"],

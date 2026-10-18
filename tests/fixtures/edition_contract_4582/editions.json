@@ -40,6 +40,14 @@
     ],
     "absent_text": "No new chapter since Tuesday, October 6.",
     "data": {
+     "latest": {
+      "week": 5,
+      "label": "Week 5",
+      "date": "2026-10-06",
+      "status": "published"
+     },
+     "held": null,
+     "next_due": "2026-10-21",
      "title": "Park's Blind Spot",
      "date": "2026-10-06",
      "week_label": "Week 5",
@@ -139,7 +147,8 @@
          304.0,
          302.2
         ],
-        "text": "302.2 lb, down 6.1 across 6 weigh-ins."
+        "text": "302.2 lb, down 6.1 across 6 weigh-ins.",
+        "unit": " lb"
        }
       },
       "training": {
@@ -158,6 +167,7 @@
          90.0
         ],
         "text": "Trained on 7 of 7 days recorded.",
+        "unit": " minutes",
         "met": [
          true,
          true,
@@ -185,6 +195,7 @@
          8.8
         ],
         "text": "Slept 7 hours or more on 7 of 7 days recorded.",
+        "unit": " hours",
         "met": [
          true,
          true,
@@ -212,6 +223,7 @@
          null
         ],
         "text": "At or above 170 g protein on 1 of 2 days recorded.",
+        "unit": " g",
         "met": [
          true,
          false,
@@ -231,15 +243,26 @@
        "facts": [
         {
          "label": "Weight",
-         "text": "302.2 lb"
+         "text": "302.2 lb",
+         "value": 302.2,
+         "unit": " lb"
         },
         {
          "label": "Training",
-         "text": "90 minutes of walking"
+         "text": "90 minutes of walking",
+         "value": 90.0,
+         "unit": " minutes",
+         "settled": false
         },
         {
          "label": "Sleep",
-         "text": "8.8 hours; recovery 62 out of 100"
+         "text": "8.8 hours; recovery 62 out of 100",
+         "value": 8.8,
+         "unit": " hours",
+         "recovery": {
+          "value": 62.0,
+          "unit": " out of 100"
+         }
         }
        ]
       },
@@ -249,15 +272,25 @@
        "facts": [
         {
          "label": "Weight",
-         "text": "304.0 lb"
+         "text": "304.0 lb",
+         "value": 304.0,
+         "unit": " lb"
         },
         {
          "label": "Training",
-         "text": "158 minutes of strength"
+         "text": "158 minutes of strength",
+         "value": 158.0,
+         "unit": " minutes"
         },
         {
          "label": "Sleep",
-         "text": "8.3 hours; recovery 70 out of 100"
+         "text": "8.3 hours; recovery 70 out of 100",
+         "value": 8.3,
+         "unit": " hours",
+         "recovery": {
+          "value": 70.0,
+          "unit": " out of 100"
+         }
         }
        ]
       },
@@ -267,15 +300,25 @@
        "facts": [
         {
          "label": "Weight",
-         "text": "304.5 lb"
+         "text": "304.5 lb",
+         "value": 304.5,
+         "unit": " lb"
         },
         {
          "label": "Training",
-         "text": "131 minutes of strength"
+         "text": "131 minutes of strength",
+         "value": 131.0,
+         "unit": " minutes"
         },
         {
          "label": "Sleep",
-         "text": "8.1 hours; recovery 59 out of 100"
+         "text": "8.1 hours; recovery 59 out of 100",
+         "value": 8.1,
+         "unit": " hours",
+         "recovery": {
+          "value": 59.0,
+          "unit": " out of 100"
+         }
         }
        ]
       },
@@ -285,15 +328,25 @@
        "facts": [
         {
          "label": "Weight",
-         "text": "305.6 lb"
+         "text": "305.6 lb",
+         "value": 305.6,
+         "unit": " lb"
         },
         {
          "label": "Training",
-         "text": "168 minutes of walking"
+         "text": "168 minutes of walking",
+         "value": 168.0,
+         "unit": " minutes"
         },
         {
          "label": "Sleep",
-         "text": "9.1 hours; recovery 75 out of 100"
+         "text": "9.1 hours; recovery 75 out of 100",
+         "value": 9.1,
+         "unit": " hours",
+         "recovery": {
+          "value": 75.0,
+          "unit": " out of 100"
+         }
         }
        ]
       },
@@ -303,15 +356,25 @@
        "facts": [
         {
          "label": "Weight",
-         "text": "305.4 lb"
+         "text": "305.4 lb",
+         "value": 305.4,
+         "unit": " lb"
         },
         {
          "label": "Training",
-         "text": "99 minutes of strength"
+         "text": "99 minutes of strength",
+         "value": 99.0,
+         "unit": " minutes"
         },
         {
          "label": "Sleep",
-         "text": "8.5 hours; recovery 79 out of 100"
+         "text": "8.5 hours; recovery 79 out of 100",
+         "value": 8.5,
+         "unit": " hours",
+         "recovery": {
+          "value": 79.0,
+          "unit": " out of 100"
+         }
         }
        ]
       },
@@ -321,19 +384,31 @@
        "facts": [
         {
          "label": "Weight",
-         "text": "308.3 lb"
+         "text": "308.3 lb",
+         "value": 308.3,
+         "unit": " lb"
         },
         {
          "label": "Training",
-         "text": "109 minutes of walking"
+         "text": "109 minutes of walking",
+         "value": 109.0,
+         "unit": " minutes"
         },
         {
          "label": "Sleep",
-         "text": "9.6 hours; recovery 67 out of 100"
+         "text": "9.6 hours; recovery 67 out of 100",
+         "value": 9.6,
+         "unit": " hours",
+         "recovery": {
+          "value": 67.0,
+          "unit": " out of 100"
+         }
         },
         {
          "label": "Food",
-         "text": "155 g protein, 1,286 kcal"
+         "text": "155 g protein, 1,286 kcal",
+         "value": 155.0,
+         "unit": " g"
         }
        ]
       },
@@ -343,15 +418,25 @@
        "facts": [
         {
          "label": "Training",
-         "text": "164 minutes of strength"
+         "text": "164 minutes of strength",
+         "value": 164.0,
+         "unit": " minutes"
         },
         {
          "label": "Sleep",
-         "text": "8.1 hours; recovery 88 out of 100"
+         "text": "8.1 hours; recovery 88 out of 100",
+         "value": 8.1,
+         "unit": " hours",
+         "recovery": {
+          "value": 88.0,
+          "unit": " out of 100"
+         }
         },
         {
          "label": "Food",
-         "text": "173 g protein, 1,512 kcal"
+         "text": "173 g protein, 1,512 kcal",
+         "value": 173.0,
+         "unit": " g"
         }
        ]
       }
@@ -501,6 +586,7 @@
      "/api/habit_streaks",
      "/api/journey",
      "/api/nutrition_overview",
+     "/api/pulse_history",
      "/api/session",
      "/api/sleep_detail",
      "/api/supplements"
@@ -539,10 +625,22 @@
       "sleep": {
        "state": "ok",
        "as_of": "2026-10-17",
-       "source": "/api/sleep_detail",
+       "source": [
+        "/api/pulse_history",
+        "/api/sleep_detail"
+       ],
        "absent_text": "No sleep has been recorded yet.",
        "data": {
-        "text": "Slept 5.3 hours on the night of Friday, October 16; recovery 62 out of 100."
+        "text": "Slept 8.8 hours on the night of Friday, October 16; recovery 62 out of 100.",
+        "hours": 8.8,
+        "unit": " hours",
+        "recovery": {
+         "value": 62.0,
+         "unit": " out of 100"
+        },
+        "night_of": "2026-10-16",
+        "wake_date": "2026-10-17",
+        "read_from": "/api/pulse_history"
        }
       },
       "food": {
@@ -759,7 +857,7 @@
         "verdict": "not_yet",
         "verdict_text": "The coaches do not beat a simple guess yet",
         "text": "Counted across all 183 calls checked to date, not this week's alone.",
-        "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
+        "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that gives every call the same chance of coming true — the share of checked calls that have so far. Going well when they beat it. Fewer than 30 checked calls is not enough data."
        }
       }
      },
@@ -821,7 +919,13 @@
      },
      "counted_text": "Counted: 11 sealed before day one, 10 sides of bets between two coaches, 106 read out of the coaches' running commentary and 56 conditional or hedged sentences.",
      "beats_simple_guess": false,
-     "comparison_text": "So far they do not beat a simple guess.",
+     "comparison_text": "The coaches do not beat a simple guess yet.",
+     "baseline": {
+      "rule": "base_rate",
+      "rate": 0.415,
+      "rate_pct": 42,
+      "text": "A guess that every call has a 42% chance of coming true does about as well."
+     },
      "brier_skill": -0.0087,
      "skill_n": 183
     }
@@ -3170,6 +3274,7 @@
       "/api/journey",
       "/api/nutrition_overview",
       "/api/owner_words",
+      "/api/pulse_history",
       "/api/session",
       "/api/sleep_detail",
       "/api/supplements"
@@ -3319,6 +3424,14 @@
      ],
      "absent_text": "No new chapter since Tuesday, October 6.",
      "data": {
+      "latest": {
+       "week": 5,
+       "label": "Week 5",
+       "date": "2026-10-06",
+       "status": "published"
+      },
+      "held": null,
+      "next_due": "2026-10-21",
       "title": "Park's Blind Spot",
       "date": "2026-10-06",
       "week_label": "Week 5",
@@ -3339,6 +3452,39 @@
   },
   "cadence": {
    "blocks": {
+    "chapter": {
+     "state": "stale",
+     "as_of": "2026-10-06",
+     "source": [
+      "/journal/posts.json",
+      "/panelcast/episodes.json"
+     ],
+     "absent_text": "No new chapter since Tuesday, October 6.",
+     "data": {
+      "latest": {
+       "week": 5,
+       "label": "Week 5",
+       "date": "2026-10-06",
+       "status": "published"
+      },
+      "held": null,
+      "next_due": null,
+      "title": "Park's Blind Spot",
+      "date": "2026-10-06",
+      "week_label": "Week 5",
+      "dek": "After 23 consecutive training days, three rest days this week sent recovery to 98% four mornings in a row — a season high — while the scale crossed 310 pounds for the first time, suggesting 18.5 pounds gone…",
+      "url": "/journal/posts/week-08/",
+      "word_count": 1262,
+      "read_minutes": 6,
+      "podcast": {
+       "state": "absent",
+       "as_of": null,
+       "source": "/panelcast/episodes.json",
+       "absent_text": "No podcast episode for this chapter yet.",
+       "data": null
+      }
+     }
+    },
     "next": {
      "state": "unavailable",
      "as_of": null,
@@ -3432,6 +3578,7 @@
       "/api/habit_streaks",
       "/api/journey",
       "/api/nutrition_overview",
+      "/api/pulse_history",
       "/api/session",
       "/api/sleep_detail",
       "/api/supplements"
@@ -3468,10 +3615,22 @@
        "sleep": {
         "state": "ok",
         "as_of": "2026-10-17",
-        "source": "/api/sleep_detail",
+        "source": [
+         "/api/pulse_history",
+         "/api/sleep_detail"
+        ],
         "absent_text": "No sleep has been recorded yet.",
         "data": {
-         "text": "Slept 5.3 hours on the night of Friday, October 16; recovery 62 out of 100."
+         "text": "Slept 8.8 hours on the night of Friday, October 16; recovery 62 out of 100.",
+         "hours": 8.8,
+         "unit": " hours",
+         "recovery": {
+          "value": 62.0,
+          "unit": " out of 100"
+         },
+         "night_of": "2026-10-16",
+         "wake_date": "2026-10-17",
+         "read_from": "/api/pulse_history"
         }
        },
        "food": {
@@ -3845,6 +4004,7 @@
       "/api/journey",
       "/api/nutrition_overview",
       "/api/owner_words",
+      "/api/pulse_history",
       "/api/session",
       "/api/sleep_detail",
       "/api/supplements"
@@ -3883,10 +4043,22 @@
        "sleep": {
         "state": "ok",
         "as_of": "2026-10-17",
-        "source": "/api/sleep_detail",
+        "source": [
+         "/api/pulse_history",
+         "/api/sleep_detail"
+        ],
         "absent_text": "No sleep has been recorded yet.",
         "data": {
-         "text": "Slept 5.3 hours on the night of Friday, October 16; recovery 62 out of 100."
+         "text": "Slept 8.8 hours on the night of Friday, October 16; recovery 62 out of 100.",
+         "hours": 8.8,
+         "unit": " hours",
+         "recovery": {
+          "value": 62.0,
+          "unit": " out of 100"
+         },
+         "night_of": "2026-10-16",
+         "wake_date": "2026-10-17",
+         "read_from": "/api/pulse_history"
         }
        },
        "food": {
@@ -4044,7 +4216,7 @@
          "verdict": "not_yet",
          "verdict_text": "The coaches do not beat a simple guess yet",
          "text": "Counted across all 183 calls checked to date, not this week's alone.",
-         "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
+         "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that gives every call the same chance of coming true — the share of checked calls that have so far. Going well when they beat it. Fewer than 30 checked calls is not enough data."
         }
        }
       },
@@ -4098,6 +4270,7 @@
       "/api/journey",
       "/api/nutrition_overview",
       "/api/owner_words",
+      "/api/pulse_history",
       "/api/session",
       "/api/sleep_detail",
       "/api/supplements"
@@ -4136,10 +4309,22 @@
        "sleep": {
         "state": "ok",
         "as_of": "2026-10-17",
-        "source": "/api/sleep_detail",
+        "source": [
+         "/api/pulse_history",
+         "/api/sleep_detail"
+        ],
         "absent_text": "No sleep has been recorded yet.",
         "data": {
-         "text": "Slept 5.3 hours on the night of Friday, October 16; recovery 62 out of 100."
+         "text": "Slept 8.8 hours on the night of Friday, October 16; recovery 62 out of 100.",
+         "hours": 8.8,
+         "unit": " hours",
+         "recovery": {
+          "value": 62.0,
+          "unit": " out of 100"
+         },
+         "night_of": "2026-10-16",
+         "wake_date": "2026-10-17",
+         "read_from": "/api/pulse_history"
         }
        },
        "food": {
@@ -4297,7 +4482,7 @@
          "verdict": "not_yet",
          "verdict_text": "The coaches do not beat a simple guess yet",
          "text": "Counted across all 183 calls checked to date, not this week's alone.",
-         "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
+         "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that gives every call the same chance of coming true — the share of checked calls that have so far. Going well when they beat it. Fewer than 30 checked calls is not enough data."
         }
        }
       },
@@ -4350,6 +4535,7 @@
       "/api/habit_streaks",
       "/api/journey",
       "/api/nutrition_overview",
+      "/api/pulse_history",
       "/api/session",
       "/api/sleep_detail",
       "/api/supplements"
@@ -4388,7 +4574,10 @@
        "sleep": {
         "state": "unavailable",
         "as_of": null,
-        "source": "/api/sleep_detail",
+        "source": [
+         "/api/pulse_history",
+         "/api/sleep_detail"
+        ],
         "absent_text": "Last night's sleep is not served right now.",
         "data": null
        },
@@ -4451,6 +4640,7 @@
       "/api/habit_streaks",
       "/api/journey",
       "/api/nutrition_overview",
+      "/api/pulse_history",
       "/api/session",
       "/api/sleep_detail",
       "/api/supplements"
@@ -4487,10 +4677,22 @@
        "sleep": {
         "state": "ok",
         "as_of": "2026-10-17",
-        "source": "/api/sleep_detail",
+        "source": [
+         "/api/pulse_history",
+         "/api/sleep_detail"
+        ],
         "absent_text": "No sleep has been recorded yet.",
         "data": {
-         "text": "Slept 5.3 hours on the night of Friday, October 16; recovery 62 out of 100."
+         "text": "Slept 8.8 hours on the night of Friday, October 16; recovery 62 out of 100.",
+         "hours": 8.8,
+         "unit": " hours",
+         "recovery": {
+          "value": 62.0,
+          "unit": " out of 100"
+         },
+         "night_of": "2026-10-16",
+         "wake_date": "2026-10-17",
+         "read_from": "/api/pulse_history"
         }
        },
        "food": {
@@ -4584,7 +4786,8 @@
           304.0,
           302.2
          ],
-         "text": "302.2 lb, down 6.1 across 6 weigh-ins."
+         "text": "302.2 lb, down 6.1 across 6 weigh-ins.",
+         "unit": " lb"
         }
        },
        "training": {
@@ -4603,6 +4806,7 @@
           90.0
          ],
          "text": "Trained on 7 of 7 days recorded.",
+         "unit": " minutes",
          "met": [
           true,
           true,
@@ -4630,6 +4834,7 @@
           8.8
          ],
          "text": "Slept 7 hours or more on 7 of 7 days recorded.",
+         "unit": " hours",
          "met": [
           true,
           true,
@@ -4656,15 +4861,26 @@
         "facts": [
          {
           "label": "Weight",
-          "text": "302.2 lb"
+          "text": "302.2 lb",
+          "value": 302.2,
+          "unit": " lb"
          },
          {
           "label": "Training",
-          "text": "90 minutes of walking"
+          "text": "90 minutes of walking",
+          "value": 90.0,
+          "unit": " minutes",
+          "settled": false
          },
          {
           "label": "Sleep",
-          "text": "8.8 hours; recovery 62 out of 100"
+          "text": "8.8 hours; recovery 62 out of 100",
+          "value": 8.8,
+          "unit": " hours",
+          "recovery": {
+           "value": 62.0,
+           "unit": " out of 100"
+          }
          }
         ]
        },
@@ -4674,15 +4890,25 @@
         "facts": [
          {
           "label": "Weight",
-          "text": "304.0 lb"
+          "text": "304.0 lb",
+          "value": 304.0,
+          "unit": " lb"
          },
          {
           "label": "Training",
-          "text": "158 minutes of strength"
+          "text": "158 minutes of strength",
+          "value": 158.0,
+          "unit": " minutes"
          },
          {
           "label": "Sleep",
-          "text": "8.3 hours; recovery 70 out of 100"
+          "text": "8.3 hours; recovery 70 out of 100",
+          "value": 8.3,
+          "unit": " hours",
+          "recovery": {
+           "value": 70.0,
+           "unit": " out of 100"
+          }
          }
         ]
        },
@@ -4692,15 +4918,25 @@
         "facts": [
          {
           "label": "Weight",
-          "text": "304.5 lb"
+          "text": "304.5 lb",
+          "value": 304.5,
+          "unit": " lb"
          },
          {
           "label": "Training",
-          "text": "131 minutes of strength"
+          "text": "131 minutes of strength",
+          "value": 131.0,
+          "unit": " minutes"
          },
          {
           "label": "Sleep",
-          "text": "8.1 hours; recovery 59 out of 100"
+          "text": "8.1 hours; recovery 59 out of 100",
+          "value": 8.1,
+          "unit": " hours",
+          "recovery": {
+           "value": 59.0,
+           "unit": " out of 100"
+          }
          }
         ]
        },
@@ -4710,15 +4946,25 @@
         "facts": [
          {
           "label": "Weight",
-          "text": "305.6 lb"
+          "text": "305.6 lb",
+          "value": 305.6,
+          "unit": " lb"
          },
          {
           "label": "Training",
-          "text": "168 minutes of walking"
+          "text": "168 minutes of walking",
+          "value": 168.0,
+          "unit": " minutes"
          },
          {
           "label": "Sleep",
-          "text": "9.1 hours; recovery 75 out of 100"
+          "text": "9.1 hours; recovery 75 out of 100",
+          "value": 9.1,
+          "unit": " hours",
+          "recovery": {
+           "value": 75.0,
+           "unit": " out of 100"
+          }
          }
         ]
        },
@@ -4728,15 +4974,25 @@
         "facts": [
          {
           "label": "Weight",
-          "text": "305.4 lb"
+          "text": "305.4 lb",
+          "value": 305.4,
+          "unit": " lb"
          },
          {
           "label": "Training",
-          "text": "99 minutes of strength"
+          "text": "99 minutes of strength",
+          "value": 99.0,
+          "unit": " minutes"
          },
          {
           "label": "Sleep",
-          "text": "8.5 hours; recovery 79 out of 100"
+          "text": "8.5 hours; recovery 79 out of 100",
+          "value": 8.5,
+          "unit": " hours",
+          "recovery": {
+           "value": 79.0,
+           "unit": " out of 100"
+          }
          }
         ]
        },
@@ -4746,15 +5002,25 @@
         "facts": [
          {
           "label": "Weight",
-          "text": "308.3 lb"
+          "text": "308.3 lb",
+          "value": 308.3,
+          "unit": " lb"
          },
          {
           "label": "Training",
-          "text": "109 minutes of walking"
+          "text": "109 minutes of walking",
+          "value": 109.0,
+          "unit": " minutes"
          },
          {
           "label": "Sleep",
-          "text": "9.6 hours; recovery 67 out of 100"
+          "text": "9.6 hours; recovery 67 out of 100",
+          "value": 9.6,
+          "unit": " hours",
+          "recovery": {
+           "value": 67.0,
+           "unit": " out of 100"
+          }
          }
         ]
        },
@@ -4764,11 +5030,19 @@
         "facts": [
          {
           "label": "Training",
-          "text": "164 minutes of strength"
+          "text": "164 minutes of strength",
+          "value": 164.0,
+          "unit": " minutes"
          },
          {
           "label": "Sleep",
-          "text": "8.1 hours; recovery 88 out of 100"
+          "text": "8.1 hours; recovery 88 out of 100",
+          "value": 8.1,
+          "unit": " hours",
+          "recovery": {
+           "value": 88.0,
+           "unit": " out of 100"
+          }
          }
         ]
        }
@@ -4918,6 +5192,7 @@
       "/api/habit_streaks",
       "/api/journey",
       "/api/nutrition_overview",
+      "/api/pulse_history",
       "/api/session",
       "/api/sleep_detail",
       "/api/supplements"
@@ -4956,10 +5231,22 @@
        "sleep": {
         "state": "ok",
         "as_of": "2026-10-17",
-        "source": "/api/sleep_detail",
+        "source": [
+         "/api/pulse_history",
+         "/api/sleep_detail"
+        ],
         "absent_text": "No sleep has been recorded yet.",
         "data": {
-         "text": "Slept 5.3 hours on the night of Friday, October 16; recovery 62 out of 100."
+         "text": "Slept 8.8 hours on the night of Friday, October 16; recovery 62 out of 100.",
+         "hours": 8.8,
+         "unit": " hours",
+         "recovery": {
+          "value": 62.0,
+          "unit": " out of 100"
+         },
+         "night_of": "2026-10-16",
+         "wake_date": "2026-10-17",
+         "read_from": "/api/pulse_history"
         }
        },
        "food": {
@@ -5112,7 +5399,7 @@
          "verdict": "not_yet",
          "verdict_text": "The coaches do not beat a simple guess yet",
          "text": "Counted across all 183 calls checked to date, not this week's alone.",
-         "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
+         "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that gives every call the same chance of coming true — the share of checked calls that have so far. Going well when they beat it. Fewer than 30 checked calls is not enough data."
         }
        }
       },
@@ -5155,6 +5442,7 @@
       "/api/habit_streaks",
       "/api/journey",
       "/api/nutrition_overview",
+      "/api/pulse_history",
       "/api/session",
       "/api/sleep_detail",
       "/api/supplements"
@@ -5193,10 +5481,22 @@
        "sleep": {
         "state": "ok",
         "as_of": "2026-10-17",
-        "source": "/api/sleep_detail",
+        "source": [
+         "/api/pulse_history",
+         "/api/sleep_detail"
+        ],
         "absent_text": "No sleep has been recorded yet.",
         "data": {
-         "text": "Slept 5.3 hours on the night of Friday, October 16; recovery 62 out of 100."
+         "text": "Slept 8.8 hours on the night of Friday, October 16; recovery 62 out of 100.",
+         "hours": 8.8,
+         "unit": " hours",
+         "recovery": {
+          "value": 62.0,
+          "unit": " out of 100"
+         },
+         "night_of": "2026-10-16",
+         "wake_date": "2026-10-17",
+         "read_from": "/api/pulse_history"
         }
        },
        "food": {
@@ -5256,6 +5556,7 @@
       "/api/habit_streaks",
       "/api/journey",
       "/api/nutrition_overview",
+      "/api/pulse_history",
       "/api/session",
       "/api/sleep_detail",
       "/api/supplements"
@@ -5294,10 +5595,22 @@
        "sleep": {
         "state": "ok",
         "as_of": "2026-10-17",
-        "source": "/api/sleep_detail",
+        "source": [
+         "/api/pulse_history",
+         "/api/sleep_detail"
+        ],
         "absent_text": "No sleep has been recorded yet.",
         "data": {
-         "text": "Slept 5.3 hours on the night of Friday, October 16; recovery 62 out of 100."
+         "text": "Slept 8.8 hours on the night of Friday, October 16; recovery 62 out of 100.",
+         "hours": 8.8,
+         "unit": " hours",
+         "recovery": {
+          "value": 62.0,
+          "unit": " out of 100"
+         },
+         "night_of": "2026-10-16",
+         "wake_date": "2026-10-17",
+         "read_from": "/api/pulse_history"
         }
        },
        "food": {
@@ -5357,6 +5670,7 @@
       "/api/habit_streaks",
       "/api/journey",
       "/api/nutrition_overview",
+      "/api/pulse_history",
       "/api/session",
       "/api/sleep_detail",
       "/api/supplements"
@@ -5395,10 +5709,22 @@
        "sleep": {
         "state": "ok",
         "as_of": "2026-10-17",
-        "source": "/api/sleep_detail",
+        "source": [
+         "/api/pulse_history",
+         "/api/sleep_detail"
+        ],
         "absent_text": "No sleep has been recorded yet.",
         "data": {
-         "text": "Slept 5.3 hours on the night of Friday, October 16; recovery 62 out of 100."
+         "text": "Slept 8.8 hours on the night of Friday, October 16; recovery 62 out of 100.",
+         "hours": 8.8,
+         "unit": " hours",
+         "recovery": {
+          "value": 62.0,
+          "unit": " out of 100"
+         },
+         "night_of": "2026-10-16",
+         "wake_date": "2026-10-17",
+         "read_from": "/api/pulse_history"
         }
        },
        "food": {
@@ -5498,6 +5824,7 @@
           90.0
          ],
          "text": "Trained on 7 of 7 days recorded.",
+         "unit": " minutes",
          "met": [
           true,
           true,
@@ -5532,6 +5859,7 @@
           null
          ],
          "text": "At or above 170 g protein on 1 of 2 days recorded.",
+         "unit": " g",
          "met": [
           true,
           false,
@@ -5551,7 +5879,10 @@
         "facts": [
          {
           "label": "Training",
-          "text": "90 minutes of walking"
+          "text": "90 minutes of walking",
+          "value": 90.0,
+          "unit": " minutes",
+          "settled": false
          }
         ]
        },
@@ -5561,7 +5892,9 @@
         "facts": [
          {
           "label": "Training",
-          "text": "158 minutes of strength"
+          "text": "158 minutes of strength",
+          "value": 158.0,
+          "unit": " minutes"
          }
         ]
        },
@@ -5571,7 +5904,9 @@
         "facts": [
          {
           "label": "Training",
-          "text": "131 minutes of strength"
+          "text": "131 minutes of strength",
+          "value": 131.0,
+          "unit": " minutes"
          }
         ]
        },
@@ -5581,7 +5916,9 @@
         "facts": [
          {
           "label": "Training",
-          "text": "168 minutes of walking"
+          "text": "168 minutes of walking",
+          "value": 168.0,
+          "unit": " minutes"
          }
         ]
        },
@@ -5591,7 +5928,9 @@
         "facts": [
          {
           "label": "Training",
-          "text": "99 minutes of strength"
+          "text": "99 minutes of strength",
+          "value": 99.0,
+          "unit": " minutes"
          }
         ]
        },
@@ -5601,11 +5940,15 @@
         "facts": [
          {
           "label": "Training",
-          "text": "109 minutes of walking"
+          "text": "109 minutes of walking",
+          "value": 109.0,
+          "unit": " minutes"
          },
          {
           "label": "Food",
-          "text": "155 g protein, 1,286 kcal"
+          "text": "155 g protein, 1,286 kcal",
+          "value": 155.0,
+          "unit": " g"
          }
         ]
        },
@@ -5615,16 +5958,132 @@
         "facts": [
          {
           "label": "Training",
-          "text": "164 minutes of strength"
+          "text": "164 minutes of strength",
+          "value": 164.0,
+          "unit": " minutes"
          },
          {
           "label": "Food",
-          "text": "173 g protein, 1,512 kcal"
+          "text": "173 g protein, 1,512 kcal",
+          "value": 173.0,
+          "unit": " g"
          }
         ]
        }
       ],
       "weight_series": []
+     }
+    },
+    "life": {
+     "state": "ok",
+     "as_of": "2026-10-17",
+     "source": [
+      "/api/decisions",
+      "/api/experiments",
+      "/api/habit_streaks",
+      "/api/journey",
+      "/api/nutrition_overview",
+      "/api/pulse_history",
+      "/api/session",
+      "/api/sleep_detail",
+      "/api/supplements"
+     ],
+     "absent_text": "Nothing is recorded yet.",
+     "data": {
+      "order": [
+       "body",
+       "training",
+       "sleep",
+       "food",
+       "habits",
+       "supplements",
+       "experiments",
+       "mind"
+      ],
+      "rows": {
+       "body": {
+        "state": "ok",
+        "as_of": "2026-10-17",
+        "source": "/api/journey",
+        "absent_text": "No weigh-in yet.",
+        "data": {
+         "text": "25.1 lb down so far; 117.2 lb to go to reach 185."
+        }
+       },
+       "training": {
+        "state": "ok",
+        "as_of": "2026-10-17",
+        "source": "/api/session",
+        "absent_text": "No session is planned for today.",
+        "data": {
+         "text": "Planned for today: Bench Press (Barbell), Dumbbell Row and 5 more."
+        }
+       },
+       "sleep": {
+        "state": "ok",
+        "as_of": "2026-10-17",
+        "source": [
+         "/api/pulse_history",
+         "/api/sleep_detail"
+        ],
+        "absent_text": "No sleep has been recorded yet.",
+        "data": {
+         "text": "Slept 5.3 hours on the night of Friday, October 16; recovery 62 out of 100.",
+         "hours": 5.3,
+         "unit": " hours",
+         "recovery": {
+          "value": 62.0,
+          "unit": " out of 100"
+         },
+         "night_of": "2026-10-16",
+         "wake_date": "2026-10-17",
+         "read_from": "/api/sleep_detail"
+        }
+       },
+       "food": {
+        "state": "stale",
+        "as_of": "2026-10-12",
+        "source": "/api/nutrition_overview",
+        "absent_text": "Nothing newer than Monday, October 12.",
+        "data": {
+         "text": "At or above the 170 g protein floor on 8 of 25 logged days."
+        }
+       },
+       "habits": {
+        "state": "ok",
+        "as_of": "2026-10-16",
+        "source": "/api/habit_streaks",
+        "absent_text": "No habits have been recorded yet.",
+        "data": {
+         "text": "3 of 7 daily habits kept on Friday, October 16."
+        }
+       },
+       "supplements": {
+        "state": "ok",
+        "as_of": "2026-10-17",
+        "source": "/api/supplements",
+        "absent_text": "No supplements are listed.",
+        "data": {
+         "text": "21 in the daily stack."
+        }
+       },
+       "experiments": {
+        "state": "ok",
+        "as_of": "2026-10-17",
+        "source": "/api/experiments",
+        "absent_text": "No experiments are listed.",
+        "data": {
+         "text": "None running right now; 4 ready to start."
+        }
+       },
+       "mind": {
+        "state": "stale",
+        "as_of": "2026-09-23",
+        "source": "/api/decisions",
+        "absent_text": "Nothing new in his own words since Wednesday, September 23.",
+        "data": null
+       }
+      }
      }
     },
     "scorecard": {
@@ -5727,7 +6186,7 @@
          "verdict": "not_yet",
          "verdict_text": "The coaches do not beat a simple guess yet",
          "text": "Counted across all 183 calls checked to date, not this week's alone.",
-         "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
+         "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that gives every call the same chance of coming true — the share of checked calls that have so far. Going well when they beat it. Fewer than 30 checked calls is not enough data."
         }
        }
       },
@@ -5802,7 +6261,8 @@
           304.0,
           302.2
          ],
-         "text": "302.2 lb, down 6.1 across 6 weigh-ins."
+         "text": "302.2 lb, down 6.1 across 6 weigh-ins.",
+         "unit": " lb"
         }
        },
        "training": {
@@ -5828,6 +6288,7 @@
           8.8
          ],
          "text": "Slept 7 hours or more on 7 of 7 days recorded.",
+         "unit": " hours",
          "met": [
           true,
           true,
@@ -5855,6 +6316,7 @@
           null
          ],
          "text": "At or above 170 g protein on 1 of 2 days recorded.",
+         "unit": " g",
          "met": [
           true,
           false,
@@ -5874,11 +6336,19 @@
         "facts": [
          {
           "label": "Weight",
-          "text": "302.2 lb"
+          "text": "302.2 lb",
+          "value": 302.2,
+          "unit": " lb"
          },
          {
           "label": "Sleep",
-          "text": "8.8 hours; recovery 62 out of 100"
+          "text": "8.8 hours; recovery 62 out of 100",
+          "value": 8.8,
+          "unit": " hours",
+          "recovery": {
+           "value": 62.0,
+           "unit": " out of 100"
+          }
          }
         ]
        },
@@ -5888,11 +6358,19 @@
         "facts": [
          {
           "label": "Weight",
-          "text": "304.0 lb"
+          "text": "304.0 lb",
+          "value": 304.0,
+          "unit": " lb"
          },
          {
           "label": "Sleep",
-          "text": "8.3 hours; recovery 70 out of 100"
+          "text": "8.3 hours; recovery 70 out of 100",
+          "value": 8.3,
+          "unit": " hours",
+          "recovery": {
+           "value": 70.0,
+           "unit": " out of 100"
+          }
          }
         ]
        },
@@ -5902,11 +6380,19 @@
         "facts": [
          {
           "label": "Weight",
-          "text": "304.5 lb"
+          "text": "304.5 lb",
+          "value": 304.5,
+          "unit": " lb"
          },
          {
           "label": "Sleep",
-          "text": "8.1 hours; recovery 59 out of 100"
+          "text": "8.1 hours; recovery 59 out of 100",
+          "value": 8.1,
+          "unit": " hours",
+          "recovery": {
+           "value": 59.0,
+           "unit": " out of 100"
+          }
          }
         ]
        },
@@ -5916,11 +6402,19 @@
         "facts": [
          {
           "label": "Weight",
-          "text": "305.6 lb"
+          "text": "305.6 lb",
+          "value": 305.6,
+          "unit": " lb"
          },
          {
           "label": "Sleep",
-          "text": "9.1 hours; recovery 75 out of 100"
+          "text": "9.1 hours; recovery 75 out of 100",
+          "value": 9.1,
+          "unit": " hours",
+          "recovery": {
+           "value": 75.0,
+           "unit": " out of 100"
+          }
          }
         ]
        },
@@ -5930,11 +6424,19 @@
         "facts": [
          {
           "label": "Weight",
-          "text": "305.4 lb"
+          "text": "305.4 lb",
+          "value": 305.4,
+          "unit": " lb"
          },
          {
           "label": "Sleep",
-          "text": "8.5 hours; recovery 79 out of 100"
+          "text": "8.5 hours; recovery 79 out of 100",
+          "value": 8.5,
+          "unit": " hours",
+          "recovery": {
+           "value": 79.0,
+           "unit": " out of 100"
+          }
          }
         ]
        },
@@ -5944,15 +6446,25 @@
         "facts": [
          {
           "label": "Weight",
-          "text": "308.3 lb"
+          "text": "308.3 lb",
+          "value": 308.3,
+          "unit": " lb"
          },
          {
           "label": "Sleep",
-          "text": "9.6 hours; recovery 67 out of 100"
+          "text": "9.6 hours; recovery 67 out of 100",
+          "value": 9.6,
+          "unit": " hours",
+          "recovery": {
+           "value": 67.0,
+           "unit": " out of 100"
+          }
          },
          {
           "label": "Food",
-          "text": "155 g protein, 1,286 kcal"
+          "text": "155 g protein, 1,286 kcal",
+          "value": 155.0,
+          "unit": " g"
          }
         ]
        },
@@ -5962,11 +6474,19 @@
         "facts": [
          {
           "label": "Sleep",
-          "text": "8.1 hours; recovery 88 out of 100"
+          "text": "8.1 hours; recovery 88 out of 100",
+          "value": 8.1,
+          "unit": " hours",
+          "recovery": {
+           "value": 88.0,
+           "unit": " out of 100"
+          }
          },
          {
           "label": "Food",
-          "text": "173 g protein, 1,512 kcal"
+          "text": "173 g protein, 1,512 kcal",
+          "value": 173.0,
+          "unit": " g"
          }
         ]
        }
@@ -6213,7 +6733,7 @@
          "verdict": "not_yet",
          "verdict_text": "The coaches do not beat a simple guess yet",
          "text": "Counted across all 183 calls checked to date, not this week's alone.",
-         "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
+         "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that gives every call the same chance of coming true — the share of checked calls that have so far. Going well when they beat it. Fewer than 30 checked calls is not enough data."
         }
        }
       },

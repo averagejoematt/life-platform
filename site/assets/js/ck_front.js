@@ -314,9 +314,14 @@ export function scorecardHTML(block, base = "/", { label = true } = {}) {
       const name = (r && r.name) || (d.names && d.names[key]) || key;
       const keyHTML = SCORE_LINKS[key] ? `<a class="ck-rows__key" href="${esc(base)}${SCORE_LINKS[key]}">${esc(name)}</a>` : `<span class="ck-rows__key">${esc(name)}</span>`;
       if (!r || !r.verdict_text) return `<li>${keyHTML}<span>${esc(row.absent_text || "Not served right now.")}</span></li>`;
-      const dot = EARNED.has(r.verdict) ? '<i class="ck-dot" aria-hidden="true"></i>' : r.verdict === "not_enough_data" ? "" : '<i class="ck-dot ck-dot--off" aria-hidden="true"></i>';
+      // Site-to-A round 1: a row with too little data showed no dot at all beside rows that had
+      // one, so the absence read as a missing mark. It takes the kit's hollow dot and says so in
+      // words — an absence shown as an absence, never as a verdict either way.
+      const thin = r.verdict === "not_enough_data";
+      const dot = EARNED.has(r.verdict) ? '<i class="ck-dot" aria-hidden="true"></i>' : `<i class="ck-dot ck-dot--off${thin ? " ck-dot--none" : ""}" aria-hidden="true"></i>`;
+      const thinLabel = thin ? ' <span class="ck-small">Not enough data for a verdict.</span>' : "";
       const rule = r.rule ? `<br><span class="ck-small">${esc(shortRule(r.rule))}</span>` : "";
-      return `<li>${keyHTML}<span>${dot}<b>${esc(r.verdict_text)}.</b> ${esc(r.text || "")}${rule}</span></li>`;
+      return `<li>${keyHTML}<span>${dot}<b>${esc(r.verdict_text)}.</b> ${esc(r.text || "")}${thinLabel}${rule}</span></li>`;
     })
     .join("");
   const right = d.went_right || {};

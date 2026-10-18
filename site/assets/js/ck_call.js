@@ -180,9 +180,19 @@ export function claimHTML(call, base = "") {
     return `<div class="ck-bet"><p class="ck-small">${esc(logged ? `A bet opened ${logged}` : "A bet between two coaches")}</p><p><b>${esc(call.called)}</b></p>${sides}</div>`;
   }
   const when = logged ? ` · ${call.sealed ? `sealed ${logged}, before day one` : `logged ${logged}`}` : "";
-  return `<div class="ck-bet"><p class="ck-small">${coachNameHTML(call, call.coach_id, call.coach_name, base)}${esc(when)}</p><p><b>“${esc(call.claim)}”</b></p>${soft(call.called)}</div>`;
+  // Site-to-A round 1: the call is said ONCE at the top — the page's title is the route's sentence
+  // (`called_short`), so this card is who, when, and the coach's own words; the route's longer
+  // sentence (the same call with its graded day) is not printed under it a third time. The graded
+  // day is said in the outcome.
+  return `<div class="ck-bet"><p class="ck-small">${coachNameHTML(call, call.coach_id, call.coach_name, base)}${esc(when)}</p><p><b>“${esc(call.claim)}”</b></p></div>`;
 }
 
+// "The simple guess was also right." when the coach's call and the guess both came out right;
+// "" otherwise (the guess's own card carries its verdict either way).
+export function guessAlso(call) {
+  const g = call && call.simple_guess;
+  return g && g.state === "scored" && g.right === true && call.verdict === "right" ? "The simple guess was also right." : "";
+}
 // What happened, the verdict and the simple guess: the kit's verdict pair. With `base`, the
 // graded day opens that day's page (#4675).
 export function outcomeHTML(call, base = "") {
@@ -194,8 +204,9 @@ export function outcomeHTML(call, base = "") {
   const day = measuredDay(call);
   const iso = base ? gradedDayISO(call) : "";
   const gradedHTML = graded && iso && day ? esc(graded).replace(esc(day), `<a class="ck-link" href="${esc(withFrom(`${base}day/?d=${iso}`, `call:${call.id}`))}">${esc(day)}</a>`) : esc(graded);
-  const when = `${graded ? ` ${gradedHTML}` : ""}${checked ? esc(` Checked ${checked}.`) : ""}`;
-  const softHTML = (lead) => (lead || when ? `<p class="ck-soft">${esc(lead || "")}${when}</p>` : "");
+  // The page's label already says the day it settled, so "Checked <day>" is not said again here.
+  const when = graded ? ` ${gradedHTML}` : "";
+  const softHTML = (lead, tail = "") => (lead || when || tail ? `<p class="ck-soft">${esc(lead || "")}${when}${tail ? `${lead || when ? " " : ""}${esc(tail)}` : ""}</p>` : "");
   if (call.kind === "bet") {
     const cards = (call.sides || [])
       .filter((s) => s && s.coach_name)
@@ -205,17 +216,59 @@ export function outcomeHTML(call, base = "") {
   }
   // #4808: the tag carries the rule; the soft line says what the allowed distance is, once. A
   // call whose rule cannot be read is not shown as right or wrong: no tag and no "was right".
+  // Site-to-A round 1: the result is the heading above this card (`happened_short`), so the card
+  // does not restate it in bold, and "<coach> was right" is the tag's own word — the soft line is
+  // the rule in words, the day it was graded on, and, when the simple guess also won, that fact.
   const tag = callVerdictTag(call);
-  const lead = tag ? [call.verdict_text, toleranceNote(call)].filter(Boolean).join(" ") : NO_RULE;
-  const verdict = `<div>${tag}<p><b>${esc(call.happened)}</b></p>${softHTML(lead)}</div>`;
+  const verdict = tag ? `<div>${tag}${softHTML(toleranceNote(call), guessAlso(call))}</div>` : `<div>${softHTML(NO_RULE)}</div>`;
   return `<div class="ck-verdicts">${verdict}${guessCard(call)}</div>`;
 }
 
-// The running record beside the call: counts only, in the route's own sentence, and never
-// alone (#4585): what a simple guess scored on the same calls sits directly under it.
+// The running record beside the call: counts only, in the route's own words, and never alone
+// (#4585): what a simple guess scored on the same calls sits directly under it.
+// Site-to-A round 1: the served comparison is one ~120-word sentence, one clause per kind of call,
+// that says "the coaches" of what is ONE coach's record. The page prints two short sentences
+// naming the coach — the served count ("Max Reyes: 13 of 27 checked calls right.") and the
+// comparison's verdict per kind, read off the served clauses' own verdict words (level / right
+// more often), never added across kinds — and keeps the served sentence whole one tap below.
+// A served short form (`comparison.short`, lane E of #4580) is printed instead when it arrives;
+// a sentence in another shape is printed as served with "the coaches" named as the coach.
+// One served clause per kind of call: "<Kind>: on the N a guess could also be checked against, the
+// coaches were right X and a guess that nothing changes Y — <verdict>[, <qualifier>]."
+const KIND_WORDS = { "Number calls": "number calls", "Direction calls": "direction calls", "Yes/no bets": "yes/no bets", "Sealed day-one predictions": "sealed day-one predictions" };
+const CLAUSE_RE = /^(Number calls|Direction calls|Yes\/no bets|Sealed day-one predictions): on the \d+ a guess could also be checked against, the coaches were right .+? and a guess that nothing changes .+? — ([^,]+?)(?:, (?:but )?([^.]+))?\.$/;
+const listWords = (items) => (items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`);
+const standing = (verdict) => (/^level$/i.test(verdict) ? "level" : /^the coaches were right more often$/i.test(verdict) ? "ahead" : /^a guess .* more often$/i.test(verdict) ? "behind" : "");
+export function recordComparisonShort(name, cmp) {
+  const served = cmp && typeof cmp.short === "string" ? cmp.short.trim() : "";
+  if (served) return served;
+  const sentence = cmp && typeof cmp.sentence === "string" ? cmp.sentence.trim() : "";
+  if (!sentence) return "";
+  const clauses = sentence.split(/(?<=\.)\s+(?=(?:Number calls|Direction calls|Yes\/no bets|Sealed day-one predictions):)/).map((c) => CLAUSE_RE.exec(c.trim()));
+  // Any clause in another shape: the served sentence stands as served (nothing is reworded).
+  if (!clauses.length || clauses.some((m) => !m || !standing(m[2]))) return sentence;
+  const by = { ahead: [], level: [], behind: [] };
+  for (const m of clauses) by[standing(m[2])].push(KIND_WORDS[m[1]]);
+  const parts = Object.entries(by).filter(([, kinds]) => kinds.length).map(([word, kinds]) => `${word} on ${listWords(kinds)}`);
+  const guess = (cmp.rule_words && String(cmp.rule_words).trim()) || "a guess that nothing changes";
+  const quals = clauses.map((m) => (m[3] || "").trim());
+  const margin = quals.every(Boolean) ? (quals.every((q) => q === quals[0]) ? `, each ${quals[0]}` : ", none by a clear margin") : "";
+  return `Against ${guess}, ${name || "the coach"} is ${listWords(parts)}${margin}.`;
+}
 export function recordHTML(call, body) {
   if (!isCall(call)) return "";
-  const lines = (call.records || []).filter((r) => r && r.text).map((r) => `<p>${esc(r.text)}</p>${coachComparison(r.comparison, { cls: "ck-soft" })}`);
+  const lines = (call.records || [])
+    .filter((r) => r && r.text)
+    .map((r) => {
+      const name = (/^([^:]+):/.exec(String(r.text)) || [])[1] || "";
+      const sentence = r.comparison && typeof r.comparison.sentence === "string" ? r.comparison.sentence.trim() : "";
+      const short = recordComparisonShort(name, r.comparison);
+      const inline = short && short !== sentence ? short : "";
+      // The comparison's full served sentence, whole, one tap below (the comparison reader's own
+      // paragraph, so a missing block is still the honest absence line, #4585).
+      const whole = inline ? `<details><summary>The record by kind of call</summary>${coachComparison(r.comparison, { cls: "ck-soft" })}</details>` : coachComparison(r.comparison, { cls: "ck-soft" });
+      return `<p>${esc(r.text)}${inline ? ` ${esc(inline)}` : ""}</p>${whole}`;
+    });
   const more = body && body.excluded && body.excluded.count ? "The record counts every checked call, including the ones with no page of their own." : "";
   return `${lines.join("")}${soft(more)}`;
 }

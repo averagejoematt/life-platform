@@ -60,7 +60,8 @@ test("every served driver has plain words", () => {
 test("the level says how many areas it came from and the day it is for", () => {
   const html = S.levelHTML(character);
   const c = character.character;
-  assert.match(html, new RegExp(`<p class="ck-big">${Math.round(c.level)}<span> level on [A-Z][a-z]+day, [A-Z][a-z]+ \\d+</span></p>`));
+  // Site-to-A round 1: "Level 12 on Friday, October 16", never "12 level on …".
+  assert.match(html, new RegExp(`<p class="ck-big"><span>Level </span>${Math.round(c.level)}<span> on [A-Z][a-z]+day, [A-Z][a-z]+ \\d+</span></p>`));
   assert.ok(html.includes(`Worked out from ${c.composite_pillar_count} of ${c.composite_pillar_total} areas`));
   if (c.composite_pillar_count < c.composite_pillar_total) assert.match(html, /an area with nothing measuring it is left out, not counted as average\./);
   assert.match(S.levelHTML(null), /not served right now/);
@@ -76,11 +77,12 @@ test("only earned badges are listed, newest first, the undated one last", () => 
   assert.equal(earned.length, achievements.summary.earned);
   assert.equal((html.match(/<li>/g) || []).length, earned.length);
   assert.match(html, new RegExp(`${earned.length} of ${achievements.achievements.length} earned so far\\.`));
-  const dated = earned.filter((a) => a.earned_date).sort((x, y) => y.earned_date.localeCompare(x.earned_date));
+  // The page prints a badge's words in its own units ("lb"), so they are looked up the same way.
+  const dated = earned.filter((a) => a.earned_date).sort((x, y) => y.earned_date.localeCompare(x.earned_date)).map((a) => ({ ...a, label: S.badgeWords(a.label) }));
   for (let i = 1; i < dated.length; i += 1) {
     if (dated[i - 1].earned_date !== dated[i].earned_date) assert.ok(html.indexOf(dated[i - 1].label) < html.indexOf(dated[i].label), `newest first: ${dated[i - 1].label} before ${dated[i].label}`);
   }
-  for (const u of earned.filter((a) => !a.earned_date)) assert.ok(dated.every((d) => html.indexOf(d.label) < html.indexOf(u.label)), "the undated one last");
+  for (const u of earned.filter((a) => !a.earned_date)) assert.ok(dated.every((d) => html.indexOf(d.label) < html.indexOf(S.badgeWords(u.label))), "the undated one last");
   assert.match(S.badgesHTML({ achievements: [{ label: "A", earned: false }] }), /None of the 1 badges has been earned yet\./);
   assert.match(S.badgesHTML(null), /not served right now/);
 });
@@ -108,6 +110,8 @@ test("an earned badge with no recorded date is counted and says so, never dated 
   const html = S.badgesHTML(body);
   assert.match(html, /2 of 3 earned so far\./, "the count matches summary.earned");
   assert.equal((html.match(/<li>/g) || []).length, 2);
-  assert.match(html, /date not recorded<\/span><span>Lost 20 lbs/);
-  assert.ok(html.indexOf("Lost 5 lbs") < html.indexOf("Lost 20 lbs"), "the undated badge is listed last");
+  // Site-to-A round 1: "lb" is the one weight unit on every kit page, in a badge's words too.
+  assert.match(html, /date not recorded<\/span><span>Lost 20 lb</);
+  assert.ok(html.indexOf("Lost 5 lb") < html.indexOf("Lost 20 lb"), "the undated badge is listed last");
+  assert.doesNotMatch(html, /\blbs\b/);
 });
