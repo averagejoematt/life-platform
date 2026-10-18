@@ -96,7 +96,7 @@ MEASURE_UNITS = {
     "hrv_ms": METRIC_UNITS["hrv"],
     "rhr": METRIC_UNITS["resting_heart_rate"],
     "rhr_bpm": METRIC_UNITS["resting_heart_rate"],
-    "steps": METRIC_UNITS["steps"],
+    "steps": METRIC_UNITS["steps"],  # steps-truth: a unit label keyed by metric name, not a row read
     "protein": METRIC_UNITS["total_protein_g"],
     "protein_g": METRIC_UNITS["total_protein_g"],
     "calories": METRIC_UNITS["total_calories_kcal"],
