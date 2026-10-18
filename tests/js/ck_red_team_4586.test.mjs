@@ -363,26 +363,70 @@ test("Start: the weight chart is framed start to goal, as the front page's mark 
   assert.match(bare, /ck-chart__line/);
 });
 
-test("one quantity, one unit: recovery is a percentage on the day line, the trend and the call card; a served unit wins", () => {
-  assert.equal(F.recoveryShown("recovery 62 out of 100"), "recovery 62%");
-  assert.equal(D.MEASURES.recovery.write(62), "62%");
-  assert.equal(D.MEASURES.recovery.unit, "%");
-  assert.doesNotMatch(D.MEASURES.recovery.about, /out of 100/);
+test("one quantity, one unit: recovery is printed out of 100 on the day line, the trend and the call card; a served unit wins", () => {
+  // Re-grade 2026-10-18: the route serves " out of 100" beside every recovery measure (lane E), and that
+  // served string is the one fallback too — so the band, the day page, the trend and the call card agree.
+  assert.equal(D.RECOVERY_UNIT, "out of 100");
+  assert.equal(F.recoveryShown("recovery 62 out of 100"), "recovery 62 out of 100");
+  assert.equal(F.recoveryShown("recovery 62%"), "recovery 62 out of 100", "an older percent form takes the one unit");
+  assert.equal(F.recoveryShown("recovery 62 out of 100", "%"), "recovery 62%", "a served unit wins over the fallback");
+  assert.equal(D.MEASURES.recovery.write(62), "62 out of 100");
+  assert.equal(D.MEASURES.recovery.unit, "out of 100");
+  assert.doesNotMatch(D.MEASURES.recovery.about, /percentage/);
   const calls = load("calls").calls;
   const recovery = calls.find((c) => c.kind === "number" && /recovery score/.test(c.called) && /^\d+(\.\d+)?$/.test(c.tolerance.text));
-  assert.match(V.ruleFor(recovery, recovery.verdict === "right"), /^(not )?within [\d.]+% either way$/);
-  assert.doesNotMatch(V.ruleFor(recovery, true), /points|out of 100/);
-  assert.match(TERMS.find(([, term]) => term === "Recovery")[2], /percentage/);
+  assert.match(V.ruleFor(recovery, recovery.verdict === "right"), /^(not )?within [\d.]+ out of 100 either way$/);
+  assert.doesNotMatch(V.ruleFor(recovery, true), /points|%/);
+  assert.match(TERMS.find(([, term]) => term === "Recovery")[2], /out of 100/);
   // The served unit, when the route names one (lane E of #4580), is read before any of this.
   assert.equal(V.ruleFor({ ...recovery, tolerance: { ...recovery.tolerance, unit: "points" } }, true), `within ${recovery.tolerance.text} points either way`);
+  assert.equal(V.ruleFor({ ...recovery, actual: { ...recovery.actual, unit: "%" } }, true), `within ${recovery.tolerance.text}% either way`, "the call's served actual.unit is read");
   assert.equal(D.servedUnit("recovery", { pulse: { units: { recovery_pct: "points" } } }), "points");
+  assert.equal(D.servedUnit("recovery", { edition: EDITION.blocks }), "out of 100", "the edition week's served unit is read");
+  assert.equal(D.servedUnit("weight", { edition: EDITION.blocks }), "lb");
   assert.equal(D.writerFor("recovery", { pulse: { units: { recovery_pct: "points" } } })(62), "62 points");
-  assert.equal(D.writerFor("recovery", { pulse: {} })(62), "62%");
+  assert.equal(D.writerFor("recovery", { pulse: { units: { recovery_pct: "%" } } })(62), "62%");
+  assert.equal(D.writerFor("recovery", { pulse: {} })(62), "62 out of 100");
   // A unit in parentheses beside a number survives the rule reader; a gloss in parentheses does not.
   const bet = { kind: "bet", called: "Two coaches bet on whether his weight (lb) would be below 305 on October 16. Max Reyes said yes." };
   assert.equal(V.ruleFor(bet, true), "on whether his weight (lb) would be below 305 on October 16");
   const gloss = { kind: "bet", called: "Two coaches bet on whether his morning recovery score (his wrist strap’s morning score out of 100) would be below 70 on September 30. Max Reyes said yes." };
   assert.equal(V.ruleFor(gloss, true), "on whether his morning recovery score would be below 70 on September 30");
+});
+
+// Re-grade 2026-10-18: the front page's call line and the call pages said "out of 100", the front band and
+// the day page "62%". One case over the real fixtures: the same recovery reading, the same unit string, on all three.
+test("one unit for recovery on the front band, the day page and the call card, from the served fixtures", () => {
+  const detail = B.week.data.detail.find((d) => d.facts.some((f) => f.recovery && typeof f.recovery.value === "number"));
+  assert.ok(detail, "the capture's week carries a day with a served recovery reading");
+  const fact = detail.facts.find((f) => f.recovery);
+  const served = fact.recovery.unit;
+  assert.equal(served, " out of 100", "the route's served recovery unit (prediction_reason.MEASURE_UNITS)");
+  assert.equal(served.trim(), D.RECOVERY_UNIT, "the kit's fallback IS the served string, so a page with no unit served agrees");
+  const n = Math.round(fact.recovery.value);
+  const expected = `${n} out of 100`;
+  // Front band: yesterday's facts line.
+  const front = F.factLine(detail.facts);
+  assert.match(front, new RegExp(`recovery ${expected}(?:\\b|$)`), `front: ${front}`);
+  assert.doesNotMatch(front, /recovery \d+%/);
+  // Day page: the measured facts, read from the pulse body with no unit served — the fallback.
+  const pulse = load("pulse_history");
+  const day = D.dayFactsHTML(detail.date, { pulse }, "/next/v8/");
+  assert.ok(day.includes(`Recovery: ${expected}`), `day: ${day}`);
+  assert.doesNotMatch(day, /Recovery: \d+%/);
+  // Life row: the same served shape on the longer view.
+  const life = B.life.data.rows.sleep.data.recovery;
+  assert.equal(life.unit, served, "life.rows.sleep.recovery carries the same served unit");
+  // Call card: a recovery call's served actual.unit, and the rule's unit, are the same string.
+  const call = B.calls.data.calls.find((c) => c.kind === "number" && /recovery score/.test(c.called) && c.actual && c.actual.unit);
+  assert.ok(call, "the capture's calls carry a recovery call with a served actual.unit");
+  assert.equal(call.actual.unit, served, "calls[].actual.unit is the served recovery unit");
+  assert.equal(V.servedUnit(call), D.RECOVERY_UNIT);
+  assert.match(V.ruleFor(call, call.verdict === "right"), /^(not )?within [\d.]+ out of 100 either way$/);
+  // The served sentences on the call pages already say it the same way.
+  const bet = B.calls.data.calls.find((c) => c.kind === "bet" && /recovery score/.test(c.called_short || ""));
+  if (bet) assert.match(bet.called_short, /\d+ out of 100/);
+  assert.doesNotMatch([front, day, V.ruleFor(call, true)].join(" "), /\d%|percentage/, "no percent form of recovery anywhere");
 });
 
 test("Week: a row with too little data takes the hollow dot and says so; every scored row has a dot", () => {

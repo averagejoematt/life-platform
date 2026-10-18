@@ -81,7 +81,7 @@ test("watching now shows ONE item in the coach's own words with its date; the re
 test("a watch item that uses a known term gets the plain line directly under it, not behind a tap", () => {
   const onPage = C.watchingHTML(OWN).split("<details>")[0];
   assert.match(onPage, /helps his deep sleep\.”<\/p><p class="ck-soft">Deep sleep: also called slow-wave sleep: the share of the night spent in the deepest stage\.<\/p>/);
-  assert.deepEqual(C.glossLines("Recovery and HRV"), ["Recovery: his wrist strap’s morning score, as a percentage.", "HRV: heart-rate variability: how much the gap between heartbeats changes overnight, as the wrist strap measures it."]);
+  assert.deepEqual(C.glossLines("Recovery and HRV"), ["Recovery: his wrist strap’s morning score out of 100.", "HRV: heart-rate variability: how much the gap between heartbeats changes overnight, as the wrist strap measures it."]);
   assert.deepEqual(C.glossLines(OWN_LIST[2]), [], "no known term, no line");
 });
 
@@ -331,7 +331,7 @@ test("the character notes are the served ones, marked as the author's design", (
 test("a term is glossed only when it appears on the page", () => {
   const html = C.termsHTML("<p>Recovery score and the EWMA of HRV</p>");
   assert.match(html, /<summary>Recovery, HRV and Running average<\/summary>/);
-  assert.match(html, /His wrist strap’s morning score, as a percentage\./);
+  assert.match(html, /His wrist strap’s morning score out of 100\./);
   assert.doesNotMatch(html, /DEXA|Zone 2/);
   assert.equal(C.termsHTML("<p>Nothing technical here.</p>"), "");
 });

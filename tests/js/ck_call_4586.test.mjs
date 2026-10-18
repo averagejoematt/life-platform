@@ -42,7 +42,7 @@ test("what happened carries the verdict as the kit's tag, beside the simple gues
   const right = C.outcomeHTML(call);
   // Site-to-A round 1: the result is the heading above the card and the verdict is the tag's word, so the
   // card is the tag and one soft line — neither `happened` in bold nor "<coach> was right" again.
-  assert.match(right, new RegExp(`<span class="ck-verdicts__tag ck-verdicts__tag--right">Right · within ${tol.replace(".", "\\.")}% either way</span><p class="ck-soft">The allowed distance is`));
+  assert.match(right, new RegExp(`<span class="ck-verdicts__tag ck-verdicts__tag--right">Right · within ${tol.replace(".", "\\.")} out of 100 either way</span><p class="ck-soft">The allowed distance is`));
   assert.ok(!right.includes(`<b>${call.happened}</b>`) && !right.includes(call.verdict_text), "the call and its verdict are not restated");
   // #4808: the allowed distance is in the tag, and what it is — its statistic and window — once, below
   assert.ok(right.includes(`The allowed distance is ${call.tolerance.statistic}.`));
@@ -57,18 +57,18 @@ test("what happened carries the verdict as the kit's tag, beside the simple gues
   delete unchecked.simple_guess;
   assert.match(C.outcomeHTML(unchecked), /<span class="ck-verdicts__tag">The simple guess<\/span><p>The simple guess has not been checked against this call yet\.<\/p>/);
   const wrong = C.outcomeHTML(C.callsOf(BODY).find((c) => c.verdict === "wrong"));
-  assert.match(wrong, /<span class="ck-verdicts__tag">Wrong · not within [\d.]+% either way<\/span>/);
+  assert.match(wrong, /<span class="ck-verdicts__tag">Wrong · not within [\d.]+ out of 100 either way<\/span>/);
 });
 
 test("a call the simple guess was checked on says what it said and whether it was right", () => {
   const call = clone(C.findCall(BODY, NUMBER));
   call.simple_guess = { state: "scored", right: true, text: "The simple guess was that it would stay at 62, the last reading before the call. That guess was also right.", short: "also right" };
-  assert.match(C.outcomeHTML(call), /<span class="ck-verdicts__tag ck-verdicts__tag--right">The simple guess: right · within 17\.9% either way<\/span><p>The simple guess was that it would stay at 62/);
+  assert.match(C.outcomeHTML(call), /<span class="ck-verdicts__tag ck-verdicts__tag--right">The simple guess: right · within 17\.9 out of 100 either way<\/span><p>The simple guess was that it would stay at 62/);
   // Site-to-A round 1: the verdict line says when the simple guess also won.
   assert.match(C.outcomeHTML(call), /<p class="ck-soft">The allowed distance is [^<]+\. Graded on the reading for September 8\. The simple guess was also right\.<\/p>/);
   assert.equal(C.guessAlso(call), "The simple guess was also right.");
   call.simple_guess = { ...call.simple_guess, right: false, short: "wrong" };
-  assert.match(C.outcomeHTML(call), /<span class="ck-verdicts__tag">The simple guess: wrong · not within 17\.9% either way<\/span>/);
+  assert.match(C.outcomeHTML(call), /<span class="ck-verdicts__tag">The simple guess: wrong · not within 17\.9 out of 100 either way<\/span>/);
   assert.equal(C.guessAlso(call), "");
 });
 
@@ -134,7 +134,7 @@ test("the front page's last settled call is one block that opens its page", () =
   assert.ok(html.startsWith(`<div class="ck-bet"><p class="ck-small">Settled ${when}</p>`));
   // #4808, the house rule: the tag (verdict and rule) first, then the call with the RESULT bold,
   // then what the allowed distance is — the number once, in the tag
-  assert.ok(html.includes(`<span class="ck-verdicts__tag">Wrong · not within ${call.tolerance.text}% either way</span><p>${V.matthewsCall(call.called)} <b>${call.happened_short}</b></p>`));
+  assert.ok(html.includes(`<span class="ck-verdicts__tag">Wrong · not within ${call.tolerance.text} out of 100 either way</span><p>${V.matthewsCall(call.called)} <b>${call.happened_short}</b></p>`));
   assert.ok(html.includes(`<p class="ck-soft">The allowed distance is ${call.tolerance.statistic}. `), "the card says what counts as right");
   assert.equal((html.match(new RegExp(call.tolerance.text.replace(".", "\\."), "g")) || []).length, 1, "the allowed distance is printed once");
   const scored = call.simple_guess && call.simple_guess.state === "scored" && call.simple_guess.short;
@@ -192,7 +192,7 @@ test("the list is every settled call newest first, the older ones folded away", 
 test("each page names itself from the call", () => {
   const meta = C.metaFor(C.findCall(BODY, NUMBER));
   assert.equal(meta.title, "Lisa Park called his morning recovery score at about 61: right — Average Joe Matt");
-  assert.equal(meta.description, "Lisa Park called his morning recovery score at about 61. It came in at 67. Right · within 17.9% either way.");
+  assert.equal(meta.description, "Lisa Park called his morning recovery score at about 61. It came in at 67. Right · within 17.9 out of 100 either way.");
   assert.equal(C.metaFor(C.findCall(BODY, BET)).description, "Marcus Webb and Amara Patel bet on whether his morning recovery score would be below 70 out of 100 on September 30. It came in at 59 out of 100. Marcus Webb was right; Amara Patel was wrong.");
   assert.equal(C.metaFor(null).title, "A coach’s call, checked — Average Joe Matt");
 });
