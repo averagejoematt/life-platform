@@ -307,7 +307,9 @@ def test_whoop_zone_rebuild_counts_only_and_shares_the_writer_function():
     from ingestion import whoop_lambda
 
     assert rebuild.zone_minutes_from_score is whoop_lambda.zone_minutes_from_score
-    assert not hasattr(rebuild, "apply") and "--apply" not in open(spec.origin).read().split('"""', 2)[2]
+    # #4629 box 1: the write-back exists (--apply) but only ever update_item; never put/delete
+    code = open(spec.origin).read().split('"""', 2)[2]
+    assert "--apply" in code and "update_item" in code and "put_item" not in code and "delete_item" not in code
 
     recs = _whoop_workout_wire()
     payloads = {

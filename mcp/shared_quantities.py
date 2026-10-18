@@ -58,6 +58,12 @@ THE DEFINITIONS (each stated once, here, and imported by every critic and tool)
               6.82 lb/wk) and counted as a full week over the cap — one week toward the
               "2 consecutive weeks" overshoot clock, on 3 days of evidence.
 
+  THE STATED LOSS RATE (#5001 — `loss_rate_lb_wk`)
+    the loss rate above, carried as ONE dict under `shared_quantities.loss_rate_lb_wk` by both
+    `plan_next_session`'s constraint block (its `rate_ceiling` row is evaluated over it) and
+    `get_nutrition`: `value`, `method`, `window_days`, `n_weigh_ins`, `source: withings`, and the
+    partition's own DATE# weigh-ins with the window's days that carry none.
+
   The TDEE back-solve's endpoint trend (`health.tdee.weight_trend_lb_per_wk`, #3931) is a
   DIFFERENT quantity — "could this intake have produced this much change" — and is left alone.
 
@@ -370,6 +376,66 @@ def weekly_loss_rates_from_rows(
     reported by `weekly_loss_rate_weeks_from_rows`. None when no week is counted."""
     rates = [w["rate_lb_wk"] for w in weekly_loss_rate_weeks_from_rows(rows, end, weeks=weeks, genesis=genesis) if w["counted"]]
     return rates or None
+
+
+# ── THE stated loss-rate quantity (#5001) ─────────────────────────────────────────────
+# On 2026-10-18 the plan's stage-2 packet carried 4.12 lb/wk (this module's least-squares rate over
+# 10-04..10-17) while `get_nutrition` printed -4.38 (the TDEE back-solve's first-vs-last endpoint over
+# 10-03..10-17) — two numbers, neither stating which it was. `loss_rate_lb_wk` is the ONE stated
+# quantity both carry under `shared_quantities.loss_rate_lb_wk`: the value, its method, its window,
+# its n and its source, with the Withings partition rows it was computed from listed date by date so
+# a reader can hold it against `get_date_range source=withings` (the brief's validation rule: a
+# weigh-in list that is not the partition's own DATE# rows is not evidence).
+LOSS_RATE_SOURCE = "withings"
+LOSS_RATE_PARTITION = "USER#matthew#SOURCE#withings"
+# ADR-105 label for the WINDOW: owner — v0.3 §1, his plan's own words ("the 14-day weigh-in average is
+# the number; single days are noise"); the water-week floor is his schedule's step note.
+LOSS_RATE_WINDOW_PROVENANCE = "owner (v0.3 §1: 'the 14-day weigh-in average is the number'; weeks 1-2 excluded as water)"
+LOSS_RATE_METHOD = "ols_slope_14d_post_water"
+
+
+def loss_rate_quantity_from_rows(rows: list[dict[str, Any]] | None, end: str, *, genesis: str | None = None) -> dict[str, Any]:
+    """PURE: THE stated loss rate (#5001) over the rows of the Withings partition — `loss_rate_from_rows`'
+    number with its method, window, n, source, the weigh-ins it read and the days in the window that
+    carry none. `value` is POSITIVE when losing; None = unknown, never 0."""
+    g = genesis or _genesis()
+    base = loss_rate_from_rows(rows, end, genesis=g)
+    win = base["window"]
+    pts = [(d, w) for d, w in _weighins(rows) if win["start"] <= d <= win["end"]]
+    have = {d for d, _ in pts}
+    n_days = _days(win["start"], win["end"]) + 1 if win["start"] <= win["end"] else 0
+    missing = [d for d in (shift_day_key(win["start"], i) for i in range(n_days)) if d not in have]
+    return {
+        "value": base["rate_lb_wk"],
+        "unit": "lb/wk, positive = losing",
+        "method": LOSS_RATE_METHOD,
+        "estimator": base["estimator"],
+        "window_days": win["days"],
+        "window": {"start": win["start"], "end": win["end"]},
+        "window_provenance": LOSS_RATE_WINDOW_PROVENANCE,
+        "water_weeks_excluded_through": base["water_weeks_excluded_through"],
+        "n_weigh_ins": base["n_weighins"],
+        "span_days": base["span_days"],
+        "provisional": base["provisional"],
+        "reason": base.get("reason"),
+        "experiment_week": _days(g, end) // WEEK_DAYS + 1 if end >= g else None,
+        "source": LOSS_RATE_SOURCE,
+        "validation": {
+            "partition": LOSS_RATE_PARTITION,
+            "weigh_ins": [{"date": d, "weight_lbs": w} for d, w in pts],
+            "days_without_a_weigh_in": missing,
+        },
+        "definition": SHARED_QUANTITIES_VERSION + ": loss_rate_lb_wk (see mcp/shared_quantities.py, #5001)",
+    }
+
+
+def loss_rate_lb_wk(day: str, *, today: str | None = None, read: Callable[[str, str, str], list[dict[str, Any]]] | None = None) -> dict:
+    """THE stated loss rate for a plan or a nutrition read on `day` (#5001): the 14 completed days ending
+    `completed_end(day)`, read straight off the Withings partition. Raises on a failed read (the caller
+    reports it) — an unreadable partition is never an empty one."""
+    end = completed_end(day, today)
+    rows = (read or _core.query_source)(LOSS_RATE_SOURCE, shift_day_key(end, -(LOSS_RATE_WINDOW_DAYS - 1)), end)
+    return loss_rate_quantity_from_rows(rows, end)
 
 
 # #4166: THE DXA read the protein gate's body-fat tier derives from — every scan on or before `end_day`

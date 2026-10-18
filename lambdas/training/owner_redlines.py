@@ -718,7 +718,8 @@ TRIPWIRES: list[dict[str, Any]] = [
             "fires; below 260 the rehearsal maintenance weeks at 260 / 240 / 220 are the planned breaks."
         ),
     },
-    # ── the adaptive-rate rules (§7) — reported, not yet evaluated by plan_engine ──
+    # ── the adaptive-rate rules (§7) — reported, not yet evaluated by plan_engine (bar `rate_ceiling`, #5001:
+    # evaluated by `redline_rate.rate_ceiling_check` over `mcp.shared_quantities.loss_rate_lb_wk`) ──
     {
         "id": "loss_acceptable",
         "signal": "14-day trend vs the band's target",
@@ -759,7 +760,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "provenance": "population-derived",
         "derived_by": "physician / nutritionist (red team 2026-09-22)",
         "action": "+150 kcal/day regardless of every other signal",
-        "evaluated_by_engine": False,
+        "after_week": 3,
         "note": "An absolute ceiling above the schedule's caps; the only rate rule with no 'unless'.",
     },
     {

@@ -458,7 +458,7 @@ def compute_readiness(data, baselines=None):
     # Readiness: recovery 40% (most actionable), sleep 25%, HRV trend 20%, TSB 10% (lagging).
     # Sleep is 25% (not 30%) to stay aligned with the live MCP get_readiness_score model
     # so the tool's _precomputed_cross_check is a true drift detector — on the typical day
-    # (Garmin stale → Body Battery gated/re-normalised out) the two models are identical.
+    # (no overnight-physiology component — the live tool's 5% leg since #4978) the weights are identical.
     # #4999: inside an HR regime marker's window (hr_regime) the HR inputs draw no tier — no score,
     # colour "gray" (the stored no-tier value every colour map knows), HR components re-baselining.
     if hr_regime.is_rebaselining(data.get("date")):

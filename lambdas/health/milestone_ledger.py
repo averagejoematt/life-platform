@@ -608,7 +608,6 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
     training_lookback = max(process_milestones.SUSTAIN_RUNG_WEEKS) * 7
     hevy = _range("hevy", _back(training_lookback))
     strava = _range("strava", _back(training_lookback))
-    garmin = _range("garmin", _back(process_milestones.ZONE2_WINDOW_DAYS - 1))
     whoop = _range("whoop", _back(2 * process_milestones.TREND_WINDOW_DAYS - 1))
     macro = _range("macrofactor", _back(process_milestones.STRENGTH_WINDOW_DAYS - 1))
     measurements = _range("measurements", _back(process_milestones.WAIST_WINDOW_DAYS - 1))
@@ -649,18 +648,12 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
             if vol is not None:
                 strength_volume_by_day[day] = strength_volume_by_day.get(day, 0.0) + vol
 
-    # Zone 2 minutes: per-day MAX of garmin's all-day zone2_minutes vs strava's
-    # per-activity total_zone2_seconds — never the sum. Garmin activities auto-sync
-    # to Strava, so summing double-counts the same workout (2026-07-26 review), and
-    # the two fields measure different things (all-day vs per-activity). max() keeps
-    # the better-covered source per day and preserves the sum_undercount_only claim.
-    garmin_z2_by_day: dict[str, float] = {}
+    # Zone 2 minutes: strava's per-activity total_zone2_seconds, summed per day.
+    # #4976: the garmin all-day leg is gone — Garmin's direct feed is retired (#4640),
+    # its zone2_minutes field produced zero live records in its whole life (0/1461,
+    # 2026-07-26 review), and the watch's activities already arrive through Strava, so
+    # max(garmin, strava) only ever resolved strava. Garmin's stored rows are untouched.
     strava_z2_by_day: dict[str, float] = {}
-    for item in garmin:
-        sk = str(item.get("sk") or "")
-        z2 = _f(item.get("zone2_minutes")) or _f(item.get("time_in_zone_2_minutes"))
-        if sk.startswith("DATE#") and len(sk) == 15 and z2 is not None:
-            garmin_z2_by_day[sk[5:15]] = garmin_z2_by_day.get(sk[5:15], 0.0) + z2
     for item in strava:
         sk = str(item.get("sk") or "")
         if not sk.startswith("DATE#"):
@@ -670,18 +663,9 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
         z2s = _f(item.get("total_zone2_seconds"))
         if z2s is not None:
             strava_z2_by_day[day] = strava_z2_by_day.get(day, 0.0) + z2s / 60.0
-    zone2_by_day: dict[str, float] = {
-        day: max(garmin_z2_by_day.get(day, 0.0), strava_z2_by_day.get(day, 0.0)) for day in set(garmin_z2_by_day) | set(strava_z2_by_day)
-    }
-    # #1809: which source WON the max() per day — garmin's all-day zone2_minutes/
-    # time_in_zone_2_minutes has produced zero live records to date (0/1461,
-    # 2026-07-26 review; the extractor is wired but its heartRateZones read has
-    # always come back empty), so this has so far always resolved strava. Measured
-    # live rather than hardcoded, so it self-corrects the day garmin's leg revives.
-    zone2_source_by_day: dict[str, str] = {
-        day: ("garmin" if garmin_z2_by_day.get(day, 0.0) >= strava_z2_by_day.get(day, 0.0) else "strava")
-        for day in set(garmin_z2_by_day) | set(strava_z2_by_day)
-    }
+    zone2_by_day: dict[str, float] = dict(strava_z2_by_day)
+    # #1809: which source carried each day — measured, never implied (one source today).
+    zone2_source_by_day: dict[str, str] = {day: "strava" for day in strava_z2_by_day}
 
     # RHR / HRV: whoop daily records (skip interleaved #WORKOUT# sub-records).
     rhr_by_day: dict[str, float] = {}

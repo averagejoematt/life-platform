@@ -462,6 +462,19 @@ def _protein_days_7d(end_date: str) -> tuple[int | None, int | None]:
     return (missed, measured) if measured else (None, None)  # #4161: THE count, shared with the nutrition critics
 
 
+def _weight_of(reference: Any, ref_status: dict[str, Any]) -> tuple[float | None, dict[str, Any]]:
+    """(current weight, its input status) off the benchmark prescription — extracted from
+    `tool_plan_next_session` (#5001, the #4880 function-length ratchet)."""
+    from training import plan_engine
+
+    weight = reference.get("current_weight") if isinstance(reference, dict) else None
+    if ref_status["state"] == plan_engine.READ_FAILED:
+        return weight, dict(ref_status)
+    if weight is not None:
+        return weight, plan_engine.input_status(plan_engine.MEASURED, "from the benchmark prescription")
+    return weight, plan_engine.input_status(plan_engine.ABSENT, "the benchmark carried no current_weight")
+
+
 def tool_plan_next_session(args):
     """Stage 1: the deterministic constraint block (#3751). Stage 2, with `routine_id`: the
     four critics over disjoint evidence, verdicts stored on the draft (#3752)."""
@@ -518,18 +531,7 @@ def tool_plan_next_session(args):
         status["reference"] = st(ABSENT, f"no applicable weight-matched reference: {reference.get('reason')}")
         reference = {"proven_target": None, "_inapplicable_reason": reference.get("reason")}
 
-    weight = None
-    if isinstance(reference, dict):
-        weight = reference.get("current_weight")
-    status["weight_lb"] = (
-        dict(status["reference"])
-        if status["reference"]["state"] == READ_FAILED
-        else (
-            st(plan_engine.MEASURED, "from the benchmark prescription")
-            if weight is not None
-            else st(ABSENT, "the benchmark carried no current_weight")
-        )
-    )
+    weight, status["weight_lb"] = _weight_of(reference, status["reference"])
 
     readiness, status["recovery_tier"] = _read("recovery_tier", tool_get_readiness_score, {"date": target_date})
     readiness = readiness or {}
@@ -568,6 +570,10 @@ def tool_plan_next_session(args):
     from mcp.shared_quantities import dxa_scans as _dxa_scans
 
     dxa, status["dxa_scans"] = _read("dxa_scans", _dxa_scans, target_date)
+    # #5001: THE stated loss rate, read off the Withings partition — the rate_ceiling input and the advocate's rate
+    from mcp.shared_quantities import loss_rate_lb_wk
+
+    loss_rate, status["loss_rate"] = _read("loss_rate", loss_rate_lb_wk, target_date)
     if dxa == [] and status["dxa_scans"]["state"] != READ_FAILED:
         status["dxa_scans"] = st(ABSENT, "no DXA scan on file — the protein gate's body-fat tier is unknown (report-only)")
 
@@ -745,6 +751,7 @@ def tool_plan_next_session(args):
         block_workouts=block_workouts,
         training_memory_constraints=training_memory,
         recent_aerobic=recent_aerobic,
+        loss_rate=loss_rate,
         input_status=status,
     )
     _merge_walking_volume(block, walk_layer)
@@ -844,6 +851,11 @@ from mcp.plan_draft_evidence import (  # noqa: E402,F401
 
 
 # ── stage 2: the red team ────────────────────────────────────────────────────────────
+def _block_rate(block: dict[str, Any]) -> dict[str, Any] | None:
+    """The constraint block's stated loss rate (#5001), or None on a block built without one."""
+    return (block.get("shared_quantities") or {}).get("loss_rate_lb_wk")
+
+
 def _run_stage_2(
     ir: Any,
     block: dict[str, Any],
@@ -890,8 +902,10 @@ def _run_stage_2(
                 rate_target=block.get("rate_target"),
                 # #4068: THE loss rate (mcp.shared_quantities via get_benchmark's `loss_rate`
                 # block) — the number the deficit critic reads, provisional flag included.
-                current_rate_lb_wk=_loss_rate_of(reference)[0],
-                rate_provisional=_loss_rate_of(reference)[1],
+                # #5001: the constraint block's `shared_quantities.loss_rate_lb_wk` first — the SAME quantity its
+                # rate_ceiling row was evaluated over, so the advocate's rate and its tripwire can never disagree.
+                current_rate_lb_wk=_loss_rate_of(reference, _block_rate(block))[0],
+                rate_provisional=_loss_rate_of(reference, _block_rate(block))[1],
                 lifting_sessions_7d=evidence.get("lifting_sessions_7d"),
             ),
             "blueprint_historian": critics.build_historian_packet(

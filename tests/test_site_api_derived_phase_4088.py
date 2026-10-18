@@ -92,7 +92,7 @@ SITE_RULINGS = {
     ("_metrics_index", "_query_source", "'apple_health'", "site_api_fingerprint.py"): CLAMPED,
     ("_metrics_index", "_query_source", "'garmin'", "site_api_fingerprint.py"): CLAMPED,
     ("device_agreement", "_query_source", "'whoop'", "site_api_freshness.py"): EXPLICIT,
-    ("device_agreement", "_query_source", "'garmin'", "site_api_freshness.py"): EXPLICIT,
+    ("device_agreement", "_query_source", "'apple_health'", "site_api_freshness.py"): EXPLICIT,
     ("character_calibration", "_query_source", "'felt_probe'", "site_api_fulfillment.py"): CLAMPED,  # EXPERIMENT_START
     ("character_calibration", "_query_source", "'character_sheet'", "site_api_fulfillment.py"): SCOPED,
     ("journey", "_query_source", "'withings'", "site_api_journey.py"): CLAMPED,  # max(d120, EXPERIMENT_START)
@@ -172,7 +172,8 @@ SITE_RULINGS = {
     ("strength_deep_dive", "_query_source", "'hevy'", "site_api_training.py"): CLAMPED,  # _experiment_date(90)
     # the Lift Index: "a direction, not a 1RM goal" over a stated 90-day trend
     ("strength_benchmarks", "_query_source", "'hevy'", "site_api_training.py"): HISTORY,
-    ("_vo2max_arc", "_query_source", "'garmin'", "site_api_vitals_depth.py"): EXPLICIT,
+    # #4976: the arc reads every source in METRIC_TRUTH["vo2_max"] (Apple Watch, then Garmin history)
+    ("_vo2max_arc", "_query_source", "src", "site_api_vitals_depth.py"): EXPLICIT,
     ("_walking_hr", "_query_source", "'strava'", "site_api_vitals_depth.py"): EXPLICIT,
 }
 

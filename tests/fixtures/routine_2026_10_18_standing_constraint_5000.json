@@ -1,0 +1,52 @@
+{
+  "_source": "DDB life-platform, read 2026-10-18 (#5000). Structure only: movement keys, slot tags, skill tiers and set counts; loads and body numbers are not copied. The hand-built routine's semantic parts are recorded as flags, in the public vocabulary of training.standing_constraints (its own words are owner-only).",
+  "target_date": "2026-10-18",
+  "archetype": "upper",
+  "draft_2167c0e68e25f311d46f1015cbefc047": {
+    "version": 5,
+    "exercises": [
+      {"movement_key": "barbell_bench_press", "rationale_tag": "anchor:bench:volume", "skill_tier": 3, "sets": 3},
+      {"movement_key": "one_arm_db_row", "rationale_tag": "anchor:row:volume", "skill_tier": 2, "sets": 3},
+      {"movement_key": "db_shoulder_press", "rationale_tag": "anchor:overhead_press:volume", "skill_tier": 2, "sets": 3},
+      {"movement_key": "lat_pulldown", "rationale_tag": "anchor:vertical_pull:volume", "skill_tier": 1, "sets": 2},
+      {"movement_key": "cable_chest_fly", "rationale_tag": "accessory:cable_chest_fly:accessory", "skill_tier": 2, "sets": 2},
+      {"movement_key": "cable_tricep_pushdown", "rationale_tag": "accessory:cable_tricep_pushdown:accessory", "skill_tier": 1, "sets": 2},
+      {"movement_key": "db_curl", "rationale_tag": "accessory:db_curl:accessory", "skill_tier": 1, "sets": 2}
+    ],
+    "training_context": {"loaded_lifting_streak": 0, "deficit_state": "deep"},
+    "inputs_current_through": "2026-10-16",
+    "protein_days_missed_7d": 6,
+    "observed_defects": {
+      "whoop_band_cues_on_first_exercise": true,
+      "green_branch_printed": true,
+      "cardio_block_in_draft": false
+    }
+  },
+  "hand_built_014e1142aaad30b3b3b1fb5e90046dc2": {
+    "hevy_routine_id": "680a71ef-217d-49d1-b5fa-352d9f936184",
+    "exercises": [
+      {"movement_key": "barbell_bench_press", "sets": 3},
+      {"movement_key": "one_arm_db_row", "sets": 3},
+      {"movement_key": "db_shoulder_press", "sets": 3},
+      {"movement_key": "lat_pulldown", "sets": 2},
+      {"movement_key": "cable_chest_fly", "sets": 2, "optional_if_not_sinus": true},
+      {"movement_key": "cable_tricep_pushdown", "sets": 2},
+      {"movement_key": "db_curl", "sets": 2, "optional_if_not_sinus": true},
+      {"movement_key": "cycling", "sets": 1, "duration_seconds": 1200, "optional_if_not_sinus": true},
+      {"movement_key": "tmpl:527DA061", "sets": 1, "duration_seconds": 600, "_note": "a mobility finisher the owner added by hand; not a draft-path box of #5000"}
+    ],
+    "first_exercise_gate": {
+      "ecg_before_you_leave": true,
+      "whoop_bands_named_invalid": true,
+      "sinus_rpe_cap": 8,
+      "not_sinus_rpe_cap": 7,
+      "not_sinus_optional": ["accessories", "cardio"],
+      "green_withheld_with_count": "6 of 7",
+      "stop_list_present": true,
+      "exhale_no_breath_hold": true,
+      "get_up_slowly": true,
+      "whoop_band_numbers_present": false
+    },
+    "cardio": {"movement_key": "cycling", "recumbent": true, "minutes": 20, "talk_test": true, "hr_target": false}
+  }
+}

@@ -327,7 +327,12 @@ _WHOOP_CONSUMER_REGISTRY = {
         "shared-guard",
         "filter_day_rows for avg_strain + #WORKOUT# rows by distinct id (#4629 — was a missed member, not a non-member) + #4627: the Zone 2 read hands rows to training.zone2_minutes.whoop_recordings, which keeps ONLY #WORKOUT# sub-rows, one per workout_id",
     ),
-    "mcp/tools_health.py": (2, "non-member", "field-absent-safe tool extraction"),
+    "mcp/tools_health.py": (
+        3,
+        "non-member",
+        "field-absent-safe tool extraction + #4978: the overnight-physiology baseline read keeps only rows carrying "
+        "respiratory_rate / skin_temp_celsius, which #WORKOUT# sub-rows never carry",
+    ),
     "mcp/tools_plan.py": (1, "shared-guard", "filter_day_rows on the readiness_floor whoop read (#4072)"),
     "mcp/tools_training.py": (
         2,

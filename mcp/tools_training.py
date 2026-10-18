@@ -679,14 +679,8 @@ def _get_training_recommendation(args):
         readiness["deep_pct"] = _sf(es_today.get("deep_pct"))
         readiness["rem_pct"] = _sf(es_today.get("rem_pct"))
 
-    # Garmin Body Battery
-    garmin_items = query_source("garmin", d3_start, target_date)
-    garmin_sorted = sorted(garmin_items, key=lambda x: x.get("date", ""), reverse=True)
-    garmin_today = next((g for g in garmin_sorted if g.get("body_battery_high") is not None), None)
-    if garmin_today:
-        readiness["body_battery"] = _sf(garmin_today.get("body_battery_high")) or _sf(garmin_today.get("body_battery_end"))
-        readiness["garmin_stress"] = _sf(garmin_today.get("avg_stress"))
-        readiness["training_readiness_garmin"] = _sf(garmin_today.get("training_readiness"))
+    # #4976: no Garmin Body Battery / stress / training-readiness read. Garmin's direct feed
+    # is retired (#4640); its stored rows stay, but a retired device is not a readiness input.
 
     # ── 2. Training load context ─────────────────────────────────────────────
     training_context = {}
@@ -827,7 +821,6 @@ def _get_training_recommendation(args):
     # ── 5. Compute readiness tier ────────────────────────────────────────────
     recovery_score = readiness.get("whoop_recovery")
     sleep_score = readiness.get("sleep_score")
-    body_battery = readiness.get("body_battery")
     tsb = training_context.get("tsb")
     acwr = training_context.get("acwr")
 
@@ -837,10 +830,8 @@ def _get_training_recommendation(args):
         signals.append(recovery_score)
     if sleep_score is not None:
         signals.append(sleep_score)
-    if body_battery is not None:
-        signals.append(body_battery)
 
-    # ADR-104: with Whoop, Eight Sleep AND Garmin all silent this used to return
+    # ADR-104: with Whoop and Eight Sleep (and, before #4976, Garmin) all silent this used to return
     # `composite = 50` — a fabricated mid-scale number published in the same field, with
     # the same type, as a measured one, and a confident YELLOW tier with a Zone 2
     # prescription attached. All-silent is a live state (Garmin is paused platform-wide
@@ -869,7 +860,7 @@ def _get_training_recommendation(args):
             "type": "No recommendation — readiness data unavailable",
             "intensity": None,
             "description": (
-                "No recovery signal (Whoop recovery, Eight Sleep score, Garmin body battery) exists for this "
+                "No recovery signal (Whoop recovery, Eight Sleep score) exists for this "
                 "date, so no readiness-based prescription is made. Check source freshness before training off "
                 "this answer; the training-load context below is still measured."
             ),
@@ -1013,8 +1004,6 @@ def _get_training_recommendation(args):
             warnings.append(
                 f"⚠️ HRV ({readiness['whoop_hrv']}ms) is {round((1 - readiness['whoop_hrv']/hrv_avg)*100)}% below your 7-day average. Parasympathetic suppression — reduce intensity."
             )
-    if readiness.get("garmin_stress") and readiness["garmin_stress"] > 50:
-        warnings.append(f"⚠️ Garmin stress score {readiness['garmin_stress']} (elevated). Consider how allostatic load affects recovery.")
 
     # ── 8. Board of Directors rationale ───────────────────────────────────────
     bod_notes = []
@@ -1070,11 +1059,7 @@ def _get_training_recommendation(args):
         # ADR-105: the n behind the mean. A composite built from ONE signal and one built
         # from THREE were reported identically — same field, same type, no n.
         "composite_readiness_n": len(signals),
-        "composite_readiness_signals": [
-            k
-            for k, v in (("whoop_recovery", recovery_score), ("sleep_score", sleep_score), ("body_battery", body_battery))
-            if v is not None
-        ],
+        "composite_readiness_signals": [k for k, v in (("whoop_recovery", recovery_score), ("sleep_score", sleep_score)) if v is not None],
         "recommendation": rec,
         "warnings": warnings,
         "board_of_directors": bod_notes,
@@ -1093,7 +1078,7 @@ def _get_training_recommendation(args):
         "muscle_recovery": muscle_recovery,
         "recent_activities_7d": recent_activities[:10],
         # #4075: hevy (the load model's set log) and computed_metrics (the one ACWR) are read.
-        "source": "whoop + eightsleep + garmin + strava + hevy + computed_metrics",
+        "source": "whoop + eightsleep + strava + hevy + computed_metrics",
     }
 
 
