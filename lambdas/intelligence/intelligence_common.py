@@ -636,17 +636,10 @@ _CLAIM_DOMAIN_MAP = {
     "biomarker": ["labs"],
 }
 
-# SOT definitions — which source is authoritative for each metric
-_SOURCE_OF_TRUTH = {
-    # "steps" retired (#4630): resolved per day by common.metric_truth from the registry facet.
-    "weight": "withings",
-    "sleep_duration": "whoop",
-    "recovery": "whoop",
-    "hrv": "whoop",
-    "glucose": "cgm",
-    "calories": "macrofactor",
-    "protein": "macrofactor",
-}
+# #4975: the module's `_SOURCE_OF_TRUTH` table is retired — nothing read it (a second,
+# unread statement of which source answers each metric). The truth for a metric carried by
+# more than one source is the registry's METRIC_TRUTH facet, applied by common.metric_truth;
+# tests/test_metric_truth_modes_4975.py fails if a hand-written SOT table names one again.
 
 
 # The checks validate_coach_output can actually emit. write_quality_results derives

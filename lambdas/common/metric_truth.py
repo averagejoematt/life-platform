@@ -15,6 +15,17 @@ them in keyed by source id; a source it did not fetch is simply absent from the 
 the resolver reports in its `reason` rather than hiding.
 
 Reproduce one day from the stored rows (read-only): `python3 scripts/resolve_steps_day_4630.py --date YYYY-MM-DD`.
+
+Truth modes (#4975). A facet's optional `mode` says how its sources combine, and `resolve` is
+the ONE function every reader already goes through, so a mode change is a registry edit:
+  * `primary` (the default, today's behaviour) — the facet's `overlap_rule` over `fallback_order`;
+  * `primary_backup` — the truth source when it has a usable value, else the ONE named `backup`;
+    `source_used` names which answered;
+  * `mean` — the mean of the sources with a usable value, `n_sources` and the per-source
+    `values` returned (a zero report joins only when no source has a positive value — the
+    same rule that keeps a device's 0 from zeroing a day another device counted).
+Which mode a metric gets is the owner's ruling (#4975 gate:owner, after the #4974 agreement
+study); every facet on main is on `primary`.
 """
 
 from __future__ import annotations
@@ -39,11 +50,29 @@ class Resolution:
     field: Optional[str]
     reason: str
     candidates: dict[str, Optional[float]] = dataclasses.field(default_factory=dict)
+    mode: str = "primary"
+    sources_used: tuple[str, ...] = ()
 
     @property
     def count(self) -> Optional[int]:
         """The value as an integer count (steps are counts), or None."""
         return None if self.value is None else int(round(self.value))
+
+    @property
+    def source_used(self) -> Optional[str]:
+        """The ONE source that answered (primary / primary_backup, or a mean over one source);
+        None for a mean over several — read `sources_used` / `values` then."""
+        return self.source
+
+    @property
+    def n_sources(self) -> int:
+        """How many sources the value was computed from (0 when nothing resolved)."""
+        return len(self.sources_used)
+
+    @property
+    def values(self) -> dict[str, float]:
+        """The per-source usable values the resolver saw (absent sources left out)."""
+        return {s: v for s, v in self.candidates.items() if v is not None}
 
 
 def sources_for(metric: str) -> tuple[str, ...]:
@@ -111,8 +140,19 @@ def resolve(metric: str, rows: Mapping[str, Optional[Mapping[str, Any]]]) -> Res
     (or the reproduce command) can show what lost and by how much."""
     facet = metric_truth(metric)
     order = facet["fallback_order"]
-    fields = facet["field_by_source"]
     candidates: dict[str, Optional[float]] = {src: source_value(metric, src, rows.get(src)) for src in order}
+    mode = facet.get("mode", "primary")
+    if mode == "primary_backup":
+        return _resolve_primary_backup(metric, facet, rows, candidates)
+    if mode == "mean":
+        return _resolve_mean(metric, facet, candidates)
+    return _resolve_primary(metric, facet, rows, candidates)
+
+
+def _resolve_primary(metric: str, facet: Mapping[str, Any], rows: Mapping[str, Any], candidates: dict[str, Optional[float]]) -> Resolution:
+    """Mode `primary` — the facet's overlap_rule (first_positive_else_first_zero), unchanged."""
+    order = facet["fallback_order"]
+    fields = facet["field_by_source"]
     for rank, src in enumerate(order):
         v = candidates[src]
         if v is None or v == 0:
@@ -121,11 +161,47 @@ def resolve(metric: str, rows: Mapping[str, Optional[Mapping[str, Any]]]) -> Res
             why = f"{src} is the truth source and has a count"
         else:
             why = f"fallback #{rank + 1}: {', '.join(_why_skipped(facet, rows, candidates, s) for s in order[:rank])} → {src}"
-        return Resolution(metric, v, src, fields[src], why, candidates)
+        return Resolution(metric, v, src, fields[src], why, candidates, "primary", (src,))
     for src in order:
         if candidates[src] == 0:
-            return Resolution(metric, 0.0, src, fields[src], f"no source has a positive count; {src} reported 0", candidates)
-    return Resolution(metric, None, None, None, "no source has a usable count", candidates)
+            return Resolution(
+                metric, 0.0, src, fields[src], f"no source has a positive count; {src} reported 0", candidates, "primary", (src,)
+            )
+    return Resolution(metric, None, None, None, "no source has a usable count", candidates, "primary")
+
+
+def _resolve_primary_backup(
+    metric: str, facet: Mapping[str, Any], rows: Mapping[str, Any], candidates: dict[str, Optional[float]]
+) -> Resolution:
+    """Mode `primary_backup` — the truth source when it has a usable value (0 included: a
+    reading is a reading), else the facet's ONE `backup`. No third source is ever consulted."""
+    fields = facet["field_by_source"]
+    primary, backup = facet["truth_source"], facet["backup"]
+    seen = {s: candidates.get(s) for s in (primary, backup)}
+    if seen[primary] is not None:
+        return Resolution(
+            metric, seen[primary], primary, fields[primary], f"{primary} is the primary and has a value", seen, "primary_backup", (primary,)
+        )
+    if seen[backup] is not None:
+        why = f"backup: {_why_skipped(facet, rows, seen, primary)} → {backup}"
+        return Resolution(metric, seen[backup], backup, fields[backup], why, seen, "primary_backup", (backup,))
+    return Resolution(metric, None, None, None, "neither the primary nor the backup has a usable value", seen, "primary_backup")
+
+
+def _resolve_mean(metric: str, facet: Mapping[str, Any], candidates: dict[str, Optional[float]]) -> Resolution:
+    """Mode `mean` — the mean of the usable values. Positives only while any source has one;
+    when none does, the zero reports stand (a mean of zeros is 0)."""
+    fields = facet["field_by_source"]
+    present = [(s, v) for s, v in candidates.items() if v is not None]
+    positive = [(s, v) for s, v in present if v > 0]
+    used = positive or present
+    if not used:
+        return Resolution(metric, None, None, None, "no source has a usable value", candidates, "mean")
+    srcs = tuple(s for s, _ in used)
+    value = sum(v for _, v in used) / len(used)
+    if len(used) == 1:
+        return Resolution(metric, value, srcs[0], fields[srcs[0]], f"mean over one source: {srcs[0]}", candidates, "mean", srcs)
+    return Resolution(metric, value, None, None, f"mean of {len(used)} sources: {', '.join(srcs)}", candidates, "mean", srcs)
 
 
 def _row_date(row: Mapping[str, Any]) -> Optional[str]:
