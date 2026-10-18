@@ -694,7 +694,9 @@ def lambda_handler(event, context):
             # line and would drop them) and stored as that week's owner voice. Never generates a confirmation mail.
             sq_week = story_questions.week_from_subject(subject)
             if sq_week is not None:
-                sq_questions = story_questions.questions_for_subject(subject)  # #4584: the Tuesday reply's one question
+                sq_questions = story_questions.questions_for_subject(subject) or story_questions.sent_questions(  # #4584 / #4546
+                    table, f"USER#{USER_ID}#SOURCE#chronicle", sq_week
+                )
                 sq_answers = story_questions.parse_reply(body_text, sq_questions)
                 print(f"[INFO] story-questions reply for week {sq_week}: {len(sq_answers)} answer(s)")
                 if sq_answers and not dry_run:

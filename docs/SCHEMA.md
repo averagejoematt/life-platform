@@ -1,6 +1,6 @@
 # Life Platform — Schema & Data Dictionary
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-22
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
@@ -458,12 +458,13 @@ Note: the XML import path (`apple_health_lambda.py` `QUANTITY_RECORDS`) writes m
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `active_calories` | number | Active calories burned (Apple Watch, daily sum) |
-| `basal_calories` | number | Basal metabolic calories (Apple Watch, daily sum) |
+| `active_calories` | number | Active calories burned (daily sum — the #4628 delivered-readings sum, see `delivered_readings_only`) |
+| `basal_calories` | number | Basal metabolic calories (daily sum — the #4628 delivered-readings sum) |
 | `total_calories_burned` | number | Derived: active + basal (Apple Watch TDEE) |
-| `steps` | number | Step count (daily sum) |
-| `flights_climbed` | number | Floors climbed (daily sum) |
-| `distance_walk_run_miles` | number | Walking + running distance (daily sum, miles) |
+| `steps` | number | Step count (daily sum — the #4628 delivered-readings sum) |
+| `flights_climbed` | number | Floors climbed (daily sum — the #4628 delivered-readings sum) |
+| `distance_walk_run_miles` | number | Walking + running distance (daily sum, miles — the #4628 delivered-readings sum) |
+| `delivered_readings_only` | boolean | **#4628 (owner Q2 "b — readings stay in S3, one daily value per source in DynamoDB", Q3 "labelled 'what the phone delivered'", 2026-10-17).** `true` when the row's five additive fields (`steps`, `active_calories`, `basal_calories`, `distance_walk_run_miles`, `flights_climbed`) are the sum over unique reading timestamps of every reading the phone DELIVERED for this UTC day — each delivery merged into `raw/matthew/additive_readings/<field>/YYYY/MM/DD.json` (the `apple_health` raw_layout `additive_<field>` sub_layouts; resolve with `raw_date_key`), a re-sent reading counted once, every device source summed (no cross-source max), written without GREATEST. It means *what the phone delivered*, not the day: on non-walk days the phone under-delivers against the wrist count, so this is not a complete daily step total (which device a steps read uses is the read-side truth facet, Q4). Absent on rows written before the fix, or by a delivery whose archive could not be read (that delivery keeps the old payload-max under GREATEST). Writer: `lambdas/ingestion/health_auto_export_additive.py` |
 | `distance_cycling_miles` | number | Cycling distance (daily sum, miles) — 2026-06-20 capture-everything expansion |
 | `distance_swimming_miles` | number | Swimming distance (daily sum, miles) — 2026-06-20 |
 | `distance_snow_miles` | number | Downhill snow-sports distance (daily sum, miles) — 2026-06-20 |
@@ -1008,7 +1009,7 @@ Note: Garmin auto-syncs activities to Strava. `garmin_activities` captures Garmi
 | Field | Type | Description |
 |-------|------|-------------|
 | `habits` | object | Map of habit name → count (Decimal: `1` = completed, `0` = not completed) |
-| `habit_statuses` | object | Per-habit structured status map (TD-11): status, completed_at, `habit_id` (the vendor's habit id, string — #4632, additive; absent on rows ingested before it and when the vendor sends none), `aliases` (list of strings — #4632: every OTHER display name the same `habit_id` carried on the nearest earlier stored day, plus that entry's own `aliases`, derived at ingest from id continuity; absent when the habit was never renamed; the read side resolves a registry habit by its `habitify_id`, then its key/`habitify_names`, then these aliases — `lambdas/health/habit_identity.py`), `status_channel` (`logs`\|`journal` — #4632: which channel decided the status; only a `logs`-decided vendor `failed` may withdraw a stored completion, and only on an explicit correction run), `miss_source` (`vendor`\|`platform`, present only when status is `failed` — #3666), etc. Since #422 also carries `notes` (list of verbatim in-app note strings for that day, clipped), `notes_at` (their created timestamps) and `note_channel: "habitify_note"` when the habit has notes — the PRIMARY habit-causality capture channel (a note on a done day = driver context; on a skipped/failed day = the why-missed reason). Stored raw — the `trigger:`/`reward:` line-prefix convention is interpreted on read by `lambdas/habit_causality.parse_note`, never inferred (ADR-104). |
+| `habit_statuses` | object | Per-habit structured status map (TD-11): status, completed_at, `habit_id` (the vendor's habit id, string — #4632, additive; absent on rows ingested before it and when the vendor sends none), `aliases` (list of strings — #4632: every OTHER display name the same `habit_id` carried on the nearest earlier stored day, plus that entry's own `aliases`, derived at ingest from id continuity; absent when the habit was never renamed; the read side resolves a registry habit by its `habitify_id`, then its key/`habitify_names`, then these aliases — `lambdas/health/habit_identity.py`; the history before #4921 gains its ids and aliases through the owner-run `scripts/habit_alias_backfill_4632.py`, dry-run by default), `status_channel` (`logs`\|`journal` — #4632: which channel decided the status; only a `logs`-decided vendor `failed` may withdraw a stored completion, and only on an explicit correction run), `miss_source` (`vendor`\|`platform`, present only when status is `failed` — #3666), etc. Since #422 also carries `notes` (list of verbatim in-app note strings for that day, clipped), `notes_at` (their created timestamps) and `note_channel: "habitify_note"` when the habit has notes — the PRIMARY habit-causality capture channel (a note on a done day = driver context; on a skipped/failed day = the why-missed reason). Stored raw — the `trigger:`/`reward:` line-prefix convention is interpreted on read by `lambdas/habit_causality.parse_note`, never inferred (ADR-104). |
 | `by_group` | object | Map of AREA name → group stats object (see below). #3666: the group set is DERIVED from Habitify's live `/areas` response, not the hardcoded nine P40 names — those had been renamed to `Core`/`Optimize`/`Vice`, which left `by_group` empty and `total_possible` 0 on every stored day. |
 | `total_completed` | number | Total habits completed that day |
 | `total_possible` | number | Total habits tracked that day |
