@@ -1119,7 +1119,11 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 265 -> 266 (2026-10-18, #4580 round 1 lane E): structural::test_edition_one_number_4580.py — the one-number /
         # one-unit / one-sentence contracts over the edition wire — arrives PROVEN via STRUCTURAL_HAND_PROOFS (three plants, each
         # 1 failed / 6 passed; restored 7 passed). Enters exactly that id, leaves {}.
-        <= 266
+        # Upper bound 266 -> 267 (2026-10-18, #4588 cut-over rehearsal rebuilt on the post-#4988 main, HELD): structural::test_v4_redirects_function.py —
+        # the every-existing-URL-still-resolves sweep — arrives PROVEN via GUARD_PROOFS in scripts/gate_census_proofs.py (M1 the /start/
+        # 301 left at the edge, M2 a cut-over page missing, M3 /story/about/ dropped: each 1 failed; reverted 1 passed). Enters exactly
+        # that id, leaves {}, unproven does NOT move.
+        <= 267
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

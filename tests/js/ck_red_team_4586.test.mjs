@@ -719,7 +719,7 @@ test("Built: the first-person draft sits under the fold with one draft mark, and
   assert.equal((body.match(/[.!?](\s|$)/g) || []).length, 2, "the draft is two sentences, not three paragraphs");
 });
 
-test("Appendix: a jump list of plain links reaches each kind, Tools first, with the replaced-layouts group's empty sentence", () => {
+test("Appendix: a jump list of plain links reaches each kind, Tools first, and the replaced-layouts group lists the reference copies", () => {
   const html = page("appendix");
   const jump = /<p class="ck-soft">((?:<a class="ck-link" href="#kind-[a-z]+">[^<]+<\/a>(?: · )?)+)<\/p>/.exec(html);
   assert.ok(jump, "the jump list is one paragraph of kit links");
@@ -728,7 +728,15 @@ test("Appendix: a jump list of plain links reaches each kind, Tools first, with 
   for (const id of targets) assert.ok(html.includes(`<section class="ck-section" id="${id}">`), id);
   const sections = [...html.matchAll(/<section class="ck-section" id="(kind-[a-z]+)">/g)].map((m) => m[1]);
   assert.deepEqual(sections, targets, "the links are in the sections' order");
-  assert.match(html, /id="kind-replaced">\s*<p class="ck-label">Replaced layouts<\/p>\s*<p class="ck-soft">The home page’s earlier layout will be listed here once the cut-over copies it\. Nothing is here yet\.<\/p>/);
+  // #4588 (owner ruling 2026-10-18): the cut-over keeps each replaced layout as a served, noindex
+  // reference page under /reference/<date>-<slug>/ and lists it here; the group's empty sentence
+  // is gone with the first copies (tests/test_v8_appendix_4586.py proves the sentence on a render
+  // without them).
+  const replaced = /<section class="ck-section" id="kind-replaced">(.*?)<\/section>/s.exec(html)[1];
+  assert.match(replaced, /<p class="ck-label">Replaced layouts<\/p>/);
+  assert.match(replaced, /href="\/reference\/2026-10-22-home-v5\/">The front page, before 22 October 2026<\/a>/);
+  assert.match(replaced, /href="\/reference\/2026-10-22-story-v5\/">The story hub, before 22 October 2026<\/a>/);
+  assert.doesNotMatch(replaced, /Nothing is here yet/);
   assert.doesNotMatch(html, /<a class="ck-link" href="\/next\/v8\/">Back<\/a>/, "no second back link under the list");
 });
 
