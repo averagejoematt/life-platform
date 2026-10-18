@@ -44,6 +44,7 @@ from common.pacific_time import pacific_today  # #2798: target_date is a Pacific
 from training import commit_binding  # #4066: the commit is bound to the red-teamed routine
 from training.warmup_sets import working_set_count  # #5049: the set ceilings count working sets
 
+from mcp.draft_custom_session import attach_draft_warmups, stamp_program_slot  # #5005 slot tags; #5049 warm-ups
 from mcp.hevy_prescription_gate import prescription_gate, refusal as _gate_refusal, summary as _gate_summary
 
 # #3670: everything the commit result must report honestly lives in its own module
@@ -811,8 +812,6 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     cardio_cues = attach_custom_cardio_notes(ir, target_date)
     ir.inputs_snapshot["cardio_cues"] = cardio_cues
     # #5005: a program-session date re-tags the blocks with the slot's intensity, so the commit gate checks the engine's floors
-    from mcp.draft_custom_session import attach_draft_warmups, stamp_program_slot
-
     program_slot, warmups = stamp_program_slot(ir), attach_draft_warmups(ir, catalog, args)  # #5049: the generator's climb too
     draft_versioned(ir)
     resp = {
