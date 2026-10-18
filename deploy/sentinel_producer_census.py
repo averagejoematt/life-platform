@@ -115,7 +115,13 @@ EVENT_WINDOWS: dict[str, dict] = {
 }
 
 # ── paused: derived from the source registry's `paused` facet (never hand-typed truth) ──
-PAUSED: dict[str, str] = {}
+# Q39 (owner 2026-10-17, #4644): the three social-feed schedules are retired; the registry marks each source
+# `paused: True` and the function stays deployed, invokable by hand, until an account exists (#4641).
+PAUSED: dict[str, str] = {
+    "youtube-social-ingestion": "youtube",
+    "bluesky-social-ingestion": "bluesky",
+    "mastodon-social-ingestion": "mastodon",
+}
 
 # ── first scheduled fire still ahead (dated; the row reds itself once overdue) ──
 FIRST_DUE: dict[str, dict] = {
