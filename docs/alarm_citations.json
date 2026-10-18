@@ -199,5 +199,12 @@
     "cause_observed": "2026-10-17",
     "citation": "#4914 — the alarm doing its job: chronicle-approve's 48-hour sweep refused the unapproved, unaudited week-6 legacy draft at 2026-10-16T18:00:44Z (CHRONICLE-AUTOPUBLISH-HELD Week 6 (2026-10-13) held: unapproved for 48.0h and the audit found 1 blocking item(s) — 'no audit on record: the Story Desk did not write this week'), the alarm went OK→ALARM 2026-10-16T18:01:57Z and ALARM→OK 18:16:57Z (period 300, missing data notBreaching: one datapoint per refusal is its design, routed to life-platform-alerts-digest — SNS NumberOfNotificationsDelivered 1 in the 18:00Z bucket). That episode is issue 4694's live proof (closed on it 2026-10-17T02:58Z). The sweep runs daily at 18:00Z and the draft stays inside its 10-day window until 2026-10-24, so the same 15-minute episode is expected every day at ~18:01Z until the owner approves week 6 from the preview email or forces the desk (issue 4914, the open owner). No action for the alarm itself; prune this entry 72 h after the last episode.",
     "updated": "2026-10-17"
+  },
+  "slo-source-freshness": {
+    "added": "2026-10-18",
+    "cause_observed": "2026-10-18",
+    "updated": "2026-10-18",
+    "citation": "#4970 — regression from the Apple Watch registry entry + dead-man change (the watch-metrics PR merged 2026-10-18 21:08Z, deployed ~21:25Z): the alarm went ALARM at 21:34Z on StaleSourceCount = 1 while the watch dead-man itself reads ok (last reading 15 h ago, 36 h threshold) and the only stale sources (food_delivery, notion) were stale for weeks with the alarm OK — so the checker now counts a new entry (the `watch` registry entry evaluated as a day-partition source, or one of its four day-level groups such as the 14-day fitness group) into the SLO count; the checker log shows 'Alert sent for 2 stale source(s)' at 21:33–21:40Z and '1 stale source(s)' at 21:48Z. A sonnet lane is diagnosing and fixing it (only a stale/unreadable 36 h dead-man may count; the day-level groups report but never count); the alarm goes OK on the first checker run after that deploy. Expiry: if still ALARM after 2026-10-19 12:00Z, the fix did not land — re-cite with the lane's finding.",
+    "note": "Reader-facing alarm class (freshness), cited on first red per #3423."
   }
 }
