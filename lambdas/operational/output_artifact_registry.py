@@ -145,8 +145,8 @@ def check_artifact(key: str, s3_client, now: Optional[datetime] = None) -> dict:
         elif code in ("AccessDenied", "403"):
             out["detail"] = (
                 f"Access denied reading {out['s3_uri']} — this CHECK is broken, which is not the "
-                f"same as the backup being broken. Grant s3:GetObject on the prefix "
-                f"(cdk/stacks/role_policies_operational.py) and redeploy."
+                f"same as the backup being broken. Grant s3:GetObject on the heartbeat key to the CALLER role "
+                f"(role_policies_operational.py freshness checker; role_policies_serve.py mcp_server) and redeploy."
             )
         else:
             out["detail"] = f"Could not read {out['s3_uri']} ({name} {code}) — reporting unknown rather than fresh."
