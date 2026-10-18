@@ -92,9 +92,8 @@
   "qa-smoke-warnings": {
     "added": "2026-10-04",
     "cause_observed": "2026-10-18",
-    "citation": "#4935 — the 2026-10-18 18:30Z run (CAUSE warn c28c8975) names ONE live cause: reader_truth:confirm + reader_truth:verdict on finding fcd7d5 — /api/sleep_detail's sleep_trend row for 2026-09-19 carries Eight Sleep 1.7 h / 16.9 % beside Whoop 8.6 h / score 83 although the payload says flagged nights are left out; this is #4935's own second cause (its title names it), the orphan-draft cause is gone (the five drafts archived 10-18 03:33Z–04:3xZ, box 4 ticks) and supplement_join_liveness no longer fires. A reader fix lane (the trend rows apply the headline's discount rule) runs 2026-10-18 20:5xZ; the alarm goes OK on the first 18:30Z run after its deploy; prune 72 h after OK · Prior entry (2026-10-18T07:55Z): #4935 — self-clearing after the five orphan routine drafts were archived.",
-    "updated": "2026-10-18",
-    "cause": "reader_truth:verdict"
+    "citation": "#4935 — self-clearing: the last live cause (reader_truth:verdict fcd7d5, the /api/sleep_detail 2026-09-19 trend row carrying a discounted Eight Sleep night's hours) was fixed by the sleep-detail reader change merged 2026-10-18 21:09Z (the trend rows apply the headline's discount rule), live on the site API from 21:25Z; the forced qa-smoke run at ~21:3xZ read `[QA] CAUSE warn none -` (warned 4, all chronic), so this entry declares no cause; the alarm goes OK at its next evaluation of WarnCount (the 2026-10-19 18:30Z run is the box-4 read on #4935); prune 72 h after OK · Prior entry (2026-10-18 20:4xZ): #4935 — the 18:30Z run named reader_truth:verdict fcd7d5 alone; the orphan-draft cause was gone (the five drafts archived 03:33Z–04:3xZ) and supplement_join_liveness no longer fired.",
+    "updated": "2026-10-18"
   },
   "site-api-invocation-spike": {
     "citation": "2026-08-24 session note — self-inflicted QA traffic",
