@@ -1,6 +1,6 @@
 # Engineering Standards — the "definition of an A" for this codebase
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-21
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 > **What this is.** The single, durable source for *how code and the repo should look and hold
 > together* here — the craft an outside engineer judges cold. It is both the **standard new
@@ -25,7 +25,7 @@ public platform's stated postures*," not "A for a 50-engineer org."
 | # | Dimension | **A** (an outside panel nods) | **C** (works, but a skeptic frowns) | **F** (a reviewer stops reading) |
 |---|-----------|-------------------------------|--------------------------------------|-----------------------------------|
 | **D1** | **First impression / repo cleanliness** | Root is load-bearing dirs only; every tracked dir earns its place; no committed archives, process exhaust, or throwaway artifacts | A few stray dirs; some tracked junk; tree needs the README to be legible | Committed dead-code archives, spike PNGs, session transcripts, backups; the root reads as a working directory |
-| **D2** | **Structure & module hygiene** | Packaging finished; no source file over the size ceiling without a documented reason; boundaries are obvious | Half-done packaging (subpackages + a flat pile); one or two god-modules | A flat pile of modules; multiple 2–3k-line files; no discernible structure |
+| **D2** | **Structure & module hygiene** | Packaging finished; no source file over the size ceiling and no function over the length ceiling without a documented reason; boundaries are obvious | Half-done packaging (subpackages + a flat pile); one or two god-modules | A flat pile of modules; multiple 2–3k-line files; no discernible structure |
 | **D3** | **Naming & code aesthetics** | Idiomatic, consistent, self-explaining names; earned abstractions; a stranger reads a random file and nods | Mostly consistent; some cryptic or inconsistent names; occasional cleverness tax | Inconsistent conventions; misleading names; abstraction for its own sake |
 | **D4** | **Trustworthy gates** | A skeptic believes lint/type/coverage mean something: real mypy, no blanket waivers, a credible coverage floor | Gates pass but are visibly loose (broad `disable_error_code`, per-dir suppressions) — or loose-but-documented | Gates are decorative — everything substantive silenced; green means nothing |
 | **D5** | **CI/CD maintainability** | Pipelines are DRY: shared setup in composite actions, thin reusable workflows; no mega-file | Duplicated setup across workflows; one large workflow file | A single multi-thousand-line workflow + N near-duplicate copies |
@@ -56,8 +56,10 @@ public platform's stated postures*," not "A for a 50-engineer org."
 ### 2. Structure & module size (D2)
 - **Finish the packaging.** New modules go into the domain subpackage they belong to
   (`lambdas/<domain>/`), not the flat root. Shared helpers go to a single `common/` (or `core/`),
-  not the root pile.
-- **Module-size ceiling: ~650 LOGICAL lines (smell) / 1,000 (finding).**
+  not the root pile. Enforced by `tests/test_lambdas_packaging_guard.py` (ADR-146); and because the
+  bundle stages the whole `lambdas/` tree into every zip, `tests/test_no_dead_shared_defs_3538.py`
+  fails on a public function nothing references in any staged package.
+- **Module-size ceiling: ~650 LOGICAL lines (smell, a review judgment — not mechanized) / 1,000 (finding, `HARD_CEILING` in `tests/test_module_size_guard.py`, shrink-only).**
   **The unit is logical lines, not `wc -l` (#3537).** A logical line is a physical line
   carrying at least one Python token that is not a comment and not blank; a multi-line
   statement counts every line it spans, and a docstring counts (it is a string expression,
@@ -74,6 +76,21 @@ public platform's stated postures*," not "A for a 50-engineer org."
   carries a top-of-file comment naming the exception* — which registers it with the
   module-size guard.
 - Enforced by the **module-size ratchet guard** (below).
+- **Function-length ceiling: 150 LOGICAL lines (finding, `HARD_CEILING` in `tests/test_function_length_guard_4880.py`, shrink-only; owner ruling 2026-10-17, #4880).**
+  A module ceiling cannot see a 600-line function inside a 900-line module, so function length is
+  bounded beside it, in the same unit: the #3537 logical line (comments and blanks are not charged;
+  a docstring is). The instrument parses each file with `ast`; a function's span runs from its first
+  decorator to its last line, nested functions included (a nested helper is also measured on its own
+  key). **Scope: git-tracked `lambdas/`, `mcp/`, `scripts/` and `deploy/`. `cdk/` and `tests/` are out
+  of scope for now (owner ruling 2026-10-17)** — widening is a one-line change plus the new entries.
+  Generated files are exempt. The ratchet is down-only, exactly the module-size shape (`docs/CONVENTIONS.md` §9
+  names it; not restated here): a new over-limit function fails, a recorded one may not grow past its
+  number in `FUNCTION_LENGTH_COUNTS`, shrinking is always allowed and lowering the record after a real
+  shrink is welcome, an entry that dropped under the ceiling or no longer exists must be pruned, and the
+  record is never raised. **Escape hatch:** a genuine dispatch/registry table may carry a reasoned
+  `# function-length-exception: <reason>` comment on the line directly above the `def` (above its first
+  decorator, if any); a comment with no reason does not register. The instrument reads this comment
+  today (`_EXCEPTION_RE`). The live table: `python3 tests/test_function_length_guard_4880.py`.
 - **Accepted debt has a per-file number, and headroom is EARNED, never granted (#2610).**
   Files already over the ceiling carry a maximum line count in
   `tests/test_module_size_guard.BASELINE`. Re-baselining those at *measured* (2026-08-09)
@@ -100,8 +117,8 @@ public platform's stated postures*," not "A for a 50-engineer org."
   - The zero-headroom set is **never hand-listed** — it moves every week. Print it:
     `python3 scripts/module_size_headroom.py` (add `--zero`, or `--json`). The tightest rows
     are the extraction queue.
-  - The same failure shape exists in the engine-doc gate (**#2619**) — same decision applies
-    there when it is picked up; it is not fixed by this policy note.
+  - The same failure shape existed in the engine-doc gate (**#2619**, closed 2026-08-13); read
+    that issue for how the decision was applied there.
 
 ### 3. Naming & aesthetics (D3)
 - **Python:** `snake_case` modules/functions/vars, `PascalCase` classes, `UPPER_SNAKE` constants.
@@ -127,8 +144,10 @@ public platform's stated postures*," not "A for a 50-engineer org."
   with a reason**, at the specific site.
 - **Line length** is 140 by deliberate posture — that choice is documented in `.flake8`; don't
   relitigate it, and don't loosen further.
-- **Coverage** floor is a real, enforced number (target **70%**) and moves **up only** — never
-  regresses (the up-only guard below).
+- **Coverage** floor is a real, enforced number — `fail_under` in `pyproject.toml`, which
+  `tests/test_coverage_floor_ratchet.py` pins to CI's `--cov-fail-under` and an up-only
+  `RATCHET_FLOOR` — and moves **up only**, never regresses (the up-only guard below). Read the
+  number there; it is not restated here.
 
 ### 5. CI/CD as composition (D5)
 - Shared setup (checkout + language setup + cloud auth) lives in **one composite action**, not
@@ -180,11 +199,13 @@ These CI guards make regression *fail the build* rather than accumulate silently
 philosophy as the existing `reconcile` / doc-sync anti-drift machinery, extended to craft.
 (Implemented under the Engineering-excellence epic; listed here as the standing contract.)
 
-- **Root-clutter guard** — an allowlist of sanctioned top-level dirs; a new unlisted top-level
+- **Root-clutter guard** (`tests/test_root_clutter_guard.py`) — an allowlist of sanctioned top-level dirs; a new unlisted top-level
   dir fails CI until it's either removed or added to the allowlist with a reason (D1).
-- **Module-size guard** — a new source file over the ceiling fails CI unless it's a generated
+- **Module-size guard** (`tests/test_module_size_guard.py`) — a new source file over the ceiling fails CI unless it's a generated
   file or carries a registered top-of-file exception comment (D2).
-- **Coverage up-only guard** — `--cov-fail-under` may rise, never fall; a PR that lowers measured
+- **Function-length guard** (`tests/test_function_length_guard_4880.py`) — a new function over 150 logical lines fails CI unless it carries a
+  registered `# function-length-exception: <reason>` comment above its `def`; a recorded one may not grow (D2).
+- **Coverage up-only guard** (`tests/test_coverage_floor_ratchet.py`) — `--cov-fail-under` may rise, never fall; a PR that lowers measured
   coverage below the floor fails (D4/D8).
 - **mypy clean-set guard** — `tests/test_mypy_clean_modules.py` covers the whole first-party
   surface (empty denylist since #1656); a PR may not shrink it, re-add a denylist entry, add a

@@ -97,12 +97,13 @@ def built_page_findings(page: str, module: str) -> list[str]:
             f"ci-cd.yml's jobs behind `environment: production` are {gated}, not ['deploy-iam'] — the page says only a permissions change waits"
         )
     for said in (
-        "approves one thing by hand: a change to what the programs are permitted to do",
-        "Permissions only",
-        "The one thing I approve by hand",
+        "approves two things by hand: a change to what the programs are permitted to do, and each chapter and podcast episode before it publishes",
+        "I approve two things by hand, a change to what the programs are permitted to do and each chapter and podcast episode before it publishes",
     ):
         if said not in text:
-            out.append(f"the page no longer says {said!r} — the approval claim must be one statement in the row, the picture and the draft")
+            out.append(
+                f"the page no longer says {said!r} — the approval claim is one statement in the Who-decides paragraph and one in the draft"
+            )
     if "public demonstration of engineering practice" not in (ROOT / "docs" / "PROPORTIONALITY.md").read_text(encoding="utf-8"):
         out.append("docs/PROPORTIONALITY.md no longer states the 'public demonstration of engineering practice' standard the page restates")
     agent = (ROOT / "remediation" / "agent.py").read_text(encoding="utf-8")
@@ -169,7 +170,7 @@ def test_mutation_a_stale_count_a_wrong_band_and_stray_first_person_are_each_cau
     assert any("scheduled programs" in f for f in stale), stale
     band = built_page_findings(page.replace("From about 87%", "From about 85%"), module)
     assert any("tier 2" in f for f in band), band
-    voice = built_page_findings(page.replace("<h2>One picture.</h2>", "<h2>My picture.</h2>"), module)
+    voice = built_page_findings(page.replace("<h2>Five parts, in order.</h2>", "<h2>My five parts.</h2>"), module)
     assert any("first-person wording outside" in f for f in voice), voice
     unlabelled = built_page_findings(page.replace(DRAFT_LABEL, ""), module)
     assert any("does not carry the label" in f for f in unlabelled), unlabelled

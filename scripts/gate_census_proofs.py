@@ -1927,6 +1927,94 @@ STRUCTURAL_HAND_PROOFS.update(
             ),
             "proved_on": "2026-10-12",
         },
+        # #4632 (2026-10-17): every reader resolves a habit by vendor id — the AST sweep over
+        # lambdas/ + mcp/ for a `habitify_reading` / `day_name_for` call that drops the day's
+        # `habit_statuses` (the #4362 name-only path), plus the seven call sites' rename fixture.
+        "structural::test_habit_identity_4632.py": {
+            "gate_name": "test_habit_identity_4632.py",
+            "command": "python3 -m pytest tests/test_habit_identity_4632.py -q -p no:cacheprovider   # baseline 18 passed",
+            "mutation": (
+                "six plants, ONE AT A TIME, each restored from an in-memory byte copy: M1 ai/ai_calls.py "
+                "_missed_registry_habits drops `statuses` from its habitify_reading call; M2 ai/ai_context.py "
+                "the 7-day trend's T0 call drops `statuses`; M3 ai/ai_context.py the pillar effort count back to "
+                "the raw `habits_map.get(h)` name lookup; M4 content/html_builder.py _habits_deep_dive drops "
+                "`h_statuses`; M5 scripts/check_habit_registry_drift.py `ids = ids or {}` -> `ids = {}`; M6 the "
+                "sweep's offender append replaced by `pass`."
+            ),
+            "observed": (
+                "M1 2 failed / 16 passed (the call-site test + the sweep). M2 2 failed / 16. M3 1 failed / 17 "
+                "(the call-site test only — a raw .get is outside the sweep's pattern). M4 2 failed / 16. M5 1 "
+                "failed / 17 (the drift rename test). M6 1 failed / 17 (the sweep's planted positive control). "
+                "Restored 18 passed."
+            ),
+            "scope": (
+                "The sweep matches only calls named habitify_reading / day_name_for (Name or Attribute) whose "
+                "statuses argument is absent or the literal None; *args/**kwargs splats are trusted. A raw "
+                "`habits.get(name)` lookup is NOT swept (the legacy mvp_habits lists are bare names with no vendor "
+                "id, out of scope) — the call-site fixture test is what holds the seven sites."
+            ),
+            "proved_on": "2026-10-17",
+        },
+        # #4580 round 1, lane E — one quantity, one number, one unit, one sentence across the served routes.
+        "structural::test_edition_one_number_4580.py": {
+            "gate_name": "test_edition_one_number_4580.py",
+            "command": "python3 -m pytest tests/test_edition_one_number_4580.py -q -p no:cacheprovider   # baseline 7 passed",
+            "mutation": (
+                "three plants, ONE AT A TIME, each restored from a byte copy: M1 web/site_api_edition.py _life_sleep reads "
+                "sleep_detail's own total_sleep_hours again instead of the pulse row (the round-1 5.3 h vs 8.8 h defect); "
+                "M2 _week's day detail is handed the training row of one fixed day for every date (a forward-fill); "
+                "M3 web/edition_scorecard.py writes the AI row's 'do not beat a simple guess yet' as its own literal instead "
+                "of importing record_words."
+            ),
+            "observed": (
+                "M1 1 failed / 6 passed (the sleep-row contract). M2 1 failed / 6 (the per-date training contract; its "
+                "own in-test mutation control also names exactly the mutated date). M3 1 failed / 6 (the written-once "
+                "sweep). Restored 7 passed."
+            ),
+            "scope": (
+                "Holds the edition composed from tests/fixtures/edition_wire_4582 and the calls route's committed output "
+                "for tests/fixtures/calls_wire_4586; the written-once sweep reads lambdas/web/*.py for the two record "
+                "sentences by regex. The deployed route's live capture is NOT compared here (its new fields arrive at the "
+                "first recapture after the deploy)."
+            ),
+            "proved_on": "2026-10-18",
+        },
+    }
+)
+
+STRUCTURAL_HAND_PROOFS.update(
+    {
+        # #4630: one resolver for the day's steps — the registry facet, the resolver, and the reader guard.
+        "structural::test_steps_truth_resolver_4630.py": {
+            "gate_name": "test_steps_truth_resolver_4630.py",
+            "command": "python3 -m pytest tests/test_steps_truth_resolver_4630.py -q -p no:randomly   # baseline 16 passed",
+            "mutation": (
+                "three plants in the real tracked tree, ONE AT A TIME, each restored from a byte copy "
+                "(md5 3f2221362ede44580a77d14d7ac8e51b of lambdas/ingestion/source_registry.py before and after): "
+                "(M1) METRIC_TRUTH['steps'] swapped to Apple first — truth_source 'apple_health', fallback_order "
+                "('apple_health', 'whoop', 'garmin'); (M1b) fallback_order alone swapped; (M2) a new file "
+                'lambdas/web/zz_planted_4630.py whose one function returns `_safe_float(apple, "steps")`.'
+            ),
+            "observed": (
+                "2026-10-16. BASELINE 16 passed. M1: 8 failed / 8 passed (test_whoop_wins_when_both_devices_have_a_count, "
+                "test_apple_health_when_whoop_has_no_count, test_unfetched_source_is_named_in_the_reason, "
+                "test_a_zero_report_counts_only_when_no_source_has_a_positive_count, "
+                "test_by_date_resolves_each_day_and_takes_the_per_source_max, "
+                "test_resolver_reads_the_registry_facet_not_its_own_list, test_facet_refuses_a_malformed_truth, "
+                "test_the_reproduce_command_names_the_winner_and_rebuilds_the_movement_score). "
+                "M1b: collection error — ValueError 'fallback_order must start with truth_source' at import. "
+                "M2: 1 failed / 15 passed (test_no_reader_reads_a_steps_field_directly names zz_planted_4630.py:2). "
+                "RESTORED: 16 passed."
+            ),
+            "scope": (
+                "The reader guard is a line-pattern sweep of lambdas/ and mcp/ (.get/subscript/helper-call/`in` reads of "
+                "steps|step_count, (source, 'steps') metric tables, {'steps': source} maps); a read through a variable "
+                "field name (`row.get(field)` with field='steps') is NOT caught — the metric tables that feed such reads "
+                "are, which is how measurable_metrics/experiment_design/tools_lifestyle were found. A line carrying "
+                "`# steps-truth: <reason>` is exempt by design; EXEMPT_FILES names the writers and per-source liveness checks."
+            ),
+            "proved_on": "2026-10-16",
+        },
     }
 )
 
@@ -3405,30 +3493,38 @@ GUARD_PROOFS.update(
         },
     }
 )
-# ── #4588 (2026-10-15): the cut-over's "every existing URL still resolves" gate ─────────────
-# `tests/test_v4_redirects_function.py` became a structural gate when the cut-over rehearsal
-# added `test_every_existing_url_still_resolves_4588` (an os.walk of site/). The mutations are
-# the cut-over's own failure modes, each planted in the real tracked files and reverted.
-GUARD_PROOFS["structural::test_v4_redirects_function.py"] = {
-    "gate_name": "test_v4_redirects_function.py",
-    "command": "python3 -m pytest tests/test_v4_redirects_function.py::test_every_existing_url_still_resolves_4588 -q   # baseline 1 passed",
-    "mutation": (
-        "M1: the `/start/` -> `/` 301 put back into deploy/generated/v4_redirects_function.js (the edge left "
-        "unpublished after the cut-over). M2: site/coaches/index.html moved away (a cut-over page missing). "
-        "M3: site/story/about/index.html deleted (an existing page dropped)."
-    ),
-    "observed": (
-        "M1 1 failed: `pages under site/ that a 301 shadows at the edge: ['/start/']`. M2 1 failed: `URLs that no "
-        "longer resolve to a file under site/: ['/coaches/']`. M3 1 failed: `URLs that no longer resolve to a file "
-        "under site/: ['/about/', '/dispatches/about/', '/mission/', '/story/about/']`. REVERTED: 1 passed. "
-        "Watched 2026-10-15 in the #4588 lane."
-    ),
-    "scope": (
-        "Offline only: a URL resolves when the edge function's hops end on a file under site/. The URL set is "
-        "the site/ pages, the committed sitemap and every redirect source, so a page that is in none of those "
-        "and is deleted is not seen (it leaves the set with its file). Says nothing about the live edge — the "
-        "published CloudFront function can lag deploy/generated/ until the owner publishes it — nor about the "
-        "generated-content origin (/journal/posts/week-*), which KNOWN_UNRESOLVED_4588 names."
-    ),
-    "proved_on": "2026-10-15",
-}
+
+
+# ── #4632 (2026-10-15): the habit-registry drift check ───────────────────────────────────
+# `scripts/check_habit_registry_drift.py` (family 2, guard-script) reports, as counts only,
+# the name-keyed habit structures a Habitify rename would orphan; its offline twin is
+# fixture-driven and needs no creds. Three plants in the REAL tracked script, one at a time,
+# restored from a pre-mutation copy and md5-verified byte-identical between each.
+GUARD_PROOFS.update(
+    {
+        "guard::scripts/check_habit_registry_drift.py": {
+            "gate_name": "scripts/check_habit_registry_drift.py",
+            "command": "python3 -m pytest tests/test_habitify_rename_alias_merge_4655.py -q -p no:cacheprovider   # baseline 16 passed; the two drift tests are the fixture-driven twin",  # noqa: E501
+            "mutation": (
+                "M1: main()'s `return 1 if drifted else 0` -> `return 0` (the exit code stops carrying the verdict). "
+                "M2: `_bridge_live()` -> `return True` (a SUPPLEMENT_MAP key that no live habit answers to reads as live). "
+                'M3: the `not e.get("is_archived")` filter dropped from live_names() (an archived habit counts as live). '
+                "md5 8df4b10acc1198bed5c2900d3ef440af before, after each restore, and at the end; tree clean afterwards."
+            ),
+            "observed": (
+                "2026-10-15. BASELINE 16 passed. M1: 1 failed / 15 passed (test_the_drift_check_fails_on_each_kind_of_orphan — "
+                "the orphaned fixtures exited 0). M2: 1 failed / 15 passed (the same test — bridge_without_live read 0 on the "
+                "orphaned-bridge fixture). M3: 16 passed — SURVIVED: no fixture carries an archived journal entry, so the "
+                "archived filter is not under test. RESTORED: 16 passed."
+            ),
+            "scope": (
+                "Proves the exit code and the bridge-resolution count are load-bearing for the fixture twin. The archived "
+                "filter (M3) is unproven by this record — a fixture with `is_archived: true` would close it. The `--live` path "
+                "(Secrets Manager + vendor GET + one DynamoDB GetItem, read-only) is `# pragma: no cover` and not exercised "
+                "here; the script is standalone/manual, not wired into blocking CI, so a rename is caught on the next "
+                "invocation, not automatically."
+            ),
+            "proved_on": "2026-10-15",
+        },
+    }
+)

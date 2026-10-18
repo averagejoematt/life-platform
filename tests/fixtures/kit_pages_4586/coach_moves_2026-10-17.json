@@ -1,0 +1,55 @@
+{
+ "_meta": {
+  "generated_at": "2026-10-17T23:29:16.352756+00:00",
+  "served_at": "2026-10-17T23:29:16.352756+00:00",
+  "cache_seconds": 300,
+  "request_id": "4785e702de104693"
+ },
+ "state": "ok",
+ "date": "2026-10-17",
+ "source": "/api/coach_moves",
+ "absent_text": "No coach line is recorded for Saturday, October 17.",
+ "lines": [
+  {
+   "coach_id": "mind_coach",
+   "coach": "Nathan Reeves",
+   "move": "call",
+   "move_label": "A call",
+   "text": "Something has gone quiet in Matthew that protein gains haven't touched \u2014 38 days without a journal entry, and my read is that the block isn't physical. I expect the silence continues until he names what he's actually avoiding, not until another number moves.",
+   "replies_to": null,
+   "bet_settles": null
+  }
+ ],
+ "absent": [
+  {
+   "coach": "glucose_coach",
+   "state": "absent",
+   "reason": "No new readings have reached this coach's area, so there is nothing new to read."
+  },
+  {
+   "coach": "sleep_coach",
+   "state": "absent",
+   "reason": "This coach's line did not pass the day's checks, so it was held back."
+  },
+  {
+   "coach": "nutrition_coach",
+   "state": "absent",
+   "reason": "This coach's line did not pass the day's checks, so it was held back."
+  },
+  {
+   "coach": "physical_coach",
+   "state": "absent",
+   "reason": "This coach had nothing new to add."
+  },
+  {
+   "coach": "labs_coach",
+   "state": "absent",
+   "reason": "This coach had nothing new to add."
+  },
+  {
+   "coach": "explorer_coach",
+   "state": "absent",
+   "reason": "This coach had nothing new to add."
+  }
+ ]
+}

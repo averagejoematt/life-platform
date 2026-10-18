@@ -69,10 +69,6 @@ def main() -> int:
     if not HOME.exists():
         print("error: site/index.html not found — run from repo root.", file=sys.stderr)
         return 2
-    if _apply_chrome.is_kit_page(HOME):
-        # #4588: after the cut-over `/` is the kit front page — no v4 proof block, no v4 OG to bake.
-        print("site/index.html is a kit page (#4588) — no home proof to bake; left as it is.")
-        return 0
     journey = load_journey()
     char = load_character()
     html = HOME.read_text(encoding="utf-8")

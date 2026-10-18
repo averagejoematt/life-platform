@@ -112,7 +112,7 @@ SHELL = """<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>{title}</title>
   <meta name="description" content="{desc}">
-  <link rel="canonical" href="https://averagejoematt.com/story/{canon}">
+{robots}  <link rel="canonical" href="https://averagejoematt.com/story/{canon}">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="averagejoematt">
   <meta property="og:url" content="https://averagejoematt.com/story/{canon}">
@@ -221,25 +221,6 @@ def write(path: Path, html_text: str) -> None:
     _apply_chrome.write_page(path, html_text)  # #3721
 
 
-def _write_hub(chronicle_proof: str, hub_og: dict) -> None:
-    """The v4 /story/ hub shell (defaults to the chronicle view)."""
-    write(
-        OUT / "index.html",
-        SHELL.format(
-            title="The Story — averagejoematt",
-            desc="An AI journalist writes up each week; Matthew writes in his own words.",
-            canon="",
-            start="chronicle",
-            og_card="og-chronicle.png",  # #1395: the story hub leads with the chronicle card
-            og_title=hub_og[("property", "og:title")],
-            og_desc=hub_og[("property", "og:description")],
-            proof=chronicle_proof,
-            kicker=DOOR_KICKER,
-            promise=DOOR_PROMISE,
-        ),
-    )
-
-
 def main() -> None:
     # #730: bake the dated chronicle post list into the served HTML (noscript) so the
     # best writing is crawlable/greppable, not locked behind JS. Shown on the hub
@@ -252,13 +233,23 @@ def main() -> None:
     # dispatches, dated) on the weekly-chronicle card instead of the generic home card.
     hub_og = story_og(posts)
 
-    # hub (defaults to chronicle). #4588: after the cut-over `/story/` is the kit story page;
-    # the section shells below are still this generator's, the hub is not.
-    hub_is_kit = _apply_chrome.is_kit_page(OUT / "index.html")
-    if hub_is_kit:
-        print("site/story/index.html is a kit page (#4588) — the hub is left as it is.")
-    else:
-        _write_hub(chronicle_proof, hub_og)
+    # hub (defaults to chronicle)
+    write(
+        OUT / "index.html",
+        SHELL.format(
+            title="The Story — averagejoematt",
+            desc="An AI journalist writes up each week; Matthew writes in his own words.",
+            canon="",
+            robots=v4_chrome.robots_meta("/story/"),  # #4604: "" unless the path is held until ruled
+            start="chronicle",
+            og_card="og-chronicle.png",  # #1395: the story hub leads with the chronicle card
+            og_title=hub_og[("property", "og:title")],
+            og_desc=hub_og[("property", "og:description")],
+            proof=chronicle_proof,
+            kicker=DOOR_KICKER,
+            promise=DOOR_PROMISE,
+        ),
+    )
     # per-section sub-pages
     for key, label, desc in SECTIONS:
         section_title = f"{label} — The Story — averagejoematt"
@@ -268,6 +259,7 @@ def main() -> None:
                 title=section_title,
                 desc=desc,
                 canon=f"{key}/",
+                robots=v4_chrome.robots_meta(f"/story/{key}/"),  # #4604: /story/build/ is held until ruled
                 start=key,
                 og_card=OG_CARD_BY_SECTION.get(key, DEFAULT_OG_CARD),
                 og_title=section_title,
@@ -277,8 +269,7 @@ def main() -> None:
                 promise=PROMISE_BY_SECTION.get(key, DOOR_PROMISE),
             ),
         )
-    hub = "" if hub_is_kit else "site/story/index.html + "
-    print(f"✅ wrote {hub}{len(SECTIONS)} section shells: " + ", ".join(k for k, _, _ in SECTIONS))
+    print(f"✅ wrote site/story/index.html + {len(SECTIONS)} section shells: " + ", ".join(k for k, _, _ in SECTIONS))
 
 
 if __name__ == "__main__":

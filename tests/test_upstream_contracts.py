@@ -163,9 +163,13 @@ CONTRACTS = [
             ("records[0].score.kilojoule", "number"),
             ("records[0].score.average_heart_rate", "number"),
             ("records[0].score.max_heart_rate", "number"),
+            # #4630: the daily step count is on the cycle RECORD (not in ``score``) — the archived
+            # v2 wire carries it on every day's records[0] from 2026-09-21; the fixture mirrors that
+            # two-record shape (the key day's cycle first, the prior day's overlapping cycle second).
+            ("records[0].step_count", "number"),
         ],
         _extract_cycle,
-        ["strain", "kilojoule", "average_heart_rate", "max_heart_rate"],
+        ["strain", "kilojoule", "average_heart_rate", "max_heart_rate", "step_count"],
     ),
     Contract(
         "whoop",

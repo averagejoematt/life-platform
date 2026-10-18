@@ -1013,7 +1013,7 @@
     "ai_features": 25,
     "alarms": 139,
     "emf_namespaces": 33,
-    "schedules": 95,
+    "schedules": 92,
     "secrets": 30
   },
   "edges": [
@@ -2663,6 +2663,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": "insight-email-parser",
+      "module": "lambdas/emails/insight_email_parser_lambda.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": "insight-email-parser",
       "module": "lambdas/emails/insight_email_parser_lambda.py",
@@ -3226,6 +3233,13 @@
       "direction": "read",
       "lambda": "habitify-data-ingestion",
       "module": "lambdas/ingestion/habitify_lambda.py",
+      "partition": "habitify",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "habitify-data-ingestion",
+      "module": "lambdas/ingestion/habitify_lambda.py",
       "partition": "supplements",
       "via": "pk"
     },
@@ -3325,6 +3339,13 @@
       "lambda": "strava-data-ingestion",
       "module": "lambdas/ingestion/strava_lambda.py",
       "partition": "strava",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/ingestion/whoop_empty_day.py",
+      "partition": "whoop",
       "via": "pk"
     },
     {
@@ -3668,13 +3689,6 @@
       "lambda": null,
       "module": "lambdas/intelligence/intelligence_common.py",
       "partition": "coach_thread",
-      "via": "pk"
-    },
-    {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/intelligence/intelligence_common.py",
-      "partition": "garmin",
       "via": "pk"
     },
     {
@@ -4271,6 +4285,13 @@
       "module": "lambdas/web/site_api_ai_context.py",
       "partition": "what_changed",
       "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_autonomic.py",
+      "partition": "hevy",
+      "via": "seam"
     },
     {
       "direction": "read",
@@ -5080,6 +5101,13 @@
     {
       "direction": "read",
       "lambda": null,
+      "module": "lambdas/web/site_api_physical.py",
+      "partition": "whoop",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
       "module": "lambdas/web/site_api_protocols.py",
       "partition": "experiments",
       "via": "pk"
@@ -5781,7 +5809,21 @@
       "direction": "read",
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_correlation.py",
+      "partition": "hevy",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_correlation.py",
       "partition": "strava",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_correlation.py",
+      "partition": "whoop",
       "via": "seam"
     },
     {
@@ -6316,12 +6358,7 @@
       "handler": "ingestion.bluesky_lambda.lambda_handler",
       "memory_mb": null,
       "module": "lambdas/ingestion/bluesky_lambda.py",
-      "schedules": [
-        {
-          "expr": "cron(0 14,2 * * ? *)",
-          "resolution": "resolved"
-        }
-      ],
+      "schedules": [],
       "stack": "ingestion_stack",
       "timeout_seconds": 120
     },
@@ -6563,8 +6600,9 @@
       "module": "lambdas/emails/daily_brief_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 17 * * ? *)",
-          "resolution": "constant"
+          "expr": "cron(0 10 * * ? *)",
+          "resolution": "constant",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -7166,12 +7204,7 @@
       "handler": "ingestion.mastodon_lambda.lambda_handler",
       "memory_mb": null,
       "module": "lambdas/ingestion/mastodon_lambda.py",
-      "schedules": [
-        {
-          "expr": "cron(0 14,2 * * ? *)",
-          "resolution": "resolved"
-        }
-      ],
+      "schedules": [],
       "stack": "ingestion_stack",
       "timeout_seconds": 120
     },
@@ -7640,12 +7673,7 @@
       "handler": "ingestion.youtube_lambda.lambda_handler",
       "memory_mb": null,
       "module": "lambdas/ingestion/youtube_lambda.py",
-      "schedules": [
-        {
-          "expr": "cron(0 14,2 * * ? *)",
-          "resolution": "resolved"
-        }
-      ],
+      "schedules": [],
       "stack": "ingestion_stack",
       "timeout_seconds": 120
     }
@@ -7659,7 +7687,7 @@
       "lambdas": "cdk/stacks/*.py function_name= declarations (AST)",
       "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets",
       "privacy": "lambdas/privacy/field_tiers.py SOURCE_TIERS + FIELD_TIERS (#2803/#3045, ADR-155 consent) \u2014 loaded, not re-typed",
-      "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
+      "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead"
     },
     "counts": {
       "alarms": 139,
@@ -7676,27 +7704,27 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 742,
+      "edges": 748,
       "lambdas": 108,
       "mcp_tool_modules": 36,
       "mcp_tools": 88,
       "partitions": 116,
-      "privacy_fields_owner_only": 33,
+      "privacy_fields_owner_only": 35,
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 18,
       "privacy_sources_owner_published": 3,
-      "scheduled_lambdas": 84,
-      "schedules": 95
+      "scheduled_lambdas": 81,
+      "schedules": 92
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 361,
-        "sites_resolved": 930,
-        "sites_total": 1291
+        "sites_dynamic": 363,
+        "sites_resolved": 940,
+        "sites_total": 1303
       },
       "schedule_resolution": {
         "dynamic": 0,
-        "resolved": 84
+        "resolved": 81
       }
     },
     "non_census_families": [
@@ -7754,7 +7782,7 @@
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "Keyless public AppView pull (framework), 2x daily",
+      "method": "Schedule retired 2026-10-17 (Q39) \u2014 no scheduled pull; function kept, invoke by hand if an account is provisioned",
       "privacy_tier": "public",
       "stale_hours": null
     },
@@ -7854,9 +7882,12 @@
       "privacy_tier": "public"
     },
     "dexa": {
+      "category": "Clinical",
       "class": "cross_phase",
-      "ingestion": false,
-      "privacy_tier": "owner_published"
+      "ingestion": true,
+      "method": "Manual upload of the scan report after each visit (~12-month cadence) via scripts/ingest_lab_report.py",
+      "privacy_tier": "owner_published",
+      "stale_hours": 8640
     },
     "diary_claims": {
       "class": "experiment_scoped",
@@ -8060,7 +8091,7 @@
       "category": "Clinical",
       "class": "cross_phase",
       "ingestion": true,
-      "method": "Manual upload of the lab PDF/report after each draw (~6-month cadence)",
+      "method": "Manual upload of the lab PDF/report after each draw (~6-month cadence) via scripts/ingest_lab_report.py",
       "privacy_tier": "owner_published",
       "stale_hours": 4320
     },
@@ -8096,7 +8127,7 @@
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "Keyless public REST pull (framework), 2x daily",
+      "method": "Schedule retired 2026-10-17 (Q39) \u2014 no scheduled pull; function kept, invoke by hand if an account is provisioned",
       "privacy_tier": "public",
       "stale_hours": null
     },
@@ -8370,6 +8401,8 @@
         "height_m",
         "hydration_kg",
         "intracellular_water_kg",
+        "measurement_attrib",
+        "measurement_group_attribs",
         "metabolic_age",
         "muscle_mass_kg",
         "muscle_mass_lbs",
@@ -8397,7 +8430,7 @@
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "Keyless per-channel RSS pull (framework), 2x daily",
+      "method": "Schedule retired 2026-10-17 (Q39) \u2014 no scheduled pull; function kept, invoke by hand if an account is provisioned",
       "privacy_tier": "public",
       "stale_hours": null
     }
@@ -8445,6 +8478,8 @@
         "height_m": "owner_only",
         "hydration_kg": "owner_only",
         "intracellular_water_kg": "owner_only",
+        "measurement_attrib": "owner_only",
+        "measurement_group_attribs": "owner_only",
         "metabolic_age": "owner_only",
         "muscle_mass_kg": "owner_only",
         "muscle_mass_lbs": "owner_only",
@@ -8822,13 +8857,6 @@
       "utc": "17:00"
     },
     {
-      "expr": "cron(0 17 * * ? *)",
-      "lambda": "daily-brief",
-      "resolution": "constant",
-      "stack": "email_stack",
-      "utc": "17:00"
-    },
-    {
       "expr": "cron(0 17 ? * SUN *)",
       "lambda": "episode-detect",
       "resolution": "constant",
@@ -9032,17 +9060,19 @@
       "utc": "22:00"
     },
     {
-      "expr": "cron(0 14,2 * * ? *)",
-      "lambda": "bluesky-social-ingestion",
-      "resolution": "resolved",
-      "stack": "ingestion_stack",
-      "utc": null
-    },
-    {
       "expr": "cron(10 0-5,15-23 * * ? *)",
       "lambda": "coach-nudge",
       "resolution": "constant",
       "stack": "email_stack",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 10 * * ? *)",
+      "lambda": "daily-brief",
+      "local": "10:00",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
       "utc": null
     },
     {
@@ -9095,13 +9125,6 @@
       "utc": null
     },
     {
-      "expr": "cron(0 14,2 * * ? *)",
-      "lambda": "mastodon-social-ingestion",
-      "resolution": "resolved",
-      "stack": "ingestion_stack",
-      "utc": null
-    },
-    {
       "expr": "cron(0 14,21,3 * * ? *)",
       "lambda": "notion-journal-ingestion",
       "resolution": "resolved",
@@ -9146,13 +9169,6 @@
     {
       "expr": "cron(5 14,17,21,0 * * ? *)",
       "lambda": "withings-data-ingestion",
-      "resolution": "resolved",
-      "stack": "ingestion_stack",
-      "utc": null
-    },
-    {
-      "expr": "cron(0 14,2 * * ? *)",
-      "lambda": "youtube-social-ingestion",
       "resolution": "resolved",
       "stack": "ingestion_stack",
       "utc": null

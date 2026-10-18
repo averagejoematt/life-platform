@@ -73,6 +73,9 @@ SITE_RULINGS = {
     ("handle_autonomic_balance", "_query_source", "'whoop'", "site_api_autonomic.py"): HISTORY,
     # /data/zone2: "trailing 90 days", "N of M weeks" over the window it states
     ("handle_zone2_breakdown", "_query_source", "'strava'", "site_api_autonomic.py"): HISTORY,
+    # #4627: the same trailing window, now through THE Zone 2 computation (Whoop workout zones; Hevy cardio reported apart)
+    ("handle_zone2_breakdown", "_query_source", "'whoop'", "site_api_autonomic.py"): HISTORY,
+    ("handle_zone2_breakdown", "_query_source", "'hevy'", "site_api_autonomic.py"): HISTORY,
     ("glucose", "_query_source", "'apple_health'", "site_api_biomarkers.py"): CLAMPED,  # _experiment_date(30)
     # /api/vitals: live windows are max(..., EXPERIMENT_START) (#1084); time-travel passes ip
     ("vitals", "_query_source", "'whoop'", "site_api_body.py"): EXPLICIT,
@@ -129,6 +132,7 @@ SITE_RULINGS = {
     ("weekly_physical_summary", "_query_source", "'strava'", "site_api_physical.py"): CLAMPED,
     ("weekly_physical_summary", "_query_source", "'garmin'", "site_api_physical.py"): CLAMPED,
     ("weekly_physical_summary", "_query_source", "'apple_health'", "site_api_physical.py"): CLAMPED,
+    ("weekly_physical_summary", "_query_source", "'whoop'", "site_api_physical.py"): CLAMPED,  # #4630: same _experiment_date(7) window
     ("pulse_history", "_query_source", "'whoop'", "site_api_pulse.py"): CLAMPED,
     ("pulse_history", "_query_source", "'withings'", "site_api_pulse.py"): CLAMPED,
     ("pulse_history", "_query_source", "'garmin'", "site_api_pulse.py"): CLAMPED,

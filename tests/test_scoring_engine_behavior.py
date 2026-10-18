@@ -258,33 +258,49 @@ class TestScoreMovement:
         data = {"strava": {"activity_count": 0, "total_moving_time_seconds": 0}}
         assert se.score_movement(data, {})[1]["exercise_score"] == 0
 
-    def test_steps_are_scored_against_the_profile_target(self):
-        data = {"apple": {"steps": 3500}}
-        assert se.score_movement(data, {"step_target": 7000})[1]["step_score"] == 50
+    def test_walking_minutes_are_scored_against_the_profile_target(self):
+        """ADR-163: the second half is walking time. 30 of a 60-minute target → 50."""
+        data = {"strava": _walk_day(1800)}
+        assert se.score_movement(data, {"walking_minutes_target": 60})[1]["walking_score"] == 50
 
-    def test_steps_beyond_the_target_do_not_score_above_one_hundred(self):
-        data = {"apple": {"steps": 20000}}
-        assert se.score_movement(data, {"step_target": 7000})[1]["step_score"] == 100
+    def test_walking_beyond_the_target_does_not_score_above_one_hundred(self):
+        data = {"strava": _walk_day(3 * 3600)}
+        assert se.score_movement(data, {"walking_minutes_target": 60})[1]["walking_score"] == 100
 
-    def test_exercise_and_steps_are_weighted_equally(self):
-        data = {"strava": {"activity_count": 1, "total_moving_time_seconds": 3600}, "apple": {"steps": 0}}
-        assert se.score_movement(data, {"step_target": 7000})[0] == 50
+    def test_exercise_and_walking_are_weighted_equally(self):
+        """A logged hour that is not a walk (a ride) — exercise 100, walking 0 → 50."""
+        ride = {"activity_count": 1, "total_moving_time_seconds": 3600, "activities": [{"type": "Ride", "moving_time_seconds": 3600}]}
+        assert se.score_movement({"strava": ride}, {"walking_minutes_target": 60})[0] == 50
 
     def test_a_day_with_no_movement_source_at_all_scores_zero_not_absent(self):
         """CHARACTERIZATION, not an endorsement. Every other component here
         returns None when its source is silent (and so drops out of the grade);
         movement instead scores a hard 0, because `exercise_score` is appended
-        unconditionally. On a day when BOTH Strava and Apple Health failed to
-        ingest, the day grade is therefore penalised as if nothing was done.
-        The asymmetry is reported with this tranche — see the PR body."""
+        unconditionally. On a day when BOTH Strava and Hevy are silent, the day
+        grade is therefore penalised as if nothing was done — the walking half
+        drops out exactly as the step half did for a missing count (ADR-163)."""
         score, details = se.score_movement({}, {})
         assert score == 0
         assert details["exercise_score"] == 0
-        assert "step_score" not in details
+        assert "walking_score" not in details
 
-    def test_the_step_count_is_reported_alongside_its_score(self):
-        details = se.score_movement({"apple": {"steps": 8123}}, {"step_target": 7000})[1]
-        assert details["steps"] == 8123
+    def test_the_walking_minutes_are_reported_with_their_source_and_target(self):
+        details = se.score_movement({"strava": _walk_day(2700)}, {"walking_minutes_target": 60})[1]
+        assert details["walking_minutes"] == 45.0
+        assert details["walking_minutes_target"] == 60
+        assert details["walking_source"].startswith("walking-volume@")
+
+    def test_steps_no_longer_score_movement(self):
+        """ADR-163: a step count is not read — 20,000 steps and no walk is the same score as no steps."""
+        day = {"strava": _walk_day(0)}
+        with_steps = dict(day, apple={"steps": 20000}, whoop={"step_count": 20000})
+        assert se.score_movement(with_steps, {}) == se.score_movement(day, {})
+
+
+def _walk_day(walk_seconds):
+    """A Strava day row carrying one Walk of `walk_seconds` (0 = a row with no walk)."""
+    acts = [{"type": "Walk", "sport_type": "Walk", "moving_time_seconds": walk_seconds}] if walk_seconds else []
+    return {"activity_count": len(acts), "total_moving_time_seconds": walk_seconds, "activities": acts}
 
 
 # ──────────────────────────────────────────────────────────────────────────────

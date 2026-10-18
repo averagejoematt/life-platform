@@ -23,7 +23,7 @@
 import { tryJSON, esc, fmtShort } from "/assets/js/evidence_shared.js";
 import { dayInWords } from "/assets/js/entry_age.js";
 import { callHref, callsOf, withFrom, backFor, setBack } from "/assets/js/ck_call.js";
-import { callCardHTML, hasRule, ruleless } from "/assets/js/ck_verdict.js";
+import { callCardHTML, hasRule, ruleless, gradedOnText } from "/assets/js/ck_verdict.js";
 
 const LB_PER_KG = 2.20462;
 const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
@@ -42,7 +42,8 @@ export const MEASURES = {
   weight: { name: "Weight", unit: "lb", write: (v) => `${v.toFixed(1)} lb`, about: "Every weigh-in since the start." },
   steps: { name: "Steps", unit: "steps", write: (v) => whole(v), about: "Steps as my phone and watch counted them. A day they were not carried reads low, so some days here are lower than the training recorded suggests." },
   sleep: { name: "Sleep", unit: "hours", write: (v) => `${trim1(v)} hours`, about: "Hours asleep each night." },
-  recovery: { name: "Recovery", unit: "out of 100", write: (v) => `${whole(v)} out of 100`, about: "My wrist strap’s morning score out of 100." },
+  // One unit for recovery on every kit page (site-to-A round 1): a percentage, as the day line prints it.
+  recovery: { name: "Recovery", unit: "%", write: (v) => `${whole(v)}%`, about: "My wrist strap’s morning score, as a percentage." },
   protein: { name: "Protein", unit: "g", write: (v) => `${whole(v)} g`, about: "Grams of protein logged each day." },
   calories: { name: "Calories", unit: "kcal", write: (v) => `${whole(v)} kcal`, about: "Calories logged each day." },
   carbs: { name: "Carbs", unit: "g", write: (v) => `${whole(v)} g`, about: "Grams of carbohydrate logged each day." },
@@ -52,6 +53,26 @@ export const MEASURES = {
 
 // Own keys only: the measure name arrives from the address bar.
 export const isMeasure = (m) => Object.prototype.hasOwnProperty.call(MEASURES, String(m));
+// The field each measure is read from, so a served unit can be looked up by it.
+const FIELD_OF = { weight: "weight_lbs", steps: "steps", sleep: "sleep_hours", recovery: "recovery_pct", protein: "protein_g", calories: "calories", carbs: "carbs_g", fat: "fat_g", training: "total_min" };
+/** The unit the route serves for a measure's field (`units: {field: unit}` on any served body —
+ *  lane E of #4580 adds it; absent, the measure's own unit stands). "" when none is served. */
+export function servedUnit(measure, src) {
+  const field = FIELD_OF[measure];
+  for (const body of Object.values(src || {})) {
+    const u = body && body.units && typeof body.units[field] === "string" ? body.units[field].trim() : "";
+    if (u) return u;
+  }
+  return "";
+}
+/** The measure's writer, with the served unit when the route names one. */
+export function writerFor(measure, src) {
+  const m = MEASURES[measure];
+  const u = servedUnit(measure, src);
+  if (!u || u === m.unit) return m.write;
+  const n = measure === "weight" ? (v) => v.toFixed(1) : measure === "sleep" ? trim1 : whole;
+  return (v) => (u === "%" ? `${n(v)}%` : `${n(v)} ${u}`);
+}
 export const trendHref = (base, measure, lift = "", from = "") => `${base}trend/?m=${encodeURIComponent(measure)}${lift ? `&x=${encodeURIComponent(lift)}` : ""}${isDay(from) ? `&from=${from}` : ""}`;
 export const dayHref = (base, iso) => `${base}day/?d=${encodeURIComponent(iso)}`;
 
@@ -240,7 +261,10 @@ export function dayLiftsHTML(iso, src, base) {
         .map(([k, word]) => `${whole(minutes[k])} minutes of ${word}`)
     : [];
   const otherLine = other.length ? soft(`Also that day: ${other.join("; ")}.`) : "";
-  if (!session || !(session.exercises || []).length) return otherLine || soft("No training was recorded on this day.");
+  // "What I lifted." over a walk alone read as a heading over nothing (#4580 D1): the absence
+  // is said first, then what else the day recorded. The walking minutes are the served
+  // training_overview.daily_modality_minutes_30d[date].walking_min, the field the front reads too.
+  if (!session || !(session.exercises || []).length) return otherLine ? `${soft("No lifting logged that day.")}${otherLine}` : soft("No training was recorded on this day.");
   const named = session.exercises.filter((e) => e && e.name);
   const worked = named.filter((e) => (e.sets || []).some(isWork));
   // Timed or distance work (the bike, stretching, a carry) has no reps: it is named with its
@@ -298,6 +322,23 @@ export function dayNavHTML(iso, src, base) {
 
 // ── what was said and settled on the day (#4648) ───────────────────────────────
 const SETTLED_FIRST = 2; // calls shown before the rest fold under one disclosure
+// A call that can be checked names a day and a number: a month, a weekday, "tomorrow", "tonight",
+// "next week" or "by/within/in N days", and a figure.
+const DATE_WORD = /\b(january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|tonight|next week|this week|(?:by|within|in|over) (?:the )?(?:next )?\d+ (?:days?|weeks?|mornings?|nights?))\b/i;
+export const datedCall = (text) => DATE_WORD.test(String(text || "")) && /\d/.test(String(text || ""));
+// The day the checked reading was taken, in words (#4580 D2): the served `observed_on` when the
+// route carries it ("Graded on Friday’s reading, October 16."); until then the day named in the
+// served `called` sentence, through the shared reader. "" when neither names one.
+export function observedOnText(call) {
+  const iso = call && isDay(call.observed_on) ? call.observed_on : "";
+  // The served words ("Friday, October 16", lane E's `observed_on_text`) when the day itself is not.
+  const words = iso ? dayInWords(iso) : String((call && call.observed_on_text) || "").trim();
+  if (words) {
+    const [weekday, ...rest] = words.split(", ");
+    return weekday && rest.length ? `Graded on ${weekday}’s reading, ${rest.join(", ")}.` : `Graded on the reading for ${words}.`;
+  }
+  return gradedOnText(call);
+}
 export const coachHref = (base, id) => `${base}coach/?c=${encodeURIComponent(id)}`;
 // The coaches' lines for the day, from GET /api/coach_moves?date=<day>: who, the kind of
 // line it is, and the words exactly as served. "" when the day has none, when the body is
@@ -309,7 +350,11 @@ export function daySaidHTML(iso, movesBody, base) {
     .map((l) => {
       // The coach's page returns to this day by name (#4675).
       const name = l.coach_id ? `<a class="ck-link" href="${esc(withFrom(coachHref(base, l.coach_id), iso))}">${esc(l.coach)}</a>` : esc(l.coach);
-      const kind = l.move === "reply" && l.replies_to ? `A reply to ${l.replies_to}` : [l.move_label, l.replies_to ? `replying to ${l.replies_to}` : ""].filter(Boolean).join(" · ");
+      // A "call" with no date and no number in it cannot be checked, so it is labelled a note
+      // (#4580 D3: "38 days without a journal entry … I expect the silence continues" was served
+      // as "A call"). The engine's own relabelling is lane E's; this is the page's floor.
+      const label = l.move === "call" && !datedCall(l.text) ? "A note" : l.move_label;
+      const kind = l.move === "reply" && l.replies_to ? `A reply to ${l.replies_to}` : [label, l.replies_to ? `replying to ${l.replies_to}` : ""].filter(Boolean).join(" · ");
       return `<li><span class="ck-coach__who">${name}${kind ? esc(` · ${kind}`) : ""}</span><span>“${esc(l.text)}”</span></li>`;
     })
     .join("");
@@ -325,7 +370,7 @@ function settledRow(call, base, iso = "") {
   if (call.kind === "bet") {
     return `<li><span class="ck-soft">${esc(call.verdict_text || "Settled")}</span><span>${esc(call.called_short || call.called)} <b>${esc(call.happened_short)}</b></span><a class="ck-link" href="${esc(href)}">The whole call</a></li>`;
   }
-  return callCardHTML(call, { href, wrap: "li" });
+  return callCardHTML(call, { href, wrap: "li", when: observedOnText(call) });
 }
 // Every call settled on the day, from GET /api/calls. "" when none settled that day. Under
 // the coaches' lines it takes a label, not a second heading: the two are one part of the day.
@@ -378,9 +423,27 @@ export const TREND_AREAS = [
 ];
 // A lift's trend is reached from the lift itself on a day page, so the index lists the
 // nine measures only: a list of every exercise is a menu, and nothing links to a menu.
-export function trendIndexHTML(base) {
-  const link = (href, text) => `<li><a href="${esc(href)}">${esc(text)} <span aria-hidden="true">→</span></a></li>`;
-  return TREND_AREAS.map((a) => `<p class="ck-label">${esc(a.name)}</p><ul class="ck-rows ck-rows--more">${a.measures.map((m) => link(trendHref(base, m), MEASURES[m].name)).join("")}</ul>`).join("");
+// Site-to-A round 1: each row carries its latest served reading and the day it is from ("Weight ·
+// 302.2 lb · October 17"), read from the same series the measure's page draws — the index showed
+// nine bare names, less than the day page a reader comes from. With no bodies (`src` null) or no
+// reading, the name alone.
+export function trendIndexHTML(base, src = null, today = "") {
+  const link = (href, text, day) => `<li><a href="${esc(href)}">${esc(text)} <span>${esc(day ? `${day} ` : "")}<span aria-hidden="true">→</span></span></a></li>`;
+  const row = (m) => {
+    const pts = src ? seriesOf(m, src, today) : [];
+    const last = pts[pts.length - 1];
+    return link(trendHref(base, m), last ? `${MEASURES[m].name} · ${writerFor(m, src)(last.value)}` : MEASURES[m].name, last ? shortDay(last.date) : "");
+  };
+  return TREND_AREAS.map((a) => `<p class="ck-label">${esc(a.name)}</p><ul class="ck-rows ck-rows--more">${a.measures.map(row).join("")}</ul>`).join("");
+}
+// The index's date line, like the sibling pages' ("Saturday, October 17 · Day 42"): the newest
+// served day of the pulse. "" with none.
+export function trendIndexDay(src) {
+  const rows = (src && src.pulse && src.pulse.pulse_history) || [];
+  const last = [...rows].filter((r) => r && isDay(r.date)).sort((a, b) => a.date.localeCompare(b.date)).pop();
+  if (!last) return "";
+  const day = dayInWords(last.date);
+  return num(last.day_number) !== null && last.day_number >= 1 ? `${day} · Day ${last.day_number}` : day;
 }
 
 // ── mount ──────────────────────────────────────────────────────────────────────
@@ -438,12 +501,17 @@ const COUNTS = new Set(["steps", "protein", "calories", "carbs", "fat", "trainin
 async function mountTrend(base) {
   const measure = param("m");
   if (!measure) {
-    const src = await load({ workouts: "/api/workouts" });
+    // The same bodies the measure pages read, so each row's latest reading is the page's own.
+    const src = await load({ pulse: "/api/pulse_history", nutrition: "/api/nutrition_overview", training: "/api/training_overview" });
     fill("ck-label", "The detail");
     fill("ck-title", "Every trend");
     document.title = "Every trend — Average Joe Matt";
+    // The date line the sibling pages carry; the shell has no slot for it yet, so one is added to the header.
+    const header = document.querySelector(".ck-header");
+    if (!document.getElementById("ck-day") && header) header.insertAdjacentHTML("beforeend", '<span class="ck-header__day" id="ck-day"></span>');
+    fill("ck-day", esc(trendIndexDay(src)));
     fill("ck-about", soft("Each one is a single measure over the whole experiment. Every reading links back to its day."));
-    fill("ck-chart", trendIndexHTML(base));
+    fill("ck-chart", trendIndexHTML(base, src, todayPT()));
     for (const id of ["ck-recent-section", "ck-extra-section", "ck-related-section"]) document.getElementById(id)?.remove();
     return;
   }
@@ -469,7 +537,8 @@ async function mountTrend(base) {
     const food = ["protein", "calories", "carbs", "fat"].includes(measure);
     const src = await load(food ? { nutrition: "/api/nutrition_overview", meals: "/api/frequent_meals" } : measure === "training" ? { training: "/api/training_overview" } : { pulse: "/api/pulse_history" });
     points = seriesOf(measure, src, today);
-    ({ name, about, write } = MEASURES[measure]);
+    ({ name, about } = MEASURES[measure]);
+    write = writerFor(measure, src);
     sentenceOpts = { average: COUNTS.has(measure) };
     if (measure === "protein") {
       const floor = num(src.nutrition && src.nutrition.nutrition && src.nutrition.nutrition.protein_floor_g);

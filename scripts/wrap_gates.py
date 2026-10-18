@@ -20,7 +20,8 @@ WALL CLOCK (#4262 — replaces the old '~10s', which was a 12-gate battery on 20
   Measured on real wraps since the 25-gate shape (#4262 box 4, main checkout, network-bound gates live):
     2026-10-13 (Session BR)  gather 19.2 s
     2026-10-14 (Session BS)  gather 15.2 s (7 gates, slowest hooks 15.2 s)
-  — a whole wrap's gate wall is well under two minutes; the third session's reading closes the box.
+    2026-10-15 (Session BT)  gather 17.2 s (7 gates, slowest hooks 17.2 s)
+  — three real wraps, every gather wall under 20 s: a whole wrap's gate battery is well under two minutes (#4262 box 4 closed on this third reading).
   Then 29 -> 25 gate runs (gather 11 -> 7): backlog-hygiene, unlinked-closures and
   merge-text-closures moved to the nightly workflow (NIGHTLY, below), and the a11y dead-man
   pytest left for the CI suite that already runs it on every push. backlog-hygiene was the

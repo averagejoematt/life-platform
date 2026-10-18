@@ -1,6 +1,6 @@
 # Site Uplevel Playbook
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-03
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-18 (#4580 / #4588 — the front-page cut-over section carried onto main from the rehearsal's docs commit `2d749c6d4`, extended with the 2026-10-18 rulings: the Thursday 2026-10-22 go, the reference-copy step, the appendix-as-footnote reach rule and the static `og:image`. Prior verify 2026-10-17: the deploy surface and JS harness sections re-read against the tree.)
 
 > **How to redesign or uplevel the site well** — the method and the hard-won lessons, so the
 > next Claude inherits the playbook, not just the state. Start from
@@ -18,8 +18,8 @@ moment someone actually looked at it.
 
 ### 1. Render-QA sweep (before AND after)
 - Screenshot **every page at desktop (1280) + mobile (390)**, full-page, with Playwright (chromium).
-  Build the URL list from the registry (`scripts/v4_build_evidence.py` PILLARS/REGISTRY) + the static
-  routes so nothing is missed (~56 pages).
+  Build the URL list from the page registry (`python3 qa/qa_manifest.py --emit paths`, which derives
+  from `scripts/v4_build_evidence.py` PILLARS/REGISTRY + the static routes) so nothing is missed.
 - **Scroll each page through** before screenshotting so lazy/reveal content renders.
 - Triage for **objective bugs only**: broken/empty/flat charts, text overflow/clipping (esp. mobile),
   literal `undefined`/`null`/`NaN`/`[object Object]`/`{placeholder}`/walls-of-"—"/stuck loaders,
@@ -44,17 +44,21 @@ moment someone actually looked at it.
   Matthew or surgically de-fabricate the published file).
 - **CloudFront: invalidate the VIEWER path, not the S3 key.** `generated/journal/*` is served at
   `/journal/*` (the `generated/` prefix is stripped at the edge). Invalidating `/generated/...` does nothing.
-- **The 3 narrative lambdas (chronicle/podcast/ai-expert) are CDK-asset-bundled** — they import
-  non-layer siblings. A single-file `deploy_lambda.sh` strips them and breaks the function. Ship
-  code-only changes by zipping `lambdas/` with `_ASSET_EXCLUDES` (from `cdk/stacks/lambda_helpers.py`)
-  and `update-function-code` directly — avoids a drift-risky full `cdk deploy`.
-- **Matthew runs prod deploys.** This is a standing boundary; explicit in-session authorization
-  ("you run it this time") unblocks it. (Memory: `feedback_prod_deploy_authorization`.)
+- **The narrative lambdas (chronicle/podcast/ai-expert) ship in the ONE code bundle** — the whole
+  `lambdas/` tree staged by `deploy/build_bundle.py` (`docs/CONVENTIONS.md` §1), so there is no
+  single-file strip hazard any more. Ship code-only changes with `bash deploy/deploy_fleet.sh` (the
+  one fleet path; `deploy_lambda.sh` is the laptop hot-fix path) — not a hand-zipped `_ASSET_EXCLUDES`
+  upload (that list was retired from CDK; `build_bundle.py` carries the one copy).
+- **Matthew runs prod deploys of Lambdas and infrastructure.** This is a standing boundary; explicit
+  in-session authorization ("you run it this time") unblocks it. (Memory: `feedback_prod_deploy_authorization`.)
+  **The site is the exception:** a merge to `main` touching `site/**` deploys it automatically
+  (`.github/workflows/site-deploy.yml`, `docs/CONVENTIONS.md` §2), and a red site-deploy is silent — read
+  the newest run's conclusion (the SessionStart pre-flight prints it) before and after a site merge.
 - **Work in a git worktree** — Matthew runs concurrent sessions on one repo (memory:
   `feedback_concurrent_session_worktree`).
 - **Build scripts generate committed HTML.** `sync_site_to_s3.sh` re-runs the generator suite
-  per deploy (8 `v4_build_*.py` scripts as of 2026-07-10 — see `docs/SITE_AUTHORING.md` §3 for the
-  inventory). After editing a generator, run it and commit its output — never hand-edit generated pages.
+  per deploy (the set is the `run_site_generator` steps in that script — see `docs/SITE_AUTHORING.md` §3 for the
+  inventory; a generator-only change does not trigger `site-deploy.yml`, so dispatch it). After editing a generator, run it and commit its output — never hand-edit generated pages.
 - **The pre-commit hook auto-bumps doc dates** (`sync_doc_metadata.py`) — cosmetic, expect it.
 - **Assets are hashed across the FULL module graph, not just HTML** (ADR-098). `deploy/hash_site_assets.py`
   hashes every CSS/JS file leaves-first and rewrites HTML refs, intra-module `import`s, and CSS. If you
@@ -129,21 +133,29 @@ suite with `node --test` from the repo root (auto-discovers everything under `te
 - **CI gate:** `.github/workflows/v4-gate.yml`'s `site-gate` job runs `node --test` right after
   the #1432 import-graph gate, on every `site/**`-touching PR and push to main.
 
-## Deploy surface (when authorized)
-1. **Site** — `bash deploy/sync_site_to_s3.sh` (+ explicit `aws s3 sync site/assets/fonts/` if fonts changed). Content-hashes + invalidates + rolls the SW version.
+## Deploy surface
+1. **Site** — automatic on merge to `main` (`site-deploy.yml`: sync + explicit fonts sync + smoke ∥ visual/AI-QA, auto-rollback on a red; `docs/SITE_AUTHORING.md` §7). Attended fallback, when authorized and always from `main`: `bash deploy/sync_site_to_s3.sh` (+ explicit `aws s3 sync site/assets/fonts/` if fonts changed). Content-hashes + invalidates + rolls the SW version.
 2. **Site-API** — `bash deploy/deploy_site_api.sh [verify_path]` (ships the full `web/` package; never single-file).
 3. **CloudFront redirects** — apply `deploy/generated/v4_redirects_function.js` to dist `E3S424OXQZ8NBE` (update-function → publish).
-4. **Narrative lambdas** — the `lambdas/` asset zip method above.
+4. **Narrative lambdas** — `bash deploy/deploy_fleet.sh` (the one-bundle path above).
 5. Reconcile `main` — open a PR from the worktree branch so `main` matches what's live.
 
 ## The front-page cut-over (#4588, epic #4580)
 
 The living front page goes live as **one commit**: the four kit pages of epic #4580 (front page,
 Start here, Story, Coaches) copied from `/next/v8/` to `/`, `/start/`, `/story/` and `/coaches/`.
-Their deep links stay on `/next/v8/` (`data-ck-base`). No page is renamed, and no redirect is added. Every
-other page stays as it is. The rehearsal is the HELD draft PR on #4588. It only merges on the owner's go,
-on a Thursday, outside the Tuesday-evening to Wednesday-noon PT freeze around the weekly chapter
-and email.
+Their deep links stay on `/next/v8/` (`data-ck-base`); the other eight kit pages keep their
+`/next/v8/` paths until a later cut-over (the door table is `SITE_MAP_AND_INTENT.md`). No page is
+renamed, and no redirect is added. Every other page stays as it is. The rehearsal is the HELD draft
+PR #4928 on #4588.
+
+**When it merges — the Thursday rule and the freeze.** Only on the owner's go, recorded on #4588
+(given 2026-10-18 for **Thursday 2026-10-22, morning PT**, provided five readers are recorded on
+#4587 by Wednesday noon and the rebuilt rehearsal is green). A cut-over merges on a **Thursday**,
+never inside the **Tuesday-evening to Wednesday-noon PT merge freeze** around the weekly chapter and
+email: the chapter and podcast publish into that window, and a site deploy that auto-rolls back there
+reverts the chapter's page with it. Thursday leaves the week's publish behind it and three weekdays
+ahead to watch the live page. If a Thursday is missed, the next Thursday — never a Friday.
 
 - **Every existing URL still resolves.** `tests/test_v4_redirects_function.py::test_every_existing_url_still_resolves_4588`
   checks this offline. Every site/ page, every sitemap URL and every old URL the edge 301s must end on a served
@@ -153,6 +165,22 @@ and email.
   `deploy/generated/v4_redirects_function.js`. Both URLs keep answering 200, now with the new page. The edge
   function is published by hand (Deploy surface, step 3). Until it is, the two new pages are unreachable and
   the two old 301s still answer.
+- **The replaced layout is kept as a reference page (owner ruling 2026-10-18, standing for every
+  cut-over).** Before the four files are overwritten, the cut-over commit copies each layout it
+  replaces — the v5 home first — to a served, `noindex`, out-of-navigation reference page with the
+  last live sha in its head comment (`<!-- reference copy of / at <sha>, replaced 2026-10-22 -->`),
+  and adds it to the footnote appendix (`/next/v8/appendix/`). The path convention is
+  `/reference/<date>-<slug>/` (`/reference/2026-10-22-home-v5/`), never under `/legacy/`, which is
+  never linked from the UI. Nothing is deleted: the ~87 pages the kit does not replace stay served
+  at their URLs and listed in the appendix.
+- **The appendix is a footnote, not navigation (owner ruling 2026-10-18).** The kit footer links
+  `/next/v8/appendix/`, which lists every off-path page, so a naive walk from `/` reaches ~87 pages.
+  `tests/test_site_nav_reach_ratchet.py` counts with the appendix excluded; `NAV_REACH_CEILING`
+  (`ledgers/site_vocabulary_residue.py`, 24 today) is lowered to what the rebuilt rehearsal
+  measures, never raised. The pages the appendix lists carry no nav weight.
+- **`og:image` is a static wordmark card** until the daily mark is ruled (#4586's `ck-mark`); the
+  front page ships no data-driven unfurl image before then. A shared link must still unfurl — the
+  rehearsal's "no `og:` tags" gap closes on the wordmark card, not on the mark.
 - **The deploy builders leave a kit page alone.** `v4_build_home_proof.py` would otherwise exit 2
   (no proof anchor), and that blocks the sync. `v4_build_dispatches.py` would otherwise overwrite `/story/`
   with the v4 hub and silently undo the cut-over on its first deploy. Both now ask
@@ -166,7 +194,8 @@ and email.
   # then re-publish deploy/generated/v4_redirects_function.js to E3S424OXQZ8NBE (Deploy surface, step 3)
   ```
   The quickest path to the old site is `bash deploy/rollback_site.sh <pre-cut-over sha>`. It restores
-  site/ only. The revert above is the full rollback.
+  site/ only. The revert above is the full rollback. Rehearsed 2026-10-15 on the lane: the revert of
+  the cut-over commit left `git diff --stat` against the pre-cut-over tree empty.
 - **If the AI visual check is paused by the budget tier, the cut-over waits.** `visual_ai_qa` sits in
   `budget_guard`'s operator-truth band (cutoff 3). It runs at tiers 0–2 and stops only at tier 3. There it
   prints SKIPPED-BY-BUDGET and the visual-QA job stays green on the Playwright sweep alone (CONVENTIONS
@@ -176,8 +205,12 @@ and email.
      elements in the static shell, so a green says nothing about whether the dated edition rendered.
   2. A tier-3 month is also when the edition's AI-written lines are paused. The front page would open in
      its degraded state.
-  3. The cut-over has no fixed date, so waiting for the next Thursday costs nothing.
+  3. A missed Thursday costs one week, and the go on #4588 carries to the next Thursday.
   So read SSM `/life-platform/budget-tier` before the merge. At tier 3, hold to the next Thursday.
+- **Live proof** (the box #4588 closes on, never the merge): on the Thursday,
+  `curl -s https://averagejoematt.com/ | grep -c 'data-ck-page="front"'` → 1, and `/start/`, `/story/`
+  and `/coaches/` each answering 200 with their kit page; `/reference/2026-10-22-home-v5/` answering
+  200 with `noindex`; the site-deploy run green and not auto-rolled back.
 
 ## Measurement pipeline — traffic digest (infra; Matthew runs the deploy)
 
@@ -187,10 +220,11 @@ email of page views / unique / returning visitors / top pages / referrers, parse
 memory for distinct/returning counts then discarded; output is aggregate only. The
 privacy page documents this verbatim under "Cookies and tracking."
 
-Two one-time infra steps (both require AWS perms beyond the site/API deploys — **hand to
-Matthew**, do not run from the agent):
+One-time infra (step 2 below is already CDK-declared; both require AWS perms beyond the site/API deploys — **hand to
+Matthew**, do not run from the agent). It is the weekly Monday ops-pack email (#2835): the same
+digest also carries the folded data-reconciliation and pip-audit artifacts.
 
-1. **CDK** — `cd cdk && npx cdk deploy LifePlatformOperational`. This creates:
+1. **CDK** — `bash deploy/cdk_deploy.sh LifePlatformOperational` (the drift-guarded path, `docs/CONVENTIONS.md` §6). This creates:
    - the log bucket `matthew-life-platform-cf-logs` (BUCKET_OWNER_PREFERRED ACL so
      CloudFront can write; 90-day lifecycle; `RETAIN` on stack delete), and
    - the `life-platform-traffic-digest` Lambda on `cron(0 16 ? * MON *)` (9 AM PT Mondays),
@@ -198,17 +232,12 @@ Matthew**, do not run from the agent):
      failing is low-stakes — same as the other `alerts_topic=None` operational Lambdas).
    Run `npx cdk diff LifePlatformOperational` first — expect **no IAM changes to existing
    roles**, one new role + bucket + function.
-2. **Enable CloudFront logging** — point dist `E3S424OXQZ8NBE`'s standard logging at the
-   new bucket, prefix `cf/`:
-   ```bash
-   aws cloudfront get-distribution-config --id E3S424OXQZ8NBE > /tmp/cf.json   # capture ETag
-   # set Logging: { Enabled:true, IncludeCookies:false,
-   #   Bucket:"matthew-life-platform-cf-logs.s3.amazonaws.com", Prefix:"cf/" }
-   aws cloudfront update-distribution --id E3S424OXQZ8NBE \
-     --distribution-config file:///tmp/cf-config.json --if-match <ETag>
-   ```
-   Logs begin landing within ~an hour. The first digest fires the following Monday (it
-   self-skips and sends nothing if the window is empty).
+2. **CloudFront logging — done, now CDK-declared.** The standard-logging block (bucket
+   `matthew-life-platform-cf-logs.s3.amazonaws.com`, prefix `cf/`, cookies off) is part of the
+   distribution in `cdk/stacks/web_stack.py` (`LoggingProperty`, ADR-099 #349), so a redeploy preserves
+   it; the old `get-distribution-config` / `update-distribution` hand step is retired. (Read-only check
+   2026-10-17: dist `E3S424OXQZ8NBE` reports `Logging.Enabled: true`, prefix `cf/`.) The first digest
+   fires the Monday after logs land; it self-skips and sends nothing if the window is empty.
 
 Verify after a few days of logs exist: `aws lambda invoke --function-name
 life-platform-traffic-digest /tmp/out.json` → a digest email arrives (or a logged

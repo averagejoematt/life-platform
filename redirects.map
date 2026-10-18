@@ -20,6 +20,7 @@
 /chronicle/	/story/chronicle/
 /chronicle/archive/	/story/chronicle/
 /chronicle/sample/	/story/chronicle/
+/coaches/	/method/board/
 /community/	/
 /cost/	/method/cost/
 /discoveries/	/protocols/discoveries/
@@ -101,6 +102,7 @@
 /results/	/method/results/
 /sleep/	/data/sleep/
 /stack/	/data/stack/
+/start/	/
 /status/	/cockpit/
 /story/coaches/	/coaching/coaches/
 /story/lab-notes/	/coaching/lab-notes/

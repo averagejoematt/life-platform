@@ -1,18 +1,18 @@
 {
  "_meta": {
-  "generated_at": "2026-10-13T01:38:50.023170+00:00",
-  "served_at": "2026-10-13T01:38:50.023170+00:00",
+  "generated_at": "2026-10-17T23:29:16.525854+00:00",
+  "served_at": "2026-10-17T23:29:16.525854+00:00",
   "cache_seconds": 300,
-  "request_id": "b827f2778eed44c0"
+  "request_id": "496af977748e4418"
  },
  "chronicle": {
   "paused": false,
-  "next_date": "2026-10-14",
-  "display": "Next Chronicle installment drafted Wednesday, October 14 \u2014 publishes once Matthew reviews and approves the draft."
+  "next_date": "2026-10-21",
+  "display": "Next Chronicle installment drafted Wednesday, October 21 \u2014 publishes once Matthew reviews and approves the draft."
  },
  "podcast": {
   "paused": false,
-  "next_date": "2026-10-14",
-  "display": "The Panel podcast ships the same week as the next Chronicle installment (week of Wednesday, October 14), once that installment publishes \u2014 it has no schedule of its own."
+  "next_date": "2026-10-21",
+  "display": "The Panel podcast ships the same week as the next Chronicle installment (week of Wednesday, October 21), once that installment publishes \u2014 it has no schedule of its own."
  }
 }

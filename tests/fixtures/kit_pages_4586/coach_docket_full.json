@@ -1,49 +1,60 @@
 {
  "_meta": {
-  "generated_at": "2026-10-13T01:38:39.156909+00:00",
-  "served_at": "2026-10-13T01:38:39.156909+00:00",
+  "generated_at": "2026-10-17T23:29:07.655056+00:00",
+  "served_at": "2026-10-17T23:29:07.655056+00:00",
   "cache_seconds": 300,
-  "request_id": "cb1e907b3f3a4d78"
+  "request_id": "fd8ccf4c372a4851"
  },
- "open": [
+ "open": [],
+ "resolved": [
   {
    "topic": "Deep sleep spike interpretation: signal vs. noise",
    "topic_slug": "deep-sleep-spike-interpretation-signal-vs-noise",
    "coach_a": "physical_coach",
    "coach_b": "sleep_coach",
    "claims": {
-    "sleep_coach": "27.6% deep sleep spike on Sept 22 (1.8 SD above baseline) is likely regression-to-mean noise without thermal anchor and subjective context; requires five consecutive same-direction observations to confirm signal",
-    "physical_coach": "Deep sleep decline is occurring simultaneously with recovery climb; opposing vectors suggest internal depletion masked by external scores; deep sleep architecture is high-influence confounder"
+    "physical_coach": "Deep sleep decline is occurring simultaneously with recovery climb; opposing vectors suggest internal depletion masked by external scores; deep sleep architecture is high-influence confounder",
+    "sleep_coach": "27.6% deep sleep spike on Sept 22 (1.8 SD above baseline) is likely regression-to-mean noise without thermal anchor and subjective context; requires five consecutive same-direction observations to confirm signal"
    },
    "criterion": {
     "condition": "gte",
+    "description": "deep_pct_7day_avg >= 26 on 2026-10-16",
     "metric": "deep_pct_7day_avg",
-    "threshold": 26.0,
-    "description": "deep_pct_7day_avg >= 26 on 2026-10-16"
+    "threshold": 26.0
    },
    "sides": {
-    "sleep_coach": false,
-    "physical_coach": true
+    "physical_coach": true,
+    "sleep_coach": false
    },
    "resolution_date": "2026-10-16",
    "opened_date": "2026-10-02",
    "stakes": {
+    "physical_coach": {
+     "brier": 0.25,
+     "brier_n": 14.0,
+     "confidence": 0.5,
+     "subdomain": "sleep"
+    },
     "sleep_coach": {
      "brier": 0.2505,
-     "subdomain": "sleep",
      "brier_n": 30.0,
-     "confidence": 0.467
-    },
-    "physical_coach": {
-     "confidence": 0.5,
-     "subdomain": "sleep",
-     "brier_n": 14.0,
-     "brier": 0.25
+     "confidence": 0.467,
+     "subdomain": "sleep"
     }
-   }
-  }
- ],
- "resolved": [
+   },
+   "verdict": {
+    "actual_value": 16.357142857142858,
+    "holds": false,
+    "loser": "physical_coach",
+    "outcome": "graded",
+    "winner": "sleep_coach"
+   },
+   "winner": "sleep_coach",
+   "loser": "physical_coach",
+   "actual_value": 16.357142857142858,
+   "resolved_date": "2026-10-16",
+   "concession": "CONCESSION (2026-10-16) \u2014 I lost the docket dispute on 'Deep sleep spike interpretation: signal vs. noise'. My recorded claim: \"Deep sleep decline is occurring simultaneously with recovery climb; opposing vectors suggest internal depletion masked by external scores; deep sleep architecture is high-influence confounder\". The criterion we agreed to at open \u2014 deep_pct_7day_avg >= 26 on 2026-10-16 \u2014 resolved against me: actual value 16.3571. The sleep coach took the other side and was right. This stays on my record: when I next address Deep sleep spike interpretation: signal vs. noise, I cite this concession instead of relitigating it."
+  },
   {
    "topic": "Fuel-cognition link mechanistic validity",
    "topic_slug": "fuel-cognition-link-mechanistic-validity",
@@ -267,8 +278,8 @@
   }
  ],
  "counts": {
-  "open": 1,
-  "resolved": 4
+  "open": 0,
+  "resolved": 5
  },
  "withheld": 0,
  "disclosure": "Standing disagreements between AI coaches, each with skin in the game: the stake is the coach's own Brier record, frozen when the docket opened. The resolution criterion and date are agreed at open and graded by deterministic code against real data \u2014 no AI writes the verdict, and lost disputes stay on the record next to the wins. Claims and concessions cross the same standing privacy filter as the coach dossier before publishing; any hit withholds the whole entry and this payload counts it."

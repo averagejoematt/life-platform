@@ -38,11 +38,13 @@ Usage in a stack:
     )
 """
 
+import json
 import os
 import sys
 
 from aws_cdk import (
     Duration,
+    Stack,
     aws_cloudwatch as cloudwatch,
     aws_cloudwatch_actions as cw_actions,
     aws_dynamodb as dynamodb,
@@ -52,6 +54,7 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_logs as logs,
     aws_s3 as s3,
+    aws_scheduler as scheduler,
     aws_sns as sns,
     aws_sqs as sqs,
 )
@@ -96,6 +99,42 @@ def staged_tree_asset():
     return _lambda.Code.from_asset(_TREE_STAGE)
 
 
+def _add_zoned_schedule(scope, id, fn, schedule, timezone, schedule_input=None):
+    """EventBridge Scheduler carrier for ONE zoned schedule (#4284). Additive IAM: one
+    role, assumable only by scheduler.amazonaws.com from this account, holding exactly one
+    `lambda:InvokeFunction` on this function's ARN. Two async attempts inside a one-hour
+    event age (Scheduler's default is 185 attempts over 24 h — a brief delivered a day late
+    is worse than a missed one, and the send ledger is the dedup for the retry)."""
+    stack = Stack.of(scope)
+    role = iam.Role(
+        scope,
+        f"{id}SchedulerRole",
+        assumed_by=iam.PrincipalWithConditions(
+            iam.ServicePrincipal("scheduler.amazonaws.com"),
+            {"StringEquals": {"aws:SourceAccount": stack.account}},
+        ),
+        description=f"EventBridge Scheduler -> {fn.function_name} (#4284); invoke only",
+    )
+    role.add_to_policy(iam.PolicyStatement(actions=["lambda:InvokeFunction"], resources=[fn.function_arn]))
+    target = scheduler.CfnSchedule.TargetProperty(
+        arn=fn.function_arn,
+        role_arn=role.role_arn,
+        retry_policy=scheduler.CfnSchedule.RetryPolicyProperty(maximum_retry_attempts=2, maximum_event_age_in_seconds=3600),
+        **({"input": json.dumps(schedule_input)} if schedule_input is not None else {}),
+    )
+    sched = scheduler.CfnSchedule(
+        scope,
+        f"{id}PacificSchedule",
+        flexible_time_window=scheduler.CfnSchedule.FlexibleTimeWindowProperty(mode="OFF"),
+        schedule_expression=schedule,
+        schedule_expression_timezone=timezone,
+        state="ENABLED",
+        target=target,
+        description=f"{fn.function_name} at {schedule} {timezone} (#4284)",
+    )
+    sched.node.add_dependency(role)
+
+
 def create_platform_lambda(
     scope: Construct,
     id: str,
@@ -112,6 +151,11 @@ def create_platform_lambda(
     secrets: list[str] = None,
     schedule: str = None,
     schedule_input: dict = None,  # constant event for the scheduled target; None = EventBridge's own event
+    # #4284: an IANA zone (e.g. "America/Los_Angeles") moves THIS schedule off the fixed-UTC
+    # `events.Rule` carrier onto an EventBridge Scheduler schedule, so `schedule=` is read as
+    # wall-clock time in that zone and follows the DST change. None (every other Lambda) = the
+    # fixed-UTC rule, unchanged.
+    schedule_timezone: str = None,
     timeout_seconds: int = 120,
     memory_mb: int = 256,
     environment: dict = None,
@@ -331,7 +375,9 @@ def create_platform_lambda(
         cfn_fn.dead_letter_config = _lambda.CfnFunction.DeadLetterConfigProperty(target_arn=dlq.queue_arn)
 
     # ── EventBridge schedule ──
-    if schedule:
+    if schedule and schedule_timezone:
+        _add_zoned_schedule(scope, id, fn, schedule, schedule_timezone, schedule_input)
+    elif schedule:
         rule = events.Rule(
             scope,
             f"{id}Schedule",

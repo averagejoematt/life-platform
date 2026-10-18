@@ -11,6 +11,7 @@ import re
 from datetime import date as _date_cls
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, EXPERIMENT_TZ, PLAN_DAILY_CALORIES_TARGET  # noqa: F401
+from common.metric_truth import resolve_steps, steps_series  # #4630: the ONE steps resolver
 from common.pacific_time import pacific_now  # #2811: THE Pacific frame — journey days are PT days
 from health.scoring_engine import habitify_reading  # #4362: rename-aware habit lookup
 from intelligence import (
@@ -404,9 +405,9 @@ def _build_habit_outcome_context(data, profile):
     trend_lines = []
     for day_rec in habitify_7d[-7:]:
         date_str = day_rec.get("sk", "").replace("DATE#", "")
-        habits_map = day_rec.get("habits", {}) if isinstance(day_rec, dict) else {}
-        t0_done = sum(1 for h in tier0_names if (habitify_reading(habits_map, h, registry.get(h)) or 0) >= 1)  # #4362
-        t1_done = sum(1 for h in tier1_names if (habitify_reading(habits_map, h, registry.get(h)) or 0) >= 1)
+        habits_map, statuses = (day_rec.get("habits", {}), day_rec.get("habit_statuses")) if isinstance(day_rec, dict) else ({}, None)
+        t0_done = sum(1 for h in tier0_names if (habitify_reading(habits_map, h, registry.get(h), statuses) or 0) >= 1)  # #4362
+        t1_done = sum(1 for h in tier1_names if (habitify_reading(habits_map, h, registry.get(h), statuses) or 0) >= 1)
         trend_lines.append(f"  {date_str}: T0 {t0_done}/{len(tier0_names)}, T1 {t1_done}/{len(tier1_names)}")
 
     # Known habit-outcome relationships to surface to the AI
@@ -505,7 +506,7 @@ def _compute_data_quality(data, profile):
 
     # --- Apple Health (steps, CGM, gait) ---
     apple = data.get("apple") or {}
-    steps = _safe_float(apple, "steps")
+    steps = _safe_float(apple, "steps")  # steps-truth: per-source data-quality check of Apple's OWN capture (is the phone stream flowing?)
     glucose_avg = _safe_float(apple, "blood_glucose_avg")
 
     if not apple or (steps is None and glucose_avg is None):
@@ -628,11 +629,13 @@ def _compute_surprise_scores(data):
         }
 
     # --- Steps ---
+    # #4630: the day and its 7-day baseline both through the ONE resolver (registry
+    # METRIC_TRUTH facet) — a Whoop-day compared with an Apple-baseline would read as a surprise.
     apple = data.get("apple") or {}
-    steps = _safe_float(apple, "steps")
+    steps = resolve_steps({"whoop": data.get("whoop"), "apple_health": apple, "garmin": data.get("garmin")}).value
     apple_7d = data.get("apple_7d") or []
     if steps is not None and apple_7d:
-        steps_7d = [_safe_float(d, "steps") for d in apple_7d if _safe_float(d, "steps") is not None]
+        steps_7d = steps_series({"whoop": data.get("whoop_7d") or [], "apple_health": apple_7d})
         if steps_7d:
             avg_steps = sum(steps_7d) / len(steps_7d)
             if avg_steps > 0:
@@ -710,9 +713,8 @@ def _compute_diminishing_returns(character_sheet, data, profile):
     if not character_sheet:
         return ""
 
-    registry = profile.get("habit_registry", {})
-    habitify = data.get("habitify") or {}
-    habits_map = habitify.get("habits", {}) if isinstance(habitify, dict) else {}
+    registry, habitify = profile.get("habit_registry", {}), (data.get("habitify") or {})
+    habits_map, habit_statuses = (habitify.get("habits", {}), habitify.get("habit_statuses")) if isinstance(habitify, dict) else ({}, None)
 
     # Map habits to pillars
     HABIT_PILLAR_MAP = {
@@ -744,7 +746,7 @@ def _compute_diminishing_returns(character_sheet, data, profile):
         pillar_habits = HABIT_PILLAR_MAP.get(pillar_name, [])
         active_habits = [h for h in pillar_habits if registry.get(h, {}).get("status") == "active"]
         if active_habits:
-            completed = sum(1 for h in active_habits if habits_map.get(h) is not None and float(habits_map.get(h, 0)) >= 1)
+            completed = sum(1 for h in active_habits if (habitify_reading(habits_map, h, registry.get(h), habit_statuses) or 0) >= 1)
             effort_pct = round(completed / len(active_habits) * 100) if active_habits else 0
         else:
             effort_pct = None  # No habits mapped to this pillar
@@ -1183,7 +1185,7 @@ def _build_training_data(data):
         "recovery_score": _safe_float(whoop, "recovery_score"),
         "strain": _safe_float(whoop, "strain"),
         "hrv": _safe_float(whoop, "hrv"),
-        "steps": _safe_float(garmin, "steps") or _safe_float(apple, "steps"),  # Garmin wearable is SOT for steps
+        "steps": resolve_steps({"whoop": whoop, "apple_health": apple, "garmin": garmin}).value,  # #4630: the ONE steps resolver
         "recent_activities": [
             {
                 "type": a.get("type") or a.get("sport_type", "unknown"),

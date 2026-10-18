@@ -16,6 +16,17 @@ is not a thing; entries only ever come OUT (the #1964 ratchet precedent).
 Populated honestly by the initial sweep on 2026-08-17 (37 sites). Every entry
 is real debt: convert the site to a registry projection, then delete its line.
 
+2026-10-17 (#4639): dexa entered SOURCE_REGISTRY (the #3669 residual), so the sweep's
+vocabulary grew again. Same mechanics as the 2026-09-17 note below: the
+`intelligence_common.py::sources::…` `_INVENTORY_SOURCES` key gained `dexa` (site unedited,
+date unchanged), and ONE site became visible for the first time — the topic-synonym map
+`"body composition": ["dexa", "withings"]` (intelligence_common.py, in the tree since
+2026-07-28, d105055c8), whose `withings` alone was below the sweep's two-member floor.
+Dated 2026-08-17 because the debt predates the initial sweep; it is the same debt measured
+at its true size, not a new hand-list. A THIRD site that would have surfaced the same way,
+`inventory_window.py`'s `_EPISODIC_PARTITIONS = {"labs", "dexa"}`, is NOT ledgered: it is
+literally the registry's `cadence_months` set and now derives from `due_months()`.
+
 2026-09-17 (#3669): ONE key re-keyed, date UNCHANGED, ledger size unchanged. The
 entry for `lambdas/intelligence/intelligence_common.py::sources::…` gained `labs` in its
 matched-member list. The site was not edited — not one byte of `_INVENTORY_SOURCES`
@@ -50,7 +61,8 @@ CONFORMANCE_RESIDUE: dict[str, str] = {
     "lambdas/health/pillar_absence.py::sources::habitify,todoist": "2026-08-17",
     "lambdas/health/pillar_absence.py::sources::hevy,strava": "2026-08-17",
     "lambdas/intelligence/ai_expert_analyzer_lambda.py::sources::garmin,strava": "2026-08-17",
-    "lambdas/intelligence/intelligence_common.py::sources::apple_health,eightsleep,garmin,habitify,labs,macrofactor,measurements,notion,strava,supplements,whoop,withings": "2026-08-17",
+    "lambdas/intelligence/intelligence_common.py::sources::apple_health,dexa,eightsleep,garmin,habitify,labs,macrofactor,measurements,notion,strava,supplements,whoop,withings": "2026-08-17",
+    "lambdas/intelligence/intelligence_common.py::sources::dexa,withings": "2026-08-17",
     "lambdas/intelligence/intelligence_common.py::sources::eightsleep,whoop": "2026-08-17",
     "lambdas/intelligence/intelligence_common.py::sources::garmin,strava": "2026-08-17",
     "lambdas/operational/ai_quality_canary_lambda.py::personas::sleep_coach,training_coach": "2026-08-17",
@@ -59,9 +71,7 @@ CONFORMANCE_RESIDUE: dict[str, str] = {
     "lambdas/web/site_api_rollups.py::sources::macrofactor,notion,withings": "2026-08-17",
     "lambdas/web/site_api_status.py::sources::eightsleep,whoop": "2026-08-17",
     "lambdas/web/site_stats_refresh_lambda.py::lambdas::habitify-data-ingestion,whoop-data-ingestion,withings-data-ingestion": "2026-08-17",
-    "lambdas/web/vitals_resolver.py::sources::apple_health,garmin": "2026-08-17",
     "mcp/tools_labs.py::sources::apple_health,eightsleep,habitify,whoop": "2026-08-17",
-    "mcp/tools_lifestyle.py::sources::apple_health,hevy,strava": "2026-08-17",
     "mcp/tools_nutrition.py::sources::habitify,hevy,strava,whoop": "2026-08-17",
     "mcp/tools_nutrition.py::sources::macrofactor,withings": "2026-08-17",
 }

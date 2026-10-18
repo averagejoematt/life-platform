@@ -465,3 +465,24 @@ def test_grant_matcher_ignores_unrelated_principals_and_rules(monkeypatch):
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
+
+
+def test_scheduler_schedules_are_recorded_not_flagged_as_orphans_4284(monkeypatch):
+    """#4284: the morning brief's carrier is an AWS::Scheduler::Schedule. It must be recorded
+    in the result and must neither be mistaken for an Events rule nor disturb the verdict."""
+    fake_ev, _ = _wire(monkeypatch, rules=[_rule("cdk-rule-a")], targets={"cdk-rule-a": [{"Id": "t"}]}, managed={})
+
+    class _Cfn:
+        def list_stack_resources(self, **kw):
+            return {
+                "StackResourceSummaries": [
+                    {"ResourceType": "AWS::Events::Rule", "PhysicalResourceId": "cdk-rule-a"},
+                    {"ResourceType": "AWS::Scheduler::Schedule", "PhysicalResourceId": "LifePlatformEmail-DailyBriefPacificSchedule-X"},
+                ]
+            }
+
+    monkeypatch.setattr(se, "_client", lambda service, region=None: fake_ev if service == "events" else _Cfn())
+    res = se.check_eventbridge_rules()
+    assert res["status"] == "clean"
+    assert res["managed_scheduler_schedules"] == ["LifePlatformEmail-DailyBriefPacificSchedule-X"]
+    assert res["managed_count"] == 1  # the schedule is not counted as an Events rule

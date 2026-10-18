@@ -86,7 +86,7 @@ test("the Today band is this morning, yesterday and the plan, one line each, wit
   assert.match(html, new RegExp(`<span class="ck-rows__key">Yesterday, ${weekday}</span>`));
   assert.match(html, new RegExp(`href="/next/v8/day/\\?d=${yesterday}">The full day</a>`));
   assert.doesNotMatch(html, /Steps|steps/, "step counts stay off the front page");
-  assert.match(html, /Recovery is the wrist strap’s morning score out of 100\./);
+  assert.match(html, /Recovery is the wrist strap’s morning score, as a percentage\./);
   assert.doesNotMatch(html, new RegExp(`d=${dayShift(TODAY, -2)}`), "nothing older than yesterday");
   // Yesterday carries its food when the food log has it: read the morning after a logged day.
   const logged = B.week.data.detail.find((d) => d.facts.some((f) => f.label === "Food"));
@@ -104,7 +104,9 @@ test("a day with nothing recorded yet says so", () => {
 });
 
 test("coach lines today are the served moves, or the block's own sentence", () => {
-  assert.equal((F.coachTodayHTML(B.coach_lines).match(/<li>/g) || []).length, B.coach_lines.data.lines.length);
+  // Only the lines the front page may quote (F.frontQuotable: a move about the record, not the mind coach).
+  const quotable = B.coach_lines.data.lines.filter(F.frontQuotable).length;
+  assert.equal((F.coachTodayHTML(B.coach_lines).match(/<li>/g) || []).length, quotable);
   assert.equal(F.coachTodayHTML({ state: "absent", absent_text: "No coach had anything to say on Sunday, October 4.", data: null }), '<p class="ck-soft">No coach had anything to say on Sunday, October 4.</p>');
 });
 
@@ -169,7 +171,11 @@ test("the chapter and podcast lines are labelled as AI-written and carry Read an
 });
 
 test("the follow box says what arrives next and when", () => {
-  assert.equal(F.followLine(B.next), "The next chapter and podcast are due Wednesday, October 14. The week’s numbers go out every Sunday.");
+  // The capture's cadence marks the date a draft, not a promise: the box does not say "due".
+  assert.ok(B.next.data.chapter.data.drafted_not_promised);
+  assert.equal(F.followLine(B.next), "A new chapter and podcast most weeks, each once Matthew approves it, and the numbers every Sunday.");
+  const promised = { ...B.next, data: { ...B.next.data, chapter: { ...B.next.data.chapter, data: { date: "2026-10-14" } } } };
+  assert.equal(F.followLine(promised), "The next chapter and podcast are due Wednesday, October 14. The week’s numbers go out every Sunday.");
   assert.match(F.followLine({}), /most weeks/);
 });
 

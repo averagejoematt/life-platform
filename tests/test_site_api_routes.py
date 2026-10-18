@@ -128,6 +128,7 @@ _sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 from coach import persona_registry as _personas  # noqa: E402
 from web import (
     edition_page_reads as _reads,  # noqa: E402
+    record_words as _record_words,  # noqa: E402
     site_api_edition as _ed,  # noqa: E402
 )
 from web.prediction_reason import metric_words as _metric_words  # noqa: E402
@@ -151,6 +152,23 @@ _CONTRACT_KEYS = ("state", "as_of", "source", "absent_text", "data")
 
 def _wire():
     return {k: _json.load(open(os.path.join(_WIRE, f"{k}.json"), encoding="utf-8")) for k in _ed.SOURCES}
+
+
+def _with_open_bet(wire):
+    """The wire with an open bet due after its capture day. A capture taken between bets (the
+    2026-10-17 recapture had none open) reopens its newest settled bet in a COPY, due three days
+    after the capture day, verdict fields dropped — so the bet-shaped assertions still run on the
+    docket's own served criterion, claims and sides (#4586 round 2)."""
+    open_due = [d for d in (wire["docket"].get("open") or []) if str(d.get("resolution_date") or "") >= _CAPTURE_DAY]
+    if open_due or not (wire["docket"].get("resolved") or []):
+        return wire
+    out = _copy.deepcopy(wire)
+    bet = _copy.deepcopy(sorted(out["docket"]["resolved"], key=lambda d: str(d.get("resolution_date") or ""))[-1])
+    for k in ("verdict", "winner", "loser", "actual_value", "resolved_date", "concession"):
+        bet.pop(k, None)
+    bet["resolution_date"] = (_dt.fromisoformat(_CAPTURE_DAY) + _td(days=3)).strftime("%Y-%m-%d")
+    out["docket"]["open"] = [bet]
+    return out
 
 
 def _edition(bodies):
@@ -203,7 +221,7 @@ def _parts(doc):
 def test_edition_every_block_carries_the_contract_on_the_wire():
     """Every block (and nested part) has state/as_of/source/absent_text/data; the document
     has ONE Pacific as_of and day_n, and the blocks arrive in page order."""
-    wire = _wire()
+    wire = _with_open_bet(_wire())
     doc = _edition(wire)
     assert doc["as_of"] == _CAPTURE_DAY and doc["day_n"] == (_dt.fromisoformat(_CAPTURE_DAY) - _dt.fromisoformat("2026-09-06")).days + 1
     assert list(doc["blocks"]) == list(_ed.ORDER) == doc["order"]
@@ -238,7 +256,7 @@ def test_edition_next_bet_carries_each_coachs_reason_through_the_coach_line_filt
     """#4809: each side of the open bet carries one clause of that coach's opening position, in
     its served words — the docket's `claims` — through the same honest-text filter and honorific
     strip as the coach lines; a clause the filter refuses, or one too long for the card, is None."""
-    wire = _wire()
+    wire = _with_open_bet(_wire())
     sides = _edition(wire)["blocks"]["next"]["data"]["bet"]["data"]["sides"]
     docket = wire["docket"]["open"][0]
     assert len(sides) == 2 and all(isinstance(side["coach"], str) and side["coach"] for side in sides)
@@ -284,7 +302,7 @@ def test_edition_one_upstream_failing_leaves_only_its_block_unavailable():
     """For EACH upstream in turn: a failed read (500 for a route, None for a manifest)
     makes exactly the block(s) it feeds `unavailable` with the not-served sentence and no
     figure; every other block is byte-identical to the all-green edition."""
-    wire = _wire()
+    wire = _with_open_bet(_wire())
     baseline = _edition(wire)
     feeds = {
         "journal": {"chapter", "catch_up"},
@@ -312,6 +330,19 @@ def test_edition_one_upstream_failing_leaves_only_its_block_unavailable():
         "character": {"sheet"},
         "priority": {"lead_read"},
     }
+
+    # #4580 round 1: two blocks read a SECOND upstream for one field and degrade that field alone, never the
+    # block: the chapter's `next_due` is the cadence's date (None when that read failed) and the sleep row
+    # reads its hours off the pulse row the week block reads (its own sleep_detail figure when pulse failed).
+    def _without_next_due(block):
+        (block.get("data") or {}).pop("next_due", None)
+        return block
+
+    def _without_sleep_row(block):
+        ((block.get("data") or {}).get("rows") or {}).pop("sleep", None)
+        return block
+
+    degrades = {("cadence", "chapter"): _without_next_due, ("pulse", "life"): _without_sleep_row}
     offenders = []
     for key, fed in feeds.items():
         s3 = {k: (None if k == key else wire[k]) for k in ("journal", "panelcast")}
@@ -326,12 +357,19 @@ def test_edition_one_upstream_failing_leaves_only_its_block_unavailable():
             if p["state"] != "unavailable" or p["data"] is not None or not p["absent_text"].endswith("is not served right now."):
                 offenders.append(f"{key} failing: {name} -> {p['state']} {p['absent_text']!r}")
         untouched = [n for n in doc["blocks"] if n not in fed and not any(f.startswith(n + ".") for f in fed)]
+        if key == "pulse" and doc["blocks"]["life"]["data"]["rows"]["sleep"]["data"]["read_from"] != _ed.SOURCES["sleep"]:
+            offenders.append("pulse failing: the sleep row did not fall back to sleep_detail's own figure")
         if key == "cadence":
+            if doc["blocks"]["chapter"]["data"]["next_due"] is not None:
+                offenders.append("cadence failing: the chapter still claims a next_due")
             untouched.remove("follow")  # follow carries the cadence date: checked below
             if doc["blocks"]["follow"]["data"]["next_chapter_state"] != "unavailable":
                 offenders.append("cadence failing: follow still claims a next chapter date")
         for n in untouched:
-            if doc["blocks"][n] != baseline["blocks"][n]:
+            got, was = doc["blocks"][n], baseline["blocks"][n]
+            if (key, n) in degrades:
+                got, was = degrades[(key, n)](_copy.deepcopy(got)), degrades[(key, n)](_copy.deepcopy(was))
+            if got != was:
                 offenders.append(f"{key} failing: unrelated block {n} changed")
         offenders += [o for name, block in parts.items() for o in _contract_offences(name, block)]
     # A degraded 200 (a fallback payload from inside an except, #2686) is a failed read too.
@@ -447,6 +485,14 @@ def test_edition_coach_texts_from_different_days_are_each_dated():
         got = spoken({c["coach_id"]})
         if got["data"]:
             day_of[c["coach_id"]] = got["data"]["lines"][0]["as_of"]
+    if len(set(day_of.values())) < 2 and len(day_of) >= 2:
+        # A capture whose texts were all written on one day (2026-10-17): one seat's text is dated a
+        # day earlier in this test's copy, so the mixed-day rule is still exercised on served texts.
+        first = next(iter(day_of))
+        for c in dash["coaches"]:
+            if c["coach_id"] == first:
+                c["analysis_generated_at"] = (_dt.fromisoformat(day_of[first]) - _td(days=1)).strftime("%Y-%m-%dT18:00:00+00:00")
+        day_of = {cid: spoken({cid})["data"]["lines"][0]["as_of"] for cid in day_of}
     assert len(set(day_of.values())) >= 2, "the capture's coach texts are from at least two different days"
     newest = max(day_of.values())
     older = next(cid for cid, day in day_of.items() if day != newest)
@@ -476,7 +522,8 @@ def test_edition_record_never_serializes_the_count_without_the_comparison():
     skill = wire["calibration"]["platform"]["strata"]["coaches"]["brier_skill"]
     beats = skill > 0
     assert ok["data"]["beats_simple_guess"] is beats
-    assert ok["data"]["comparison_text"] == ("So far they beat a simple guess." if beats else "So far they do not beat a simple guess.")
+    assert ok["data"]["comparison_text"] == (_record_words.GUESS_BEATS if beats else _record_words.GUESS_NOT_YET)
+    assert ok["data"]["baseline"]["rule"] == "base_rate" and 0 < ok["data"]["baseline"]["rate"] < 1
     no_stratum = _json.loads(_json.dumps(wire["calibration"]))
     no_stratum["platform"]["strata"].pop("coaches")
     cases = {
@@ -683,7 +730,9 @@ def test_todays_zero_training_minutes_is_not_a_day_without_training():
     rows[-2] = {"date": rows[-2]["date"], "total_min": 0}
     past = _edition(wire)["blocks"]["week"]["data"]
     assert past["measures"]["training"]["data"]["text"] == "Trained on 5 of 6 days recorded."
-    assert {"label": "Training", "text": "No training recorded."} in past["detail"][1]["facts"]
+    assert {"label": "Training", "text": "No training recorded."}.items() <= next(
+        f for f in past["detail"][1]["facts"] if f["label"] == "Training"
+    ).items()
 
 
 # ── #4584: his own words — the owner-words store leads, the decisions note is the fallback ──

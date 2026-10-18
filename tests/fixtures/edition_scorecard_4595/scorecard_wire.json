@@ -1,6 +1,6 @@
 {
  "state": "ok",
- "as_of": "2026-10-12",
+ "as_of": "2026-10-17",
  "source": [
   "/api/calibration",
   "/api/decisions",
@@ -31,20 +31,20 @@
   "rows": {
    "body": {
     "state": "ok",
-    "as_of": "2026-10-12",
+    "as_of": "2026-10-17",
     "source": "/api/pulse_history",
     "absent_text": "Body has no verdict this week.",
     "data": {
      "name": "Body",
      "verdict": "faster_than_planned",
      "verdict_text": "Weight down faster than planned",
-     "text": "Seven-day average 307.6 lb, down 3.9 lb from the seven days before.",
+     "text": "Seven-day average 305.0 lb, down 3.6 lb from the seven days before.",
      "rule": "The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; faster than planned when it fell more than 2.5 lb in the week. Fewer than 3 weigh-ins in either week is not enough data."
     }
    },
    "training": {
     "state": "ok",
-    "as_of": "2026-10-12",
+    "as_of": "2026-10-17",
     "source": "/api/training_overview",
     "absent_text": "Training has no verdict this week.",
     "data": {
@@ -57,33 +57,33 @@
    },
    "sleep": {
     "state": "ok",
-    "as_of": "2026-10-12",
+    "as_of": "2026-10-17",
     "source": "/api/pulse_history",
     "absent_text": "Sleep has no verdict this week.",
     "data": {
      "name": "Sleep",
      "verdict": "going_well",
      "verdict_text": "5 or more long nights",
-     "text": "7 hours or more on 5 of 7 nights recorded.",
+     "text": "7 hours or more on 7 of 7 nights recorded.",
      "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
     }
    },
    "food": {
     "state": "ok",
-    "as_of": "2026-10-12",
+    "as_of": "2026-10-17",
     "source": "/api/nutrition_overview",
     "absent_text": "Food has no verdict this week.",
     "data": {
      "name": "Food",
      "verdict": "not_enough_data",
      "verdict_text": "Too few days logged",
-     "text": "4 days logged; 5 are needed.",
+     "text": "2 days logged; 5 are needed.",
      "rule": "Logged days at or above the plan's protein floor in the last seven. Going well at 5. Fewer than 5 logged days is not enough data."
     }
    },
    "mind": {
     "state": "ok",
-    "as_of": "2026-10-12",
+    "as_of": "2026-10-17",
     "source": [
      "/api/owner_words",
      "/api/decisions"
@@ -99,7 +99,7 @@
    },
    "ai": {
     "state": "ok",
-    "as_of": "2026-10-12",
+    "as_of": "2026-10-17",
     "source": [
      "/api/predictions",
      "/api/calibration"
@@ -107,26 +107,23 @@
     "absent_text": "The AI has no verdict this week.",
     "data": {
      "name": "The AI",
-     "verdict": "going_well",
-     "verdict_text": "The coaches beat a simple guess",
-     "text": "Counted across all 154 calls checked to date, not this week's alone.",
-     "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
+     "verdict": "not_yet",
+     "verdict_text": "The coaches do not beat a simple guess yet",
+     "text": "Counted across all 183 calls checked to date, not this week's alone.",
+     "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that gives every call the same chance of coming true — the share of checked calls that have so far. Going well when they beat it. Fewer than 30 checked calls is not enough data."
     }
    }
   },
   "went_right": {
    "matthew": {
     "area": "sleep",
-    "text": "Sleep: 7 hours or more on 5 of 7 nights recorded.",
+    "text": "Sleep: 7 hours or more on 7 of 7 nights recorded.",
     "source": "/api/pulse_history"
    },
    "engine": {
-    "area": "ai",
-    "text": "The AI: The coaches beat a simple guess, counted across all 154 calls checked to date, not this week's alone.",
-    "source": [
-     "/api/predictions",
-     "/api/calibration"
-    ]
+    "area": null,
+    "text": "Nothing this week.",
+    "source": null
    }
   },
   "verdicts": {
@@ -136,8 +133,8 @@
    "not_enough_data": "Not enough data"
   },
   "window": {
-   "from": "2026-10-06",
-   "to": "2026-10-12"
+   "from": "2026-10-11",
+   "to": "2026-10-17"
   },
   "rules_set": "2026-10-09",
   "rules_set_text": "The rules were set on Friday, October 9."

@@ -1,17 +1,17 @@
 # Life Platform — Service Level Objectives (SLOs)
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 > OBS-3: Formal SLO definitions for critical platform paths.
-> Last updated: 2026-09-06 (v8.6.0)
+> Last updated: 2026-10-18 (v8.6.0)
 
 ---
 
 ## Overview
 
-Four SLOs define the platform's reliability contract. Each SLO has a measurable Service Level Indicator (SLI), a target, and a CloudWatch alarm that fires on breach.
+Four SLOs define the platform's reliability contract (a fifth alarm, `slo-warmer-completeness`, is described after SLO-4). Each SLO has a measurable Service Level Indicator (SLI), a target, and a CloudWatch alarm that fires on breach.
 
-All SLO alarms publish to `life-platform-alerts` SNS topic. The operational dashboard (`life-platform-ops`) includes an SLO tracking widget section.
+**Alarm routing differs per SLO** (ADR-050): only `slo-daily-brief-delivery` publishes to the urgent `life-platform-alerts` topic. The others (freshness, AI coaching, MCP availability and the warmer alarm below) publish to the digest topic, being degradation signals rather than pages. Read the routing from the alarm declarations, not from this page. The `life-platform-ops` dashboard has **no dedicated SLO section** (see *CloudWatch Dashboard Widgets*).
 
 ---
 
@@ -39,12 +39,12 @@ All SLO alarms publish to `life-platform-alerts` SNS topic. The operational dash
 | **SLI** | Number of monitored data sources with data older than 48 hours |
 | **Target** | 99% of checks show 0 stale sources |
 | **Window** | Rolling 30-day |
-| **Alarm** | `slo-source-freshness` — fires if `StaleSourceCount > 0` for 2 consecutive checks |
-| **Metric** | `LifePlatform/Freshness::StaleSourceCount`, custom metric emitted by `freshness_checker_lambda.py` |
+| **Alarm** | `slo-source-freshness` — fires if `StaleSourceCount` Maximum ≥ 1 in a 24-hour period (one evaluation period) |
+| **Metric** | `LifePlatform/Freshness::StaleSourceCount`, custom metric emitted by `lambdas/emails/freshness_checker_lambda.py` |
 | **Recovery** | Identify stale source → check ingestion Lambda logs → fix auth/API issue → manually invoke |
 
-**Monitored sources (13):** Whoop, Withings, Strava, Todoist, Apple Health, Eight Sleep, MacroFactor, Garmin, Habitify, Notion Journal, Weather, Food Delivery (90-day threshold), Measurements.
-**Note:** Labs, DEXA, and Genome are periodic/manual — not subject to 48h freshness SLO. Food Delivery uses a 90-day stale threshold instead of 48h.
+**Monitored sources:** the behavioral, non-paused sources in `lambdas/ingestion/source_registry.py` (each source's `stale_hours` and `paused` facets are authoritative; the count and the per-source thresholds live there, not on this page). The 48h figure below is the checker's default (`STALE_HOURS`); sources with a longer cadence (e.g. Food Delivery, 90 days) carry their own `stale_hours`.
+**Note:** Labs, DEXA, and Genome are periodic/manual — not subject to the 48h freshness SLO. Infrastructure liveness (a pipe erroring or not running) is a separate alarm, `ingest-liveness-unhealthy`, so a quiet behavioral source and a broken pipe are never conflated.
 
 **Why 48h threshold:** Many sources only sync once daily. A 24h threshold would false-alarm on normal timezone drift. 48h catches genuine failures while tolerating expected gaps (e.g., no MacroFactor data on a day Matthew doesn't log food).
 
@@ -57,13 +57,13 @@ All SLO alarms publish to `life-platform-alerts` SNS topic. The operational dash
 | **SLI** | MCP Lambda invocations that complete without error |
 | **Target** | 99.5% |
 | **Window** | Rolling 7-day |
-| **Alarm** | `slo-mcp-availability` — fires if MCP Lambda error rate exceeds 0.5% over 1 hour |
-| **Metric** | `AWS/Lambda::Errors` / `AWS/Lambda::Invocations` for `life-platform-mcp` |
+| **Alarm** | `slo-mcp-availability` — fires if MCP Lambda `Errors` Sum ≥ 3 in a 1-hour period (an absolute count, not a rate; the 99.5% target is a review measure, not computed by the alarm — `cdk/stacks/mcp_stack.py`) |
+| **Metric** | `AWS/Lambda::Errors` for `life-platform-mcp` (the SLI ratio would add `AWS/Lambda::Invocations`) |
 | **Recovery** | Check CloudWatch logs → redeploy from last-known-good code |
 
 **Why 99.5%:** MCP is the interactive query layer — errors directly block Claude from answering questions. Higher bar than batch email Lambdas.
 
-**Cold start note:** Cold starts (~700-800ms) are not errors. The SLI measures availability (error-free completion), not latency. A separate informational metric tracks p95 duration.
+**Cold start note:** Cold starts (~700-800ms) are not errors. The SLI measures availability (error-free completion), not latency. Latency is watched separately by the `mcp-server-duration-high` alarm (`Duration` p99 ≥ 240000 ms over 24h, digest-routed).
 
 ---
 
@@ -81,25 +81,25 @@ All SLO alarms publish to `life-platform-alerts` SNS topic. The operational dash
 
 **Why count-based not rate-based:** The platform makes ~15-20 AI calls/day across all Lambdas. A rate-based alarm with so few datapoints would be noisy. A count threshold of 3 failures/day (fleet-wide) means something is systematically wrong (not just a transient 429).
 
+**Emitter roster is a floor, not a list:** `tests/test_alarm_emission_dimension_3260.py` pins `EMITTER_FLOOR` (7 for `AnthropicAPIFailure`); read that test, not this row, for the current minimum.
+
 **The dimensionless series is load-bearing (#3260).** CloudWatch does not roll a custom metric up across dimension sets. Until 2026-08-27 every emitter attached `{LambdaFunction=…}` and the alarm had no dimensions, so it read a series nothing wrote: **0 datapoints in 180 days**, while `{LambdaFunction=daily-brief}` alone recorded 329 failures over 18 days and 2026-05-26 saw 191 failures across five Lambdas. The alarm's last state change was 2026-03-08 with `StateReason: "no datapoints were received"`. The fix is the emitters' dimensionless twin — the same shape `bedrock_client._emit_usage_metrics` uses for `AnthropicOutputTokens` and `auth_breaker.auth_health_metric_data` uses for `IngestAuthHealthy`. The alarm stays dimensionless **deliberately**: a per-function dimension would silently reinterpret `Sum >= 3` as a per-function threshold (five Lambdas failing twice each = 10 real failures and no page). Pinned by `tests/test_alarm_emission_dimension_3260.py`.
+
+### SLO-5: MCP Warmer Completeness (alarm only)
+
+`slo-warmer-completeness` (`cdk/stacks/mcp_stack.py`) fires if `life-platform-mcp-warmer` `Errors` Sum ≥ 1 in 24h (digest-routed): a failed warmer means the tools serve stale cached data all day. It is an Errors alarm and cannot see a warmer that stopped running; the absence case has its own alarm in the same file (#3161). It has no target or error budget below.
 
 ---
 
 ## CloudWatch Dashboard Widgets
 
-The `life-platform-ops` dashboard includes an "SLO Health" section with:
-
-1. **SLO Status Panel** — 4 metric widgets showing current alarm states
-2. **Daily Brief Success Rate** — 30-day graph of daily-brief errors
-3. **Source Freshness Trend** — 30-day graph of stale source count
-4. **MCP Error Rate** — 7-day graph of MCP error count
-5. **AI Failure Trend** — 7-day graph of Anthropic API failures
+**Drift found 2026-10-17:** earlier editions of this page described an "SLO Health" section on `life-platform-ops` (status panel, daily-brief success rate, MCP error rate, AI failure trend). `cdk/stacks/monitoring_dashboards.py` defines no such section. What `life-platform-ops` actually carries is: ingestion freshness counts (including `StaleSourceCount`), per-source ingestion Lambda errors and invocations, compute-pipeline duration and errors (which includes `daily-brief`), AI output tokens and projected spend, the budget tier, and ingestion DLQ depth. There is no widget for `AnthropicAPIFailure`, MCP errors or an SLO alarm-state panel; the SLO alarms are read from CloudWatch alarms directly.
 
 ---
 
 ## SLO Review Cadence
 
-- **Weekly:** Glance at ops dashboard SLO section during Weekly Digest review
+- **Weekly:** Glance at the SLO alarm states (CloudWatch alarms) and the ops dashboard during Weekly Digest review
 - **Monthly:** Review any SLO breaches in Monthly Digest (future integration)
 - **Quarterly:** Review whether SLO targets need adjustment based on platform growth
 
@@ -134,4 +134,4 @@ Point-in-time ALARM snapshots drift (the 2026-05-19 snapshot that used to sit he
 
 ---
 
-**Verified:** 2026-05-19 (V2 audit operational sweep)
+**Verified:** 2026-10-17 (re-verified against the alarm declarations; the May 2026 V2 audit sweep remains the origin of the historical snapshot above)

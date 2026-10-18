@@ -1,6 +1,6 @@
 # The Life Platform Engineering Wiki
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 > **Sources of truth:** this directory's files; counts auto-synced by `deploy/sync_doc_metadata.py`
 
 This is the home page of the platform's documentation. Everything lives **in this repo**
@@ -83,18 +83,19 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | Doc | |
 |---|---|
 | [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md) | The durable why — purpose, thesis, audiences, success bar |
-| [DECISIONS.md](DECISIONS.md) | **ADRs (001–161)** — every significant decision with rationale; index auto-generated |
+| [DECISIONS.md](DECISIONS.md) | **ADRs (001–163)** — every significant decision with rationale; index auto-generated |
 | [CONVENTIONS.md](CONVENTIONS.md) | **The load-bearing reflexes** (one-bundle rule #781, deploy-from-main, squash-drift, CI gate ordering, asset-staging trap) + drift-discovery commands |
 | [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) | **The "definition of an A" for craft** — the 10-dimension rubric + naming/size/gate standards `/review craft` grades against |
 | [OPERATING_DISCIPLINE.md](OPERATING_DISCIPLINE.md) | **The work-adjudication + session reflexes** — verifying a finding, closing an issue, judging an epic, concurrent lanes, watchers; plus the dated memory-corpus audit and the residual gap list (#2848) |
 | [OPERATING_KNOWLEDGE_LEDGER.md](OPERATING_KNOWLEDGE_LEDGER.md) | **Where every memory-corpus rule is homed** — one row per file in the operator's Claude-memory index: type, repo home (or the reason it has none), status; guarded by `tests/test_operating_knowledge_ledger_2848.py` (#2848) |
 | [CONTINUITY.md](CONTINUITY.md) | What lives outside `docs/` and how a human reads/exports it |
 | [PHASE_TAXONOMY.md](PHASE_TAXONOMY.md) | What resets vs. persists at experiment restart (ADR-077) |
-| [IDEMPOTENCY.md](IDEMPOTENCY.md) | **The replay census** — every external side effect (28 SES senders, the live webhook, site writes, write-MCP) × what happens if it runs twice; the three replay vectors and which guard covers which (DIL-025) |
+| [IDEMPOTENCY.md](IDEMPOTENCY.md) | **The replay census** — every external side effect (every SES sender, the live webhook, site writes, write-MCP) × what happens if it runs twice; the three replay vectors and which guard covers which (DIL-025) |
 | [OPERATOR_SUBSTRATE_SPIKE.md](OPERATOR_SUBSTRATE_SPIKE.md) | The resident-operator substrate decision (#2849): composite — cloud routines for scheduled judgment, Actions+Bedrock for repo work, AgentCore declined per ADR-103; rent per leg, Architect leg live |
 | [NEW_SIGNAL_PLAYBOOK.md](NEW_SIGNAL_PLAYBOOK.md) | A new metric/device/source lands through one ordered checklist — absence semantics + privacy tier first (ADR-154, from the BodyScan 2 spike #2782) |
 | [DATA_GOVERNANCE.md](DATA_GOVERNANCE.md) | PII classification + retention |
 | [PERMANENCE_CONTRACT.md](PERMANENCE_CONTRACT.md) | **The written commitment** — nightly public archive, its admission gate, the continuity clock, and what none of it promises (#1400) |
+| [FRONTIER.md](FRONTIER.md) | **The parked quantified-life register** — the folded Roadmap vision (#3943) plus the variant-slot (#4423) and conditioning-stage (#4424) training programs, scores and acceptance verbatim; one promotion per cycle (ADR-099 amendment 2026-08-22) |
 | [PROPORTIONALITY.md](PROPORTIONALITY.md) | The complexity-posture ledger — posture, rent, demote trigger per subsystem (ADR-103/144) |
 | [SECURITY.md](SECURITY.md) | Threat model, defense layers, accepted risks |
 | [CI_CONTINUE_ON_ERROR_REGISTRY.md](CI_CONTINUE_ON_ERROR_REGISTRY.md) | **Every `continue-on-error` site in `.github/workflows/`, with a dated verdict** — covered / accepted / residual / resolved; a swallowed step reports `success`, which is how one build shipped with no SBOM while both steps read green (3848). Guarded by `tests/test_continue_on_error_registry_3848.py` |
@@ -128,14 +129,17 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | `specs/` | Dated feature specs (shipped — historical record; includes the 2026-06-21 page-redesign series) |
 | `archive/` | Superseded designs, plans, and launch artifacts (incl. the v4 design quartet, V2 audit) |
 | `reviews/` | Dated board/consultancy reviews. **The external acquisition-diligence line (epic [#3042](https://github.com/averagejoematt/life-platform/issues/3042)) is the current one:** [DILIGENCE_2026-08-23_RESPONSE](reviews/DILIGENCE_2026-08-23_RESPONSE.md) is the per-finding register (52 findings → CONFIRMED / STALE / WRONG / PRICED, with live evidence per row); [REGRADE_BRIEF_2026-08-25](reviews/REGRADE_BRIEF_2026-08-25.md) is what an external assessor is handed to re-score it; `scripts/diligence_verify.py` is the acceptance instrument (the report's §15 playbooks, scripted against live state — three verdicts, `UNVERIFIED` never folded into `PASS`) and `reviews/evidence/` holds its dated bundles. Also: [R21](reviews/R21_BACKLOG.md), the 2026-07-06 definitive review; [FRONTIER_REVIEW_2026-07-18](reviews/FRONTIER_REVIEW_2026-07-18.md), the quantified-life strategy review → label `review:frontier-2026-07-18`. [PLATFORM_PRODUCT_REVIEW_2026-07](reviews/PLATFORM_PRODUCT_REVIEW_2026-07.md) also holds the **parked register** — the gated/won't-do/owner-capture items the ADR-099 backlog deliberately does not file as issues (ADR-101); pointer issue [#423](https://github.com/averagejoematt/life-platform/issues/423), never duplicated here |
-| `design/` | Current design assets + the portrait runbook |
+| `design/` | Current design assets + the portrait runbook; `design/v7/` and `design/v8/` hold the prototypes and the v8 kit |
+| `engines/` | The algorithm pages (SCORING · CHARACTER · READINESS · HYPOTHESIS · COACH_STANCE), indexed in the Reference table |
+| `methods/` | Method notes behind public claims (currently [TIME_AFFLUENCE_PROXY.md](methods/TIME_AFFLUENCE_PROXY.md)) |
+| `_lint/` | CI lint data — `tombstones.txt`, the retired-concept list `scripts/check_doc_tombstones.py` scans for |
 | `design-review/` | The paste-ready design-review prompt kit (current tooling) |
 | `coaching/` | Coaching *system* docs (deliberately public); owner-private coaching material lives at the S3 owner prefix — see [coaching/README.md](coaching/README.md) (#3043) |
 | `content/` | Content-production checklists (build dispatches etc.) + [REDDIT_PLAYBOOK.md](content/REDDIT_PLAYBOOK.md) — the manual Reddit operating procedure (**do-not-automate**, #1625) |
 | `briefs/` | Dated feature briefs (historical) |
 | `audits/` · `v2-audits/` · `rca/` | Dated audit + post-mortem records |
 | `restart/` | **Machine-written** reset-pipeline run reports (the restart scripts write here — do not relocate) |
-| `site-reviews/` | Dated site reviews |
+| `site-reviews/` | Dated site reviews. **Latest: [SITE_REVIEW_2026-10-18](site-reviews/SITE_REVIEW_2026-10-18.md)** — the twelve v8 kit pages graded by eight independent graders + two verifiers, fixed once (PR #4988), re-graded by a fresh pair; letters in [`site_grades_2026-10-18.json`](site-reviews/site_grades_2026-10-18.json). Prior: [SITE_REVIEW_2026-06-21](site-reviews/SITE_REVIEW_2026-06-21.md) (the v4 four-door full-site pass, superseded by the rebuild) |
 | `qa/` | QA gate ledgers ([SURFACE_DRIFT_EXEMPTIONS.md](qa/SURFACE_DRIFT_EXEMPTIONS.md) — the #1454 surface-drift gate's dated exemption ledger) |
 
 ---
@@ -147,6 +151,6 @@ Four layers keep these pages true (full contract: [CONVENTIONS.md](CONVENTIONS.m
 1. **Generated facts** — counts/versions are never hand-typed in canonical pages; `deploy/sync_doc_metadata.py` discovers them from source (AST) and `--check` fails CI when a literal drifts — including when a sync rule itself stops matching. `MCP_TOOL_CATALOG.md` and the ADR index are fully generated (`scripts/generate_mcp_tool_catalog.py`, `scripts/generate_adr_index.py`).
 2. **Mechanical CI lint** — dead-link check, retired-concept (tombstone) scan, and index-coverage check run on every docs push (`docs-ci.yml`) and inside the main pipeline's lint job.
 3. **Process gates** — the session-wrap skill has a **doc-impact sweep gate**: every shipped change either updates the affected pages or records an explicit "docs: none needed — <reason>"; silent omission is not an outcome. New pages follow the checklist in CONVENTIONS §7 (status header, index entry here, checkers green).
-4. **Periodic verification** — each canonical page carries a `Verified:` date in its status header; the index checker reports pages unverified for >90 days.
+4. **Periodic verification** — each canonical page carries a `Verified:` date in its status header; the index checker reports pages unverified for >90 days (advisory) and fails a deploy-surface doc unverified for >180 days.
 
 **Adding a page?** Flat in `docs/` if canonical, `specs/` if a dated spec, `archive/` if superseded. Give it the status header, add it to this index, run the three checkers. That's the whole process.

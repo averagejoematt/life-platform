@@ -243,21 +243,6 @@ def rewrite(html: str, self_path: str | None = None):
     return html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted, lf_changed, head_changed, gloss_changed
 
 
-# #4588: a page built from the living-front-page kit (`<body data-ck-page="...">`, the
-# /next/v8/ pages and, after the cut-over, `/`, `/start/`, `/story/`, `/coaches/`) is
-# hand-authored and carries none of the v4 chrome or proof blocks. A v4 generator that
-# would overwrite or inject into one of those files asks this first and leaves it alone.
-KIT_PAGE_MARK = 'data-ck-page="'
-
-
-def is_kit_page(path) -> bool:
-    """True when the file at `path` exists and is a kit page (#4588)."""
-    if not os.path.isfile(path):
-        return False
-    with open(path, encoding="utf-8") as fh:
-        return KIT_PAGE_MARK in fh.read()
-
-
 def write_page(path, html: str) -> str:
     """Normalize a generator's HTML through `rewrite` and write it. Returns the
     normalized text.

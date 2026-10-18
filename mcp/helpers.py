@@ -100,9 +100,10 @@ def warm_start_seed(daily_values_chrono, days=7):
 
 
 # ── HR zone classification (ONE definition, #2221) ────────────────────────────
-# The platform's canonical 5-zone model by % of max HR, published by
-# `mcp/tools_correlation.py::tool_get_zone2_breakdown` (the tool `get_zone2_breakdown`
-# is registered to) and pinned by `tests/api_schemas/api_zone2.json`. It lives here
+# The platform's 5-zone INTENSITY model by % of max HR (the periodization view's
+# easy / moderate / hard split and the load model's Z1 ceiling). Since #4627 Zone 2
+# MINUTES are not classified from it: they are each device's own stored time-in-zone,
+# `training.zone2_minutes`, which `get_zone2_breakdown` publishes. It lives here
 # because `mcp/tools_training.py`'s periodization view used to carry a SECOND,
 # incompatible definition (`avg_hr <= 70% of max` == Zone 2, which swallowed Zone 1 and
 # below and used an inclusive upper bound), so the two tools published different

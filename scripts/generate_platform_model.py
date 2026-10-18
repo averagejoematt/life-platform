@@ -186,7 +186,11 @@ def extract_lambdas() -> dict[str, dict]:
                     record[field] = v.value
             sched = kwargs.get("schedule")
             if sched is not None:
-                record["schedules"].append(_schedule_of(sched, consts))
+                entry = _schedule_of(sched, consts)
+                tz = kwargs.get("schedule_timezone")  # #4284: a zoned (EventBridge Scheduler) schedule
+                if isinstance(tz, ast.Constant) and isinstance(tz.value, str) and entry:
+                    entry["tz"] = tz.value
+                record["schedules"].append(entry)
             an = kwargs.get("alarm_name")
             if isinstance(an, ast.Constant) and isinstance(an.value, str):
                 record["declared_alarm"] = an.value
@@ -309,15 +313,20 @@ def extract_schedules(lambdas: dict[str, dict]) -> list[dict]:
     rows: list[dict] = []
     for name, rec in sorted(lambdas.items()):
         for sched in rec["schedules"]:
-            rows.append(
-                {
-                    "lambda": name,
-                    "stack": rec["stack"],
-                    "expr": sched["expr"],
-                    "resolution": sched["resolution"],
-                    "utc": _utc_of(sched["expr"]),
-                }
-            )
+            row = {
+                "lambda": name,
+                "stack": rec["stack"],
+                "expr": sched["expr"],
+                "resolution": sched["resolution"],
+                "utc": _utc_of(sched["expr"]),
+            }
+            if sched.get("tz"):
+                # #4284: a zoned (EventBridge Scheduler) schedule is a wall-clock time in its zone, NOT a
+                # UTC instant — its UTC hour moves with DST, so `utc` is None and `local` carries HH:MM.
+                row["tz"] = sched["tz"]
+                row["local"] = row.pop("utc")
+                row["utc"] = None
+            rows.append(row)
     rows.sort(key=lambda r: (r["utc"] is None, r["utc"] or "", r["lambda"]))
     return rows
 
@@ -844,7 +853,7 @@ def build_model() -> dict:
                     "unioned with the KNOWN_MUST_AGREE_PAIRS floor and ratcheted by ENROLLED_FLOOR"
                 ),
                 "privacy": "lambdas/privacy/field_tiers.py SOURCE_TIERS + FIELD_TIERS (#2803/#3045, ADR-155 consent) — loaded, not re-typed",
-                "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron",
+                "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead",
                 "cost_surface": (
                     "#3374 R1 — the five cost-bearing population counts: alarms + schedules from this model's own planes; "
                     "emf_namespaces from deploy/emf_namespace_ledger.LEDGER (AST), secrets from "
@@ -921,7 +930,7 @@ def render_doc(model: dict) -> str:
     add("")
     add("## 1. Scheduled Lambdas (CDK ground truth)")
     add("")
-    add("Crons are the CDK `schedule=` strings (fixed UTC, no DST drift); `resolved` = an")
+    add("Crons are the CDK `schedule=` strings (fixed UTC, no DST drift — except a schedule marked with its zone, #4284); `resolved` = an")
     add("f-string schedule resolved through module constants; `constructed` = built from a")
     add("`Schedule.cron(...)` keyword form. Multi-schedule lambdas show every schedule.")
     add("")
@@ -934,7 +943,7 @@ def render_doc(model: dict) -> str:
         # crons in ONE cell — check_doc_facts's one-row-one-cron scan skips
         # multi-cron lines by design, and its per-block cmap mis-attributes
         # multi-schedule functions (see the #1205 parser's own comments).
-        exprs = " + ".join(f"`{s['expr']}`" for s in rec["schedules"])
+        exprs = " + ".join(f"`{s['expr']}`" + (f" ({s['tz']}, not UTC)" if s.get("tz") else "") for s in rec["schedules"])
         resolutions = ", ".join(s["resolution"] for s in rec["schedules"])
         add(f"| `{name}` | {rec['stack']} | {exprs} | {resolutions} |")
     add("")
@@ -1075,7 +1084,7 @@ def render_doc(model: dict) -> str:
         f"- Privacy: {counts.get('privacy_sources_owner_only', 0)} owner-only + {counts.get('privacy_sources_owner_published', 0)} owner-published sources; "
         f"{counts.get('privacy_fields_owner_only', 0)} owner-only + {counts.get('privacy_fields_owner_published', 0)} owner-published fields — non-default entries only"
     )
-    add(f"- Schedules: {counts.get('schedules', 0)} (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not")
+    add(f"- Schedules: {counts.get('schedules', 0)} (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)")
     non_census = model["meta"].get("non_census_families", [])
     if non_census:
         add(

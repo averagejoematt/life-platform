@@ -699,7 +699,7 @@
       "evidence_summary": "WHO + Attia: 150 min/week moderate cardio is the longevity minimum. Zone 2 specifically improves mitochondrial function.",
       "board_recommender": "Max Reyes",
       "board_quote": "Zone 2 is boring. It's also the single most important exercise modality for longevity.",
-      "protocol": "150+ minutes per week in HR Zone 2 (roughly 60-70% max HR). Can be walking, cycling, rowing, swimming. Track via Whoop/Strava.",
+      "protocol": "150+ minutes per week in HR Zone 2 (each device's own Zone 2, counted as minutes actually in the zone). Can be walking, cycling, rowing, swimming. Track via Whoop/Strava.",
       "status": "backlog",
       "evidence_scope": "literature"
     },

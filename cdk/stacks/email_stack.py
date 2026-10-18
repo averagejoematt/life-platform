@@ -111,7 +111,11 @@ class EmailStack(Stack):
             function_name="daily-brief",
             handler="emails.daily_brief_lambda.lambda_handler",
             source_file="lambdas/emails/daily_brief_lambda.py",
-            schedule="cron(0 17 * * ? *)",
+            # #4284 (owner ruling, docket #4644 Q42): the brief keeps its PACIFIC wall-clock time
+            # across the DST change — 10:00 PDT (17:00 UTC) until 2026-11-01, 10:00 PST (18:00 UTC)
+            # after. Every producer it reads runs 16:30-16:55 UTC, i.e. before 10:00 on both sides.
+            schedule="cron(0 10 * * ? *)",
+            schedule_timezone="America/Los_Angeles",
             timeout_seconds=900,
             memory_mb=768,
             environment=_email_env,

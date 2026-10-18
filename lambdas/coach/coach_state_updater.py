@@ -128,7 +128,7 @@ def _parse_confidence(raw) -> float:
 # spec building, timeframe→window mapping, subdomain inference, and the record
 # builder that decides status/gradeable_by (qualitative → "observation", never
 # "pending"). Re-exported because the suite pins the spec builder off this module.
-from coach.metric_trailing_series import point_tolerance as _point_tolerance  # noqa: E402  (#3551: level-claim tolerance)
+from coach.metric_trailing_series import point_tolerance as _point_tolerance, source_items as _source_items  # noqa: E402  (#3551, #4630)
 from coach.prediction_emission import (  # noqa: E402,F401  (F401: _build_prediction_eval_spec/_prediction_window_days are the #3046 contract's re-exports; the loop routes through _resolve_eval_spec since #3551)
     POINT_TYPE as _POINT_TYPE,  # #3551
     build_prediction_eval_spec as _build_prediction_eval_spec,
@@ -184,28 +184,16 @@ def _metric_has_recent_data(metric_key, liveness_cache):
         # window), not the OUTPUT# frame — off by an hour changes it by <=1 day.
         end = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         start = (datetime.now(timezone.utc) - timedelta(days=_LIVENESS_LOOKBACK_DAYS)).strftime("%Y-%m-%d")
-        kwargs = {
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": f"USER#{USER_ID}#SOURCE#{source}",
-                ":s": "DATE#" + start,
-                ":e": "DATE#" + end + "~",
-            },
-        }
         n = 0
-        while True:
-            resp = table.query(**with_phase_filter(kwargs, include_pilot=True))  # #2023: cross-phase liveness
-            for item in resp.get("Items", []):
-                val = item.get(base)
-                if val is not None:
-                    try:
-                        float(val)
-                        n += 1
-                    except (TypeError, ValueError):
-                        pass
-            if "LastEvaluatedKey" not in resp:
-                break
-            kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+        # #2023: cross-phase liveness; #4630: a resolved pseudo-source reads its facet's sources.
+        for item in _source_items(table, USER_ID, source, start, end):
+            val = item.get(base)
+            if val is not None:
+                try:
+                    float(val)
+                    n += 1
+                except (TypeError, ValueError):
+                    pass
         alive = n >= _LIVENESS_MIN_POINTS
     except Exception as e:
         logger.warning("Metric liveness check failed for %s (%s) — failing open: %s", metric_key, source, e)

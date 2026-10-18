@@ -144,10 +144,7 @@ V5_DOOR: dict[str, str] = {
 # Old URLs whose top segment is now a LIVE v5 door (or is superseded by a manual 301
 # below) — never emit a scan-derived redirect for these: /data/ and /protocols/ serve
 # the new doors themselves, and /mind/ has a manual 301 to /data/reading/ (#313).
-# #4588 (the living-front-page cut-over): /start/ and /coaches/ are live kit pages again
-# (site/start/, site/coaches/), so their old scan-derived 301s (/start/ -> /, /coaches/ ->
-# /method/board/) would shadow them at the edge. Both URLs keep returning 200.
-SCAN_SKIP_URLS = {"/data/", "/protocols/", "/mind/", "/start/", "/coaches/"}
+SCAN_SKIP_URLS = {"/data/", "/protocols/", "/mind/"}
 
 
 def original_url(html_path: Path) -> str:

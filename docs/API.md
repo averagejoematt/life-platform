@@ -1,8 +1,8 @@
 # Public API Reference
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-**Last updated:** 2026-07-12 (added `/api/routine`; NB the endpoint list is a curated subset last fully verified 2026-05-19 — newer endpoints like `/api/presence` are documented in their shipping PRs)
+**Last updated:** 2026-10-17 (re-verified against `ROUTES` / `_SIMPLE_ROUTES` in `lambdas/web/site_api_lambda.py`: removed seven documented endpoints that no handler serves, corrected `changes-since`, the AI-endpoint limits and the telemetry names; the data-endpoint list is still a curated subset — `ROUTES` is the complete list)
 
 > The public-facing HTTP API behind `averagejoematt.com`. Two Lambda functions back it: `life-platform-site-api` (data) and `life-platform-site-api-ai` (AI endpoints). All endpoints route via CloudFront → Lambda Function URLs.
 
@@ -25,61 +25,67 @@ All responses: `Content-Type: application/json` (except OG image endpoints).
 | Endpoint class | Auth |
 |---|---|
 | Read-only data endpoints (`/api/vitals`, `/api/labs`, etc.) | None — public |
-| Subscriber-gated endpoints | `X-Subscriber-Token` header (issued at `/api/subscribe/confirm`) |
-| AI endpoints (`/api/ask`, `/api/board_ask`) | Per-IP rate limit (no auth header) |
+| Subscriber-gated endpoints | `X-Subscriber-Token` header (checked via `/api/verify_subscriber`) |
+| AI endpoints (`/api/ask`, `/api/board_ask`, `/api/explain`) | Per-IP rate limit; `/api/ask` raises its limit for a valid `X-Subscriber-Token` |
 | Subscribe / unsubscribe | Email-based double opt-in (stored confirm token) / signed HMAC unsubscribe token — no plaintext email in URLs (#3044) |
 
 ---
 
 ## Data endpoints — `life-platform-site-api`
 
+The authoritative list is the `ROUTES` dict plus `_SIMPLE_ROUTES` and the inline `if path == ...` branches in `_dispatch_route`
+(all in `lambdas/web/site_api_lambda.py`, handlers in the `lambdas/web/site_api_*.py` modules). Cache TTLs are each handler's
+`cache_seconds` (success envelope `_ok` in `site_api_common.py`); responses carry a `_meta` block (`generated_at`, `served_at`,
+`cache_seconds`, optional `content_as_of` / `degraded`). The endpoints below are the curated, stable subset.
+
 ### `GET /api/vitals`
-Returns latest vital signs across all sources.
-**Cache:** 60s
-**Response:** `{ "hrv": 45.3, "recovery_score": 65, "rhr": 58, "weight_lbs": 185, "updated_at": "2026-05-19" }`
+Latest vital signs across sources; `?date=YYYY-MM-DD` returns a past day.
 
 ### `GET /api/labs`
-Returns latest lab results + 90-day trend deltas.
-**Cache:** 1h
-**Response shape:** `{ "panels": [...], "deltas": {...}, "updated_at": "..." }`
+Latest lab results and trend deltas.
 
-### `GET /api/observatory_week`
-Returns 7-day rolling summary including coach narratives.
-**Cache:** 5 min
-**Response:** large object with `coaches`, `metrics`, `events`
+### `GET /api/observatory_week?domain=`
+Rolling-week summary for one observatory domain (default `sleep`).
 
-### `GET /api/changes-since?days=N`
-Returns metric deltas over the last N days. Default N=7.
+### `GET /api/changes-since?ts=EPOCH`
+Notable changes since the given epoch-seconds timestamp. `ts` is required: missing returns 400 `Missing ts parameter`, a non-integer returns 400 `Invalid ts parameter`. (An earlier version of this doc described `?days=N`; no such parameter exists.)
 
 ### `GET /api/status` + `/api/status/summary`
-Pipeline health status. `/api/status` is detailed (used by status page); `/api/status/summary` is small (footer dot).
-**Cache:** 60s. CE cost data cached 24h (V2 P5.3).
+Pipeline health status. `/api/status` is detailed (status page); `/api/status/summary` is small (footer dot).
 
 ### `GET /api/timeline`
-Timeline of significant events: weight milestones, lab updates, chronicle posts.
-
-### `GET /api/board_of_directors`
-Returns the AI persona panel info (names, roles, current contributions).
-
-### `GET /api/journal_entries`
-Subscriber-only. Recent journal entries (anonymized).
+Timeline of significant events.
 
 ### `GET /api/predictions`
-Coach predictions log: confirmed/refuted/pending with hit-rate stats.
+Coach predictions log. Query: `?status=&coach_id=&limit=`.
 
 ### `GET /api/discoveries`
-Notable findings from the platform's analysis.
+Active hypotheses, inner life and AI findings.
 
 ### `GET /api/experiments`
-List of active + completed self-experiments.
+Active and completed self-experiments (see also `/api/experiment_library`, `/api/experiment_detail`).
 
 ### `GET /api/challenges`
-List of active challenges + leaderboard.
+Active challenges (see also `/api/challenge_catalog`, `/api/current_challenge`).
 
 ### `GET /api/routine`
-Current prescribed training block for the /now/ levers station (added 2026-07-12, #1066). Counts-only projection — block phase, archetype/variant, exercise/set counts, prescription dates; never exercise names, loads, notes, or Hevy ids. Cache 900s.
+Current prescribed training block for the /now/ levers station (#1066). Counts-only projection — block phase, archetype/variant, exercise/set counts, prescription dates; never exercise names, loads, notes, or Hevy ids.
 
-(Total: 60+ data endpoints. See `lambdas/site_api_lambda.py` `_SIMPLE_ROUTES` and `ROUTES` dispatch tables for the complete list.)
+### `GET /api/healthz`
+Lightweight health check, no PII, no data access (#3561); polled by `deploy/deploy_convergence.py`.
+
+### Other families (see `ROUTES` for each name)
+The remaining routes are grouped by prefix or purpose, and are not individually documented here:
+
+- observatory and pillar pages: `/api/*_overview`, `/api/nutrition_overview`, `/api/training_overview`, `/api/sleep_*`, `/api/glucose`, `/api/zone2`, `/api/vitals_depth`
+- coaches and the panel: `/api/coaches`, `/api/coach_*`, `/api/calls`, `/api/panel_ledger`, `/api/weekly_priority`, `/api/coaching-dashboard`
+- the front page and journey: `/api/edition`, `/api/journey*`, `/api/character*`, `/api/pulse*`, `/api/fingerprint`, `/api/wall`, `/api/presence`
+- platform self-description: `/api/platform_stats`, `/api/source_freshness`, `/api/methods`, `/api/receipts`, `/api/inference_receipt`
+- reading and social membrane: `/api/reading_*`, `/api/constellation`, `/api/broadcast`, `/api/membrane`, `/api/ladder_counts`, `/api/cohort_strip`
+
+**Not served (removed from this doc 2026-10-17):** `/api/board_of_directors`, `/api/journal_entries`, `/api/follows`, `/api/findings`,
+`POST /api/experiments/{id}/vote`, `POST /api/challenges/{id}/join`, `POST /api/challenges/{id}/checkin` — none is in `ROUTES`,
+`_SIMPLE_ROUTES` or any inline branch. The real write doors are listed under "Interactive endpoints".
 
 ---
 
@@ -88,15 +94,18 @@ Current prescribed training block for the /now/ levers station (added 2026-07-12
 ### `POST /api/ask`
 Q&A with health data context.
 **Body:** `{ "question": "string" }`
-**Rate limit:** 5/hr anonymous, 20/hr subscriber (per IP)
-**Response:** `{ "answer": "string", "remaining": <int> }`
-**Token metrics:** emits `LifePlatform/AI` namespace with `Endpoint=api_ask` dimension (V2 follow-up)
+**Rate limit:** 5/hr anonymous, 20/hr with a valid subscriber token (per IP, DynamoDB-backed)
+**Response:** `{ "answer": "string", "remaining": <int> }`; 429 `{ "error": "Rate limit exceeded...", "remaining": 0 }` with `Retry-After: 3600`
+**Token metrics:** emits `LifePlatform/AI` namespace dimensioned by `LambdaFunction` and `Endpoint`
 
 ### `POST /api/board_ask`
-6-persona board panel answers.
-**Body:** `{ "question": "string" }`
-**Rate limit:** 5/IP/hr (each call makes up to 6 Haiku calls)
-**Response:** `{ "responses": { "dr_okafor": "...", "dr_park": "...", ... } }`
+Coach panel answers (opening turn) or a follow-up with the same coach.
+**Body:** `{ "question": "string", "personas": [coach ids] }` (default three coaches); a follow-up sends `{ "session_token": "...", "persona": "..." }` instead
+**Rate limit:** a fan-out budget of `BOARD_RATE_LIMIT` (7) tokens/IP/hr in `lambdas/web/site_api_ai_lambda.py` — one token per persona, so a full board costs the whole hour; fail-closed
+**Response:** `{ "responses": {...}, "grounding": {...}, "session_token": "..." }` (the token is minted for follow-ups: bounded TTL, `MAX_FOLLOWUPS`)
+
+### `POST /api/explain`
+One-tap server-grounded page explainer. **Body:** `{ "surface": "string" }`. **Response:** `{ "explanation", "surface", "remaining" }`. Same AI Lambda, never cached (#403).
 
 ---
 
@@ -124,41 +133,42 @@ One-click unsubscribe (#3044). `t` is a signed short-lived token
 validity — no plaintext email in any URL). Anonymize-at-unsubscribe: the same write
 flips `status=unsubscribed` AND redacts the plaintext email, keeping only the sha256
 suppression hash. A GET without a valid token cannot mutate subscription state.
-Legacy pre-token `email=<plaintext>` links are honored (logged) until **2026-09-22**,
-then rejected. Redirects to `/subscribe/confirm/?unsubscribed=true` (or
+Legacy pre-token `email=<plaintext>` links were honored (logged) until **2026-09-22**
+and are now rejected (`LEGACY_EMAIL_PARAM_SUNSET` in `lambdas/web/email_subscriber_lambda.py`). Redirects to `/subscribe/confirm/?unsubscribed=true` (or
 `?error=invalid_token`).
 
 ---
 
-## Interactive endpoints (subscriber-only)
+## Interactive endpoints (write doors)
 
-### `POST /api/experiments/{id}/vote`
-Vote on a self-experiment.
-**Body:** `{ "vote": "useful" | "not_useful" }`
-**Auth:** Subscriber token
+The only writes the site API makes (CLAUDE.md: the site API is primarily read-only); each is a `_SIMPLE_ROUTES` entry with the allowed methods shown. Core data queries never write.
 
-### `POST /api/challenges/{id}/join`
-Join a challenge.
-
-### `POST /api/challenges/{id}/checkin`
-Daily challenge check-in.
-
-### `POST /api/follows`
-Follow a metric for notifications.
-
-### `POST /api/findings`
-User-submitted finding (gets reviewed, may surface on board).
+| Route | Methods | Purpose |
+|---|---|---|
+| `/api/experiment_vote` | POST | Vote on a self-experiment |
+| `/api/experiment_follow` | POST | Follow an experiment |
+| `/api/experiment_suggest` | POST | Suggest an experiment |
+| `/api/challenge_vote`, `/api/challenge_follow`, `/api/challenge_checkin` | POST | Challenge vote / follow / daily check-in |
+| `/api/submit_finding` | POST | User-submitted finding (reviewed before it surfaces) |
+| `/api/page_feedback` | POST | The two-question reader door (#4182) |
+| `/api/predict_week` | GET, POST | Weekly prediction tallies / record a prediction |
+| `/api/cohort_submit` | POST | One-tap weekly cohort number |
+| `/api/replicate_certify` | POST | Replicator self-cert |
+| `/api/board_question` | POST | Submit a question to the board |
+| `/api/nudge` | POST | In-page nudge click tracking |
+| `/api/ritual_log` | GET, OPTIONS | One-tap evening ritual |
+| `/api/morning_note` | GET, POST | Served note (GET); owner write (POST) |
 
 ---
 
 ## Error responses
 
-All errors return JSON with `statusCode` and `error` keys:
+Errors return JSON with an `error` message (plus `request_id` when present); the HTTP status is the response status, not a body key. Rate-limited AI responses also carry a `Retry-After` header (3600 on `/api/ask`):
 
 ```json
 {
-  "error": "Rate limit exceeded",
-  "retry_after": 1800
+  "error": "Rate limit exceeded.",
+  "remaining": 0
 }
 ```
 
@@ -170,7 +180,7 @@ All errors return JSON with `statusCode` and `error` keys:
 | 404 | Not found |
 | 429 | Rate limit |
 | 500 | Server error |
-| 503 | AI service unavailable (Anthropic-side issue, auto-degraded) |
+| 503 | AI service unavailable or paused (budget tier 3, ADR-125) |
 
 ---
 
@@ -178,37 +188,35 @@ All errors return JSON with `statusCode` and `error` keys:
 
 | Endpoint type | TTL | Where |
 |---|---|---|
-| Vitals/labs/observatory | 60s-1h | CloudFront + in-Lambda response |
-| Cost/budget data | 24h (V2 P5.3) | In-Lambda `_cost_cache` |
-| Public stats (homepage stats) | 5min | CloudFront edge cache |
-| AI responses | NEVER cached (`Cache-Control: no-store`) | — personalized |
-| OG images | 24h | CloudFront edge cache |
+| Data endpoints | per-handler `cache_seconds` (`Cache-Control: public, max-age=N, s-maxage=N`) | CloudFront + response header; the TTL is also echoed in `_meta.cache_seconds` |
+| Errors and write doors | `no-store` | — |
+| AI responses | NEVER cached (`private, no-store, must-revalidate`) | personalized |
+| OG images | `/og` behaviour, `default_ttl` in `cdk/stacks/web_stack.py` | CloudFront edge cache |
 
 ---
 
 ## Telemetry & observability
 
-- **Per-endpoint metrics:** `LifePlatform/SiteApi` namespace (request counts, latency)
-- **AI token usage:** `LifePlatform/AI` namespace dimensioned by `Endpoint=api_ask|api_board_ask|...`
-- **Rate-limit hits:** `LifePlatform/RateLimit` namespace
-- **CloudWatch dashboard:** `https://us-west-2.console.aws.amazon.com/cloudwatch/home#dashboards:name=LifePlatform`
+- **Per-endpoint metrics:** `LifePlatform/SiteAPI` namespace (`SITE_API_METRIC_NAMESPACE` in `lambdas/common/metric_namespaces.py`)
+- **AI token usage:** `LifePlatform/AI` namespace dimensioned by `LambdaFunction` and `Endpoint`
+- **Rate-limit hits:** `RateLimitHit` in the `LifePlatform/SiteApiAi` namespace, dimension `Endpoint`
+- **CloudWatch dashboard:** `life-platform-site-api-dashboard` (`cdk/stacks/monitoring_dashboards.py`), us-west-2
 
 ---
 
 ## Versioning & breaking changes
 
 - No formal versioning (single-user platform). Changes to response shape go in `docs/CHANGELOG.md`.
-- Endpoint deprecation: announced 30 days in advance via response `Sunset` header.
-- Subscribers notified by email of any auth-flow changes.
+- No `Sunset` header is emitted by any handler; a deprecation is a `docs/CHANGELOG.md` entry.
 
 ---
 
 ## Local development
 
-The site-api Lambda is `lambdas/site_api_lambda.py`. To test locally:
+The site-api Lambda is `lambdas/web/site_api_lambda.py` (handler `web.site_api_lambda.lambda_handler`). To test locally:
 ```bash
 # Direct python invoke (simulates Lambda)
-python3 -c "from lambdas.site_api_lambda import lambda_handler; \
+cd lambdas && python3 -c "from web.site_api_lambda import lambda_handler; \
     print(lambda_handler({'rawPath': '/api/vitals', 'requestContext': {'http': {'method': 'GET'}}}, None))"
 ```
 
@@ -222,4 +230,4 @@ cat /tmp/out.json
 
 ---
 
-**Verified:** 2026-05-19
+**Verified:** 2026-10-17

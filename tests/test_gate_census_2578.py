@@ -1103,11 +1103,23 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 260 -> 261 (2026-10-12, #4880): structural::test_function_length_guard_4880.py — the function-length
         # ratchet — arrives PROVEN via STRUCTURAL_HAND_PROOFS (151-line plant: 1 failed / 10 passed; recorded function +1 code
         # line: 1 failed / 10 passed; comment-only control and revert: 11 passed). Measured locally: 785 {261, 512, 7, 5}.
-        # Upper bound 261 -> 262 (2026-10-15, #4588 cut-over rehearsal, HELD): structural::test_v4_redirects_function.py —
-        # the every-existing-URL-still-resolves sweep — arrives PROVEN via GUARD_PROOFS in scripts/gate_census_proofs.py
-        # (M1 /start/ 301 left at the edge, M2 a cut-over page missing, M3 /story/about/ dropped: each 1 failed; reverted
-        # 1 passed). Id-set diff vs a `git archive` export of 09e18fd89: 784 {261, 511, 7, 5} -> 785 {262, 511, 7, 5}.
-        <= 262
+        # Upper bound 261 -> 262 (2026-10-15, #4632): guard::scripts/check_habit_registry_drift.py — the habit-registry drift
+        # check — arrives PROVEN via GUARD_PROOFS (M1 exit code and M2 bridge resolution each 1 failed / 15 passed; M3 the
+        # archived filter survived and is named unproven in the record). CI's pre-merge lane measured n=262 on 3cc971adf.
+        # Upper bound 262 -> 263 (2026-10-16, #4630): structural::test_steps_truth_resolver_4630.py — the steps
+        # truth-facet resolver + reader guard, STRUCTURAL_HAND_PROOFS record (facet swapped Apple-first: 8 failed;
+        # planted direct read: 1 failed; restored 16 passed).
+        # Upper bound 263 -> 264 (2026-10-17, #4604 merged onto the post-#4630 main): structural::test_reader_surface_sweep_4604.py — the
+        # start-count sweep over every served site/ page, the sitemap and the committed feed titles — arrives PROVEN via STRUCTURAL_PROOFS
+        # in scripts/gate_census_mutations.py (an untracked site/ page counting the restarts: baseline 11 passed | mutated 1 failed,
+        # 10 passed | reverted 11 passed). Enters exactly that id, leaves {}, unproven does NOT move.
+        # Upper bound 264 -> 265 (2026-10-17, #4632 follow-on merged onto the post-#4604 main): structural::test_habit_identity_4632.py — the AST
+        # sweep for a habitify_reading/day_name_for call that drops the day's habit_statuses + the seven reader call sites' rename fixture —
+        # arrives PROVEN via STRUCTURAL_HAND_PROOFS (six plants, each 1-2 failed; restored 18 passed). Enters exactly that id, leaves {}.
+        # Upper bound 265 -> 266 (2026-10-18, #4580 round 1 lane E): structural::test_edition_one_number_4580.py — the one-number /
+        # one-unit / one-sentence contracts over the edition wire — arrives PROVEN via STRUCTURAL_HAND_PROOFS (three plants, each
+        # 1 failed / 6 passed; restored 7 passed). Enters exactly that id, leaves {}.
+        <= 266
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

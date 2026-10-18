@@ -516,6 +516,16 @@ _COACH_VISION_READER_PY = (
     '    return table.query(KeyConditionExpression="pk = :pk", ExpressionAttributeValues={":pk": "USER#matthew#SOURCE#coach_vision"})\n'
 )
 
+# #4604: a served page whose copy counts the restarts — the owner ruled (2026-09-26) that no count of
+# earlier starts, attempts, cycles or resets appears on any reader surface. Planted as a NEW page in a
+# section nobody edited, so it proves the sweep reaches every served page, not a named list. The ordinal
+# is generic on purpose: the real count is never restated in the repo.
+_START_COUNT_PAGE_HTML = (
+    "<!DOCTYPE html>\n"
+    '<html lang="en"><head><meta charset="UTF-8"><title>census probe</title></head>\n'
+    "<body><p>census probe: this is his third restart.</p></body></html>\n"
+)
+
 # #3615 box 5: a page under site/ advertising a feed the hook registry DECLARES dark —
 # i.e. offering a reader a podcast subscription to a show with zero episodes. This is the
 # exact 11-page defect the gate was written for, planted as a NEW page so it also proves
@@ -667,6 +677,17 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         plants=(("site/_census_probe_3760.html", _LINKED_PRIVATE_ROUTE_HTML),),
         track=False,  # the guard rglobs site/ on disk, so an untracked file is in scope
+    ),
+    "structural::test_reader_surface_sweep_4604.py": MutationSpec(
+        gate_id="structural::test_reader_surface_sweep_4604.py",
+        target="tests/test_reader_surface_sweep_4604.py",
+        detects=(
+            "a served static page under site/ whose copy counts the restarts — the #4604 class: the #4538 "
+            "check ran only at the story door's chokepoints, so whole pages built around a cross-start "
+            "comparison stayed served and sitemap-advertised with no gate holding them"
+        ),
+        plants=(("site/_census_probe_4604/index.html", _START_COUNT_PAGE_HTML),),
+        track=False,  # the guard rglobs site/ on disk, so an untracked page is in scope
     ),
     "structural::test_coach_vision_isolation_3759.py": MutationSpec(
         gate_id="structural::test_coach_vision_isolation_3759.py",
@@ -1354,6 +1375,21 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "its real EVENT# rows). It judges SOURCE SHAPE, never live rows: whether an unstamped row "
         "actually exists is the qa-smoke inverse leg's question, not this gate's.",
         proved_on="2026-09-20",
+    ),
+    "structural::test_reader_surface_sweep_4604.py": _proof(
+        "structural::test_reader_surface_sweep_4604.py",
+        "ARMED 1/1 — baseline: 11 passed in 0.58s | mutated: 1 failed, 10 passed in 0.58s :: "
+        "test_no_served_page_sitemap_entry_or_chapter_title_renders_a_start_count | reverted: 11 passed in 0.56s",
+        "site/**/*.html on disk (rglob; site/legacy/ excluded — the frozen noindex archive, ADR-071), so an UNTRACKED "
+        "page is in scope: visible text plus the head/unfurl copy through story_checks.reader_surface (prose mode); "
+        "every site/sitemap.xml <loc> read as words (constructed mode) and held to the ledger; the chapter titles in "
+        "three committed feeds (scripts/proof_snapshot.json, tests/fixtures/kit_pages_4586/posts.json, "
+        "site/journal/blog.json; constructed mode). The held set (v4_chrome.HELD_UNTIL_RULED) is skipped by the count "
+        "sweep but held to noindex + out-of-sitemap, shrink-only against the frozen #4604 set. STILL INVISIBLE, stated "
+        "rather than papered over: a count a page renders from the API at runtime (most of the held pages do exactly "
+        "that), the live posts feed itself (only its committed copies are read), and any phrasing outside "
+        "reader_surface's five count shapes.",
+        proved_on="2026-10-12",
     ),
     "structural::test_coach_vision_isolation_3759.py": _proof(
         "structural::test_coach_vision_isolation_3759.py",

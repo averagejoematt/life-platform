@@ -68,7 +68,7 @@ def compute_habit_streaks(profile, yesterday_str, fetch_date):
     gap_days = 0
     consecutive_missing = 0
 
-    def _day_verdict(habit_names, is_weekday, habits_map, skip_post_training):
+    def _day_verdict(habit_names, is_weekday, habits_map, statuses, skip_post_training):
         """(any_reading, all_done) over the habits applicable on this day."""
         any_reading = False
         for h in habit_names:
@@ -79,8 +79,10 @@ def compute_habit_streaks(profile, yesterday_str, fetch_date):
             if skip_post_training and applicable == "post_training":
                 continue
             # #4362: resolved through the registry's `habitify_names` too, so a habit
-            # renamed in Habitify still reads under its registry key.
-            done = habitify_reading(habits_map, h, meta)
+            # renamed in Habitify still reads under its registry key. #4632: and by the
+            # vendor habit id / the ingest-derived aliases on the day's `habit_statuses`,
+            # so a rename mid-history is ONE streak, not a streak and an unobserved gap.
+            done = habitify_reading(habits_map, h, meta, statuses)
             if done is None:
                 continue  # no reading — not evidence of a miss
             any_reading = True
@@ -101,9 +103,10 @@ def compute_habit_streaks(profile, yesterday_str, fetch_date):
             continue
         consecutive_missing = 0
         habits_map = rec.get("habits", {})
+        statuses = rec.get("habit_statuses")  # #4632: id + aliases
 
         if tier0_habits and not t0_broken:
-            seen_t0, all_t0 = _day_verdict(tier0_habits, is_weekday, habits_map, False)
+            seen_t0, all_t0 = _day_verdict(tier0_habits, is_weekday, habits_map, statuses, False)
             if seen_t0:
                 if all_t0:
                     tier0_streak += 1
@@ -111,7 +114,7 @@ def compute_habit_streaks(profile, yesterday_str, fetch_date):
                     t0_broken = True
 
         if tier01_habits and not t01_broken:
-            seen_t01, all_t01 = _day_verdict(tier01_habits, is_weekday, habits_map, True)
+            seen_t01, all_t01 = _day_verdict(tier01_habits, is_weekday, habits_map, statuses, True)
             if seen_t01:
                 if all_t01:
                     tier01_streak += 1
@@ -119,7 +122,7 @@ def compute_habit_streaks(profile, yesterday_str, fetch_date):
                     t01_broken = True
 
         for v in vice_habits:
-            done = None if vice_broken[v] else habitify_reading(habits_map, v, registry.get(v))
+            done = None if vice_broken[v] else habitify_reading(habits_map, v, registry.get(v), statuses)
             if done is None:
                 continue
             if done >= 1:

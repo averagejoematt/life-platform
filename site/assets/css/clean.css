@@ -45,13 +45,19 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--ck-bg); color: var(--ck-fg); font-family: var(--ck-sans); font-size: var(--ck-fs-body); line-height: 1.55; -webkit-font-smoothing: antialiased; }
 a { color: inherit; }
-a:focus-visible { outline: 2px solid var(--ck-accent); outline-offset: 3px; border-radius: 4px; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--ck-accent); outline-offset: 3px; border-radius: 4px; }
+summary { cursor: pointer; list-style: none; font-weight: 500; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: " +"; color: var(--ck-faint); font-weight: 400; }
+details[open] > summary::after { content: " \2212"; }
 h1, h2, p, ul, ol { margin: 0; }
 h1 { font-size: var(--ck-fs-h1); line-height: 1.1; letter-spacing: -0.03em; font-weight: 600; text-wrap: balance; }
 h2 { font-size: var(--ck-fs-h2); line-height: 1.2; letter-spacing: -0.02em; font-weight: 600; text-wrap: balance; }
 
 /* The column */
-.ck-page { max-width: var(--ck-col); margin: 0 auto; padding-inline: 24px; padding-block: 0 96px; }
+.ck-page { max-width: var(--ck-col); margin: 0 auto; padding-inline: 24px; padding-block: 0 96px; position: relative; }
+.ck-skip { position: absolute; left: 24px; top: -200px; z-index: 10; padding: 10px 16px; border-radius: 999px; background: var(--ck-bg); text-decoration: none; box-shadow: inset 0 0 0 1.5px var(--ck-line); }
+.ck-skip:focus-visible { top: 12px; }
 .ck-main, .ck-section { display: flex; flex-direction: column; }
 .ck-main { gap: var(--ck-gap-section); }
 .ck-section { gap: var(--ck-gap-block); }
@@ -63,12 +69,13 @@ h2 { font-size: var(--ck-fs-h2); line-height: 1.2; letter-spacing: -0.02em; font
 .ck-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; }
 .ck-btn { background: var(--ck-fg); color: var(--ck-bg); text-decoration: none; font-weight: 500; padding: 13px 22px; border-radius: 999px; }
 .ck-btn--ghost { background: transparent; color: var(--ck-fg); box-shadow: inset 0 0 0 1.5px var(--ck-line); }
-.ck-link { text-decoration: underline; text-decoration-color: var(--ck-line); text-underline-offset: 4px; text-decoration-thickness: 2px; }
+/* The one underline: copy links, a summary, the front page's doors. */
+.ck-link, summary, .ck-num a > *, .ck-rows--deeper .ck-rows__key { text-decoration: underline; text-decoration-color: var(--ck-line); text-underline-offset: 4px; text-decoration-thickness: 2px; }
 
 /* 1. Edition header */
 .ck-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding-block: 20px; font-size: 0.95rem; }
-.ck-header__brand { font-weight: 600; letter-spacing: -0.01em; }
-.ck-header__back { text-decoration: none; color: var(--ck-soft); }
+.ck-header__brand { font-weight: 600; letter-spacing: -0.01em; font-size: inherit; line-height: inherit; text-wrap: wrap; }
+.ck-header__back { text-decoration: none; color: var(--ck-soft); display: inline-block; padding-block: 6px; margin-block: -6px; }
 .ck-header__day { color: var(--ck-soft); font-variant-numeric: tabular-nums; }
 .ck-who { display: flex; align-items: center; gap: 14px; }
 .ck-who img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; display: block; }
@@ -132,8 +139,8 @@ h2 { font-size: var(--ck-fs-h2); line-height: 1.2; letter-spacing: -0.02em; font
 
 /* The "Go deeper" list on the front page: the door in ink in a fixed column, the note soft beside it. */
 .ck-rows--deeper li { grid-template-columns: 7.6rem 1fr; }
-.ck-rows--deeper .ck-rows__key { color: inherit; font-size: inherit; font-weight: 500; text-decoration: none; }
-.ck-rows--deeper .ck-rows__key:hover { text-decoration: underline; text-underline-offset: 4px; }
+.ck-rows--deeper .ck-rows__key { color: inherit; font-size: inherit; font-weight: 500; }
+.ck-rows--deeper .ck-rows__key:hover { text-decoration-color: currentColor; }
 .ck-rows--deeper li > span { color: var(--ck-soft); }
 
 /* 7. Bet card */
@@ -151,7 +158,6 @@ h2 { font-size: var(--ck-fs-h2); line-height: 1.2; letter-spacing: -0.02em; font
 
 /* 10. Chart */
 .ck-chart { width: 100%; height: auto; display: block; }
-.ck-chart text { font-family: var(--ck-sans); font-size: 13px; fill: var(--ck-faint); }
 .ck-chart__area { fill: var(--ck-accent-wash); }
 .ck-chart__line { fill: none; stroke: var(--ck-accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
 .ck-chart__now { fill: var(--ck-accent); }
@@ -160,14 +166,15 @@ h2 { font-size: var(--ck-fs-h2); line-height: 1.2; letter-spacing: -0.02em; font
    (a proposal — not yet approved by the owner). */
 .ck-mark { width: 100%; height: auto; display: block; }
 .ck-mark__gone { fill: var(--ck-accent); }
-.ck-mark__left { fill: var(--ck-line); }
+.ck-mark__left { fill: var(--ck-faint); }
 
 /* 11. Follow box */
 .ck-follow { background: var(--ck-panel); border-radius: 20px; padding: 32px 24px; align-items: flex-start; }
 
 /* 12. Footer */
-.ck-footer { display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: 0.92rem; color: var(--ck-soft); margin-top: var(--ck-gap-section); padding-top: 24px; border-top: 1px solid var(--ck-line); }
-.ck-footer a { text-decoration: none; }
+.ck-footer { font-size: 0.92rem; color: var(--ck-soft); margin-top: var(--ck-gap-section); padding-top: 24px; border-top: 1px solid var(--ck-line); }
+.ck-footer__nav { display: flex; flex-wrap: wrap; gap: 10px 22px; }
+.ck-footer a { text-decoration: none; display: inline-block; padding-block: 6px; margin-block: -6px; }
 .ck-footer + .ck-small { margin-top: 20px; font-size: 0.82rem; }
 
 @media (max-width: 480px) {

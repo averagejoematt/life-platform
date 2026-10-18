@@ -291,7 +291,7 @@ BASELINE = {
     # mcp/tools_social_connection.py (257 lines, under the ceiling), which paid for the
     # honest-numbers fixes that stayed behind (get_insights pagination + corpus counts)
     # and still handed back 160 lines. The ratchet tightening.
-    "mcp/tools_lifestyle.py": 1477,
+    "mcp/tools_lifestyle.py": 1463,  # #4630: 1477 -> 1455 measured after the experiment_metrics split; 8 of ~40 extracted lines banked
     "lambdas/emails/coach_panel_podcast_lambda.py": 1508,
     # site_api_coach.py (2664 by the time the slice ran) drained to a ~440-line facade by
     # #1654 — the handler logic now lives in cohesive web/site_api_coach_{profile,stance,
@@ -321,7 +321,10 @@ BASELINE = {
     # ALL of them handed back (no headroom banked) — the file lands 58 lines
     # BELOW its old baseline even after the fixes landed. The pure-subset
     # ratchet allows tightening a shrunk entry.
-    "lambdas/ingestion/health_auto_export_lambda.py": 1258,
+    # #4628 (2026-10-17): the additive day-sum archive went to the sibling
+    # `health_auto_export_additive.py`; the distance conversion it shares with
+    # process_generic_metrics moved there too — 1258 -> 1255, all handed back.
+    "lambdas/ingestion/health_auto_export_lambda.py": 1255,
     # deploy/sync_doc_metadata.py LEFT the baseline 2026-09-29 (#4271): deleting the seven CLAUDE.md
     # sync rules took it to 966 lines, under the 1000 ceiling — the ratchet tightened, entry removed.
     # 2026-08-09 (#2334): +3 — a hand-typed roster literal became the registry import

@@ -1,11 +1,684 @@
 {
  "_meta": {
-  "generated_at": "2026-10-13T01:38:48.204918+00:00",
-  "served_at": "2026-10-13T01:38:48.204918+00:00",
+  "generated_at": "2026-10-17T23:19:41.137260+00:00",
+  "served_at": "2026-10-17T23:19:41.137260+00:00",
   "cache_seconds": 900,
-  "request_id": "86515a4bab734cf8"
+  "request_id": "4077ae09215248cc"
  },
  "workouts": [
+  {
+   "date": "2026-10-16",
+   "title": "Foundation - Lower - 7 - 33",
+   "duration_min": 158,
+   "total_volume_kg": 18676.7,
+   "exercise_count": 7.0,
+   "set_count": 25.0,
+   "exercises": [
+    {
+     "name": "Squat (Barbell)",
+     "notes": "",
+     "sets": [
+      {
+       "type": "warmup",
+       "reps": 5.0,
+       "weight_kg": 61.2,
+       "rpe": null,
+       "distance_m": null
+      },
+      {
+       "type": "warmup",
+       "reps": 5.0,
+       "weight_kg": 61.2,
+       "rpe": null,
+       "distance_m": null
+      },
+      {
+       "type": "warmup",
+       "reps": 3.0,
+       "weight_kg": 83.9,
+       "rpe": null,
+       "distance_m": null
+      },
+      {
+       "type": "warmup",
+       "reps": 2.0,
+       "weight_kg": 97.5,
+       "rpe": null,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 5.0,
+       "weight_kg": 102.1,
+       "rpe": 8.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 5.0,
+       "weight_kg": 111.1,
+       "rpe": 8.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 5.0,
+       "weight_kg": 111.1,
+       "rpe": 9.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 5.0,
+       "weight_kg": 93.0,
+       "rpe": 7.5,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 5.0,
+       "weight_kg": 83.9,
+       "rpe": 7.5,
+       "distance_m": null
+      }
+     ]
+    },
+    {
+     "name": "Romanian Deadlift (Barbell)",
+     "notes": "",
+     "sets": [
+      {
+       "type": "warmup",
+       "reps": 5.0,
+       "weight_kg": 61.2,
+       "rpe": null,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 5.0,
+       "weight_kg": 102.1,
+       "rpe": 8.5,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 5.0,
+       "weight_kg": 102.1,
+       "rpe": 9.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 5.0,
+       "weight_kg": 102.1,
+       "rpe": 8.5,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 5.0,
+       "weight_kg": 102.1,
+       "rpe": 8.5,
+       "distance_m": null
+      }
+     ]
+    },
+    {
+     "name": "Leg Press (Machine)",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "reps": 8.0,
+       "weight_kg": 163.3,
+       "rpe": 8.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 8.0,
+       "weight_kg": 163.3,
+       "rpe": 8.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 8.0,
+       "weight_kg": 163.3,
+       "rpe": 8.0,
+       "distance_m": null
+      }
+     ]
+    },
+    {
+     "name": "Calf Press (Machine)",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "reps": 15.0,
+       "weight_kg": 163.3,
+       "rpe": 7.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 15.0,
+       "weight_kg": 163.3,
+       "rpe": 7.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 15.0,
+       "weight_kg": 163.3,
+       "rpe": 7.0,
+       "distance_m": null
+      }
+     ]
+    },
+    {
+     "name": "Seated Leg Curl (Machine)",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "reps": 10.0,
+       "weight_kg": 49.9,
+       "rpe": 8.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 10.0,
+       "weight_kg": 49.9,
+       "rpe": 8.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 10.0,
+       "weight_kg": 49.9,
+       "rpe": 8.0,
+       "distance_m": null
+      }
+     ]
+    },
+    {
+     "name": "Cycling",
+     "notes": "Level 11 flat",
+     "sets": [
+      {
+       "type": "normal",
+       "reps": null,
+       "weight_kg": null,
+       "rpe": null,
+       "distance_m": 17059.0
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "reps": null,
+       "weight_kg": null,
+       "rpe": null,
+       "distance_m": null
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "date": "2026-10-15",
+   "title": "Foundation - Upper - 8 - 32",
+   "duration_min": 131,
+   "total_volume_kg": 9192.1,
+   "exercise_count": 8.0,
+   "set_count": 28.0,
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "notes": "",
+     "sets": [
+      {
+       "type": "warmup",
+       "reps": 10.0,
+       "weight_kg": 20.4,
+       "rpe": null,
+       "distance_m": null
+      },
+      {
+       "type": "warmup",
+       "reps": 5.0,
+       "weight_kg": 61.2,
+       "rpe": null,
+       "distance_m": null
+      },
+      {
+       "type": "warmup",
+       "reps": 3.0,
+       "weight_kg": 70.3,
+       "rpe": null,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 5.0,
+       "weight_kg": 83.9,
+       "rpe": 8.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 5.0,
+       "weight_kg": 93.0,
+       "rpe": 9.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 3.0,
+       "weight_kg": 102.1,
+       "rpe": 9.5,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 3.0,
+       "weight_kg": 102.1,
+       "rpe": 9.5,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 10.0,
+       "weight_kg": 83.9,
+       "rpe": 9.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 15.0,
+       "weight_kg": 61.2,
+       "rpe": 8.5,
+       "distance_m": null
+      }
+     ]
+    },
+    {
+     "name": "Dumbbell Row",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "reps": 5.0,
+       "weight_kg": 45.4,
+       "rpe": 8.5,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 5.0,
+       "weight_kg": 45.4,
+       "rpe": 8.5,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 5.0,
+       "weight_kg": 45.4,
+       "rpe": 8.5,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 5.0,
+       "weight_kg": 45.4,
+       "rpe": 8.5,
+       "distance_m": null
+      }
+     ]
+    },
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "reps": 8.0,
+       "weight_kg": 34.0,
+       "rpe": 8.5,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 8.0,
+       "weight_kg": 34.0,
+       "rpe": 8.5,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 6.0,
+       "weight_kg": 34.0,
+       "rpe": 10.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 6.0,
+       "weight_kg": 34.0,
+       "rpe": 10.0,
+       "distance_m": null
+      }
+     ]
+    },
+    {
+     "name": "Triceps Pushdown",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "reps": 12.0,
+       "weight_kg": 43.1,
+       "rpe": 7.5,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 12.0,
+       "weight_kg": 43.1,
+       "rpe": 7.5,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 12.0,
+       "weight_kg": 43.1,
+       "rpe": 7.5,
+       "distance_m": null
+      }
+     ]
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "reps": 8.0,
+       "weight_kg": 72.6,
+       "rpe": 8.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 5.0,
+       "weight_kg": 81.6,
+       "rpe": 9.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 5.0,
+       "weight_kg": 81.6,
+       "rpe": 9.5,
+       "distance_m": null
+      }
+     ]
+    },
+    {
+     "name": "Bicep Curl (Dumbbell)",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "reps": 10.0,
+       "weight_kg": 13.6,
+       "rpe": 8.5,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 10.0,
+       "weight_kg": 13.6,
+       "rpe": 8.5,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 10.0,
+       "weight_kg": 13.6,
+       "rpe": 8.5,
+       "distance_m": null
+      }
+     ]
+    },
+    {
+     "name": "Cycling",
+     "notes": "Level 11 flat",
+     "sets": [
+      {
+       "type": "normal",
+       "reps": null,
+       "weight_kg": null,
+       "rpe": null,
+       "distance_m": 10783.0
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "reps": null,
+       "weight_kg": null,
+       "rpe": null,
+       "distance_m": null
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "date": "2026-10-13",
+   "title": "Foundation - Lower - 6 - 31",
+   "duration_min": 99,
+   "total_volume_kg": 18846.8,
+   "exercise_count": 7.0,
+   "set_count": 20.0,
+   "exercises": [
+    {
+     "name": "Deadlift (Trap bar)",
+     "notes": "",
+     "sets": [
+      {
+       "type": "warmup",
+       "reps": 5.0,
+       "weight_kg": 61.2,
+       "rpe": null,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 8.0,
+       "weight_kg": 102.1,
+       "rpe": 8.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 8.0,
+       "weight_kg": 102.1,
+       "rpe": 8.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 8.0,
+       "weight_kg": 102.1,
+       "rpe": 8.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 8.0,
+       "weight_kg": 102.1,
+       "rpe": 8.0,
+       "distance_m": null
+      }
+     ]
+    },
+    {
+     "name": "Squat (Barbell)",
+     "notes": "",
+     "sets": [
+      {
+       "type": "warmup",
+       "reps": 5.0,
+       "weight_kg": 61.2,
+       "rpe": null,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 8.0,
+       "weight_kg": 93.0,
+       "rpe": 8.5,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 8.0,
+       "weight_kg": 93.0,
+       "rpe": 8.5,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 8.0,
+       "weight_kg": 93.0,
+       "rpe": 8.5,
+       "distance_m": null
+      }
+     ]
+    },
+    {
+     "name": "Leg Press (Machine)",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "reps": 8.0,
+       "weight_kg": 163.3,
+       "rpe": 8.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 8.0,
+       "weight_kg": 163.3,
+       "rpe": 8.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 8.0,
+       "weight_kg": 163.3,
+       "rpe": 8.0,
+       "distance_m": null
+      }
+     ]
+    },
+    {
+     "name": "Calf Press (Machine)",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "reps": 15.0,
+       "weight_kg": 163.3,
+       "rpe": 7.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 15.0,
+       "weight_kg": 163.3,
+       "rpe": 7.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 15.0,
+       "weight_kg": 163.3,
+       "rpe": 7.0,
+       "distance_m": null
+      }
+     ]
+    },
+    {
+     "name": "Seated Leg Curl (Machine)",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "reps": 12.0,
+       "weight_kg": 40.8,
+       "rpe": 7.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 12.0,
+       "weight_kg": 40.8,
+       "rpe": 7.0,
+       "distance_m": null
+      },
+      {
+       "type": "normal",
+       "reps": 12.0,
+       "weight_kg": 40.8,
+       "rpe": 8.5,
+       "distance_m": null
+      }
+     ]
+    },
+    {
+     "name": "Cycling",
+     "notes": "Level 11 flat - bike switched off while i fixed lace and decided to end early due to time of day and still needing dinner. Estimated miles.",
+     "sets": [
+      {
+       "type": "normal",
+       "reps": null,
+       "weight_kg": null,
+       "rpe": null,
+       "distance_m": 9656.0
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "reps": null,
+       "weight_kg": null,
+       "rpe": null,
+       "distance_m": null
+      }
+     ]
+    }
+   ]
+  },
   {
    "date": "2026-10-11",
    "title": "Foundation - Upper - 7 - 30",
@@ -4023,974 +4696,7 @@
      ]
     }
    ]
-  },
-  {
-   "date": "2026-09-16",
-   "title": "Foundation - Pull - 3 - 10",
-   "duration_min": 144,
-   "total_volume_kg": 7579.5,
-   "exercise_count": 8.0,
-   "set_count": 22.0,
-   "exercises": [
-    {
-     "name": "Lat Pulldown (Cable)",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 63.5,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 63.5,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 63.5,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 63.5,
-       "rpe": 9.0,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Lat Pulldown - Close Grip (Cable)",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 54.4,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 54.4,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 54.4,
-       "rpe": 8.5,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Dumbbell Row",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 8.0,
-       "weight_kg": 36.3,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 8.0,
-       "weight_kg": 36.3,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 8.0,
-       "weight_kg": 36.3,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 8.0,
-       "weight_kg": 36.3,
-       "rpe": 8.5,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Straight Arm Lat Pulldown (Cable)",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 22.7,
-       "rpe": 7.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 26.1,
-       "rpe": 9.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 26.1,
-       "rpe": 9.0,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Face Pull",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 26.1,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 26.1,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 29.5,
-       "rpe": 9.0,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Hammer Curl (Dumbbell)",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 10.2,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 10.2,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 10.2,
-       "rpe": 9.5,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Cycling",
-     "notes": "Level 10 flat.  Swapped cycling for treadmill as all treadmills were in use in the gym.",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": null,
-       "weight_kg": null,
-       "rpe": null,
-       "distance_m": 20052.0
-      }
-     ]
-    },
-    {
-     "name": "Stretching",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": null,
-       "weight_kg": null,
-       "rpe": null,
-       "distance_m": null
-      }
-     ]
-    }
-   ]
-  },
-  {
-   "date": "2026-09-15",
-   "title": "Foundation - Engine - 1 - 9",
-   "duration_min": 125,
-   "total_volume_kg": 0.0,
-   "exercise_count": 3.0,
-   "set_count": 3.0,
-   "exercises": [
-    {
-     "name": "Cycling",
-     "notes": "Level 10 flat",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": null,
-       "weight_kg": null,
-       "rpe": null,
-       "distance_m": 13921.0
-      }
-     ]
-    },
-    {
-     "name": "Treadmill",
-     "notes": "60 min - 1.0 incline at 3mph",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": null,
-       "weight_kg": null,
-       "rpe": null,
-       "distance_m": 4828.0
-      }
-     ]
-    },
-    {
-     "name": "Stretching",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": null,
-       "weight_kg": null,
-       "rpe": null,
-       "distance_m": null
-      }
-     ]
-    }
-   ]
-  },
-  {
-   "date": "2026-09-14",
-   "title": "Foundation - Push - 3 - 8",
-   "duration_min": 146,
-   "total_volume_kg": 5436.3,
-   "exercise_count": 7.0,
-   "set_count": 22.0,
-   "exercises": [
-    {
-     "name": "Bench Press (Barbell)",
-     "notes": "",
-     "sets": [
-      {
-       "type": "warmup",
-       "reps": 10.0,
-       "weight_kg": 20.4,
-       "rpe": null,
-       "distance_m": null
-      },
-      {
-       "type": "warmup",
-       "reps": 3.0,
-       "weight_kg": 61.2,
-       "rpe": null,
-       "distance_m": null
-      },
-      {
-       "type": "warmup",
-       "reps": 5.0,
-       "weight_kg": 70.3,
-       "rpe": 7.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 8.0,
-       "weight_kg": 61.2,
-       "rpe": 7.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 5.0,
-       "weight_kg": 70.3,
-       "rpe": 7.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 5.0,
-       "weight_kg": 83.9,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 5.0,
-       "weight_kg": 93.0,
-       "rpe": 9.5,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Incline Bench Press (Dumbbell)",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 8.0,
-       "weight_kg": 34.0,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 8.0,
-       "weight_kg": 34.0,
-       "rpe": 9.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 8.0,
-       "weight_kg": 34.0,
-       "rpe": 9.5,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Shoulder Press (Dumbbell)",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 18.1,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 18.1,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 18.1,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 18.1,
-       "rpe": 8.0,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Triceps Pushdown",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 32.9,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 32.9,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 32.9,
-       "rpe": 8.5,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Lateral Raise (Dumbbell)",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 6.8,
-       "rpe": 7.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 6.8,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 6.8,
-       "rpe": 8.5,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Treadmill",
-     "notes": "First 30 i had 0.5 incline, second 30 no incline - at 3mph",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": null,
-       "weight_kg": null,
-       "rpe": null,
-       "distance_m": 4812.0
-      }
-     ]
-    },
-    {
-     "name": "Stretching",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": null,
-       "weight_kg": null,
-       "rpe": null,
-       "distance_m": null
-      }
-     ]
-    }
-   ]
-  },
-  {
-   "date": "2026-09-13",
-   "title": "Foundation - Legs - 3 - 7",
-   "duration_min": 159,
-   "total_volume_kg": 22407.5,
-   "exercise_count": 8.0,
-   "set_count": 27.0,
-   "exercises": [
-    {
-     "name": "Romanian Deadlift (Barbell)",
-     "notes": "This felt fine. But i could feel my right side of my lower back more consciously.  And so i decided to not add weight this workout to risk anything.  So more safe - it wasnt pain or ache - i just could tell during the pull movement i could feel it in my lower right back more than i could my lower left.",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 8.0,
-       "weight_kg": 70.3,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 8.0,
-       "weight_kg": 70.3,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 8.0,
-       "weight_kg": 70.3,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 8.0,
-       "weight_kg": 70.3,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 8.0,
-       "weight_kg": 70.3,
-       "rpe": 8.0,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Linear Leg Press",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 163.3,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 163.3,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 163.3,
-       "rpe": 9.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 163.3,
-       "rpe": 9.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 163.3,
-       "rpe": 9.0,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Calf Press (Machine)",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 15.0,
-       "weight_kg": 122.5,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 15.0,
-       "weight_kg": 122.5,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 15.0,
-       "weight_kg": 122.5,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 15.0,
-       "weight_kg": 122.5,
-       "rpe": null,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Leg Extension (Machine)",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 31.8,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 31.8,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 31.8,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 31.8,
-       "rpe": 7.5,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Cable Pallof Press",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 13.6,
-       "rpe": 7.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 13.6,
-       "rpe": 7.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 13.6,
-       "rpe": 7.0,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Glute Machine Kickback",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 49.9,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 40.8,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 40.8,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 40.8,
-       "rpe": 7.5,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Walking",
-     "notes": "0 incline and 3mph",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": null,
-       "weight_kg": null,
-       "rpe": null,
-       "distance_m": 4812.0
-      }
-     ]
-    },
-    {
-     "name": "Stretching",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": null,
-       "weight_kg": null,
-       "rpe": null,
-       "distance_m": null
-      }
-     ]
-    }
-   ]
-  },
-  {
-   "date": "2026-09-12",
-   "title": "Foundation - Pull - 2 - 6",
-   "duration_min": 155,
-   "total_volume_kg": 8577.4,
-   "exercise_count": 9.0,
-   "set_count": 27.0,
-   "exercises": [
-    {
-     "name": "Lat Pulldown (Cable)",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 54.4,
-       "rpe": 7.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 63.5,
-       "rpe": 7.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 63.5,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 63.5,
-       "rpe": 10.0,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Dumbbell Row",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 8.0,
-       "weight_kg": 36.3,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 8.0,
-       "weight_kg": 36.3,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 8.0,
-       "weight_kg": 36.3,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 8.0,
-       "weight_kg": 36.3,
-       "rpe": 8.5,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Straight Arm Lat Pulldown (Cable)",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 22.7,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 22.7,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 22.7,
-       "rpe": 9.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 22.7,
-       "rpe": 10.0,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Face Pull",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 22.7,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 26.1,
-       "rpe": 8.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 26.1,
-       "rpe": 9.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 26.1,
-       "rpe": 9.0,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Lat Pulldown - Close Grip (Cable)",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 54.4,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 54.4,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 54.4,
-       "rpe": 9.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 10.0,
-       "weight_kg": 54.4,
-       "rpe": 10.0,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Hammer Curl (Dumbbell)",
-     "notes": "The weight is easy but the fatigue kicks in on the latter reps.  Like id guess i could be doing 40lb if reps were 5-8.",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 10.2,
-       "rpe": 8.5,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 10.2,
-       "rpe": 9.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 10.2,
-       "rpe": 9.0,
-       "distance_m": null
-      },
-      {
-       "type": "normal",
-       "reps": 12.0,
-       "weight_kg": 10.2,
-       "rpe": 9.0,
-       "distance_m": null
-      }
-     ]
-    },
-    {
-     "name": "Cycling",
-     "notes": "Level 9 flat",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": null,
-       "weight_kg": null,
-       "rpe": null,
-       "distance_m": 10589.0
-      }
-     ]
-    },
-    {
-     "name": "Walking",
-     "notes": "3 incline at 2.8",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": null,
-       "weight_kg": null,
-       "rpe": null,
-       "distance_m": 2237.0
-      }
-     ]
-    },
-    {
-     "name": "Stretching",
-     "notes": "",
-     "sets": [
-      {
-       "type": "normal",
-       "reps": null,
-       "weight_kg": null,
-       "rpe": null,
-       "distance_m": null
-      }
-     ]
-    }
-   ]
   }
  ],
- "count": 25
+ "count": 23
 }

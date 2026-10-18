@@ -19,7 +19,6 @@ it (they must not drift).
 """
 
 import json
-import os
 import re
 from pathlib import Path
 
@@ -99,73 +98,3 @@ def test_fix_present_in_generator_and_artifact():
 
 
 # premerge-gate: structural gate that sweeps the repo tree (#2372)
-
-
-# ── #4588: every existing URL still resolves (the cut-over's offline "returns 200" box) ──
-# The living-front-page cut-over puts four kit pages at live paths with no renames and no
-# new redirects. Offline, "every existing URL still returns 200" means: every path a reader
-# can hold — a page under site/, a URL the committed sitemap lists, an old URL the edge
-# 301s — ends, after the edge function's own hops, on a file the site/ prefix serves; and
-# no page under site/ sits behind a 301 that would shadow it (a page there is unreachable).
-SITE = ROOT / "site"
-SITEMAP = SITE / "sitemap.xml"
-
-#: The four kit pages the cut-over places, by live path (#4588; the four pages of epic #4580).
-CUTOVER_PATHS = ("/", "/start/", "/story/", "/coaches/")
-
-#: Paths that resolve somewhere other than site/, or were already unresolved before #4588.
-#: Exact-match: an entry that starts resolving must be removed (the set only shrinks).
-KNOWN_UNRESOLVED_4588 = {
-    "/journal/posts/week-01/": "served by the generated-content origin (web_stack.py `/journal/posts/week-*`), not site/",
-    "/journal/posts/week-02/": "served by the generated-content origin (web_stack.py `/journal/posts/week-*`), not site/",
-    "/journal/posts/week-03/": "served by the generated-content origin (web_stack.py `/journal/posts/week-*`), not site/",
-    "/stack/": "pre-existing before #4588: its 301 target /data/stack/ has no page under site/",
-}
-
-#: Pages under site/ that a 301 already shadowed before #4588 (the 301 is the intended URL).
-KNOWN_SHADOWED_4588 = {
-    "/mind/": "#313: the retired standalone reading page; the manual 301 to /data/reading/ wins",
-}
-
-
-def _site_pages() -> set:
-    """Every page URL the site/ prefix serves as `<path>/index.html` (legacy included)."""
-    out = set()
-    for root, _dirs, files in os.walk(SITE):
-        if "index.html" in files:
-            rel = Path(root).relative_to(SITE).as_posix()
-            out.add("/" if rel == "." else f"/{rel}/")
-    return out
-
-
-def _resolves(path: str, table: dict, pages: set) -> bool:
-    """Follow the edge function's hops (at most five) and say whether site/ serves the end."""
-    for _ in range(5):
-        dst = _simulate(path, table)
-        if not dst:
-            break
-        path = dst
-    return path in pages or (SITE / path.lstrip("/")).is_file()
-
-
-def _existing_urls(table: dict, pages: set) -> set:
-    """A page, a sitemap URL, an old URL with a 301, and the four cut-over paths."""
-    sitemap = set(re.findall(r"<loc>https://averagejoematt\.com(/[^<]*)</loc>", SITEMAP.read_text(encoding="utf-8")))
-    return pages | sitemap | set(table) | set(CUTOVER_PATHS)
-
-
-def test_every_existing_url_still_resolves_4588():
-    """Every URL a reader can hold ends on a served file; no page sits behind a 301."""
-    table = _load_redirect_table()
-    pages = _site_pages()
-    unresolved = sorted(u for u in _existing_urls(table, pages) if not _resolves(u, table, pages))
-    assert set(unresolved) == set(KNOWN_UNRESOLVED_4588), (
-        f"URLs that no longer resolve to a file under site/: {sorted(set(unresolved) - set(KNOWN_UNRESOLVED_4588))}; "
-        f"known entries that now resolve (remove them): {sorted(set(KNOWN_UNRESOLVED_4588) - set(unresolved))}"
-    )
-    shadowed = {p for p in pages if p in table}
-    assert shadowed == set(
-        KNOWN_SHADOWED_4588
-    ), f"pages under site/ that a 301 shadows at the edge: {sorted(shadowed - set(KNOWN_SHADOWED_4588))}"
-    for path in CUTOVER_PATHS:
-        assert path in pages and path not in table, f"{path}: the cut-over page is missing or behind a 301"

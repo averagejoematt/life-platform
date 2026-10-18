@@ -1,22 +1,29 @@
 # averagejoematt.com — Holistic Site Review Methodology
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-06-20
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-18
 
 > Repeatable process for reviewing the *whole* public site as a product and a story —
 > not "did it render" (that's the gating `qa/visual_qa.py`), but "does each page's
 > story land, does the site cohere into one throughline, and does the data corroborate
 > and tell the right story." Runs as a human-in-the-loop pass in Claude Code via the
 > `/review site` lens (Claude Code sees the screenshots directly).
-> First review: 2026-06-20. Cadence: weekly through the first 3 months, then monthly.
-> Findings stored in `docs/site-reviews/`. Tooling: `qa/site_review.py` (capture +
-> data corroboration), `qa/site_review_bindings.py` (page→endpoint map).
+> First review: 2026-06-20. Cadence: event-driven, **no clock** — the lens runs when the site's
+> story changes (a redesign, a new door); `scripts/operating_calendar.py` carries the dated exemption
+> (2026-08-22), and `/review accuracy` owns the site's monthly truth pass. See "Cadence & scope" below.
+> Findings stored in `docs/site-reviews/` (index: `docs/site-reviews/README.md`; latest:
+> `SITE_REVIEW_2026-10-18.md`, the twelve v8 kit pages — eight independent graders, two
+> verifiers reproducing every finding, one fix round, a fresh pair after; its letters are
+> `site_grades_2026-10-18.json`). Tooling: `qa/site_review.py` (capture +
+> data corroboration), `qa/site_review_bindings.py` (page→endpoint map); the 2026-10-18 pass
+> rendered the kit gate's pinned fixtures instead of a live capture, so grader and verifier
+> read the same bytes.
 
 ---
 
 ## ⚠️ What this review is — and is not
 
 **This is internal self-assessment by Claude against a rubric the platform authored**
-(the V4 Design Constitution + the Product Board's standing questions). It measures
+(the V4 Design Constitution, now archived at `docs/archive/V4_DESIGN_CONSTITUTION_2026_06_01.md`, + the Product Board's standing questions). It measures
 *conformance to the site's own stated intent* — not external quality, not market
 validation, not "an A from real users." It is a useful internal QA signal and a
 work-order generator; it is **not** a substitute for the one thing that actually
@@ -40,9 +47,14 @@ actual friend and watch. Treat every verdict here as "passes our own bar," never
 When "best for me daily" collides with "legible to a stranger," **me-daily wins.** Success is *recurring value*, not viral reach, not first-impression wow.
 
 ### The three doors (Constitution §3, ADR-071)
+> The live nav has since split into Home + five doors (`today · the numbers · the coaches · what he
+> tries · the story` — `docs/SITE_MAP_AND_INTENT.md`, `scripts/v4_chrome.py::DOORS`). The table below
+> is the Constitution's cut and is what `qa/site_review.py --door` still groups by (`home | cockpit |
+> story | evidence`; `evidence` = the Data/Protocols/Method pages); the throughline test is unchanged.
+
 | Door | Path | The one question it answers |
 |------|------|------------------------------|
-| **Cockpit** | `/now/` | "Am I winning, and what's the one thing right now?" (the daily tool) |
+| **Cockpit** | `/cockpit/` | "Am I winning, and what's the one thing right now?" (the daily tool) |
 | **Story** | `/story/` | "What's the honest arc of this transformation?" (the writing hub) |
 | **Evidence** | `/evidence/` | "What's the protocol, what's it built on, does the data hold up?" (the archive) |
 | Home | `/` | the cinematic hook into the above |
@@ -82,17 +94,17 @@ Each page is read through these standing questions. Findings are tagged with the
 ### Step 1 — Capture (build the packet)
 ```bash
 python3 qa/site_review.py                # full site → qa-screenshots/<today>/
-python3 qa/site_review.py --door story   # one door (the weekly-cadence default)
-python3 qa/site_review.py --page /now/    # single-page deep dive
+python3 qa/site_review.py --door story   # one door (the routine pass)
+python3 qa/site_review.py --page /cockpit/    # single-page deep dive
 python3 qa/site_review.py --from-report qa-screenshots   # augment a CI capture instead of re-shooting
 ```
 Produces `qa-screenshots/<date>/`: screenshots (full + mobile + chart crops), `api/*.json` (the data each page is built from), `consistency.json` (cross-page metric agreement), `manifest.json` (the index), and an `annotations/` drop-zone.
 
 ### Step 2 — (optional) Point at specifics
-Drop marked-up screenshots into `qa-screenshots/<date>/annotations/`, named `<slug>-<label>.png` (e.g. `now-font.png`). The skill reads them and treats your markup as **directed, top-priority** findings — this is how you "show exactly what you mean."
+Drop marked-up screenshots into `qa-screenshots/<date>/annotations/`, named `<slug>-<label>.png` (e.g. `cockpit-font.png`). The skill reads them and treats your markup as **directed, top-priority** findings — this is how you "show exactly what you mean."
 
 ### Step 3 — Review (the `/review site` lens, in Claude Code)
-`/review site review <date>` (defaults to the latest packet, one door per run for the weekly cadence). Claude reads `manifest.json` + `consistency.json` + this doc + the constitution, then walks the pages in `narrative_order`, **reading each screenshot**, and for every page asks:
+`/review site review <date>` (defaults to the latest packet, one door per run for the routine pass). Claude reads `manifest.json` + `consistency.json` + this doc + the constitution, then walks the pages in `narrative_order`, **reading each screenshot**, and for every page asks:
 1. **What is this page trying to say** — for Matt-daily, the circle, the discoverer, commercialization. Does it land? (the audience-hierarchy + Sofia/Raj lenses)
 2. **Visual / type / IA** — Tyrell + Mara lenses; restraint-reads-as-credibility; mobile parity.
 3. **Narrative / throughline** — Ava lens + the §0 archetype; does this page advance the one story.
@@ -132,7 +144,10 @@ The binding map (`qa/site_review_bindings.py`) is the single source of truth for
 
 ## Cadence & scope
 
-- **Weekly** for the first 3 months (high-change period), then **monthly**.
-- **One door per weekly run** (Cockpit / Story / Evidence) keeps each session focused and within Claude Code's image-context budget; rotate doors week to week.
-- **Full-site pass** before launching any new door or major surface, and at each monthly review.
+- **Event-driven, no clock.** `/review site` is an owner-attended editorial walkthrough run when the
+  site's story changes; cadencing a judgment would manufacture runs with nothing to judge. The original
+  weekly-then-monthly cadence (2026-06-20) was retired with the dated exemption in
+  `scripts/operating_calendar.py` (2026-08-22).
+- **One door per run** (Cockpit / Story / Evidence, plus Home) keeps each session focused and within Claude Code's image-context budget; rotate doors between runs.
+- **Full-site pass** before launching any new door or major surface, and whenever the site's story has changed enough to warrant one.
 - Phase 2 (designed, deferred): an automated budget-gated vision panel runs the Product Board over the captured screenshots weekly and emails a ranked digest, seeding the human run. See the plan in the session log (`session-archive` branch).

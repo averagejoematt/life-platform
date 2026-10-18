@@ -255,6 +255,10 @@ def _parse_measurements(raw_body: dict) -> dict:
         "measurement_timestamp": latest_ts,
         "measurement_time_utc": datetime.fromtimestamp(latest_ts, tz=timezone.utc).isoformat(),
     }
+    # #4642 capture-all: the attribution code of EVERY group is kept as sent (0 device,
+    # 1 ambiguous, 2 manual, ...). Which group wins the day is untouched (owner's Q, #4644).
+    result["measurement_group_attribs"] = [{"timestamp": g["date"], "attrib": g.get("attrib")} for g in grps_sorted]
+    result["measurement_attrib"] = grps_sorted[0].get("attrib")
     for grp in grps_sorted:
         for meas in grp.get("measures", []):
             mtype = meas["type"]

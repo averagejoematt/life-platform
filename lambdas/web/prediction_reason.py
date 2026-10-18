@@ -58,6 +58,67 @@ METRIC_WORDS = {
     "body_fat_pct": "body-fat percentage",
 }
 
+#: The unit each METRIC_WORDS measure is read in, for a number printed beside its words (a bet's
+#: line: "26% or higher", red team 2026-10-17 — "26 or higher" beside a coach's "27.6%"). A score
+#: out of 100 says so. One entry per METRIC_WORDS key (tests/test_bet_question_unit_4586.py).
+METRIC_UNITS = {
+    "hrv": " ms",
+    "recovery_score": " out of 100",
+    "resting_heart_rate": " bpm",
+    "sleep_duration_hours": " hours",
+    "sleep_score": " out of 100",
+    "deep_pct": "%",
+    "rem_pct": "%",
+    "weight_lbs": " lb",
+    "total_calories_kcal": " kcal",
+    "total_protein_g": " g",
+    "steps": " steps",
+    "blood_glucose_avg": " mg/dL",
+    "blood_glucose_std_dev": " mg/dL",
+    "body_fat_pct": "%",
+}
+
+
+#: #4580 round 1: the units of the measures the pages print by their OWN names (the pulse row's
+#: ``recovery_pct`` / ``sleep_hours`` / ``strain``, the week block's four measures, the day facts) — the same
+#: quantity reads in the same unit on every page: recovery is "out of 100" on the front, the day and the call
+#: card alike, never "%" on one and "points" on another. A Whoop strain is a score of 21.
+MEASURE_UNITS = {
+    "recovery": METRIC_UNITS["recovery_score"],
+    "recovery_pct": METRIC_UNITS["recovery_score"],
+    "sleep_score": METRIC_UNITS["sleep_score"],
+    "strain": " of 21",
+    "weight": METRIC_UNITS["weight_lbs"],
+    "weight_lbs": METRIC_UNITS["weight_lbs"],
+    "sleep": METRIC_UNITS["sleep_duration_hours"],
+    "sleep_hours": METRIC_UNITS["sleep_duration_hours"],
+    "hrv": METRIC_UNITS["hrv"],
+    "hrv_ms": METRIC_UNITS["hrv"],
+    "rhr": METRIC_UNITS["resting_heart_rate"],
+    "rhr_bpm": METRIC_UNITS["resting_heart_rate"],
+    "steps": METRIC_UNITS["steps"],  # steps-truth: a unit label keyed by metric name, not a row read
+    "protein": METRIC_UNITS["total_protein_g"],
+    "protein_g": METRIC_UNITS["total_protein_g"],
+    "calories": METRIC_UNITS["total_calories_kcal"],
+    "training": " minutes",
+}
+
+
+def metric_unit(metric: Any) -> str | None:
+    """'deep_pct_7day_avg' -> '%'; None when the measure has no registered unit."""
+    key = str(metric or "").strip()
+    return METRIC_UNITS.get(base_metric(key)) if key else None
+
+
+def measure_unit(name: Any) -> str | None:
+    """The unit of a page measure by its own name ('recovery' -> ' out of 100'), falling back to the
+    prediction metric registry ('recovery_score_7day_avg' -> ' out of 100'); None when neither knows it."""
+    key = str(name or "").strip()
+    if not key:
+        return None
+    return MEASURE_UNITS.get(key) or metric_unit(key)
+
+
 _SUFFIX_WORDS = {"_7day_avg": "7-day average", "_14day_avg": "14-day average", "_30day_avg": "30-day average"}
 _DIRECTIONS = {"up": "up", "down": "down"}
 _NO_VERDICT = ("inconclusive", "expired")

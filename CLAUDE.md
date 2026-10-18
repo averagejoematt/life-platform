@@ -71,7 +71,7 @@ python3 mcp_bridge.py
 
 **Site API is primarily read-only** — limited writes exist only for interactive features (votes, follows, checkins, suggestions, user-submitted findings). Core data queries must never write. Rate limiting is DynamoDB-backed per-IP atomic counters (`rate_limiter.py`; the in-memory dict is fail-open fallback only).
 
-**EventBridge crons use fixed UTC** — every schedule in `cdk/stacks/`.
+**Crons are fixed UTC** — bar zoned `daily-brief` (CONVENTIONS §1b).
 
 **Shared code — ONE bundle, no layer (#781)** — `docs/CONVENTIONS.md` §1.
 
@@ -138,4 +138,4 @@ channel are functional and stay. Why earlier history was left intact: ADR-159.
 
 The live session state is `handovers/HANDOVER_LATEST.md`, the only handover on `main` (#1650; prior ones are on the `session-archive` branch, `handovers/README.md`). `/wrap` (`.claude/skills/wrap/SKILL.md`) archives it, overwrites it, and replaces the ONE pointer line below — never a paragraph, never stacked.
 
-**Status:** see handovers/HANDOVER_LATEST.md (Verified 2026-10-14)
+**Status:** see handovers/HANDOVER_LATEST.md (Verified 2026-10-17)

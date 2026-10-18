@@ -362,9 +362,9 @@ def _set_chronicle_pending(week_num, reason, display):
     return _store._set_chronicle_pending(week_num, reason, display, _g=globals())
 
 
-def _send_preview_email(title, week_num, date_str, approval_token, email_html, kit_block="", desk_fallback=""):
+def _send_preview_email(title, week_num, date_str, approval_token, email_html, kit_block="", desk_fallback="", craft=()):
     return _store._send_preview_email(
-        title, week_num, date_str, approval_token, email_html, kit_block=kit_block, desk_fallback=desk_fallback, _g=globals()
+        title, week_num, date_str, approval_token, email_html, kit_block=kit_block, desk_fallback=desk_fallback, craft=craft, _g=globals()
     )
 
 
@@ -1074,22 +1074,11 @@ def _handler_core(event: dict, context) -> dict:
     # ── Story door (#4538, fail-closed) — the ONE shared reader-surface check, at the one point every writer passes
     # (the desk, the legacy writer, a reused cache): no cycle/reset/attempt count in the title, the stat line or the
     # body, and no off-record specifics. The desk's writers already rewrite against it; this is what holds the week
-    # when a rewrite did not clear it, or when the writer was not the desk.
-    from content import story_checks
-
-    _door = story_checks.reader_surface(f"{title}\n{stats_line}\n{raw_installment}")
-    if _door:
-        logger.error(f"[story-door] BLOCKED chronicle week {week_num} — {_door}")
-        return _held_week(
-            week_num,
-            "story_door_hold",
-            f"Week {week_num}'s installment was generated but withheld before publishing — it didn't clear "
-            "the platform's automatic check on what the series puts on the record. No content was published "
-            "or stored for this week.",
-            json.dumps({"status": "story_door_hold", "week": week_num, "findings": _door}),
-            status_code=200,
-            dry_run=_dry,
-        )
+    # when a rewrite did not clear it, or when the writer was not the desk. Craft (#4545, owner ruling "b"): a residual
+    # story_craft finding never holds the week for readers; it routes the week to the preview (_preview), never auto-published.
+    _held, _preview, _craft = _store.publish_holds(week_num, title, stats_line, raw_installment, _desk, _dry, PREVIEW_MODE, _g=globals())
+    if _held:
+        return _held
 
     # ── #405: the per-chronicle share kit — machine-made from ALREADY-PUBLISHED fields
     # only (title, honest stats line, an excerpt of the prose, the canonical post URL).
@@ -1139,10 +1128,10 @@ def _handler_core(event: dict, context) -> dict:
         # every write in this handler lives in the two branches below and in the
         # email_log row after them, and none of them run.
         return _store.dry_run_response(
-            week_num, date_str, title, stats_line, raw_installment, _conf_level, has_board, share_kit, recap, PREVIEW_MODE, _g=globals()
+            week_num, date_str, title, stats_line, raw_installment, _conf_level, has_board, share_kit, recap, _preview, _g=globals()
         )
 
-    if PREVIEW_MODE:
+    if _preview:
         # ── FEAT-12: Build all HTML artifacts without publishing ─────────────
         logger.info("FEAT-12: PREVIEW_MODE — building draft artifacts")
 
@@ -1186,7 +1175,7 @@ def _handler_core(event: dict, context) -> dict:
         )
 
         if _stored and _desk:
-            _attach_desk_artifacts(date_str, _desk)
+            _attach_desk_artifacts(date_str, _desk)  # + desk_craft_json / publish_hold=craft_hold (#4545)
 
         # #2254: the conditional put refused (a protected row raced in between the
         # idempotency read and this write). The approval_token was never persisted, so
@@ -1202,7 +1191,7 @@ def _handler_core(event: dict, context) -> dict:
                 ),
             }
 
-        _send_preview_email(title, week_num, date_str, approval_token, draft_email_html, kit_block=share_kit_block, desk_fallback=_fallback)
+        _send_preview_email(title, week_num, date_str, approval_token, draft_email_html, share_kit_block, _fallback, _craft)
         logger.info(f"FEAT-12: Draft Week {week_num} stored — awaiting approval")
 
     else:
@@ -1302,8 +1291,8 @@ def _handler_core(event: dict, context) -> dict:
     # PREVIEW_MODE nothing was sent to a reader: a draft was stored and an approval email
     # raised to Matthew. That belongs in its own partition. The real subscriber delivery
     # is logged by chronicle-email-sender when a send actually succeeds.
-    record_email_send(table, "wednesday_chronicle_preview" if PREVIEW_MODE else "wednesday_chronicle")
-    if PREVIEW_MODE:
+    record_email_send(table, "wednesday_chronicle_preview" if _preview else "wednesday_chronicle")
+    if _preview:
         return {
             "statusCode": 200,
             "body": f"Chronicle Week {week_num} draft stored — preview email sent to {RECIPIENT}",
@@ -1316,19 +1305,33 @@ def _handler_core(event: dict, context) -> dict:
 
 def _attach_desk_artifacts(date_str, desk):
     """#4535/#4536: the desk's budget, episode script and the ledger this week leaves ride on the chronicle row — the
-    Panel renders the episode from it, and the approve path commits the ledger on publish."""
+    Panel renders the episode from it, and the approve path commits the ledger on publish.
+
+    #4545 (owner ruling "b"): the residual craft verdict rides along as ``desk_craft_json``; when it is non-empty the row
+    also carries ``publish_hold = "craft_hold"`` -- approval metadata the 48 h sweep refuses (content/autopublish_audit),
+    never a reader-facing marker. Only the owner's approve click publishes that draft."""
     try:
+        craft = list(desk.get("craft_findings") or [])
+        values = {
+            ":b": json.dumps(desk["budget"], default=str),
+            ":e": json.dumps(desk["episode"], default=str),
+            ":l": json.dumps(desk["ledger"], default=str),
+            ":f": json.dumps(desk["findings"], default=str),
+            ":c": json.dumps(craft, default=str),
+            ":ph": "experiment",
+        }
+        expr = "SET desk_budget_json = :b, desk_episode_json = :e, desk_ledger_json = :l, desk_findings_json = :f, desk_craft_json = :c"
+        expr += ", #p = if_not_exists(#p, :ph)"
+        if craft:
+            values[":h"] = "craft_hold"
+            expr += ", publish_hold = :h"
+        else:
+            expr += " REMOVE publish_hold"  # a forced re-run that cleared the craft gate must not inherit the old hold
         table.update_item(
             Key={"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"DATE#{date_str}"},
-            UpdateExpression="SET desk_budget_json = :b, desk_episode_json = :e, desk_ledger_json = :l, desk_findings_json = :f, #p = if_not_exists(#p, :ph)",
+            UpdateExpression=expr,
             ExpressionAttributeNames={"#p": "phase"},
-            ExpressionAttributeValues={
-                ":b": json.dumps(desk["budget"], default=str),
-                ":e": json.dumps(desk["episode"], default=str),
-                ":l": json.dumps(desk["ledger"], default=str),
-                ":f": json.dumps(desk["findings"], default=str),
-                ":ph": "experiment",
-            },
+            ExpressionAttributeValues=values,
         )
     except Exception as e:  # noqa: BLE001 — the post still publishes; the Panel falls back to its own writer
         logger.error(f"[#4535] could not attach desk artifacts to {date_str}: {e}")
@@ -1352,10 +1355,17 @@ def _send_story_questions(event):
     so_far = {**upcoming, "end": min(upcoming["end"], (today - timedelta(days=1)).isoformat())}
     dossier, _ = story_dossier.week_dossier(table, so_far)
     ledger = story_ledger.latest_visible(table, f"USER#{USER_ID}#SOURCE#chronicle", upcoming["end"])
-    questions = story_questions.generate(dossier, story_ledger.ledger_for_prompt(ledger, n))
+    escalated = story_questions.escalated_questions(ledger)  # #4546: a coach ask carried CARRIED_MAX_WEEKS weeks goes to him first
+    questions = story_questions.compose(escalated, story_questions.generate(dossier, story_ledger.ledger_for_prompt(ledger, n)))
     if event.get("dry_run"):
-        return {"statusCode": 200, "body": json.dumps({"status": "dry_run", "week": n, "questions": questions})}
+        return {
+            "statusCode": 200,
+            "body": json.dumps({"status": "dry_run", "week": n, "questions": questions, "escalated": len(escalated)}),
+        }
     resp = story_questions.send(ses, week=n, questions=questions, to=RECIPIENT, sender=SENDER)
+    logger.info(
+        f"[#4546] story questions sent for week {n}: {len(questions)} question(s), {len(escalated)} escalated ask(s), {resp.get('MessageId', '')}"
+    )
     from experiment.phase_taxonomy import experiment_stamp_for
 
     table.put_item(

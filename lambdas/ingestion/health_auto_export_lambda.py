@@ -144,7 +144,10 @@ except ImportError:
 # not fail-soft: this sibling ships in the same CDK asset as this file (both are
 # under `ingestion/`, staged whole by the bundle), so an ImportError here means
 # the deploy itself is broken, not that an optional feature is missing.
-from ingestion import health_auto_export_archive as _archive
+from ingestion import (
+    health_auto_export_additive as _additive,  # #4628: the archived day sum
+    health_auto_export_archive as _archive,
+)
 
 
 def _merge_is_valid(fields, date_str):
@@ -452,6 +455,10 @@ SOURCE_PRIORITY = {
 # overlap. MAX does both right and matches Apple Health's own dedup for the common
 # single-device-worn day. These bypass SOURCE_PRIORITY (its entries above are now inert
 # for these fields, kept only as documentation of the prior approach).
+# #4628: SUPERSEDED for the five fields in health_auto_export_additive.ADDITIVE_SUM_FIELDS —
+# with incremental payloads the max-of-one-payload + GREATEST kept the biggest SYNC, not the
+# day. Those five are now the archived sum over unique reading timestamps (no max, no
+# GREATEST); this max survives only as their fail-safe fallback and for the other distances.
 _ACTIVITY_MAX_FIELDS = {
     "steps",
     "distance_walk_run_miles",
@@ -676,6 +683,14 @@ SKIP_METRICS = {
 # Fields that need reading-level dedup (glass-by-glass logging)
 _DEDUP_FIELDS = {"water_intake_raw", "caffeine_mg"}
 
+# #4628 box 3: the four gait averages ride the SAME `_rd_{field}` reading map,
+# but the day value is the MEAN of the merged map, not its sum. Since the export
+# went incremental (2026-06-21) each payload carries only that sync's readings,
+# so a payload-local average overwrote the day with the last sync's mean (equal
+# to the last payload on 40 of 40 field-days measured). The map is keyed on the
+# reading's own timestamp, so a re-delivered reading cannot shift the mean.
+_AVG_DEDUP_FIELDS = {"walking_speed_mph", "walking_step_length_in", "walking_double_support_pct", "walking_asymmetry_pct"}
+
 
 def _water_ml_factor(units):
     """mL per reported water unit (#483/D-9). Historical payloads report fl-oz, which the
@@ -709,7 +724,7 @@ def process_generic_metrics(metrics):
 
     Returns:
         daily_data: {date: {field: value}}
-        daily_timestamps: {date: {field: {ts: qty}}} — for water/caffeine reading-level dedup
+        daily_timestamps: {date: {field: {ts: qty}}} — water/caffeine dedup + the gait full-day mean (#4628)
         source_audit: {date: {field: {"chosen": src, "rejected": [src, ...]}}} — diagnostic
     """
     daily_data = defaultdict(dict)
@@ -785,9 +800,10 @@ def process_generic_metrics(metrics):
             day_source_counts[date][src_key] += 1
             kept += 1
 
-            # Reading-level timestamp dedup for water/caffeine — tracked WITHIN the
-            # source so that source priority resolution preserves the correct dedup map.
-            if field in _DEDUP_FIELDS:
+            # Reading-level timestamp dedup for water/caffeine (+ the gait averages,
+            # #4628) — tracked WITHIN the source so that source priority resolution
+            # preserves the correct dedup map.
+            if field in _DEDUP_FIELDS or field in _AVG_DEDUP_FIELDS:
                 ts_key = reading.get("date", "")
                 acc["ts"][ts_key] = qty_f
 
@@ -841,10 +857,10 @@ def process_generic_metrics(metrics):
             elif agg in ("avg", "avg_special", "avg_pct"):
                 daily_data[date][field] = round(sum(all_vals) / len(all_vals), 2)
 
-            # Carry forward timestamp-level dedup data for water/caffeine.
+            # Carry forward timestamp-level dedup data for water/caffeine/gait.
             # When multiple sources are combined (no-priority case), merge ts dicts —
             # entries at identical timestamps will dedupe naturally.
-            if field in _DEDUP_FIELDS:
+            if field in _DEDUP_FIELDS or field in _AVG_DEDUP_FIELDS:
                 merged_ts = {}
                 for src in sources_to_use:
                     if src in src_data and src_data[src]["ts"]:
@@ -881,16 +897,8 @@ def process_generic_metrics(metrics):
 
         # Distances are stored as miles. Convert km/m if so tagged; warn on anything else (#483/D-9).
         for dfield in [f for f in fields if f.endswith("_miles")]:
-            dv = fields.get(dfield)
-            if dv is None:
-                continue
-            du = (field_units.get(dfield) or "").lower().strip()
-            if du in ("km", "kilometer", "kilometers"):
-                fields[dfield] = round(dv * 0.621371, 4)
-            elif du in ("m", "meter", "meters"):
-                fields[dfield] = round(dv * 0.000621371, 4)
-            elif du and du not in ("mi", "mile", "miles"):
-                logger.warning(f"[HAE] unexpected distance units {du!r} for {dfield} {date}; assuming miles")
+            if fields.get(dfield) is not None:
+                fields[dfield] = _additive.to_miles(fields[dfield], field_units.get(dfield))
 
     # ── Logging ──
     if matched:
@@ -913,19 +921,21 @@ def process_generic_metrics(metrics):
 # ── DynamoDB Write ─────────────────────────────────────────────────────────────
 
 
-def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_guard=True):
+def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_guard=True, archived=()):
     """
     Merge fields into existing DynamoDB record using update_item.
     Only updates specified fields — does NOT overwrite unrelated fields.
 
-    reading_timestamps: optional dict of {field_name: set_of_timestamp_strings}
-      for dedup-able fields (water, caffeine). Each reading's timestamp is tracked
-      in a DynamoDB String Set so re-sends of the same readings are not double-counted.
+    reading_timestamps: optional {field_name: {timestamp: qty}} for water, caffeine and
+      gait (#4628), merged into the `_rd_{field}` map so a re-sent reading is never
+      double-counted; a gait day value is the map's MEAN, every other field's its sum.
     monotonic_guard: when True (live path), additive activity totals AND the
       reading-count fields (#3119: see _READING_COUNT_GUARD_FIELDS) are written
       with GREATEST(stored, new) — a day's count only increases, so a later
       PARTIAL export must never LOWER a fuller stored value. The backfill
       passes False to SET the recomputed-from-raw value authoritatively.
+    archived: #4628 — fields whose value is the archived day sum
+      (health_auto_export_additive.py); they are SET as computed, never guarded.
 
     Concurrency (#3119 residual #3 — accepted in writing, not made
     conditional/versioned): still a plain read-modify-write, so two DIFFERENT
@@ -946,7 +956,7 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
     # ── GREATEST-on-write for monotonic activity totals + reading counts ──
     if monotonic_guard:
         _guarded_fields = _ACTIVITY_MAX_FIELDS | _READING_COUNT_GUARD_FIELDS
-        _guard = [f for f in _guarded_fields if f in fields and fields[f] is not None]
+        _guard = [f for f in _guarded_fields if f in fields and fields[f] is not None and f not in archived]
         if _guard:
             try:
                 _gn = {f"#g{i}": f for i, f in enumerate(_guard)}
@@ -982,13 +992,11 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
                 stored_map = existing.get(f"_rd_{field_name}", {})
                 # Convert Decimal values from DynamoDB to float
                 stored = {k: float(str(v)) for k, v in stored_map.items()} if stored_map else {}
-                # Merge: new readings added, existing keys NOT overwritten
-                merged = {**stored}
-                for ts, qty in new_readings.items():
-                    if ts not in merged:
-                        merged[ts] = qty
-                # Recompute total from full deduplicated map
-                fields[field_name] = round(sum(merged.values()), 2)
+                # Merge: new readings added, existing keys NOT overwritten (stored wins a collision)
+                merged = {**new_readings, **stored}
+                # Recompute the day value from the full deduplicated map: a sum for
+                # the additive dedup fields, the mean of every reading for gait (#4628).
+                fields[field_name] = round(sum(merged.values()) / (len(merged) if field_name in _AVG_DEDUP_FIELDS else 1), 2)
                 # Store merged map back (handled in write section below)
                 reading_timestamps[field_name] = merged
                 _dedup_ok_fields.add(field_name)
@@ -1550,10 +1558,10 @@ def lambda_handler(event, context):
 
     # ── Process other metrics ──
     other_daily, other_timestamps, source_audit = process_generic_metrics(metrics)
+    archived = _additive.apply_archived_sums(other_daily, metrics, METRIC_MAP, parse_date_str, s3_client, S3_BUCKET)
     other_days = 0
     for date_str, fields in other_daily.items():
-        ts = other_timestamps.get(date_str)
-        merge_day_to_dynamo(date_str, fields, reading_timestamps=ts)
+        merge_day_to_dynamo(date_str, fields, reading_timestamps=other_timestamps.get(date_str), archived=archived.get(date_str, ()))
         other_days += 1
 
     if other_days:

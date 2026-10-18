@@ -33,8 +33,29 @@ import statistics
 from typing import Any, Dict, List, Optional, Tuple
 
 from common.constants import EXPERIMENT_START_DATE as GENESIS  # noqa: E402 — one genesis (ADR-058)
+from common.metric_truth import resolve_steps, steps_sources  # #4630: the ONE steps resolver
 
 USER = "matthew"
+
+
+# #4629 box 2: a Whoop workout row's label. New rows carry the vendor's own name (lowercase,
+# hyphenated: ``walking``, ``weightlifting``, ``functional-fitness``, ``stretching``) in BOTH
+# ``sport_name`` and ``vendor_sport_name``; rows stored before #4629 carry a hand-written table
+# label in ``sport_name`` (63 "Hiking" = the vendor's walking, 45 "Cross Training" = its
+# weightlifting, ``Sport_<id>`` for unmapped ids) until the owner's relabel. The vendor field
+# wins when present; the not-cardio set names BOTH vocabularies so a pre-relabel row and a new
+# row for the same session filter alike. "cross training" is in it on purpose: id 45 is the lift
+# itself (attested_training: residual 0 min against the same-day Hevy session in every case).
+_WHOOP_NOT_CARDIO = frozenset({"weightlifting", "functional fitness", "powerlifting", "stretching", "cross training"})
+
+
+def _whoop_sport_key(label: str) -> str:
+    return label.lower().replace("-", " ").replace("_", " ").strip()
+
+
+def whoop_sport_label(row: dict) -> str:
+    """The row's sport label — the vendor's own when stored, else the stored ``sport_name``."""
+    return str(row.get("vendor_sport_name") or row.get("sport_name") or "")
 
 
 def _operational() -> tuple:
@@ -211,17 +232,13 @@ def _training(table, wk: Dict[str, Any]) -> Dict[str, Any]:
             mins = round((b - a).total_seconds() / 60) if a and b else None
         except (KeyError, ValueError):
             pass
-        sport = str(w.get("sport_name") or "")
-        if (
-            sport.lower() in ("weightlifting", "functional fitness", "powerlifting")
-            or sport.startswith("Sport_")
-            or w.get("average_heart_rate") is None
-        ):
+        sport = whoop_sport_label(w)
+        if not sport or _whoop_sport_key(sport) in _WHOOP_NOT_CARDIO or sport.startswith("Sport_") or w.get("average_heart_rate") is None:
             continue
         cardio.append(
             {
                 "date": w.get("date"),
-                "sport": w.get("sport_name"),
+                "sport": sport,
                 "minutes": mins,
                 "avg_hr": _f(w.get("average_heart_rate")),
                 "max_hr": _f(w.get("max_heart_rate")),
@@ -657,10 +674,16 @@ def _grades(table, wk: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _steps(table, wk: Dict[str, Any]) -> Dict[str, Any]:
-    days = _days(table, "apple_health", wk["start"], wk["end"])
+    # #4630: each day through the ONE resolver (registry METRIC_TRUTH facet) — the wrist's
+    # count when Whoop has one, else the phone's — and the winning source rides the row.
+    by_source = {src: _days(table, src, wk["start"], wk["end"]) for src in steps_sources()}
+    per_day = []
+    for d in sorted({d for days in by_source.values() for d in days}):
+        res = resolve_steps({src: days.get(d) for src, days in by_source.items()})
+        per_day.append({"date": d, "steps": _f(res.value), "source": res.source})
     return {
-        "per_day": [{"date": d, "steps": _f(r.get("steps"))} for d, r in sorted(days.items())],
-        "caveat": "steps come from the phone only this experiment (the watch feed is paused), so they undercount — gym treadmill walks and walks without the phone are invisible; do not build a story on step counts",
+        "per_day": per_day,
+        "caveat": "steps are the wrist's count (Whoop) when it has one and the phone's (Apple Health) otherwise; the phone undercounts on days it is not carried (treadmill, bike) — do not build a story on step counts",
     }
 
 

@@ -172,7 +172,7 @@ def strava_day(date: str, *, kilojoules=None, activities=None, activity_count=No
     return rec
 
 
-def activity(sport: str, *, minutes: float, avg_hr=None) -> dict:
+def activity(sport: str, *, minutes: float, avg_hr=None, zones_min=None) -> dict:
     """One nested Strava activity as ``strava_lambda`` writes it.
 
     Both duration fields are SECONDS and both are populated, because the two
@@ -184,6 +184,10 @@ def activity(sport: str, *, minutes: float, avg_hr=None) -> dict:
     act = {"sport_type": sport, "elapsed_time_seconds": minutes * 60, "moving_time_seconds": minutes * 60}
     if avg_hr is not None:
         act["average_heartrate"] = avg_hr
+    # #4627: Zone 2 minutes are read from the stored time-in-zone (`zone{n}_seconds`, the
+    # strava writer's field names) — `zones_min` maps a zone number to its minutes.
+    for z, m in (zones_min or {}).items():
+        act[f"zone{z}_seconds"] = m * 60
     return act
 
 
@@ -216,7 +220,6 @@ def profile(monkeypatch):
     threshold in this file is computed against a known number."""
     prof = {"max_heart_rate": 190, "resting_heart_rate_baseline": 55}
     monkeypatch.setattr(tt, "get_profile", lambda: prof)
-    monkeypatch.setattr(tc, "get_profile", lambda: prof)
     return prof
 
 
@@ -595,9 +598,9 @@ def test_periodization_zone2_agrees_with_the_canonical_zone2_tool(sources):
     day = strava_day(
         TODAY,
         activities=[
-            activity("Walk", minutes=60, avg_hr=95),  # 50.0% — below zone 2
-            activity("Ride", minutes=45, avg_hr=124),  # 65.3% — zone 2
-            activity("Run", minutes=30, avg_hr=140),  # 73.7% — zone 3
+            activity("Walk", minutes=60, avg_hr=95, zones_min={1: 60}),  # 50.0% — below zone 2
+            activity("Ride", minutes=45, avg_hr=124, zones_min={2: 45}),  # 65.3% — zone 2
+            activity("Run", minutes=30, avg_hr=140, zones_min={3: 30}),  # 73.7% — zone 3
         ],
     )
     sources(strava=[day], macrofactor_workouts=[])
@@ -1261,7 +1264,7 @@ def test_recommendation_zone2_board_note_reports_the_real_minutes(sources):
         whoop=[_recovery_day(TODAY, recovery=80)],
         eightsleep=[{"date": TODAY, "sleep_score": 80}],
         garmin=[],
-        strava=[strava_day(_d(-1), activities=[activity("Run", minutes=60, avg_hr=124)], activity_count=1)],
+        strava=[strava_day(_d(-1), activities=[activity("Run", minutes=60, avg_hr=124, zones_min={2: 60})], activity_count=1)],
         macrofactor_workouts=[],
         computed_metrics=[],
     )
@@ -1289,8 +1292,8 @@ def test_recommendation_zone2_note_is_suppressed_once_half_the_target_is_met(sou
         eightsleep=[{"date": TODAY, "sleep_score": 80}],
         garmin=[],
         strava=[
-            strava_day(_d(-1), activities=[activity("Run", minutes=60, avg_hr=124)], activity_count=1),
-            strava_day(_d(-2), activities=[activity("Ride", minutes=60, avg_hr=124)], activity_count=1),
+            strava_day(_d(-1), activities=[activity("Run", minutes=60, avg_hr=124, zones_min={2: 60})], activity_count=1),
+            strava_day(_d(-2), activities=[activity("Ride", minutes=60, avg_hr=124, zones_min={2: 60})], activity_count=1),
         ],
         macrofactor_workouts=[],
         computed_metrics=[],

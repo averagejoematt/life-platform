@@ -738,8 +738,7 @@ def gather_daily_data(profile, yesterday):
     withings_14d = fetch_range("withings", (today - timedelta(days=14)).isoformat(), yesterday)
     # #2221: one definition, one place — the compute Lambda resolves the same concept
     # through this helper, so the weekly delta no longer flips on which pipeline ran.
-    target_date = (today - timedelta(days=7)).isoformat()
-    week_ago_weight = weight_recency.week_ago_weight(withings_14d, target_date)
+    week_ago_weight = weight_recency.week_ago_weight(withings_14d, (today - timedelta(days=7)).isoformat())
 
     # Avatar weight: 30-day lookback so avatar doesn't reset to frame 1 on missed weigh-ins
     avatar_weight = latest_weight
@@ -757,13 +756,11 @@ def gather_daily_data(profile, yesterday):
                 avatar_weight = wt
                 break
 
-    # 7-day Apple Health for CGM trend context
-    apple_7d = fetch_range("apple_health", (today - timedelta(days=7)).isoformat(), yesterday)
+    apple_7d = fetch_range("apple_health", (today - timedelta(days=7)).isoformat(), yesterday)  # CGM trend + 7d steps baseline
 
     # Cumulative sleep debt (last 7 days) for smart guidance
-    sleep_7d = [_normalize_whoop_sleep(i) for i in fetch_range("whoop", (today - timedelta(days=7)).isoformat(), yesterday)]
-    target_hrs = profile.get("sleep_target_hours_ideal", 7.5)
-    sleep_debt_hrs = 0.0
+    sleep_7d = [_normalize_whoop_sleep(i) for i in hrv_7d_recs]  # #4630: the same 7-day Whoop read, not a second query
+    target_hrs, sleep_debt_hrs = profile.get("sleep_target_hours_ideal", 7.5), 0.0
     for s in sleep_7d:
         dur = safe_float(s, "sleep_duration_hours")
         if dur is not None:
@@ -914,6 +911,9 @@ def gather_daily_data(profile, yesterday):
         "habitify": habitify,
         "garmin": garmin,
         "mf_workouts": mf_workouts,
+        # ADR-163: the day's raw Hevy workout rows — the inline day grade's movement score reads its
+        # walking/treadmill blocks beside Strava's walks (the compute Lambda carries the same key)
+        "hevy": fetch_range("hevy", yesterday, yesterday),
         "hrv": {"hrv_7d": avg(hrv_7d_vals), "hrv_30d": avg(hrv_30d_vals), "hrv_yesterday": safe_float(whoop, "hrv")},
         # #2221: the CGM day aggregate rides the apple_health row (where the HAE webhook
         # writes it and /api/biomarkers reads it) — a re-key of a row already in hand,
@@ -925,6 +925,7 @@ def gather_daily_data(profile, yesterday):
         "journal_entries": journal_entries,
         "social_posts": social_posts,  # #1671: enriched public voice → coach signal
         "apple_7d": apple_7d,
+        "whoop_7d": hrv_7d_recs,  # #4630: the same window's Whoop rows, so the 7d steps baseline resolves like the day
         "anomaly": anomaly,
         "latest_weight": latest_weight,
         # #1924: namespaced rather than spread, so adding dated weight facts cannot

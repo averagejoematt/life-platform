@@ -488,19 +488,21 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # against the API is cheap and catches the late-workout / dropped-day silent
         # drop the DDB-only checks are blind to. whoop_lambda._reconcile.
         "provider_reconcile": True,
-        # #4638: stated default (owner ruling pending). Re-fetch is refresh_trailing_days=2.
+        # #4638: owner ruling 2026-10-17 "write it" (deletes → empty day). Re-fetch is refresh_trailing_days=2.
         "upstream_changes": {
             "edits": "inside_window",
-            "deletes": "not_propagated",
+            "deletes": "inside_window",
             "window_days": 2,
             "standing": "stated_default",
             "note": (
                 "An edit (re-typed workout, revised score) inside the 2-day trailing re-fetch overwrites the "
-                "stored record by id; older edits are never re-fetched. A workout deleted in the app keeps its "
-                "DATE#…#WORKOUT#id row at any age — the vendor's update/delete webhooks are unused. Since #4638 the "
-                "daily _reconcile REPORTS the store → vendor difference inside its 14-day window (stored workout ids "
-                "the vendor no longer lists, and changed sport or start/end, as StoreOnlyActivityCount / "
-                "ChangedActivityCount with Source=whoop) but stays read-only: nothing is removed."
+                "stored record by id; older edits are never re-fetched. The daily _reconcile compares the vendor's "
+                "trailing workout list with the store inside its 14-day window and REPORTS stored workout ids the "
+                "vendor no longer lists, and changed sport or start/end, as StoreOnlyActivityCount / "
+                'ChangedActivityCount with Source=whoop. Since the owner\'s 2026-10-17 ruling on #4638 ("write it") a '
+                "delete propagates as an empty day: when every stored workout of a day strictly inside the window is "
+                "gone from a non-empty vendor list, each row is replaced by a tombstone (the day's recovery/sleep row "
+                "is untouched); changed rows are reported only."
             ),
         },
     },
@@ -710,7 +712,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "raw_layout": {
             "prefix": "raw/matthew/health_auto_export",
             "scheme": "timestamped",
-            "note": "sub-datatypes also land at raw/matthew/{cgm_readings,blood_pressure,state_of_mind,workouts}/ — see sub_layouts",
+            "note": "sub-datatypes also land at raw/matthew/{cgm_readings,blood_pressure,state_of_mind,workouts,additive_readings}/ — see sub_layouts",
             # #2278: the note above was prose only, so every reader of an HAE
             # sub-datatype hand-built its key from it — and one (the dormant BP
             # reader in mcp/tools_lifestyle.py) dropped the user segment entirely
@@ -783,6 +785,35 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
                         "note": "10 objects, live-confirmed via read-only aws s3 ls; same X-9 no-user-segment "
                         "predecessor shape as raw/whoop. Modeling a replay path is out of this Small story's scope. #3570.",
                     },
+                },
+                # #4628 (Q2 "b — readings stay in S3, one daily value per source in DynamoDB",
+                # owner 2026-10-17): every delivered reading of the five ADDITIVE activity
+                # fields, merged per READING day (the UTC DATE# day, day_key_frame above) and
+                # deduped by the reading's own timestamp. The DynamoDB day value is the sum of
+                # this object — `ingestion/health_auto_export_additive.py`. One object per field
+                # because HAE's automations deliver the field groups concurrently (steps+active,
+                # basal, distance+flights land in the same second), so a shared object would
+                # lose a merge to a read-modify-write race.
+                "additive_steps": {"prefix": "raw/matthew/additive_readings/steps", "scheme": "date-tree", "filename": "DD.json"},
+                "additive_active_calories": {
+                    "prefix": "raw/matthew/additive_readings/active_calories",
+                    "scheme": "date-tree",
+                    "filename": "DD.json",
+                },
+                "additive_basal_calories": {
+                    "prefix": "raw/matthew/additive_readings/basal_calories",
+                    "scheme": "date-tree",
+                    "filename": "DD.json",
+                },
+                "additive_distance_walk_run_miles": {
+                    "prefix": "raw/matthew/additive_readings/distance_walk_run_miles",
+                    "scheme": "date-tree",
+                    "filename": "DD.json",
+                },
+                "additive_flights_climbed": {
+                    "prefix": "raw/matthew/additive_readings/flights_climbed",
+                    "scheme": "date-tree",
+                    "filename": "DD.json",
                 },
             },
             # #3570 (DA-8, found by the 2026-09-05 /review full baseline, reverified
@@ -954,7 +985,11 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "probe_functions": (("habitify-data-ingestion", "Habitify"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": "required",
-        # cadence reason (internal, kept out of the published method text): kept hourly by decision (#3666 same-day freshness); notes/mood calls await ruling #4644 (#4641)
+        # cadence reason (internal, kept out of the published method text): kept hourly by decision (#3666 same-day freshness).
+        # Per-habit notes + mood calls STOPPED 2026-10-17 (calls removed, not flagged), owner Q28 (#4644):
+        # "yes, stop (2,928 calls/day for 0 notes)" — 0 notes in all 223 stored rows; run average was 36.5 s,
+        # expected ~1 s. Supersedes the #422/#950 capture-channel reason. Rows written from this date carry no
+        # `notes`/`mood`; earlier rows are untouched (#4641).
         "method": "API pull, hourly (24h)",
         "metrics": "Daily habit completions",
         "posture": "load-bearing",
@@ -1262,12 +1297,17 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "probe_functions": (
             ("notion-journal-ingestion", "Notion"),
             ("journal-enrichment", "Journal Enrichment"),
+            # Q39: the three feeds that owned this probe are retired (paused), and a paused source is never
+            # invoked; social-enrichment is still scheduled daily, so a live source carries its probe.
+            ("social-enrichment", "Social Enrichment"),
         ),  # #4643: the daily boot probe's targets
         "expected_days": 5,
         # was checked as a phantom "journal" partition in qa_smoke — the real
         # partition is notion (X-10; the check is warn-only either way).
         "qa_tier": "optional",
-        # cadence reason (internal, kept out of the published method text): was hourly; 0 of 252 runs found a page (#4641)
+        # cadence reason (internal, kept out of the published method text): was hourly; 0 of 252 runs found a page (#4641).
+        # Journal stays a channel at 3/day by the owner's word, Q33 2026-10-17 (#4644): "yes, keep polling at 3/day
+        # (already cut)" — no further cadence change.
         "method": "API pull (journal database), 3x daily",
         "metrics": "Journal entries — the subjective layer",
         "posture": "portfolio",
@@ -1303,19 +1343,18 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "behavioral": True,  # public posting is the behavior
         "social_channel": True,  # #2806/#2807/#2808: registry vocabulary for social/broadcast channels
         "stale_hours": None,
+        "paused": True,  # Q39 tombstone: the entry stays, reported paused, never counted stale
         "freshness": False,  # registry-resident until the channel id is provisioned (#1669)
         "monitored": False,  # never paged; not on the public board yet
         "active_api": False,  # keyless RSS pull; flip True once the channel id is live
-        "probe_functions": (
-            ("youtube-social-ingestion", "YouTube"),
-            ("social-enrichment", "Social Enrichment"),
-        ),  # #4643: the daily boot probe's targets
+        "probe_functions": (("youtube-social-ingestion", "YouTube"),),  # #4643: the daily boot probe's targets
         "expected_days": None,  # sporadic — not a reconciliation source
         "qa_tier": None,
-        # cadence reason (internal, kept out of the published method text): was hourly; 0 rows in 252 runs; placeholder account (#4641, #1669)
-        "method": "Keyless per-channel RSS pull (framework), 2x daily",
+        # RETIRED schedule, owner Q39 2026-10-17 (#4644): "no — retire the three schedules". 0 rows in 756 scheduled runs across the three feeds
+        # (#4641); the function stays deployed, invokable by hand, until accounts exist.
+        "method": "Schedule retired 2026-10-17 (Q39) — no scheduled pull; function kept, invoke by hand if an account is provisioned",
         "metrics": "Video posts — the outbound public voice, ingested back in",
-        "posture": "portfolio",
+        "posture": "paused",
         # #1682 follow-up: deliberately NO capture_channel. YouTube is a scheduled,
         # keyless RSS pull with no human in the capture loop — per this registry's
         # contract (see the capture_channel doc above) an automatic pipe must not
@@ -1351,19 +1390,18 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "behavioral": True,  # public posting is the behavior
         "social_channel": True,  # #2806/#2807/#2808: registry vocabulary for social/broadcast channels
         "stale_hours": None,
+        "paused": True,  # Q39 tombstone: the entry stays, reported paused, never counted stale
         "freshness": False,  # registry-resident until the handle is provisioned (#1676)
         "monitored": False,  # never paged; not on the public board yet
         "active_api": False,  # keyless public AppView pull; flip True once the handle is live
-        "probe_functions": (
-            ("bluesky-social-ingestion", "Bluesky"),
-            ("social-enrichment", "Social Enrichment"),
-        ),  # #4643: the daily boot probe's targets
+        "probe_functions": (("bluesky-social-ingestion", "Bluesky"),),  # #4643: the daily boot probe's targets
         "expected_days": None,  # sporadic — not a reconciliation source
         "qa_tier": None,
-        # cadence reason (internal, kept out of the published method text): was hourly; 0 rows in 252 runs; placeholder account (#4641, #1669)
-        "method": "Keyless public AppView pull (framework), 2x daily",
+        # RETIRED schedule, owner Q39 2026-10-17 (#4644): "no — retire the three schedules". 0 rows in 756 scheduled runs across the three feeds
+        # (#4641); the function stays deployed, invokable by hand, until accounts exist.
+        "method": "Schedule retired 2026-10-17 (Q39) — no scheduled pull; function kept, invoke by hand if an account is provisioned",
         "metrics": "Posts — the outbound public voice, ingested back in",
-        "posture": "portfolio",
+        "posture": "paused",
         # Deliberately NO capture_channel — same #1682 rationale as youtube: a
         # scheduled, keyless pull with no human in the capture loop must not carry
         # one (would mislabel it a manual "you forgot to log" source).
@@ -1395,19 +1433,18 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "behavioral": True,  # public posting is the behavior
         "social_channel": True,  # #2806/#2807/#2808: registry vocabulary for social/broadcast channels
         "stale_hours": None,
+        "paused": True,  # Q39 tombstone: the entry stays, reported paused, never counted stale
         "freshness": False,  # registry-resident until the instance/handle is provisioned (#1676)
         "monitored": False,  # never paged; not on the public board yet
         "active_api": False,  # keyless public REST pull; flip True once the account is live
-        "probe_functions": (
-            ("mastodon-social-ingestion", "Mastodon"),
-            ("social-enrichment", "Social Enrichment"),
-        ),  # #4643: the daily boot probe's targets
+        "probe_functions": (("mastodon-social-ingestion", "Mastodon"),),  # #4643: the daily boot probe's targets
         "expected_days": None,  # sporadic — not a reconciliation source
         "qa_tier": None,
-        # cadence reason (internal, kept out of the published method text): was hourly; 0 rows in 252 runs; placeholder account (#4641, #1669)
-        "method": "Keyless public REST pull (framework), 2x daily",
+        # RETIRED schedule, owner Q39 2026-10-17 (#4644): "no — retire the three schedules". 0 rows in 756 scheduled runs across the three feeds
+        # (#4641); the function stays deployed, invokable by hand, until accounts exist.
+        "method": "Schedule retired 2026-10-17 (Q39) — no scheduled pull; function kept, invoke by hand if an account is provisioned",
         "metrics": "Posts — the outbound public voice, ingested back in",
-        "posture": "portfolio",
+        "posture": "paused",
         # Deliberately NO capture_channel — same #1682 rationale as youtube.
         # Not on the public /data/ + gear catalogues yet — the source is wired but
         # awaits owner instance/handle provisioning + the S4 display story (epic #1668).
@@ -1509,7 +1546,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "active_api": False,
         "expected_days": None,  # episodic — a week with no draw is not a gap
         "qa_tier": None,
-        "method": "Manual upload of the lab PDF/report after each draw (~6-month cadence)",
+        "method": "Manual upload of the lab PDF/report after each draw (~6-month cadence) via scripts/ingest_lab_report.py",
         "metrics": "Blood biomarkers (episodic panels), ASCVD 10-year risk, clinician notes",
         "posture": "load-bearing",  # clinical truth — the deepest evidence the platform holds
         # #3571: manual-by-method, so the explicit answer is required rather than optional.
@@ -1526,11 +1563,56 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             "scheme": "date-folder",
             "filename": "<draw-date>/<document>.pdf|.md",
             "note": (
-                "one folder per DRAW DATE holding N documents (the PDF plus a markdown transcription), "
-                "hand-uploaded — not written by any lambda in this file. 7 objects live-confirmed 2026-09-06 "
-                "(#3570). The prefix also holds hand-uploaded DEXA documents, whose DDB partition is SOURCE#dexa "
-                "(see UNREGISTERED_PARTITIONS below) — the S3 prefix and the DDB partition do not partition the "
-                "same way. No per-day key: raw_date_key() raises for a non-date-tree scheme by design."
+                "one folder per DRAW DATE holding N documents (the PDF plus a markdown transcription). Written by "
+                "scripts/ingest_lab_report.py (#4639: archive-first, then one DDB row with `provenance`) — not by "
+                "any lambda in this file. 7 objects live-confirmed 2026-09-06 (#3570), all under one dated folder. "
+                "DEXA documents have their own prefix since #4639 (raw/matthew/dexa, the `dexa` entry below) — a "
+                "2026-09-06 note claimed they lived here; the live listing on 2026-10-17 held none. No per-day key: "
+                "raw_date_key() raises for a non-date-tree scheme by design."
+            ),
+        },
+    },
+    # ── #4639 (epic #4625): dexa joins the registry — the #3669 residual, paid when the writer arrived.
+    # Owner ruling 2026-10-17 (Q37 on #4644): a repeatable upload -> review -> store path for labs
+    # and DEXA. `scripts/ingest_lab_report.py dexa` is that writer; a partition with a writer and a
+    # cadence is a source, so the dated UNREGISTERED_PARTITIONS disposition and the serving-layer
+    # `_DUE_MONTHS_UNREGISTERED["dexa"]` literal both retire here (the registry owns the number).
+    "dexa": {
+        "label": "DEXA",
+        "checker_label": "DEXA scan",
+        "desc": "Body-composition scans — a DXA scan roughly every 12 months, uploaded after each visit",
+        "category": "Clinical",
+        "behavioral": True,  # a scan happens when he books one; silence is never breakage
+        # no `instrument_for`: physical_coach reads body composition but is not darked by a 12-month scan cadence (#4217 is for sensors)
+        "cadence_months": 12,  # THE cadence — `stale_hours` is DERIVED from it (same rule as labs)
+        "stale_hours": None,  # computed by _derive_cadence_stale_hours(); never typed here
+        # freshness: False for the same reason as labs — a ~8,700-hour healthy state would sit
+        # permanently 🟡 under the checker's global 24h warning tier. The cadence is enforced
+        # where an episodic cadence belongs: /api/status's due-date panel via due_months().
+        "freshness": False,
+        "active_api": False,
+        "expected_days": None,  # episodic — a week with no scan is not a gap
+        "qa_tier": None,
+        "method": "Manual upload of the scan report after each visit (~12-month cadence) via scripts/ingest_lab_report.py",
+        "metrics": "Body composition (lean/fat mass, body fat %, visceral fat), bone density, segmental and limb detail",
+        "posture": "load-bearing",  # the body-composition truth Withings trends against
+        # #3571: manual-by-method, so the explicit answer is required rather than optional.
+        "capture_channel": None,
+        "capture_channel_reason": (
+            "2026-10-17: a scan upload is manual capture on a ~12-month cadence; the #746 channel set "
+            "('hae'|'notion'|'mcp') is an OWNER decision (the same open ruling as labs on issue 3571), and a "
+            "'you have not uploaded a scan' nudge would be noise at this cadence. Stated, not left as a missing key."
+        ),
+        "raw_layout": {
+            "prefix": "raw/matthew/dexa",
+            "scheme": "date-folder",
+            "filename": "<scan-date>/<document>.pdf",
+            "note": (
+                "one folder per SCAN DATE holding the scan report(s), archived by scripts/ingest_lab_report.py "
+                "BEFORE the DDB row is written (#4639). New prefix on 2026-10-17 — 0 objects until the next scan; "
+                "the two stored scans (2025-05-10, 2026-03-30) predate the path and their reports are the owner's "
+                "to back-archive or record as unavailable (the issue's last box). No per-day key: raw_date_key() "
+                "raises for a non-date-tree scheme by design."
             ),
         },
     },
@@ -1639,16 +1721,8 @@ RETIRED_SOURCES: dict[str, dict[str, Any]] = {
 # cross_phase) that still are not ingestion sources. Each carries a dated reason naming
 # WHAT WRITES IT, because "I could not find a writer" is not evidence there isn't one.
 UNREGISTERED_PARTITIONS: dict[str, dict[str, str]] = {
-    "dexa": {
-        "dated": "2026-09-17",
-        "reason": (
-            "Body-composition scans, 2 rows. Episodic clinical capture on a ~12-month cadence (last scan "
-            "2026-03-30), hand-entered per scan with no ingestion pipe — no lambda writes this partition. "
-            "Named by #3669 so the set is complete. A registry entry with `cadence_months: 12` is the obvious "
-            "follow-on and is deliberately NOT taken here: `/api/status` renders dexa from its own DUE_MONTHS "
-            "row, and #3669's box 1 ruled on labs only. Tracked as the residual on 3669's PR."
-        ),
-    },
+    # "dexa" LEFT this dict in #4639 (2026-10-17): it is a SOURCE_REGISTRY source now, with
+    # `cadence_months: 12` and a writer (scripts/ingest_lab_report.py) — the #3669 residual.
     "genome": {
         "dated": "2026-09-17",
         "reason": (
@@ -1867,8 +1941,7 @@ EXTRA_QUERYABLE_PARTITIONS = (
     # "labs" left this tuple in #3669 — it is a SOURCE_REGISTRY source now, so
     # mcp_source_ids() already derives it from the registry's partition-bearing keys.
     # Listing it twice would be the restatement this registry exists to end (the union
-    # made it invisible, which is how a restatement survives).
-    "dexa",
+    # made it invisible, which is how a restatement survives). "dexa" left the same way in #4639.
     "genome",
     "clinical",  # ADR-155 amendment (2026-10-12): owner clinical record — owner-written, TIER_INTERNAL
     "state_of_mind",
@@ -2663,3 +2736,80 @@ def catalog_entries() -> list:
             }
         )
     return sorted(rows, key=lambda r: (posture_rank.get(r["posture"], 9), r["name"]))
+
+
+# ── #4630: the per-metric TRUTH facet — which stored field answers "what was the day's X?" ──
+#
+# The owner rule of 2026-10-04 ("capture all, interpret later", docs/CONVENTIONS.md): every
+# writer stores its own source's value under that source and never picks a winner; the
+# precedence lives HERE, and ONE read-side resolver (lambdas/common/metric_truth.py) applies
+# it. A consumer never names a source or a field for a metric listed below — it calls the
+# resolver (tests/test_steps_truth_resolver_4630.py fails on a direct read of a steps field).
+#
+# Facets per metric:
+#   truth_source     — the source that wins whenever it has a usable value
+#   unit             — the unit every field below is stored in (the resolver never converts)
+#   fallback_order   — the sources the resolver consults, in order; truth_source is first
+#   field_by_source  — the stored DATE# row field that carries the metric for each source
+#   min_by_source    — the smallest POSITIVE value that counts as "has a count" for a source;
+#                      a positive value below it is absent for the day (not zero); 0 is a
+#                      zero report (see overlap_rule)
+#   overlap_rule     — what happens when more than one source has a usable value:
+#                      first_positive_else_first_zero = the first source in fallback_order
+#                      with a POSITIVE value wins; only when none has one does the
+#                      highest-precedence zero report stand (a genuine 0-step day, #1658)
+#   ruling           — where the precedence was decided (or is pending)
+#
+# steps: HELD on #4644 Q4. Built on the recommended answer "4: yes — Whoop when both devices
+# have a count": the phone delivers roughly 0.27-0.62 of the wrist's count on days it is not
+# carried (treadmill, bike), and the two agree closely on outdoor-walk days. Garmin is paused
+# (ADR-074) and stays last so pre-pause history still resolves; its 1000 floor is the one the
+# site readers already applied to drop the phantom ~298 partial-sync row.
+METRIC_TRUTH: dict[str, dict[str, Any]] = {
+    "steps": {
+        "truth_source": "whoop",
+        "unit": "count/day",
+        "fallback_order": ("whoop", "apple_health", "garmin"),
+        "field_by_source": {"whoop": "step_count", "apple_health": "steps", "garmin": "steps"},
+        "min_by_source": {"whoop": 1, "apple_health": 1, "garmin": 1000},
+        "overlap_rule": "first_positive_else_first_zero",
+        "ruling": "#4644 Q4 (recommended: 'yes — Whoop when both devices have a count') — pending the owner",
+    },
+}
+
+METRIC_TRUTH_OVERLAP_KINDS = ("first_positive_else_first_zero",)
+
+
+def _validate_metric_truth() -> None:
+    """Import-time shape check: a truth facet that names an unknown source or a source
+    with no field is a resolver that silently answers None — refuse it at import."""
+    for metric, facet in METRIC_TRUTH.items():
+        order = tuple(facet["fallback_order"])
+        if not order or order[0] != facet["truth_source"]:
+            raise ValueError(f"METRIC_TRUTH[{metric!r}]: fallback_order must start with truth_source")
+        if len(set(order)) != len(order):
+            raise ValueError(f"METRIC_TRUTH[{metric!r}]: fallback_order repeats a source")
+        if facet["overlap_rule"] not in METRIC_TRUTH_OVERLAP_KINDS:
+            raise ValueError(f"METRIC_TRUTH[{metric!r}]: unknown overlap_rule {facet['overlap_rule']!r}")
+        for src in order:
+            if src not in SOURCE_REGISTRY:
+                raise ValueError(f"METRIC_TRUTH[{metric!r}]: {src!r} is not a registered source")
+            if src not in facet["field_by_source"]:
+                raise ValueError(f"METRIC_TRUTH[{metric!r}]: no field_by_source entry for {src!r}")
+
+
+_validate_metric_truth()
+
+
+def metric_truth(metric: str) -> dict:
+    """The truth facet for `metric` (a copy — callers cannot mutate the registry).
+
+    Raises KeyError for a metric with no facet: a resolver asked about an unresolved
+    metric must fail loudly rather than guess a source."""
+    facet = METRIC_TRUTH[metric]
+    return {
+        **facet,
+        "fallback_order": tuple(facet["fallback_order"]),
+        "field_by_source": dict(facet["field_by_source"]),
+        "min_by_source": dict(facet["min_by_source"]),
+    }
