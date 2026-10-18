@@ -321,7 +321,10 @@ BASELINE = {
     # ALL of them handed back (no headroom banked) — the file lands 58 lines
     # BELOW its old baseline even after the fixes landed. The pure-subset
     # ratchet allows tightening a shrunk entry.
-    "lambdas/ingestion/health_auto_export_lambda.py": 1258,
+    # #4628 (2026-10-17): the additive day-sum archive went to the sibling
+    # `health_auto_export_additive.py`; the distance conversion it shares with
+    # process_generic_metrics moved there too — 1258 -> 1255, all handed back.
+    "lambdas/ingestion/health_auto_export_lambda.py": 1255,
     # deploy/sync_doc_metadata.py LEFT the baseline 2026-09-29 (#4271): deleting the seven CLAUDE.md
     # sync rules took it to 966 lines, under the 1000 ceiling — the ratchet tightened, entry removed.
     # 2026-08-09 (#2334): +3 — a hand-typed roster literal became the registry import
