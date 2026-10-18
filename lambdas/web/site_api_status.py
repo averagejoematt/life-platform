@@ -277,7 +277,7 @@ def status(*, _g) -> dict:
         (
             "garmin",
             "Activity Tracking (1 of 2)",
-            "Steps \u00b7 GPS routes \u00b7 stress \u00b7 body battery",
+            "Walks \u00b7 runs \u00b7 GPS routes \u2014 delivered through Strava (direct feed retired, #4640)",
             25,
             49,
             "auto",

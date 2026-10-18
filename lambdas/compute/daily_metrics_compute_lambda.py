@@ -457,7 +457,7 @@ def compute_readiness(data, baselines=None):
     # Readiness: recovery 40% (most actionable), sleep 25%, HRV trend 20%, TSB 10% (lagging).
     # Sleep is 25% (not 30%) to stay aligned with the live MCP get_readiness_score model
     # so the tool's _precomputed_cross_check is a true drift detector — on the typical day
-    # (Garmin stale → Body Battery gated/re-normalised out) the two models are identical.
+    # (no overnight-physiology component — the live tool's 5% leg since #4978) the weights are identical.
     components = []
     whoop_today = data.get("whoop_today")
     whoop_yest = data.get("whoop")

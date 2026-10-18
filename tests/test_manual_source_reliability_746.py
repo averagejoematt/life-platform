@@ -52,7 +52,7 @@ def test_capture_channels_are_matthews_four():
     authenticated upload surface on the public site, which is strictly more attack surface
     for the most sensitive artifact on the platform.
     """
-    got = {k: v["channel"] for k, v in reg.manual_capture_sources().items()}
+    got = {k: v["channel"] for k, v in reg.manual_capture_sources(include_paused=True).items()}
     assert got == {
         "apple_health": "hae",
         "notion": "notion",
@@ -66,10 +66,10 @@ def test_capture_channels_are_matthews_four():
 
 
 def test_channel_filter():
-    assert set(reg.manual_capture_sources(channel="mcp")) == {"measurements", "food_delivery"}
-    assert set(reg.manual_capture_sources(channel="hae")) == {"apple_health"}
-    assert set(reg.manual_capture_sources(channel="notion")) == {"notion"}
-    assert set(reg.manual_capture_sources(channel="telegram")) == {"progress_photos"}
+    assert set(reg.manual_capture_sources(include_paused=True, channel="mcp")) == {"measurements", "food_delivery"}
+    assert set(reg.manual_capture_sources(include_paused=True, channel="hae")) == {"apple_health"}
+    assert set(reg.manual_capture_sources(include_paused=True, channel="notion")) == {"notion"}
+    assert set(reg.manual_capture_sources(include_paused=True, channel="telegram")) == {"progress_photos"}
 
 
 def test_notion_threshold_derived_from_journaling_cadence():

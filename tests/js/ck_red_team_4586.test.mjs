@@ -230,16 +230,14 @@ test("Front, no bet and no exchange: the newest quotable line keeps the coaches'
 const V8 = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "site", "next", "v8");
 const shell = (page) => readFileSync(join(V8, page, "index.html"), "utf8");
 
-test("item 1: the two premise sentences are the drafts posted on #4590, marked as drafts until his word", () => {
+test("item 1: the two premise sentences are his approved copy (#4590), unmarked", () => {
   const front = shell("");
   const start = shell("start");
-  assert.match(front, /<p class="ck-premise" data-ck-draft="premise">I’m Matthew\. I’m trying to get from 327 pounds to 185 and to get my life back with it, in public, because I do better when someone is watching\. A team of AI coaches I built predicts how it will go, and code checks every call\.<\/p>/);
-  assert.match(start, /<p class="ck-premise" data-ck-draft="premise">I’m Matthew\. The weight was never really about food, so this is me measuring the whole thing out loud: what my scale, wrist strap, bed sensor and food log record each day, what the AI coaches I built with Claude make of it, and whether they were right\.<\/p>/);
+  assert.match(front, /<p class="ck-premise">I’m Matthew\. I’m trying to get from 327 pounds to 185 and to get my life back with it, in public, because I do better when someone is watching\. A team of AI coaches I built predicts how it will go, and code checks every call\.<\/p>/);
+  assert.match(start, /<p class="ck-premise">I’m Matthew\. The weight was never really about food, so this is me measuring the whole thing out loud: what my scale, wrist strap, bed sensor and food log record each day, what the AI coaches I built with Claude make of it, and whether they were right\.<\/p>/);
   for (const html of [front, start]) {
-    const note = /<p class="ck-small">(Preview\. [^<]*)<\/p>\s*<\/div>/.exec(html);
-    assert.ok(note, "the footer keeps its draft note");
-    assert.equal((note[1].match(/[.!?](\s|$)/g) || []).length, 2, `one short sentence after "Preview.": ${note[1]}`);
-    assert.match(note[1], /draft/i);
+    assert.doesNotMatch(html, /data-ck-draft/, "no draft mark on an approved sentence");
+    assert.doesNotMatch(html, /drafts until Matthew approves/, "the draft footer note is gone");
   }
   assert.doesNotMatch(front, /a program grades/, "front:F8 — the grader is code");
   assert.match(front, /<p class="ck-label">Graded by code<\/p>/);

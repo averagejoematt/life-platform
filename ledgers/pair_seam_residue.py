@@ -363,6 +363,16 @@ _WHOOP_HISTORY_READ_REASON = (
 
 
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
+    "whoop::lambdas/ingestion/whoop_cycle_day.py::read": (
+        "2026-10-18",
+        "#5002: the cycle-id guard reads back ONLY `sk` and `cycle_id` of the neighbouring whoop day rows. Both sides of "
+        "`cycle_id` live in the one module: `whoop_cycle_day.cycle_identity` builds the field `whoop_lambda._extract_cycle` "
+        "writes, and `cycle_id_filed_elsewhere` beside it reads it back. A drift cannot fabricate a row: an unmatched "
+        "name reads as no neighbour holding the id, and the "
+        "start-day rule (`cycle_for_day`) still keeps the prior day's cycle off the row. Pinned two-sided on the "
+        "archived 2026-10-17/18 payloads by tests/test_whoop_cycle_day_dedup_5002.py (guard removed -> 2 red; "
+        "start-day rule removed too -> the 10-18 duplicate is written again).",
+    ),
     "whoop::lambdas/web/site_api_physical.py::read": (
         "2026-10-16",
         "#4630: the weekly physical summary reads whoop rows ONLY to hand them to common.metric_truth's steps resolver, "
@@ -464,6 +474,16 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
     "hevy::mcp/tools_health.py::read": (
         "2026-09-20",
         _HEVY_WORKED_SET_REASON,
+    ),
+    # #4976 (2026-10-18): /api/device_agreement re-pointed from garmin to the Apple Watch. It reads
+    # `date` + `resting_heart_rate_apple` only — the one name health_auto_export_lambda's tier-2
+    # _METRIC_DEFS writes for Apple RHR (freshness_checker writes no such field). A writer-side
+    # rename leaves the reader with NO matching rows, which the endpoint serves as an explicit
+    # 'unavailable' with a reason (tests/test_device_agreement.py::test_no_overlap_returns_shaped_unavailable_200)
+    # — the two sides can disagree only into an honest absence, never into a wrong number.
+    "apple_health::lambdas/web/site_api_freshness.py::read": (
+        "2026-10-18",
+        "reads resting_heart_rate_apple + date only; a writer rename degrades to an explicit 'unavailable', never a wrong value",
     ),
     "hevy::mcp/tools_nutrition.py::read": (
         "2026-09-20",

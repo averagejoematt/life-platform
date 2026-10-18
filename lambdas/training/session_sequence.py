@@ -79,6 +79,11 @@ RULINGS (#4110/#4147/#4161 — stated so a reader can dispute them, not discover
     beside the served session (`spacing`), never by skipping it — the owner audibles, the plan
     remembers. v0.3's "non-consecutive days" advisory is gone: the order alternates upper and
     lower, so back-to-back days never load the same region twice.
+  * #5004: the spacing window is the 7 days ENDING ON AND INCLUDING the target date, the target
+    session counted in it; the advisory states that window. `self_added_volume` is NOT on this window
+    and stays on its Mon–Sun Pacific calendar week (changing it would alter the Sunday digest's
+    report): that is a weekly performed-vs-prescribed-sets report, this is a rolling session count.
+    The two differ on purpose and each says which it is. The 3–4/wk redline value is unchanged.
 """
 
 from __future__ import annotations
@@ -460,24 +465,38 @@ def completed_positions(workouts: Iterable[dict[str, Any]] | None, before_day: s
     return [{**pos, **c} for c, pos in zip(done, ledger([c["date"] for c in done]))]
 
 
+SPACING_WINDOW_DAYS = 7
+"""The spacing advisory's window (#5004): the 7 days ENDING ON AND INCLUDING the target date (target-6 .. target).
+The pre-#5004 cut, `date >= target-7` over the sessions before the target, spanned 8 days with the target — so four
+sessions in 10-11..10-17 were flagged on 2026-10-18 though every 7-day window holding 10-18 held four."""
+
+
 def _spacing(completed: list[dict[str, Any]], day: str) -> dict[str, Any]:
-    """The redline's calendar advisories beside the served session — never a reason to skip it."""
+    """The redline's calendar advisories beside the served session — never a reason to skip it.
+
+    Window: the 7 days ending on and including `day` (`SPACING_WINDOW_DAYS`). `completed` holds the sessions
+    BEFORE `day`, so the prior ones are those in [day-6, day-1]; the served session is the window's one more.
+    (`self_added_volume` keeps its own Mon–Sun Pacific week — a different question, a weekly report on
+    performed-vs-prescribed sets; this is a rolling count against a per-week ceiling. See the module docstring.)"""
     from training import owner_redlines
 
     lift = owner_redlines.REDLINES["lifting_sessions_per_wk"]
     yesterday = shift_day_key(day, -1)
-    week_ago = shift_day_key(day, -7)
-    trailing = [c for c in completed if c["date"] >= week_ago]
+    window_start = shift_day_key(day, -(SPACING_WINDOW_DAYS - 1))
+    prior = [c for c in completed if window_start <= c["date"] < day]
+    in_window = len(prior) + 1  # this session is the window's own
     loaded_yesterday = bool(completed) and completed[-1]["date"] == yesterday
     advisories: list[str] = []
-    if len(trailing) >= int(lift["high"]):
+    if in_window > int(lift["high"]):
         advisories.append(
-            f"{len(trailing)} loaded sessions in the 7 days before this one — at the redline's {lift['low']}–{lift['high']}/wk "
-            "ceiling; another today would exceed it"
+            f"{in_window} loaded sessions in the 7 days ending {day}, including this session — over the redline's "
+            f"{lift['low']}–{lift['high']}/wk ceiling ({len(prior)} already logged {window_start}..{shift_day_key(day, -1)})"
         )
     return {
         "loaded_yesterday": loaded_yesterday,
-        "loaded_sessions_prior_7d": len(trailing),
+        "window": {"start": window_start, "end": day, "days": SPACING_WINDOW_DAYS, "includes_target": True},
+        "loaded_sessions_prior_in_window": len(prior),
+        "loaded_sessions_in_window": in_window,
         "redline_sessions_per_wk": [lift["low"], lift["high"]],
         "advisories": advisories,
     }

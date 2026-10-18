@@ -3349,6 +3349,13 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/ingestion/whoop_cycle_day.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
       "direction": "unknown",
       "lambda": null,
       "module": "lambdas/ingestion/whoop_empty_day.py",
@@ -4584,15 +4591,15 @@
       "direction": "read",
       "lambda": null,
       "module": "lambdas/web/site_api_freshness.py",
-      "partition": "engagement_state",
-      "via": "pk"
+      "partition": "apple_health",
+      "via": "seam"
     },
     {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/web/site_api_freshness.py",
-      "partition": "garmin",
-      "via": "seam"
+      "partition": "engagement_state",
+      "via": "pk"
     },
     {
       "direction": "read",
@@ -5543,13 +5550,6 @@
       "direction": "read",
       "lambda": null,
       "module": "lambdas/web/site_api_vitals_depth.py",
-      "partition": "garmin",
-      "via": "seam"
-    },
-    {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/web/site_api_vitals_depth.py",
       "partition": "strava",
       "via": "seam"
     },
@@ -5750,6 +5750,13 @@
       "via": "seam"
     },
     {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/shared_quantities.py",
+      "partition": "withings",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_benchmark.py",
@@ -5866,13 +5873,6 @@
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_health.py",
       "partition": "computed_metrics",
-      "via": "seam"
-    },
-    {
-      "direction": "read",
-      "lambda": "life-platform-mcp",
-      "module": "mcp/tools_health.py",
-      "partition": "garmin",
       "via": "seam"
     },
     {
@@ -6209,13 +6209,6 @@
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_training.py",
       "partition": "eightsleep",
-      "via": "seam"
-    },
-    {
-      "direction": "read",
-      "lambda": "life-platform-mcp",
-      "module": "mcp/tools_training.py",
-      "partition": "garmin",
       "via": "seam"
     },
     {
@@ -7711,7 +7704,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 749,
+      "edges": 748,
       "lambdas": 108,
       "mcp_tool_modules": 36,
       "mcp_tools": 88,
@@ -7725,9 +7718,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 363,
-        "sites_resolved": 941,
-        "sites_total": 1304
+        "sites_dynamic": 364,
+        "sites_resolved": 942,
+        "sites_total": 1306
       },
       "schedule_resolution": {
         "dynamic": 0,

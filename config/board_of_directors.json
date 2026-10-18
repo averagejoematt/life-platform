@@ -23,7 +23,6 @@
       "data_sources": [
         "strava",
         "whoop",
-        "garmin",
         "hevy",
         "apple_health"
       ],
@@ -570,7 +569,7 @@
       "data_sources": [
         "whoop",
         "eightsleep",
-        "garmin",
+        "apple_health",
         "state_of_mind",
         "weather"
       ],
@@ -1028,7 +1027,7 @@
       "data_sources": [
         "hevy",
         "whoop",
-        "garmin"
+        "apple_health"
       ],
       "voice": {
         "tone": "Cautious, anatomically precise, prefers the safer option when there is one",

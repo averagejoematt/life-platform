@@ -4,7 +4,8 @@ lambdas/web/site_api_vitals_depth.py — the vitals-DEPTH endpoint (#421 / VIT-0
 One read-only endpoint, `/api/vitals_depth`, that deepens the daily vitals surface with the
 slow-moving, long-horizon reads the daily aggregates can't show:
 
-  • VO2max trend        — actually-recorded Garmin estimates, the multi-year aerobic arc.
+  • VO2max trend        — actually-recorded estimates through the metric-truth resolver (Apple
+                          Watch from now on, Garmin history before it), the multi-year aerobic arc.
   • Walking heart rate  — the average HR of real Strava `Walk` activities (a genuine
                           walking-HR capture source), a recent trend with gaps as gaps.
   • Fitness age         — a complementary age estimate MAPPED from VO2max against male
@@ -24,7 +25,8 @@ ideas are deferred here for exactly that reason (see `_DEFERRED` below):
     sign-off per the privacy line; BP capture coverage is also not yet confirmed.
 
 Data provenance (verified against live DDB, 2026-07-08):
-  • Garmin `vo2_max` — 287 real records, 2022-04 → 2026-05 (source USER#matthew#SOURCE#garmin).
+  • Garmin `vo2_max` — 287 real records, 2022-04 → 2026-05 (source USER#matthew#SOURCE#garmin) — history,
+    read through `METRIC_TRUTH["vo2_max"]` behind the Apple Watch's `vo2max` since #4976.
   • Strava `Walk` activities with `average_heartrate` — 775 real activities, 2020-11 → 2026-07.
   Both partitions are RAW_TIMESERIES (cross-phase, kept across resets — lambdas/phase_taxonomy.py),
   and the records carry phase=pilot, so these arcs are read with include_pilot=True — the
@@ -33,6 +35,9 @@ Data provenance (verified against live DDB, 2026-07-08):
 
 import json
 from datetime import datetime, timedelta
+
+from common import metric_truth
+from ingestion.source_registry import source_label
 
 from web.site_api_common import (
     PT,
@@ -51,6 +56,7 @@ _ARC_EARLIEST = "2010-01-01"  # far enough back to sweep the full recorded histo
 # available panel declares scope="multi_year" and the renderer labels it ("multi-year history ·
 # not reset with the experiment"). Labeling only — the history is real and nothing is blanked.
 _SCOPE_MULTI_YEAR = "multi_year"
+_VO2 = metric_truth.VO2_MAX  # #4976: the arc reads through the resolver, never a device field
 _WALK_WINDOW_DAYS = 182  # the rendered walking-HR trend is the last ~6 months (recent read)
 _FITNESS_BASIS_DAYS = 180  # VO2max readings feeding the fitness-age estimate (recent aerobic state)
 
@@ -166,23 +172,23 @@ def _fitness_age_estimate(vo2_series):
 
 # ── VO2max arc ───────────────────────────────────────────────────────────────────────────────
 def _vo2max_arc():
-    """The recorded VO2max arc from Garmin (real estimates only; gaps stay gaps)."""
-    rows = _query_source("garmin", _ARC_EARLIEST, _today(), include_pilot=True)
+    """The recorded VO2max arc, read through the metric-truth resolver (#4976).
+
+    `METRIC_TRUTH["vo2_max"]` names the sources and fields: the Apple Watch's estimate from now
+    on, Garmin's stored estimates for the history before it (the direct feed is retired, #4640;
+    its rows are read, never rewritten). Real estimates only; gaps stay gaps. Each point carries
+    the source that answered for its day, because two vendors' estimators are not one series."""
+    rows_by_source = {src: _query_source(src, _ARC_EARLIEST, _today(), include_pilot=True) for src in metric_truth.sources_for(_VO2)}
     series = []
-    for r in rows:
-        v = r.get("vo2_max")
-        d = r.get("date") or (r.get("sk", "").replace("DATE#", "") or None)
-        if v is None or not d:
+    for d, r in sorted(metric_truth.resolve_by_date(_VO2, rows_by_source).items()):
+        if r.value is None or r.value <= 0:
             continue
-        try:
-            series.append({"date": d, "value": round(float(v), 1)})
-        except (TypeError, ValueError):
-            continue
-    series.sort(key=lambda x: x["date"])
+        series.append({"date": d, "value": round(r.value, 1), "source": r.source})
     if not series:
         return {"available": False, "reason": "No recorded VO2max estimates yet."}
     values = [p["value"] for p in series]
     current = series[-1]
+    arc_sources = [source_label(src) or src for src in dict.fromkeys(p["source"] for p in series)]
     # Direction over the recorded arc: first-vs-last, honest and coarse (an arc metric, not a daily line).
     first_v, last_v = values[0], values[-1]
     delta = round(last_v - first_v, 1)
@@ -194,8 +200,11 @@ def _vo2max_arc():
         trend = "declining"
     return {
         "available": True,
-        "scope": _SCOPE_MULTI_YEAR,  # #1091 — Garmin arc spans cycles; kept across resets
-        "source": "Garmin",
+        "scope": _SCOPE_MULTI_YEAR,  # #1091 — the arc spans cycles; kept across resets
+        # #4976: the device that answered for the newest point, and every device on the arc.
+        "source": source_label(current["source"]) or current["source"],
+        "sources": arc_sources,
+        "mixed_devices": len(arc_sources) > 1,
         "unit": "ml/kg/min",
         "series": series,
         "n": len(series),
