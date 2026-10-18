@@ -8,6 +8,12 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// SITE is read by a test registered above the lane-D block that first declared it (item 8 / round 2 reads
+// clean.css). A test can start while this module is suspended at a later top-level `await import`, so a
+// `const` declared below that await is in its temporal dead zone for any earlier-registered test — the
+// CI runner hit exactly that ("Cannot access 'SITE' before initialization"). Declared before the first await.
+const SITE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "site");
+
 const P = await import("../../site/assets/js/ck_pages.js");
 const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit_pages_4586");
 const load = (name) => JSON.parse(readFileSync(join(FIX, `${name}.json`), "utf8"));
@@ -595,7 +601,6 @@ test("Day D3: a 'call' with no date and no number in it is labelled a note", () 
 
 // ── site-to-A round 1, lane D (2026-10-18): the sheet, how it's built, the appendix, a call, a coach ──
 const BU = await import("../../site/assets/js/ck_built.js");
-const SITE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "site");
 const page = (name) => readFileSync(join(SITE, "next", "v8", name, "index.html"), "utf8");
 const textOf = (html) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
