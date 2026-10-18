@@ -58,6 +58,9 @@ DEAD_MAN_LOOKBACK_DAYS = 14
 STATUS_OK = "ok"
 STATUS_STALE = "stale"
 STATUS_UNKNOWN = "unknown"
+# No stamp has ever been written and the dead-man's `armed_after` instant has not passed:
+# reported, never counted (the field only exists from the webhook deploy).
+STATUS_PENDING = "pending"
 
 
 def is_watch_source(source: Any) -> bool:
@@ -128,7 +131,15 @@ def dead_man_specs() -> list[dict[str, Any]]:
         dm = d.get("dead_man")
         if not isinstance(dm, dict):
             continue
-        out.append({"key": str(d["key"]), "label": str(d["label"]), "field": str(dm["field"]), "stale_hours": float(dm["stale_hours"])})
+        out.append(
+            {
+                "key": str(d["key"]),
+                "label": str(d["label"]),
+                "field": str(dm["field"]),
+                "stale_hours": float(dm["stale_hours"]),
+                "armed_after": dm.get("armed_after"),
+            }
+        )
     return out
 
 
@@ -140,6 +151,15 @@ def evaluate(spec: dict[str, Any], last_epoch: float | None, now: datetime, look
     stale_hours = float(spec["stale_hours"])
     row: dict[str, Any] = {"key": spec["key"], "label": spec["label"], "stale_hours": stale_hours}
     if last_epoch is None:
+        armed = parse_iso_utc(spec["armed_after"]) if spec.get("armed_after") else None
+        if armed is not None and now < armed:
+            row.update(
+                status=STATUS_PENDING,
+                age_hours=None,
+                last_reading_at=None,
+                detail=f"no {spec['label']} presence stamp yet — dead-man not armed until {armed.isoformat()}",
+            )
+            return row
         row.update(
             status=STATUS_STALE,
             age_hours=None,
@@ -231,5 +251,5 @@ def check_dead_men(
 
 
 def not_ok(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """The rows that must reach the alarm path (stale or unknown)."""
-    return [r for r in rows if r.get("status") != STATUS_OK]
+    """The rows that must reach the alarm path (stale or unknown; a pending bootstrap row is not)."""
+    return [r for r in rows if r.get("status") not in (STATUS_OK, STATUS_PENDING)]

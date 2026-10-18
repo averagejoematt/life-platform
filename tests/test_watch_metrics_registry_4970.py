@@ -248,7 +248,7 @@ NOW = datetime(2026, 10, 18, 16, 45, tzinfo=timezone.utc)  # the checker's daily
 
 def test_registry_carries_the_watch_entries_and_the_36h_dead_man():
     by = {d["key"]: d for d in hae_datatype_thresholds()}
-    assert by["watch"]["dead_man"] == {"field": wp.WATCH_PRESENCE_FIELD, "stale_hours": 36}
+    assert {k: by["watch"]["dead_man"][k] for k in ("field", "stale_hours")} == {"field": wp.WATCH_PRESENCE_FIELD, "stale_hours": 36}
     assert by["watch_overnight_vitals"]["stale_days"] == 2
     assert all(not by[k]["manual"] for k in ("watch", "watch_overnight_vitals", "watch_heart", "watch_activity", "watch_fitness"))
     assert [s["key"] for s in wp.dead_man_specs()] == ["watch"]
@@ -263,7 +263,7 @@ def test_dead_man_threshold_both_sides():
 
 
 def test_dead_man_with_no_reading_states_the_lookback_never_an_age():
-    row = wp.evaluate(wp.dead_man_specs()[0], None, NOW)
+    row = wp.evaluate({**wp.dead_man_specs()[0], "armed_after": None}, None, NOW)
     assert row["status"] == "stale" and row["age_hours"] is None and "14 days" in row["detail"]
 
 
@@ -278,7 +278,9 @@ class _QueryTable:
         return {"Items": [i for i in self.items if i["sk"] >= kw["ExpressionAttributeValues"][":lo"]]}
 
 
-def test_check_dead_men_reads_the_newest_stamp_and_fails_soft():
+def test_check_dead_men_reads_the_newest_stamp_and_fails_soft(monkeypatch):
+    real = wp.dead_man_specs
+    monkeypatch.setattr(wp, "dead_man_specs", lambda: [{**x, "armed_after": None} for x in real()])
     fresh = _QueryTable([{"sk": "DATE#2026-10-18", wp.WATCH_PRESENCE_FIELD: NOW.timestamp() - 3600}])
     assert [r["status"] for r in wp.check_dead_men(fresh, NOW)] == ["ok"]
     assert fresh.queries[0]["ExpressionAttributeValues"][":lo"] == "DATE#2026-10-04"  # 14-day floor on the key condition
@@ -337,3 +339,47 @@ def test_a_live_watch_adds_nothing_through_the_real_handler(monkeypatch):
 
     stale_metric = [m["Value"] for call in cw.metrics for m in call["MetricData"] if m["MetricName"] == "StaleSourceCount"]
     assert stale_metric == [0.0], stale_metric
+
+
+# ── regression: the bootstrap page (2026-10-18 21:34Z) ─────────────────────────────────
+# The first checker run after the #5033 deploy found NO presence stamp (the webhook had not
+# yet received a watch payload) and counted the dead-man into StaleSourceCount, paging
+# slo-source-freshness on a healthy watch. Day-level groups never counted; the counted entry
+# was "Apple Watch (any watch-sourced reading) dead-man".
+
+
+def _handler_count(monkeypatch, stamp_age_h, armed_after):
+    import test_freshness_checker_handler_wiring as harness
+
+    fc = harness.fc
+    today = fc.pacific_now().date()
+    ah = {"pk": f"USER#{fc.USER_ID}#SOURCE#apple_health", "sk": f"DATE#{today.isoformat()}"}  # groups empty
+    if stamp_age_h is not None:
+        ah[wp.WATCH_PRESENCE_FIELD] = fc.pacific_now().timestamp() - stamp_age_h * 3600
+    rows = [{"pk": f"USER#{fc.USER_ID}#SOURCE#whoop", "sk": f"DATE#{today.isoformat()}"}, ah]
+    _sns, cw = harness._install(monkeypatch, harness.FakeTable(rows=rows))
+    real = wp.dead_man_specs
+    monkeypatch.setattr(wp, "dead_man_specs", lambda: [{**s, "armed_after": armed_after} for s in real()])
+    monkeypatch.setattr(fc, "check_watch_dead_men", wp.check_dead_men)
+    fc.lambda_handler({}, None)
+    return [m["Value"] for call in cw.metrics for m in call["MetricData"] if m["MetricName"] == "StaleSourceCount"]
+
+
+def test_unarmed_dead_man_with_no_stamp_and_empty_groups_adds_nothing(monkeypatch):
+    assert _handler_count(monkeypatch, None, "2099-01-01T00:00:00+00:00") == [0.0]
+
+
+def test_mutation_control_armed_dead_man_with_no_stamp_counts(monkeypatch):
+    """Can-fail: drop the grace (armed in the past) and the same world counts 1."""
+    assert _handler_count(monkeypatch, None, "2000-01-01T00:00:00+00:00") == [1.0]
+
+
+def test_a_40h_stamp_counts_one_even_inside_the_grace(monkeypatch):
+    assert _handler_count(monkeypatch, 40, "2099-01-01T00:00:00+00:00") == [1.0]
+
+
+def test_pending_row_is_reported_but_not_alarmed():
+    spec = {**wp.dead_man_specs()[0], "armed_after": "2099-01-01T00:00:00+00:00"}
+    row = wp.evaluate(spec, None, NOW)
+    assert row["status"] == "pending" and wp.not_ok([row]) == []
+    assert wp.evaluate({**spec, "armed_after": "2000-01-01T00:00:00+00:00"}, None, NOW)["status"] == "stale"

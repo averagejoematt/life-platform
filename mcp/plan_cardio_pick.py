@@ -13,7 +13,10 @@ a read that fails is itself named, and never costs the draft.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
+
+logger = logging.getLogger("tools_hevy_routine")
 
 
 def draft_cardio_warnings(blocks: list[Any], archetype: str, target_date: str) -> list[str]:
@@ -43,3 +46,34 @@ def draft_cardio_warnings(blocks: list[Any], archetype: str, target_date: str) -
         f"{pick['reason']}. Stage 2's joints_tendons critic swaps it when the legs are loaded (#4387)."
         for b in timed_wb
     ]
+
+
+def attach_custom_cardio_notes(ir: Any, target_date: str) -> int:
+    """#3700/#5048: `attach_cardio_cues` on a `draft_custom` routine. Returns how many cardio notes were written.
+
+    `generate_routines` calls `attach_cardio_cues` at the end of its build; `draft_custom` builds its blocks
+    straight from the caller's arguments and never reaches it, so this is the one call that path needs.
+    It runs AFTER `_new_routine_id` (the id is content-derived — a routine must not get a new id because
+    his history moved) and BEFORE `draft_versioned`, so `dry_run`/`commit` push the bytes this reports.
+    The note is the prescription-first composed note (`training.cardio_note`): it REPLACES an authored
+    cardio note (kept on the snapshot) and recomposes identically on a re-draft, so it never stacks.
+    Fail-soft twice over: `attach_cardio_cues` returns 0 with every note untouched on an index-load
+    failure, and the guard here means no cue path can cost a draft. The count is REPORTED, never assumed:
+    0 on a routine with no cardio block is the honest answer."""
+    try:
+        from training import cardio_note
+        from training.routine_generator import attach_cardio_cues
+
+        layer = None
+        if any(cardio_note.machine_for(b.movement_key) for b in ir.exercises):
+            # the week's walking load decides whether a harder shape is allowed, and writes the why line
+            try:
+                from mcp import shared_quantities
+
+                layer = shared_quantities.recent_aerobic_layer(target_date)
+            except Exception as e:  # noqa: BLE001 — unread: the ride stays flat
+                logger.warning(f"draft_custom: recent-aerobic read failed ({e}); the cardio shape stays flat")
+        return attach_cardio_cues(ir, aerobic_block=layer)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"draft_custom: cardio cue pass failed ({e}); notes untouched")
+        return 0

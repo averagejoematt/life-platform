@@ -44,8 +44,6 @@ from common.pacific_time import pacific_today  # #2798: target_date is a Pacific
 from training import commit_binding  # #4066: the commit is bound to the red-teamed routine
 from training.warmup_sets import working_set_count  # #5049: the set ceilings count working sets
 
-# #3971: the subtract-only rule as a GATE on this path rather than a discipline. Its own
-# module for the same reason — this file sits at the ratchet's ceiling.
 from mcp.hevy_prescription_gate import prescription_gate, refusal as _gate_refusal, summary as _gate_summary
 
 # #3670: everything the commit result must report honestly lives in its own module
@@ -57,6 +55,10 @@ from mcp.hevy_routine_commit_report import (
     ensure_folder as _ensure_folder,
     folder_title_for as _folder_title_for,
 )
+
+# #3971: the subtract-only rule as a GATE on this path rather than a discipline. Its own
+# module for the same reason — this file sits at the ratchet's ceiling.
+from mcp.plan_cardio_pick import attach_custom_cardio_notes  # #3700/#5048: the chat path's cardio note pass
 from mcp.utils import mcp_error
 
 logger = logging.getLogger("tools_hevy_routine")
@@ -804,28 +806,9 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         rationale=_CUSTOM_RATIONALE + [f"{len(blocks)} exercises, {total_sets} total sets"],
         caps={},
     )
-    # #3700 — the chat path gets the SAME cardio cue the cron path already stamps.
-    # `generate_routines` calls `attach_cardio_cues` at the end of its build; `draft_custom`
-    # builds its blocks straight from the caller's arguments and never reaches it, so a
-    # chat-authored treadmill/cycling block went to Hevy with no baseline in front of it
-    # while an identical generated block carried one. This is the whole residual, and it is
-    # one call wide.
-    #
-    # It runs AFTER `_new_routine_id` (the id is content-derived — a routine must not get a
-    # new id because his history moved) and BEFORE `draft_versioned`, so the PERSISTED draft
-    # carries the cue and `dry_run`/`commit` push the same bytes this response reports.
-    # Fail-soft twice over: `attach_cardio_cues` swallows its own index-load failures and
-    # returns 0 with every note untouched, and the outer guard means no cue path can cost a
-    # draft. It is idempotent on a note already opening "Last:", so a re-draft never stacks.
-    # The count is REPORTED rather than assumed: 0 on a routine with no cardio block is the
-    # honest answer, and 0 on a routine WITH one says the history had nothing to quote.
-    cardio_cues = 0
-    try:
-        from training.routine_generator import attach_cardio_cues
-
-        cardio_cues = attach_cardio_cues(ir)
-    except Exception as e:  # noqa: BLE001
-        logger.warning(f"draft_custom: cardio cue pass failed ({e}); notes untouched")
+    # #3700/#5048 — the chat path gets the SAME prescription-first cardio note the cron path stamps,
+    # AFTER `_new_routine_id` and BEFORE `draft_versioned`, so the persisted draft carries it.
+    cardio_cues = attach_custom_cardio_notes(ir, target_date)
     ir.inputs_snapshot["cardio_cues"] = cardio_cues
     # #5005: a program-session date re-tags the blocks with the slot's intensity, so the commit gate checks the engine's floors
     from mcp.draft_custom_session import attach_draft_warmups, stamp_program_slot
