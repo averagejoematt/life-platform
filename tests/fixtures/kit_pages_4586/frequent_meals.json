@@ -1,14 +1,14 @@
 {
  "_meta": {
-  "generated_at": "2026-10-17T22:51:37.258954+00:00",
-  "served_at": "2026-10-17T22:51:37.258954+00:00",
+  "generated_at": "2026-10-18T07:15:19.352655+00:00",
+  "served_at": "2026-10-18T07:15:19.352655+00:00",
   "cache_seconds": 3600,
-  "request_id": "59b52a8f0f90427a"
+  "request_id": "128d107d744d4305"
  },
  "meals": [
   {
    "name": "Morning Smoothies",
-   "frequency": 22,
+   "frequency": 23,
    "avg_calories": 80,
    "avg_protein_g": 15,
    "avg_carbs_g": 4,
@@ -16,7 +16,7 @@
   },
   {
    "name": "Sugar Free Jello",
-   "frequency": 18,
+   "frequency": 21,
    "avg_calories": 10,
    "avg_protein_g": 1,
    "avg_carbs_g": 0,
@@ -32,42 +32,42 @@
   },
   {
    "name": "Cool Whip Lite",
-   "frequency": 11,
+   "frequency": 12,
    "avg_calories": 81,
    "avg_protein_g": 1,
    "avg_carbs_g": 12,
    "protein_cal_pct": 5
   },
   {
-   "name": "Rice White Cooked Without Salt",
-   "frequency": 10,
-   "avg_calories": 206,
-   "avg_protein_g": 4,
-   "avg_carbs_g": 45,
-   "protein_cal_pct": 8
-  },
-  {
-   "name": "Fiber Gummies",
-   "frequency": 10,
-   "avg_calories": 25,
-   "avg_protein_g": 0,
-   "avg_carbs_g": 10,
-   "protein_cal_pct": 0
-  },
-  {
    "name": "Complete Vanilla 20g Protein Greek Yogurt",
-   "frequency": 10,
+   "frequency": 11,
    "avg_calories": 82,
    "avg_protein_g": 10,
    "avg_carbs_g": 8,
    "protein_cal_pct": 49
   },
   {
+   "name": "Rice White Cooked Without Salt",
+   "frequency": 10,
+   "avg_calories": 236,
+   "avg_protein_g": 4,
+   "avg_carbs_g": 52,
+   "protein_cal_pct": 7
+  },
+  {
    "name": "Olive Oil",
    "frequency": 10,
-   "avg_calories": 60,
+   "avg_calories": 56,
    "avg_protein_g": 0,
    "avg_carbs_g": 0,
+   "protein_cal_pct": 0
+  },
+  {
+   "name": "Fiber Gummies",
+   "frequency": 9,
+   "avg_calories": 25,
+   "avg_protein_g": 0,
+   "avg_carbs_g": 10,
    "protein_cal_pct": 0
   }
  ],

@@ -27,9 +27,9 @@ const CAPTURE_HAS_BET = !!(B.next.data.bet && B.next.data.bet.data);
 if (!CAPTURE_HAS_BET) B.next.data.bet = PINNED.bet;
 const inWords = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
 const weekday = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
-// The day the next chapter is due, as the captured edition serves it ("Wednesday, October 14").
+// The day the next chapter is due, as the captured edition serves it ("Wednesday, October 21").
 const NEXT_DUE = `${weekday(B.next.data.chapter.data.date)}, ${inWords(B.next.data.chapter.data.date)}`;
-// The captured chapter (week 5) has no podcast episode yet. WITH_POD is that chapter carrying
+// The captured chapter (week 6) has no podcast episode yet. WITH_POD is that chapter carrying
 // the week 4 episode as the edition served it on October 3, so the player stays pinned.
 const POD = { state: "ok", as_of: "2026-10-01", source: "/panelcast/episodes.json", absent_text: "No podcast episode for this chapter yet.", data: { title: "EP4 · The Body Answers Back", guest: "Marcus Webb", guest_domain: "food", duration_sec: 420, duration_minutes: 7, mp3_url: "/panelcast/wk4.mp3", date: "2026-10-01" } };
 const WITH_POD = { ...B.chapter, state: "ok", data: { ...B.chapter.data, podcast: POD } };
@@ -54,11 +54,11 @@ test("the header carries the edition's one day and day number, in words", () => 
 
 test("a fresh chapter leads with its badge, title, player and the AI byline", () => {
   const html = P.chapterHTML(WITH_POD, B.next);
-  assert.match(html, /New this week · Week 5/);
-  assert.match(html, /<h1>Park's Blind Spot<\/h1>/);
+  assert.match(html, /New this week · Week 6/);
+  assert.match(html, /<h1>The Quiet Accumulation<\/h1>/);
   assert.match(html, /<audio controls preload="none" src="\/panelcast\/wk4\.mp3"/);
   assert.match(html, new RegExp(`Written by AI from the record on ${inWords(B.chapter.data.date)}\\. Matthew reads each chapter before it publishes\\.`));
-  assert.ok(html.indexOf("Written by AI") < html.indexOf("After 23 consecutive"), "the AI label sits above the AI's words");
+  assert.ok(html.indexOf("Written by AI") < html.indexOf("The Monday afternoon walk"), "the AI label sits above the AI's words");
   // As captured: no episode yet, so no player and the block's own sentence.
   const live = P.chapterHTML(B.chapter, B.next);
   assert.doesNotMatch(live, /<audio/);
@@ -66,7 +66,7 @@ test("a fresh chapter leads with its badge, title, player and the AI byline", ()
 });
 
 test("a stale chapter is not called new, and an unserved one prints its sentence", () => {
-  assert.match(P.chapterHTML({ ...B.chapter, state: "stale" }, B.next), /Latest chapter · Week 5 \(written October 6\)/);
+  assert.match(P.chapterHTML({ ...B.chapter, state: "stale" }, B.next), /Latest chapter · Week 6 \(written October 13\)/);
   assert.doesNotMatch(P.chapterHTML({ ...B.chapter, state: "stale" }, B.next), /New this week/);
   assert.equal(P.chapterHTML(UNAVAILABLE, B.next), '<p class="ck-soft">The latest chapter is not served right now.</p>');
 });
@@ -234,7 +234,7 @@ test("the front page runs one sentence of the chapter, a Listen button and no id
   assert.doesNotMatch(html, /<audio/);
   assert.match(html, /<a class="ck-btn ck-btn--ghost" href="\/next\/v8\/story\/">Listen · 7 min<\/a>/);
   assert.equal((html.match(/ck-premise/g) || []).length, 1, "one paragraph of the chapter");
-  assert.match(html, /<p class="ck-premise ck-soft">After 23 consecutive training days/);
+  assert.match(html, /<p class="ck-premise ck-soft">The Monday afternoon walk covered 5\.4 miles/);
   assert.match(html, new RegExp(`On the podcast: the food coach, Marcus Webb\\. The next draft is due ${NEXT_DUE}; it publishes once Matthew approves it\\.`));
   // As captured, with no episode: no Listen button, and the next chapter's day still said.
   const live = P.chapterHTML(B.chapter, B.next, { heading: "h2", player: false, listenHref: "/next/v8/story/" });

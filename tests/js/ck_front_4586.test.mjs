@@ -22,7 +22,7 @@ const TODAY = edition.as_of;
 const SERIES = B.week.data.weight_series;
 const GONE = { state: "unavailable", absent_text: "Not served right now.", data: null };
 
-// The captured chapter (week 5) has no podcast episode yet: WITH_POD carries the week 4 episode
+// The captured chapter (week 6) has no podcast episode yet: WITH_POD carries the week 4 episode
 // as the edition served it on October 3. The captured lead read is null (the route served no
 // weekly priority at capture time): LEAD_READ is the read it served on September 28.
 const POD = { state: "ok", as_of: "2026-10-01", source: "/panelcast/episodes.json", absent_text: "No podcast episode for this chapter yet.", data: { title: "EP4 · The Body Answers Back", guest: "Marcus Webb", guest_domain: "food", duration_sec: 420, duration_minutes: 7, mp3_url: "/panelcast/wk4.mp3", date: "2026-10-01" } };
@@ -69,18 +69,26 @@ test("the mark's caption carries the day, the weight and the distance, from serv
 });
 
 test("this morning's weight is set against the weigh-in before it", () => {
+  // The capture is from 00:15 Pacific: no weigh-in yet on its own day, so that morning's line is empty and
+  // the served weigh-in (B.today.data.date) is the morning the rule is read on.
+  assert.equal(F.morningLine(B.week, TODAY), "", "no weigh-in yet on the capture's day");
+  const WEIGH_DAY = B.today.data.date;
   const values = B.week.data.measures.weight.data.values;
-  const at = B.week.data.days.indexOf(TODAY);
+  const at = B.week.data.days.indexOf(WEIGH_DAY);
   const prev = values.slice(0, at).reverse().find((v) => v !== null);
   const move = Math.abs(WEIGHT - prev) < 0.05 ? "the same as" : WEIGHT < prev ? `down ${fmt1(prev - WEIGHT)} from` : `up ${fmt1(WEIGHT - prev)} from`;
-  assert.match(F.morningLine(B.week, TODAY), new RegExp(`^${fmt1(WEIGHT)} lb, ${move} ${weekday}\\.$`));
+  assert.match(F.morningLine(B.week, WEIGH_DAY), new RegExp(`^${fmt1(WEIGHT)} lb, ${move} ${weekday}\\.$`));
   assert.equal(F.morningLine(GONE, TODAY), "");
 });
 
 test("the Today band is this morning, yesterday and the plan, one line each, with yesterday's full day", () => {
   const html = F.todayBandHTML(edition, B, "/next/v8/");
   const yesterday = dayShift(TODAY, -1);
-  assert.match(html, new RegExp(`<span class="ck-rows__key">Today so far</span><span>${fmt1(WEIGHT)} lb, (up|down) [\\d.]+ from ${weekday}( ·|\\.)`));
+  // The capture is from 00:15 Pacific: nothing is recorded yet on its own day, and the served sentence says so.
+  assert.match(html, new RegExp(`<span class="ck-rows__key">Today so far</span><span>Nothing recorded yet today\\. <a class="ck-link" href="/next/v8/day/\\?d=${TODAY}">The full day</a>`));
+  // Read on the morning of the served weigh-in, the row leads with the weight against the one before it.
+  const weighed = F.todayBandHTML({ ...edition, as_of: B.today.data.date }, B, "/next/v8/");
+  assert.match(weighed, new RegExp(`<span class="ck-rows__key">Today so far</span><span>${fmt1(WEIGHT)} lb, (up|down) [\\d.]+ from ${weekday}( ·|\\.)`));
   assert.doesNotMatch(html, new RegExp(`${weekday}\\. ·`), "no stop before a middle dot");
   assert.match(html, new RegExp(`\\. <a class="ck-link" href="/next/v8/day/\\?d=${TODAY}">The full day`), "a stop before the link to the full day");
   assert.match(html, new RegExp(`<span class="ck-rows__key">Yesterday, ${weekday}</span>`));
@@ -141,7 +149,11 @@ test("first sentences are whole sentences inside the limit", () => {
 });
 
 test("the lead coach's read is quoted with its author, as an AI, and its date; unserved, it is nothing, and the page drops the section", () => {
-  assert.equal(F.leadReadHTML(load("weekly_priority"), "/next/v8/"), "", "the captured read is null: nothing, so no heading apologises under itself (round 8)");
+  // The 2026-10-18 capture serves the lead's read (data through October 17); a null read is nothing, so no heading apologises under itself (round 8).
+  const captured = load("weekly_priority");
+  const live = F.leadReadHTML(captured, "/next/v8/");
+  assert.match(live, /^<p class="ck-small">Eli Marsh, the AI lead coach, on Saturday, October 17<\/p><p>“I'm watching Matthew execute at a steady clip/);
+  assert.equal(F.leadReadHTML({ ...captured, weekly_priority: null }, "/next/v8/"), "", "a null read: nothing");
   const html = F.leadReadHTML(LEAD_READ, "/next/v8/");
   assert.match(html, /Eli Marsh, the AI lead coach, on Monday, September 28/);
   assert.match(html, /“The one priority I've asked him to address next is his protein intake/);
@@ -161,9 +173,9 @@ test("the podcast line is the guest's own first turn, verbatim, and absent when 
 
 test("the chapter and podcast lines are labelled as AI-written and carry Read and Listen", () => {
   const html = F.quotesHTML(WITH_POD, load("transcript_wk4"), "/next/v8/");
-  assert.match(html, /Written by AI from the record on October 6; Matthew reads each chapter before it publishes\./);
+  assert.match(html, /Written by AI from the record on October 13; Matthew reads each chapter before it publishes\./);
   assert.match(html, /Marcus Webb, the AI food coach, on the podcast/);
-  assert.match(html, /<a class="ck-btn" href="\/journal\/posts\/week-08\/">Read · 6 min<\/a>/);
+  assert.match(html, /<a class="ck-btn" href="\/journal\/posts\/week-09\/">Read · 7 min<\/a>/);
   assert.doesNotMatch(F.quotesHTML(B.chapter, load("transcript_wk4"), "/"), /on the podcast|Listen/, "as captured, no episode: no podcast line");
   assert.match(html, /<a class="ck-btn ck-btn--ghost" href="\/next\/v8\/story\/">Listen · 7 min<\/a>/);
   assert.doesNotMatch(F.quotesHTML(B.chapter, null, "/"), /on the podcast/, "no transcript: no podcast line");

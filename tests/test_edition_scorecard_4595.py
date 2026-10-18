@@ -303,21 +303,35 @@ def test_a_failed_source_is_unavailable_not_a_verdict_and_all_failed_is_the_bloc
 
 def test_went_right_is_one_sourced_line_each_or_nothing_this_week():
     wire = _wire()
-    right = _scorecard(wire)["data"]["went_right"]
+    block = _scorecard(wire)["data"]
+    right, rows = block["went_right"], block["rows"]
+    # Matthew's line is the FIRST area going well in the fixed order body, training, sleep, food, mind. On the
+    # 2026-10-18 capture that is training (6 of 6 days); sleep is going well too and sits behind it.
+    order = ("body", "training", "sleep", "food", "mind")
+    first = next(a for a in order if rows[a]["state"] == "ok" and rows[a]["data"]["verdict"] == sc.GOING_WELL)
+    assert first == "training", f"this capture's first area going well is {first}"
+    assert right["matthew"] == {
+        "area": "training",
+        "text": f"Training: {rows['training']['data']['text']}",
+        "source": "/api/training_overview",
+    }
     week = set(_days(7))
     nights = [r["sleep_hours"] for r in wire["pulse"]["pulse_history"] if r["date"] in week and r.get("sleep_hours") is not None]
     long_nights = sum(1 for h in nights if h >= 7)
-    assert right["matthew"] == {
-        "area": "sleep",
-        "text": f"Sleep: 7 hours or more on {long_nights} of {len(nights)} nights recorded.",
-        "source": "/api/pulse_history",
-    }
+    assert (
+        rows["sleep"]["data"]["verdict"] == sc.GOING_WELL
+        and rows["sleep"]["data"]["text"] == f"7 hours or more on {long_nights} of {len(nights)} nights recorded."
+    )
     assert set(right["engine"]) == {"area", "text", "source"}
     if right["engine"]["area"] is None:
         assert right["engine"] == {"area": None, "text": "Nothing this week.", "source": None}
+    # Short nights take sleep out of the running; training still leads. No area going well is the one sentence.
     wire = _wire()
     wire["pulse"] = _pulse(sleep={d: 6.0 for d in _days(7)})
-    assert _scorecard(wire)["data"]["went_right"]["matthew"]["text"] == "Nothing this week."
+    muted = _scorecard(wire)["data"]
+    assert muted["rows"]["sleep"]["data"]["verdict"] != sc.GOING_WELL and muted["went_right"]["matthew"]["area"] == "training"
+    none_well = {a: {**r, "data": {**(r["data"] or {}), "verdict": sc.NOT_YET}} for a, r in muted["rows"].items() if r.get("data")}
+    assert sc._went_right(none_well)["matthew"] == {"area": None, "text": "Nothing this week.", "source": None}
 
 
 # ── #4809: the verdict's words say what happened against the rule ─────────────────────

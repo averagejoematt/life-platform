@@ -1,11 +1,25 @@
 {
  "_meta": {
-  "generated_at": "2026-10-17T23:29:15.920065+00:00",
-  "served_at": "2026-10-17T23:29:15.920065+00:00",
+  "generated_at": "2026-10-18T04:38:17.763733+00:00",
+  "served_at": "2026-10-18T07:15:19.419627+00:00",
   "cache_seconds": 300,
-  "request_id": "d16e828e8c66405e"
+  "content_as_of": "2026-10-18T04:38:17.763733+00:00",
+  "request_id": "a502f7a1552d49de"
  },
- "weekly_priority": null,
- "cross_domain_notes": {},
+ "weekly_priority": "I'm watching Matthew execute at a steady clip: 54 logged training sessions in thirty days, consistent daily movement, and a weight loss rate holding at 3.3 pounds per week from his starting weight of 302.2 pounds on day 42. The structural adherence is working. What I'm tracking closely now is the gap between doing and logging\u2014his food logs stopped four days ago, and his journal entries have been silent for forty days. The wearables are still reporting (sleep locked, recovery stable), so the passive data shows the machine is humming, but without active logging, I can't see the decision-making underneath. For a twelve-month recomposition after a previous cycle that stalled in the final phase, that visibility is the early warning system. I've asked him to restart one of those two channels this week\u2014food log or journal entry\u2014because the goal isn't perfection in logging, it's seeing what's real so we can adjust before the momentum quiets.",
+ "cross_domain_notes": {
+  "glucose": "No current glucose data in play, but the steady weight loss with no digestive friction suggests metabolic processing is tracking normally.",
+  "mind": "Habit adherence dropped to 26% over eight days and journal entries are at 4 across six weeks\u2014the execution is still happening, but consciousness has stepped back. This is the exact failure mode Matthew flagged in his own project retrospective: a system that runs without watching itself eventually stops delivering what was intended.",
+  "nutrition": "Protein intake remains flat at 148.8g against a 170g floor; without logging, we can't diagnose whether this is a ceiling or a gap in tracking. The silence is the problem, not the number\u2014yet.",
+  "physical": "Weight loss rate is predictable (3.3 lbs/week), but without DEXA lean mass confirmation since the start and without visibility into loaded training stimulus, we can't see if the losses are coming from fat or if metabolic adaptation is accelerating. This is the blind spot Physical Coach raised.",
+  "sleep": "Sleep is locked at 7.5+ hours with stable architecture\u2014this is the foundation holding up the deficit and recovery. No friction there.",
+  "training": "54 sessions in 30 days means Matthew is training hard, but Physical Coach flags that loaded strength sessions aren't being logged on Hevy, which means we can't verify whether the stimulus is protecting lean mass through the deficit. Volume doesn't equal signal."
+ },
+ "generated_at": "2026-10-18T04:38:17.763733+00:00",
+ "data_through": "2026-10-17",
+ "as_of_day_n": 42,
+ "week_number": 6.0,
+ "coach_name": "Eli Marsh",
+ "coach_title": "Principal Investigator \u2014 Program Lead",
  "pre_start": false
 }

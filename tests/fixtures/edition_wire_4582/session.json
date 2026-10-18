@@ -1,18 +1,18 @@
 {
  "_meta": {
-  "generated_at": "2026-10-17T23:19:47.071594+00:00",
-  "served_at": "2026-10-17T23:19:47.071594+00:00",
+  "generated_at": "2026-10-18T07:15:25.180126+00:00",
+  "served_at": "2026-10-18T07:15:25.180126+00:00",
   "cache_seconds": 900,
-  "request_id": "81a86bd659384404"
+  "request_id": "17cc4fcb56ca41ab"
  },
- "date": "2026-10-17",
+ "date": "2026-10-18",
  "state": "served",
  "reason": null,
  "source": "hevy-routine-draft",
  "kind": "program",
  "session_role": "upper_volume",
  "position_label": "week 4 \u00b7 session 2 of 4 \u00b7 upper-volume",
- "routine_ref": "e24fac652870",
+ "routine_ref": "acb501c44897",
  "exercises": [
   {
    "name": "Bench Press (Barbell)",
@@ -88,5 +88,5 @@
    ]
   }
  ],
- "as_of": "2026-10-17T23:19:46.784852+00:00"
+ "as_of": "2026-10-18T07:15:24.909290+00:00"
 }

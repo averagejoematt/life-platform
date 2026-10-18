@@ -1,5 +1,5 @@
 {
- "captured_at": "2026-10-17T23:33:25Z",
+ "captured_at": "2026-10-18T07:15:07Z",
  "base": "https://averagejoematt.com",
  "by": "scripts/capture_kit_page_fixtures.py (#4671) \u2014 one pass, read-only GETs; re-run it, never hand-edit a file",
  "files": {
@@ -14,7 +14,7 @@
   "coach_moves_2026-09-24.json": "/api/coach_moves?date=2026-09-24",
   "coach_moves_2026-10-01.json": "/api/coach_moves?date=2026-10-01",
   "coach_moves_2026-10-07.json": "/api/coach_moves?date=2026-10-07",
-  "coach_moves_2026-10-17.json": "/api/coach_moves?date=2026-10-17",
+  "coach_moves_2026-10-18.json": "/api/coach_moves?date=2026-10-18",
   "coach_physical_coach.json": "/api/coach/physical_coach",
   "coach_sleep_coach.json": "/api/coach/sleep_coach",
   "coaches.json": "/api/coaches",

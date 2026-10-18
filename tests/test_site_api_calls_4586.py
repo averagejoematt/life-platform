@@ -48,9 +48,9 @@ TODAY = "2026-10-04"
 _FIX = os.path.join(_REPO, "tests", "fixtures", "calls_wire_4586")
 _OUT = os.path.join(_FIX, "route_output.json")  # this route's output for the wire fixture, whole
 _KIT = os.path.join(_REPO, "tests", "fixtures", "kit_pages_4586", "calls.json")  # the live capture (#4671)
-#: #4580 round 1 (lane E): fields this route writes that the deployed route did not on the capture day. Empty
-#: this set at the first recapture after the deploy.
-ADDED_SINCE_CAPTURE = {"observed_on", "observed_on_text"}
+#: #4580 round 1 (lane E): fields this route writes that the deployed route did not on the capture day. Emptied
+#: at the first recapture after the deploy (2026-10-18T07:15:07Z); a new served field goes here until the next one.
+ADDED_SINCE_CAPTURE: set = set()
 NAMES = {
     "sleep": "Lisa Park",
     "training": "Sarah Chen",

@@ -80,9 +80,9 @@ test("a bet shows both coaches' words and who was right", () => {
   // The route may hold a side whose words rest on an unsourced reading: then the name is followed by its sentence, not a quote.
   assert.match(claim, /Amara Patel said no(: “|\. )/);
   const out = C.outcomeHTML(bet);
-  assert.match(out, /ck-verdicts__tag--right">Right · on whether his morning recovery score would be below 70 on September 30<\/span><p><b>Marcus Webb said yes\.<\/b>/);
-  assert.match(out, /<span class="ck-verdicts__tag">Wrong · on whether his morning recovery score would be below 70 on September 30<\/span><p><b>Amara Patel said no\.<\/b>/);
-  assert.match(out, /It came in at 59\. Graded on the reading for September 30\.<\/p>/);
+  assert.match(out, /ck-verdicts__tag--right">Right · on whether his morning recovery score would be below 70 out of 100 on September 30<\/span><p><b>Marcus Webb said yes\.<\/b>/);
+  assert.match(out, /<span class="ck-verdicts__tag">Wrong · on whether his morning recovery score would be below 70 out of 100 on September 30<\/span><p><b>Amara Patel said no\.<\/b>/);
+  assert.match(out, /It came in at 59 out of 100\. Graded on the reading for September 30\.<\/p>/);
 });
 
 // #4673: the route holds a side whose words rest on a sensor that had sent no reading by the
@@ -193,7 +193,7 @@ test("each page names itself from the call", () => {
   const meta = C.metaFor(C.findCall(BODY, NUMBER));
   assert.equal(meta.title, "Lisa Park called his morning recovery score at about 61: right — Average Joe Matt");
   assert.equal(meta.description, "Lisa Park called his morning recovery score at about 61. It came in at 67. Right · within 17.9% either way.");
-  assert.equal(C.metaFor(C.findCall(BODY, BET)).description, "Marcus Webb and Amara Patel bet on whether his morning recovery score would be below 70 on September 30. It came in at 59. Marcus Webb was right; Amara Patel was wrong.");
+  assert.equal(C.metaFor(C.findCall(BODY, BET)).description, "Marcus Webb and Amara Patel bet on whether his morning recovery score would be below 70 out of 100 on September 30. It came in at 59 out of 100. Marcus Webb was right; Amara Patel was wrong.");
   assert.equal(C.metaFor(null).title, "A coach’s call, checked — Average Joe Matt");
 });
 

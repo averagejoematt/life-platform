@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-17T23:29:09.890627+00:00",
-  "served_at": "2026-10-17T23:29:09.890627+00:00",
+  "generated_at": "2026-10-18T07:15:11.538199+00:00",
+  "served_at": "2026-10-18T07:15:11.538199+00:00",
   "cache_seconds": 300,
-  "request_id": "d11ce6df7fc342ee"
+  "request_id": "d9264df500d444d2"
  },
  "persona_id": "physical_coach",
  "name": "Max Reyes",
@@ -793,7 +793,7 @@
    "superseded": {
     "note": "superseded \u2014 generated before the logging-record fix",
     "claimed_logging_stopped_after": "2026-09-10",
-    "served_last_log": "2026-10-12",
+    "served_last_log": "2026-10-17",
     "ref": "#4185 / #4227"
    }
   },

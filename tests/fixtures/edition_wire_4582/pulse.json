@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-17T22:51:35.963555+00:00",
-  "served_at": "2026-10-17T22:51:35.963555+00:00",
+  "generated_at": "2026-10-18T07:15:17.795143+00:00",
+  "served_at": "2026-10-18T07:15:17.795143+00:00",
   "cache_seconds": 3600,
-  "request_id": "f3eda2b9187e4c7b"
+  "request_id": "d9743b4426a44478"
  },
  "pulse_history": [
   {
@@ -16,7 +16,7 @@
    "hrv_ms": 31.3,
    "rhr_bpm": 65,
    "strain": 9.6,
-   "steps": 9654,
+   "steps": 18390,
    "headline": "327 lbs (+0.0) \u00b7 Recovery 48% \u00b7 Sleep 7.9h"
   },
   {
@@ -29,7 +29,7 @@
    "hrv_ms": 38.9,
    "rhr_bpm": 60,
    "strain": 13.6,
-   "steps": 2558,
+   "steps": 3873,
    "headline": "Recovery 76% \u00b7 Sleep 8.4h"
   },
   {
@@ -42,7 +42,7 @@
    "hrv_ms": 37.8,
    "rhr_bpm": 57,
    "strain": 14.8,
-   "steps": 1671,
+   "steps": 3263,
    "headline": "Recovery 67% \u00b7 Sleep 6.8h"
   },
   {
@@ -55,7 +55,7 @@
    "hrv_ms": 37.0,
    "rhr_bpm": 62,
    "strain": 13.0,
-   "steps": 1578,
+   "steps": 2451,
    "headline": "Recovery 64% \u00b7 Sleep 6.5h"
   },
   {
@@ -68,7 +68,7 @@
    "hrv_ms": 31.1,
    "rhr_bpm": 65,
    "strain": 13.7,
-   "steps": 1353,
+   "steps": 3807,
    "headline": "Recovery 44% \u00b7 Sleep 7.5h"
   },
   {
@@ -81,7 +81,7 @@
    "hrv_ms": 22.2,
    "rhr_bpm": 65,
    "strain": 13.7,
-   "steps": 2415,
+   "steps": 5186,
    "headline": "Recovery 24% \u00b7 Sleep 4.7h"
   },
   {
@@ -94,7 +94,7 @@
    "hrv_ms": 33.9,
    "rhr_bpm": 60,
    "strain": 13.1,
-   "steps": 974,
+   "steps": 3357,
    "headline": "320 lbs (-7.7) \u00b7 Recovery 59% \u00b7 Sleep 8.8h"
   },
   {
@@ -107,7 +107,7 @@
    "hrv_ms": 36.4,
    "rhr_bpm": 60,
    "strain": 10.6,
-   "steps": 1823,
+   "steps": 3381,
    "headline": "Recovery 73% \u00b7 Sleep 9.0h"
   },
   {
@@ -120,7 +120,7 @@
    "hrv_ms": 35.1,
    "rhr_bpm": 59,
    "strain": 10.1,
-   "steps": 3579,
+   "steps": 5053,
    "headline": "Recovery 63% \u00b7 Sleep 6.3h"
   },
   {
@@ -133,7 +133,7 @@
    "hrv_ms": 38.8,
    "rhr_bpm": 58,
    "strain": 10.4,
-   "steps": 2077,
+   "steps": 4822,
    "headline": "319 lbs (-8.4) \u00b7 Recovery 82% \u00b7 Sleep 9.0h"
   },
   {
@@ -146,7 +146,7 @@
    "hrv_ms": 43.4,
    "rhr_bpm": 56,
    "strain": 11.4,
-   "steps": 940,
+   "steps": 2934,
    "headline": "Recovery 92% \u00b7 Sleep 6.3h"
   },
   {
@@ -159,7 +159,7 @@
    "hrv_ms": 45.7,
    "rhr_bpm": 55,
    "strain": 10.1,
-   "steps": 3031,
+   "steps": 8555,
    "headline": "317 lbs (-10.0) \u00b7 Recovery 94% \u00b7 Sleep 7.0h"
   },
   {
@@ -172,7 +172,7 @@
    "hrv_ms": 41.2,
    "rhr_bpm": 56,
    "strain": 8.3,
-   "steps": 1029,
+   "steps": 4425,
    "headline": "315 lbs (-12.2) \u00b7 Recovery 84% \u00b7 Sleep 7.9h"
   },
   {
@@ -185,7 +185,7 @@
    "hrv_ms": 48.5,
    "rhr_bpm": 54,
    "strain": 13.0,
-   "steps": 1280,
+   "steps": 2909,
    "headline": "316 lbs (-11.7) \u00b7 Recovery 98% \u00b7 Sleep 8.6h"
   },
   {
@@ -198,7 +198,7 @@
    "hrv_ms": 51.4,
    "rhr_bpm": 53,
    "strain": 13.2,
-   "steps": 1139,
+   "steps": 3463,
    "headline": "317 lbs (-10.4) \u00b7 Recovery 97% \u00b7 Sleep 7.5h"
   },
   {
@@ -211,7 +211,7 @@
    "hrv_ms": 46.2,
    "rhr_bpm": 56,
    "strain": 12.7,
-   "steps": 1405,
+   "steps": 8740,
    "headline": "316 lbs (-11.5) \u00b7 Recovery 90% \u00b7 Sleep 9.0h"
   },
   {
@@ -224,7 +224,7 @@
    "hrv_ms": 44.4,
    "rhr_bpm": 57,
    "strain": 13.6,
-   "steps": 2017,
+   "steps": 8933,
    "headline": "315 lbs (-12.4) \u00b7 Recovery 78% \u00b7 Sleep 7.7h"
   },
   {
@@ -237,7 +237,7 @@
    "hrv_ms": 46.2,
    "rhr_bpm": 57,
    "strain": 8.2,
-   "steps": 2520,
+   "steps": 8563,
    "headline": "315 lbs (-11.9) \u00b7 Recovery 80% \u00b7 Sleep 6.7h"
   },
   {
@@ -250,7 +250,7 @@
    "hrv_ms": 48.2,
    "rhr_bpm": 54,
    "strain": 8.3,
-   "steps": 2292,
+   "steps": 8457,
    "headline": "314 lbs (-13.6) \u00b7 Recovery 86% \u00b7 Sleep 6.7h"
   },
   {
@@ -263,7 +263,7 @@
    "hrv_ms": 56.8,
    "rhr_bpm": 52,
    "strain": 12.0,
-   "steps": 1565,
+   "steps": 9961,
    "headline": "313 lbs (-14.2) \u00b7 Recovery 99% \u00b7 Sleep 9.9h"
   },
   {
@@ -276,7 +276,7 @@
    "hrv_ms": 46.5,
    "rhr_bpm": 55,
    "strain": 11.9,
-   "steps": 14824,
+   "steps": 13165,
    "headline": "314 lbs (-13.5) \u00b7 Recovery 77% \u00b7 Sleep 8.6h"
   },
   {
@@ -289,7 +289,7 @@
    "hrv_ms": 48.9,
    "rhr_bpm": 55,
    "strain": 14.0,
-   "steps": 18420,
+   "steps": 17662,
    "headline": "314 lbs (-12.8) \u00b7 Recovery 89% \u00b7 Sleep 7.5h"
   },
   {
@@ -302,7 +302,7 @@
    "hrv_ms": 42.8,
    "rhr_bpm": 57,
    "strain": 14.1,
-   "steps": 1134,
+   "steps": 3254,
    "headline": "313 lbs (-14.2) \u00b7 Recovery 64% \u00b7 Sleep 7.8h"
   },
   {
@@ -315,7 +315,7 @@
    "hrv_ms": 39.5,
    "rhr_bpm": 58,
    "strain": 13.3,
-   "steps": 1561,
+   "steps": 3340,
    "headline": "312 lbs (-15.0) \u00b7 Recovery 54% \u00b7 Sleep 8.7h"
   },
   {
@@ -328,7 +328,7 @@
    "hrv_ms": 41.4,
    "rhr_bpm": 57,
    "strain": 11.3,
-   "steps": 4833,
+   "steps": 11722,
    "headline": "311 lbs (-16.0) \u00b7 Recovery 59% \u00b7 Sleep 8.2h"
   },
   {
@@ -341,7 +341,7 @@
    "hrv_ms": 42.8,
    "rhr_bpm": 57,
    "strain": 9.3,
-   "steps": 6383,
+   "steps": 3420,
    "headline": "312 lbs (-15.6) \u00b7 Recovery 62% \u00b7 Sleep 9.1h"
   },
   {
@@ -354,7 +354,7 @@
    "hrv_ms": 58.8,
    "rhr_bpm": 54,
    "strain": 14.2,
-   "steps": 1113,
+   "steps": 3376,
    "headline": "311 lbs (-16.3) \u00b7 Recovery 98% \u00b7 Sleep 8.4h"
   },
   {
@@ -367,7 +367,7 @@
    "hrv_ms": 58.0,
    "rhr_bpm": 54,
    "strain": 12.7,
-   "steps": 9913,
+   "steps": 24816,
    "headline": "311 lbs (-16.4) \u00b7 Recovery 98% \u00b7 Sleep 8.8h"
   },
   {
@@ -380,7 +380,7 @@
    "hrv_ms": 63.8,
    "rhr_bpm": 50,
    "strain": 8.7,
-   "steps": 1201,
+   "steps": 10466,
    "headline": "312 lbs (-15.2) \u00b7 Recovery 98% \u00b7 Sleep 9.4h"
   },
   {
@@ -393,7 +393,7 @@
    "hrv_ms": 58.1,
    "rhr_bpm": 51,
    "strain": 8.0,
-   "steps": 683,
+   "steps": 9057,
    "headline": "311 lbs (-16.2) \u00b7 Recovery 98% \u00b7 Sleep 8.9h"
   },
   {
@@ -406,7 +406,7 @@
    "hrv_ms": 62.4,
    "rhr_bpm": 51,
    "strain": 10.5,
-   "steps": 8101,
+   "steps": 3547,
    "headline": "309 lbs (-18.5) \u00b7 Recovery 82% \u00b7 Sleep 5.0h"
   },
   {
@@ -419,7 +419,7 @@
    "hrv_ms": 56.7,
    "rhr_bpm": 52,
    "strain": 10.6,
-   "steps": 890,
+   "steps": 8666,
    "headline": "308 lbs (-19.0) \u00b7 Recovery 78% \u00b7 Sleep 8.2h"
   },
   {
@@ -432,7 +432,7 @@
    "hrv_ms": 73.4,
    "rhr_bpm": 52,
    "strain": 7.9,
-   "steps": 1209,
+   "steps": 9922,
    "headline": "307 lbs (-20.2) \u00b7 Recovery 97% \u00b7 Sleep 8.9h"
   },
   {
@@ -445,7 +445,7 @@
    "hrv_ms": 51.9,
    "rhr_bpm": 52,
    "strain": 8.9,
-   "steps": 2731,
+   "steps": 2743,
    "headline": "306 lbs (-21.2) \u00b7 Recovery 59% \u00b7 Sleep 7.2h"
   },
   {
@@ -458,7 +458,7 @@
    "hrv_ms": 50.0,
    "rhr_bpm": 52,
    "strain": 13.1,
-   "steps": 424,
+   "steps": 8509,
    "headline": "307 lbs (-20.8) \u00b7 Recovery 56% \u00b7 Sleep 6.7h"
   },
   {
@@ -471,7 +471,7 @@
    "hrv_ms": 136.9,
    "rhr_bpm": 66,
    "strain": 8.4,
-   "steps": 4799,
+   "steps": 3335,
    "headline": "Recovery 88% \u00b7 Sleep 8.1h"
   },
   {
@@ -484,7 +484,7 @@
    "hrv_ms": 47.4,
    "rhr_bpm": 60,
    "strain": 7.7,
-   "steps": 1960,
+   "steps": 12512,
    "headline": "308 lbs (-19.0) \u00b7 Recovery 67% \u00b7 Sleep 9.6h"
   },
   {
@@ -548,9 +548,22 @@
    "sleep_hours": 8.8,
    "hrv_ms": 45.4,
    "rhr_bpm": 56,
-   "strain": 8.5,
-   "steps": 7704,
+   "strain": 10.8,
+   "steps": 17596,
    "headline": "302 lbs (-25.1) \u00b7 Recovery 62% \u00b7 Sleep 8.8h"
+  },
+  {
+   "date": "2026-10-18",
+   "day_number": 43,
+   "weight_lbs": null,
+   "weight_delta": null,
+   "recovery_pct": null,
+   "sleep_hours": null,
+   "hrv_ms": null,
+   "rhr_bpm": null,
+   "strain": null,
+   "steps": 347,
+   "headline": "No data recorded"
   }
  ]
 }

@@ -1,6 +1,6 @@
 {
  "state": "ok",
- "as_of": "2026-10-17",
+ "as_of": "2026-10-18",
  "source": [
   "/api/calibration",
   "/api/decisions",
@@ -31,59 +31,59 @@
   "rows": {
    "body": {
     "state": "ok",
-    "as_of": "2026-10-17",
+    "as_of": "2026-10-18",
     "source": "/api/pulse_history",
     "absent_text": "Body has no verdict this week.",
     "data": {
      "name": "Body",
      "verdict": "faster_than_planned",
      "verdict_text": "Weight down faster than planned",
-     "text": "Seven-day average 305.0 lb, down 3.6 lb from the seven days before.",
+     "text": "Seven-day average 305.0 lb, down 3 lb from the seven days before.",
      "rule": "The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; faster than planned when it fell more than 2.5 lb in the week. Fewer than 3 weigh-ins in either week is not enough data."
     }
    },
    "training": {
     "state": "ok",
-    "as_of": "2026-10-17",
+    "as_of": "2026-10-18",
     "source": "/api/training_overview",
     "absent_text": "Training has no verdict this week.",
     "data": {
      "name": "Training",
-     "verdict": "not_yet",
-     "verdict_text": "No rest day",
-     "text": "Trained on 7 of 7 days recorded.",
+     "verdict": "going_well",
+     "verdict_text": "Trained, with a rest day",
+     "text": "Trained on 6 of 6 days recorded.",
      "rule": "Days trained in the last seven. Going well at 4 to 6, so at least one rest day. Fewer than 5 days recorded is not enough data."
     }
    },
    "sleep": {
     "state": "ok",
-    "as_of": "2026-10-17",
+    "as_of": "2026-10-18",
     "source": "/api/pulse_history",
     "absent_text": "Sleep has no verdict this week.",
     "data": {
      "name": "Sleep",
      "verdict": "going_well",
      "verdict_text": "5 or more long nights",
-     "text": "7 hours or more on 7 of 7 nights recorded.",
+     "text": "7 hours or more on 6 of 6 nights recorded.",
      "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
     }
    },
    "food": {
     "state": "ok",
-    "as_of": "2026-10-17",
+    "as_of": "2026-10-18",
     "source": "/api/nutrition_overview",
     "absent_text": "Food has no verdict this week.",
     "data": {
      "name": "Food",
-     "verdict": "not_enough_data",
-     "verdict_text": "Too few days logged",
-     "text": "2 days logged; 5 are needed.",
+     "verdict": "not_yet",
+     "verdict_text": "Protein under the floor too often",
+     "text": "At or above the 170 g protein floor on 0 of 6 logged days.",
      "rule": "Logged days at or above the plan's protein floor in the last seven. Going well at 5. Fewer than 5 logged days is not enough data."
     }
    },
    "mind": {
     "state": "ok",
-    "as_of": "2026-10-17",
+    "as_of": "2026-10-18",
     "source": [
      "/api/owner_words",
      "/api/decisions"
@@ -99,7 +99,7 @@
    },
    "ai": {
     "state": "ok",
-    "as_of": "2026-10-17",
+    "as_of": "2026-10-18",
     "source": [
      "/api/predictions",
      "/api/calibration"
@@ -116,9 +116,9 @@
   },
   "went_right": {
    "matthew": {
-    "area": "sleep",
-    "text": "Sleep: 7 hours or more on 7 of 7 nights recorded.",
-    "source": "/api/pulse_history"
+    "area": "training",
+    "text": "Training: Trained on 6 of 6 days recorded.",
+    "source": "/api/training_overview"
    },
    "engine": {
     "area": null,
@@ -133,8 +133,8 @@
    "not_enough_data": "Not enough data"
   },
   "window": {
-   "from": "2026-10-11",
-   "to": "2026-10-17"
+   "from": "2026-10-12",
+   "to": "2026-10-18"
   },
   "rules_set": "2026-10-09",
   "rules_set_text": "The rules were set on Friday, October 9."
