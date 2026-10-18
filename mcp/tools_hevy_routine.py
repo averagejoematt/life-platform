@@ -217,7 +217,7 @@ def _apply_recovery_adaptation(
     existing inputs_snapshot so no layer-resident IR schema bump is needed for v1.
 
     #5000: an active standing constraint (`constraint`) replaces the band block with the ECG + feel
-    gate (`mcp.draft_constraint_gate.apply_gate`); `green_withheld` (a tripped `protein_floor_missed`)
+    gate (`mcp.draft_standing_constraint.apply_gate`); `green_withheld` (a tripped `protein_floor_missed`)
     omits the 🟢 branch on either path.
     """
     from mcp.recovery_authoring import RPE_BASE_YELLOW, build_top_set_branches, render_branch_block, render_session_block
@@ -226,7 +226,7 @@ def _apply_recovery_adaptation(
         return {}
 
     if constraint:
-        from mcp.draft_constraint_gate import apply_gate
+        from mcp.draft_standing_constraint import apply_gate
 
         structured = apply_gate(ir, ctx, inputs_current_through, constraint, green_withheld)
     else:
@@ -276,7 +276,7 @@ def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
     ctx = _gather_training_context(target_date)
     inputs_current_through = gate.get("data_current_through")
     # #5000: the standing constraint, the 🟢 tripwire and the cardio block — each read fail-soft and named
-    from mcp.draft_constraint_gate import gate_draft
+    from mcp.draft_standing_constraint import gate_draft
 
     gated = gate_draft(ideal, inputs.target_date, lambda c, w: _apply_recovery_adaptation(ideal, ctx, inputs_current_through, c, w))
     adaptation = gated.pop("adaptation")

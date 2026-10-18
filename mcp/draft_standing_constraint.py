@@ -1,4 +1,4 @@
-"""draft_constraint_gate.py — the draft obeys the standing constraint and the 🟢 tripwire (#5000).
+"""draft_standing_constraint.py — the draft obeys the standing constraint and the 🟢 tripwire (#5000).
 
 The 2026-10-18 draft (`2167c0e68e25f311d46f1015cbefc047`) shipped three defects against the
 owner's hand-built routine (`014e1142aaad30b3b3b1fb5e90046dc2`):
@@ -32,7 +32,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
-logger = logging.getLogger("draft_constraint_gate")
+logger = logging.getLogger("draft_standing_constraint")
 
 GREEN_TRIPWIRE = "protein_floor_missed"
 

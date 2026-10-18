@@ -1,10 +1,10 @@
-"""tests/test_draft_constraint_gate_5000.py — the draft obeys the standing constraint and the 🟢 tripwire (#5000).
+"""tests/test_draft_standing_constraint_5000.py — the draft obeys the standing constraint and the 🟢 tripwire (#5000).
 
 The 2026-10-18 draft (`2167c0e6…`, reproduced from DDB on 2026-10-18) carried the Whoop-band tier
 cues, printed the 🟢 branch with `protein_floor_missed` tripped 6 of 7, and dropped the computed
 `cardio_pick` (with HR fields) on the floor. The owner's hand-built routine for that day (`014e1142…`)
 is the regression fixture: re-drafting 2026-10-18 must produce notes equivalent to it in every
-semantic part (`tests/fixtures/routine_2026_10_18_constraint_gate_5000.json`).
+semantic part (`tests/fixtures/routine_2026_10_18_standing_constraint_5000.json`).
 
 Privacy: the stop list is read at draft time from the owner-only memory row; every test here feeds
 a PLACEHOLDER string instead. No clock is read: every date is passed in.
@@ -29,10 +29,10 @@ sys.path.insert(0, str(REPO))
 from training import recent_aerobic, standing_constraints as sc  # noqa: E402
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set  # noqa: E402
 
-from mcp import draft_constraint_gate as dcg  # noqa: E402
+from mcp import draft_standing_constraint as dcg  # noqa: E402
 from mcp.recovery_authoring import derive_training_context, find_conditional_up  # noqa: E402
 
-FIX = json.loads((REPO / "tests" / "fixtures" / "routine_2026_10_18_constraint_gate_5000.json").read_text(encoding="utf-8"))
+FIX = json.loads((REPO / "tests" / "fixtures" / "routine_2026_10_18_standing_constraint_5000.json").read_text(encoding="utf-8"))
 DAY = FIX["target_date"]
 DRAFT = FIX["draft_2167c0e68e25f311d46f1015cbefc047"]
 HAND = FIX["hand_built_014e1142aaad30b3b3b1fb5e90046dc2"]
@@ -210,7 +210,7 @@ def test_the_registry_entry_names_no_clinical_specifics():
 def test_action_draft_wires_the_gate_the_tripwire_and_the_cardio_block(monkeypatch):
     """`manage_hevy_routine draft` itself (`_action_draft`), every I/O seam patched: the persisted ideal
     carries the gate, no band cue, the cardio block last, and the reads on its snapshot. Mutation control:
-    drop the `ideal.exercises.append(cardio)` line in `draft_constraint_gate.gate_draft` — this reds."""
+    drop the `ideal.exercises.append(cardio)` line in `draft_standing_constraint.gate_draft` — this reds."""
     from types import SimpleNamespace
 
     from training import routine_generator, routine_repo

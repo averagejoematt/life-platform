@@ -16,7 +16,7 @@ This repo is public. The constraint's clinical specifics stay owner-only in plat
 named by `memory_sk`); this module carries only what the draft path has to ACT on — the date it took
 effect, that it invalidates HR-derived tiers, that it forbids HR prescriptions, and the gate's two RPE
 caps — each with its provenance (ADR-105). The stop list itself is read from the memory row at draft
-time (`mcp.draft_constraint_gate.read_standing_constraint`); this module only says which numbered rule
+time (`mcp.draft_standing_constraint.read_standing_constraint`); this module only says which numbered rule
 of that row carries it. Pure: no I/O, no boto3, stdlib only.
 
 `training_context_registry.RECORDED_CONSTRAINTS` (#3715) is the INJURY list a coach reads before
