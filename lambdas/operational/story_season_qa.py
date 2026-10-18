@@ -38,6 +38,8 @@ THE HOLD IS READ FROM THE PUBLIC MARKER, NOT THE PRIVATE DRAFT
 WHAT IS NOT CLAIMED
   * The marker holds ONE week. Two weeks held at once show as one hold and one
     bare miss, which is the louder reading and the correct one.
+  * A week the owner RETIRED by name (episodes.json `retired`, #4536) is accounted for:
+    named in the green line, never a miss and never an escalated hold.
   * A week published with no chronicle row at all is not a member of the set —
     that is `chronicle-delivery-heartbeat`'s class.
   * The questions check sees the SEND MARKER (`STORYQ#W{n}`), which is written
@@ -138,12 +140,26 @@ def published_weeks(rows: list[dict]) -> dict[int, dict]:
     return weeks
 
 
+def retired_weeks(doc: dict) -> dict[int, str]:
+    """`{week: retired_at}` from episodes.json's public `retired` list (#4536 — the coach-panel-podcast
+    `{"week": N, "retire": true}` path writes it beside the private marker in panelcast-holds/)."""
+    out: dict[int, str] = {}
+    for r in doc.get("retired") or []:
+        if not isinstance(r, dict):
+            continue
+        try:
+            out[int(r.get("week"))] = str(r.get("retired_at") or "")
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 def episode_findings(weeks: dict[int, dict], doc: dict, now: datetime) -> tuple[list[str], list[str], list[str]]:
     """`(missing, escalated, sanctioned)` — each a list of sentences naming a week.
 
     missing    past 48 h, no episode, no hold naming the week          -> FAIL
     escalated  held, and the hold or the overdue clock is past 7 days   -> FAIL
-    sanctioned inside the 48 h window, or held for under 7 days         -> named, green
+    sanctioned inside the 48 h window, held for under 7 days, or retired by name (#4536) -> named, green
     """
     aired: set[int] = set()
     for e in doc.get("episodes") or []:
@@ -158,6 +174,7 @@ def episode_findings(weeks: dict[int, dict], doc: dict, now: datetime) -> tuple[
     except (TypeError, ValueError):
         held_week = None
     held_at = parse_iso_utc(pending.get("noted_at")) if held_week is not None else None
+    retired = retired_weeks(doc)
 
     missing: list[str] = []
     escalated: list[str] = []
@@ -166,6 +183,9 @@ def episode_findings(weeks: dict[int, dict], doc: dict, now: datetime) -> tuple[
         if wk in aired:
             continue
         published = weeks[wk]["published"]
+        if wk in retired:  # #4536: the owner retired the week by name — accounted for, never a bare miss
+            sanctioned.append(f"week {wk} retired by name {retired[wk] or ''}".rstrip() + f" (chronicle published {published.isoformat()})")
+            continue
         due = published + timedelta(hours=EPISODE_WINDOW_HOURS)
         if now <= due:
             sanctioned.append(f"week {wk} published {published.isoformat()} — inside its {EPISODE_WINDOW_HOURS} h window")
