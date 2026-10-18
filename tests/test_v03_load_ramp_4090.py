@@ -79,6 +79,11 @@ BENCH = "barbell_bench_press"
 DAY = "2026-09-27"  # week 1, after three completed sessions (lower-heavy, upper-volume, lower-volume)
 
 
+def _ws(block):
+    """The block's WORKING sets — #5049 prepends `warmup` sets to a qualifying compound."""
+    return [s for s in block.sets if s.type != "warmup"]
+
+
 def _generate(day: str = DAY, history=HISTORY, weights=WEIGHTS, **kw):
     kw.setdefault("block_workouts", _done(3))  # #4147: three done -> upper-heavy is next, still week 1
     with patch.object(routine_generator, "_load_note_indexes", return_value=(history, weights, {}, {})):
@@ -104,7 +109,7 @@ def _done(n: int) -> list[dict]:
 
 
 def _top(ideal, key):
-    return next(b for b in ideal.exercises if b.movement_key == key).sets[0].weight_kg
+    return _ws(next(b for b in ideal.exercises if b.movement_key == key))[0].weight_kg
 
 
 def _discounted(key):
@@ -166,9 +171,9 @@ def test_back_offs_stay_10_percent_under_the_ramped_top_set_and_the_cue_names_th
     ideal = _generate()[0]
     for key in HEAVY_ANCHORS:
         block = next(b for b in ideal.exercises if b.movement_key == key)
-        top = block.sets[0].weight_kg
-        assert [s.weight_kg for s in block.sets[1:]] == [routine_generator._floor_half_kg(top * 0.9)] * 2
-        assert ideal.inputs_snapshot["load_floors"]["movements"][key]["back_off_floor_kg"] == block.sets[1].weight_kg
+        top = _ws(block)[0].weight_kg
+        assert [s.weight_kg for s in _ws(block)[1:]] == [routine_generator._floor_half_kg(top * 0.9)] * 2
+        assert ideal.inputs_snapshot["load_floors"]["movements"][key]["back_off_floor_kg"] == _ws(block)[1].weight_kg
         assert "Week 1 load" in block.notes and "60% of your band anchor" in block.notes
         assert "never up" in block.notes
 
@@ -321,7 +326,7 @@ def test_without_the_transform_the_floor_is_still_the_band_best():
     audit = routine_generator._enforce_load_floors(
         [block], CATALOG, HISTORY, WEIGHTS, target_date="2026-09-24", days_since_last_workout=1, layoff_days=7, rationale=[]
     )
-    assert block.sets[0].weight_kg == pytest.approx(ANCHOR_LB["leg_press"] * LB)
+    assert _ws(block)[0].weight_kg == pytest.approx(ANCHOR_LB["leg_press"] * LB)
     assert audit["movements"]["leg_press"]["ramp"] is None
 
 

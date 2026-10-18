@@ -42,6 +42,7 @@ from typing import Any
 
 from common.pacific_time import pacific_today  # #2798: target_date is a Pacific-day WRITE KEY
 from training import commit_binding  # #4066: the commit is bound to the red-teamed routine
+from training.warmup_sets import working_set_count  # #5049: the set ceilings count working sets
 
 # #3971: the subtract-only rule as a GATE on this path rather than a discipline. Its own
 # module for the same reason — this file sits at the ratchet's ceiling.
@@ -744,7 +745,7 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
 
     archetype = (args.get("archetype") or "custom").strip().lower()
     target_date = args.get("target_date") or pacific_today()
-    total_sets = sum(len(b.sets) for b in blocks)
+    total_sets = sum(working_set_count(b.sets) for b in blocks)  # #5049: working sets — what the ceilings count
 
     warnings: list[str] = []
     try:
@@ -827,9 +828,9 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         logger.warning(f"draft_custom: cardio cue pass failed ({e}); notes untouched")
     ir.inputs_snapshot["cardio_cues"] = cardio_cues
     # #5005: a program-session date re-tags the blocks with the slot's intensity, so the commit gate checks the engine's floors
-    from mcp.draft_custom_session import stamp_program_slot
+    from mcp.draft_custom_session import attach_draft_warmups, stamp_program_slot
 
-    program_slot = stamp_program_slot(ir)
+    program_slot, warmups = stamp_program_slot(ir), attach_draft_warmups(ir, catalog, args)  # #5049: the generator's climb too
     draft_versioned(ir)
     resp = {
         "status": "drafted_custom",
@@ -838,6 +839,7 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         "archetype": archetype,
         "exercise_count": len(blocks),
         "total_sets": total_sets,
+        "warmup_sets": (warmups or {}).get("warmup_sets", 0),
         "cardio_cues": cardio_cues,
         "program_slot": program_slot,
         "warnings": warnings,

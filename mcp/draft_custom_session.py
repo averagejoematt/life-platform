@@ -19,11 +19,17 @@ Nothing here computes a load, a floor or a ceiling: the gate derives every floor
 exactly as it does for the engine draft, so this makes the two paths check the SAME numbers and
 never loosens either. Fail-soft: a read that fails leaves every block `custom` (the old
 behaviour) and says so by name in the result — it never costs the draft.
+
+#5049: the same module gives the chat draft the warm-up climb the generator writes
+(`attach_draft_warmups`, over `training.warmup_sets` — one rule table for both paths).
 """
 
 from __future__ import annotations
 
+import logging
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 CUSTOM_TAG = "custom"
 CALENDAR_KEYS = ("source", "week", "block", "deload", "label", "session_role", "session_in_week", "sequence_index", "position_label")
@@ -125,3 +131,25 @@ def stamp_program_slot(ir: Any, block_workouts_reader=None) -> dict[str, Any]:
     else:
         ir.rationale.append(f"program slot: {slot['status']} — every movement stays custom (#5005)")
     return slot
+
+
+def attach_draft_warmups(ir: Any, catalog: dict[str, Any], args: dict[str, Any]) -> dict[str, Any] | None:
+    """#5049: the chat path gets the SAME warm-up climb the generator writes — the 10-18 bench shipped
+    through draft_custom and opened on its 185 lb working set. A block that already carries warm-ups is
+    left as authored; `warmups=false` opts the whole draft out. Runs after `_new_routine_id` (as the
+    cardio cue does) and before `draft_versioned`, so the persisted draft is what dry_run/commit push.
+    Fail-soft: no warm-up path can cost a draft; the snapshot records what happened."""
+    if args.get("warmups") is False or str(args.get("warmups")).lower() == "false":
+        ir.inputs_snapshot["warmups"] = {"status": "opted_out"}
+        return None
+    try:
+        from training.warmup_sets import attach_warmups, rationale_line
+
+        audit = attach_warmups(ir.exercises, catalog)
+        ir.rationale.append(rationale_line(audit))
+        ir.inputs_snapshot["warmups"] = audit
+        return audit
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"draft_custom: warm-up pass failed ({e}); sets untouched")
+        ir.inputs_snapshot["warmups"] = {"status": "failed", "error": str(e)[:200]}
+        return None

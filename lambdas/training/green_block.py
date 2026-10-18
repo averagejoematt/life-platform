@@ -46,8 +46,10 @@ def session_set_check(blocks: list[Any], archetype: str | None = None) -> list[s
     """Warnings for a drafted session against the v0.5 ceilings (empty when it fits). The base sets
     (every non-`bonus` block) are graded against 20; the 🟢 sets against the per-session cap for the
     archetype; the two together against 24."""
-    base = sum(len(getattr(b, "sets", None) or []) for b in blocks if not _is_bonus(b))
-    bonus = sum(len(getattr(b, "sets", None) or []) for b in blocks if _is_bonus(b))
+    from training.warmup_sets import working_set_count  # #5049: a warm-up is not a hard set
+
+    base = sum(working_set_count(getattr(b, "sets", None)) for b in blocks if not _is_bonus(b))
+    bonus = sum(working_set_count(getattr(b, "sets", None)) for b in blocks if _is_bonus(b))
     out: list[str] = []
     if base > BASE_SESSION_SET_CEILING:
         out.append(

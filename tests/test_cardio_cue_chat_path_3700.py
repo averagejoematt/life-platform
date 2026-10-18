@@ -175,8 +175,11 @@ def test_a_chat_drafted_cycling_block_carries_the_SAME_cue_the_cron_path_stamps(
     bike = next(b for b in ir.exercises if b.movement_key == "cycling")
     assert bike.notes == cp.cardio_cue(CYCLING_TID, cardio, whoop)
     assert bike.notes.startswith("Last: level 15, 10.70 mi in 45:00 (14.3 mph)")
-    # the strength block is untouched — the cardio arm never reaches a barbell
-    assert next(b for b in ir.exercises if b.movement_key == "barbell_bench_press").notes == ""
+    # the strength block is untouched by the cardio arm — it never reaches a barbell; the only clause on
+    # the bench is #5049's warm-up movement cue (a 155 lb bench gets the climb)
+    from training.warmup_sets import cue_clause
+
+    assert next(b for b in ir.exercises if b.movement_key == "barbell_bench_press").notes == cue_clause("bench")
     assert out["cardio_cues"] == 1
 
 
@@ -250,7 +253,8 @@ def test_a_strength_only_chat_draft_reports_zero_rather_than_omitting_the_count(
     Mutation control: only set `cardio_cues` in the response when it is non-zero — this
     reds on the key.
     """
-    out, ir = _draft_custom([{"movement_key": "barbell_bench_press", "sets": [{"weight_lbs": 155, "reps": 8}]}])
+    # warmups=False: #5049's warm-up cue would otherwise be the bench's one clause; this test is the cardio arm's
+    out, ir = _draft_custom([{"movement_key": "barbell_bench_press", "sets": [{"weight_lbs": 155, "reps": 8}]}], warmups=False)
     assert out["cardio_cues"] == 0
     assert all(b.notes == "" for b in ir.exercises)
 

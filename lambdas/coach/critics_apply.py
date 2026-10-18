@@ -148,7 +148,9 @@ def _apply_one(ir: Any, m: "re.Match[str]", to: Any) -> tuple[bool, str | None]:
         if to == "hold":
             return False, "hold: no growth this week — the draft is not enlarged, nothing to trim automatically"
         target = int(to)
-        current = sum(len(getattr(e, "sets", []) or []) for e in exercises)
+        from training.warmup_sets import is_warmup, working_set_count  # #5049: the cut is of WORKING sets
+
+        current = sum(working_set_count(getattr(e, "sets", None)) for e in exercises)
         if target == current:
             return False, f"total_sets already {current}"
         if target > current:
@@ -161,11 +163,13 @@ def _apply_one(ir: Any, m: "re.Match[str]", to: Any) -> tuple[bool, str | None]:
         # below one set per exercise, so a cut spreads across the session instead of hollowing
         # out its tail.
         while current > target:
-            candidates = [ex for ex in exercises if len(ex.sets) > 1]
+            candidates = [ex for ex in exercises if working_set_count(ex.sets) > 1]
             if not candidates:
                 break
-            victim = max(candidates, key=lambda ex: (len(ex.sets), exercises.index(ex)))
-            victim.sets.pop()
+            victim = max(candidates, key=lambda ex: (working_set_count(ex.sets), exercises.index(ex)))
+            # the LAST working set goes; a programmed warm-up is never trimmed (#5049)
+            last = max(i for i, st in enumerate(victim.sets) if not is_warmup(st))
+            victim.sets.pop(last)
             current -= 1
         return current == target, None if current == target else f"could only trim to {current}"
     idx, attr = int(m.group(2)), m.group(3)
