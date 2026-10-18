@@ -52,7 +52,7 @@ STANDING_CONSTRAINTS: list[dict[str, Any]] = [
             "not_sinus_rpe_cap": 7,
             "optional_when_not_sinus": ("accessory", "cardio"),
         },
-        # The memory row is a numbered rule list; rule (4) is the stop list (the ED return list).
+        # The memory row is a numbered rule list; rule (4) is the stop list.
         "stop_list_rule": 4,
         "provenance": {
             "invalidates_hr_tiers": "owner — platform memory 2026-10-10, rule (1)",
