@@ -690,14 +690,10 @@ def gather_daily_data(profile, yesterday):
 
     hrv_7d_recs = fetch_range("whoop", (today - timedelta(days=7)).isoformat(), yesterday)
     hrv_30d_recs = fetch_range("whoop", (today - timedelta(days=30)).isoformat(), yesterday)
-    # #2221 (P1): key-presence let an explicit NULL hrv cell reach float(None) →
-    # TypeError out of the unwrapped gather_daily_data call, costing the whole brief.
-    hrv_7d_vals = [v for v in (safe_float(r, "hrv") for r in hrv_7d_recs) if v is not None]
-    hrv_30d_vals = [v for v in (safe_float(r, "hrv") for r in hrv_30d_recs) if v is not None]
-    # #2221: the same windows carry RHR, so `rhr_trend` can be a measurement.
-    rhr_7d_vals = [v for v in (safe_float(r, "resting_heart_rate") for r in hrv_7d_recs) if v is not None]
-    rhr_30d_vals = [v for v in (safe_float(r, "resting_heart_rate") for r in hrv_30d_recs) if v is not None]
-
+    # #4999: the post-marker, AF-day-excluded HRV + RHR baselines daily-metrics-compute stores (a NULL cell is skipped, #2221).
+    _bl = hr_regime.trailing_baselines(hrv_30d_recs, ("hrv", "resting_heart_rate"), today, yesterday, fetch_range=fetch_range)
+    hrv_7d_vals, hrv_30d_vals = _bl[("hrv", 7)][0], _bl[("hrv", 30)][0]
+    rhr_7d_vals, rhr_30d_vals = _bl[("resting_heart_rate", 7)][0], _bl[("resting_heart_rate", 30)][0]
     strava_60d = fetch_range("strava", (today - timedelta(days=60)).isoformat(), yesterday)
     tsb = compute_tsb(strava_60d, today)
     strava_7d_cutoff = (today - timedelta(days=7)).isoformat()
@@ -969,7 +965,7 @@ def fetch_anomaly_record(date_str):
 # AST-level check confirmed zero logic divergence. One implementation, one
 # place for the next scoring change.
 # ==============================================================================
-from health import habit_streaks  # noqa: E402 — #2221: the ADR-104 streak scan, lifted out
+from health import habit_streaks, hr_regime  # noqa: E402 — #2221: the ADR-104 streak scan; #4999: the HR regime markers
 from health.scoring_engine import (  # noqa: E402,F401
     COMPONENT_SCORERS,
     compute_day_grade,

@@ -2100,6 +2100,9 @@ Pre-computed daily metrics written by `daily-metrics-compute` Lambda at 9:40 AM 
 | `readiness_score` | number | 0-100 composite readiness |
 | `readiness_level` | string | GREEN / YELLOW / RED |
 | `hrv_7d_avg` | number | 7-day HRV rolling average (ms) |
+| `hrv_7d_n` / `hrv_30d_n` | number | Readings behind each HRV average (#4999 — after the HR regime-marker cut and AF-day exclusion) |
+| `hrv_7d_basis` / `hrv_30d_basis` | map | The HRV baseline's window: `since`, `through`, `n`, `excluded_days_n` (a count only), and `truncated_at_marker` / `requested_start` when an HR regime marker cut it (`lambdas/health/hr_regime.py`, #4999) |
+| `readiness_state` | string | `re-baselining` on a date inside an HR regime marker's window (no score, colour `gray`); absent otherwise (#4999) |
 | `hrv_trend` | string | improving / stable / declining |
 | `weight_7d_avg` | number | 7-day weight rolling average (lbs) |
 | `tsb` | number | Training Stress Balance (ATL-CTL) |

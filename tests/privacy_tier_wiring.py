@@ -116,6 +116,13 @@ CONSUMERS: dict[tuple[str, str], dict] = {
         "Same map, device measure 130 (ECG screening; 0 = ran, not detected). Stored as "
         "an event-class result, never rolled into a trend stat.",
     ),
+    ("lambdas/health/hr_regime.py", "afib_result"): _d(
+        SAW,
+        "#4999 AF-day exclusion: `af_days` reads the field off the Withings rows the caller already "
+        "fetched and reduces it to 'this date is excluded from the HRV/RHR baselines' — a set of dates "
+        "that never leaves the baseline math. The value is never returned, stored, logged or counted by "
+        "reason (the stored basis carries only `excluded_days_n`, which merges it with the Eight Sleep spike rule).",
+    ),
     ("lambdas/ingestion/withings_lambda.py", "measurement_attrib"): _d(
         SAW,
         "The ingester (#4642): stores the Withings attribution code of the day's latest "

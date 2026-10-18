@@ -6,6 +6,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from health import hr_regime  # #4999: THE dated HR regime markers
 from training import (
     training_load,  # #4075: the ONE load model (computed_metrics' TSB)
     zone2_minutes,  # #4627: THE Zone 2 computation
@@ -1096,6 +1097,29 @@ def _get_training_recommendation(args):
     }
 
 
+def _gated_training_recommendation(args):
+    """`view=recommendation` — the recommendation through `_apply_hr_regime` (#4999)."""
+    return _apply_hr_regime(_get_training_recommendation(args))
+
+
+def _apply_hr_regime(out: dict) -> dict:
+    """#4999: inside an HR regime marker's re-baselining window (health.hr_regime) the readiness tier
+    is built on HR-derived signals whose baseline straddles the regime change — it is replaced, not
+    trusted: no tier, no HR prescription, no zone-2 note. The ACWR injury flag is still carried (a
+    protective flag is never dropped)."""
+    regime = hr_regime.regime_status(out.get("date") or "")
+    if regime is None:
+        return out
+    acwr = ((out.get("training_context") or {}).get("training_load") or {}).get("acwr")
+    rec = {"type": "No HR-tier prescription — re-baselining", "intensity": None, "description": regime["note"], "duration_min": None}
+    rec["hr_ceiling"] = None
+    if acwr is not None and acwr > 1.5:
+        rec["load_flag"] = f"ACWR {acwr} > 1.5 — injury-risk load flag; keep the session easy whatever the gate says."
+    out.update(readiness_tier=hr_regime.REBASELINING.upper(), hr_regime=regime, recommendation=rec)
+    out["board_of_directors"] = ["HR-derived readiness is re-baselining after an HR regime marker; no HR-based coaching tier is drawn."]
+    return out
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # #28 — EXERCISE VARIETY SCORING (Sponsor: Sarah Chen)
 # ═══════════════════════════════════════════════════════════════════════
@@ -1262,7 +1286,7 @@ def tool_get_training(args):
     VALID_VIEWS = {
         "load": _get_training_load,
         "periodization": _get_training_periodization,
-        "recommendation": _get_training_recommendation,
+        "recommendation": _gated_training_recommendation,  # #4999: HR regime marker gate
     }
     view = (args.get("view") or "load").lower().strip()
     if view not in VALID_VIEWS:

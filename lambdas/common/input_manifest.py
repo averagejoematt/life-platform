@@ -155,6 +155,7 @@ COMPUTE_INPUTS: Dict[str, Tuple[str, ...]] = {
     ),
     "daily-metrics-compute": (
         "apple_health",
+        "eightsleep",  # #4999: the AF-day exclusion reads Eight Sleep hrv_avg
         "habitify",
         "hevy",
         "macrofactor",
