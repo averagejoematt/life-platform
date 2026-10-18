@@ -356,6 +356,13 @@ def load_goals_config() -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+# #4976: replaces the stale Garmin steps-truth rule (Garmin's feed is retired, #4640) — steps arrive resolved.
+_STEPS_TRUTH_RULE = (
+    "- Step counts arrive already resolved by the platform's one steps resolver (Whoop, else Apple Health) — "
+    "quote the number given and never choose between devices yourself."
+)
+
+
 def build_coach_preamble(coach_name: str, domain: str, goals: dict, inventory: dict, maturity: dict, action_history: list = None) -> str:
     """
     Build the standard context preamble injected into every coach prompt.
@@ -546,7 +553,7 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict, inventory: d
         'say "no training logged" NOT "provide your training data"\n'
         "- If a data source exists but values are null for today, use the most recent available data\n"
         '- NEVER tell Matthew to "obtain" or "get" a scan/test if the data already exists above\n'
-        "- Garmin is the step count source of truth (wearable). Ignore Apple Health step counts if Garmin data is available.\n"
+        f"{_STEPS_TRUTH_RULE}\n"
         '- If a target is "not yet set", do NOT invent one. You may suggest one with reasoning.\n'
     )
 
@@ -968,7 +975,7 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
       - Workouts logged (Strava)
       - Journal entries written (Notion)
       - Habit completion rate (Habitify)
-      - Steps (Garmin — SOT)
+      - Steps (the steps resolver, common.metric_truth — Whoop, else Apple Health)
 
     Score 0-100:
       0-30: healthy (health activity >= platform activity)

@@ -2611,7 +2611,7 @@ def engagement_primary_channel() -> str:
 # ── #746: manual-source reliability — staleness surfaced kindly ────────────────
 
 
-def manual_capture_sources(channel: str = None) -> dict:
+def manual_capture_sources(channel: str = None, include_paused: bool = False) -> dict:
     """{key: {label, channel, stale_hours}} for the manual-capture sources — the
     HAE / Notion / MCP-conversation channels Matthew fills by hand (#746,
     Matthew's decision).
@@ -2621,11 +2621,19 @@ def manual_capture_sources(channel: str = None) -> dict:
     automatic pipe (worn device, scheduled pull) has no capture_channel, so a
     device outage — a dead Whoop token the nudge can't fix — is structurally
     excluded from both surfaces. Pass `channel` to filter to one lane
-    ('hae' | 'notion' | 'mcp'). `stale_hours` falls back to the registry default."""
+    ('hae' | 'notion' | 'mcp'). `stale_hours` falls back to the registry default.
+
+    #5006: a source with `paused: True` (ADR-074 posture) is OFF BY DESIGN, so it is
+    excluded unless `include_paused=True` — a paused channel must never be named the
+    "longest-dark manual channel" in a coach check-in question, get a "gone quiet"
+    nudge, or wear the public "dark N days" stamp. Un-pausing returns it with no
+    other change."""
     out = {}
     for k, v in SOURCE_REGISTRY.items():
         ch = v.get("capture_channel")
         if not ch or (channel and ch != channel):
+            continue
+        if v.get("paused") and not include_paused:
             continue
         sh = v.get("stale_hours")
         out[k] = {"label": v["label"], "channel": ch, "stale_hours": sh if sh is not None else DEFAULT_STALE_HOURS}
@@ -2784,6 +2792,19 @@ METRIC_TRUTH: dict[str, dict[str, Any]] = {
         "min_by_source": {"whoop": 1, "apple_health": 1, "garmin": 1000},
         "overlap_rule": "first_positive_else_first_zero",
         "ruling": "#4644 Q4 (recommended: 'yes — Whoop when both devices have a count') — pending the owner",
+    },
+    # vo2_max (#4976): the Apple Watch's estimate from now on, Garmin's stored estimates for the
+    # history before it (the direct Garmin feed is retired, #4640 — its rows stay and stay
+    # readable). The two are different vendors' estimators, so a reader that draws an arc across
+    # both carries each point's `source` and says when the arc spans more than one device.
+    "vo2_max": {
+        "truth_source": "apple_health",
+        "unit": "ml/kg/min",
+        "fallback_order": ("apple_health", "garmin"),
+        "field_by_source": {"apple_health": "vo2max", "garmin": "vo2_max"},
+        "min_by_source": {"apple_health": 10, "garmin": 10},
+        "overlap_rule": "first_positive_else_first_zero",
+        "ruling": "#4976 + owner ruling 2026-10-17 (a): keep Whoop and the Apple Watch; Garmin's feed is retired (#4640)",
     },
     # #4975: the three Whoop-only vitals the scattered tables (mcp/config.py domain owners,
     # web/vitals_resolver.py) used to state by hand. Each is ONE source on mode "primary" —

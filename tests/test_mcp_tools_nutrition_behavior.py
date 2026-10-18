@@ -1645,3 +1645,69 @@ def test_every_view_answers_a_quiet_platform_with_an_error_never_a_zero(monkeypa
         assert "daily_averages" not in out and "adherence" not in out
     assert "error" in tn.tool_get_deficit_sustainability({})
     assert "error" in tn._get_metabolic_adaptation({})
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 5b. #5003 - one protein hit-rate: the macros view and the protein_floor_missed tripwire
+# ──────────────────────────────────────────────────────────────────────────────
+
+# MacroFactor total_protein_g for 2026-10-11..17 (read-only DDB, 2026-10-18); floor 170 g (PLAN_DAILY_PROTEIN_MIN_G).
+WEEK_1011_PROTEIN = {
+    "2026-10-11": 173,
+    "2026-10-12": 155,
+    "2026-10-13": 166,
+    "2026-10-14": 152,
+    "2026-10-15": 98,
+    "2026-10-16": 166,
+    "2026-10-17": 133,
+}
+
+
+def _week_rows():
+    return [mf(d, total_calories_kcal=2000, total_protein_g=g, total_fiber_g=30) for d, g in WEEK_1011_PROTEIN.items()]
+
+
+def _macros_week(monkeypatch):
+    from common.constants import PLAN_DAILY_PROTEIN_MIN_G
+
+    install(monkeypatch, _week_rows())
+    return tn.tool_get_nutrition(
+        {
+            "view": "macros",
+            "start_date": "2026-10-11",
+            "end_date": "2026-10-17",
+            "calorie_target": 2000,
+            "protein_target": PLAN_DAILY_PROTEIN_MIN_G,
+        }
+    )
+
+
+def test_macros_and_the_protein_tripwire_count_the_same_week_the_same_way(monkeypatch):
+    """6 of 7 days are below 170 g; only 10-11 (173) met it. 166 g (10-13, 10-16) is NOT a hit."""
+    from training.redline_rate import protein_days_missed
+
+    out = _macros_week(monkeypatch)
+    hits = [d["date"] for d in out["daily_breakdown"] if d["hit_protein_target"]]
+    assert hits == ["2026-10-11"]
+    assert {d["date"]: d["hit_protein_target"] for d in out["daily_breakdown"]}["2026-10-13"] is False
+    assert {d["date"]: d["hit_protein_target"] for d in out["daily_breakdown"]}["2026-10-16"] is False
+    missed, measured = protein_days_missed(list(WEEK_1011_PROTEIN.values()))
+    assert (missed, measured) == (6, 7)
+    assert out["adherence"]["protein_target_hit_pct"] == round((measured - missed) / measured * 100, 1)  # 1 of 7 = 14.3
+
+
+def test_a_lenient_macros_comparison_is_caught_by_the_agreement_test(monkeypatch):
+    """Mutation control: restore the old `>= floor * 0.95` and the view marks 166 g a hit -> disagrees with the tripwire."""
+    monkeypatch.setattr(tn, "met_floor", lambda g, floor, tolerance_g=0.0: None if g is None else g >= floor * 0.95)
+    out = _macros_week(monkeypatch)
+    hits = [d["date"] for d in out["daily_breakdown"] if d["hit_protein_target"]]
+    assert hits == ["2026-10-11", "2026-10-13", "2026-10-16"]  # the 42.9 % the owner saw
+    assert len(hits) != 1
+
+
+def test_met_floor_is_strict_by_default_and_tolerance_is_opt_in():
+    from health.protein_floor import met_floor
+
+    assert met_floor(170, 170) is True and met_floor(169.9, 170) is False and met_floor(166, 170) is False
+    assert met_floor(None, 170) is None
+    assert met_floor(166, 170, tolerance_g=4) is True  # the owner's future one-line change; set nowhere today

@@ -429,12 +429,11 @@ def test_process_milestones_write_through_ledger_write_once():
 def test_return_beats_every_other_ladder_on_the_same_run():
     """LADDER_PRIORITY: the restart is the champion when several ladders trip at once."""
     table = FakeTable()
-    t = date.fromisoformat("2026-05-05")
     table.put_item(Item=_strava_day("2026-04-25"))
     _sweep(table, "2026-05-01")
-    table.put_item(Item=_strava_day("2026-05-05"))
-    for i in range(21):  # 630 Zone 2 minutes in the 4-week window
-        table.put_item(Item={"pk": USER_PREFIX + "garmin", "sk": f"DATE#{_iso(t - timedelta(days=i))}", "zone2_minutes": 30})
+    # 630 Zone 2 minutes in the 4-week window, all on the return day itself (#4976: Zone 2
+    # is strava-only now, and spreading it over 21 strava days would erase the gap).
+    table.put_item(Item={**_strava_day("2026-05-05"), "total_zone2_seconds": 630 * 60})
     r = _sweep(table, "2026-05-05")
     assert [e["milestone_id"] for e in r["announced"]] == ["return_after_gap_2026-05-05"]
     assert set(r["deferred"]) == {"zone2_4w_300", "zone2_4w_600"}, "the other satisfied ladder must defer, not vanish"
@@ -500,22 +499,23 @@ def test_windows_genesis_guard_baselines_without_announcing():
     assert any("return_after_gap" in str(e.get("milestone_id", "")) for e in out2["announced"])
 
 
-def test_zone2_takes_per_day_max_of_garmin_and_strava_not_sum():
-    """Review P2: garmin activities auto-sync to Strava — summing the two sources
-    double-counts the same workout. Per-day max keeps the better-covered source."""
+def test_zone2_reads_strava_only_and_never_a_garmin_row():
+    """#4976: the garmin all-day leg is retired. A stored garmin zone2_minutes row (history,
+    left in place) contributes nothing; strava's per-activity seconds are the minutes.
+    (Mutation control: restore the garmin max() leg and 07-20 reads 40 from garmin, 07-21 25.)"""
     table = FakeTable()
-    # Same day, both sources report the same 40-minute ride.
     table.put_item(Item={"pk": "USER#matthew#SOURCE#garmin", "sk": "DATE#2026-07-20", "zone2_minutes": 40})
-    table.put_item(Item={"pk": "USER#matthew#SOURCE#strava", "sk": "DATE#2026-07-20", "total_zone2_seconds": 2400})
-    # A garmin-only day and a strava-only day survive untouched.
+    table.put_item(Item={"pk": "USER#matthew#SOURCE#strava", "sk": "DATE#2026-07-20", "total_zone2_seconds": 1200})
     table.put_item(Item={"pk": "USER#matthew#SOURCE#garmin", "sk": "DATE#2026-07-21", "zone2_minutes": 25})
     table.put_item(Item={"pk": "USER#matthew#SOURCE#strava", "sk": "DATE#2026-07-22", "total_zone2_seconds": 1800})
+    garmin_before = {k: dict(v) for k, v in table.items.items() if k[0].endswith("#garmin")}
 
     signals = ml.collect_signals(table, "USER#matthew#SOURCE#", None, "2026-07-23")
     z2 = signals["zone2_minutes_by_day"]
-    assert z2["2026-07-20"] == 40.0  # max, not 80
-    assert z2["2026-07-21"] == 25.0
+    assert z2["2026-07-20"] == 20.0  # strava's 1200 s, not garmin's 40
+    assert "2026-07-21" not in z2  # garmin-only day: no strava minutes, no Zone 2
     assert z2["2026-07-22"] == 30.0
+    assert {k: dict(v) for k, v in table.items.items() if k[0].endswith("#garmin")} == garmin_before  # history untouched
 
 
 # ── #1808: strength_in_deficit's Mifflin fallback (2026-07-26 deep-quality review) ──
@@ -625,30 +625,27 @@ def test_zone2_accumulation_discloses_source_coverage():
     fired = pm.zone2_accumulation(by_day, today, source)
     assert fired  # rungs 300/600 satisfied, same fixture as test_zone2_accumulation_rungs
     for _, meas in fired:
-        assert meas["source_coverage"] == {"garmin_days": 0, "strava_days": 21}
+        assert meas["source_coverage"] == {"strava_days": 21}
 
     # No source map -> honest zeros, never a fabricated split.
     fired_no_src = pm.zone2_accumulation(by_day, today)
     for _, meas in fired_no_src:
-        assert meas["source_coverage"] == {"garmin_days": 0, "strava_days": 0}
+        assert meas["source_coverage"] == {"strava_days": 0}
 
 
 def test_collect_signals_discloses_zone2_source_by_day():
-    """#1809: extends test_zone2_takes_per_day_max_of_garmin_and_strava_not_sum —
-    collect_signals must also expose WHICH source won the per-day max(), not just
-    the merged minutes, so the milestone measurement can disclose real coverage
-    instead of implying (currently falsely) that garmin ever contributes."""
+    """#1809 (re-pointed by #4976): collect_signals exposes WHICH source carried each day's
+    minutes, so the milestone measurement discloses real coverage — strava only, never an
+    implied garmin contribution."""
     table = FakeTable()
     table.put_item(Item={"pk": "USER#matthew#SOURCE#garmin", "sk": "DATE#2026-07-20", "zone2_minutes": 40})
     table.put_item(Item={"pk": "USER#matthew#SOURCE#strava", "sk": "DATE#2026-07-20", "total_zone2_seconds": 2400})
-    table.put_item(Item={"pk": "USER#matthew#SOURCE#garmin", "sk": "DATE#2026-07-21", "zone2_minutes": 25})
     table.put_item(Item={"pk": "USER#matthew#SOURCE#strava", "sk": "DATE#2026-07-22", "total_zone2_seconds": 1800})
 
     signals = ml.collect_signals(table, "USER#matthew#SOURCE#", None, "2026-07-23")
     src = signals["zone2_source_by_day"]
-    assert src["2026-07-20"] == "garmin"  # tied minutes -> garmin wins the >= comparison
-    assert src["2026-07-21"] == "garmin"
-    assert src["2026-07-22"] == "strava"
+    assert src == {"2026-07-20": "strava", "2026-07-22": "strava"}
+    assert "garmin" not in set(src.values())
 
 
 # ── #1810: return_after_gap's event_date is the true return date ─────────────

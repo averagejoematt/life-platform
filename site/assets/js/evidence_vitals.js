@@ -184,17 +184,20 @@ export function scopeStamp(o, opts = {}) {
 }
 
 // #421 (VIT-03) — VO2max arc. The longevity gold-standard fitness number, a slow-moving arc
-// metric beside the daily vitals. Real recorded Garmin estimates only; the date-positioned trend
+// metric beside the daily vitals. Real recorded device estimates only, read through the server's
+// metric-truth resolver (#4976: Apple Watch from now on, Garmin history before it); the date-positioned trend
 // shows gaps as gaps. Renders nothing (no placeholder) until real estimates exist.
 export function vitalsVo2max(vo) {
   if (!vo || !vo.available) return "";
   const dirWord = vo.trend === "improving" ? "climbing" : vo.trend === "declining" ? "declining" : "holding";
   const deltaLbl = (vo.delta > 0 ? "+" : "") + fmt(vo.delta, 1);
+  // #4976: an arc spanning two vendors' estimators says so — a step at the hand-over is a device change, not fitness.
+  const fromLbl = vo.mixed_devices && Array.isArray(vo.sources) ? `${vo.sources.map(esc).join(", then ")} (two devices' estimators — a step where one hands over to the other is the device, not the body)` : esc(vo.source);
   return sec("VO₂max — the aerobic arc",
     scopeStamp(vo) +
     figs([fig(fmt(vo.current, 1), "now · ml/kg/min"), fig(fmt(vo.peak, 1), "recorded peak"), fig(deltaLbl, "arc-to-date")]) +
     arcTrend(vo.series, { valueKey: "value", unit: " ml/kg/min", label: "VO₂max", height: 180, decimals: 1 }) +
-    `<p class="rd-meta label">The estimated maximal oxygen uptake from ${esc(vo.source)} — the single best-studied fitness-longevity number. This is an <strong>arc metric</strong>, not a daily dial: ${vo.n} recorded estimates, ${dirWord} (${esc(deltaLbl)} ml/kg/min across the record). The line is positioned by real date, so the sparse recent cadence reads as honest gaps — a device estimate, not a lab CPET, so read the multi-month direction, not any one reading.</p>`);
+    `<p class="rd-meta label">The estimated maximal oxygen uptake from ${fromLbl} — the single best-studied fitness-longevity number. This is an <strong>arc metric</strong>, not a daily dial: ${vo.n} recorded estimates, ${dirWord} (${esc(deltaLbl)} ml/kg/min across the record). The line is positioned by real date, so the sparse recent cadence reads as honest gaps — a device estimate, not a lab CPET, so read the multi-month direction, not any one reading.</p>`);
 }
 
 // #421 (VIT-02, PHY-06) — walking heart rate. A genuine walking-HR capture source: the average

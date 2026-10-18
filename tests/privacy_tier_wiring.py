@@ -177,6 +177,11 @@ CONSUMERS: dict[tuple[str, str], dict] = {
         "bmr_kcal. Cross-name collision with the withings device field, not a read "
         "of it — this module never touches withings rows.",
     ),
+    ("mcp/tools_health.py", "skin_temp_celsius"): _d(
+        SAW,
+        "#4978: the owner MCP readiness tool scores the night's Whoop skin temperature against his own "
+        "30-night baseline (overnight_physiology) and returns the deviation on the owner's own surface only.",
+    ),
     ("mcp/tools_health.py", "bmr_kcal"): _d(
         SAW,
         "Owner MCP energy-budget tool: reads tdee.py's computed bmr_kcal output "

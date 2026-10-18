@@ -20,12 +20,23 @@ DynamoDB QUERY, read-only) and adds stored_workout_rows / stored_rows_nonzero_zo
 stored_rows_differing (a stored row whose zone fields differ from the recomputation, including
 fabricated zeros on a null-score workout).
 
-THERE IS NO WRITE MODE. No --apply, no put/update/delete, on purpose: zone history is not
-rewritten from a lane. Writing the recomputed values back waits on two things the issue names —
-the duplicate removal (#4629 box 3, 181 ids under two keys, an approved one-off owner write) and
-the Zone 2 definition (#4627) — because repaired zones under two keys double-count, and every
-reader that sums Whoop zone 2 would add a fourth stack to the served Zone 2 number. The write-back,
-when it comes, is the owner's to run.
+WRITE-BACK (``--apply``, #4629 box 1). Until 2026-10-18 this script had no write mode on purpose:
+repaired zones under two keys double-count, and every reader that sums Whoop zone 2 would have added a
+fourth stack to the served Zone 2 number. Both preconditions are now met: the duplicate removal (box 3,
+183 off-start-day copies removed 2026-10-18, one key per workout id) and the Zone 2 definition (ADR-162,
+#4627). ``--dry-run`` and ``--apply`` build ONE plan (``build_plan``) and print the same
+``plan_sha256``, so the dry-run the owner read is provably the apply that ran:
+
+  * a stored workout row whose zone fields differ from ``zone_minutes_from_score`` on its archived
+    record gets the recomputed fields SET (Decimal) via ``update_item``;
+  * a stored zone field the recomputation does not carry (null-score workout, missing zone) is REMOVEd
+    — never rewritten as 0 (ADR-104);
+  * a row with no archived record is never touched (rows_unresolved); non-zone fields are never touched;
+  * ``--report PATH`` writes {rows_updated, rows_zeros_removed, rows_unchanged, rows_unresolved,
+    plan_sha256} as JSON. One attempt on the boto clients (``AWS_MAX_ATTEMPTS=1``).
+
+Counts-only mode (neither flag) is unchanged. The plan lines name row keys, so they print only under
+``--dry-run`` / ``--apply``.
 
 It prints counts only: no workout ids, no dates, no values (CONVENTIONS: no live record keys in
 lane output).
@@ -34,21 +45,26 @@ COVERAGE. The combined date tree (``raw_date_key("whoop", d)``) starts at the 20
 migration; earlier days live in the per-metric ``sub_layouts`` generations and are reported as
 days_missing, not guessed at.
 
-RUN:  python3 scripts/whoop_zone_rebuild_4629.py                       # experiment start .. today
+RUN:  AWS_MAX_ATTEMPTS=1 python3 scripts/whoop_zone_rebuild_4629.py --start 2026-05-17 --dry-run --report <path>
+      AWS_MAX_ATTEMPTS=1 python3 scripts/whoop_zone_rebuild_4629.py --start 2026-05-17 --apply --report <path>
+      python3 scripts/whoop_zone_rebuild_4629.py                       # experiment start .. today
       python3 scripts/whoop_zone_rebuild_4629.py --start 2026-09-06 --end 2026-10-04 --compare-store
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
+os.environ.setdefault("AWS_MAX_ATTEMPTS", "1")
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("USER_ID", "matthew")
@@ -159,22 +175,107 @@ def _read_store(table, start: str, end: str) -> list:
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
 
-def main(argv: list | None = None) -> int:
+def build_plan(day_payloads: dict, stored_rows: list) -> dict:
+    """The ONE plan --dry-run prints and --apply executes. Per stored workout row: SET the recomputed
+    zone fields, REMOVE stored zone fields the recomputation does not carry; rows with no archived record
+    are unresolved, equal rows unchanged. Matched on (day, id), else on id when it sits on one archived day."""
+    by_key: dict = {}
+    days_of: dict = {}
+    for day, payload in day_payloads.items():
+        for rec in (workout_records(payload) if payload is not None else []):
+            wid = str(rec.get("id"))
+            by_key[(day, wid)] = zone_minutes_from_score(rec.get("score"))
+            days_of.setdefault(wid, set()).add(day)
+    rows: list = []
+    c: Counter = Counter()
+    for row in stored_rows:
+        sk = str(row.get("sk", ""))
+        if _WORKOUT_MARK not in sk:
+            continue
+        day, wid = sk[len("DATE#") :][:10], sk.split(_WORKOUT_MARK, 1)[1]
+        if (day, wid) in by_key:
+            want = by_key[(day, wid)]
+        elif len(days_of.get(wid, ())) == 1:
+            want = by_key[(next(iter(days_of[wid])), wid)]
+        else:
+            c["rows_unresolved"] += 1
+            continue
+        have = {k: row[k] for k in _ZONE_FIELDS if row.get(k) is not None}
+        if _as_float_zones(want) == _as_float_zones(have) and set(want) == set(have):
+            c["rows_unchanged"] += 1
+            continue
+        sets = {k: str(v) for k, v in sorted(want.items())}
+        removes = sorted(k for k in have if k not in want)
+        c["rows_updated" if sets else "rows_zeros_removed"] += 1
+        rows.append({"sk": sk, "set": sets, "remove": removes})
+    rows.sort(key=lambda r: r["sk"])
+    counts = {k: c.get(k, 0) for k in ("rows_updated", "rows_zeros_removed", "rows_unchanged", "rows_unresolved")}
+    return {"rows": rows, **counts, "plan_sha256": hashlib.sha256(json.dumps(rows, sort_keys=True).encode()).hexdigest()}
+
+
+def print_plan_lines(plan: dict) -> None:
+    for r in plan["rows"]:
+        print(f"ZONES sk={r['sk']} set={r['set']} remove={r['remove']}")
+
+
+def apply_plan(table, plan: dict, user_id: str) -> int:
+    """Execute the plan with update_item only (never put/delete); returns rows written."""
+    pk = f"USER#{user_id}#SOURCE#whoop"
+    written = 0
+    for r in plan["rows"]:
+        values = {f":z{i}": Decimal(v) for i, v in enumerate(r["set"].values())}
+        expr = ""
+        if r["set"]:
+            expr += "SET " + ", ".join(f"{k} = :z{i}" for i, k in enumerate(r["set"]))
+        if r["remove"]:
+            expr += (" " if expr else "") + "REMOVE " + ", ".join(r["remove"])
+        kw = {"Key": {"pk": pk, "sk": r["sk"]}, "UpdateExpression": expr, "ConditionExpression": "attribute_exists(sk)"}
+        if values:
+            kw["ExpressionAttributeValues"] = values
+        table.update_item(**kw)
+        written += 1
+    return written
+
+
+def main(argv: list | None = None, table=None, s3=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--start", default=EXPERIMENT_START_DATE)
     ap.add_argument("--end", default=datetime.now(timezone.utc).date().isoformat())
     ap.add_argument("--compare-store", action="store_true", help="also read the stored rows (DynamoDB query, read-only)")
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--dry-run", action="store_true", help="print the write-back plan and its plan_sha256; writes nothing")
+    mode.add_argument("--apply", action="store_true", help="write the plan (update_item only)")
+    ap.add_argument("--report", default=None, metavar="PATH", help="write the plan counts + plan_sha256 here as JSON")
     args = ap.parse_args(argv)
+    planning = args.dry_run or args.apply
 
-    import boto3
+    if table is None or s3 is None:
+        import boto3
+        from botocore.config import Config
 
-    region = os.environ["AWS_DEFAULT_REGION"]
+        cfg = Config(retries={"max_attempts": 1})
+        region = os.environ["AWS_DEFAULT_REGION"]
+        s3 = s3 or boto3.client("s3", region_name=region, config=cfg)
+        if table is None and (planning or args.compare_store):
+            table = boto3.resource("dynamodb", region_name=region, config=cfg).Table(os.environ["TABLE_NAME"])
     days = iter_days(args.start, args.end)
-    payloads = _read_archive(boto3.client("s3", region_name=region), os.environ["S3_BUCKET"], days)
-    stored = None
-    if args.compare_store:
-        stored = _read_store(boto3.resource("dynamodb", region_name=region).Table(os.environ["TABLE_NAME"]), args.start, args.end)
-    print(json.dumps({"range": [args.start, args.end], "write_mode": "none", **tally(payloads, stored)}, indent=2))
+    payloads = _read_archive(s3, os.environ["S3_BUCKET"], days)
+    stored = _read_store(table, args.start, args.end) if (planning or args.compare_store) else None
+    print(
+        json.dumps({"range": [args.start, args.end], "write_mode": "apply" if args.apply else "none", **tally(payloads, stored)}, indent=2)
+    )
+    if not planning:
+        return 0
+    plan = build_plan(payloads, stored)
+    print_plan_lines(plan)
+    result = {k: plan[k] for k in ("rows_updated", "rows_zeros_removed", "rows_unchanged", "rows_unresolved", "plan_sha256")}
+    result["dry_run"] = not args.apply
+    if args.apply:
+        result["rows_written"] = apply_plan(table, plan, os.environ["USER_ID"])
+    print(json.dumps(result, indent=2))
+    if args.report:
+        with open(args.report, "w") as fh:
+            json.dump(result, fh, indent=2)
     return 0
 
 
