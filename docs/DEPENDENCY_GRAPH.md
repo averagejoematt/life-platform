@@ -470,11 +470,25 @@ Field-level rulings (only non-default fields are declared):
 
 | Source | Field | Tier |
 |--------|-------|------|
+| `apple_health` | `_rd_sleep_apple` | owner_only |
 | `apple_health` | `breathing_disturbances_apple` | owner_only |
 | `apple_health` | `cardio_recovery_bpm_apple` | internal |
 | `apple_health` | `hrv_sdnn_apple` | internal |
 | `apple_health` | `respiratory_rate_apple` | internal |
 | `apple_health` | `resting_heart_rate_apple` | internal |
+| `apple_health` | `sleep_awake_min_apple` | owner_only |
+| `apple_health` | `sleep_core_min_apple` | owner_only |
+| `apple_health` | `sleep_deep_min_apple` | owner_only |
+| `apple_health` | `sleep_end_apple` | owner_only |
+| `apple_health` | `sleep_in_bed_end_apple` | owner_only |
+| `apple_health` | `sleep_in_bed_hours_apple` | owner_only |
+| `apple_health` | `sleep_in_bed_start_apple` | owner_only |
+| `apple_health` | `sleep_record_kind_apple` | owner_only |
+| `apple_health` | `sleep_rem_min_apple` | owner_only |
+| `apple_health` | `sleep_source_apple` | owner_only |
+| `apple_health` | `sleep_start_apple` | owner_only |
+| `apple_health` | `sleep_total_hours_apple` | owner_only |
+| `apple_health` | `sleep_unspecified_min_apple` | owner_only |
 | `apple_health` | `spo2_pct_apple` | owner_only |
 | `apple_health` | `walking_heart_rate_avg` | internal |
 | `apple_health` | `walking_steadiness_pct` | internal |
@@ -547,7 +561,7 @@ Field-level rulings (only non-default fields are declared):
 - Edge sites: 1312 total · 948 resolved · 364 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (108 lambdas total)
 - Alarms: 139 literal-named declarations across three idioms, 4 composite; routing digest 95 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
-- Privacy: 18 owner-only + 3 owner-published sources; 53 owner-only + 11 owner-published fields — non-default entries only
+- Privacy: 18 owner-only + 3 owner-published sources; 67 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 96 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
