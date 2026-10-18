@@ -1,6 +1,6 @@
 # Remediation Taxonomy — how the self-healing agent classifies signals
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-06-28
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 This is the rubric the remediation agent (`remediation/agent.py`) uses to triage
 each technical signal (CloudWatch alarm, QA-smoke failure, freshness alert, CI
@@ -12,6 +12,16 @@ fixed 2026-05-26→29; extend as new patterns recur.
 (diagnose + open PRs + email — a human merges every PR). `auto` was **retired
 2026-08-30** (#2833, ADR-129 amendment): there is no self-merge path in any mode, and
 a stale `auto` in SSM runs as shadow and is reported as needs-human.
+
+> **Dated note (2026-10-17) — the live parameter and the ADR disagree, unresolved here.**
+> A read-only check of `/life-platform/remediation-mode` shows `off` (set 2026-10-03);
+> ADR-129 names `shadow` as the permanent mode. The agent code (`remediation/agent.py`,
+> `_LIVE_MODES = ("off", "shadow")`; default `shadow` when the parameter is absent) and
+> `.github/workflows/remediation-agent.yml` (cron `35 17 * * 1,3,5`, Mon/Wed/Fri 17:35 UTC,
+> plus `repository_dispatch` and `workflow_dispatch`) both accept either value. While the
+> parameter reads `off` the agent is a no-op. Which value is intended is an owner ruling;
+> this page records the fact and does not choose. The merge ban does not depend on the
+> mode: `Bash(gh pr merge *)` is in `disallowed_tools` in `remediation/agent.py`.
 
 ---
 
@@ -57,7 +67,7 @@ Anything that changes **behavior**, not just config/permissions:
 ## Bucket C — NEEDS-HUMAN (report only; no PR, no change)
 
 The stable set the operator must handle — the agent gives the *specific* action:
-- **OAuth re-auth**: Garmin (`setup_garmin_browser_auth.py`), Whoop/Withings/Eight Sleep 401/403 that isn't a transient rotation race. → "re-auth X."
+- **OAuth re-auth**: Garmin (`setup/setup_garmin_browser_auth.py`), Whoop/Withings/Eight Sleep 401/403 that isn't a transient rotation race. → "re-auth X."
 - **Sporadic-data staleness**: a working source with no recent data because the operator hasn't acted (no weigh-in, no workout). → "log/sync X" (not a bug).
 - **Paid-tier / vendor decision**: Strava HTTP 402, an API that now requires payment. → "decide: pay or retire."
 - **AWS account-level**: Lambda concurrency quota, Service Quotas, Support cases. → "follow up on case N."
@@ -79,7 +89,8 @@ flags a Lambda as an orphan when it's live in `REGION` (us-west-2) but isn't a
 `AWS::Lambda::Function` resource of any **region-local** CloudFormation stack — it
 already scopes the comparison to one region on both sides (see the `STACKS`
 mapping: every stack deploys to us-west-2 except `LifePlatformWeb`, which is
-us-east-1 for CloudFront). The signal you receive under `drift.flagging.orphan_functions`
+us-east-1 for CloudFront, and `LifePlatformBackup`, the raw/ replica in us-east-2
+— the `STACKS` mapping is authoritative, not this list). The signal you receive under `drift.flagging.orphan_functions`
 is **already region-scoped** — it is a real live-in-us-west-2 orphan by construction.
 
 **#1228 incident:** a us-west-2 orphan twin of `email-subscriber` (the managed copy

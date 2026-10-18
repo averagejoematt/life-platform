@@ -49,7 +49,7 @@ function check(where, { say = [], gone = [], pairs = [], oneOf = [], sections = 
   for (const id of say) assert.ok(seen(id), `${where}: #${id} is blank`);
   for (const id of gone) if (seen(id) !== null) assert.ok(seen(id), `${where}: #${id} stands empty`);
   // The argument's body is empty by design when the bet card carries it, or its heading says nothing is in dispute.
-  if (els.has("ck-argument")) assert.ok(seen("ck-argument") || seen("ck-bet") || /^Nothing is in dispute/.test(seen("ck-argue-heading")), `${where}: the argument section says nothing`);
+  if (els.has("ck-argument")) assert.ok(seen("ck-argument") || seen("ck-bet") || /^(Nothing is in dispute|No open bet between them)/.test(seen("ck-argue-heading")), `${where}: the argument section says nothing`);
   for (const [section, body] of sections) if (!seen(body)) assert.equal(seen(section), null, `${where}: #${section} stands over an empty #${body}`);
   for (const [lab, body] of pairs) if (seen(body) === null) assert.equal(seen(lab), null, `${where}: #${lab} dangles over a removed #${body}`);
   for (const group of oneOf) assert.equal(group.filter((id) => seen(id)).length, 1, `${where}: exactly one of ${group} says something`);

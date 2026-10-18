@@ -219,9 +219,12 @@ const daysBefore = (iso, n) => {
   const t = Date.parse(`${iso}T12:00:00Z`);
   return Number.isFinite(t) ? new Date(t - n * 86400000).toISOString().slice(0, 10) : "";
 };
-export function lastCallPick(callsBody, asOf = "") {
+// `since`: the first day of the window the page itself prints as "this week" (round 3: a miss
+// settled the day before the printed week was headed "this week"). Without it, the seven days
+// ending on `asOf`, inclusive.
+export function lastCallPick(callsBody, asOf = "", { since: from = "" } = {}) {
   const all = callsOf(callsBody).filter(hasRule);
-  const since = asOf ? daysBefore(asOf, RECENT_DAYS) : "";
+  const since = from || (asOf ? daysBefore(asOf, RECENT_DAYS - 1) : "");
   if (since) {
     const recent = showcasePair(all.filter((c) => c.settled_date >= since && c.settled_date <= asOf));
     if (recent.wrong) return { call: recent.wrong, kind: "recent" };
@@ -234,19 +237,22 @@ export function lastCallPick(callsBody, asOf = "") {
 // `jobs` maps a persona id to the coach's job in a word or two: with it, the card's first line
 // names the coach and the job ("Settled Saturday, October 10 · Lisa Park, the sleep coach"),
 // and the result is the bold line — the punch, not the rule (round 8b).
-export function lastCallHTML(callsBody, base, asOf = "", jobs = null) {
-  const { call } = lastCallPick(callsBody, asOf);
+export function lastCallHTML(callsBody, base, asOf = "", jobs = null, { moreDoor = "", since = "" } = {}) {
+  const { call } = lastCallPick(callsBody, asOf, { since });
   if (!call) return "";
   const day = dayInWords(call.settled_date);
   const g = call.simple_guess;
-  const guess = g && g.state === "scored" && g.short ? `The simple guess: ${g.short}.` : "";
+  // Round 2: say which guess. The served sentence names it ("…stay at 75, the last reading before
+  // the call"); otherwise it stays "The simple guess".
+  const which = g && /the last reading before the call/.test(String(g.text || "")) ? "A guess that nothing changes from the last reading" : "The simple guess";
+  const guess = g && g.state === "scored" && g.short ? `${which}: ${g.short}.` : "";
   const job = jobs && call.kind !== "bet" && call.coach_name && jobs[personaOfCall(call.coach_id)] ? ` · ${call.coach_name}, the ${jobs[personaOfCall(call.coach_id)]} coach` : "";
   const head = `<p class="ck-small">${esc(day ? `Settled ${day}` : "A settled call")}${esc(job)}</p>`;
   if (call.kind === "bet") {
     return `<div class="ck-bet">${head}<p>${esc(call.verdict_text)}</p><p>${esc(call.called || call.called_short)} <b>${esc(call.happened_short)}</b></p>${soft(guess)}<p><a class="ck-link" href="${esc(callHref(base, call.id))}">The whole call</a></p></div>`;
   }
   // The house rule (#4808): the shared card — tag, the call with the result in bold, one soft line.
-  const card = callCardHTML(call, { full: true, extra: guess, href: callHref(base, call.id), wrap: "" });
+  const card = callCardHTML(call, { full: true, extra: guess, href: callHref(base, call.id), wrap: "", moreDoor });
   return card ? `<div class="ck-bet">${head}${card}</div>` : "";
 }
 

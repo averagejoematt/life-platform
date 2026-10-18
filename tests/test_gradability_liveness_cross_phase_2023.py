@@ -195,10 +195,14 @@ def test_every_gradable_metric_source_is_a_never_hidden_class():
     because every source the gate can reach is kept across resets by taxonomy
     contract. Map a future metric onto an EXPERIMENT_SCOPED source and this fails,
     which is the moment to revisit the read — not silently inherit it."""
-    for metric, source in sorted(mm.METRIC_SOURCES.items()):
-        cls = tax.SOURCE_CLASS.get(source)
-        assert cls is not None, f"{metric} → source '{source}' is unclassified in phase_taxonomy"
-        assert cls in NEVER_HIDDEN_CLASSES, f"{metric} → '{source}' is {cls}; a cross-phase liveness read is unjustified"
+    from common.metric_truth import resolved_metric, sources_for
+
+    for metric, mapped in sorted(mm.METRIC_SOURCES.items()):
+        # #4630: a resolved pseudo-source reads every source in its registry truth facet.
+        for source in sources_for(resolved_metric(mapped)) if resolved_metric(mapped) else (mapped,):
+            cls = tax.SOURCE_CLASS.get(source)
+            assert cls is not None, f"{metric} → source '{source}' is unclassified in phase_taxonomy"
+            assert cls in NEVER_HIDDEN_CLASSES, f"{metric} → '{source}' is {cls}; a cross-phase liveness read is unjustified"
 
 
 def test_current_phase_rows_are_not_excluded_by_the_fix():
@@ -982,7 +986,8 @@ def test_the_scan_sees_the_fixed_consumers_as_cross_phase():
     for the next reset to expose it."""
     derived = _derive_raw_source_phase_filtered_functions()
     fixed = {
-        "lambdas/coach/coach_state_updater.py::_metric_has_recent_data": "the gradability liveness read (#2023)",
+        # #4630: the liveness read's query moved into the shared seam (resolved pseudo-sources).
+        "lambdas/coach/metric_trailing_series.py::source_items": "the gradability liveness read (#2023)",
         "lambdas/emails/daily_brief_lambda.py::scan_stale_sources": "the brief's per-source staleness scan (#2080)",
         "lambdas/emails/anomaly_detector_lambda.py::fetch_range": "the anomaly detector's rolling baseline (#2081)",
         "lambdas/emails/daily_brief_lambda.py::gather_daily_data": "the brief's SOURCE#travel TRIP# read (#2109)",

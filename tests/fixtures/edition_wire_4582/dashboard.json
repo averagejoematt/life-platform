@@ -1,10 +1,10 @@
 {
  "_meta": {
   "generated_at": "2026-10-05T17:01:57.021488+00:00",
-  "served_at": "2026-10-13T01:38:50.927480+00:00",
+  "served_at": "2026-10-17T23:29:17.446356+00:00",
   "cache_seconds": 300,
   "content_as_of": "2026-10-05T17:01:57.021488+00:00",
-  "request_id": "d87fc3a7edc84214"
+  "request_id": "467d227e290c43e0"
  },
  "weekly_priority": {
   "text": null,
@@ -15,14 +15,14 @@
   "data_through": null
  },
  "lead_daily": {
-  "text": "Matthew has lost 20.8 pounds since Sunday, September 6, and his weight loss is now settling into a steady pattern of 3.0 pounds per week, likely ranging between 2.6 and 3.3 pounds weekly. His morning recovery score stands at 67, his resting heart rate is 60 beats per minute, and he slept 9.6 hours last night, suggesting solid physical restoration as he moves through day 37 of the experiment.",
-  "generated_at": "2026-10-12T17:08:02.045775+00:00",
-  "data_through": "2026-10-11",
+  "text": "Matthew has lost 23.3 pounds since Sunday, September 6, settling into a weekly loss rate of 3.2 pounds per week, likely between 3.0 and 3.4. His latest weigh-in on Friday, October 16 shows 304.0 pounds. His recovery score this morning is 60, with a heart-rate variability of 45 milliseconds, resting heart rate of 56 beats per minute, and 7.4 hours of sleep last night.",
+  "generated_at": "2026-10-17T17:00:18.598857+00:00",
+  "data_through": "2026-10-16",
   "cited": [
    {
     "metric": "day of the experiment",
-    "value": "37",
-    "as_of": "2026-10-12",
+    "value": "42",
+    "as_of": "2026-10-17",
     "source_field": "ai_context.build_experiment_phase_context.days_in"
    },
    {
@@ -33,14 +33,14 @@
    },
    {
     "metric": "latest weigh-in (lb)",
-    "value": "306.5",
-    "as_of": "2026-10-10",
+    "value": "304.0",
+    "as_of": "2026-10-16",
     "source_field": "withings.weight_lbs"
    },
    {
     "metric": "latest weigh-in date",
-    "value": "Saturday, October 10",
-    "as_of": "2026-10-10",
+    "value": "Friday, October 16",
+    "as_of": "2026-10-16",
     "source_field": "withings.sk"
    },
    {
@@ -51,50 +51,50 @@
    },
    {
     "metric": "lost since the start (lb)",
-    "value": "20.8",
-    "as_of": "2026-10-10",
+    "value": "23.3",
+    "as_of": "2026-10-16",
     "source_field": "journey.lost_lbs"
    },
    {
     "metric": "weekly loss rate (lb per week)",
-    "value": "3.0",
-    "as_of": "2026-10-11",
+    "value": "3.2",
+    "as_of": "2026-10-16",
     "source_field": "computed_metrics.weekly_rate_lbs"
    },
    {
     "metric": "weekly loss rate, likely range (lb per week)",
-    "value": "2.6 to 3.3",
-    "as_of": "2026-10-11",
+    "value": "3.0 to 3.4",
+    "as_of": "2026-10-16",
     "source_field": "computed_metrics.weekly_rate_ci"
    },
    {
     "metric": "rate status",
     "value": "settled",
-    "as_of": "2026-10-11",
+    "as_of": "2026-10-16",
     "source_field": "computed_metrics.rate_provisional"
    },
    {
     "metric": "morning recovery score (0-100, Whoop)",
-    "value": "67",
-    "as_of": "2026-10-12",
+    "value": "60",
+    "as_of": "2026-10-17",
     "source_field": "whoop.recovery_score"
    },
    {
     "metric": "heart-rate variability (ms)",
-    "value": "47",
-    "as_of": "2026-10-12",
+    "value": "45",
+    "as_of": "2026-10-17",
     "source_field": "whoop.hrv"
    },
    {
     "metric": "resting heart rate (beats per minute)",
-    "value": "60",
-    "as_of": "2026-10-12",
+    "value": "56",
+    "as_of": "2026-10-17",
     "source_field": "whoop.resting_heart_rate"
    },
    {
     "metric": "sleep last night (hours)",
-    "value": "9.6",
-    "as_of": "2026-10-12",
+    "value": "7.4",
+    "as_of": "2026-10-17",
     "source_field": "whoop.sleep_duration_hours"
    }
   ],
@@ -103,16 +103,16 @@
   "coach_title": "Principal Investigator \u2014 Program Lead"
  },
  "moves": {
-  "date": "2026-10-12",
-  "generated_at": "2026-10-12T19:00:35.141696+00:00",
+  "date": "2026-10-17",
+  "generated_at": "2026-10-17T19:00:33.324296+00:00",
   "lines": [
    {
-    "coach_id": "labs_coach",
-    "name": "James Okafor",
-    "move": "question",
-    "move_label": "A question for Matthew",
-    "text": "My read is that 20.8 lb gone in 37 days is real progress, yet two items I flagged weeks ago remain unresolved \u2014 has Matthew taken any step this week to schedule either the blood draw or the symptom check-in?",
-    "date": "2026-10-12",
+    "coach_id": "mind_coach",
+    "name": "Nathan Reeves",
+    "move": "call",
+    "move_label": "A call",
+    "text": "Something has gone quiet in Matthew that protein gains haven't touched \u2014 38 days without a journal entry, and my read is that the block isn't physical. I expect the silence continues until he names what he's actually avoiding, not until another number moves.",
+    "date": "2026-10-17",
     "replies_to": null,
     "replies_to_name": null
    }
@@ -127,103 +127,44 @@
   "silent": [
    "sleep_coach",
    "nutrition_coach",
-   "mind_coach",
    "physical_coach",
+   "labs_coach",
    "explorer_coach"
+  ],
+  "sidelined": [
+   {
+    "coach": "glucose_coach",
+    "state": "absent",
+    "reason": "No new readings have reached this coach's area, so there is nothing new to read."
+   },
+   {
+    "coach": "sleep_coach",
+    "state": "absent",
+    "reason": "This coach's line did not pass the day's checks, so it was held back."
+   },
+   {
+    "coach": "nutrition_coach",
+    "state": "absent",
+    "reason": "This coach's line did not pass the day's checks, so it was held back."
+   },
+   {
+    "coach": "physical_coach",
+    "state": "absent",
+    "reason": "This coach had nothing new to add."
+   },
+   {
+    "coach": "labs_coach",
+    "state": "absent",
+    "reason": "This coach had nothing new to add."
+   },
+   {
+    "coach": "explorer_coach",
+    "state": "absent",
+    "reason": "This coach had nothing new to add."
+   }
   ]
  },
  "open_actions": [
-  {
-   "coach_id": "sleep",
-   "coach_name": "Lisa Park",
-   "text": "I've asked him to log one-word felt-sense before checking his Whoop score each morning this week.",
-   "asked_on": "2026-10-05",
-   "due": "2026-10-12",
-   "status": "pending",
-   "check": null,
-   "evidence_link": null,
-   "days_overdue": 0
-  },
-  {
-   "coach_id": "labs",
-   "coach_name": "James Okafor",
-   "text": "I've asked him to schedule a fasting lab panel this week, at least 48 hours after training.",
-   "asked_on": "2026-10-05",
-   "due": "2026-10-12",
-   "status": "pending",
-   "check": null,
-   "evidence_link": null,
-   "days_overdue": 0
-  },
-  {
-   "coach_id": "labs",
-   "coach_name": "James Okafor",
-   "text": "I've asked him to provide a symptom baseline (fatigue and cold tolerance) today.",
-   "asked_on": "2026-10-05",
-   "due": "2026-10-12",
-   "status": "pending",
-   "check": null,
-   "evidence_link": null,
-   "days_overdue": 0
-  },
-  {
-   "coach_id": "nutrition",
-   "coach_name": "Marcus Webb",
-   "text": "I've asked him to clarify what dinner looked like September 19 through 26.",
-   "asked_on": "2026-10-08",
-   "due": "2026-10-15",
-   "status": "pending",
-   "check": null,
-   "evidence_link": null,
-   "days_overdue": 0
-  },
-  {
-   "coach_id": "mind",
-   "coach_name": "Nathan Reeves",
-   "text": "I've asked him to reflect on whether the tracking structure is still serving him.",
-   "asked_on": "2026-10-08",
-   "due": "2026-10-15",
-   "status": "pending",
-   "check": null,
-   "evidence_link": null,
-   "days_overdue": 0
-  },
-  {
-   "coach_id": "physical",
-   "coach_name": "Max Reyes",
-   "text": "I need him to explain the reason for the recent step drop.",
-   "asked_on": "2026-10-08",
-   "due": "2026-10-15",
-   "status": "pending",
-   "check": null,
-   "evidence_link": null,
-   "days_overdue": 0
-  },
-  {
-   "coach_id": "physical",
-   "coach_name": "Max Reyes",
-   "text": "I've asked him to log food consistently and reach 170 grams of protein daily for seven straight days.",
-   "asked_on": "2026-10-08",
-   "due": "2026-10-15",
-   "status": "pending",
-   "check": {
-    "metric": "total_protein_g",
-    "direction": "up"
-   },
-   "evidence_link": "/data/nutrition/",
-   "days_overdue": 0
-  },
-  {
-   "coach_id": "explorer",
-   "coach_name": "Henning Brandt",
-   "text": "I've asked him to log his meals from October 5th and 6th, even rough estimates.",
-   "asked_on": "2026-10-08",
-   "due": "2026-10-15",
-   "status": "pending",
-   "check": null,
-   "evidence_link": null,
-   "days_overdue": 0
-  },
   {
    "coach_id": "nutrition",
    "coach_name": "Marcus Webb",
@@ -241,6 +182,97 @@
    "text": "I've asked him to confirm any carb reduction is calorie-neutral before implementing it.",
    "asked_on": "2026-10-12",
    "due": "2026-10-19",
+   "status": "pending",
+   "check": null,
+   "evidence_link": null,
+   "days_overdue": 0
+  },
+  {
+   "coach_id": "mind",
+   "coach_name": "Nathan Reeves",
+   "text": "I've asked him to write one sentence this week, for himself alone, exploring his silence.",
+   "asked_on": "2026-10-12",
+   "due": "2026-10-19",
+   "status": "pending",
+   "check": null,
+   "evidence_link": null,
+   "days_overdue": 0
+  },
+  {
+   "coach_id": "explorer",
+   "coach_name": "Henning Brandt",
+   "text": "I need him to clarify what happened during the October 5-6 logging gap and whether carb intake changed.",
+   "asked_on": "2026-10-12",
+   "due": "2026-10-19",
+   "status": "pending",
+   "check": null,
+   "evidence_link": null,
+   "days_overdue": 0
+  },
+  {
+   "coach_id": "nutrition",
+   "coach_name": "Marcus Webb",
+   "text": "I've asked him to clarify what dinner looked like during September 19\u201326.",
+   "asked_on": "2026-10-15",
+   "due": "2026-10-22",
+   "status": "pending",
+   "check": null,
+   "evidence_link": null,
+   "days_overdue": 0
+  },
+  {
+   "coach_id": "mind",
+   "coach_name": "Nathan Reeves",
+   "text": "I've asked him to share one sentence about what the journaling silence might represent.",
+   "asked_on": "2026-10-15",
+   "due": "2026-10-22",
+   "status": "pending",
+   "check": null,
+   "evidence_link": null,
+   "days_overdue": 0
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "I've asked him to restart food logging tonight to verify protein intake direction.",
+   "asked_on": "2026-10-15",
+   "due": "2026-10-22",
+   "status": "pending",
+   "check": {
+    "metric": "total_protein_g",
+    "direction": "up"
+   },
+   "evidence_link": "/data/nutrition/",
+   "days_overdue": 0
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "I've asked him to explain the 36% step drop in one sentence this week.",
+   "asked_on": "2026-10-15",
+   "due": "2026-10-22",
+   "status": "pending",
+   "check": null,
+   "evidence_link": null,
+   "days_overdue": 0
+  },
+  {
+   "coach_id": "labs",
+   "coach_name": "James Okafor",
+   "text": "I've asked him to rate his fatigue (1\u201310) and report whether he's running colder than usual.",
+   "asked_on": "2026-10-15",
+   "due": "2026-10-22",
+   "status": "pending",
+   "check": null,
+   "evidence_link": null,
+   "days_overdue": 0
+  },
+  {
+   "coach_id": "labs",
+   "coach_name": "James Okafor",
+   "text": "I've asked him to hold protein intake at current levels pending kidney function verification.",
+   "asked_on": "2026-10-15",
+   "due": "2026-10-22",
    "status": "pending",
    "check": null,
    "evidence_link": null,
@@ -283,25 +315,25 @@
    "title": "Evidence-Based Nutrition",
    "color": "#22c55e",
    "observatory_link": "/nutrition/",
-   "position_summary": "I called the October 1 spike a turning point\u2014I was wrong. Protein averaged 150.6g across 27 logged days, short of the 170g floor, with recent decline from 158g to 146.5g.",
+   "position_summary": "",
    "emotional_investment": "neutral",
    "prediction_count": 0,
    "data_phase": "established",
-   "analysis_generated_at": "2026-10-12T17:03:00.808879+00:00",
-   "analysis_as_of_day_n": 37,
-   "analysis_data_through": "2026-10-11",
+   "analysis_generated_at": "2026-10-15T17:03:16.797877+00:00",
+   "analysis_as_of_day_n": 40,
+   "analysis_data_through": "2026-10-14",
    "instrument": {
     "source": "macrofactor",
     "datatype": null
    },
    "absent": false,
    "published_vitals": {
-    "rhr_bpm": 60.0,
-    "recovery_as_of": "2026-10-12",
-    "sleep_as_of": "2026-10-12",
-    "sleep_hours": 9.55,
-    "recovery_pct": 67.0,
-    "hrv_ms": 47.42
+    "hrv_ms": 43.94,
+    "recovery_as_of": "2026-10-15",
+    "recovery_pct": 59.0,
+    "rhr_bpm": 55.0,
+    "sleep_as_of": "2026-10-15",
+    "sleep_hours": 8.05
    }
   },
   {
@@ -311,22 +343,22 @@
    "title": "Psychiatrist \u2014 Behavioral Patterns",
    "color": "#a78bfa",
    "observatory_link": "/mind/",
-   "position_summary": "Sixteen days of silence, and protein has recovered to 149 g a day \u2014 but the journaling didn't follow. I was wrong about the mechanism.",
+   "position_summary": "He hasn't written a journal entry in sixteen days. I predicted protein recovery would break the silence \u2014 protein has climbed to 150.9 g a day, yet the journal remains exactly as quiet.",
    "emotional_investment": "neutral",
    "prediction_count": 0,
    "data_phase": "established",
-   "analysis_generated_at": "2026-10-12T17:03:39.108126+00:00",
-   "analysis_as_of_day_n": 37,
-   "analysis_data_through": "2026-10-11",
+   "analysis_generated_at": "2026-10-15T17:03:51.817787+00:00",
+   "analysis_as_of_day_n": 40,
+   "analysis_data_through": "2026-10-14",
    "instrument": null,
    "absent": false,
    "published_vitals": {
-    "hrv_ms": 47.42,
-    "sleep_as_of": "2026-10-12",
-    "recovery_pct": 67.0,
-    "sleep_hours": 9.55,
-    "recovery_as_of": "2026-10-12",
-    "rhr_bpm": 60.0
+    "hrv_ms": 43.94,
+    "recovery_as_of": "2026-10-15",
+    "recovery_pct": 59.0,
+    "rhr_bpm": 55.0,
+    "sleep_as_of": "2026-10-15",
+    "sleep_hours": 8.05
    }
   },
   {
@@ -336,25 +368,25 @@
    "title": "Performance \u2014 Training, Cardio & Mobility",
    "color": "#f59e0b",
    "observatory_link": "/physical/",
-   "position_summary": "His steps contracted 36% over seven days, dropping from 4,558 to 3,751, and I need to understand why before we move forward.",
+   "position_summary": "Three overdue data commitments are blocking my analysis. His steps dropped 36% over seven days with no explanation, and food logging has been silent since October 12.",
    "emotional_investment": "neutral",
    "prediction_count": 0,
    "data_phase": "established",
-   "analysis_generated_at": "2026-10-08T17:05:27.653776+00:00",
-   "analysis_as_of_day_n": 33,
-   "analysis_data_through": "2026-10-07",
+   "analysis_generated_at": "2026-10-15T17:04:46.751971+00:00",
+   "analysis_as_of_day_n": 40,
+   "analysis_data_through": "2026-10-14",
    "instrument": {
     "source": "hevy",
     "datatype": null
    },
    "absent": false,
    "published_vitals": {
-    "sleep_hours": 8.93,
-    "hrv_ms": 73.43,
-    "rhr_bpm": 52.0,
-    "sleep_as_of": "2026-10-08",
-    "recovery_as_of": "2026-10-08",
-    "recovery_pct": 97.0
+    "hrv_ms": 43.94,
+    "recovery_as_of": "2026-10-15",
+    "recovery_pct": 59.0,
+    "rhr_bpm": 55.0,
+    "sleep_as_of": "2026-10-15",
+    "sleep_hours": 8.05
    }
   },
   {
@@ -385,25 +417,25 @@
    "title": "Clinical Pathology & Preventive Labs",
    "color": "#5ba4cf",
    "observatory_link": "/labs/",
-   "position_summary": "Three prerequisites are blocking clinical progress: no lab draw is booked, the symptom baseline I've requested remains uncollected, and his protein intake has breached the hold threshold I set pending kidney function verification.",
+   "position_summary": "Three clinical prerequisites are blocking meaningful interpretation: no lab draw is booked, his fatigue and cold tolerance baseline has been uncollected for 12+ days, and the protein hold status is unresolved.",
    "emotional_investment": "neutral",
    "prediction_count": 0,
    "data_phase": "established",
-   "analysis_generated_at": "2026-10-05T17:06:15.559542+00:00",
-   "analysis_as_of_day_n": 30,
-   "analysis_data_through": "2026-10-04",
+   "analysis_generated_at": "2026-10-15T17:05:48.238138+00:00",
+   "analysis_as_of_day_n": 40,
+   "analysis_data_through": "2026-10-14",
    "instrument": {
     "source": "labs",
     "datatype": null
    },
    "absent": false,
    "published_vitals": {
-    "rhr_bpm": 51.0,
-    "recovery_as_of": "2026-10-05",
-    "sleep_as_of": "2026-10-05",
-    "recovery_pct": 98.0,
-    "hrv_ms": 58.15,
-    "sleep_hours": 8.88
+    "hrv_ms": 43.94,
+    "recovery_as_of": "2026-10-15",
+    "recovery_pct": 59.0,
+    "rhr_bpm": 55.0,
+    "sleep_as_of": "2026-10-15",
+    "sleep_hours": 8.05
    }
   },
   {
@@ -413,29 +445,29 @@
    "title": "Research & Longevity \u2014 Evidence Appraisal",
    "color": "#e879f9",
    "observatory_link": "/explorer/",
-   "position_summary": "On Saturday, October 10th, his recovery score was 88% and HRV measured 136.9 ms \u2014 solid readings.",
+   "position_summary": "Recovery and deep sleep have declined in parallel over seven days \u2014 exactly the pattern I predicted if carb reduction occurred without protein escalation.",
    "emotional_investment": "neutral",
    "prediction_count": 0,
    "data_phase": "established",
-   "analysis_generated_at": "2026-10-12T17:07:43.570427+00:00",
-   "analysis_as_of_day_n": 37,
-   "analysis_data_through": "2026-10-11",
+   "analysis_generated_at": "2026-10-15T17:06:57.758632+00:00",
+   "analysis_as_of_day_n": 40,
+   "analysis_data_through": "2026-10-14",
    "instrument": null,
    "absent": false,
    "published_vitals": {
-    "recovery_pct": 67.0,
-    "sleep_hours": 9.55,
-    "sleep_as_of": "2026-10-12",
-    "hrv_ms": 47.42,
-    "recovery_as_of": "2026-10-12",
-    "rhr_bpm": 60.0
+    "hrv_ms": 43.94,
+    "recovery_as_of": "2026-10-15",
+    "recovery_pct": 59.0,
+    "rhr_bpm": 55.0,
+    "sleep_as_of": "2026-10-15",
+    "sleep_hours": 8.05
    }
   }
  ],
  "predictions": [],
  "content_day_span": {
   "oldest_day_n": 30,
-  "newest_day_n": 37,
+  "newest_day_n": 40,
   "mixed": true
  },
  "regeneration_paused": false

@@ -143,6 +143,9 @@ REGISTRY: dict[str, tuple[str, str | None]] = {
     "binge_days_30d": (EXTENSIVE, None),
     "count_30d": (EXTENSIVE, None),
     "daily_modality_minutes_30d": (EXTENSIVE, None),
+    "hevy_cardio_minutes_30d": (EXTENSIVE, None),  # #4627: a sum of Hevy cardio-block minutes over the genesis-clamped window
+    "trailing_7d": (EXTENSIVE, None),  # #4627 /api/zone2: a SUM over the 7 dates it names (start_date/end_date/dates ride with it)
+    "z2_trailing_7d_window": (EXTENSIVE, None),  # #4627 training_overview: the same 7-date SUM, its dates stated
     "distinct_exercises_30d": (EXTENSIVE, None),
     "journal_entries_30d": (EXTENSIVE, None),
     "n_scored_7d": (EXTENSIVE, None),

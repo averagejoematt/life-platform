@@ -162,7 +162,7 @@ class FakeTable:
         return {}
 
 
-def _both_days_table(now, *, with_garmin=False):
+def _both_days_table(now, *, with_garmin=False, with_whoop=False):
     """THE fixture that creates the bug: the Pacific day's real total AND the next-UTC-day
     partial, both present, exactly as they sit in DynamoDB during the PT evening."""
     days = {_pt(now): (PACIFIC_DAY_STEPS, PACIFIC_DAY_WATER_ML)}
@@ -171,6 +171,8 @@ def _both_days_table(now, *, with_garmin=False):
     by_pk = {_AH_PK: [_ah_record(d, st, wa) for d, (st, wa) in days.items()]}
     if with_garmin:
         by_pk[_GARMIN_PK] = [{"sk": f"DATE#{_pt(now)}", "steps": 8123}]
+    if with_whoop:
+        by_pk[_WHOOP_PK] = [{"sk": f"DATE#{_pt(now)}", "date": _pt(now), "step_count": 9100}]
     return FakeTable(by_pk)
 
 
@@ -208,13 +210,15 @@ def test_the_pre_fix_selection_reproduced_the_filed_symptom(now):
 
 
 @pytest.mark.parametrize("now", ALL_INSTANTS, ids=_IDS)
-def test_garmin_still_outranks_apple_health(now):
-    """The pre-existing source policy is untouched: garmin is the watch of record. The
-    selection guard must not have quietly become a source preference."""
+def test_the_registry_truth_facet_still_decides_the_source(now):
+    """#4630: the source policy is the registry's METRIC_TRUTH facet (Whoop, else Apple Health,
+    else paused Garmin) — the Pacific-reached selection guard must not have quietly become a
+    source preference, and the frame disclosed is the WINNER's."""
     out = vitals_resolver.resolve_vitals(_both_days_table(now, with_garmin=True), "USER#matthew#SOURCE#", now=now)
-    assert out["steps_source"] == "garmin"
-    assert out["steps"] == 8123
-    assert out["steps_as_of_frame"] == "pacific"
+    assert (out["steps_source"], out["steps"], out["steps_as_of"]) == ("apple_health", PACIFIC_DAY_STEPS, _pt(now))
+    assert out["steps_as_of_frame"] == "utc"
+    out = vitals_resolver.resolve_vitals(_both_days_table(now, with_garmin=True, with_whoop=True), "USER#matthew#SOURCE#", now=now)
+    assert (out["steps_source"], out["steps"], out["steps_as_of"]) == ("whoop", 9100, _pt(now))
 
 
 def test_the_scan_window_was_not_narrowed():

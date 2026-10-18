@@ -28,8 +28,8 @@ is not answerable. `target_hit_rate_pct` is now None with `target_applicable: fa
 note saying why — and the deficit alerts are suppressed too, since "0 min target (-N min
 shortfall)" is the same nonsense in prose.
 
-These are unit tests over `tool_get_zone2_breakdown` with `query_source` and `get_profile`
-replaced. The activity fixture is what makes them real: one 150-minute zone-2 session in a
+These are unit tests over `tool_get_zone2_breakdown` with `query_source` replaced (#4627:
+the tool no longer reads a profile maximum — Zone 2 is each device's own stored time-in-zone). The activity fixture is what makes them real: one 150-minute zone-2 session in a
 thirteen-week window is the shape that produced the live 100%.
 """
 
@@ -66,13 +66,17 @@ THIRTEEN = 13
 def _day(date, minutes, hr=Z2_HR):
     return {
         "date": date,
-        "activities": [{"moving_time_seconds": minutes * 60, "average_heartrate": hr, "sport_type": "Ride", "name": "ride"}],
+        # #4627: Zone 2 is read from the stored time-in-zone (`zone2_seconds`), never the average HR.
+        "activities": [
+            {
+                "moving_time_seconds": minutes * 60,
+                "average_heartrate": hr,
+                "zone2_seconds": minutes * 60,
+                "sport_type": "Ride",
+                "name": "ride",
+            }
+        ],
     }
-
-
-@pytest.fixture(autouse=True)
-def _no_aws(monkeypatch):
-    monkeypatch.setattr(tc, "get_profile", lambda: {"max_heart_rate": MAX_HR})
 
 
 def _run(days, monkeypatch, **args):

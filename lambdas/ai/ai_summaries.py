@@ -13,6 +13,8 @@ access — keep working unchanged.
 
 from typing import Any
 
+from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
+
 
 def _safe_float(rec, field, default=None):
     if rec and field in rec:
@@ -56,7 +58,8 @@ def build_data_summary(data: dict[str, Any], profile: dict[str, Any]) -> dict[st
         "fat_g": _safe_float(mf, "total_fat_g"),
         "carbs_g": _safe_float(mf, "total_carbs_g"),
         "fiber_g": _safe_float(mf, "total_fiber_g"),
-        "steps": _safe_float(apple, "steps"),
+        # #4630: the day's steps through the ONE resolver (registry METRIC_TRUTH facet).
+        "steps": resolve_steps({"whoop": data.get("whoop"), "apple_health": apple, "garmin": data.get("garmin")}).value,
         "water_ml": _safe_float(apple, "water_intake_ml"),
         "glucose_avg": _safe_float(apple, "blood_glucose_avg"),
         "glucose_tir": _safe_float(apple, "blood_glucose_time_in_range_pct"),

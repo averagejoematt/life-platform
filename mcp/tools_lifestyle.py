@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from boto3.dynamodb.conditions import Key
+from common.metric_truth import STEPS, resolve_by_date, resolved_metric, resolved_rows, sources_for, steps_sources  # #4630
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from experiment.phase_taxonomy import experiment_stamp_for  # #3513: the class-gated, date-derived write-time stamp
@@ -91,49 +92,17 @@ _KJ_PER_KCAL = 1.0 / 4.184  # thermochemical kilocalorie (#2221)
 _INSIGHTS_PAGE_SIZE = 200
 _INSIGHTS_MAX_SCAN = 2000
 
-# ── Experiment metrics ──
-
-_EXPERIMENT_METRICS = [
-    # Sleep
-    ("whoop", "sleep_score", "Sleep Score", True),  # normalized from sleep_quality_score
-    ("whoop", "sleep_efficiency_pct", "Sleep Efficiency %", True),  # normalized from sleep_efficiency_percentage
-    ("whoop", "deep_pct", "Deep Sleep %", True),  # normalized from slow_wave_sleep_hours
-    ("whoop", "rem_pct", "REM Sleep %", True),  # normalized from rem_sleep_hours
-    ("eightsleep", "time_to_sleep_min", "Sleep Onset Latency", False),  # writer: eightsleep_lambda.py (#2221)
-    # Recovery
-    ("whoop", "recovery_score", "Whoop Recovery", True),
-    ("whoop", "hrv", "HRV (rMSSD)", True),  # writer: whoop_lambda.py stores `hrv` (#2221)
-    ("whoop", "resting_heart_rate", "Resting HR", False),
-    # Stress & Energy
-    ("garmin", "avg_stress", "Garmin Stress", False),  # writer: garmin_lambda.py (#2221)
-    ("garmin", "body_battery_high", "Body Battery Peak", True),
-    # Body
-    ("withings", "weight_lbs", "Weight (lbs)", None),  # direction depends on goal
-    # Nutrition
-    ("macrofactor", "calories_kcal", "Calories", None),  # writer: macrofactor_lambda.py (#2221)
-    ("macrofactor", "protein_g", "Protein (g)", None),
-    # Movement
-    ("apple_health", "steps", "Steps", True),
-    # Glucose (if available) — writer: health_auto_export_lambda.py stores blood_glucose_* (#2221)
-    ("apple_health", "blood_glucose_avg", "Mean Glucose", False),
-    ("apple_health", "blood_glucose_time_in_range_pct", "CGM Time in Range %", True),
-]
+# ── Experiment metrics: the table + extractor live in mcp/experiment_metrics.py (#4630 split) ──
+from mcp.experiment_metrics import _EXPERIMENT_METRICS, _extract_metric  # noqa: E402,F401
 
 
-def _extract_metric(item, field_path):
-    """Extract a numeric value from a DynamoDB item, handling nested dicts."""
-    val = item
-    for part in field_path.split("."):
-        if isinstance(val, dict):
-            val = val.get(part)
-        else:
-            return None
-    if val is None:
-        return None
-    try:
-        return float(val)
-    except (ValueError, TypeError):
-        return None
+def _query_metric_source(src, start, end):
+    """`query_source`, plus #4630's resolved pseudo-sources: `resolved:<metric>` reads every
+    source in the registry's truth facet and returns the resolved day rows."""
+    metric = resolved_metric(src)
+    if metric:
+        return resolved_rows(metric, {s: query_source(s, start, end) for s in sources_for(metric)})
+    return query_source(src, start, end)
 
 
 def _fetch_weather_range(start_date, end_date):
@@ -1075,8 +1044,8 @@ def tool_get_experiment_results(args):
     during_data = {}
     for src in sources_needed:
         try:
-            before_items = query_source(src, before_start, before_end)
-            during_items = query_source(src, during_start, during_end)
+            before_items = _query_metric_source(src, before_start, before_end)
+            during_items = _query_metric_source(src, during_start, during_end)
             before_data[src] = before_items
             during_data[src] = during_items
         except Exception as e:
@@ -1362,7 +1331,7 @@ def _run_design_analysis(existing, design, end_date):
         source/field (from DESIGN_METRICS) through the same fetch path."""
         src = metric_source or source
         fld = metric_field or field
-        items = query_source(src, start, end)
+        items = _query_metric_source(src, start, end)
         if src == "whoop":
             items = [normalize_whoop_sleep(i) for i in items]
         out = {}
@@ -1501,7 +1470,9 @@ def _get_movement_score(args):
     # its own, drive a sedentary conclusion — has_workout is true if a normalized workout
     # exists from ANY source (Hevy first, then Strava). Hevy stores one record per workout
     # under DATE#{date}#WORKOUT#{id}, so a date "has a Hevy workout" if any such record exists.
-    sources = parallel_query_sources(["apple_health", "strava", "hevy"], start_date, end_date)
+    sources = parallel_query_sources(
+        ["apple_health", "strava", "hevy", *[s for s in steps_sources() if s != "apple_health"]], start_date, end_date
+    )
     ah_items = sources.get("apple_health", [])
     strava_items = sources.get("strava", [])
     hevy_items = sources.get("hevy", [])
@@ -1511,19 +1482,22 @@ def _get_movement_score(args):
     ah_by_date = {i.get("date"): i for i in ah_items if i.get("date")}
     strava_by_date = {i.get("date"): i for i in strava_items if i.get("date")}
     hevy_dates = {i.get("date") for i in hevy_items if i.get("date")}
+    # #4630: the day's steps through the ONE resolver (registry METRIC_TRUTH facet).
+    resolved_steps = resolve_by_date(STEPS, {s: sources.get(s, []) for s in steps_sources()})
 
     daily = []
     neat_vals = []
     step_vals = []
     sedentary_days = []
-    step_incomplete_dates = []  # DI-1.4: AH record present but step field missing (false-clean envelope)
+    step_incomplete_dates = []  # DI-1.4: AH record present but no resolved step count (false-clean envelope; #4630)
 
     # Union of Apple-Health and Hevy dates: a Hevy-only training day (no Apple sync)
     # must still report has_workout and is never sedentary.
     for date in sorted(set(ah_by_date.keys()) | hevy_dates):
         ah = ah_by_date.get(date, {})
         strava = strava_by_date.get(date, {})
-        steps = ah.get("steps")
+        _rs = resolved_steps.get(date)
+        steps = _rs.value if _rs else None
         flights = ah.get("flights_climbed")
         distance = ah.get("distance_walk_run_miles")
         active_cal = ah.get("active_calories")
@@ -1538,6 +1512,7 @@ def _get_movement_score(args):
             row["workout_sources"] = (["hevy"] if hevy_workout else []) + (["strava"] if strava_workout else [])
         if steps is not None:
             row["steps"] = int(float(steps))
+            row["steps_source"] = _rs.source
             step_vals.append(float(steps))
         # DI-1.4: step-field completeness. The apple_health envelope can read "fresh"
         # while the step field itself is missing for the day — surface that gap rather
@@ -1588,7 +1563,7 @@ def _get_movement_score(args):
         baseline_neat = sum(neat_vals) / len(neat_vals) if neat_vals else 1
         for row in daily:
             c = {}
-            s = row.get("steps")
+            s = row.get("steps")  # steps-truth: the row's resolved count, set above
             if s is not None and baseline_steps > 0:
                 c["steps"] = min(100, s / (baseline_steps * 1.5) * 100)
             f = row.get("flights_climbed")

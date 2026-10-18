@@ -102,6 +102,39 @@ def head_chrome(indent: str = "  ") -> str:
     return "\n".join(indent + tag for tag in HEAD_CHROME_TAGS)
 
 
+# ── Held until ruled (#4604) ────────────────────────────────────────────────
+#
+# The owner ruled on 2026-09-26 that no count of earlier starts, attempts, cycles or resets
+# appears on any reader surface. These served pages present one (most render it from the
+# API, so the static sweep cannot see it), and each waits on his per-page ruling on #4604:
+# retire with a redirect, keep without the count, or keep as a `noindex` exception. Until
+# he rules, the conservative step holds: every page here carries `noindex` (its generator
+# emits `robots_meta(path)`; a hand-authored shell carries the tag itself) and the sitemap
+# builder leaves it out even if the tag goes missing.
+#
+# A LEDGER, NOT AN ALLOWANCE: tests/test_reader_surface_sweep_4604.py exempts exactly these
+# from its count sweep, holds each to noindex + out-of-sitemap, and refuses a path that is
+# not in its frozen set — so a ruled page leaves this dict and the dict never grows. The
+# counts themselves are deliberately not restated (public repo; the ruling is the point).
+HELD_UNTIL_RULED = {
+    "/data/wall/": "#4604",
+    "/method/cycles/": "#4604",
+    "/method/postmortems/": "#4604",
+    "/method/survival/": "#4604",
+    "/story/attempts/": "#4604",
+    "/method/fingerprint/": "#4604 (explains the marks on /data/wall/; follows its ruling)",
+    "/story/build/": "#4604 (extension, Session BI 2026-10-04)",
+    "/story/diary/": "#4604 (extension, Session BI 2026-10-04)",
+    "/journal/essays/org-chart-of-one/": "#4604 (extension, Session BI 2026-10-04)",
+}
+NOINDEX_META = '<meta name="robots" content="noindex">'
+
+
+def robots_meta(path: str, indent: str = "  ") -> str:
+    """The `noindex` line (with its trailing newline) for a path held until ruled, else "" (#4604)."""
+    return f"{indent}{NOINDEX_META}\n" if path in HELD_UNTIL_RULED else ""
+
+
 # ── Syndication chrome (#3615 box 5) ──────────────────────────────────────────
 #
 # WHAT WAS SHIPPING. Eleven pages under /story/ carried

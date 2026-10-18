@@ -181,10 +181,16 @@ def test_every_stated_facet_note_matches_the_code_it_describes():
     if strava.get("deletes") != "inside_window":
         offenders.append(f"strava: deletes={strava.get('deletes')!r}, but the reconcile writes the emptied day (#4759)")
 
-    # whoop: the reconcile reports store → vendor but never writes, so deletes stay not_propagated.
+    # whoop: the reconcile writes the emptied day (owner ruling 2026-10-17, "write it"), so deletes are inside_window.
     whoop = _module("lambdas/ingestion/whoop_lambda.py")
-    if {"delete_item"} & _called_attrs(whoop) and (_facet("whoop") or {}).get("deletes") == "not_propagated":
-        offenders.append("whoop: a delete path now exists but deletes is still stated not_propagated")
+    whoop_facet = _facet("whoop") or {}
+    empty_day = _module("lambdas/ingestion/whoop_empty_day.py")
+    whoop_calls = {getattr(n.func, "id", None) for n in ast.walk(whoop) if isinstance(n, ast.Call)}
+    writes_empty_day = "store_vendor_result" in whoop_calls
+    if writes_empty_day and "put_item" in _called_attrs(empty_day) and whoop_facet.get("deletes") != "inside_window":
+        offenders.append(f"whoop: the reconcile writes the emptied day but deletes={whoop_facet.get('deletes')!r}")
+    if not writes_empty_day and whoop_facet.get("deletes") == "inside_window":
+        offenders.append("whoop: deletes is stated inside_window but the empty-day write is gone")
 
     assert not offenders, "upstream_changes facet disagrees with its code:\n  " + "\n  ".join(offenders)
 

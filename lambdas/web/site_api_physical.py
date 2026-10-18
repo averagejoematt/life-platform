@@ -13,6 +13,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from boto3.dynamodb.conditions import Key
+from common.digest_utils import filter_day_rows
+from common.metric_truth import steps_by_date as resolved_steps_by_date  # #4630 — the ONE steps resolver
 from experiment.phase_filter import with_phase_filter  # ADR-058
 
 from web.site_api_common import (
@@ -68,7 +70,7 @@ def _physical_cadences() -> dict:
 def weekly_physical_summary(*, _g) -> dict:
     """
     GET /api/weekly_physical_summary
-    Returns: 7-day array with per-day modality breakdown (Strava + Garmin steps + breathwork).
+    Returns: 7-day array with per-day modality breakdown (Strava + resolved steps, #4630 + breathwork).
     Cache: 3600s.
     """
     _query_source = _g["_query_source"]
@@ -80,9 +82,12 @@ def weekly_physical_summary(*, _g) -> dict:
     strava_items = _query_source("strava", d7, today)
     garmin_items = _query_source("garmin", d7, today)
     ah_items = _query_source("apple_health", d7, today)
+    whoop_items = filter_day_rows(_query_source("whoop", d7, today))  # #3442: day rows only
 
     # Build per-day maps
-    garmin_by_date = {(g.get("date") or g.get("sk", "").replace("DATE#", "")): g for g in garmin_items}
+    # #4630: steps per day through the ONE resolver (registry METRIC_TRUTH facet — Whoop's
+    # step_count, else Apple Health, else Garmin at >=1000, which drops the phantom ~298 record).
+    steps_by_date = resolved_steps_by_date({"whoop": whoop_items, "apple_health": ah_items, "garmin": garmin_items})
     ah_by_date = {(h.get("date") or h.get("sk", "").replace("DATE#", "")): h for h in ah_items}
 
     # Flatten Strava activities by day, dedup by activity ID
@@ -110,7 +115,6 @@ def weekly_physical_summary(*, _g) -> dict:
         dt = datetime.now(PT) - timedelta(days=6 - i)
         d = dt.strftime("%Y-%m-%d")
         dow = dt.strftime("%a")
-        garmin = garmin_by_date.get(d, {})
         ah = ah_by_date.get(d, {})
         activities = day_activities.get(d, [])
         total_active_min = sum(a["minutes"] for a in activities)
@@ -121,10 +125,6 @@ def weekly_physical_summary(*, _g) -> dict:
         if bw_min > 0:
             activities.append({"type": "Breathwork", "minutes": round(bw_min)})
             total_active_min += bw_min
-        # Steps: Apple Health first; Garmin only if AH absent AND plausible (drops the
-        # phantom ~298 Garmin record — same fix as handle_training_overview, #8).
-        _ah_steps = int(float(ah["steps"])) if ah.get("steps") and float(ah["steps"]) > 0 else None
-        _gm_steps = int(float(garmin["steps"])) if garmin.get("steps") and float(garmin["steps"]) >= 1000 else None
         # #3523 (ADR-104): the query window's lower bound is `_experiment_date(7)`, which
         # CLAMPS to EXPERIMENT_START — so a calendar day before genesis was never asked
         # about. Its activity total is therefore an absence, not "zero minutes of
@@ -138,7 +138,7 @@ def weekly_physical_summary(*, _g) -> dict:
             {
                 "date": d,
                 "day_of_week": dow,
-                "steps": None if _pre_genesis else (_ah_steps if _ah_steps is not None else _gm_steps),
+                "steps": None if _pre_genesis else steps_by_date.get(d),
                 "activities": [] if _pre_genesis else activities,
                 "total_active_minutes": None if _pre_genesis else round(total_active_min),
                 "pre_genesis": _pre_genesis,

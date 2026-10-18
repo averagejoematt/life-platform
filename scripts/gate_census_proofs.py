@@ -1927,6 +1927,70 @@ STRUCTURAL_HAND_PROOFS.update(
             ),
             "proved_on": "2026-10-12",
         },
+        # #4632 (2026-10-17): every reader resolves a habit by vendor id — the AST sweep over
+        # lambdas/ + mcp/ for a `habitify_reading` / `day_name_for` call that drops the day's
+        # `habit_statuses` (the #4362 name-only path), plus the seven call sites' rename fixture.
+        "structural::test_habit_identity_4632.py": {
+            "gate_name": "test_habit_identity_4632.py",
+            "command": "python3 -m pytest tests/test_habit_identity_4632.py -q -p no:cacheprovider   # baseline 18 passed",
+            "mutation": (
+                "six plants, ONE AT A TIME, each restored from an in-memory byte copy: M1 ai/ai_calls.py "
+                "_missed_registry_habits drops `statuses` from its habitify_reading call; M2 ai/ai_context.py "
+                "the 7-day trend's T0 call drops `statuses`; M3 ai/ai_context.py the pillar effort count back to "
+                "the raw `habits_map.get(h)` name lookup; M4 content/html_builder.py _habits_deep_dive drops "
+                "`h_statuses`; M5 scripts/check_habit_registry_drift.py `ids = ids or {}` -> `ids = {}`; M6 the "
+                "sweep's offender append replaced by `pass`."
+            ),
+            "observed": (
+                "M1 2 failed / 16 passed (the call-site test + the sweep). M2 2 failed / 16. M3 1 failed / 17 "
+                "(the call-site test only — a raw .get is outside the sweep's pattern). M4 2 failed / 16. M5 1 "
+                "failed / 17 (the drift rename test). M6 1 failed / 17 (the sweep's planted positive control). "
+                "Restored 18 passed."
+            ),
+            "scope": (
+                "The sweep matches only calls named habitify_reading / day_name_for (Name or Attribute) whose "
+                "statuses argument is absent or the literal None; *args/**kwargs splats are trusted. A raw "
+                "`habits.get(name)` lookup is NOT swept (the legacy mvp_habits lists are bare names with no vendor "
+                "id, out of scope) — the call-site fixture test is what holds the seven sites."
+            ),
+            "proved_on": "2026-10-17",
+        },
+    }
+)
+
+STRUCTURAL_HAND_PROOFS.update(
+    {
+        # #4630: one resolver for the day's steps — the registry facet, the resolver, and the reader guard.
+        "structural::test_steps_truth_resolver_4630.py": {
+            "gate_name": "test_steps_truth_resolver_4630.py",
+            "command": "python3 -m pytest tests/test_steps_truth_resolver_4630.py -q -p no:randomly   # baseline 16 passed",
+            "mutation": (
+                "three plants in the real tracked tree, ONE AT A TIME, each restored from a byte copy "
+                "(md5 3f2221362ede44580a77d14d7ac8e51b of lambdas/ingestion/source_registry.py before and after): "
+                "(M1) METRIC_TRUTH['steps'] swapped to Apple first — truth_source 'apple_health', fallback_order "
+                "('apple_health', 'whoop', 'garmin'); (M1b) fallback_order alone swapped; (M2) a new file "
+                'lambdas/web/zz_planted_4630.py whose one function returns `_safe_float(apple, "steps")`.'
+            ),
+            "observed": (
+                "2026-10-16. BASELINE 16 passed. M1: 8 failed / 8 passed (test_whoop_wins_when_both_devices_have_a_count, "
+                "test_apple_health_when_whoop_has_no_count, test_unfetched_source_is_named_in_the_reason, "
+                "test_a_zero_report_counts_only_when_no_source_has_a_positive_count, "
+                "test_by_date_resolves_each_day_and_takes_the_per_source_max, "
+                "test_resolver_reads_the_registry_facet_not_its_own_list, test_facet_refuses_a_malformed_truth, "
+                "test_the_reproduce_command_names_the_winner_and_rebuilds_the_movement_score). "
+                "M1b: collection error — ValueError 'fallback_order must start with truth_source' at import. "
+                "M2: 1 failed / 15 passed (test_no_reader_reads_a_steps_field_directly names zz_planted_4630.py:2). "
+                "RESTORED: 16 passed."
+            ),
+            "scope": (
+                "The reader guard is a line-pattern sweep of lambdas/ and mcp/ (.get/subscript/helper-call/`in` reads of "
+                "steps|step_count, (source, 'steps') metric tables, {'steps': source} maps); a read through a variable "
+                "field name (`row.get(field)` with field='steps') is NOT caught — the metric tables that feed such reads "
+                "are, which is how measurable_metrics/experiment_design/tools_lifestyle were found. A line carrying "
+                "`# steps-truth: <reason>` is exempt by design; EXEMPT_FILES names the writers and per-source liveness checks."
+            ),
+            "proved_on": "2026-10-16",
+        },
     }
 )
 
@@ -3402,6 +3466,41 @@ GUARD_PROOFS.update(
                 "`inbound-auth-gate-bypassed` alarm, not by this proof."
             ),
             "proved_on": "2026-10-11",
+        },
+    }
+)
+
+
+# ── #4632 (2026-10-15): the habit-registry drift check ───────────────────────────────────
+# `scripts/check_habit_registry_drift.py` (family 2, guard-script) reports, as counts only,
+# the name-keyed habit structures a Habitify rename would orphan; its offline twin is
+# fixture-driven and needs no creds. Three plants in the REAL tracked script, one at a time,
+# restored from a pre-mutation copy and md5-verified byte-identical between each.
+GUARD_PROOFS.update(
+    {
+        "guard::scripts/check_habit_registry_drift.py": {
+            "gate_name": "scripts/check_habit_registry_drift.py",
+            "command": "python3 -m pytest tests/test_habitify_rename_alias_merge_4655.py -q -p no:cacheprovider   # baseline 16 passed; the two drift tests are the fixture-driven twin",  # noqa: E501
+            "mutation": (
+                "M1: main()'s `return 1 if drifted else 0` -> `return 0` (the exit code stops carrying the verdict). "
+                "M2: `_bridge_live()` -> `return True` (a SUPPLEMENT_MAP key that no live habit answers to reads as live). "
+                'M3: the `not e.get("is_archived")` filter dropped from live_names() (an archived habit counts as live). '
+                "md5 8df4b10acc1198bed5c2900d3ef440af before, after each restore, and at the end; tree clean afterwards."
+            ),
+            "observed": (
+                "2026-10-15. BASELINE 16 passed. M1: 1 failed / 15 passed (test_the_drift_check_fails_on_each_kind_of_orphan — "
+                "the orphaned fixtures exited 0). M2: 1 failed / 15 passed (the same test — bridge_without_live read 0 on the "
+                "orphaned-bridge fixture). M3: 16 passed — SURVIVED: no fixture carries an archived journal entry, so the "
+                "archived filter is not under test. RESTORED: 16 passed."
+            ),
+            "scope": (
+                "Proves the exit code and the bridge-resolution count are load-bearing for the fixture twin. The archived "
+                "filter (M3) is unproven by this record — a fixture with `is_archived: true` would close it. The `--live` path "
+                "(Secrets Manager + vendor GET + one DynamoDB GetItem, read-only) is `# pragma: no cover` and not exercised "
+                "here; the script is standalone/manual, not wired into blocking CI, so a rename is caught on the next "
+                "invocation, not automatically."
+            ),
+            "proved_on": "2026-10-15",
         },
     }
 )

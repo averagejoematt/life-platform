@@ -290,7 +290,8 @@ _WHOOP_CONSUMER_REGISTRY = {
     "lambdas/compute/dashboard_refresh_lambda.py": (1, "non-member", "fetch_date = exact-key day read"),
     "lambdas/compute/personal_baselines_lambda.py": (1, "non-member", "field-absent-safe per-field series extraction"),
     "lambdas/content/output_writers.py": (4, "non-member", "field-absent-safe extraction (calc-proof sweep)"),
-    "lambdas/emails/daily_brief_lambda.py": (7, "non-member", "fetch_date exact-key + field-absent-safe ranges (calc-proof sweep)"),
+    # #4630: 7 -> 6 — sleep_7d now reuses the identical 7-day hrv_7d_recs read instead of re-querying the same window.
+    "lambdas/emails/daily_brief_lambda.py": (6, "non-member", "fetch_date exact-key + field-absent-safe ranges (calc-proof sweep)"),
     "lambdas/emails/monday_compass_lambda.py": (
         1,
         "non-member",
@@ -302,22 +303,40 @@ _WHOOP_CONSUMER_REGISTRY = {
         "filter_day_rows on both raw arms before ex_whoop (#3442 member 7; fetch is via SOURCES loop, no literal site)",
     ),
     "lambdas/intelligence/challenge_generator_lambda.py": (1, "non-member", "field-absent-safe context summary"),
-    "lambdas/web/site_api_autonomic.py": (1, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
+    "lambdas/web/site_api_autonomic.py": (
+        2,
+        "non-member",
+        "site_api_* verified explicit filters (calc-proof non-member) + #4627: the Zone 2 read hands rows to training.zone2_minutes.whoop_recordings, which keeps ONLY #WORKOUT# sub-rows, one per workout_id",
+    ),
     "lambdas/web/site_api_body.py": (2, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
     "lambdas/web/site_api_fingerprint.py": (1, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
     "lambdas/web/site_api_freshness.py": (1, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
     "lambdas/web/site_api_nutrition.py": (1, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
+    "lambdas/web/site_api_physical.py": (
+        1,
+        "shared-guard",
+        "#4630: filter_day_rows on the steps-resolver whoop read (the resolver also skips sub-rows)",
+    ),
     "lambdas/web/site_api_pulse.py": (1, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
     "lambdas/web/site_api_rollups.py": (7, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
     "lambdas/web/site_api_sleep.py": (2, "non-member", "site_api_* verified explicit filters (calc-proof non-member)"),
     "lambdas/web/site_api_training.py": (
-        1,
+        2,
         "shared-guard",
-        "filter_day_rows for avg_strain + #WORKOUT# rows by distinct id (#4629 — was a missed member, not a non-member)",
+        "filter_day_rows for avg_strain + #WORKOUT# rows by distinct id (#4629 — was a missed member, not a non-member) + #4627: the Zone 2 read hands rows to training.zone2_minutes.whoop_recordings, which keeps ONLY #WORKOUT# sub-rows, one per workout_id",
     ),
     "mcp/tools_health.py": (2, "non-member", "field-absent-safe tool extraction"),
     "mcp/tools_plan.py": (1, "shared-guard", "filter_day_rows on the readiness_floor whoop read (#4072)"),
-    "mcp/tools_training.py": (1, "non-member", "field-absent-safe tool extraction"),
+    "mcp/tools_training.py": (
+        2,
+        "non-member",
+        "field-absent-safe tool extraction + #4627: the Zone 2 read hands rows to training.zone2_minutes.whoop_recordings, which keeps ONLY #WORKOUT# sub-rows, one per workout_id",
+    ),
+    "mcp/tools_correlation.py": (
+        1,
+        "non-member",
+        "#4627: get_zone2_breakdown's whoop read goes only to training.zone2_minutes.whoop_recordings (#WORKOUT# sub-rows only, one per workout_id)",
+    ),
 }
 
 _GUARD_TOKENS = ("filter_day_rows", "is_day_row", "DAY_SK_RE", "digest_utils.query_range")

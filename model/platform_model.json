@@ -3226,6 +3226,13 @@
       "direction": "read",
       "lambda": "habitify-data-ingestion",
       "module": "lambdas/ingestion/habitify_lambda.py",
+      "partition": "habitify",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "habitify-data-ingestion",
+      "module": "lambdas/ingestion/habitify_lambda.py",
       "partition": "supplements",
       "via": "pk"
     },
@@ -3325,6 +3332,13 @@
       "lambda": "strava-data-ingestion",
       "module": "lambdas/ingestion/strava_lambda.py",
       "partition": "strava",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/ingestion/whoop_empty_day.py",
+      "partition": "whoop",
       "via": "pk"
     },
     {
@@ -3668,13 +3682,6 @@
       "lambda": null,
       "module": "lambdas/intelligence/intelligence_common.py",
       "partition": "coach_thread",
-      "via": "pk"
-    },
-    {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/intelligence/intelligence_common.py",
-      "partition": "garmin",
       "via": "pk"
     },
     {
@@ -4271,6 +4278,13 @@
       "module": "lambdas/web/site_api_ai_context.py",
       "partition": "what_changed",
       "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_autonomic.py",
+      "partition": "hevy",
+      "via": "seam"
     },
     {
       "direction": "read",
@@ -5080,6 +5094,13 @@
     {
       "direction": "read",
       "lambda": null,
+      "module": "lambdas/web/site_api_physical.py",
+      "partition": "whoop",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
       "module": "lambdas/web/site_api_protocols.py",
       "partition": "experiments",
       "via": "pk"
@@ -5781,7 +5802,21 @@
       "direction": "read",
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_correlation.py",
+      "partition": "hevy",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_correlation.py",
       "partition": "strava",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_correlation.py",
+      "partition": "whoop",
       "via": "seam"
     },
     {
@@ -7676,12 +7711,12 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 742,
+      "edges": 747,
       "lambdas": 108,
       "mcp_tool_modules": 36,
       "mcp_tools": 88,
       "partitions": 116,
-      "privacy_fields_owner_only": 33,
+      "privacy_fields_owner_only": 35,
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 18,
       "privacy_sources_owner_published": 3,
@@ -7690,9 +7725,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 361,
-        "sites_resolved": 930,
-        "sites_total": 1291
+        "sites_dynamic": 364,
+        "sites_resolved": 939,
+        "sites_total": 1303
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8370,6 +8405,8 @@
         "height_m",
         "hydration_kg",
         "intracellular_water_kg",
+        "measurement_attrib",
+        "measurement_group_attribs",
         "metabolic_age",
         "muscle_mass_kg",
         "muscle_mass_lbs",
@@ -8445,6 +8482,8 @@
         "height_m": "owner_only",
         "hydration_kg": "owner_only",
         "intracellular_water_kg": "owner_only",
+        "measurement_attrib": "owner_only",
+        "measurement_group_attribs": "owner_only",
         "metabolic_age": "owner_only",
         "muscle_mass_kg": "owner_only",
         "muscle_mass_lbs": "owner_only",

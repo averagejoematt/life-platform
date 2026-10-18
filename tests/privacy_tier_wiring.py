@@ -116,6 +116,16 @@ CONSUMERS: dict[tuple[str, str], dict] = {
         "Same map, device measure 130 (ECG screening; 0 = ran, not detected). Stored as "
         "an event-class result, never rolled into a trend stat.",
     ),
+    ("lambdas/ingestion/withings_lambda.py", "measurement_attrib"): _d(
+        SAW,
+        "The ingester (#4642): stores the Withings attribution code of the day's latest "
+        "group as sent. Writer-only footprint; owner-only in FIELD_TIERS, no reader.",
+    ),
+    ("lambdas/ingestion/withings_lambda.py", "measurement_group_attribs"): _d(
+        SAW,
+        "The ingester (#4642): stores a {timestamp, attrib} list for the day's groups, "
+        "capture only. Writer-only footprint; owner-only in FIELD_TIERS, no reader.",
+    ),
     # NOTE — `mcp/tools_data.py` is deliberately ABSENT. It was the #2809 leak site and
     # it carried a hand-written `TIER2_STRIP_FIELDS` literal naming all three fields.
     # #2803 made it derive from `field_tiers.strip_map()`, so it no longer names any of

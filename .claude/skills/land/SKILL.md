@@ -81,6 +81,14 @@ green run on main that never deployed; its alarm names the one recovery command.
 
 ## 4. Verify by CONTENT, not by sha
 
+**For `site/**` or a `scripts/v4_build_*.py` generator, the content check is the live
+page AND the newest `site-deploy.yml` run's conclusion** (`gh run list --workflow
+site-deploy.yml --limit 1 --json conclusion,headSha`): the workflow publishes and then
+rolls itself back on a red QA, or fails before publishing, and nothing pages either way
+(#3878 3 d, #4703 23 h). A merge is not a publish; a `success` conclusion on the merged
+sha is. A generator change is outside the workflow's `paths` — dispatch it
+(`gh workflow run site-deploy.yml`) and read that run.
+
 **Merged is not deployed. Deployed is not verified.**
 
 A `Fixes` auto-closure proves the merge and nothing else — if CI/CD died before the deploy

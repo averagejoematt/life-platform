@@ -199,9 +199,9 @@ def _hr_walk(minutes, avg_hr):
 
 def test_z1_ceiling_is_derived_from_the_platforms_one_zone_table():
     """The Z1 ceiling is not a new number: it is the platform's zone-1 upper bound
-    (mcp/helpers.HR_ZONE_BOUNDS, mirrored by site_api_autonomic._ZONE_BOUNDS) × the
-    owner's measured max HR. Pin all three tables together so none can move alone.
-    Both tables are read from SOURCE by AST — importing a handler module here would
+    (mcp/helpers.HR_ZONE_BOUNDS) × the owner's measured max HR. Pin the two together so
+    neither can move alone. (#4627 retired site_api_autonomic's mirror: /api/zone2 now reads
+    each device's own stored time-in-zone, no %-of-max table.) The table is read from SOURCE by AST — importing a handler module here would
     drive its clock from this file's dated fixtures (#2376)."""
     import ast
 
@@ -215,9 +215,8 @@ def test_z1_ceiling_is_derived_from_the_platforms_one_zone_table():
         raise AssertionError(f"{name} not found in {rel}")
 
     helpers = _bounds("mcp/helpers.py", "HR_ZONE_BOUNDS")
-    autonomic = _bounds("lambdas/web/site_api_autonomic.py", "_ZONE_BOUNDS")
-    assert helpers[0][0] == "zone_1" and autonomic[0][0] == "zone_1"
-    assert tl.Z1_CEILING_FRACTION_OF_MAX == helpers[0][3] == autonomic[0][3]
+    assert helpers[0][0] == "zone_1"
+    assert tl.Z1_CEILING_FRACTION_OF_MAX == helpers[0][3]
     assert tl.Z1_CEILING_HR == round(tl.MAX_HR * tl.Z1_CEILING_FRACTION_OF_MAX, 1) == 109.8
 
 

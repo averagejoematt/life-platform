@@ -488,19 +488,21 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # against the API is cheap and catches the late-workout / dropped-day silent
         # drop the DDB-only checks are blind to. whoop_lambda._reconcile.
         "provider_reconcile": True,
-        # #4638: stated default (owner ruling pending). Re-fetch is refresh_trailing_days=2.
+        # #4638: owner ruling 2026-10-17 "write it" (deletes → empty day). Re-fetch is refresh_trailing_days=2.
         "upstream_changes": {
             "edits": "inside_window",
-            "deletes": "not_propagated",
+            "deletes": "inside_window",
             "window_days": 2,
             "standing": "stated_default",
             "note": (
                 "An edit (re-typed workout, revised score) inside the 2-day trailing re-fetch overwrites the "
-                "stored record by id; older edits are never re-fetched. A workout deleted in the app keeps its "
-                "DATE#…#WORKOUT#id row at any age — the vendor's update/delete webhooks are unused. Since #4638 the "
-                "daily _reconcile REPORTS the store → vendor difference inside its 14-day window (stored workout ids "
-                "the vendor no longer lists, and changed sport or start/end, as StoreOnlyActivityCount / "
-                "ChangedActivityCount with Source=whoop) but stays read-only: nothing is removed."
+                "stored record by id; older edits are never re-fetched. The daily _reconcile compares the vendor's "
+                "trailing workout list with the store inside its 14-day window and REPORTS stored workout ids the "
+                "vendor no longer lists, and changed sport or start/end, as StoreOnlyActivityCount / "
+                'ChangedActivityCount with Source=whoop. Since the owner\'s 2026-10-17 ruling on #4638 ("write it") a '
+                "delete propagates as an empty day: when every stored workout of a day strictly inside the window is "
+                "gone from a non-empty vendor list, each row is replaced by a tombstone (the day's recovery/sleep row "
+                "is untouched); changed rows are reported only."
             ),
         },
     },
@@ -710,7 +712,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "raw_layout": {
             "prefix": "raw/matthew/health_auto_export",
             "scheme": "timestamped",
-            "note": "sub-datatypes also land at raw/matthew/{cgm_readings,blood_pressure,state_of_mind,workouts}/ — see sub_layouts",
+            "note": "sub-datatypes also land at raw/matthew/{cgm_readings,blood_pressure,state_of_mind,workouts,additive_readings}/ — see sub_layouts",
             # #2278: the note above was prose only, so every reader of an HAE
             # sub-datatype hand-built its key from it — and one (the dormant BP
             # reader in mcp/tools_lifestyle.py) dropped the user segment entirely
@@ -783,6 +785,35 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
                         "note": "10 objects, live-confirmed via read-only aws s3 ls; same X-9 no-user-segment "
                         "predecessor shape as raw/whoop. Modeling a replay path is out of this Small story's scope. #3570.",
                     },
+                },
+                # #4628 (Q2 "b — readings stay in S3, one daily value per source in DynamoDB",
+                # owner 2026-10-17): every delivered reading of the five ADDITIVE activity
+                # fields, merged per READING day (the UTC DATE# day, day_key_frame above) and
+                # deduped by the reading's own timestamp. The DynamoDB day value is the sum of
+                # this object — `ingestion/health_auto_export_additive.py`. One object per field
+                # because HAE's automations deliver the field groups concurrently (steps+active,
+                # basal, distance+flights land in the same second), so a shared object would
+                # lose a merge to a read-modify-write race.
+                "additive_steps": {"prefix": "raw/matthew/additive_readings/steps", "scheme": "date-tree", "filename": "DD.json"},
+                "additive_active_calories": {
+                    "prefix": "raw/matthew/additive_readings/active_calories",
+                    "scheme": "date-tree",
+                    "filename": "DD.json",
+                },
+                "additive_basal_calories": {
+                    "prefix": "raw/matthew/additive_readings/basal_calories",
+                    "scheme": "date-tree",
+                    "filename": "DD.json",
+                },
+                "additive_distance_walk_run_miles": {
+                    "prefix": "raw/matthew/additive_readings/distance_walk_run_miles",
+                    "scheme": "date-tree",
+                    "filename": "DD.json",
+                },
+                "additive_flights_climbed": {
+                    "prefix": "raw/matthew/additive_readings/flights_climbed",
+                    "scheme": "date-tree",
+                    "filename": "DD.json",
                 },
             },
             # #3570 (DA-8, found by the 2026-09-05 /review full baseline, reverified
@@ -954,7 +985,11 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "probe_functions": (("habitify-data-ingestion", "Habitify"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": "required",
-        # cadence reason (internal, kept out of the published method text): kept hourly by decision (#3666 same-day freshness); notes/mood calls await ruling #4644 (#4641)
+        # cadence reason (internal, kept out of the published method text): kept hourly by decision (#3666 same-day freshness).
+        # Per-habit notes + mood calls STOPPED 2026-10-17 (calls removed, not flagged), owner Q28 (#4644):
+        # "yes, stop (2,928 calls/day for 0 notes)" — 0 notes in all 223 stored rows; run average was 36.5 s,
+        # expected ~1 s. Supersedes the #422/#950 capture-channel reason. Rows written from this date carry no
+        # `notes`/`mood`; earlier rows are untouched (#4641).
         "method": "API pull, hourly (24h)",
         "metrics": "Daily habit completions",
         "posture": "load-bearing",
@@ -1267,7 +1302,9 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # was checked as a phantom "journal" partition in qa_smoke — the real
         # partition is notion (X-10; the check is warn-only either way).
         "qa_tier": "optional",
-        # cadence reason (internal, kept out of the published method text): was hourly; 0 of 252 runs found a page (#4641)
+        # cadence reason (internal, kept out of the published method text): was hourly; 0 of 252 runs found a page (#4641).
+        # Journal stays a channel at 3/day by the owner's word, Q33 2026-10-17 (#4644): "yes, keep polling at 3/day
+        # (already cut)" — no further cadence change.
         "method": "API pull (journal database), 3x daily",
         "metrics": "Journal entries — the subjective layer",
         "posture": "portfolio",
@@ -2663,3 +2700,80 @@ def catalog_entries() -> list:
             }
         )
     return sorted(rows, key=lambda r: (posture_rank.get(r["posture"], 9), r["name"]))
+
+
+# ── #4630: the per-metric TRUTH facet — which stored field answers "what was the day's X?" ──
+#
+# The owner rule of 2026-10-04 ("capture all, interpret later", docs/CONVENTIONS.md): every
+# writer stores its own source's value under that source and never picks a winner; the
+# precedence lives HERE, and ONE read-side resolver (lambdas/common/metric_truth.py) applies
+# it. A consumer never names a source or a field for a metric listed below — it calls the
+# resolver (tests/test_steps_truth_resolver_4630.py fails on a direct read of a steps field).
+#
+# Facets per metric:
+#   truth_source     — the source that wins whenever it has a usable value
+#   unit             — the unit every field below is stored in (the resolver never converts)
+#   fallback_order   — the sources the resolver consults, in order; truth_source is first
+#   field_by_source  — the stored DATE# row field that carries the metric for each source
+#   min_by_source    — the smallest POSITIVE value that counts as "has a count" for a source;
+#                      a positive value below it is absent for the day (not zero); 0 is a
+#                      zero report (see overlap_rule)
+#   overlap_rule     — what happens when more than one source has a usable value:
+#                      first_positive_else_first_zero = the first source in fallback_order
+#                      with a POSITIVE value wins; only when none has one does the
+#                      highest-precedence zero report stand (a genuine 0-step day, #1658)
+#   ruling           — where the precedence was decided (or is pending)
+#
+# steps: HELD on #4644 Q4. Built on the recommended answer "4: yes — Whoop when both devices
+# have a count": the phone delivers roughly 0.27-0.62 of the wrist's count on days it is not
+# carried (treadmill, bike), and the two agree closely on outdoor-walk days. Garmin is paused
+# (ADR-074) and stays last so pre-pause history still resolves; its 1000 floor is the one the
+# site readers already applied to drop the phantom ~298 partial-sync row.
+METRIC_TRUTH: dict[str, dict[str, Any]] = {
+    "steps": {
+        "truth_source": "whoop",
+        "unit": "count/day",
+        "fallback_order": ("whoop", "apple_health", "garmin"),
+        "field_by_source": {"whoop": "step_count", "apple_health": "steps", "garmin": "steps"},
+        "min_by_source": {"whoop": 1, "apple_health": 1, "garmin": 1000},
+        "overlap_rule": "first_positive_else_first_zero",
+        "ruling": "#4644 Q4 (recommended: 'yes — Whoop when both devices have a count') — pending the owner",
+    },
+}
+
+METRIC_TRUTH_OVERLAP_KINDS = ("first_positive_else_first_zero",)
+
+
+def _validate_metric_truth() -> None:
+    """Import-time shape check: a truth facet that names an unknown source or a source
+    with no field is a resolver that silently answers None — refuse it at import."""
+    for metric, facet in METRIC_TRUTH.items():
+        order = tuple(facet["fallback_order"])
+        if not order or order[0] != facet["truth_source"]:
+            raise ValueError(f"METRIC_TRUTH[{metric!r}]: fallback_order must start with truth_source")
+        if len(set(order)) != len(order):
+            raise ValueError(f"METRIC_TRUTH[{metric!r}]: fallback_order repeats a source")
+        if facet["overlap_rule"] not in METRIC_TRUTH_OVERLAP_KINDS:
+            raise ValueError(f"METRIC_TRUTH[{metric!r}]: unknown overlap_rule {facet['overlap_rule']!r}")
+        for src in order:
+            if src not in SOURCE_REGISTRY:
+                raise ValueError(f"METRIC_TRUTH[{metric!r}]: {src!r} is not a registered source")
+            if src not in facet["field_by_source"]:
+                raise ValueError(f"METRIC_TRUTH[{metric!r}]: no field_by_source entry for {src!r}")
+
+
+_validate_metric_truth()
+
+
+def metric_truth(metric: str) -> dict:
+    """The truth facet for `metric` (a copy — callers cannot mutate the registry).
+
+    Raises KeyError for a metric with no facet: a resolver asked about an unresolved
+    metric must fail loudly rather than guess a source."""
+    facet = METRIC_TRUTH[metric]
+    return {
+        **facet,
+        "fallback_order": tuple(facet["fallback_order"]),
+        "field_by_source": dict(facet["field_by_source"]),
+        "min_by_source": dict(facet["min_by_source"]),
+    }

@@ -93,6 +93,9 @@ FIELD_TIERS: dict[str, dict[str, int]] = {
         "vascular_age": TIER_OWNER_ONLY,  # age-class, #2782
         "metabolic_age": TIER_OWNER_ONLY,  # age-class, same posture
         "afib_result": TIER_OWNER_ONLY,  # event-class medical result (ECG screening)
+        # #4642 capture-all: weigh-in attribution (device / ambiguous / manual) — owner-only until tiered
+        "measurement_attrib": TIER_OWNER_ONLY,
+        "measurement_group_attribs": TIER_OWNER_ONLY,
         # ── ADR-155 owner-published: served today on /api/vitals + the nutrition
         #    surface (weight + deltas + trends; lean mass drives the public protein
         #    floor in site_api_nutrition) ──

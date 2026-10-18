@@ -611,11 +611,15 @@ class TestTrainingSnapshot:
         table.add("hevy", TODAY, set_count=Decimal("20"))
         assert az.gather_data_for_expert("training")["modality_breakdown"] == {"strength": 1}
 
-    def test_garmin_steps_are_used_only_while_garmin_is_live(self, table):
-        table.add("garmin", TODAY, steps=Decimal("11000"))
+    def test_steps_follow_the_registry_truth_facet(self, table):
+        """#4630: Whoop's step_count wins when it has one; Apple Health otherwise; Garmin only
+        when it is the day's only count (and at its >=1000 floor)."""
+        table.add("whoop", TODAY, step_count=Decimal("11000"))
         table.add("apple_health", TODAY, steps=Decimal("3000"))
+        table.add("apple_health", _days_ago(1), steps=Decimal("5000"))
+        table.add("garmin", _days_ago(1), steps=Decimal("9000"))
         data = az.gather_data_for_expert("training")
-        assert data["step_source"] == "garmin" and data["avg_daily_steps"] == 11000
+        assert data["step_source"] == "apple_health+whoop" and data["avg_daily_steps"] == 8000
 
     def test_a_stale_garmins_sparse_partials_never_enter_the_step_average(self, table):
         """DI-1.4 'phantom 298': a rate-limited Garmin emits partial daily reads that

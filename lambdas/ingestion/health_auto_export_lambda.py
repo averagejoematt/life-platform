@@ -144,7 +144,10 @@ except ImportError:
 # not fail-soft: this sibling ships in the same CDK asset as this file (both are
 # under `ingestion/`, staged whole by the bundle), so an ImportError here means
 # the deploy itself is broken, not that an optional feature is missing.
-from ingestion import health_auto_export_archive as _archive
+from ingestion import (
+    health_auto_export_additive as _additive,  # #4628: the archived day sum
+    health_auto_export_archive as _archive,
+)
 
 
 def _merge_is_valid(fields, date_str):
@@ -452,6 +455,10 @@ SOURCE_PRIORITY = {
 # overlap. MAX does both right and matches Apple Health's own dedup for the common
 # single-device-worn day. These bypass SOURCE_PRIORITY (its entries above are now inert
 # for these fields, kept only as documentation of the prior approach).
+# #4628: SUPERSEDED for the five fields in health_auto_export_additive.ADDITIVE_SUM_FIELDS —
+# with incremental payloads the max-of-one-payload + GREATEST kept the biggest SYNC, not the
+# day. Those five are now the archived sum over unique reading timestamps (no max, no
+# GREATEST); this max survives only as their fail-safe fallback and for the other distances.
 _ACTIVITY_MAX_FIELDS = {
     "steps",
     "distance_walk_run_miles",
@@ -890,16 +897,8 @@ def process_generic_metrics(metrics):
 
         # Distances are stored as miles. Convert km/m if so tagged; warn on anything else (#483/D-9).
         for dfield in [f for f in fields if f.endswith("_miles")]:
-            dv = fields.get(dfield)
-            if dv is None:
-                continue
-            du = (field_units.get(dfield) or "").lower().strip()
-            if du in ("km", "kilometer", "kilometers"):
-                fields[dfield] = round(dv * 0.621371, 4)
-            elif du in ("m", "meter", "meters"):
-                fields[dfield] = round(dv * 0.000621371, 4)
-            elif du and du not in ("mi", "mile", "miles"):
-                logger.warning(f"[HAE] unexpected distance units {du!r} for {dfield} {date}; assuming miles")
+            if fields.get(dfield) is not None:
+                fields[dfield] = _additive.to_miles(fields[dfield], field_units.get(dfield))
 
     # ── Logging ──
     if matched:
@@ -922,7 +921,7 @@ def process_generic_metrics(metrics):
 # ── DynamoDB Write ─────────────────────────────────────────────────────────────
 
 
-def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_guard=True):
+def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_guard=True, archived=()):
     """
     Merge fields into existing DynamoDB record using update_item.
     Only updates specified fields — does NOT overwrite unrelated fields.
@@ -935,6 +934,8 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
       with GREATEST(stored, new) — a day's count only increases, so a later
       PARTIAL export must never LOWER a fuller stored value. The backfill
       passes False to SET the recomputed-from-raw value authoritatively.
+    archived: #4628 — fields whose value is the archived day sum
+      (health_auto_export_additive.py); they are SET as computed, never guarded.
 
     Concurrency (#3119 residual #3 — accepted in writing, not made
     conditional/versioned): still a plain read-modify-write, so two DIFFERENT
@@ -955,7 +956,7 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
     # ── GREATEST-on-write for monotonic activity totals + reading counts ──
     if monotonic_guard:
         _guarded_fields = _ACTIVITY_MAX_FIELDS | _READING_COUNT_GUARD_FIELDS
-        _guard = [f for f in _guarded_fields if f in fields and fields[f] is not None]
+        _guard = [f for f in _guarded_fields if f in fields and fields[f] is not None and f not in archived]
         if _guard:
             try:
                 _gn = {f"#g{i}": f for i, f in enumerate(_guard)}
@@ -1557,10 +1558,10 @@ def lambda_handler(event, context):
 
     # ── Process other metrics ──
     other_daily, other_timestamps, source_audit = process_generic_metrics(metrics)
+    archived = _additive.apply_archived_sums(other_daily, metrics, METRIC_MAP, parse_date_str, s3_client, S3_BUCKET)
     other_days = 0
     for date_str, fields in other_daily.items():
-        ts = other_timestamps.get(date_str)
-        merge_day_to_dynamo(date_str, fields, reading_timestamps=ts)
+        merge_day_to_dynamo(date_str, fields, reading_timestamps=other_timestamps.get(date_str), archived=archived.get(date_str, ()))
         other_days += 1
 
     if other_days:

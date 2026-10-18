@@ -17,6 +17,7 @@ same byte-identical artifact AC1 pins):
 from datetime import datetime, timedelta
 
 from common.digest_utils import filter_day_rows
+from common.metric_truth import steps_by_date
 
 from web.fingerprint import build_mark, mark_to_svg
 from web.site_api_common import EXPERIMENT_START, PT, _ok, _query_source
@@ -44,7 +45,7 @@ _MASTHEAD = 200  # the cockpit masthead / single-day mark size
 def _metrics_index(start_date, end_date):
     """One batched read of the daily instruments over [start,end] → {date: metrics}.
     Mirrors handle_pulse_history's source selection (Whoop for recovery/sleep/HRV/
-    strain; Apple Health then plausible-Garmin for steps) so the mark is seeded by the
+    strain; steps from common.metric_truth, #4630) so the mark is seeded by the
     same real numbers the vitals page shows."""
     if start_date > end_date:
         return {}
@@ -55,15 +56,9 @@ def _metrics_index(start_date, end_date):
     ah = _query_source("apple_health", start_date, end_date)
     garmin = _query_source("garmin", start_date, end_date)
 
-    steps = {}
-    for h in ah:
-        d = h.get("sk", "").replace("DATE#", "")[:10]
-        if d and h.get("steps") and float(h["steps"]) > 0:
-            steps[d] = max(steps.get(d, 0), int(float(h["steps"])))
-    for g in garmin:
-        d = g.get("sk", "").replace("DATE#", "")[:10]
-        if d and g.get("steps") and float(g["steps"]) >= 1000 and d not in steps:
-            steps[d] = int(float(g["steps"]))
+    # #4630: the day's steps through the ONE resolver (registry METRIC_TRUTH facet —
+    # Whoop's step_count, else Apple Health, else plausible Garmin).
+    steps = steps_by_date({"whoop": whoop, "apple_health": ah, "garmin": garmin})
 
     out = {}
     for w in whoop:

@@ -1,8 +1,8 @@
 # Testing Strategy
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-**Last updated:** 2026-05-19 (v8.0.0)
+**Last updated:** 2026-10-17 (re-verified against `.github/workflows/`, `pytest.ini`, `pyproject.toml` and `tests/`; the QA Strategy Scorecard section was not re-graded)
 
 > What's tested, what isn't, and how to add tests without slowing yourself down.
 
@@ -12,9 +12,9 @@
 
 | Layer | Location | Speed | Runs in CI? |
 |---|---|---|---|
-| Unit | `tests/test_*.py` (no integration mark) | ~3s for all | Yes, every push |
-| Integration (AWS) | `tests/test_integration_aws.py` | ~24s | No — manual + nightly |
-| Smoke (post-deploy) | `tests/smoke_test_site.sh` + `qa-smoke` Lambda | ~30s | Yes, after each deploy |
+| Unit | `tests/test_*.py` (no integration mark) | Minutes — sharded across three runner legs in CI (`ci-test.yml`) | Yes — PRs (`pr-checks.yml`) and every push to main |
+| Integration (AWS) | `tests/test_integration_aws.py` (`@pytest.mark.integration`) | ~24s when run alone | Excluded from the unit lanes; a named subset (I1, I2, I4–I9, I22–I24) runs post-deploy in `ci-cd.yml`; the rest manual |
+| Smoke (post-deploy) | `deploy/smoke_test_site.sh` + the `life-platform-qa-smoke` Lambda | ~30s | Yes, after each deploy |
 | Manual | Browser checks, MCP tool dispatch | Variable | No |
 
 **Total tests:** derived, never committed — `test_count` is stamped into every Lambda bundle by `deploy/build_bundle.py`, served at `/api/platform_stats` (#4250).
@@ -24,7 +24,7 @@
 ## Running tests
 
 ```bash
-# All unit tests (fast — ~3 sec)
+# All offline tests (what the suite runs; the integration marker needs live AWS)
 python3 -m pytest tests/ -m 'not integration' -q
 
 # Specific file
@@ -33,12 +33,16 @@ python3 -m pytest tests/test_shared_modules.py -v
 # Specific test
 python3 -m pytest tests/test_shared_modules.py::test_retry_utils_backoff -v
 
+# The PR fast lane's selection (what the required check runs)
+python3 -m pytest tests/ -m "deploy_critical and not integration and not serial" -q -n auto --dist loadfile
+
 # Show top-N slowest (find perf regressions)
 python3 -m pytest tests/ --durations=20
-# Duration budget (#1847): the full offline suite runs in ~2.5 min locally
-# (7,544 tests, 2026-07-26); the slowest single test is ~18s. If a run blows
-# past ~5 min, something regressed — profile with --durations before merging.
-# CI's Unit-Tests job warns at 480s via scripts/coverage_gap_warn.py (#1349).
+# Duration budget (#1847/#4252): the full suite is too big for one runner, so CI/CD
+# splits it into three legs (two parallel shards + the serial pass) and grades coverage
+# once over the union. Do not restate a test count or a minutes figure here — they rot
+# within weeks; read the last green run. The Unit-Tests job warns when it nears its
+# duration budget via scripts/coverage_gap_warn.py (#1349).
 # Known failure shape: a test that hangs SILENTLY while memory climbs is a
 # mock-fed infinite loop (e.g. DDB pagination on a truthy MagicMock
 # LastEvaluatedKey, #1847/#1849) — it OOM-kills CI runners with
@@ -48,6 +52,8 @@ python3 -m pytest tests/ --durations=20
 # Coverage (requires pytest-cov)
 python3 -m pytest tests/ -m 'not integration' \
     --cov=lambdas --cov=mcp --cov-report=term-missing --no-cov-on-fail
+# The coverage floor is `fail_under` in pyproject.toml (an up-only ratchet,
+# tests/test_coverage_floor_ratchet.py) — read it there, never restate it.
 ```
 
 ```bash
@@ -61,8 +67,8 @@ python3 -m pytest tests/ -m integration -v
 
 ### 1. Shared module tests (`test_shared_modules.py`, `test_numeric.py`, etc.)
 - Exercise `retry_utils`, `ai_calls`, `secret_cache`, `numeric`, `http_retry`, `rate_limiter`, `request_validator`, `compute_metadata`, `auth_breaker`
-- Mock all AWS clients (boto3 with `moto` library)
-- Run sub-millisecond per test
+- Mock AWS clients (`unittest.mock` and hand-built stubs; `moto` is not a dependency)
+- No live AWS: CI asserts no real credentials resolve (ci-cd.yml, "AWS creds parity")
 
 ### 2. Lambda-handler tests
 - For each new Lambda: smoke `lambda_handler(event, context)` with mocked AWS clients
@@ -74,12 +80,12 @@ python3 -m pytest tests/ -m integration -v
 - Marked `@pytest.mark.integration` so they don't run in CI by default
 - Key tests:
   - `test_i1_lambda_handlers_match_expected` — all `ci/lambda_map.json` Lambdas exist in AWS
-  - `test_i2_lambda_layer_version_current` — all consumers on latest layer
+  - `test_i2_shared_layer_retired` — no function references the retired shared layer
   - `test_i3_spot_check_lambda_invocability` — random Lambdas don't error on healthcheck
   - `test_i9_dlq_no_deploy_caused_messages` — no deploy-caused DLQ messages (pre-existing transients warn, #1327)
   - `test_i10_mcp_lambda_responds` — MCP roundtrip
   - `test_i11_data_reconciliation_running` — weekly reconciliation alive
-  - `test_i12_mcp_tool_shape` — tool dispatch returns expected shape
+  - `test_i12_mcp_tool_call_response_shape` — tool dispatch returns expected shape
   - `test_i13_freshness_checker_returns_valid_data` — pipeline health
 
 ### 4. Shared-code distribution invariant (post-#781)
@@ -92,8 +98,7 @@ there is no layer version to keep consistent). The surviving invariant:
 
 ### 5. MCP orphan tool tests (`test_mcp_orphan_tools.py`)
 - Catches `def tool_*` functions that aren't registered in `mcp/registry.py`
-- Uses a ratchet: `AUDITED_AT = 64` — new orphans cause failures, existing accepted as legacy
-- Plan: ratchet down toward 0 as MCP tool pruning happens
+- Uses a ratchet: `AUDITED_AT` in the test file (now 0 — any orphan fails); the dated history and the removal procedure are `docs/MCP_TOOL_AUDIT.md`
 
 ### 6. Wiring coverage tests (`test_wiring_coverage.py`)
 - Every MCP tool in `mcp/tools_*.py` is callable + has a JSON schema
@@ -101,21 +106,22 @@ there is no layer version to keep consistent). The surviving invariant:
 - No causal language in prompts (W4 — `"makes you", "causes"` banned phrases)
 
 ### 7. Schema/IAM/secrets consistency
-- `test_ddb_patterns.py` — DDB writes use Decimal, not float
-- `test_iam_secrets_consistency.py` — every secret referenced in `role_policies.py` exists; every grant has a known secret
+- `test_ddb_patterns.py` — DDB key construction, reserved-word handling, `schema_version` and validate-before-write on ingestion puts (D1–D4); Decimal-not-float is a convention (CLAUDE.md) enforced by the write paths' own tests
+- `test_iam_secrets_consistency.py` — every secret referenced in `role_policies.py` is a known secret; every grant has a known secret
 - `test_role_policies.py` — IAM statements are well-formed
-- `test_secret_references.py` — code's secret names match Secrets Manager actual names
+- `test_secret_references.py` — OFFLINE: every secret-name literal in Lambda source is in `KNOWN_SECRETS` and none is in `DELETED_SECRETS` (SR1–SR5); it does not call Secrets Manager
 
 ### 8. CI/handler consistency
 - `test_cdk_handler_consistency.py` — every CDK Lambda definition's `handler="..."` matches a real `def lambda_handler` in source
 
 ### 9. Type/style ratchets
-- `test_handler_type_hints.py` — handlers have type hints (rolling allowlist of legacy handlers)
-- `test_logger_discipline.py` — Lambdas use `platform_logger` (not bare `print`)
+- `test_handler_type_hints.py` — handlers have type hints (a baseline that can only decrease)
+- `test_logger_discipline.py` — no new bare `print` in Lambdas (baseline count; use `platform_logger`)
+- `mypy` on the clean-module set (`scripts/mypy_clean_set.py`, ADR-080) is a CI gate, not a pytest file
 
 ### 10. Site-API route tests (`test_site_api_routes.py`)
-- Every route in `_SIMPLE_ROUTES` and `ROUTES` is dispatched
-- No-growth rule on `site_api_lambda.py` LOC count (catches lazy adds without refactor)
+- The `_SIMPLE_ROUTES` / `ROUTES` tables parse, have no duplicate paths or handlers, every handler is defined, paths are well-formed and methods are valid verbs
+- Also holds the wire-contract replay (frozen to the capture clock in `_capture.json`, #4864); API response shapes are baselined in `tests/api_schemas/`
 
 ### 11. AI-output faithfulness harness (`test_ai_output_faithfulness.py`) — ER-03 Layer 1
 The **inverted-testing** fix: `visual_ai_qa.py` checks that pages *render*; this
@@ -179,7 +185,7 @@ for the plane below it:
    90-day retention) so any past generation is reconstructable, not screenshot
    archaeology.
 4. **Human editorial plane** (plane 4, D3 / #1442) — the **weekly AI review-pack email**
-   (`lambdas/emails/ai_review_pack_lambda.py`, Sunday 18:00 UTC). It curates plane-3's
+   (`lambdas/emails/ai_review_pack_lambda.py`; its cron is the `ai-review-pack` row of `model/platform_model.json`). It curates plane-3's
    archive for the trailing week into one scannable email — Chronicle, Board answers,
    Coach commentary, State of Matthew, Field notes, Coach memoirs, each with an inline
    snippet and an S3 link — guaranteeing a human eyeball over every AI surface at the
@@ -306,44 +312,26 @@ def test_my_tool_returns_correct_shape():
 
 ## CI/CD test invocation
 
-In `.github/workflows/ci-cd.yml`:
+`ci-cd.yml` is an orchestrator over reusable workflows; the gates live in these files (read the step names there, they are the gate ids in `scripts/gate_census.py`):
 
-```yaml
-- name: Run unit tests
-  run: python3 -m pytest tests/ -m 'not integration' -v --tb=short
+| Workflow | Job (check name) | What it gates |
+|---|---|---|
+| `pr-checks.yml` | `Collect + deploy-critical + format` (**required**) | `pytest --collect-only`, the `deploy_critical` lane (`-n auto --dist loadfile`, then the serial complement), mypy on the clean set, `black --check`, `ruff check`, the bundle-boot gate |
+| `pr-checks.yml` | `Full unit suite (pre-merge, issue 3025)` (**required**) | the whole tree, parallel pass then `-m serial`, after reconciling doc literals and regenerating the platform model in-workspace |
+| `ci-lint.yml` | `Lint + Syntax Check` | flake8 (full report advisory; `E9,F63,F7,F82` blocking), `black --check`, `ruff check`, mypy clean set, py_compile, pip-audit, gitleaks, lambda_map coverage, content-policy scan, `bash -n` on `deploy/` |
+| `ci-test.yml` | `Unit Tests` (3 shard legs + combine) | the exhaustive offline suite; coverage floor and ratchet; non-gating for deploy (#416, ADR-117) |
+| `ci-cd.yml` | `Deploy-critical tests` | `-m "deploy_critical and not integration"` — gates Plan → Deploy |
+| `docs-ci.yml` | `Wiki drift gates` | the doc gates (`python3 scripts/ci_gate_commands.py docs-ci.yml` lists them) |
 
-- name: Run linters
-  run: |
-    flake8 lambdas/ mcp/ --select=E9,F63,F7,F82 --count --show-source --statistics
-    find lambdas/ mcp/ -name '*.py' -exec python3 -m py_compile {} \;
-```
+**The format gate** (identical in the PR lane and Lint): `black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/ qa/` (line length 140, `pyproject.toml`; `.json` is never run through black) and `ruff check` over the same directories (rules E/W/F/I/S). flake8 (`.flake8`, `E501` ignored) is the syntax/undefined-name floor. The tool versions are pinned via `scripts/ci_pins.py` from `requirements-dev.txt`; `deploy/agent_commit.sh` uses the pinned black.
 
-CI fails on:
-- Any unit test failure
-- `E9` (syntax) / `F63` (assertion always-true) / `F7` (forward reference) / `F82` (undefined name)
-- `py_compile` errors
-
-CI does NOT fail on style-only flake8 issues (E2xx etc.) — those are warnings.
+Style-only flake8 findings do not fail CI; black, ruff, mypy-clean-set, `py_compile` and the E9/F63/F7/F82 floor do.
 
 ---
 
-## Pre-commit hooks (not configured)
+## Pre-commit and commit-msg hooks
 
-Considered, deferred per ADR-057 W-08 (similar cost/benefit). If you want:
-```bash
-# In .pre-commit-config.yaml
-- repo: https://github.com/pre-commit/pre-commit-hooks
-  hooks: [trailing-whitespace, end-of-file-fixer]
-- repo: local
-  hooks:
-    - id: pytest-fast
-      name: pytest (unit only)
-      entry: python3 -m pytest tests/ -m 'not integration' -q
-      language: system
-      pass_filenames: false
-```
-
-Then `pre-commit install`.
+Installed per clone by `bash scripts/install_hooks.sh` (the hooks live in untracked `.git/hooks/`, so rerun it after cloning and whenever it changes; `python3 deploy/session_postflight.py` reports hook freshness). The commit-msg hook enforces Conventional Commits and refuses tool-attribution lines; agents commit through `deploy/agent_commit.sh`. Details: `CONTRIBUTING.md`. Never bypass them (`--no-verify`).
 
 ---
 
@@ -433,11 +421,11 @@ When you add new shared module:
 ```bash
 # 1. Write the module in lambdas/
 # 2. No packaging step — deploy/build_bundle.py ships the whole lambdas/ tree (#781)
-# 3. Add to ci/lambda_map.json skip_deploy
+# 3. Add to ci/lambda_map.json (skip_deploy if it is not a standalone Lambda)
 # 4. Add to cdk/stacks/constants.py if needed
 # 5. Write tests/test_<new_module>.py
 ```
 
 ---
 
-**Verified:** 2026-05-19
+**Verified:** 2026-10-17

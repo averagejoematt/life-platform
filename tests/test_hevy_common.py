@@ -216,3 +216,24 @@ def test_verify_signature_hmac_match(monkeypatch):
     assert verify_webhook_signature(body, sig) is True
     assert verify_webhook_signature(body, "sha256=" + sig) is True
     assert verify_webhook_signature(body, "nope") is False
+
+
+def test_exercise_keeps_superset_index_and_workout_updated_at_4642():
+    """Wire shape read from an archived raw/hevy payload (keys: index, superset_id, updated_at).
+    Mutation control: drop the superset_id line in _normalize_exercise -> reds."""
+    raw = {
+        "id": "w-4642",
+        "title": "t",
+        "start_time": "2026-10-01T16:00:00Z",
+        "end_time": "2026-10-01T17:00:00Z",
+        "updated_at": "2026-10-01T17:05:00.123Z",
+        "exercises": [
+            {"index": 0, "title": "A", "exercise_template_id": "T1", "notes": "", "superset_id": 7, "sets": []},
+            {"index": 1, "title": "B", "exercise_template_id": "T2", "notes": "", "superset_id": None, "sets": []},
+        ],
+    }
+    from training.hevy_common import normalize_workout
+
+    rec = normalize_workout(raw)
+    assert [(e["exercise_index"], e["superset_id"]) for e in rec["exercises"]] == [(0, 7), (1, None)]
+    assert rec["hevy_updated_at"] == "2026-10-01T17:05:00.123Z"

@@ -41,10 +41,13 @@ from typing import Any
 # What the data shows, and why this cannot be derived instead:
 #   - 95 Whoop sessions DO start within 45 min of a Hevy lift ending, but the
 #     median is 22 min and only 34 of 95 fall in the 25-70 min band.
-#   - Whoop `Cross Training` (id=45) is the LIFT itself: paired against the
-#     same-day Hevy session the residual is 0 min in every case.
-#   - `Sport_128` (n=289) is not it either: median 20 min, 41/289 in range,
-#     and no heart rate recorded at all.
+#   - Whoop id=45 is the LIFT itself: paired against the same-day Hevy session
+#     the residual is 0 min in every case. (Measured under the pre-#4629 table
+#     label `Cross Training`; the vendor's own name, stored since #4629, is
+#     `weightlifting`.)
+#   - id=128 (n=289; stored as `Sport_128` before #4629, the vendor's
+#     `stretching`) is not it either: median 20 min, 41/289 in range, and no
+#     heart rate recorded at all.
 #   - Strava rides are genuine outdoor cycling, per the owner — not this.
 # A low-intensity seated bike at ~100 bpm plausibly never crossed Whoop's
 # auto-detect threshold, which is why it is absent rather than mislabelled.

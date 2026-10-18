@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import re
 
+from common.metric_truth import resolved_source_id  # #4630: steps resolve per day, never one partition
+
 # Metric key → the DynamoDB source partition the evaluator reads it from.
 # Keep additions here; the allowlist + the suffix-aggregate logic follow automatically.
 # INVARIANT (#813): the key must be the EXACT attribute name on that source's DATE#
@@ -38,7 +40,9 @@ METRIC_SOURCES = {
     "weight_lbs": "withings",
     "total_calories_kcal": "macrofactor",
     "total_protein_g": "macrofactor",
-    "steps": "apple_health",
+    # #4630: steps are resolved per day (Whoop's step_count, else Apple Health) — the grader's
+    # fetch seam reads every source in the registry's METRIC_TRUTH facet for this id.
+    "steps": resolved_source_id("steps"),
     "blood_glucose_avg": "apple_health",
     "blood_glucose_std_dev": "apple_health",
     "body_fat_pct": "dexa",

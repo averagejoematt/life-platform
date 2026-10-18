@@ -653,7 +653,11 @@ REGISTRY = {
         # ±2% band, same 9-observation floor. What moved is `_fetch_range`'s return: it goes
         # through `strava_read_seam`, a no-op for every source but strava, where it drops
         # multi-device duplicate activities and recomputes the day totals.
-        "f5c734515863",
+        # Re-recorded 2026-10-16 (#4630). METHOD unchanged, prose re-read: same EWMA, same
+        # ±2% band, same 9-observation floor. What moved is `_get_source_data`: a resolved
+        # pseudo-source (`resolved:steps`) reads every source in the registry's steps truth
+        # facet and serves the resolved day rows — steps' series is now Whoop-first.
+        "46278ce3929c",
         min_n=9,
         used_by=(
             "Coach prediction grading \u2014 since #4617 only a direction call with no filing date "

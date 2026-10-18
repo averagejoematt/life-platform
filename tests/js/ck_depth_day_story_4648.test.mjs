@@ -13,6 +13,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const D = await import("../../site/assets/js/ck_depth.js");
+const V = await import("../../site/assets/js/ck_verdict.js");
 const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit_pages_4586");
 const load = (name) => JSON.parse(readFileSync(join(FIX, `${name}.json`), "utf8"));
 const CALLS = load("calls");
@@ -61,7 +62,7 @@ test("a day with a settled call shows the call, its rule, the verdict and a link
   const call = CALLS.calls.find((c) => c.settled_date === "2026-10-02");
   const html = D.daySettledHTML("2026-10-02", CALLS, BASE);
   assert.match(html, /<h2>A call was checked this day\.<\/h2>/);
-  assert.ok(html.includes(call.called_short), "the served short sentence; the rule rides the shared tag (#4647)");
+  assert.ok(html.includes(V.matthewsCall(call.called_short)), "the served short sentence; the rule rides the shared tag (#4647)");
   assert.match(html, /<span class="ck-verdicts__tag ck-verdicts__tag--right">Right · within 1\.2 hours either way<\/span>/);
   assert.match(html, /It came in at 8\.6 hours\./);
   assert.ok(html.includes(`href="/next/v8/call/?id=${call.id}&amp;from=2026-10-02"`), "the call page returns to this day (#4675)");

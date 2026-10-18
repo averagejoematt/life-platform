@@ -277,7 +277,10 @@ class TestClosePathRandomization:
         d = _design()
 
         def fake_query_source(source, start, end, **kw):
-            assert source == "apple_health"
+            # #4630: steps resolve across the registry's truth-facet sources; only Apple has rows here.
+            assert source in ("whoop", "apple_health", "garmin")
+            if source != "apple_health":
+                return []
             items = []
             from datetime import datetime, timedelta
 

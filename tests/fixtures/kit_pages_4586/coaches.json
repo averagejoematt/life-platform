@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-13T01:38:39.011987+00:00",
-  "served_at": "2026-10-13T01:38:39.011987+00:00",
+  "generated_at": "2026-10-17T23:29:07.500852+00:00",
+  "served_at": "2026-10-17T23:29:07.500852+00:00",
   "cache_seconds": 300,
-  "request_id": "a520dbff17664653"
+  "request_id": "9aed6a72d6544c0f"
  },
  "coaches": [
   {
@@ -31,12 +31,12 @@
    "emoji": "\ud83d\ude34",
    "color": "#818cf8",
    "board_role": "Sleep Scientist & Circadian Specialist",
-   "headline_stat": "17 of 41 checked calls right (41%) through October 11",
+   "headline_stat": "19 of 46 checked calls right (41%) through October 17",
    "record": {
-    "confirmed": 17,
-    "refuted": 24,
-    "n": 41,
-    "through": "2026-10-11"
+    "confirmed": 19,
+    "refuted": 27,
+    "n": 46,
+    "through": "2026-10-17"
    },
    "comparison": {
     "rule": "nothing_changes",
@@ -60,13 +60,13 @@
       "rule_right_pct": 39.1
      },
      "direction": {
-      "graded": 14,
-      "coach_right": 2,
-      "scored": 14,
-      "coach_right_on_scored": 2,
-      "rule_right": 2,
-      "coach_only": 2,
-      "rule_only": 2,
+      "graded": 18,
+      "coach_right": 3,
+      "scored": 18,
+      "coach_right_on_scored": 3,
+      "rule_right": 3,
+      "coach_only": 3,
+      "rule_only": 3,
       "unscorable": 0,
       "unscorable_reasons": {},
       "not_yet_scored": 0,
@@ -76,11 +76,11 @@
       "rule_right_pct": null
      },
      "yes_no": {
-      "graded": 2,
-      "coach_right": 1,
-      "scored": 2,
-      "coach_right_on_scored": 1,
-      "rule_right": 1,
+      "graded": 3,
+      "coach_right": 2,
+      "scored": 3,
+      "coach_right_on_scored": 2,
+      "rule_right": 2,
       "coach_only": 0,
       "rule_only": 0,
       "unscorable": 0,
@@ -111,28 +111,28 @@
     "unclassified": 0,
     "scored_complete": true,
     "skill": {
-     "n": 41,
-     "brier_skill": -0.0157,
-     "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
+     "n": 46,
+     "brier_skill": -0.0214,
+     "sentence": "Across 46 checked calls, so far they do not beat a simple guess."
     },
-    "rule_sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell.",
-    "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 14 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell.",
+    "rule_sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell.",
+    "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
    "tier": "staff",
    "latest_checked": {
-    "prediction_id": "pred_20260926_recovery_score_will_be_approximately_85",
-    "claim": "Recovery score will be approximately 85.3% tomorrow, with 80% confidence interval of 60.9\u2013100%",
-    "created_date": "2026-09-26",
+    "prediction_id": "pred_20261003_once_morning_notes_resume_and_protein_st",
+    "claim": "Once morning notes resume and protein stabilizes above 145 grams, the recovery interval will narrow in a defensible direction",
+    "created_date": "2026-10-03",
     "pre_registered_at": null,
-    "outcome_date": "2026-10-11",
+    "outcome_date": "2026-10-17",
     "metric": "recovery_score",
-    "eval_type": "point",
-    "condition": "within",
-    "threshold": 85.3,
-    "actual_value": 89.0,
-    "status": "confirmed"
+    "eval_type": "directional",
+    "condition": "up",
+    "threshold": null,
+    "actual_value": -0.3878,
+    "status": "refuted"
    },
    "instrument": {
     "source": "whoop",
@@ -149,12 +149,12 @@
    "emoji": "\ud83e\udd57",
    "color": "#22c55e",
    "board_role": "Nutritionist",
-   "headline_stat": "8 of 30 checked calls right (27%) through October 12",
+   "headline_stat": "8 of 36 checked calls right (22%) through October 14",
    "record": {
     "confirmed": 8,
-    "refuted": 22,
-    "n": 30,
-    "through": "2026-10-12"
+    "refuted": 28,
+    "n": 36,
+    "through": "2026-10-14"
    },
    "comparison": {
     "rule": "nothing_changes",
@@ -178,20 +178,20 @@
       "rule_right_pct": null
      },
      "direction": {
-      "graded": 21,
+      "graded": 27,
       "coach_right": 5,
-      "scored": 21,
+      "scored": 27,
       "coach_right_on_scored": 5,
-      "rule_right": 4,
+      "rule_right": 6,
       "coach_only": 5,
-      "rule_only": 4,
+      "rule_only": 6,
       "unscorable": 0,
       "unscorable_reasons": {},
       "not_yet_scored": 0,
       "verdict": "no_clear_difference",
       "sign_test_p": 1.0,
-      "coach_right_pct": 23.8,
-      "rule_right_pct": 19.0
+      "coach_right_pct": 18.5,
+      "rule_right_pct": 22.2
      },
      "yes_no": {
       "graded": 2,
@@ -229,27 +229,27 @@
     "unclassified": 0,
     "scored_complete": true,
     "skill": {
-     "n": 30,
-     "brier_skill": -0.2018,
-     "sentence": "Across 30 checked calls, so far they do not beat a simple guess."
+     "n": 36,
+     "brier_skill": -0.3742,
+     "sentence": "Across 36 checked calls, so far they do not beat a simple guess."
     },
-    "rule_sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right once and a guess that nothing changes 6 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 21 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, but not by a clear margin. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
-    "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right once and a guess that nothing changes 6 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 21 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, but not by a clear margin. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "rule_sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right once and a guess that nothing changes 6 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 27 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 6 times \u2014 the guess was right more often, but not by a clear margin. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right once and a guess that nothing changes 6 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 27 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 6 times \u2014 the guess was right more often, but not by a clear margin. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
    "tier": "staff",
    "latest_checked": {
-    "prediction_id": "docket-mind_coach__nutrition_coach-protein-fuel-cognition-link-mechanistic-validity-2026-09-28",
-    "claim": "Protein intake gap (102g vs 190g target) mechanistically suppresses cognition through tryptophan availability; dinner disruption during Sept 19-26 window would confirm protein collapse hypothesis",
-    "created_date": null,
+    "prediction_id": "pred_20260930_protein_likely_collapsed_well_below_the",
+    "claim": "Protein likely collapsed well below the 170g floor during the September 19\u201326 gap if dinner was the casualty",
+    "created_date": "2026-09-30",
     "pre_registered_at": null,
-    "outcome_date": "2026-10-12",
-    "metric": null,
-    "eval_type": null,
-    "condition": null,
+    "outcome_date": "2026-10-14",
+    "metric": "total_protein_g",
+    "eval_type": "directional",
+    "condition": "down",
     "threshold": null,
-    "actual_value": null,
+    "actual_value": 0.0993,
     "status": "refuted"
    },
    "instrument": {
@@ -267,12 +267,12 @@
    "emoji": "\ud83e\udde0",
    "color": "#a78bfa",
    "board_role": "Psychiatrist \u2014 Behavioral Patterns",
-   "headline_stat": "7 of 19 checked calls right (37%) through October 12",
+   "headline_stat": "8 of 20 checked calls right (40%) through October 14",
    "record": {
-    "confirmed": 7,
+    "confirmed": 8,
     "refuted": 12,
-    "n": 19,
-    "through": "2026-10-12"
+    "n": 20,
+    "through": "2026-10-14"
    },
    "comparison": {
     "rule": "nothing_changes",
@@ -280,12 +280,12 @@
     "rule_version": 1,
     "records": {
      "number": {
-      "graded": 6,
-      "coach_right": 2,
-      "scored": 6,
-      "coach_right_on_scored": 2,
+      "graded": 7,
+      "coach_right": 3,
+      "scored": 7,
+      "coach_right_on_scored": 3,
       "rule_right": 4,
-      "coach_only": 0,
+      "coach_only": 1,
       "rule_only": 2,
       "unscorable": 0,
       "unscorable_reasons": {},
@@ -347,27 +347,27 @@
     "unclassified": 0,
     "scored_complete": true,
     "skill": {
-     "n": 19,
-     "brier_skill": -0.0744,
-     "sentence": "Too few checked calls yet (19) to compare them with a simple guess."
+     "n": 20,
+     "brier_skill": -0.0417,
+     "sentence": "Across 20 checked calls, so far they do not beat a simple guess."
     },
-    "rule_sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
-    "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "rule_sentence": "Number calls: on the 7 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 7 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 4 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 9 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
    "tier": "staff",
    "latest_checked": {
-    "prediction_id": "docket-mind_coach__nutrition_coach-protein-fuel-cognition-link-mechanistic-validity-2026-09-28",
-    "claim": "Fuel-cognition link may be slower than estimated or barrier is not primarily metabolic; journaling silence persists despite protein recovery (157g EWMA), suggesting structural/emotional barrier",
-    "created_date": null,
+    "prediction_id": "pred_20260930_protein_intake_will_continue_to_rise_and",
+    "claim": "Protein intake will continue to rise and track around 157 grams daily based on current trajectory.",
+    "created_date": "2026-09-30",
     "pre_registered_at": null,
-    "outcome_date": "2026-10-12",
-    "metric": null,
-    "eval_type": null,
-    "condition": null,
-    "threshold": null,
-    "actual_value": null,
+    "outcome_date": "2026-10-14",
+    "metric": "total_protein_g",
+    "eval_type": "point",
+    "condition": "within",
+    "threshold": 157,
+    "actual_value": 155.0,
     "status": "confirmed"
    },
    "instrument": null,
@@ -382,12 +382,12 @@
    "emoji": "\ud83d\udcca",
    "color": "#f59e0b",
    "board_role": "Performance Coach \u2014 Training, Cardio & Mobility",
-   "headline_stat": "11 of 22 checked calls right (50%) through October 11",
+   "headline_stat": "13 of 27 checked calls right (48%) through October 17",
    "record": {
-    "confirmed": 11,
-    "refuted": 11,
-    "n": 22,
-    "through": "2026-10-11"
+    "confirmed": 13,
+    "refuted": 14,
+    "n": 27,
+    "through": "2026-10-17"
    },
    "comparison": {
     "rule": "nothing_changes",
@@ -395,11 +395,11 @@
     "rule_version": 1,
     "records": {
      "number": {
-      "graded": 9,
-      "coach_right": 5,
-      "scored": 9,
-      "coach_right_on_scored": 5,
-      "rule_right": 5,
+      "graded": 10,
+      "coach_right": 6,
+      "scored": 10,
+      "coach_right_on_scored": 6,
+      "rule_right": 6,
       "coach_only": 0,
       "rule_only": 0,
       "unscorable": 0,
@@ -411,13 +411,13 @@
       "rule_right_pct": null
      },
      "direction": {
-      "graded": 10,
-      "coach_right": 4,
-      "scored": 10,
-      "coach_right_on_scored": 4,
-      "rule_right": 1,
-      "coach_only": 4,
-      "rule_only": 1,
+      "graded": 13,
+      "coach_right": 5,
+      "scored": 13,
+      "coach_right_on_scored": 5,
+      "rule_right": 2,
+      "coach_only": 5,
+      "rule_only": 2,
       "unscorable": 0,
       "unscorable_reasons": {},
       "not_yet_scored": 0,
@@ -427,13 +427,13 @@
       "rule_right_pct": null
      },
      "yes_no": {
-      "graded": 1,
+      "graded": 2,
       "coach_right": 1,
-      "scored": 1,
+      "scored": 2,
       "coach_right_on_scored": 1,
-      "rule_right": 0,
+      "rule_right": 1,
       "coach_only": 1,
-      "rule_only": 0,
+      "rule_only": 1,
       "unscorable": 0,
       "unscorable_reasons": {},
       "not_yet_scored": 0,
@@ -462,28 +462,28 @@
     "unclassified": 0,
     "scored_complete": true,
     "skill": {
-     "n": 22,
-     "brier_skill": 0.0414,
-     "sentence": "Across 22 checked calls, so far they beat a simple guess."
+     "n": 27,
+     "brier_skill": 0.0324,
+     "sentence": "Across 27 checked calls, so far they beat a simple guess."
     },
-    "rule_sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
-    "sentence": "Number calls: on the 9 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 5 times \u2014 level, on too few calls to tell. Direction calls: on the 10 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes once \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "rule_sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
    "tier": "staff",
    "latest_checked": {
-    "prediction_id": "pred_20261002_tomorrow_s_recovery_will_reach_approxima",
-    "claim": "Tomorrow's recovery will reach approximately 75.8%, a single-day rebound from the September 30 low",
-    "created_date": "2026-10-02",
+    "prediction_id": "pred_20261015_weight_will_be_around_304_5_pounds_tomor",
+    "claim": "Weight will be around 304.5 pounds tomorrow morning",
+    "created_date": "2026-10-15",
     "pre_registered_at": null,
-    "outcome_date": "2026-10-11",
-    "metric": "recovery_score",
+    "outcome_date": "2026-10-17",
+    "metric": "weight_lbs",
     "eval_type": "point",
     "condition": "within",
-    "threshold": 75.8,
-    "actual_value": 98.0,
-    "status": "refuted"
+    "threshold": 304.5,
+    "actual_value": 304.03,
+    "status": "confirmed"
    },
    "instrument": {
     "source": "hevy",
@@ -500,12 +500,12 @@
    "emoji": "\ud83d\udd2c",
    "color": "#2dd4bf",
    "board_role": "Metabolic Health Researcher",
-   "headline_stat": "1 of 6 checked calls right through September 30",
+   "headline_stat": "1 of 7 checked calls right through October 16",
    "record": {
     "confirmed": 1,
-    "refuted": 5,
-    "n": 6,
-    "through": "2026-09-30"
+    "refuted": 6,
+    "n": 7,
+    "through": "2026-10-16"
    },
    "comparison": {
     "rule": "nothing_changes",
@@ -529,13 +529,13 @@
       "rule_right_pct": null
      },
      "direction": {
-      "graded": 2,
+      "graded": 3,
       "coach_right": 0,
-      "scored": 2,
+      "scored": 3,
       "coach_right_on_scored": 0,
-      "rule_right": 1,
+      "rule_right": 2,
       "coach_only": 0,
-      "rule_only": 1,
+      "rule_only": 2,
       "unscorable": 0,
       "unscorable_reasons": {},
       "not_yet_scored": 0,
@@ -580,42 +580,28 @@
     "unclassified": 0,
     "scored_complete": true,
     "skill": {
-     "n": 6,
-     "brier_skill": -0.6331,
-     "sentence": "Too few checked calls yet (6) to compare them with a simple guess."
+     "n": 7,
+     "brier_skill": -0.8794,
+     "sentence": "Too few checked calls yet (7) to compare them with a simple guess."
     },
-    "rule_sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 2 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes once \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
-    "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 2 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes once \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
+    "rule_sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
+    "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
    "tier": "staff",
    "latest_checked": {
-    "prediction_id": "pred_20260909_nocturnal_glucose_dips_will_trigger_cort",
-    "claim": "",
-    "created_date": "2026-09-09",
+    "prediction_id": "pred_20260925_nocturnal_glucose_dips_are_contributing",
+    "claim": "Nocturnal glucose dips are contributing to deep sleep decline through counter-regulatory cortisol fragmentation of slow-wave sleep.",
+    "created_date": "2026-09-25",
     "pre_registered_at": null,
-    "outcome_date": "2026-09-30",
+    "outcome_date": "2026-10-16",
     "metric": "deep_pct",
     "eval_type": "directional",
     "condition": "down",
     "threshold": null,
-    "actual_value": 0.0035,
-    "status": "refuted",
-    "unsourced": {
-     "reason": "no sensor since 2026-08-27",
-     "instrument": {
-      "source": "apple_health",
-      "datatype": "cgm"
-     },
-     "last_seen": "2026-08-27",
-     "gap": {
-      "start": "2026-08-27",
-      "end": null
-     },
-     "said_on": "2026-09-09",
-     "text": "Not quoted: this was said on September 9 and rests on his glucose sensor, which had sent no reading since August 27."
-    }
+    "actual_value": -0.0482,
+    "status": "refuted"
    },
    "instrument": {
     "source": "apple_health",
@@ -632,12 +618,12 @@
    "emoji": "\ud83e\ude7a",
    "color": "#5ba4cf",
    "board_role": "Longevity & Preventive Medicine",
-   "headline_stat": "7 of 8 checked calls right through October 11",
+   "headline_stat": "9 of 12 checked calls right (75%) through October 17",
    "record": {
-    "confirmed": 7,
-    "refuted": 1,
-    "n": 8,
-    "through": "2026-10-11"
+    "confirmed": 9,
+    "refuted": 3,
+    "n": 12,
+    "through": "2026-10-17"
    },
    "comparison": {
     "rule": "nothing_changes",
@@ -645,11 +631,11 @@
     "rule_version": 1,
     "records": {
      "number": {
-      "graded": 3,
-      "coach_right": 3,
-      "scored": 3,
-      "coach_right_on_scored": 3,
-      "rule_right": 3,
+      "graded": 4,
+      "coach_right": 4,
+      "scored": 4,
+      "coach_right_on_scored": 4,
+      "rule_right": 4,
       "coach_only": 0,
       "rule_only": 0,
       "unscorable": 0,
@@ -661,13 +647,13 @@
       "rule_right_pct": null
      },
      "direction": {
-      "graded": 3,
-      "coach_right": 2,
-      "scored": 3,
-      "coach_right_on_scored": 2,
-      "rule_right": 0,
-      "coach_only": 2,
-      "rule_only": 0,
+      "graded": 6,
+      "coach_right": 3,
+      "scored": 6,
+      "coach_right_on_scored": 3,
+      "rule_right": 2,
+      "coach_only": 3,
+      "rule_only": 2,
       "unscorable": 0,
       "unscorable_reasons": {},
       "not_yet_scored": 0,
@@ -712,28 +698,28 @@
     "unclassified": 0,
     "scored_complete": true,
     "skill": {
-     "n": 8,
-     "brier_skill": -1.2857,
-     "sentence": "Too few checked calls yet (8) to compare them with a simple guess."
+     "n": 12,
+     "brier_skill": -0.3333,
+     "sentence": "Too few checked calls yet (12) to compare them with a simple guess."
     },
-    "rule_sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
-    "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "rule_sentence": "Number calls: on the 4 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 4 times \u2014 level, on too few calls to tell. Direction calls: on the 6 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 4 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 4 times \u2014 level, on too few calls to tell. Direction calls: on the 6 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
    "tier": "staff",
    "latest_checked": {
-    "prediction_id": "pred_20260924_recovery_score_is_expected_to_be_around",
-    "claim": "Recovery score is expected to be around 84.8% tomorrow, with an 80% confidence interval of 60.5\u2013100%.",
-    "created_date": "2026-09-24",
+    "prediction_id": "pred_20261003_hrv_running_average_may_be_moving_direct",
+    "claim": "HRV running average may be moving directionally upward, but trend is not yet confirmed",
+    "created_date": "2026-10-03",
     "pre_registered_at": null,
-    "outcome_date": "2026-10-11",
-    "metric": "recovery_score",
-    "eval_type": "point",
-    "condition": "within",
-    "threshold": 84.8,
-    "actual_value": 99.0,
-    "status": "confirmed"
+    "outcome_date": "2026-10-17",
+    "metric": "hrv_7day_avg",
+    "eval_type": "directional",
+    "condition": "up",
+    "threshold": null,
+    "actual_value": 0.0077,
+    "status": "refuted"
    },
    "instrument": {
     "source": "labs",
@@ -750,12 +736,12 @@
    "emoji": "\ud83d\udd0d",
    "color": "#e879f9",
    "board_role": "Biostatistician \u2014 N=1 Research",
-   "headline_stat": "14 of 28 checked calls right (50%) through October 11",
+   "headline_stat": "18 of 35 checked calls right (51%) through October 17",
    "record": {
-    "confirmed": 14,
-    "refuted": 14,
-    "n": 28,
-    "through": "2026-10-11"
+    "confirmed": 18,
+    "refuted": 17,
+    "n": 35,
+    "through": "2026-10-17"
    },
    "comparison": {
     "rule": "nothing_changes",
@@ -763,11 +749,11 @@
     "rule_version": 1,
     "records": {
      "number": {
-      "graded": 6,
-      "coach_right": 4,
-      "scored": 5,
-      "coach_right_on_scored": 4,
-      "rule_right": 3,
+      "graded": 7,
+      "coach_right": 5,
+      "scored": 6,
+      "coach_right_on_scored": 5,
+      "rule_right": 4,
       "coach_only": 1,
       "rule_only": 0,
       "unscorable": 1,
@@ -781,20 +767,20 @@
       "rule_right_pct": null
      },
      "direction": {
-      "graded": 20,
-      "coach_right": 9,
-      "scored": 20,
-      "coach_right_on_scored": 9,
+      "graded": 26,
+      "coach_right": 12,
+      "scored": 26,
+      "coach_right_on_scored": 12,
       "rule_right": 3,
-      "coach_only": 9,
+      "coach_only": 12,
       "rule_only": 3,
       "unscorable": 0,
       "unscorable_reasons": {},
       "not_yet_scored": 0,
-      "verdict": "no_clear_difference",
-      "sign_test_p": 0.146,
-      "coach_right_pct": 45.0,
-      "rule_right_pct": 15.0
+      "verdict": "coaches_better",
+      "sign_test_p": 0.0352,
+      "coach_right_pct": 46.2,
+      "rule_right_pct": 11.5
      },
      "yes_no": {
       "graded": 0,
@@ -832,27 +818,27 @@
     "unclassified": 0,
     "scored_complete": true,
     "skill": {
-     "n": 28,
-     "brier_skill": 0.0,
-     "sentence": "Across 28 checked calls, so far they do not beat a simple guess."
+     "n": 35,
+     "brier_skill": -0.0008,
+     "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
     },
-    "rule_sentence": "Number calls: on the 5 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 20 a guess could also be checked against, the coaches were right 9 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, but not by a clear margin. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
-    "sentence": "Number calls: on the 5 a guess could also be checked against, the coaches were right 4 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 20 a guess could also be checked against, the coaches were right 9 times and a guess that nothing changes 3 times \u2014 the coaches were right more often, but not by a clear margin. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "rule_sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 26 a guess could also be checked against, the coaches were right 12 times and a guess that nothing changes 3 times \u2014 the coaches did better. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 6 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 4 times \u2014 the coaches were right more often, on too few calls to tell. 1 more could not be checked against the guess. Direction calls: on the 26 a guess could also be checked against, the coaches were right 12 times and a guess that nothing changes 3 times \u2014 the coaches did better. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
    "tier": "staff",
    "latest_checked": {
-    "prediction_id": "pred_20260915_whoop_recovery_will_rebound_to_approxima",
-    "claim": "Whoop recovery will rebound to approximately 63.5% tomorrow (80% interval 38\u201389%)",
-    "created_date": "2026-09-15",
+    "prediction_id": "pred_20261003_if_recovery_climbs_even_as_protein_stays",
+    "claim": "If recovery climbs even as protein stays flat around current levels, the carb-side hypothesis was carrying more explanatory weight than assigned.",
+    "created_date": "2026-10-03",
     "pre_registered_at": null,
-    "outcome_date": "2026-10-11",
+    "outcome_date": "2026-10-17",
     "metric": "recovery_score",
-    "eval_type": "point",
-    "condition": "within",
-    "threshold": 63.5,
-    "actual_value": 92.0,
+    "eval_type": "directional",
+    "condition": "up",
+    "threshold": null,
+    "actual_value": -0.2041,
     "status": "refuted"
    },
    "instrument": null,

@@ -32,6 +32,7 @@ import boto3
 import coach.coach_presence_gate as _presence  # #4217 — the absent coach is not asked
 from coach import coach_brief_input_gate as _in_gate  # #3107 — the upstream change-gate + the shared data-inventory block
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G
+from common.metric_truth import STEPS  # #4630: the resolved steps key build_data_summary fills
 from common.pacific_time import pacific_today
 from health.scoring_engine import habitify_reading  # #4362
 
@@ -662,6 +663,25 @@ Tone: direct, empathetic, no-BS.{protocol_note}"""
     return intro
 
 
+def _missed_registry_habits(registry, habitify):
+    """The active registry habits the day records as NOT done, as (name, meta) in registry order.
+
+    #4362/#4632: each resolved through `scoring_engine.habitify_reading` WITH the day's
+    `habit_statuses` — by vendor id first, names as aliases (`health.habit_identity`) — so a
+    habit renamed in Habitify is the same habit here as in the scoring and the streaks
+    (#4644 Q26). Unobserved (None) is not a miss."""
+    habitify = habitify or {}
+    h_map, statuses = habitify.get("habits", {}), habitify.get("habit_statuses")
+    out = []
+    for h_name, meta in (registry or {}).items():
+        if meta.get("status") != "active":
+            continue
+        done = habitify_reading(h_map, h_name, meta, statuses)
+        if done is not None and done < 1:
+            out.append((h_name, meta))
+    return out
+
+
 def call_board_of_directors(
     data, profile, day_grade, grade, component_scores, api_key="", character_sheet=None, brief_mode="standard", shared_system=None
 ):
@@ -687,21 +707,16 @@ def call_board_of_directors(
 
     # Habit context from registry
     registry = profile.get("habit_registry", {})
-    habitify = data.get("habitify") or {}
-    h_map = habitify.get("habits", {})
+    missed = _missed_registry_habits(registry, data.get("habitify"))
     missed_t0 = []
     missed_t1 = []
-    for h_name, meta in registry.items():
-        if meta.get("status") != "active" or meta.get("tier", 2) > 1:
-            continue
-        done = habitify_reading(h_map, h_name, meta)  # #4362: rename-aware; unobserved is not a miss
-        if done is not None and done < 1:
-            why = meta.get("why_matthew", "")
-            tier = meta.get("tier", 2)
-            if tier == 0:
-                missed_t0.append(h_name + (" — " + why[:80] if why else ""))
-            elif tier == 1:
-                missed_t1.append(h_name)
+    for h_name, meta in missed:
+        why = meta.get("why_matthew", "")
+        tier = meta.get("tier", 2)
+        if tier == 0:
+            missed_t0.append(h_name + (" — " + why[:80] if why else ""))
+        elif tier == 1:
+            missed_t1.append(h_name)
     habit_ctx = ""
     if missed_t0:
         habit_ctx += "\nMISSED TIER 0 (non-negotiable): " + "; ".join(missed_t0)
@@ -710,15 +725,9 @@ def call_board_of_directors(
 
     # Synergy group analysis
     synergy_misses = {}
-    for h_name, meta in registry.items():
-        if meta.get("status") != "active":
-            continue
-        sg = meta.get("synergy_group")
-        if not sg:
-            continue
-        done = habitify_reading(h_map, h_name, meta)  # #4362
-        if done is not None and done < 1:
-            synergy_misses.setdefault(sg, []).append(h_name)
+    for h_name, meta in missed:
+        if meta.get("synergy_group"):
+            synergy_misses.setdefault(meta["synergy_group"], []).append(h_name)
     for sg, misses in synergy_misses.items():
         total_in_group = sum(1 for _, m in registry.items() if m.get("synergy_group") == sg and m.get("status") == "active")
         if len(misses) >= total_in_group * 0.5 and total_in_group >= 3:
@@ -903,16 +912,16 @@ def call_tldr_and_guidance(
     missed_mvp = []
     missed_context = []
     if registry:
-        for h_name, meta in registry.items():
-            if meta.get("status") != "active" or meta.get("tier", 2) > 1:
+        for h_name, meta in _missed_registry_habits(registry, habitify):
+            if meta.get("tier", 2) > 1:
                 continue
-            done = habitify_reading(habits_map, h_name, meta)  # #4362: rename-aware; unobserved is not a miss
-            if done is not None and done < 1:
-                missed_mvp.append(h_name)
-                why = meta.get("why_matthew", "")
-                if why:
-                    missed_context.append(h_name + " (T" + str(meta.get("tier", "?")) + "): " + why[:60])
+            missed_mvp.append(h_name)
+            why = meta.get("why_matthew", "")
+            if why:
+                missed_context.append(h_name + " (T" + str(meta.get("tier", "?")) + "): " + why[:60])
     else:
+        # mvp_habits is the pre-registry legacy list of bare names (no meta, no vendor id) — out of
+        # #4632's id-keyed scope, carried on the issue; it never reads when a registry exists.
         mvp_list = profile.get("mvp_habits", [])
         for h in mvp_list:
             done = habits_map.get(h, 0)
@@ -1052,7 +1061,7 @@ YESTERDAY'S SIGNALS:
 - Calories: {data_summary.get("calories")}/target, Protein: {data_summary.get("protein_g")}g/{PLAN_DAILY_PROTEIN_MIN_G}g
 - Glucose: avg {data_summary.get("glucose_avg")} mg/dL, TIR {data_summary.get("glucose_tir")}%, overnight low {data_summary.get("glucose_min")} mg/dL
 - Gait: walking speed {data_summary.get("walking_speed_mph")} mph, step length {data_summary.get("walking_step_length_in")} in, asymmetry {data_summary.get("walking_asymmetry_pct")}%
-- Steps: {data_summary.get("steps")}
+- Steps: {data_summary.get(STEPS)}
 - Weight: {data_summary.get("current_weight")} lbs (week ago: {data_summary.get("week_ago_weight")})
 - Missed habits: {(", ".join(missed_mvp) if missed_mvp else "none — all completed")}
 - Missed habit context: {("; ".join(missed_context[:5]) if missed_context else "n/a")}
