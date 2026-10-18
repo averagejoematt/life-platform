@@ -3528,3 +3528,31 @@ GUARD_PROOFS.update(
         },
     }
 )
+
+
+# #4972 (2026-10-18): the owner-only heart-rhythm channel's privacy gate — the sweep + the
+# route walk. Proved by hand on the lane against the REAL reader file, each plant restored
+# from a byte copy.
+STRUCTURAL_HAND_PROOFS["structural::test_rhythm_channel_privacy_4972.py"] = {
+    "gate_name": "test_rhythm_channel_privacy_4972.py",
+    "command": "python3 -m pytest tests/test_rhythm_channel_privacy_4972.py -q -p no:cacheprovider   # baseline 7 passed",
+    "mutation": (
+        "two plants in lambdas/web/site_api_vitals.py::handle_vitals, ONE AT A TIME: M1 the reader queries "
+        "USER#matthew#SOURCE#clinical and serves the ECG classification field by name per row (names a "
+        "channel field); M2 the reader queries the same partition and serves dict(r) per row (names NO channel token — "
+        "the row-dump shape the sweep cannot see)."
+    ),
+    "observed": (
+        "M1 3 failed / 4 passed (the allowlist sweep and the never-tree sweep name site_api_vitals.py; the "
+        "planted-reader control also red because M1 raised NameError inside the walk). M2 1 failed / 6 passed "
+        "(test_no_api_route_serves_a_channel_row: /api/vitals and /api/snapshot leak every channel field and "
+        "sentinel value, bare and with source=clinical params). Restored 7 passed."
+    ),
+    "scope": (
+        "The sweep reads lambdas/ mcp/ site/ scripts/ deploy/ cdk/ (deploy/generated skipped). The walk calls every "
+        "site-API GET route (ROUTES + _SIMPLE_ROUTES + inline _dispatch_route branches) in a subprocess against a "
+        "partition-aware fake table holding one channel row; S3/HTTP/Bedrock raise, so a route that serves only "
+        "from S3 or a POST door is outside the walk (the sweep covers those by name)."
+    ),
+    "proved_on": "2026-10-18",
+}

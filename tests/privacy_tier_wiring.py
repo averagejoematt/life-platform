@@ -331,6 +331,45 @@ _WRITER_ONLY = {
         "spo2_percentage",
     ),
 }
+# #4972: the heart-rhythm event channel's producer. `lambdas/health/rhythm_channel.py` parses
+# the HAE ECG / heart-rate-notification / medication payloads and builds the `RHYTHM#` rows, so
+# it necessarily names every channel field; it is the writer (via clinical_facts.put_channel_rows),
+# where the tier is assigned, not where it leaks. No other module names these fields.
+_RHYTHM_FIELDS = (
+    "cross_device_same_day",
+    "rhythm_ecg_avg_hr_bpm",
+    "rhythm_ecg_classification",
+    "rhythm_ecg_device",
+    "rhythm_ecg_sample_start",
+    "rhythm_med_at",
+    "rhythm_med_dose_text",
+    "rhythm_med_name",
+    "rhythm_med_status",
+    "rhythm_notification_at",
+    "rhythm_notification_bpm",
+    "rhythm_notification_device",
+    "rhythm_notification_kind",
+    "rhythm_notification_kind_inferred",
+    "rhythm_notification_threshold_bpm",
+)
+for _field in _RHYTHM_FIELDS:
+    CONSUMERS[("lambdas/health/rhythm_channel.py", _field)] = _d(
+        SAW,
+        f"The #4972 channel producer builds `{_field}` on a `RHYTHM#` clinical row from the HAE "
+        "event payload (writer-only footprint, verified tree-wide 2026-10-18). Owner-only by "
+        "owner ruling (c), 2026-10-17; tests/test_rhythm_channel_privacy_4972.py holds every reader out.",
+    )
+CONSUMERS[("lambdas/health/rhythm_channel.py", "afib_result")] = _d(
+    SAW,
+    "ECG de-duplication (#4972): reads only the PRESENCE of the Withings day row's ECG result to "
+    "set `cross_device_same_day` on a watch ECG row — the value itself is never copied, logged or returned.",
+)
+CONSUMERS[("lambdas/health/rhythm_channel.py", "measurement_group_attribs")] = _d(
+    SAW,
+    "ECG de-duplication (#4972): reads the Withings group TIMESTAMPS only, to recognise a "
+    "Withings ECG mirrored through Apple Health as the recording Withings already stores; "
+    "the attribution codes are never read, copied or returned.",
+)
 for _path, _fields in _WRITER_ONLY.items():
     for _field in _fields:
         CONSUMERS[(_path, _field)] = _d(

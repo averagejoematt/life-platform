@@ -178,6 +178,33 @@ FIELD_TIERS: dict[str, dict[str, int]] = {
         "retentionScore": TIER_OWNER_ONLY,
         "moodSnapshot": TIER_OWNER_ONLY,
     },
+    # #4972 (owner ruling (c), 2026-10-17: heart-rhythm data is owner-only): the
+    # heart-rhythm event channel's `RHYTHM#` rows inside the clinical partition. The
+    # partition itself is TIER_INTERNAL (ADR-155 amendment — coach context admitted); these
+    # fields are STRICTER, owner-only, so no AI narrative context and no public surface may
+    # carry them, and every row dumper strips them (`strip_map`). Declared before the first
+    # row exists (ADR-154's ordering). `tests/test_rhythm_channel_privacy_4972.py` holds
+    # this set equal to `health.rhythm_channel.CHANNEL_FIELDS`.
+    "clinical": {
+        f: TIER_OWNER_ONLY
+        for f in (
+            "rhythm_ecg_classification",
+            "rhythm_ecg_avg_hr_bpm",
+            "rhythm_ecg_sample_start",
+            "rhythm_ecg_device",
+            "cross_device_same_day",
+            "rhythm_notification_kind",
+            "rhythm_notification_kind_inferred",
+            "rhythm_notification_at",
+            "rhythm_notification_bpm",
+            "rhythm_notification_threshold_bpm",
+            "rhythm_notification_device",
+            "rhythm_med_name",
+            "rhythm_med_dose_text",
+            "rhythm_med_at",
+            "rhythm_med_status",
+        )
+    },
 }
 
 # ── The source registry (partition-level tiers, #3045) ────────────────────────
