@@ -200,11 +200,16 @@ def _subject(metric: Any, gloss: bool = True) -> str | None:
     return noun
 
 
-def _amount(value: Any, metric: Any) -> str | None:
+def _amount(value: Any, metric: Any, distance: bool = False) -> str | None:
+    """A number with its measure's unit — "26%", "70 out of 100" (#4580 round 1: the short bet sentence read
+    "at or above 26" because this looked the unit up in the four-entry table; ``metric_unit`` covers every measure).
+    A ``distance`` (an allowance, a band) keeps the four-entry table: "within 17.9 out of 100" is not a distance."""
     num = prediction_reason._num(value)
     if num is None:
         return None
-    return f"{num}{prediction_reason._UNITS.get(base_metric(str(metric or '')), '')}"
+    if distance:
+        return f"{num}{prediction_reason._UNITS.get(base_metric(str(metric or '')), '')}"
+    return f"{num}{prediction_reason.metric_unit(metric) or ''}"
 
 
 def _whole(value: Any) -> int | None:
@@ -291,7 +296,7 @@ def tolerance_block(spec: dict, text: str | None = None) -> dict | None:
     allowance as ``said_pair`` printed it beside the two numbers, when it needed more than the
     one decimal to keep a reader's check honest."""
     metric = spec.get("metric")
-    text = text or _amount(spec.get("tolerance"), metric)
+    text = text or _amount(spec.get("tolerance"), metric, distance=True)
     if not text:
         return None
     m = _TOLERANCE_RULE_RE.search(str(spec.get("tolerance_rule") or ""))
@@ -313,7 +318,7 @@ _SWING_CLAUSE = re.compile(r", inside its usual day-to-day swing of [^—]+(?= �
 def window_band_block(window: dict, metric: Any) -> dict | None:
     """A window-graded direction call's band (#4617) in the same shape as ``tolerance_block``
     (#4808): the number, and in words what it is — the grader's own ``band_rule``."""
-    text = _amount(window.get("band"), metric)
+    text = _amount(window.get("band"), metric, distance=True)
     rule = str(window.get("band_rule") or "").strip()
     if not text:
         return None
@@ -465,6 +470,7 @@ def build_call(short_id: str, name: str, row: dict, record: dict, dark: list | N
         if not want or not seen:
             return None, NO_READER_WORDS
         target = _iso_day(spec.get("target_date"))
+        observed_on = target or _iso_day(row.get("outcome_date"))
         on = f" for {_words(target)}" if target else ""
         # #4808: the allowed distance is NOT in this sentence any more. It is served once, in
         # ``tolerance`` (the number and, in words, what it was computed from), and the kit
@@ -474,8 +480,9 @@ def build_call(short_id: str, name: str, row: dict, record: dict, dark: list | N
         called_short = f"{name} called {plain} at about {want}."
         happened_short = f"It came in at {seen}."
         happened = f"{prediction_reason._cap(str(plain))} came in at {seen} against a call of {want}."
-        actual = {"value": notes.get("actual_value"), "text": seen}
+        actual = {"value": notes.get("actual_value"), "text": seen, "unit": prediction_reason.metric_unit(metric)}
     else:
+        observed_on = _iso_day(row.get("outcome_date"))
         direction = _DIRECTION_WORDS[str(spec.get("condition")).strip().lower()]
         happened_short = _went(reason)
         if happened_short is None:
@@ -493,6 +500,7 @@ def build_call(short_id: str, name: str, row: dict, record: dict, dark: list | N
                 f"to the last, {_words(_iso_day(window.get('end')))}."
             )
             tolerance = window_band_block(window, metric)
+            observed_on = _iso_day(window.get("end")) or observed_on
             if tolerance:
                 happened = _SWING_CLAUSE.sub("", happened)
         elif checked:
@@ -511,6 +519,10 @@ def build_call(short_id: str, name: str, row: dict, record: dict, dark: list | N
             "logged_date": logged,
             "sealed": sealed,
             "settled_date": _iso_day(row.get("outcome_date")),
+            # #4580 round 1: the day the checked reading belongs to — a number call's target day, a direction
+            # call's last window day — so a page can say "Friday's reading, 304 lb" beside today's weigh-in.
+            "observed_on": observed_on,
+            "observed_on_text": _words(observed_on, weekday=True) or None,
             "called": called,
             "called_short": called_short,
             "happened": happened,
@@ -605,11 +617,17 @@ def build_bet(docket: dict, names: dict, records: dict, rows_by_coach: dict, dar
             "logged_date": _iso_day(docket.get("opened_date")),
             "sealed": False,
             "settled_date": _iso_day(docket.get("resolved_date")) or day,
+            "observed_on": day,
+            "observed_on_text": _words(day, weekday=True) or None,
             "called": called,
             "called_short": f"{won} and {lost} bet on whether {plain_question} on {_words(day)}.",
             "happened": f"It came in at {seen}.",
             "happened_short": f"It came in at {seen}.",
-            "actual": {"value": verdict.get("actual_value", docket.get("actual_value")), "text": seen},
+            "actual": {
+                "value": verdict.get("actual_value", docket.get("actual_value")),
+                "text": seen,
+                "unit": prediction_reason.metric_unit(criterion.get("metric")),
+            },
             "verdict": "right",
             "verdict_text": f"{won} was right; {lost} was wrong.",
             "simple_guess": guess,

@@ -14,6 +14,7 @@ from typing import Any
 
 from common.pacific_time import day_in_words, pacific_date_of, parse_day_key, parse_iso_utc
 
+from web import record_words
 from web.site_api_edition import (
     SLEEP_BAR_HOURS,
     SOURCES,
@@ -91,8 +92,8 @@ SCORECARD_RULE_TEXT = {
         f"When the {MIND_SERVE_LIMIT} newest entries all fall inside the week, the count is not enough data."
     ),
     "ai": (
-        f"Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes "
-        f"from the last reading. Going well when they beat it. Fewer than {AI_MIN_CALLS} checked calls is not enough data."
+        f"Every call the coaches have had checked to date, not this week's alone, against {record_words.GUESS_RULE_WORDS}. "
+        f"Going well when they beat it. Fewer than {AI_MIN_CALLS} checked calls is not enough data."
     ),
 }
 
@@ -124,8 +125,9 @@ VERDICT_TEXT = {
     ("mind", GOING_WELL): f"In his own words on {MIND_WELL_DAYS} or more days",
     ("mind", UNDER): f"In his own words on fewer than {MIND_WELL_DAYS} days",
     ("mind", FEW): "More entries than the count can see",
-    ("ai", GOING_WELL): "The coaches beat a simple guess",
-    ("ai", UNDER): "The coaches do not beat a simple guess yet",
+    # #4580 round 1: the record's one sentence (web/record_words.py), without its period — the page adds it.
+    ("ai", GOING_WELL): record_words.GUESS_BEATS.rstrip("."),
+    ("ai", UNDER): record_words.GUESS_NOT_YET.rstrip("."),
     ("ai", FEW): "Too few checked calls to compare",
 }
 
