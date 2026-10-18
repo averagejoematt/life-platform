@@ -33,6 +33,10 @@ import json
 import logging
 from datetime import datetime, timezone
 
+from ingestion.source_registry import raw_date_key, raw_layout_for
+
+_SOURCE = "apple_health"
+
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights (same
 # setup as health_auto_export_lambda.py; duplicated rather than imported so
 # this module has no dependency on its sibling).
@@ -47,7 +51,7 @@ except ImportError:
 
 def save_cgm_readings_to_s3(s3_client, bucket, user_id, date_str, readings):
     """Save individual CGM readings to S3 for detailed analysis."""
-    s3_key = f"raw/{user_id}/cgm_readings/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
+    s3_key = raw_date_key(_SOURCE, date_str, sub="cgm_readings")
 
     # Merge with existing readings for this day (idempotent)
     existing = []
@@ -77,7 +81,7 @@ def save_cgm_readings_to_s3(s3_client, bucket, user_id, date_str, readings):
 
 def save_bp_readings_to_s3(s3_client, bucket, user_id, date_str, readings):
     """Save individual BP readings to S3 for detailed analysis (v1.4.0)."""
-    s3_key = f"raw/{user_id}/blood_pressure/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
+    s3_key = raw_date_key(_SOURCE, date_str, sub="blood_pressure")
 
     existing = []
     try:
@@ -105,7 +109,7 @@ def save_bp_readings_to_s3(s3_client, bucket, user_id, date_str, readings):
 
 def save_state_of_mind_to_s3(s3_client, bucket, user_id, date_str, entries):
     """Save individual State of Mind check-ins to S3 (v1.5.0)."""
-    s3_key = f"raw/{user_id}/state_of_mind/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
+    s3_key = raw_date_key(_SOURCE, date_str, sub="state_of_mind")
 
     existing = []
     try:
@@ -134,7 +138,7 @@ def save_state_of_mind_to_s3(s3_client, bucket, user_id, date_str, entries):
 
 def save_workouts_to_s3(s3_client, bucket, user_id, date_str, workouts_list):
     """Save individual workout records to S3, merging with existing (v1.6.0)."""
-    s3_key = f"raw/{user_id}/workouts/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
+    s3_key = raw_date_key(_SOURCE, date_str, sub="workouts")
 
     existing = []
     try:
@@ -177,7 +181,9 @@ def save_raw_payload(s3_client, bucket, user_id, payload):
     now = datetime.now(timezone.utc)
     body = json.dumps(payload, default=str, sort_keys=True)
     content_hash = hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]
-    s3_key = f"raw/{user_id}/health_auto_export/{now.strftime('%Y/%m/%d')}_{content_hash}.json"
+    # `timestamped` scheme: MANY objects a day, so no per-day key exists — the prefix comes from
+    # the registry's raw_layout facet, the leaf is this generation's `DD_{contenthash16}.json`.
+    s3_key = f"{raw_layout_for(_SOURCE)['prefix']}/{now.strftime('%Y/%m')}/{now.strftime('%d')}_{content_hash}.json"
     s3_client.put_object(
         Bucket=bucket,
         Key=s3_key,
