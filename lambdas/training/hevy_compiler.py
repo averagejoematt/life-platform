@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from training.hevy_note_types import PINNED_ROUTINE_NOTE_FIELD  # #5047: the ONE note field the platform writes
 from training.routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
 
 
@@ -134,7 +135,7 @@ def _exercise_to_wire(ex: ExerciseBlock, template_resolver: Callable[[str], str]
         "exercise_template_id": template_id,
         "superset_id": ex.superset_id,
         "rest_seconds": ex.rest_seconds,
-        "notes": sanitize_note(ex.notes),
+        PINNED_ROUTINE_NOTE_FIELD: sanitize_note(ex.notes),  # the app's Pinned Routine Note (#5047)
         "sets": [_set_to_wire(s) for s in ex.sets],
     }
 
@@ -174,13 +175,18 @@ def render_branches_note(branches: list[RoutineBranch]) -> str:
 # composed note is placed on the FIRST exercise's notes (the channel that provably lands), ahead
 # of whatever that exercise already carries. `verify_commit_landed` reports any sent field the
 # readback lacks as `unverifiable`, so this class cannot go dark again.
+# #5047 (2026-10-18): still true on the live spec — `routine.notes` is declared on the POST/PUT
+# request bodies but NOT on the Routine read schema, and every routine GET that day had no
+# routine-level note — so the session-level cues (the gate line, the stop list, the day's plan)
+# stay on the first exercise's PINNED ROUTINE NOTE, never `routine.notes` and never a pinned
+# exercise note (Matthew's; not in the API). docs/integrations/hevy-changes-2026-10.md §6.
 def _place_routine_note(exercises: list[dict[str, Any]], composed: str) -> list[dict[str, Any]]:
     """Prepend the routine-level note to exercises[0].notes; a routine with no exercises has nowhere to
     carry it and Hevy would reject the routine anyway (the tool's precheck names that)."""
     if composed and exercises:
         first = exercises[0]
-        existing = first.get("notes") or ""
-        first["notes"] = f"{composed}\n\n{existing}" if existing else composed
+        existing = first.get(PINNED_ROUTINE_NOTE_FIELD) or ""
+        first[PINNED_ROUTINE_NOTE_FIELD] = f"{composed}\n\n{existing}" if existing else composed
     return exercises
 
 

@@ -1,6 +1,6 @@
 # Hevy changes since July 2026, and pinned exercise notes
 
-**Issue:** #5010 (epic #4625) · **Verified:** 2026-10-18 · **Status:** research done; defensive code shipped; the pinned-note write question is an owner decision
+**Issue:** #5010 (epic #4625), #5047 (epic #3742, §6) · **Verified:** 2026-10-18 · **Status:** research done; defensive code shipped; the three note types mapped and named in code (§6); the pinned-note write question is an owner decision
 **Contract captures:** `tests/fixtures/hevy_openapi_5010/` (live 2026-10-18 + the Wayback 2026-08-17 baseline), pinned by `tests/test_hevy_pinned_notes_5010.py`
 
 ## The short answer
@@ -92,6 +92,71 @@ Fixtures are the live 2026-10-15 and 10-16 Hevy rows, `tests/fixtures/hevy_opena
 - [ ] Adopt the marker: start each pinned setup note with `📌` (or `Setup:`).
 - [ ] The one-session test that settles §2's open question: pin `📌 Setup: seat 7` on Cycling, log one ride with a session note, and the next session reads `raw/hevy/<id>.json`. If `exercises[].notes` holds the pinned text, Hevy merges them (and the marker rule is doing the work). If it doesn't, the two are separate and the marker is belt-and-braces.
 
+## 6. The three note types, mapped to the API (#5047)
+
+Hevy 3.2.0 shows three notes on an exercise (the owner's screenshot, 2026-10-18). Each has one
+owner and one platform behaviour, declared once in `lambdas/training/hevy_note_types.py`
+(`NOTE_TYPES`) and pinned by `tests/test_hevy_note_types_5047.py`.
+
+| App note type | App description | API field | Readable | Writable | In a workout payload | Owner | Platform behaviour |
+|---|---|---|---|---|---|---|---|
+| **Pinned Exercise Note** | "appears every time you log this exercise; hidden from workout posts" | **none** (`PINNED_EXERCISE_NOTE_FIELD = None`) | No | No | No separate field. Copied into `exercises[].notes`? **Unsettled** (no pinned note exists yet, below) | Matthew | **Never touches.** Setup text he marks `📌`/`Setup:` is split out at ingest if it ever appears (#5024) |
+| **Pinned Routine Note** | "appears every time you log this routine; hidden from workout posts" | routine `exercises[].notes` (`PINNED_ROUTINE_NOTE_FIELD`) | Yes (`GET /v1/routines/{id}`) | Yes (`POST`/`PUT /v1/routines`) | **Not copied** into the workout (below) | the platform | **Writes coaching cues** (`hevy_compiler._exercise_to_wire`); session-level cues on the first exercise |
+| **Workout Note** | "appears only in this workout; visible to friends and followers" | workout `exercises[].notes` (`WORKOUT_NOTE_FIELD`) | Yes (`GET /v1/workouts`, the events feed, the webhook fetch) | Only by creating a workout (`POST /v1/workouts`), which the platform never calls | Is the payload's `exercises[].notes` | Matthew | **Reads as his feedback**: parsed for RPE / pain / context (`training_notes`), stored as `owner_session_note` |
+
+Two free-text fields sit outside the three: the routine-level `routine.notes` (below) and the
+workout-level `description`, which the record already stores verbatim as `description`. The
+platform writes neither.
+
+**Evidence (read-only `GET`s, 2026-10-18).** The 30 most recent workouts (2026-09-11 →
+2026-10-18; 29 performed from a routine) and each routine they name, read side by side:
+
+- Every routine object's keys are `{created_at, exercises, folder_id, id, title, updated_at}`.
+  None carries a routine-level `notes`.
+- 215 exercise rows had a readable routine exercise beside them; 165 of those routine
+  exercises carried a pinned routine note (up to 1,395 characters: the gate block on the first
+  exercise). In 137 of the 165 the workout's `exercises[].notes` was **empty**; the other 28
+  held Matthew's own text, none equal to or containing the routine note. **Hevy does not copy
+  the pinned routine note into the saved workout.** So the ingest needs no routine-text match:
+  a workout note is his text, plus a pinned exercise note if Hevy copies those.
+- No workout note in the 30 starts with a setup marker, and none repeats a pinned-exercise-style
+  setup line, so §5's one-session test **has not been run** (no pinned exercise note existed yet,
+  as far as the data shows). The marker split stays the guard; the routine-note result says
+  nothing about pinned exercise notes, which are a different app object.
+- All 30 `description` fields were empty.
+
+**Why the session-level cues stay on the first exercise.** The spec declares `routine.notes`
+on `PostRoutinesRequestBody` and `PutRoutinesRequestBody` ("Additional notes for the
+routine") but not on the `Routine` read schema, and no routine GET has ever returned it
+(#3938: 12 of 12 September routines; all 28 above). A write that can't be read back can't be
+verified, and #3938 found the text never reached the app. So the gate line (ECG + feel),
+the stop list and the day's one-line plan stay at the top of the **first exercise's pinned
+routine note** (`hevy_compiler._place_routine_note`, the `session_block` in
+`mcp/tools_hevy_routine.py`). Testing whether the app now shows `routine.notes` would take a
+routine write, which this lane may not make. If a re-capture of the spec adds `notes` to
+`Routine`, `test_the_map_matches_the_live_spec` reds, and that's the signal to try a test
+routine.
+
+**What the code now says by name.**
+- Write: the compiler fills exactly `PINNED_ROUTINE_NOTE_FIELD` per exercise and never sends
+  `routine.notes` (`test_compiler_writes_exactly_the_pinned_routine_note_and_never_routine_notes`).
+- Read: `normalize_workout` adds `owner_session_note` to every Hevy session record: one line
+  per noted exercise, `"<exercise>: <text>"`, with `📌`/`Setup:`/`Pinned:` lines removed. `""`
+  when the session has no note. The raw `exercises[].notes` stays verbatim, and the
+  training-notes extractor still parses each raw note (pain over the whole note, the session
+  parsers over the session text, as #5024 left it). Records gain the field on their next
+  ingest; no backfill is needed for any reader today, because nothing reads it yet.
+- Request shape: a full `manage_hevy_routine` commit, create branch and update branch,
+  drives the client's one transport (`hevy_write_client._request`). It sends only `GET`/`POST`
+  `/v1/routines`, `GET`/`PUT /v1/routines/{id}` and the routine-folder calls. It never reaches
+  a workout endpoint (any method) or a template write, and every body key is a property the
+  spec declares for that request. So the tool **cannot overwrite or clear a pinned exercise
+  note or a workout note**.
+
+**Owner decision (the #5047 `gate:owner` box, his):** whether the platform may ever write a
+pinned exercise note once the API allows it. Today it cannot. Recommended answer: no, setup
+notes stay his.
+
 ## Sources
 
 - https://www.hevyapp.com/community-updates/ (latest post: July 2026)
@@ -100,4 +165,4 @@ Fixtures are the live 2026-10-15 and 10-16 Hevy rows, `tests/fixtures/hevy_opena
 - https://play.google.com/store/apps/details?id=com.hevy (fetched, but no readable release notes came back)
 - r/Hevy "Pinned notes" thread: not reachable (Reddit blocks automated fetches)
 - https://api.hevyapp.com/docs/swagger-ui-init.js (the embedded `swaggerDoc`, 2026-10-18); Wayback captures `20260428075209`, `20260817182101`, `20261010114847`
-- Live read-only `GET`s, 2026-10-18: `/v1/exercise_templates/{D8F7F851,79D0BB3A,cb2d3813-…}`, `/v1/exercise_templates?pageSize=100`, `/v1/routines`, `/v1/workouts?pageSize=3`; the DynamoDB `SOURCE#hevy` rows for 2026-09-20 to 10-16; S3 `raw/hevy/e9f10998-….json`
+- Live read-only `GET`s, 2026-10-18: `/v1/exercise_templates/{D8F7F851,79D0BB3A,cb2d3813-…}`, `/v1/exercise_templates?pageSize=100`, `/v1/routines`, `/v1/workouts?pageSize=3`; for §6, `/v1/workouts?page=1..3&pageSize=10` and `/v1/routines/{id}` for each routine they name; the DynamoDB `SOURCE#hevy` rows for 2026-09-20 to 10-16; S3 `raw/hevy/e9f10998-….json`
