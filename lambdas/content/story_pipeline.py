@@ -208,7 +208,9 @@ def live_week(table: Any, date_str: str, *, chronicle_pk: str = "USER#matthew#SO
     ep, efind = _write_ep(g, dossier, budget, ledger, n, body, None, guest)
     ep["guest"] = {"name": guest.get("name"), "coach_id": guest.get("coach_id"), "persona_id": guest.get("persona_id")}
     ep["bet"] = budget.get("bet")
-    new_ledger = story_ledger.apply_budget(ledger, budget, week=n, date=date_str, title=title)
+    new_ledger = story_ledger.apply_budget(
+        ledger, budget, week=n, date=date_str, title=title, owner_answers=(dossier.get("owner_voice") or {}).get("answers")
+    )
     md = with_dek(md, dossier, new_ledger, budget, n)
     _t, body_with_dek = story_writers.split_title(md)
     sl = stats_line(n, dossier)
