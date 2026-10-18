@@ -986,9 +986,10 @@ def _clinical_table():
             "USER#matthew#SOURCE#dexa": [
                 {
                     "scan_date": "2026-02-01",
-                    "body_composition": {"body_fat_pct": 34.2, "lean_mass_lbs": 190.1, "fat_mass_lbs": 110.0, "visceral_fat_g": 900},
-                    "bone_density": {"t_score": 1.2},
-                    "interpretations": {"ffmi": 22.4},
+                    # The LIVE row shape (docs/SCHEMA.md dexa; epic #4625): `_lb` leaves, `bone`, `indices`.
+                    "body_composition": {"body_fat_pct": 34.2, "lean_mass_lb": 190.1, "fat_mass_lb": 110.0, "visceral_fat_g": 900},
+                    "bone": {"t_score": 1.2},
+                    "indices": {"ffmi_kg_m2": 22.4},
                 }
             ],
             "USER#matthew#SOURCE#labs": [
@@ -1054,9 +1055,35 @@ def test_write_clinical_json_body_comp_from_the_latest_dexa_scan():
         "ffmi": 22.4,
         "lean_mass_lbs": 190.1,
         "fat_mass_lbs": 110.0,
-        "visceral_fat_area": 900,
-        "bmd": 1.2,
+        "visceral_fat_g": 900,
+        "bmd_t_score": 1.2,
     }
+
+
+def test_dexa_body_comp_older_scan_has_no_indices_and_ffmi_is_null_not_invented():
+    # The 2025-05-10 live row: `bone.{t_score,z_score}` and `interpretations.{strengths,goals_6mo}` — no `indices`.
+    bc = ow._dexa_body_comp(
+        {
+            "scan_date": "2025-05-10",
+            "body_composition": {"body_fat_pct": 30.0, "lean_mass_lb": 180.0, "fat_mass_lb": 90.0},
+            "bone": {"t_score": 1.0, "z_score": 1.1},
+            "interpretations": {"strengths": ["x"]},
+        }
+    )
+    assert bc["ffmi"] is None and bc["visceral_fat_g"] is None
+    assert (bc["lean_mass_lbs"], bc["fat_mass_lbs"], bc["bmd_t_score"]) == (180.0, 90.0, 1.0)
+
+
+def test_dexa_body_comp_does_not_read_the_retired_names_no_live_row_holds():
+    bc = ow._dexa_body_comp(
+        {
+            "scan_date": "2026-01-01",
+            "body_composition": {"lean_mass_lbs": 1.0, "fat_mass_lbs": 2.0},
+            "bone_density": {"t_score": 3.0},
+            "interpretations": {"ffmi": 4.0},
+        }
+    )
+    assert bc["ffmi"] is None and bc["bmd_t_score"] is None and bc["lean_mass_lbs"] is None and bc["fat_mass_lbs"] is None
 
 
 def test_write_clinical_json_labs_are_ordered_by_category_then_name():

@@ -172,14 +172,14 @@ o+='<div class="v-card"><div class="v-label">Blood Pressure</div><div class="v-n
 o+='</div></div>';
 
 // ── BODY COMP ──
-var bc=d.body_composition||{};
+var bc=d.body_comp||{};
 o+='<div class="sec"><div class="sec-hdr">Body Composition (DEXA)</div>';
 if(bc.scan_date){
   o+='<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Scan date: '+fd(bc.scan_date)+'</div><div class="v-grid">';
   o+='<div class="v-card"><div class="v-label">Body Fat</div><div class="v-val">'+f(bc.body_fat_pct,1)+'<span class="v-unit">%</span></div></div>';
   o+='<div class="v-card"><div class="v-label">FFMI</div><div class="v-val">'+f(bc.ffmi,1)+'</div></div>';
   o+='<div class="v-card"><div class="v-label">Lean Mass</div><div class="v-val">'+f(bc.lean_mass_lbs,1)+'<span class="v-unit">lb</span></div></div>';
-  if(bc.visceral_fat_area_cm2!=null)o+='<div class="v-card"><div class="v-label">Visceral Fat</div><div class="v-val">'+f(bc.visceral_fat_area_cm2)+'<span class="v-unit">cm\u00b2</span></div></div>';
+  if(bc.visceral_fat_g!=null)o+='<div class="v-card"><div class="v-label">Visceral Fat</div><div class="v-val">'+f(bc.visceral_fat_g)+'<span class="v-unit">g</span></div></div>';
   if(bc.bmd_t_score!=null)o+='<div class="v-card"><div class="v-label">Bone Density T-Score</div><div class="v-val">'+f(bc.bmd_t_score,1)+'</div></div>';
   o+='</div>';
 }else{o+='<div class="sec-note">No DEXA scan data available.</div>'}

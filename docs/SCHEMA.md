@@ -1268,6 +1268,8 @@ Each draw record contains all biomarkers from that blood draw as a nested `bioma
 
 **Biomarker keys** are snake_case normalized names: `apob`, `ldl_c`, `testosterone_total`, `vitamin_d_25oh`, `hs_crp`, etc.
 
+**One analyte, two stored spellings (`health.lab_units.MARKER_ALIASES`, #4639 / epic #4625).** High-sensitivity CRP is stored as `hs_crp` on the 2025-04-17 draw and as `crp_hs` on the 2026-04-03 draw. The canonical key is **`hs_crp`**; `crp_hs` is its alias. Stored history is not rewritten (capture-all: each draw keeps its writer's spelling) — a NEW draw through `scripts/ingest_lab_report.py` stores `hs_crp` only (a report row spelled `crp_hs` is stored as `hs_crp`; both in one report is refused as a duplicate), and every reader resolves either spelling (`labs_schema.biomarker_entry`, `labs_coaching` via `canonical_marker`). Add a new alias only for a spelling the live partition actually holds.
+
 **Provider metadata fields:**
 
 | Field | Type | Description |

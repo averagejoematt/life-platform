@@ -388,6 +388,24 @@ LAB_FLAGS: Tuple[str, ...] = ("normal", "high", "low", "carrier", "noncarrier", 
 
 _NON_KEY = re.compile(r"[^a-z0-9]+")
 
+#: spelling -> canonical key, for ONE analyte the live partition spells two ways (#4639 / epic
+#: #4625 row). 2025-04-17 stores `hs_crp`, 2026-04-03 stores `crp_hs`; SCHEMA.md, the coaching
+#: rule and the owner-facing docs say `hs_crp`, so that is the canonical key. Stored history is
+#: NEVER rewritten (capture-all: each draw stays as its writer spelled it); the alias is applied
+#: on the way IN (a new draw stores the canonical key only) and on the READ (`aliases_of`).
+MARKER_ALIASES: Dict[str, str] = {"crp_hs": "hs_crp"}
+
+
+def canonical_marker(key: str) -> str:
+    """`key` -> the one key a NEW draw stores it under (identity for every non-aliased marker)."""
+    return MARKER_ALIASES.get(key, key)
+
+
+def spellings_of(key: str) -> Tuple[str, ...]:
+    """Every key this analyte has been stored under, canonical first ("crp_hs" -> ("hs_crp", "crp_hs"))."""
+    canon = canonical_marker(key)
+    return (canon,) + tuple(sorted(a for a, c in MARKER_ALIASES.items() if c == canon))
+
 
 def marker_key(name: str) -> str:
     """A report's marker label -> the snake_case key the schema uses ("LDL-C" -> "ldl_c")."""
