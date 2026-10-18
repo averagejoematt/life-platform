@@ -47,6 +47,7 @@ from common.http_retry import urlopen_with_retry
 from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive input == UTC, never runner-local)
 
 from ingestion.ingestion_framework import IngestionConfig, run_ingestion
+from ingestion.whoop_cycle_day import cycle_for_day, cycle_identity, drop_cycle_filed_elsewhere
 from ingestion.whoop_empty_day import store_vendor_result
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -414,12 +415,13 @@ def _extract_sleep(sleep: dict) -> dict:
     return fields
 
 
-def _extract_cycle(cycle: dict) -> dict:
+def _extract_cycle(cycle: dict, date_str: str | None = None) -> dict:
     fields: dict[str, Any] = {}
-    records = cycle.get("records", [])
-    if not records or records[0].get("score_state") != "SCORED":
+    # #5002: the cycle that STARTED on the UTC day date_str — never the prior day's still-open one.
+    record = cycle_for_day(cycle.get("records", []), date_str, _utc_day)
+    if not record or record.get("score_state") != "SCORED":
         return fields
-    score = records[0].get("score") or {}
+    score = record.get("score") or {}
     # strain + kilojoule rounded to 2dp, the two heart rates as sent (folded to a loop for #1665's ceiling).
     for name, ndigits in (("strain", 2), ("kilojoule", 2), ("average_heart_rate", None), ("max_heart_rate", None)):
         _set_dec(fields, name, score.get(name) if ndigits is None else _round(score.get(name), ndigits))
@@ -429,7 +431,8 @@ def _extract_cycle(cycle: dict) -> dict:
     # merged, maxed or compared with Apple's steps here; which count a reader shows is the
     # read-side resolver's job (#4630 box 2, HELD on #4644 Q4/Q5). Absent stays absent, never 0;
     # ``type(...) is int`` also refuses a bool.
-    _set_dec(fields, "step_count", steps if type(steps := records[0].get("step_count")) is int else None)
+    _set_dec(fields, "step_count", steps if type(steps := record.get("step_count")) is int else None)
+    fields.update(cycle_identity(record))  # #5002: cycle_id / cycle_start / cycle_end, as the vendor sent them
     return fields
 
 
@@ -781,7 +784,8 @@ def transform(raw: dict, date_str: str) -> list[dict]:
     normalized = {}
     normalized.update(_extract_recovery(raw["recovery"]))
     normalized.update(_extract_sleep(raw["sleep"]))
-    normalized.update(_extract_cycle(raw["cycle"]))
+    normalized.update(_extract_cycle(raw["cycle"], date_str))
+    drop_cycle_filed_elsewhere(_table, USER_ID, normalized, date_str, logger)  # #5002: one cycle id, one day row
 
     # Field-presence validation logging (F2.5)
     critical = ["recovery_score", "hrv", "resting_heart_rate", "sleep_duration_hours", "strain"]

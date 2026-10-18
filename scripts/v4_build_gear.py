@@ -143,7 +143,7 @@ GEAR: dict[str, dict] = {
         "icon": "vitals",
         "affiliate_url": "",  # ← Apple affiliate + / or Health Auto Export link
         "accountability": {
-            "text": "Steps and active energy overlap with the other movement sensors; CGM, blood pressure and mood are hand-captured through the same webhook.",
+            "text": "Resting heart rate is the independent sensor Whoop is cross-checked against; steps and active energy overlap with the other movement sensors; CGM, blood pressure and mood are hand-captured through the same webhook.",
             "href": "/method/verify/",
         },
     },
@@ -154,10 +154,10 @@ GEAR: dict[str, dict] = {
         "icon": "training",
         "affiliate_url": "",  # ← Garmin affiliate URL
         "accountability": {
-            "text": "Resting-heart-rate and step readings are the independent sensor Whoop is cross-checked against — though server-side ingestion is paused (ADR-074, vendor anti-automation).",
-            "href": "/method/verify/",
+            "text": "The watch&rsquo;s walks and runs (distance, cadence, route, heart-rate zones) arrive through Strava; it is no longer a source of truth for steps, readiness or resting heart rate.",
+            "href": "/method/pipeline/",
         },
-        "note": "Ingestion is paused (ADR-074) — the device is real, the automated pull isn&rsquo;t running.",
+        "note": "The direct Garmin feed is retired (#4640) — its stored history is kept; new activities arrive through Strava.",
     },
     "hevy": {
         "kind": "gear",
@@ -245,6 +245,14 @@ GEAR: dict[str, dict] = {
     # #3669 gave labs a registry row, which this page's coverage gate then refused to build
     # without (found by #4182's regeneration). Owner ruling 2026-09-06, from the registry:
     # "labs i just do every 6 months or so and upload" — a clinic draw, nothing to buy.
+    "dexa": {
+        "kind": "other",
+        "product": "DEXA scans",
+        "vendor": "a clinic DEXA scanner",
+        "icon": "character",
+        "affiliate_url": "",
+        "note": "Scanned at a clinic and uploaded by hand — nothing to buy.",
+    },
     "labs": {
         "kind": "other",
         "product": "Blood tests",

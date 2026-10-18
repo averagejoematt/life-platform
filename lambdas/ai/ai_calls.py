@@ -1855,7 +1855,7 @@ DATA INTERPRETATION RULES:
 - If an activity count or log is ZERO, that means Matthew hasn't done that activity — say "no training logged this week" NOT "provide your training data"
 - If a data source exists but values are null for today, it means today's sync hasn't completed — use the most recent available data
 - NEVER tell Matthew to "obtain" or "get" a scan/test if the data already exists in the payload below
-- Garmin is the step count source of truth (wearable). Ignore Apple Health step counts if Garmin is available.
+- Step counts arrive already resolved by the platform's one steps resolver (Whoop, else Apple Health) — quote the number given and never choose between devices yourself.
 READER RULES (a friend of Matthew's with no health background reads a condensed version):
 {_reader_rules}
 - Every figure carries its day or window IN THE SAME SENTENCE, in words, Pacific time: "182 g on Friday, September 25", "153 g a day over the last 20 logged days", "99 % on the night of Thursday, September 24". A figure with no day is dropped. No ISO dates.

@@ -20,7 +20,7 @@ from ai.model_routing import model_for  # noqa: E402 — #4770: the one model re
 
 WRITER_MODEL = model_for("story.writer")
 
-from content import story_checks, story_craft, story_ledger
+from content import body_numbers, story_checks, story_craft, story_ledger
 
 CHRONICLE_MAX_TOKENS = 7000  # ~1,100-1,500 words lands near 2,500 tokens; the ceiling is headroom, never the target
 EPISODE_MAX_TOKENS = 8000
@@ -239,8 +239,7 @@ def write_episode(
 
 # A rate is not a body number (#4993): "2.64 pounds per week" is a pace, and the old pattern read its "64 pounds" as a
 # weigh-in. The figure must not be the tail of a decimal ("2.64"), and a rate unit after the weight unit clears it.
-_RATE_TAIL = r"(?:\s*/\s*(?:week|wk|w)\b|\s+(?:per|a|each|every)\s+week\b)"
-_BODY_NUM_RE = re.compile(r"(?<![\d.,])\b\d{2,3}(?:\.\d+)?\s?(?:lb|lbs|pound|pounds|kg|kilo|kilos|kilograms)\b(?!" + _RATE_TAIL + ")", re.I)
+_BODY_NUM_RE = body_numbers.BODY_NUM_RE  # the ONE detector, shared with the Panel renderer (#4993)
 _GRIEF_RE = re.compile(
     r"\b(?:grief|grieving|died|passed away|funeral|cancer|terminal|hospice|"
     r"my (?:mom|mum|dad|mother|father|parent|parents|wife|husband|girlfriend|boyfriend|partner|brother|sister|son|daughter|family))\b",

@@ -310,6 +310,9 @@ Daily records (`sk = DATE#YYYY-MM-DD`) + workout sub-items (`sk = DATE#YYYY-MM-D
 | `average_heart_rate` | number | Daily avg HR (bpm) |
 | `max_heart_rate` | number | Daily max HR (bpm) |
 | `step_count` | number | Whoop's own daily step count, from the day's cycle record (vendor field from 2026-09-21; absent before, never 0-filled). Stored per source beside Apple's `steps` — never merged or compared at write time; which count a reader shows is the read-side resolver's (#4630). Back-fill: `scripts/whoop_steps_backfill_4630.py` |
+| `cycle_id` | number | The Whoop cycle id (the vendor's `id` on the cycle record) the row's cycle fields (`strain`, `kilojoule`, `average_heart_rate`, `max_heart_rate`, `step_count`) came from. **One cycle, one day row (#5002):** the row for D carries only the cycle whose `start` is on the UTC day D (`whoop_cycle_day.py::cycle_for_day`), and a cycle id already on the D-1 or D+1 row is refused (`drop_cycle_filed_elsewhere`). A day with no cycle started yet carries no cycle fields (an honest partial). Absent on rows written before #5002; those rows can hold the PRIOR day's still-open cycle copied field-for-field (`scripts/whoop_daily_duplicates_5002.py --dry-run` counts them; removal is the owner's later apply) |
+| `cycle_start` | string | The cycle's `start` as the vendor sent it (ISO, UTC) — the instant that decides the row's day (#5002). Absent before #5002 |
+| `cycle_end` | string | The cycle's `end` as the vendor sent it; **absent while the cycle is still open** (the vendor sends `null`), so a missing `cycle_end` beside a `cycle_start` marks a cycle still accruing strain/steps (#5002) |
 | `sleep_start` | string | ISO timestamp |
 | `sleep_end` | string | ISO timestamp |
 | `sleep_onset_minutes` | number | Minutes from midnight to sleep onset |
