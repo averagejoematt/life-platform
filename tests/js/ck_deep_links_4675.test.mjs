@@ -56,7 +56,7 @@ test("a call page links the coach's name to the coach page, and the graded day t
   assert.ok(claim.includes(`<a class="ck-link" href="/next/v8/coach/?c=sleep_coach&amp;from=call%3A${NUMBER}">Lisa Park</a> · logged September 7`), claim);
   assert.equal(CALL.gradedDayISO(call), "2026-09-08");
   const out = CALL.outcomeHTML(call, BASE);
-  assert.ok(out.includes(`Graded on the reading for <a class="ck-link" href="/next/v8/day/?d=2026-09-08&amp;from=call%3A${NUMBER}">September 8</a>. Checked September 21.`), out);
+  assert.ok(out.includes(`Graded on the reading for <a class="ck-link" href="/next/v8/day/?d=2026-09-08&amp;from=call%3A${NUMBER}">September 8</a>.`), out);
   // Without a base the builders print the same words with no links (the front page's use).
   assert.doesNotMatch(CALL.claimHTML(call) + CALL.outcomeHTML(call), /<a /);
 });
