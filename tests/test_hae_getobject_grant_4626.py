@@ -28,12 +28,11 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "cdk"))
 sys.path.insert(0, str(ROOT / "lambdas"))
 
+import pytest  # noqa: E402
 from ingestion import (
     health_auto_export_archive as archive,  # noqa: E402
     source_registry as sr,  # noqa: E402
 )
-from stacks import role_policies_ingestion as rpi  # noqa: E402
-from stacks.role_policies_base import BUCKET_ARN  # noqa: E402
 
 # Every HAE fan-out stream the registry names — the SET the grant must cover (the four
 # day-file merges below plus #4962's additive_readings/* trees, which the webhook also
@@ -43,8 +42,19 @@ MERGED_SUBS = ("cgm_readings", "blood_pressure", "state_of_mind", "workouts")
 assert set(MERGED_SUBS) <= set(HAE_SUBS)
 
 
-def _sub_arn(sub: str) -> str:
-    return f"{BUCKET_ARN}/{sr.raw_layout_for('apple_health', sub)['prefix']}/*"
+def _policy():
+    """The HAE statements + the bucket ARN. Imported HERE, not at module scope: `stacks.*` reaches
+    `aws_cdk`, which the minimal deploy-critical lane does not install (#2758/#3784) — the two
+    policy tests skip there, the three archive-merge tests below still run."""
+    pytest.importorskip("aws_cdk")
+    from stacks import role_policies_ingestion as rpi
+    from stacks.role_policies_base import BUCKET_ARN
+
+    return rpi.ingestion_hae(), BUCKET_ARN
+
+
+def _sub_arn(bucket_arn: str, sub: str) -> str:
+    return f"{bucket_arn}/{sr.raw_layout_for('apple_health', sub)['prefix']}/*"
 
 
 def _covered(arn: str, stmts) -> bool:
@@ -53,12 +63,12 @@ def _covered(arn: str, stmts) -> bool:
 
 
 def test_every_merged_day_file_prefix_is_readable_and_writable_by_the_hae_role():
-    stmts = rpi.ingestion_hae()
+    stmts, bucket_arn = _policy()
     reads = [s for s in stmts if "s3:GetObject" in s.actions]
     writes = [s for s in stmts if "s3:PutObject" in s.actions]
     missing = []
     for sub in HAE_SUBS:
-        arn = _sub_arn(sub)
+        arn = _sub_arn(bucket_arn, sub)
         if not _covered(arn, reads):
             missing.append(("GetObject", arn))
         if not _covered(arn, writes):
@@ -67,13 +77,13 @@ def test_every_merged_day_file_prefix_is_readable_and_writable_by_the_hae_role()
 
 
 def test_the_read_grant_stays_inside_the_hae_raw_trees_and_adds_no_delete_or_wildcard():
-    stmts = rpi.ingestion_hae()
+    stmts, bucket_arn = _policy()
     for s in stmts:
         assert "s3:*" not in s.actions and not any(a.startswith("s3:Delete") for a in s.actions), s.sid
     for s in (s for s in stmts if "s3:GetObject" in s.actions):
         for r in s.resources:
-            assert r.startswith(f"{BUCKET_ARN}/raw/matthew/") and r.endswith("/*"), (s.sid, r)
-            assert r != f"{BUCKET_ARN}/raw/matthew/*", (s.sid, r)
+            assert r.startswith(f"{bucket_arn}/raw/matthew/") and r.endswith("/*"), (s.sid, r)
+            assert r != f"{bucket_arn}/raw/matthew/*", (s.sid, r)
 
 
 class _NoSuchKey(Exception):
