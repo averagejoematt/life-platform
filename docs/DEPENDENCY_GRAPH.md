@@ -119,7 +119,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-748 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+752 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -159,7 +159,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `discovery_annotations` | — | site_api_journey.py |
 | `dropbox_tracker` | dropbox_poll_lambda.py | dropbox_poll_lambda.py |
 | `effect_fits` | — | — |
-| `eightsleep` | — | ai_expert_analyzer_lambda.py, site_api_sleep.py, tools_nutrition.py, tools_training.py |
+| `eightsleep` | — | ai_expert_analyzer_lambda.py, site_api_sleep.py, tools_health.py, tools_nutrition.py, tools_training.py |
 | `email_digest` | between_chronicle_lambda.py | between_chronicle_lambda.py |
 | `email_log` | ai_review_pack_lambda.py, anomaly_detector_lambda.py, between_chronicle_lambda.py, chronicle_email_sender_lambda.py, chronicle_store.py, daily_brief_lambda.py, evening_nudge_lambda.py, insight_email_parser_lambda.py, milestone_digest_lambda.py, monday_compass_lambda.py, nutrition_review_lambda.py, partner_email_lambda.py, weekly_digest_lambda.py, weekly_plate_lambda.py, weekly_signal_lambda.py | ai_review_pack_lambda.py, anomaly_detector_lambda.py, between_chronicle_lambda.py, daily_brief_lambda.py, evening_nudge_lambda.py, insight_email_parser_lambda.py, milestone_digest_lambda.py, monday_compass_lambda.py, nutrition_review_lambda.py, partner_email_lambda.py, send_ledger.py, weekly_digest_lambda.py, weekly_plate_lambda.py, weekly_signal_lambda.py |
 | `engagement_state` | adaptive_mode_lambda.py | ai_expert_analyzer_lambda.py, character_sheet_lambda.py, coach_chat_grounding.py, coach_panel_podcast_lambda.py, daily_brief_lambda.py, daily_debrief_lambda.py, monday_compass_lambda.py, monthly_digest_lambda.py, site_api_ai_context.py, site_api_freshness.py, state_of_matthew_lambda.py, tools_coach_checkin.py, weekly_digest_lambda.py |
@@ -220,7 +220,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `sick_days` | sick_day_checker.py, tools_sick_days.py | sick_day_checker.py, tools_sick_days.py |
 | `state_of_matthew` | — | site_api_foresight.py |
 | `state_of_mind` | — | site_api_mind.py, site_api_pulse.py |
-| `strava` | enrichment_lambda.py | ai_expert_analyzer_lambda.py, cardio_hr_store.py, enrichment_lambda.py, intelligence_common.py, monthly_digest_lambda.py, recap_data.py, site_api_autonomic.py, site_api_nutrition.py, site_api_physical.py, site_api_pulse.py, site_api_training.py, site_api_vitals_depth.py, site_stats_refresh_lambda.py, tools_benchmark.py, tools_correlation.py, tools_health.py, tools_nutrition.py, tools_training.py, vacation_fund.py |
+| `strava` | enrichment_lambda.py | ai_expert_analyzer_lambda.py, cardio_hr_store.py, enrichment_lambda.py, intelligence_common.py, monthly_digest_lambda.py, recap_data.py, site_api_autonomic.py, site_api_nutrition.py, site_api_physical.py, site_api_pulse.py, site_api_training.py, site_api_vitals_depth.py, site_stats_refresh_lambda.py, strava_lambda.py, tools_benchmark.py, tools_correlation.py, tools_health.py, tools_nutrition.py, tools_training.py, vacation_fund.py |
 | `subscribers` | canary_lambda.py, delete_user_data_lambda.py, email_subscriber_lambda.py | canary_lambda.py, delete_user_data_lambda.py, email_subscriber_lambda.py, site_api_social.py, site_api_social_engage.py, site_api_social_ladder.py, subscriber_onboarding_lambda.py, weekly_digest_lambda.py |
 | `supplements` | habitify_lambda.py | habitify_lambda.py, site_api_nutrition.py, site_api_protocols.py |
 | `temptations` | — | site_api_mind.py |
@@ -235,7 +235,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `weight_episodes` | — | — |
 | `what_changed` | weekly_correlation_compute_lambda.py | between_chronicle_lambda.py, site_api_ai_context.py, site_api_ledger.py, weekly_correlation_compute_lambda.py |
 | `whoop` | whoop_lambda.py | ai_expert_analyzer_lambda.py, cardio_hr_store.py, enrichment_lambda.py, failure_pattern_compute_lambda.py, hevy_restamp_lambda.py, intake_response.py, monday_compass_lambda.py, site_api_autonomic.py, site_api_body.py, site_api_fingerprint.py, site_api_freshness.py, site_api_lambda.py, site_api_nutrition.py, site_api_physical.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, tools_correlation.py, tools_health.py, tools_hevy_routine.py, tools_plan.py, tools_training.py, weight_truth_qa.py, whoop_cycle_day.py, whoop_lambda.py |
-| `withings` | — | adaptive_mode_lambda.py, ai_expert_analyzer_lambda.py, progress_viewer_lambda.py, recap_data.py, site_api_body.py, site_api_coach_profile.py, site_api_journey.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_benchmark.py, tools_health.py, tools_nutrition.py |
+| `withings` | — | adaptive_mode_lambda.py, ai_expert_analyzer_lambda.py, progress_viewer_lambda.py, recap_data.py, rhythm_channel.py, site_api_body.py, site_api_coach_profile.py, site_api_journey.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_benchmark.py, tools_health.py, tools_nutrition.py |
 | `zone2_efficiency` | weekly_correlation_compute_lambda.py | — |
 
 ## 4. MCP Layer
@@ -480,6 +480,21 @@ Field-level rulings (only non-default fields are declared):
 | `apple_health` | `walking_steadiness_pct` | internal |
 | `apple_health` | `watch_last_reading_epoch_apple` | internal |
 | `apple_health` | `wrist_temp_sleep_c_apple` | owner_only |
+| `clinical` | `cross_device_same_day` | owner_only |
+| `clinical` | `rhythm_ecg_avg_hr_bpm` | owner_only |
+| `clinical` | `rhythm_ecg_classification` | owner_only |
+| `clinical` | `rhythm_ecg_device` | owner_only |
+| `clinical` | `rhythm_ecg_sample_start` | owner_only |
+| `clinical` | `rhythm_med_at` | owner_only |
+| `clinical` | `rhythm_med_dose_text` | owner_only |
+| `clinical` | `rhythm_med_name` | owner_only |
+| `clinical` | `rhythm_med_status` | owner_only |
+| `clinical` | `rhythm_notification_at` | owner_only |
+| `clinical` | `rhythm_notification_bpm` | owner_only |
+| `clinical` | `rhythm_notification_device` | owner_only |
+| `clinical` | `rhythm_notification_kind` | owner_only |
+| `clinical` | `rhythm_notification_kind_inferred` | owner_only |
+| `clinical` | `rhythm_notification_threshold_bpm` | owner_only |
 | `reading` | `moodSnapshot` | owner_only |
 | `reading` | `retentionScore` | owner_only |
 | `whoop` | `hrv` | owner_published |
@@ -529,10 +544,10 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1306 total · 942 resolved · 364 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1312 total · 948 resolved · 364 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (108 lambdas total)
 - Alarms: 139 literal-named declarations across three idioms, 4 composite; routing digest 95 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
-- Privacy: 18 owner-only + 3 owner-published sources; 38 owner-only + 11 owner-published fields — non-default entries only
+- Privacy: 18 owner-only + 3 owner-published sources; 53 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 92 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)

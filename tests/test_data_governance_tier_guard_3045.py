@@ -27,6 +27,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(_HERE)
 sys.path.insert(0, os.path.join(REPO, "lambdas"))
 
+from health.rhythm_channel import CHANNEL_FIELDS as RHYTHM_CHANNEL_FIELDS  # noqa: E402
 from ingestion import health_auto_export_sleep as _apple_sleep  # noqa: E402
 from privacy.field_tiers import (  # noqa: E402
     FIELD_TIERS,
@@ -181,6 +182,14 @@ ROW_MAP: list[dict] = [
     # sense (never on a public surface) but registry tier TIER_INTERNAL, because the owner
     # ruled it may enter AI coach context. No `claims`: no public projection at all.
     {"key": "clinical", "pattern": r"^Owner clinical record", "requirements": [("source", "clinical", TIER_INTERNAL)], "claims": []},
+    # #4972: the heart-rhythm event channel inside the clinical partition — field-level
+    # owner-only, stricter than the partition's TIER_INTERNAL (owner ruling (c), 2026-10-17).
+    {
+        "key": "rhythm_channel",
+        "pattern": r"^Heart-rhythm event channel",
+        "requirements": [("field", "clinical", f, OO) for f in sorted(RHYTHM_CHANNEL_FIELDS)],
+        "claims": [],
+    },
 ]
 
 # The #2782/#2809 trio is ruled Tier-2 by docs/SCHEMA.md (its prose home predates this

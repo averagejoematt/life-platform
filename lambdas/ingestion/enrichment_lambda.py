@@ -348,7 +348,21 @@ def _day_date(day) -> str:
     return ""
 
 
-def enrich_date_range(start_date: str, end_date: str):
+#: How many days the nightly run covers, ending yesterday. Matches the Strava ingest's own
+#: trailing refresh (`refresh_trailing_days=3`), so an activity that syncs up to two days late
+#: still gets its label (epic #4625 row: 66 of 68 labelled, a one-day window never saw a late sync).
+NIGHTLY_WINDOW_DAYS = 3
+
+
+def enrich_date_range(start_date: str, end_date: str, fill_only_before: str = ""):
+    """Label the activities of every stored Strava day in [start_date, end_date].
+
+    `fill_only_before`: days dated BEFORE it only get a label where none is stored. The
+    percentile context shifts as the archive grows, so re-ranking an older day every night
+    would rewrite a label the reader has already seen; the nightly run's older days exist
+    only to catch a late sync. Empty (the default, and every explicit/backfill range) means
+    every day is re-evaluated, exactly as before.
+    """
     logger.info(f"[enrichment] Starting enrichment for {start_date} → {end_date}")
 
     # Load all Strava data (for percentile context) and target window
@@ -386,8 +400,15 @@ def enrich_date_range(start_date: str, end_date: str):
         updated_activities = []
         day_changed = False
 
+        fill_only = bool(fill_only_before) and date_str < fill_only_before
+
         for act in activities:
             name = act.get("name", "")
+
+            if fill_only and act.get("enriched_name"):
+                skipped_count += 1
+                updated_activities.append(act)
+                continue
 
             # Per-activity error boundary. lambda_handler() re-raises, so without
             # one, a single malformed row aborted the batch and every LATER day
@@ -453,6 +474,7 @@ def lambda_handler(event, context):
         if hasattr(logger, "set_date"):
             logger.set_date(today)  # OBS-1
         yesterday = (pacific_now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        fill_only_before = ""
 
         if event.get("backfill"):
             # ARCHIVE_START, not 2020-01-01: the percentile context already reads
@@ -470,12 +492,14 @@ def lambda_handler(event, context):
             end_date = event.get("end_date") or today
             logger.info(f"[enrichment] Explicit range: {start_date} → {end_date}")
         else:
-            # Default: yesterday (nightly run)
-            start_date = yesterday
+            # Default (nightly): the NIGHTLY_WINDOW_DAYS days ending yesterday; the older days
+            # are fill-only (a late sync gets its label, a labelled day is not re-ranked).
+            start_date = (pacific_now() - timedelta(days=NIGHTLY_WINDOW_DAYS)).strftime("%Y-%m-%d")
             end_date = yesterday
+            fill_only_before = yesterday
 
-        result = enrich_date_range(start_date, end_date)
-        # #4643: a malformed row is a FAILED run for liveness (the window is one day nightly,
+        result = enrich_date_range(start_date, end_date, fill_only_before)
+        # #4643: a malformed row is a FAILED run for liveness (the nightly window is three days,
         # so one bad row cannot latch a permanent streak).
         _record_health(succeeded=not result.get("malformed"), exc="parse")
 

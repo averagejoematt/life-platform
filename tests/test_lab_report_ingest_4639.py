@@ -397,3 +397,67 @@ def test_both_sources_are_registered_with_the_facets_the_road_requires():
         assert row["cadence_months"] == months and row["stale_hours"] == months * 30 * 24
         assert row["raw_layout"]["scheme"] == "date-folder" and "ingest_lab_report.py" in row["method"]
         assert row.get("paused") is not True and row["capture_channel"] is None and row["capture_channel_reason"]
+
+
+# ── one analyte, two stored spellings (epic #4625 row: crp_hs / hs_crp) ─────────────────────
+
+
+def test_alias_table_points_every_spelling_at_a_marker_the_contract_knows():
+    for alias, canon in lab_units.MARKER_ALIASES.items():
+        assert alias in lab_units.LAB_UNITS and canon in lab_units.LAB_UNITS, "stored history is the contract: both spellings stay"
+        assert lab_units.LAB_UNITS[alias] == lab_units.LAB_UNITS[canon], "an alias is the same analyte: same unit, category, kind"
+        assert lab_units.canonical_marker(canon) == canon
+
+
+def test_ingest_accepts_either_spelling_and_stores_the_canonical_one():
+    for spelling in ("crp_hs", "CRP-HS", "hs_crp", "hs-crp"):
+        item = _labs_item(rows=[{"marker": spelling, "value": "0.4", "unit": "mg/L", "ref_text": "<1.0"}])
+        assert set(item["biomarkers"]) == {"hs_crp"}, spelling
+
+
+def test_ingest_refuses_the_same_analyte_listed_under_both_spellings():
+    rows = [
+        {"marker": "crp_hs", "value": "0.4", "unit": "mg/L"},
+        {"marker": "hs_crp", "value": "0.5", "unit": "mg/L"},
+    ]
+    with pytest.raises(ing.Refusal, match="listed twice"):
+        _labs_item(rows=rows)
+
+
+def test_previous_value_is_found_under_the_other_spelling():
+    previous = {
+        "sk": "DATE#2026-04-03",
+        "draw_date": "2026-04-03",
+        "biomarkers": {"crp_hs": {"value": 0.3, "value_numeric": 0.3, "unit": "mg/L"}},
+    }
+    item = _labs_item(rows=[{"marker": "hs_crp", "value": "0.4", "unit": "mg/L"}], previous=previous)
+    assert (
+        item["biomarkers"]["hs_crp"]["previous_value"] == Decimal("0.3") and item["biomarkers"]["hs_crp"]["previous_date"] == "2026-04-03"
+    )
+
+
+def test_reader_resolves_either_spelling_off_a_stored_draw():
+    old = {"sk": "DATE#2025-04-17", "biomarkers": {"hs_crp": {"value_numeric": 1.0}}}
+    new = {"sk": "DATE#2026-04-03", "biomarkers": {"crp_hs": {"value_numeric": 2.0}}}
+    for want in ("hs_crp", "crp_hs"):
+        assert labs_schema.marker_numeric(labs_schema.biomarker_entry(old, want)) == 1.0
+        assert labs_schema.marker_numeric(labs_schema.biomarker_entry(new, want)) == 2.0
+    assert labs_schema.biomarker_entry(new, "ldl_c") is None
+
+
+def test_coaching_sees_the_draw_that_spelled_it_crp_hs():
+    from health import labs_coaching
+
+    class _T:
+        def query(self, **kw):
+            return {"Items": [{"sk": "DATE#2026-04-03", "biomarkers": {"crp_hs": {"value_numeric": 5.0, "unit": "mg/L"}}}]}
+
+    assert "hs-CRP elevated" in labs_coaching.build_labs_coaching_context(_T(), "USER#matthew#SOURCE#")
+
+
+def test_mcp_genome_xref_holds_every_spelling():
+    import re
+
+    src = open(os.path.join(REPO, "mcp", "labs_helpers.py"), encoding="utf-8").read()
+    for alias, canon in lab_units.MARKER_ALIASES.items():
+        assert re.search(rf'"{alias}":', src) and re.search(rf'"{canon}":', src)

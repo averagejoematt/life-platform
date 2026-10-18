@@ -178,6 +178,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `…SOURCE#qa_hook_matrix` / `DATE#<d>` | the nightly hook-liveness matrix (#3615/#4015): one row per PT day keyed by `cycle_day`, the (hook × downstream artifact) liveness cells the qa-smoke `hooks:liveness_matrix` leg wrote that night. SYSTEM_STATE (ADR-077 ruling 2026-09-22): an operational instrument's own output, regenerated nightly, never evidence about the experiment — survives a reset, read genesis-anchored | `operational/hook_liveness_qa.py` (inside `qa_smoke_lambda`) | qa-smoke email, `check_alarm_citations` | n/v |
 | `…SOURCE#progress_photos` / `DATE#<d>#<pose>` | the progress-photo index row (#3758): `pose` (front\|side\|back), `s3_key`, `bytes`, `sha256`, `telegram_file_unique_id`, `week_n`, `source_channel: telegram`. **Tier 2, owner-only (#3757/#3782)** — registered before the first byte could be stored, per ADR-154's ordering. The JPEG itself lives at `raw/matthew/progress_photos/<YYYY>/<MM>/<YYYY-MM-DD>-<pose>.jpg`; `raw/*` carries no anonymous `Allow` in the bucket policy (the three that exist are `site/*`, `blog/*`, `generated/*`) and no CloudFront behaviour. The DATE in the LEAF is load-bearing — the registry's first draft said `<pose>.jpg`, which under `date-tree` overwrites every week of a month with the last. Idempotent on `telegram_file_unique_id`: a re-send is a no-op, a genuinely different file for the same day and pose is a retake and replaces it. | `coach/progress_capture.py` (via `telegram-worker`) | — (owner-only; no public projection) | n/v |
 | `…SOURCE#clinical` / `EVENT#<date>#<slug>`, `MED#<slug>`, `ECG#<YYYY-MM-DDTHH:MM:SS>#<device>`, `LABS#<date>`, `HISTORY#<date>`, `GUIDANCE#current`, `DOC#<date>#<slug>` | **the owner clinical record (ADR-155 amendment, 2026-10-12)** — `EVENT#`: a diagnosis or clinical event (`type`, `date`, `title`, `status`, free-form detail fields such as `interpretation`/`presentation`, optional `source_file`/`s3_key`); `MED#`: a medication (`name`, `dose`, `frequency`, `status` — rendered when `active`/`paused`); `ECG#`: one consumer-device recording (`recorded_at_local`, `tz`, `device`, `lead_config`, `verdict`, `avg_hr_bpm`, `source_file`, `sha256`, `s3_key`); `LABS#`: a clinical lab panel (`collection_date`, `biomarkers` in the `labs` per-marker shape `value`/`unit`/`ref_text`/`flag`/`category`); `HISTORY#`: an intake history questionnaire; `GUIDANCE#current`: the clinicians' standing `rules` for coaches (full, owner channel) and neutrally-worded `public_rules` (the only part a published-surface coach sees) with `effective`/`review_after`; `DOC#`: an index row per source document (`file`, `kind`, `s3_key`, `content_type`, `sha256`, `bytes`; the bytes stay in S3). Every row carries `source: clinical`, `schema_version: 1`, `updated_at`. Source documents at `raw/matthew/clinical/<YYYY-MM-DD>/<filename>`. **`TIER_INTERNAL` — never public; admitted to coach AI context by owner ruling.** No clinical value is ever committed: the data file lives outside the repo. | `scripts/load_clinical_record.py --apply` (owner-run; no lambda writes it) | `health/clinical_facts.py` → daily-brief coach inputs, expert-analyzer shared prompt, Telegram coach domain facts; MCP raw-data tools | cross_phase | n/v |
+| `…SOURCE#clinical` / `RHYTHM#ECG#<YYYY-MM-DDTHH:MM:SS>#<device-slug>`, `RHYTHM#HRNOTIF#<YYYY-MM-DDTHH:MM:SS>#<kind>`, `RHYTHM#MEDLOG#<YYYY-MM-DDTHH:MM:SS>#<name-hash10>` | **the owner-only heart-rhythm event channel (#4972, owner ruling (c) 2026-10-17)** — watch ECG results, high/low/irregular/hypertension heart-rate notifications and the medication log; field reference: "clinical — heart-rhythm event channel" below. The local wall-clock timestamp is the event's own (HAE sends it with its offset); the medication key carries a hash of the name, never the name. **Every channel field is `TIER_OWNER_ONLY`** (`field_tiers.FIELD_TIERS["clinical"]`) — stricter than the partition's `TIER_INTERNAL`: no AI narrative context, no public surface, stripped by the MCP row dumpers. Conditional put — first write wins, a re-delivery is a counted duplicate. | `ingestion/health_auto_export_lambda.py` → `health/rhythm_channel.py` → `clinical_facts.put_channel_rows` (the one lambda-side writer of the partition; refuses any non-`RHYTHM#` key) | none yet — NOT rendered by `clinical_facts` (the coach fact pack is #4977); MCP raw-data tools see the row with every channel field stripped | cross_phase | n/v |
 | `…SOURCE#panelcast` / — | The Panel podcast series state | `emails/coach_panel_podcast_lambda.py` | podcast lambdas | n/v |
 | `…SOURCE#experiments` / `EXP#<id>` | experiment records | MCP `create_experiment`/`end_experiment` | site_api_vitals/social, `list_experiments` | ✓ |
 | `…SOURCE#challenges` / `CHALLENGE#<slug>_<date>` | challenge records | `intelligence/challenge_generator_lambda.py`, MCP | site_api_social, `list_challenges` | ✓ |
@@ -1330,6 +1331,8 @@ Each draw record contains all biomarkers from that blood draw as a nested `bioma
 
 **Biomarker keys** are snake_case normalized names: `apob`, `ldl_c`, `testosterone_total`, `vitamin_d_25oh`, `hs_crp`, etc.
 
+**One analyte, two stored spellings (`health.lab_units.MARKER_ALIASES`, #4639 / epic #4625).** High-sensitivity CRP is stored as `hs_crp` on the 2025-04-17 draw and as `crp_hs` on the 2026-04-03 draw. The canonical key is **`hs_crp`**; `crp_hs` is its alias. Stored history is not rewritten (capture-all: each draw keeps its writer's spelling) — a NEW draw through `scripts/ingest_lab_report.py` stores `hs_crp` only (a report row spelled `crp_hs` is stored as `hs_crp`; both in one report is refused as a duplicate), and every reader resolves either spelling (`labs_schema.biomarker_entry`, `labs_coaching` via `canonical_marker`). Add a new alias only for a spelling the live partition actually holds.
+
 **Provider metadata fields:**
 
 | Field | Type | Description |
@@ -1563,6 +1566,31 @@ Note: Idempotent ingestion — deduplicates by timestamp on re-ingestion. Requir
 Access via `get_state_of_mind_trend` MCP tool.
 
 ---
+
+### clinical — heart-rhythm event channel (#4972, owner-only)
+
+Rows under `USER#matthew#SOURCE#clinical` with sort keys `RHYTHM#…` (key-family row above). Written by the Health Auto Export webhook from the HAE `ecg`, `heartRateNotifications` and `medications` data types (shapes from the vendor's JSON v2 documentation — not yet captured live, #4968). **Owner ruling (c), 2026-10-17: heart-rhythm data is owner-only.** Every field below except the common envelope is **Tier 2, `TIER_OWNER_ONLY`**; `tests/test_rhythm_channel_privacy_4972.py` proves no `/api/*` route or public reader reaches them.
+
+| Field | Row | Type | Tier | Notes |
+|---|---|---|---|---|
+| `rhythm_ecg_classification` | ECG | string | 2 owner-only | the device's rhythm classification, verbatim |
+| `rhythm_ecg_avg_hr_bpm` | ECG | number | 2 owner-only | omitted when absent or 0 — never stored as 0 |
+| `rhythm_ecg_sample_start` | ECG | ISO-8601 with offset | 2 owner-only | the recording's start instant |
+| `rhythm_ecg_device` | ECG | string | 2 owner-only | HAE `source`, verbatim; slugged into the key |
+| `cross_device_same_day` | ECG | bool | 2 owner-only | `true` when the Withings day row also holds an ECG result (`afib_result`) — the two are separate rows, never merged; absent otherwise |
+| `rhythm_notification_kind` | HRNOTIF | `high`\|`low`\|`irregular`\|`hypertension`\|`unknown` | 2 owner-only | named by the payload when it says; otherwise inferred from shape |
+| `rhythm_notification_kind_inferred` | HRNOTIF | bool | 2 owner-only | `true` when the kind was inferred (threshold vs readings, or an HRV series) |
+| `rhythm_notification_at` | HRNOTIF | ISO-8601 with offset | 2 owner-only | the notification's instant |
+| `rhythm_notification_bpm` | HRNOTIF | number | 2 owner-only | max reading (high) / min reading (low); omitted when the payload carries none |
+| `rhythm_notification_threshold_bpm` | HRNOTIF | number | 2 owner-only | the configured threshold, when sent |
+| `rhythm_notification_device` | HRNOTIF | string | 2 owner-only | HAE `source`, when sent |
+| `rhythm_med_name` | MEDLOG | string | 2 owner-only | HAE `nickname`, else `displayText` |
+| `rhythm_med_dose_text` | MEDLOG | string | 2 owner-only | `dosage` + `form`/`unit` as text; omitted when neither is sent |
+| `rhythm_med_at` | MEDLOG | ISO-8601 with offset | 2 owner-only | the log entry's instant |
+| `rhythm_med_status` | MEDLOG | string | 2 owner-only | lower-cased HAE `status` (e.g. taken / skipped), when sent |
+| `channel`, `event_kind`, `event_date`, `source`, `ingested_by`, `schema_version`, `updated_at` | all | — | partition (1) | envelope: `channel: rhythm`, `event_kind: ecg\|hr_notification\|medication_log`, `event_date` = the event's local date |
+
+**Absence (day 1):** no event = no row. Nothing is written to the `apple_health` day row, so no day row ever carries a 0 for any of these. **ECG de-duplication:** one row per instant + device — a recording within 60 s of an ECG the partition already holds (the loader's `ECG#` rows or another `RHYTHM#ECG#` spelling) is the same recording, stored once; a Withings-sourced ECG mirrored through Apple Health within 60 s of a Withings measurement timestamp is already stored on the Withings row and is skipped. Voltage samples are not stored in DynamoDB (they stay in the raw HAE archive, `raw/matthew/health_auto_export/`).
 
 ### evening_ritual (#769 — the C-floor two-scalar fulfillment ritual, ADR-124)
 
@@ -2162,6 +2190,9 @@ Pre-computed daily metrics written by `daily-metrics-compute` Lambda at 9:40 AM 
 | `readiness_score` | number | 0-100 composite readiness |
 | `readiness_level` | string | GREEN / YELLOW / RED |
 | `hrv_7d_avg` | number | 7-day HRV rolling average (ms) |
+| `hrv_7d_n` / `hrv_30d_n` | number | Readings behind each HRV average (#4999 — after the HR regime-marker cut and AF-day exclusion) |
+| `hrv_7d_basis` / `hrv_30d_basis` | map | The HRV baseline's window: `since`, `through`, `n`, `excluded_days_n` (a count only), and `truncated_at_marker` / `requested_start` when an HR regime marker cut it (`lambdas/health/hr_regime.py`, #4999) |
+| `readiness_state` | string | `re-baselining` on a date inside an HR regime marker's window (no score, colour `gray`); absent otherwise (#4999) |
 | `hrv_trend` | string | improving / stable / declining |
 | `weight_7d_avg` | number | 7-day weight rolling average (lbs) |
 | `tsb` | number | Training Stress Balance (ATL-CTL) |

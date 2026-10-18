@@ -121,6 +121,7 @@ try:
     from health import glycemic
 except ImportError:
     glycemic = None
+from health import rhythm_channel as _rhythm  # #4972: the owner-only ECG / HR-notification / medication-log channel
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -1525,8 +1526,7 @@ def lambda_handler(event, context):
             glucose_metric = m
             break
 
-    glucose_days = 0
-    glucose_readings_new = 0
+    glucose_days = glucose_readings_new = 0
 
     if glucose_metric:
         glucose_data = glucose_metric.get("data", [])
@@ -1639,9 +1639,7 @@ def lambda_handler(event, context):
                 # (was one level out → broke on the first metric regardless of name)
 
     # ── Process workouts (v1.6.0) ──
-    workout_days = 0
-    workout_new = 0
-    recovery_days = 0
+    workout_days = workout_new = recovery_days = 0
 
     if workouts:
         daily_workouts, workout_daily_agg = process_workouts(workouts)
@@ -1685,6 +1683,7 @@ def lambda_handler(event, context):
         "workout_days": workout_days,
         "workout_new": workout_new,
         "recovery_days": recovery_days,
+        "rhythm_channel": _rhythm.webhook_ingest(table, data, user_id=USER_ID),  # #4972: counts only, fail-soft
         "metrics_received": [m.get("name") for m in metrics],
         "workouts_received": len(workouts),
         "raw_archive": s3_key,

@@ -363,6 +363,13 @@ _WHOOP_HISTORY_READ_REASON = (
 
 
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
+    "strava::lambdas/ingestion/strava_lambda.py::read": (
+        "2026-10-18",
+        "#4626: strava_lambda reads back its OWN day row (strava_id, zoneN_seconds, hr_recovery, elapsed_time_seconds) to skip "
+        "re-fetching unchanged enrichment; the writer of those fields is the same module's _normalize, and enrichment_lambda only "
+        "writes enriched_name/enriched_at. Pinned on the real row shape by tests/test_strava_enrichment_reuse_4626.py::"
+        "test_reader_parses_exactly_what_normalize_writes; a stale or missing field degrades to the vendor call.",
+    ),
     "whoop::lambdas/ingestion/whoop_cycle_day.py::read": (
         "2026-10-18",
         "#5002: the cycle-id guard reads back ONLY `sk` and `cycle_id` of the neighbouring whoop day rows. Both sides of "
