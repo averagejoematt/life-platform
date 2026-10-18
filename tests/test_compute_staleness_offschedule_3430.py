@@ -209,6 +209,13 @@ class TestTheComputeCronConstantCannotDrift:
         m = re.search(r'schedule="cron\((\d+) (\d+) ', block)
         assert m, "could not read daily-brief's schedule= from cdk/stacks/email_stack.py"
         brief_minute, brief_hour = int(m.group(1)), int(m.group(2))
+        tz = re.search(r'schedule_timezone="([^"]+)"', block.split("create_platform_lambda(")[0])
+        if tz:  # #4284: a zoned schedule — the EARLIEST UTC instant it can fire at (PDT) is the strict bound
+            from datetime import datetime, timezone
+            from zoneinfo import ZoneInfo
+
+            zone = ZoneInfo(tz.group(1))
+            brief_hour = min(datetime(2026, mo, 15, brief_hour, brief_minute, tzinfo=zone).astimezone(timezone.utc).hour for mo in (7, 12))
         assert (brief_hour, brief_minute) > (
             brief.COMPUTE_DEADLINE_UTC_HOUR,
             brief.COMPUTE_DEADLINE_UTC_MINUTE,

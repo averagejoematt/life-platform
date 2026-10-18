@@ -37,6 +37,9 @@ Both shapes are live today — measured 2026-08-29: 83 names + 10 ARNs across th
 us-west-2 stacks. `_rule_name()` normalizes; without it this check would have reported
 ten CFN-managed rules as orphans on its first run.
 
+SCHEDULER (#4284): `AWS::Scheduler::Schedule` resources are EventBridge Scheduler, a different
+service from rules — `list_rules` cannot see them. They are only RECORDED (CFN side, no new IAM).
+
 Scope: default event bus, REGION only — mirrors `check_orphan_functions`' scoping.
 Measured 2026-08-29: zero `AWS::Events::Rule` resources in the non-default-region
 stacks (LifePlatformWeb us-east-1, LifePlatformBackup us-east-2), so a region-local
@@ -130,6 +133,7 @@ def check_eventbridge_rules():
     try:
         cfn = _client("cloudformation")
         managed = set()
+        managed_schedulers = set()  # #4284: AWS::Scheduler::Schedule — the zoned carrier (see docstring)
         for name in stacks:
             token = None
             while True:
@@ -140,6 +144,8 @@ def check_eventbridge_rules():
                 for r in resp.get("StackResourceSummaries", []):
                     if r.get("ResourceType") == "AWS::Events::Rule" and r.get("PhysicalResourceId"):
                         managed.add(_rule_name(r["PhysicalResourceId"]))
+                    elif r.get("ResourceType") == "AWS::Scheduler::Schedule" and r.get("PhysicalResourceId"):
+                        managed_schedulers.add(_rule_name(r["PhysicalResourceId"]))
                 token = resp.get("NextToken")
                 if not token:
                     break
@@ -168,6 +174,12 @@ def check_eventbridge_rules():
         "status": "drift" if (enabled_targetless or out_of_iac) else "clean",
         "live_count": len(live),
         "managed_count": len(managed),
+        # #4284: a Scheduler schedule is not an Events rule, so `list_rules` never sees it. The
+        # morning brief moved to one (Pacific wall-clock across DST); its presence in the IaC is
+        # recorded here so the move is visible, and its liveness stays with the invocation alarm
+        # `daily-brief-no-invocations-24h`. A live GetSchedule read needs scheduler:GetSchedule on
+        # the hand-applied remediation role — a follow-up row on #4284, not done here.
+        "managed_scheduler_schedules": sorted(managed_schedulers),
         "enabled_targetless": enabled_targetless,
         "out_of_iac": out_of_iac,
         "known_out_of_iac": known_out_of_iac,

@@ -97,7 +97,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 
 ### Scheduled ingestion (EventBridge → Lambda)
 
-Each source has its own dedicated Lambda and IAM role. Cadence is per source (its `schedule=` in `cdk/stacks/ingestion_stack.py`, mirrored as the registry facet); the `INGEST_HOURLY` helper skips the overnight-PT window for the sources that use it. All cron expressions use fixed UTC.
+Each source has its own dedicated Lambda and IAM role. Cadence is per source (its `schedule=` in `cdk/stacks/ingestion_stack.py`, mirrored as the registry facet); the `INGEST_HOURLY` helper skips the overnight-PT window for the sources that use it. All cron expressions use fixed UTC, with one exception: `daily-brief` runs on an EventBridge Scheduler schedule in `America/Los_Angeles` (#4284).
 
 **Gap-aware backfill (v2.46.0):** All API-based ingestion Lambdas implement self-healing gap detection. On each run, the Lambda queries DynamoDB for the last N days (including today), identifies missing DATE# records, and fetches only those from the upstream API. Cost is ~$0/month — Lambdas short-circuit in <50ms when no new data exists.
 
@@ -141,7 +141,7 @@ The headline set; the full inventory (every function, handler, schedule, alarm) 
 | Adaptive Mode Compute | `adaptive-mode-compute` | `cron(35 16 * * ? *)` | 09:35 AM |
 | Character Sheet Compute | `character-sheet-compute` | `cron(30 16 * * ? *)` | 09:30 AM |
 | Anomaly Detector | `anomaly-detector` | `cron(5 15 * * ? *)` | 08:05 AM |
-| Daily Brief | `daily-brief` | `cron(0 17 * * ? *)` | 10:00 AM |
+| Daily Brief | `daily-brief` | `cron(0 10 * * ? *)` America/Los_Angeles (zoned, #4284) | 10:00 AM |
 | Monday Compass | `monday-compass` | `cron(0 15 ? * MON *)` | Mon 08:00 AM |
 | Wednesday Chronicle | `wednesday-chronicle` | `cron(0 15 ? * WED *)` | Wed 08:00 AM |
 | The Weekly Plate | `weekly-plate` | `cron(0 2 ? * SAT *)` | Fri 07:00 PM |
@@ -282,14 +282,14 @@ All of these ship together via the standard `Code.from_asset("../lambdas")` zip.
 
 ### Email / Intelligence cadence
 
-Schedules are fixed UTC (no DST drift); the PDT column is the UTC-7 rendering. The cron
+Schedules are fixed UTC (no DST drift) except `daily-brief`, which is zoned to America/Los_Angeles (#4284); the PDT column is the UTC-7 rendering. The cron
 column is diffed against `cdk/stacks/*.py` by `scripts/check_doc_facts.py` (#1205), so a
 schedule change that skips this table reds CI.
 
 | Lambda | Schedule (UTC) | Time (PDT) | Purpose |
 |---|---|---|---|
 | `anomaly-detector` | `cron(5 15 * * ? *)` | 8:05 AM daily | 15 metrics, CV-based Z thresholds |
-| `daily-brief` | `cron(0 17 * * ? *)` | 10:00 AM daily | 18-section brief, 4 Haiku calls |
+| `daily-brief` | `cron(0 10 * * ? *)` America/Los_Angeles (zoned, #4284) | 10:00 AM daily | 18-section brief, 4 Haiku calls |
 | `monday-compass` | `cron(0 15 ? * MON *)` | Mon 8:00 AM | Forward-looking planning + Todoist |
 | `wednesday-chronicle` | `cron(0 15 ? * WED *)` | Wed 8:00 AM | Elena Voss narrative, blog + email |
 | `weekly-plate` | `cron(0 2 ? * SAT *)` | Fri 7:00 PM | Food magazine column |
