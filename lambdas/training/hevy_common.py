@@ -73,6 +73,8 @@ except ImportError:
 from common.hevy_schema import SET_DURATION_FIELD  # #4158: the ONE stored-set duration key
 from common.pacific_time import PACIFIC, parse_iso_utc
 
+from training.hevy_note_types import OWNER_SESSION_NOTE_FIELD, WORKOUT_NOTE_FIELD, owner_session_note  # #5047
+
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 HEVY_BASE = "https://api.hevyapp.com"
@@ -278,7 +280,8 @@ def _normalize_exercise(ex: dict, unit_hint: str) -> dict:
         "name": ex.get("title") or ex.get("name") or "",
         "template_id": ex.get("exercise_template_id") or ex.get("template_id"),
         "sets": [_normalize_set(s, unit_hint) for s in (ex.get("sets") or [])],
-        "notes": ex.get("notes") or "",
+        # #5047: the Workout Note — Matthew's own per-session text, stored verbatim.
+        "notes": ex.get(WORKOUT_NOTE_FIELD) or "",
         # #4642 capture-all: the wire's own grouping + order, stored as sent (None when absent).
         "superset_id": ex.get("superset_id"),
         "exercise_index": ex.get("index"),
@@ -361,6 +364,8 @@ def normalize_workout(raw: dict) -> dict:
         "duration_sec": duration_sec,
         "total_volume_kg": total_volume_kg,
         "exercises": exercises,
+        # #5047: his workout notes as session feedback, by name — setup-marked lines (#5024) split out.
+        OWNER_SESSION_NOTE_FIELD: owner_session_note(exercises),
         "exercise_count": len(exercises),
         "set_count": sum(len(e["sets"]) for e in exercises),
         "original_unit": unit_hint,
