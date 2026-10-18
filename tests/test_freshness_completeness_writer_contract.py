@@ -86,6 +86,7 @@ NOT_A_WRITER = {
     "source_registry.py": "the source facet registry; writes no record",
     "source_state.py": "auth/breaker state helpers, keyed by source name",
     "enrichment_lambda.py": "post-hoc enrichment pass over records other writers stored",
+    "watch_presence.py": "#4970: READS the apple_health partition for the watch dead-man; writes no record",
 }
 
 

@@ -194,6 +194,11 @@ def _install(monkeypatch, table, sns=None, cw=None, s3=None):
     # conditions this double does not speak. Stub it HEALTHY by default so these tests stay
     # about the wiring; the dark path gets its own test below, which drives the real handler.
     monkeypatch.setattr(fc, "training_notes_health", lambda *_a, **_k: {"checked": True, "extractor_dark": False})
+    # #4970: the Apple Watch dead-man reads the apple_health partition; an empty fake
+    # table is a silent watch, which would add a row to every count asserted here. Stub
+    # it HEALTHY; its stale path drives this same real handler in
+    # tests/test_watch_metrics_registry_4970.py.
+    monkeypatch.setattr(fc, "check_watch_dead_men", lambda *_a, **_k: [])
     return sns, cw
 
 
