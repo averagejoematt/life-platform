@@ -186,6 +186,58 @@ def _count_findings(text: str) -> List[str]:
     ]
 
 
+# A REFERENCE to an earlier cycle, with no count (#4580 A-X1). The 2026-09-26 ruling is "no reference to the 17th
+# cycle on the site", not only no number: "after a previous cycle that stalled in the final phase" reached the lead
+# read's public_summary on /api/edition, /api/weekly_priority and /api/coaching-dashboard with no count in it, so the
+# count patterns above passed it. Keyed on a past-marker beside the restart vocabulary, never on the bare word: a
+# bare "restart" is a verb about anything ("asked him to restart one of those two channels"), "the last run" is a
+# workout, and "his previous attempt at 225" is a barbell (`_LIFT_AFTER`).
+_PAST = r"previous|prior|earlier|former|failed|abandoned|stalled|past"
+# "an earlier reset of his bedtime", "a prior attempt to log lunch": the noun owns an object, it is not the experiment
+_NOT_ABOUT = r"(?!\s+(?:(?:of|to|on|week|day|button|window)\b|at\s+\d))"
+_REFERENCE_PATTERNS = [
+    # "a previous cycle", "earlier attempts", "the failed starts", "past resets", "the last cycle", "the last reset"
+    re.compile(
+        rf"\b(?:{_PAST})\s+(?:experiment\s+)?(?P<noun>cycles?|attempts?|resets?|restarts?|relaunch(?:es)?|tries)\b{_NOT_ABOUT}", _FLAGS
+    ),
+    # "start" is also a time of day ("an earlier start to his eating window"): only the failure markers count it
+    re.compile(
+        rf"\b(?:failed|abandoned|previous|prior)\s+(?:experiment\s+)?(?P<noun>starts?)\b(?!\s+(?:times?|to|of|date)\b){_NOT_ABOUT}", _FLAGS
+    ),
+    re.compile(r"\b(?:the|his|a)\s+last\s+(?:experiment\s+)?(?P<noun>cycle|reset|restart|attempt at (?:this|the experiment))\b", _FLAGS),
+    # "since the reset", "after his last restart", "before the reset" (but "the restart of his food log" is not one)
+    re.compile(
+        r"\b(?:since|after|before)\s+(?:the|his|this|that)\s+(?:(?:last|latest|most recent|previous)\s+)?(?P<noun>reset|restart)\b"
+        r"(?!\s+(?:of|on|to|week)\b)",
+        _FLAGS,
+    ),
+    # "restarted the experiment", "reset the experiment", "started over"
+    re.compile(r"\b(?:re-?started|reset|relaunched|rebooted)\s+(?:the|his|this)\s+experiment\b", _FLAGS),
+    re.compile(r"\bstart(?:ed|ing)?\s+(?:it\s+)?(?:all\s+)?over\s+again\b|\bstarted\s+over\b", _FLAGS),
+]
+
+
+def _reference_findings(text: str) -> List[str]:
+    seen: List[str] = []
+    for pat in _REFERENCE_PATTERNS:
+        for m in pat.finditer(text or ""):
+            noun = (m.groupdict().get("noun") or "").lower()
+            if noun.startswith(("attempt", "tries")) and _LIFT_AFTER.match(text[m.end() :]):
+                continue  # "his previous attempt at 225"
+            if noun.startswith("cycle") and _SLEEP_AFTER.match(text[m.end() :]):
+                continue  # "earlier cycles of REM"
+            if m.group(0) not in seen:
+                seen.append(m.group(0))
+    return [f"story-door: a reference to an earlier cycle/attempt/reset is not reader copy (owner ruling 2026-09-26): {p!r}" for p in seen]
+
+
+def cycle_reference_findings(text: str) -> List[str]:
+    """THE one cycle/attempt/reset pattern (#4580): a count (``_count_findings``) or a reference with no count
+    (``_REFERENCE_PATTERNS``). ``reader_surface`` and ``coach.audience_guard.reader_safe`` both call this, so the
+    Story Desk's door and every coach's public slot refuse the same phrases."""
+    return _count_findings(text) + _reference_findings(text)
+
+
 # Off the record (#4538). The journal is deep background: its weather may inform a writer, its specifics may not
 # reach a reader — and the specifics that identify are the people around him and his working life. One label,
 # stated once, rides on every journal-derived input a writer is shown (``emails/chronicle_data`` is the one live
@@ -242,7 +294,7 @@ def reader_surface(text: str, *, constructed: bool = False) -> List[str]:
 
     ``constructed=True`` is for a surface with no free prose — a card, a caption, a hashtag line (the recap
     cards' own rule, ``web/recap_layouts``): there the frame word itself is refused, count or no count."""
-    findings = _count_findings(text)
+    findings = cycle_reference_findings(text)
     if constructed:
         for m in _FRAME_WORD.finditer(text or ""):
             findings.append(f"story-door: the frame is the experiment, not an attempt at it (owner ruling 2026-09-19): {m.group(0)!r}")

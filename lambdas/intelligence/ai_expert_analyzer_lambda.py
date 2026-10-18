@@ -161,10 +161,13 @@ def _latest_item(source):
 
 
 from common.constants import (
+    EXPERIMENT_BASELINE_WEIGHT_LBS,  # #4580 B-01: arms the gate's labelled starting-weight check
     EXPERIMENT_START_DATE as EXPERIMENT_START,  # ADR-058
     PLAN_DAILY_PROTEIN_MIN_G,  # #4540: the plan's targets
 )
 from health.pillar_absence import absence_gate_map, nutrition_absence_facts  # #2756
+
+from intelligence import labelled_facts_gate as _lf  # #4580 B-01/A-X1: labelled-fact + reader-surface findings
 
 _CANON_FACTS_CACHE: dict[str, Any] = {}
 
@@ -1008,7 +1011,19 @@ def _presence_logs(gen_date_iso):
         return None
 
 
-def _gate_prose(label, text, prompt, api_key, *, shared_system=None, extra_sources=(), available_logs=None, absence=None, extract=None):
+def _gate_prose(
+    label,
+    text,
+    prompt,
+    api_key,
+    *,
+    shared_system=None,
+    extra_sources=(),
+    available_logs=None,
+    absence=None,
+    extract=None,
+    reader_findings=None,
+):
     """The module's ONE grounding chokepoint (#2421) — every model call routes here.
 
     Before #2421 only the two `generate_and_cache` calls were gated: the Mode-B
@@ -1024,6 +1039,11 @@ def _gate_prose(label, text, prompt, api_key, *, shared_system=None, extra_sourc
 
     `extract` maps a raw rewrite back to reader text for the JSON-shaped callers, which
     also use it to capture the re-parsed record. Returns grounded text, or "" to hold.
+
+    #4580 B-01: the labelled facts are checked too — the starting weight (`baseline_lbs`), the served 30-day
+    session count, the food-log lag and the journal gap (`labelled_facts_gate`); the current weight already is
+    (`served_fact_findings`). `reader_findings(text)` adds a reader-bound field's own findings (the cycle/attempt/
+    reset class, A-X1) — passed only for a public field, never for the owner-read analysis.
     """
     facts = _load_canonical_facts()
     allowed = _gg.allowed_numbers(prompt, shared_system, facts, *extra_sources)
@@ -1035,16 +1055,26 @@ def _gate_prose(label, text, prompt, api_key, *, shared_system=None, extra_sourc
         {**facts, "date": gen_date_iso}, table=table, today=gen_date_iso
     )  # #4185: cited protein/days-logged/gap + weight/rate (the canonical trajectory) vs served
 
+    _labelled = _lf.labelled_facts(
+        gen_date_iso, _served, query_source=_query_source, engagement=_load_engagement_signal, floor=EXPERIMENT_START
+    )
+
     def _findings_fn(_t):
-        return _ci.served_fact_findings(_t, _served) + _gg.grounding_findings(
-            _t,
-            facts=facts,
-            allowed=allowed,
-            generation_date_iso=gen_date_iso,
-            start_date_iso=EXPERIMENT_START,
-            nightly_vitals=_night_map(facts),  # #1968: the unlabeled "7.5-hour sleep"
-            available_logs=available_logs,  # #2056/#1699
-            known_absence_days=absence,  # #2756: narrated absence spans vs measured
+        _extra = _lf.labelled_fact_findings(_t, _labelled) + (reader_findings(_t) if reader_findings is not None else [])
+        return (
+            _extra
+            + _ci.served_fact_findings(_t, _served)
+            + _gg.grounding_findings(
+                _t,
+                facts=facts,
+                allowed=allowed,
+                baseline_lbs=EXPERIMENT_BASELINE_WEIGHT_LBS,  # #4580 B-01: "starting weight of 302.2" passed with this off
+                generation_date_iso=gen_date_iso,
+                start_date_iso=EXPERIMENT_START,
+                nightly_vitals=_night_map(facts),  # #1968: the unlabeled "7.5-hour sleep"
+                available_logs=available_logs,  # #2056/#1699
+                known_absence_days=absence,  # #2756: narrated absence spans vs measured
+            )
         )
 
     def _regen(_correction):
@@ -1077,8 +1107,10 @@ def _gate_prose(label, text, prompt, api_key, *, shared_system=None, extra_sourc
 
 # #2421/#3018: gating wrapper — the JSON-record logic itself lives in
 # integrator_prompts.gate_json_record (extracted at the #1665 size ratchet).
-def _gate_json_record(label, parsed, key, partial, prompt, api_key):
-    return _integrator_gate_json_record(label, parsed, key, partial, prompt, api_key, gate_prose=_gate_prose, lenient_json=_lenient_json)
+def _gate_json_record(label, parsed, key, partial, prompt, api_key, reader_keys=()):
+    return _integrator_gate_json_record(
+        label, parsed, key, partial, prompt, api_key, gate_prose=_gate_prose, lenient_json=_lenient_json, reader_keys=reader_keys
+    )
 
 
 def generate_and_cache(expert_key, shared_system=None):
@@ -1403,24 +1435,9 @@ def generate_synthesis(all_coach_outputs):
         _now = pacific_now()  # #2811: every derivation below is a DATE#-keyed day, not an instant
         _today_str = _now.strftime("%Y-%m-%d")
         _day_n = max(1, (_now.date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
-        _count_bits.append(f"experiment day_n = {_day_n}")
-        _d30 = max((_now - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
-        _n_sessions = len(_query_source("hevy", _d30, _today_str)) + len(_query_source("strava", _d30, _today_str))
-        _count_bits.append(f"logged training sessions (last 30d, Hevy + Strava) = {_n_sessions}")
         _nr = (_ci.served_run_facts({"date": _today_str}, table=table, today=_today_str) or {}).get("nutrition")  # #4185: THE served record
-        if _nr:
-            _count_bits.append(
-                f"food-log days since {_nr.get('window_start')} = {_nr.get('days_logged')}; last food log = {_nr.get('latest_log_date')}"
-            )
-        _sig = _load_engagement_signal()
-        for _src, _det in sorted((_sig.get("channel_detail") or {}).items()):
-            if not isinstance(_det, dict):
-                continue
-            _lbl = _det.get("label") or _src
-            _g = _det.get("gap_days")
-            _count_bits.append(
-                f"{_lbl} gap_days = {int(_g)}" if _g is not None else f"{_lbl} gap_days = unknown (nothing logged in window)"
-            )
+        _sessions = _lf.served_sessions_30d(_query_source, _today_str, EXPERIMENT_START)  # #4580 B-01: the page's count
+        _count_bits = _lf.count_bits(_day_n, _sessions, _nr, _load_engagement_signal())
     except Exception as _ce:  # noqa: BLE001 — counts are additive, never break synthesis
         logger.warning("synthesis deterministic counts failed (non-blocking): %s", _ce)
     if _count_bits:
@@ -1465,7 +1482,15 @@ def generate_synthesis(all_coach_outputs):
 
     # #2421/#3018: the Chair's weekly priority AND public_summary — same call, graded together.
     _synth_partial = {"cross_domain_notes": {}, "disagreements": []}
-    synthesis = _gate_json_record("weekly_priority", synthesis, ("weekly_priority", "public_summary"), _synth_partial, prompt, api_key)
+    synthesis = _gate_json_record(
+        "weekly_priority",
+        synthesis,
+        ("weekly_priority", "public_summary"),
+        _synth_partial,
+        prompt,
+        api_key,
+        reader_keys=("public_summary",),
+    )  # #4580 A-X1: the public_summary is a reader surface — a cycle/attempt/reset reference gets one rewrite, then HOLDS
     if synthesis is None:  # #4703: the hold renews the prior record it promises keeps serving
         return _held.renew_held(table, CACHE_PK, "EXPERT#integrator", _held.WEEKLY_TTL_DAYS)
 

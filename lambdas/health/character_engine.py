@@ -31,7 +31,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET  # ADR-058
+from common.macrofactor_fields import macro_value, protein_meals_at  # #4580 B-22: the row's declared field names
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_today  # #2811: the character sheet's DAY is the Pacific day
@@ -532,14 +533,16 @@ def compute_nutrition_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
     """Compute Nutrition pillar raw_score (0-100)."""
     pillar_cfg = config.get("pillars", {}).get("nutrition", {})
     components = pillar_cfg.get("components", {})
-    config.get("baseline", {})
     scores = {}
 
     mf = data.get("macrofactor") or {}
 
     # Calorie adherence
-    cals = _safe_float(mf, "calories") or _safe_float(mf, "total_calories")
-    cal_target = _safe_float(mf, "calorie_target") or _safe_float(mf, "target_calories")
+    # #4580 B-22: the row's macro names come from common.macrofactor_fields (SCHEMA.md § macrofactor) —
+    # this read spelled `calories`/`protein`, names a v1 row never carries, so every logged day scored
+    # ABSENT. The row carries no target; the plan's target is the reference (#4540).
+    cals = macro_value(mf, "calories")
+    cal_target = _safe_float(mf, "calorie_target") or _safe_float(mf, "target_calories") or PLAN_DAILY_CALORIES_TARGET
     if cals is not None and cal_target and cal_target > 0:
         deviation = abs(cals - cal_target) / cal_target
         scores["calorie_adherence"] = _clamp(round(100 - (deviation / 0.20) * 100, 1))
@@ -547,7 +550,7 @@ def compute_nutrition_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
         scores["calorie_adherence"] = None
 
     # Protein total
-    protein = _safe_float(mf, "protein") or _safe_float(mf, "total_protein")
+    protein = macro_value(mf, "protein")
     # #1898: the fallback is a PLAN LITERAL and must track the sealed pre-registration
     # (170 g floor for cycle 11), not the wiped pilot cycle's 190. A stale default here
     # is the same drift class as the config copies — worse, it only bites when the config
@@ -556,19 +559,10 @@ def compute_nutrition_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
     protein_target = components.get("protein_total", {}).get("target_grams", 170)
     scores["protein_total"] = _pct_of_target(protein, protein_target, 1.2)
 
-    # Protein distribution
-    meals = mf.get("meals") or []
-    high_protein_meals = 0
+    # Protein distribution — #4580 B-22: a v1 row has no `meals` list; the ingest's own meal grouping stores the count
     dist_threshold = components.get("protein_distribution", {}).get("threshold_grams", 30)
     dist_target = components.get("protein_distribution", {}).get("target_meals", 4)
-    for meal in meals:
-        mp = _safe_float(meal, "protein")
-        if mp and mp >= dist_threshold:
-            high_protein_meals += 1
-    if meals:
-        scores["protein_distribution"] = _pct_of_target(high_protein_meals, dist_target, 1.25)
-    else:
-        scores["protein_distribution"] = None
+    scores["protein_distribution"] = _pct_of_target(protein_meals_at(mf, dist_threshold), dist_target, 1.25)
 
     # Consistency (14d)
     mf_14d = data.get("macrofactor_14d", [])
@@ -576,7 +570,7 @@ def compute_nutrition_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
         in_range_count = 0
         tracked_count = 0
         for day in mf_14d:
-            dc = _safe_float(day, "calories") or _safe_float(day, "total_calories")
+            dc = macro_value(day, "calories")
             dt_target = _safe_float(day, "calorie_target") or _safe_float(day, "target_calories") or cal_target
             if dc is not None and dt_target and dt_target > 0:
                 tracked_count += 1

@@ -34,6 +34,8 @@ chokepoint (#2972's shape, pointed at the producer #2972 didn't reach).
 
 import logging
 
+from intelligence import labelled_facts_gate as _lf  # #4580 A-X1: the reader-surface (cycle/attempt/reset) findings
+
 logger = logging.getLogger(__name__)
 
 
@@ -92,7 +94,7 @@ HOW TO JUDGE THE WEEK (read this before you write):
 Produce EXACTLY this JSON structure (no markdown, no explanation):
 {{
   "weekly_priority": "One paragraph. Open by crediting what Matthew actually did well this week (be specific, drawn from the data). Then name the ONE thing that matters most NEXT — framed as the next step forward from where he is, not a scolding about the gap to the goal. One concrete action. If coaches disagree, make the call and say why. Decisive but encouraging — the voice of a coach who saw the real effort this week.",
-  "public_summary": "The same weekly call, rewritten for VISITORS to the public website — an audience reading ABOUT Matthew's experiment, not Matthew himself (2 short paragraphs, ~120-180 words). Speak AS {lead_surname} in first person ('I'm watching…'), but refer to Matthew strictly in the THIRD person — by his first name or 'he'/'his'. NEVER address him: no 'you'/'your', no name-as-salutation ('Matthew — …'), no imperatives aimed at him. Open with what he did well this week, then the one thing that matters most next — reported ('I've asked him to…'), never commanded. Keep the most important data point. This is the ONLY field served to site visitors; weekly_priority speaks to Matthew directly and is never shown to them.",
+  "public_summary": "The same weekly call, rewritten for VISITORS to the public website — an audience reading ABOUT Matthew's experiment, not Matthew himself (2 short paragraphs, ~120-180 words). Speak AS {lead_surname} in first person ('I'm watching…'), but refer to Matthew strictly in the THIRD person — by his first name or 'he'/'his'. NEVER address him: no 'you'/'your', no name-as-salutation ('Matthew — …'), no imperatives aimed at him. Open with what he did well this week, then the one thing that matters most next — reported ('I've asked him to…'), never commanded. Keep the most important data point. Never refer to an earlier cycle, attempt, start, reset or restart of the experiment, and never count them (owner ruling 2026-09-26): there is ONE experiment, counted in days ('Day 42', 'since September 6'). This is the ONLY field served to site visitors; weekly_priority speaks to Matthew directly and is never shown to them.",
   "cross_domain_notes": {{
     "sleep": "1-2 sentences connecting sleep to the other domains this week",
     "nutrition": "1-2 sentences connecting nutrition to the other domains",
@@ -178,7 +180,7 @@ Produce EXACTLY this JSON (no markdown, no preamble):
 For chapters: one entry per week given, in order. The headline is the chapter title that week earns in the larger story."""
 
 
-def gate_json_record(label, parsed, key, partial, prompt, api_key, *, gate_prose, lenient_json):
+def gate_json_record(label, parsed, key, partial, prompt, api_key, *, gate_prose, lenient_json, reader_keys=()):
     """#2421: gate the reader-bound field(s) of a JSON-shaped generator (the weekly-
     priority synthesis, the experiment arc, the month rollup). A rewrite comes back as
     raw JSON, so the extractor re-parses it and keeps the WHOLE rewritten record —
@@ -211,7 +213,15 @@ def gate_json_record(label, parsed, key, partial, prompt, api_key, *, gate_prose
         return ""
 
     joined = "\n\n".join(str(parsed.get(k) or "") for k in keys)
-    text = gate_prose(label, joined, prompt, api_key, extract=_extract)
+
+    def _reader(_t):
+        # #4580 A-X1: `reader_keys` name the reader-bound fields (the synthesis's public_summary); their own text is
+        # checked for the cycle/attempt/reset class — the record graded is the draft, or the rewrite `_extract` parsed.
+        rec = parsed if _t == joined else (fresh.get("parsed") or {})
+        return [f for k in reader_keys for f in _lf.reader_surface_findings(str(rec.get(k) or ""))]
+
+    _kw = {"reader_findings": _reader} if reader_keys else {}
+    text = gate_prose(label, joined, prompt, api_key, extract=_extract, **_kw)
     if not text:
         logger.warning("%s HELD by the grounding gate (#2421/#2391) — prior cached record keeps serving", label)
         return None
