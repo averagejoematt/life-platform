@@ -3,6 +3,7 @@ Health & body composition tools.
 """
 
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from health import tdee as tdee_core  # ADR-152 / #2310: THE one TDEE definition
@@ -31,7 +32,7 @@ RESP_RATE_TOLERANCE_BRPM, RESP_RATE_ZERO_BRPM = 0.5, 3.0
 SKIN_TEMP_TOLERANCE_C, SKIN_TEMP_ZERO_C = 0.3, 1.0
 APPLE_RHR_FIELD = "resting_heart_rate_apple"  # health_auto_export_lambda tier-2 field (Apple Watch only)
 
-READINESS_FORMULA = {
+READINESS_FORMULA: dict[str, Any] = {
     "score": "round(Σ score_i · w_i / Σ w_i, 1) over the components present (missing ones re-normalise)",
     "labels": "GREEN ≥ 70 · YELLOW ≥ 40 · RED < 40",
     "components": {
