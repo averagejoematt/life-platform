@@ -26,6 +26,7 @@ from common.digest_utils import (
     fmt,
     safe_float,
 )
+from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -202,7 +203,7 @@ def ex_strava(recs_dict, profile):
     recs = list(recs_dict.values()) if recs_dict else []
     if not recs:
         return None
-    max_hr = profile.get("max_heart_rate", 186)
+    max_hr = max_hr_from_profile(profile)
     z2_low = max_hr * 0.60
     z2_high = max_hr * 0.70
     acts = []

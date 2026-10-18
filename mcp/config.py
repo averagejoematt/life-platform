@@ -74,7 +74,8 @@ _DEFAULT_SOURCE_OF_TRUTH = {
 # Public alias: the static domain map (the stored profile's `source_of_truth` overrides it).
 SOURCE_OF_TRUTH = _DEFAULT_SOURCE_OF_TRUTH
 
-P40_GROUPS = ["Data", "Discipline", "Growth", "Hygiene", "Nutrition", "Performance", "Recovery", "Supplements", "Wellbeing"]
+# P40_GROUPS retired (#4624): zero readers, and the nine-area list predates the owner's Core / Optimize / Vice regroup.
+# The groups come from the live Habitify /areas response (ingestion/habitify_lambda.py), never a list here.
 
 FIELD_ALIASES = {
     "strava": {

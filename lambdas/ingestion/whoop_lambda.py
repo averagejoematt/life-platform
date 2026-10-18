@@ -487,6 +487,8 @@ def _extract_workout(workout: dict) -> dict:
 
 
 def _sleep_onset_minutes(iso_ts: str | None) -> int | None:
+    """Minutes after UTC midnight of the instant (#4624: the stored `sleep_onset_minutes` is UTC-framed, not Pacific
+    clock time; its only reader is the midnight-wrapped consistency std-dev, where the frame cancels)."""
     dt = parse_iso_utc(iso_ts)  # #1964: the one parser
     return dt.hour * 60 + dt.minute if dt else None
 
