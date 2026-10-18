@@ -115,9 +115,9 @@ test("Front: a line in the statistician's jargon, or one with a reader-gate find
 
 test("the record's comparison names the guess and the gap, or says there is none yet", () => {
   const d = B.record.data;
-  assert.match(P.recordLine(B.record), /; (about as good as|better than|worse than) always guessing \d+%, which is how often they're right\.$/);
-  assert.equal(P.guessClause({ ...d, brier_skill: null }), "there is no comparison with a guess yet.");
-  assert.match(P.guessClause({ ...d, skill_n: d.decided + 1 }), /always guessing how often they turn out right\./);
+  assert.match(P.recordLine(B.record), /^\d+ of \d+ checked calls right\. A guess that every call has a \d+% chance of coming true does (about as well|better|worse)\.$/);
+  assert.equal(P.guessClause({ ...d, brier_skill: null }), "There is no comparison with a guess yet.");
+  assert.match(P.guessClause({ ...d, skill_n: d.decided + 1 }), /A guess that every call has the same chance of coming true/);
 });
 
 test("Coaches: one rule for every row — the count, no bar; the lead says no checked calls", () => {
@@ -153,4 +153,20 @@ test("Front: 'this week' for the miss is the week the page prints; outside it th
 
 test("Coaches: one short job form for every coach", () => {
   for (const job of Object.values(P.COACH_JOBS)) assert.ok(job.split(" ").length <= 4 && !/\./.test(job), job);
+});
+
+// ── round 4 ─────────────────────────────────────────────────────────────────────
+const V = await import("../../site/assets/js/ck_verdict.js");
+test("a call sentence says whose reading it was: Matthew's, never a bare 'his' beside a coach's name", () => {
+  assert.equal(V.matthewsCall("Henning Brandt called his weight at about 307.2 lb."), "Henning Brandt called Matthew’s weight at about 307.2 lb.");
+  const html = P.callVerdictsHTML(load("calls"), "/next/v8/");
+  assert.doesNotMatch(html, /called his\b/);
+});
+test("Front, no bet and no exchange: the newest quotable line keeps the coaches' voice; else the no-bet line", () => {
+  const quietDay = { ...B, moves: { state: "ok", data: { days: [{ state: "ok", date: EDITION.as_of, lines: [{ coach_id: "sleep_coach", coach: "Lisa Park", move: "call", text: "Bedtime moved earlier this week." }] }] } } };
+  const out = P.frontReadSlots(EDITION, quietDay, "/next/v8/");
+  assert.match(out["ck-argument"], /Bedtime moved earlier this week\./);
+  assert.equal(out["ck-argue-heading"], "The latest from the coaches.");
+  const silent = { ...B, moves: { state: "ok", data: { days: [] } } };
+  assert.equal(P.frontReadSlots(EDITION, silent, "/next/v8/")["ck-argue-heading"], "No open bet between them this week.");
 });

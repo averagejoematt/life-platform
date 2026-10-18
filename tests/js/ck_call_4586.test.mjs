@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const C = await import("../../site/assets/js/ck_call.js");
+const V = await import("../../site/assets/js/ck_verdict.js");
 const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit_pages_4586");
 const BODY = JSON.parse(readFileSync(join(FIX, "calls.json"), "utf8"));
 const BASE = "/next/v8/";
@@ -115,7 +116,7 @@ test("the front page's last settled call is one block that opens its page", () =
   assert.ok(html.startsWith(`<div class="ck-bet"><p class="ck-small">Settled ${when}</p>`));
   // #4808, the house rule: the tag (verdict and rule) first, then the call with the RESULT bold,
   // then what the allowed distance is — the number once, in the tag
-  assert.ok(html.includes(`<span class="ck-verdicts__tag">Wrong · not within ${call.tolerance.text} points either way</span><p>${call.called} <b>${call.happened_short}</b></p>`));
+  assert.ok(html.includes(`<span class="ck-verdicts__tag">Wrong · not within ${call.tolerance.text} points either way</span><p>${V.matthewsCall(call.called)} <b>${call.happened_short}</b></p>`));
   assert.ok(html.includes(`<p class="ck-soft">The allowed distance is ${call.tolerance.statistic}. `), "the card says what counts as right");
   assert.equal((html.match(new RegExp(call.tolerance.text.replace(".", "\\."), "g")) || []).length, 1, "the allowed distance is printed once");
   const scored = call.simple_guess && call.simple_guess.state === "scored" && call.simple_guess.short;

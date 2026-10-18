@@ -257,12 +257,15 @@ const countedText = (d) => String((d && d.counted_text) || "").trim();
 // The precise skill figure is said once, on Coaches, under the breakdown (`skillClause`).
 export const NEAR_SKILL = 0.05;
 const baseRate = (d) => (num(d.skill_n) !== null && d.skill_n === d.decided && num(d.right) !== null && d.decided > 0 ? Math.round((100 * d.right) / d.decided) : null);
+// Round 4: name the guess. The served comparison is a Brier skill score against the base rate
+// (stats_core.brier_skill_score): the guess gives EVERY call the same chance of coming true — the
+// share that did. So: "A guess that every call has a 42% chance of coming true does about as well."
 export function guessClause(d) {
   const skill = num(d && d.brier_skill);
-  if (skill === null) return "there is no comparison with a guess yet.";
-  const how = Math.abs(skill) < NEAR_SKILL ? "about as good as" : skill > 0 ? "better than" : "worse than";
+  if (skill === null) return "There is no comparison with a guess yet.";
+  const how = Math.abs(skill) < NEAR_SKILL ? "does about as well" : skill > 0 ? "does worse" : "does better";
   const base = baseRate(d);
-  return base === null ? `${how} always guessing how often they turn out right.` : `${how} always guessing ${base}%, which is how often they're right.`;
+  return base === null ? `A guess that every call has the same chance of coming true ${how}.` : `A guess that every call has a ${base}% chance of coming true ${how}.`;
 }
 export function skillClause(d) {
   const skill = num(d && d.brier_skill);
@@ -272,8 +275,7 @@ export function skillClause(d) {
 }
 export function recordLine(block) {
   if (!usable(block) || !block.data.count_text || !String(block.data.comparison_text || "").trim()) return "";
-  const count = String(block.data.count_text).trim().replace(/[.\s]+$/, "");
-  return `${count}; ${guessClause(block.data)}`;
+  return `${String(block.data.count_text).trim()} ${guessClause(block.data)}`;
 }
 // The breakdown on Coaches, after one plain sentence that says why there is one: "Not all of
 // them are formal predictions. Of the 183: 11 sealed before day one, …". The served sentence's
@@ -306,7 +308,7 @@ export function recordBigHTML(block) {
     d.decided >= MIN_PERCENT_N
       ? `<div class="ck-track" role="img" aria-label="${d.right} of ${d.decided} checked calls right"><i style="width:${Math.round((100 * d.right) / d.decided)}%"></i></div>`
       : "";
-  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span> of ${d.decided} checked calls</span></p>${track}<p>${esc(`${cmp.charAt(0).toUpperCase()}${cmp.slice(1)}`)}</p>${countedHTML(d)}${skillClause(d) ? `<p class="ck-small">${esc(skillClause(d))}</p>` : ""}</div>`;
+  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span> of ${d.decided} checked calls</span></p>${track}<p>${esc(skillClause(d) ? `${cmp} ${skillClause(d)}` : cmp)}</p>${countedHTML(d)}</div>`;
 }
 
 // ── the bet card ───────────────────────────────────────────────────────────────
@@ -662,7 +664,14 @@ export function frontReadSlots(edition, b, base = "/") {
   // against it; failing a bet, the newest exchange, from the served moves.
   const pick = F.pickArgument(moves, b.next);
   out["ck-argue-label"] = esc(F.argumentLabel(pick));
-  if (!pick && b.moves.state === "unavailable") {
+  // Round 4: with no bet and no exchange, the newest dated line that passes the plain-language
+  // rule (any coach, newest first) keeps the coaches' voice on a quiet day; only with none does
+  // the section say there is no open bet.
+  const quiet = pick ? "" : F.lastHeardHTML(moves, [], base);
+  if (quiet) {
+    out["ck-argue-heading"] = esc("The latest from the coaches.");
+    out["ck-argument"] = quiet;
+  } else if (!pick && b.moves.state === "unavailable") {
     // A failed read is not "nothing in dispute": the section says the lines are not served.
     out["ck-argue-heading"] = esc("What they are arguing about.");
     out["ck-argument"] = soft(b.moves.absent_text);
@@ -695,11 +704,8 @@ export function frontReadSlots(edition, b, base = "/") {
     // The last line heard stands in only when the argument section is empty: with an exchange or
     // an open bet above it, the coaches have already spoken on this page, and a further quote is the
     // same voice twice (a quarter screen; red team 2026-10-17 — the front page should get shorter).
-    const heard = pick ? "" : F.lastHeardHTML(moves, shown, base);
-    if (heard) {
-      out["ck-coach-lines-label"] = "The coaches, last heard";
-      out["ck-coach-lines"] = heard;
-    } else if (b.coach_lines.state !== "unavailable") {
+    // No "last heard" row here: with no argument the section above carries the newest quotable line.
+    if (b.coach_lines.state !== "unavailable") {
       out["ck-coach-lines-label"] = null;
       out["ck-coach-lines"] = null;
     }

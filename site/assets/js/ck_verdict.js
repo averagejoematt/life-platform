@@ -148,10 +148,14 @@ export function sharedToleranceNote(calls) {
  *    wrap     "div" (a card in a .ck-verdicts pair), "li" (a day page's row) or "" (inside a
  *             card the caller already drew)
  *    note     false when the caller prints `sharedToleranceNote` once under a pair */
+/** Round 4: "Henning Brandt called his weight" → "called Matthew's weight". The possessive in a
+ *  served call sentence refers to Matthew; on a page that also names coaches, "his" reads as the
+ *  coach's. One helper, so every page that prints a call says it the same way. */
+export const matthewsCall = (text) => String(text || "").replace(/\bcalled his\b/g, "called Matthew’s");
 export function callCardHTML(call, { full = false, when = "", extra = "", href = "", linkText = "The whole call", wrap = "div", note = true, moreDoor = "" } = {}) {
   if (!call || call.kind === "bet") return "";
   const tag = callVerdictTag(call);
-  const said = String((full && call.called) || call.called_short || "").trim();
+  const said = matthewsCall(String((full && call.called) || call.called_short || "").trim());
   const result = String(call.happened_short || "").trim();
   if (!tag || !said || !result) return "";
   const soft = [note ? toleranceNote(call) : "", String(when || "").trim(), String(extra || "").trim()].filter(Boolean).join(" ");

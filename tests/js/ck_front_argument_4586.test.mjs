@@ -261,7 +261,7 @@ test("the deeper rows: the chapter is one door with its week and its own first s
   assert.equal(slots["ck-week-span"], `How the whole thing is going · ${WEEK_SPAN}`);
   for (const gone of ["ck-week", "ck-quotes", "ck-lead-read", "ck-sheet-line"]) assert.equal(slots[gone], undefined, `${gone} left the front page`);
   // The first screen's numbers are doors; a failed block prints its sentence with no door.
-  assert.ok(slots["ck-record"].startsWith(`<a href="/next/v8/coaches/">${B.record.data.count_text.replace(/\.$/, "")};`));
+  assert.ok(slots["ck-record"].startsWith(`<a href="/next/v8/coaches/">${B.record.data.count_text} A guess that`));
   assert.ok(slots["ck-mark-caption"].startsWith(`<a href="/next/v8/trend/?m=weight"><b>${B.today.data.weight_lbs.toFixed(1)} lb</b>`));
   const gone = { state: "unavailable", absent_text: "Not served right now.", data: null };
   assert.equal(P.frontSlots(edition, { ...B, record: gone, today: gone }, BASE)["ck-record"], "Not served right now.");
