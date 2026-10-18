@@ -307,8 +307,8 @@ export function scorecardRows(block) {
 export const shortRule = (rule) => String(rule || "").replace(/\s*(?:Fewer than|When the)[^.]*not enough data\.?\s*$/, "").trim();
 // A row that earned its mark: going well, or ahead of the plan. Both take the filled dot.
 const EARNED = new Set(["going_well", "faster_than_planned"]);
-const NOTHING = /^nothing this week\.?$/i;
-export function scorecardHTML(block, base = "/", { label = true } = {}) {
+const TO_DATE = /not this week['’]s alone/;
+export function scorecardHTML(block, base = "/", { label = true, aiText = "" } = {}) {
   const rows = scorecardRows(block);
   if (!rows.length) return soft((block && block.absent_text) || "The scorecard is not served right now.");
   const d = block.data;
@@ -327,20 +327,27 @@ export function scorecardHTML(block, base = "/", { label = true } = {}) {
       const dot = EARNED.has(r.verdict) ? '<i class="ck-dot" aria-hidden="true"></i>' : `<i class="ck-dot ck-dot--off${thin ? " ck-dot--none" : ""}" aria-hidden="true"></i>`;
       const thinLabel = thin ? ' <span class="ck-small">Not enough data for a verdict.</span>' : "";
       const rule = r.rule ? `<br><span class="ck-small">${esc(shortRule(r.rule))}</span>` : "";
-      return `<li>${keyHTML}<span>${dot}<b>${esc(r.verdict_text)}.</b> ${esc(r.text || "")}${thinLabel}${rule}</span></li>`;
+      // The AI row (#4580 W3): the engine's shared comparison sentence — served on the row, or the
+      // record block's `comparison_text` the caller passes (lane E writes it once, record_words) —
+      // else the row's verdict; and the "to date, not this week's alone" clause once — the rule
+      // under the row already says it with the yardstick, so the row's own copy is dropped.
+      const shared = key === "ai" ? String(r.comparison_text || aiText || "").trim().replace(/\.$/, "") : "";
+      const verdict = shared || r.verdict_text;
+      const text = key === "ai" && TO_DATE.test(String(r.rule || "")) && TO_DATE.test(String(r.text || "")) ? "" : r.text || "";
+      return `<li>${keyHTML}<span>${dot}<b>${esc(verdict)}.</b> ${esc(text)}${thinLabel}${rule}</span></li>`;
     })
     .join("");
-  const right = d.went_right || {};
-  // "Nothing this week." is not a line worth a row: a party with nothing to show is left out,
-  // and with neither having anything the part is not printed at all.
-  const said = (part) => (part && part.text && !NOTHING.test(String(part.text).trim()) ? part.text : "");
-  const line = (who, part) => (said(part) ? `<li><span class="ck-rows__key">${esc(who)}</span><span>${esc(said(part))}</span></li>` : "");
-  const wentRight = `${line("Matthew", right.matthew)}${line("The engine", right.engine)}`;
+  // "What went right this week" is no longer printed (#4580 W2): its "Matthew" row repeated the
+  // Sleep row word for word, and it was built upstream from GOING_WELL alone while the filled
+  // dot also marks "faster than planned" — one page, two sources, two answers. The filled dots
+  // are what went right, and the rule line says so.
+  // "The rules in grey were written down on Friday, October 9." (#4580 W8): the served sentence
+  // has no antecedent on the page; "in grey" gives it one without changing its day.
+  const rules = String(d.rules_set_text || "").replace(/^The rules were set on\b/, "The rules in grey were written down on");
   return [
     label ? `<p class="ck-label">How the whole thing is going</p>` : "",
     `<ul class="ck-rows">${items}</ul>`,
-    wentRight ? `<p class="ck-label">What went right this week</p><ul class="ck-rows">${wentRight}</ul>` : "",
-    small(d.rules_set_text),
+    small([items.includes('class="ck-dot"') ? "A filled dot is an area going well this week." : "", rules].filter(Boolean).join(" ")),
   ].join("");
 }
 // The first sentences of a text, up to `max` characters, never cut mid-sentence.

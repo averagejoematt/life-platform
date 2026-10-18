@@ -23,7 +23,7 @@
 import { tryJSON, esc, fmtShort } from "/assets/js/evidence_shared.js";
 import { dayInWords } from "/assets/js/entry_age.js";
 import { callHref, callsOf, withFrom, backFor, setBack } from "/assets/js/ck_call.js";
-import { callCardHTML, hasRule, ruleless } from "/assets/js/ck_verdict.js";
+import { callCardHTML, hasRule, ruleless, gradedOnText } from "/assets/js/ck_verdict.js";
 
 const LB_PER_KG = 2.20462;
 const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
@@ -261,7 +261,10 @@ export function dayLiftsHTML(iso, src, base) {
         .map(([k, word]) => `${whole(minutes[k])} minutes of ${word}`)
     : [];
   const otherLine = other.length ? soft(`Also that day: ${other.join("; ")}.`) : "";
-  if (!session || !(session.exercises || []).length) return otherLine || soft("No training was recorded on this day.");
+  // "What I lifted." over a walk alone read as a heading over nothing (#4580 D1): the absence
+  // is said first, then what else the day recorded. The walking minutes are the served
+  // training_overview.daily_modality_minutes_30d[date].walking_min, the field the front reads too.
+  if (!session || !(session.exercises || []).length) return otherLine ? `${soft("No lifting logged that day.")}${otherLine}` : soft("No training was recorded on this day.");
   const named = session.exercises.filter((e) => e && e.name);
   const worked = named.filter((e) => (e.sets || []).some(isWork));
   // Timed or distance work (the bike, stretching, a carry) has no reps: it is named with its
@@ -319,6 +322,23 @@ export function dayNavHTML(iso, src, base) {
 
 // ── what was said and settled on the day (#4648) ───────────────────────────────
 const SETTLED_FIRST = 2; // calls shown before the rest fold under one disclosure
+// A call that can be checked names a day and a number: a month, a weekday, "tomorrow", "tonight",
+// "next week" or "by/within/in N days", and a figure.
+const DATE_WORD = /\b(january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|tonight|next week|this week|(?:by|within|in|over) (?:the )?(?:next )?\d+ (?:days?|weeks?|mornings?|nights?))\b/i;
+export const datedCall = (text) => DATE_WORD.test(String(text || "")) && /\d/.test(String(text || ""));
+// The day the checked reading was taken, in words (#4580 D2): the served `observed_on` when the
+// route carries it ("Graded on Friday’s reading, October 16."); until then the day named in the
+// served `called` sentence, through the shared reader. "" when neither names one.
+export function observedOnText(call) {
+  const iso = call && isDay(call.observed_on) ? call.observed_on : "";
+  // The served words ("Friday, October 16", lane E's `observed_on_text`) when the day itself is not.
+  const words = iso ? dayInWords(iso) : String((call && call.observed_on_text) || "").trim();
+  if (words) {
+    const [weekday, ...rest] = words.split(", ");
+    return weekday && rest.length ? `Graded on ${weekday}’s reading, ${rest.join(", ")}.` : `Graded on the reading for ${words}.`;
+  }
+  return gradedOnText(call);
+}
 export const coachHref = (base, id) => `${base}coach/?c=${encodeURIComponent(id)}`;
 // The coaches' lines for the day, from GET /api/coach_moves?date=<day>: who, the kind of
 // line it is, and the words exactly as served. "" when the day has none, when the body is
@@ -330,7 +350,11 @@ export function daySaidHTML(iso, movesBody, base) {
     .map((l) => {
       // The coach's page returns to this day by name (#4675).
       const name = l.coach_id ? `<a class="ck-link" href="${esc(withFrom(coachHref(base, l.coach_id), iso))}">${esc(l.coach)}</a>` : esc(l.coach);
-      const kind = l.move === "reply" && l.replies_to ? `A reply to ${l.replies_to}` : [l.move_label, l.replies_to ? `replying to ${l.replies_to}` : ""].filter(Boolean).join(" · ");
+      // A "call" with no date and no number in it cannot be checked, so it is labelled a note
+      // (#4580 D3: "38 days without a journal entry … I expect the silence continues" was served
+      // as "A call"). The engine's own relabelling is lane E's; this is the page's floor.
+      const label = l.move === "call" && !datedCall(l.text) ? "A note" : l.move_label;
+      const kind = l.move === "reply" && l.replies_to ? `A reply to ${l.replies_to}` : [label, l.replies_to ? `replying to ${l.replies_to}` : ""].filter(Boolean).join(" · ");
       return `<li><span class="ck-coach__who">${name}${kind ? esc(` · ${kind}`) : ""}</span><span>“${esc(l.text)}”</span></li>`;
     })
     .join("");
@@ -346,7 +370,7 @@ function settledRow(call, base, iso = "") {
   if (call.kind === "bet") {
     return `<li><span class="ck-soft">${esc(call.verdict_text || "Settled")}</span><span>${esc(call.called_short || call.called)} <b>${esc(call.happened_short)}</b></span><a class="ck-link" href="${esc(href)}">The whole call</a></li>`;
   }
-  return callCardHTML(call, { href, wrap: "li" });
+  return callCardHTML(call, { href, wrap: "li", when: observedOnText(call) });
 }
 // Every call settled on the day, from GET /api/calls. "" when none settled that day. Under
 // the coaches' lines it takes a label, not a second heading: the two are one part of the day.

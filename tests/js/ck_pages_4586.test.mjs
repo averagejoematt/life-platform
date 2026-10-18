@@ -106,8 +106,8 @@ test("the coaches' count never renders without its comparison", () => {
   assert.ok(P.recordBigHTML(B.record).includes(`${rd.right}<span> of ${rd.decided} checked calls</span>`));
   // Round 4: on Coaches the precise clause follows the guess sentence directly, so "that guess" has its antecedent.
   assert.ok(P.recordBigHTML(B.record).includes(`${P.guessClause(rd)} ${P.skillClause(rd)}`), "the guess, then the precise clause");
-  assert.equal(P.recordBigHTML(B.record).split("Weighing how sure").length - 1, 1, "said once");
-  assert.doesNotMatch(P.recordLine(B.record), /Weighing/, "the front page and Start carry the plain sentence only");
+  assert.equal(P.recordBigHTML(B.record).split("Counting how sure").length - 1, 1, "said once");
+  assert.doesNotMatch(P.recordLine(B.record), /Counting how sure/, "the front page and Start carry the plain sentence only");
   assert.match(P.guessClause({ ...rd, brier_skill: null }), /no comparison with a guess yet/);
 });
 
@@ -121,8 +121,10 @@ test("no percentage picture on fewer than 20 checked calls", () => {
     // Round 2: one rule for every row — the count, never a bar.
     assert.doesNotMatch(row(c.name), /ck-meter/, c.name);
   }
-  assert.match(row("Eli Marsh"), /no checked calls/);
-  assert.match(row("Amara Patel"), /Sitting out: no sensor since August 27\./);
+  assert.match(row("Eli Marsh"), /runs the program, so no checked calls/);
+  // #4580 C5: the sitting-out sentence is one small line under the list, not a four-line job cell.
+  assert.doesNotMatch(row("Amara Patel").split("</li>")[0], /sitting out/i);
+  assert.match(html, /<\/ul><p class="ck-small">Amara Patel is sitting out: no sensor since August 27\.<\/p>$/);
   const few = { ...B.record, data: { ...B.record.data, right: 3, decided: 7 } };
   assert.doesNotMatch(P.recordBigHTML(few), /ck-track/);
 });
