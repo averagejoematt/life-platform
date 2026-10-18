@@ -216,6 +216,7 @@ def _commit_through_the_transport(ir: RoutineSpec, fake: _FakeHevy) -> dict[str,
             patch("training.hevy_template_cache.resolve_movement", return_value=TID),
             patch("training.routine_title.build_title_context", return_value=_TITLE_CTX),
             patch("mcp.routine_spec_ledger.save_routine_spec", return_value={"saved": True, "key": "stub"}),
+            patch("mcp.hevy_prescription_gate._load_indexes", return_value=({}, {}, None)),  # offline: no DDB read
             patch.object(wc, "_request", side_effect=fake),
         ):
             stack.enter_context(cm)

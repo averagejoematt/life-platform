@@ -730,7 +730,8 @@ Hevy data is stored at the workout and set level, not day-level aggregates. Acce
 | `end_time` | string | ISO timestamp |
 | `duration_sec` | number | Workout duration (seconds) |
 | `total_volume_kg` | number | Sum of weight × reps across all sets (kg) |
-| `exercises` | list | Per-exercise objects with sets (reps × weight) |
+| `exercises` | list | Per-exercise objects with sets (reps × weight); each exercise's `notes` is Hevy's Workout Note, verbatim |
+| `owner_session_note` | string | Matthew's workout notes as session feedback (#5047): one `"<exercise>: <text>"` line per noted exercise, setup-marked lines (`📌`/`Setup:`/`Pinned:`, #5024) removed; `""` when none. Present from the first ingest after #5047; the three Hevy note types are mapped in `docs/integrations/hevy-changes-2026-10.md` §6 |
 | `exercise_count` | number | Number of exercises |
 | `set_count` | number | Total sets across exercises |
 | `original_unit` | string | Unit hint from the raw payload |
