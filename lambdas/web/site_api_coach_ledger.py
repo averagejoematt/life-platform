@@ -37,6 +37,7 @@ from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-
 from web import (
     claim_sourcing,  # #4673: a dated claim citing a sensor with no reading that day is not quoted
     prediction_reason,  # #4220: a graded call's reason in reader words
+    record_words,  # #4580 round 1: the base-rate guess's exact rate, beside the counts
 )
 from web.site_api_common import (
     PT,
@@ -812,6 +813,12 @@ def _counted_block(decided) -> dict:
     return {"counted": counted, "counted_text": coach_record.counted_text(counted)}
 
 
+def _record_extras(decided_rows, confirmed: int, decided: int) -> dict:
+    """What rides beside a record's counts: what they count (#4617) and, #4580 round 1, the exact rate a
+    base-rate guess assigns every call (``web.record_words.baseline``) — the field behind the one sentence."""
+    return {**_counted_block(decided_rows), "baseline": record_words.baseline(confirmed, decided)}
+
+
 def record_bodies(rows_by_cid: dict, today_pt: str, genesis) -> dict:
     """The record line's five facts from the coaches' raw PREDICTION# rows (#4607) — pure.
 
@@ -844,7 +851,7 @@ def record_bodies(rows_by_cid: dict, today_pt: str, genesis) -> dict:
                 "refuted": refuted,
                 "decided": confirmed + refuted,
                 "due": {"as_of": today_pt},
-                **_counted_block(season_all),
+                **_record_extras(season_all, confirmed, confirmed + refuted),
             }
         },
         "calibration": {
@@ -1230,7 +1237,7 @@ def handle_predictions(event, *, _g):
                     "decided": resolved,
                     "accuracy_pct": accuracy_pct,
                     "due": due,
-                    **_counted_block(season_decided),  # #4617: sealed / bets / commentary / conditional, as counts
+                    **_record_extras(season_decided, confirmed, resolved),  # #4617 counts + the #4580 base-rate guess's rate
                     "lifetime": {
                         "total": l_total,
                         "confirmed": l_confirmed,

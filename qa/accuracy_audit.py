@@ -405,6 +405,7 @@ _SHARE_PCT_FIELDS = frozenset(
         "protein_cal_pct",
         "protein_floor_hit_pct",
         "protein_hit_pct",
+        "rate_pct",  # #4580 lane E: record_words.baseline — right / decided x 100, the share of checked calls that came true, <= 100 by construction
         "rdw_pct",
         "recovery_pct",
         "rem_pct",

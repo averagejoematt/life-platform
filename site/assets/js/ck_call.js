@@ -37,8 +37,26 @@ export const NO_RULE = "The rule this call was checked by is not served, so it i
 const LIST_FIRST = 8; // rows shown before the rest fold under one disclosure
 
 const soft = (t) => (t ? `<p class="ck-soft">${esc(t)}</p>` : "");
+const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const shortDay = (iso) => dayInWords(iso, { weekday: false });
 const isCall = (c) => c && typeof c.id === "string" && c.called_short && c.happened_short && c.settled_date;
+
+// The served `called_short` of a bet can drop the unit its long `called` carries ("at or above 26"
+// beside "(… as a percentage)"). Until the route serves the unit on the short form, it is read off
+// the long one — only when the long form names it, never guessed (#4580 round 1, call-4).
+const UNIT_FROM_CALLED = [
+  [/\bas a percentage\b/i, "%", ""],
+  [/\bin pounds\b/i, " lb", " "],
+  [/\bin grams\b/i, " g", " "],
+];
+export function calledShortWithUnit(call) {
+  const short = String((call && call.called_short) || "");
+  const long = String((call && call.called) || "");
+  const bare = /\b((?:at or )?(?:above|below|over|under|at least|at most)\s+)(-?\d+(?:\.\d+)?)(?=\s+on\b|\s+by\b|[.,;]|$)/;
+  if (!short || !long || !bare.test(short)) return short;
+  for (const [names, unit] of UNIT_FROM_CALLED) if (names.test(long)) return short.replace(bare, `$1$2${unit}`);
+  return short;
+}
 
 // ── where a deep page returns to (#4675) ───────────────────────────────────────
 // A deep page exists only as the destination of a number or a name, and returns to where the
@@ -163,9 +181,19 @@ export function claimHTML(call, base = "") {
     return `<div class="ck-bet"><p class="ck-small">${esc(logged ? `A bet opened ${logged}` : "A bet between two coaches")}</p><p><b>${esc(call.called)}</b></p>${sides}</div>`;
   }
   const when = logged ? ` · ${call.sealed ? `sealed ${logged}, before day one` : `logged ${logged}`}` : "";
-  return `<div class="ck-bet"><p class="ck-small">${coachNameHTML(call, call.coach_id, call.coach_name, base)}${esc(when)}</p><p><b>“${esc(call.claim)}”</b></p>${soft(call.called)}</div>`;
+  // Site-to-A round 1: the call is said ONCE at the top — the page's title is the route's sentence
+  // (`called_short`), so this card is who, when, and the coach's own words; the route's longer
+  // sentence (the same call with its graded day) is not printed under it a third time. The graded
+  // day is said in the outcome.
+  return `<div class="ck-bet"><p class="ck-small">${coachNameHTML(call, call.coach_id, call.coach_name, base)}${esc(when)}</p><p><b>“${esc(call.claim)}”</b></p></div>`;
 }
 
+// "The simple guess was also right." when the coach's call and the guess both came out right;
+// "" otherwise (the guess's own card carries its verdict either way).
+export function guessAlso(call) {
+  const g = call && call.simple_guess;
+  return g && g.state === "scored" && g.right === true && call.verdict === "right" ? "The simple guess was also right." : "";
+}
 // What happened, the verdict and the simple guess: the kit's verdict pair. With `base`, the
 // graded day opens that day's page (#4675).
 export function outcomeHTML(call, base = "") {
@@ -177,8 +205,9 @@ export function outcomeHTML(call, base = "") {
   const day = measuredDay(call);
   const iso = base ? gradedDayISO(call) : "";
   const gradedHTML = graded && iso && day ? esc(graded).replace(esc(day), `<a class="ck-link" href="${esc(withFrom(`${base}day/?d=${iso}`, `call:${call.id}`))}">${esc(day)}</a>`) : esc(graded);
-  const when = `${graded ? ` ${gradedHTML}` : ""}${checked ? esc(` Checked ${checked}.`) : ""}`;
-  const softHTML = (lead) => (lead || when ? `<p class="ck-soft">${esc(lead || "")}${when}</p>` : "");
+  // The page's label already says the day it settled, so "Checked <day>" is not said again here.
+  const when = graded ? ` ${gradedHTML}` : "";
+  const softHTML = (lead, tail = "") => (lead || when || tail ? `<p class="ck-soft">${esc(lead || "")}${when}${tail ? `${lead || when ? " " : ""}${esc(tail)}` : ""}</p>` : "");
   if (call.kind === "bet") {
     const cards = (call.sides || [])
       .filter((s) => s && s.coach_name)
@@ -188,17 +217,59 @@ export function outcomeHTML(call, base = "") {
   }
   // #4808: the tag carries the rule; the soft line says what the allowed distance is, once. A
   // call whose rule cannot be read is not shown as right or wrong: no tag and no "was right".
+  // Site-to-A round 1: the result is the heading above this card (`happened_short`), so the card
+  // does not restate it in bold, and "<coach> was right" is the tag's own word — the soft line is
+  // the rule in words, the day it was graded on, and, when the simple guess also won, that fact.
   const tag = callVerdictTag(call);
-  const lead = tag ? [call.verdict_text, toleranceNote(call)].filter(Boolean).join(" ") : NO_RULE;
-  const verdict = `<div>${tag}<p><b>${esc(call.happened)}</b></p>${softHTML(lead)}</div>`;
+  const verdict = tag ? `<div>${tag}${softHTML(toleranceNote(call), guessAlso(call))}</div>` : `<div>${softHTML(NO_RULE)}</div>`;
   return `<div class="ck-verdicts">${verdict}${guessCard(call)}</div>`;
 }
 
-// The running record beside the call: counts only, in the route's own sentence, and never
-// alone (#4585): what a simple guess scored on the same calls sits directly under it.
+// The running record beside the call: counts only, in the route's own words, and never alone
+// (#4585): what a simple guess scored on the same calls sits directly under it.
+// Site-to-A round 1: the served comparison is one ~120-word sentence, one clause per kind of call,
+// that says "the coaches" of what is ONE coach's record. The page prints two short sentences
+// naming the coach — the served count ("Max Reyes: 13 of 27 checked calls right.") and the
+// comparison's verdict per kind, read off the served clauses' own verdict words (level / right
+// more often), never added across kinds — and keeps the served sentence whole one tap below.
+// A served short form (`comparison.short`, lane E of #4580) is printed instead when it arrives;
+// a sentence in another shape is printed as served with "the coaches" named as the coach.
+// One served clause per kind of call: "<Kind>: on the N a guess could also be checked against, the
+// coaches were right X and a guess that nothing changes Y — <verdict>[, <qualifier>]."
+const KIND_WORDS = { "Number calls": "number calls", "Direction calls": "direction calls", "Yes/no bets": "yes/no bets", "Sealed day-one predictions": "sealed day-one predictions" };
+const CLAUSE_RE = /^(Number calls|Direction calls|Yes\/no bets|Sealed day-one predictions): on the \d+ a guess could also be checked against, the coaches were right .+? and a guess that nothing changes .+? — ([^,]+?)(?:, (?:but )?([^.]+))?\.$/;
+const listWords = (items) => (items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`);
+const standing = (verdict) => (/^level$/i.test(verdict) ? "level" : /^the coaches were right more often$/i.test(verdict) ? "ahead" : /^a guess .* more often$/i.test(verdict) ? "behind" : "");
+export function recordComparisonShort(name, cmp) {
+  const served = cmp && typeof cmp.short === "string" ? cmp.short.trim() : "";
+  if (served) return served;
+  const sentence = cmp && typeof cmp.sentence === "string" ? cmp.sentence.trim() : "";
+  if (!sentence) return "";
+  const clauses = sentence.split(/(?<=\.)\s+(?=(?:Number calls|Direction calls|Yes\/no bets|Sealed day-one predictions):)/).map((c) => CLAUSE_RE.exec(c.trim()));
+  // Any clause in another shape: the served sentence stands as served (nothing is reworded).
+  if (!clauses.length || clauses.some((m) => !m || !standing(m[2]))) return sentence;
+  const by = { ahead: [], level: [], behind: [] };
+  for (const m of clauses) by[standing(m[2])].push(KIND_WORDS[m[1]]);
+  const parts = Object.entries(by).filter(([, kinds]) => kinds.length).map(([word, kinds]) => `${word} on ${listWords(kinds)}`);
+  const guess = (cmp.rule_words && String(cmp.rule_words).trim()) || "a guess that nothing changes";
+  const quals = clauses.map((m) => (m[3] || "").trim());
+  const margin = quals.every(Boolean) ? (quals.every((q) => q === quals[0]) ? `, each ${quals[0]}` : ", none by a clear margin") : "";
+  return `Against ${guess}, ${name || "the coach"} is ${listWords(parts)}${margin}.`;
+}
 export function recordHTML(call, body) {
   if (!isCall(call)) return "";
-  const lines = (call.records || []).filter((r) => r && r.text).map((r) => `<p>${esc(r.text)}</p>${coachComparison(r.comparison, { cls: "ck-soft" })}`);
+  const lines = (call.records || [])
+    .filter((r) => r && r.text)
+    .map((r) => {
+      const name = (/^([^:]+):/.exec(String(r.text)) || [])[1] || "";
+      const sentence = r.comparison && typeof r.comparison.sentence === "string" ? r.comparison.sentence.trim() : "";
+      const short = recordComparisonShort(name, r.comparison);
+      const inline = short && short !== sentence ? short : "";
+      // The comparison's full served sentence, whole, one tap below (the comparison reader's own
+      // paragraph, so a missing block is still the honest absence line, #4585).
+      const whole = inline ? `<details><summary>The record by kind of call</summary>${coachComparison(r.comparison, { cls: "ck-soft" })}</details>` : coachComparison(r.comparison, { cls: "ck-soft" });
+      return `<p>${esc(r.text)}${inline ? ` ${esc(inline)}` : ""}</p>${whole}`;
+    });
   const more = body && body.excluded && body.excluded.count ? "The record counts every checked call, including the ones with no page of their own." : "";
   return `${lines.join("")}${soft(more)}`;
 }
@@ -271,8 +342,26 @@ export function nextCallHTML(callsBody) {
 // is the rule, is the row's own sentence.
 // A row opens the call's page, which then returns here by name (#4675).
 const row = (base) => (c) =>
-  `<li><a href="${esc(withFrom(callHref(base, c.id), "calls"))}">${esc(`${shortDay(c.settled_date)}: ${c.called_short}`)} <span>${esc(c.kind === "bet" ? c.verdict_text || "Settled" : callVerdictText(c) || "Not shown as right or wrong: its rule is not served.")}</span></a></li>`;
-export function listHTML(callsBody, base) {
+  `<li><a href="${esc(withFrom(callHref(base, c.id), "calls"))}">${esc(`${shortDay(c.settled_date)}: ${calledShortWithUnit(c)}`)} <span>${esc(c.kind === "bet" ? c.verdict_text || "Settled" : callVerdictText(c) || "Not shown as right or wrong: its rule is not served.")}</span></a></li>`;
+// Round 2 (call, G9/G10): 8 listed + 55 earlier + 115 without a page was 178 against the 183
+// every other page prints. The five are the bets: one page each here, two sides each in the
+// record (record.counted.bet counts sides). So the sum is printed from served fields — the list's
+// count, its bets, `excluded.count` and the record's `decided` — and only when they add up; when
+// they do not, the line says how many of the record's calls this page accounts for and no more.
+// Never two totals.
+export function countsLine(callsBody, decided) {
+  const calls = callsOf(callsBody);
+  const shown = num(callsBody && callsBody.count) !== null ? callsBody.count : calls.length;
+  const bets = calls.filter((c) => c && c.kind === "bet").length;
+  const out = num(callsBody && callsBody.excluded && callsBody.excluded.count) !== null ? callsBody.excluded.count : 0;
+  if (num(decided) === null || !shown) return "";
+  if (shown + bets + out === decided) {
+    const betWords = bets ? `, ${bets} of them ${bets === 1 ? "a bet the record counts" : "bets the record counts"} once for each coach` : "";
+    return `${decided} checked calls in all: ${shown} with a page here${betWords}${out ? `, and ${out} without` : ""}.`;
+  }
+  return `${shown + out} of the ${decided} checked calls are accounted for on this page; the rest count in the record only.`;
+}
+export function listHTML(callsBody, base, { decided = null } = {}) {
   const calls = callsOf(callsBody);
   if (!calls.length) return "";
   const first = calls.slice(0, LIST_FIRST).map(row(base)).join("");
@@ -281,7 +370,8 @@ export function listHTML(callsBody, base) {
     ? `<details><summary>${rest.length} earlier ${rest.length === 1 ? "call" : "calls"}</summary><ul class="ck-rows ck-rows--more ck-rows--calls">${rest.map(row(base)).join("")}</ul></details>`
     : "";
   const out = callsBody.excluded && callsBody.excluded.text ? soft(callsBody.excluded.text) : "";
-  return `<ul class="ck-rows ck-rows--more ck-rows--calls">${first}</ul>${older}${out}`;
+  const sum = countsLine(callsBody, decided);
+  return `<ul class="ck-rows ck-rows--more ck-rows--calls">${first}</ul>${older}${out}${sum ? `<p class="ck-small">${esc(sum)}</p>` : ""}`;
 }
 
 // The page's own title and link-card text, from the call.
@@ -289,7 +379,7 @@ export function metaFor(call) {
   if (!isCall(call)) return { title: "A coach’s call, checked — Average Joe Matt", description: "" };
   const text = call.kind === "bet" ? call.verdict_text : callVerdictText(call);
   const result = text ? `${text}${call.kind === "bet" ? "" : "."}` : "";
-  return { title: `${call.title} — Average Joe Matt`, description: [call.called_short, call.happened_short, result].filter(Boolean).join(" ") };
+  return { title: `${call.title} — Average Joe Matt`, description: [calledShortWithUnit(call), call.happened_short, result].filter(Boolean).join(" ") };
 }
 
 // ── mount ──────────────────────────────────────────────────────────────────────
@@ -317,7 +407,10 @@ export async function mount() {
   // Back goes to the page named by `from=`, by name; without it, the front page (#4675).
   const from = params.get("from") || "";
   setBack(backFor(from, base));
-  const body = await tryJSON("/api/calls");
+  const [body, edition] = await Promise.all([tryJSON("/api/calls"), tryJSON("/api/edition")]);
+  // The record's total, for the counts line under the list (round 2): the edition's record block.
+  const rec = edition && edition.blocks && edition.blocks.record;
+  const decided = rec && (rec.state === "ok" || rec.state === "stale") && rec.data ? num(rec.data.decided) : null;
   setBack(backFor(from, base, callNames(body)));
   const calls = callsOf(body);
   const call = id ? findCall(body, id) : calls[0];
@@ -327,14 +420,14 @@ export async function mount() {
     fill("ck-title", id && calls.length ? "Not a settled call" : "A coach’s call, checked");
     fill("ck-call", soft(calls.length ? NO_SUCH_CALL : (body && body.absent_text) || NOT_SERVED));
     drop("ck-outcome-section", "ck-record-section");
-    fill("ck-list", listHTML(body, base));
+    fill("ck-list", listHTML(body, base, { decided }));
     if (!calls.length) drop("ck-list-section");
     document.body.dataset.ckReady = "1";
     return;
   }
   const day = dayInWords(call.settled_date);
   fill("ck-label", esc(day ? `Settled ${day}` : "A settled call"));
-  fill("ck-title", esc(call.called_short));
+  fill("ck-title", esc(calledShortWithUnit(call)));
   setMeta(metaFor(call));
   fill("ck-call", claimHTML(call, base));
   fill("ck-happened", esc(call.kind === "bet" ? call.verdict_text : call.happened_short));
@@ -345,7 +438,7 @@ export async function mount() {
     drop("ck-list-section");
     fill("ck-all", `<a class="ck-link" href="${esc(base)}call/">Every settled call, newest first</a>`);
   } else {
-    fill("ck-list", listHTML(body, base));
+    fill("ck-list", listHTML(body, base, { decided }));
     drop("ck-all");
   }
   document.body.dataset.ckReady = "1";

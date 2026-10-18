@@ -32,6 +32,13 @@ export const SCHEDULED = { count: 81, asOf: "2026-10-17" };
  *  _THRESHOLD_REFERENCE_CEILING, EARLY_MONTH_DAYS, the trailing window in the handler). */
 export const GOVERNOR = { shares: [55 / 75, 65 / 75, 73 / 75], earlyDays: 5, windowDays: 7 };
 
+/** What each tier means for a reader, in plain words, said once where the tier is first named. */
+export const TIER_WORDS = {
+  1: "behind-the-scenes AI is paused, and nothing a reader sees changes",
+  2: "behind-the-scenes AI, the coaches’ daily commentary, the weekly writing and the podcast are paused",
+  3: "all AI is paused, and a reader’s question gets a “paused” answer",
+};
+
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const whole = (v) => Math.round(v).toLocaleString("en-US");
 const usd = (v) => `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -58,7 +65,8 @@ export function programsHTML(stats, coaches) {
   const read = sources === null ? "" : ` They read ${whole(sources)} sources of data: devices, apps and lab results.`;
   const roster = coaches && Array.isArray(coaches.coaches) ? coaches.coaches.length : 0;
   const cast = roster ? ` ${whole(roster)} AI coaches write and predict.` : "";
-  return numberHTML(whole(SCHEDULED.count), `programs run on a timer.${onCall}${read}${cast}`, `As of ${day(SCHEDULED.asOf)}.`);
+  // The timer count is read from the code, not served; it carries the day it was counted.
+  return numberHTML(whole(SCHEDULED.count), `programs run on a timer.${onCall}${read}${cast}`, `Counted ${day(SCHEDULED.asOf)}, from the code.`);
 }
 
 /** Longest comparison sentence printed open under the count; a longer one folds under a summary. */
@@ -75,13 +83,21 @@ export function recordHTML(predictions) {
   // under a summary directly below the count instead, so it never pushes the page past its screen budget (#4864).
   const cmp = comparisonText(predictions.comparison).length > COMPARISON_OPEN_MAX ? `<details><summary>What a simple guess scored on the same calls</summary>${line}</details>` : line;
   const when = day(o.due && o.due.as_of) || instant(predictions._meta && predictions._meta.served_at);
-  const dated = `${when ? `As of ${when}. ` : ""}Code does the grading, not a person and not an AI.`;
+  const dated = `${when ? `Checked to ${when}. ` : ""}Code does the grading, not a person and not an AI.`;
   return numberHTML(`${whole(right)} right, ${whole(wrong)} wrong`, "is the AI coaches’ record on the predictions that have come due.", dated, cmp);
 }
 
 /** The numbers section: two blocks, each figure dated. Spend has its own section. */
 export function numbersHTML(src) {
   return [programsHTML(src.stats, src.coaches), recordHTML(src.predictions)].join("");
+}
+
+/** The day at the top of the page: the latest instant any of its routes was served. */
+export function foldDay(src) {
+  const stamps = [src.stats && src.stats._meta && src.stats._meta.served_at, src.receipts && (src.receipts.computed_at || src.receipts.as_of), src.predictions && src.predictions._meta && src.predictions._meta.served_at]
+    .filter((s) => typeof s === "string" && Number.isFinite(Date.parse(s)))
+    .sort();
+  return stamps.length ? instantDayInWords(stamps[stamps.length - 1]) : "";
 }
 
 /** Every /api/receipts field the cost section prints or decides on, by sentence. The
@@ -149,8 +165,12 @@ export function costHTML(receipts) {
   const stamp = receipts.computed_at || receipts.as_of;
   const when = instant(stamp);
   const tier = num(receipts.tier);
-  const paused = tier === 0 ? "Nothing is paused." : tier === null ? "" : `The system is at tier ${tier}.`;
-  out.push(para(`${top} ${when ? `As of ${when}, ` : ""}${usd(mtd)} is spent this month.${receipts.stale ? " This figure is out of date." : ""} ${paused}`.trim()));
+  const paused = tier === 0 ? "Nothing is paused." : tier === null ? "" : `The system is at tier ${tier}: ${TIER_WORDS[tier] || "some AI is paused"}.`;
+  // Spend and forecast side by side, each with its date, before the tier is named (#4580 round 1, built-2).
+  const forecast = num(receipts.projected_month_end_usd);
+  const by = day(receipts.month_end_date);
+  const ahead = forecast === null ? "" : `, and the forecast for ${by || "month end"} is ${usd(forecast)}, ${side(forecast)}`;
+  out.push(para(`${top} ${when ? `As of ${when}, ` : ""}${usd(mtd)} is spent this month${ahead}.${receipts.stale ? " This figure is out of date." : ""} ${paused}`.trim()));
 
   // The forecasts run on a recent-days rate: the last week, or the month so far if shorter.
   const t = Date.parse(String(stamp || ""));
@@ -189,10 +209,8 @@ export function costHTML(receipts) {
   }
 
   // Both forecasts, what each one assumes, and what they say against the ceiling.
-  const forecast = num(receipts.projected_month_end_usd);
   const all = num(receipts.projected_all_classes_usd);
   if (forecast !== null) {
-    const by = day(receipts.month_end_date);
     const banked = high && forecast > ceiling && usual.month <= ceiling && forecast - high.above <= ceiling ? " because of the high days already spent" : "";
     const wide = all === null || all <= forecast ? "" : ` If building and testing also carried on at that pace every day, it would be ${usd(all)}.`;
     more.push(
@@ -221,6 +239,7 @@ const fill = (id, html) => {
 export async function mount() {
   if (!document.body || document.body.dataset.ckPage !== "built") return;
   const [stats, receipts, predictions, coaches] = await Promise.all(["/api/platform_stats", "/api/receipts", "/api/predictions", "/api/coaches"].map(tryJSON));
+  fill("ck-day", esc(foldDay({ stats, receipts, predictions })));
   fill("ck-numbers", numbersHTML({ stats, receipts, predictions, coaches }));
   fill("ck-cost", costHTML(receipts));
   document.body.dataset.ckReady = "1";

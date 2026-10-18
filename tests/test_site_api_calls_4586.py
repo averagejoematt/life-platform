@@ -48,6 +48,9 @@ TODAY = "2026-10-04"
 _FIX = os.path.join(_REPO, "tests", "fixtures", "calls_wire_4586")
 _OUT = os.path.join(_FIX, "route_output.json")  # this route's output for the wire fixture, whole
 _KIT = os.path.join(_REPO, "tests", "fixtures", "kit_pages_4586", "calls.json")  # the live capture (#4671)
+#: #4580 round 1 (lane E): fields this route writes that the deployed route did not on the capture day. Empty
+#: this set at the first recapture after the deploy.
+ADDED_SINCE_CAPTURE = {"observed_on", "observed_on_text"}
 NAMES = {
     "sleep": "Lisa Park",
     "training": "Sarah Chen",
@@ -114,7 +117,10 @@ def test_a_number_call_reads_as_a_sentence_with_the_measure_glossed():
     assert call["happened"] == "His morning recovery score came in at 67 against a call of 61."
     assert call["tolerance"]["text"] == "17.9" and call["tolerance"]["window_days"] == 30
     assert call["tolerance"]["statistic"] == "one standard deviation of his readings over the 30 days before the call"
-    assert call["happened_short"] == "It came in at 67." and call["actual"] == {"value": 67.0, "text": "67"}
+    assert call["happened_short"] == "It came in at 67." and call["actual"] == {"value": 67.0, "text": "67", "unit": " out of 100"}
+    # #4580 round 1: the reading's own day, served, so a page can scope "it came in at 67" to its date
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", call["observed_on"]) and call["observed_on"] <= call["settled_date"]
+    assert call["observed_on_text"] == calls._words(call["observed_on"], weekday=True)
     record = call["records"][0]
     assert {k: record[k] for k in ("state", "right", "n", "through", "text")} == {
         "state": "ok",
@@ -207,9 +213,9 @@ def test_a_resolved_bet_is_one_page_with_both_sides():
     assert bet["id"] == "bet-20260930-994b3d89f6" and bet["settled_date"] == "2026-09-30" and bet["logged_date"] == "2026-09-23"
     assert bet["called"] == (
         "Marcus Webb and Amara Patel bet on one question, fixed the day the bet opened: whether his morning recovery score "
-        "(his wrist strap’s morning score out of 100) would be below 70 on September 30. Marcus Webb said yes; Amara Patel said no."
+        "(his wrist strap’s morning score out of 100) would be below 70 out of 100 on September 30. Marcus Webb said yes; Amara Patel said no."
     )
-    assert bet["happened"] == "It came in at 59." and bet["verdict_text"] == "Marcus Webb was right; Amara Patel was wrong."
+    assert bet["happened"] == "It came in at 59 out of 100." and bet["verdict_text"] == "Marcus Webb was right; Amara Patel was wrong."
     assert [(s["coach_name"], s["said"], s["right"]) for s in bet["sides"]] == [("Marcus Webb", "yes", True), ("Amara Patel", "no", False)]
     assert [r["text"] for r in bet["records"]] == ["Marcus Webb: 7 of 23 checked calls right.", "Amara Patel: 2 of 6 checked calls right."]
     # the two docket PREDICTION# rows (one per side) are the same bet, never two more pages
@@ -282,7 +288,7 @@ def test_next_names_the_next_bet_or_call_to_settle_and_its_day():
     assert nxt["data"]["kind"] == "bet" and nxt["data"]["coach_names"] == ["Max Reyes", "Lisa Park"]
     assert nxt["data"]["text"] == (
         "Next: the bet between Max Reyes and Lisa Park on whether the 7-day average of his morning recovery score "
-        "will be at or above 81.6 settles Monday, October 5."
+        "will be at or above 81.6 out of 100 settles Monday, October 5."
     )
 
 
@@ -403,7 +409,11 @@ def test_the_kit_page_capture_carries_the_fields_this_route_writes(monkeypatch):
         shape.setdefault(call["kind"], set(call))
     for call in kit["calls"]:
         assert call["kind"] in shape, f"{call['id']}: a kind this route does not write ({call['kind']})"
-        assert set(call) == shape[call["kind"]], f"{call['id']}: fields differ: {sorted(set(call) ^ shape[call['kind']])}"
+        # #4580 round 1 added fields the deployed route does not serve yet; the capture may lack exactly those
+        # until the first recapture after the deploy, and nothing else.
+        assert (
+            set(call) | ADDED_SINCE_CAPTURE == shape[call["kind"]]
+        ), f"{call['id']}: fields differ: {sorted(set(call) ^ shape[call['kind']])}"
 
 
 def test_an_id_serves_one_call_and_an_unknown_id_is_a_404_with_a_sentence(monkeypatch):

@@ -7,15 +7,31 @@
   <meta name="description" content="The story in two minutes: who Matthew is, what has happened so far, and what is open now.">
   <meta name="robots" content="noindex,nofollow">
   <link rel="canonical" href="https://averagejoematt.com/next/v8/start/">
+  <meta property="og:title" content="Start here — Average Joe Matt">
+  <meta property="og:description" content="The story in two minutes: who Matthew is, what has happened so far, and what is open now.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/next/v8/start/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/og/wordmark-1200x630.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Average Joe Matt. 327 to 185, in public. Every coach call checked.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Start here — Average Joe Matt">
+  <meta name="twitter:description" content="The story in two minutes: who Matthew is, what has happened so far, and what is open now.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/og/wordmark-1200x630.png">
+  <meta name="twitter:image:alt" content="Average Joe Matt. 327 to 185, in public. Every coach call checked.">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#FFFFFF">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0D0F10">
+  <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life — The Panel (podcast)" href="/panelcast/feed.xml">
   <link rel="icon" href="/favicon.ico">
   <link rel="preload" href="/assets/fonts/clean/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/assets/css/clean.css">
   <script src="/assets/js/boot_theme.js"></script>
 </head>
-<body data-ck-page="start">
+<body data-ck-page="start" data-ck-base="/next/v8/">
 <div class="ck-page">
+  <a class="ck-skip" href="#main">Skip to content</a>
   <header class="ck-header">
     <a class="ck-header__back" href="/next/v8/">← Average Joe Matt</a>
     <span class="ck-header__day" id="ck-day"></span>
@@ -25,7 +41,7 @@
     <section class="ck-section ck-section--tight">
       <p class="ck-label">New here?</p>
       <h1>The story in two minutes.</h1>
-      <p class="ck-premise">I’m Matthew. I’m trying to get from 327 pounds to 185, and to rebuild the rest of my life with it, in public. My scale, wrist strap, bed sensor and food log record each day; a team of AI coaches I built with Claude reads it, and code checks whether they were right.</p>
+      <p class="ck-premise" data-ck-draft="premise">I’m Matthew. The weight was never really about food, so this is me measuring the whole thing out loud: what my scale, wrist strap, bed sensor and food log record each day, what the AI coaches I built with Claude make of it, and whether they were right.</p>
       <noscript><p class="ck-soft">The dated parts of this page are drawn from the site’s served data when scripts run.</p></noscript>
     </section>
 
@@ -33,7 +49,8 @@
       <p class="ck-label">So far</p>
       <h2>Chapter by chapter.</h2>
       <p class="ck-soft">The chapters are written by AI from the record. I read each one before it publishes.</p>
-      <div id="ck-recap"><p class="ck-soft">Loading.</p></div>
+      <div id="ck-recap"></div>
+      <p class="ck-small" id="ck-open"></p>
       <p><a class="ck-link" href="/next/v8/story/">Read or listen to every chapter</a></p>
     </section>
 
@@ -44,16 +61,11 @@
     </section>
 
     <section class="ck-section">
-      <p class="ck-label">Open now</p>
-      <h2>What happens next.</h2>
-      <div class="ck-section ck-section--tight" id="ck-open"></div>
-    </section>
-
-    <section class="ck-section">
       <p class="ck-label">The AI</p>
       <h2>Who the coaches are.</h2>
       <p>They are software I built with Claude, not people. Each has one job. Each morning they read my data and make predictions with a date on them. When the date comes, code compares the prediction with what happened.</p>
-      <p class="ck-soft" id="ck-record"></p>
+      <div id="ck-record"></div>
+      <div id="ck-bet"></div>
       <p><a class="ck-link" href="/next/v8/coaches/">The coaches and their record</a></p>
     </section>
 
@@ -63,17 +75,25 @@
       <p>These are my numbers for my body. Nothing here is advice for yours. Nothing is for sale, and nothing on this site is sponsored.</p>
     </section>
 
+    <section class="ck-section ck-follow" id="follow">
+      <h2>Follow along.</h2>
+      <p class="ck-soft" id="ck-follow-line">A new chapter and podcast most weeks, the numbers every Sunday.</p>
+      <a class="ck-btn" href="/subscribe/">Follow by email</a>
+      <p class="ck-small">Or by <a class="ck-link" href="/rss.xml">RSS</a> · <a class="ck-link" href="/panelcast/feed.xml">the podcast feed</a>.</p>
+    </section>
   </main>
 
   <footer class="ck-footer">
-    <a href="/next/v8/start/">Start here</a>
-    <a href="/next/v8/story/">The story</a>
-    <a href="/next/v8/coaches/">The AI coaches</a>
-    <a href="/next/v8/built/">How it’s built</a>
-    <a href="/next/v8/appendix/">Appendix</a>
-    <a href="https://github.com/averagejoematt/life-platform" rel="noopener">The code</a>
+    <nav class="ck-footer__nav" aria-label="Site">
+      <a href="/next/v8/start/">Start here</a>
+      <a href="/next/v8/story/">The story</a>
+      <a href="/next/v8/coaches/">The AI coaches</a>
+      <a href="/next/v8/built/">How it’s built</a>
+      <a href="/next/v8/appendix/">Appendix</a>
+      <a href="https://github.com/averagejoematt/life-platform" rel="noopener">The code</a>
+    </nav>
   </footer>
-  <p class="ck-small">Preview. A first-person line with no date on it is draft wording Matthew has not rewritten yet.</p>
+  <p class="ck-small">Preview. The first-person sentences are drafts until Matthew approves them.</p>
 </div>
 <script type="module" src="/assets/js/ck_pages.js"></script>
 </body>

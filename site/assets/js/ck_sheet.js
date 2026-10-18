@@ -58,19 +58,33 @@ const DRIVERS = {
 };
 export const driverWords = (ids) => (ids || []).map((id) => DRIVERS[id] || String(id).replace(/_/g, " "));
 
-// "Level 16. Score 84 of 100, down 0.6 on the day."
-export function areaLine(p) {
+// The sentence after the level: "Score 80.5 of 100, down 0.5 on the day." The score and its
+// move share one precision (one decimal, as served), so the move can be read off the score
+// from one day to the next; a whole score beside a tenth of a point could not (#4580 round 1).
+export function areaSentence(p) {
   if (!p) return "";
   if (p.not_instrumented) return "Not measured yet: nothing records this area.";
   const level = num(p.level);
   const score = num(p.raw_score);
   if (level === null || score === null) return "Not served right now.";
-  // An area held for thin coverage has a score built from a sliver of its inputs; printing
-  // it beside a fully measured area's score reads as a contradiction.
-  if (p.coverage_hold) return `Level ${whole(level)}. Too little of this area is measured to score it yet.`;
+  // An area held for thin coverage prints its score like every other row (round 2, sheet:
+  // "left out", "still counts" and "too little to score yet" sat within one screen); that it is
+  // thinly measured and still counts is said once, beside the level (levelHTML).
   const d = num(p.score_delta);
   const move = d === null || Math.abs(d) < 0.05 ? "level on the day" : d > 0 ? `up ${d.toFixed(1)} on the day` : `down ${(-d).toFixed(1)} on the day`;
-  return `Level ${whole(level)}. Score ${whole(score)} of 100, ${move}.`;
+  return `Score ${score.toFixed(1)} of 100, ${move}.`;
+}
+// "Level 22" — the row's right-hand figure; empty for an area nothing measures.
+export function areaLevel(p) {
+  if (!p || p.not_instrumented) return "";
+  const level = num(p.level);
+  return level === null || num(p.raw_score) === null ? "" : `Level ${whole(level)}`;
+}
+// "Level 16. Score 84 of 100, down 0.6 on the day." — the two together, one line.
+export function areaLine(p) {
+  if (!p) return "";
+  const lv = areaLevel(p);
+  return lv ? `${lv}. ${areaSentence(p)}` : areaSentence(p);
 }
 export function areaDetail(p) {
   if (!p || p.not_instrumented) return "";
@@ -82,12 +96,43 @@ export function areaDetail(p) {
   if ((dr.no_data || []).length) parts.push(`No data yet: ${listWords(driverWords(dr.no_data))}.`);
   return parts.join(" ");
 }
+// The row's one plain sentence about the drivers: the biggest helper and the biggest drag,
+// nothing more. The four-bucket list (areaDetail) read as a formula dump in every row.
+export function areaBrief(p) {
+  if (!p || p.not_instrumented || p.coverage_hold) return "";
+  const dr = p.drivers || {};
+  const top = driverWords(dr.top || [])[0];
+  const drag = driverWords(dr.dragging || [])[0];
+  if (top && drag) return `Helped most by ${top}; held back most by ${drag}.`;
+  if (top) return `Helped most by ${top}.`;
+  if (drag) return `Held back most by ${drag}.`;
+  return "";
+}
+// The kit's record row, one per area: name, level at the right, one plain sentence under.
 export function areasHTML(body) {
   const pillars = ((body && body.pillars) || []).filter((p) => p && p.name);
   if (!pillars.length) return soft("The seven areas are not served right now.");
-  return `<ul class="ck-coach">${pillars
-    .map((p) => `<li><span class="ck-coach__who">${esc(AREAS[p.name] || p.name)}</span><span>${esc(areaLine(p))}${areaDetail(p) ? ` <span class="ck-soft">${esc(areaDetail(p))}</span>` : ""}</span></li>`)
+  return `<ul class="ck-coach ck-coach--record">${pillars
+    .map((p) => {
+      const line = [areaSentence(p), areaBrief(p)].filter(Boolean).join(" ");
+      const lv = areaLevel(p);
+      return `<li><span class="ck-coach__name">${esc(AREAS[p.name] || p.name)}</span><span class="ck-coach__job">${esc(line)}</span>${lv ? `<span class="ck-coach__record">${esc(lv)}</span>` : ""}</li>`;
+    })
     .join("")}</ul>`;
+}
+// Which areas count toward the level, said ONCE, beside the level (round 2, sheet): an area with
+// nothing measuring it is left out of the mean; an area held for thin data is still averaged in
+// (character.composite_note excludes only the uninstrumented area — taking a held area out of the
+// composite is an engine change and the owner's call, #4580 round 1, sheet-3). Both by name.
+export function countsNote(body) {
+  const pillars = ((body && body.pillars) || []).filter((p) => p && p.name);
+  const name = (p) => AREAS[p.name] || p.name;
+  const out = pillars.filter((p) => p.not_instrumented).map(name);
+  const thin = pillars.filter((p) => p.coverage_hold && !p.not_instrumented).map(name);
+  const parts = [];
+  if (out.length) parts.push(`${listWords(out)} ${out.length > 1 ? "have" : "has"} nothing measuring ${out.length > 1 ? "them" : "it"} and ${out.length > 1 ? "are" : "is"} left out`);
+  if (thin.length) parts.push(`${listWords(thin)} ${thin.length > 1 ? "are" : "is"} measured thinly and still count${thin.length > 1 ? "" : "s"}`);
+  return parts.length ? `${parts.join("; ")}.` : "";
 }
 // The one level, with how many areas it was worked out from and the day it is for.
 export function levelHTML(body) {
@@ -95,8 +140,10 @@ export function levelHTML(body) {
   if (!c || num(c.level) === null) return soft("The level is not served right now.");
   const day = dayInWords(c.as_of_date);
   const [n, of] = [num(c.composite_pillar_count), num(c.composite_pillar_total)];
-  const from = n !== null && of !== null ? `Worked out from ${n} of ${of} areas${n < of ? "; an area with nothing measuring it is left out, not counted as average" : ""}.` : "";
-  return `<div class="ck-today"><p class="ck-big">${esc(whole(c.level))}<span> level${day ? ` on ${esc(day)}` : ""}</span></p>${soft(from)}</div>`;
+  const note = countsNote(body);
+  const from = n !== null && of !== null ? `Worked out from ${n} of ${of} areas${note ? `: ${note}` : "."}` : note;
+  // "Level 12 on Friday, October 16" (site-to-A round 1: it read "12 level on Friday, October 16").
+  return `<div class="ck-today"><p class="ck-big"><span>Level </span>${esc(whole(c.level))}<span>${day ? ` on ${esc(day)}` : ""}</span></p>${soft(from)}</div>`;
 }
 // "Level 10 across seven areas" — the front page's one line, a door to this page.
 export function sheetLine(body) {
@@ -108,8 +155,11 @@ export function sheetLine(body) {
   const across = of === null ? "" : n !== null && n < of ? ` across ${words(n)} of ${words(of)} areas of his life` : ` across ${words(of)} areas of his life`;
   return `Level ${whole(c.level)}${across}`;
 }
+// A badge's served words in the page's own units and names (site-to-A round 1): "lb" is the one
+// weight unit on every kit page, and the level is "Level", never "Character Level".
+export const badgeWords = (text) => String(text || "").replace(/\blbs\b/g, "lb").replace(/\bCharacter Level\b/g, "Level");
 export function badgesHTML(body) {
-  const all = ((body && body.achievements) || []).filter((a) => a && a.label);
+  const all = ((body && body.achievements) || []).filter((a) => a && a.label).map((a) => ({ ...a, label: badgeWords(a.label), description: badgeWords(a.description) }));
   if (!all.length) return soft("The badges are not served right now.");
   // An earned badge whose date was never recorded is still earned: it is counted and
   // listed last as "date not recorded", never dropped and never given a made-up date (#4704).
@@ -140,8 +190,9 @@ export async function mount() {
   fill("ck-level", levelHTML(character));
   fill("ck-areas", areasHTML(character));
   fill("ck-badges", badgesHTML(achievements));
+  // The late-sources caveat sits under the areas, not stacked under the level with the hold note.
   const note = character && character.input_manifest && character.input_manifest.complete === false ? "Some sources were late when this was worked out, so today’s numbers may move." : "";
-  fill("ck-sheet-note", small(note));
+  fill("ck-sheet-late", small(note));
   const back = document.getElementById("ck-back");
   try {
     const ref = document.referrer ? new URL(document.referrer) : null;

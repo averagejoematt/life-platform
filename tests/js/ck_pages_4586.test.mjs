@@ -106,8 +106,8 @@ test("the coaches' count never renders without its comparison", () => {
   assert.ok(P.recordBigHTML(B.record).includes(`${rd.right}<span> of ${rd.decided} checked calls</span>`));
   // Round 4: on Coaches the precise clause follows the guess sentence directly, so "that guess" has its antecedent.
   assert.ok(P.recordBigHTML(B.record).includes(`${P.guessClause(rd)} ${P.skillClause(rd)}`), "the guess, then the precise clause");
-  assert.equal(P.recordBigHTML(B.record).split("Weighing how sure").length - 1, 1, "said once");
-  assert.doesNotMatch(P.recordLine(B.record), /Weighing/, "the front page and Start carry the plain sentence only");
+  assert.equal(P.recordBigHTML(B.record).split("Counting how sure").length - 1, 1, "said once");
+  assert.doesNotMatch(P.recordLine(B.record), /Counting how sure/, "the front page and Start carry the plain sentence only");
   assert.match(P.guessClause({ ...rd, brier_skill: null }), /no comparison with a guess yet/);
 });
 
@@ -121,8 +121,10 @@ test("no percentage picture on fewer than 20 checked calls", () => {
     // Round 2: one rule for every row — the count, never a bar.
     assert.doesNotMatch(row(c.name), /ck-meter/, c.name);
   }
-  assert.match(row("Eli Marsh"), /no checked calls/);
-  assert.match(row("Amara Patel"), /Sitting out: no sensor since August 27\./);
+  assert.match(row("Eli Marsh"), /runs the program, so no checked calls/);
+  // #4580 C5: the sitting-out sentence is one small line under the list, not a four-line job cell.
+  assert.doesNotMatch(row("Amara Patel").split("</li>")[0], /sitting out/i);
+  assert.match(html, /<\/ul><p class="ck-small">Amara Patel is sitting out: no sensor since August 27\.<\/p>$/);
   const few = { ...B.record, data: { ...B.record.data, right: 3, decided: 7 } };
   assert.doesNotMatch(P.recordBigHTML(few), /ck-track/);
 });
@@ -183,7 +185,7 @@ test("the showcase pair leads with the tightest right call and the clearest miss
   // the coaches page's scorecard door closes that same paragraph (one line given back, 2026-10-11)
   const door = '<a class="ck-link" href="/coaching/scorecard/">Every prediction, right and wrong</a>';
   assert.ok(P.callVerdictsHTML(calls, "/next/v8/", "coaches", { trailer: door }).endsWith(`before the call. ${door}</p>`));
-  assert.match(html, /<span class="ck-verdicts__tag">Wrong · not within [\d.]+ [a-z]*\s?either way<\/span><p>[^<]+ called [^<]+\. <b>It came in at [^<]+\.<\/b><\/p>/);
+  assert.match(html, /<span class="ck-verdicts__tag">Wrong · not within [\d.]+(%| [a-z]+)? either way<\/span><p>[^<]+ called [^<]+\. <b>It came in at [^<]+\.<\/b><\/p>/);
   const ids = [...html.matchAll(/call\/\?id=([a-z0-9-]+)/g)].map((m) => m[1]);
   assert.equal(ids.length, 2, "one door per call");
   for (const id of ids) assert.ok(calls.calls.some((c) => c.id === id), `${id} is a served call`);
@@ -197,7 +199,8 @@ test("the recap skips an editor's note and never prints a clipped sentence", () 
   const html = P.recapHTML(P.postsInOrder(load("posts")));
   assert.doesNotMatch(html, /Editor/);
   assert.doesNotMatch(html, /…/);
-  assert.match(html, /Week 3 · Storming Mode<\/span><span>Day 11 to Day 17 · 315\.0 lb, down 3\.9 this week · 7 training sessions\.<\/span>/);
+  // Site-to-A round 1: a kit chapter row, the title a door. Round 2: the change is the chapter's own served one.
+  assert.match(html, /<span class="ck-rows__key">Week 3<\/span><span><a href="\/journal\/posts\/week-06\/">Storming Mode<\/a><br><span class="ck-small">Day 11 to Day 17 · 315\.0 lb, down 3\.9 that week · 7 training sessions\.<\/span>/);
   // Red team 2026-10-17: one kind of line per chapter, one unit label, no repeated opening sentence.
   assert.doesNotMatch(html, /\blbs\b|Tomorrow morning/);
   const lines = [...html.matchAll(/<\/span><span>([^<]*)<\/span>/g)].map((m) => m[1]);

@@ -77,7 +77,15 @@ export function markHTML(series, todayIso, start, goal, { width = 640, height = 
       return `<rect class="ck-mark__left" x="${x}" y="0" width="${w.toFixed(1)}" height="${height}" rx="2"/><rect class="ck-mark__gone" x="${x}" y="0" width="${w.toFixed(1)}" height="${cap.toFixed(1)}" rx="2"/>`;
     })
     .join("");
-  return `<svg class="ck-mark" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(markSentence(cells, start, goal))}">${rects}</svg>`;
+  return `<svg class="ck-mark" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(markSentence(cells, start, goal))}">${rects}</svg>${markEndsHTML(start, goal)}`;
+}
+// The mark's two ends, named under it in ONE line (site-to-A round 1, front:F15; round 2, G10:
+// a left-hand "at the start" and a right-hand "the goal" read as a time axis on a drawing whose
+// scale is vertical). The top of every column is the start weight, the floor is the goal — the
+// grey the legend names. "" without both numbers.
+export function markEndsHTML(start, goal) {
+  if (num(start) === null || num(goal) === null || start <= goal) return "";
+  return `<div class="ck-ends"><span>${esc(`Each column runs from ${fmt1(start)} lb, the start, at the top to ${String(Number(goal.toFixed(1)))} lb, the goal, at the floor.`)}</span></div>`;
 }
 // "312.1 lb · Day 29 · 15.2 down, 127.1 to go to 185" — the mark's one line of numbers,
 // the weight in bold. Returns HTML.
@@ -299,10 +307,15 @@ export function scorecardRows(block) {
 // The rule under a row is its judgment, not its floor: the "not enough data" clause is a
 // grader's detail (round 8b: "a rulebook where a scoreboard should be").
 export const shortRule = (rule) => String(rule || "").replace(/\s*(?:Fewer than|When the)[^.]*not enough data\.?\s*$/, "").trim();
-// A row that earned its mark: going well, or ahead of the plan. Both take the filled dot.
-const EARNED = new Set(["going_well", "faster_than_planned"]);
-const NOTHING = /^nothing this week\.?$/i;
-export function scorecardHTML(block, base = "/", { label = true } = {}) {
+// A row that earned its mark takes the filled dot: going well, and only that. "Faster than
+// planned" is the rule's rate flag (it parts from going_well at 2.5 lb a week), not a win, so it
+// takes the hollow dot and the legend says why (round 2, G9/G10: a filled accent dot under a
+// legend that says filled = going well carried the claim "good" on a week the rule flagged).
+const EARNED = new Set(["going_well"]);
+const FLAGGED = "faster_than_planned";
+export const HOLLOW_FLAG_LINE = "A hollow dot beside “faster than planned” is a flag, not a win.";
+const TO_DATE = /not this week['’]s alone/;
+export function scorecardHTML(block, base = "/", { label = true, aiText = "" } = {}) {
   const rows = scorecardRows(block);
   if (!rows.length) return soft((block && block.absent_text) || "The scorecard is not served right now.");
   const d = block.data;
@@ -314,22 +327,34 @@ export function scorecardHTML(block, base = "/", { label = true } = {}) {
       const name = (r && r.name) || (d.names && d.names[key]) || key;
       const keyHTML = SCORE_LINKS[key] ? `<a class="ck-rows__key" href="${esc(base)}${SCORE_LINKS[key]}">${esc(name)}</a>` : `<span class="ck-rows__key">${esc(name)}</span>`;
       if (!r || !r.verdict_text) return `<li>${keyHTML}<span>${esc(row.absent_text || "Not served right now.")}</span></li>`;
-      const dot = EARNED.has(r.verdict) ? '<i class="ck-dot" aria-hidden="true"></i>' : r.verdict === "not_enough_data" ? "" : '<i class="ck-dot ck-dot--off" aria-hidden="true"></i>';
+      // Site-to-A round 1: a row with too little data showed no dot at all beside rows that had
+      // one, so the absence read as a missing mark. It takes the kit's hollow dot and says so in
+      // words — an absence shown as an absence, never as a verdict either way.
+      const thin = r.verdict === "not_enough_data";
+      const dot = EARNED.has(r.verdict) ? '<i class="ck-dot" aria-hidden="true"></i>' : `<i class="ck-dot ck-dot--off${thin ? " ck-dot--none" : ""}" aria-hidden="true"></i>`;
+      const thinLabel = thin ? ' <span class="ck-small">Not enough data for a verdict.</span>' : "";
       const rule = r.rule ? `<br><span class="ck-small">${esc(shortRule(r.rule))}</span>` : "";
-      return `<li>${keyHTML}<span>${dot}<b>${esc(r.verdict_text)}.</b> ${esc(r.text || "")}${rule}</span></li>`;
+      // The AI row (#4580 W3): the engine's shared comparison sentence — served on the row, or the
+      // record block's `comparison_text` the caller passes (lane E writes it once, record_words) —
+      // else the row's verdict; and the "to date, not this week's alone" clause once — the rule
+      // under the row already says it with the yardstick, so the row's own copy is dropped.
+      const shared = key === "ai" ? String(r.comparison_text || aiText || "").trim().replace(/\.$/, "") : "";
+      const verdict = shared || r.verdict_text;
+      const text = key === "ai" && TO_DATE.test(String(r.rule || "")) && TO_DATE.test(String(r.text || "")) ? "" : r.text || "";
+      return `<li>${keyHTML}<span>${dot}<b>${esc(verdict)}.</b> ${esc(text)}${thinLabel}${rule}</span></li>`;
     })
     .join("");
-  const right = d.went_right || {};
-  // "Nothing this week." is not a line worth a row: a party with nothing to show is left out,
-  // and with neither having anything the part is not printed at all.
-  const said = (part) => (part && part.text && !NOTHING.test(String(part.text).trim()) ? part.text : "");
-  const line = (who, part) => (said(part) ? `<li><span class="ck-rows__key">${esc(who)}</span><span>${esc(said(part))}</span></li>` : "");
-  const wentRight = `${line("Matthew", right.matthew)}${line("The engine", right.engine)}`;
+  // "What went right this week" is no longer printed (#4580 W2): its "Matthew" row repeated the
+  // Sleep row word for word, and it was built upstream from GOING_WELL alone while the filled
+  // dot also marks "faster than planned" — one page, two sources, two answers. The filled dots
+  // are what went right, and the rule line says so.
+  // "The rules in grey were written down on Friday, October 9." (#4580 W8): the served sentence
+  // has no antecedent on the page; "in grey" gives it one without changing its day.
+  const rules = String(d.rules_set_text || "").replace(/^The rules were set on\b/, "The rules in grey were written down on");
   return [
     label ? `<p class="ck-label">How the whole thing is going</p>` : "",
     `<ul class="ck-rows">${items}</ul>`,
-    wentRight ? `<p class="ck-label">What went right this week</p><ul class="ck-rows">${wentRight}</ul>` : "",
-    small(d.rules_set_text),
+    small([items.includes('class="ck-dot"') ? "A filled dot is an area going well this week." : "", rows.some(({ row }) => usable(row) && row.data.verdict === FLAGGED) ? HOLLOW_FLAG_LINE : "", rules].filter(Boolean).join(" ")),
   ].join("");
 }
 // The first sentences of a text, up to `max` characters, never cut mid-sentence.
@@ -566,8 +591,9 @@ export function chapterRowHTML(chapter) {
   if (!usable(chapter) || !chapter.data.title || !chapter.data.url) return soft((chapter && chapter.absent_text) || "The latest chapter is not served right now.");
   const c = chapter.data;
   const lead = c.week_label ? `${c.week_label} · ` : "";
-  // The note is the chapter's own first sentence (round 8: the one narrative hook on the
-  // site), or what the chapter is and how long it takes when the excerpt has none.
-  const note = firstSentences(c.dek, 150) || [`The chapter`, num(c.read_minutes) !== null ? `${c.read_minutes} min` : "", shortDay(c.date)].filter(Boolean).join(" · ");
+  // Site-to-A round 1 (front:F6): the row leads "Go deeper" and its note is the chapter's own
+  // date and length — the dek's first sentence carried claims ("crossed 310 pounds", "18.5 pounds
+  // gone") that Story has to repair against the page and the front page cannot.
+  const note = ["The latest chapter", shortDay(c.date), num(c.read_minutes) !== null ? `${c.read_minutes} min` : ""].filter(Boolean).join(" · ");
   return `<a class="ck-rows__key" href="${esc(c.url)}">${esc(`${lead}“${c.title}”`)}</a><span>${esc(note)}</span>`;
 }

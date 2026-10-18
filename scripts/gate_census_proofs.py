@@ -1955,6 +1955,30 @@ STRUCTURAL_HAND_PROOFS.update(
             ),
             "proved_on": "2026-10-17",
         },
+        # #4580 round 1, lane E — one quantity, one number, one unit, one sentence across the served routes.
+        "structural::test_edition_one_number_4580.py": {
+            "gate_name": "test_edition_one_number_4580.py",
+            "command": "python3 -m pytest tests/test_edition_one_number_4580.py -q -p no:cacheprovider   # baseline 7 passed",
+            "mutation": (
+                "three plants, ONE AT A TIME, each restored from a byte copy: M1 web/site_api_edition.py _life_sleep reads "
+                "sleep_detail's own total_sleep_hours again instead of the pulse row (the round-1 5.3 h vs 8.8 h defect); "
+                "M2 _week's day detail is handed the training row of one fixed day for every date (a forward-fill); "
+                "M3 web/edition_scorecard.py writes the AI row's 'do not beat a simple guess yet' as its own literal instead "
+                "of importing record_words."
+            ),
+            "observed": (
+                "M1 1 failed / 6 passed (the sleep-row contract). M2 1 failed / 6 (the per-date training contract; its "
+                "own in-test mutation control also names exactly the mutated date). M3 1 failed / 6 (the written-once "
+                "sweep). Restored 7 passed."
+            ),
+            "scope": (
+                "Holds the edition composed from tests/fixtures/edition_wire_4582 and the calls route's committed output "
+                "for tests/fixtures/calls_wire_4586; the written-once sweep reads lambdas/web/*.py for the two record "
+                "sentences by regex. The deployed route's live capture is NOT compared here (its new fields arrive at the "
+                "first recapture after the deploy)."
+            ),
+            "proved_on": "2026-10-18",
+        },
     }
 )
 

@@ -23,9 +23,9 @@ test("an area's line is its level, its score and which way it moved", () => {
   for (const name of ["sleep", "movement", "nutrition"]) {
     const p = pillar(name);
     const move = Math.abs(p.score_delta) < 0.05 ? "level on the day" : `${p.score_delta > 0 ? "up" : "down"} ${Math.abs(p.score_delta).toFixed(1)} on the day`;
-    assert.equal(S.areaLine(p), `Level ${p.level}. Score ${Math.round(p.raw_score)} of 100, ${move}.`, name);
+    assert.equal(S.areaLine(p), `Level ${p.level}. Score ${p.raw_score.toFixed(1)} of 100, ${move}.`, name);
   }
-  assert.equal(S.areaLine({ ...pillar("sleep"), score_delta: 3.7 }), `Level ${pillar("sleep").level}. Score ${Math.round(pillar("sleep").raw_score)} of 100, up 3.7 on the day.`);
+  assert.equal(S.areaLine({ ...pillar("sleep"), score_delta: 3.7 }), `Level ${pillar("sleep").level}. Score ${pillar("sleep").raw_score.toFixed(1)} of 100, up 3.7 on the day.`);
   assert.match(S.areaLine({ ...pillar("sleep"), score_delta: -1.25 }), /, down 1\.[23] on the day\.$/);
   assert.match(S.areaLine({ ...pillar("nutrition"), score_delta: 0.01 }), /, level on the day\.$/, "a move under 0.05 is no move");
 });
@@ -60,9 +60,11 @@ test("every served driver has plain words", () => {
 test("the level says how many areas it came from and the day it is for", () => {
   const html = S.levelHTML(character);
   const c = character.character;
-  assert.match(html, new RegExp(`<p class="ck-big">${Math.round(c.level)}<span> level on [A-Z][a-z]+day, [A-Z][a-z]+ \\d+</span></p>`));
+  // Site-to-A round 1: "Level 12 on Friday, October 16", never "12 level on …".
+  assert.match(html, new RegExp(`<p class="ck-big"><span>Level </span>${Math.round(c.level)}<span> on [A-Z][a-z]+day, [A-Z][a-z]+ \\d+</span></p>`));
   assert.ok(html.includes(`Worked out from ${c.composite_pillar_count} of ${c.composite_pillar_total} areas`));
-  if (c.composite_pillar_count < c.composite_pillar_total) assert.match(html, /an area with nothing measuring it is left out, not counted as average\./);
+  // Site-to-A round 2: which areas are left out and which are thin-but-counted, by name, once, here.
+  if (c.composite_pillar_count < c.composite_pillar_total) assert.match(html, /areas: Relationships has nothing measuring it and is left out; Metabolic health is measured thinly and still counts\./);
   assert.match(S.levelHTML(null), /not served right now/);
   assert.match(S.sheetLine(character), new RegExp(`^Level ${Math.round(c.level)} across \\w+ of \\w+ areas of his life$`), "the front page states the same count the sheet does");
   assert.equal(S.sheetLine({}), "");
@@ -76,11 +78,12 @@ test("only earned badges are listed, newest first, the undated one last", () => 
   assert.equal(earned.length, achievements.summary.earned);
   assert.equal((html.match(/<li>/g) || []).length, earned.length);
   assert.match(html, new RegExp(`${earned.length} of ${achievements.achievements.length} earned so far\\.`));
-  const dated = earned.filter((a) => a.earned_date).sort((x, y) => y.earned_date.localeCompare(x.earned_date));
+  // The page prints a badge's words in its own units ("lb"), so they are looked up the same way.
+  const dated = earned.filter((a) => a.earned_date).sort((x, y) => y.earned_date.localeCompare(x.earned_date)).map((a) => ({ ...a, label: S.badgeWords(a.label) }));
   for (let i = 1; i < dated.length; i += 1) {
     if (dated[i - 1].earned_date !== dated[i].earned_date) assert.ok(html.indexOf(dated[i - 1].label) < html.indexOf(dated[i].label), `newest first: ${dated[i - 1].label} before ${dated[i].label}`);
   }
-  for (const u of earned.filter((a) => !a.earned_date)) assert.ok(dated.every((d) => html.indexOf(d.label) < html.indexOf(u.label)), "the undated one last");
+  for (const u of earned.filter((a) => !a.earned_date)) assert.ok(dated.every((d) => html.indexOf(d.label) < html.indexOf(S.badgeWords(u.label))), "the undated one last");
   assert.match(S.badgesHTML({ achievements: [{ label: "A", earned: false }] }), /None of the 1 badges has been earned yet\./);
   assert.match(S.badgesHTML(null), /not served right now/);
 });
@@ -91,9 +94,9 @@ test("the page carries no emoji, honorific, ISO date or count of earlier starts"
   assert.doesNotMatch(text, /\bDr\.\s|\b20\d\d-\d\d-\d\d\b|\bcycle\b|\battempt\b|\breset\b/i);
 });
 
-test("an area held for thin coverage prints no score beside a fully measured one (red team, round 7)", () => {
-  assert.equal(S.areaLine({ level: 1, raw_score: 59.4, coverage_hold: true }), "Level 1. Too little of this area is measured to score it yet.");
-  assert.match(S.areaLine({ level: 2, raw_score: 1.8, score_delta: 0 }), /^Level 2\. Score 2 of 100/);
+test("an area held for thin coverage prints its score like every other row; that it is thin is said once, beside the level (site-to-A round 2)", () => {
+  assert.equal(S.areaLine({ level: 1, raw_score: 59.4, coverage_hold: true }), "Level 1. Score 59.4 of 100, level on the day.");
+  assert.match(S.areaLine({ level: 2, raw_score: 1.8, score_delta: 0 }), /^Level 2\. Score 1\.8 of 100/);
 });
 
 test("an earned badge with no recorded date is counted and says so, never dated (#4704)", () => {
@@ -108,6 +111,8 @@ test("an earned badge with no recorded date is counted and says so, never dated 
   const html = S.badgesHTML(body);
   assert.match(html, /2 of 3 earned so far\./, "the count matches summary.earned");
   assert.equal((html.match(/<li>/g) || []).length, 2);
-  assert.match(html, /date not recorded<\/span><span>Lost 20 lbs/);
-  assert.ok(html.indexOf("Lost 5 lbs") < html.indexOf("Lost 20 lbs"), "the undated badge is listed last");
+  // Site-to-A round 1: "lb" is the one weight unit on every kit page, in a badge's words too.
+  assert.match(html, /date not recorded<\/span><span>Lost 20 lb</);
+  assert.ok(html.indexOf("Lost 5 lb") < html.indexOf("Lost 20 lb"), "the undated badge is listed last");
+  assert.doesNotMatch(html, /\blbs\b/);
 });

@@ -153,3 +153,33 @@ def test_the_page_is_a_quiet_kit_page():
         titles = [r["title"] for r in rows]
         assert titles == sorted(titles, key=str.lower), f"{label}: rows are in title order"
     assert "/next/v8/appendix/" in kit_gate.KIT_PAGES, "the appendix is held by tests/kit_page_gate.py"
+
+
+def test_the_jump_list_reaches_every_kind_and_an_empty_kind_prints_its_sentence():
+    """#4580 round 1 (lane D): 69 rows over nine screens had no anchors. The intro carries one
+    paragraph of plain links, one per kind in the file's order (Tools first), each to a section
+    whose id is kind-<key>; a kind with no rows (Replaced layouts, until the cut-over copies the
+    v5 home) prints its `empty` sentence; a row's small print says when it is the earlier
+    version of a v8 page, or what codename the page calls itself."""
+    html = PAGE.read_text(encoding="utf-8")
+    data = build.load()
+    keys = [k["key"] for k in data["kinds"]]
+    assert keys[0] == "tools", "the interactive pages come first"
+    links = re.findall(r'<a class="ck-link" href="#kind-([a-z]+)">([^<]+)</a>', html)
+    assert [k for k, _label in links] == keys
+    assert [label for _k, label in links] == [k["label"] for k in data["kinds"]]
+    assert re.findall(r'<section class="ck-section" id="kind-([a-z]+)">', html) == keys
+    empty = [k for k in data["kinds"] if not any(r["kind"] == k["key"] for r in data["pages"])]
+    assert [k["key"] for k in empty] == ["replaced"]
+    assert html.count(build.esc(empty[0]["empty"])) == 1
+    assert "Replaced layouts" in html and 'href="/next/v8/">Back</a>' not in html
+    for row in data["pages"]:
+        line = build.row_line(row)
+        if row.get("earlier_of"):
+            assert f"Earlier version of “{row['earlier_of']}”, superseded." in line
+        if row.get("codename"):
+            assert line.endswith(f"Called “{row['codename']}” on the page.")
+            assert row["title"] != row["codename"], f"{row['url']}: the codename is not the title"
+    # the generator refuses a kind that is empty with no sentence
+    seeded = {**data, "kinds": [*data["kinds"], {"key": "spare", "label": "Spare"}]}
+    assert any("`empty` sentence" in p for p in build.problems(seeded))
