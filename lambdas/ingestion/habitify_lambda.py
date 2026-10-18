@@ -99,7 +99,6 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import TYPE_CHECKING
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request
@@ -119,29 +118,16 @@ from common.pacific_time import pacific_date_of, pacific_today
 
 from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
-# #422: bounded, verbatim clip of a habit note (shared conventions module, bundled #781).
-try:
-    from experiment.habit_causality import clip_note
-except ImportError:  # pragma: no cover — the bundle always ships lambdas/ at root
-    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
-
-        def clip_note(text, _max=500):
-            s = (text or "").strip()
-            return s[:_max].rstrip() + "…" if len(s) > _max else s
-
-
 SECRET_NAME = os.environ.get("HABITIFY_SECRET_NAME", "life-platform/habitify")
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 USER_ID = os.environ.get("USER_ID", "matthew")
 BASE_URL = "https://api.habitify.me"
 
-# #422 EVR-01/02 — Habitify is the PRIMARY habit-causality capture channel: notes attached
-# to a habit at check-off / skip time in the app become driver context (on a done day) or
-# the "why missed" reason (on a skipped/failed day). Fetching notes is one extra GET per
-# tracked habit per ingested day; toggleable without a deploy if it ever pressures the API.
-FETCH_NOTES = os.environ.get("HABITIFY_FETCH_NOTES", "1").strip().lower() not in ("0", "false", "no", "")
+# Q28 (owner, 2026-10-17, docket #4644): "yes, stop (2,928 calls/day for 0 notes)". The per-habit
+# notes GET (#422/#950) and the moods GET are REMOVED, not flagged off: 0 notes in all 223 stored
+# rows, and the calls made the run average 36.5 s (p95 54 s). A stored row therefore carries no
+# `notes`/`mood` key from this date — absent, never a fabricated empty (#4641).
 LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "7"))
-NOTES_MAX_PER_HABIT = 5
 MOOD_LABELS = {1: "Terrible", 2: "Bad", 3: "Okay", 4: "Good", 5: "Excellent"}
 
 # #3666: the group registry is DERIVED from the live `/areas` response, not hand-stated.
@@ -475,55 +461,6 @@ def reset_logs_cache() -> None:
     _LOGS_CACHE.clear()
 
 
-def fetch_moods(api_key, target_date):
-    """Mood entries for a date. Non-fatal on error."""
-    date_str = f"{target_date}T00:00:00+00:00"
-    try:
-        return api_get("/moods", api_key, {"target_date": date_str})
-    except Exception as e:
-        logger.warning("Moods fetch failed (non-fatal): %s", e)
-        return []
-
-
-def fetch_notes(api_key, habit_id, target_date):
-    """#422: per-habit notes for one date (GET /notes/{habit_id}?from=...&to=...).
-
-    #950: the notes endpoint requires a from/to RANGE — it 412s on target_date
-    ("Unable to find to, from. Expect to, from in query"), which silently killed
-    this channel since ship (non-fatal contract swallowed every call). We send the
-    target day's UTC bounds using the same ISO-8601 `+00:00` convention the
-    journal/moods endpoints use.
-
-    Non-fatal by contract — notes are the causality layer, never worth failing the whole
-    habit ingest over. Returns ``[{"content": str, "created_at": str}]`` (verbatim, clipped),
-    filtered to notes actually created on ``target_date`` so a note is never smeared across
-    every day if the API returns a wider range than requested.
-    """
-    params = {
-        "from": f"{target_date}T00:00:00+00:00",
-        "to": f"{target_date}T23:59:59+00:00",
-    }
-    try:
-        raw_notes = api_get(f"/notes/{habit_id}", api_key, params)
-    except Exception as e:
-        logger.warning("Notes fetch failed for habit %s on %s (non-fatal): %s", habit_id, target_date, e)
-        return []
-    out = []
-    for n in raw_notes or []:
-        if not isinstance(n, dict):
-            continue
-        content = clip_note(n.get("content") or n.get("note") or "")
-        if not content:
-            continue
-        created = str(n.get("created_date") or n.get("created_at") or "")
-        if created and created[:10] != target_date:
-            continue
-        out.append({"content": content, "created_at": created})
-        if len(out) >= NOTES_MAX_PER_HABIT:
-            break
-    return out
-
-
 # ── SIMP-2 framework callbacks ────────────────────────────────────────────────
 
 
@@ -536,7 +473,7 @@ def authenticate(secret_data: dict) -> dict:
 
 
 def fetch_day(credentials: dict, date_str: str) -> dict | None:
-    """Fetch journal + moods for one day. Areas fetched per-invocation (rare
+    """Fetch journal + logs for one day (Q28: no notes/moods fetch). Areas fetched per-invocation (rare
     that they change between days within a single run; could cache further)."""
     api_key = credentials["api_key"]
     area_map = fetch_areas(api_key)
@@ -544,22 +481,6 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
     if not journal:
         logger.info("No journal data for %s", date_str)
         return None
-    moods = fetch_moods(api_key, date_str)
-
-    # #422: per-habit notes → causality layer. One GET per tracked habit for this date;
-    # each is non-fatal, so a notes hiccup never blocks the completion record.
-    notes_by_name = {}
-    if FETCH_NOTES:
-        for entry in journal:
-            if entry.get("is_archived"):
-                continue
-            habit_id = entry.get("id")
-            if not habit_id:
-                continue
-            notes = fetch_notes(api_key, habit_id, date_str)
-            if notes:
-                notes_by_name[entry.get("name", "Unknown")] = notes
-
     # #3666: the completion logs — THE attribution channel. One GET per habit per
     # invocation (memoised on the window, which is anchored on Pacific today, so the
     # second and subsequent dates of a run are free). A habit missing from this map had
@@ -585,8 +506,6 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
         "date": date_str,
         "area_map": area_map,
         "journal": journal,
-        "moods": moods,
-        "notes": notes_by_name,
         "logs": logs_by_name,
     }
 
@@ -704,7 +623,7 @@ def transform(raw: dict, date_str: str) -> list[dict]:
         return []
     area_map = raw["area_map"]
     journal = raw["journal"]
-    moods = raw["moods"]
+    moods = raw.get("moods")  # absent on every live fetch since Q28; kept so an archived raw replays
     notes_by_name = raw.get("notes") or {}  # #422: {habit_name: [{content, created_at}]}
     logs_by_name = raw.get("logs")  # #3666: {habit_name: [log, …]}; absent name = fetch failed
     if not isinstance(logs_by_name, dict):

@@ -153,6 +153,23 @@ def _wire():
     return {k: _json.load(open(os.path.join(_WIRE, f"{k}.json"), encoding="utf-8")) for k in _ed.SOURCES}
 
 
+def _with_open_bet(wire):
+    """The wire with an open bet due after its capture day. A capture taken between bets (the
+    2026-10-17 recapture had none open) reopens its newest settled bet in a COPY, due three days
+    after the capture day, verdict fields dropped — so the bet-shaped assertions still run on the
+    docket's own served criterion, claims and sides (#4586 round 2)."""
+    open_due = [d for d in (wire["docket"].get("open") or []) if str(d.get("resolution_date") or "") >= _CAPTURE_DAY]
+    if open_due or not (wire["docket"].get("resolved") or []):
+        return wire
+    out = _copy.deepcopy(wire)
+    bet = _copy.deepcopy(sorted(out["docket"]["resolved"], key=lambda d: str(d.get("resolution_date") or ""))[-1])
+    for k in ("verdict", "winner", "loser", "actual_value", "resolved_date", "concession"):
+        bet.pop(k, None)
+    bet["resolution_date"] = (_dt.fromisoformat(_CAPTURE_DAY) + _td(days=3)).strftime("%Y-%m-%d")
+    out["docket"]["open"] = [bet]
+    return out
+
+
 def _edition(bodies):
     return _ed.compose(
         bodies,
@@ -203,7 +220,7 @@ def _parts(doc):
 def test_edition_every_block_carries_the_contract_on_the_wire():
     """Every block (and nested part) has state/as_of/source/absent_text/data; the document
     has ONE Pacific as_of and day_n, and the blocks arrive in page order."""
-    wire = _wire()
+    wire = _with_open_bet(_wire())
     doc = _edition(wire)
     assert doc["as_of"] == _CAPTURE_DAY and doc["day_n"] == (_dt.fromisoformat(_CAPTURE_DAY) - _dt.fromisoformat("2026-09-06")).days + 1
     assert list(doc["blocks"]) == list(_ed.ORDER) == doc["order"]
@@ -238,7 +255,7 @@ def test_edition_next_bet_carries_each_coachs_reason_through_the_coach_line_filt
     """#4809: each side of the open bet carries one clause of that coach's opening position, in
     its served words — the docket's `claims` — through the same honest-text filter and honorific
     strip as the coach lines; a clause the filter refuses, or one too long for the card, is None."""
-    wire = _wire()
+    wire = _with_open_bet(_wire())
     sides = _edition(wire)["blocks"]["next"]["data"]["bet"]["data"]["sides"]
     docket = wire["docket"]["open"][0]
     assert len(sides) == 2 and all(isinstance(side["coach"], str) and side["coach"] for side in sides)
@@ -284,7 +301,7 @@ def test_edition_one_upstream_failing_leaves_only_its_block_unavailable():
     """For EACH upstream in turn: a failed read (500 for a route, None for a manifest)
     makes exactly the block(s) it feeds `unavailable` with the not-served sentence and no
     figure; every other block is byte-identical to the all-green edition."""
-    wire = _wire()
+    wire = _with_open_bet(_wire())
     baseline = _edition(wire)
     feeds = {
         "journal": {"chapter", "catch_up"},
@@ -447,6 +464,14 @@ def test_edition_coach_texts_from_different_days_are_each_dated():
         got = spoken({c["coach_id"]})
         if got["data"]:
             day_of[c["coach_id"]] = got["data"]["lines"][0]["as_of"]
+    if len(set(day_of.values())) < 2 and len(day_of) >= 2:
+        # A capture whose texts were all written on one day (2026-10-17): one seat's text is dated a
+        # day earlier in this test's copy, so the mixed-day rule is still exercised on served texts.
+        first = next(iter(day_of))
+        for c in dash["coaches"]:
+            if c["coach_id"] == first:
+                c["analysis_generated_at"] = (_dt.fromisoformat(day_of[first]) - _td(days=1)).strftime("%Y-%m-%dT18:00:00+00:00")
+        day_of = {cid: spoken({cid})["data"]["lines"][0]["as_of"] for cid in day_of}
     assert len(set(day_of.values())) >= 2, "the capture's coach texts are from at least two different days"
     newest = max(day_of.values())
     older = next(cid for cid, day in day_of.items() if day != newest)

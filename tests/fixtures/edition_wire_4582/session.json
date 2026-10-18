@@ -1,68 +1,92 @@
 {
  "_meta": {
-  "generated_at": "2026-10-13T01:33:16.331260+00:00",
-  "served_at": "2026-10-13T01:33:16.331260+00:00",
+  "generated_at": "2026-10-17T23:19:47.071594+00:00",
+  "served_at": "2026-10-17T23:19:47.071594+00:00",
   "cache_seconds": 900,
-  "request_id": "a6e010e9517c40af"
+  "request_id": "81a86bd659384404"
  },
- "date": "2026-10-12",
+ "date": "2026-10-17",
  "state": "served",
  "reason": null,
  "source": "hevy-routine-draft",
  "kind": "program",
- "session_role": "lower_volume",
- "position_label": "week 3 \u00b7 session 3 of 4 \u00b7 lower-volume",
- "routine_ref": "9a602e9b439b",
+ "session_role": "upper_volume",
+ "position_label": "week 4 \u00b7 session 2 of 4 \u00b7 upper-volume",
+ "routine_ref": "e24fac652870",
  "exercises": [
   {
-   "name": "Deadlift (Trap bar)",
+   "name": "Bench Press (Barbell)",
    "sets": 3,
    "reps": "8\u201312",
-   "load_lbs": 215,
+   "load_lbs": 185,
    "loads_lbs": [
-    215,
-    215,
-    215
+    185,
+    185,
+    185
    ]
   },
   {
-   "name": "Squat (Barbell)",
+   "name": "Dumbbell Row",
    "sets": 3,
    "reps": "8\u201312",
-   "load_lbs": 200,
+   "load_lbs": 85,
    "loads_lbs": [
-    200,
-    200,
-    200
+    85,
+    85,
+    85
    ]
   },
   {
-   "name": "Seated Leg Curl (Machine)",
-   "sets": 2,
-   "reps": "8\u201315",
-   "load_lbs": 110,
+   "name": "Shoulder Press (Dumbbell)",
+   "sets": 3,
+   "reps": "8\u201312",
+   "load_lbs": 70,
    "loads_lbs": [
-    110,
-    110
+    70,
+    70,
+    70
    ]
   },
   {
-   "name": "Calf Press (Machine)",
+   "name": "Lat Pulldown (Cable)",
    "sets": 2,
-   "reps": "8\u201315",
-   "load_lbs": 380,
+   "reps": "8\u201312",
+   "load_lbs": 155,
    "loads_lbs": [
-    380,
-    380
+    155,
+    155
    ]
   },
   {
-   "name": "Crunch (Machine)",
+   "name": "Cable Fly Crossovers",
    "sets": 2,
    "reps": "8\u201315",
-   "load_lbs": null,
-   "loads_lbs": null
+   "load_lbs": 33,
+   "loads_lbs": [
+    33,
+    33
+   ]
+  },
+  {
+   "name": "Triceps Pushdown",
+   "sets": 2,
+   "reps": "8\u201315",
+   "load_lbs": 95,
+   "loads_lbs": [
+    95,
+    95
+   ]
+  },
+  {
+   "name": "Bicep Curl (Dumbbell)",
+   "sets": 2,
+   "reps": "8\u201315",
+   "load_lbs": 25,
+   "loads_lbs": [
+    25,
+    25
+   ]
   }
  ],
- "as_of": "2026-10-13T01:33:15.761222+00:00"
+ "as_of": "2026-10-17T23:19:46.784852+00:00"
 }

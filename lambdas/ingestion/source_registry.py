@@ -712,7 +712,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "raw_layout": {
             "prefix": "raw/matthew/health_auto_export",
             "scheme": "timestamped",
-            "note": "sub-datatypes also land at raw/matthew/{cgm_readings,blood_pressure,state_of_mind,workouts}/ — see sub_layouts",
+            "note": "sub-datatypes also land at raw/matthew/{cgm_readings,blood_pressure,state_of_mind,workouts,additive_readings}/ — see sub_layouts",
             # #2278: the note above was prose only, so every reader of an HAE
             # sub-datatype hand-built its key from it — and one (the dormant BP
             # reader in mcp/tools_lifestyle.py) dropped the user segment entirely
@@ -785,6 +785,35 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
                         "note": "10 objects, live-confirmed via read-only aws s3 ls; same X-9 no-user-segment "
                         "predecessor shape as raw/whoop. Modeling a replay path is out of this Small story's scope. #3570.",
                     },
+                },
+                # #4628 (Q2 "b — readings stay in S3, one daily value per source in DynamoDB",
+                # owner 2026-10-17): every delivered reading of the five ADDITIVE activity
+                # fields, merged per READING day (the UTC DATE# day, day_key_frame above) and
+                # deduped by the reading's own timestamp. The DynamoDB day value is the sum of
+                # this object — `ingestion/health_auto_export_additive.py`. One object per field
+                # because HAE's automations deliver the field groups concurrently (steps+active,
+                # basal, distance+flights land in the same second), so a shared object would
+                # lose a merge to a read-modify-write race.
+                "additive_steps": {"prefix": "raw/matthew/additive_readings/steps", "scheme": "date-tree", "filename": "DD.json"},
+                "additive_active_calories": {
+                    "prefix": "raw/matthew/additive_readings/active_calories",
+                    "scheme": "date-tree",
+                    "filename": "DD.json",
+                },
+                "additive_basal_calories": {
+                    "prefix": "raw/matthew/additive_readings/basal_calories",
+                    "scheme": "date-tree",
+                    "filename": "DD.json",
+                },
+                "additive_distance_walk_run_miles": {
+                    "prefix": "raw/matthew/additive_readings/distance_walk_run_miles",
+                    "scheme": "date-tree",
+                    "filename": "DD.json",
+                },
+                "additive_flights_climbed": {
+                    "prefix": "raw/matthew/additive_readings/flights_climbed",
+                    "scheme": "date-tree",
+                    "filename": "DD.json",
                 },
             },
             # #3570 (DA-8, found by the 2026-09-05 /review full baseline, reverified
@@ -956,7 +985,11 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "probe_functions": (("habitify-data-ingestion", "Habitify"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": "required",
-        # cadence reason (internal, kept out of the published method text): kept hourly by decision (#3666 same-day freshness); notes/mood calls await ruling #4644 (#4641)
+        # cadence reason (internal, kept out of the published method text): kept hourly by decision (#3666 same-day freshness).
+        # Per-habit notes + mood calls STOPPED 2026-10-17 (calls removed, not flagged), owner Q28 (#4644):
+        # "yes, stop (2,928 calls/day for 0 notes)" — 0 notes in all 223 stored rows; run average was 36.5 s,
+        # expected ~1 s. Supersedes the #422/#950 capture-channel reason. Rows written from this date carry no
+        # `notes`/`mood`; earlier rows are untouched (#4641).
         "method": "API pull, hourly (24h)",
         "metrics": "Daily habit completions",
         "posture": "load-bearing",
@@ -1272,7 +1305,9 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # was checked as a phantom "journal" partition in qa_smoke — the real
         # partition is notion (X-10; the check is warn-only either way).
         "qa_tier": "optional",
-        # cadence reason (internal, kept out of the published method text): was hourly; 0 of 252 runs found a page (#4641)
+        # cadence reason (internal, kept out of the published method text): was hourly; 0 of 252 runs found a page (#4641).
+        # Journal stays a channel at 3/day by the owner's word, Q33 2026-10-17 (#4644): "yes, keep polling at 3/day
+        # (already cut)" — no further cadence change.
         "method": "API pull (journal database), 3x daily",
         "metrics": "Journal entries — the subjective layer",
         "posture": "portfolio",

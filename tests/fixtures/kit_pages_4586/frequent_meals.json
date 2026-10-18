@@ -1,14 +1,14 @@
 {
  "_meta": {
-  "generated_at": "2026-10-13T01:38:48.532434+00:00",
-  "served_at": "2026-10-13T01:38:48.532434+00:00",
+  "generated_at": "2026-10-17T22:51:37.258954+00:00",
+  "served_at": "2026-10-17T22:51:37.258954+00:00",
   "cache_seconds": 3600,
-  "request_id": "3118f0d7adda417f"
+  "request_id": "59b52a8f0f90427a"
  },
  "meals": [
   {
    "name": "Morning Smoothies",
-   "frequency": 25,
+   "frequency": 22,
    "avg_calories": 80,
    "avg_protein_g": 15,
    "avg_carbs_g": 4,
@@ -16,15 +16,39 @@
   },
   {
    "name": "Sugar Free Jello",
-   "frequency": 17,
+   "frequency": 18,
    "avg_calories": 10,
    "avg_protein_g": 1,
    "avg_carbs_g": 0,
    "protein_cal_pct": 40
   },
   {
+   "name": "Buffalo Edemame",
+   "frequency": 12,
+   "avg_calories": 109,
+   "avg_protein_g": 11,
+   "avg_carbs_g": 7,
+   "protein_cal_pct": 40
+  },
+  {
+   "name": "Cool Whip Lite",
+   "frequency": 11,
+   "avg_calories": 81,
+   "avg_protein_g": 1,
+   "avg_carbs_g": 12,
+   "protein_cal_pct": 5
+  },
+  {
+   "name": "Rice White Cooked Without Salt",
+   "frequency": 10,
+   "avg_calories": 206,
+   "avg_protein_g": 4,
+   "avg_carbs_g": 45,
+   "protein_cal_pct": 8
+  },
+  {
    "name": "Fiber Gummies",
-   "frequency": 13,
+   "frequency": 10,
    "avg_calories": 25,
    "avg_protein_g": 0,
    "avg_carbs_g": 10,
@@ -32,42 +56,18 @@
   },
   {
    "name": "Complete Vanilla 20g Protein Greek Yogurt",
-   "frequency": 11,
-   "avg_calories": 106,
-   "avg_protein_g": 13,
-   "avg_carbs_g": 10,
-   "protein_cal_pct": 49
-  },
-  {
-   "name": "Cool Whip Lite",
-   "frequency": 11,
-   "avg_calories": 78,
-   "avg_protein_g": 1,
-   "avg_carbs_g": 12,
-   "protein_cal_pct": 5
-  },
-  {
-   "name": "Onion, White, Yellow or Red, Raw",
    "frequency": 10,
-   "avg_calories": 15,
-   "avg_protein_g": 0,
-   "avg_carbs_g": 4,
-   "protein_cal_pct": 0
+   "avg_calories": 82,
+   "avg_protein_g": 10,
+   "avg_carbs_g": 8,
+   "protein_cal_pct": 49
   },
   {
    "name": "Olive Oil",
    "frequency": 10,
-   "avg_calories": 64,
+   "avg_calories": 60,
    "avg_protein_g": 0,
    "avg_carbs_g": 0,
-   "protein_cal_pct": 0
-  },
-  {
-   "name": "Red Bell Peppers, Cooked",
-   "frequency": 10,
-   "avg_calories": 18,
-   "avg_protein_g": 0,
-   "avg_carbs_g": 4,
    "protein_cal_pct": 0
   }
  ],

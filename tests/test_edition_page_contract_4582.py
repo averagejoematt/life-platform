@@ -139,6 +139,9 @@ def _moves_wire() -> dict:
                 "bet_settles": "2026-10-06",
             }
         ],
+        # /api/coach_moves serves who sat the day out beside the lines; the edition passes the day
+        # through (the 2026-10-17 kit capture carries it), so its fields are part of the route's shape.
+        "absent": [{"coach": "glucose_coach", "state": "absent", "reason": "This coach had nothing new to add."}],
     }
     wire["moves"] = {"days": days}
     wire["priority"] = {

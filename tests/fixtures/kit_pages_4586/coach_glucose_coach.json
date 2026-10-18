@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-13T01:38:42.586623+00:00",
-  "served_at": "2026-10-13T01:38:42.586623+00:00",
+  "generated_at": "2026-10-17T23:29:10.793185+00:00",
+  "served_at": "2026-10-17T23:29:10.793185+00:00",
   "cache_seconds": 300,
-  "request_id": "4f3f56f0d48a484a"
+  "request_id": "dadc5ab61e2b44b6"
  },
  "persona_id": "glucose_coach",
  "name": "Amara Patel",
@@ -91,31 +91,17 @@
   "disclosure": "Authored character design \u2014 fixed numbers written into the cast by the author, not generated and not measured."
  },
  "latest_checked": {
-  "prediction_id": "pred_20260909_nocturnal_glucose_dips_will_trigger_cort",
-  "claim": "",
-  "created_date": "2026-09-09",
+  "prediction_id": "pred_20260925_nocturnal_glucose_dips_are_contributing",
+  "claim": "Nocturnal glucose dips are contributing to deep sleep decline through counter-regulatory cortisol fragmentation of slow-wave sleep.",
+  "created_date": "2026-09-25",
   "pre_registered_at": null,
-  "outcome_date": "2026-09-30",
+  "outcome_date": "2026-10-16",
   "metric": "deep_pct",
   "eval_type": "directional",
   "condition": "down",
   "threshold": null,
-  "actual_value": 0.0035,
-  "status": "refuted",
-  "unsourced": {
-   "reason": "no sensor since 2026-08-27",
-   "instrument": {
-    "source": "apple_health",
-    "datatype": "cgm"
-   },
-   "last_seen": "2026-08-27",
-   "gap": {
-    "start": "2026-08-27",
-    "end": null
-   },
-   "said_on": "2026-09-09",
-   "text": "Not quoted: this was said on September 9 and rests on his glucose sensor, which had sent no reading since August 27."
-  }
+  "actual_value": -0.0482,
+  "status": "refuted"
  },
  "instrument": {
   "source": "apple_health",
@@ -212,16 +198,16 @@
  "report_card": {
   "track_record": {
    "confirmed": 1,
-   "refuted": 5,
-   "decided": 6,
-   "hit_rate_pct": 16.7,
+   "refuted": 6,
+   "decided": 7,
+   "hit_rate_pct": 14.3,
    "record": {
     "confirmed": 1,
-    "refuted": 5,
-    "n": 6,
-    "through": "2026-09-30"
+    "refuted": 6,
+    "n": 7,
+    "through": "2026-10-16"
    },
-   "headline": "1 of 6 checked calls right through September 30",
+   "headline": "1 of 7 checked calls right through October 16",
    "comparison": {
     "rule": "nothing_changes",
     "rule_words": "a guess that nothing changes",
@@ -244,13 +230,13 @@
       "rule_right_pct": null
      },
      "direction": {
-      "graded": 2,
+      "graded": 3,
       "coach_right": 0,
-      "scored": 2,
+      "scored": 3,
       "coach_right_on_scored": 0,
-      "rule_right": 1,
+      "rule_right": 2,
       "coach_only": 0,
-      "rule_only": 1,
+      "rule_only": 2,
       "unscorable": 0,
       "unscorable_reasons": {},
       "not_yet_scored": 0,
@@ -295,18 +281,24 @@
     "unclassified": 0,
     "scored_complete": true,
     "skill": {
-     "n": 6,
-     "brier_skill": -0.6331,
-     "sentence": "Too few checked calls yet (6) to compare them with a simple guess."
+     "n": 7,
+     "brier_skill": -0.8794,
+     "sentence": "Too few checked calls yet (7) to compare them with a simple guess."
     },
-    "rule_sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 2 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes once \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
-    "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 2 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes once \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
+    "rule_sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
+    "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
    "preliminary": true,
    "n_note": "preliminary \u2014 fewer than 12 decided predictions",
    "recent": [
+    {
+     "date": "2026-10-16",
+     "status": "refuted",
+     "metric": "deep_pct",
+     "reason": "predicted down, metric flat \u2014 deep_pct 16.6 on 2026-09-25 -> 15.8 on 2026-10-09 (change -0.8, band \u00b11.9, window 2026-09-25..2026-10-09)"
+    },
     {
      "date": "2026-09-30",
      "status": "refuted",
@@ -1318,6 +1310,46 @@
    "ungradeable": 0
   },
   "learnings": [
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-17#pred-20260918-protein-escalation-to-190-g-day-will-red-expir",
+    "date": "2026-10-17",
+    "status": "expired",
+    "metric": "blood_glucose_avg",
+    "reason": "Expired: 29 days elapsed (window=14, max=28). [window] Insufficient data to grade 'blood_glucose_avg' across its window: 0 reading(s) inside the window 2026-09-18..2026-10-02, fewer than 4",
+    "evidence": {
+     "prediction_id": "pred_20260918_protein_escalation_to_190_g_day_will_red",
+     "condition": "down"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-16#pred-20260925-nocturnal-glucose-dips-are-contributing-refute",
+    "date": "2026-10-16",
+    "status": "refuted",
+    "metric": "deep_pct",
+    "reason": "predicted down, metric flat \u2014 deep_pct 16.6 on 2026-09-25 -> 15.8 on 2026-10-09 (change -0.8, band \u00b11.9, window 2026-09-25..2026-10-09)",
+    "evidence": {
+     "prediction_id": "pred_20260925_nocturnal_glucose_dips_are_contributing",
+     "actual_value": -0.048193,
+     "condition": "down"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-16#pred-20260917-when-readable-cgm-data-arrives-glucose-expired",
+    "date": "2026-10-16",
+    "status": "expired",
+    "metric": "blood_glucose_std_dev",
+    "reason": "Expired: 29 days elapsed (window=14, max=28). [window] Insufficient data to grade 'blood_glucose_std_dev' across its window: 0 reading(s) inside the window 2026-09-17..2026-10-01, fewer than 4",
+    "evidence": {
+     "prediction_id": "pred_20260917_when_readable_cgm_data_arrives_glucose",
+     "condition": "up"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
    {
     "kind": "learning",
     "record_id": "LEARNING#2026-10-05#pred-20260906-with-a-strict-11-30am-7-30pm-eating-wind-expir",
