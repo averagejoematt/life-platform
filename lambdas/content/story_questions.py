@@ -22,6 +22,14 @@ this same routing token. His reply rides the identical route (behind the parser'
 verdict, #4633): a ``STORYQA#W`` row for Wednesday's chronicle, and a verbatim, screened ``owner_words`` entry for
 the edition (``content.owner_words``). A one-question email is answered by top-posting, so ``parse_reply`` pairs an
 unlabelled top-posted reply with Q1 when — and only when — exactly one question was asked.
+
+ESCALATED COACH ASKS (#4546, the follow-up from #4914). An ask a coach made of him that the desk carried
+``story_ledger.CARRIED_MAX_WEEKS`` installments with no reply and no data is ESCALATED, and it used to retire there in
+silence. Now ``escalated_questions`` puts each one to him by email ahead of the generated gap questions (``compose``),
+numbered like the rest and tagged ``[<ask id>]`` so the inline extractor's pairing carries the id in the question text
+and ``story_ledger.apply_budget(owner_answers=)`` marks the ask ``answered`` when the week publishes. The parser reads
+Monday's sent questions from the ``STORYQ#W<n>`` marker (``sent_questions``) so a reply whose client dropped the
+quote still pairs by number.
 """
 
 from __future__ import annotations
@@ -124,6 +132,40 @@ _FORBIDDEN = re.compile(
 
 def _forbidden(q: str) -> bool:
     return bool(_FORBIDDEN.search(q))
+
+
+def escalated_questions(ledger: Dict[str, Any]) -> List[str]:
+    """One question per escalated coach ask (#4546), oldest first, each tagged with its ask id. The ask text is the
+    coach's own words from the desk's validated budget — quoted, not filtered: a question that was never sent is the
+    silent retirement this exists to end. His answer is still gated by the off-record rule and the writers' quote cap."""
+    from content import story_ledger
+
+    out = []
+    for a in story_ledger.escalated_asks(ledger)[:MAX_QUESTIONS]:
+        who = str(a.get("coach_id") or "a coach").replace("_", " ")
+        when = f" in Week {a['week']}" if a.get("week") is not None else ""
+        out.append(
+            f'Your {who} asked you{when}: "{str(a.get("ask") or "").strip()}" — did you, and what happened? {story_ledger.ask_tag(a)}'
+        )
+    return out
+
+
+def compose(escalated: List[str], generated: List[str]) -> List[str]:
+    """The week's numbered questions: the escalated asks first, then the generated gap questions, ``MAX_QUESTIONS`` in all."""
+    qs = list(escalated[:MAX_QUESTIONS])
+    return qs + [q for q in generated if q not in qs][: max(0, MAX_QUESTIONS - len(qs))]
+
+
+def sent_questions(table: Any, pk: str, week: int) -> Optional[List[str]]:
+    """Monday's questions as sent, from the ``STORYQ#W<n>`` marker the sender writes (#4546) — so the parser pairs a
+    reply by number even when the client dropped the quote, and the escalated asks' tags survive. None when there is
+    no marker (or the read fails): the parser falls back to the quoted questions, as before."""
+    try:
+        item = table.get_item(Key={"pk": pk, "sk": f"STORYQ#W{int(week):03d}"}).get("Item") or {}
+        qs = json.loads(item.get("questions_json") or "[]")
+        return [str(q) for q in qs if q] or None
+    except Exception:  # noqa: BLE001 — a missing marker is a normal state; the quote is still there
+        return None
 
 
 def render_email(week: int, questions: List[str]) -> Dict[str, str]:

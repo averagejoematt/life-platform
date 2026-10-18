@@ -535,11 +535,15 @@ def test_og_source_count_gate_is_not_vacuous():
     d = Path(tempfile.mkdtemp())
 
     # the EXACT #1260 defect: a hardcoded stale count in a reader-facing draw.text — caught.
+    # The plant must DIFFER from the live truth or the scan is right not to flag it: the
+    # registry reached exactly 25 sources on 2026-10-17 (#4639 registered dexa), which made
+    # the historical literal equal to the truth and this proof read vacuous for a day.
+    stale = 25 if truth != 25 else 26
     bad = d / "og_image_lambda.py"
-    bad.write_text('    draw.text((48, 180), "One man. 25 data sources. Total transparency.", fill=MUTED)\n')
+    bad.write_text(f'    draw.text((48, 180), "One man. {stale} data sources. Total transparency.", fill=MUTED)\n')
     hits = facts._og_source_hits([bad], truth)
-    assert hits, "og-source scan is VACUOUS — it did not flag the planted stale '25 data sources'"
-    assert "claims 25 data sources" in hits[0] and f"truth is {truth}" in hits[0]
+    assert hits, f"og-source scan is VACUOUS — it did not flag the planted stale '{stale} data sources'"
+    assert f"claims {stale} data sources" in hits[0] and f"truth is {truth}" in hits[0]
 
     # the fixed card: an f-string interpolates the count, so no numeric literal is present — clean.
     good = d / "og_good.py"

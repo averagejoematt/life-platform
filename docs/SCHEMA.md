@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-10-17 (v8.6.0 — 88 MCP tools, 20 data sources, 108 Lambdas, 12 cached tools)
+**Last updated:** 2026-10-18 (v8.6.0 — 88 MCP tools, 20 data sources, 108 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -142,7 +142,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `…SOURCE#flourishing` / `DATE#<d>` | daily PERMA projection over journal enrichment (#1403): `values_lived[_count]`, `gratitude_count`, `flow`, `growth_signals_count`, `ownership_score`, `social_quality_score` + `enrichment_model`/`enrichment_schema_version` provenance per row | `journal_enrichment_lambda.py` via `lambdas/health/flourishing.py` (idempotent projection; `{"flourishing_only": true}` = zero-LLM backfill) | MCP `get_flourishing_trend`, `character_sheet_lambda` (Relationships primary social input, Mind `values_alignment`) | raw_timeseries (fact layer, follows notion parent) | ✓ |
 | `…SOURCE#private_intake` / `DATE#<d>` | **Matthew-PRIVATE** evening intake count (#1405): `intake_count` 0–4 + `intake_count_logged_at` + `source` (`evening_nudge_link`\|`mcp`). NEVER read by web/ or any public artifact — `tests/test_intake_privacy_contract.py` enforces both directions | signed nudge tap (`site_api_social._handle_ritual_log` write-only routing), MCP `log_evening_intake` | MCP `get_intake_response` + daily-brief line only (`lambdas/coach/intake_response.py`) | raw_timeseries | ✓ |
 | `…SOURCE#felt_probe` / `DATE#<d>` | weekly felt-reality probe (#1409, Sunday one-tap ×3): `felt_vitality`/`felt_rest`/`felt_connection` 0–4 + `<metric>_logged_at` + `source`. Feeds the calibration ledger; item values NEVER served publicly (aggregates only per ADR-124 C-floor) | signed Sunday nudge tap (`site_api_social._handle_ritual_log` routing via `ritual_link.WEEKLY_PROBE_METRICS`) | `/api/character_calibration` (r + Fisher CI on n_eff vs 7-day mean pillar level_score, `experiment_gates` floors) | raw_timeseries | ✓ |
-| `…SOURCE#{labs, dexa, genome, supplements}` / `DATE#<d>` (+ `PROVIDER#<provider>#<period>` for labs) | clinical/identity truths | labs/dexa/genome upload paths, `log_supplement` | tools_labs, tools_health | cross_phase | ✓ (labs) |
+| `…SOURCE#{labs, dexa, genome, supplements}` / `DATE#<d>` (+ `PROVIDER#<provider>#<period>` for labs) | clinical/identity truths | `scripts/ingest_lab_report.py labs|dexa` (#4639: archive-first, review, `--apply`), genome one-off import, `log_supplement` | tools_labs, tools_health | cross_phase | ✓ (labs) |
 | `…SOURCE#chronicling` / `DATE#<d>#journal#…` | frozen pre-platform archive | none (frozen) | story pages | cross_phase | n/v |
 | `…SOURCE#subscribers` / `EMAIL#<sha256>` | audience identity | `web/email_subscriber_lambda.py`, `subscriber_onboarding_lambda.py` | `web/site_api_social.py` | cross_phase | ✓ |
 | `…SOURCE#calibration` / `CALIB#<date>#<id>` | hypothesis + forecast resolution ledger (the long-run scoreboard) | `hypothesis_engine_lambda.py`, `forecast_engine_lambda.py` | scorecard/site, digests | cross_phase | ✓ |
@@ -464,7 +464,7 @@ Note: the XML import path (`apple_health_lambda.py` `QUANTITY_RECORDS`) writes m
 | `steps` | number | Step count (daily sum — the #4628 delivered-readings sum) |
 | `flights_climbed` | number | Floors climbed (daily sum — the #4628 delivered-readings sum) |
 | `distance_walk_run_miles` | number | Walking + running distance (daily sum, miles — the #4628 delivered-readings sum) |
-| `delivered_readings_only` | boolean | **#4628 (owner Q2 "b — readings stay in S3, one daily value per source in DynamoDB", Q3 "labelled 'what the phone delivered'", 2026-10-17).** `true` when the row's five additive fields (`steps`, `active_calories`, `basal_calories`, `distance_walk_run_miles`, `flights_climbed`) are the sum over unique reading timestamps of every reading the phone DELIVERED for this UTC day — each delivery merged into `raw/matthew/additive_readings/<field>/YYYY/MM/DD.json` (the `apple_health` raw_layout `additive_<field>` sub_layouts; resolve with `raw_date_key`), a re-sent reading counted once, every device source summed (no cross-source max), written without GREATEST. It means *what the phone delivered*, not the day: on non-walk days the phone under-delivers against the wrist count, so this is not a complete daily step total (which device a steps read uses is the read-side truth facet, Q4). Absent on rows written before the fix, or by a delivery whose archive could not be read (that delivery keeps the old payload-max under GREATEST). Writer: `lambdas/ingestion/health_auto_export_additive.py` |
+| `delivered_readings_only` | boolean | **#4628 (owner Q2 "b — readings stay in S3, one daily value per source in DynamoDB", Q3 "labelled 'what the phone delivered'", 2026-10-17).** `true` when the row's five additive fields (`steps`, `active_calories`, `basal_calories`, `distance_walk_run_miles`, `flights_climbed`) are the sum over unique reading timestamps of every reading the phone DELIVERED for this UTC day — each delivery merged into `raw/matthew/additive_readings/<field>/YYYY/MM/DD.json` (the `apple_health` raw_layout `additive_<field>` sub_layouts; resolve with `raw_date_key`), a re-sent reading counted once, every device source summed (no cross-source max), written without GREATEST. It means *what the phone delivered*, not the day: on non-walk days the phone under-delivers against the wrist count, so this is not a complete daily step total (which device a steps read uses is the read-side truth facet, Q4). Absent on rows written before the fix, or by a delivery whose archive could not be read (that delivery keeps the old payload-max under GREATEST). Writer: `lambdas/ingestion/health_auto_export_additive.py`. Rows from 2026-06-21 stored before the fix are rebuilt from the raw delivery archive by `scripts/hae_additive_backfill_4628.py` (dry-run by default; the owner/driver runs `--apply`), which sets the same stamp — a rebuilt row holds what the phone delivered, and readings the phone never delivered cannot be recovered (#4628 box 4) |
 | `distance_cycling_miles` | number | Cycling distance (daily sum, miles) — 2026-06-20 capture-everything expansion |
 | `distance_swimming_miles` | number | Swimming distance (daily sum, miles) — 2026-06-20 |
 | `distance_snow_miles` | number | Downhill snow-sports distance (daily sum, miles) — 2026-06-20 |
@@ -485,6 +485,7 @@ Note: the XML import path (`apple_health_lambda.py` `QUANTITY_RECORDS`) writes m
 | `walking_step_length_in` | number | Average step length (inches) — earliest aging gait marker |
 | `walking_asymmetry_pct` | number | Left/right gait asymmetry (%) — injury/compensation indicator |
 | `walking_double_support_pct` | number | Double support time (%) — balance/fall risk proxy |
+| `_rd_walking_speed_mph`, `_rd_walking_step_length_in`, `_rd_walking_double_support_pct`, `_rd_walking_asymmetry_pct` | map | Reading-level map {timestamp: quantity} (#4628) — the gait day value is the MEAN of this merged map, so an incremental sync no longer overwrites the day with its own average |
 
 Note: Gait metrics are Apple Watch exclusive. Walking speed <1.0 m/s (2.24 mph) is a clinical flag. Sustained asymmetry >3-4% indicates compensation for pain/injury. These fields are available from v1.1.0 of the webhook Lambda.
 
@@ -1009,7 +1010,7 @@ Note: Garmin auto-syncs activities to Strava. `garmin_activities` captures Garmi
 | Field | Type | Description |
 |-------|------|-------------|
 | `habits` | object | Map of habit name → count (Decimal: `1` = completed, `0` = not completed) |
-| `habit_statuses` | object | Per-habit structured status map (TD-11): status, completed_at, `habit_id` (the vendor's habit id, string — #4632, additive; absent on rows ingested before it and when the vendor sends none), `aliases` (list of strings — #4632: every OTHER display name the same `habit_id` carried on the nearest earlier stored day, plus that entry's own `aliases`, derived at ingest from id continuity; absent when the habit was never renamed; the read side resolves a registry habit by its `habitify_id`, then its key/`habitify_names`, then these aliases — `lambdas/health/habit_identity.py`), `status_channel` (`logs`\|`journal` — #4632: which channel decided the status; only a `logs`-decided vendor `failed` may withdraw a stored completion, and only on an explicit correction run), `miss_source` (`vendor`\|`platform`, present only when status is `failed` — #3666), etc. Since #422 also carries `notes` (list of verbatim in-app note strings for that day, clipped), `notes_at` (their created timestamps) and `note_channel: "habitify_note"` when the habit has notes — the PRIMARY habit-causality capture channel (a note on a done day = driver context; on a skipped/failed day = the why-missed reason). Stored raw — the `trigger:`/`reward:` line-prefix convention is interpreted on read by `lambdas/habit_causality.parse_note`, never inferred (ADR-104). |
+| `habit_statuses` | object | Per-habit structured status map (TD-11): status, completed_at, `habit_id` (the vendor's habit id, string — #4632, additive; absent on rows ingested before it and when the vendor sends none), `aliases` (list of strings — #4632: every OTHER display name the same `habit_id` carried on the nearest earlier stored day, plus that entry's own `aliases`, derived at ingest from id continuity; absent when the habit was never renamed; the read side resolves a registry habit by its `habitify_id`, then its key/`habitify_names`, then these aliases — `lambdas/health/habit_identity.py`; the history before #4921 gains its ids and aliases through the owner-run `scripts/habit_alias_backfill_4632.py`, dry-run by default), `status_channel` (`logs`\|`journal` — #4632: which channel decided the status; only a `logs`-decided vendor `failed` may withdraw a stored completion, and only on an explicit correction run), `miss_source` (`vendor`\|`platform`, present only when status is `failed` — #3666), etc. Since #422 also carries `notes` (list of verbatim in-app note strings for that day, clipped), `notes_at` (their created timestamps) and `note_channel: "habitify_note"` when the habit has notes — the PRIMARY habit-causality capture channel (a note on a done day = driver context; on a skipped/failed day = the why-missed reason). Stored raw — the `trigger:`/`reward:` line-prefix convention is interpreted on read by `lambdas/habit_causality.parse_note`, never inferred (ADR-104). |
 | `by_group` | object | Map of AREA name → group stats object (see below). #3666: the group set is DERIVED from Habitify's live `/areas` response, not the hardcoded nine P40 names — those had been renamed to `Core`/`Optimize`/`Vice`, which left `by_group` empty and `total_possible` 0 on every stored day. |
 | `total_completed` | number | Total habits completed that day |
 | `total_possible` | number | Total habits tracked that day |
@@ -1294,6 +1295,21 @@ Each draw record contains all biomarkers from that blood draw as a nested `bioma
 
 Note: SBP currently uses estimate (125 mmHg) — `ascvd_inputs.systolic_bp_source` tracks provenance. Update when BP monitor data available.
 
+**Provenance fields (every row written through the path, `schema_version: "v2"`, #4639):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `provenance.documents` | list | One `{file, s3_key, sha256, bytes, content_type}` per archived source document — archived under the registry's `raw_layout` (`raw/matthew/labs/<draw-date>/<file>`) BEFORE the row is written |
+| `provenance.documents_unavailable_reason` | string | Only on a back-fill with no document to archive: why (the owner's words) |
+| `provenance.lab` / `provenance.lab_network` / `provenance.drawn_date` | string | Who drew it, which network ran it, the collection date |
+| `provenance.extraction_method` | string | `csv via scripts/ingest_lab_report.py` or `json via …` — how the figures left the report |
+| `provenance.reviewer` | string | Who read the review table before `--apply` (default `matthew`) |
+| `provenance.ingested_at` | string | ISO-8601 UTC |
+| `ingested_at`, `ingestion_method`, `source` | string | Top-level copies kept for continuity with the hand-extracted 2026-04-03 row (`schema_version: "v1"`, per-document `*_s3_key` fields) |
+| `biomarkers.<k>.previous_value` / `previous_date` | number / string | Filled from the newest prior draw (read through `health/labs_schema.py`) when the marker has one |
+
+**Writer:** `scripts/ingest_lab_report.py labs <report.csv|json> --draw-date … --document …` — dry run prints the review table; `--apply` archives the documents, then writes ONE `DATE#` row (`attribute_not_exists(sk)` unless `--overwrite`). The write REFUSES a marker key or a unit not in `lambdas/health/lab_units.py` (`LAB_UNITS`: 189 marker keys and the unit spellings the partition has stored); the table grows by PR. No lambda writes this partition.
+
 Access via labs-specific MCP tools (`get_lab_results`, `get_lab_trends`, `get_out_of_range_summary`).
 
 ### dexa (body composition scans)
@@ -1304,24 +1320,29 @@ Access via labs-specific MCP tools (`get_lab_results`, `get_lab_trends`, `get_ou
 - PK: `USER#matthew#SOURCE#dexa`
 - SK: `DATE#YYYY-MM-DD` (one item per scan date)
 
+Field names below are the LIVE shape (re-read from both stored scans 2026-10-17, #4639; an
+earlier draft of this table carried `weight_lbs`/`lean_mass_lbs`/`bone_density` names that no
+row has ever held). The authoritative leaf list is `lambdas/health/lab_units.py::DEXA_FIELDS`
+(124 dotted paths); the unit of a numeric leaf is its own suffix (`_lb`, `_pct`, `_g`, `_kg_m2`,
+`t_score`/`z_score` in SD).
+
 | Field | Type | Description |
 |-------|------|-------------|
 | `scan_date` | string | YYYY-MM-DD |
-| `facility` | string | e.g. "DexaFit Seattle" |
-| `scan_type` | string | `dexa_body_composition` |
-| `body_composition.weight_lbs` | number | Total body weight |
-| `body_composition.body_fat_pct` | number | Whole-body fat % |
-| `body_composition.lean_mass_lbs` | number | Lean body mass |
-| `body_composition.fat_mass_lbs` | number | Total fat mass |
-| `body_composition.android_gynoid_ratio` | number | A/G ratio (target ≤1.0) |
-| `body_composition.visceral_fat_g` | number | Visceral adipose tissue (grams) |
-| `bone_density.t_score` | number | BMD T-score |
-| `bone_density.z_score` | number | BMD Z-score |
-| `posture_assessment` | object | Kinetisense 3D captures (frontal, sagittal, transverse) |
-| `interpretations` | object | Percentile ranks, clinical context, goals |
-| `goals` | object | 6-month targets for body fat, lean mass, A/G ratio |
+| `provider` / `provider_address` | string | e.g. `dexafit_seattle` |
+| `scan_type` | string | `dexa` |
+| `body_composition.{total_mass_lb, lean_mass_lb, fat_mass_lb, bone_mineral_content_lb}` | number | Whole-body masses — the four leaves every reader depends on (`DEXA_REQUIRED`: `ai/ai_context.py` physical coach, `content/output_writers.py`, the #4166 training derivation) |
+| `body_composition.{body_fat_pct, android_fat_pct, gynoid_fat_pct, ag_ratio}` | number | Fat distribution; `ag_ratio` is android/gynoid |
+| `body_composition.{visceral_fat_lb, visceral_fat_g}` | number | Visceral adipose tissue |
+| `bone.{t_score, z_score, bmc_lb, t_score_change}` · `bone.bmd_by_region.<region>.{bmd, percentile}` | number | Bone density; regions `head, arms, legs, trunk, ribs, pelvis, spine, total_body` |
+| `indices.{ffmi_kg_m2, fmi_kg_m2, almi_kg_m2, almi_percentile, ffmi_rating, fmi_rating}` | number / string | Fat-free, fat and appendicular-lean mass indices |
+| `limbs.<right_arm|left_arm|right_leg|left_leg>.{total_lb, lean_lb, fat_lb, fat_pct, lean_pct, mbr}` · `limbs.{arm_symmetry, leg_symmetry}` | number | Per-limb composition and symmetry |
+| `segmental_fat.*` / `segmental_lean.*` | number | Segmental (arms/legs/trunk, left/right) masses and percentages |
+| `body_score.{numeric, percentile, grade, rating, suggested_next_visit_days}` · `score_360.{score, biological_age, bio_age_rating}` | number / string | The provider's composite scores. **`score_360.biological_age` is an age-class metric: Tier 2, never on a public surface** (PhenoAge posture) |
+| `changes_vs_baseline.*` / `targets.*` | number | The provider's deltas against the first scan and its targets |
+| `provenance` | object | Same shape as the labs provenance block (`documents[]` archived under `raw/matthew/dexa/<scan-date>/<file>`, `scanner`, `scanned_date`, `extraction_method`, `reviewer`, `ingested_at`), #4639 |
 
-Manual entry source — new scans seeded via `seed_physicals_dexa.py`. Cadence: semi-annual.
+**Writer:** `scripts/ingest_lab_report.py dexa <scan.csv|json> --scan-date … --provider … --document …` (#4639) — same archive-first / review / `--apply` contract as labs; refuses a leaf path not in `DEXA_FIELDS`, a non-number in a numeric leaf, a unit that contradicts the leaf's suffix, and a scan missing any of `DEXA_REQUIRED`. Registry: `SOURCE_REGISTRY["dexa"]` (`cadence_months: 12`; it left `UNREGISTERED_PARTITIONS` in #4639). The two scans on file (2025-05-10, 2026-03-30) predate the path and carry no `provenance`.
 
 ### genome (SNP clinical interpretations)
 

@@ -10,7 +10,7 @@ pick the story up the way a human desk would:
   * ``featured`` — which coach the week put in front of readers (rotation input);
   * ``leads`` / ``beats`` — the angle that led and the beats already used (repeat guard);
   * ``arcs`` — one line per character (Elena, each coach) on how they have moved;
-  * ``asks`` — what a coach asked of him, ``open | followed_up | escalated`` (#4914).
+  * ``asks`` — what a coach asked of him, ``open | followed_up | escalated | answered`` (#4914, #4546).
 
 THE ASK RULE (#4914) — one rule, ``matched_ask`` (scored by ``_match_score``), shared by the desk's validator and ``apply_budget``:
   * every ask carries a stable ``id`` (``ask_id`` of its normalized text), assigned when ``apply_budget``
@@ -21,8 +21,12 @@ THE ASK RULE (#4914) — one rule, ``matched_ask`` (scored by ``_match_score``),
     ``ASK_OVERLAP`` of its content words (and ``ASK_OVERLAP_MIN_WORDS`` of them) (a paraphrase is a follow-up);
   * outcome ``carried`` (``CARRIED``) means no reply and no data yet: the ask stays ``open`` with a
     ``carried_weeks`` count. After ``CARRIED_MAX_WEEKS`` carried installments it is ESCALATED — status
-    ``escalated`` with ``escalated_week``, no longer demanded of the desk, listed by ``_escalated_asks`` (private until the reply desk, #4546, consumes it) for
-    the reply desk (#4546) to put to him by email instead of asking the data something it cannot answer.
+    ``escalated`` with ``escalated_week``, no longer demanded of the desk, and listed by ``escalated_asks`` for
+    the reply desk (#4546) to put to him by email instead of asking the data something it cannot answer;
+  * the reply desk sends an escalated ask as a numbered question tagged ``[<ask id>]`` (``ask_tag``); his reply is
+    paired to the question by the inline extractor (``story_questions.parse_reply``), and when the week publishes
+    ``apply_budget(..., owner_answers=)`` finds the tag in the answer's question text (``tagged_ask_id``) and marks
+    the ask ``answered`` (``ANSWERED``) with ``answered_week`` — and his words, unless he marked them off record.
 
 Pure: the ledger is a dict in, a dict out. Persistence (`ledger_row` / `latest_visible`)
 is the only part that touches a table, and it reads through ``singleton_visible`` so a
@@ -50,6 +54,9 @@ LEDGER_PREFIX = "LEDGER#"
 # ── the ask rule (#4914) ─────────────────────────────────────────────────────
 CARRIED = "carried"  # an asks_followed_up outcome: no reply, no data yet
 CARRIED_MAX_WEEKS = 3  # carried this many installments → escalated to the reply desk (#4546)
+ESCALATED = "escalated"
+ANSWERED = "answered"  # he answered the reply desk's tagged question (#4546)
+ASK_TAG_RE = re.compile(r"\[(ask-[0-9a-f]{8})\]")  # how a reply-desk question carries its ask id
 ASK_PREFIX_CHARS = 40  # the legacy verbatim rule, kept as one of the accepted ways to name an ask
 ASK_OVERLAP = (
     0.4  # share of the FOLLOW-UP's own content words (4+ letters) that must be the ask's; the single best match wins, a tie matches nothing
@@ -118,9 +125,36 @@ def open_asks(ledger: Dict[str, Any]) -> List[Dict[str, Any]]:
     return [a for a in ledger.get("asks", []) if is_open_ask(a)]
 
 
-def _escalated_asks(ledger: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Asks carried ``CARRIED_MAX_WEEKS`` installments with no reply — for the reply desk (#4546) to put to him."""
-    return [a for a in ledger.get("asks", []) if a.get("status") == "escalated"]
+def escalated_asks(ledger: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Asks carried ``CARRIED_MAX_WEEKS`` installments with no reply — for the reply desk (#4546) to put to him,
+    oldest first (the coach who has waited longest goes first in the email)."""
+    return sorted((a for a in ledger.get("asks", []) if a.get("status") == ESCALATED), key=lambda a: int(a.get("week") or 0))
+
+
+def ask_tag(ask: Dict[str, Any]) -> str:
+    """The tag a reply-desk question carries so the answer can be paired back to the ask: ``[ask-1a2b3c4d]``."""
+    return f"[{ask_key(ask)}]"
+
+
+def tagged_ask_id(answer: Dict[str, Any]) -> Optional[str]:
+    """The ask id a parsed reply answers — read from the TAG in its question text, never from the answer."""
+    m = ASK_TAG_RE.search(str(answer.get("question") or ""))
+    return m.group(1) if m else None
+
+
+def mark_answered(ledger: Dict[str, Any], answers: List[Dict[str, Any]], *, week: int) -> List[Dict[str, Any]]:
+    """Mutates ``ledger``: every escalated ask whose tag a parsed reply carries becomes ``answered``. His words are
+    kept on the ask unless he marked them off record (then only the fact that he answered). Returns the asks marked."""
+    by_id = {ask_key(a): a for a in ledger.get("asks", []) if a.get("status") == ESCALATED}
+    marked = []
+    for ans in answers or []:
+        a = by_id.pop(tagged_ask_id(ans) or "", None)
+        if a is None or not str(ans.get("answer") or "").strip():
+            continue
+        a["status"], a["answered_week"] = ANSWERED, week
+        a["answer"] = None if ans.get("off_record") else ans["answer"]
+        marked.append(a)
+    return marked
 
 
 def unfollowed_asks(ledger: Dict[str, Any], budget: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -207,10 +241,14 @@ def continuity_findings(prev: Dict[str, Any], budget: Dict[str, Any], week: int)
     return findings
 
 
-def apply_budget(prev: Dict[str, Any], budget: Dict[str, Any], *, week: int, date: str, title: str) -> Dict[str, Any]:
-    """The ledger after this installment publishes. Never mutates ``prev``."""
+def apply_budget(
+    prev: Dict[str, Any], budget: Dict[str, Any], *, week: int, date: str, title: str, owner_answers: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
+    """The ledger after this installment publishes. Never mutates ``prev``. ``owner_answers`` is the week's
+    ``owner_voice`` answers (#4546): the ones tagged with an escalated ask's id mark that ask answered."""
     led = copy.deepcopy(prev) if prev else empty_ledger()
     led["week"], led["date"] = week, date
+    mark_answered(led, owner_answers or [], week=week)
     by_id = {t["id"]: t for t in led.get("threads", [])}
     for act in budget.get("thread_actions", []):
         tid, kind = act.get("thread_id"), act.get("action")
@@ -269,7 +307,7 @@ def apply_budget(prev: Dict[str, Any], budget: Dict[str, Any], *, week: int, dat
         if is_carried(fu.get("outcome")):
             a["carried_weeks"] = int(a.get("carried_weeks") or 0) + 1
             if a["carried_weeks"] >= CARRIED_MAX_WEEKS:
-                a["status"], a["escalated_week"] = "escalated", week
+                a["status"], a["escalated_week"] = ESCALATED, week
         else:
             a["status"], a["outcome"], a["followed_week"] = "followed_up", fu.get("outcome"), week
     for ask in budget.get("coach_asks", []):

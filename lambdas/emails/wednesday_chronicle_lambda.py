@@ -1355,10 +1355,17 @@ def _send_story_questions(event):
     so_far = {**upcoming, "end": min(upcoming["end"], (today - timedelta(days=1)).isoformat())}
     dossier, _ = story_dossier.week_dossier(table, so_far)
     ledger = story_ledger.latest_visible(table, f"USER#{USER_ID}#SOURCE#chronicle", upcoming["end"])
-    questions = story_questions.generate(dossier, story_ledger.ledger_for_prompt(ledger, n))
+    escalated = story_questions.escalated_questions(ledger)  # #4546: a coach ask carried CARRIED_MAX_WEEKS weeks goes to him first
+    questions = story_questions.compose(escalated, story_questions.generate(dossier, story_ledger.ledger_for_prompt(ledger, n)))
     if event.get("dry_run"):
-        return {"statusCode": 200, "body": json.dumps({"status": "dry_run", "week": n, "questions": questions})}
+        return {
+            "statusCode": 200,
+            "body": json.dumps({"status": "dry_run", "week": n, "questions": questions, "escalated": len(escalated)}),
+        }
     resp = story_questions.send(ses, week=n, questions=questions, to=RECIPIENT, sender=SENDER)
+    logger.info(
+        f"[#4546] story questions sent for week {n}: {len(questions)} question(s), {len(escalated)} escalated ask(s), {resp.get('MessageId', '')}"
+    )
     from experiment.phase_taxonomy import experiment_stamp_for
 
     table.put_item(

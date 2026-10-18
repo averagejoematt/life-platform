@@ -677,6 +677,24 @@ def ingestion_hae() -> list[iam.PolicyStatement]:
                 "raw/matthew/additive_readings/*",
             ),
         ),
+        # #4626 (found 2026-10-17 by the #4628 lane): every one of these four day files is
+        # read-merge-dedup-put (`health_auto_export_archive.py`), and on a read error other than
+        # NoSuchKey the writer logs at WARNING and puts the delivery alone — so with PutObject and
+        # no GetObject the live role OVERWROTE each day file with only the latest delivery
+        # (`/aws/lambda/health-auto-export-webhook`: `s3_read_workouts raw/matthew/workouts/
+        # 2026/10/11.json: … AccessDenied … s3:GetObject`). The missing-key case is answered as
+        # NoSuchKey by the bucket-level ListBucket below (#4962). Same four trees as S3Write —
+        # the registry's `sub_layouts` prefixes (tests/test_hae_getobject_grant_4626.py).
+        iam.PolicyStatement(
+            sid="S3ReadDayFiles",
+            actions=["s3:GetObject"],
+            resources=_s3(
+                "raw/matthew/cgm_readings/*",
+                "raw/matthew/blood_pressure/*",
+                "raw/matthew/state_of_mind/*",
+                "raw/matthew/workouts/*",
+            ),
+        ),
         # #4628 (Q2 b): the additive day value is the sum of the per-reading archive, so the
         # webhook READS back the day's object before merging. ListBucket is what makes S3 answer
         # a not-yet-written day with NoSuchKey (an empty day) instead of AccessDenied — which the

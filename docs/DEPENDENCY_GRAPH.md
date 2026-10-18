@@ -122,7 +122,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-747 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+748 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -522,7 +522,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1303 total · 939 resolved · 364 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1303 total · 940 resolved · 363 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 84 resolved · 0 dynamic of 84 scheduled lambdas (108 lambdas total)
 - Alarms: 139 literal-named declarations across three idioms, 4 composite; routing digest 95 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 18 owner-only + 3 owner-published sources; 35 owner-only + 11 owner-published fields — non-default entries only
