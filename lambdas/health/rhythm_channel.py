@@ -52,6 +52,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Iterable, Optional
 
+from common.pacific_time import parse_iso_utc
+
 logger = logging.getLogger(__name__)
 
 PREFIX = "RHYTHM#"
@@ -303,9 +305,12 @@ def ecg_verdicts(table, rows: list, user_id: str = "matthew") -> tuple[list, int
         if "afib_result" in withings:
             device = str(row.get("rhythm_ecg_device") or "")
             if device and not _is_apple(device):
-                at_utc = datetime.fromisoformat(row["rhythm_ecg_sample_start"]).astimezone(timezone.utc).timestamp()
+                started = parse_iso_utc(row["rhythm_ecg_sample_start"])
+                at_utc = started.timestamp() if started is not None else None
                 stamps = [g.get("timestamp") for g in withings.get("measurement_group_attribs") or [] if isinstance(g, dict)]
-                if any(_positive(s) is not None and abs(float(s) - at_utc) <= SAME_RECORDING_SECONDS for s in stamps):
+                if at_utc is not None and any(
+                    _positive(s) is not None and abs(float(s) - at_utc) <= SAME_RECORDING_SECONDS for s in stamps
+                ):
                     dupes += 1
                     continue
             row["cross_device_same_day"] = True
