@@ -685,6 +685,21 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "expected_days": 7,
         "qa_tier": "required",
         "method": "Health Auto Export webhook, near-real-time",
+        # #5042 (Refs #4976): the first day the Apple WATCH is the sensor behind this partition's
+        # resting heart rate. The stored DATE# rows carry no per-reading device, and before the
+        # watch the Apple Health RHR stream was other writers (the HAE drops of 10-15/10-16 carry
+        # source "WHOOP" — Whoop's own app writing into Apple Health), so an all-history read
+        # compares Whoop with Whoop. Determined from the raw HAE drops (read-only s3 cp of
+        # raw/matthew/health_auto_export/2026/10/, 2026-10-18): the earliest resting-heart-rate
+        # reading whose source is "Matthew's Apple Watch" is dated 2026-10-17. Readers that
+        # mean "the watch" (the /api/device_agreement comparison) floor their window here.
+        "watch_first_day": {
+            "date": "2026-10-17",
+            "determined_by": (
+                "the earliest resting-heart-rate reading sourced \u201cMatthew\u2019s Apple Watch\u201d in the raw "
+                "Health Auto Export drops (the stored daily rows carry no device)"
+            ),
+        },
         # #3257: the ONE source whose DATE# key names a UTC calendar day, not a Pacific
         # one — health_auto_export_lambda.parse_date_str converts to UTC before taking the
         # day (TD-19 Phase 2). Every consumer that ages this key must anchor it at UTC
