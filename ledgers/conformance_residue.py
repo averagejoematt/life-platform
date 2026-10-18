@@ -50,7 +50,7 @@ CONFORMANCE_RESIDUE: dict[str, str] = {
     "cdk/stacks/monitoring_stack.py::sources::eightsleep,hevy,strava,whoop,withings": "2026-08-17",
     "lambdas/content/engagement_core.py::sources::apple_health,eightsleep,whoop": "2026-08-17",
     "lambdas/content/html_builder.py::sources::habitify,macrofactor,strava,whoop": "2026-08-17",
-    "lambdas/content/insight_writer.py::sources::garmin,strava,whoop": "2026-08-17",
+    "lambdas/content/insight_writer.py::sources::strava,whoop": "2026-08-17",  # #4976: was garmin,strava,whoop — garmin dropped
     "lambdas/emails/anomaly_detector_lambda.py::sources::eightsleep,garmin,habitify,macrofactor,strava,todoist,whoop,withings": "2026-08-17",
     "lambdas/emails/chronicle_render.py::personas::andrew_huberman,elena_voss,layne_norton,margaret_calloway,maya_rodriguez,paul_conti,peter_attia,rhonda_patrick,the_chair,vivek_murthy": "2026-08-17",
     "lambdas/emails/freshness_checker_lambda.py::sources::apple_health,eightsleep,habitify,whoop": "2026-08-17",
