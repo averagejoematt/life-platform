@@ -98,10 +98,11 @@ def _done(n: int) -> list[dict]:
         {
             "date": shift_day_key("2026-09-24", i),
             "source_workout_id": f"w{i}",
-            # #4312: a lower and an upper set, so each generic session matches the role it takes
+            # #4312: a lower and an upper set (and, #5069, a delt set), so each generic session matches the role it takes
             "exercises": [
                 {"name": "Leg Press", "sets": [{"weight_kg": 90, "reps": 5}]},
                 {"name": "Bench Press", "sets": [{"weight_kg": 60, "reps": 5}]},
+                {"name": "Lateral Raise (Dumbbell)", "sets": [{"weight_kg": 10, "reps": 12}]},
             ],
         }
         for i in range(n)
@@ -189,9 +190,9 @@ def test_moderate_anchors_ride_the_same_ramp():
 
 # ── 3. week 9 ────────────────────────────────────────────────────────────────
 def test_week_9_is_capped_at_85_percent():
-    # #4161: weeks are hybrid (4 sessions AND >= 7 days) — lifting daily, week 9 opens on day 56 (11-19);
-    # index 59 (11-22) is upper-heavy (4 a week, from lower-heavy)
-    ideal = _generate("2026-11-22", block_workouts=_done(59))[0]
+    # #4161: weeks are hybrid (the cycle AND >= 7 days) — lifting daily, week 9 opens on day 56 (11-19); #5069: past the
+    # cut-over the five-day order continues from the last v0.4 session (index 24, lower-heavy), so index 58 (11-21) is upper-heavy
+    ideal = _generate("2026-11-21", block_workouts=_done(58))[0]
     assert ideal.inputs_snapshot["calendar"]["week"] == 9 and ideal.title.startswith("UPPER-HEAVY")
     for key in HEAVY_ANCHORS:
         top = _top(ideal, key)
@@ -252,19 +253,21 @@ def test_weekly_hard_sets_per_muscle_sit_inside_the_redline_ranges():
     assert lift["sets_per_muscle_wk"] == [8, 12] and lift["sets_per_muscle_wk_small"] == [4, 6]  # #4147: v0.4's ~10
     for group, row in week.items():
         lo, hi = row["range"]
-        assert lo <= row["sets"] <= hi, (group, row)
-    assert week["back"]["sets"] == 10 and week["delts"]["sets"] == 6
-    # the summed total still sits in §3's 50–65 — the locked v0.4 block's band (#4503 OD4: v0.5's 60–75 governs the next block)
+        # #5069: the shoulders+arms day (owner ruling 5) puts delts and arms over v0.4's 4–6 by design — a floor for them now
+        assert lo <= row["sets"] and (row["sets"] <= hi or not row["band_top_binds"]), (group, row)
+    assert week["back"]["sets"] == 12 and week["delts"]["sets"] == 13
+    # the five-day week sits in v0.5's 60–75 (#4503 OD4) with no 🟢 tail
     total = sum(
         program_structure.session_prescription_for_role(r)["total_sets"] for r in program_structure.SESSION_SEQUENCE["session_roles"]
     )
-    lo, hi = lift["total_hard_sets_wk_v0_4"]
+    lo, hi = lift["total_hard_sets_wk"]
     assert lo <= total <= hi, total
 
 
 def test_mutation_control_the_pre_4090_shape_breaks_delts():
-    """#4090's two fixes, re-applied to v0.4 (#4147): pulldown at 3 sets on both upper days puts back
-    at 12 (the band's top) and a lateral raise on upper-heavy puts delts at 8 — over 4–6."""
+    """#4090's fix, re-applied to the five-day split (#5069): pulldown at 3 sets on both upper days puts back at 14 — over
+    the 8–12 top (the shoulders+arms day's shrug already holds back at 12). Delts are no longer the tell: their 4–6 top
+    stopped binding when ruling 5 added the aesthetic day."""
     upper_heavy = program_structure.SESSION_TEMPLATES["upper_heavy"]
     upper_volume = program_structure.SESSION_TEMPLATES["upper_volume"]
     with (
@@ -272,7 +275,7 @@ def test_mutation_control_the_pre_4090_shape_breaks_delts():
         patch.dict(upper_volume, {"anchor_sets": {}}),
     ):
         week = program_structure.weekly_sets_by_muscle(MOVEMENTS)
-    assert week["back"]["sets"] == 12 and week["delts"]["sets"] == 8 and week["delts"]["sets"] > week["delts"]["range"][1]
+    assert week["back"]["sets"] == 14 > week["back"]["range"][1] and week["back"]["band_top_binds"]
 
 
 # ── 7. the planner carries the same loads ────────────────────────────────────
@@ -291,7 +294,8 @@ def test_plan_next_session_2026_09_24_carries_week_1_ramp_loads():
     session = json.loads(resp["content"][0]["text"])["constraint_block"]["session"]
     assert session["session_role"] == "upper_heavy"
     assert session["loads"]["status"] == "applied" and session["loads"]["week"] == 1
-    assert session["weekly_sets_by_muscle"]["back"] == {"sets": 10, "range": [8, 12]}
+    back = session["weekly_sets_by_muscle"]["back"]
+    assert (back["sets"], back["range"], back["frequency_per_wk"]) == (12, [8, 12], 3)  # #5069: + the shoulders+arms day's shrug
     ideal = _generate()[0]
     assert set(HEAVY_ANCHORS) <= {e["movement_key"] for e in session["prescription"]["exposures"]}
     for e in session["prescription"]["exposures"]:

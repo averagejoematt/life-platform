@@ -3,22 +3,24 @@ Health & body composition tools.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Optional
 
 from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from health import (
     hr_regime,  # #4999: THE dated HR regime markers (re-baselining window, post-marker baselines, AF days)
     tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
 )
-from training import training_load  # #4075: the ONE load-provenance predicate for the TSB label
+from training import rate_band, training_load  # #4075: the ONE load-provenance predicate for the TSB label
 
+from mcp import core as _mcp_core
 from mcp.config import logger
 from mcp.core import decimal_to_float, get_profile, phase_scope_block, query_source, query_source_cross_phase
 from mcp.helpers import normalize_whoop_sleep
 from mcp.tools_training import _get_training_load
 from mcp.weight_rate import (
-    RATE_FLAG_PCT_BW_PER_WK,
     annotate_weekly_rates,
+    bmi_category,
+    calc_bmi,
     rate_pct_bw,
 )  # noqa: F401 — #5060, split by the size guard
 
@@ -605,6 +607,14 @@ def _rebaselining_result(end_date, components, device_agreement, regime):
     }
 
 
+def _guidance_cap_state() -> tuple[Optional[float], str]:
+    """(cap, "read" | "read_failed") — ADR-105: a broken clinical read is surfaced on rate_band, never read as 'no cap'."""
+    try:
+        return rate_band.guidance_cap_for(_mcp_core.table), "read"
+    except rate_band.GuidanceReadError:
+        return None, "read_failed"
+
+
 def tool_get_weight_loss_progress(args):
     end_date = args.get("end_date", pacific_today())
     explicit_start = args.get("start_date")  # None when caller didn't pass one
@@ -652,35 +662,13 @@ def tool_get_weight_loss_progress(args):
     if not weight_series:
         return {"error": "No weight_lbs field found in Withings data."}
 
-    def calc_bmi(weight_lbs, height_in):
-        if not height_in:
-            return None
-        # 703 converts imperial (lbs/in^2) to metric BMI (kg/m^2)
-        return round(703 * weight_lbs / (height_in**2), 1)
-
-    bmi_categories = [
-        (18.5, "Underweight"),
-        (25.0, "Normal weight"),
-        (30.0, "Overweight"),
-        (35.0, "Obese Class I"),
-        (40.0, "Obese Class II"),
-        (float("inf"), "Obese Class III"),
-    ]
-
-    def bmi_category(bmi):
-        if bmi is None:
-            return None
-        for threshold, label in bmi_categories:
-            if bmi < threshold:
-                return label
-        return "Obese Class III"
-
     for pt in weight_series:
         bmi = calc_bmi(pt["weight_lbs"], height_in)
         pt["bmi"] = bmi
         pt["bmi_category"] = bmi_category(bmi)
 
-    weekly_rates = annotate_weekly_rates(weight_series)
+    guidance_cap, guidance_read = _guidance_cap_state()
+    weekly_rates = annotate_weekly_rates(weight_series, guidance_cap)
 
     milestones = {}
     milestone_thresholds = [
@@ -822,6 +810,7 @@ def tool_get_weight_loss_progress(args):
         "avg_weekly_loss_pct_bodyweight": rate_pct_bw(avg_weekly, current_weight),
         "rate_lb_per_wk": avg_weekly,
         "rate_pct_bodyweight_per_wk": rate_pct_bw(avg_weekly, current_weight),
+        "rate_band": {**(rate_band.band_view(current_weight, avg_weekly, guidance_cap) or {}), "guidance_read": guidance_read},
         "projection": projection,
         "plateau_detected": plateau,
         "milestones_achieved": milestones,
@@ -837,8 +826,9 @@ def tool_get_weight_loss_progress(args):
             "A gap in logging shows as missing dates here — never an interpolated or smoothed entry."
         ),
         "clinical_note": (
-            f"Rate is judged relative to bodyweight, shown in lb/wk and % of bodyweight. Losing more than "
-            f"{RATE_FLAG_PCT_BW_PER_WK}% of bodyweight per week consistently risks lean mass catabolism (Helms 2014)."
+            "Rate is judged against the owner's band (`rate_band`, from the training charter) and relative to bodyweight, "
+            "shown in lb/wk and % of bodyweight; a weekly point is flagged only above his schedule's cap at that weight "
+            "(sustained losses past it risk lean mass catabolism, Helms 2014)."
         ),
     }
 

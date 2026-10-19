@@ -1,12 +1,33 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.0.0",
+  "version": "1.3.0",
   "change_log": [
     {
       "version": "1.0.0",
       "date": "2026-10-18",
       "by": "owner rulings 2026-10-18 (the elite-panel training review, #5067)",
       "what": "First charter: the frame, the rate band, the 5-day split, the step floor and target, the cardio menu, no scheduled deload, effort ceilings, rotation cadence, gated movements, the concession ledger.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.1.0",
+      "date": "2026-10-18",
+      "by": "the owner's double-progression ruling (#4503 OD5, 2026-09-30), moved here from owner_redlines.REDLINES['lifting_sessions_per_wk']['gain_rule'] (#5052)",
+      "what": "Added `progression`: the gain rule (two top-of-range exposures at or under the effort ceiling earn one 5-lb step, reps back to the bottom) and the self-raised-load rule (a load the owner raised himself at or under the ceiling becomes the next floor and is graded progressed, not a breach). The redline copy is retired; the engine reads it here.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.2.0",
+      "date": "2026-10-19",
+      "by": "owner ruling 2026-10-18 on #5088 (a late-December trip: travel templates, steps held, 2-3 short sessions a week, step back up on return)",
+      "what": "Adds split.minimum_session (the 20-minute minimum per role: anchors only, top set + one back-off) and the disruption block (an owner-switched mode that holds habits instead of targets, its travel/busy templates, the step-back-up week and when the coach OFFERS the mode).",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.3.0",
+      "date": "2026-10-19",
+      "by": "owner rulings 2026-10-18, ruling 4 (gym cardio is deliberate, from a menu, with level, speed and RPE) and ruling 7 (intervals and conditioning open, by RPE / talk test); #5076",
+      "what": "The cardio menu gains its dose: each block's talk test and machines, the incline treadmill walk's starting dose (8-12 % at 2.5-3.0 mph; his treadmill history tops out at 6 % at 2.8 mph, so the walk starts at the floor of the band) and step, the interval set, and the weekly placement rule.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -32,6 +53,15 @@
     "sequence": ["Upper-heavy", "Lower-heavy", "Shoulders+arms", "Upper-volume", "Lower-volume"],
     "frequency": {"each_major_muscle_per_wk": 2, "delts_per_wk": 3},
     "session_minutes": {"lifting": [60, 75], "cardio_block_max": 30, "stretching_max": 10},
+    "minimum_session": {
+      "minutes": 20,
+      "shape": "anchors only, top set + one back-off",
+      "sets_per_movement": 2,
+      "max_movements": 4,
+      "est_minutes_per_set": 2.5,
+      "back_off_pct": -10,
+      "from": "owner_redlines lifting_sessions_per_wk.minimum_viable_session, tightened to 20 minutes for disruption weeks (#5088)"
+    },
     "rule": "the next session is the one after the last performed lift, whatever the date"
   },
   "volume_priorities": {
@@ -65,13 +95,28 @@
     "every_block_carries": ["level", "speed", "rpe_or_talk_test"],
     "progression": "same RPE at a higher level",
     "blocks": {
-      "easy": {"rpe": [4, 5], "talk_test": "full sentences"},
-      "tempo": {"label": "hard flat 40", "rpe": [6, 7], "minutes": 40},
-      "hills": {"rpe": [5, 7]},
-      "intervals": {"rpe_hard_minutes": 8, "note": "RPE 8 on the hard minutes; open by RPE / talk test"},
-      "incline_treadmill_walk": {"rpe": [4, 6], "default": true},
+      "easy": {"rpe": [4, 5], "talk_test": "full sentences", "machines": ["cycling", "elliptical", "rowing_machine"]},
+      "tempo": {"label": "hard flat 40", "rpe": [6, 7], "minutes": 40, "talk_test": "short phrases", "machines": ["cycling", "elliptical", "rowing_machine"]},
+      "hills": {"rpe": [5, 7], "talk_test": "short phrases on the climbs", "shape": "incline then decline", "machines": ["treadmill", "cycling", "elliptical"]},
+      "intervals": {"rpe_hard_minutes": 8, "note": "RPE 8 on the hard minutes; open by RPE / talk test", "talk_test": "a few words on the hard minutes", "work_easy_minutes": [2, 2], "efforts": 5, "machines": ["cycling", "air_bike", "rowing_machine", "elliptical"]},
+      "incline_treadmill_walk": {
+        "rpe": [4, 6],
+        "default": true,
+        "talk_test": "full sentences",
+        "machines": ["treadmill"],
+        "starting_dose": {"incline_pct": [8, 12], "mph": [2.5, 3.0]},
+        "step": {"incline_pct": 1, "mph": 0.1}
+      },
       "kettlebell_swings_and_circuits": {"available": "now", "prescribed_by": "RPE / talk test"}
-    }
+    },
+    "placement": {
+      "conditioning_order": ["tempo_or_hills", "intervals"],
+      "the_rest": "easy",
+      "recumbent_after": ["a lower day", "a heavy walking weekend"],
+      "never_consecutive": "the same hard shape",
+      "rule": "conditioning 2x/wk (one tempo-or-hills, one intervals), every other block easy; the recumbent after a lower day or a heavy walking weekend; never the same hard shape on consecutive days"
+    },
+    "movement_minutes": "gym cardio minutes count toward the daily steps/movement goal (steps.gym_cardio_minutes_count_toward_movement)"
   },
   "deload": {
     "scheduled": false,
@@ -93,6 +138,38 @@
       "share_of_sets": 0.5,
       "weeks_running": 2,
       "effect": "proposes a ceiling change (an owner ruling applies it)"
+    }
+  },
+  "progression": {
+    "gain_rule": {
+      "kind": "double_progression",
+      "trigger": "the top of the slot's rep range on the top set of 2 consecutive same-type exposures (heavy -> heavy, volume -> volume), each logged at or under the movement's effort ceiling",
+      "consecutive_same_type_exposures": 2,
+      "step_lb": 5,
+      "step_pct": 2.5,
+      "size": "+2.5 % of the load in whole 5-lb steps, never less than one 5-lb step; reps back to the bottom of the range",
+      "reps_after_step": "bottom_of_range",
+      "rpe_role": "veto only — a top-of-range set logged above the movement's effort ceiling (or with no RPE logged) does not count toward the trigger",
+      "nutrition_clause": null,
+      "refused_when": [
+        "recovery < 50",
+        "sleep < 6.5 h",
+        "the week after a rate-over-cap flag",
+        "the first three exposures of a novel-again pattern",
+        "a deload the owner applied"
+      ],
+      "provenance": "owner",
+      "stated": "2026-09-30",
+      "ruling": "#4503 OD5"
+    },
+    "self_raised_load": {
+      "rule": "a load the owner raised himself, logged at or under the movement's effort ceiling (an overage within `effort_ceilings.overage_tolerance_rpe` is not a breach), becomes the next floor and is graded `progressed` — a named state, never folded into an adherence percentage",
+      "above_the_ceiling": "a raised load logged above the ceiling plus the tolerance is a breach and never becomes a floor"
+    },
+    "ceiling_tier": {
+      "compounds": "the low end of `effort_ceilings.by_experience_tier.compounds_rpe` until #5058 assigns the owner's tier",
+      "last_isolation_set": "the low end of `effort_ceilings.by_experience_tier.last_isolation_set_rpe`; an isolation movement's earlier sets read the compounds band",
+      "refs": "#5058"
     }
   },
   "rotation": {
@@ -137,6 +214,19 @@
       {"label": "late December 2026", "start": null, "end": null, "templates": "#5088"}
     ],
     "rule": "travel templates by mid-December; no calendar blocking"
+  },
+  "disruption": {
+    "owner_switched": true,
+    "imposed": false,
+    "rule": "the owner switches the mode on and off; the coach OFFERS it and never applies it (owner ruling 2026-10-18, #5088)",
+    "holds": ["steps.floor", "protein_floor", "sleep_floor", "one short session"],
+    "templates": {
+      "travel": {"sessions_per_wk": [2, 3], "pools": ["hotel", "bodyweight"], "note": "a resort/hotel gym first, bodyweight when there is none"},
+      "busy": {"sessions_per_wk": [1, 5], "pools": ["gym_minimum", "bodyweight"], "note": "the 20-minute minimum at the usual club"}
+    },
+    "step_back_up": {"days": 7, "serves": "the minimum session at the club", "then": "the full split"},
+    "offer": {"travel_lead_days": 3, "missed_session_days": 4},
+    "max_days": 28
   },
   "calibration": {
     "tape_and_photos": {"every_weeks": 2, "dead_man_missed_cycles": 2},

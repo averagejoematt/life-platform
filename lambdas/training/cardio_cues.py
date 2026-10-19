@@ -25,7 +25,10 @@ def attach_cardio_cues(
 
     Returns how many blocks were written. The note is `training.cardio_note.compose`'s: line 1 the
     prescription in one fixed grammar (machine · minutes · level N shape · effort rule), line 2 the
-    recovery answer and at most one sentence of why. The level is still derived from his history
+    recovery answer, the dose's reason and at most one sentence of why. #5076: each block's KIND is the
+    charter menu's weekly placement (`cardio_menu.choose_kind` over every cardio machine's history this
+    week), or the kind the draft path placed (`rationale_tag` `cardio:<key>:menu:<kind>`); the treadmill
+    dose is `cardio_menu.treadmill_dose`. The level is still derived from his history
     (`cardio_progression.cardio_facts` + `level_verdict`: the last ride's level, else his calibration
     note); the "Last: …" sentence and the calibration quote are no longer printed (#5048).
 
@@ -78,48 +81,86 @@ def attach_cardio_cues(
             logger.warning(f"cardio cue: whoop load failed ({e}); cue renders without HR-at-level: {e}")
             whoop_index = {}
 
-    from common.pacific_time import parse_day_key
-
-    from training import recent_aerobic, standing_constraints
+    from training import cardio_menu, recent_aerobic, standing_constraints
     from training.cardio_progression import cardio_facts, level_verdict
 
     target_date = str(getattr(spec, "target_date", "") or "")[:10]
-    day = parse_day_key(target_date)
-    week_start = (day.fromordinal(day.toordinal() - day.weekday())).isoformat() if day else target_date
     constraint = standing_constraints.active_constraint(target_date) if target_date else None
     archetype = getattr(spec, "archetype", "") or ""
+
+    def _tid(key: str) -> str | None:
+        return movements.get(key, {}).get("hevy_template_id_hint") or (key[5:] if key.startswith("tmpl:") else None)
+
+    # #5076: the week's placement reads every cardio machine's history, not only this block's
+    hist = cardio_menu.history_context(cardio_index, catalog, target_date)
+    prior_kinds = hist["week_kinds"]
+    loaded, _why = recent_aerobic.legs_loaded(aerobic_block)
     replaced: list[dict[str, Any]] = []
     audits: list[dict[str, Any]] = []
+    placed: list[str] = []
     stamped = 0
     for ex in targets:
         key = str(getattr(ex, "movement_key", "") or "")
-        tid = movements.get(key, {}).get("hevy_template_id_hint") or (key[5:] if key.startswith("tmpl:") else None)
+        tid = _tid(key)
         sessions = (cardio_index or {}).get(tid or "") or []
         facts = cardio_facts(tid, cardio_index, whoop_index) if sessions else {}
         verdict = level_verdict(facts.get("series"), facts.get("last_level")) if sessions else None
         minutes = round(sum(int(getattr(s, "duration_seconds", 0) or 0) for s in ex.sets) / 60)
+        tag = str(getattr(ex, "rationale_tag", "") or "").split(":")
+        existing = (getattr(ex, "notes", "") or "").strip()
+        authored = cardio_note.composed_kind(existing) or (cardio_menu.authored_kind(key, existing) if existing else None)
+        if len(tag) >= 4 and tag[0] == "cardio" and tag[2] == "menu" and tag[3] in cardio_menu.KINDS:
+            kind, why = tag[3], "placed by the draft"
+        elif authored:
+            kind, why = authored, "the author's note names it"
+        else:
+            pick = cardio_menu.choose_kind(
+                target_date=target_date,
+                archetype=archetype,
+                week_kinds=prior_kinds + placed,
+                prior_day_kind=hist["prior_day_kind"],
+                legs_loaded=loaded,
+                last_tempo_or_hills=hist["last_tempo_or_hills"],
+                machines=(key,),
+            )
+            kind, why = pick["kind"], pick["why"]
         note, audit = cardio_note.compose(
             movement_key=key,
             minutes=minutes,
             target_date=target_date,
             archetype=archetype,
+            kind=kind,
             facts=facts,
             verdict=verdict,
+            treadmill_sessions=hist["by_machine"].get(cardio_menu.TREADMILL),
             aerobic_block=aerobic_block,
-            prior_week_shapes=cardio_note.week_shapes(sessions, week_start, target_date),
             constraint=constraint,
             hr_ceiling_bpm=None if constraint else recent_aerobic.HR_CEILING_BPM,
+            placement_why=why,
         )
-        existing = (getattr(ex, "notes", "") or "").strip()
+        placed.append(audit["kind"])
         if existing and not cardio_note.is_composed(existing) and existing != note:
             replaced.append({"movement_key": key, "notes": existing})
         ex.notes = note
         audits.append({"movement_key": key, **audit})
         stamped += 1
+    plan = {
+        "version": cardio_menu.CARDIO_MENU_VERSION,
+        "charter_version": audits[0].get("charter_version") if audits else None,
+        "kinds": placed,
+        "week_kinds_before": prior_kinds,
+        # the gym cardio minutes this routine adds to the day's steps/movement goal (#5076 -> #5056)
+        "movement_minutes": cardio_menu.movement_minutes(exercises),
+    }
     snap = getattr(spec, "inputs_snapshot", None)
     if isinstance(snap, dict) or snap is None:
         try:
-            spec.inputs_snapshot = {**(snap or {}), "cardio_notes": audits, **({"cardio_notes_replaced": replaced} if replaced else {})}
+            spec.inputs_snapshot = {
+                **(snap or {}),
+                "cardio_notes": audits,
+                "cardio_plan": plan,
+                **({"cardio_notes_replaced": replaced} if replaced else {}),
+            }
         except AttributeError:  # pragma: no cover - a spec without the field
             pass
     return stamped

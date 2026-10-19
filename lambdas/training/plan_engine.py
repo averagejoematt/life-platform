@@ -84,12 +84,16 @@ from typing import Any, Callable
 from health import deficit_disclosures
 
 from training import (
+    block_model,
     deload_word,
+    disruption,
+    load_progression,
     owner_redlines,
     program_structure,
     recent_aerobic,
     redline_rate,
     self_added_volume,
+    steps_ramp,
     training_charter,
     training_context_registry,
 )
@@ -106,7 +110,8 @@ _CRITICS_NOT_WIRED = {
     ),
 }
 
-ENGINE_VERSION = "plan-engine@1.10.0"  # #4503 OD7: walking_collapse counts standalone walks + carries the named-human actuator mark
+ENGINE_VERSION = "plan-engine@1.11.0"  # #5052: the block carries `progression` (the charter's double progression + effort limits)
+# plan-engine@1.10.0 (#4503 OD7): walking_collapse counts standalone walks + carries the named-human actuator mark
 # plan-engine@1.9.0 (#4387): recent_aerobic per activity; walking_collapse + walking_overshoot evaluated, report-only
 # plan-engine@1.8.0 (#4161): hybrid weeks, the lock-anchored −40 % deload, the protein-gated rate target
 # plan-engine@1.7.0 (#4110/#4147): the session and the program week follow the completed-session SEQUENCE (v0.4 upper/lower)
@@ -148,9 +153,11 @@ ENGINE_INPUTS = (
     "block_workouts",
     "training_memory_constraints",
     "deload_records",  # #5070: the owner's recorded word on a deload (DELOAD#<start>), read like pain_dismissals
+    "disruption_records",  # #5088: his disruption-mode switch (MODE#disruption#<start>), read like deload_records
     "dxa_scans",  # #4166: the protein gate's body-fat tier
     "recent_aerobic",  # #4387: per-activity aerobic load, 3 days through target − 1
     "loss_rate",  # #5001: THE stated loss rate (`mcp.shared_quantities.loss_rate_lb_wk`) — the rate_ceiling input
+    "steps_window",  # #5082: the resolver's trailing window the steps ramp starts from (`training.steps_ramp.window_days`)
 )
 _TRIPWIRE_INPUT = {
     "protein_floor_missed": "protein_days_missed_7d",
@@ -374,6 +381,7 @@ def _tripwire_states(
     recent_aerobic_block: dict[str, Any] | None = None,
     loss_rate: dict[str, Any] | None = None,
     weight_lb: float | None = None,
+    guidance_cap_lb_wk: float | None = None,
 ) -> list[dict[str, Any]]:
     """Evaluate each owner tripwire against the inputs, or say why it could not be read.
 
@@ -647,14 +655,9 @@ def _tripwire_states(
             row["standalone_walks"] = ((recent_aerobic_block or {}).get("totals") or {}).get("standalone_walks")
             row["actuator"] = recent_aerobic.collapse_actuator(row["state"], None)
         out.append(row)
-    # #5001 — rate_ceiling over THE stated loss rate; the advocate reads the same `rate_ceiling_check`.
-    rc = redline_rate.rate_ceiling_check(loss_rate, weight_lb)
-    rc_row = (
-        _missing("rate_ceiling", rc["detail"])
-        if loss_rate is None
-        else _row("rate_ceiling", rc["state"], rc["observed_lb_wk"], rc["detail"])
-    )
-    out.append({**rc_row, "evidence": rc})
+    rc = redline_rate.rate_ceiling_check(loss_rate, weight_lb, guidance_cap_lb_wk)  # #5001: the advocate reads this same check
+    args = ("rate_ceiling", rc["state"], rc["observed_lb_wk"], rc["detail"])
+    out.append({**(_missing("rate_ceiling", rc["detail"]) if loss_rate is None else _row(*args)), "evidence": rc})
     # #4098: the week gate, applied to EVERY row whose tripwire declares `not_before_week` —
     # never per-tripwire, so a new declaration is read the day it is written.
     for row in out:
@@ -707,6 +710,9 @@ def _scheduled_session(
     elif out.get("prescription"):
         # #4090: the week's direct hard sets per redline muscle, beside the range each must sit in
         out["weekly_sets_by_muscle"] = program_structure.weekly_sets_by_muscle(catalog_movements or {}, skill_ceiling)
+    if out.get("prescription"):
+        # #5077: the block mesocycle model's week — the per-muscle set target, the ramp stage, the next block, no deload week
+        out["block_model"] = block_model.for_session(out, deload_records)
     out["how_to_draft"] = (
         "manage_hevy_routine action=draft target_date=" + day + " builds exactly this session (the generator reads the same "
         "session sequence and prescription); draft_custom only for a deliberate departure"
@@ -715,12 +721,13 @@ def _scheduled_session(
 
 
 def _deload_recommendation(
+    session: dict[str, Any],
     date: str,
     deload_records: list[dict[str, Any]] | None,
     fatigue: dict[str, Any] | None,
     readiness_low_streak_days: int | None,
     tripwires: list[dict[str, Any]],
-    state: dict[str, Any] | None,
+    states: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """`constraint_block.deload_recommendation` (#5070): the signals that argue for a deload and whether the owner's
     recorded word applies one today. NEVER an applied set cut by itself. Pain notes count only while the flag is
@@ -733,8 +740,35 @@ def _deload_recommendation(
         readiness_low_streak_days=readiness_low_streak_days,
         pain_note_sites=[str(x) for x in ((pain or {}).get("observed") or [])],
     )
-    rec["records_state"] = (state or {}).get("state")
+    rec["records_state"] = ((states or {}).get("deload_records") or {}).get("state")
+    session["deload_recommendation"] = rec  # also stamped on the served session
     return rec
+
+
+def _steps_ramp_block(
+    date: str,
+    window: dict[str, Any] | None,
+    pain_instances: list[dict[str, Any]] | None,
+    dismissals: list[dict[str, Any]] | None,
+    deload_records: list[dict[str, Any]] | None,
+    input_status: dict[str, dict[str, Any]] | None,
+) -> dict[str, Any]:
+    """`constraint_block.steps_ramp` (#5082): the ramp to the charter steps floor, held by a lower-leg strain flag.
+    An unread steps window is stated (`state: unknown`), never a target built on nothing; so is an unreadable
+    dismissal store, deload record or performed-lift pain read (a hold cannot be judged released, nor a strain flag absent, from a read that failed — #4072).
+    """
+    st = (input_status or {}).get("steps_window") or {}
+    unreadable = [
+        k
+        for k in ("pain_dismissals", "deload_records", "pain_evidence_scope")
+        if ((input_status or {}).get(k) or {}).get("state") == READ_FAILED
+    ]
+    if window is None or unreadable:
+        why = [f"{k} read failed" for k in unreadable] + (
+            [] if window is not None else [st.get("detail") or st.get("error") or "the steps window was not read"]
+        )
+        return {"date": date, "state": "unknown", "reason": "; ".join(why), "charter_version": training_charter.charter_version()}
+    return steps_ramp.compute(date, window, pain_flag_instances=pain_instances, pain_dismissals=dismissals, deload_records=deload_records)
 
 
 def _walking_block(walk_hr_wk_now: float | None, failed_reads: dict[str, dict[str, Any]]) -> dict[str, Any]:
@@ -815,6 +849,29 @@ def _reference_block(reference: dict[str, Any] | None) -> dict[str, Any]:
     return ref_block
 
 
+def _rate_target(
+    weight_lb: float | None,
+    missed_7d: int | None,
+    measured_7d: int | None,
+    window: dict[str, str] | None,
+    dxa_scans: list[dict[str, Any]] | None,
+    guidance_cap_lb_wk: float | None = None,
+) -> dict[str, Any] | None:
+    """`constraint_block.rate_target` (extracted for the #4880 function-length ratchet, #5088).
+
+    #4161 ruling B: protein-gated; #4166: the gate's mode scales with the latest DXA's body fat;
+    #5074: the owner clinical record's cap outranks the charter band.
+    """
+    return owner_redlines.rate_target_lb_per_wk(
+        weight_lb,
+        protein_missed_7d=missed_7d,
+        protein_measured_7d=measured_7d,
+        protein_window_days=window,
+        dxa_scans=dxa_scans,
+        guidance_cap_lb_wk=guidance_cap_lb_wk,
+    )
+
+
 def constraint_block(
     *,
     date: str,
@@ -847,10 +904,13 @@ def constraint_block(
     block_workouts: list[dict[str, Any]] | None = None,
     training_memory_constraints: list[dict[str, Any]] | None = None,
     deload_records: list[dict[str, Any]] | None = None,
+    disruption_records: list[dict[str, Any]] | None = None,
     fatigue: dict[str, Any] | None = None,
     input_status: dict[str, dict[str, Any]] | None = None,
     recent_aerobic: dict[str, Any] | None = None,
     loss_rate: dict[str, Any] | None = None,
+    guidance_cap_lb_wk: float | None = None,  # #5074: the owner clinical record's rate cap — outranks the charter band
+    steps_window: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The deterministic inputs to tomorrow's session. No model, no I/O, no hidden state.
 
@@ -887,6 +947,7 @@ def constraint_block(
             "block_workouts": block_workouts,
             "training_memory_constraints": training_memory_constraints,
             "deload_records": deload_records,
+            "disruption_records": disruption_records,
             "dxa_scans": dxa_scans,
             "recent_aerobic": recent_aerobic,
             "loss_rate": loss_rate,
@@ -898,8 +959,6 @@ def constraint_block(
 
     # FIRST, deliberately. See the module docstring.
     walking = _walking_block(walk_hr_wk_now, failed_reads)
-
-    ref_block = _reference_block(reference)
 
     # #4098/#4110: the sequence's program week decides which redlines are armed (`not_before_week`).
     week = program_week(date, block_workouts)
@@ -923,6 +982,7 @@ def constraint_block(
         recent_aerobic_block=recent_aerobic,
         loss_rate=loss_rate,
         weight_lb=weight_lb,
+        guidance_cap_lb_wk=guidance_cap_lb_wk,
     )
     tripped, unknown, failed_tripwires, not_yet_active = (
         [t["id"] for t in tripwires if t["state"] == st] for st in ("tripped", "unknown", READ_FAILED, "not_yet_active")
@@ -947,8 +1007,7 @@ def constraint_block(
 
     session = _scheduled_session(date, catalog_movements, skill_ceiling, block_workouts, deload_records)
     # #5070: signals recommend, the owner's recorded word applies — one block, also stamped on the served session
-    deload_rec = _deload_recommendation(date, deload_records, fatigue, readiness_low_streak_days, tripwires, states.get("deload_records"))
-    session["deload_recommendation"] = deload_rec
+    deload_rec = _deload_recommendation(session, date, deload_records, fatigue, readiness_low_streak_days, tripwires, states)
 
     return {
         "engine_version": ENGINE_VERSION,
@@ -973,24 +1032,25 @@ def constraint_block(
         # into a reviewed list.
         "standing_constraints_from_chat": training_memory_constraints or [],
         # #4064/#4110 — WHAT the program serves on this date: the next UNDONE session of the
-        # sequence (v0.4, #4147: upper-heavy -> lower-heavy -> upper-volume -> lower-volume, from
-        # lower-heavy on 2026-09-24; it advances only on a completed loaded Hevy session; deload
-        # at the later of week 6 or the block lock, #4161) and its session — anchors with their sets and reps,
+        # sequence (the charter's five-day order since #5069; v0.4's four before its cut-over; it advances only on a
+        # completed loaded Hevy session; a deload only on the owner's recorded word, #5070) and its session — anchors with their sets and reps,
         # the fixed accessories, the Hevy folder. Third, right after the two safety keys:
         # walking and the standing constraints outrank any single session.
         "session": session,
         "deload_recommendation": deload_rec,
+        # #5077: the block mesocycle model (sets per muscle this week, ramp stage, next block); None when no session is prescribed.
+        # `with_recommendation` stamps the signals in place, so the served session's copy (the same dict) carries them too.
+        "block_model": block_model.with_recommendation(session.get("block_model"), deload_rec),
+        "steps_ramp": _steps_ramp_block(date, steps_window, pain_flag_instances, pain_dismissals, deload_records, input_status),
+        # #5088 — his disruption mode (habits held, not targets) or the coach's OFFER of it; never self-applied
+        "disruption": disruption.constraint(date, disruption_records, block_workouts, None, states["disruption_records"]["state"]),
         # #4387 — the walking total cannot say "yesterday was 2¾ h on foot". These rows can: one
         # per activity over the 3 days through target − 1, each flagged against the walking
         # redlines, with the session's cardio modality picked FROM them (`cardio_pick`).
         "recent_aerobic": _recent_aerobic_view(recent_aerobic, session.get("archetype"), states.get("recent_aerobic"), date),
         # v3.3 ruling "B" (#4161): the SERVED target is gated by protein adherence — `rate_target.protein_gate` says which
-        "rate_target": owner_redlines.rate_target_lb_per_wk(
-            weight_lb,
-            protein_missed_7d=protein_days_missed_7d,
-            protein_measured_7d=protein_days_measured_7d,
-            protein_window_days=protein_window,
-            dxa_scans=dxa_scans,  # #4166: the gate's mode scales with the latest DXA's body fat
+        "rate_target": _rate_target(
+            weight_lb, protein_days_missed_7d, protein_days_measured_7d, protein_window, dxa_scans, guidance_cap_lb_wk
         ),
         # #5001: THE stated loss rate (method, window, n, source, the partition rows) — the rate_ceiling row's input
         "shared_quantities": {"loss_rate_lb_wk": loss_rate},
@@ -1000,7 +1060,7 @@ def constraint_block(
         "acwr_flag": acwr_flag,
         "muscle_volume": muscle_volume or {},
         "days_since_movement": days_since_movement or {},
-        "reference": ref_block,
+        "reference": _reference_block(reference),
         "tripwires": tripwires,
         "tripped": tripped,
         # #4072: both kinds of "could not evaluate", kept apart — `unreadable_tripwires` is the
@@ -1029,6 +1089,8 @@ def constraint_block(
         # (steps, split, rate band, cadences) onto the charter; until then the literals
         # above still come from owner_redlines/program_structure and this is a stamp only.
         "charter_version": training_charter.charter_version(),
+        # #5052: the charter's double progression and effort limits the draft path applied, stamped with its version
+        "progression": load_progression.rule_summary(),
         "critics": dict(_CRITICS_NOT_WIRED),
         "honesty": [
             s
@@ -1086,38 +1148,7 @@ def constraint_block(
                     )
                     for d in dismissals_in_play
                 ],
-                (
-                    None
-                    if program["active"]
-                    else f"TRAINING_PROGRAM v{program['program_version']} ({program['split']}) is PROPOSED, not approved — the engine is still running on the live week grid (#3755)"
-                ),
-                (
-                    "the program has UNRESOLVED conflicts with the owner's own redlines: "
-                    + ", ".join(c["id"] for c in program["conflicts"] if not c.get("resolved"))
-                    if any(not c.get("resolved") for c in program["conflicts"])
-                    else None
-                ),
-                # #4080: a conflict resolved by owner ruling stays NAMED (audit trail — see
-                # program_structure.conflicts()) rather than silently dropping out of the
-                # block; it must never read as "UNRESOLVED" once it isn't.
-                (
-                    "the program's conflict(s) RESOLVED by owner ruling: "
-                    + ", ".join(
-                        f"{c['id']} ({c.get('resolution_source', 'no source recorded')})" for c in program["conflicts"] if c.get("resolved")
-                    )
-                    if any(c.get("resolved") for c in program["conflicts"])
-                    else None
-                ),
-                (
-                    f"the accessory layer is {rotation['state']}: {rotation['detail']}"
-                    if rotation["ok"] is None
-                    else (
-                        None
-                        if rotation["ok"]
-                        else "the accessory layer is DRIFTING (the program fixes accessories for the block) — added in the trailing 7 days: "
-                        + ", ".join(rotation["added_in_trailing_7d"][:4])
-                    )
-                ),
+                *_program_honesty(program, rotation),
                 (
                     "population-derived thresholds in play: " + ", ".join(redlines["population_derived_thresholds"])
                     if redlines["population_derived_thresholds"]
@@ -1127,6 +1158,40 @@ def constraint_block(
             if s
         ],
     }
+
+
+def _program_honesty(program: dict[str, Any], rotation: dict[str, Any]) -> list[str | None]:
+    """`constraint_block.honesty`'s program and accessory-layer sentences (extracted for the #4880 ratchet, #5074)."""
+    return [
+        (
+            None
+            if program["active"]
+            else f"TRAINING_PROGRAM v{program['program_version']} ({program['split']}) is PROPOSED, not approved — the engine is still running on the live week grid (#3755)"
+        ),
+        *_program_conflict_lines(program["conflicts"]),
+        (
+            f"the accessory layer is {rotation['state']}: {rotation['detail']}"
+            if rotation["ok"] is None
+            else (
+                None
+                if rotation["ok"]
+                else "the accessory layer is DRIFTING (the program fixes accessories for the block) — added in the trailing 7 days: "
+                + ", ".join(rotation["added_in_trailing_7d"][:4])
+            )
+        ),
+    ]
+
+
+def _program_conflict_lines(conflicts: list[dict[str, Any]]) -> list[str | None]:
+    """The honesty lines for the program's conflicts with the owner's redlines: the UNRESOLVED ones, then the ones
+    resolved by owner ruling. #4080: a resolved conflict stays NAMED (audit trail — see `program_structure.conflicts()`)
+    rather than silently dropping out of the block; it must never read as "UNRESOLVED" once it isn't."""
+    unresolved = [c["id"] for c in conflicts if not c.get("resolved")]
+    resolved = [f"{c['id']} ({c.get('resolution_source', 'no source recorded')})" for c in conflicts if c.get("resolved")]
+    return [
+        "the program has UNRESOLVED conflicts with the owner's own redlines: " + ", ".join(unresolved) if unresolved else None,
+        "the program's conflict(s) RESOLVED by owner ruling: " + ", ".join(resolved) if resolved else None,
+    ]
 
 
 def _recent_aerobic_view(

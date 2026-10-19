@@ -18,11 +18,27 @@ def _redlines() -> dict[str, Any]:
 
 
 def rate_schedule_step(weight_lb: float) -> dict[str, Any]:
-    """The scheduled step for a bodyweight — the first step whose `above_lb` the weight exceeds."""
-    for step in _redlines()["rate_schedule_lb_wk"]["steps"]:
-        if weight_lb > step["above_lb"]:
-            return step
-    return _redlines()["rate_schedule_lb_wk"]["steps"][-1]
+    """The scheduled step for a bodyweight — the first step whose `above_lb` the weight exceeds.
+
+    A step marked `governed_by: charter` (every step above the landing, #5074) has no literal target/cap: they
+    are resolved HERE from the charter band — target = the band's CEILING (he aims at the top; the protein gate's
+    brake of 0.5 lands on the floor), cap = the same CEILING (ruling 3 names one ceiling; no margin is added).
+    From the landing down the step is his own schedule, unchanged. Charter unreadable -> target/cap are None."""
+    steps = _redlines()["rate_schedule_lb_wk"]["steps"]
+    step = next((s for s in steps if weight_lb > s["above_lb"]), steps[-1])
+    if step.get("governed_by") != "charter":
+        return step
+    from training import rate_band
+
+    b = rate_band.band(weight_lb)
+    if b is None:
+        return {**step, "target": None, "cap": None}
+    return {
+        **step,
+        "target": b["ceiling_lb_wk"],
+        "cap": b["ceiling_lb_wk"],
+        "pct_bw_wk": f"{b['floor_pct_bodyweight_per_wk']}-{b['ceiling_pct_bodyweight_per_wk']}",
+    }
 
 
 def protein_days_missed(grams_by_day: list[Any] | None) -> tuple[int | None, int]:
@@ -188,6 +204,7 @@ def rate_target_lb_per_wk(
     protein_measured_7d: int | None = None,
     protein_window_days: dict[str, str] | None = None,
     dxa_scans: list[dict[str, Any]] | None = None,
+    guidance_cap_lb_wk: float | None = None,
 ) -> dict[str, Any] | None:
     """The rate at a given bodyweight: the %BW envelope in pounds AND the scheduled absolute target —
     gated by protein adherence (v3.3 ruling "B", `protein_gate`): `target_lb_wk` is the SERVED target.
@@ -195,9 +212,16 @@ def rate_target_lb_per_wk(
     minus the brake, or the gated target — decided HERE, the one place the served target is computed."""
     if not weight_lb:
         return None
+    from training import rate_band as _rb
+
     band = _redlines()["rate_band_pct_bw_per_wk"]
     step = rate_schedule_step(weight_lb)
-    low = round(weight_lb * band["low"] / 100, 1)
+    if step.get("target") is None:
+        return None  # a charter-governed step with the charter unreadable: no target is better than a guessed one
+    cb = _rb.band(weight_lb, guidance_cap_lb_wk)
+    # above the landing the CHARTER band is the band (lb/wk); from the landing down, his %BW envelope as before
+    low = cb["floor_lb_wk"] if cb and cb["governs"] else round(weight_lb * band["low"] / 100, 1)
+    high = cb["ceiling_lb_wk"] if cb and cb["governs"] else round(weight_lb * band["high"] / 100, 1)
     bf = body_fat_tier(weight_lb, dxa_scans)
     gate = protein_gate(protein_missed_7d, protein_measured_7d, protein_window_days, bf)
     gated, gated_source = gated_target_lb_wk(weight_lb)
@@ -208,13 +232,17 @@ def rate_target_lb_per_wk(
         served = step["target"]
     else:
         served = gate["braked_target_lb_wk"] if gate["mode"] == "brake" else gated
+    cap = step["cap"]
+    if cb and cb["guidance_capped"]:  # the clinical record outranks the band (and the schedule's cap) — no detail carried
+        served, cap = min(served, cb["ceiling_lb_wk"]), min(cap, cb["ceiling_lb_wk"])
     return {
         "low_lb_wk": low,
-        "high_lb_wk": round(weight_lb * band["high"] / 100, 1),
+        "high_lb_wk": high,
+        "band": cb,
         "target_lb_wk": served,
         "step_target_lb_wk": step["target"],
         "protein_gate": gate,
-        "cap_lb_wk": step["cap"],
+        "cap_lb_wk": cap,
         "dxa_gate": step.get("dxa_gate"),
         "target_pct_bw_wk": round(served / weight_lb * 100, 2),
         "schedule_step_above_lb": step["above_lb"],
@@ -233,7 +261,9 @@ def _tripwire(tid: str) -> dict[str, Any]:
     return next(t for t in owner_redlines.TRIPWIRES if t["id"] == tid)
 
 
-def rate_ceiling_check(loss_rate: dict[str, Any] | None, weight_lb: float | None) -> dict[str, Any]:
+def rate_ceiling_check(
+    loss_rate: dict[str, Any] | None, weight_lb: float | None, guidance_cap_lb_wk: float | None = None
+) -> dict[str, Any]:
     """THE `rate_ceiling` evaluation (#5001) — the plan engine's tripwire row and the rate advocate both read it.
 
     `loss_rate` is `mcp.shared_quantities.loss_rate_lb_wk` (positive = losing). The threshold is the schedule
@@ -245,7 +275,9 @@ def rate_ceiling_check(loss_rate: dict[str, Any] | None, weight_lb: float | None
     tw = _tripwire("rate_ceiling")
     absolute = float(tw["threshold_lb_wk"])
     step = rate_schedule_step(weight_lb) if weight_lb else None
-    band_cap = float(step["cap"]) if step else None
+    band_cap = float(step["cap"]) if step and step.get("cap") is not None else None
+    if band_cap is not None and guidance_cap_lb_wk is not None:  # the clinical record outranks the schedule's cap
+        band_cap = min(band_cap, float(guidance_cap_lb_wk))
     threshold = min(absolute, band_cap) if band_cap is not None else absolute
     q = loss_rate or {}
     value, week = _num(q.get("value")), q.get("experiment_week")

@@ -50,7 +50,7 @@ _protocols_cache = None
 _domains_cache = None
 
 
-_ROUTINE_HIDDEN_VARIANTS = ("floor", "re_entry")
+_ROUTINE_HIDDEN_VARIANTS = ("floor", "re_entry", "disruption")  # #5088: a travel/busy session is owner-only (it implies absence)
 
 
 def experiments(*, _g) -> dict:

@@ -130,6 +130,7 @@ def _generator_inputs(args: dict[str, Any]):
         days_since_last_workout=int(args.get("days_since_last_workout") or 2),
         add_load_enabled=False,  # never permitted from chat; SSM-gated only
         deload_records=args.get("deload_records"),  # #5070: injected when the caller read the store; None = read once, fail-soft
+        disruption_records=args.get("disruption_records"),  # #5088: the same contract for his disruption-mode records
     )
 
 
@@ -275,6 +276,9 @@ def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
     routines = generate_routines(inputs)
     ideal = next((r for r in routines if r.variant == "ideal"), None)
     floor = next((r for r in routines if r.variant == "floor"), None)
+    # #5088: under his disruption mode the served session is the short one; it carries its own notes, so the
+    # recovery branches and the appended cardio block (a full-session adaptation) are not run over it
+    short = next((r for r in routines if r.variant == "disruption"), None)
 
     # Tier-agnostic adaptation: the ideal routine becomes the self-adapting carrier.
     ctx = _gather_training_context(target_date)
@@ -289,10 +293,11 @@ def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
     return {
         "status": "drafted",
         "target_date": inputs.target_date,
-        "ideal_routine_id": getattr(ideal, "routine_id", None),
+        "ideal_routine_id": getattr(ideal or short, "routine_id", None),
+        "disruption": (short.inputs_snapshot or {}).get("disruption") if short else None,
         "floor_routine_id": getattr(floor, "routine_id", None),
         "variants_persisted": [r.variant for r in routines],
-        "rationale": (ideal.rationale if ideal else []),
+        "rationale": getattr(ideal or short, "rationale", None) or [],
         "freshness_gate": {"ok": gate.get("ok"), "gaps": gate.get("gaps", []), "inputs_current_through": inputs_current_through},
         "recovery_adaptation": {
             "applied": bool(adaptation),

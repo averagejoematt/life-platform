@@ -39,7 +39,11 @@ READ_WEEK = {
 }
 
 # The issue's grammar, written out again here rather than imported, so the module's own regex is held to it.
-GRAMMAR = re.compile(r"^[A-Z][A-Za-z ]+ · \d+ min · level \d+ (?:flat|intervals \d+×\d+|hill) · \S.*$")
+# #5076 widened the dose: a bike's "level N at S mph", a treadmill's "incline I% at S mph" and its "walk" shape.
+GRAMMAR = re.compile(
+    r"^[A-Z][A-Za-z ]+ · \d+ min · (?:level \d+(?: at \d+(?:\.\d)? mph)? |incline \d+(?:\.\d)?(?:–\d+(?:\.\d)?)?% at \d+(?:\.\d)? mph )"
+    r"(?:flat|intervals \d+×\d+|hill|walk) · \S.*$"
+)
 
 
 def reader_offences(note: str) -> list[str]:
@@ -93,13 +97,16 @@ def test_the_rewritten_2026_10_18_note_is_two_lines_with_the_prescription_first(
     note = spec.exercises[0].notes
     assert reader_offences(note) == [], note
     line1, line2 = note.split("\n")
-    assert line1 == "Recumbent bike · 20 min · level 11 flat · talk-test pace, full sentences"
+    # #5076: the dose (level + his speed at it) and the menu's RPE band + talk test; his "flat" stands as easy
+    assert line1 == "Recumbent bike · 20 min · level 11 at 13.4 mph flat · RPE 4–5, full sentences"
     assert cn.LINE1_RE.match(line1)
-    # the recovery question, answered under the standing constraint: no push, no HR number at all
-    assert line2.startswith("No push — talk test only, no HR target (standing constraint since 2026-10-10).")
+    # the recovery question, answered under the constraint's HR half: by feel, no HR number at all.
+    # The "no push" half is retired from 2026-10-18 (owner ruling 7), so it is not on this day's note.
+    assert line2.startswith("By feel, no HR target: hold level 11.")
+    assert "No push" not in note
     assert not re.search(r"\d+\s*bpm", note)
     # the why: one sentence, positive, from the day's walking load
-    why = line2.split("). ", 1)[1]
+    why = line2.split("level 11. ", 1)[1]
     assert why == "Seated, so the feet rest after 2.8 h on them in 48 h; the week is already 1.7 h over the walking ramp."
     assert len(re.findall(r"[.!?](?:\s|$)", why)) == 1
     # the author's prose is replaced, never silently lost
@@ -107,11 +114,12 @@ def test_the_rewritten_2026_10_18_note_is_two_lines_with_the_prescription_first(
 
 
 def test_the_level_is_still_derived_from_the_last_ride_and_the_week_shapes_are_read():
-    audit = _redraft().inputs_snapshot["cardio_notes"][0]
+    spec = _redraft()
+    audit = spec.inputs_snapshot["cardio_notes"][0]
     assert audit["level"] == 11 and audit["level_basis"] == "last ride's level"
-    assert audit["prior_week_shapes"] == ["flat", "flat", "flat"]  # 10-13, 10-15, 10-16
-    assert audit["shape"] == "flat" and audit["shape_why"] == "the 2026-10-10 standing constraint: no push"
-    assert audit["constraint"] == "hr_regime_change_2026_10_10"
+    assert spec.inputs_snapshot["cardio_plan"]["week_kinds_before"] == ["easy", "easy", "easy"]  # 10-13, 10-15, 10-16
+    assert audit["kind"] == "easy" and audit["placement_why"] == "the author's note names it"
+    assert audit["constraint"] == "hr_regime_change_2026_10_10" and audit["no_push_gate"] is False
 
 
 def test_a_redraft_recomposes_the_same_note_and_never_stacks():
@@ -121,17 +129,15 @@ def test_a_redraft_recomposes_the_same_note_and_never_stacks():
     assert spec.exercises[0].notes == first
 
 
-def test_MUTATION_CONTROL_without_the_constraint_the_same_day_answers_green_and_allows_intervals(monkeypatch):
-    """Executed: drop the standing constraint (and put the week under the ramp) — the same history now
-    picks intervals (the week's last ride was flat) and prints the owner's HR cap. That is what the
-    constraint is buying on the live day."""
-    monkeypatch.setattr(sc, "active_constraint", lambda d, constraints=None: None)
+def test_MUTATION_CONTROL_the_day_before_the_ruling_the_no_push_gate_still_holds():
+    """Executed: the same history replayed on 2026-10-17 (the gate's last day) composes the no-push answer;
+    on 2026-10-18 it does not. A replay of an older day composes what that day composed."""
     spec = _live_spec()
-    rg.attach_cardio_cues(spec, cardio_index=_cardio_index(), whoop_index={}, aerobic_block=READ_WEEK)
-    line1, line2 = spec.exercises[0].notes.split("\n")
-    assert line1 == "Recumbent bike · 20 min · level 11 intervals 5×2 · 2 min at level 13, 2 min easy between, average HR ≤ 120 bpm"
-    assert line2.startswith("Green: as written; yellow or red: ride it flat at level 11")
-    assert "platform-chosen" in line2
+    spec.target_date = "2026-10-17"
+    rg.attach_cardio_cues(spec, cardio_index=_cardio_index(), whoop_index={}, aerobic_block=FIX["recent_aerobic"])
+    assert "No push — talk test only, no HR target (standing constraint since 2026-10-10)." in spec.exercises[0].notes
+    assert spec.inputs_snapshot["cardio_notes"][0]["no_push_gate"] is True
+    assert "No push" not in _redraft().exercises[0].notes
 
 
 # ── box 2: the recovery question ──────────────────────────────────────────────────────
@@ -160,9 +166,9 @@ def test_an_unknown_band_answers_both_branches_in_one_sentence():
     )
 
 
-def test_the_constraint_answers_no_push_whatever_the_band():
+def test_the_constraint_answers_no_push_whatever_the_band_while_its_gate_holds():
     for band in (None, "green", "yellow"):
-        note = _flat(constraint=CONSTRAINT, recovery_band=band, hr_ceiling_bpm=120)
+        note = _flat(constraint=CONSTRAINT, recovery_band=band, hr_ceiling_bpm=120, target_date="2026-10-17")
         assert "No push — talk test only" in note and "add 5 min" not in note and "bpm" not in note
 
 
@@ -170,34 +176,22 @@ def test_every_number_the_note_acts_on_is_labelled():
     """ADR-105: the +5 min step and the interval set are platform-chosen, and the note says so."""
     assert set(cn.LABELS.values()) == {"platform-chosen"}
     assert "platform-chosen" in _flat(recovery_band="green")
-    assert "platform-chosen" in _flat(prior_week_shapes=["flat"])
+    assert "platform-chosen" in _flat(kind="tempo")  # the tempo's +1 level
 
 
-# ── box 3: shapes by rule, never by default ───────────────────────────────────────────
-def test_the_default_shape_is_flat():
-    assert cn.compose(movement_key="cycling", minutes=20, target_date="2026-09-30")[1]["shape"] == "flat"
-    assert _flat().split("\n")[0] == "Recumbent bike · 20 min · level 11 flat · talk-test pace, full sentences"
+# ── box 3: the default is easy; the harder kinds are the menu's placement (#5076) ─────────
+def test_the_default_kind_is_easy_flat_and_the_treadmills_is_the_incline_walk():
+    assert cn.compose(movement_key="cycling", minutes=20, target_date="2026-09-30")[1]["kind"] == "easy"
+    assert _flat().split("\n")[0] == "Recumbent bike · 20 min · level 11 flat · RPE 4–5, full sentences"
+    assert cn.compose(movement_key="treadmill", minutes=30, target_date="2026-09-30")[1]["kind"] == "incline_treadmill_walk"
 
 
-def test_the_second_ride_of_the_week_is_intervals_and_the_third_is_hill_when_the_ramp_allows():
-    assert " intervals 5×2 · " in _flat(prior_week_shapes=["flat"]).split("\n")[0]
-    assert " hill · " in _flat(prior_week_shapes=["flat", "intervals"]).split("\n")[0]
-    assert " flat · " in _flat(prior_week_shapes=["flat", "intervals", "hill"]).split("\n")[0]
-
-
-def test_every_hold_condition_keeps_the_ride_flat():
-    over = {"state": "read", "totals": {"week_to_date": {"over_ramp": True}}}
-    cases = {
-        "constraint": dict(constraint=CONSTRAINT),
-        "yellow": dict(recovery_band="yellow"),
-        "red": dict(recovery_band="red"),
-        "over ramp": dict(aerobic_block=over),
-        "unread week": dict(aerobic_block=None),
-        "no level": dict(facts={}),
-        "too short": dict(minutes=15),
-    }
-    for name, kw in cases.items():
-        assert " flat · " in _flat(prior_week_shapes=["flat"], **kw).split("\n")[0], name
+def test_the_gate_holds_a_hard_kind_easy_only_before_its_retirement():
+    for kind in ("tempo", "intervals", "hills"):
+        assert " flat · " in _flat(kind=kind, constraint=CONSTRAINT, target_date="2026-10-17").split("\n")[0], kind
+        assert _flat(kind=kind, constraint=CONSTRAINT, target_date="2026-10-18") != _flat(
+            kind="easy", constraint=CONSTRAINT, target_date="2026-10-18"
+        )
 
 
 def test_a_performed_rides_shape_is_read_from_its_own_note():
@@ -221,7 +215,7 @@ def test_the_level_falls_back_to_his_calibration_and_rises_only_on_a_raise_verdi
 def test_cardio_optional_lives_only_in_the_gate_line():
     lines = sc.gate_lines(CONSTRAINT, "x", None)
     assert any("accessories and cardio optional" in ln for ln in lines)
-    note = cn.compose(movement_key="cycling", minutes=20, target_date=DAY, facts={"last_level": 11}, constraint=CONSTRAINT)[0]
+    note = cn.compose(movement_key="cycling", minutes=20, target_date="2026-10-17", facts={"last_level": 11}, constraint=CONSTRAINT)[0]
     assert "optional" not in note.lower()
 
 

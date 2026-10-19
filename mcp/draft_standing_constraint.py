@@ -19,7 +19,8 @@ failed read never costs the draft and never reads as "no constraint" or "tripwir
     platform-memory row the registry entry names;
   * `protein_tripwire` — the `protein_floor_missed` state over THE protein-gate window
     (`mcp.tools_plan._protein_days_7d`, the count the critics read) against the owner's threshold;
-  * `cardio_block` — the pick as an `ExerciseBlock`, appended to the ideal routine;
+  * `cardio_block` — the day's block from the charter's cardio menu (#5076: kind, machine, minutes
+    and dose), appended to the ideal routine;
   * `apply_gate` — the ECG + feel gate in place of the band cues when a constraint is active.
 
 Nothing here changes the v0.4 structure (split, order, templates, accessories, loads): the gate
@@ -112,12 +113,19 @@ def green_withheld_reason(trip: dict[str, Any]) -> str | None:
     return None
 
 
-def cardio_block(target_date: str, archetype: str, constraint: dict[str, Any] | None, layer: Any = None) -> tuple[Any, dict[str, Any]]:
-    """(ExerciseBlock | None, pick) — `recent_aerobic.cardio_pick` as the routine's cardio block.
+def cardio_block(
+    target_date: str, archetype: str, constraint: dict[str, Any] | None, layer: Any = None, cardio_index: dict[str, list] | None = None
+) -> tuple[Any, dict[str, Any]]:
+    """(ExerciseBlock | None, pick) — the day's block from the charter's cardio menu (#5076).
 
-    Under a constraint that forbids HR prescriptions the pick carries no HR field and the note
-    writes the talk test; otherwise line 1's effort rule carries the pick's HR ceiling (#5048)."""
-    from training import recent_aerobic, standing_constraints
+    The kind and the machine are `cardio_menu.choose_kind` over this week's performed cardio
+    (`cardio_index`, None = unread: no conditioning is counted, so the placement starts the week) and the
+    48 h walking load in `layer`; the minutes are the menu's (`cardio_menu.block_minutes`). The block's
+    `rationale_tag` carries the kind (`cardio:<key>:menu:<kind>`) so the history pass that follows
+    (`attach_cardio_cues`) doses the same block rather than re-placing it. `pick` is
+    `recent_aerobic.cardio_pick` (the served stage-1 pick, HR fields dropped under the constraint) with the
+    menu's choice under `menu`. Under a constraint that forbids HR prescriptions the note carries no HR."""
+    from training import cardio_menu, cardio_note, recent_aerobic
     from training.routine_ir import ExerciseBlock, Set
 
     try:
@@ -126,32 +134,56 @@ def cardio_block(target_date: str, archetype: str, constraint: dict[str, Any] | 
 
             layer = shared_quantities.recent_aerobic_layer(target_date)
         pick = recent_aerobic.cardio_pick(layer, archetype, target_date)
+        hist = cardio_menu.history_context(cardio_index, _catalog(), target_date)
+        menu = cardio_menu.choose_kind(
+            target_date=target_date,
+            archetype=archetype,
+            week_kinds=hist["week_kinds"],
+            prior_day_kind=hist["prior_day_kind"],
+            legs_loaded=recent_aerobic.legs_loaded(layer)[0],
+            last_tempo_or_hills=hist["last_tempo_or_hills"],
+        )
     except Exception as e:  # noqa: BLE001 — named, never a lost draft
         logger.warning("cardio block: pick failed: %s", e)
         return None, {"state": "failed", "error": type(e).__name__}
-    minutes = standing_constraints.CARDIO_BLOCK_MINUTES
-    # #5048: the prescription-first note (`training.cardio_note`). Under the constraint the pick carries
-    # no HR field and the note says "no push — talk test only"; "optional if the ECG is not sinus" is the
-    # gate's own line (`standing_constraints.gate_lines`), never repeated on the block. Without the
-    # constraint the pick's HR ceiling (the owner redline) rides line 1's effort rule.
-    from training import cardio_note
-
-    notes, _ = cardio_note.compose(
-        movement_key=pick["movement_key"],
+    key, kind = menu["machine"], menu["kind"]
+    minutes = cardio_menu.block_minutes(kind)
+    notes, audit = cardio_note.compose(
+        movement_key=key,
         minutes=minutes,
         target_date=target_date,
         archetype=archetype,
+        kind=kind,
+        treadmill_sessions=hist["by_machine"].get(cardio_menu.TREADMILL),
         aerobic_block=layer,
         constraint=constraint,
         hr_ceiling_bpm=pick.get("hr_ceiling_bpm"),
+        placement_why=menu["why"],
     )
     block = ExerciseBlock(
-        movement_key=pick["movement_key"],
+        movement_key=key,
         sets=[Set(duration_seconds=minutes * 60)],
         notes=notes,
-        rationale_tag=f"cardio:{pick['movement_key']}:pick",
+        rationale_tag=f"cardio:{key}:menu:{audit['kind']}",
     )
-    return block, pick
+    return block, {**pick, "menu": {"kind": audit["kind"], "machine": key, "minutes": minutes, "why": menu["why"]}}
+
+
+def _catalog() -> dict[str, Any]:
+    from training.routine_generator import _load_json
+
+    return _load_json("movement_catalog.json")
+
+
+def _cardio_index_failsoft() -> dict[str, list] | None:
+    """His cardio history for the placement, or None (named in the log) when it cannot be read."""
+    try:
+        from training.exercise_history import DEFAULT_LOOKBACK_DAYS, FLOOR_LOOKBACK_DAYS, load_history_indexes
+
+        return load_history_indexes(lookback_days=max(DEFAULT_LOOKBACK_DAYS, FLOOR_LOOKBACK_DAYS))[1]
+    except Exception as e:  # noqa: BLE001 — the placement then counts no conditioning this week
+        logger.warning("cardio block: history read failed: %s", e)
+        return None
 
 
 def _is_accessory(ex: Any) -> bool:
@@ -220,14 +252,15 @@ def gate_draft(ideal: Any, target_date: str, adapt: Callable[[dict[str, Any] | N
         layer = shared_quantities.recent_aerobic_layer(target_date)
     except Exception as e:  # noqa: BLE001 — cardio_block names the failure itself on a None layer read below
         logger.warning("cardio block: recent-aerobic read failed: %s", e)
-    cardio, pick = cardio_block(target_date, getattr(ideal, "archetype", "") or "", constraint, layer=layer)
+    cardio_index = _cardio_index_failsoft()
+    cardio, pick = cardio_block(target_date, getattr(ideal, "archetype", "") or "", constraint, layer=layer, cardio_index=cardio_index)
     if cardio is not None:
         ideal.exercises.append(cardio)
         # #5048: the level comes from his ride history (fail-soft: a failed load keeps the note, no level)
         try:
             from training.routine_generator import attach_cardio_cues
 
-            attach_cardio_cues(ideal, aerobic_block=layer)
+            attach_cardio_cues(ideal, cardio_index=cardio_index, aerobic_block=layer)
         except Exception as e:  # noqa: BLE001 — the block keeps the note cardio_block wrote
             logger.warning("cardio block: level pass failed: %s", e)
     summary = {k: constraint.get(k) for k in ("id", "active_from", "memory_read")} if constraint else None
@@ -237,5 +270,10 @@ def gate_draft(ideal: Any, target_date: str, adapt: Callable[[dict[str, Any] | N
         "adaptation": adaptation,
         "standing_constraint": summary,
         "green_block": green,
-        "cardio_block": {"appended": cardio is not None, "pick": pick},
+        "cardio_block": {
+            "appended": cardio is not None,
+            "pick": pick,
+            # the gym cardio minutes the drafted routine adds to the day's steps/movement goal (#5076 -> #5056)
+            "movement_minutes": (ideal.inputs_snapshot.get("cardio_plan") or {}).get("movement_minutes"),
+        },
     }

@@ -402,7 +402,11 @@ def legs_loaded(block: dict[str, Any] | None) -> tuple[bool | None, str]:
 
 
 def is_lower(archetype: Any) -> bool:
-    return str(archetype or "").strip().lower() in ("lower", "legs", "lower-heavy", "lower-volume")
+    """A lower-body session: the `lower` / `legs` archetypes, or a charter `split.sequence` name that opens with
+    'lower' (#5069). One definition, `cardio_menu.is_lower` (#5076), shared with the cardio menu's placement."""
+    from training import cardio_menu
+
+    return cardio_menu.is_lower(archetype)
 
 
 def cardio_pick(block: dict[str, Any] | None, archetype: Any, target_date: str | None = None) -> dict[str, Any]:

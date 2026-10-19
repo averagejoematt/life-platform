@@ -64,9 +64,6 @@ def _operational() -> tuple:
     return tuple(OPERATIONAL_COACH_IDS)
 
 
-RATE_FLAG_LB_WK = 2.5  # the platform's own "losing too fast" flag (get_weight_loss_progress)
-
-
 # ── the season calendar ──────────────────────────────────────────────────────
 
 
@@ -165,6 +162,9 @@ def _weight(table, wk: Dict[str, Any], plan: Dict[str, Any]) -> Dict[str, Any]:
     marks = [m for m in range(325, 180, -5) if end_w <= m < start_ref[1]]
     waypoints = plan.get("weight_waypoints") or []
     nxt = next((w for w in waypoints if w["lbs"] < end_w), None)
+    from training import rate_band
+
+    _flag_lb = rate_band.flag_threshold_lb_wk(end_w)
     return {
         "available": True,
         "first_weigh_in": {"date": first_d, "lbs": _r(first_w)},
@@ -175,8 +175,10 @@ def _weight(table, wk: Dict[str, Any], plan: Dict[str, Any]) -> Dict[str, Any]:
         "total_change_lbs": _r(end_w - first_w),
         "avg_rate_lb_per_wk_since_start": _r(rate, 2),
         "rate_this_window_lb_per_wk": _r(week_rate, 2),
-        "platform_rate_flag": rate > RATE_FLAG_LB_WK,
-        "platform_rate_flag_rule": f"the platform flags losses above {RATE_FLAG_LB_WK} lb/wk as a lean-mass risk",
+        # #5074: the line is his schedule's cap at this weight (training/rate_band.py); the rule text carries no number —
+        # the band is never published, and the writers must not restate it
+        "platform_rate_flag": (_flag_lb is not None and rate > _flag_lb),
+        "platform_rate_flag_rule": "the platform flags a loss past the schedule's cap at this bodyweight as a lean-mass risk",
         "round_numbers_crossed_this_week": marks,
         "weigh_ins_in_window": [{"date": d, "lbs": _r(w)} for d, w in in_win],
         "next_plan_waypoint": nxt,

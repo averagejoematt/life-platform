@@ -313,9 +313,10 @@ def format_title(ir: RoutineSpec, ctx: dict[str, Any]) -> str:
 
 
 _ROLE_WHY = {
-    # v0.4 (#4147) — upper/lower, in order
+    # the five-day split (#5069; v0.4's four roles #4147 unchanged), in the charter's order
     "upper_heavy": "Upper heavy: one top set at RPE 7-8 on bench and row, back-offs 10% lighter. Loads hold.",
     "lower_heavy": "Lower heavy: one top set at RPE 7-8 on the squat, back-offs 10% lighter. Loads hold.",
+    "shoulders_arms": "Shoulders and arms: press, side and rear delts, biceps, triceps, traps. Loads hold.",
     "upper_volume": "Upper volume: steady sets of 8-12, a few left in the tank. Loads hold.",
     "lower_volume": "Lower volume: steady sets of 8-12, a few left in the tank. Loads hold.",
     # v0.3 (superseded 2026-09-24) — kept so a v0.3 routine still reads right

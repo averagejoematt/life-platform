@@ -86,6 +86,10 @@ carried before); the risk is adherence, not the floor, so a week of misses serve
 
 v3.4 (2026-10-18, #5070): owner ruling — NO scheduled or automatic deload; v3.3's week-6 / block-lock deload is retired and a
 deload applies only on his recorded word (`training.deload_word`; the response is `lifting_sessions_per_wk.deload`)."""
+# Same day (#5069), owner rulings 5 + 6: five lifting days in the charter's order, 60-75 min of lifting, and the v0.4 lock
+# lifted. `lifting_sessions_per_wk` low/high, `structure` and `session_minutes` are READ from the training charter
+# (`split.lifting_days_per_wk`, `split.sequence`, `split.session_minutes.lifting`). The v0.4 values — 3–4 sessions/wk, the
+# four-session order (`training.program_v04`), 55–70 min, and v0.4's 50–65 hard sets/wk — are this comment's history.
 
 RED_TEAM_RECORD = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.3_redteam.md"
 PLAN = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.4.md"  # #4147; written by the driver, owner-private
@@ -96,6 +100,7 @@ from common.constants import PLAN_DAILY_PROTEIN_MIN_G as _PLAN_PROTEIN_FLOOR_G  
 
 from training.green_block import SESSION_SET_CEILINGS  # noqa: E402  (#4503 OD4)
 from training.redline_changelog import CHANGELOG_V1_TO_V2, CHANGELOG_V2_TO_V3  # noqa: E402
+from training.training_charter import charter_value as _charter_value  # noqa: E402  (#5069: the split is the charter's)
 
 LAST_REVIEWED_BY_OWNER: str | None = "2026-09-23"
 """ISO date the owner last read this file. None means never."""
@@ -114,7 +119,7 @@ REDLINES: dict[str, dict[str, Any]] = {
             "instruction is the scheduled absolute target in `rate_schedule_lb_wk`. v3 changes the invariant: not "
             "%BW/wk (a population figure from people carrying 20–40 lb of fat) but the LEAN COST of each week — the "
             "Forbes/Hall fat fraction of the loss, anchored on his two DEXAs, times the rate — held at ≤0.5–0.7 lb "
-            "lean/wk. 3.5 lb/wk at 317 lb is 1.10 %BW/wk, ABOVE this envelope's top, and is his instruction anyway."
+            "lean/wk. His charter band (training/rate_band.py) at 317 lb is ABOVE this envelope's top, and is his instruction anyway."
         ),
         "owner_to_resolve": None,
         "resolution": (
@@ -129,32 +134,24 @@ REDLINES: dict[str, dict[str, Any]] = {
         "steps": [
             {
                 "above_lb": 295,
-                "target": 3.5,
-                "cap": 4.0,
-                "pct_bw_wk": "1.10–1.19",
+                "governed_by": "charter",  # target/cap read from governing_goal.rate_band_lb_per_wk (training/rate_band.py, #5074)
                 "note": "weeks 1–2 excluded (water); his measured 3.37 at 290s on 16 h walking",
             },
             {
                 "above_lb": 275,
-                "target": 3.25,
-                "cap": 3.75,
-                "pct_bw_wk": "1.18",
-                "note": "3.5 → 3.25 across the band; his measured 3.66 at 280s (19 h), 2.76 at 270s",
+                "governed_by": "charter",  # target/cap read from governing_goal.rate_band_lb_per_wk (training/rate_band.py, #5074)
+                "note": "his measured 3.66 at 280s (19 h), 2.76 at 270s",
             },
             {
                 "above_lb": 260,
-                "target": 3.0,
-                "cap": 3.5,
-                "pct_bw_wk": "1.09–1.15",
-                "dxa_gate": "3.5 permitted ONLY if the week-16 DXA lean share of the loss is ≤ 12 % and the anchors are flat (OD6, #4503: week 8 is a baseline)",
+                "governed_by": "charter",  # target/cap read from governing_goal.rate_band_lb_per_wk (training/rate_band.py, #5074)
+                "dxa_gate": "a rate above the band floor is permitted ONLY if the week-16 DXA lean share of the loss is ≤ 12 % and the anchors are flat (OD6, #4503: week 8 is a baseline)",
                 "note": "his measured 1.99 at 260s — walking had fallen to 7 h. The energy floor binds here on any base under 13 h",
             },
             {
                 "above_lb": 240,
-                "target": 2.75,
-                "cap": 3.25,
-                "pct_bw_wk": "1.06–1.15",
-                "dxa_gate": "3.0 permitted while the DXA lean share of the loss is ≤ 15 %",
+                "governed_by": "charter",  # target/cap read from governing_goal.rate_band_lb_per_wk (training/rate_band.py, #5074)
+                "dxa_gate": "the band floor is permitted while the DXA lean share of the loss is ≤ 15 %",
                 "note": "his measured 1.96 / 2.65; the fat fraction of the loss falls through 0.79–0.75 here",
             },
             {
@@ -358,23 +355,22 @@ REDLINES: dict[str, dict[str, Any]] = {
         ),
     },
     "lifting_sessions_per_wk": {
-        "low": 3,
-        "high": 4,
-        # #4147 (owner, 2026-09-23, DECISION#2026-09-24T03:10:59): v0.4 Upper/Lower replaced v0.3 full-body. The v0.3
-        # structure string is kept below as history; the numbers it did not touch are unchanged.
+        # #5069 (owner ruling 5, 2026-10-18): five lifting days — the charter's `split.lifting_days_per_wk`; was 3–4 (v3/v0.4)
+        "low": int(_charter_value("split.lifting_days_per_wk") or 0),
+        "high": int(_charter_value("split.lifting_days_per_wk") or 0),
+        # #5069: the charter's order (ruling 5) and its split.frequency; v0.4's four-session order is `training.program_v04`
         "structure": (
-            "upper/lower in ORDER: upper-heavy -> lower-heavy -> upper-volume -> lower-volume, repeating; the next session is the one "
-            "after the last performed lift, whatever the date (a walk audible postpones, never skips); each muscle 2x/wk"
+            " -> ".join(str(n).lower() for n in _charter_value("split.sequence") or []) + ", repeating, in ORDER; the next session is "
+            "the one after the last performed lift, whatever the date (a walk audible postpones, never skips); frequency: split.frequency"
         ),
         "structure_v0_3": "full-body: heavy / moderate / heavy-moderate on non-consecutive days; the optional 4th only after two green recovery days",
         "sets_per_muscle_wk": [8, 12],
         "sets_per_muscle_wk_provenance": "owner 2026-09-23 (#4147, v0.4): ~10 hard sets/muscle/wk; was [6, 10] under v0.3 (red team 2026-09-22)",
         "sets_per_muscle_wk_small": [4, 6],
-        # #4503 OD4 (A, owner 2026-09-30): base 60–75, was v0.4's 50–65. The locked v0.4 block (56/wk, no 🟢 tail — OD8a) runs
-        # under it until `program_structure.BLOCK_LOCK['locked_until']`; the band governs the next block's templates.
+        # #4503 OD4 (A, owner 2026-09-30): base 60–75, was v0.4's 50–65. The five-day week (#5069) sits inside it; the v0.4
+        # lock that held the four-session week under it is lifted (ruling 6; history: `program_v04.BLOCK_LOCK`).
         "total_hard_sets_wk": [60, 75],
-        "total_hard_sets_wk_v0_4": [50, 65],
-        "session_minutes": [55, 70],
+        "session_minutes": list(_charter_value("split.session_minutes.lifting") or []),  # #5069: the charter's lifting minutes
         "anchors_per_week": 2,
         "load_rule": "hold — gains are rep-triggered (double progression, #4503 OD5)",
         "load_entry": {
@@ -385,25 +381,11 @@ REDLINES: dict[str, dict[str, Any]] = {
             "max_pct_of_band_e1rm_until_week_8": 85,
             "then": "hold",
         },
-        # #4503 OD5 (A, owner 2026-09-30): rep-triggered double progression; RPE is a veto only; NO nutrition clause (v0.4's
-        # "prior-day intake logged >= 1,800 kcal" is retired); `protein_floor_missed` gates the 🟢 block only (training.green_block).
-        "gain_rule": {
-            "kind": "double_progression",
-            "trigger": "the top of the slot's rep range on 2 consecutive same-type exposures (heavy -> heavy, volume -> volume)",
-            "consecutive_same_type_exposures": 2,
-            "size": "one 5-lb step (~+2.5 %), reps back to the bottom of the range",
-            "rpe_role": "veto only — a top-of-range set logged above the slot's RPE ceiling does not count toward the trigger",
-            "nutrition_clause": None,
-            "refused_when": [
-                "recovery < 50",
-                "sleep < 6.5 h",
-                "the week after a rate-over-cap flag",
-                "the first three exposures of a novel-again pattern",
-            ],
-            "provenance": "owner",
-            "stated": "2026-09-30",
-            "v0_4": "+2.5 % or +1 rep, one anchor at a time, <= every 14 d; offered after two top sets <= RPE 7, no pain flag 14 d, prior-day intake >= 1,800 kcal",
-        },
+        # #4503 OD5 (owner 2026-09-30): rep-triggered double progression. #5052 moved the rule to the charter
+        # (`config/training_charter.json` `progression.gain_rule`, v1.1.0) and `training.load_progression` applies it —
+        # this is a pointer, never a second copy (the charter is the registry, ADR-164). `protein_floor_missed` gates the 🟢
+        # block only (training.green_block), never the gain rule.
+        "gain_rule": {"source": "config/training_charter.json#progression.gain_rule", "applied_by": "training.load_progression"},
         "cal_rep_out": "CAL rep-out 2/wk on machine accessories (the existing pushdown / leg curl) until n >= 6, then 1/wk (OD5, OD8c)",
         "rep_scheme": "heavy exposure 4–6: one top set at RPE 7–8 plus two back-offs at −10 %; moderate 6–10; volume 8–12; accessories 8–15 at RIR 1–2",
         "accessory_rule": "2–3 per session, 2 sets, machines/cables, fixed for the block — none added after week 1; first thing dropped on a bad day",
@@ -773,7 +755,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "action": "+150–250 kcal/day and ursodiol on — unless strength, DXA and recovery are ALL clean (`loss_excessive_clean`: hold); overshoot is a failure, not a win",
         "evaluated_by_engine": False,
         "note": (
-            "Cap-based: the cap is the schedule step's `cap` at his current weight (4.0 above 295, 3.75 above 275, …). "
+            "Cap-based: the cap is the schedule step's `cap` at his current weight (the charter band's ceiling above the landing, #5074; his taper caps from the landing down). "
             "`health.nutrition_critics` reads `threshold_weeks` and the overshoot rule's words and offers the +250 as a change; "
             "its week gate is 'after week 4' from v2 and one week looser than v3's 'after week 3' — noted, not silently corrected."
         ),
