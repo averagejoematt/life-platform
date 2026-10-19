@@ -251,6 +251,32 @@ def _deload_records() -> list[dict[str, Any]]:
     return read()
 
 
+def _disruption_records() -> list[dict[str, Any]]:
+    """His disruption-mode records (#5088), read from the module that writes them; a raise is `read_failed`."""
+    from mcp.tools_training_notes import _disruption_records as read
+
+    return read()
+
+
+def _owner_word_records(status: dict[str, Any]) -> tuple[Any, Any]:
+    """The two owner-word stores stage 1 reads, each status stamped onto `status` (extracted for the #4880 ratchet):
+    #5070's deload word (a deload applies ONLY when one covers the day) and #5088's disruption-mode switch (the mode
+    applies ONLY when his record covers the day; otherwise the block may OFFER it). An empty store is ABSENT, a raise
+    is `read_failed` — never "no word on file"."""
+    from training.plan_engine import ABSENT, READ_FAILED, input_status as st
+
+    out = []
+    for name, reader, absent in (
+        ("deload_records", _deload_records, "no owner deload word on file"),
+        ("disruption_records", _disruption_records, "no disruption-mode record on file"),
+    ):
+        records, status[name] = _read(name, reader)
+        if records == [] and status[name]["state"] != READ_FAILED:
+            status[name] = st(ABSENT, absent)
+        out.append(records)
+    return out[0], out[1]
+
+
 def _training_memory_constraints() -> list[dict[str, Any]]:
     """Standing training constraints written from chat (the RDL gate, a toe flag, a back
     flag — #4077) via `write_platform_memory(category='training')`. Read through the SAME
@@ -640,10 +666,7 @@ def tool_plan_next_session(args):
     if dismissals == [] and status["pain_dismissals"]["state"] != READ_FAILED:
         status["pain_dismissals"] = st(ABSENT, "no owner dismissal on file")
 
-    # #5070: the owner's recorded deload word — a deload applies ONLY when one covers the day.
-    deload_records, status["deload_records"] = _read("deload_records", _deload_records)
-    if deload_records == [] and status["deload_records"]["state"] != READ_FAILED:
-        status["deload_records"] = st(ABSENT, "no owner deload word on file")
+    deload_records, disruption_records = _owner_word_records(status)
 
     # #4077: standing training constraints (RDL gate, toe flag, back flag, …) written from
     # chat via write_platform_memory(category='training') — the durable home that category
@@ -781,6 +804,7 @@ def tool_plan_next_session(args):
         block_workouts=block_workouts,
         training_memory_constraints=training_memory,
         deload_records=deload_records,
+        disruption_records=disruption_records,
         fatigue=(evidence or {}).get("fatigue"),
         recent_aerobic=recent_aerobic,
         loss_rate=loss_rate,
