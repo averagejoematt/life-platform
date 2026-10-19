@@ -79,6 +79,8 @@ from typing import Any
 
 from training.routine_repo import ORPHAN_DRAFT_DAYS
 
+from mcp.plan_helpers import coach_context_brief  # #5071
+
 logger = logging.getLogger("nightly_predraft")
 
 MARKER = "nightly_predraft"
@@ -602,6 +604,7 @@ def run(target_date: str | None = None) -> dict[str, Any]:
         routine_version=rec.get("routine_version"),
         critics=_critics_summary(rec),
         committed=False,
+        coach_context=coach_context_brief(target),  # #5071: the charter version + May frame the evening chat explains it in
     )
     return out
 

@@ -1,0 +1,207 @@
+{
+  "conversation": "planning-2026-10-18",
+  "source": "CloudWatch Logs /aws/lambda/life-platform-mcp, the handler's `Calling tool '<name>' with args` line (read-only filter-log-events, 2026-10-19); one conversation = calls with no gap over 45 minutes",
+  "window_utc": [
+    "2026-10-18T20:37:37Z",
+    "2026-10-18T22:24:08Z"
+  ],
+  "redaction": "tool name only, plus manage_hevy_routine's `action` and whether plan_next_session carried a routine_id; every other argument dropped",
+  "tool_calls": [
+    {
+      "at": "2026-10-18T20:37:37Z",
+      "tool": "get_sources"
+    },
+    {
+      "at": "2026-10-18T20:37:37Z",
+      "tool": "get_todoist_snapshot"
+    },
+    {
+      "at": "2026-10-18T20:47:26Z",
+      "tool": "get_weight_loss_progress"
+    },
+    {
+      "at": "2026-10-18T20:48:54Z",
+      "tool": "get_nutrition"
+    },
+    {
+      "at": "2026-10-18T20:52:59Z",
+      "tool": "get_weight_loss_progress"
+    },
+    {
+      "at": "2026-10-18T21:01:32Z",
+      "tool": "get_weight_loss_progress"
+    },
+    {
+      "at": "2026-10-18T21:11:27Z",
+      "tool": "get_capture_queues"
+    },
+    {
+      "at": "2026-10-18T21:11:28Z",
+      "tool": "get_freshness_status"
+    },
+    {
+      "at": "2026-10-18T21:11:30Z",
+      "tool": "plan_next_session"
+    },
+    {
+      "at": "2026-10-18T21:11:46Z",
+      "tool": "get_date_range"
+    },
+    {
+      "at": "2026-10-18T21:11:47Z",
+      "tool": "get_workouts"
+    },
+    {
+      "at": "2026-10-18T21:11:48Z",
+      "tool": "get_readiness_score"
+    },
+    {
+      "at": "2026-10-18T21:11:49Z",
+      "tool": "get_coach_thread"
+    },
+    {
+      "at": "2026-10-18T21:12:05Z",
+      "tool": "get_workout_detail"
+    },
+    {
+      "at": "2026-10-18T21:12:10Z",
+      "tool": "get_workout_detail"
+    },
+    {
+      "at": "2026-10-18T21:12:14Z",
+      "tool": "get_workout_detail"
+    },
+    {
+      "at": "2026-10-18T21:12:19Z",
+      "tool": "get_nutrition"
+    },
+    {
+      "at": "2026-10-18T21:13:13Z",
+      "tool": "get_date_range"
+    },
+    {
+      "at": "2026-10-18T21:13:37Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "draft_custom"
+      }
+    },
+    {
+      "at": "2026-10-18T21:13:45Z",
+      "tool": "plan_next_session",
+      "args": {
+        "routine_id": "<present>"
+      }
+    },
+    {
+      "at": "2026-10-18T21:14:28Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "dry_run"
+      }
+    },
+    {
+      "at": "2026-10-18T21:20:19Z",
+      "tool": "get_capture_queues"
+    },
+    {
+      "at": "2026-10-18T21:22:50Z",
+      "tool": "get_weight_loss_progress"
+    },
+    {
+      "at": "2026-10-18T21:23:12Z",
+      "tool": "get_workouts"
+    },
+    {
+      "at": "2026-10-18T21:23:13Z",
+      "tool": "get_muscle_volume"
+    },
+    {
+      "at": "2026-10-18T21:23:14Z",
+      "tool": "get_training"
+    },
+    {
+      "at": "2026-10-18T21:23:36Z",
+      "tool": "get_date_range"
+    },
+    {
+      "at": "2026-10-18T21:24:07Z",
+      "tool": "get_date_range"
+    },
+    {
+      "at": "2026-10-18T21:24:07Z",
+      "tool": "get_daily_metrics"
+    },
+    {
+      "at": "2026-10-18T21:24:07Z",
+      "tool": "get_zone2_breakdown"
+    },
+    {
+      "at": "2026-10-18T21:24:08Z",
+      "tool": "get_acwr_status"
+    },
+    {
+      "at": "2026-10-18T21:25:15Z",
+      "tool": "get_date_range"
+    },
+    {
+      "at": "2026-10-18T21:25:26Z",
+      "tool": "get_date_range"
+    },
+    {
+      "at": "2026-10-18T21:25:26Z",
+      "tool": "get_date_range"
+    },
+    {
+      "at": "2026-10-18T21:30:51Z",
+      "tool": "get_readiness_score"
+    },
+    {
+      "at": "2026-10-18T21:38:32Z",
+      "tool": "get_sources"
+    },
+    {
+      "at": "2026-10-18T21:38:32Z",
+      "tool": "get_todoist_snapshot"
+    },
+    {
+      "at": "2026-10-18T21:39:02Z",
+      "tool": "get_weight_loss_progress"
+    },
+    {
+      "at": "2026-10-18T21:40:13Z",
+      "tool": "get_weight_loss_progress"
+    },
+    {
+      "at": "2026-10-18T21:44:43Z",
+      "tool": "get_readiness_score"
+    },
+    {
+      "at": "2026-10-18T21:50:31Z",
+      "tool": "get_freshness_status"
+    },
+    {
+      "at": "2026-10-18T21:52:25Z",
+      "tool": "get_weight_loss_progress"
+    },
+    {
+      "at": "2026-10-18T21:59:46Z",
+      "tool": "get_weight_loss_progress"
+    },
+    {
+      "at": "2026-10-18T22:23:44Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "commit"
+      }
+    },
+    {
+      "at": "2026-10-18T22:24:06Z",
+      "tool": "log_decision"
+    },
+    {
+      "at": "2026-10-18T22:24:08Z",
+      "tool": "save_insight"
+    }
+  ]
+}

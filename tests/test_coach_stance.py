@@ -94,13 +94,14 @@ def test_watches_reference_real_signals():
 
 
 def test_resolver_picks_the_right_rung():
-    # weight-banded coach: baseline ~306 -> foundation
-    tr = _load("training_coach")
+    # weight-banded coach: baseline ~306 -> foundation. #5071: the live Performance seat's ladder — the retired
+    # training_coach's stance file (this test's old fixture, read by nothing at runtime) was retired with it.
+    tr = _load("physical_coach")
     st = coach_stance.resolve_stage(tr["stage_ladder"], 306.87)
     assert st and st["stage_id"] == "foundation"
     # a lighter weight lands in a later rung
     st2 = coach_stance.resolve_stage(tr["stage_ladder"], 225)
-    assert st2 and st2["stage_id"] == "develop"
+    assert st2 and st2["stage_id"] == "composition"
     # None resolves to nothing (honest empty-state pre-data)
     assert coach_stance.resolve_stage(tr["stage_ladder"], None) is None
     # every value in range resolves to exactly one stage

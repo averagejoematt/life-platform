@@ -1,0 +1,85 @@
+{
+  "conversation": "planning-2026-10-09",
+  "source": "CloudWatch Logs /aws/lambda/life-platform-mcp, the handler's `Calling tool '<name>' with args` line (read-only filter-log-events, 2026-10-19); one conversation = calls with no gap over 45 minutes",
+  "window_utc": [
+    "2026-10-09T21:53:28Z",
+    "2026-10-09T21:58:25Z"
+  ],
+  "redaction": "tool name only, plus manage_hevy_routine's `action` and whether plan_next_session carried a routine_id; every other argument dropped",
+  "tool_calls": [
+    {
+      "at": "2026-10-09T21:53:28Z",
+      "tool": "get_capture_queues"
+    },
+    {
+      "at": "2026-10-09T21:53:30Z",
+      "tool": "get_freshness_status"
+    },
+    {
+      "at": "2026-10-09T21:53:31Z",
+      "tool": "get_coach_session_packet"
+    },
+    {
+      "at": "2026-10-09T21:53:34Z",
+      "tool": "plan_next_session"
+    },
+    {
+      "at": "2026-10-09T21:53:44Z",
+      "tool": "get_readiness_score"
+    },
+    {
+      "at": "2026-10-09T21:54:09Z",
+      "tool": "get_date_range"
+    },
+    {
+      "at": "2026-10-09T21:54:09Z",
+      "tool": "get_workouts"
+    },
+    {
+      "at": "2026-10-09T21:54:11Z",
+      "tool": "get_coach_thread"
+    },
+    {
+      "at": "2026-10-09T21:54:12Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "list"
+      }
+    },
+    {
+      "at": "2026-10-09T21:54:17Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "get"
+      }
+    },
+    {
+      "at": "2026-10-09T21:55:15Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "draft_custom"
+      }
+    },
+    {
+      "at": "2026-10-09T21:55:23Z",
+      "tool": "plan_next_session",
+      "args": {
+        "routine_id": "<present>"
+      }
+    },
+    {
+      "at": "2026-10-09T21:56:07Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "dry_run"
+      }
+    },
+    {
+      "at": "2026-10-09T21:58:25Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "commit"
+      }
+    }
+  ]
+}

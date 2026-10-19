@@ -58,7 +58,9 @@ from mcp.plan_helpers import (  # noqa: F401 (#4149)
     _resolver,
     _safe,
     _union_evidence_rows,
+    attach_coach_context,  # #5071
     attach_morning_note,  # #4189
+    critics_with_charter,  # #5071
 )
 from mcp.plan_hevy_windows import _block_workouts, _prescription_window, _rotation_window  # noqa: F401  (#4110 size fix)
 
@@ -876,6 +878,7 @@ def tool_plan_next_session(args):
     out["nutrition_critics"] = _safe(_nutrition_critics_block) or {"error": "nutrition critics could not be built", "verdicts": []}
     # #4503 OD6: between DXA scans, Body Scan 2 is the lean/regional trend — labelled bioimpedance, never the DXA anchor
     out["between_dxa_lean"] = _safe(_between_dxa_lean, target_date, dxa, status["dxa_scans"]["state"]) or {"state": "read_failed"}
+    attach_coach_context(out, target_date, constraint_block=block)  # #5071: charter + panel + guidance + May frame
     if ir is None:  # #4084: the overnight pre-draft comes FIRST — the evening chat reviews it instead of rebuilding
         from mcp.nightly_predraft import attach_to_stage_1
 
@@ -1015,7 +1018,7 @@ def _run_stage_2(
 
     draft_exercises = [asdict(e) for e in ir.exercises]
     draft = critics.draft_summary(ir)
-    packets = build(draft)
+    packets = critics_with_charter(build(draft), target_date, block)  # #5071: the critics read the one context
     allowed, paused = _model_allowed()
     invoke = None
     if allowed:
