@@ -397,6 +397,11 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
     "lambdas/privacy/content_filter_channel.py:last_channel_errors": (
         "#3609 box 2 widen: exercised only by tests/test_content_filter_channel_errors_2655.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
     ),
+    "lambdas/training/program_structure.py:volume_floor_coverage": (
+        "#5053: the five roles' weekly sets against the charter's MEV floors and sets_per_wk bands — the measurement "
+        "tests/test_volume_floors_5053.py pins (KNOWN_BAND_GAPS, shrink-only) and the numbers the owner ruling #5162 is "
+        "decided on. No live caller yet by design: the coach-facing reader is the volume block #5162's ruling unblocks."
+    ),
     "lambdas/training/training_charter.py:reset_cache": (
         "The charter loader's cache reset (#5068, ADR-164) — the same shape as content_filter_channel.reset_cache "
         "above: called by tests/test_training_charter_loader_5068.py between channel fixtures (env -> local -> S3) and "
