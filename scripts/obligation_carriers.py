@@ -459,6 +459,13 @@ RESIDUE_LEDGERS: Dict[str, Dict[str, str]] = {
         "expires": _REVIEW_BY,
         "consumer": "tests/test_obligation_carriers_3597.py",
     },
+    "ledgers/training_charter_residue.py::TRAINING_CHARTER_RESIDUE": {
+        "carrier": "#5050",  # the W1 engine epic: each lane that moves a read onto the charter deletes its row
+        "condition": "a site leaves when its hand copy of a charter value is replaced by a training_charter read (#5068, ADR-164)",
+        "declared": "2026-10-18",
+        "expires": "2027-01-15",  # declared + 89 days — inside MAX_EXPIRY_DAYS
+        "consumer": "tests/test_training_charter_derivation_5068.py",
+    },
 }
 
 

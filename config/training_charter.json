@@ -1,0 +1,166 @@
+{
+  "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
+  "version": "1.0.0",
+  "change_log": [
+    {
+      "version": "1.0.0",
+      "date": "2026-10-18",
+      "by": "owner rulings 2026-10-18 (the elite-panel training review, #5067)",
+      "what": "First charter: the frame, the rate band, the 5-day split, the step floor and target, the cardio menu, no scheduled deload, effort ceilings, rotation cadence, gated movements, the concession ledger.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    }
+  ],
+  "governing_goal": {
+    "frame": "a Hollywood, time-bound, must-hit target",
+    "mentality": "time-bound, must-hit: every expert school is synthesized and each concedes something to the deadline (see concession_ledger)",
+    "target_date": "2027-05-15",
+    "rate_band_lb_per_wk": {
+      "floor": 3.0,
+      "ceiling": 3.5,
+      "shown_as": ["lb_per_wk", "pct_bodyweight_per_wk"],
+      "note": "always shown in lb AND as a percent of bodyweight"
+    },
+    "precedence": "the owner clinical guidance record (USER#matthew#SOURCE#clinical, GUIDANCE#current) outranks the rate band wherever the two conflict; it is reference context, never a gate on intensity",
+    "published": false
+  },
+  "phase_after_may": {
+    "frame": "toward the long-term goal and maintenance — the frame does not end at the target date",
+    "rule": "the charter is re-versioned on an owner ruling before the target date, not after it"
+  },
+  "split": {
+    "lifting_days_per_wk": 5,
+    "sequence": ["Upper-heavy", "Lower-heavy", "Shoulders+arms", "Upper-volume", "Lower-volume"],
+    "frequency": {"each_major_muscle_per_wk": 2, "delts_per_wk": 3},
+    "session_minutes": {"lifting": [60, 75], "cardio_block_max": 30, "stretching_max": 10},
+    "rule": "the next session is the one after the last performed lift, whatever the date"
+  },
+  "volume_priorities": {
+    "sets_per_wk": {
+      "side_rear_delts": [14, 18],
+      "lats": [14, 18],
+      "upper_chest": [14, 18],
+      "legs": [8, 10],
+      "arms": [10, 14]
+    },
+    "legs_posture": "strong maintenance",
+    "mev_floors_in_every_template": ["side_rear_delts", "traps", "calves", "core"]
+  },
+  "steps": {
+    "floor": 12000,
+    "target": 15000,
+    "every_day": true,
+    "lifting_days_included": true,
+    "ramp": {
+      "from": "the trailing average over `ramp_window_days`",
+      "ramp_window_days": 14,
+      "owner_adjustable": ["ramp_window_days"],
+      "held_by": "a lower-leg strain flag holds the ramp at its current level"
+    },
+    "gym_cardio_minutes_count_toward_movement": true,
+    "note": "walking carries the volume; gym cardio is deliberate, from the menu"
+  },
+  "cardio_menu": {
+    "default": "incline_treadmill_walk",
+    "conditioning_sessions_per_wk": 2,
+    "every_block_carries": ["level", "speed", "rpe_or_talk_test"],
+    "progression": "same RPE at a higher level",
+    "blocks": {
+      "easy": {"rpe": [4, 5], "talk_test": "full sentences"},
+      "tempo": {"label": "hard flat 40", "rpe": [6, 7], "minutes": 40},
+      "hills": {"rpe": [5, 7]},
+      "intervals": {"rpe_hard_minutes": 8, "note": "RPE 8 on the hard minutes; open by RPE / talk test"},
+      "incline_treadmill_walk": {"rpe": [4, 6], "default": true},
+      "kettlebell_swings_and_circuits": {"available": "now", "prescribed_by": "RPE / talk test"}
+    }
+  },
+  "deload": {
+    "scheduled": false,
+    "automatic": false,
+    "owner_gated": true,
+    "recommendation_triggers": ["rpe_drift", "recovery", "event_signals"],
+    "applied_only_on": "the owner's recorded word",
+    "note": "fatigue signals become a recommendation; a deload happens only on his recorded word (owner ruling 2026-10-18)"
+  },
+  "effort_ceilings": {
+    "by_experience_tier": {
+      "compounds_rpe": [8, 9],
+      "last_isolation_set_rpe": [9, 10]
+    },
+    "overage_tolerance_rpe": 1,
+    "overage_rule": "within +1 RPE of the ceiling is not a breach",
+    "ceiling_change_proposal": {
+      "when": "a ceiling is beaten on more than 50% of sets two weeks running",
+      "share_of_sets": 0.5,
+      "weeks_running": 2,
+      "effect": "proposes a ceiling change (an owner ruling applies it)"
+    }
+  },
+  "rotation": {
+    "anchors_fixed_weeks": 6,
+    "accessory_slots_rotate_every_weeks": 3,
+    "pool_seeded_from": "the owner's Hevy history",
+    "pool": {
+      "traps": ["barbell shrug"],
+      "second_press": ["incline barbell press", "dumbbell flat press", "decline machine press"],
+      "rows": ["chest-supported T-bar row", "seated cable row"],
+      "vertical_pull": ["assisted pull-up", "assisted chin-up"],
+      "hinge": ["stiff-leg deadlift", "Romanian deadlift"],
+      "single_leg_progression": ["supported split squat", "reverse lunge", "Bulgarian split squat"],
+      "carries": ["farmer carry", "suitcase carry"],
+      "delts": ["lateral raise", "face pull"],
+      "core": ["Pallof press"]
+    }
+  },
+  "gated_movements": {
+    "conventional_deadlift": {"gate_lb": 275, "until_then": "trap bar"},
+    "power_clean": {"revisit_at_lb": 250},
+    "running": {
+      "gate_lb": 240,
+      "prerequisites": ["four weeks pain-free walking", "Stage 4 of the run/walk on-ramp completed"],
+      "refs": "#5090"
+    },
+    "lower_leg_prep": {
+      "from_lb": 260,
+      "carve_out_from_plyometrics_exclusion": ["low-amplitude pogo hops", "calf work", "tibialis work", "brisk incline walking"],
+      "note": "the carve-out is limited to the list; everything else plyometric stays excluded"
+    },
+    "kettlebell_swings_and_circuits": {"available": "now", "prescribed_by": "RPE / talk test"}
+  },
+  "equipment": {
+    "assumed": "full commercial club — machines, cables, plate-loaded, T-bar, dumbbells to heavy, kettlebells, sled, full cardio deck",
+    "not_available": [],
+    "owner_editable": ["not_available"],
+    "rule": "the club is never named in this repo"
+  },
+  "travel": {
+    "windows": [
+      {"label": "late December 2026", "start": null, "end": null, "templates": "#5088"}
+    ],
+    "rule": "travel templates by mid-December; no calendar blocking"
+  },
+  "calibration": {
+    "tape_and_photos": {"every_weeks": 2, "dead_man_missed_cycles": 2},
+    "dexa": {"every_weeks_approx": 12},
+    "fitness_tests": {
+      "every_weeks": 6,
+      "battery": ["6-minute walk", "20-minute bike at RPE 6", "dead hang", "assisted pull-up assistance"]
+    },
+    "block_retro": {"every_weeks": 6, "scorecard_rows": 13}
+  },
+  "concession_ledger": {
+    "nippard": {"concedes": "a faster deficit than it would pick", "in_return": "double progression, stretch-position work, rotation"},
+    "athlean_x": {"concedes": "looks-first over athletic carryover", "in_return": "corrective work, carries, single-leg work"},
+    "rp_israetel": {"concedes": "no scheduled deload and legs at maintenance", "in_return": "rising volume on shoulders, lats and upper chest plus MEV floors"},
+    "sbs_nuckols": {"concedes": "a deadline-set loss rate", "in_return": "coded progression and strength tracking that catches muscle loss early"},
+    "galpin": {"concedes": "no deload rhythm", "in_return": "weekly fatigue flags and a real hard/easy cardio split"},
+    "dan_john": {"concedes": "machines and isolation in the mix", "in_return": "carries and kettlebell work weekly"},
+    "hollywood_transformation_trainer": {"concedes": "nothing", "in_return": "gets the frame, the deadline, the steps and the session length"},
+    "clinical_exercise_physiologist": {"concedes": "fast loss alongside 5 lifting days", "in_return": "weekly strength, sleep and fat-free-mass tracking, effort by RPE"}
+  },
+  "panel_target": {
+    "overall": "A",
+    "every_seat_at_least": 9,
+    "out_of": 10,
+    "rule": "every seat scores at least 9/10 with its concession named"
+  }
+}

@@ -147,7 +147,7 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/operational/pipeline_health_check_lambda.py::lambda_handler": 154,
     "lambdas/training/full_body_session.py::full_body_routines": 160,
     "lambdas/training/plan_engine.py::_tripwire_states": 253,
-    "lambdas/training/plan_engine.py::constraint_block": 283,
+    "lambdas/training/plan_engine.py::constraint_block": 276,  # 283 -> 276 (#5068: the critics stub extracted, the charter stamp added)
     "lambdas/web/recap_card_lambda.py::render_for_date": 190,
     "lambdas/web/site_api_ai_lambda.py::_handle_board_followup": 181,
     "lambdas/web/site_api_body.py::vitals": 174,
