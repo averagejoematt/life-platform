@@ -86,6 +86,7 @@ from health import deficit_disclosures
 from training import (
     block_model,
     deload_word,
+    disruption,
     load_progression,
     owner_redlines,
     program_structure,
@@ -152,6 +153,7 @@ ENGINE_INPUTS = (
     "block_workouts",
     "training_memory_constraints",
     "deload_records",  # #5070: the owner's recorded word on a deload (DELOAD#<start>), read like pain_dismissals
+    "disruption_records",  # #5088: his disruption-mode switch (MODE#disruption#<start>), read like deload_records
     "dxa_scans",  # #4166: the protein gate's body-fat tier
     "recent_aerobic",  # #4387: per-activity aerobic load, 3 days through target − 1
     "loss_rate",  # #5001: THE stated loss rate (`mcp.shared_quantities.loss_rate_lb_wk`) — the rate_ceiling input
@@ -851,6 +853,23 @@ def _reference_block(reference: dict[str, Any] | None) -> dict[str, Any]:
     return ref_block
 
 
+def _rate_target(
+    weight_lb: float | None,
+    missed_7d: int | None,
+    measured_7d: int | None,
+    window: dict[str, str] | None,
+    dxa_scans: list[dict[str, Any]] | None,
+) -> dict[str, Any]:
+    """`constraint_block.rate_target` (extracted for the #4880 function-length ratchet, #5088)."""
+    return owner_redlines.rate_target_lb_per_wk(
+        weight_lb,
+        protein_missed_7d=missed_7d,
+        protein_measured_7d=measured_7d,
+        protein_window_days=window,
+        dxa_scans=dxa_scans,  # #4166: the gate's mode scales with the latest DXA's body fat
+    )
+
+
 def constraint_block(
     *,
     date: str,
@@ -883,6 +902,7 @@ def constraint_block(
     block_workouts: list[dict[str, Any]] | None = None,
     training_memory_constraints: list[dict[str, Any]] | None = None,
     deload_records: list[dict[str, Any]] | None = None,
+    disruption_records: list[dict[str, Any]] | None = None,
     fatigue: dict[str, Any] | None = None,
     input_status: dict[str, dict[str, Any]] | None = None,
     recent_aerobic: dict[str, Any] | None = None,
@@ -924,6 +944,7 @@ def constraint_block(
             "block_workouts": block_workouts,
             "training_memory_constraints": training_memory_constraints,
             "deload_records": deload_records,
+            "disruption_records": disruption_records,
             "dxa_scans": dxa_scans,
             "recent_aerobic": recent_aerobic,
             "loss_rate": loss_rate,
@@ -1018,18 +1039,14 @@ def constraint_block(
         # `with_recommendation` stamps the signals in place, so the served session's copy (the same dict) carries them too.
         "block_model": block_model.with_recommendation(session.get("block_model"), deload_rec),
         "steps_ramp": _steps_ramp_block(date, steps_window, pain_flag_instances, pain_dismissals, deload_records, input_status),
+        # #5088 — his disruption mode (habits held, not targets) or the coach's OFFER of it; never self-applied
+        "disruption": disruption.constraint(date, disruption_records, block_workouts, None, states["disruption_records"]["state"]),
         # #4387 — the walking total cannot say "yesterday was 2¾ h on foot". These rows can: one
         # per activity over the 3 days through target − 1, each flagged against the walking
         # redlines, with the session's cardio modality picked FROM them (`cardio_pick`).
         "recent_aerobic": _recent_aerobic_view(recent_aerobic, session.get("archetype"), states.get("recent_aerobic"), date),
         # v3.3 ruling "B" (#4161): the SERVED target is gated by protein adherence — `rate_target.protein_gate` says which
-        "rate_target": owner_redlines.rate_target_lb_per_wk(
-            weight_lb,
-            protein_missed_7d=protein_days_missed_7d,
-            protein_measured_7d=protein_days_measured_7d,
-            protein_window_days=protein_window,
-            dxa_scans=dxa_scans,  # #4166: the gate's mode scales with the latest DXA's body fat
-        ),
+        "rate_target": _rate_target(weight_lb, protein_days_missed_7d, protein_days_measured_7d, protein_window, dxa_scans),
         # #5001: THE stated loss rate (method, window, n, source, the partition rows) — the rate_ceiling row's input
         "shared_quantities": {"loss_rate_lb_wk": loss_rate},
         # #3753 v3: tripwires the engine does not yet compute are NAMED here, never silent (ADR-105).

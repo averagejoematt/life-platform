@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -14,6 +14,13 @@
       "date": "2026-10-18",
       "by": "the owner's double-progression ruling (#4503 OD5, 2026-09-30), moved here from owner_redlines.REDLINES['lifting_sessions_per_wk']['gain_rule'] (#5052)",
       "what": "Added `progression`: the gain rule (two top-of-range exposures at or under the effort ceiling earn one 5-lb step, reps back to the bottom) and the self-raised-load rule (a load the owner raised himself at or under the ceiling becomes the next floor and is graded progressed, not a breach). The redline copy is retired; the engine reads it here.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.2.0",
+      "date": "2026-10-19",
+      "by": "owner ruling 2026-10-18 on #5088 (a late-December trip: travel templates, steps held, 2-3 short sessions a week, step back up on return)",
+      "what": "Adds split.minimum_session (the 20-minute minimum per role: anchors only, top set + one back-off) and the disruption block (an owner-switched mode that holds habits instead of targets, its travel/busy templates, the step-back-up week and when the coach OFFERS the mode).",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -39,6 +46,15 @@
     "sequence": ["Upper-heavy", "Lower-heavy", "Shoulders+arms", "Upper-volume", "Lower-volume"],
     "frequency": {"each_major_muscle_per_wk": 2, "delts_per_wk": 3},
     "session_minutes": {"lifting": [60, 75], "cardio_block_max": 30, "stretching_max": 10},
+    "minimum_session": {
+      "minutes": 20,
+      "shape": "anchors only, top set + one back-off",
+      "sets_per_movement": 2,
+      "max_movements": 4,
+      "est_minutes_per_set": 2.5,
+      "back_off_pct": -10,
+      "from": "owner_redlines lifting_sessions_per_wk.minimum_viable_session, tightened to 20 minutes for disruption weeks (#5088)"
+    },
     "rule": "the next session is the one after the last performed lift, whatever the date"
   },
   "volume_priorities": {
@@ -176,6 +192,19 @@
       {"label": "late December 2026", "start": null, "end": null, "templates": "#5088"}
     ],
     "rule": "travel templates by mid-December; no calendar blocking"
+  },
+  "disruption": {
+    "owner_switched": true,
+    "imposed": false,
+    "rule": "the owner switches the mode on and off; the coach OFFERS it and never applies it (owner ruling 2026-10-18, #5088)",
+    "holds": ["steps.floor", "protein_floor", "sleep_floor", "one short session"],
+    "templates": {
+      "travel": {"sessions_per_wk": [2, 3], "pools": ["hotel", "bodyweight"], "note": "a resort/hotel gym first, bodyweight when there is none"},
+      "busy": {"sessions_per_wk": [1, 5], "pools": ["gym_minimum", "bodyweight"], "note": "the 20-minute minimum at the usual club"}
+    },
+    "step_back_up": {"days": 7, "serves": "the minimum session at the club", "then": "the full split"},
+    "offer": {"travel_lead_days": 3, "missed_session_days": 4},
+    "max_days": 28
   },
   "calibration": {
     "tape_and_photos": {"every_weeks": 2, "dead_man_missed_cycles": 2},
