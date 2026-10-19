@@ -32,6 +32,11 @@ import the counting / estimating primitives themselves):
                            and `tools_plan._protein_days_7d` for the days-below-floor count.
   walking_hours_7d         `tools_plan._walking_volume_last_7d` -> `shared_quantities.walking_layer`
                            (#4068/#4105 — THE definition).
+  steps_7d                 `training.steps_resolver.steps_range` (#5081) over the 7 completed days before the
+                           target — each day's ONE steps figure through `common.metric_truth.resolve_steps`
+                           (the registry's METRIC_TRUTH winner rule), losers kept, a no-source day null, the
+                           Strava-walk figure a separate DERIVED estimate. Rows via `core.query_source_range`
+                           (Hevy via the one sanctioned Hevy read).
   loss_rate                `tools_benchmark._loss_rate_block` -> `shared_quantities.loss_rate_from_rows`.
   streaks                  `tools_plan._training_streaks` -> `training_streaks.streaks` (#4067).
   readiness                `get_readiness_score`, tiered by `tools_plan._recovery_tier`.
@@ -61,7 +66,7 @@ from typing import Any
 from common.pacific_time import pacific_today, shift_day_key
 from training.routine_title import ROUTINE_INDEX_LOOKBACK_DAYS as _ROUTINE_INDEX_LOOKBACK_DAYS
 
-PACKET_VERSION = "coach-session-packet@1.3.0"  # 1.3.0 #4189: morning_note field; 1.2.0 #4313: today; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
+PACKET_VERSION = "coach-session-packet@1.4.0"  # 1.4.0 #5081: steps_7d; 1.3.0 #4189: morning_note field; 1.2.0 #4313: today; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
 # Long enough that each performed type is found once a block is running (a v0.4 role recurs
 # weekly; an Engine day twice a week), bounded so the read stays one Hevy query.
 LAST_SESSION_LOOKBACK_DAYS = 28
@@ -77,6 +82,8 @@ SOURCES: dict[str, str] = {
     ),
     "nutrition_7d": "get_nutrition view=summary + tools_plan._protein_days_7d (plan_next_session's protein window)",
     "walking_hours_7d": "tools_plan._walking_volume_last_7d -> mcp.shared_quantities.walking_layer (#4068/#4105)",
+    "steps_7d": "training.steps_resolver.steps_range (#5081) -> common.metric_truth.resolve_steps (the METRIC_TRUTH steps facet) — "
+    "the 7 completed days before target_date, one winner per day, losers kept, no-source days null, Strava walks a DERIVED estimate",
     "loss_rate": "tools_benchmark._loss_rate_block -> mcp.shared_quantities.loss_rate_from_rows (#4068)",
     "streaks": "tools_plan._training_streaks -> training.training_streaks.streaks (#4067)",
     "readiness": "get_readiness_score, tier by tools_plan._recovery_tier",
@@ -98,7 +105,8 @@ COACH_PACKET_DESCRIPTION = (
     "CALL FIRST in any training-coaching conversation (#4082). ONE read of the coaching input packet a chat "
     "otherwise spends 10+ calls re-verifying: working sets per muscle over the 7 and 28 completed days, the "
     "last session of each type (and each v0.4 session role — the order-based sequence) with every set and every note, MacroFactor kcal + "
-    "protein over 7 days with the protein-floor count, weekly walking hours (THE one definition), the loss "
+    "protein over 7 days with the protein-floor count, weekly walking hours (THE one definition), daily steps over the 7 "
+    "completed days (one named winning source per day, the losers kept, a no-source day null — never 0), the loss "
     "rate, the active-day and loaded-lifting streaks, readiness + the readiness-floor streak, the v0.4 "
     "sequence position (the next undone session, #4110), `today` (#4311) — every activity on the day BEFORE target_date (what a "
     "night-before debrief reviews) from Hevy AND Strava on every device (WHOOP, Garmin, Apple), de-duplicated in time, each with device, "
@@ -332,6 +340,30 @@ def _walking(target_date: str) -> tuple[Any, dict[str, Any]]:
     return value, status
 
 
+def _steps_fetch(source: str, start: str, end: str) -> list[dict[str, Any]]:
+    """Rows for the steps resolver: Hevy through the ONE sanctioned Hevy read, every other source
+    through the MCP range read (Strava's multi-device duplicates removed there, #4419)."""
+    if source == "hevy":
+        from mcp.tools_strength import _read_hevy_all_phases
+
+        items, _phases = _read_hevy_all_phases(start, end)
+        return list(items or [])
+    from mcp import core
+
+    return list(core.query_source_range(source, start, end) or [])
+
+
+def _steps(target_date: str) -> tuple[Any, dict[str, Any]]:
+    """The 7 completed days of steps, resolved by `training.steps_resolver` (#5081) — carried, not counted."""
+    from training.plan_engine import ABSENT, MEASURED
+    from training.steps_resolver import steps_range
+
+    out = steps_range(shift_day_key(target_date, -7), shift_day_key(target_date, -1), fetch=_steps_fetch)
+    if not out["summary"]["days_measured"]:
+        return out, _st(ABSENT, f"no steps source has a count in {out['window']['start']}..{out['window']['end']}")
+    return out, _st(MEASURED)
+
+
 def _loss_rate(target_date: str) -> tuple[Any, dict[str, Any]]:
     from training.plan_engine import ABSENT, MEASURED, READ_FAILED
 
@@ -468,6 +500,7 @@ READERS = {
     "last_session_by_type": _last_sessions_field,
     "nutrition_7d": _nutrition,
     "walking_hours_7d": _walking,
+    "steps_7d": _steps,
     "loss_rate": _loss_rate,
     "streaks": _streaks,
     "readiness": _readiness,

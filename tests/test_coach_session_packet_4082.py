@@ -121,6 +121,19 @@ def stub_readers(monkeypatch):
     monkeypatch.setattr(coach_packet_today, "read_hevy_day", _today_hevy)
     monkeypatch.setattr(coach_packet_today, "read_strava_day", _today_strava)
     monkeypatch.setattr(coach_packet_today, "pacific_today", lambda: "2026-09-26")
+    # #5081: steps_7d reads its rows through the packet's one fetch seam; stub it to a live-shaped day.
+    monkeypatch.setattr(pkt, "_steps_fetch", _steps_rows)
+
+
+# #5081: field-projected live rows (DATE#2026-10-14, read 2026-10-18) placed on a packet-window day.
+def _steps_rows(source: str, start: str, end: str) -> list[dict]:
+    from decimal import Decimal
+
+    rows = {
+        "whoop": [{"sk": "DATE#2026-09-20", "date": "2026-09-20", "step_count": Decimal("17739")}],
+        "apple_health": [{"sk": "DATE#2026-09-20", "date": "2026-09-20", "steps": Decimal("13157.82")}],
+    }
+    return [r for r in rows.get(source, []) if start <= r["date"] <= end]
 
 
 # ── the contract: one tool, every field, three states ─────────────────────────────────
@@ -251,6 +264,24 @@ def test_packet_carries_the_planners_own_numbers(stub_readers):
     assert out["nutrition_7d"]["value"]["protein_days_measured"] == 2
     assert out["readiness"]["value"]["recovery_tier"] == "green"
     assert out["muscle_volume"]["value"]["window_7d"]["muscles"]["Chest"]["sets_per_week"] == 6.0
+    steps = out["steps_7d"]["value"]
+    assert steps["window"] == {"start": "2026-09-16", "end": "2026-09-22"}
+    day = {d["date"]: d for d in steps["days"]}["2026-09-20"]
+    assert (day["steps"], day["winner"]) == (17739, "whoop") and steps["summary"]["days_measured"] == 1
+
+
+def test_steps_7d_with_no_source_is_absent_and_a_read_error_is_read_failed(stub_readers, monkeypatch):
+    """Mutation (#5081): report a week with no steps source as measured zeros, or swallow a read error."""
+    monkeypatch.setattr(pkt, "_steps_fetch", lambda s, a, b: [])
+    f = pkt.tool_get_coach_session_packet({"target_date": "2026-09-23"})["fields"]["steps_7d"]
+    assert f["state"] == "absent" and all(d["steps"] is None for d in f["value"]["days"])
+
+    def boom(s, a, b):
+        raise TimeoutError("ddb")
+
+    monkeypatch.setattr(pkt, "_steps_fetch", boom)
+    f = pkt.tool_get_coach_session_packet({"target_date": "2026-09-23"})["fields"]["steps_7d"]
+    assert f["state"] == "read_failed" and "TimeoutError" in str(f)
 
 
 def test_muscle_volume_is_read_over_plan_next_sessions_window(stub_readers, monkeypatch):
@@ -466,7 +497,7 @@ def test_morning_note_is_measured_with_the_four_words_the_day_and_the_pt_instant
     assert v["written_at_pt"].endswith("PT") and "written_at" not in v
     expected = {k: val for k, val in mn.coach_fact(dict(MORNING_NOTE_ROW)).items() if k != "state"}
     assert v == expected, "the packet must carry coach_fact's shape verbatim"
-    assert out["packet_version"] == "coach-session-packet@1.3.0"
+    assert out["packet_version"] == "coach-session-packet@1.4.0"
 
 
 def test_morning_note_no_row_is_absent_and_a_failed_read_is_read_failed(stub_readers, monkeypatch):

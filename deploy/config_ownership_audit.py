@@ -220,6 +220,24 @@ RULINGS: tuple[Ruling, ...] = (
         "of an S3 object. Uploading it is a publish (it also has a per-user alias key, see config_twin_registry).",
     ),
     Ruling(
+        "config/training_charter.json",
+        HAND_OWNED,
+        "#5068 (ADR-164): the training charter — the one source of every training target (the split, the step floor and "
+        "target, the cardio menu, the rotation cadence, the concession ledger). Hand-authored on an owner ruling, "
+        "versioned with its own change_log; read by lambdas/training/training_charter.py (local/bundle copy first, the "
+        "S3 twin as the fallback), staged into every Lambda bundle by deploy/build_bundle.py. No writer anywhere. "
+        "Uploading it is a publish. The owner-only half (body/appearance targets) is NOT in this file — see the "
+        "example below.",
+    ),
+    Ruling(
+        "config/training_charter.private.example.json",
+        HAND_OWNED,
+        "#5087: a committed TEMPLATE (null placeholders only) for the owner-only half of the training charter. The real "
+        "object is off-repo — env TRAINING_CHARTER_PRIVATE_JSON, the gitignored training_charter.private.local.json, or "
+        "the owner-private S3 key config/coaching/training_charter.private.json — and this file is documentation, "
+        "excluded from the twin set by *.example.json.",
+    ),
+    Ruling(
         "config/content_filter.example.json",
         HAND_OWNED,
         "A committed TEMPLATE (`_README`: ER-06 vocabulary TEMPLATE). The real vocabulary is off-repo since #2503 "

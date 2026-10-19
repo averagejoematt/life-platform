@@ -62,7 +62,9 @@ GET_EXERCISE_NOTES_DESCRIPTION = (
     "makes the flag read 'clear': plan_next_session reports the tripwire as dismissed_by_owner with the "
     "date and his words, and the joints/tendons critic stops vetoing that instance. It RE-ARMS on its "
     "own — a note dated after the dismissal trips the flag again and marks the dismissal superseded. "
-    "action='dismissals' lists them."
+    "action='dismissals' lists them. "
+    "action='deload' (#5070, OWNER-ONLY): record his word that a deload starts (words VERBATIM, optional "
+    "start_date/days/sets_pct) — the ONLY way a deload ever applies; action='deloads' lists them."
 )
 
 # ── the inputSchema that lives beside its description (the #3692 ceiling) ────────────
@@ -78,10 +80,12 @@ GET_EXERCISE_NOTES_INPUT = {
     "properties": {
         "action": {
             "type": "string",
-            "enum": ["read", "dismiss", "dismissals"],
+            "enum": ["read", "dismiss", "dismissals", "deload", "deloads"],
             "description": (
                 "read (default) = the note timeline. dismiss = record HIS dismissal of a pain flag on this "
-                "movement (#4036, OWNER-ONLY WRITE). dismissals = list every dismissal on the record."
+                "movement (#4036, OWNER-ONLY WRITE). dismissals = list every dismissal on the record. "
+                "deload = record HIS word that a deload starts (#5070, OWNER-ONLY WRITE; `words` verbatim, optional "
+                "`start_date`, `days`, `sets_pct`). deloads = list them."
             ),
         },
         "exercise": {
@@ -110,6 +114,9 @@ GET_EXERCISE_NOTES_INPUT = {
             ),
         },
         "dismissed_on": {"type": "string", "description": "action='dismiss': YYYY-MM-DD he said it. Defaults to today (Pacific)."},
+        "start_date": {"type": "string", "description": "action='deload': YYYY-MM-DD the deload starts. Defaults to today (Pacific)."},
+        "days": {"type": "integer", "description": "action='deload': days the deload covers (default 7)."},
+        "sets_pct": {"type": "integer", "description": "action='deload': the set cut, negative (default -40)."},
     },
     "required": [],
 }

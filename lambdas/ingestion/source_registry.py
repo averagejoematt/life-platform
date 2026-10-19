@@ -2889,7 +2889,7 @@ METRIC_TRUTH: dict[str, dict[str, Any]] = {
         "field_by_source": {"whoop": "step_count", "apple_health": "steps", "garmin": "steps"},
         "min_by_source": {"whoop": 1, "apple_health": 1, "garmin": 1000},
         "overlap_rule": "first_positive_else_first_zero",
-        "ruling": "#4644 Q4 (recommended: 'yes — Whoop when both devices have a count') — pending the owner",
+        "ruling": "#4644 Q4 'yes — Whoop when both devices have a count' (owner 'all recommended', recorded 2026-10-17)",
     },
     # vo2_max (#4976): the Apple Watch's estimate from now on, Garmin's stored estimates for the
     # history before it (the direct Garmin feed is retired, #4640 — its rows stay and stay

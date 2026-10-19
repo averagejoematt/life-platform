@@ -115,3 +115,10 @@ keywords = ["site_api_origin_secret", "x-amj-origin", "x_amj_origin"]
 [[allowlists]]
 description = "tests/fixtures/gitleaks/** — the POSITIVE CONTROLS for the five rules above. Each file plants a syntactically real token of the shape its rule hunts, so that the rule can be shown to fire (by `gitleaks detect --source tests/fixtures/gitleaks --no-git`, and by tests/test_gitleaks_rules_3620.py where the binary is absent). None is a live credential: every value is locally generated, self-describing, and matched here by path so the gate does not red on the controls that prove it works."
 paths = ['''tests/fixtures/gitleaks/.*''']
+
+[[allowlists]]
+description = "scripts/register_charter_predictions.py — the four charter-build prediction ids (#5089) were first committed as a `key` field (commit 2a290730 on the charter-w0 wave branch), which gitleaks' generic-api-key rule reads as a credential; they are metric slugs, renamed to `metric` in the tree. Scoped to the file and the four literals so the one historical commit in a wave PR's range stays green."
+condition = "AND"
+regexTarget = "match"
+regexes = ['''anchor_e1rm_up''', '''zero_accessory_stalls''', '''steps_floor_90pct''', '''rate_in_band_4_of_6''']
+paths = ['''scripts/register_charter_predictions\.py''']

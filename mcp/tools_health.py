@@ -16,6 +16,11 @@ from mcp.config import logger
 from mcp.core import decimal_to_float, get_profile, phase_scope_block, query_source, query_source_cross_phase
 from mcp.helpers import normalize_whoop_sleep
 from mcp.tools_training import _get_training_load
+from mcp.weight_rate import (
+    RATE_FLAG_PCT_BW_PER_WK,
+    annotate_weekly_rates,
+    rate_pct_bw,
+)  # noqa: F401 — #5060, split by the size guard
 
 # ── #4978: the readiness formula, stated once and returned with every score ─────────
 READINESS_WEIGHTS = {
@@ -675,31 +680,7 @@ def tool_get_weight_loss_progress(args):
         pt["bmi"] = bmi
         pt["bmi_category"] = bmi_category(bmi)
 
-    weekly_rates = []
-    for i in range(len(weight_series)):
-        pt = weight_series[i]
-        target_dt = datetime.strptime(pt["date"], "%Y-%m-%d") - timedelta(days=7)
-        prior = None
-        best_gap = 999
-        for j in range(i):
-            d = datetime.strptime(weight_series[j]["date"], "%Y-%m-%d")
-            gap = abs((target_dt - d).days)
-            if gap < best_gap:
-                best_gap = gap
-                prior = weight_series[j]
-        if prior and best_gap <= 4:
-            days_diff = (datetime.strptime(pt["date"], "%Y-%m-%d") - datetime.strptime(prior["date"], "%Y-%m-%d")).days
-            if days_diff > 0:
-                weekly_rate = round((prior["weight_lbs"] - pt["weight_lbs"]) / days_diff * 7, 2)
-                pt["weekly_loss_rate_lbs"] = weekly_rate
-                weekly_rates.append(weekly_rate)
-                # >2.5 lbs/week exceeds ACSM safe rate; risk of lean mass catabolism (Helms 2014)
-                if weekly_rate > 2.5:
-                    pt["rate_flag"] = "⚠️ Losing too fast (>2.5 lbs/wk) — risk of muscle loss. Check nutrition."
-                elif weekly_rate < 0:
-                    pt["rate_flag"] = "↑ Weight gain this week"
-                elif weekly_rate < 0.25 and len(weight_series) > 14:
-                    pt["rate_flag"] = "⏸ Very slow — review deficit"
+    weekly_rates = annotate_weekly_rates(weight_series)
 
     milestones = {}
     milestone_thresholds = [
@@ -737,6 +718,7 @@ def tool_get_weight_loss_progress(args):
                     "milestone": label,
                     "lbs_to_cross": round(lbs_to_threshold, 1),
                     "recent_pace_lbs_per_week": _recent_mean,
+                    "recent_pace_pct_bodyweight_per_week": rate_pct_bw(_recent_mean, weight_series[-1]["weight_lbs"]),
                     "n_recent_rates": len(_recent),
                 }
                 if _recent_mean is not None and _recent_mean > 0:
@@ -817,6 +799,7 @@ def tool_get_weight_loss_progress(args):
             "goal_weight_lbs": goal_weight,
             "lbs_remaining": round(current_weight - goal_weight, 1),
             "avg_weekly_loss_lbs": avg_weekly,
+            "avg_weekly_loss_pct_bodyweight": rate_pct_bw(avg_weekly, current_weight),
             # ADR-105: the n behind the average travels with it — three paired
             # weigh-ins and thirty no longer produce identically-confident output.
             "n_weekly_rates": len(weekly_rates),
@@ -836,6 +819,9 @@ def tool_get_weight_loss_progress(args):
         "current_bmi_category": weight_series[-1].get("bmi_category"),
         "total_lost_lbs": total_lost,
         "avg_weekly_loss_lbs": avg_weekly,
+        "avg_weekly_loss_pct_bodyweight": rate_pct_bw(avg_weekly, current_weight),
+        "rate_lb_per_wk": avg_weekly,
+        "rate_pct_bodyweight_per_wk": rate_pct_bw(avg_weekly, current_weight),
         "projection": projection,
         "plateau_detected": plateau,
         "milestones_achieved": milestones,
@@ -850,7 +836,10 @@ def tool_get_weight_loss_progress(args):
             "Real weigh-ins only, from USER#matthew#SOURCE#withings, trailing 14 days off end_date. "
             "A gap in logging shows as missing dates here — never an interpolated or smoothed entry."
         ),
-        "clinical_note": "Safe loss rate: 0.5–2.0 lbs/week. >2.5 lbs/week consistently risks lean mass catabolism.",
+        "clinical_note": (
+            f"Rate is judged relative to bodyweight, shown in lb/wk and % of bodyweight. Losing more than "
+            f"{RATE_FLAG_PCT_BW_PER_WK}% of bodyweight per week consistently risks lean mass catabolism (Helms 2014)."
+        ),
     }
 
 

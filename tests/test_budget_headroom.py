@@ -303,7 +303,7 @@ def test_format_tier1_incident_matches_issue_example():
     head, sep, paused = line.partition(" · paused: ")
     assert head == "Budget: tier 1 · projected $83 vs $75 ceiling · AI $1.79/day of the $2.68/day burn — near-zero slack for reader growth"
     assert sep, "a tier-1 line must name what tier 1 paused (#1927)"
-    assert paused.startswith("6 AI features (")
+    assert paused.startswith(f"{len(budget_guard.paused_features(1))} AI features (")  # derived, not pinned (#5084 grew band 1)
 
 
 def test_format_tier2_over_ceiling():

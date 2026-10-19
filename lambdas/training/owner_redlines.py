@@ -82,7 +82,10 @@ training recommendations were approved: the deload moves from every 6th session-
 lock, −40 % sets for 7 days, loads held (`lifting_sessions_per_wk.deload`). (b) Ruling "B": the
 loss-rate target is CONDITIONAL ON PROTEIN ADHERENCE (`rate_protein_gate`) — the protein floor stays
 (`PLAN_DAILY_PROTEIN_MIN_G`; owner ruling 2026-10-11, #4540: 170 g, the sealed plan's number, not the 180 g
-carried before); the risk is adherence, not the floor, so a week of misses serves the envelope's LOWER band instead of the schedule step."""
+carried before); the risk is adherence, not the floor, so a week of misses serves the envelope's LOWER band instead of the schedule step.
+
+v3.4 (2026-10-18, #5070): owner ruling — NO scheduled or automatic deload; v3.3's week-6 / block-lock deload is retired and a
+deload applies only on his recorded word (`training.deload_word`; the response is `lifting_sessions_per_wk.deload`)."""
 
 RED_TEAM_RECORD = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.3_redteam.md"
 PLAN = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.4.md"  # #4147; written by the driver, owner-private
@@ -404,19 +407,16 @@ REDLINES: dict[str, dict[str, Any]] = {
         "cal_rep_out": "CAL rep-out 2/wk on machine accessories (the existing pushdown / leg curl) until n >= 6, then 1/wk (OD5, OD8c)",
         "rep_scheme": "heavy exposure 4–6: one top set at RPE 7–8 plus two back-offs at −10 %; moderate 6–10; volume 8–12; accessories 8–15 at RIR 1–2",
         "accessory_rule": "2–3 per session, 2 sets, machines/cables, fixed for the block — none added after week 1; first thing dropped on a bad day",
-        # v3.3 (#4161, the 2026-09-24 red team, owner-approved): was {"every_nth_week": 6, "sets_pct": -30} — every 6th
-        # session-counted week. Now ONE pre-planned deload at the LATER of program week 6 or the v0.4 block lock
-        # (`program_structure.BLOCK_LOCK['locked_until']`, the one home of that date), then every 6th week after it.
+        # v3.4 (#5070, owner ruling 2026-10-18): NO scheduled or automatic deload. This is the response a deload APPLIES AS
+        # WRITTEN when — and only when — the owner's recorded word covers the day (`training.deload_word`); the schedule
+        # (v3.3's program-week-6 / block-lock deload, #4161) is retired. Whether one may run is the charter's `deload` block.
         "deload": {
-            "at_program_week": 6,
-            "not_before": "program_structure.BLOCK_LOCK['locked_until']",
-            "every_nth_week": 6,
             "sets_pct": -40,
             "days": 7,
             "loads": "held",
             "week_off": False,
             "provenance": "owner",
-            "stated": "2026-09-24",
+            "stated": "2026-10-18",
             "evidence": "Coleman 2024 PeerJ 12:e16777 (a one-week deload mid-block: strength and hypertrophy not improved over continuous training, not lost)",
         },
         "minimum_viable_session": "anchors only, top set + one back-off, ~25 min",

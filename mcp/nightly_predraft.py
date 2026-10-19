@@ -146,16 +146,18 @@ def _block_record(target_date: str) -> list[dict[str, Any]] | None:
         return None
 
 
-def _session_from(target_date: str, block_workouts: list[dict[str, Any]] | None) -> dict[str, Any] | None:
+def _session_from(
+    target_date: str, block_workouts: list[dict[str, Any]] | None, deload_records: list[dict[str, Any]] | None = None
+) -> dict[str, Any] | None:
     from training import plan_engine
 
     from mcp.plan_helpers import _catalog_and_ceiling
 
     catalog, ceiling = _catalog_and_ceiling()
-    return plan_engine._scheduled_session(target_date, catalog, ceiling, block_workouts)
+    return plan_engine._scheduled_session(target_date, catalog, ceiling, block_workouts, deload_records)
 
 
-def scheduled_session(target_date: str) -> dict[str, Any] | None:
+def scheduled_session(target_date: str, deload_records: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
     """The session the program serves on `target_date` — the SAME function stage 1 uses (#4064).
 
     #4110 / #4147 (PR #4120 — v0.4 Upper/Lower, ORDER-BASED: the next undone session in the
@@ -167,7 +169,11 @@ def scheduled_session(target_date: str) -> dict[str, Any] | None:
     session is draftable iff it carries a `prescription` (`is_lifting_session`), whatever its
     archetype (`upper`, `lower`; `full` for v0.3 history).
     """
-    return _session_from(target_date, _block_record(target_date))
+    from training import deload_word
+
+    # #5070: the owner's recorded deload word rides the served session; the recommendation (signals) is stage 1's
+    records = deload_records if deload_records is not None else deload_word.load_records_failsoft()
+    return _session_from(target_date, _block_record(target_date), records)
 
 
 def is_lifting_session(session: dict[str, Any] | None) -> bool:
@@ -474,7 +480,19 @@ def run(target_date: str | None = None) -> dict[str, Any]:
 
     session = scheduled_session(target) or {}
     # #4161: the week counter's basis (sessions AND days) and the deload ride with the pre-draft too
-    keys = ("label", "archetype", "session_role", "optional", "source", "week", "deload", "week_basis", "advance_blocked_by", "note")
+    keys = (
+        "label",
+        "archetype",
+        "session_role",
+        "optional",
+        "source",
+        "week",
+        "deload",
+        "deload_recommendation",
+        "week_basis",
+        "advance_blocked_by",
+        "note",
+    )
     out["session"] = {k: session.get(k) for k in keys}
     if not is_lifting_session(session):
         out.update(

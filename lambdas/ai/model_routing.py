@@ -72,6 +72,9 @@ TIERS = tuple(TIER_MODELS)
 # ── Feature → default tier: EXACTLY budget_guard._FEATURE_CUTOFF's keys ─────────────────
 FEATURE_TIERS: dict[str, str] = {
     "broadcast_sensitivity": WORKHORSE,  # #4769 restores its Haiku call
+    "charter_judge": WORKHORSE,  # #5084: the charter's panel-rubric judge (#5072)
+    "charter_narrative": WORKHORSE,  # #5084: the plan's charter-frame explanation lines
+    "charter_retro": WORKHORSE,  # #5084: the block retro (#5079)
     "chronicle": WORKHORSE,
     "chronicle_editor": WORKHORSE,
     "coach_diary_reaction": NARRATIVE,  # call_anthropic default (shared.narrative)
@@ -120,6 +123,12 @@ ROUTES: dict[str, Route] = {
     "shared.narrative": Route(tier=_N, env="AI_MODEL"),
     "shared.workhorse": Route(tier=_W, env="AI_MODEL_HAIKU"),
     # ── Budget-gated features.
+    # #5084: the training charter's three callers, bound in lambdas/training/charter_ai.py. Each reads
+    # the workhorse channel (AI_MODEL_HAIKU) like the other Haiku callers; their cached charter block
+    # was measured on Haiku 4.5 (prompt_cache.CACHING_DECISIONS "charter-*"), so a move re-measures.
+    "charter.judge": Route(feature="charter_judge", env="AI_MODEL_HAIKU"),
+    "charter.narrative": Route(feature="charter_narrative", env="AI_MODEL_HAIKU"),
+    "charter.retro": Route(feature="charter_retro", env="AI_MODEL_HAIKU"),
     "chronicle": Route(feature="chronicle", env="AI_MODEL_HAIKU"),  # wednesday_chronicle (+ chronicle_personas)
     "chronicle.panel_podcast": Route(feature="chronicle", env="AI_MODEL_HAIKU"),
     "chronicle.panel_podcast_intro": Route(feature="chronicle", tier=_N, env="AI_MODEL_SONNET"),

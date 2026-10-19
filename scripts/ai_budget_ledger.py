@@ -191,6 +191,20 @@ LEDGER: dict[str, dict] = {
         "founding window, so $0 stamped; dedicated allowlisted CI label (#2888), same pattern as "
         "visual_ai_qa/reader_truth_qa above but band 1 (advisory triage signal, not a deploy gate)",
     ),
+    "charter_judge": _row(
+        owner="lambdas/training/charter_ai.py",
+        attribution=NONE,
+        note="#5084: the charter's panel-rubric judge (#5072) — one Haiku call per panel seat per graded plan, the "
+        "cached charter block written once and read by the rest. No caller deployed yet, so no dimension value: its "
+        "golden-case runs land under the CI or dev-session key of whatever runs them, the weekly grade under its host "
+        "Lambda. Estimate (#5084, docs/PROPORTIONALITY.md): $0.0426 per graded plan cached",
+    ),
+    "charter_retro": _row(
+        owner="lambdas/training/charter_ai.py",
+        attribution=NONE,
+        note="#5084: the block retro (#5079) — the judge's rubric, one call per seat, once per block from the "
+        "/training-review skill on a workstation, so its spend lands under dev-session. Estimate: $0.0746 per retro",
+    ),
     # ── band 2: reader narrative ─────────────────────────────────────────────
     "coach_narrative": _row(
         owner="lambdas/coach/coach_narrative_orchestrator.py",
@@ -256,6 +270,14 @@ LEDGER: dict[str, dict] = {
         "caller; EstimatedCostUSD{LambdaFunction=life-platform-mcp} had ZERO datapoints over the trailing 30d on "
         "2026-09-19). Did not exist in the founding window, so $0 stamped; the floor budget means growth past $1/mo "
         "gets a look at close. Re-measure from LifePlatform/AI::EstimatedCostUSD{LambdaFunction=life-platform-mcp}",
+    ),
+    "charter_narrative": _row(
+        owner="lambdas/training/charter_ai.py",
+        attribution=NONE,
+        note="#5084: the plan's charter-frame explanation lines, three back-to-back Haiku calls a night in the nightly "
+        "pre-draft. Its expected host is life-platform-mcp-warmer (mcp_stack: the NightlyPredraft rule targets the warmer), "
+        "where the pre-draft's plan_critics stage also runs — the lane that wires the first call reconciles the two rows' "
+        "attribution in the same PR. Estimate: $0.0154/night cached (~$0.46/mo)",
     ),
     "coach_vision": _row(
         owner="lambdas/coach/coach_vision.py",
