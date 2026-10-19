@@ -47,6 +47,7 @@ def _prompts():
         "coach-state-updater": EXTRACTION_SYSTEM_PROMPT,
         "daily-brief": daily_brief_shared_system({"date": "2026-10-10"}, {"active_goals": ["lose weight", "build strength"]}, 72, "B"),
         "charter-judge": charter,
+        "charter-judge-gate": charter,  # #5072
         "charter-narrative": charter,
         "charter-retro": charter,
     }

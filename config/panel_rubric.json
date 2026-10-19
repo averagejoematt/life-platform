@@ -1,0 +1,105 @@
+{
+  "_README": "#5072 (epic #5067): the panel rubric — a FIXED standard the training plan is graded against, one seat per school of the training charter's concession_ledger (the seat keys must equal the ledger's keys; tests/test_panel_rubric_5072.py holds it). Each criterion is graded by CODE (a named check in lambdas/training/panel_rubric.py CHECKS, ADR-105: deterministic computation before any model verdict) or by the JUDGE (lambdas/training/panel_judge.py, route charter.judge / charter.judge_gate) when code cannot check it. The concession each seat makes is READ from the charter at grade time, never copied here. The target (overall letter, every-seat floor) is the charter's panel_target. Hand-owned; a change is a new version with a change_log line.",
+  "version": "1.0.0",
+  "change_log": [
+    {"version": "1.0.0", "date": "2026-10-19", "issue": "#5072", "what": "the eight seats, 40 criteria (32 by code, 8 by the judge), the letter scale"}
+  ],
+  "scale": {"min": 0, "max": 10},
+  "letters": [
+    {"letter": "A", "min": 9.0},
+    {"letter": "A-", "min": 8.5},
+    {"letter": "B+", "min": 8.0},
+    {"letter": "B", "min": 7.0},
+    {"letter": "C", "min": 6.0},
+    {"letter": "D", "min": 5.0},
+    {"letter": "F", "min": 0.0}
+  ],
+  "overall_rule": "the overall score is the mean of the eight seat scores, mapped through `letters`; a seat score is the mean of its criteria; the target is met only when the overall letter reaches the charter's panel_target.overall AND every seat reaches panel_target.every_seat_at_least",
+  "calibration": {
+    "owner_graded_plans_required": 5,
+    "owner_grades": [],
+    "rule": "the judge is uncalibrated until the owner has graded this many plans by hand and the judge's seat scores sit within 1 point of his on each; every grade carries its calibration state"
+  },
+  "seats": {
+    "nippard": {
+      "school": "evidence-based hypertrophy (the Nippard school)",
+      "criteria": [
+        {"id": "double_progression", "by": "code", "check": "double_progression_with_reason", "text": "every lifting movement carries the double progression's verdict (step, hold, floor raise or re-entry) with its reason"},
+        {"id": "rep_ranges", "by": "code", "check": "rep_ranges_stated", "text": "working sets carry a rep range wide enough for double progression to run"},
+        {"id": "accessory_rotation", "by": "code", "check": "accessory_rotation_ok", "text": "the accessory layer rotates on the charter cadence instead of freezing"},
+        {"id": "priority_volume", "by": "code", "check": "priority_sets_in_landmarks", "text": "weekly hard sets for the priority muscles sit between MEV and MAV"},
+        {"id": "stretch_position", "by": "judge", "text": "each priority muscle gets at least one movement loaded in its lengthened (stretch) position, and the exercise choices are the high-stimulus, low-fatigue options for this trainee"}
+      ]
+    },
+    "athlean_x": {
+      "school": "Athlean-X (athletic, corrective)",
+      "criteria": [
+        {"id": "single_leg", "by": "code", "check": "single_leg_work", "text": "single-leg lower-body work appears at least twice a week"},
+        {"id": "carries", "by": "code", "check": "carries_weekly", "text": "loaded carries appear at least once a week"},
+        {"id": "corrective", "by": "code", "check": "corrective_work", "text": "corrective / posture work (face pulls, Pallof press, rear delts, rotator cuff) appears at least twice a week"},
+        {"id": "pull_push_balance", "by": "code", "check": "pull_push_balance", "text": "pulling volume at least matches pressing volume"},
+        {"id": "athletic_carryover", "by": "judge", "text": "the plan keeps some athletic carryover (multi-planar, unilateral, trunk stability) and does not read as machines-only bodybuilding"}
+      ]
+    },
+    "rp_israetel": {
+      "school": "Renaissance Periodization (Israetel)",
+      "criteria": [
+        {"id": "priority_volume", "by": "code", "check": "priority_sets_in_landmarks", "text": "weekly sets per priority muscle sit inside MEV-MAV"},
+        {"id": "mev_floors", "by": "code", "check": "mev_floors_every_template", "text": "the charter's MEV-floor muscles appear in every lifting session"},
+        {"id": "legs_maintenance", "by": "code", "check": "legs_at_maintenance_floor", "text": "legs are held at or above their maintenance floor (MEV)"},
+        {"id": "no_unrecorded_deload", "by": "code", "check": "no_unrecorded_deload", "text": "no deload is scheduled or applied without the owner's recorded word"},
+        {"id": "fatigue_management", "by": "judge", "text": "volume is distributed so per-session junk volume is avoided and fatigue is managed without a scheduled deload"}
+      ]
+    },
+    "sbs_nuckols": {
+      "school": "Stronger By Science (Nuckols)",
+      "criteria": [
+        {"id": "coded_progression", "by": "code", "check": "progression_rule_coded", "text": "the progression and stall rules are coded, not improvised"},
+        {"id": "anchors", "by": "code", "check": "anchors_every_lifting_day", "text": "every lifting day carries a tracked anchor lift"},
+        {"id": "strength_tripwire", "by": "code", "check": "strength_tripwire_live", "text": "the anchor-strength tripwire is evaluated, so muscle loss is caught early"},
+        {"id": "effort_by_rpe", "by": "code", "check": "effort_by_rpe", "text": "effort is prescribed by RPE on the lifting movements"},
+        {"id": "honest_claims", "by": "judge", "text": "numbers in the plan's reasons are stated with their basis (his own data vs population defaults); nothing claims more certainty than the evidence carries"}
+      ]
+    },
+    "galpin": {
+      "school": "Galpin (concurrent training)",
+      "criteria": [
+        {"id": "hard_easy_split", "by": "code", "check": "hard_easy_cardio_split", "text": "conditioning is split hard/easy with the charter's number of hard sessions"},
+        {"id": "cardio_dosed", "by": "code", "check": "cardio_dosed", "text": "every cardio block carries a dose: minutes, a level/speed/incline and an RPE or talk test"},
+        {"id": "fatigue_flags", "by": "code", "check": "fatigue_flags_present", "text": "weekly fatigue signals are wired into a deload recommendation"},
+        {"id": "steps_floor", "by": "code", "check": "steps_floor_carried", "text": "the daily step floor is carried by the plan"},
+        {"id": "interference", "by": "judge", "text": "hard conditioning is placed to limit interference with the heavy lower day and recovery"}
+      ]
+    },
+    "dan_john": {
+      "school": "Dan John (simple, fundamental)",
+      "criteria": [
+        {"id": "carries_or_kb", "by": "code", "check": "carries_or_kettlebell_weekly", "text": "carries or kettlebell work every week"},
+        {"id": "fundamental_patterns", "by": "code", "check": "fundamental_patterns", "text": "the week covers hinge, squat, push, pull and carry"},
+        {"id": "sustainable_length", "by": "code", "check": "sessions_within_cap", "text": "no session runs past the charter's lifting-minute cap"},
+        {"id": "anchors", "by": "code", "check": "anchors_every_lifting_day", "text": "the same few big lifts repeat across the week"},
+        {"id": "keep_the_goal", "by": "judge", "text": "the plan is simple enough to execute for months — the goal stays the goal, no novelty for its own sake"}
+      ]
+    },
+    "hollywood_transformation_trainer": {
+      "school": "Hollywood transformation trainer",
+      "criteria": [
+        {"id": "five_days", "by": "code", "check": "lifting_days_match", "text": "the charter's number of lifting days"},
+        {"id": "session_length", "by": "code", "check": "session_minutes_in_band", "text": "every lifting session sits inside the charter's lifting-minute band"},
+        {"id": "delts_frequency", "by": "code", "check": "delts_frequency", "text": "delts are trained the charter's number of times a week"},
+        {"id": "steps", "by": "code", "check": "steps_floor_carried", "text": "the step floor and target are carried every day"},
+        {"id": "the_frame", "by": "judge", "text": "the plan reads like a time-bound transformation: aesthetic priorities (delts, lats, upper chest, arms) get the emphasis and nothing in the week wastes the deadline"}
+      ]
+    },
+    "clinical_exercise_physiologist": {
+      "school": "clinical exercise physiologist",
+      "criteria": [
+        {"id": "effort_by_rpe", "by": "code", "check": "effort_by_rpe", "text": "effort is prescribed by RPE"},
+        {"id": "no_auto_deload", "by": "code", "check": "no_unrecorded_deload", "text": "no automatic deload; a deload only on the owner's word"},
+        {"id": "conditioning_by_rpe", "by": "code", "check": "conditioning_by_rpe", "text": "conditioning is prescribed by RPE or the talk test"},
+        {"id": "monitoring", "by": "code", "check": "recovery_tripwires_wired", "text": "the recovery, protein, strength and weight-stall tripwires are evaluated every week"},
+        {"id": "safe_dosing", "by": "judge", "text": "the week's total dose (lifting days, conditioning, steps) is sensible for fast loss, with warm-ups on the heavy lifts and the hardest work spread out"}
+      ]
+    }
+  }
+}

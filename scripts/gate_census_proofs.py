@@ -3586,3 +3586,52 @@ STRUCTURAL_HAND_PROOFS["structural::test_guidance_freshness_5059.py"] = {
     ),
     "proved_on": "2026-10-19",
 }
+
+
+# #5072 (2026-10-19): the panel rubric's regression gate over the golden plan cases. Proved on the lane
+# against the REAL tracked files, one plant at a time, each restored from a byte copy (md5 checked).
+GUARD_PROOFS.update(
+    {
+        "guard::scripts/panel_rubric_gate.py": {
+            "gate_name": "scripts/panel_rubric_gate.py",
+            "command": "python3 scripts/panel_rubric_gate.py --recorded ; python3 -m pytest tests/test_panel_rubric_5072.py -q -p no:cacheprovider   # baseline exit 0 (5 of 5 cases behaved); 11 passed",  # noqa: E501
+            "mutation": (
+                "M1 lambdas/training/panel_rubric.py check_cardio_dosed counts every cardio block as dosed (the check stops "
+                "discriminating). M2 scripts/panel_rubric_gate.py run()'s `return (1 if failed else 0), lines` -> `return 0, lines`. "
+                "M3 check_minutes_band's floor raised 10 min (`lo + 10 <= m`), which the good charter plan can no longer meet. "
+                "md5 panel_rubric.py 9bf6ab224fd1df207535b58ab963b501 and panel_rubric_gate.py 741f422370ad5f9f77da16cd6f3d6f00 "
+                "before and after each restore."
+            ),
+            "observed": (
+                "2026-10-19. M1: exit 1 — `FAIL neg_cardio_no_dose ... galpin.cardio_dosed scored 10.0`. M2: 1 failed / 10 passed "
+                "(test_the_gate_reds_when_a_check_stops_discriminating — the exit code stopped carrying the verdict). M3: exit 1 — "
+                "`FAIL good_charter_plan ... seats below 9: ['hollywood_transformation_trainer']`. RESTORED: exit 0, 11 passed."
+            ),
+            "scope": (
+                "Proves the recorded-mode gate reds on a control that slips a criterion it exists to fail, on a good plan that "
+                "drops below the charter's panel_target, and that the exit code carries the verdict. The --live judge path "
+                "(Bedrock, route charter.judge_gate) is not exercised here — the recorded replies stand in for it; its first live "
+                "run is the driver's after the owner applies the workflow + the Sonnet grant."
+            ),
+            "proved_on": "2026-10-19",
+        },
+    }
+)
+CI_PROOFS["ci::panel-rubric-gate.yml::gate::3"] = {
+    "gate_name": "gate / Recorded judge (gating, free)",
+    "command": 'bash -eo pipefail -c "$(the step\'s run: text read from .github/workflows/panel-rubric-gate.yml)"   # = python3 scripts/panel_rubric_gate.py --recorded; baseline exit 0',  # noqa: E501
+    "mutation": (
+        "The step's REAL `run:` text (read from the workflow YAML, unpiped) executed under `bash -eo pipefail`, with the "
+        "same plants as guard::scripts/panel_rubric_gate.py: M1 check_cardio_dosed counts every cardio block as dosed; M3 "
+        "check_minutes_band's floor raised 10 min. md5 panel_rubric.py 9bf6ab224fd1df207535b58ab963b501 before and after."
+    ),
+    "observed": (
+        "2026-10-19. M1: step exit 1 (`FAIL neg_cardio_no_dose ... galpin.cardio_dosed scored 10.0`). M3: step exit 1 "
+        "(`FAIL good_charter_plan ... seats below 9`). RESTORED: step exit 0."
+    ),
+    "scope": (
+        "Proves the step carries the script's verdict (no pipe, no `|| true`). It does not prove the path filter fires on "
+        "every #5072 Set member — that is a reading of the `paths:` list against the issue's enumeration, stated on the PR."
+    ),
+    "proved_on": "2026-10-19",
+}
