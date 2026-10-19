@@ -16,9 +16,9 @@ hands them in — it computes nothing of its own:
   run gate   (#5090) the same Hevy rows plus ONE Strava read feed `shared_quantities.walking_layer` (THE walking
              definition) for each of the gate's walking weeks — the walking modality's hours — and each week's
              lower-leg pain flag (a pain-lexicon note naming a lower-leg site, `training.training_notes` +
-             `training.steps_ramp.is_lower_leg`); a lower-leg pain note in the 14 days before the Sunday is the
-             hold. Owner dismissals are not read here (the plan's steps ramp reads them); an unread source is
-             None, never a pain-free week.
+             `training.steps_ramp.is_lower_leg`); a lower-leg pain note inside the steps ramp's quiet period
+             (`steps_ramp.RELEASE_QUIET_DAYS`) before the Sunday is the hold. Owner dismissals are not read
+             here (the plan's steps ramp reads them); an unread source is None, never a pain-free week.
 
 THE WRITE. `nightly_leg()` rides the nightly pre-draft run (`mcp.nightly_predraft.lambda_entry`,
 02:00Z): it rebuilds the newest COMPLETED Monday-Sunday week (with the week before it, for the
@@ -146,6 +146,7 @@ def _lower_leg_pain(hevy: Optional[list], start: str, end: str) -> Optional[bool
 def running_inputs(sunday: str, strava: Optional[list], hevy: Optional[list]) -> dict[str, Any]:
     """The run gate's walking weeks (newest first) and hold for the week ending `sunday`, from rows already read."""
     from training import run_onramp
+    from training.steps_ramp import RELEASE_QUIET_DAYS
 
     from mcp import shared_quantities
 
@@ -161,7 +162,7 @@ def running_inputs(sunday: str, strava: Optional[list], hevy: Optional[list]) ->
         layer = shared_quantities.walking_layer(end, days=7, today=mt.shift(sunday, 1), read=_slice)
         hours = None if not layer or layer.get("total_hr") is None else float((layer.get("by_modality") or {}).get("walking") or 0.0)
         walking_weeks.append({"week_start": mt.shift(end, -6), "hours": hours, "pain_flag": _lower_leg_pain(hevy, mt.shift(end, -6), end)})
-    recent = _lower_leg_pain(hevy, mt.shift(sunday, -13), sunday)
+    recent = _lower_leg_pain(hevy, mt.shift(sunday, -(RELEASE_QUIET_DAYS - 1)), sunday)  # the steps ramp's quiet period
     return {
         "walking_weeks": walking_weeks,
         "holds": None if recent is None else ([f"strain_flag:lower_leg_note_14d_to_{sunday}"] if recent else []),
@@ -172,6 +173,7 @@ def compute_weeks(last_monday: str, weeks: int = 4) -> list[dict[str, Any]]:
     """`weeks` completed tracker rows ending with the week of `last_monday`, oldest first; each row's
     triggers read the row before it (the first reads none)."""
     from training.muscle_volume import normalize_hevy_items, working_sets_by_muscle
+    from training.run_onramp import running
     from training.steps_resolver import steps_range
 
     from mcp import core
@@ -185,8 +187,6 @@ def compute_weeks(last_monday: str, weeks: int = 4) -> list[dict[str, Any]]:
     mrows, m_err = _read(core.query_source, "measurements", "2000-01-01", last_sunday)
     srange, s_err = _read(steps_range, first, last_sunday, fetch=_steps_fetch, derived=False)
     hevy, h_err = _read(_read_hevy_all_phases, mt.shift(first, -ANCHOR_LOOKBACK_DAYS), last_sunday)
-    from training.run_onramp import running
-
     # the run gate's walking weeks reach `gated_movements.running.walking_weeks` before the oldest tracked Sunday
     strava, st_err = _read(core.query_source_range, "strava", mt.shift(first, -7 * int(running().get("walking_weeks") or 0)), last_sunday)
     items = list((hevy or ([], []))[0] or [])
