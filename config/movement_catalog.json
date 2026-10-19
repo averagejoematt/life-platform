@@ -9,13 +9,13 @@
     "history_through": "2026-10-18",
     "workouts": 518,
     "distinct_templates": 538,
-    "entries": 541,
+    "entries": 543,
     "reviewed": 26,
-    "coach_added": 0,
+    "coach_added": 2,
     "generated": 515,
     "entries_by_skill_tier": {
-      "1": 277,
-      "2": 196,
+      "1": 278,
+      "2": 197,
       "3": 68
     },
     "entries_by_anchor_family": {
@@ -13070,6 +13070,60 @@
       "first_done": "2025-02-13",
       "last_done": "2025-02-13",
       "anchor_family": null
+    },
+    "pike_pushup": {
+      "title": "Pike Pushup",
+      "hevy_template_id_hint": "0EFE8162",
+      "primary_muscle": "shoulders",
+      "secondary_muscles": [
+        "triceps"
+      ],
+      "volume_muscle": "Shoulders",
+      "hevy_primary_muscle_group": "shoulders",
+      "hevy_type": "reps_only",
+      "is_custom": false,
+      "skill_tier": 2,
+      "skill_tier_source": "coach_added: the press loads most of the bodyweight onto the shoulders, so tier 2 by hand (#5088)",
+      "joint_friendly_score": 2,
+      "default_rep_range": {
+        "start": 6,
+        "end": 10
+      },
+      "equipment": "none",
+      "provenance": "coach_added",
+      "reviewed": false,
+      "sessions": 0,
+      "first_done": null,
+      "last_done": null,
+      "anchor_family": null,
+      "notes": "coach_added for the #5088 bodyweight travel variants (owner ruling 2026-10-18); template id from the Hevy template index built 2026-10-18"
+    },
+    "single_leg_glute_bridge": {
+      "title": "Single Leg Glute Bridge",
+      "hevy_template_id_hint": "CBC0D834",
+      "primary_muscle": "glutes",
+      "secondary_muscles": [
+        "hamstrings"
+      ],
+      "volume_muscle": "Glutes",
+      "hevy_primary_muscle_group": "glutes",
+      "hevy_type": "reps_only",
+      "is_custom": false,
+      "skill_tier": 1,
+      "skill_tier_source": "hevy_equipment:none",
+      "joint_friendly_score": 3,
+      "default_rep_range": {
+        "start": 10,
+        "end": 15
+      },
+      "equipment": "none",
+      "provenance": "coach_added",
+      "reviewed": false,
+      "sessions": 0,
+      "first_done": null,
+      "last_done": null,
+      "anchor_family": null,
+      "notes": "coach_added for the #5088 bodyweight travel variants (owner ruling 2026-10-18); template id from the Hevy template index built 2026-10-18"
     }
   }
 }

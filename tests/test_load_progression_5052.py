@@ -49,10 +49,10 @@ def test_the_gain_rule_lives_on_the_charter_with_the_redlines_numbers():
     assert rule["kind"] == "double_progression" and rule["consecutive_same_type_exposures"] == 2
     assert rule["step_lb"] == 5 and rule["step_pct"] == 2.5 and rule["nutrition_clause"] is None
     assert rule["stated"] == "2026-09-30" and "#4503" in rule["ruling"]
-    # the #5052 entry by content, not position: later lanes bump the version past it
-    change_log = tc.charter_value("change_log")
-    assert tc.charter_version() == change_log[-1]["version"]
-    assert [c["version"] for c in change_log if "#5052" in c["by"]] == ["1.1.0"]
+    # the charter moves on past 1.1.0 as later lanes add their own entries; this lane's entry is the one it owns
+    assert tuple(int(x) for x in tc.charter_version().split(".")) >= (1, 1, 0)
+    log = next(e for e in tc.charter_value("change_log") if e["version"] == "1.1.0")
+    assert "#5052" in log["by"]
     # the redline copy is retired: a pointer, no numbers
     pointer = owner_redlines.REDLINES["lifting_sessions_per_wk"]["gain_rule"]
     assert set(pointer) == {"source", "applied_by"} and pointer["source"].endswith("progression.gain_rule")

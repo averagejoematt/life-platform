@@ -20,7 +20,7 @@ packet the callers above send, and calls no model, so it has no budget feature a
 
 CACHING (``ai.prompt_cache.CACHING_DECISIONS``, entries ``charter-*``): all three send the
 owner-only charter block (``published=False``) as the cached system prefix — measured on the
-wire at 5,431 tokens on Haiku 4.5 (floor 4,096) — with the per-call material in a second,
+wire at 7,738 tokens on Haiku 4.5 (charter v1.3.0) (floor 4,096) — with the per-call material in a second,
 uncached block (``system_blocks``). A cache write is only worth paying when a second call
 reads it inside the TTL, so each caller issues its calls BACK-TO-BACK in one run: the judge
 and the retro one call per panel seat (the charter's concession-ledger schools), the

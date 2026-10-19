@@ -94,6 +94,7 @@ class GeneratorInputs:
         add_load_enabled: bool = False,  # SSM gate — default false until N>=30
         block_workouts: list[dict[str, Any]] | None = None,  # #4110: Hevy rows since the program's block start; None = read it here
         deload_records: list[dict[str, Any]] | None = None,  # #5070: the owner's recorded deload words; None = read it here (fail-soft)
+        disruption_records: list[dict[str, Any]] | None = None,  # #5088: his disruption-mode records; None = read it here (fail-soft)
     ) -> None:
         self.target_date = target_date
         self.recovery_tier = recovery_tier
@@ -105,6 +106,7 @@ class GeneratorInputs:
         self.add_load_enabled = add_load_enabled
         self.block_workouts = block_workouts
         self.deload_records = deload_records
+        self.disruption_records = disruption_records
 
 
 def _archetype_for_date(target_date: str, week_cfg: dict[str, Any]) -> str:
@@ -120,8 +122,8 @@ def _schedule_entry_for_date(
     deload_records: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The whole schedule entry for the day. #3755: the module grid carries a key the JSON grid
-    never had — `session_role` (v0.4: upper_heavy / lower_heavy / upper_volume / lower_volume,
-    #4147) — which routes the day to the program's session and rides on the rationale and title.
+    never had — `session_role` (the five roles of the charter's split, #5069; v0.4's four, #4147) —
+    which routes the day to the program's session and rides on the rationale and title.
 
     #4110 (replacing #4064's weekday calendar): when the seam served the MODULE grid
     (`source == "module"`, i.e. the program is ACTIVE), the session SEQUENCE answers first —
@@ -820,6 +822,14 @@ def _load_note_indexes(
     return history_index, weight_index, cardio_index, whoop_index
 
 
+def _disruption_mode(inputs: GeneratorInputs) -> dict[str, Any]:
+    """#5088: the owner's disruption mode on the target day — injected records, else one fail-soft read (no record = off)."""
+    from training import disruption
+
+    records = inputs.disruption_records if inputs.disruption_records is not None else disruption.load_records_failsoft()
+    return disruption.state(records, inputs.target_date)
+
+
 def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     """Returns 1-3 RoutineSpec IR records (ideal, floor, optional re-entry).
 
@@ -842,9 +852,13 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     if archetype in ("rest", "aerobic", "mobility"):
         # Non-lifting day — return a minimal placeholder ideal + floor.
         return _non_lifting_pair(inputs, archetype, week_cfg, landmarks, catalog, day_entry=day_entry)
+    if day_entry.get("session_role") and (mode := _disruption_mode(inputs)).get("phase") != "off":
+        from training import disruption  # #5088: his switched-on mode (or its step-back-up week) serves the short session
+
+        return disruption.routines(inputs.target_date, day_entry["session_role"], mode, catalog, int(week_cfg.get("skill_ceiling", 2)))
     if day_entry.get("session_role") in program_structure.SESSION_TEMPLATES:
-        # #4064/#4147 — a program role (v0.4: upper/lower heavy/volume) is the program's session
-        # (anchors at heavy/moderate/volume, fixed accessories, the #4161 deload at the later of week 6 or the block lock),
+        # #4064/#4147/#5069 — a program role (the five-day split's) is the program's session
+        # (anchors at heavy/moderate/volume, fixed accessories, the deload only on the owner's recorded word — #5070),
         # not a muscle-budget session with a role label on it. Only the module grid carries a
         # `session_role`; the JSON grid's upper/lower days still take the muscle-budget path.
         from training.full_body_session import full_body_routines

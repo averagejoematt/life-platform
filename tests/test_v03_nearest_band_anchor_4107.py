@@ -158,6 +158,8 @@ def _completed(n: int) -> list[dict]:
                 "exercises": [
                     {"name": "Lat Pulldown (Cable)", "sets": [{"type": "normal", "weight_kg": 50, "reps": 8}]},
                     {"name": "Leg Press", "sets": [{"type": "normal", "weight_kg": 90, "reps": 5}]},
+                    # #5069: a delt set, so the generic session also matches shoulders+arms
+                    {"name": "Lateral Raise (Dumbbell)", "sets": [{"type": "normal", "weight_kg": 10, "reps": 12}]},
                 ],
             }
         )
@@ -278,8 +280,9 @@ def test_a_this_cycle_anchor_ramps_from_the_undiscounted_load():
 def test_the_discount_decision_is_fixed_for_the_program_not_re_aged_each_session():
     """Week 9 reads the SAME discount ruling as week 1 — an age measured to the session date
     would discount the 09-20 anchor from late October and cut the load mid-ramp."""
-    # #4161: hybrid weeks (4 sessions AND >= 7 days) — lifting daily, index 59 (11-22) is week 9's upper-heavy
-    w9 = _generate("2026-11-22", weights={**WEIGHTS, "2026-11-21": 314.0}, block_workouts=_completed(59))[0].inputs_snapshot["load_floors"][
+    # #4161: hybrid weeks (the cycle AND >= 7 days) — lifting daily, week 9 opens 11-19; #5069: past the cut-over the
+    # five-day order runs, and index 58 (11-21) is week 9's upper-heavy
+    w9 = _generate("2026-11-21", weights={**WEIGHTS, "2026-11-20": 314.0}, block_workouts=_completed(58))[0].inputs_snapshot["load_floors"][
         "movements"
     ]["lat_pulldown"]
     assert w9["ramp"]["week"] == 9 and w9["ramp"]["discount_pct"] == 0

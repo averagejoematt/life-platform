@@ -20,8 +20,15 @@ logger = logging.getLogger("tools_hevy_routine")
 
 
 def draft_cardio_warnings(blocks: list[Any], archetype: str, target_date: str) -> list[str]:
-    """One warning per timed weight-bearing block the pick would not have drafted."""
-    from training import recent_aerobic
+    """One warning per timed weight-bearing block the pick would not have drafted — after one per break of the charter's
+    session shape (#5069, owner ruling 5: lifting minutes, ONE cardio block, the cardio and stretching caps). The chat path
+    flags; the generator enforces (`program_structure.enforce_session_shape`)."""
+    from training import program_structure, recent_aerobic
+
+    shape = [
+        f"session shape: {w} — allowed for a custom session, just flagging (#5069)"
+        for w in program_structure.session_shape_problems(blocks, {})
+    ]
 
     timed_wb = [
         b
@@ -30,18 +37,18 @@ def draft_cardio_warnings(blocks: list[Any], archetype: str, target_date: str) -
         and recent_aerobic._hevy_modality(str(getattr(b, "movement_key", "")).replace("_", " ")) in recent_aerobic.WEIGHT_BEARING
     ]
     if not timed_wb:
-        return []
+        return shape
     try:
         from mcp import shared_quantities
 
         pick = recent_aerobic.cardio_pick(shared_quantities.recent_aerobic_layer(target_date), archetype, target_date)
     except Exception as e:  # noqa: BLE001 — named, never a lost draft
-        return [f"cardio: the recent-aerobic pick could not be computed ({type(e).__name__}) — the modality is unchecked (#4387)"]
+        return shape + [f"cardio: the recent-aerobic pick could not be computed ({type(e).__name__}) — the modality is unchecked (#4387)"]
     if pick["movement_key"] == "treadmill":
-        return []
+        return shape
     # #5000: under a standing constraint the pick carries the talk test, never an HR number
     how = pick.get("intensity") or f"HR avg ≤ {pick['hr_ceiling_bpm']} bpm, target {pick['hr_target_bpm']}"
-    return [
+    return shape + [
         f"cardio: {b.movement_key} drafted, but the pick from the last 3 days is {pick['modality']} ({how}) — "
         f"{pick['reason']}. Stage 2's joints_tendons critic swaps it when the legs are loaded (#4387)."
         for b in timed_wb

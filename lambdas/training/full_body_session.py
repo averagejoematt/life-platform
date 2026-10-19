@@ -1,8 +1,8 @@
 """full_body_session.py — the program's session for one role, as IR (#4064; v0.4 #4147).
 
 The module name is v0.3's (full body, superseded 2026-09-24); it now builds whatever the ACTIVE
-program's role is — under v0.4, upper_heavy / lower_heavy / upper_volume / lower_volume, with
-archetype `upper` / `lower` and the Upper / Lower Hevy folders.
+program's role is — since #5069 the five roles of the charter's split (upper_heavy / lower_heavy /
+shoulders_arms / upper_volume / lower_volume), archetype `upper` / `lower`, the Upper / Lower Hevy folders.
 
 `routine_generator.generate_routines` hands a day here when the schedule entry carries a
 program role (`program_structure.SESSION_TEMPLATES`). Split out of `routine_generator` so
@@ -146,6 +146,38 @@ def _back_offs_then_warmups(
     return warmup_sets.attach_and_note(blocks, movements, rationale)
 
 
+def _sequence_line(day_entry: dict[str, Any]) -> str:
+    """The rationale line naming where the session came from: the sequence position (and what advanced it), or the weekday grid."""
+    if day_entry.get("source") != "session_sequence":
+        return f"weekday grid: {day_entry.get('label')}"
+    adv = day_entry.get("advanced_by")
+    return f"session sequence: {day_entry['position_label']}, block {day_entry['block']}" + (
+        f"; advanced by {adv['date']} {adv.get('title') or ''} ({adv['was']})".rstrip() if adv else "; the first session of the program"
+    )
+
+
+def _fit_session_shape(
+    blocks: list[ExerciseBlock], rx: dict[str, Any], caps: dict[str, Any], load_catalog: dict[str, Any], rationale: list[str]
+) -> dict[str, Any]:
+    """#5069 (owner ruling 5): ONE lifting-minute estimate (sets as written, warm-ups included, x set time + rest) and the
+    charter's session shape — one cardio block and the stretching cut to their caps (`program_structure.enforce_session_shape`).
+    The lifting minutes were fitted upstream (`session_prescription_for_role` trims accessories first); an overrun that
+    survives is flagged, never cut from the anchors."""
+    shape = program_structure.enforce_session_shape(blocks, load_catalog.get("movements") or {})
+    rationale += [f"session shape: {a}" for a in shape["actions"]]
+    t = rx.get("time_trim") or {}
+    if t.get("dropped_accessories"):
+        rationale.append(
+            f"time: ~{t['estimate_before_min']} min > the {t['cap_minutes']}-min lifting cap — dropped "
+            f"{', '.join(map(str, t['dropped_accessories']))} (accessories first) -> ~{t['estimate_after_min']} min"
+        )
+    if shape["lifting_minutes"] > caps["session_minutes"]:
+        rationale.append(
+            f"OVER the {caps['session_minutes']}-min lifting cap at ~{shape['lifting_minutes']} min — anchors are never cut for time; flagged"
+        )
+    return shape
+
+
 def _session_loads(
     blocks: list[ExerciseBlock],
     load_catalog: dict[str, Any],
@@ -205,18 +237,7 @@ def full_body_routines(
         f"week grid source={resolved_week.source} ({resolved_week.detail})",
         f"archetype={archetype}; program=v{program_structure.PROGRAM_VERSION}; session_role={role}; autoreg={autoreg:.2f} (recovery={inputs.recovery_tier}, acwr={inputs.acwr_flag})",
     ]
-    if day_entry.get("source") == "session_sequence":
-        adv = day_entry.get("advanced_by")
-        rationale.append(
-            f"session sequence: {day_entry['position_label']}, block {day_entry['block']}"
-            + (
-                f"; advanced by {adv['date']} {adv.get('title') or ''} ({adv['was']})".rstrip()
-                if adv
-                else "; the first session of the program"
-            )
-        )
-    else:
-        rationale.append(f"weekday grid: {day_entry.get('label')}")
+    rationale.append(_sequence_line(day_entry))
     if deload and rx.get("deload_trim"):
         t = rx["deload_trim"]
         rationale.append(f"deload: sets {t['sets_before']} -> {t['sets_after']} ({t['pct']}%), loads held")
@@ -266,8 +287,8 @@ def full_body_routines(
     }
     total_sets = sum(warmup_sets.working_set_count(b.sets) for b in blocks)
     assert total_sets <= caps["total_sets"], f"BUG: total_sets {total_sets} > cap {caps['total_sets']}"
-    est_minutes = total_sets * 3 + len(blocks) * 2
-    assert est_minutes <= caps["session_minutes"], f"BUG: est_minutes {est_minutes} > cap {caps['session_minutes']}"
+    shape = _fit_session_shape(blocks, rx, caps, load_catalog, rationale)  # #5069: the charter's session shape
+    est_minutes = shape["lifting_minutes"]
 
     budget_used: dict[str, int] = {}
     for b in blocks:
@@ -300,7 +321,13 @@ def full_body_routines(
         exercises=blocks,
         budget_used=budget_used,
         inputs_snapshot=_build_inputs_snapshot(inputs, landmarks, catalog)
-        | {"load_floors": load_floors, "session_prescription": rx, "calendar": calendar_snapshot, "warmups": warmups},
+        | {
+            "load_floors": load_floors,
+            "session_prescription": rx,
+            "calendar": calendar_snapshot,
+            "warmups": warmups,
+            "session_shape": shape,
+        },
         rationale=rationale,
         caps=caps,
     )

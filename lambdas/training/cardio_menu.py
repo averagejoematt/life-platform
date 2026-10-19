@@ -128,10 +128,10 @@ def interval_set() -> tuple[int, int, int]:
 
 
 def lower_names() -> set[str]:
-    """The lower sessions' names, lower-cased: every `split.sequence` name that says 'lower', plus the
-    generic archetypes the generator writes ('lower', 'legs')."""
+    """The lower sessions' names, lower-cased: every `split.sequence` name that opens with 'lower' (#5069),
+    plus the generic archetypes the generator writes ('lower', 'legs')."""
     seq = training_charter.charter_value("split.sequence", []) or []
-    return {str(s).strip().lower() for s in seq if "lower" in str(s).lower()} | {"lower", "legs"}
+    return {str(s).strip().lower() for s in seq if str(s).strip().lower().startswith("lower")} | {"lower", "legs"}
 
 
 def is_lower(archetype: Any) -> bool:
