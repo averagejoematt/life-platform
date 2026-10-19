@@ -147,7 +147,7 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/operational/pipeline_health_check_lambda.py::lambda_handler": 154,
     "lambdas/training/full_body_session.py::full_body_routines": 160,
     "lambdas/training/plan_engine.py::_tripwire_states": 253,
-    "lambdas/training/plan_engine.py::constraint_block": 276,  # 283 -> 276 (#5068: the critics stub extracted, the charter stamp added)
+    "lambdas/training/plan_engine.py::constraint_block": 242,  # 283 -> 276 (#5068) -> 242 (#5070: the reference block extracted, the deload recommendation added)
     "lambdas/web/recap_card_lambda.py::render_for_date": 190,
     "lambdas/web/site_api_ai_lambda.py::_handle_board_followup": 181,
     "lambdas/web/site_api_body.py::vitals": 174,
@@ -181,7 +181,7 @@ FUNCTION_LENGTH_COUNTS = {
     "mcp/tools_lifestyle.py::tool_create_experiment": 207,
     "mcp/tools_lifestyle.py::tool_get_experiment_results": 166,
     "mcp/tools_nutrition.py::tool_get_deficit_sustainability": 211,
-    "mcp/tools_plan.py::tool_plan_next_session": 236,
+    "mcp/tools_plan.py::tool_plan_next_session": 229,  # 236 -> 229 (#5070: the pain-scope status extracted, the deload-word read added)
     "mcp/tools_training.py::_get_training_periodization": 296,
     "mcp/tools_training.py::_get_training_recommendation": 361,
     "scripts/apply_branch_protection.py::main": 165,

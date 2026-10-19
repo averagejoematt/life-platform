@@ -91,7 +91,7 @@ FATIGUE_PROVENANCE: dict[str, Any] = {
         "Sports Med Open doi:10.1186/s40798-024-00691-y; a loaded-day streak is not a validated fatigue signal (Kataoka 2022 "
         "Sports Med 52(1):25; Yang 2018 Front Physiol 9:725)"
     ),
-    "response": "−30 % sets, loads held, ONE session, then re-test — the owner's signed cut (v3), unchanged",
+    "response": "−30 % sets, loads held, ONE session, then re-test — RECOMMENDED only (#5070, owner ruling 2026-10-18): never applied without his recorded word",
     "approved": "owner, 2026-09-24 (the red team's recommendation)",
     "issue": ISSUE,
 }

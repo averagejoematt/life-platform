@@ -75,7 +75,6 @@ TRAINING_CHARTER_RESIDUE = {
     "lambdas/training/owner_redlines.py::effort_ceiling_rpe": 1,
     "lambdas/training/owner_redlines.py::movement_gate_lb": 7,
     "lambdas/training/owner_redlines.py::rate_band": 6,
-    "lambdas/training/owner_redlines.py::scheduled_deload_week": 2,
     "lambdas/training/owner_redlines.py::sequence_names": 1,
     "lambdas/training/owner_redlines.py::session_minutes": 1,
     "lambdas/training/owner_redlines.py::volume_band_sets": 1,

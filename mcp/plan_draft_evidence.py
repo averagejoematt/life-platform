@@ -122,12 +122,18 @@ def _exposure_history(sessions: list[dict[str, Any]], target_date: str) -> dict[
 
 
 def attach_fatigue_inputs(
-    evidence: dict[str, Any] | None, *, readiness_low_streak_days: int | None, block_workouts: list | None, target_date: str
+    evidence: dict[str, Any] | None,
+    *,
+    readiness_low_streak_days: int | None,
+    block_workouts: list | None,
+    target_date: str,
+    deload_records: list | None = None,
 ) -> None:
     """#4161: stamp the evidence with what the joints critic's fatigue trigger reads — the session role of
     every completed session (THE ledger, `session_sequence`), the readiness streak, each drafted lift's
     same-role performance trend and consecutive-session soreness, and the 48 h same-region read. Pure over
-    reads already made; a None block record leaves every role-dependent input unknown, never clear."""
+    reads already made; `deload_records` (the owner's recorded word, #5070) is what makes the served session a deload;
+    a None block record leaves every role-dependent input unknown, never clear."""
     if evidence is None:
         return
     from coach import critics_fatigue
@@ -135,7 +141,11 @@ def attach_fatigue_inputs(
 
     done = session_sequence.completed_positions(block_workouts, target_date) if block_workouts is not None else None
     role_by_date = {p["date"]: p["session_role"] for p in done} if done is not None else None
-    served = session_sequence.next_session(target_date, block_workouts) if target_date >= session_sequence.block_start() else None
+    served = (
+        session_sequence.next_session(target_date, block_workouts, deload_records)
+        if target_date >= session_sequence.block_start()
+        else None
+    )
     role = (served or {}).get("session_role")
     session_dates = sorted(role_by_date) if role_by_date is not None else []
     perf, sore = {}, {}
@@ -150,7 +160,11 @@ def attach_fatigue_inputs(
         soreness_by_idx=sore,
         same_region=critics_fatigue.same_region_recent(block_workouts, target_date, region),
         # #4161 review: inside the deload window the larger cut is taken, never both
-        deload_sets_pct=(served or {}).get("deload_plan", {}).get("sets_pct") if (served or {}).get("deload") else None,
+        deload_sets_pct=(
+            ((served or {}).get("deload_recommendation") or {}).get("applied_on", {}).get("sets_pct")
+            if (served or {}).get("deload")
+            else None
+        ),
     )
     evidence["fatigue"]["performance"] = {i: p for i, p in perf.items() if p.get("state") != "insufficient"}
 

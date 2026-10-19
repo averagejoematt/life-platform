@@ -243,6 +243,14 @@ def _pain_dismissals() -> list[dict[str, Any]]:
     return _dismissal_records()
 
 
+def _deload_records() -> list[dict[str, Any]]:
+    """The owner's recorded deload words (#5070), read from the SAME module that writes them (like `_pain_dismissals`).
+    A raise propagates — `_read` reports it `read_failed`, never as "no deload word on file"."""
+    from mcp.tools_training_notes import _deload_records as read
+
+    return read()
+
+
 def _training_memory_constraints() -> list[dict[str, Any]]:
     """Standing training constraints written from chat (the RDL gate, a toe flag, a back
     flag — #4077) via `write_platform_memory(category='training')`. Read through the SAME
@@ -475,6 +483,35 @@ def _weight_of(reference: Any, ref_status: dict[str, Any]) -> tuple[float | None
     return weight, plan_engine.input_status(plan_engine.ABSENT, "the benchmark carried no current_weight")
 
 
+def _pain_scope_of(
+    performed: dict[str, Any] | None, performed_status: dict[str, Any], layer_status: str, target_date: str, status: dict[str, Any]
+) -> dict[str, Any]:
+    """The stage-1 pain-evidence scope, and its input status stamped onto `status` (#4051/#4072) — extracted from
+    `tool_plan_next_session` for the #4880 function-length ratchet (#5070)."""
+    from training.plan_engine import ABSENT, MEASURED, READ_FAILED, input_status as st
+
+    pain_scope = (performed or {}).get("scope") or {
+        "status": READ_FAILED if performed_status["state"] == READ_FAILED else "none",
+        "source": "hevy",
+        "movements_considered": None,
+        "note_layer_status": layer_status,
+        "error": performed_status.get("error"),
+        "reason": (
+            f"the Hevy partition could not be read for {_minus_days(target_date, PAIN_LOOKBACK_DAYS)}..{target_date} — "
+            "the performed-movement set is unknown, not empty"
+            if performed_status["state"] == READ_FAILED
+            else "the performed-movement reader returned no scope"
+        ),
+    }
+    if performed_status["state"] == READ_FAILED:
+        status["pain_evidence_scope"] = performed_status
+    elif pain_scope.get("status") == "read":
+        status["pain_evidence_scope"] = st(MEASURED, pain_scope.get("reason"))
+    else:
+        status["pain_evidence_scope"] = st(ABSENT, pain_scope.get("reason"))
+    return pain_scope
+
+
 def tool_plan_next_session(args):
     """Stage 1: the deterministic constraint block (#3751). Stage 2, with `routine_id`: the
     four critics over disjoint evidence, verdicts stored on the draft (#3752)."""
@@ -603,6 +640,11 @@ def tool_plan_next_session(args):
     if dismissals == [] and status["pain_dismissals"]["state"] != READ_FAILED:
         status["pain_dismissals"] = st(ABSENT, "no owner dismissal on file")
 
+    # #5070: the owner's recorded deload word — a deload applies ONLY when one covers the day.
+    deload_records, status["deload_records"] = _read("deload_records", _deload_records)
+    if deload_records == [] and status["deload_records"]["state"] != READ_FAILED:
+        status["deload_records"] = st(ABSENT, "no owner deload word on file")
+
     # #4077: standing training constraints (RDL gate, toe flag, back flag, …) written from
     # chat via write_platform_memory(category='training') — the durable home that category
     # used to reject outright.
@@ -627,25 +669,7 @@ def tool_plan_next_session(args):
     # draft's rows below. A raise is reported `read_failed` with its error class (#4072) —
     # never as "he performed nothing", and never as a bare unknown.
     performed, performed_status = _read("pain_evidence_scope", _gather_performed_evidence, target_date, layer_status)
-    pain_scope = (performed or {}).get("scope") or {
-        "status": READ_FAILED if performed_status["state"] == READ_FAILED else "none",
-        "source": "hevy",
-        "movements_considered": None,
-        "note_layer_status": layer_status,
-        "error": performed_status.get("error"),
-        "reason": (
-            f"the Hevy partition could not be read for {_minus_days(target_date, PAIN_LOOKBACK_DAYS)}..{target_date} — "
-            "the performed-movement set is unknown, not empty"
-            if performed_status["state"] == READ_FAILED
-            else "the performed-movement reader returned no scope"
-        ),
-    }
-    if performed_status["state"] == READ_FAILED:
-        status["pain_evidence_scope"] = performed_status
-    elif pain_scope.get("status") == "read":
-        status["pain_evidence_scope"] = st(plan_engine.MEASURED, pain_scope.get("reason"))
-    else:
-        status["pain_evidence_scope"] = st(ABSENT, pain_scope.get("reason"))
+    pain_scope = _pain_scope_of(performed, performed_status, layer_status, target_date, status)
     rows = _union_evidence_rows((performed or {}).get("exercises") or [], (evidence or {}).get("exercises") or [])
     flagged = [r for r in rows if r.get("pain_flag_any")]
 
@@ -695,7 +719,13 @@ def tool_plan_next_session(args):
     if block_workouts == [] and status["block_workouts"]["state"] != READ_FAILED:
         status["block_workouts"] = st(ABSENT, "no Hevy session since the program's block start")
 
-    attach_fatigue_inputs(evidence, readiness_low_streak_days=readiness_streak, block_workouts=block_workouts, target_date=target_date)
+    attach_fatigue_inputs(
+        evidence,
+        readiness_low_streak_days=readiness_streak,
+        block_workouts=block_workouts,
+        target_date=target_date,
+        deload_records=deload_records,
+    )
     block = plan_engine.constraint_block(
         date=target_date,
         catalog_movements=catalog_movements,
@@ -750,6 +780,8 @@ def tool_plan_next_session(args):
         hevy_workouts_prescription_window=prescription_rows,
         block_workouts=block_workouts,
         training_memory_constraints=training_memory,
+        deload_records=deload_records,
+        fatigue=(evidence or {}).get("fatigue"),
         recent_aerobic=recent_aerobic,
         loss_rate=loss_rate,
         input_status=status,

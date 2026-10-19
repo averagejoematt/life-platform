@@ -392,10 +392,11 @@ def test_the_seam_is_the_function_stage_1_uses():
         patch("mcp.plan_helpers._catalog_and_ceiling", return_value=({"m": {}}, 3)),
         patch("mcp.plan_hevy_windows._block_workouts", return_value=done) as reader,
         patch("training.plan_engine._scheduled_session", return_value=LIFTING) as picker,
+        patch("training.deload_gate.load_records_failsoft", return_value=[]),  # #5070: his recorded word rides in
     ):
         assert npd.scheduled_session(TARGET) is LIFTING
     reader.assert_called_once_with(TARGET)
-    picker.assert_called_once_with(TARGET, {"m": {}}, 3, done)
+    picker.assert_called_once_with(TARGET, {"m": {}}, 3, done, [])
 
 
 def test_an_unread_sequence_record_is_named_never_a_silent_session_one():

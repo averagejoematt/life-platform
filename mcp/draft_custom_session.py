@@ -72,7 +72,7 @@ def resolve_program_session(target_date: str, block_workouts: list[dict[str, Any
     when the date is not a program session (program inactive, before the block start, a
     non-lifting role, or the sequence unreadable). The engine's own inputs: the catalog, the
     week grid's skill ceiling and the in-block record (`planned_session`)."""
-    from training import program_structure
+    from training import deload_gate, program_structure
     from training.program_seam import resolve_week_grid
     from training.routine_generator import _load_json
 
@@ -84,6 +84,7 @@ def resolve_program_session(target_date: str, block_workouts: list[dict[str, Any
         block_workouts=block_workouts,
         catalog_movements=(_load_json("movement_catalog.json") or {}).get("movements") or {},
         skill_ceiling=int(week.get("skill_ceiling", 2)),
+        deload_records=deload_gate.load_records_failsoft(),  # #5070: a deload applies only on his recorded word
     )
     if planned.get("source") != "session_sequence" or not planned.get("prescription"):
         return None

@@ -128,9 +128,9 @@ def _schedule_entry_for_date(
     grid (v0.2 / any inactive program) never consults the sequence."""
     dow = date.fromisoformat(target_date).weekday()
     if source == "module":
-        from training import session_sequence
+        from training import deload_gate, session_sequence
 
-        seq = session_sequence.next_session(target_date, block_workouts)
+        seq = session_sequence.next_session(target_date, block_workouts, deload_gate.load_records_failsoft())  # #5070: his word
         if seq is not None and seq.get("source") == "session_sequence":
             return seq
         if seq is not None:
