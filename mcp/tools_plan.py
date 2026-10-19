@@ -102,6 +102,16 @@ def _read_guidance_cap(status: dict[str, Any]) -> Optional[float]:
     return cap
 
 
+def _guidance_freshness() -> dict[str, Any]:
+    """#5059: is the owner's guidance record older than his latest logged appointment? REFERENCE on the block —
+    no critic, generator or ceiling reads it (owner ruling 7); a broken read is `unreadable`, never raised."""
+    from health import guidance_freshness
+
+    from mcp.config import table
+
+    return guidance_freshness.read_freshness(table, pacific_today())
+
+
 def _read(name: str, fn, *a, **kw) -> tuple[Any, dict[str, Any]]:
     """(value, input status) — `_safe`, but the failure is KEPT (#4072).
 
@@ -850,6 +860,7 @@ def tool_plan_next_session(args):
     # #4112: the accessory half of the two-tier trend split — tracked/reported, never a
     # change/veto flag. Reads the SAME per-exercise rows `_worst_anchor` already built above.
     accessory_strength_trend.attach(block, evidence)
+    block["guidance_freshness"] = _guidance_freshness()  # #5059: reference only — read by nothing that prescribes
 
     out: dict[str, Any] = {
         "target_date": target_date,

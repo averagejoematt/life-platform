@@ -49,7 +49,7 @@ STANDING_CONSTRAINTS: list[dict[str, Any]] = [
         # The intensity half of this constraint (the cardio "no push" rule) is retired from this day on:
         # the owner ruling of 2026-10-18 (ruling 7) and his guidance record of the same day open intervals
         # and conditioning, prescribed by RPE / talk test. The HR half (no HR-derived tier, no HR target)
-        # stays in force. The lifting gate (`gate_lines`) is #5059's to retire.
+        # stays in force. The lifting gate (`gate_lines`) is #5167's to retire (owner-gated).
         "intensity_gate_retired_from": "2026-10-18",
         "gate": {
             "kind": "ecg_and_feel",
