@@ -17,7 +17,7 @@ already owns it — this module arranges and compares, it does not count:
   volume     the charter's `volume_priorities.sets_per_wk` rows over the week's
              `muscle_volume.working_sets_by_muscle` output (a key the per-muscle count does not
              carry is `absent`, with its parent bucket as context only — #5053 adds the keys);
-  fitness    the latest fitness-test battery (absent until #5078 stores one);
+  fitness    the battery's per-test trend and its cadence state (`training.fitness_tests`, #5078);
   running    the run gate through `training.run_onramp.gate_state` (#5090): closed / prep / held / open,
              lb to the prep and to the gate, and the walking weeks met / needed.
 
@@ -349,14 +349,29 @@ def volume_section(vol: Optional[Mapping[str, Any]], read_error: Optional[str] =
     return {"state": state, "source": src, "charter_path": "volume_priorities.sets_per_wk", "rows": rows}
 
 
-def fitness_section(record: Optional[Mapping[str, Any]], read_error: Optional[str] = None) -> dict[str, Any]:
-    src = "fitness-test battery (#5078)"
+def fitness_section(view: Optional[Mapping[str, Any]], sunday: Optional[str] = None, read_error: Optional[str] = None) -> dict[str, Any]:
+    """The fitness-test battery as of Sunday (#5078): each test's latest / previous / delta in its better
+    direction (`fitness_tests.trend`) and, when supplied, the cadence state (`fitness_tests.due`). `view` is
+    `{"batteries": [...], "due": {...} | None}` (mcp.tools_fitness_tests.read_view); None = nothing read."""
+    from training import fitness_tests
+
+    src = "fitness-test battery (#5078: training.fitness_tests over the BATTERY# record + Hevy)"
     every = _cv("calibration.fitness_tests.every_weeks")
     if read_error:
         return cell(READ_FAILED, None, src, error=read_error)
-    if not record:
-        return cell(ABSENT, None, src, "no fitness-test record is stored yet (#5078 builds the battery)", every_weeks=every)
-    return cell(MEASURED, dict(record), src, every_weeks=every)
+    batts = [b for b in (view or {}).get("batteries") or [] if sunday is None or str(b.get("date")) <= sunday]
+    cadence = (view or {}).get("due")
+    if not batts:
+        return cell(ABSENT, None, src, "no fitness-test battery is on file yet (#5078)", every_weeks=every, due=cadence)
+    return cell(
+        MEASURED,
+        fitness_tests.trend(batts),
+        src,
+        latest_date=batts[-1]["date"],
+        batteries=len(batts),
+        every_weeks=every,
+        due=cadence,
+    )
 
 
 def running_gate_section(

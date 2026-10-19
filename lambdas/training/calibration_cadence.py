@@ -225,6 +225,12 @@ def table_readers(table: Any) -> dict[str, Callable[[], list[str]]]:
 
 
 def read(table: Any, today: str) -> dict[str, Any]:
+    """The block over one table, plus the fitness battery's row (#5078): its due date and prompt come from
+    `training.fitness_tests` (the program's own week), carried here so the owner channel has ONE prompt path."""
     from common.constants import EXPERIMENT_START_DATE
 
-    return compute(today, table_readers(table), anchor=EXPERIMENT_START_DATE)
+    from training import fitness_tests
+
+    block = compute(today, table_readers(table), anchor=EXPERIMENT_START_DATE)
+    block["kinds"][fitness_tests.CALIBRATION_KIND] = fitness_tests.calibration_row_from_table(table, today)
+    return block

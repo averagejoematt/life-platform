@@ -234,6 +234,12 @@
       "stack": "monitoring_silence_alarms",
       "via": "declaration"
     },
+    "fitness-battery-missed": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "mcp_stack",
+      "via": "declaration"
+    },
     "freshness-checker-errors": {
       "kind": "metric",
       "routing": "digest",
@@ -1011,7 +1017,7 @@
   ],
   "cost_surface": {
     "ai_features": 29,
-    "alarms": 139,
+    "alarms": 140,
     "emf_namespaces": 33,
     "schedules": 96,
     "secrets": 30
@@ -4116,6 +4122,20 @@
       "lambda": null,
       "module": "lambdas/training/exercise_history.py",
       "partition": "withings",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/fitness_tests.py",
+      "partition": "fitness_tests",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/training/fitness_tests.py",
+      "partition": "fitness_tests",
       "via": "pk"
     },
     {
@@ -7915,9 +7935,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead"
     },
     "counts": {
-      "alarms": 139,
+      "alarms": 140,
       "alarms_by_routing": {
-        "digest": 95,
+        "digest": 96,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
@@ -7929,23 +7949,23 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 764,
+      "edges": 766,
       "lambdas": 108,
-      "mcp_tool_modules": 37,
+      "mcp_tool_modules": 38,
       "mcp_tools": 89,
-      "partitions": 117,
+      "partitions": 118,
       "privacy_fields_owner_only": 67,
       "privacy_fields_owner_published": 11,
-      "privacy_sources_owner_only": 19,
+      "privacy_sources_owner_only": 20,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 81,
       "schedules": 96
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 376,
-        "sites_resolved": 963,
-        "sites_total": 1339
+        "sites_dynamic": 377,
+        "sites_resolved": 965,
+        "sites_total": 1342
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8232,6 +8252,11 @@
       "class": "experiment_scoped",
       "ingestion": false,
       "privacy_tier": "public"
+    },
+    "fitness_tests": {
+      "class": "cross_phase",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
     },
     "flourishing": {
       "class": "raw_timeseries",
@@ -8810,6 +8835,7 @@
       "coach_vision": "owner_only",
       "dexa": "owner_published",
       "felt_probe": "owner_only",
+      "fitness_tests": "owner_only",
       "flourishing": "owner_only",
       "genome": "owner_only",
       "hevy": "owner_only",

@@ -474,6 +474,8 @@ def test_stage_4_survives_its_early_levels_leaving_the_anchor_window(monkeypatch
     monkeypatch.setattr(tmt, "pacific_today", lambda: "2027-03-09")
     assert days[0] < tmt.mt.shift(monday, -7 - tmt.ANCHOR_LOOKBACK_DAYS)  # L1 is outside the anchor window
     row = tmt.compute_weeks(monday, weeks=1)[-1]
-    assert reads == [start]
+    from training.session_sequence import block_start
+
+    assert reads == [min(start, block_start())]  # still ONE Hevy read; #5078's battery position reaches the block start through it
     gate = row["running_gate"]
     assert gate["onramp"]["level"] == LEVELS[-1]["level"] and gate["onramp"]["stage4_done"] is True

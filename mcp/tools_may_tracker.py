@@ -10,6 +10,7 @@ hands them in — it computes nothing of its own:
   waist      the measurements partition;
   steps      `training.steps_resolver.steps_range` (measured candidates only — the Strava-walk
              derived estimate is not a step count);
+  fitness    `mcp.tools_fitness_tests.read_view` (#5078): the battery record, Hevy and the cadence state;
   Hevy       ONE read (`tools_strength._read_hevy_all_phases`) serves the week's working sets
              (`muscle_volume.working_sets_by_muscle`) and the four core anchors' e1RM series
              (`strength_helpers.extract_hevy_sessions` over `plan_draft_evidence._core_anchor_identities`);
@@ -132,6 +133,20 @@ def _guidance() -> dict[str, Any]:
     return {"state": mt.MEASURED if cap is not None else mt.ABSENT, "cap_lb_wk": cap}
 
 
+def _fitness_view(as_of: str, hevy_rows: Optional[list] = None) -> dict[str, Any]:
+    """#5078: the battery read (record + the sequence position over the tracker's ONE Hevy read) through its own module."""
+    from mcp.tools_fitness_tests import read_view
+
+    return read_view(as_of, hevy_rows)
+
+
+def _fitness_as_of(view: Optional[dict[str, Any]], sunday: str, last_sunday: str) -> Optional[dict[str, Any]]:
+    """The newest week carries the cadence state; an earlier week carries its trend only (no due state is back-dated)."""
+    if view is None:
+        return None
+    return {"batteries": view.get("batteries") or [], "due": view.get("due") if sunday == last_sunday else None}
+
+
 def _rows_in(rows: Optional[list], start: str, end: str) -> list:
     return [r for r in rows or [] if start <= _day(r) <= end]
 
@@ -241,6 +256,7 @@ def compute_weeks(last_monday: str, weeks: int = 4) -> list[dict[str, Any]]:
     triggers read the row before it (the first reads none)."""
     from training.muscle_volume import normalize_hevy_items, working_sets_by_muscle
     from training.run_onramp import history_from, running
+    from training.session_sequence import block_start
     from training.steps_resolver import steps_range
 
     from mcp import core
@@ -254,8 +270,9 @@ def compute_weeks(last_monday: str, weeks: int = 4) -> list[dict[str, Any]]:
     mrows, m_err = _read(core.query_source, "measurements", "2000-01-01", last_sunday)
     srange, s_err = _read(steps_range, first, last_sunday, fetch=_steps_fetch, derived=False)
     lookback = mt.shift(first, -ANCHOR_LOOKBACK_DAYS)
-    # one Hevy read, reaching back to the on-ramp's history_from for Stage 4 alone; the other sections keep their window
-    hevy, h_err = _read(_read_hevy_all_phases, min(lookback, history_from() or lookback), last_sunday)
+    # one Hevy read, reaching back to the on-ramp's history_from for Stage 4 and to the block start for the fitness
+    # battery's program position (#5078); the other sections keep their window
+    hevy, h_err = _read(_read_hevy_all_phases, min(lookback, history_from() or lookback, block_start()), last_sunday)
     # the run gate's walking weeks reach `gated_movements.running.walking_weeks` before the oldest tracked Sunday
     strava, st_err = _read(core.query_source_range, "strava", mt.shift(first, -7 * int(running().get("walking_weeks") or 0)), last_sunday)
     all_items = list((hevy or ([], []))[0] or [])
@@ -265,6 +282,7 @@ def compute_weeks(last_monday: str, weeks: int = 4) -> list[dict[str, Any]]:
     workouts = normalize_hevy_items(items) if not h_err else []
     series, a_err = _read(_anchor_series, items) if not h_err else (None, h_err)
     guidance = _guidance() if not w_err else None
+    fitness, f_err = _read(_fitness_view, last_sunday, None if h_err else all_items)
     days = (srange or {}).get("days") or []
 
     rows: list[dict[str, Any]] = []
@@ -281,7 +299,7 @@ def compute_weeks(last_monday: str, weeks: int = 4) -> list[dict[str, Any]]:
             steps=mt.steps_section([d for d in days if mon <= d["date"] <= sun], s_err),
             anchors=mt.anchors_section(series, sun, a_err),
             volume=mt.volume_section(None if h_err else working_sets_by_muscle(workouts, mon, sun), h_err),
-            fitness=mt.fitness_section(None),
+            fitness=mt.fitness_section(_fitness_as_of(fitness, sun, last_sunday), sun, f_err),
             prior=prior,
             built_at=pacific_today(),
             running=running_inputs(sun, None if st_err else (strava or []), None if h_err else all_items, dismissals),

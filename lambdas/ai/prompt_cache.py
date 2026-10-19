@@ -308,15 +308,16 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_NARRATIVE_MODEL",
         "cdk_stack": None,
         "measured_on": "haiku-4-5",
-        "prefix_tokens": 7738,
+        "prefix_tokens": 11602,
         "calls_within_ttl": 3,
-        "decided": "2026-10-18",
+        "decided": "2026-10-19",
         "issue": 5084,
         "why": (
-            "7,738 tok on the wire, clears the 4,096 floor. A ONE-call-a-night narrative would be a decline (a write "
+            "11,602 tok on the wire (Bedrock CountTokens 2026-10-19, after the #5090 run on-ramp and #5078 fitness battery "
+            "grew the charter; 7,738 on 2026-10-18), clears the 4,096 floor. A ONE-call-a-night narrative would be a decline (a write "
             "premium nothing reads), so the design batches it: the nightly pre-draft writes the plan, Hevy-note and "
             "Telegram lines back-to-back (charter_ai.NARRATIVE_SURFACES) — one write, two reads. ~1,500 tok volatile "
-            "in / ~200 out per line: $0.0187/night cached vs $0.0307 uncached (-39%). If the caller ships as one call "
+            "in / ~200 out per line: $0.0243/night cached vs $0.0423 uncached (-43%). If the caller ships as one call "
             "a night, flip this to engaged=False and send the block uncached — the guard reds the mismatch."
         ),
     },
@@ -327,14 +328,15 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_RETRO_MODEL",
         "cdk_stack": None,
         "measured_on": "haiku-4-5",
-        "prefix_tokens": 7738,
+        "prefix_tokens": 11602,
         "calls_within_ttl": 8,
-        "decided": "2026-10-18",
+        "decided": "2026-10-19",
         "issue": 5084,
         "why": (
-            "7,738 tok on the wire, clears the 4,096 floor. The block retro reuses the judge's panel rubric — one "
+            "11,602 tok on the wire (Bedrock CountTokens 2026-10-19, re-measured with charter-narrative), clears the 4,096 "
+            "floor. The block retro reuses the judge's panel rubric — one "
             "call per seat, back-to-back in one /training-review run, once per block. ~4,000 tok volatile in "
-            "(the block's evidence) / ~800 out per seat: $0.0791 per retro cached vs $0.1259 uncached (-37%). "
+            "(the block's evidence) / ~800 out per seat: $0.0866 per retro cached vs $0.1568 uncached (-45%). "
             "Runs on a workstation, so the dev AI cap bounds it as well."
         ),
     },
