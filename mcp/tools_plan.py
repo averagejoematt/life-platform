@@ -86,6 +86,14 @@ class InputShapeError(Exception):
     """
 
 
+def _guidance_cap():
+    from training import rate_band
+
+    from mcp.config import table
+
+    return rate_band.guidance_cap_for(table)
+
+
 def _read(name: str, fn, *a, **kw) -> tuple[Any, dict[str, Any]]:
     """(value, input status) — `_safe`, but the failure is KEPT (#4072).
 
@@ -604,12 +612,10 @@ def tool_plan_next_session(args):
         status["protein_days_missed_7d"] = st(ABSENT, "no MacroFactor day with protein logged in the trailing 7 days")
 
     # #4166: the protein gate's body-fat tier reads the latest DXA — a failed read is reported, never "no scan"
-    from mcp.shared_quantities import dxa_scans as _dxa_scans
+    from mcp.shared_quantities import dxa_scans as _dxa_scans, loss_rate_lb_wk
 
     dxa, status["dxa_scans"] = _read("dxa_scans", _dxa_scans, target_date)
     # #5001: THE stated loss rate, read off the Withings partition — the rate_ceiling input and the advocate's rate
-    from mcp.shared_quantities import loss_rate_lb_wk
-
     loss_rate, status["loss_rate"] = _read("loss_rate", loss_rate_lb_wk, target_date)
     if dxa == [] and status["dxa_scans"]["state"] != READ_FAILED:
         status["dxa_scans"] = st(ABSENT, "no DXA scan on file — the protein gate's body-fat tier is unknown (report-only)")
@@ -742,14 +748,14 @@ def tool_plan_next_session(args):
         # per-muscle table as `muscle_volume`, each row with `total_sets` / `avg_sets_per_week`.
         acwr_flag=acwr_flag,
         muscle_volume=muscle_sets,
-        # #4051: performed UNION drafted, so the day with no draft is no longer the day with
-        # no movements — `days_since_movement` is non-empty whenever a session is in the window.
+        # #4051: performed UNION drafted — `days_since_movement` is non-empty whenever a session is in the window.
         days_since_movement={r["label"]: r["days_since"] for r in rows if r.get("days_since") is not None},
         reference=reference if isinstance(reference, dict) else None,
         protein_days_missed_7d=protein_missed,
         protein_days_measured_7d=protein_measured,  # #4161 ruling "B": the rate target's protein gate
         protein_window=plan_engine.owner_redlines.protein_window(target_date, pacific_today()),
         dxa_scans=dxa,  # #4166
+        guidance_cap_lb_wk=_guidance_cap(),  # #5074: the clinical record's rate cap outranks the charter band (no detail kept)
         readiness_low_streak_days=readiness_streak,
         anchor_lift_drop_pct=worst[0],
         anchor_lift_drop_sessions=worst[1],

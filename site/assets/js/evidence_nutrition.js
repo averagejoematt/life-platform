@@ -137,16 +137,14 @@ export function nutritionProteinLead(n) {
     `<p class="lead-sub mono">${esc(sub)}</p></section>`;
 }
 
-// §1 loss-rate readout (P0.9) — target rate → required deficit → actual deficit → gap,
-// with the deficit-intensity flag, the rate and the protein status on ONE sightline.
+// §1 loss-rate readout (P0.9) — actual deficit → the rate it implies (lb/wk AND % of bodyweight), with the
+// deficit-intensity flag and the protein status on ONE sightline. No target is published (#5074).
 // Two-voice: mono states the chain, serif surfaces the (contested) read honestly.
 export function nutritionLossRate(lr, n) {
-  if (!lr || lr.target_rate_lb_wk == null) return "";
+  if (!lr) return "";
   const chain = [
-    `target ${fmt(lr.target_rate_lb_wk)} lb/wk`,
-    lr.required_deficit_kcal != null ? `needs −${fmt(lr.required_deficit_kcal)} kcal/day` : null,
     lr.actual_deficit_kcal != null ? `running ${lr.actual_deficit_kcal >= 0 ? "−" : "+"}${fmt(Math.abs(lr.actual_deficit_kcal))}` : lr.deficit_published === false ? "actual deficit not published" : "actual deficit unknown until an expenditure read lands",
-    lr.gap_kcal != null ? `gap ${lr.gap_kcal >= 0 ? "+" : "−"}${fmt(Math.abs(lr.gap_kcal))}` : null,
+    lr.implied_rate_lb_wk != null ? `≈ ${fmt(lr.implied_rate_lb_wk)} lb/wk${lr.implied_rate_pct_bw_wk != null ? ` (${fmt(lr.implied_rate_pct_bw_wk)}% of bodyweight)` : ""}` : null,
     (lr.protein_floor_hit_pct ?? lr.protein_hit_pct) != null ? `protein floor ${n ? _hitPhrase(n, lr.protein_floor_hit_pct != null, lr.protein_floor_hit_pct ?? lr.protein_hit_pct) : `${fmt(lr.protein_floor_hit_pct ?? lr.protein_hit_pct)}% of days`}` : null,
   ].filter(Boolean).join(" → ");
   const flag = lr.deficit_label ? `<span class="nut-flag nut-flag-${esc(lr.deficit_label)}">${esc(lr.deficit_label)} cut</span>` : "";
@@ -158,7 +156,7 @@ export function nutritionLossRate(lr, n) {
   else if (fp != null && fp < 100) floorClause = ", and right now that floor's missed most days";
   else if (fp != null && fp >= 100) floorClause = ", and right now that floor's holding";
   else floorClause = "";
-  const serif = `Three pounds a week is an aggressive rate. The bench is split on it — defensible early at this size if it's monitored, but only while the protein floor holds${floorClause}. That's why the rate and the protein sit on the same line here.`;
+  const serif = `A fast rate is contested. The bench is split on it — defensible early at this size if it's monitored, but only while the protein floor holds${floorClause}. That's why the rate and the protein sit on the same line here.`;
   return `<div class="two-voice nut-lossrate"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(chain)} ${flag}</p><p class="tv-human">${esc(serif)}</p></div>`;
 }
 

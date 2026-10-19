@@ -191,6 +191,18 @@ def _loss_rate(inputs: dict[str, Any]) -> float | None:
 
 
 # ── critic 1: the deficit advocate ─────────────────────────────────────────────────────
+def _served_target(weight, p_missed, p_measured, inputs):
+    """The rate target the critics argue against: protein-gated (#4161), body-fat tiered (#4166), guidance-capped (#5074)."""
+    return owner_redlines.rate_target_lb_per_wk(
+        weight,
+        protein_missed_7d=p_missed,
+        protein_measured_7d=p_measured,
+        protein_window_days=_protein7_window(inputs),
+        dxa_scans=inputs.get("dxa_scans"),
+        guidance_cap_lb_wk=inputs.get("guidance_cap_lb_wk"),
+    )
+
+
 def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
     """Argues FOR the owner's scheduled rate. Below target is an ADHERENCE AUDIT, never
     "eat less" — unless mean intake sits above the prescribed band's top. Above the cap
@@ -203,13 +215,7 @@ def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
     weight = _num(inputs.get("weight_lb"))
     # v3.3 ruling "B" (#4161): the target this critic argues against is the SERVED one — gated by protein adherence
     p_missed, p_measured = _protein7_counts(inputs)
-    target = owner_redlines.rate_target_lb_per_wk(
-        weight,
-        protein_missed_7d=p_missed,
-        protein_measured_7d=p_measured,
-        protein_window_days=_protein7_window(inputs),
-        dxa_scans=inputs.get("dxa_scans"),  # #4166: the same body-fat tier the plan reads
-    )
+    target = _served_target(weight, p_missed, p_measured, inputs)
     loss = _loss_rate(inputs)
     intake14 = _logged(_series(inputs, "intake_kcal_by_day"))
     mean14 = _mean(intake14)
@@ -835,7 +841,7 @@ def decisions_offered(
 
     # 2. rate overshoot — the schedule's own +250 rule
     weight = _num(inputs.get("weight_lb"))
-    target = owner_redlines.rate_target_lb_per_wk(weight)
+    target = owner_redlines.rate_target_lb_per_wk(weight, guidance_cap_lb_wk=inputs.get("guidance_cap_lb_wk"))
     rates = [r for r in (_num(x) for x in (inputs.get("weekly_loss_rates_lb_wk") or [])) if r is not None]
     weeks = inputs.get("weeks_since_genesis")
     need = int(over_t["threshold_weeks"])

@@ -135,14 +135,16 @@ def test_rate_ceiling_is_evaluated_and_trips_at_4_12_above_295():
 
 
 def test_the_threshold_is_the_band_cap_and_never_looser_than_the_absolute_ceiling():
-    """At 280 lb the step cap is 3.75: 3.8 trips, 3.7 is clear. Mutation control: compare against the
-    tripwire's absolute 4.0 instead of the band cap — 3.8 reads clear and this reds."""
+    """Above the landing the cap is the charter ceiling + the overshoot margin (4.0, #5074); at 221 lb it is his
+    own landing step (2.75): 2.8 trips there, 2.7 is clear. Mutation control: compare against the tripwire's
+    absolute 4.0 instead of the band cap — 2.8 at 221 reads clear and this reds."""
 
     def at(value, weight):
         return redline_rate.rate_ceiling_check({"value": value, "provisional": False, "experiment_week": 7}, weight)
 
-    assert at(3.8, 280.0)["state"] == "tripped" and at(3.8, 280.0)["threshold_lb_wk"] == 3.75
-    assert at(3.7, 280.0)["state"] == "clear"
+    assert at(2.8, 221.0)["state"] == "tripped" and at(2.8, 221.0)["threshold_lb_wk"] == 2.75
+    assert at(2.7, 221.0)["state"] == "clear"
+    assert at(3.9, 280.0)["state"] == "clear" and at(4.1, 280.0)["state"] == "tripped"
     assert at(4.01, None)["state"] == "tripped" and at(4.01, None)["threshold_lb_wk"] == 4.0
     for w in (330.0, 300.0, 280.0, 262.0, 241.0, 221.0, 211.0, 206.0, 199.0):
         assert at(0.0, w)["threshold_lb_wk"] <= 4.0, w

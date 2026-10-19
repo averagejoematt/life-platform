@@ -354,6 +354,19 @@ def _pain_read_failed(scope: dict[str, Any] | None, layer_status: str | None, in
 # owner was told recovery, volume and protein were "unknown" while every source was fresh,
 # and a reader cannot act on the difference between "no data" and "the read broke" if the
 # block will not say which one it was. Every row carries its input's `input_state`.
+def _rate_target(weight_lb, protein, dxa_scans, guidance_cap_lb_wk):
+    """The served rate target (#4161 ruling B: protein-gated; #4166: body-fat tier; #5074: the clinical cap outranks the band)."""
+    missed, measured, window = protein
+    return owner_redlines.rate_target_lb_per_wk(
+        weight_lb,
+        protein_missed_7d=missed,
+        protein_measured_7d=measured,
+        protein_window_days=window,
+        dxa_scans=dxa_scans,
+        guidance_cap_lb_wk=guidance_cap_lb_wk,
+    )
+
+
 def _tripwire_states(
     *,
     protein_days_missed_7d: int | None,
@@ -374,6 +387,7 @@ def _tripwire_states(
     recent_aerobic_block: dict[str, Any] | None = None,
     loss_rate: dict[str, Any] | None = None,
     weight_lb: float | None = None,
+    guidance_cap_lb_wk: float | None = None,
 ) -> list[dict[str, Any]]:
     """Evaluate each owner tripwire against the inputs, or say why it could not be read.
 
@@ -647,14 +661,9 @@ def _tripwire_states(
             row["standalone_walks"] = ((recent_aerobic_block or {}).get("totals") or {}).get("standalone_walks")
             row["actuator"] = recent_aerobic.collapse_actuator(row["state"], None)
         out.append(row)
-    # #5001 — rate_ceiling over THE stated loss rate; the advocate reads the same `rate_ceiling_check`.
-    rc = redline_rate.rate_ceiling_check(loss_rate, weight_lb)
-    rc_row = (
-        _missing("rate_ceiling", rc["detail"])
-        if loss_rate is None
-        else _row("rate_ceiling", rc["state"], rc["observed_lb_wk"], rc["detail"])
-    )
-    out.append({**rc_row, "evidence": rc})
+    rc = redline_rate.rate_ceiling_check(loss_rate, weight_lb, guidance_cap_lb_wk)  # #5001: the advocate reads this same check
+    args = ("rate_ceiling", rc["state"], rc["observed_lb_wk"], rc["detail"])
+    out.append({**(_missing("rate_ceiling", rc["detail"]) if loss_rate is None else _row(*args)), "evidence": rc})
     # #4098: the week gate, applied to EVERY row whose tripwire declares `not_before_week` —
     # never per-tripwire, so a new declaration is read the day it is written.
     for row in out:
@@ -851,6 +860,7 @@ def constraint_block(
     input_status: dict[str, dict[str, Any]] | None = None,
     recent_aerobic: dict[str, Any] | None = None,
     loss_rate: dict[str, Any] | None = None,
+    guidance_cap_lb_wk: float | None = None,  # #5074: the owner clinical record's rate cap — outranks the charter band
 ) -> dict[str, Any]:
     """The deterministic inputs to tomorrow's session. No model, no I/O, no hidden state.
 
@@ -923,6 +933,7 @@ def constraint_block(
         recent_aerobic_block=recent_aerobic,
         loss_rate=loss_rate,
         weight_lb=weight_lb,
+        guidance_cap_lb_wk=guidance_cap_lb_wk,
     )
     tripped, unknown, failed_tripwires, not_yet_active = (
         [t["id"] for t in tripwires if t["state"] == st] for st in ("tripped", "unknown", READ_FAILED, "not_yet_active")
@@ -972,12 +983,8 @@ def constraint_block(
         # write is not, and collapsing the two would silently launder an unreviewed write
         # into a reviewed list.
         "standing_constraints_from_chat": training_memory_constraints or [],
-        # #4064/#4110 — WHAT the program serves on this date: the next UNDONE session of the
-        # sequence (v0.4, #4147: upper-heavy -> lower-heavy -> upper-volume -> lower-volume, from
-        # lower-heavy on 2026-09-24; it advances only on a completed loaded Hevy session; deload
-        # at the later of week 6 or the block lock, #4161) and its session — anchors with their sets and reps,
-        # the fixed accessories, the Hevy folder. Third, right after the two safety keys:
-        # walking and the standing constraints outrank any single session.
+        # #4064/#4110 — WHAT the program serves on this date: the next UNDONE session of the sequence (it advances only on
+        # a completed loaded Hevy session) and its session. Third, right after the two safety keys.
         "session": session,
         "deload_recommendation": deload_rec,
         # #4387 — the walking total cannot say "yesterday was 2¾ h on foot". These rows can: one
@@ -985,12 +992,8 @@ def constraint_block(
         # redlines, with the session's cardio modality picked FROM them (`cardio_pick`).
         "recent_aerobic": _recent_aerobic_view(recent_aerobic, session.get("archetype"), states.get("recent_aerobic"), date),
         # v3.3 ruling "B" (#4161): the SERVED target is gated by protein adherence — `rate_target.protein_gate` says which
-        "rate_target": owner_redlines.rate_target_lb_per_wk(
-            weight_lb,
-            protein_missed_7d=protein_days_missed_7d,
-            protein_measured_7d=protein_days_measured_7d,
-            protein_window_days=protein_window,
-            dxa_scans=dxa_scans,  # #4166: the gate's mode scales with the latest DXA's body fat
+        "rate_target": _rate_target(
+            weight_lb, (protein_days_missed_7d, protein_days_measured_7d, protein_window), dxa_scans, guidance_cap_lb_wk
         ),
         # #5001: THE stated loss rate (method, window, n, source, the partition rows) — the rate_ceiling row's input
         "shared_quantities": {"loss_rate_lb_wk": loss_rate},

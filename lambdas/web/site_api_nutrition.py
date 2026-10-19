@@ -45,12 +45,10 @@ _RDO_MIN_OVERLAP_DAYS = 14
 
 _RDO_IMPACT_R = 0.15
 
-# Phase-1 "Ignition" rate target: 3 lb/week ≈ 1,500 kcal/day (matches the profile /
-# ai_calls Phase-1 target). Module scope so the genesis-week empty state publishes the
-# SAME loss_rate constants the populated branch does (#2221 shape parity).
-_TARGET_RATE_LB_WK = 3
+# #5074 — NO rate target on this published surface: the band lives under the charter's `governing_goal`
+# (NEVER_PUBLISHED), so the public readout is the MEASURED rate in both units only. `target_rate_lb_wk`,
+# `required_deficit_kcal` and `gap_kcal` (each a restatement of the target) are retired from the payload.
 _KCAL_PER_LB = 3500
-_REQUIRED_DEFICIT_KCAL = round(_TARGET_RATE_LB_WK * _KCAL_PER_LB / 7)  # 1500
 
 
 def _num(v):
@@ -381,11 +379,9 @@ def nutrition_overview(*, _g) -> dict:
                 # also publishes None and NEITHER branch queries the private
                 # partition, so shape parity costs nothing privacy-wise.
                 "loss_rate": {
-                    "target_rate_lb_wk": _TARGET_RATE_LB_WK,
-                    "required_deficit_kcal": _REQUIRED_DEFICIT_KCAL,
                     "actual_deficit_kcal": None,
-                    "gap_kcal": None,
                     "implied_rate_lb_wk": None,
+                    "implied_rate_pct_bw_wk": None,
                     "deficit_pct": None,
                     "deficit_label": None,
                     # #3931 box 4 + #2221 shape parity: method/basis on the empty branch too.
@@ -665,21 +661,20 @@ def nutrition_overview(*, _g) -> dict:
             periodization[key]["avg_deficit"] = round(tdee - avg) if avg else None
 
     # ── Loss-rate readout (P0.9): the deficit chain + sustainability flag ──
-    # Phase-1 "Ignition" target: 3 lb/week ≈ 1,500 kcal/day deficit (matches the profile /
-    # ai_calls Phase-1 target). The full multi-channel sustainability early-warning (HRV,
+    # The rate chain: the measured deficit and the rate it implies in BOTH units (lb/wk and % of bodyweight).
+    # No target is published (#5074). The full multi-channel sustainability early-warning (HRV,
     # sleep, recovery, habits, training) lives in the get_deficit_sustainability MCP tool;
     # here we surface only the rate chain + the deficit-intensity label (same BS-12 rubric).
-    TARGET_RATE_LB_WK = _TARGET_RATE_LB_WK
     KCAL_PER_LB = _KCAL_PER_LB
-    required_deficit = _REQUIRED_DEFICIT_KCAL
+    _bw = _latest_weight_lbs(d30, today, _g=_g)
     deficit_pct = round(deficit / tdee * 100, 1) if (deficit is not None and tdee and deficit_published) else None
     deficit_label = _deficit_label(deficit_pct)
     loss_rate = {
-        "target_rate_lb_wk": TARGET_RATE_LB_WK,
-        "required_deficit_kcal": required_deficit,
         "actual_deficit_kcal": deficit if deficit_published else None,
-        "gap_kcal": (required_deficit - deficit) if (deficit is not None and deficit_published) else None,
         "implied_rate_lb_wk": round(deficit * 7 / KCAL_PER_LB, 1) if (deficit is not None and deficit_published) else None,
+        "implied_rate_pct_bw_wk": (
+            round(deficit * 7 / KCAL_PER_LB / _bw * 100, 2) if (deficit is not None and deficit_published and _bw) else None
+        ),
         "deficit_pct": deficit_pct,
         "deficit_label": deficit_label,
         # #3931 box 4: every calorie/deficit surface carries the method it came from and

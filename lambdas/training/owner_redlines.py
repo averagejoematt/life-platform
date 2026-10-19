@@ -114,7 +114,7 @@ REDLINES: dict[str, dict[str, Any]] = {
             "instruction is the scheduled absolute target in `rate_schedule_lb_wk`. v3 changes the invariant: not "
             "%BW/wk (a population figure from people carrying 20–40 lb of fat) but the LEAN COST of each week — the "
             "Forbes/Hall fat fraction of the loss, anchored on his two DEXAs, times the rate — held at ≤0.5–0.7 lb "
-            "lean/wk. 3.5 lb/wk at 317 lb is 1.10 %BW/wk, ABOVE this envelope's top, and is his instruction anyway."
+            "lean/wk. His charter band (training/rate_band.py) at 317 lb is ABOVE this envelope's top, and is his instruction anyway."
         ),
         "owner_to_resolve": None,
         "resolution": (
@@ -129,32 +129,24 @@ REDLINES: dict[str, dict[str, Any]] = {
         "steps": [
             {
                 "above_lb": 295,
-                "target": 3.5,
-                "cap": 4.0,
-                "pct_bw_wk": "1.10–1.19",
+                "governed_by": "charter",  # target/cap read from governing_goal.rate_band_lb_per_wk (training/rate_band.py, #5074)
                 "note": "weeks 1–2 excluded (water); his measured 3.37 at 290s on 16 h walking",
             },
             {
                 "above_lb": 275,
-                "target": 3.25,
-                "cap": 3.75,
-                "pct_bw_wk": "1.18",
-                "note": "3.5 → 3.25 across the band; his measured 3.66 at 280s (19 h), 2.76 at 270s",
+                "governed_by": "charter",  # target/cap read from governing_goal.rate_band_lb_per_wk (training/rate_band.py, #5074)
+                "note": "his measured 3.66 at 280s (19 h), 2.76 at 270s",
             },
             {
                 "above_lb": 260,
-                "target": 3.0,
-                "cap": 3.5,
-                "pct_bw_wk": "1.09–1.15",
-                "dxa_gate": "3.5 permitted ONLY if the week-16 DXA lean share of the loss is ≤ 12 % and the anchors are flat (OD6, #4503: week 8 is a baseline)",
+                "governed_by": "charter",  # target/cap read from governing_goal.rate_band_lb_per_wk (training/rate_band.py, #5074)
+                "dxa_gate": "a rate above the band floor is permitted ONLY if the week-16 DXA lean share of the loss is ≤ 12 % and the anchors are flat (OD6, #4503: week 8 is a baseline)",
                 "note": "his measured 1.99 at 260s — walking had fallen to 7 h. The energy floor binds here on any base under 13 h",
             },
             {
                 "above_lb": 240,
-                "target": 2.75,
-                "cap": 3.25,
-                "pct_bw_wk": "1.06–1.15",
-                "dxa_gate": "3.0 permitted while the DXA lean share of the loss is ≤ 15 %",
+                "governed_by": "charter",  # target/cap read from governing_goal.rate_band_lb_per_wk (training/rate_band.py, #5074)
+                "dxa_gate": "the band floor is permitted while the DXA lean share of the loss is ≤ 15 %",
                 "note": "his measured 1.96 / 2.65; the fat fraction of the loss falls through 0.79–0.75 here",
             },
             {

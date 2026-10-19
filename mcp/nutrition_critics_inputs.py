@@ -38,6 +38,14 @@ SERIES_DAYS = 14
 DECISIONS_LOOKBACK_DAYS = 14
 
 
+def _guidance_cap():
+    from training import rate_band
+
+    from mcp.config import table
+
+    return rate_band.guidance_cap_for(table)
+
+
 def _safe(fn: Callable[..., Any], *a: Any, **kw: Any) -> Any:
     try:
         return fn(*a, **kw)
@@ -227,6 +235,7 @@ def resolve(
         "training_above_prescription_weeks": above_weeks,
         "estimated_maintenance_kcal": estimated_maintenance_kcal,
         "dxa_scans": dxa,
+        "guidance_cap_lb_wk": _guidance_cap(),  # #5074: the clinical record's rate cap outranks the charter band
     }
     return {"inputs": inputs, "unresolved": unresolved}
 

@@ -715,15 +715,12 @@ def test_the_average_deficit_is_the_tdee_minus_the_average_intake():
     assert n["avg_deficit"] == 800
 
 
-def test_the_loss_rate_chain_states_the_target_deficit_the_gap_and_the_implied_rate():
-    # tdee 2900, intake 2000 → deficit 900; required 3 lb/wk = 3*3500/7 = 1500
-    # gap = 1500 - 900 = 600; implied rate = 900*7/3500 = 1.8 lb/wk
+def test_the_loss_rate_chain_states_the_deficit_and_the_implied_rate_in_both_units_and_publishes_no_target():
+    # tdee 2900, intake 2000 → deficit 900; implied rate = 900*7/3500 = 1.8 lb/wk (#5074: no target on a published surface)
     src = FakeSources(macrofactor=[mf("2026-05-09", total_calories_kcal=2000, expenditure_kcal=2900)])
     lr = overview(src)["loss_rate"]
-    assert lr["target_rate_lb_wk"] == 3
-    assert lr["required_deficit_kcal"] == 1500
+    assert not {"target_rate_lb_wk", "required_deficit_kcal", "gap_kcal"} & set(lr)
     assert lr["actual_deficit_kcal"] == 900
-    assert lr["gap_kcal"] == 600
     assert lr["implied_rate_lb_wk"] == 1.8
 
 
@@ -731,7 +728,6 @@ def test_the_loss_rate_chain_reports_absent_rather_than_zero_when_the_tdee_is_un
     src = FakeSources(macrofactor=[mf("2026-05-09", total_calories_kcal=2000)])
     lr = overview(src)["loss_rate"]
     assert lr["actual_deficit_kcal"] is None
-    assert lr["gap_kcal"] is None
     assert lr["implied_rate_lb_wk"] is None
     assert lr["deficit_pct"] is None
     assert lr["deficit_label"] is None

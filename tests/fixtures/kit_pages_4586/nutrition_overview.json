@@ -244,11 +244,9 @@
   }
  ],
  "loss_rate": {
-  "target_rate_lb_wk": 3,
-  "required_deficit_kcal": 1500,
   "actual_deficit_kcal": null,
-  "gap_kcal": null,
   "implied_rate_lb_wk": null,
+  "implied_rate_pct_bw_wk": null,
   "deficit_pct": null,
   "deficit_label": null,
   "tdee_method": "mifflin_bmr_plus_worked_set_exercise",

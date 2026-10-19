@@ -890,16 +890,21 @@ def _series(start_lbs, per_week, n=4):
     return [withings(d("2026-04-01", 7 * i), weight_lbs=start_lbs - per_week * i) for i in range(n)]
 
 
-def test_weight_loss_rate_flag_is_relative_to_bodyweight(monkeypatch):
-    """Same absolute 4.5 lb/wk: at ~400 lb that is ~1.1%/wk (no flag); at ~250 lb it is ~1.8%/wk (flags)."""
-    install(monkeypatch, _series(400.0, 4.5))
-    heavy = th.tool_get_weight_loss_progress({})
-    assert not [p for p in heavy["weight_series"] if "Losing too fast" in p.get("rate_flag", "")]
-    install(monkeypatch, _series(250.0, 4.5))
-    light = th.tool_get_weight_loss_progress({})
-    flagged = [p for p in light["weight_series"] if "Losing too fast" in p.get("rate_flag", "")]
-    assert len(flagged) == 3
-    assert "% of bodyweight" in flagged[0]["rate_flag"] and "lb/wk" in flagged[0]["rate_flag"]
+def test_weight_loss_rate_flag_is_his_schedule_cap_at_that_weight(monkeypatch):
+    """#5074: the line is the schedule's cap at the weigh-in's own weight — the charter ceiling + 0.5 (4.0 lb/wk)
+    above the 240 lb landing, his own taper cap from the landing down. 3.9 lb/wk never flags at 400 or 280; 4.5 flags
+    at both; 3.0 lb/wk flags once he is on the landing schedule (cap 2.25 at 210)."""
+    for start in (400.0, 280.0):
+        install(monkeypatch, _series(start, 3.9))
+        out = th.tool_get_weight_loss_progress({})
+        assert not [p for p in out["weight_series"] if "Losing too fast" in p.get("rate_flag", "")], start
+        install(monkeypatch, _series(start, 4.5))
+        flagged = [p for p in th.tool_get_weight_loss_progress({})["weight_series"] if "Losing too fast" in p.get("rate_flag", "")]
+        assert len(flagged) == 3, start
+        assert "% of bodyweight" in flagged[0]["rate_flag"] and "lb/wk" in flagged[0]["rate_flag"]
+    install(monkeypatch, _series(215.0, 3.0))
+    landing = [p for p in th.tool_get_weight_loss_progress({})["weight_series"] if "Losing too fast" in p.get("rate_flag", "")]
+    assert len(landing) == 3
 
 
 def test_weight_loss_reports_both_units_for_every_rate(monkeypatch):
@@ -915,6 +920,28 @@ def test_weight_loss_reports_both_units_for_every_rate(monkeypatch):
         if "weekly_loss_rate_lbs" in p:
             assert p["rate_lb_per_wk"] == p["weekly_loss_rate_lbs"]
             assert p["rate_pct_bodyweight_per_wk"] is not None
+
+
+def test_weight_loss_shows_the_owners_band_beside_both_units_at_the_current_weight(monkeypatch):
+    """#5074: 3.0 lb/wk at 311 lb -> band 3.0-3.5 lb/wk = 0.96-1.13 %BW/wk, in band (at its floor)."""
+    install(monkeypatch, WEIGH_INS)
+    rb = th.tool_get_weight_loss_progress({})["rate_band"]
+    assert (rb["floor_lb_wk"], rb["ceiling_lb_wk"], rb["floor_pct_bw"], rb["ceiling_pct_bw"]) == (3.0, 3.5, 0.96, 1.13)
+    assert (rb["in_band"], rb["position"], rb["guidance_capped"]) == (True, "in", False)
+
+
+@pytest.mark.parametrize("per_week,position", [(2.0, "below"), (3.2, "in"), (4.5, "above")])
+def test_weight_loss_places_the_average_rate_in_the_band(monkeypatch, per_week, position):
+    install(monkeypatch, _series(340.0, per_week))
+    rb = th.tool_get_weight_loss_progress({})["rate_band"]
+    assert rb["position"] == position
+
+
+def test_weight_loss_band_yields_to_the_clinical_guidance_cap(monkeypatch):
+    install(monkeypatch, _series(340.0, 3.2))
+    monkeypatch.setattr(th.rate_band, "guidance_cap_for", lambda table, user_id="matthew": 2.0)
+    rb = th.tool_get_weight_loss_progress({})["rate_band"]
+    assert (rb["ceiling_lb_wk"], rb["guidance_capped"], rb["position"]) == (2.0, True, "above")
 
 
 def test_weight_loss_clinical_note_carries_no_fixed_lb_ceiling(monkeypatch):
