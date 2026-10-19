@@ -75,6 +75,16 @@ def _limits_for(ir: Any) -> dict[str, float | None]:
         return {}
 
 
+def _rep_range_for(ir: Any, movement_key: str) -> tuple[int, int] | None:
+    """The (bottom, top) rep range one IR prescribed for `movement_key` (#5057), or None."""
+    from training.load_ramp import _rep_range_of
+
+    for ex in getattr(ir, "exercises", []) or []:
+        if (getattr(ex, "movement_key", "") or "") == movement_key:
+            return _rep_range_of(getattr(ex, "sets", None))
+    return None
+
+
 def _prescription_for(workout: dict[str, Any]) -> tuple[Any | None, str | None]:
     """The routine IR that was pushed for this workout, or (None, None).
 
@@ -163,6 +173,7 @@ def stall_check(args: dict[str, Any], *, get_workouts: Any = None) -> dict[str, 
 
     points: list[Any] = []
     provenance: list[dict[str, Any]] = []
+    rep_range: tuple[int, int] | None = None  # #5057: the latest prescription's range sizes a step_due
     for page in range(1, MAX_PAGES + 1):
         workouts = (get_workouts(page=page, page_size=PAGE_SIZE) or {}).get("workouts") or []
         if not workouts:
@@ -181,6 +192,7 @@ def stall_check(args: dict[str, Any], *, get_workouts: Any = None) -> dict[str, 
                     if str(candidate.get("template_id") or "") == template_id:
                         row = candidate
                         movement_key = movement_key or key
+                        rep_range = rep_range or _rep_range_for(ir, key)
                         break
             if not row:
                 # No plan on file for this session (unmatched, ambiguous, or the movement
@@ -203,7 +215,7 @@ def stall_check(args: dict[str, Any], *, get_workouts: Any = None) -> dict[str, 
 
     points.reverse()  # the detector reads OLDEST first
     provenance.reverse()
-    verdict = assess_stall(points, movement_key=movement_key or f"tmpl:{template_id}")
+    verdict = assess_stall(points, movement_key=movement_key or f"tmpl:{template_id}", rep_range=rep_range)
     return {
         "status": "ok",
         "movement_key": movement_key or None,
@@ -212,6 +224,8 @@ def stall_check(args: dict[str, Any], *, get_workouts: Any = None) -> dict[str, 
         "sessions_requested": wanted,
         "prescription_provenance": provenance,
         "stall": verdict,
+        # #5057: the prescription's own failure to progress, with the step the next draft carries
+        "step_due": verdict.get("step") if verdict.get("verdict") == "step_due" else None,
     }
 
 
