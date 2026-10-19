@@ -122,3 +122,10 @@ condition = "AND"
 regexTarget = "match"
 regexes = ['''anchor_e1rm_up''', '''zero_accessory_stalls''', '''steps_floor_90pct''', '''rate_in_band_4_of_6''']
 paths = ['''scripts/register_charter_predictions\.py''']
+
+[[allowlists]]
+description = "tests/test_panel_rubric_5072.py — the blinding test plants fake routine ids so it can assert the judge never sees them (#5072). They were first committed as `rt-SECRET-ID` / `hv-SECRET` (commit 19bd44a8e on the charter-w2 wave branch), which gitleaks' generic-api-key rule reads as a credential; renamed to `PLANTED` in the tree. Scoped to the file and the two literals so the one historical commit in the wave PR's range stays green."
+condition = "AND"
+regexTarget = "match"
+regexes = ['''rt-SECRET-ID''', '''hv-SECRET''']
+paths = ['''tests/test_panel_rubric_5072\.py''']
