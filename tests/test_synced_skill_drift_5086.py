@@ -131,7 +131,7 @@ def test_the_coach_session_skill_runs_the_order_contract_from_the_packet():
     assert "`lambdas/training/coach_context.py::ORDER`" in SOURCE
     assert "`departure_reason`" in SOURCE and "`draft_custom` is ONLY for a departure he has stated" in SOURCE
     assert "action `deload`" in SOURCE and "action `disruption`" in SOURCE and "`disruption_end`" in SOURCE
-    assert "may_frame" in SOURCE and "`cardio_menu`" in SOURCE and "+1 RPE" in SOURCE
+    assert "may_frame" in SOURCE and "`cardio_menu`" in SOURCE and "`effort_ceilings.overage_tolerance_rpe`" in SOURCE
     assert "`deload_recommendation`" in SOURCE and "`steps_ramp`" in SOURCE
 
 

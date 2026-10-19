@@ -138,8 +138,9 @@ lifting minutes inside `split.session_minutes`. `plan_next_session`'s `session` 
 program serves; argue with it out loud, never silently replace it.
 
 - **Effort ceilings by movement class.** Compounds and the last isolation set each have a
-  charter band; the top of the band is the ceiling a set is graded against, and a set within
-  the charter's overage tolerance (+1 RPE) above it is not a breach. Two weeks of most sets
+  charter band; the top of the band is the ceiling a set is graded against, and a set above it
+  by no more than the charter's `effort_ceilings.overage_tolerance_rpe` (served in
+  `coach_context`) is not a breach. Two weeks of most sets
   beating a ceiling proposes a ceiling change; only his ruling applies it.
 - **Progression is engine-authored** (double progression, the charter's step): read the load
   the engine wrote and its reason. A stall serves its step; say which.
@@ -175,7 +176,8 @@ He authors at night and trains the next morning with **zero chance to adjust.**
 - **Hevy render rules.** The session note is cut at about 150 characters and the red-team
   verdicts are prepended to it: keep it to one short line. Put the tier cues in the first
   exercise's notes (exercise notes render in full). Every cue carries its reason, for example
-  "+5 lb: two top sets at the top of the range, RPE inside the ceiling". Hevy stores kg;
+  "+<the step the engine wrote>: two top sets at the top of the range, RPE inside the ceiling";
+  quote the load and step the engine wrote, never a number from memory. Hevy stores kg;
   convert for display.
 - **Finishers:** read the actual exercise list of the last sessions before programming core,
   carries or a finisher; don't repeat one anti-movement pattern on consecutive days.
