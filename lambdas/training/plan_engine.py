@@ -85,6 +85,7 @@ from health import deficit_disclosures
 
 from training import (
     deload_word,
+    load_progression,
     owner_redlines,
     program_structure,
     recent_aerobic,
@@ -106,7 +107,8 @@ _CRITICS_NOT_WIRED = {
     ),
 }
 
-ENGINE_VERSION = "plan-engine@1.10.0"  # #4503 OD7: walking_collapse counts standalone walks + carries the named-human actuator mark
+ENGINE_VERSION = "plan-engine@1.11.0"  # #5052: the block carries `progression` (the charter's double progression + effort limits)
+# plan-engine@1.10.0 (#4503 OD7): walking_collapse counts standalone walks + carries the named-human actuator mark
 # plan-engine@1.9.0 (#4387): recent_aerobic per activity; walking_collapse + walking_overshoot evaluated, report-only
 # plan-engine@1.8.0 (#4161): hybrid weeks, the lock-anchored −40 % deload, the protein-gated rate target
 # plan-engine@1.7.0 (#4110/#4147): the session and the program week follow the completed-session SEQUENCE (v0.4 upper/lower)
@@ -899,8 +901,6 @@ def constraint_block(
     # FIRST, deliberately. See the module docstring.
     walking = _walking_block(walk_hr_wk_now, failed_reads)
 
-    ref_block = _reference_block(reference)
-
     # #4098/#4110: the sequence's program week decides which redlines are armed (`not_before_week`).
     week = program_week(date, block_workouts)
 
@@ -1000,7 +1000,7 @@ def constraint_block(
         "acwr_flag": acwr_flag,
         "muscle_volume": muscle_volume or {},
         "days_since_movement": days_since_movement or {},
-        "reference": ref_block,
+        "reference": _reference_block(reference),
         "tripwires": tripwires,
         "tripped": tripped,
         # #4072: both kinds of "could not evaluate", kept apart — `unreadable_tripwires` is the
@@ -1029,6 +1029,8 @@ def constraint_block(
         # (steps, split, rate band, cadences) onto the charter; until then the literals
         # above still come from owner_redlines/program_structure and this is a stamp only.
         "charter_version": training_charter.charter_version(),
+        # #5052: the charter's double progression and effort limits the draft path applied, stamped with its version
+        "progression": load_progression.rule_summary(),
         "critics": dict(_CRITICS_NOT_WIRED),
         "honesty": [
             s

@@ -892,6 +892,21 @@ def _provenance_fields(floor: dict[str, Any]) -> dict[str, Any]:
     return {k: (floor or {}).get(k) for k in PROVENANCE_FIELDS}
 
 
+def _exposure_progression(e: dict[str, Any], entry: dict[str, Any], sessions: list, ramped: dict[str, Any], top: float) -> dict[str, Any]:
+    """`load_progression.next_prescription` for one planner exposure (#5052) — the same inputs the
+    generator's `_progress_block` hands it, so the plan and the draft cannot disagree on the load."""
+    from training import load_progression as lp
+
+    return lp.next_prescription(
+        list(sessions),
+        current_kg=top,
+        rep_range=_rep_range_of(e.get("sets")),
+        cls=lp.movement_class(entry),
+        exposure=e.get("intensity"),
+        re_entry_reason=ramped.get("layoff_reason"),
+    )
+
+
 def annotate_prescription(
     rx: dict[str, Any],
     catalog_movements: dict[str, Any] | None,
@@ -924,7 +939,10 @@ def annotate_prescription(
         load.update(_provenance_fields(ramped))
         if ramped.get("ramp"):
             top = float(ramped["floor_kg"])
-            load.update({"top_kg": top, "ramp": ramped["ramp"], "basis": ramped.get("basis")})
+            # #5052: the generator's double progression on top of the ramp — the planner and the draft read ONE rule
+            prog = _exposure_progression(e, (catalog_movements or {}).get(key) or {}, history_index.get(tid) or [], ramped, top)
+            top = max(top, float(prog.get("next_load_kg") or 0))
+            load.update({"top_kg": top, "ramp": ramped["ramp"], "basis": ramped.get("basis"), "progression": prog})
             pct = next((s.get("pct_of_top") for s in e.get("sets") or [] if s.get("kind") == "back_off"), None)
             if pct is not None:
                 load["back_off_kg"] = _floor_half_kg(top * pct / 100.0)

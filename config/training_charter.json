@@ -1,12 +1,19 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "change_log": [
     {
       "version": "1.0.0",
       "date": "2026-10-18",
       "by": "owner rulings 2026-10-18 (the elite-panel training review, #5067)",
       "what": "First charter: the frame, the rate band, the 5-day split, the step floor and target, the cardio menu, no scheduled deload, effort ceilings, rotation cadence, gated movements, the concession ledger.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.1.0",
+      "date": "2026-10-18",
+      "by": "the owner's double-progression ruling (#4503 OD5, 2026-09-30), moved here from owner_redlines.REDLINES['lifting_sessions_per_wk']['gain_rule'] (#5052)",
+      "what": "Added `progression`: the gain rule (two top-of-range exposures at or under the effort ceiling earn one 5-lb step, reps back to the bottom) and the self-raised-load rule (a load the owner raised himself at or under the ceiling becomes the next floor and is graded progressed, not a breach). The redline copy is retired; the engine reads it here.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -93,6 +100,38 @@
       "share_of_sets": 0.5,
       "weeks_running": 2,
       "effect": "proposes a ceiling change (an owner ruling applies it)"
+    }
+  },
+  "progression": {
+    "gain_rule": {
+      "kind": "double_progression",
+      "trigger": "the top of the slot's rep range on the top set of 2 consecutive same-type exposures (heavy -> heavy, volume -> volume), each logged at or under the movement's effort ceiling",
+      "consecutive_same_type_exposures": 2,
+      "step_lb": 5,
+      "step_pct": 2.5,
+      "size": "+2.5 % of the load in whole 5-lb steps, never less than one 5-lb step; reps back to the bottom of the range",
+      "reps_after_step": "bottom_of_range",
+      "rpe_role": "veto only — a top-of-range set logged above the movement's effort ceiling (or with no RPE logged) does not count toward the trigger",
+      "nutrition_clause": null,
+      "refused_when": [
+        "recovery < 50",
+        "sleep < 6.5 h",
+        "the week after a rate-over-cap flag",
+        "the first three exposures of a novel-again pattern",
+        "a deload the owner applied"
+      ],
+      "provenance": "owner",
+      "stated": "2026-09-30",
+      "ruling": "#4503 OD5"
+    },
+    "self_raised_load": {
+      "rule": "a load the owner raised himself, logged at or under the movement's effort ceiling (an overage within `effort_ceilings.overage_tolerance_rpe` is not a breach), becomes the next floor and is graded `progressed` — a named state, never folded into an adherence percentage",
+      "above_the_ceiling": "a raised load logged above the ceiling plus the tolerance is a breach and never becomes a floor"
+    },
+    "ceiling_tier": {
+      "compounds": "the low end of `effort_ceilings.by_experience_tier.compounds_rpe` until #5058 assigns the owner's tier",
+      "last_isolation_set": "the low end of `effort_ceilings.by_experience_tier.last_isolation_set_rpe`; an isolation movement's earlier sets read the compounds band",
+      "refs": "#5058"
     }
   },
   "rotation": {
