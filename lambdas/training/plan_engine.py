@@ -864,7 +864,7 @@ def _rate_target(
     window: dict[str, str] | None,
     dxa_scans: list[dict[str, Any]] | None,
     guidance_cap_lb_wk: float | None = None,
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
     """`constraint_block.rate_target` (extracted for the #4880 function-length ratchet, #5088).
 
     #4161 ruling B: protein-gated; #4166: the gate's mode scales with the latest DXA's body fat;
