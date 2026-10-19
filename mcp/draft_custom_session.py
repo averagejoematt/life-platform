@@ -167,6 +167,20 @@ def _history_index() -> dict[str, list]:
     return load_history_indexes(lookback_days=FLOOR_LOOKBACK_DAYS)[0]
 
 
+def _authored_top(sets: list[Any] | None, rep_range: tuple[int, int] | None) -> tuple[float, int]:
+    """(heaviest non-warm-up `weight_kg`, authored reps) of a draft_custom block — read straight off
+    the sets, with no reps requirement: a block authored `rep_range_start/end` and no `reps` is a
+    sanctioned input (tools_hevy_routine `reps|rep_range_start/end`), and `load_progression.top_set`
+    would drop it as a non-working set. Reps are the range's bottom (or `reps`), so 'carried' means
+    the authored prescription already holds the step at its least demanding end."""
+    loads = [
+        float(s.weight_kg)
+        for s in sets or []
+        if str(getattr(s, "type", None) or "normal").lower() not in {"warmup", "warm_up", "warm-up"} and getattr(s, "weight_kg", None)
+    ]
+    return (max(loads) if loads else 0.0), (rep_range[0] if rep_range else 0)
+
+
 def attach_step_due(ir: Any, catalog: dict[str, Any], history_reader=None) -> list[dict[str, Any]]:
     """#5057: the chat draft names the stall rule's step on every block where it is due.
 
@@ -189,10 +203,8 @@ def attach_step_due(ir: Any, catalog: dict[str, Any], history_reader=None) -> li
             step = lp.stall_step(list(index.get(tid) or []) if tid else [], rep_range=_rep_range_of(b.sets))
             if step is None:
                 continue
-            authored = lp.top_set({"sets": [{"weight_kg": s.weight_kg, "reps": s.reps, "type": s.type} for s in b.sets]})
-            carried = (authored["load_kg"] or 0) >= step["next_load_kg"] - lp.LOAD_TOLERANCE_KG and (authored["reps"] or 0) >= int(
-                step["next_reps"] or 0
-            )
+            load_kg, reps = _authored_top(b.sets, _rep_range_of(b.sets))
+            carried = load_kg >= step["next_load_kg"] - lp.LOAD_TOLERANCE_KG and reps >= int(step["next_reps"] or 0)
             if not carried:
                 b.notes = f"{b.notes} Step due: {step['reason']}.".strip()
             rows.append({"movement_key": key, "carried": carried, **step})

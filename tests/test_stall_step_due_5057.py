@@ -156,6 +156,15 @@ def test_two_exposures_do_not_trigger():
     assert sd.assess_stall(_points(two))["verdict"] == sd.VERDICT_UNKNOWN
 
 
+def test_a_lowered_exposure_count_is_not_hidden_behind_the_trend_floor(monkeypatch):
+    """The detector's 3-session trend floor (MIN_SESSIONS) must not silently cap the charter's
+    `consecutive_exposures`: lowered to 2, a two-exposure window IS step_due."""
+    two = [_session(d, 200, 10, 7.0) for d in ("2026-10-16", "2026-10-13")]
+    rule = dict(tc.charter_value("progression.stall_rule"), consecutive_exposures=2)
+    monkeypatch.setattr(lp, "stall_rule", lambda: dict(rule))
+    assert sd.assess_stall(_points(two))["verdict"] == sd.VERDICT_STEP_DUE
+
+
 def test_a_fixed_load_with_changing_reps_is_not_a_stall():
     hist = [_session(d, 360, r, 7.5) for d, r in (("2026-10-16", 8), ("2026-10-13", 9), ("2026-10-09", 8))]
     verdict = sd.assess_stall(_points(hist))
@@ -258,6 +267,34 @@ def test_draft_custom_names_the_step_on_a_block_authored_below_it():
     carried = _ir(365, 8)
     rows = attach_step_due(carried, catalog, history_reader=lambda: {LEG_PRESS: _history(LEG_PRESS)})
     assert rows[0]["carried"] is True and "Step due" not in carried.exercises[0].notes
+
+    # A block authored as a rep RANGE with no `reps` (a sanctioned draft_custom input) is read by
+    # its load and its range's bottom — never dropped as a non-working set and falsely noted.
+    def _ranged(lb: float, lo: int, hi: int) -> RoutineSpec:
+        return RoutineSpec(
+            routine_id="r",
+            target_date="2026-10-19",
+            archetype="lower",
+            variant="ideal",
+            exercises=[
+                ExerciseBlock(
+                    movement_key="leg_press",
+                    sets=[
+                        Set(type="warmup", weight_kg=_kg(500), reps=5),
+                        Set(type="normal", weight_kg=_kg(lb), rep_range_start=lo, rep_range_end=hi),
+                    ],
+                )
+            ],
+            inputs_snapshot={},
+        )
+
+    above = _ranged(365, 10, 12)
+    rows = attach_step_due(above, catalog, history_reader=lambda: {LEG_PRESS: _history(LEG_PRESS)})
+    assert rows[0]["next_reps"] == 10 and rows[0]["carried"] is True
+    assert "Step due" not in (above.exercises[0].notes or "")
+    short = _ranged(360, 8, 12)
+    rows = attach_step_due(short, catalog, history_reader=lambda: {LEG_PRESS: _history(LEG_PRESS)})
+    assert rows[0]["carried"] is False and "Step due: +" in short.exercises[0].notes
 
     def _boom():
         raise RuntimeError("ddb down")

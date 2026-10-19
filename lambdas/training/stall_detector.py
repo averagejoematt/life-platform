@@ -382,13 +382,11 @@ def assess_stall(
         result.update(extra or {})
         return result
 
-    # 1. Not enough sessions for any trend claim, in either direction.
-    if len(pts) < min_sessions:
-        return _out(VERDICT_UNKNOWN, f"{len(pts)} session(s) — below the {min_sessions}-session floor for a trend claim.")
-
-    # 1b. #5057: the same top-set load × reps at an easy self-reported RPE, exposure after
-    #     exposure, is the PRESCRIPTION failing to progress — a claim about the plan, so it is
-    #     callable where `stall` (a claim about him) is refused, including with no plan on file.
+    # 1. #5057: the same top-set load × reps at an easy self-reported RPE, exposure after
+    #    exposure, is the PRESCRIPTION failing to progress — a claim about the plan, so it is
+    #    callable where `stall` (a claim about him) is refused, including with no plan on file.
+    #    It runs BEFORE the trend floor: `stall_step` enforces the charter's own
+    #    `progression.stall_rule.consecutive_exposures`, so lowering that never hides behind MIN_SESSIONS.
     step = step_due(pts, rep_range)
     if step is not None:
         return _out(
@@ -398,6 +396,10 @@ def assess_stall(
             used_rpe=True,
             extra={"step": step},
         )
+
+    # 1b. Not enough sessions for any trend claim, in either direction.
+    if len(pts) < min_sessions:
+        return _out(VERDICT_UNKNOWN, f"{len(pts)} session(s) — below the {min_sessions}-session floor for a trend claim.")
 
     # 2. No prescription on file at all. This is the exact state the owner's ruling
     #    names: without the diff there is nothing but performed data, so no stall.
