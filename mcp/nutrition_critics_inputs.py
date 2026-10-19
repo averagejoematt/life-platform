@@ -38,6 +38,14 @@ SERIES_DAYS = 14
 DECISIONS_LOOKBACK_DAYS = 14
 
 
+def _guidance_cap():
+    from training import rate_band
+
+    from mcp.config import table
+
+    return rate_band.guidance_cap_for(table)
+
+
 def _safe(fn: Callable[..., Any], *a: Any, **kw: Any) -> Any:
     try:
         return fn(*a, **kw)
@@ -210,6 +218,11 @@ def resolve(
     above_weeks, above_raised = _above_prescription_weeks(end_date)
     if above_raised:
         unresolved["self_added_volume"] = "the Hevy prescription-window read raised"
+    try:
+        guidance_cap = _guidance_cap()
+    except Exception:  # noqa: BLE001 — reported by name below; a broken read is not 'no cap'
+        guidance_cap = None
+        unresolved["guidance_cap"] = "the clinical guidance read failed — the rate cap could not be applied (report-only)"
     inputs: dict[str, Any] = {
         "window_end": end_date,
         "intake_kcal_by_day": intake,
@@ -227,6 +240,7 @@ def resolve(
         "training_above_prescription_weeks": above_weeks,
         "estimated_maintenance_kcal": estimated_maintenance_kcal,
         "dxa_scans": dxa,
+        "guidance_cap_lb_wk": guidance_cap,  # #5074: the clinical record's rate cap outranks the charter band
     }
     return {"inputs": inputs, "unresolved": unresolved}
 

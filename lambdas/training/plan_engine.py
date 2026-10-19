@@ -382,6 +382,7 @@ def _tripwire_states(
     recent_aerobic_block: dict[str, Any] | None = None,
     loss_rate: dict[str, Any] | None = None,
     weight_lb: float | None = None,
+    guidance_cap_lb_wk: float | None = None,
 ) -> list[dict[str, Any]]:
     """Evaluate each owner tripwire against the inputs, or say why it could not be read.
 
@@ -655,14 +656,9 @@ def _tripwire_states(
             row["standalone_walks"] = ((recent_aerobic_block or {}).get("totals") or {}).get("standalone_walks")
             row["actuator"] = recent_aerobic.collapse_actuator(row["state"], None)
         out.append(row)
-    # #5001 — rate_ceiling over THE stated loss rate; the advocate reads the same `rate_ceiling_check`.
-    rc = redline_rate.rate_ceiling_check(loss_rate, weight_lb)
-    rc_row = (
-        _missing("rate_ceiling", rc["detail"])
-        if loss_rate is None
-        else _row("rate_ceiling", rc["state"], rc["observed_lb_wk"], rc["detail"])
-    )
-    out.append({**rc_row, "evidence": rc})
+    rc = redline_rate.rate_ceiling_check(loss_rate, weight_lb, guidance_cap_lb_wk)  # #5001: the advocate reads this same check
+    args = ("rate_ceiling", rc["state"], rc["observed_lb_wk"], rc["detail"])
+    out.append({**(_missing("rate_ceiling", rc["detail"]) if loss_rate is None else _row(*args)), "evidence": rc})
     # #4098: the week gate, applied to EVERY row whose tripwire declares `not_before_week` —
     # never per-tripwire, so a new declaration is read the day it is written.
     for row in out:
@@ -882,14 +878,20 @@ def _rate_target(
     measured_7d: int | None,
     window: dict[str, str] | None,
     dxa_scans: list[dict[str, Any]] | None,
+    guidance_cap_lb_wk: float | None = None,
 ) -> dict[str, Any]:
-    """`constraint_block.rate_target` (extracted for the #4880 function-length ratchet, #5088)."""
+    """`constraint_block.rate_target` (extracted for the #4880 function-length ratchet, #5088).
+
+    #4161 ruling B: protein-gated; #4166: the gate's mode scales with the latest DXA's body fat;
+    #5074: the owner clinical record's cap outranks the charter band.
+    """
     return owner_redlines.rate_target_lb_per_wk(
         weight_lb,
         protein_missed_7d=missed_7d,
         protein_measured_7d=measured_7d,
         protein_window_days=window,
-        dxa_scans=dxa_scans,  # #4166: the gate's mode scales with the latest DXA's body fat
+        dxa_scans=dxa_scans,
+        guidance_cap_lb_wk=guidance_cap_lb_wk,
     )
 
 
@@ -930,6 +932,7 @@ def constraint_block(
     input_status: dict[str, dict[str, Any]] | None = None,
     recent_aerobic: dict[str, Any] | None = None,
     loss_rate: dict[str, Any] | None = None,
+    guidance_cap_lb_wk: float | None = None,  # #5074: the owner clinical record's rate cap — outranks the charter band
     steps_window: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The deterministic inputs to tomorrow's session. No model, no I/O, no hidden state.
@@ -1002,6 +1005,7 @@ def constraint_block(
         recent_aerobic_block=recent_aerobic,
         loss_rate=loss_rate,
         weight_lb=weight_lb,
+        guidance_cap_lb_wk=guidance_cap_lb_wk,
     )
     tripped, unknown, failed_tripwires, not_yet_active = (
         [t["id"] for t in tripwires if t["state"] == st] for st in ("tripped", "unknown", READ_FAILED, "not_yet_active")
@@ -1068,7 +1072,9 @@ def constraint_block(
         # redlines, with the session's cardio modality picked FROM them (`cardio_pick`).
         "recent_aerobic": _recent_aerobic_view(recent_aerobic, session.get("archetype"), states.get("recent_aerobic"), date),
         # v3.3 ruling "B" (#4161): the SERVED target is gated by protein adherence — `rate_target.protein_gate` says which
-        "rate_target": _rate_target(weight_lb, protein_days_missed_7d, protein_days_measured_7d, protein_window, dxa_scans),
+        "rate_target": _rate_target(
+            weight_lb, protein_days_missed_7d, protein_days_measured_7d, protein_window, dxa_scans, guidance_cap_lb_wk
+        ),
         # #5001: THE stated loss rate (method, window, n, source, the partition rows) — the rate_ceiling row's input
         "shared_quantities": {"loss_rate_lb_wk": loss_rate},
         # #3753 v3: tripwires the engine does not yet compute are NAMED here, never silent (ADR-105).
@@ -1165,22 +1171,7 @@ def constraint_block(
                     )
                     for d in dismissals_in_play
                 ],
-                (
-                    None
-                    if program["active"]
-                    else f"TRAINING_PROGRAM v{program['program_version']} ({program['split']}) is PROPOSED, not approved — the engine is still running on the live week grid (#3755)"
-                ),
-                *_program_conflict_lines(program["conflicts"]),
-                (
-                    f"the accessory layer is {rotation['state']}: {rotation['detail']}"
-                    if rotation["ok"] is None
-                    else (
-                        None
-                        if rotation["ok"]
-                        else "the accessory layer is DRIFTING (the program fixes accessories for the block) — added in the trailing 7 days: "
-                        + ", ".join(rotation["added_in_trailing_7d"][:4])
-                    )
-                ),
+                *_program_honesty(program, rotation),
                 (
                     "population-derived thresholds in play: " + ", ".join(redlines["population_derived_thresholds"])
                     if redlines["population_derived_thresholds"]
@@ -1190,6 +1181,28 @@ def constraint_block(
             if s
         ],
     }
+
+
+def _program_honesty(program: dict[str, Any], rotation: dict[str, Any]) -> list[str | None]:
+    """`constraint_block.honesty`'s program and accessory-layer sentences (extracted for the #4880 ratchet, #5074)."""
+    return [
+        (
+            None
+            if program["active"]
+            else f"TRAINING_PROGRAM v{program['program_version']} ({program['split']}) is PROPOSED, not approved — the engine is still running on the live week grid (#3755)"
+        ),
+        *_program_conflict_lines(program["conflicts"]),
+        (
+            f"the accessory layer is {rotation['state']}: {rotation['detail']}"
+            if rotation["ok"] is None
+            else (
+                None
+                if rotation["ok"]
+                else "the accessory layer is DRIFTING (the program fixes accessories for the block) — added in the trailing 7 days: "
+                + ", ".join(rotation["added_in_trailing_7d"][:4])
+            )
+        ),
+    ]
 
 
 def _program_conflict_lines(conflicts: list[dict[str, Any]]) -> list[str | None]:

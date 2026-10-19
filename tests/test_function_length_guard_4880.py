@@ -133,7 +133,6 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/emails/weekly_digest_lambda.py::build_html": 679,
     "lambdas/health/character_engine.py::compute_character_sheet": 267,
     "lambdas/health/character_engine.py::evaluate_level_changes": 189,
-    "lambdas/health/nutrition_critics.py::build_deficit_advocate_packet": 153,
     "lambdas/health/nutrition_critics.py::build_muscle_defense_packet": 163,
     "lambdas/ingestion/food_delivery_lambda.py::ingest_food_delivery_rows": 177,
     "lambdas/ingestion/health_auto_export_lambda.py::lambda_handler": 223,
@@ -145,8 +144,8 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/intelligence/ai_expert_analyzer_lambda.py::generate_and_cache": 210,
     "lambdas/intelligence/intelligence_common.py::build_coach_preamble": 182,
     "lambdas/operational/pipeline_health_check_lambda.py::lambda_handler": 154,
-    "lambdas/training/plan_engine.py::_tripwire_states": 253,
-    "lambdas/training/plan_engine.py::constraint_block": 228,  # 283 -> 276 (#5068) -> 242 (#5070: the reference block extracted, the deload recommendation added) -> 239 (#5088: the rate target extracted, the disruption block added; 241 once #5052/#5077/#5082 stacked) -> 228 (#5069 merge: the program-conflict honesty lines extracted)
+    "lambdas/training/plan_engine.py::_tripwire_states": 250,  # 253 -> 250 (#5074: the rate_ceiling row folded)
+    "lambdas/training/plan_engine.py::constraint_block": 217,  # 283 -> 276 (#5068) -> 242 (#5070: the reference block extracted, the deload recommendation added) -> 239 (#5088: the rate target extracted, the disruption block added; 241 once #5052/#5077/#5082 stacked) -> 228 (#5069 merge: the program-conflict honesty lines extracted) -> 217 (#5074 merge: the program-active + accessory-layer honesty lines extracted)
     "lambdas/web/recap_card_lambda.py::render_for_date": 190,
     "lambdas/web/site_api_ai_lambda.py::_handle_board_followup": 181,
     "lambdas/web/site_api_body.py::vitals": 174,
@@ -172,7 +171,7 @@ FUNCTION_LENGTH_COUNTS = {
     "mcp/tools_cgm.py::_get_fasting_glucose_validation": 327,
     "mcp/tools_health.py::_get_hydration_score": 177,
     "mcp/tools_health.py::tool_get_readiness_score": 284,
-    "mcp/tools_health.py::tool_get_weight_loss_progress": 168,
+    "mcp/tools_health.py::tool_get_weight_loss_progress": 152,  # 168 -> 152 (#5074: the BMI helpers moved to weight_rate)
     "mcp/tools_hevy_routine.py::_action_draft_custom": 163,
     "mcp/tools_journal.py::tool_mark_journal_quote": 161,
     "mcp/tools_labs.py::tool_get_freshness_status": 252,
