@@ -1975,6 +1975,21 @@ The cron emits a `RoutineConflict` CloudWatch metric and returns `pushed=false` 
 3. If transient: redrive via the existing DLQ consumer (`life-platform-dlq-consumer`, every 6h).
 4. If persistent: disable the cron (`aws events disable-rule --name hevy-routine-cron-weekly`) until Hevy recovers.
 
+### Nightly pre-draft plan source — the v0.4 revert (#5080)
+
+The nightly pre-draft (`mcp/nightly_predraft.py`, 02:00Z on `life-platform-mcp-warmer`) persists ONE plan per night. Which one is SSM `/life-platform/training-plan-source` (`v04 | charter`), read with a 60-s cache. **The parameter's absence means `charter`** (`mcp/predraft_shadow.py` `DEFAULT_SOURCE`), and so does a missing `ssm:GetParameter` grant or any read error — the run names the reason under `plan_source`.
+
+```bash
+# Revert to the frozen v0.4 plan (training/program_v04.build_session) from the next nightly run:
+aws ssm put-parameter --name /life-platform/training-plan-source --value v04 --type String --overwrite
+# Back to the charter engine:
+aws ssm put-parameter --name /life-platform/training-plan-source --value charter --type String --overwrite
+# What it reads now:
+aws ssm get-parameter --name /life-platform/training-plan-source --query Parameter.Value --output text --cli-read-timeout 60
+```
+
+The parameter is deliberately NOT CDK-owned — a stack deploy would re-assert a synth value and undo a revert. The flip takes effect on the next run (a warm container may hold the previous answer for up to 60 s). It changes only the nightly pre-draft; a draft built in chat is unaffected, and nothing is committed to Hevy either way. For the first five nights the run also builds the other plan and writes an owner-only side-by-side at `USER#matthew#SOURCE#training_constraints / SHADOW#<date>` (`docs/SCHEMA.md`); the run's log line carries the one-line `shadow.summary`.
+
 ### Public-site copy reminder
 
 Never describe this feature as "autoregulated" on averagejoematt.com or in the chronicle while the readiness signal is unvalidated. Correct phrasing: **deterministic volume-landmark programming with red-day deload guard.**
