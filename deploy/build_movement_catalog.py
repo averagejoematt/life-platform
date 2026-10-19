@@ -129,9 +129,11 @@ UNKNOWN_EQUIPMENT_TIER = 3
 #:            never be auto-picked under the skill ceiling of 2.
 #: An assisted/machine/band-assisted variant (title says "assisted", "machine" or "band") is NOT
 #: bodyweight-loaded — the stack takes part of the load — and keeps its equipment tier; so does
-#: every other equipment-none title (mobility, stretching, plank, push-up) at tier 1.
+#: every other equipment-none title (mobility, stretching, plank, push-up) at tier 1. Known gap: a
+#: title with no pull/chin/dip/inverted-row word (e.g. "Plyo Inverted Chins") stays at its equipment
+#: tier; the rule is deliberately title-word based, review such a row by hand (`reviewed: true`).
 BODYWEIGHT_SKILL_TIER_3 = re.compile(
-    r"\bmuscle[\s-]?ups?\b|\bpistol\b|\bnordic\b|\bhandstand\s+push|\bflag\b|\b(?:1|one)[\s-]?arm\s+(?:push|pull|chin)", re.I
+    r"\bmuscle[\s-]?ups?\b|\bpistol\b|\bnordic\b|\bhandstand\s+push|\bflag\b|\b(?:1|one)[\s-]?arm\s+(?:push|pull|chin)[\s-]?ups?\b", re.I
 )
 BODYWEIGHT_SKILL_TIER_2 = re.compile(r"\bpull[\s-]?ups?\b|\bchin[\s-]?ups?\b|\bdips?\b|\binverted\s+rows?\b", re.I)
 BODYWEIGHT_ASSISTED = re.compile(r"\bassist|\bmachine\b|\bband(?:ed)?\b|\bcable\b", re.I)
@@ -150,7 +152,7 @@ _WORKOUT_SK = re.compile(r"^DATE#(\d{4}-\d{2}-\d{2})#WORKOUT#")
 CATALOG_COMMENT = (
     "Internal movement vocabulary. Maps a stable internal key -> Hevy exercise_template_id. Tags every movement with primary "
     "muscle (the config/training_landmarks.json key the generator matches on), secondary muscles, skill_tier "
-    "(1=machine/band/bodyweight, 2=dumbbell/cable/kettlebell, 3=barbell/smith) and joint_friendly_score (3=highest, 0=lowest). "
+    "(1=machine/band/mobility; 2=dumbbell/cable/kettlebell; 3=barbell/smith; bodyweight-loaded titles 2-3 by title, see _rules.skill_tier) and joint_friendly_score (3=highest, 0=lowest). "
     "Consumed by routine_generator.py for selection + hevy_template_cache.py for resolution. Entries with `reviewed: true` "
     "are hand-curated and are preserved verbatim by the builder; `provenance: hevy_history` entries are GENERATED from the "
     "owner's whole Hevy history by deploy/build_movement_catalog.py (#4108) — review one by setting `reviewed: true` and "
@@ -388,6 +390,11 @@ def build_catalog(current: dict[str, Any], history: dict[str, Any], metadata: di
     retired: list[str] = []
     unavailable: list[str] = []
     generated: dict[str, dict[str, Any]] = {}
+    prior_notes = {
+        str(v.get("hevy_template_id_hint") or "").upper(): v["notes"]
+        for v in (current.get("movements") or {}).values()
+        if v.get("notes") and _kind(v) == "regenerate"
+    }
     for tid in sorted(hist):
         if tid in claimed:
             continue
@@ -398,6 +405,8 @@ def build_catalog(current: dict[str, Any], history: dict[str, Any], metadata: di
         if meta is None:
             unavailable.append(tid)
         entry = generated_entry(tid, hist[tid], meta)
+        if tid.upper() in prior_notes:  # hand-written provenance (#4169/#4176) survives regeneration
+            entry.setdefault("notes", prior_notes[tid.upper()])
         key = _slug(entry["title"])
         if key in kept or key in generated:
             key = f"{key}_{_slug(tid)[:8]}"

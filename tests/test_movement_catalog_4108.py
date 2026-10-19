@@ -211,6 +211,9 @@ def test_bodyweight_loaded_movements_are_above_the_easiest_tier_5054():
         ("none", "Inverted Chin Curls", 1),
         ("none", "Push Up", 1),
         ("none", "Plank", 1),
+        ("none", "1 Arm Pushdown", 1),  # over-match probe: not a one-arm push-up
+        ("none", "One Arm Pull Down", 1),
+        ("none", "One Arm Pull Up", 3),
     ]:
         assert bmc._skill_tier(equipment, title)[0] == tier, (equipment, title)
     assert bmc._skill_tier("none", "Pull Up")[1] == "title:bodyweight_loaded"
@@ -390,6 +393,15 @@ def test_a_reviewed_generated_entry_is_preserved_verbatim():
     first["movements"]["face_pull_cable"] |= {"reviewed": True, "joint_friendly_score": 3, "notes": "owner reviewed"}
     again = bmc.build_catalog(first, hist, _META)["movements"]["face_pull_cable"]
     assert again["reviewed"] is True and again["joint_friendly_score"] == 3 and again["notes"] == "owner reviewed"
+
+
+def test_regeneration_carries_forward_a_hand_written_note_5054():
+    """A note on an unreviewed hevy_history entry (#4169/#4176 provenance) survives the rebuild."""
+    hist = _history(AAAA0001=3)
+    first = bmc.build_catalog({"movements": {}}, hist, _META)
+    first["movements"]["face_pull_cable"]["notes"] = "provenance line"
+    again = bmc.build_catalog(first, hist, _META)["movements"]["face_pull_cable"]
+    assert again["notes"] == "provenance line"
 
 
 def test_a_coach_added_entry_is_enriched_kept_and_eligible():

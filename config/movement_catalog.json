@@ -1,5 +1,5 @@
 {
-  "_comment": "Internal movement vocabulary. Maps a stable internal key -> Hevy exercise_template_id. Tags every movement with primary muscle (the config/training_landmarks.json key the generator matches on), secondary muscles, skill_tier (1=machine/band/bodyweight, 2=dumbbell/cable/kettlebell, 3=barbell/smith) and joint_friendly_score (3=highest, 0=lowest). Consumed by routine_generator.py for selection + hevy_template_cache.py for resolution. Entries with `reviewed: true` are hand-curated and are preserved verbatim by the builder; `provenance: hevy_history` entries are GENERATED from the owner's whole Hevy history by deploy/build_movement_catalog.py (#4108) — review one by setting `reviewed: true` and editing its fields, never by hand-adding a generated-shaped entry. Which entries the generator may auto-program is training/movement_catalog.generator_eligible (reviewed OR a default_rep_range, under the skill ceiling — no frequency gate). `coach_added` entries are never-trained exercises added on purpose (see training/movement_catalog.py).",
+  "_comment": "Internal movement vocabulary. Maps a stable internal key -> Hevy exercise_template_id. Tags every movement with primary muscle (the config/training_landmarks.json key the generator matches on), secondary muscles, skill_tier (1=machine/band/mobility; 2=dumbbell/cable/kettlebell; 3=barbell/smith; bodyweight-loaded titles 2-3 by title, see _rules.skill_tier) and joint_friendly_score (3=highest, 0=lowest). Consumed by routine_generator.py for selection + hevy_template_cache.py for resolution. Entries with `reviewed: true` are hand-curated and are preserved verbatim by the builder; `provenance: hevy_history` entries are GENERATED from the owner's whole Hevy history by deploy/build_movement_catalog.py (#4108) — review one by setting `reviewed: true` and editing its fields, never by hand-adding a generated-shaped entry. Which entries the generator may auto-program is training/movement_catalog.generator_eligible (reviewed OR a default_rep_range, under the skill ceiling — no frequency gate). `coach_added` entries are never-trained exercises added on purpose (see training/movement_catalog.py).",
   "_version": 2,
   "_id_format": "8-char uppercase hex for a Hevy standard template; a custom template's id is a UUID. The hint is the id Hevy serves (GET /v1/exercise_templates).",
   "_provenance": {
@@ -868,7 +868,8 @@
       "sessions": 38,
       "first_done": "2021-04-12",
       "last_done": "2025-05-14",
-      "anchor_family": null
+      "anchor_family": null,
+      "notes": "#4169: the `calf_raise_machine` catalog key's hint until 2026-09-26, when it was moved to `91237BDD` (Calf Press) because that is the machine the owner actually logs. This id is real logged history (38 sessions), not deleted — just no longer the pool's active choice. Field values other than title/hint/sessions/first_done/last_done are carried over from the prior curated entry, not a fresh live enrichment."
     },
     "ez_bar_biceps_curl": {
       "title": "EZ Bar Biceps Curl",
@@ -1605,7 +1606,8 @@
       "sessions": 12,
       "first_done": "2022-08-31",
       "last_done": "2024-11-29",
-      "anchor_family": null
+      "anchor_family": null,
+      "notes": "#4169: the `leg_curl` catalog key's hint until 2026-09-26, when it was moved to `11A123F3` (Seated Leg Curl) because that is the machine the owner actually logs. This id is real logged history (12 sessions), not deleted — just no longer the pool's active choice. Field values other than title/hint/sessions/first_done/last_done are carried over from the prior curated entry, not a fresh live enrichment."
     },
     "bottomed_out_squat_reaches": {
       "title": "Bottomed Out Squat Reaches",
