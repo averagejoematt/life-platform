@@ -80,7 +80,7 @@ def run(mode: str, fixtures: Path = FIXTURES) -> tuple[int, list[str]]:
     lines, failed, cost = [], 0, 0.0
     for case in cases:
         call = _replay(recorded.get(case["case_id"])) if mode == "recorded" else None
-        grade = panel_judge.grade_case(case, rubric, route=panel_judge.GATE_ROUTE, call=call)
+        grade = panel_judge.grade_case(case, rubric, route=panel_judge.CI_ROUTE, call=call)
         why = case_failures(case, grade)
         cost += float(grade["judge"].get("cost_usd") or 0)
         judge_state = grade["judge"]["status"]

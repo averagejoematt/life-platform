@@ -183,7 +183,7 @@ def test_the_judge_is_blinded_to_the_engine_its_version_and_the_author():
 
 def test_the_judge_runs_on_a_different_tier_from_the_planner():
     bad = {
-        r: panel_judge.tier_check(r) for r in (panel_judge.WEEKLY_ROUTE, panel_judge.GATE_ROUTE) if panel_judge.tier_check(r)["same_model"]
+        r: panel_judge.tier_check(r) for r in (panel_judge.WEEKLY_ROUTE, panel_judge.CI_ROUTE) if panel_judge.tier_check(r)["same_model"]
     }
     assert not bad, f"judge and planner resolve to the same model: {bad}"
 
@@ -195,7 +195,7 @@ def test_a_paused_or_failed_judge_degrades_and_never_fabricates(monkeypatch):
     case = _case("good_charter_plan")
     monkeypatch.setattr(budget_guard, "allow", lambda feature: False)
     monkeypatch.setattr(budget_guard, "current_tier", lambda: 3)
-    paused = panel_judge.grade_case(case, rubric, route=panel_judge.GATE_ROUTE)
+    paused = panel_judge.grade_case(case, rubric, route=panel_judge.CI_ROUTE)
 
     def boom(body):
         raise RuntimeError("ThrottlingException")

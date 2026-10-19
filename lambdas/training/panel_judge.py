@@ -38,7 +38,7 @@ from training import charter_ai, panel_rubric
 logger = logging.getLogger(__name__)
 
 WEEKLY_ROUTE = "charter.judge"
-GATE_ROUTE = "charter.judge_gate"
+CI_ROUTE = "charter.judge_gate"
 PLANNER_ROUTE = "plan_critics"  # the tier the plan's own red team runs on — the judge must not share it
 # One weekly run = the real plan + every negative control, back-to-back (the cache register's calls_within_ttl).
 WEEKLY_CALLS_PER_RUN = 1 + len(panel_rubric.CONTROL_MUTATIONS)

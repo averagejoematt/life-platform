@@ -3569,7 +3569,7 @@ GUARD_PROOFS.update(
                 "M1 lambdas/training/panel_rubric.py check_cardio_dosed counts every cardio block as dosed (the check stops "
                 "discriminating). M2 scripts/panel_rubric_gate.py run()'s `return (1 if failed else 0), lines` -> `return 0, lines`. "
                 "M3 check_minutes_band's floor raised 10 min (`lo + 10 <= m`), which the good charter plan can no longer meet. "
-                "md5 panel_rubric.py 9bf6ab224fd1df207535b58ab963b501 and panel_rubric_gate.py 13c10edf4a133f29e9524b7045f1fb3b "
+                "md5 panel_rubric.py 9bf6ab224fd1df207535b58ab963b501 and panel_rubric_gate.py 741f422370ad5f9f77da16cd6f3d6f00 "
                 "before and after each restore."
             ),
             "observed": (
