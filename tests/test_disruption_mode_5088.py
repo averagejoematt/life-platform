@@ -253,7 +253,8 @@ def test_a_fixture_travel_window_is_offered_and_never_applies_itself():
 
 
 def test_the_charters_null_dated_window_is_pending_never_offered_or_guessed():
-    off = d.offer("2026-12-24", block_workouts=[])
+    # A fixture null-dated window, not the live charter's: the owner dates the trip before December (#5088).
+    off = d.offer("2026-12-24", block_workouts=[], windows=[{"label": "x", "start": None, "end": None}])
     assert off["offered"] is False
     assert off["pending_windows"] and "dates pending the owner" in off["pending_windows"][0]
 

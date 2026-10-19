@@ -123,7 +123,7 @@ def holds(template: str | None) -> list[dict[str, Any]]:
     sleep = next((t for t in owner_redlines.TRIPWIRES if t.get("id") == "sleep"), {})
     tmpl = (policy().get("templates") or {}).get(template or "") or {}
     return [
-        {"habit": "steps", "floor": _charter("steps.floor"), "source": "charter steps.floor", "every_day": True},
+        {"habit": "steps", "floor": _charter("steps.floor"), "source": "charter steps.floor", "every_day": _charter("steps.every_day")},
         {"habit": "protein", "floor_g": owner_redlines.REDLINES["protein_floor_g"]["value"], "source": "owner_redlines protein_floor_g"},
         {"habit": "sleep", "floor_h": sleep.get("threshold_hours"), "source": "owner_redlines TRIPWIRES sleep"},
         {
@@ -297,11 +297,11 @@ def offer(day: str, *, block_workouts: list[dict[str, Any]] | None, windows: lis
 
 
 def sessions_due(st: dict[str, Any], day: str, block_workouts: list[dict[str, Any]] | None) -> dict[str, Any]:
-    """On an active mode: the sessions logged in the trailing 7 days against the template's weekly band."""
+    """On an active mode: the sessions logged in the 7 days before `day` (`[day-7, day)`) against the template's weekly band."""
     band = st.get("sessions_per_wk") or []
     if st.get("phase") != PHASE_ACTIVE or not band or block_workouts is None:
         return {"due": True, "done_7d": None, "band": band or None}
-    start = shift_day_key(day, -6)
+    start = shift_day_key(day, -7)
     done = sum(1 for x in _session_days(block_workouts) if start <= x < day)
     return {"due": done < int(band[-1]), "done_7d": done, "band": band}
 
