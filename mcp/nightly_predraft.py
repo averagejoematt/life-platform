@@ -32,7 +32,8 @@ WHAT A RUN DOES — nothing a chat turn could not already do, in the same order
   3b. #5080 THE SWITCH + SHADOW (`mcp/predraft_shadow.py`): SSM `/life-platform/training-plan-source` (`v04 | charter`,
      60-s cache, FAIL-SAFE to `charter` when absent or unreadable) picks which plan step 3 persists — the charter draft,
      or the FROZEN v0.4 plan (`program_v04.build_session`) through `draft_custom`'s action function. Only one is ever
-     persisted. For the first `SHADOW_NIGHTS` nights the other is built too and an owner-only diff row is written
+     persisted; a v04 draft lands on the CHARTER's lifting days and never applies v0.4's calendar deload (#5070). For the
+     first `SHADOW_NIGHTS` nights the other is built too and an owner-only diff row is written
      (`SHADOW#<date>`); fail-soft, never the outcome. Revert: `predraft_shadow.REVERT_COMMAND`.
   5. `plan_next_session(routine_id=…)` — stage 2, the four critics. Their model calls are
      gated by `budget_guard` feature `plan_critics` INSIDE stage 2 (`tools_plan._model_allowed`):
@@ -317,7 +318,7 @@ def _mark_draft(
                 "session_label": session.get("label"),
                 "session_role": session.get("session_role"),
                 "optional": bool(session.get("optional")),
-                "seam": "plan_engine._scheduled_session",
+                "seam": "program_v04.build_session" if plan_source == "v04" else "plan_engine._scheduled_session",
                 "charter_version": (ir.inputs_snapshot or {}).get("charter_version"),  # #5085: the version that drafted it
                 "plan_source": plan_source,  # #5080: which engine this draft is (`charter`, or the frozen `v04` revert)
             },
@@ -363,6 +364,16 @@ def _draft_by_source(target_date: str, switch: dict[str, Any]) -> dict[str, Any]
 
     plan = ps.v04_plan(target_date, _block_record(target_date))
     return {**ps.draft_v04(target_date, plan), "v04_plan": plan}
+
+
+def _v04_marked(plan: dict[str, Any]) -> dict[str, Any]:
+    """#5080: the marker's session for a v0.4 draft — the frozen plan's own role, so `_routine_role` reads what was drafted."""
+    return {
+        "label": f"v0.4 {plan['session_role']}",
+        "session_role": plan["session_role"],
+        "archetype": plan["archetype"],
+        "optional": False,
+    }
 
 
 def _shadow(target: str, switch: dict[str, Any], session: dict[str, Any], routine_id: str, run_at: str, v04: Any) -> dict[str, Any]:
@@ -624,7 +635,7 @@ def run(target_date: str | None = None) -> dict[str, Any]:
         _mark_draft(
             target,
             routine_id,
-            session,
+            _v04_marked(v04_built) if v04_built else session,  # #5080: a v0.4 draft carries ITS role, never the charter's
             run_at,
             {r.routine_id: int(r.version) for r in existing},
             frozenset(r.routine_id for r in others),

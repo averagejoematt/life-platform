@@ -80,7 +80,8 @@ live structure, and nothing compares the two to refuse an edit."""
 # The pre-charter engine no longer exists as code (wave 1 made the generator the charter engine), so "v0.4" can only be
 # compared against, or reverted to, as a frozen definition. Everything below is v0.4 as it was SERVED (2026-09-24 ..
 # 2026-10-18), recorded as data and never read from a live module: the four role templates with the movement each slot
-# resolved to, the pre-charter rep scheme and RPE, v0.3 §3's entry ramp, and v3.3's one pre-planned deload. No
+# resolved to, the pre-charter rep scheme and RPE, v0.3 §3's entry ramp, and v3.3's one pre-planned deload (recorded,
+# never applied — #5070: a deload is his recorded word, under a revert too). No
 # progression, no rotation, no cardio dose, no steps target — v0.4 had none of them. A live module changing (the
 # charter's templates, effort ceilings, ramp or deload) moves nothing here; that is the point of a frozen baseline.
 V04_EXPOSURES: dict[str, dict[str, Any]] = {
@@ -145,7 +146,9 @@ V04_DELOAD: dict[str, Any] = {
     "sets_pct": -40,
     "loads": "held",
 }
-"""v0.4's scheduled deload as recorded (owner_redlines v3.3). The charter retired it (#5070): a deload is his recorded word."""
+"""v0.4's scheduled deload as recorded (owner_redlines v3.3) — INFORMATION ONLY. The builder never applies it: owner
+ruling 2026-10-18 (#5070) is that no deload is scheduled or automatic, and that ruling outranks v0.4 under a revert
+too. `build_session` reports `would_have_deloaded`; sets are cut only by a record of his word (`owner_deload`)."""
 
 _LB_PER_KG = 2.20462
 
@@ -181,8 +184,8 @@ def _load_lb(e1rm_kg: float | None, pct: int, bottom_reps: int, rpe_ceiling: flo
     return float(lb) if lb > 0 else None
 
 
-def _deload_sets(n: int) -> int:
-    return max(1, round(n * (100 + V04_DELOAD["sets_pct"]) / 100.0))
+def _deload_sets(n: int, sets_pct: int) -> int:
+    return max(1, round(n * (100 + int(sets_pct)) / 100.0))
 
 
 def v04_deload_on(target_date: str) -> bool:
@@ -197,13 +200,20 @@ def build_session(target_date: str, inputs: dict[str, Any] | None = None) -> dic
 
     `inputs` (all optional): `credited_sessions` (loaded sessions since the block start — picks the role and, with the
     calendar, the program week), `role` (overrides the order), `e1rm_kg` ({movement_key: kg} — without one a slot's load
-    is None and says why). Every set, rep and load comes from the frozen records above; nothing reads the charter."""
+    is None and says why), `owner_deload` (the owner's DELOAD# record covering the day, or None). Every set, rep and
+    load comes from the frozen records above; nothing reads the charter or the store.
+
+    THE DELOAD (owner ruling 2 of 2026-10-18, #5070): v0.4's calendar deload is NEVER applied — it is reported as
+    `deload.would_have_deloaded` only. Sets are cut only when `owner_deload` (his recorded word) covers the day, by
+    that record's `sets_pct` (v0.4's −40 % when the record carries none); loads are held either way."""
     inputs = dict(inputs or {})
     credited = int(inputs.get("credited_sessions") or 0)
     role = str(inputs.get("role") or v04_role(credited))
     week = v04_week(target_date, credited)
     pct = _ramp_pct(week)
-    deload = v04_deload_on(target_date)
+    scheduled = v04_deload_on(target_date)
+    word = inputs.get("owner_deload") or None
+    cut_pct = int(word.get("sets_pct") or V04_DELOAD["sets_pct"]) if word else 0
     e1rm = dict(inputs.get("e1rm_kg") or {})
     tmpl = V04_TEMPLATES[role]
     exercises: list[dict[str, Any]] = []
@@ -220,8 +230,8 @@ def build_session(target_date: str, inputs: dict[str, Any] | None = None) -> dic
             ]
         else:
             sets = [{"kind": "working", "reps": [lo, hi], "load_lb": load} for _ in range(int(n_override or spec["sets"]))]
-        if deload:
-            sets = sets[: _deload_sets(len(sets))]
+        if word:
+            sets = sets[: _deload_sets(len(sets), cut_pct)]
         exercises.append(
             {
                 "movement_key": key,
@@ -245,5 +255,12 @@ def build_session(target_date: str, inputs: dict[str, Any] | None = None) -> dic
         "cardio_block": None,
         "steps_target": None,
         "progression": None,
-        "deload": {"on": deload, "rule": V04_DELOAD["rule"], "starts_on": V04_DELOAD["starts_on"], "sets_pct": V04_DELOAD["sets_pct"]},
+        "deload": {
+            "on": bool(word),
+            "applied_by": f"owner DELOAD# record from {word.get('start_date')}" if word else None,
+            "sets_pct": cut_pct if word else None,
+            "would_have_deloaded": scheduled,
+            "v04_rule": f"{V04_DELOAD['rule']} — not applied: a deload is his recorded word (#5070)",
+            "starts_on": V04_DELOAD["starts_on"],
+        },
     }

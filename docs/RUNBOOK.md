@@ -1990,6 +1990,11 @@ aws ssm get-parameter --name /life-platform/training-plan-source --query Paramet
 
 The parameter is deliberately NOT CDK-owned — a stack deploy would re-assert a synth value and undo a revert. The flip takes effect on the next run (a warm container may hold the previous answer for up to 60 s). It changes only the nightly pre-draft; a draft built in chat is unaffected, and nothing is committed to Hevy either way. For the first five nights the run also builds the other plan and writes an owner-only side-by-side at `USER#matthew#SOURCE#training_constraints / SHADOW#<date>` (`docs/SCHEMA.md`); the run's log line carries the one-line `shadow.summary`.
 
+What a revert does and does not change (read before flipping to `v04`):
+
+- **The days are still the charter's.** The run asks the charter's schedule (`scheduled_session`) whether tomorrow is a lifting day and returns `no_session` when it is not, so under `v04` the v0.4 sessions are drafted on the charter's five lifting days, not v0.4's four-day `program_v04.NOMINAL_WEEK`. The v0.4 ROLE is v0.4's own order (`v04_role` over the loaded sessions since the block start), and the draft's marker carries that role (`seam: program_v04.build_session`). The owner-routine skip and the partition check still compare against the charter's served session; a v0.4 draft that would version over a routine he authored is refused by `_mark_draft`'s backstop, by name.
+- **No scheduled deload, under a revert too.** v0.4's calendar deload (from 2026-11-04, −40 % sets) is never applied — owner ruling 2 of 2026-10-18 (#5070) outranks v0.4. The plan reports it as `deload.would_have_deloaded` (and the shadow summary says "v0.4 would have deloaded — not applied"); sets are cut only when his recorded DELOAD# word (`get_exercise_notes action='deload'`) covers the day, exactly as on the charter path.
+
 ### Public-site copy reminder
 
 Never describe this feature as "autoregulated" on averagejoematt.com or in the chronicle while the readiness signal is unvalidated. Correct phrasing: **deterministic volume-landmark programming with red-day deload guard.**

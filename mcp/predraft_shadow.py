@@ -176,9 +176,13 @@ def _history_index() -> dict[str, list]:
     return load_history_indexes(lookback_days=E1RM_LOOKBACK_DAYS)[0]
 
 
-def v04_plan(target_date: str, block_workouts: list[dict[str, Any]] | None, history_index=None, catalog=None) -> dict[str, Any]:
-    """The frozen v0.4 session for the date, its loads from his logged e1RM (a failed history read leaves loads None, named)."""
-    from training import program_v04
+def v04_plan(
+    target_date: str, block_workouts: list[dict[str, Any]] | None, history_index=None, catalog=None, deload_records=None
+) -> dict[str, Any]:
+    """The frozen v0.4 session for the date, its loads from his logged e1RM (a failed history read leaves loads None, named).
+    v0.4's calendar deload is never applied (#5070); his recorded DELOAD# word covering the day is (read fail-soft: an
+    unreadable store cuts nothing)."""
+    from training import deload_word, program_v04
 
     credited = credited_sessions(target_date, block_workouts)
     role = program_v04.v04_role(credited)
@@ -188,7 +192,9 @@ def v04_plan(target_date: str, block_workouts: list[dict[str, Any]] | None, hist
         e1rm = e1rm_by_movement(target_date, history_index if history_index is not None else _history_index(), catalog or _catalog(), keys)
     except Exception as e:  # noqa: BLE001 — the plan still builds; its loads say why they are empty
         e1rm, note = {}, f"history unreadable ({type(e).__name__}) — loads unprescribed"
-    plan = program_v04.build_session(target_date, {"credited_sessions": credited, "e1rm_kg": e1rm})
+    records = deload_records if deload_records is not None else deload_word.load_records_failsoft()
+    word = deload_word.active_record(records, target_date)
+    plan = program_v04.build_session(target_date, {"credited_sessions": credited, "e1rm_kg": e1rm, "owner_deload": word})
     plan["credited_basis"] = "the Hevy record since the block start" if block_workouts is not None else "record unread — counted 0"
     plan["e1rm_basis"] = note or f"best Epley set per movement, last {E1RM_LOOKBACK_DAYS} days (not bodyweight-band matched)"
     return plan
@@ -294,7 +300,12 @@ def v04_side(plan: dict[str, Any], catalog: dict[str, Any]) -> dict[str, Any]:
         "lifting_minutes": mins["lifting_minutes"],
         "cardio_blocks": [],
         "steps_target": None,
-        "deload": {"on": plan["deload"]["on"], "rule": plan["deload"]["rule"]},
+        "deload": {
+            "on": plan["deload"]["on"],
+            "applied_by": plan["deload"]["applied_by"],
+            "would_have_deloaded": plan["deload"]["would_have_deloaded"],
+            "rule": plan["deload"]["v04_rule"],
+        },
         "e1rm_basis": plan.get("e1rm_basis"),
     }
 
@@ -309,7 +320,8 @@ def diff_report(target_date: str, persisted: str, charter: dict[str, Any], v04: 
         f"{target_date}: persisted {persisted}. Role {charter['session_role']} vs v0.4 {v04['session_role']}; "
         f"{charter['total_sets']} vs {v04['total_sets']} working sets; ~{charter['lifting_minutes']:g} vs ~{v04['lifting_minutes']:g} lifting min; "
         f"cardio {cardio} vs none; steps {steps.get('floor')}-{steps.get('target')} vs none; "
-        f"deload {'on' if charter['deload']['on'] else 'off'} vs {'on' if v04['deload']['on'] else 'off'}; "
+        f"deload {'on' if charter['deload']['on'] else 'off'} vs {'on' if v04['deload']['on'] else 'off'}"
+        f"{' (v0.4 would have deloaded — not applied, #5070)' if v04['deload'].get('would_have_deloaded') else ''}; "
         f"{len(ck - vk)} movement(s) only in the charter plan, {len(vk - ck)} only in v0.4."
     )
     return {
@@ -329,6 +341,7 @@ def diff_report(target_date: str, persisted: str, charter: dict[str, Any], v04: 
             "cardio_blocks": [len(charter["cardio_blocks"]), 0],
             "steps_target": [steps.get("target"), None],
             "deload": [charter["deload"]["on"], v04["deload"]["on"]],
+            "v04_would_have_deloaded": bool(v04["deload"].get("would_have_deloaded")),
         },
         "summary": summary,
         "revert_command": REVERT_COMMAND,

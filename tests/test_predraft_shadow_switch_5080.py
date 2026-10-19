@@ -133,7 +133,7 @@ def _stage_2(repo):
     return stage_2
 
 
-def _run(repo, source, *, shadow_due=False, put=None):
+def _run(repo, source, *, shadow_due=False, put=None, deload_records=None):
     switch = {"source": source, "read": "ssm", "reason": "test", "shadow": {"due": shadow_due, "reason": "test"}}
     persisted = []
 
@@ -160,6 +160,7 @@ def _run(repo, source, *, shadow_due=False, put=None):
         patch.object(npd, "_draft", side_effect=charter_draft),
         patch.object(ps, "draft_v04", side_effect=v04_draft),
         patch.object(ps, "_history_index", return_value={}),
+        patch("training.deload_word.load_records_failsoft", return_value=deload_records or []),
         patch.object(ps, "charter_preview", return_value=_ir("r-preview", movements=("barbell_bench_press", "db_lateral_raise"))),
         patch.object(ps, "write_report", side_effect=lambda report, put=None: writes.append(report)),
         patch.object(npd, "_stage_2", side_effect=_stage_2(repo)),
@@ -175,6 +176,13 @@ def test_the_flip_runs_both_directions_and_persists_exactly_one_plan():
         repo = _Repo()
         out, persisted, _ = _run(repo, source)
         marker = (repo.get_current(rid).inputs_snapshot or {}).get(npd.MARKER) or {}
+        # #5080 review: a v0.4 draft's marker carries the v0.4 plan's role and seam, never the charter session's
+        want_role = program_v04.v04_role(0) if source == "v04" else SESSION["session_role"]
+        want_seam = "program_v04.build_session" if source == "v04" else "plan_engine._scheduled_session"
+        if (marker.get("session_role"), marker.get("seam")) != (want_role, want_seam) or npd._routine_role(repo.get_current(rid))[
+            1
+        ] != want_role:
+            offenders.append((source, "marker role/seam", marker.get("session_role"), marker.get("seam")))
         if (
             out["outcome"] != npd.DRAFTED
             or persisted != [source]
@@ -275,7 +283,7 @@ def test_the_diff_report_shape_and_its_decimal_safe_write():
             {"date": TARGET, "sets": [{"weight_kg": 200.0, "reps": 5}]},
         ]
     }
-    plan = ps.v04_plan(TARGET, [], history_index=history, catalog=CATALOG)
+    plan = ps.v04_plan(TARGET, [], history_index=history, catalog=CATALOG, deload_records=[])
     assert plan["session_role"] == program_v04.SESSION_SEQUENCE["first_role"], "no credited session: v0.4's first role"
     charter = ps.charter_side(_ir("r", movements=("barbell_bench_press", "db_lateral_raise")), SESSION, CATALOG)
     report = ps.diff_report(TARGET, ps.CHARTER, charter, ps.v04_side(plan, CATALOG), "2026-10-21T02:00:00Z")
@@ -350,9 +358,29 @@ def test_the_frozen_builder_serves_v04s_order_ramp_and_deload():
     wk1 = program_v04.build_session("2026-09-25", {"role": "upper_heavy", "e1rm_kg": {"barbell_bench_press": 100.0}})
     top = wk1["exercises"][0]["sets"][0]
     assert wk1["ramp_pct"] == 60 and top["kind"] == "top" and top["load_lb"] == 130.0  # 60 % x 100 kg = 132 lb -> 130
-    on = program_v04.build_session("2026-11-05", {"role": "upper_volume"})
+    # owner ruling 2 (#5070): v0.4's calendar deload is information, never a cut — on its window the sets are HELD
+    sched = program_v04.build_session("2026-11-05", {"role": "upper_volume"})
     off = program_v04.build_session("2026-11-12", {"role": "upper_volume"})
-    assert on["deload"]["on"] and not off["deload"]["on"] and on["total_sets"] < off["total_sets"]
+    assert sched["deload"]["would_have_deloaded"] and not off["deload"]["would_have_deloaded"]
+    assert not sched["deload"]["on"] and sched["total_sets"] == off["total_sets"], "a scheduled deload must never cut sets"
+    word = {"start_date": "2026-11-12", "days": 7, "sets_pct": -40}
+    cut = program_v04.build_session("2026-11-12", {"role": "upper_volume", "owner_deload": word})
+    assert cut["deload"]["on"] and cut["deload"]["applied_by"] and cut["total_sets"] < off["total_sets"], "only his recorded word cuts"
+
+
+def test_a_revert_on_v04s_deload_window_persists_held_sets_unless_his_word_covers_the_day():
+    """The review's case: flipped to v04 on/after 2026-11-04, the nightly v0.4 draft must not drop 40 % of its sets."""
+    day = "2026-11-05"
+    held = ps.v04_plan(day, [], history_index={}, catalog=CATALOG, deload_records=[])
+    baseline = program_v04.build_session("2026-11-12", {"role": held["session_role"]})
+    assert held["deload"]["would_have_deloaded"] and not held["deload"]["on"] and held["total_sets"] == baseline["total_sets"]
+    words = [{"start_date": "2026-11-05", "days": 7, "sets_pct": -40, "words": "deload this week"}]
+    cut = ps.v04_plan(day, [], history_index={}, catalog=CATALOG, deload_records=words)
+    assert cut["deload"]["on"] and cut["total_sets"] < held["total_sets"]
+    side = ps.v04_side(held, CATALOG)
+    charter = ps.charter_side(_ir("r"), SESSION, CATALOG)
+    rep = ps.diff_report(day, ps.V04, charter, side, "2026-11-05T02:00:00Z")
+    assert rep["diff"]["v04_would_have_deloaded"] is True and "would have deloaded — not applied" in rep["summary"]
 
 
 def test_every_frozen_movement_is_in_the_catalog():
