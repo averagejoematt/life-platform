@@ -199,11 +199,16 @@ def choose_kind(
     last_tempo_or_hills: str | None = None,
     machines: tuple[str, ...] | None = None,
     days_left: int | None = None,
+    run_walk: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """{kind, machine, why} for today's block. `machines` restricts the choice to a block that is already
     on one machine (a chat-drafted bike); None lets the menu pick the machine too.
 
-    `week_kinds` are this week's blocks before today (performed or placed), oldest first."""
+    `week_kinds` are this week's blocks before today (performed or placed), oldest first.
+
+    `run_walk` (#5090) is `run_onramp.run_day_verdict` for today: once the run gate is open, an eligible day's
+    EASY slot becomes the run/walk block (kind `run_walk`, on the treadmill, with its block) — never a conditioning
+    slot, and never under a yellow/red recovery band."""
     week = list(week_kinds or [])
     order = list(placement().get("conditioning_order") or [])[: conditioning_per_wk()]
     done = [k for k in week if k in HARD]
@@ -253,6 +258,14 @@ def choose_kind(
         machine, kind = _fit_machine(kind, machines)
     if on_recumbent and machine == RECUMBENT:
         why += f"; the recumbent: {recumbent_why}"
+    if run_walk and run_walk.get("eligible") and kind not in HARD and recovery_band not in ("yellow", "red") and not machines:
+        return {
+            "kind": "run_walk",
+            "machine": TREADMILL,
+            "why": f"{why}; run/walk: {run_walk.get('why')}",
+            "needed": needed,
+            "block": run_walk.get("block"),
+        }
     return {"kind": kind, "machine": machine, "why": why, "needed": needed}
 
 
@@ -274,13 +287,25 @@ def _fit_machine(kind: str, machines: tuple[str, ...]) -> tuple[str, str]:
     return m, ("incline_treadmill_walk" if m == TREADMILL else "easy")
 
 
-def place_week(days: list[dict[str, Any]], last_tempo_or_hills: str | None = None) -> list[dict[str, Any] | None]:
+def place_week(
+    days: list[dict[str, Any]],
+    last_tempo_or_hills: str | None = None,
+    run_gate: dict[str, Any] | None = None,
+    run_level: int | None = None,
+    runs_done: int = 0,
+) -> list[dict[str, Any] | None]:
     """The placement over a week of days, each `{date, archetype}` (None archetype = a rest day, no gym
     block) plus optional `legs_loaded`. Returns one `choose_kind` result per day (None on a rest day).
-    The same rule `choose_kind` applies to a single draft, iterated so the week can be read whole."""
+    The same rule `choose_kind` applies to a single draft, iterated so the week can be read whole.
+
+    `run_gate` (#5090, `run_onramp.gate_state`): once open, each day is offered a run/walk at `run_level` through
+    `run_onramp.run_day_verdict` — the weekly cap counts `runs_done` plus the runs placed so far."""
+    from training import run_onramp
+
     out: list[dict[str, Any] | None] = []
     week: list[str] = []
     prior: str | None = None
+    runs = int(runs_done)
     lifting = [d for d in days if d.get("archetype")]
     for d in days:
         if not d.get("archetype"):
@@ -296,7 +321,9 @@ def place_week(days: list[dict[str, Any]], last_tempo_or_hills: str | None = Non
             legs_loaded=d.get("legs_loaded", False),
             last_tempo_or_hills=last_tempo_or_hills,
             days_left=left,
+            run_walk=run_onramp.run_day_verdict(d["archetype"], gate=run_gate, runs_this_week=runs, level=run_level) if run_gate else None,
         )
+        runs += pick["kind"] == "run_walk"
         out.append(pick)
         week.append(pick["kind"])
         prior = pick["kind"]

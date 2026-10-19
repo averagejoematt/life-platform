@@ -93,6 +93,7 @@ from training import (
     program_structure,
     recent_aerobic,
     redline_rate,
+    run_onramp,
     self_added_volume,
     steps_nudge,
     steps_ramp,
@@ -680,6 +681,8 @@ def _scheduled_session(
     skill_ceiling: int,
     block_workouts: list[dict[str, Any]] | None = None,
     deload_records: list[dict[str, Any]] | None = None,
+    weight_lb: float | None = None,
+    pain_flag_instances: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The session the program serves on `day` (#4064, #4110). Pure.
 
@@ -715,6 +718,7 @@ def _scheduled_session(
     if out.get("prescription"):
         # #5077: the block mesocycle model's week — the per-muscle set target, the ramp stage, the next block, no deload week
         out["block_model"] = block_model.for_session(out, deload_records)
+        run_onramp.attach_prep(out, day, weight_lb, pain_flag_instances, catalog_movements, skill_ceiling)  # #5090: lower-leg prep
     out["how_to_draft"] = (
         "manage_hevy_routine action=draft target_date=" + day + " builds exactly this session (the generator reads the same "
         "session sequence and prescription); draft_custom only for a deliberate departure"
@@ -1016,7 +1020,7 @@ def constraint_block(
         block_boundaries=_block_boundaries(block_workouts, date),
     )
 
-    session = _scheduled_session(date, catalog_movements, skill_ceiling, block_workouts, deload_records)
+    session = _scheduled_session(date, catalog_movements, skill_ceiling, block_workouts, deload_records, weight_lb, pain_flag_instances)
     # #5070: signals recommend, the owner's recorded word applies — one block, also stamped on the served session
     deload_rec = _deload_recommendation(session, date, deload_records, fatigue, readiness_low_streak_days, tripwires, states)
 
