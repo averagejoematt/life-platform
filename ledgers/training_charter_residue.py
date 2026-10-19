@@ -21,12 +21,15 @@ to three value classes the #5068 Set names (the movement gates, the volume bands
 ceilings) and to four Set files (mcp/tools_benchmark.py, lambdas/web/site_api_nutrition.py,
 config/user_goals.json, docs/coaching/COACH_SESSION.md). Widening after merge would have
 meant RAISING the seed against this ledger's own rule, so it was re-seeded here: 11 patterns,
-11 files beyond the two directory sweeps, 21 rows. The original 10 rows are unchanged.
+11 files beyond the two directory sweeps, 21 rows (20 after #5074 deleted the site_api_nutrition row). The original 10 rows are unchanged.
 
 What W1 (#5050) is expected to retire, by row:
-  * owner_redlines.py rate_band / session_minutes / sequence_names — the engine's rate
-    band, lifting budget and split read from the charter (`governing_goal.rate_band_lb_per_wk`,
-    `split.session_minutes.lifting`, `split.sequence`);
+  * owner_redlines.py session_minutes / sequence_names — the engine's lifting budget and split
+    read from the charter (`split.session_minutes.lifting`, `split.sequence`);
+  * owner_redlines.py rate_band — RETIRED #5074 down to 2 rows' worth of lines: the schedule's
+    above-landing target/cap now read `governing_goal.rate_band_lb_per_wk` (`training/rate_band.py`);
+    the 2 left are the overshoot trigger's own 3.0 lb/wk threshold (a different quantity that shares
+    the number) — NOT band copies, and not retireable by a charter read;
   * owner_redlines.py scheduled_deload_week — the scheduled deload is retired outright
     (charter `deload.scheduled: false`, owner ruling 2026-10-18);
   * owner_redlines.py movement_gate_lb (the taper table's `above_lb` steps at the three
@@ -48,10 +51,8 @@ What W1 (#5050) is expected to retire, by row:
   * recent_aerobic.py sequence_names — the lower-session predicate reads `split.sequence`;
   * routine_generator.py session_minutes — the floor/empty-session caps derive from
     `split.session_minutes.lifting`;
-  * lambdas/web/site_api_nutrition.py rate_band — `_TARGET_RATE_LB_WK` is retired by the
-    #5087 Set's W1 reader lane (a published surface may not show the rate band at all:
-    `public_view()` carries no `governing_goal.*`, so the row leaves with the literal, not
-    by a charter read);
+  * lambdas/web/site_api_nutrition.py rate_band — RETIRED #5074 (the literal, `target_rate_lb_wk`,
+    `required_deficit_kcal` and `gap_kcal` left the published payload; the row is deleted);
   * config/user_goals.json steps_floor — `daily_movement_target` (a 6–7k steps note that
     predates the 12,000 floor) is retired or re-pointed at `steps.floor` by the W1 lane
     that re-seeds the pre-registration from the charter.
@@ -77,7 +78,7 @@ TRAINING_CHARTER_RESIDUE = {
     "docs/coaching/COACH_SESSION.md::movement_gate_lb": 1,
     "lambdas/training/owner_redlines.py::effort_ceiling_rpe": 1,
     "lambdas/training/owner_redlines.py::movement_gate_lb": 7,
-    "lambdas/training/owner_redlines.py::rate_band": 6,
+    "lambdas/training/owner_redlines.py::rate_band": 2,
     "lambdas/training/owner_redlines.py::volume_band_sets": 1,
     "lambdas/training/program_structure.py::effort_ceiling_rpe": 2,
     "lambdas/training/program_structure.py::movement_gate_lb": 2,
@@ -85,6 +86,5 @@ TRAINING_CHARTER_RESIDUE = {
     "lambdas/training/program_v03.py::anchor_block_weeks": 1,
     "lambdas/training/routine_generator.py::session_minutes": 2,
     "lambdas/training/routine_title.py::effort_ceiling_rpe": 3,
-    "lambdas/web/site_api_nutrition.py::rate_band": 1,
     "mcp/tools_benchmark.py::movement_gate_lb": 3,
 }

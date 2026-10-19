@@ -233,8 +233,8 @@ def test_the_rate_tension_is_resolved_as_a_schedule_and_approved():
     assert summ["plan"].endswith("TRAINING_PROGRAM_v0.4.md") and owner_redlines.PLAN_V0_3.endswith("TRAINING_PROGRAM_v0.3.md")
     assert summ["red_team_record"].endswith("TRAINING_PROGRAM_v0.3_redteam.md")
     rate = owner_redlines.rate_target_lb_per_wk(316.9)
-    assert rate["target_lb_wk"] == 3.5 and rate["cap_lb_wk"] == 4.0 and rate["schedule_step_above_lb"] == 295
-    assert owner_redlines.rate_target_lb_per_wk(250.0)["target_lb_wk"] == 2.75
+    assert rate["target_lb_wk"] == 3.5 and rate["cap_lb_wk"] == 3.5 and rate["schedule_step_above_lb"] == 295
+    assert owner_redlines.rate_target_lb_per_wk(250.0)["target_lb_wk"] == 3.5  # #5074: the charter band governs above 240
     assert owner_redlines.rate_target_lb_per_wk(199.0)["target_lb_wk"] == 0.0  # the maintenance block
     # the tripwires the engine cannot compute are named in the block, never silent (ADR-105)
     block = plan_engine.constraint_block(**_FULL)
@@ -242,20 +242,20 @@ def test_the_rate_tension_is_resolved_as_a_schedule_and_approved():
     # #4387: walking_collapse is evaluated (report-only) now; rate_overshoot is still named as unevaluated
     assert any("NOT evaluated by this engine" in line and "rate_overshoot" in line for line in block["honesty"])
     rate = plan_engine.constraint_block(**_FULL)["rate_target"]
-    assert rate["low_lb_wk"] == pytest.approx(1.6, abs=0.05)
-    assert rate["high_lb_wk"] == pytest.approx(3.2, abs=0.05)
+    assert (rate["low_lb_wk"], rate["high_lb_wk"]) == (3.0, 3.5)  # #5074: the charter band, not the 0.5-1.0 %BW envelope
     assert rate["owner_to_resolve"] is None and rate["resolution"].startswith("RESOLVED as a schedule")
 
 
 # ── 5b. v3 (#3753 approved 2026-09-21): the §1 table, the landing, the new tripwires ────
 _V3_TABLE = [
     # (weight_lb, target, cap, step_above_lb) — the plan's §1 rows, sampled INSIDE each band
-    (317.0, 3.5, 4.0, 295),
-    (296.0, 3.5, 4.0, 295),
-    (290.0, 3.25, 3.75, 275),
-    (276.0, 3.25, 3.75, 275),
-    (270.0, 3.0, 3.5, 260),
-    (250.0, 2.75, 3.25, 240),
+    (317.0, 3.5, 3.5, 295),
+    (296.0, 3.5, 3.5, 295),
+    # #5074: above the landing the charter band governs — target = cap = the 3.5 ceiling (ruling 3: one ceiling, no margin), every step
+    (290.0, 3.5, 3.5, 275),
+    (276.0, 3.5, 3.5, 275),
+    (270.0, 3.5, 3.5, 260),
+    (250.0, 3.5, 3.5, 240),
     (230.0, 2.25, 2.75, 220),
     (215.0, 1.75, 2.25, 210),
     (207.0, 1.25, 1.75, 205),
@@ -277,9 +277,11 @@ def test_v3_schedule_boundaries_are_strict_and_the_dxa_gates_travel():
     DXA-gated steps carry their gate text so a coach cannot take 3.5 at 270 without seeing it."""
     steps = owner_redlines.REDLINES["rate_schedule_lb_wk"]["steps"]
     assert [s["above_lb"] for s in steps] == [295, 275, 260, 240, 220, 210, 205, 0]
-    assert [s["target"] for s in steps] == [3.5, 3.25, 3.0, 2.75, 2.25, 1.75, 1.25, 0.0]
-    assert [s["cap"] for s in steps] == [4.0, 3.75, 3.5, 3.25, 2.75, 2.25, 1.75, 0.0]
-    assert owner_redlines.rate_target_lb_per_wk(295.0)["target_lb_wk"] == 3.25
+    # the four steps above the landing carry NO literal target/cap (#5074): they read the charter; the landing is his own
+    assert [s.get("governed_by") for s in steps[:4]] == ["charter"] * 4 and not any("target" in s or "cap" in s for s in steps[:4])
+    assert [s["target"] for s in steps[4:]] == [2.25, 1.75, 1.25, 0.0]
+    assert [s["cap"] for s in steps[4:]] == [2.75, 2.25, 1.75, 0.0]
+    assert owner_redlines.rate_target_lb_per_wk(295.0)["target_lb_wk"] == 3.5
     assert owner_redlines.rate_target_lb_per_wk(240.0)["target_lb_wk"] == 2.25
     assert "12 %" in owner_redlines.rate_target_lb_per_wk(270.0)["dxa_gate"]
     assert "15 %" in owner_redlines.rate_target_lb_per_wk(250.0)["dxa_gate"]

@@ -668,6 +668,7 @@ def test_the_resolver_block_carries_the_verdicts_and_names_what_it_could_not_rea
     monkeypatch.setattr("training.routine_title._load_routine_index", lambda start: [])  # #4312: the complement split's index read
     monkeypatch.setattr(nci, "_walking_hours", lambda end: 9.0)
     monkeypatch.setattr(nci, "_metabolic_severity", lambda end: None)  # IC-29 unreadable
+    monkeypatch.setattr(nci, "_guidance_cap", lambda: None)  # #5074: the clinical record states no cap (the read succeeded)
     monkeypatch.setattr(nci, "already_logged", lambda days=14: [])
     monkeypatch.setattr(nci.shared_quantities, "dxa_scans", lambda end: [])  # #4166: no scan on file -> tier unknown
     out = nci.block("2026-09-20", deficit_severity="SUSTAINABLE", degraded_count=0)
