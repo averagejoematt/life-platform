@@ -176,12 +176,6 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
         "qa_check_subscriber_promise); deleting the set the promise is checked AGAINST "
         "would leave the promise asserted only against itself."
     ),
-    "lambdas/training/training_charter.py:reset_cache": (
-        "#5084: the charter loader's test hook (forget the cached charter and the once-per-container "
-        "warnings), called by every charter test fixture and by no runtime path — a loader with a "
-        "15-min cache needs one, and it is the same shape as the other module caches' hooks. Was red "
-        "on the charter-w0 base since #5118; registered here with its reason rather than left red."
-    ),
     # ── #3609 box 2: the widened-scan batch (101 entries, dated 2026-09-19). ────────
     #
     # SCAN_PACKAGES went from 2 hand-typed packages (common, ai) to ~15 derived from
