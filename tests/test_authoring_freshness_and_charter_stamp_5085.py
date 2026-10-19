@@ -78,6 +78,55 @@ def test_add_input_age_is_fail_soft_on_a_read_failure():
     assert out["ok"] is True
 
 
+def _phase(phase):
+    from training import disruption
+
+    return patch.object(disruption, "state", return_value={"phase": phase}), patch.object(
+        disruption, "load_records_failsoft", return_value=[]
+    )
+
+
+def test_step_back_up_phase_is_exempt():
+    from training import disruption
+
+    a, b = _phase(disruption.PHASE_STEP_BACK_UP)
+    with a, b, patch.object(age, "_sick_day_in_window", return_value=False):
+        assert age._lifting_expected("2026-12-31", "2026-12-20") is False
+
+
+def test_active_phase_is_exempt():
+    from training import disruption
+
+    a, b = _phase(disruption.PHASE_ACTIVE)
+    with a, b, patch.object(age, "_sick_day_in_window", return_value=False):
+        assert age._lifting_expected("2026-12-25", "2026-12-20") is False
+
+
+def test_a_recorded_sick_day_is_exempt():
+    from training import disruption
+
+    a, b = _phase(disruption.PHASE_OFF)
+    with a, b, patch.object(age, "_sick_day_in_window", return_value=True):
+        assert age._lifting_expected("2026-10-19", "2026-10-05") is False
+
+
+def test_unrecorded_layoff_still_refuses_by_name():
+    from training import disruption
+
+    a, b = _phase(disruption.PHASE_OFF)
+    with a, b, patch.object(age, "_sick_day_in_window", return_value=False):
+        expected = age._lifting_expected("2026-10-19", "2026-10-05")
+    assert expected is True
+    gaps = age.assess_input_age("2026-10-19", "2026-10-05", NOW, hevy_expected=expected)
+    assert gaps and gaps[0]["reason"].startswith("blocked_stale_inputs: hevy last workout")
+
+
+def test_sick_day_window_reads_the_checker_between_last_workout_and_target():
+    with patch("health.sick_day_checker.get_sick_days_range", return_value=[{"date": "2026-10-10"}]) as g:
+        assert age._sick_day_in_window("2026-10-05", "2026-10-19") is True
+    assert g.call_args[0][2:] == ("2026-10-05", "2026-10-19")
+
+
 def test_the_draft_gate_runs_the_age_check():
     import inspect
 

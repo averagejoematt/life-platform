@@ -79,15 +79,32 @@ def _latest_hevy_date() -> str | None:
     return items[0]["sk"].split("DATE#", 1)[1][:10] if items else None
 
 
-def _lifting_expected(target_date: str) -> bool:
-    """False while his disruption mode is active on the day (no lifting is the plan, not an outage)."""
+def _sick_day_in_window(start: str | None, end: str) -> bool:
+    """True when a sick day he recorded (`manage_sick_days`, tombstoned rows excluded) falls in [start, end]."""
+    from health import sick_day_checker
+
+    from mcp.config import USER_ID, table
+
+    lo = (start or end)[:10]
+    return bool(sick_day_checker.get_sick_days_range(table, USER_ID, lo, end[:10]))
+
+
+def _lifting_expected(target_date: str, hevy_date: str | None = None) -> bool:
+    """False when no lifting is the RECORDED plan: any non-OFF disruption phase (travel active, or stepping back
+    up after it) or a sick day he recorded since the last workout. An UNRECORDED layoff stays refused by name."""
     try:
         from training import disruption
 
-        return disruption.state(disruption.load_records_failsoft(), target_date).get("phase") != disruption.PHASE_ACTIVE
+        if disruption.state(disruption.load_records_failsoft(), target_date).get("phase") != disruption.PHASE_OFF:
+            return False
     except Exception as e:  # noqa: BLE001
         logger.warning("input age: disruption read failed (%s) — lifting is expected", e)
-        return True
+    try:
+        if _sick_day_in_window(hevy_date, target_date):
+            return False
+    except Exception as e:  # noqa: BLE001
+        logger.warning("input age: sick-day read failed (%s) — lifting is expected", e)
+    return True
 
 
 def add_input_age(gate: dict[str, Any], latest_recovery: str | None, target_date: str, now: datetime | None = None) -> dict[str, Any]:
@@ -98,7 +115,7 @@ def add_input_age(gate: dict[str, Any], latest_recovery: str | None, target_date
     except Exception as e:  # noqa: BLE001
         logger.warning("input age: hevy read failed: %s", e)
         hevy_date = None
-    gaps = assess_input_age(latest_recovery, hevy_date, now, hevy_expected=_lifting_expected(target_date))
+    gaps = assess_input_age(latest_recovery, hevy_date, now, hevy_expected=_lifting_expected(target_date, hevy_date))
     if gaps:
         gate["gaps"] = list(gate.get("gaps") or []) + gaps
         gate["ok"] = False
