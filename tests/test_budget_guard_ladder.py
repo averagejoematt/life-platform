@@ -63,7 +63,7 @@ _IRREDUCIBLE_READER = ("website_ai", "daily_brief_ai")
 # upstream of every reader surface, and they are per-deploy + bounded rather than
 # per-day + open-ended. They pause at the hard stop, i.e. exactly when Bedrock
 # stops for everything.
-_OPERATOR_TRUTH = ("reader_truth_qa", "visual_ai_qa")
+_OPERATOR_TRUTH = ("reader_truth_qa", "visual_ai_qa", "charter_judge_gate")  # #5072: the panel-rubric regression gate
 # #4643: the ingest-path AI callers, listed at the hard stop BY DECLARATION — the cutoff each
 # already inherited by being unlisted, so naming them changed no live behaviour. Moving one into
 # band 1 would pause it on most days of a month (tier >= 1 is the default at current burn), which

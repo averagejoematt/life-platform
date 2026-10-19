@@ -194,10 +194,17 @@ LEDGER: dict[str, dict] = {
     "charter_judge": _row(
         owner="lambdas/training/charter_ai.py",
         attribution=NONE,
-        note="#5084: the charter's panel-rubric judge (#5072) — one Haiku call per panel seat per graded plan, the "
-        "cached charter block written once and read by the rest. No caller deployed yet, so no dimension value: its "
-        "golden-case runs land under the CI or dev-session key of whatever runs them, the weekly grade under its host "
-        "Lambda. Estimate (#5084, docs/PROPORTIONALITY.md): $0.0426 per graded plan cached",
+        note="#5084/#5072: the charter's panel-rubric judge, the WEEKLY real-plan grade — one Sonnet call per plan with "
+        "every seat in it, the real plan + 4 negative controls back-to-back, the cached charter block written once and "
+        "read by the rest. Hosted by the MCP Lambda's weekly job once scheduled (no dimension value of its own: it "
+        "lands under the host's). Estimate (#5072): ~$0.15 a weekly run, ~$0.65/month",
+    ),
+    "charter_judge_gate": _row(
+        owner="lambdas/training/panel_judge.py",
+        attribution=NONE,
+        note="#5072: the same judge as the CI regression gate over the golden plan cases (band 3, an operator-truth CI "
+        "gate). Path-filtered to charter / engine-template / skill / coach-prompt changes, so it bills only on those "
+        "merges; lands under the ci (or dev-session) caller class. Estimate: ~$0.15 a run (5 cases)",
     ),
     "charter_retro": _row(
         owner="lambdas/training/charter_ai.py",

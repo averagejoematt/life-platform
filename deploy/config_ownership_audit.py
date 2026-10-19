@@ -230,6 +230,15 @@ RULINGS: tuple[Ruling, ...] = (
         "example below.",
     ),
     Ruling(
+        "config/panel_rubric.json",
+        HAND_OWNED,
+        "#5072 (epic #5067): the panel rubric — the fixed standard the training plan is graded against, one seat per "
+        "school of the charter's concession_ledger, each criterion graded by code (lambdas/training/panel_rubric.py "
+        "CHECKS) or by the judge (lambdas/training/panel_judge.py). Hand-authored, versioned with its own change_log; "
+        "staged into every Lambda bundle by deploy/build_bundle.py and read from the bundle only. No writer anywhere. "
+        "Uploading it is a publish.",
+    ),
+    Ruling(
         "config/training_charter.private.example.json",
         HAND_OWNED,
         "#5087: a committed TEMPLATE (null placeholders only) for the owner-only half of the training charter. The real "

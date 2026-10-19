@@ -180,23 +180,23 @@ def render_branches_note(branches: list[RoutineBranch]) -> str:
 # routine-level note — so the session-level cues (the gate line, the stop list, the day's plan)
 # stay on the first exercise's PINNED ROUTINE NOTE, never `routine.notes` and never a pinned
 # exercise note (Matthew's; not in the API). docs/integrations/hevy-changes-2026-10.md §6.
-def _place_routine_note(exercises: list[dict[str, Any]], composed: str) -> list[dict[str, Any]]:
-    """Prepend the routine-level note to exercises[0].notes; a routine with no exercises has nowhere to
-    carry it and Hevy would reject the routine anyway (the tool's precheck names that)."""
-    if composed and exercises:
+def _place_routine_note(exercises: list[dict[str, Any]], composed: str, menu: str = "") -> list[dict[str, Any]]:
+    """Place the routine-level text on exercises[0].notes; a routine with no exercises has nowhere to
+    carry it and Hevy would reject the routine anyway (the tool's precheck names that).
+
+    #5083 ordering rule (docs/integrations/hevy-render-table.md): the session WHY line first, then
+    exercise 0's OWN note (its prescription line leads it), then the session menus (the branch menu)
+    last — so a cut of the visible note lands on a menu, never on exercise 0's reason line."""
+    if (composed or menu) and exercises:
         first = exercises[0]
-        existing = first.get(PINNED_ROUTINE_NOTE_FIELD) or ""
-        first[PINNED_ROUTINE_NOTE_FIELD] = f"{composed}\n\n{existing}" if existing else composed
+        parts = (composed, first.get(PINNED_ROUTINE_NOTE_FIELD) or "", menu)
+        first[PINNED_ROUTINE_NOTE_FIELD] = "\n\n".join(p for p in parts if p)
     return exercises
 
 
-def _compose_notes(ir: RoutineSpec, why_note: str | None) -> str:
-    """Base WHY note (or ir.notes) + the branch menu, both sanitized for the wire."""
-    base = sanitize_note(why_note if why_note is not None else ir.notes)
-    branch_block = sanitize_note(render_branches_note(ir.branches))
-    if not branch_block:
-        return base
-    return f"{base}\n\n{branch_block}" if base else branch_block
+def _compose_notes(ir: RoutineSpec, why_note: str | None) -> tuple[str, str]:
+    """(the base WHY note or ir.notes, the branch menu), both sanitized for the wire."""
+    return sanitize_note(why_note if why_note is not None else ir.notes), sanitize_note(render_branches_note(ir.branches))
 
 
 def _resolve_title(ir: RoutineSpec, title_context: dict[str, Any] | None) -> str:
@@ -227,7 +227,7 @@ def to_create_body(
     field. If None, falls back to ir.notes.
     """
     exercises = _place_routine_note(
-        [_exercise_to_wire(ex, template_resolver) for ex in _primary_exercises(ir)], _compose_notes(ir, why_note)
+        [_exercise_to_wire(ex, template_resolver) for ex in _primary_exercises(ir)], *_compose_notes(ir, why_note)
     )
     return {
         "routine": {
@@ -248,7 +248,7 @@ def to_update_body(
     (immutable per Hevy). title_context + why_note semantics match
     to_create_body."""
     exercises = _place_routine_note(
-        [_exercise_to_wire(ex, template_resolver) for ex in _primary_exercises(ir)], _compose_notes(ir, why_note)
+        [_exercise_to_wire(ex, template_resolver) for ex in _primary_exercises(ir)], *_compose_notes(ir, why_note)
     )
     return {
         "routine": {

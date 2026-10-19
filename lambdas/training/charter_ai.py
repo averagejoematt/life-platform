@@ -5,8 +5,13 @@ feature (``ai.budget_guard._FEATURE_CUTOFF``), its model route (``ai.model_routi
 bound below at import exactly as every runtime caller binds its model) and which charter
 block it sends (``training_charter.prompt_prefix(published=...)``):
 
-  * ``charter.judge``     feature ``charter_judge``     — the panel-rubric judge (#5072): golden
-    plan cases and the weekly real plan, one call per panel seat. Band 1 (internal).
+  * ``charter.judge``     feature ``charter_judge``     — the panel-rubric judge (#5072): the weekly
+    real plan plus its negative controls, ONE call per plan with all panel seats in it
+    (``panel_judge.WEEKLY_CALLS_PER_RUN``). Band 1 (internal). NARRATIVE tier since #5072: the
+    plan's own red team runs on WORKHORSE (``plan_critics``), and the judge must not share its model.
+  * ``charter.judge_gate`` feature ``charter_judge_gate`` — the SAME judge run by the CI regression
+    gate (``scripts/panel_rubric_gate.py``) over the golden cases, one call per case. Band 3, with
+    the other operator-truth CI gates (``budget_guard.CI_GATE_FEATURES``): it pauses only at the hard stop.
   * ``charter.narrative`` feature ``charter_narrative`` — the plan's explanation lines in the
     charter's frame on the owner's plan, Hevy note and Telegram (#5071 "every plan explains
     itself"). Band 2 (owner-facing coach voice, with ``plan_critics``).
@@ -25,7 +30,8 @@ uncached block (``system_blocks``). A cache write is only worth paying when a se
 reads it inside the TTL, so each caller issues its calls BACK-TO-BACK in one run: the judge
 and the retro one call per panel seat (the charter's concession-ledger schools), the
 narrative one line per ``NARRATIVE_SURFACES`` entry. The register's ``calls_within_ttl`` is
-pinned to those two derivations by tests/test_charter_ai_budget_5084.py, never a hand number.
+pinned to those derivations by tests/test_charter_ai_budget_5084.py, never a hand number (#5072
+moved the judge from one call per seat to one call per PLAN: the batch is the plans of one run).
 """
 
 from __future__ import annotations
@@ -40,6 +46,7 @@ from training import training_charter
 
 # ── the models, bound through the #4770 registry (the route's env var overrides at runtime) ──
 CHARTER_JUDGE_MODEL = model_routing.model_for("charter.judge")
+CHARTER_JUDGE_GATE_MODEL = model_routing.model_for("charter.judge_gate")
 CHARTER_NARRATIVE_MODEL = model_routing.model_for("charter.narrative")
 CHARTER_RETRO_MODEL = model_routing.model_for("charter.retro")
 
@@ -59,6 +66,7 @@ class CharterCaller:
 
 CALLERS: Dict[str, CharterCaller] = {
     "charter.judge": CharterCaller("charter.judge", "charter_judge", "CHARTER_JUDGE_MODEL", False, 5072),
+    "charter.judge_gate": CharterCaller("charter.judge_gate", "charter_judge_gate", "CHARTER_JUDGE_GATE_MODEL", False, 5072),
     "charter.narrative": CharterCaller("charter.narrative", "charter_narrative", "CHARTER_NARRATIVE_MODEL", False, 5071),
     "charter.retro": CharterCaller("charter.retro", "charter_retro", "CHARTER_RETRO_MODEL", False, 5079),
 }
