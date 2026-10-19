@@ -775,12 +775,11 @@ def test_5004_a_sixth_session_in_the_window_is_flagged_and_names_the_window():
 
 
 def test_5069_the_redline_reads_the_charters_five_lifting_days():
-    """Ruling 5 moves the per-week value from v0.4's 3–4 to the charter's five; the old pair is history on the redline."""
+    """Ruling 5 moves the per-week value from v0.4's 3–4 to the charter's five (the old pair is the redline's comment history)."""
     from training.training_charter import charter_value
 
     lift = owner_redlines.REDLINES["lifting_sessions_per_wk"]
     assert [lift[k] for k in ("low", "high")] == [charter_value("split.lifting_days_per_wk")] * 2 == [5, 5]
-    assert lift["low_high_v0_4"] == [3, 4]
 
 
 def test_5004_mutation_control_the_eight_day_count_flags_the_five_session_case():
