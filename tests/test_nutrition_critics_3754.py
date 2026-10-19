@@ -442,7 +442,10 @@ def test_weight_stall_without_adherence_offers_nothing(over):
 
 
 def test_stall_conditions_are_read_from_the_redlines_not_literals():
-    assert LIFTS["low"] == 3 and PROTEIN["days_of_7"] == 6  # the values the fixture above is built around (v3: 3–4 sessions)
+    # #5069 (owner ruling 5, 2026-10-18: "5 lifting days"): the redline's low is the charter's lifting days, not v3's 3
+    from training.training_charter import charter_value
+
+    assert LIFTS["low"] == charter_value("split.lifting_days_per_wk") == 5 and PROTEIN["days_of_7"] == 6
     short = LIFTS["low"] - 1  # one lift under the redline's low in the trailing 7
     inputs = _inputs(**STALL, lifting_day_flags=[True] * 7 + [True] * short + [False] * (7 - short))
     offered = nc.decisions_offered(nc.run(inputs)["verdicts"], inputs, already_logged=[])

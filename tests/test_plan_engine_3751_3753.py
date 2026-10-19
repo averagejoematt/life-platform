@@ -41,12 +41,13 @@ from training import owner_redlines, plan_engine, training_context_registry  # n
 WEEK_7 = "2026-11-06"  # #4098: a date in program week 7, given WEEK_7_ROWS
 # #4161: weeks are HYBRID (4 sessions AND >= 7 days) — lifting daily from the block start, week 7 opens on day 42 (11-05)
 WEEK_7_ROWS = [
-    # #4312: a lower and an upper set, so each generic session matches the role it takes
+    # #4312: a lower and an upper set (and, #5069, a delt set), so each generic session matches the role it takes
     {
         "date": shift_day_key("2026-09-24", i),
         "exercises": [
             {"name": "Leg Press", "sets": [{"weight_kg": 90, "reps": 5}]},
             {"name": "Bench Press", "sets": [{"weight_kg": 60, "reps": 5}]},
+            {"name": "Lateral Raise (Dumbbell)", "sets": [{"weight_kg": 10, "reps": 12}]},
         ],
     }
     for i in range(43)
@@ -326,8 +327,13 @@ def test_v3_floors_and_new_redlines_carry_the_plans_numbers():
         and w["permanent"] is True
     )
     lift = R["lifting_sessions_per_wk"]
-    # #4147 v0.4 (owner 2026-09-23): ~10 hard sets/muscle/wk -> [8, 12]; everything else in the block is unchanged
-    assert (lift["low"], lift["high"], lift["sets_per_muscle_wk"], lift["session_minutes"]) == (3, 4, [8, 12], [55, 70])
+    # #4147 v0.4 (owner 2026-09-23): ~10 hard sets/muscle/wk -> [8, 12]. #5069 (owner ruling 5, 2026-10-18: "5 lifting days,
+    # 60-75 min of lifting"): the per-week count and the lifting minutes are READ from the training charter
+    from training.training_charter import charter_value
+
+    days, minutes = charter_value("split.lifting_days_per_wk"), charter_value("split.session_minutes.lifting")
+    assert (lift["low"], lift["high"], lift["sets_per_muscle_wk"], lift["session_minutes"]) == (days, days, [8, 12], minutes)
+    assert (days, minutes) == (5, [60, 75])
     # #4503 OD3: the tissue clause is 4 wk weight-bearing >= 8.5 h pain-free AND Stage 4; no running or impact intervals at any weight
     rg = R["run_gate_lb"]
     assert (
