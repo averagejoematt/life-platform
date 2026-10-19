@@ -206,7 +206,7 @@ def attach_step_due(ir: Any, catalog: dict[str, Any], history_reader=None) -> li
             load_kg, reps = _authored_top(b.sets, _rep_range_of(b.sets))
             carried = load_kg >= step["next_load_kg"] - lp.LOAD_TOLERANCE_KG and reps >= int(step["next_reps"] or 0)
             if not carried:
-                b.notes = f"{b.notes} Step due: {step['reason']}.".strip()
+                b.notes = f"Step due: {step['reason']}. {b.notes}".strip()  # #5083: the step LEADS the note
             rows.append({"movement_key": key, "carried": carried, **step})
         ir.inputs_snapshot["step_due"] = rows
         return rows
