@@ -246,10 +246,3 @@ def tool_get_may_tracker(args):
         "privacy": "owner-only: the target date, the band and every number here stay off the site and out of email",
         "version": mt.TRACKER_VERSION,
     }
-
-
-# #5073: the registry entry, built here so mcp/registry.py (at its module-size ceiling) carries one line for it.
-MAY_TRACKER_TOOL = {
-    "fn": tool_get_may_tracker,
-    "schema": {"name": "get_may_tracker", "description": GET_MAY_TRACKER_DESCRIPTION, "inputSchema": GET_MAY_TRACKER_INPUT},
-}

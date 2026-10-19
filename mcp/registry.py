@@ -154,13 +154,8 @@ from mcp.tools_lifestyle import (
     tool_save_insight,
     tool_update_insight_outcome,
 )
-from mcp.tools_may_tracker import MAY_TRACKER_TOOL  # #5073
-from mcp.tools_memory import (
-    tool_delete_platform_memory,
-    tool_list_memory_categories,
-    tool_read_platform_memory,
-    tool_write_platform_memory,
-)
+from mcp.tools_may_tracker import GET_MAY_TRACKER_DESCRIPTION, GET_MAY_TRACKER_INPUT, tool_get_may_tracker  # #5073
+from mcp.tools_memory import tool_delete_platform_memory, tool_list_memory_categories, tool_read_platform_memory, tool_write_platform_memory
 from mcp.tools_meta import list_registered_tools  # #3668: the meta-tool body, lifted out of this table
 from mcp.tools_nutrition import tool_get_deficit_sustainability, tool_get_nutrition
 from mcp.tools_owner_words import LOG_OWNER_NOTE_DESCRIPTION, LOG_OWNER_NOTE_INPUT, tool_log_owner_note  # #4584
@@ -347,7 +342,10 @@ TOOLS = {
         "schema": {"name": "get_coach_vision", "description": GET_COACH_VISION_DESCRIPTION, "inputSchema": GET_COACH_VISION_INPUT},
     },
     # #5073: owner-only, the May tracker; the description + input table live in the tool's own module.
-    "get_may_tracker": MAY_TRACKER_TOOL,
+    "get_may_tracker": {
+        "fn": tool_get_may_tracker,
+        "schema": {"name": "get_may_tracker", "description": GET_MAY_TRACKER_DESCRIPTION, "inputSchema": GET_MAY_TRACKER_INPUT},
+    },
     "get_predictions": {
         "fn": tool_get_predictions,
         "schema": {
