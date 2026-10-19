@@ -73,6 +73,11 @@ Retired since the seed: docs/coaching/COACH_SESSION.md::movement_gate_lb (#5086,
 COACH_SESSION.md is a pointer to it.
 Retired since the seed: lambdas/training/recent_aerobic.py::sequence_names (#5076, 2026-10-18) — `is_lower`
 reads the lower names from `split.sequence` through `training.cardio_menu.is_lower`.
+Retired since the seed: mcp/tools_benchmark.py::movement_gate_lb (#5090, 2026-10-19, 3 lines) — `RUN_GATE_LB` and its two
+prose lines read `gated_movements.running.gate_lb` (`_run_gate_lb()`); the whole gate is `training.run_onramp.gate_state`.
+The owner_redlines.py `run_gate_lb` record stays (its row): the owner's stated text, which the charter now carries as
+numbers (`gated_movements.running.walking_weeks` / `walking_hours_per_wk` / `onramp`), held equal to the record's
+`tissue_clause` by tests/test_run_onramp_5090.py.
 
 Registered in scripts/obligation_carriers.py::RESIDUE_LEDGERS (carrier #5050, expires
 2027-01-15).
@@ -92,5 +97,4 @@ TRAINING_CHARTER_RESIDUE = {
     "lambdas/training/program_v03.py::anchor_block_weeks": 1,
     "lambdas/training/routine_generator.py::session_minutes": 2,
     "lambdas/training/routine_title.py::effort_ceiling_rpe": 1,
-    "mcp/tools_benchmark.py::movement_gate_lb": 3,
 }

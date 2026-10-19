@@ -12,7 +12,13 @@ hands them in — it computes nothing of its own:
              derived estimate is not a step count);
   Hevy       ONE read (`tools_strength._read_hevy_all_phases`) serves the week's working sets
              (`muscle_volume.working_sets_by_muscle`) and the four core anchors' e1RM series
-             (`strength_helpers.extract_hevy_sessions` over `plan_draft_evidence._core_anchor_identities`).
+             (`strength_helpers.extract_hevy_sessions` over `plan_draft_evidence._core_anchor_identities`);
+  run gate   (#5090) the same Hevy rows plus ONE Strava read feed `shared_quantities.walking_layer` (THE walking
+             definition) for each of the gate's walking weeks — the walking modality's hours — and each week's
+             lower-leg pain flag (a pain-lexicon note naming a lower-leg site, `training.training_notes` +
+             `training.steps_ramp.is_lower_leg`); a lower-leg pain note in the 14 days before the Sunday is the
+             hold. Owner dismissals are not read here (the plan's steps ramp reads them); an unread source is
+             None, never a pain-free week.
 
 THE WRITE. `nightly_leg()` rides the nightly pre-draft run (`mcp.nightly_predraft.lambda_entry`,
 02:00Z): it rebuilds the newest COMPLETED Monday-Sunday week (with the week before it, for the
@@ -122,6 +128,46 @@ def _guidance() -> dict[str, Any]:
     return {"state": mt.MEASURED if cap is not None else mt.ABSENT, "cap_lb_wk": cap}
 
 
+def _rows_in(rows: Optional[list], start: str, end: str) -> list:
+    return [r for r in rows or [] if start <= str(r.get("date") or str(r.get("sk") or "")[5:15])[:10] <= end]
+
+
+def _lower_leg_pain(hevy: Optional[list], start: str, end: str) -> Optional[bool]:
+    """Any Hevy exercise note in [start, end] that the pain net flags AND that names a lower-leg site; None = unread."""
+    from training.steps_ramp import is_lower_leg
+    from training.training_notes import pain_lexicon_hit
+
+    if hevy is None:
+        return None
+    notes = [str(e.get("notes") or e.get("note") or "") for r in _rows_in(hevy, start, end) for e in r.get("exercises") or []]
+    return any(pain_lexicon_hit(n) and is_lower_leg(n) for n in notes)
+
+
+def running_inputs(sunday: str, strava: Optional[list], hevy: Optional[list]) -> dict[str, Any]:
+    """The run gate's walking weeks (newest first) and hold for the week ending `sunday`, from rows already read."""
+    from training import run_onramp
+
+    from mcp import shared_quantities
+
+    def _slice(source: str, start: str, end: str) -> list:
+        rows = strava if source == "strava" else hevy
+        if rows is None:
+            raise LookupError(f"{source} unread")
+        return _rows_in(rows, start, end)
+
+    walking_weeks = []
+    for k in range(int(run_onramp.running().get("walking_weeks") or 0)):
+        end = mt.shift(sunday, -7 * k)
+        layer = shared_quantities.walking_layer(end, days=7, today=mt.shift(sunday, 1), read=_slice)
+        hours = None if not layer or layer.get("total_hr") is None else float((layer.get("by_modality") or {}).get("walking") or 0.0)
+        walking_weeks.append({"week_start": mt.shift(end, -6), "hours": hours, "pain_flag": _lower_leg_pain(hevy, mt.shift(end, -6), end)})
+    recent = _lower_leg_pain(hevy, mt.shift(sunday, -13), sunday)
+    return {
+        "walking_weeks": walking_weeks,
+        "holds": None if recent is None else ([f"strain_flag:lower_leg_note_14d_to_{sunday}"] if recent else []),
+    }
+
+
 def compute_weeks(last_monday: str, weeks: int = 4) -> list[dict[str, Any]]:
     """`weeks` completed tracker rows ending with the week of `last_monday`, oldest first; each row's
     triggers read the row before it (the first reads none)."""
@@ -139,6 +185,10 @@ def compute_weeks(last_monday: str, weeks: int = 4) -> list[dict[str, Any]]:
     mrows, m_err = _read(core.query_source, "measurements", "2000-01-01", last_sunday)
     srange, s_err = _read(steps_range, first, last_sunday, fetch=_steps_fetch, derived=False)
     hevy, h_err = _read(_read_hevy_all_phases, mt.shift(first, -ANCHOR_LOOKBACK_DAYS), last_sunday)
+    from training.run_onramp import running
+
+    # the run gate's walking weeks reach `gated_movements.running.walking_weeks` before the oldest tracked Sunday
+    strava, st_err = _read(core.query_source_range, "strava", mt.shift(first, -7 * int(running().get("walking_weeks") or 0)), last_sunday)
     items = list((hevy or ([], []))[0] or [])
     workouts = normalize_hevy_items(items) if not h_err else []
     series, a_err = _read(_anchor_series, items) if not h_err else (None, h_err)
@@ -162,6 +212,7 @@ def compute_weeks(last_monday: str, weeks: int = 4) -> list[dict[str, Any]]:
             fitness=mt.fitness_section(None),
             prior=prior,
             built_at=pacific_today(),
+            running=running_inputs(sun, None if st_err else (strava or []), None if h_err else items),
         )
         rows.append(row)
         prior = row

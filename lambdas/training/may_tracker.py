@@ -18,7 +18,8 @@ already owns it — this module arranges and compares, it does not count:
              `muscle_volume.working_sets_by_muscle` output (a key the per-muscle count does not
              carry is `absent`, with its parent bucket as context only — #5053 adds the keys);
   fitness    the latest fitness-test battery (absent until #5078 stores one);
-  running    the distance to `gated_movements.running.gate_lb` and its prerequisites (#5090).
+  running    the run gate through `training.run_onramp.gate_state` (#5090): closed / prep / held / open,
+             lb to the prep and to the gate, and the walking weeks met / needed.
 
 Then the TRIGGERS — each names its LEVER (the review's calibration table): the rate below the
 floor two weeks running -> steps or food; above the ceiling -> the nutrition review; an anchor
@@ -347,21 +348,33 @@ def fitness_section(record: Optional[Mapping[str, Any]], read_error: Optional[st
     return cell(MEASURED, dict(record), src, every_weeks=every)
 
 
-def running_gate_section(weight: Optional[float]) -> dict[str, Any]:
+def running_gate_section(
+    weight: Optional[float], walking_weeks: Optional[list[Mapping[str, Any]]] = None, holds: Any = None, stage4_done: bool = False
+) -> dict[str, Any]:
+    """The run gate (`training.run_onramp.gate_state`, the one gate): `walking_weeks` are the tracked week's four
+    completed weeks (hours + a lower-leg pain flag each); `holds` the strain-hold causes, None = not read."""
+    from training import run_onramp
+
     gate = _cv("gated_movements.running")
     if not isinstance(gate, Mapping) or gate.get("gate_lb") is None:
         return cell(ABSENT, None, "gated_movements.running", "the charter carries no running gate")
-    gate_lb = float(gate["gate_lb"])
+    gs = run_onramp.gate_state(weight, walking_weeks, holds, stage4_done)
     return cell(
         MEASURED if weight is not None else ABSENT,
-        None if weight is None else round(max(weight - gate_lb, 0.0), 1),
-        "gated_movements.running",
+        gs["lb_to_gate"],
+        "training.run_onramp.gate_state over gated_movements.running",
         None if weight is not None else "no weigh-in",
         unit="lb to the gate weight",
-        gate_lb=gate_lb,
-        weight_cleared=None if weight is None else weight <= gate_lb,
+        gate_lb=gs["gate_lb"],
+        weight_cleared=None if weight is None else weight <= gs["gate_lb"],
+        gate_state=gs["state"],
+        reason=gs["reason"],
+        line=run_onramp.gate_line(gs),
+        prep_from_lb=gs["prep_from_lb"],
+        lb_to_prep=gs["lb_to_prep"],
+        walking=gs["walking"],
+        holds_read=gs["holds_read"],
         prerequisites=list(gate.get("prerequisites") or []),
-        prerequisites_state="not_evaluated: the walking-weeks condition and the on-ramp stage are #5090's",
         refs=gate.get("refs"),
     )
 
@@ -452,6 +465,7 @@ def build_week(
     fitness: Mapping[str, Any],
     prior: Optional[Mapping[str, Any]] = None,
     built_at: Optional[str] = None,
+    running: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any]:
     """The week's row from its sections (each built above), triggers evaluated against `prior`."""
     from training.training_charter import charter_version
@@ -471,7 +485,7 @@ def build_week(
         "anchors": dict(anchors),
         "volume": dict(volume),
         "fitness_tests": dict(fitness),
-        "running_gate": running_gate_section(w),
+        "running_gate": running_gate_section(w, **dict(running or {})),  # #5090: walking_weeks / holds from the caller
         "tier": "owner_only",
     }
     if built_at:

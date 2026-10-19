@@ -510,7 +510,7 @@ def _select_movements_for_muscle(
         for k, v in catalog["movements"].items()
         # #4108: the skill ceiling AND the prescribable-shape rule (reviewed, or carries a rep
         # range) — one predicate in training.movement_catalog, no frequency gate (owner ruling C).
-        if v.get("primary_muscle") == muscle and generator_eligible(v, skill_ceiling) and k not in chosen_so_far
+        if v.get("primary_muscle") == muscle and generator_eligible(v, skill_ceiling, key=k) and k not in chosen_so_far
     ]
     if not candidates:
         return []

@@ -16,7 +16,15 @@ movement's `sessions` / `last_done` are recorded, never used to exclude it):
     The muscle selector builds rep-range sets; a plank, a treadmill or an id whose Hevy
     metadata is gone has no rep range to prescribe, so it is catalogued but never picked.
     That is a SHAPE rule, not a frequency one: the builder gives every rep-based Hevy type a
-    range by tier.
+    range by tier, AND
+  * it is not PLYOMETRIC (`is_plyometric`: a jump, hop, bound, pogo, sprint or plyo title or
+    key) — the owner's v0.4 exclusion (`program_structure.EXCLUDED_METHODS`, 2026-09-23), which
+    until #5090 was a stated rule the muscle selector did not apply (39 jump/hop/sprint entries
+    were eligible). The ONE carve-out is the training charter's
+    `gated_movements.lower_leg_prep.carve_out_catalog_keys` (owner ruling 2026-10-18, #5090:
+    low-amplitude pogo hops as lower-leg prep), and only when the caller says the prep is open
+    (`prep_open=True` — `training.run_onramp` passes it from the prep weight on). Every other
+    plyometric entry stays excluded at every weight.
 
 An entry with no `reviewed` key is treated as reviewed: that is every catalog written before
 #4108 and every hand-written test fixture, all curated by construction.
@@ -58,6 +66,7 @@ THE THREE PROVENANCES:
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 PROVENANCE_CURATED = "hand_curated"
@@ -86,13 +95,34 @@ def is_reviewed(entry: dict[str, Any]) -> bool:
     return bool(entry.get("reviewed", True))
 
 
-def generator_eligible(entry: dict[str, Any], skill_ceiling: int) -> bool:
-    """True when the generator may auto-program this catalog entry at `skill_ceiling`."""
+#: The plyometric words (v0.4 exclusion, #5090): matched on the entry's title and on its key read as words.
+PLYOMETRIC_RE = re.compile(r"\b(?:jumps?|jumping|pogos?|plyo\w*|bounds?|bounding|hops?|hopping|sprints?|skips?|skipping)\b", re.IGNORECASE)
+
+
+def is_plyometric(entry: dict[str, Any], key: str | None = None) -> bool:
+    """True when the entry's title or catalog key names a plyometric / impact movement."""
+    words = f"{entry.get('title') or ''} {(key or '').replace('_', ' ')}"
+    return bool(PLYOMETRIC_RE.search(words))
+
+
+def carve_out_keys() -> frozenset[str]:
+    """The catalog keys the charter carves out of the plyometric exclusion (lower-leg prep, #5090)."""
+    from training import training_charter  # noqa: PLC0415 — lazy: the catalog rules stay import-light
+
+    keys = training_charter.charter_value("gated_movements.lower_leg_prep.carve_out_catalog_keys", []) or []
+    return frozenset(str(k) for k in keys)
+
+
+def generator_eligible(entry: dict[str, Any], skill_ceiling: int, *, key: str | None = None, prep_open: bool = False) -> bool:
+    """True when the generator may auto-program this catalog entry at `skill_ceiling`. A plyometric entry is
+    eligible only when `key` is a charter carve-out key AND `prep_open` (the lower-leg prep is on)."""
     try:
         tier = int(entry.get("skill_tier", 99))
     except (TypeError, ValueError):
         return False
     if tier > int(skill_ceiling):
+        return False
+    if is_plyometric(entry, key) and not (prep_open and key in carve_out_keys()):
         return False
     if is_reviewed(entry):
         return True

@@ -377,7 +377,7 @@ def resolve(keys: list[str], movements: dict[str, Any], skill_ceiling: int, take
         m = movements.get(k)
         if m is None:
             skipped.append(f"{k} (not in catalog)")
-        elif not generator_eligible(m, skill_ceiling):
+        elif not generator_eligible(m, skill_ceiling, key=k):
             skipped.append(f"{k} (not generator_eligible at ceiling {skill_ceiling})")
         elif k in taken:
             skipped.append(f"{k} (already in this session)")
