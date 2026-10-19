@@ -4058,6 +4058,13 @@
     {
       "direction": "unknown",
       "lambda": null,
+      "module": "lambdas/training/deload_word.py",
+      "partition": "training_constraints",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
       "module": "lambdas/training/exercise_history.py",
       "partition": "hevy",
       "via": "pk"
@@ -7852,7 +7859,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 753,
+      "edges": 754,
       "lambdas": 108,
       "mcp_tool_modules": 36,
       "mcp_tools": 88,
@@ -7866,9 +7873,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 364,
-        "sites_resolved": 948,
-        "sites_total": 1312
+        "sites_dynamic": 366,
+        "sites_resolved": 950,
+        "sites_total": 1316
       },
       "schedule_resolution": {
         "dynamic": 0,
