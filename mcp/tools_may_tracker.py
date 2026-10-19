@@ -36,6 +36,7 @@ the tracker.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Optional
 
 from common.pacific_time import pacific_today
@@ -163,9 +164,20 @@ def running_inputs(sunday: str, strava: Optional[list], hevy: Optional[list]) ->
         hours = None if not layer or layer.get("total_hr") is None else float((layer.get("by_modality") or {}).get("walking") or 0.0)
         walking_weeks.append({"week_start": mt.shift(end, -6), "hours": hours, "pain_flag": _lower_leg_pain(hevy, mt.shift(end, -6), end)})
     recent = _lower_leg_pain(hevy, mt.shift(sunday, -(RELEASE_QUIET_DAYS - 1)), sunday)  # the steps ramp's quiet period
+    holds = None if recent is None else ([f"strain_flag:lower_leg_note_to_{sunday}"] if recent else [])
+    # Stage 4: his logged run/walks (a treadmill or running block whose note names the run/walk, its level and RPE)
+    blocks = [
+        {"date": str(r.get("date") or str(r.get("sk") or "")[5:15])[:10], "note": e.get("notes") or e.get("note")}
+        for r in _rows_in(hevy, "0000-00-00", sunday)
+        for e in r.get("exercises") or []
+        if re.search(r"treadmill|running|\brun\b", str(e.get("name") or ""), re.IGNORECASE)
+    ]
+    onramp = run_onramp.stage_progress(run_onramp.performed_from_notes(blocks), holds) if hevy is not None else None
     return {
         "walking_weeks": walking_weeks,
-        "holds": None if recent is None else ([f"strain_flag:lower_leg_note_14d_to_{sunday}"] if recent else []),
+        "holds": holds,
+        "stage4_done": bool((onramp or {}).get("stage4_done")),
+        "onramp": onramp,
     }
 
 

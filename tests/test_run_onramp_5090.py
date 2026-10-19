@@ -364,3 +364,23 @@ def test_the_tracker_reads_each_walking_week_and_its_lower_leg_pain_from_the_row
     assert status["met"] == WEEKS - 1 and status["broken_by"] == "pain_flag"
     unread = tmt.running_inputs(sunday, None, None)
     assert all(w["hours"] is None and w["pain_flag"] is None for w in unread["walking_weeks"]) and unread["holds"] is None
+    assert unread["onramp"] is None and unread["stage4_done"] is False
+
+
+def test_the_tracker_reads_stage_4_from_his_logged_run_walk_notes():
+    from mcp import tools_may_tracker as tmt
+
+    sunday = "2027-03-14"
+    note = f"run/walk L1 RPE {EASY_TOP}"
+    hevy = [
+        {"date": f"2027-03-{d:02d}", "exercises": [{"name": "Treadmill", "notes": note, "sets": [{"duration_sec": 1260}]}]}
+        for d in range(1, NEED + 1)
+    ] + [
+        {"date": "2027-03-10", "exercises": [{"name": "Leg Press", "notes": note, "sets": []}]}
+    ]  # not a run block
+    got = tmt.running_inputs(sunday, [], hevy)
+    assert got["onramp"]["level"] == LEVELS[1]["level"] and got["stage4_done"] is False
+    from training import may_tracker as mt
+
+    sec = mt.running_gate_section(GATE - 1, got["walking_weeks"], got["holds"], got["stage4_done"], got["onramp"])
+    assert sec["onramp"]["level"] == LEVELS[1]["level"]

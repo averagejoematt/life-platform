@@ -397,9 +397,11 @@ def run_day_verdict(
     """Whether today's session can carry a run/walk: `{eligible, why, block}`. `archetype` is the session's
     `split.sequence` name or its role key; a generic archetype ("lower") cannot be spaced, so it carries no run."""
     cfg = onramp()
-    held = bool(gate) and gate.get("state") == HELD and bool(gate.get("onramp_open"))
-    if not gate or (gate.get("state") != OPEN and not held):
-        return {"eligible": False, "why": f"run gate {(gate or {}).get('state') or 'not read'}"}
+    if not gate:
+        return {"eligible": False, "why": "run gate not read"}
+    held = gate.get("state") == HELD and bool(gate.get("onramp_open"))
+    if gate.get("state") != OPEN and not held:
+        return {"eligible": False, "why": f"run gate {gate.get('state')}"}
     cap = int(cfg.get("max_runs_per_wk") or 0)
     if runs_this_week >= cap:
         return {"eligible": False, "why": f"the week's {cap} runs are done"}
