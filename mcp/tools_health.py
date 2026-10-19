@@ -3,7 +3,7 @@ Health & body composition tools.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Optional
 
 from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from health import (
@@ -607,6 +607,14 @@ def _rebaselining_result(end_date, components, device_agreement, regime):
     }
 
 
+def _guidance_cap_state() -> tuple[Optional[float], str]:
+    """(cap, "read" | "read_failed") — ADR-105: a broken clinical read is surfaced on rate_band, never read as 'no cap'."""
+    try:
+        return rate_band.guidance_cap_for(_mcp_core.table), "read"
+    except rate_band.GuidanceReadError:
+        return None, "read_failed"
+
+
 def tool_get_weight_loss_progress(args):
     end_date = args.get("end_date", pacific_today())
     explicit_start = args.get("start_date")  # None when caller didn't pass one
@@ -659,7 +667,7 @@ def tool_get_weight_loss_progress(args):
         pt["bmi"] = bmi
         pt["bmi_category"] = bmi_category(bmi)
 
-    guidance_cap = rate_band.guidance_cap_for(_mcp_core.table)
+    guidance_cap, guidance_read = _guidance_cap_state()
     weekly_rates = annotate_weekly_rates(weight_series, guidance_cap)
 
     milestones = {}
@@ -802,7 +810,7 @@ def tool_get_weight_loss_progress(args):
         "avg_weekly_loss_pct_bodyweight": rate_pct_bw(avg_weekly, current_weight),
         "rate_lb_per_wk": avg_weekly,
         "rate_pct_bodyweight_per_wk": rate_pct_bw(avg_weekly, current_weight),
-        "rate_band": rate_band.band_view(current_weight, avg_weekly, guidance_cap),
+        "rate_band": {**(rate_band.band_view(current_weight, avg_weekly, guidance_cap) or {}), "guidance_read": guidance_read},
         "projection": projection,
         "plateau_detected": plateau,
         "milestones_achieved": milestones,

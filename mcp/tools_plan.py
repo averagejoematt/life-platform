@@ -44,7 +44,7 @@ import logging
 import re
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Any
+from typing import Any, Optional
 
 from common.pacific_time import pacific_today
 from training.commit_binding import binding_for  # #4066
@@ -92,6 +92,12 @@ def _guidance_cap():
     from mcp.config import table
 
     return rate_band.guidance_cap_for(table)
+
+
+def _read_guidance_cap(status: dict[str, Any]) -> Optional[float]:
+    """#5074: the clinical rate cap, its read state recorded in `status` — a broken read is READ_FAILED, never 'no cap'."""
+    cap, status["guidance_cap"] = _read("guidance_cap", _guidance_cap)
+    return cap
 
 
 def _read(name: str, fn, *a, **kw) -> tuple[Any, dict[str, Any]]:
@@ -755,7 +761,7 @@ def tool_plan_next_session(args):
         protein_days_measured_7d=protein_measured,  # #4161 ruling "B": the rate target's protein gate
         protein_window=plan_engine.owner_redlines.protein_window(target_date, pacific_today()),
         dxa_scans=dxa,  # #4166
-        guidance_cap_lb_wk=_guidance_cap(),  # #5074: the clinical record's rate cap outranks the charter band (no detail kept)
+        guidance_cap_lb_wk=_read_guidance_cap(status),  # #5074: the clinical record's rate cap outranks the charter band (no detail kept)
         readiness_low_streak_days=readiness_streak,
         anchor_lift_drop_pct=worst[0],
         anchor_lift_drop_sessions=worst[1],

@@ -94,11 +94,13 @@ def test_the_rate_advocates_flag_is_graded_against_the_band():
     assert "ABOVE the 3.0-3.5 lb/wk band" in json.dumps(_rate_flags(_advocate(3.9)))
     n = _advocate(3.2)["numbers"]
     assert (n["rate_band_low_lb_wk"], n["rate_band_high_lb_wk"]) == (3.0, 3.5)
+    assert n["rate_band_floor_pct_bw"] and n["rate_band_ceiling_pct_bw"] > n["rate_band_floor_pct_bw"]
 
 
 def test_the_deficit_advocate_reads_the_band_and_the_schedule_cap():
     n = nc.build_deficit_advocate_packet({"weight_lb": 300.0})["numbers"]
     assert (n["rate_band_low_lb_wk"], n["rate_band_high_lb_wk"], n["rate_target_lb_wk"], n["rate_cap_lb_wk"]) == (3.0, 3.5, 3.5, 4.0)
+    assert (n["rate_band_floor_pct_bw"], n["rate_band_ceiling_pct_bw"]) == (1.0, 1.17)
 
 
 # ── precedence: the clinical guidance outranks the band ───────────────────────────────
@@ -138,7 +140,8 @@ def test_the_guidance_is_read_from_the_clinical_partition_failsoft():
     row = {"pk": "USER#matthew#SOURCE#clinical", "sk": "GUIDANCE#current", "public_rules": [CAP_RULE], "rules": ["PRIVATE-DETAIL-XYZ"]}
     assert rate_band.guidance_cap_for(_Table([row])) == 2.0
     assert rate_band.guidance_cap_for(_Table([])) is None and rate_band.guidance_cap_for(None) is None
-    assert rate_band.guidance_cap_for(_Table(error=RuntimeError("boom"))) is None
+    with pytest.raises(rate_band.GuidanceReadError):  # a broken read is not 'no cap' (ADR-105)
+        rate_band.guidance_cap_for(_Table(error=RuntimeError("boom")))
 
 
 # ── privacy: no clinical detail is logged, carried or published ───────────────────────
@@ -147,7 +150,9 @@ def test_no_reader_logs_or_carries_clinical_detail(caplog):
     row = {"pk": "p", "sk": "GUIDANCE#current", "public_rules": [CAP_RULE], "rules": [secret]}
     with caplog.at_level(logging.DEBUG):
         cap = rate_band.guidance_cap_for(_Table([row]))
-        rate_band.guidance_cap_for(_Table(error=RuntimeError(f"denied {secret} {CAP_RULE}")))
+        with pytest.raises(rate_band.GuidanceReadError) as ei:
+            rate_band.guidance_cap_for(_Table(error=RuntimeError(f"denied {secret} {CAP_RULE}")))
+    assert secret not in str(ei.value)
     assert cap == 2.0
     assert secret not in caplog.text and CAP_RULE not in caplog.text and "denied" not in caplog.text
     carried = json.dumps(
@@ -163,3 +168,17 @@ def test_no_reader_logs_or_carries_clinical_detail(caplog):
 def test_the_band_is_not_on_the_published_charter_view():
     assert "governing_goal" not in training_charter.public_view()
     assert "rate_band" not in json.dumps(training_charter.public_view())
+
+
+def test_a_broken_guidance_read_is_reported_not_read_as_no_cap(monkeypatch):
+    from health import clinical_facts as cf
+
+    from mcp import nutrition_critics_inputs as nci
+
+    def boom(*a, **k):
+        raise RuntimeError("down")
+
+    monkeypatch.setattr(cf, "fetch_clinical_rows", boom)
+    monkeypatch.setattr(nci, "_guidance_cap", lambda: rate_band.guidance_cap_for(_Table([])))
+    with pytest.raises(rate_band.GuidanceReadError):
+        rate_band.guidance_cap_for(_Table([]))

@@ -65,8 +65,13 @@ def guidance_cap_lb_wk(public_rules: Any) -> Optional[float]:
     return min(caps) if caps else None
 
 
+class GuidanceReadError(Exception):
+    """The clinical-record read broke. Carries no detail: 'no cap' (None) and 'the read broke' are different answers (ADR-105)."""
+
+
 def guidance_cap_for(table, user_id: str = "matthew") -> Optional[float]:
-    """Fail-soft read of the clinical record's `public_rules` cap. Any failure -> None, logged WITHOUT detail."""
+    """The clinical record's `public_rules` cap, or None when the record states none. A BROKEN read raises
+    GuidanceReadError (no detail, logged by class only) so a caller reports READ_FAILED instead of reading 'no cap'."""
     if table is None:
         return None
     try:
@@ -75,9 +80,9 @@ def guidance_cap_for(table, user_id: str = "matthew") -> Optional[float]:
         rows = cf.fetch_clinical_rows(table, user_id) or []
         g = next((r for r in rows if str(r.get("sk")) == "GUIDANCE#current"), None)
         return guidance_cap_lb_wk((g or {}).get("public_rules"))
-    except Exception as e:  # noqa: BLE001 — the band is never load-bearing on this read
+    except Exception as e:  # noqa: BLE001 — re-raised detail-free; callers route it to their own failure reporting
         logger.warning("[rate_band] guidance read unavailable (%s)", type(e).__name__)
-        return None
+        raise GuidanceReadError("the clinical guidance read failed") from None
 
 
 def flag_threshold_lb_wk(weight_lb: Optional[float], guidance_cap: Optional[float] = None) -> Optional[float]:

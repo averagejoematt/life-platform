@@ -1681,3 +1681,14 @@ def _output_schema_conformance_4286(monkeypatch):
     from test_mcp_registry import check_output_schema
 
     check_output_schema(monkeypatch, th, "get_weight_loss_progress")
+
+
+def test_weight_loss_band_reports_a_broken_guidance_read_not_no_cap(monkeypatch):
+    install(monkeypatch, _series(340.0, 3.2))
+
+    def boom(table, user_id="matthew"):
+        raise th.rate_band.GuidanceReadError("x")
+
+    monkeypatch.setattr(th.rate_band, "guidance_cap_for", boom)
+    rb = th.tool_get_weight_loss_progress({})["rate_band"]
+    assert rb["guidance_read"] == "read_failed" and rb["guidance_capped"] is False

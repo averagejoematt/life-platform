@@ -534,6 +534,8 @@ def build_rate_advocate_packet(
         "walking_hr_wk_hevy": (((walking or {}).get("sources") or {}).get("hevy") or {}).get("hours"),
         "rate_band_high_lb_wk": (rate_target or {}).get("high_lb_wk"),
         "rate_band_low_lb_wk": (rate_target or {}).get("low_lb_wk"),
+        "rate_band_floor_pct_bw": ((rate_target or {}).get("band") or {}).get("floor_pct_bw"),  # ruling 3: both units
+        "rate_band_ceiling_pct_bw": ((rate_target or {}).get("band") or {}).get("ceiling_pct_bw"),
         "current_rate_lb_wk": current_rate_lb_wk,
         "current_rate_provisional": rate_provisional,
         # #5001: the engine's `rate_ceiling` row over THE stated loss rate — tripped / clear / unknown / not_yet_active

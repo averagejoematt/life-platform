@@ -21,15 +21,15 @@ to three value classes the #5068 Set names (the movement gates, the volume bands
 ceilings) and to four Set files (mcp/tools_benchmark.py, lambdas/web/site_api_nutrition.py,
 config/user_goals.json, docs/coaching/COACH_SESSION.md). Widening after merge would have
 meant RAISING the seed against this ledger's own rule, so it was re-seeded here: 11 patterns,
-11 files beyond the two directory sweeps, 21 rows. The original 10 rows are unchanged.
+11 files beyond the two directory sweeps, 21 rows (20 after #5074 deleted the site_api_nutrition row). The original 10 rows are unchanged.
 
 What W1 (#5050) is expected to retire, by row:
   * owner_redlines.py session_minutes / sequence_names — the engine's lifting budget and split
     read from the charter (`split.session_minutes.lifting`, `split.sequence`);
   * owner_redlines.py rate_band — RETIRED #5074 down to 2 rows' worth of lines: the schedule's
     above-landing target/cap now read `governing_goal.rate_band_lb_per_wk` (`training/rate_band.py`);
-    the 2 left are the ursodiol trigger's own 3.0 lb/wk threshold (a gallbladder rule, a different
-    quantity that shares the number) — NOT band copies, and not retireable by a charter read;
+    the 2 left are the overshoot trigger's own 3.0 lb/wk threshold (a different quantity that shares
+    the number) — NOT band copies, and not retireable by a charter read;
   * owner_redlines.py scheduled_deload_week — the scheduled deload is retired outright
     (charter `deload.scheduled: false`, owner ruling 2026-10-18);
   * owner_redlines.py movement_gate_lb (the taper table's `above_lb` steps at the three
