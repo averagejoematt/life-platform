@@ -60,6 +60,8 @@ census) — #5115 (charter-w0) replaced it with a bodyweight-relative flag carry
 `# charter: governing_goal.rate_band` marker before this ledger was committed, so the row
 was deleted on the merge: the first ratchet move, made by the guard itself.
 The two coaching skills (daily-debrief, speak-to-coaches) carried no hit at the seed.
+Retired since the seed: lambdas/training/recent_aerobic.py::sequence_names (#5076, 2026-10-18) — `is_lower`
+reads the lower names from `split.sequence` through `training.cardio_menu.is_lower`.
 
 Registered in scripts/obligation_carriers.py::RESIDUE_LEDGERS (carrier #5050, expires
 2027-01-15).
@@ -85,7 +87,6 @@ TRAINING_CHARTER_RESIDUE = {
     "lambdas/training/program_structure.py::session_minutes": 2,
     "lambdas/training/program_structure.py::volume_band_sets": 3,
     "lambdas/training/program_v03.py::anchor_block_weeks": 1,
-    "lambdas/training/recent_aerobic.py::sequence_names": 1,
     "lambdas/training/routine_generator.py::session_minutes": 2,
     "lambdas/training/routine_title.py::effort_ceiling_rpe": 3,
     "lambdas/web/site_api_nutrition.py::rate_band": 1,

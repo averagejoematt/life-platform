@@ -3299,6 +3299,7 @@ Hevy routine write-loop IR (system of record). Versioned, audit-replayable, inde
 | `exercises[]` | list | Each has `movement_key`, `sets[]`, `joint_friendly_score`, `skill_tier`, `rationale_tag`. |
 | `budget_used` | map | `muscle -> set_count`. |
 | `inputs_snapshot` | map | Volume/recovery/ACWR/z2/landmarks_hash/catalog_hash at generation time — replayable audit trail. |
+| `inputs_snapshot.cardio_plan` | map | The cardio menu's placement for this routine (#5076, `training.cardio_cues`): `kinds` (one menu kind per cardio block), `week_kinds_before` (this week's performed kinds), `charter_version`, and `movement_minutes` (int) — the gym cardio minutes the routine adds to the day's steps/movement goal (`steps.gym_cardio_minutes_count_toward_movement`; read by #5056). Each block's own dose (`level`/`mph` or `incline_pct`/`mph`, `rpe`, `dose_reason`) is on `inputs_snapshot.cardio_notes[]`. |
 | `rationale` | list[string] | Human-readable log of why each block was chosen. |
 | `caps` | map | `total_sets`, `session_minutes`, `weekly_volume_per_muscle`. Hard asserts in the generator. |
 | `hevy_routine_id` | string \| null | Populated on push; null while local draft. |

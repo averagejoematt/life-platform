@@ -402,7 +402,10 @@ def legs_loaded(block: dict[str, Any] | None) -> tuple[bool | None, str]:
 
 
 def is_lower(archetype: Any) -> bool:
-    return str(archetype or "").strip().lower() in ("lower", "legs", "lower-heavy", "lower-volume")
+    """A lower session: the charter's `split.sequence` lower names plus 'lower'/'legs' (`cardio_menu.is_lower`, #5076)."""
+    from training import cardio_menu
+
+    return cardio_menu.is_lower(archetype)
 
 
 def cardio_pick(block: dict[str, Any] | None, archetype: Any, target_date: str | None = None) -> dict[str, Any]:
