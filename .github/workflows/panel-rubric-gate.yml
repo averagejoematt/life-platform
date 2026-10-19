@@ -1,0 +1,82 @@
+# The panel rubric's regression gate (#5072, epic #5067) — OWNER-APPROVED WORKFLOW CHANGE.
+#
+# A change to the training charter, the engine templates, the planning skills or the coach prompts
+# can make the plan worse with every unit test green. `scripts/panel_rubric_gate.py` grades the golden
+# plan cases (tests/fixtures/panel_golden_5072/) against config/panel_rubric.json and fails when the
+# good charter plan drops below the charter's panel_target or a negative control passes what it must fail.
+#
+# Two steps (the script's docstring is the full contract):
+#   * --recorded (gating, free, no AWS): the code pre-score + the replayed judge (also in the unit suite).
+#   * --live (gating): the blinded judge on route charter.judge_gate (band-3 CI feature charter_judge_gate),
+#     ~$0.15 a run. Soft ONLY on a budget pause (SKIPPED-BY-BUDGET + ::warning::). A judge that errors or
+#     replies with nothing gradeable is FAIL + ::error:: on every case, exit 1 — never a code-only green.
+# Degrade points today (read-only `aws iam get-role`/`get-role-policy`, 2026-10-19): the role EXISTS
+# (golden-brief-eval.yml, eval-harvest.yml assume it) but (a) its trust admits refs/heads/main only, so a
+# pull_request is refused at the OIDC step and the live step prints "live judge NOT run" + ::warning::;
+# (b) it grants Haiku only, so a dispatch on main reaches the JUDGE CALL, is denied (AccessDeniedException)
+# and the live step is RED ("0 of 5 cases behaved") until the owner's Sonnet 4.6 grant (PR #5169).
+# Path filter = the #5072 `## Set` (charter, engine templates, skills, coach prompts) + the gate's own inputs.
+
+name: Panel rubric gate
+
+on:
+  pull_request:
+    paths:
+      - 'config/training_*.json'
+      - 'config/panel_rubric.json'
+      - 'config/coaches/physical_coach*.json'
+      - 'lambdas/training/program_structure.py'
+      - 'lambdas/training/routine_generator.py'
+      - 'lambdas/training/panel_rubric.py'
+      - 'lambdas/training/panel_judge.py'
+      - 'lambdas/coach/critics*.py'
+      - '.claude/skills/daily-debrief/SKILL.md'
+      - 'docs/coaching/COACH_SESSION.md'
+      - 'scripts/panel_rubric_gate.py'
+      - 'tests/fixtures/panel_golden_5072/**'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write # OIDC for the live judge only
+
+concurrency:
+  group: panel-rubric-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-west-2
+  AWS_ACCOUNT_ID: "205930651321"
+
+jobs:
+  gate:
+    name: Panel rubric gate (golden plan cases)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-ci
+
+      - name: Install dependencies (boto3, botocore)
+        run: |
+          PINS=$(python3 scripts/ci_pins.py boto3 botocore)
+          pip install --quiet $PINS
+
+      - name: Recorded judge (gating, free)
+        # Unpiped: the script's own exit code is the verdict (the #3103 class).
+        run: python3 scripts/panel_rubric_gate.py --recorded
+
+      - name: Configure AWS (live judge)
+        id: judge-creds
+        continue-on-error: true # refused on pull_request (trust = main only); the live step reports it
+        uses: ./.github/actions/setup-ci
+        with:
+          python: 'false'
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-golden-eval-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Live judge (red when the judge errors; soft only on a budget pause)
+        env:
+          PANEL_JUDGE_CREDS: ${{ steps.judge-creds.outcome }}
+        run: python3 scripts/panel_rubric_gate.py --live
