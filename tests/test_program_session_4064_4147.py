@@ -45,7 +45,7 @@ os.environ.setdefault("S3_BUCKET", "test-bucket")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
-from training import owner_redlines, program_structure, program_v03, program_v04, routine_generator  # noqa: E402
+from training import effort_ceilings, owner_redlines, program_structure, program_v03, program_v04, routine_generator  # noqa: E402
 from training.training_charter import charter_value  # noqa: E402
 
 CATALOG = json.loads((REPO / "config" / "movement_catalog.json").read_text())
@@ -120,7 +120,8 @@ def test_heavy_days_are_a_top_set_plus_two_back_offs_and_volume_days_are_8_to_12
         assert heavy, role
         for e in heavy:
             assert [s["kind"] for s in e["sets"]] == ["top", "back_off", "back_off"]
-            assert e["sets"][0]["reps"] == [4, 6] and e["sets"][0]["rpe"] == [7, 8]
+            # #5058: the top set's RPE band is the charter's compounds band for the owner's tier (7–8 before the charter)
+            assert e["sets"][0]["reps"] == [4, 6] and e["sets"][0]["rpe"] == effort_ceilings.class_bands()[effort_ceilings.COMPOUNDS]
             assert all(s["pct_of_top"] == 90 for s in e["sets"][1:])
     for role in (UV, LV):
         anchors = [e for e in _rx(role)["exposures"] if e["kind"] == "anchor"]
@@ -132,13 +133,18 @@ def test_exposure_numbers_match_the_redline_rep_scheme_prose():
     prose = owner_redlines.REDLINES["lifting_sessions_per_wk"]["rep_scheme"]
     e = program_structure.EXPOSURES
     assert f"{e['heavy']['reps'][0]}–{e['heavy']['reps'][1]}" in prose
-    assert f"RPE {e['heavy']['top_rpe'][0]}–{e['heavy']['top_rpe'][1]}" in prose
     assert f"−{abs(e['heavy']['back_off_pct'])} %" in prose
     assert f"moderate {e['moderate']['reps'][0]}–{e['moderate']['reps'][1]}" in prose
     assert f"volume {e['volume']['reps'][0]}–{e['volume']['reps'][1]}" in prose
+    assert f"accessories {e['accessory']['reps'][0]}–{e['accessory']['reps'][1]}" in prose
+    # #5058: the RPE lives only in the charter — the prose names it, EXPOSURES names the class band, neither types a number
+    assert "the charter compound ceiling" in prose and "the charter isolation ceiling" in prose
+    assert not any(k in spec for spec in e.values() for k in ("top_rpe", "rir"))
+    bands = effort_ceilings.class_bands()
+    assert {spec["effort"] for spec in e.values()} == {effort_ceilings.COMPOUNDS} and all(spec["effort"] in bands for spec in e.values())
     assert (
-        f"accessories {e['accessory']['reps'][0]}–{e['accessory']['reps'][1]} at RIR {e['accessory']['rir'][0]}–{e['accessory']['rir'][1]}"
-        in prose
+        e["accessory"]["last_set_effort"] == effort_ceilings.LAST_ISOLATION_SET
+        and e["heavy"]["back_off_effort"] == effort_ceilings.BACK_OFF
     )
 
 
@@ -509,7 +515,8 @@ def test_generator_back_offs_sit_10_percent_under_the_ramped_top_set():
     assert ideal.inputs_snapshot["load_floors"]["movements"]["squat_barbell"]["ramp"]["hold"]["applies"] is True
     assert [s.weight_kg for s in _ws(squat)[1:]] == [routine_generator._floor_half_kg(top * 0.9)] * 2
     assert any("back-offs at 90%" in r for r in ideal.rationale)
-    assert "HEAVY: 1 top set of 4–6 @ RPE 7–8" in squat.notes
+    lo, hi = effort_ceilings.class_bands()[effort_ceilings.COMPOUNDS]
+    assert f"HEAVY: 1 top set of 4–6 @ RPE {lo:g}–{hi:g}" in squat.notes  # #5058: the charter's band in the cue
 
 
 def test_generator_deload_week_holds_loads_and_cuts_sets():

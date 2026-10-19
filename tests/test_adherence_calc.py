@@ -643,3 +643,19 @@ def test_the_template_id_lookup_is_exact_and_case_insensitive():
     assert adherence_calc._catalog_entry_for("tmpl:75A4F6C", catalog) == {}  # a prefix is not a match
     assert adherence_calc._catalog_entry_for("leg_extension_machine", catalog)["title"] == "Leg Extension (Machine)"
     assert adherence_calc._catalog_entry_for("unknown_key", catalog) == {}
+
+
+def test_5058_a_session_beaten_only_within_tolerance_reads_yes():
+    """#5058: every set above the RPE-8 note but within the charter's +1 — within_tolerance, the verdict `yes`."""
+    ir = RoutineSpec(
+        routine_id="r-5058",
+        target_date="2026-10-20",
+        archetype="upper",
+        exercises=[ExerciseBlock(movement_key="lat_pulldown", sets=[Set()] * 3, notes="RPE 8 cap.")],
+    )
+    performed = {"exercises": [{"exercise_template_id": "6A6C31A5", "sets": _sets(8.5, 9.0, 9.0)}]}
+    out = calculate_adherence(ir, performed)
+    lat = out["movements"][0]["intensity"]
+    assert lat["sets_within_tolerance"] == 3 and lat["sets_over_ceiling"] == 0 and lat["movement_class"] == "compound"
+    assert out["intensity_adherence"]["sets_beat_ceiling"] == 3
+    assert out["as_prescribed"]["verdict"] == "yes"

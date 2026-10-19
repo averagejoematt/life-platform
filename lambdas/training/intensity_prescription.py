@@ -18,8 +18,8 @@ that is a definition, not a threshold.
 THE LAST SET (#5058). A cue can name a second ceiling for an isolation movement's last
 working set ("ACCESSORY: 2 sets of 8–15 @ RPE 8–9; last set RPE 9–10."). When a block
 names BOTH a general ceiling and a clause naming the "last set", the last-set clause is
-read apart (`read_last_set_ceiling`) and grades only the last working set; a block that
-names one ceiling reads exactly as before.
+read apart and grades only the last working set; a block that
+names one ceiling reads exactly as before (`resolve_ceiling` returns it as `last_set_rpe`).
 
 WHERE A CEILING CAN LIVE. Three forms, all of them the routine's own words:
 
@@ -183,12 +183,6 @@ def _split_last_set(text: str | None) -> tuple[str | None, str | None]:
     if read_ceiling(g)[0] is None or read_ceiling(lt)[0] is None:
         return text, None
     return g, lt
-
-
-def read_last_set_ceiling(text: str | None) -> float | None:
-    """The ceiling a block names for the LAST working set only, or None (#5058)."""
-    _g, last = _split_last_set(text)
-    return read_ceiling(last)[0] if last else None
 
 
 def _normalize_words(s: str | None) -> str:

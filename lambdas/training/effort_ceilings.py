@@ -67,12 +67,6 @@ def tolerance_rpe(read: Reader = charter_value) -> float | None:
     return float(tol) if tol is not None else None
 
 
-def band_text(key: str, read: Reader = charter_value) -> str | None:
-    """'8–9' for a class band (whole numbers print whole), or None when the charter names none."""
-    band = class_bands(read).get(key)
-    return f"{band[0]:g}–{band[1]:g}" if band else None
-
-
 def proposal_rule(read: Reader = charter_value) -> dict[str, Any]:
     """`effort_ceilings.ceiling_change_proposal` ({} when unreadable)."""
     return dict(read("effort_ceilings.ceiling_change_proposal", {}) or {})

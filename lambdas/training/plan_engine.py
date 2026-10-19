@@ -746,25 +746,10 @@ def _deload_recommendation(
     return rec
 
 
-def _effort_blocks(
-    date: str, rows: list[dict[str, Any]] | None, catalog_movements: dict[str, Any] | None, states: dict[str, dict[str, Any]]
-) -> dict[str, Any]:
-    """`constraint_block.progression` (#5052) and `constraint_block.ceiling_change_proposal` (#5058).
-
-    The proposal reads the stored adherence on the prescription window's Hevy rows
-    (`training.ceiling_proposal.compute`); an unread window is `unknown`, never "no proposal" (#4072)."""
+def _effort_blocks(date: str, rows: Any, catalog_movements: Any, states: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """`progression` (#5052) + `ceiling_change_proposal` (#5058, over the prescription window's stored adherence)."""
     st = (states.get("hevy_workouts_prescription_window") or {}).get("state")
-    if rows is None or st == READ_FAILED:
-        proposal: dict[str, Any] = {
-            "date": date,
-            "state": "unknown",
-            "reason": f"the prescription window was not read ({st or 'not_read'})",
-            "auto_applied": False,
-            "applies": ceiling_proposal.APPLIES,
-            "charter_version": training_charter.charter_version(),
-        }
-    else:
-        proposal = ceiling_proposal.compute(rows, date, catalog_movements=catalog_movements)
+    proposal = ceiling_proposal.for_plan(date, rows, None if st == READ_FAILED else st, catalog_movements)
     return {"progression": load_progression.rule_summary(), "ceiling_change_proposal": proposal}
 
 

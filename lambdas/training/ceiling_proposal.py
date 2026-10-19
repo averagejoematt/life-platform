@@ -171,3 +171,21 @@ def compute(
     if out["state"] == "insufficient":
         out["reason"] = f"no movement class has graded sets in each of the last {weeks} weeks"
     return out
+
+
+def for_plan(
+    date: str, rows: list[dict[str, Any]] | None, read_state: str | None, catalog_movements: dict[str, Any] | None
+) -> dict[str, Any]:
+    """`plan_engine.constraint_block['ceiling_change_proposal']`: `compute`, or `unknown` when the window was not read
+    (`read_state` None = a failed read) — never "no proposal" from a read that did not happen (#4072)."""
+    if rows is None or read_state is None:
+        return {
+            "date": date,
+            "state": "unknown",
+            "reason": f"the prescription window was not read ({read_state or 'read_failed'})",
+            "proposals": [],
+            "auto_applied": False,
+            "applies": APPLIES,
+            "charter_version": charter_version(),
+        }
+    return compute(rows, date, catalog_movements=catalog_movements)
