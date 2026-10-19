@@ -381,7 +381,7 @@ def nutrition_overview(*, _g) -> dict:
                 "loss_rate": {
                     "actual_deficit_kcal": None,
                     "implied_rate_lb_wk": None,
-                    "implied_rate_pct_bw_wk": None,
+                    "implied_rate_pct_bodyweight_per_wk": None,
                     "deficit_pct": None,
                     "deficit_label": None,
                     # #3931 box 4 + #2221 shape parity: method/basis on the empty branch too.
@@ -672,7 +672,8 @@ def nutrition_overview(*, _g) -> dict:
     loss_rate = {
         "actual_deficit_kcal": deficit if deficit_published else None,
         "implied_rate_lb_wk": round(deficit * 7 / KCAL_PER_LB, 1) if (deficit is not None and deficit_published) else None,
-        "implied_rate_pct_bw_wk": (
+        # implied lb/wk / the latest weigh-in (lb) x 100, per week — rate_pct_bodyweight_per_wk's base and unit (#5060, #3725)
+        "implied_rate_pct_bodyweight_per_wk": (
             round(deficit * 7 / KCAL_PER_LB / _bw * 100, 2) if (deficit is not None and deficit_published and _bw) else None
         ),
         "deficit_pct": deficit_pct,

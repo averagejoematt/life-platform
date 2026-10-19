@@ -37,7 +37,7 @@ def rate_schedule_step(weight_lb: float) -> dict[str, Any]:
         **step,
         "target": b["ceiling_lb_wk"],
         "cap": b["ceiling_lb_wk"],
-        "pct_bw_wk": f"{b['floor_pct_bw']}-{b['ceiling_pct_bw']}",
+        "pct_bw_wk": f"{b['floor_pct_bodyweight_per_wk']}-{b['ceiling_pct_bodyweight_per_wk']}",
     }
 
 

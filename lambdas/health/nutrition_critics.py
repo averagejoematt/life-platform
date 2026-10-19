@@ -235,8 +235,9 @@ def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
             "rate_protein_gate_tier": ((target or {}).get("protein_gate") or {}).get("tier"),
             "rate_cap_lb_wk": (target or {}).get("cap_lb_wk"),
             "rate_band_low_lb_wk": (target or {}).get("low_lb_wk"),
-            "rate_band_floor_pct_bw": ((target or {}).get("band") or {}).get("floor_pct_bw"),  # ruling 3: both units
-            "rate_band_ceiling_pct_bw": ((target or {}).get("band") or {}).get("ceiling_pct_bw"),
+            # ruling 3: both units; % of bodyweight per week = rate (lb/wk) / current weight (lb) x 100 (#3725: name the base)
+            "rate_band_floor_pct_bodyweight_per_wk": ((target or {}).get("band") or {}).get("floor_pct_bodyweight_per_wk"),
+            "rate_band_ceiling_pct_bodyweight_per_wk": ((target or {}).get("band") or {}).get("ceiling_pct_bodyweight_per_wk"),
             "rate_band_high_lb_wk": (target or {}).get("high_lb_wk"),
             "mean_intake_kcal_14d": mean14,
             "prescribed_band_kcal": [lo, hi],

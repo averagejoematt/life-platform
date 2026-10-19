@@ -31,7 +31,7 @@ OTHER_RULE = "Example public rule: prescribe intensity by effort, not numbers."
 def test_the_band_is_the_charters_in_both_units_at_the_current_weight(weight, floor_pct, ceiling_pct):
     b = rate_band.band(weight)
     assert (b["floor_lb_wk"], b["ceiling_lb_wk"]) == (3.0, 3.5)
-    assert (b["floor_pct_bw"], b["ceiling_pct_bw"]) == (floor_pct, ceiling_pct)
+    assert (b["floor_pct_bodyweight_per_wk"], b["ceiling_pct_bodyweight_per_wk"]) == (floor_pct, ceiling_pct)
     assert b["governs"] is True and b["guidance_capped"] is False
 
 
@@ -66,7 +66,7 @@ def test_an_unreadable_charter_serves_no_target_rather_than_a_guess(monkeypatch)
 def test_the_redline_target_reads_the_band_above_the_landing_and_his_schedule_below():
     above = owner_redlines.rate_target_lb_per_wk(300.0)
     assert (above["low_lb_wk"], above["high_lb_wk"], above["target_lb_wk"], above["cap_lb_wk"]) == (3.0, 3.5, 3.5, 3.5)
-    assert above["band"]["floor_pct_bw"] == 1.0 and above["landing_phase"] is False
+    assert above["band"]["floor_pct_bodyweight_per_wk"] == 1.0 and above["landing_phase"] is False
     at_landing = owner_redlines.rate_target_lb_per_wk(240.0)  # NOT above 240: the landing schedule governs
     assert at_landing["landing_phase"] is True and at_landing["target_lb_wk"] == 2.25 and at_landing["band"]["governs"] is False
     assert at_landing["high_lb_wk"] != 3.5  # the %BW envelope, not the charter band
@@ -94,13 +94,16 @@ def test_the_rate_advocates_flag_is_graded_against_the_band():
     assert "ABOVE the 3.0-3.5 lb/wk band" in json.dumps(_rate_flags(_advocate(3.9)))
     n = _advocate(3.2)["numbers"]
     assert (n["rate_band_low_lb_wk"], n["rate_band_high_lb_wk"]) == (3.0, 3.5)
-    assert n["rate_band_floor_pct_bw"] and n["rate_band_ceiling_pct_bw"] > n["rate_band_floor_pct_bw"]
+    assert (
+        n["rate_band_floor_pct_bodyweight_per_wk"]
+        and n["rate_band_ceiling_pct_bodyweight_per_wk"] > n["rate_band_floor_pct_bodyweight_per_wk"]
+    )
 
 
 def test_the_deficit_advocate_reads_the_band_and_the_schedule_cap():
     n = nc.build_deficit_advocate_packet({"weight_lb": 300.0})["numbers"]
     assert (n["rate_band_low_lb_wk"], n["rate_band_high_lb_wk"], n["rate_target_lb_wk"], n["rate_cap_lb_wk"]) == (3.0, 3.5, 3.5, 3.5)
-    assert (n["rate_band_floor_pct_bw"], n["rate_band_ceiling_pct_bw"]) == (1.0, 1.17)
+    assert (n["rate_band_floor_pct_bodyweight_per_wk"], n["rate_band_ceiling_pct_bodyweight_per_wk"]) == (1.0, 1.17)
 
 
 # ── precedence: the clinical guidance outranks the band ───────────────────────────────

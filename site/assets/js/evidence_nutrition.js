@@ -144,7 +144,7 @@ export function nutritionLossRate(lr, n) {
   if (!lr) return "";
   const chain = [
     lr.actual_deficit_kcal != null ? `running ${lr.actual_deficit_kcal >= 0 ? "−" : "+"}${fmt(Math.abs(lr.actual_deficit_kcal))}` : lr.deficit_published === false ? "actual deficit not published" : "actual deficit unknown until an expenditure read lands",
-    lr.implied_rate_lb_wk != null ? `≈ ${fmt(lr.implied_rate_lb_wk)} lb/wk${lr.implied_rate_pct_bw_wk != null ? ` (${fmt(lr.implied_rate_pct_bw_wk)}% of bodyweight)` : ""}` : null,
+    lr.implied_rate_lb_wk != null ? `≈ ${fmt(lr.implied_rate_lb_wk)} lb/wk${lr.implied_rate_pct_bodyweight_per_wk != null ? ` (${fmt(lr.implied_rate_pct_bodyweight_per_wk)}% of bodyweight)` : ""}` : null,
     (lr.protein_floor_hit_pct ?? lr.protein_hit_pct) != null ? `protein floor ${n ? _hitPhrase(n, lr.protein_floor_hit_pct != null, lr.protein_floor_hit_pct ?? lr.protein_hit_pct) : `${fmt(lr.protein_floor_hit_pct ?? lr.protein_hit_pct)}% of days`}` : null,
   ].filter(Boolean).join(" → ");
   const flag = lr.deficit_label ? `<span class="nut-flag nut-flag-${esc(lr.deficit_label)}">${esc(lr.deficit_label)} cut</span>` : "";

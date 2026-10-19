@@ -98,6 +98,9 @@ def flag_threshold_lb_wk(weight_lb: Optional[float], guidance_cap: Optional[floa
 def band(weight_lb: Optional[float], guidance_cap: Optional[float] = None) -> Optional[dict[str, Any]]:
     """The band at a bodyweight, both units. None when the charter or the weight is unreadable.
 
+    `floor_pct_bodyweight_per_wk` / `ceiling_pct_bodyweight_per_wk` are the lb/wk bound divided by the CURRENT weight
+    (`weight_lb`) x 100, per week — the same base and unit as `get_weight_loss_progress`'s `rate_pct_bodyweight_per_wk`
+    (#5060, `mcp/weight_rate.py`); a `_pct` suffix alone is not one semantic (#3725).
     `guidance_cap` (lb/wk) is the clinical record's cap; when it is below the ceiling it wins."""
     cb = _charter_band()
     if cb is None or not weight_lb or weight_lb <= 0:
@@ -114,8 +117,8 @@ def band(weight_lb: Optional[float], guidance_cap: Optional[float] = None) -> Op
     return {
         "floor_lb_wk": floor,
         "ceiling_lb_wk": ceiling,
-        "floor_pct_bw": pct(floor),
-        "ceiling_pct_bw": pct(ceiling),
+        "floor_pct_bodyweight_per_wk": pct(floor),
+        "ceiling_pct_bodyweight_per_wk": pct(ceiling),
         "weight_lb": weight_lb,
         "governs": governs(weight_lb),
         "guidance_capped": capped,
@@ -139,8 +142,8 @@ def band_view(weight_lb: Optional[float], rate_lb_wk: Optional[float], guidance_
     return {
         "floor_lb_wk": b["floor_lb_wk"],
         "ceiling_lb_wk": b["ceiling_lb_wk"],
-        "floor_pct_bw": b["floor_pct_bw"],
-        "ceiling_pct_bw": b["ceiling_pct_bw"],
+        "floor_pct_bodyweight_per_wk": b["floor_pct_bodyweight_per_wk"],
+        "ceiling_pct_bodyweight_per_wk": b["ceiling_pct_bodyweight_per_wk"],
         **position(rate_lb_wk, b),
         "governs": b["governs"],
         "guidance_capped": b["guidance_capped"],

@@ -926,7 +926,12 @@ def test_weight_loss_shows_the_owners_band_beside_both_units_at_the_current_weig
     """#5074: 3.0 lb/wk at 311 lb -> band 3.0-3.5 lb/wk = 0.96-1.13 %BW/wk, in band (at its floor)."""
     install(monkeypatch, WEIGH_INS)
     rb = th.tool_get_weight_loss_progress({})["rate_band"]
-    assert (rb["floor_lb_wk"], rb["ceiling_lb_wk"], rb["floor_pct_bw"], rb["ceiling_pct_bw"]) == (3.0, 3.5, 0.96, 1.13)
+    assert (rb["floor_lb_wk"], rb["ceiling_lb_wk"], rb["floor_pct_bodyweight_per_wk"], rb["ceiling_pct_bodyweight_per_wk"]) == (
+        3.0,
+        3.5,
+        0.96,
+        1.13,
+    )
     assert (rb["in_band"], rb["position"], rb["guidance_capped"]) == (True, "in", False)
 
 
