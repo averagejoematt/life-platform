@@ -90,6 +90,7 @@ from training import (
     recent_aerobic,
     redline_rate,
     self_added_volume,
+    steps_ramp,
     training_charter,
     training_context_registry,
 )
@@ -151,6 +152,7 @@ ENGINE_INPUTS = (
     "dxa_scans",  # #4166: the protein gate's body-fat tier
     "recent_aerobic",  # #4387: per-activity aerobic load, 3 days through target − 1
     "loss_rate",  # #5001: THE stated loss rate (`mcp.shared_quantities.loss_rate_lb_wk`) — the rate_ceiling input
+    "steps_window",  # #5082: the resolver's trailing window the steps ramp starts from (`training.steps_ramp.window_days`)
 )
 _TRIPWIRE_INPUT = {
     "protein_floor_missed": "protein_days_missed_7d",
@@ -715,12 +717,13 @@ def _scheduled_session(
 
 
 def _deload_recommendation(
+    session: dict[str, Any],
     date: str,
     deload_records: list[dict[str, Any]] | None,
     fatigue: dict[str, Any] | None,
     readiness_low_streak_days: int | None,
     tripwires: list[dict[str, Any]],
-    state: dict[str, Any] | None,
+    states: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """`constraint_block.deload_recommendation` (#5070): the signals that argue for a deload and whether the owner's
     recorded word applies one today. NEVER an applied set cut by itself. Pain notes count only while the flag is
@@ -733,8 +736,30 @@ def _deload_recommendation(
         readiness_low_streak_days=readiness_low_streak_days,
         pain_note_sites=[str(x) for x in ((pain or {}).get("observed") or [])],
     )
-    rec["records_state"] = (state or {}).get("state")
+    rec["records_state"] = ((states or {}).get("deload_records") or {}).get("state")
+    session["deload_recommendation"] = rec  # also stamped on the served session
     return rec
+
+
+def _steps_ramp_block(
+    date: str,
+    window: dict[str, Any] | None,
+    pain_instances: list[dict[str, Any]] | None,
+    dismissals: list[dict[str, Any]] | None,
+    deload_records: list[dict[str, Any]] | None,
+    input_status: dict[str, dict[str, Any]] | None,
+) -> dict[str, Any]:
+    """`constraint_block.steps_ramp` (#5082): the ramp to the charter steps floor, held by a lower-leg strain flag.
+    An unread steps window is stated (`state: unknown`), never a target built on nothing; so is an unreadable
+    dismissal store or deload record (a hold cannot be judged released from a read that failed)."""
+    st = (input_status or {}).get("steps_window") or {}
+    unreadable = [k for k in ("pain_dismissals", "deload_records") if ((input_status or {}).get(k) or {}).get("state") == READ_FAILED]
+    if window is None or unreadable:
+        why = [f"{k} read failed" for k in unreadable] + (
+            [] if window is not None else [st.get("detail") or st.get("error") or "the steps window was not read"]
+        )
+        return {"date": date, "state": "unknown", "reason": "; ".join(why), "charter_version": training_charter.charter_version()}
+    return steps_ramp.compute(date, window, pain_flag_instances=pain_instances, pain_dismissals=dismissals, deload_records=deload_records)
 
 
 def _walking_block(walk_hr_wk_now: float | None, failed_reads: dict[str, dict[str, Any]]) -> dict[str, Any]:
@@ -851,6 +876,7 @@ def constraint_block(
     input_status: dict[str, dict[str, Any]] | None = None,
     recent_aerobic: dict[str, Any] | None = None,
     loss_rate: dict[str, Any] | None = None,
+    steps_window: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The deterministic inputs to tomorrow's session. No model, no I/O, no hidden state.
 
@@ -899,8 +925,6 @@ def constraint_block(
     # FIRST, deliberately. See the module docstring.
     walking = _walking_block(walk_hr_wk_now, failed_reads)
 
-    ref_block = _reference_block(reference)
-
     # #4098/#4110: the sequence's program week decides which redlines are armed (`not_before_week`).
     week = program_week(date, block_workouts)
 
@@ -947,8 +971,7 @@ def constraint_block(
 
     session = _scheduled_session(date, catalog_movements, skill_ceiling, block_workouts, deload_records)
     # #5070: signals recommend, the owner's recorded word applies — one block, also stamped on the served session
-    deload_rec = _deload_recommendation(date, deload_records, fatigue, readiness_low_streak_days, tripwires, states.get("deload_records"))
-    session["deload_recommendation"] = deload_rec
+    deload_rec = _deload_recommendation(session, date, deload_records, fatigue, readiness_low_streak_days, tripwires, states)
 
     return {
         "engine_version": ENGINE_VERSION,
@@ -980,6 +1003,7 @@ def constraint_block(
         # walking and the standing constraints outrank any single session.
         "session": session,
         "deload_recommendation": deload_rec,
+        "steps_ramp": _steps_ramp_block(date, steps_window, pain_flag_instances, pain_dismissals, deload_records, input_status),
         # #4387 — the walking total cannot say "yesterday was 2¾ h on foot". These rows can: one
         # per activity over the 3 days through target − 1, each flagged against the walking
         # redlines, with the session's cardio modality picked FROM them (`cardio_pick`).
@@ -1000,7 +1024,7 @@ def constraint_block(
         "acwr_flag": acwr_flag,
         "muscle_volume": muscle_volume or {},
         "days_since_movement": days_since_movement or {},
-        "reference": ref_block,
+        "reference": _reference_block(reference),
         "tripwires": tripwires,
         "tripped": tripped,
         # #4072: both kinds of "could not evaluate", kept apart — `unreadable_tripwires` is the
