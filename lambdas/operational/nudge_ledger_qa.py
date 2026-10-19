@@ -230,3 +230,38 @@ def check_nudge_ledger_liveness(table, Check, tier, pt_now, *, stuck_hours=STUCK
     else:
         c.ok(f"{len(rows)} ledger row(s) in the last {retention_days}d, every one terminal with its NUDGE# record present" + reap_note)
     return [c]
+
+
+# #5056: the steps-nudge dead-man. The pass stamps `COACH#steps_nudge / EVAL#<date>` on EVERY in-window tick (sent or
+# not), so a completed Pacific day with no eval row means the pass never ran in its 19:00-21:00 PT window.
+STEPS_LEDGER_PK = "COACH#steps_nudge"
+STEPS_EVAL_PREFIX = "EVAL#"
+STEPS_LOOKBACK_DAYS = 3
+STEPS_ARMED_ON = "2026-10-23"  # first Pacific day the pass can exist on (merge + deploy follow the 10-22 hold); earlier is no evidence
+
+
+def check_steps_nudge_liveness(table, Check, tier, pt_now, *, lookback_days=STEPS_LOOKBACK_DAYS, armed_on=STEPS_ARMED_ON):
+    c = Check("steps_nudge:eval_liveness", "Data Freshness", tier)
+    today = pt_now().date()
+    days = [(today - timedelta(days=n)).isoformat() for n in range(1, lookback_days + 1)]
+    days = [d for d in days if d >= armed_on]
+    if not days:
+        c.ok(f"steps nudge pending: armed on {armed_on}, no completed day to judge yet")
+        return [c]
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(STEPS_LEDGER_PK)
+            & Key("sk").between(f"{STEPS_EVAL_PREFIX}{min(days)}", f"{STEPS_EVAL_PREFIX}{max(days)}")
+        )
+        have = {str(r.get("sk"))[len(STEPS_EVAL_PREFIX) :] for r in resp.get("Items") or []}
+    except Exception as exc:  # noqa: BLE001
+        c.fail(f"steps nudge ledger - DDB error: {exc}")
+        return [c]
+    missing = [d for d in days if d not in have]
+    if missing:
+        c.fail(
+            f"steps nudge evaluated on none of {len(missing)} completed day(s): {', '.join(sorted(missing))} (#5056 - the 19:00 PT pass did not run)"
+        )
+    else:
+        c.ok(f"steps nudge evaluated on each of the last {len(days)} completed day(s)")
+    return [c]

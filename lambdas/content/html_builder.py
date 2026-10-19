@@ -1914,6 +1914,7 @@ def build_html(
     budget_headroom_line=None,
     intake_line=None,
     journal_coach_absent=False,
+    steps_line=None,
 ):
     """Build the full daily brief HTML email.
 
@@ -1967,6 +1968,8 @@ def build_html(
         journal_coach_absent=journal_coach_absent,
     )
     # #1405: private intake-ledger line — quiet, above the footer, never scolding.
+    if steps_line:  # #5056: the day's steps floor/target, owner-only
+        html += '<div style="padding:4px 24px 4px;"><p style="font-size:12px;color:#475569;margin:0;">👣 ' + steps_line + "</p></div>"
     if intake_line:
         html += '<div style="padding:4px 24px 12px;"><p style="font-size:12px;color:#475569;margin:0;">🌙 ' + intake_line + "</p></div>"
     html += _brief_footer(compute_age_msg, compute_stale, data, date_str, budget_headroom_line=budget_headroom_line)

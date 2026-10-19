@@ -607,7 +607,7 @@ _PK_RULES: list = [
     # sent today". Carrying a reset into them would either destroy a live send counter or
     # re-open a spend window mid-day. "I already sent N today" is not an artifact of the
     # cycle that produced it — the same sentence that settles outbound_events.
-    (lambda pk, sk: pk in ("COACH#nudge_ledger", "COACH#outbound_ledger"), SYSTEM_STATE),
+    (lambda pk, sk: pk in ("COACH#nudge_ledger", "COACH#outbound_ledger", "COACH#steps_nudge"), SYSTEM_STATE),
     # Coach intelligence tier — all experiment-scoped.
     #   #3900 ruling (2026-09-20): COACH#commitments/TALLY#current is EXPERIMENT_SCOPED, not
     #   SYSTEM_STATE. It is a rolling tally, but of THIS cycle's graded commitments (the payload
