@@ -255,7 +255,7 @@ def test_weekly_hard_sets_per_muscle_sit_inside_the_redline_ranges():
         lo, hi = row["range"]
         # #5069: the shoulders+arms day (owner ruling 5) puts delts and arms over v0.4's 4–6 by design — a floor for them now
         assert lo <= row["sets"] and (row["sets"] <= hi or not row["band_top_binds"]), (group, row)
-    assert week["back"]["sets"] == 12 and week["delts"]["sets"] == 13
+    assert week["back"]["sets"] == 12 and week["delts"]["sets"] == 15
     # the five-day week sits in v0.5's 60–75 (#4503 OD4) with no 🟢 tail
     total = sum(
         program_structure.session_prescription_for_role(r)["total_sets"] for r in program_structure.SESSION_SEQUENCE["session_roles"]

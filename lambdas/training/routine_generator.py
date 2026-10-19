@@ -684,7 +684,8 @@ def _progress_block(
 
     Reads the movement's performed sessions from the same history index the floor read, raises
     (never lowers) the working sets on a `step` / `floor_raise`, and writes the reason into the
-    exercise note — the cue pass's channel, so the note says why the load moved or held."""
+    exercise note — the cue pass's channel, so the note says why the load moved or held. The reason
+    leads the note (#5083): a cut of the visible note lands on the history cue behind it, never on it."""
     from training import load_progression as lp
     from training.load_ramp import _rep_range_of
 
@@ -702,7 +703,7 @@ def _progress_block(
     )
     prog["changes"] = lp.apply_to_sets(block.sets, prog)
     if prog["reason"] and (prog["changes"] or prog["basis"] != lp.BASIS_HOLD or current):
-        block.notes = f"{block.notes} {prog['reason']}.".strip() if block.notes else f"{prog['reason']}."
+        block.notes = f"{prog['reason']}. {block.notes}".strip()  # #5083: the reason LEADS the note (hevy-render-table.md)
     if prog["changes"]:
         rationale.append(f"{block.movement_key}: {prog['basis']} — {prog['reason']}")
     return prog

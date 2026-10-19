@@ -80,8 +80,8 @@ def brief_line(table, date: str) -> Optional[str]:
 
 
 def _first_session_pt(hevy_rows: list) -> Optional[datetime]:
-    starts = [parse_iso_utc(str(w.get("start_time"))) for w in hevy_rows if w.get("start_time")]
-    starts = [s for s in starts if s is not None]
+    parsed = [parse_iso_utc(str(w.get("start_time"))) for w in hevy_rows if w.get("start_time")]
+    starts: list[datetime] = [s for s in parsed if s is not None]
     return min(starts).astimezone(PACIFIC) if starts else None
 
 

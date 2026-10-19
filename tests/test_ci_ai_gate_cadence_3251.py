@@ -96,7 +96,7 @@ def test_gate_census_records_the_live_per_deploy_command():
 def test_c1_changed_cadence_not_the_budget_band():
     from ai import budget_guard  # lambdas/ on sys.path via conftest
 
-    assert set(budget_guard.CI_GATE_FEATURES) == {"reader_truth_qa", "visual_ai_qa"}
+    assert set(budget_guard.CI_GATE_FEATURES) == {"reader_truth_qa", "visual_ai_qa", "charter_judge_gate"}  # #5072 joined, same band
     for gate in budget_guard.CI_GATE_FEATURES:
         assert (
             budget_guard._FEATURE_CUTOFF[gate] == budget_guard._HARD_STOP_TIER

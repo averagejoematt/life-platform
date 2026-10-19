@@ -35,7 +35,8 @@ from training import charter_ai, training_charter as tc  # noqa: E402
 _HAIKU_4_5 = model_routing.TIER_MODELS[model_routing.WORKHORSE]
 # The bands #5084 decided (ADR-125 audience order): the judge and the retro are internal evals,
 # the narrative is owner-facing coach voice with plan_critics.
-_EXPECTED_BAND = {"charter_judge": 1, "charter_retro": 1, "charter_narrative": 2}
+# #5072 added the judge's CI regression-gate copy at band 3, with the other operator-truth CI gates.
+_EXPECTED_BAND = {"charter_judge": 1, "charter_retro": 1, "charter_narrative": 2, "charter_judge_gate": 3}
 # estimate_tokens over-estimates (chars/3.6); the wire count is 7,738 (charter v1.3.0). Demand 15% over the floor
 # so a charter edit that shrinks the block toward the floor reds BEFORE the marker goes inert.
 _MARGIN = 1.15
@@ -129,9 +130,19 @@ def test_the_owner_block_clears_the_workhorse_floor_and_is_byte_stable(monkeypat
 
 def _calls_per_run(route: str) -> int:
     """The back-to-back calls one run of `route` issues: one per panel seat (the charter's
-    concession-ledger schools) for the judge and the retro, one per owner surface for the narrative."""
+    concession-ledger schools) for the retro, one per owner surface for the narrative, and — since
+    #5072 — one per PLAN for the judge: the weekly real plan + its negative controls, and the CI
+    gate's golden cases (the fixture files the gate script itself discovers)."""
     if route == "charter.narrative":
         return len(charter_ai.NARRATIVE_SURFACES)
+    if route == "charter.judge":
+        from training import panel_judge
+
+        return panel_judge.WEEKLY_CALLS_PER_RUN
+    if route == "charter.judge_gate":
+        import panel_rubric_gate
+
+        return len(panel_rubric_gate.golden_cases())
     return len(tc.charter_value("concession_ledger", default={}))
 
 
