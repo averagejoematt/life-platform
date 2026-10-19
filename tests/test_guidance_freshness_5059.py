@@ -13,7 +13,6 @@ import copy
 import json
 import logging
 import os
-import re
 from pathlib import Path
 
 os.environ.setdefault("S3_BUCKET", "test-bucket")
@@ -114,17 +113,15 @@ def test_read_freshness_never_raises_and_logs_the_class_only(caplog):
 
 
 # ── privacy ───────────────────────────────────────────────────────────────────────────────
-def test_no_record_value_rides_the_flag_and_the_published_form_is_the_state_word_only(caplog):
-    """The flag copies two DATES and nothing else from the record; the published-safe form is one word; the
-    pure path logs nothing. Mutation: spread the guidance row into `_result` — the sentinel rides the flag."""
+def test_no_record_value_rides_the_flag_and_the_pure_path_logs_nothing(caplog):
+    """The flag copies two DATES and nothing else from the record; the pure path logs nothing. There is no
+    published form (a published coaching context omits the flag — tested below). Mutation: spread the guidance
+    row into `_result` — the sentinel rides the flag."""
     caplog.set_level(logging.DEBUG)
     for appts in ([], [_appt("2026-10-15")], [_appt("2026-09-01")], None):
         f = gf.freshness(GUIDANCE, appts, TODAY)
         assert SENTINEL not in json.dumps(f)
-        pub = gf.published_view(f)
-        assert set(pub) == {"state"} and pub["state"] in gf.STATES
-        assert not re.search(r"\d{4}-\d{2}-\d{2}", json.dumps(pub))
-    assert gf.published_view(None) == {"state": gf.UNREADABLE} and gf.published_view({"state": "x"}) == {"state": gf.UNREADABLE}
+        assert f["state"] in gf.STATES and f["gates_intensity"] is False
     assert not caplog.records
 
 
@@ -135,6 +132,10 @@ _ALLOWED_READERS = {
     "lambdas/health/guidance_freshness.py",
     "mcp/tools_plan.py",
     "mcp/tools_coach_packet.py",
+    # #5071's one coaching context: plan_helpers derives the flag from the SAME clinical rows it reads for the
+    # guidance text and coach_context states it inside the guidance section (owner channel; omitted published).
+    "mcp/plan_helpers.py",
+    "lambdas/training/coach_context.py",
 }
 
 
@@ -283,3 +284,31 @@ def test_the_appt_family_is_cross_phase_like_the_rest_of_the_record():
     assert pt.classify("USER#matthew#SOURCE#clinical", "APPT#2026-01-01#example") == pt.classify(
         "USER#matthew#SOURCE#clinical", "GUIDANCE#current"
     )
+
+
+# ── the one coaching context (#5071) carries the flag on the guidance section ───────────────
+def test_the_coach_context_states_the_flag_on_the_owner_channel_and_omits_it_published():
+    """Mutation: drop `guidance_freshness=` from `plan_helpers.coach_context_for`, or let `_freshness_view`
+    return the flag when published — the owner assertion or the published assertion reds."""
+    from training import coach_context
+
+    flag = gf.freshness(GUIDANCE, [_appt("2026-10-15")], TODAY)
+    own = coach_context.assemble(TODAY, packet=None, constraint_block=None, guidance=[GUIDANCE], guidance_freshness=flag)
+    sec = own["sections"]["clinical_guidance"]
+    assert sec["freshness"]["state"] == gf.STALE and sec["freshness"]["latest_appointment_date"] == "2026-10-15"
+    assert "record freshness: stale" in own["text"] and "Load the latest instructions" in own["text"]
+    pub = coach_context.assemble(TODAY, packet=None, constraint_block=None, guidance=[GUIDANCE], guidance_freshness=flag, published=True)
+    assert "freshness" not in pub["sections"]["clinical_guidance"]
+    assert "freshness" not in pub["text"] and "2026-10-15" not in pub["text"]
+
+
+def test_the_context_derives_the_flag_from_the_rows_it_already_read(monkeypatch):
+    """One partition read feeds the guidance text and its freshness; a failed read is `unreadable`."""
+    from mcp import plan_helpers
+
+    monkeypatch.setattr(plan_helpers, "_clinical_guidance", lambda: [GUIDANCE, _appt("2026-10-15")])
+    ctx = plan_helpers.coach_context_for(TODAY)
+    assert ctx["sections"]["clinical_guidance"]["freshness"]["state"] == gf.STALE
+    monkeypatch.setattr(plan_helpers, "_clinical_guidance", lambda: {"state": "read_failed", "error": "ClientError"})
+    ctx = plan_helpers.coach_context_for(TODAY)
+    assert ctx["sections"]["clinical_guidance"]["freshness"]["state"] == gf.UNREADABLE

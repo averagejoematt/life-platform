@@ -848,6 +848,7 @@ def _prompt(packet: dict[str, Any], draft: dict[str, Any]) -> dict[str, Any]:
                 "flags": packet["flags"],
                 "unknown": packet["unknown"],
                 "violations": packet.get("violations", []),
+                **({"charter": packet["charter"]} if packet.get("charter") else {}),  # #5071: the charter + May frame, context only
             },
         },
         default=str,

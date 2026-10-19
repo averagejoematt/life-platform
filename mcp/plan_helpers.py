@@ -147,3 +147,106 @@ def attach_morning_note(block: dict[str, Any], target_date: str, recovery_tier: 
         view["felt_vs_recovery_tier"] = compared
     block["morning_note"] = view
     block.setdefault("inputs", {})["morning_note"] = status
+
+
+# ── #5071: the one coaching context — read, assemble, attach ────────────────────────────────
+# `training.coach_context.assemble` is pure; these do its one DynamoDB read (the clinical partition,
+# through `health.clinical_facts`, the one reader) and put the result on the payloads a planning
+# conversation reads: plan_next_session (stages 1 and 2), get_coach_session_packet (the pre-flight
+# call — it carries the guidance, the charter and the May tracker `coach_context.PRE_FLIGHT` names),
+# the nightly pre-draft's run record, and the four critics' packets. Every MCP surface is the owner's
+# own channel, so the context is assembled published=False. Fail-soft: a failure is named on the
+# payload (`state: read_failed`), never raised into the tool.
+
+EXPLAIN_IN_MAY_TERMS = (
+    "Explain the plan in May-target terms: quote `coach_context.may_frame` and say which line of the charter or the panel "
+    "synthesis each choice serves. The clinical guidance in `coach_context` is reference context, never a gate on intensity."
+)
+
+
+def _clinical_guidance() -> Any:
+    """The clinical partition's rows, or a read_failed marker `assemble` reports as such."""
+    from health import clinical_facts
+
+    from mcp.config import table
+
+    try:
+        rows = clinical_facts.fetch_clinical_rows(table)
+    except Exception as e:  # noqa: BLE001 — named on the context, never raised into the tool
+        return {"state": "read_failed", "error": type(e).__name__}
+    return rows if rows is not None else {"state": "read_failed", "error": "NoResponse"}
+
+
+def _freshness_from(guidance: Any, target_date: str) -> dict[str, Any]:
+    """#5059: the guidance freshness flag over the rows `_clinical_guidance` already read — one partition read
+    feeds both the guidance text and its freshness. A read_failed marker reads as `unreadable` (read_failed)."""
+    from health import guidance_freshness
+
+    return guidance_freshness.from_rows(guidance if isinstance(guidance, list) else None, target_date)
+
+
+def coach_context_for(
+    target_date: str, *, packet: dict[str, Any] | None = None, constraint_block: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """The full context dict (owner channel), or ``{"state": "read_failed", ...}``."""
+    try:
+        from training import coach_context
+
+        guidance = _clinical_guidance()
+        return coach_context.assemble(
+            target_date,
+            packet=packet,
+            constraint_block=constraint_block,
+            guidance=guidance,
+            guidance_freshness=_freshness_from(guidance, target_date),
+            published=False,
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[#5071] coach context could not be assembled: %s", type(e).__name__)
+        return {"state": "read_failed", "error": f"{type(e).__name__}: {e}"[:200]}
+
+
+def attach_coach_context(
+    out: dict[str, Any], target_date: str, *, packet: dict[str, Any] | None = None, constraint_block: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Put ``coach_context`` (the compact summary + its text block) on a tool payload and lead its
+    ``how_to_use`` with the May-terms instruction. Returns ``out``."""
+    from training import coach_context
+
+    ctx = coach_context_for(target_date, packet=packet, constraint_block=constraint_block)
+    out["coach_context"] = ctx if ctx.get("state") == "read_failed" else coach_context.summary(ctx)
+    if "how_to_use" in out:
+        out["how_to_use"] = f"{EXPLAIN_IN_MAY_TERMS} {out['how_to_use']}"
+    return out
+
+
+def coach_context_brief(target_date: str) -> dict[str, Any]:
+    """The context's summary WITHOUT its text block — for a run record (the nightly pre-draft) whose log
+    line is clipped: the charter version, each section's state, the May frame line and the order."""
+    from training import coach_context
+
+    ctx = coach_context_for(target_date)
+    return ctx if ctx.get("state") == "read_failed" else {k: v for k, v in coach_context.summary(ctx).items() if k != "text"}
+
+
+def critics_with_charter(
+    packets: dict[str, dict[str, Any]], target_date: str, block: dict[str, Any] | None = None
+) -> dict[str, dict[str, Any]]:
+    """The four critics' packets, each carrying the charter summary and the May frame from the one
+    assembly (`critics._prompt` sends it to the model beside the packet's numbers). Pure: no read."""
+    try:
+        from training import coach_context
+
+        section = coach_context.charter_section(published=False)
+        charter = {
+            "source": section["source"],
+            "charter_version": section["charter_version"],
+            "headlines": coach_context.headlines(section),
+            "may_frame": (coach_context.may_frame(target_date, block) or {}).get("line"),
+        }
+    except Exception as e:  # noqa: BLE001 — the critics run on their numbers without it
+        logger.warning("[#5071] critic charter summary unavailable: %s", type(e).__name__)
+        return packets
+    for p in packets.values():
+        p["charter"] = charter
+    return packets

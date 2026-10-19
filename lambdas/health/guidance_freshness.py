@@ -9,7 +9,9 @@ WHY THIS EXISTS
 
 REFERENCE, NEVER A GATE (owner ruling 7, 2026-10-18)
   He is cleared with no exercise restrictions; the record is background context. The flag rides
-  `plan_next_session`'s constraint block and the coach packet as REFERENCE ONLY: no critic, generator,
+  `plan_next_session`'s constraint block, the coach packet and #5071's one coaching context (the
+  clinical-guidance section, owner channel only, derived from the same partition read) as REFERENCE
+  ONLY: no critic, generator,
   ceiling or progression reads it, and `tests/test_guidance_freshness_5059.py` builds the plan and runs
   the critics with a STALE flag and without one and asserts the prescriptions are identical.
 
@@ -28,8 +30,8 @@ THE FOUR STATES
                   stated as such, never read as `fresh` (ADR-105)
 
 PRIVACY
-  The owner form (`freshness`) carries two dates and a prompt — owner channel only (MCP). The
-  published-safe form (`published_view`) carries the state word and nothing else. Nothing here logs a
+  The flag (`freshness`) carries two dates and a prompt — owner channel only (MCP). There is no published
+  form: a published coaching context omits the flag (`training.coach_context._freshness_view`). Nothing here logs a
   value: a failed read logs its exception CLASS only. No `lambdas/web/` or `lambdas/emails/` module may
   import this one (the privacy test).
 """
@@ -142,9 +144,3 @@ def read_freshness(table, today: Optional[str] = None, user_id: str = "matthew")
     except Exception as e:  # noqa: BLE001 — reference only; a broken read is stated, never raised into a plan
         logger.warning("[guidance_freshness] clinical partition read failed (%s)", type(e).__name__)
         return freshness(None, None, today)
-
-
-def published_view(flag: Optional[dict]) -> dict[str, str]:
-    """The published-safe form: the state word, nothing else (no date, no prompt, no reason)."""
-    state = (flag or {}).get("state")
-    return {"state": state if state in STATES else UNREADABLE}
