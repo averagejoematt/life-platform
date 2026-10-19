@@ -24,7 +24,8 @@ THE SHAPE (ADR-105: deterministic computation before any model verdict)
                          (`charter_ai.system_blocks`). Budget-checked; a paused or failed seat is named, never
                          filled in. A laptop run is also held by the dev-session cap inside `bedrock_client`.
   * `grade`              code score and the panel median combine per `combine_rule`; letters from the
-                         scorecard's scale; movers against the previous retro (or the 2026-10-18 baseline);
+                         scorecard's scale; movers against the previous RETRO# row — the first retro's prior is
+                         the owner-only 2026-10-18 baseline row (`baseline_item`), never a letter in the repo;
                          every grade below `grade_scale.fix_below` becomes a named fix.
   * `grade_predictions`  the four dated charter predictions (#5089, `diary_claims` PREDICTION# rows, status
                          `observation`) are graded MECHANICALLY by their own `measurement` block once their
@@ -32,6 +33,10 @@ THE SHAPE (ADR-105: deterministic computation before any model verdict)
                          arrays and cannot reach that partition (`scripts/register_charter_predictions.py`), so
                          the verdicts are written by `scripts/training_block_retro.py --apply`.
   * `retro_item`         the owner-only row `USER#matthew#SOURCE#training_constraints / RETRO#<block_end>`.
+  * `baseline_item`      the one-time owner-only baseline row `RETRO#<scorecard baseline.date>` (kind `baseline`):
+                         the review's letters, read by the skill from the PRIVATE review doc and validated here
+                         against the scorecard's rows and scale. The repo is PUBLIC, so the letters never live in
+                         `config/training_scorecard.json` or a test.
   * `render_markdown`    the human-readable retro for the owner's PRIVATE review doc (never a public page).
 
 PRIVACY. Every output here is owner-only: the grades, the evidence, the target-bearing May-tracker cells.
@@ -58,6 +63,8 @@ MAX_TOKENS = 2500
 MEASURED, ABSENT = "measured", "absent"
 GRADED_BY = "block_retro_5079"
 PREDICTION_OPEN_STATUSES = ("observation",)
+BASELINE_KIND = "baseline"
+NO_PRIOR = "nothing: no earlier RETRO# row and no stored baseline row (scripts/training_block_retro.py baseline)"
 
 INSTRUCTIONS = (
     "BLOCK RETRO — ONE PANEL SEAT\n\n"
@@ -492,9 +499,12 @@ def panel_regrade(
 
 # ── combining, movers, fixes ──────────────────────────────────────────────────────────────
 def _prior_letters(scorecard: Mapping[str, Any], prior: Optional[Mapping[str, Any]]) -> tuple[dict[str, Optional[str]], str]:
+    """The prior row's letters: the last RETRO#, or the owner-only baseline row on the first run. With neither
+    stored, every prior letter is None and the retro says so — it never falls back to a letter in the repo."""
     if prior and isinstance(prior.get("rows"), dict):
-        return {rid: (r or {}).get("letter") for rid, r in prior["rows"].items()}, f"retro {prior.get('block_end')}"
-    return {r["id"]: r.get("baseline_grade") for r in scorecard["rows"]}, f"baseline {scorecard['baseline']['date']}"
+        kind = "baseline" if prior.get("kind") == BASELINE_KIND else "retro"
+        return {rid: (r or {}).get("letter") for rid, r in prior["rows"].items()}, f"{kind} {prior.get('block_end')}"
+    return {r["id"]: None for r in scorecard["rows"]}, NO_PRIOR
 
 
 def grade(
@@ -621,14 +631,31 @@ def _grade_rate_weeks(m: Mapping[str, Any], may_rows: list[Mapping[str, Any]], _
     return verdict, {"in_band": hits, "out_of_band": misses, "missing": len(ends) - hits - misses, "rates": rates}
 
 
-def _grade_anchor_up(_m: Mapping[str, Any], _rows: list[Mapping[str, Any]], sup: Mapping[str, Any]) -> tuple[str, Any]:
+def anchor_set(m: Mapping[str, Any], may_rows: list[Mapping[str, Any]]) -> tuple[list[str], str]:
+    """The lifts the pass rule ('EVERY anchor lift') quantifies over — never the keys a session happened to supply:
+    the measurement's own `anchors` list when it names one, else the families of the last May tracker row's
+    `anchors` section, else `program_structure.CORE_ANCHORS`."""
+    if isinstance(m.get("anchors"), (list, tuple)) and m["anchors"]:
+        return sorted(str(a) for a in m["anchors"]), "measurement.anchors"
+    last = (((may_rows[-1].get("anchors") or {}).get("anchors")) or {}) if may_rows else {}
+    if last:
+        return sorted(last), "may_tracker anchors (last week)"
+    from training.program_structure import CORE_ANCHORS
+
+    return sorted(CORE_ANCHORS), "program_structure.CORE_ANCHORS"
+
+
+def _grade_anchor_up(m: Mapping[str, Any], rows: list[Mapping[str, Any]], sup: Mapping[str, Any]) -> tuple[str, Any]:
     lifts = sup.get("anchor_e1rm") or {}
+    expected, basis = anchor_set(m, rows)
     if not lifts:
-        return "inconclusive", {"reason": "no anchor e1RM baseline/current was supplied"}
+        return "inconclusive", {"reason": "no anchor e1RM baseline/current was supplied", "anchor_set": expected, "anchor_set_from": basis}
     worse = sorted(k for k, v in lifts.items() if v.get("current") is not None and float(v["current"]) <= float(v["baseline"]))
     missing = sorted(k for k, v in lifts.items() if v.get("current") is None)
-    verdict = "refuted" if worse else ("inconclusive" if missing else "confirmed")
-    return verdict, {"lifts": lifts, "not_above_baseline": worse, "no_post_baseline_session": missing}
+    not_supplied = sorted(set(expected) - set(lifts))
+    verdict = "refuted" if worse else ("inconclusive" if missing or not_supplied else "confirmed")
+    detail = {"lifts": lifts, "not_above_baseline": worse, "no_post_baseline_session": missing, "not_supplied": not_supplied}
+    return verdict, {**detail, "anchor_set": expected, "anchor_set_from": basis}
 
 
 def _grade_no_stalls(_m: Mapping[str, Any], _rows: list[Mapping[str, Any]], sup: Mapping[str, Any]) -> tuple[str, Any]:
@@ -698,6 +725,38 @@ def retro_item(retro: Mapping[str, Any], user_pk: str = "USER#matthew") -> dict[
         "panel": {k: (retro.get("panel") or {}).get(k) for k in ("status", "route", "usage", "reason")},
         "scorecard_version": retro.get("scorecard_version"),
         "charter_version": retro.get("charter_version") or charter_version(),
+        "version": RETRO_VERSION,
+        "tier": "owner_only",
+    }
+
+
+def baseline_item(letters: Mapping[str, Any], scorecard: Mapping[str, Any], user_pk: str = "USER#matthew") -> dict[str, Any]:
+    """The one-time owner-only baseline row `<user_pk>#SOURCE#training_constraints / RETRO#<baseline.date>`.
+
+    `letters` = {row_id: letter}, read by the skill from the owner's PRIVATE review doc. Every scorecard row needs a
+    letter on the scale and no unknown row is accepted, so the first retro's movers are against the whole review.
+    Raises ValueError naming every problem."""
+    from training.training_charter import charter_version
+
+    ids = [r["id"] for r in scorecard["rows"]]
+    problems = [f"{rid}: no baseline letter" for rid in ids if rid not in letters]
+    problems += [f"{rid}: not a scorecard row" for rid in letters if rid not in ids]
+    problems += [
+        f"{rid}: {letters[rid]!r} is not on the scale" for rid in ids if rid in letters and letter_rank(letters[rid], scorecard) is None
+    ]
+    if problems:
+        raise ValueError("baseline letters refused: " + "; ".join(problems))
+    day = scorecard["baseline"]["date"]
+    labels = {r["id"]: r["label"] for r in scorecard["rows"]}
+    return {
+        "pk": f"{user_pk}#SOURCE#training_constraints",
+        "sk": f"{RETRO_SK_PREFIX}{day}",
+        "kind": BASELINE_KIND,
+        "block_end": day,
+        "rows": {rid: {"label": labels[rid], "letter": str(letters[rid]), "state": BASELINE_KIND} for rid in ids},
+        "source": scorecard["baseline"].get("source"),
+        "scorecard_version": scorecard.get("version"),
+        "charter_version": charter_version(),
         "version": RETRO_VERSION,
         "tier": "owner_only",
     }

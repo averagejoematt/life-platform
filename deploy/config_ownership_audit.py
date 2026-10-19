@@ -242,9 +242,10 @@ RULINGS: tuple[Ruling, ...] = (
         "config/training_scorecard.json",
         HAND_OWNED,
         "#5079 (epic #5051): the fixed thirteen-row training scorecard the /training-review block retro re-grades "
-        "once per block — each row's measurable inputs, its code rules, the grade scale and the 2026-10-18 baseline "
-        "grades. Hand-authored, versioned with its own change_log; read by lambdas/training/block_retro.py from the "
-        "checkout on the owner's workstation (scripts/training_block_retro.py). No writer anywhere and not bundled; "
+        "once per block — each row's measurable inputs, its code rules and the grade scale. NO grade letters: the "
+        "2026-10-18 baseline letters are the owner-only training_constraints RETRO#2026-10-18 row. Hand-authored, "
+        "versioned with its own change_log; read by lambdas/training/block_retro.py from the checkout on the owner's "
+        "workstation (scripts/training_block_retro.py). No writer anywhere and not bundled; "
         "the config twin sync's S3 copy is a publish nothing reads.",
     ),
     Ruling(

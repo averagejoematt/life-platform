@@ -1145,7 +1145,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # M2 drift exits 0: 2 failed / 10 passed; restored 12 passed). Enters exactly that id, leaves {}, unproven does NOT move.
         # Upper bound 274 -> 275 (2026-10-19, #5079 the block retro, on charter-w3): structural::test_block_retro_5079.py — the
         # os.walk sweep of lambdas/web + lambdas/emails for a module naming the owner-only retro — arrives PROVEN via
-        # STRUCTURAL_HAND_PROOFS (two plants, each 1 failed / 11 passed; restored 12 passed). Enters exactly that id, leaves {}.
+        # STRUCTURAL_HAND_PROOFS (two plants, each 1 failed / 12 passed; restored 13 passed). Enters exactly that id, leaves {}.
         <= 275
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"

@@ -1,8 +1,8 @@
 {
-  "_README": "#5079 (epic #5051, charter #5067): the FIXED training scorecard the /training-review block retro re-grades once per block (the block is the charter's rotation.anchors_fixed_weeks; the retro cadence is the charter's calibration.block_retro). Thirteen rows, copied from the owner-private elite-panel review of 2026-10-18 (the rows and their baseline grades only; the review itself stays private). Each row names the platform reads that grade it (`inputs`, keys of lambdas/training/block_retro.py's evidence) and, where code can score it, its `code_rules` (ADR-105: deterministic computation before any model verdict); the eight-seat panel re-grade (route charter.retro, one call per seat) scores every row, and lambdas/training/block_retro.py combines the two. Every training TARGET is read from config/training_charter.json at run time, never copied here. Hand-owned; a change is a new version with a change_log line. A grade below `grade_scale.fix_below` becomes a named fix (an issue or a charter change for the owner).",
+  "_README": "#5079 (epic #5051, charter #5067): the FIXED training scorecard the /training-review block retro re-grades once per block (the block is the charter's rotation.anchors_fixed_weeks; the retro cadence is the charter's calibration.block_retro). Thirteen rows, copied from the owner-private elite-panel review of 2026-10-18 (the rows only: the review, and the grades it gave, stay private — the 2026-10-18 baseline letters are an owner-only DynamoDB row, never this file, because the repo is PUBLIC). Each row names the platform reads that grade it (`inputs`, keys of lambdas/training/block_retro.py's evidence) and, where code can score it, its `code_rules` (ADR-105: deterministic computation before any model verdict); the eight-seat panel re-grade (route charter.retro, one call per seat) scores every row, and lambdas/training/block_retro.py combines the two. Every training TARGET is read from config/training_charter.json at run time, never copied here. Hand-owned; a change is a new version with a change_log line. A grade below `grade_scale.fix_below` becomes a named fix (an issue or a charter change for the owner).",
   "version": "1.0.0",
   "change_log": [
-    {"version": "1.0.0", "date": "2026-10-19", "issue": "#5079", "what": "the thirteen rows of the 2026-10-18 elite-panel review, their measurable inputs, the code rules, the grade scale and the baseline grades"}
+    {"version": "1.0.0", "date": "2026-10-19", "issue": "#5079", "what": "the thirteen rows of the 2026-10-18 elite-panel review, their measurable inputs, the code rules and the grade scale; the baseline letters are owner-only (training_constraints / RETRO#2026-10-18), never in this file"}
   ],
   "grade_scale": {
     "score_range": [0, 10],
@@ -24,13 +24,13 @@
   "combine_rule": "a row's score is the mean of its code score (the mean of its measured code_rules) and the panel's median seat score; with only one of the two it is that one; with neither the row is `ungraded` and carries its last grade, said so. The session may override a row only with a recorded reason (block_retro.apply_overrides).",
   "baseline": {
     "date": "2026-10-18",
-    "source": "the owner-private elite-panel training review (day 43); the first retro compares against these grades"
+    "source": "the owner-private elite-panel training review (day 43)",
+    "store": "the letters are owner-only: USER#matthew#SOURCE#training_constraints / RETRO#2026-10-18 (kind baseline), written once by `scripts/training_block_retro.py baseline --apply` from the private review; the first retro reads it as its prior. No grade letter belongs in this file."
   },
   "rows": [
     {
       "id": "outcome_weight_body_comp",
       "label": "Outcome: weight and body composition",
-      "baseline_grade": "A",
       "inputs": ["weight.weeks_counted", "weight.weeks_in_band", "weight.positions", "weight.rate_4wk_last", "waist.tape_rows", "waist.latest"],
       "code_rules": [{"kind": "share", "numerator": "weight.weeks_in_band", "denominator": "weight.weeks_counted"}],
       "fix_route": "charter"
@@ -38,7 +38,6 @@
     {
       "id": "strength_outcome",
       "label": "Strength outcome",
-      "baseline_grade": "A-",
       "inputs": ["anchors.measured", "anchors.held", "anchors.down_at_end", "anchors.tripped_any_week"],
       "code_rules": [{"kind": "share", "numerator": "anchors.held", "denominator": "anchors.measured"}],
       "fix_route": "issue"
@@ -46,7 +45,6 @@
     {
       "id": "consistency",
       "label": "Consistency",
-      "baseline_grade": "A",
       "inputs": ["sessions.logged", "sessions.planned"],
       "code_rules": [{"kind": "share", "numerator": "sessions.logged", "denominator": "sessions.planned"}],
       "fix_route": "issue"
@@ -54,7 +52,6 @@
     {
       "id": "sleep",
       "label": "Sleep",
-      "baseline_grade": "A-",
       "inputs": ["sleep.nights", "sleep.mean_hours", "sleep.consistency"],
       "code_rules": [],
       "fix_route": "issue"
@@ -62,7 +59,6 @@
     {
       "id": "program_structure",
       "label": "Program structure",
-      "baseline_grade": "B+",
       "inputs": ["panel.weeks_graded", "panel.overall_mean", "panel.criteria_means"],
       "code_rules": [
         {
@@ -82,7 +78,6 @@
     {
       "id": "walking",
       "label": "Walking",
-      "baseline_grade": "B",
       "inputs": ["steps.days_measured", "steps.days_at_floor", "steps.days_at_target"],
       "code_rules": [{"kind": "share", "numerator": "steps.days_at_floor", "denominator": "steps.days_measured"}],
       "fix_route": "issue"
@@ -90,7 +85,6 @@
     {
       "id": "exercise_selection_variety",
       "label": "Exercise selection and variety",
-      "baseline_grade": "C",
       "inputs": ["panel.criteria_means", "sessions.distinct_movements"],
       "code_rules": [
         {
@@ -111,7 +105,6 @@
     {
       "id": "fatigue_management",
       "label": "Fatigue management",
-      "baseline_grade": "C",
       "inputs": ["panel.criteria_means", "deload.records", "deload.recommendations"],
       "code_rules": [
         {
@@ -131,7 +124,6 @@
     {
       "id": "response_reference_event",
       "label": "Response to the 10 Oct event (reference only)",
-      "baseline_grade": "C+",
       "reference_only": true,
       "note": "The baseline graded how the plan and the coaching responded to one past interruption. A later block grades the response to any interruption inside it (the disruption-mode records, the step back up); a block with none carries the grade forward and raises no fix.",
       "inputs": ["disruption.records", "deload.records"],
@@ -141,7 +133,6 @@
     {
       "id": "measurement",
       "label": "Measurement",
-      "baseline_grade": "C",
       "inputs": ["calibration.due", "calibration.done", "calibration.detail", "fitness.battery"],
       "code_rules": [{"kind": "share", "numerator": "calibration.done", "denominator": "calibration.due"}],
       "fix_route": "issue"
@@ -149,7 +140,6 @@
     {
       "id": "planning_loop",
       "label": "Planning loop (chat plus engine)",
-      "baseline_grade": "C+",
       "inputs": ["loop.weeks", "loop.weeks_closed", "planning.custom_departures", "planning.committed_plans"],
       "code_rules": [{"kind": "share", "numerator": "loop.weeks_closed", "denominator": "loop.weeks"}],
       "fix_route": "issue"
@@ -157,7 +147,6 @@
     {
       "id": "cardio_programming",
       "label": "Cardio programming",
-      "baseline_grade": "D+",
       "inputs": ["cardio.conditioning_sessions", "cardio.conditioning_target", "panel.criteria_means"],
       "code_rules": [
         {"kind": "share", "numerator": "cardio.conditioning_sessions", "denominator": "cardio.conditioning_target"},
@@ -171,7 +160,6 @@
     {
       "id": "engine_progression_logic",
       "label": "Engine progression logic",
-      "baseline_grade": "D",
       "inputs": ["progression.steps_taken", "progression.step_due", "progression.stalls", "panel.criteria_means"],
       "code_rules": [
         {"kind": "share", "numerator": "progression.steps_taken", "denominator": "progression.step_opportunities"},

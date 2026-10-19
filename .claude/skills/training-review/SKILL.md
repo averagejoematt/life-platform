@@ -32,7 +32,9 @@ block end is not clear, ask him for the date; never guess one.
 
 ## 1. The baseline and the private doc
 
-The rows and their 2026-10-18 baseline grades are copied into `config/training_scorecard.json`.
+The rows are copied into `config/training_scorecard.json`; their 2026-10-18 baseline grades are NOT.
+The repo is PUBLIC, so the letters live only in the owner-only baseline row
+`training_constraints / RETRO#2026-10-18` (kind `baseline`), which the first retro reads as its prior.
 The review they come from is the owner's PRIVATE Claude Doc "Training Review — Day 43 Elite
 Panel". Read it ONLY through the Claude Docs tools, and never web-fetch it:
 
@@ -41,8 +43,15 @@ Panel". Read it ONLY through the Claude Docs tools, and never web-fetch it:
   with payload `{projection: outline}` and a `{kind: view, parentId: <the scorecard table id>}`.
 - Load the docs guide (`guide(items=["topic.index"])`) before the first docs call of the session.
 
-If the doc's scorecard has rows or baseline grades the config does not, stop and say so. The
-config changes only as a new scorecard version with a change_log line, on his word.
+If the doc's scorecard has rows the config does not, stop and say so. The config changes only as a
+new scorecard version with a change_log line, on his word.
+
+**Once, before the first retro: store the baseline.** If `grade` warns that there is no prior row,
+read the letters from the doc's scorecard, write them as `{"<row id>": "<letter>"}` to a file in
+your session scratchpad (never the repo, never a commit), and run
+`python3 scripts/training_block_retro.py baseline --letters <file>` (a dry run that validates every
+row and letter). `--apply` writes the row; it is an AWS write, so run it only on his word. It
+refuses to overwrite a stored baseline.
 
 ## 2. Gather what the platform has not stored
 
@@ -76,7 +85,9 @@ not read is LEFT OUT, never written as 0; the retro then shows that input as abs
 }
 ```
 
-`anchor_e1rm` and `accessory_stalls` feed the dated predictions only. Read each prediction's own
+`anchor_e1rm` and `accessory_stalls` feed the dated predictions only. Supply EVERY anchor lift (the
+families in the last May tracker row's `anchors`): a lift you leave out makes the anchor
+prediction `inconclusive`, naming it, never `confirmed`. Read each prediction's own
 `measurement` block (`get_predictions`, or `manage_diary_claims` action `list`) for its lifts,
 window and threshold, and scope `get_exercise_history` by Hevy `template_id`.
 
@@ -100,7 +111,7 @@ only in a block that had an interruption (a disruption-mode or deload record). O
 carried and raises no fix. Keep its wording neutral everywhere.
 
 Read `retro.md` back to him: each row's grade with its evidence (the inputs and the seats' reasons),
-then the movers against the last retro (or the 2026-10-18 baseline on the first run). If he, or you
+then the movers against the last retro (the stored baseline row on the first run). If he, or you
 with a stated reason, departs from a computed letter, record it in an `--overrides` JSON
 (`{"<row>": {"letter": "B", "reason": "..."}}`) and re-run `grade`. `block_retro.apply_overrides`
 refuses an override without a reason.

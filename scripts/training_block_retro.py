@@ -12,10 +12,16 @@ model is called once and the AWS write is a separate, deliberate act:
   store   THE WRITE (dry-run unless `--apply`). Puts `USER#matthew#SOURCE#training_constraints / RETRO#<block_end>`
           and flips each graded charter prediction from `observation` to its verdict (conditional on it still
           being open), from a retro JSON `grade` produced. The owner or the driver runs `--apply`; never a lane.
+  baseline  THE ONE-TIME WRITE (dry-run unless `--apply`). Puts the owner-only baseline row
+          `training_constraints / RETRO#<scorecard baseline.date>` (kind `baseline`) from a `--letters` JSON
+          {row_id: letter} the skill reads from the owner's PRIVATE review doc and keeps OUTSIDE the repo (the
+          repo is PUBLIC). The first retro reads it as its prior. Refuses a missing row, an unknown row, an
+          off-scale letter, or a baseline row that is already stored.
 
 Every read uses a 60 s read timeout. A failed read stops the run and names the partition — a broken read is
 never an empty block.
 
+    python3 scripts/training_block_retro.py baseline --letters <scratch>/baseline-letters.json                # dry run
     python3 scripts/training_block_retro.py grade --block-end 2026-12-06 --supplied /tmp/supplied.json --out /tmp/retro-2026-12-06
     python3 scripts/training_block_retro.py store --retro /tmp/retro-2026-12-06/retro.json            # dry run
     python3 scripts/training_block_retro.py store --retro /tmp/retro-2026-12-06/retro.json --apply    # the write
@@ -99,6 +105,8 @@ def cmd_grade(args: argparse.Namespace) -> int:
     with open(os.path.join(args.out, "retro.md"), "w", encoding="utf-8") as f:
         f.write(md)
     print(md)
+    if inputs["prior"] is None:
+        print("WARNING: no prior RETRO# row and no baseline row: no movers. Store the baseline first (`baseline`).")
     print(f"wrote {args.out}/retro.json and retro.md — panel {retro['panel'].get('status')}; nothing stored (run `store`)")
     return 0
 
@@ -150,6 +158,33 @@ def cmd_store(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_baseline(args: argparse.Namespace) -> int:
+    from datetime import datetime, timezone
+
+    sc = block_retro.load_scorecard()
+    if sc is None:
+        print("config/training_scorecard.json unreadable")
+        return 1
+    letters = json.load(open(args.letters, encoding="utf-8"))
+    item = block_retro.baseline_item(letters, sc, USER_PK)
+    if not args.apply:
+        print(f"DRY RUN — would put {item['pk']} / {item['sk']} (owner-only, {len(item['rows'])} rows); nothing written")
+        return 0
+    from experiment.phase_taxonomy import experiment_stamp_for
+
+    item.update(experiment_stamp_for(item["pk"], item["sk"]))
+    item["graded_at"] = datetime.now(timezone.utc).isoformat()
+    try:
+        _table().put_item(Item=item, ConditionExpression="attribute_not_exists(sk)")
+    except Exception as e:  # noqa: BLE001 — an already-stored baseline is reported, never overwritten
+        if getattr(e, "response", {}).get("Error", {}).get("Code") != "ConditionalCheckFailedException":
+            raise
+        print(f"already stored, left as is: {item['sk']}")
+        return 0
+    print(f"stored {item['sk']}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -162,8 +197,11 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("store", help="write the RETRO# row and the prediction verdicts (dry-run unless --apply)")
     s.add_argument("--retro", required=True, help="the retro.json `grade` wrote")
     s.add_argument("--apply", action="store_true", help="write to DynamoDB (default: dry-run)")
+    b = sub.add_parser("baseline", help="write the one-time owner-only baseline row (dry-run unless --apply)")
+    b.add_argument("--letters", required=True, help="JSON {row_id: letter} from the PRIVATE review doc, kept outside the repo")
+    b.add_argument("--apply", action="store_true", help="write to DynamoDB (default: dry-run)")
     args = ap.parse_args(argv)
-    return cmd_grade(args) if args.cmd == "grade" else cmd_store(args)
+    return {"grade": cmd_grade, "store": cmd_store, "baseline": cmd_baseline}[args.cmd](args)
 
 
 if __name__ == "__main__":

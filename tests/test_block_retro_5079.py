@@ -5,15 +5,19 @@ The contract test for `.claude/skills/training-review/SKILL.md` and the determin
 #5089 predictions as `scripts/register_charter_predictions.py` builds them, the counts the skill supplies):
 
   1. THE SCORECARD IS THE REVIEW'S: thirteen rows (the charter's `calibration.block_retro.scorecard_rows`), each
-     with a scale baseline grade, inputs the evidence actually carries and rules the module knows; every
-     `panel_mean` criterion exists in config/panel_rubric.json; the scale refines the rubric's letters.
+     with inputs the evidence actually carries and rules the module knows; every `panel_mean` criterion exists
+     in config/panel_rubric.json; the scale refines the rubric's letters. The repo is PUBLIC: the scorecard
+     carries NO grade letter — the 2026-10-18 baseline letters are the owner-only RETRO#2026-10-18 row
+     (`baseline_item`), and the tests below use SYNTHETIC letters, never the review's.
   2. REPRODUCIBLE: the same fixture gives the same evidence, code scores, movers, fixes and predictions.
-  3. THE GRADE: code + the panel median combine per the rule; movers against the baseline, then the last retro;
+  3. THE GRADE: code + the panel median combine per the rule; movers against the baseline row, then the last retro
+     (and none, said so, when neither is stored);
      every graded row below B is a fix; the reference row is carried (and raises no fix) in a block with no
      interruption; an ungraded row carries its last grade and says so.
   4. THE PANEL RE-GRADE: one call per seat on `charter.retro` with the charter block cached; a failed seat is
      named, never filled in; a paused budget calls nothing.
-  5. THE PREDICTIONS: graded by their own measurement block once grade_by has passed, never before.
+  5. THE PREDICTIONS: graded by their own measurement block once grade_by has passed, never before; the anchor
+     prediction quantifies over the anchor SET, so a supply that leaves a lift out is inconclusive, never confirmed.
   6. THE ROW + THE DOC: RETRO#<block_end> on training_constraints (owner-only tier), the charter version stamped;
      nothing in lambdas/web or lambdas/emails imports the module.
   7. THE SKILL: frontmatter, the charter (never a copied target), the route, the owner-only stores, the private
@@ -107,9 +111,23 @@ SUPPLIED = {
     "progression": {"steps_taken": 9, "step_due": 3, "stalls": 1},
     "cardio": {"conditioning_sessions": 5},
     "planning": {"custom_departures": 2, "committed_plans": 28},
-    "anchor_e1rm": {"squat": {"baseline": 300, "current": 315}, "bench": {"baseline": 230, "current": 240}},
+    "anchor_e1rm": {
+        "squat": {"baseline": 300, "current": 315},
+        "bench": {"baseline": 230, "current": 240},
+        "row": {"baseline": 200, "current": 205},
+        "press": {"baseline": 150, "current": 155},
+    },
     "accessory_stalls": {"lateral raise": {"scored": True, "stall_runs": 0}, "face pull": {"scored": True, "stall_runs": 1}},
 }
+
+
+# SYNTHETIC baseline letters, one per row — not the owner-private review's.
+_SYNTH = ["B", "C", "B-", "B", "C+", "B+", "D", "B", "B+", "A", "D+", "B-", "C"]
+
+
+def _synthetic_baseline():
+    sc = br.load_scorecard()
+    return br.baseline_item({r["id"]: _SYNTH[i] for i, r in enumerate(sc["rows"])}, sc)
 
 
 def _fixture():
@@ -135,7 +153,15 @@ def _replay(scores: dict | None = None, fail_seat: str | None = None):
 def _run(**kw):
     may, panel = _fixture()
     call, calls = _replay(**kw)
-    out = br.run(BLOCK_END, may_rows=may, panel_rows=panel, predictions=rcp.build_records(), supplied=SUPPLIED, call=call)
+    out = br.run(
+        BLOCK_END,
+        may_rows=may,
+        panel_rows=panel,
+        predictions=rcp.build_records(),
+        supplied=SUPPLIED,
+        call=call,
+        prior=_synthetic_baseline(),
+    )
     return out, calls
 
 
@@ -151,8 +177,6 @@ def test_the_scorecard_is_the_reviews_thirteen_rows_on_a_scale_that_refines_the_
     evidence = br.assemble_evidence(br.block_window(BLOCK_END))
     crit_ids = {f"{s}.{c['id']}" for s, spec in rubric["seats"].items() for c in spec["criteria"]}
     for r in sc["rows"]:
-        if br.letter_rank(r.get("baseline_grade"), sc) is None:
-            problems.append(f"{r['id']}: baseline {r.get('baseline_grade')!r} is not on the scale")
         if r.get("fix_route") not in ("issue", "charter"):
             problems.append(f"{r['id']}: fix_route {r.get('fix_route')!r}")
         for k in r["inputs"] + [x for rule in r["code_rules"] for x in (rule.get("numerator"), rule.get("denominator")) if x]:
@@ -173,27 +197,42 @@ def test_the_scorecard_is_the_reviews_thirteen_rows_on_a_scale_that_refines_the_
     assert not problems, problems
 
 
-def test_the_baseline_carries_the_2026_10_18_grades_and_the_neutral_reference_row():
+def test_the_public_scorecard_carries_no_grade_letter_and_the_baseline_is_an_owner_only_row():
     sc = _scorecard()
-    base = {r["id"]: r["baseline_grade"] for r in sc["rows"]}
-    assert sc["baseline"]["date"] == "2026-10-18"
-    assert base == {
-        "outcome_weight_body_comp": "A",
-        "strength_outcome": "A-",
-        "consistency": "A",
-        "sleep": "A-",
-        "program_structure": "B+",
-        "walking": "B",
-        "exercise_selection_variety": "C",
-        "fatigue_management": "C",
-        "response_reference_event": "C+",
-        "measurement": "C",
-        "planning_loop": "C+",
-        "cardio_programming": "D+",
-        "engine_progression_logic": "D",
-    }
+    scale = {x["letter"] for x in sc["grade_scale"]["letters"]}
+    # SHAPE, not letters: no row field names a grade, and no row value IS a letter on the scale.
+    leaks = []
+    for r in sc["rows"]:
+        leaks += [f"{r['id']}.{k}" for k in r if "grade" in k.lower() or "letter" in k.lower()]
+        leaks += [f"{r['id']}.{k}={v!r}" for k, v in r.items() if isinstance(v, str) and v.strip() in scale]
+    assert not leaks, f"a grade letter in the PUBLIC scorecard (the baseline is the owner-only RETRO# row): {leaks}"
+    assert sc["baseline"]["date"] == "2026-10-18" and "RETRO#2026-10-18" in sc["baseline"]["store"]
     ref = next(r for r in sc["rows"] if r["id"] == "response_reference_event")
     assert ref["reference_only"] is True
+    # The owner-only baseline row: every row, on the scale, owner-only tier, keyed on the baseline date.
+    item = _synthetic_baseline()
+    assert (item["pk"], item["sk"], item["kind"], item["tier"]) == (
+        "USER#matthew#SOURCE#training_constraints",
+        "RETRO#2026-10-18",
+        br.BASELINE_KIND,
+        "owner_only",
+    )
+    assert set(item["rows"]) == {r["id"] for r in sc["rows"]} and all(v["letter"] in scale for v in item["rows"].values())
+    ids = [r["id"] for r in sc["rows"]]
+    for bad, why in (
+        ({rid: "B" for rid in ids[1:]}, "no baseline letter"),
+        ({**{rid: "B" for rid in ids}, "made_up_row": "A"}, "not a scorecard row"),
+        ({**{rid: "B" for rid in ids}, ids[0]: "Z"}, "not on the scale"),
+    ):
+        with pytest.raises(ValueError, match=why):
+            br.baseline_item(bad, sc)
+    # With no stored baseline and no earlier retro the retro names that, compares nothing, and never invents a letter.
+    may, panel = _fixture()
+    window = br.block_window(BLOCK_END)
+    evidence = br.assemble_evidence(window, may_rows=may, panel_rows=panel)
+    g = br.grade(sc, evidence, br.code_scores(sc, evidence), {"seats": {}}, prior=None)
+    assert g["compared_with"] == br.NO_PRIOR and g["movers"] == []
+    assert all(r["prior_letter"] is None for r in g["rows"].values())
 
 
 # ── 2 + 3. reproducible, and the grade ────────────────────────────────────────────────────
@@ -236,7 +275,7 @@ def test_movers_are_named_against_the_baseline_then_the_last_retro_and_low_grade
     assert {f["row"] for f in g["fixes"]} == graded_low and graded_low
     # The reference row: no interruption in the block -> carried, never a fix.
     ref = g["rows"]["response_reference_event"]
-    assert ref["state"] == "reference_carried" and ref["letter"] == "C+"
+    assert ref["state"] == "reference_carried" and ref["letter"] == _synthetic_baseline()["rows"]["response_reference_event"]["letter"]
     assert "response_reference_event" not in {f["row"] for f in g["fixes"]}
     # The next retro compares with this one, not with the baseline.
     second = br.grade(sc, first["evidence"], br.code_scores(sc, first["evidence"]), first["panel"], prior=br.retro_item(first))
@@ -251,11 +290,12 @@ def test_an_interruption_grades_the_reference_row_and_an_unmeasured_row_carries(
         window, may_rows=may, panel_rows=panel, disruption_records=[{"start_date": "2026-11-10", "until": "2026-11-14"}]
     )
     codes = br.code_scores(sc, evidence)
-    g = br.grade(sc, evidence, codes, {"seats": {}})
+    base = _synthetic_baseline()
+    g = br.grade(sc, evidence, codes, {"seats": {}}, prior=base)
     assert g["rows"]["response_reference_event"]["state"] == "carried"  # no code, no panel -> carried, said so
-    assert "sleep" in g["ungraded"] and g["rows"]["sleep"]["letter"] == "A-"
+    assert "sleep" in g["ungraded"] and g["rows"]["sleep"]["letter"] == base["rows"]["sleep"]["letter"]
     panel_out = br.panel_regrade(sc, codes, window, call=_replay(scores={"response_reference_event": 5})[0])
-    g2 = br.grade(sc, evidence, codes, panel_out)
+    g2 = br.grade(sc, evidence, codes, panel_out, prior=base)
     assert g2["rows"]["response_reference_event"]["state"] == "graded"
     assert "response_reference_event" in {f["row"] for f in g2["fixes"]}
 
@@ -322,6 +362,26 @@ def test_the_charter_predictions_are_graded_by_their_own_measurement_after_grade
     assert {p["metric"]: p for p in br.grade_predictions(preds, BLOCK_END, sparse, SUPPLIED)}["rate_in_band_4_of_6"][
         "verdict"
     ] == "inconclusive"
+
+
+def test_the_anchor_prediction_quantifies_over_the_anchor_set_not_the_supplied_keys():
+    may, _ = _fixture()
+    pred = next(p for p in rcp.build_records() if p["metric"] == "anchor_e1rm_up")
+    partial = {**SUPPLIED, "anchor_e1rm": {k: v for k, v in SUPPLIED["anchor_e1rm"].items() if k in ("squat", "bench")}}
+    got = br.grade_predictions([pred], BLOCK_END, may, partial)[0]
+    # Both supplied lifts are up, but row and press were never supplied: inconclusive, naming them — not confirmed.
+    assert got["verdict"] == "inconclusive"
+    assert got["evidence"]["not_supplied"] == ["press", "row"] and got["evidence"]["anchor_set_from"] == "may_tracker anchors (last week)"
+    # A supplied lift that is not up still refutes, whatever is missing.
+    down = {**partial, "anchor_e1rm": {**partial["anchor_e1rm"], "bench": {"baseline": 230, "current": 225}}}
+    assert br.grade_predictions([pred], BLOCK_END, may, down)[0]["verdict"] == "refuted"
+    # The measurement's own list wins; with no tracker rows the set falls back to program_structure.CORE_ANCHORS.
+    from training.program_structure import CORE_ANCHORS
+
+    assert br.anchor_set({"anchors": ["squat"]}, may) == (["squat"], "measurement.anchors")
+    assert br.anchor_set({}, []) == (sorted(CORE_ANCHORS), "program_structure.CORE_ANCHORS")
+    full = br.grade_predictions([pred], BLOCK_END, may, SUPPLIED)[0]
+    assert full["verdict"] == "confirmed" and full["evidence"]["not_supplied"] == []
 
 
 # ── 6. the row, the doc tab, privacy ──────────────────────────────────────────────────────
