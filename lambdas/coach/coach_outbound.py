@@ -104,6 +104,13 @@ PROMISE_FRAME = (
     "the evidence below.]\n\nWhat you said:\n{evidence}"
 )
 
+CALIBRATION_FRAME = (
+    "[A calibration is due and it is YOUR lane. There is no inbound message — Matthew has not texted you; you are "
+    "opening this thread yourself. Send ONE short text that says what is due and how to log it, the way a colleague "
+    "with a clipboard would: plain, one sentence of why it matters at most, no pressure, no plan, no question at the "
+    "end. Use ONLY the evidence below.]\n\nWhat is due:\n{evidence}"
+)
+
 PRE_EVENT_FRAME = (
     "[Matthew told you he has a hard thing today, and this is the morning of it. There is no inbound message — he "
     "has not texted you; you are opening this thread yourself. Send ONE short text that shows you remembered: name "
@@ -136,6 +143,7 @@ PROVENANCE_PRE_EVENT = "telegram_pre_event"
 PROVENANCE_CONCERN = "telegram_concern"
 PROVENANCE_CHECKIN = "telegram_checkin"
 PROVENANCE_CELEBRATION = "telegram_celebration"
+PROVENANCE_CALIBRATION = "telegram_calibration"  # #5061: the tape / photo / DEXA due-day prompt — a fortnightly errand, ranks last
 
 OUTBOUND_PRIORITY = {
     PROVENANCE_PROMISE: 0,
@@ -144,6 +152,7 @@ OUTBOUND_PRIORITY = {
     PROVENANCE_CONCERN: 3,
     PROVENANCE_CHECKIN: 4,
     PROVENANCE_CELEBRATION: 5,
+    PROVENANCE_CALIBRATION: 6,
 }
 # An unrecognised provenance ranks LAST, never first: a new outbound feature that
 # forgets to register itself may be starved, but it can never starve a promise.
@@ -157,6 +166,7 @@ EVENT_FRAMES = {
     # opened the loop — so nothing downstream needs a new branch to send one.
     PROVENANCE_PROMISE: PROMISE_FRAME,
     PROVENANCE_PRE_EVENT: PRE_EVENT_FRAME,
+    PROVENANCE_CALIBRATION: CALIBRATION_FRAME,  # #5061
 }
 
 # How much of the referring conversation the referred coach is shown.
