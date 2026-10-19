@@ -57,7 +57,8 @@ def _wire(movement_key: str) -> str:
 def test_the_charter_carries_the_minimum_and_the_disruption_block_with_a_change_log_line():
     c = tc.load_charter()
     assert c["version"] == c["change_log"][-1]["version"]
-    assert "#5088" in c["change_log"][-1]["by"]
+    # any entry, not the last: a later charter minor (#5057's stall rule, 1.3.0) appends after it
+    assert any("#5088" in e["by"] for e in c["change_log"])
     shape = d.minimum_shape()
     # the shape fits its own minutes: max movements x sets each x minutes per set
     assert shape["max_movements"] * shape["sets_per_movement"] * shape["est_minutes_per_set"] <= shape["minutes"]

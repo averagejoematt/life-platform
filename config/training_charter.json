@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -21,6 +21,13 @@
       "date": "2026-10-19",
       "by": "owner ruling 2026-10-18 on #5088 (a late-December trip: travel templates, steps held, 2-3 short sessions a week, step back up on return)",
       "what": "Adds split.minimum_session (the 20-minute minimum per role: anchors only, top set + one back-off) and the disruption block (an owner-switched mode that holds habits instead of targets, its travel/busy templates, the step-back-up week and when the coach OFFERS the mode).",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.3.0",
+      "date": "2026-10-19",
+      "by": "the owner-requested elite-panel training review 2026-10-18 (#5057): calf press, leg press and DB curl held the same load x reps for weeks at an easy self-reported RPE",
+      "what": "Adds progression.stall_rule: the same top-set load x reps on 3 consecutive same-type exposures, each at self-reported RPE 8 or lower, is `step_due` (the prescription's failure to progress, not his) and the next draft carries one step: up to 2 more reps below the top of the range, else the gain rule's load step.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -148,6 +155,20 @@
       "compounds": "the low end of `effort_ceilings.by_experience_tier.compounds_rpe` until #5058 assigns the owner's tier",
       "last_isolation_set": "the low end of `effort_ceilings.by_experience_tier.last_isolation_set_rpe`; an isolation movement's earlier sets read the compounds band",
       "refs": "#5058"
+    },
+    "stall_rule": {
+      "verdict": "step_due",
+      "consecutive_exposures": 3,
+      "max_rpe": 8,
+      "rpe_basis": "self-reported: the RPE he logged on the top set (the first working set at the session's heaviest load); an unlogged RPE is not evidence",
+      "trigger": "the top set's load and reps are identical on the last 3 consecutive same-type exposures, each logged at RPE 8 or lower",
+      "rep_step_max": 2,
+      "step": "below the top of the slot's rep range: up to `rep_step_max` more reps at the same load, never past the top; at the top of the range (or with no range on file): the gain rule's load step (`gain_rule.step_pct` in whole `gain_rule.step_lb` steps), reps back to the bottom",
+      "not_a_stall": "step_due is the prescription's failure to progress, not his: it never fires when he fell short of a prescription on file, and it never fires under a refusal (re-entry, a deload the owner applied)",
+      "precedence": "after the gain rule's step; before a floor raise (repeating the same load is what it ends)",
+      "provenance": "owner",
+      "stated": "2026-10-18",
+      "ruling": "owner-requested elite-panel training review 2026-10-18 (#5057)"
     }
   },
   "rotation": {

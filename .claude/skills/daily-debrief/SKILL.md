@@ -118,6 +118,10 @@ review today's actual session before looking ahead at all.
   never `stall`**, on a window he performed as prescribed at a fixed load × reps, and it
   will not call one at all when no prescription is on file for those days. Report its
   `reason` — it names both numbers.
+  - `step_due` (#5057) is a different claim: the same top-set load × reps on 3 exposures
+    running at self-reported RPE 8 or lower (the charter's `progression.stall_rule`) — the
+    PRESCRIPTION failed to progress, not him. It carries the proposed step and its dates;
+    the next `draft` applies it. Say it that way, never as "he stalled".
   - RPE is the only residual signal in such a window, and it is **self-reported**. Any
     verdict that leaned on it comes back with `basis: "self-reported RPE"`; say that out
     loud whenever you quote it. An RPE drift is his own rating of the set, not a

@@ -159,3 +159,55 @@ def attach_draft_warmups(ir: Any, catalog: dict[str, Any], args: dict[str, Any])
         logger.warning(f"draft_custom: warm-up pass failed ({e}); sets untouched")
         ir.inputs_snapshot["warmups"] = {"status": "failed", "error": str(e)[:200]}
         return None
+
+
+def _history_index() -> dict[str, list]:
+    from training.exercise_history import FLOOR_LOOKBACK_DAYS, load_history_indexes
+
+    return load_history_indexes(lookback_days=FLOOR_LOOKBACK_DAYS)[0]
+
+
+def attach_step_due(ir: Any, catalog: dict[str, Any], history_reader=None) -> list[dict[str, Any]]:
+    """#5057: the chat draft names the stall rule's step on every block where it is due.
+
+    The generator APPLIES the step (`routine_generator._progress_block` → `load_progression`);
+    draft_custom's loads are the caller's, verbatim (ADR-069), so here the step is reported, not
+    written: a block authored below it gets the reason in its exercise note, and every due step
+    is returned for the response and recorded in `inputs_snapshot.step_due`. Same rule, same
+    numbers (`load_progression.stall_step`). Fail-soft: a failed read is named, never a lost draft."""
+    try:
+        from training import load_progression as lp
+        from training.load_ramp import _rep_range_of
+
+        index = (history_reader or _history_index)()
+        rows: list[dict[str, Any]] = []
+        for b in ir.exercises or []:
+            key = str(getattr(b, "movement_key", "") or "")
+            tid = ((catalog or {}).get(key) or {}).get("hevy_template_id_hint") or (
+                key[len("tmpl:") :] if key.startswith("tmpl:") else None
+            )
+            step = lp.stall_step(list(index.get(tid) or []) if tid else [], rep_range=_rep_range_of(b.sets))
+            if step is None:
+                continue
+            authored = lp.top_set({"sets": [{"weight_kg": s.weight_kg, "reps": s.reps, "type": s.type} for s in b.sets]})
+            carried = (authored["load_kg"] or 0) >= step["next_load_kg"] - lp.LOAD_TOLERANCE_KG and (authored["reps"] or 0) >= int(
+                step["next_reps"] or 0
+            )
+            if not carried:
+                b.notes = f"{b.notes} Step due: {step['reason']}.".strip()
+            rows.append({"movement_key": key, "carried": carried, **step})
+        ir.inputs_snapshot["step_due"] = rows
+        return rows
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"draft_custom: step_due pass failed ({e}); blocks untouched")
+        ir.inputs_snapshot["step_due"] = {"status": "failed", "error": str(e)[:200]}
+        return []
+
+
+def finish_custom_draft(ir: Any, catalog: dict[str, Any], args: dict[str, Any]) -> dict[str, Any]:
+    """The draft_custom passes that run after the content-derived id and before `draft_versioned`,
+    in order — the slot tags (#5005), the warm-up climb (#5049), the stall rule's step (#5057) —
+    returned as the response's `warmup_sets` / `program_slot` / `step_due` fields."""
+    program_slot = stamp_program_slot(ir)
+    warmups = attach_draft_warmups(ir, catalog, args)
+    return {"warmup_sets": (warmups or {}).get("warmup_sets", 0), "program_slot": program_slot, "step_due": attach_step_due(ir, catalog)}
