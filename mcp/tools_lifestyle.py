@@ -13,6 +13,7 @@ from common.numeric import floats_to_decimal  # bundled shared module: canonical
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from experiment.phase_taxonomy import experiment_stamp_for  # #3513: the class-gated, date-derived write-time stamp
 from ingestion.source_registry import raw_date_key  # bundled shared module: the X-9 raw/ layout facts (#2278)
+from training.training_charter import charter_value  # #5056
 
 from mcp import idempotency as _idem
 from mcp.config import EXPERIMENTS_PK, INSIGHTS_PK, S3_BUCKET, TRAVEL_PK, USER_ID, USER_PREFIX, logger, s3_client, table
@@ -1464,7 +1465,7 @@ def _get_movement_score(args):
     """Daily movement & NEAT analysis."""
     end_date = args.get("end_date", pacific_today())
     start_date = args.get("start_date", (pacific_now() - timedelta(days=30)).strftime("%Y-%m-%d"))
-    step_target = args.get("step_target", 8000)
+    step_target = args.get("step_target") or int(charter_value("steps.floor", 12000))  # #5056: the charter floor, not a hand copy
 
     # DI-1.2: Hevy is the primary "did he train" signal. A step count must never, on
     # its own, drive a sedentary conclusion — has_workout is true if a normalized workout

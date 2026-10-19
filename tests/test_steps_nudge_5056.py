@@ -216,3 +216,18 @@ def test_deadman_reds_when_a_completed_day_has_no_eval():
 def test_deadman_pending_before_armed():
     early = lambda: datetime(2026, 10, 20, 9, 0, tzinfo=PACIFIC)  # noqa: E731
     assert nudge_ledger_qa.check_steps_nudge_liveness(_QTable([]), _Check, "t", early)[0].ok_msg.startswith("steps nudge pending")
+
+
+def test_brief_line_is_failsoft_and_states_the_floor(monkeypatch):
+    import logging
+
+    from emails import brief_lines
+
+    monkeypatch.setattr(runner, "read_ramp", lambda table, date, user="matthew": RAMP)
+    assert brief_lines.steps_line(object(), DATE, logging.getLogger()) == "Steps today: floor 12,000, target 15,000"
+
+    def boom(*a, **k):
+        raise RuntimeError("ddb down")
+
+    monkeypatch.setattr(runner, "read_ramp", boom)
+    assert brief_lines.steps_line(object(), DATE, logging.getLogger()) is None

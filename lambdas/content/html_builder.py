@@ -1921,21 +1921,15 @@ def build_html(
     triggered_rewards and protocol_recs are pre-computed by lambda_handler
     (extracted from _evaluate_rewards_brief / _get_protocol_recs_brief in output_writers.py).
 
-    intake_line (#1405): the pre-formatted private intake-ledger line from
-    intake_response.brief_line() — n + CI per ADR-105, or arming progress. The
-    brief is Matthew-private; this line must never reach a public surface.
+    intake_line (#1405: intake_response.brief_line, n + CI per ADR-105) and steps_line (#5056) are pre-formatted
+    Matthew-private one-liners; they must never reach a public surface.
     """
-
     date_str = data["date"]
-    # #4182: the H1 names the morning the brief is read (the data day + 1, the subject
-    # line's day); the freshness line under it names the data day. Both in words.
+    # #4182: the H1 names the morning the brief is read (data day + 1); the freshness line names the data day.
     day_label = day_in_words(shift_day_key(date_str, 1))
 
     # Defaults
-    if triggered_rewards is None:
-        triggered_rewards = []
-    if protocol_recs is None:
-        protocol_recs = []
+    triggered_rewards, protocol_recs = triggered_rewards or [], protocol_recs or []
 
     # Adaptive mode banner colour
     banner_color = "#1a1a2e"

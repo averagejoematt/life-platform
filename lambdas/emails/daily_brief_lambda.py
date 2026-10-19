@@ -188,6 +188,7 @@ from ingestion import source_registry  # #2003: the canonical freshness set + th
 from intelligence import brief_domain_inputs, weight_recency  # #1894/#1924: a weigh-in carries its own date; #4358/#4359 coach blocks
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
+from emails import brief_lines  # #5056: fail-soft one-line readouts, extracted for the module-size ratchet
 from emails.brief_data_status import (  # #2326 quiet notice / #3049 partial-input notice
     build_data_status_banner_html,
     qualified_compute_outputs,
@@ -1444,28 +1445,6 @@ def _run_ai_coach_pipeline(
     return result
 
 
-def _budget_headroom_failsoft():
-    """#822: the one-line budget headroom readout, or None (fail-soft; extracted for the #4880 ratchet, #5056)."""
-    try:
-        from ai import budget_guard
-
-        return budget_guard.format_headroom_line(budget_guard.read_breakdown()) or None
-    except Exception as err:
-        logger.warning("budget headroom line failed (non-fatal): " + str(err))
-        return None
-
-
-def _steps_line_failsoft(table):
-    """#5056: the day's steps floor/target line, or None (never blocks the brief)."""
-    try:
-        from emails import steps_nudge_runner
-
-        return steps_nudge_runner.brief_line(table, pacific_today())
-    except Exception as err:
-        logger.warning("steps line failed (non-fatal): " + str(err))
-        return None
-
-
 def lambda_handler(event, context):
     if event.get("healthcheck"):
         return {"statusCode": 200, "body": "ok"}
@@ -2098,7 +2077,7 @@ def lambda_handler(event, context):
 
     # Budget-headroom readout (#822): one code-derived line from the cost governor's persisted projection
     # breakdown (SSM /life-platform/budget-breakdown). Fail-soft: missing/stale/malformed → the line is absent.
-    _budget_headroom_line = _budget_headroom_failsoft()
+    _budget_headroom_line = brief_lines.budget_headroom(logger)
 
     # #1405: the private intake-ledger line (n + CI per ADR-105, or arming progress). Fail-soft.
     _intake_line = None
@@ -2109,7 +2088,7 @@ def lambda_handler(event, context):
     except Exception as _ir_err:
         logger.warning("intake-response line failed (non-fatal): " + str(_ir_err))
 
-    _steps_line = _steps_line_failsoft(table)  # #5056: the day's steps floor/target, owner-only
+    _steps_line = brief_lines.steps_line(table, pacific_today(), logger)  # #5056: the day's steps floor/target, owner-only
 
     try:
         html = html_builder.build_html(
