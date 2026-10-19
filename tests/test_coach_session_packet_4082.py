@@ -127,6 +127,10 @@ def stub_readers(monkeypatch):
     monkeypatch.setattr(tools_plan, "_pain_dismissals", lambda: [])
     monkeypatch.setattr(tools_plan, "_deload_records", lambda: [])
     monkeypatch.setattr(tools_plan, "_gather_performed_evidence", lambda d, layer: {"exercises": [], "scope": {"status": "none"}})
+    # #5059: the guidance freshness flag reads the clinical partition through the plan's own seam; stub it.
+    from health import guidance_freshness as gf
+
+    monkeypatch.setattr(tools_plan, "_guidance_freshness", lambda: gf.freshness({"effective": "2026-09-01"}, [], "2026-09-26"))
 
 
 # #5081: field-projected live rows (DATE#2026-10-14, read 2026-10-18) placed on a packet-window day.
@@ -502,7 +506,7 @@ def test_morning_note_is_measured_with_the_four_words_the_day_and_the_pt_instant
     assert v["written_at_pt"].endswith("PT") and "written_at" not in v
     expected = {k: val for k, val in mn.coach_fact(dict(MORNING_NOTE_ROW)).items() if k != "state"}
     assert v == expected, "the packet must carry coach_fact's shape verbatim"
-    assert out["packet_version"] == "coach-session-packet@1.5.0"
+    assert out["packet_version"] == "coach-session-packet@1.6.0"
 
 
 def test_morning_note_no_row_is_absent_and_a_failed_read_is_read_failed(stub_readers, monkeypatch):

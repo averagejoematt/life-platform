@@ -44,7 +44,7 @@ from __future__ import annotations
 import json
 from typing import Any, Iterable, Optional
 
-CONTEXT_VERSION = "coach-context@1.0.0"
+CONTEXT_VERSION = "coach-context@1.1.0"  # 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only)
 
 # ── the order contract, as data ───────────────────────────────────────────────────────────
 ORDER: tuple[str, ...] = ("pre_flight", "plan_next_session", "manage_hevy_routine draft")
@@ -107,9 +107,25 @@ def _panel_section(published: bool) -> dict[str, Any]:
     return {"source": SRC_PANEL, "state": "measured" if ledger else "absent", "concessions": ledger or {}}
 
 
-def _guidance_section(guidance: Any, published: bool) -> dict[str, Any]:
+def _freshness_view(flag: Any, published: bool) -> Optional[dict[str, Any]]:
+    """#5059: the guidance record's freshness flag (`health.guidance_freshness`), carried as reference on the
+    owner channel only — a published context omits it (its guidance header names no record). None = not supplied."""
+    if published or not isinstance(flag, dict):
+        return None
+    return {k: flag.get(k) for k in ("state", "guidance_effective", "latest_appointment_date", "prompt", "role")}
+
+
+def _guidance_section(guidance: Any, published: bool, freshness: Any = None) -> dict[str, Any]:
     """`guidance` is the clinical partition's rows (rendered here by the one renderer) or an
-    already-rendered block. None = the caller read none."""
+    already-rendered block. None = the caller read none. `freshness` (#5059) rides the section as reference."""
+    sec = _guidance_body(guidance, published)
+    view = _freshness_view(freshness, published)
+    if view is not None:
+        sec["freshness"] = view
+    return sec
+
+
+def _guidance_body(guidance: Any, published: bool) -> dict[str, Any]:
     if guidance is None:
         return {"source": SRC_GUIDANCE, "state": NOT_SUPPLIED, "text": "", "detail": "the caller supplied no clinical guidance"}
     if isinstance(guidance, dict):  # the caller's read broke: {"state": "read_failed", "error": <class>}
@@ -215,6 +231,7 @@ def assemble(
     constraint_block: Optional[dict[str, Any]],
     tracker: Any = None,
     guidance: Any = None,
+    guidance_freshness: Any = None,
     published: bool = False,
 ) -> dict[str, Any]:
     """The planning context for `target_date`: a dict for code and ``text`` for a prompt.
@@ -226,7 +243,7 @@ def assemble(
     sections = {
         "charter": charter_section(published),
         "panel_synthesis": _panel_section(published),
-        "clinical_guidance": _guidance_section(guidance, published),
+        "clinical_guidance": _guidance_section(guidance, published, guidance_freshness),
         "plan_packet": _packet_section(packet),
         "constraint_block": _block_section(constraint_block),
         "may_tracker": {"source": "omitted", "state": "omitted_published"} if published else _tracker_section(tracker),
@@ -323,18 +340,25 @@ def _render_fields(title: str, sec: dict[str, Any], rows: Iterable[tuple[str, An
     return lines + [f"- {k}: {_clip(v)}" for k, v in rows]
 
 
+def _render_guidance(g: dict[str, Any], published: bool) -> list[str]:
+    # A published prompt names no record: the guardrails' own header (health.clinical_facts) is the whole of it.
+    head = (
+        "COACHING GUARDRAILS [owner instructions]"
+        if published
+        else f"CLINICAL GUIDANCE — reference context, not a gate on intensity [{g['source']}]"
+    )
+    lines = [head, g.get("text") or f"- {g['state']}"]
+    fr = g.get("freshness")
+    if fr:  # #5059: reference only — says whether to load the latest instructions, never shapes the plan
+        lines.append(f"- record freshness: {fr.get('state')}" + (f" — {fr['prompt']}" if fr.get("prompt") else ""))
+    return lines
+
+
 def render(ctx: dict[str, Any]) -> str:
     """The text block for a prompt: every section headed with its source; absence stated."""
     s = ctx["sections"]
     parts: list[list[str]] = [_render_charter(s["charter"]), _render_panel(s["panel_synthesis"])]
-    g = s["clinical_guidance"]
-    # A published prompt names no record: the guardrails' own header (health.clinical_facts) is the whole of it.
-    head = (
-        "COACHING GUARDRAILS [owner instructions]"
-        if ctx["published"]
-        else f"CLINICAL GUIDANCE — reference context, not a gate on intensity [{g['source']}]"
-    )
-    parts.append([head, g.get("text") or f"- {g['state']}"])
+    parts.append(_render_guidance(s["clinical_guidance"], ctx["published"]))
     pk = s["plan_packet"]
     parts.append(
         _render_fields(

@@ -3558,6 +3558,36 @@ STRUCTURAL_HAND_PROOFS["structural::test_rhythm_channel_privacy_4972.py"] = {
 }
 
 
+# #5059 (2026-10-19): the guidance-freshness flag's closed reader set (never a gate on intensity, never
+# published). Proved by hand on the lane, each plant restored from a byte copy.
+STRUCTURAL_HAND_PROOFS["structural::test_guidance_freshness_5059.py"] = {
+    "gate_name": "test_guidance_freshness_5059.py",
+    "command": "python3 -m pytest tests/test_guidance_freshness_5059.py -q -p no:cacheprovider   # baseline 15 passed (13 at lane open; +2 at the charter-w2 merge)",
+    "mutation": (
+        "three plants, ONE AT A TIME: M1 append `from health import guidance_freshness` to "
+        "lambdas/web/site_api_vitals.py (a published module reaches the flag); M2 append a `# guidance_freshness` "
+        "line to lambdas/coach/critics.py (a critic names the flag); M3 flip `latest > effective` to `>=` in "
+        "lambdas/health/guidance_freshness.py (a same-day load reads stale). Added at the charter-w2 merge: M4 drop `published or` "
+        "from coach_context._freshness_view (the flag reaches a published context)."
+    ),
+    "observed": (
+        "M1 1 failed / 12 passed (test_the_flag_has_a_closed_reader_set_and_no_web_or_email_module_reaches_it names "
+        "site_api_vitals.py). M2 1 failed (the same test names critics.py). M3 1 failed / 12 passed "
+        "(test_fresh_when_the_record_is_on_or_after_the_latest_appointment). Restored 13 passed. M4 (on the merge, 15 tests) "
+        "1 failed / 14 passed (test_the_coach_context_states_the_flag_on_the_owner_channel_and_omits_it_published); "
+        "restored 15 passed."
+    ),
+    "scope": (
+        "The sweep is a TEXT match for `guidance_freshness` over every .py under lambdas/ and mcp/ against a five-file "
+        "allowlist (the three reference surfaces + #5071's plan_helpers/coach_context), plus a source check that tools_plan assigns the flag once and _run_stage_2 never names it. The "
+        "identical-prescription test compares a constraint block and four deterministic critic verdicts with and "
+        "without a stale flag; it is a contract, not a mutation-proved gate — the flag is attached after the engine, "
+        "so the sweep is what stops a prescribing module from starting to read it."
+    ),
+    "proved_on": "2026-10-19",
+}
+
+
 # #5072 (2026-10-19): the panel rubric's regression gate over the golden plan cases. Proved on the lane
 # against the REAL tracked files, one plant at a time, each restored from a byte copy (md5 checked).
 GUARD_PROOFS.update(

@@ -177,6 +177,14 @@ def _clinical_guidance() -> Any:
     return rows if rows is not None else {"state": "read_failed", "error": "NoResponse"}
 
 
+def _freshness_from(guidance: Any, target_date: str) -> dict[str, Any]:
+    """#5059: the guidance freshness flag over the rows `_clinical_guidance` already read — one partition read
+    feeds both the guidance text and its freshness. A read_failed marker reads as `unreadable` (read_failed)."""
+    from health import guidance_freshness
+
+    return guidance_freshness.from_rows(guidance if isinstance(guidance, list) else None, target_date)
+
+
 def coach_context_for(
     target_date: str, *, packet: dict[str, Any] | None = None, constraint_block: dict[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -184,8 +192,14 @@ def coach_context_for(
     try:
         from training import coach_context
 
+        guidance = _clinical_guidance()
         return coach_context.assemble(
-            target_date, packet=packet, constraint_block=constraint_block, guidance=_clinical_guidance(), published=False
+            target_date,
+            packet=packet,
+            constraint_block=constraint_block,
+            guidance=guidance,
+            guidance_freshness=_freshness_from(guidance, target_date),
+            published=False,
         )
     except Exception as e:  # noqa: BLE001
         logger.warning("[#5071] coach context could not be assembled: %s", type(e).__name__)

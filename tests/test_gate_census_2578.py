@@ -1137,10 +1137,13 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # guard::scripts/panel_rubric_gate.py (GUARD_PROOFS: three plants, exit 1 / 1 failed of 11 / exit 1; restored exit 0)
         # and ci::panel-rubric-gate.yml::gate::3 (CI_PROOFS: the step's real run: text, M1 + M3 exit 1; restored exit 0). The
         # third entrant, the Live judge step, is ATTEMPTED_UNPROVEN. Enter exactly those ids, leave {}, unproven does NOT move.
-        # Upper bound 272 -> 273 (2026-10-19, #5086 the synced chat skills, on charter-w2, stacked on #5072):
+        # Upper bound 272 -> 273 (2026-10-19, #5059 on charter-w2, stacked on #5073 + #5072 above):
+        # structural::test_guidance_freshness_5059.py — the guidance freshness flag's closed reader set — arrives
+        # PROVEN via STRUCTURAL_HAND_PROOFS (four plants, each 1 failed; restored 15 passed). Enters exactly that id, leaves {}.
+        # Upper bound 273 -> 274 (2026-10-19, #5086 the synced chat skills, on charter-w2, stacked on #5059 above):
         # guard::scripts/check_synced_skill_drift.py arrives PROVEN via GUARD_PROOFS (M1 `_same` always True: 3 failed / 9 passed;
         # M2 drift exits 0: 2 failed / 10 passed; restored 12 passed). Enters exactly that id, leaves {}, unproven does NOT move.
-        <= 273
+        <= 274
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
