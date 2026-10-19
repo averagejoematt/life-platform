@@ -45,9 +45,11 @@ THE DEFINITIONS (each stated once, here, and imported by every critic and tool)
     honesty   a window spanning fewer than `tdee.MIN_TREND_DAYS` days is `provisional`: the
               number is reported, and no critic argues a change from it.
 
-  WEEKLY LOSS RATES (#4150 — what the overshoot rule counts)
-    weeks     the trailing 7-day windows ending `end`, `end - 7`, ... — same estimator, same
-              water floor as the loss rate;
+  WEEKLY LOSS RATES (#4150, #5100 — what the overshoot rule counts)
+    weeks     the weekly checkpoints `end`, `end - 7`, ...; the RATE at each is the 14-day trend
+              ending there (`loss_rate_from_rows`, same estimator and water floor as the loss
+              rate — #5100: the redline says "14-day weight trend", not each week's own slope);
+              completeness and the weigh-in floor are judged on the checkpoint's 7-day week;
     counted   a week's rate is COUNTED (returned by `weekly_loss_rates_from_rows`, the list
               `rate_over_cap_consecutive_weeks` reads) only when the week is COMPLETE — all 7
               days lie after water weeks 1-2, so the water floor did not clip it — AND it
@@ -337,21 +339,24 @@ def weekly_loss_rate_weeks_from_rows(
     for k in range(weeks - 1, -1, -1):
         week_end = shift_day_key(end, -WEEK_DAYS * k)
         nominal_start = shift_day_key(week_end, -(WEEK_DAYS - 1))
-        r = loss_rate_from_rows(rows, week_end, window_days=WEEK_DAYS, genesis=genesis)
-        start = r["window"]["start"]
+        wk = loss_rate_from_rows(rows, week_end, window_days=WEEK_DAYS, genesis=genesis)  # the WEEK: completeness + weigh-in floor
+        r = loss_rate_from_rows(rows, week_end, genesis=genesis)  # the RATE: the 14-day trend at this checkpoint (#5100)
+        start = wk["window"]["start"]
         days_measured = max(0, _days(start, week_end) + 1) if start <= week_end else 0
         row: dict[str, Any] = {
             "start": nominal_start,
             "end": week_end,
             "measured_start": start if start <= week_end else None,
             "days_measured": days_measured,
-            "n_weighins": r["n_weighins"],
+            "n_weighins": wk["n_weighins"],
+            "trend_window": r["window"],
+            "trend_n_weighins": r["n_weighins"],
             "rate_lb_wk": r["rate_lb_wk"],
             "counted": False,
             "min_weighins": MIN_WEEKLY_WEIGHINS,
         }
         if start > week_end:
-            row["status"], row["reason"] = "water", r.get("reason")
+            row["status"], row["reason"] = "water", wk.get("reason")
         elif days_measured < WEEK_DAYS:
             row["status"] = "partial"
             row["reason"] = (
@@ -359,9 +364,12 @@ def weekly_loss_rate_weeks_from_rows(
             )
         elif r["rate_lb_wk"] is None:
             row["status"], row["reason"] = "no_rate", r.get("reason")
-        elif r["n_weighins"] < MIN_WEEKLY_WEIGHINS:
+        elif wk["n_weighins"] < MIN_WEEKLY_WEIGHINS or r["n_weighins"] < MIN_WEEKLY_WEIGHINS:
             row["status"] = "insufficient_weighins"
-            row["reason"] = f"{r['n_weighins']} weigh-in(s) in {start}..{week_end}, under the {MIN_WEEKLY_WEIGHINS} a counted week needs"
+            row["reason"] = (
+                f"{wk['n_weighins']} weigh-in(s) in {start}..{week_end} ({r['n_weighins']} in the trend window), "
+                f"under the {MIN_WEEKLY_WEIGHINS} a counted week needs"
+            )
         else:
             row["status"], row["counted"] = "complete", True
         out.append(row)
