@@ -633,6 +633,15 @@ def emf_line(outcome: str) -> str:
     )
 
 
+def _may_tracker_leg() -> dict[str, Any]:
+    """#5073: a second, fail-soft leg on the same run — it never changes the pre-draft's outcome or its dead-man."""
+    try:
+        from mcp.tools_may_tracker import nightly_leg
+    except Exception as e:  # noqa: BLE001 — an import failure is named on the result, never raised into the pre-draft
+        return {"outcome": "failed", "error": type(e).__name__}
+    return nightly_leg()
+
+
 def lambda_entry(event: dict[str, Any]) -> dict[str, Any]:
     """The scheduled entry. Never raises: a failure is logged with its class and emits the
     datapoint at 0 (#4568), so the dead-man — not a misattributed warmer Errors alarm — reports it."""
@@ -641,6 +650,7 @@ def lambda_entry(event: dict[str, Any]) -> dict[str, Any]:
     except Exception as e:  # noqa: BLE001 — reported by name; the dead-man reads the 0
         logger.exception("nightly pre-draft failed")
         result = {"job": JOB["name"], "outcome": FAILED, "error": f"{type(e).__name__}: {e}"[:300]}
+    result["may_tracker"] = _may_tracker_leg()  # #5073: the newest completed week's tracker row; fail-soft, never the outcome
     print(emf_line(result.get("outcome") or FAILED))
     logger.info("NIGHTLY_PREDRAFT %s", json.dumps(result, default=str)[:4000])
     return {"statusCode": 200, "body": json.dumps(result, default=str), "headers": {"Content-Type": "application/json"}}
