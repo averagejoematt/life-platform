@@ -145,7 +145,6 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/intelligence/ai_expert_analyzer_lambda.py::generate_and_cache": 210,
     "lambdas/intelligence/intelligence_common.py::build_coach_preamble": 182,
     "lambdas/operational/pipeline_health_check_lambda.py::lambda_handler": 154,
-    "lambdas/training/full_body_session.py::full_body_routines": 160,
     "lambdas/training/plan_engine.py::_tripwire_states": 253,
     "lambdas/training/plan_engine.py::constraint_block": 239,  # 283 -> 276 (#5068) -> 242 (#5070: the reference block extracted, the deload recommendation added) -> 239 (#5088: the rate target extracted, the disruption block added)
     "lambdas/web/recap_card_lambda.py::render_for_date": 190,

@@ -73,6 +73,9 @@ BASIS_SELF_REPORTED_RPE = "self-reported RPE"
 MATCH_AS_PRESCRIBED = "as_prescribed"
 MATCH_DEVIATED = "deviated"
 MATCH_UNREADABLE = "unreadable"
+# #5052: he carried MORE than the prescribed load, logged at or under the charter effort limit for the movement
+# (`training.load_progression`) — progress, not a deviation. Only when the caller supplies the limit.
+MATCH_PROGRESSED = "progressed"
 
 # ── Thresholds (every one is a window or an n, never a verdict) ───────────────
 MIN_SESSIONS = 3  # two deltas is the floor for any personal noise scale
@@ -101,13 +104,21 @@ class SessionPoint:
     rpe: float | None = None
     prescribed_load_kg: float | None = None
     prescribed_reps: int | None = None
+    progression_limit_rpe: float | None = None  # #5052: the charter effort limit; None = the pre-#5052 three states
 
     def match(self) -> str:
-        """as_prescribed | deviated | unreadable — the per-session diff verdict."""
+        """as_prescribed | progressed | deviated | unreadable — the per-session diff verdict."""
         if self.prescribed_load_kg is None or self.prescribed_reps is None:
             return MATCH_UNREADABLE
         if self.load_kg is None or self.reps is None:
             return MATCH_UNREADABLE
+        if (
+            self.progression_limit_rpe is not None
+            and self.rpe is not None
+            and float(self.load_kg) > float(self.prescribed_load_kg) + LOAD_TOLERANCE_KG
+            and float(self.rpe) <= float(self.progression_limit_rpe)
+        ):
+            return MATCH_PROGRESSED
         load_same = abs(float(self.load_kg) - float(self.prescribed_load_kg)) <= LOAD_TOLERANCE_KG
         reps_same = int(self.reps) == int(self.prescribed_reps)
         return MATCH_AS_PRESCRIBED if (load_same and reps_same) else MATCH_DEVIATED
@@ -179,6 +190,7 @@ def diff_prescribed_vs_performed(
     ir: Any,
     performed_sets_by_template: dict[str, list[dict[str, Any]]],
     template_for: dict[str, str] | None = None,
+    limit_for: dict[str, float | None] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Per-movement prescribed-vs-performed diff for ONE session.
 
@@ -195,6 +207,10 @@ def diff_prescribed_vs_performed(
     performed_load_kg, performed_reps, performed_rpe, match}}``. A movement the
     routine prescribed and he never performed is reported with performed values None
     and ``match: "unreadable"`` — absence is absence, never compliance (ADR-104).
+
+    ``limit_for`` (#5052) maps ``movement_key`` → the charter effort limit for its class
+    (``load_progression.grading_limits``); with it, a heavier-than-prescribed top set at or
+    under the limit reads ``progressed`` instead of ``deviated``.
     """
     tmap = dict(template_for or {})
     performed_by_tid = {str(k): (v or []) for k, v in (performed_sets_by_template or {}).items()}
@@ -217,15 +233,9 @@ def diff_prescribed_vs_performed(
             "performed_load_kg": did["weight_kg"],
             "performed_reps": did["reps"],
             "performed_rpe": did["rpe"],
+            "progression_limit_rpe": (limit_for or {}).get(key),
         }
-        row["match"] = SessionPoint(
-            date=str(getattr(ir, "target_date", "") or ""),
-            load_kg=did["weight_kg"],
-            reps=did["reps"],
-            rpe=did["rpe"],
-            prescribed_load_kg=prescribed["weight_kg"],
-            prescribed_reps=prescribed["reps"],
-        ).match()
+        row["match"] = session_point_from_diff(str(getattr(ir, "target_date", "") or ""), row).match()
         out[key] = row
     return out
 
@@ -239,6 +249,7 @@ def session_point_from_diff(date: str, row: dict[str, Any]) -> SessionPoint:
         rpe=row.get("performed_rpe"),
         prescribed_load_kg=row.get("prescribed_load_kg"),
         prescribed_reps=row.get("prescribed_reps"),
+        progression_limit_rpe=row.get("progression_limit_rpe"),
     )
 
 
@@ -284,6 +295,7 @@ def _prescription_summary(points: list[SessionPoint]) -> dict[str, Any]:
     return {
         "sessions_compared": len(points),
         "as_prescribed": matches.count(MATCH_AS_PRESCRIBED),
+        "progressed": matches.count(MATCH_PROGRESSED),
         "deviated": matches.count(MATCH_DEVIATED),
         "unreadable": matches.count(MATCH_UNREADABLE),
         "prescription_varied": len(prescriptions) > 1,
@@ -352,7 +364,7 @@ def assess_stall(
 
     # 3. He did exactly what the platform prescribed, and the prescription never moved.
     #    e1RM is constant BY CONSTRUCTION here; the series is the prescription read back.
-    if presc["deviated"] == 0 and presc["unreadable"] == 0 and not presc["prescription_varied"]:
+    if presc["deviated"] == 0 and presc["progressed"] == 0 and presc["unreadable"] == 0 and not presc["prescription_varied"]:
         label = _fixed_prescription_label(pts)
         reason = (
             f"Every one of these {len(pts)} sessions was performed exactly as prescribed, at a fixed "

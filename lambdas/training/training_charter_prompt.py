@@ -141,6 +141,18 @@ SECTION_GUIDE: dict[str, str] = {
         "long-term goal and maintenance rather than ending, and the charter is re-versioned on an "
         "owner ruling before the date, not after it. Owner-only, like governing_goal."
     ),
+    "progression": (
+        "progression — how a load moves, decided by the engine, not improvised. `gain_rule` is the "
+        "double progression: when the top set reaches the top of its slot's rep range on the stated "
+        "number of consecutive same-type exposures, each logged at or under the movement's effort "
+        "ceiling, the load rises by the stated step and the reps return to the bottom of the range; "
+        "RPE is a veto only, and an unlogged RPE is not evidence. `refused_when` lists what holds a "
+        "step. `self_raised_load` is binding on every grade: a load the owner raised himself at or "
+        "under the ceiling (within the tolerance in effort_ceilings) is progress — it becomes the "
+        "next floor and is graded `progressed`, never a breach; above the ceiling plus tolerance it "
+        "is a breach. `ceiling_tier` says which end of each effort band is read until the tiers are "
+        "assigned. Never prescribe a load below one he has already carried within the ceiling."
+    ),
     "rotation": (
         "rotation — anchor lifts stay fixed for the number of weeks in `anchors_fixed_weeks`, so "
         "progression on them is measurable; accessory slots rotate on the cadence in "

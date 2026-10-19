@@ -14,7 +14,7 @@ argued with two of those numbers, and the owner approved its recommendations the
 
          gap 28 d – 6 months          -> 2 working sets on exposure 1 only
          gap > 6 months, or never     -> 2 on exposures 1–2, 3 on exposure 3
-         RPE <= 7 for the first 3 exposures — unchanged (`owner_redlines` gain_rule).
+         RPE <= 7 for the first 3 exposures — unchanged (the charter's `progression.gain_rule`, #5052).
 
   (ii) THE FATIGUE TRIGGER. #4149's trigger was a consecutive-LOADED-day streak (the upper tail
        of his own 2024–25 record). A day count is not a validated fatigue signal (Kataoka 2022
