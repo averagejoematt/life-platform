@@ -234,6 +234,12 @@
       "stack": "monitoring_silence_alarms",
       "via": "declaration"
     },
+    "fitness-battery-missed": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "mcp_stack",
+      "via": "declaration"
+    },
     "freshness-checker-errors": {
       "kind": "metric",
       "routing": "digest",
@@ -1011,7 +1017,7 @@
   ],
   "cost_surface": {
     "ai_features": 29,
-    "alarms": 139,
+    "alarms": 140,
     "emf_namespaces": 33,
     "schedules": 96,
     "secrets": 30
@@ -7901,9 +7907,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead"
     },
     "counts": {
-      "alarms": 139,
+      "alarms": 140,
       "alarms_by_routing": {
-        "digest": 95,
+        "digest": 96,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,

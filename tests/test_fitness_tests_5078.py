@@ -329,6 +329,20 @@ def test_an_unreadable_record_serves_the_usual_session_and_says_so():
     assert any("could not be read" in line for line in ideal.rationale)
 
 
+def test_an_unresolved_minimum_session_serves_the_usual_session_and_never_a_guessed_shape(monkeypatch):
+    real = tc.charter_value
+
+    def no_minimum(dotted, default=None):
+        return default if dotted.startswith("split.minimum_session") else real(dotted, default)
+
+    monkeypatch.setattr(tc, "charter_value", no_minimum)
+    with pytest.raises(ValueError):
+        ft.minimum_shape()
+    ideal = _ideal(_generate(_entry(ft.test_day_role(), 6), []))
+    assert not ideal.title.startswith(ft.BATTERY_TITLE) and "fitness_battery" not in ideal.inputs_snapshot
+    assert any("UNRESOLVED split.minimum_session" in line for line in ideal.rationale)
+
+
 # ── the readers: absent path, May tracker, dead-man ──────────────────────────────────────
 def test_the_may_tracker_section_is_absent_with_no_battery_and_measured_with_one():
     from training import may_tracker as mt
@@ -382,3 +396,22 @@ def test_the_battery_partition_is_owner_only_and_cross_phase():
 
     assert field_tiers.SOURCE_TIERS[ft.SOURCE] == field_tiers.TIER_OWNER_ONLY
     assert phase_taxonomy.SOURCE_CLASS[ft.SOURCE] == phase_taxonomy.CROSS_PHASE
+
+
+def test_the_missed_alarm_reads_the_series_the_dead_man_emits():
+    """The alarm in cdk/stacks/mcp_stack.py and the emitter's constants are one contract (#5078)."""
+    import re
+
+    from mcp import tools_fitness_tests as ftt
+
+    src = (_REPO / "cdk" / "stacks" / "mcp_stack.py").read_text()
+    m = re.search(
+        r'"FitnessBatteryMissed",\s*alarm_name="fitness-battery-missed",(.*?)add_alarm_action\(cw_actions\.SnsAction\(local_digest_topic\)\)',
+        src,
+        re.S,
+    )
+    assert m, "the fitness-battery-missed alarm is gone from mcp_stack.py, or no longer routes to the digest"
+    body = m.group(1)
+    assert f'namespace="{ftt.METRIC_NAMESPACE}"' in body and f'metric_name="{ftt.METRIC_NAME}"' in body
+    assert f"dimensions_map={ftt.METRIC_DIMENSIONS!r}".replace("'", '"') in body
+    assert 'statistic="Maximum"' in body and "GREATER_THAN_OR_EQUAL_TO_THRESHOLD" in body and "NOT_BREACHING" in body

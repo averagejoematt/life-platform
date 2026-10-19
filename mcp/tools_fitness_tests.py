@@ -17,11 +17,12 @@ the per-test trend and the cadence state with its prompt.
 THE DEAD-MAN is a named check on an existing schedule: `nightly_leg()` runs on the nightly pre-draft
 (`mcp.nightly_predraft.lambda_entry`, 02:00Z) and emits `LifePlatform/HevyRoutine::FitnessBatteryMissed`
 (1 when the cadence state is `missed`, else 0; nothing when the state could not be computed — the run's
-own result names that). The ALARM on that series is the owner's CDK change (not in this PR).
+own result names that). The alarm on that series is `fitness-battery-missed` (cdk/stacks/mcp_stack.py,
+Maximum >= 1 over one day, missing = not breaching, digest); its liveness is the pre-draft's dead-man.
 
 THE PROMPT: `due()['prompt']` is on the read, on the May tracker's fitness section and on the coach
-packet's `fitness_tests` field. #5061's owner-channel calibration prompt has not landed; when it does it
-reads `cadence()` here rather than a second computation.
+packet's `fitness_tests` field. #5061's owner-channel calibration prompt has not landed; it carries the
+instruction (Refs #5078 comment on #5061) to read `cadence()` here rather than a second computation.
 
 NEVER on a published surface: the battery is Tier owner-only (`field_tiers.SOURCE_TIERS`).
 """

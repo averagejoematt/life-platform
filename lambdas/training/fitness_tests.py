@@ -420,6 +420,19 @@ def _test_block(test_id: str, row: Mapping[str, Any], movements: Mapping[str, An
     )
 
 
+def minimum_shape() -> tuple[int, int]:
+    """The charter's minimum session (`split.minimum_session`): (sets_per_movement, max_movements).
+    Raises when the charter cannot say — the test day then stays the usual session, never a guessed shape."""
+    from training.training_charter import charter_value
+
+    shape = charter_value("split.minimum_session", None)
+    sets = shape.get("sets_per_movement") if isinstance(shape, Mapping) else None
+    most = shape.get("max_movements") if isinstance(shape, Mapping) else None
+    if not (isinstance(sets, int) and isinstance(most, int)) or isinstance(sets, bool) or isinstance(most, bool) or min(sets, most) < 1:
+        raise ValueError(f"fitness_tests: charter split.minimum_session is {shape!r}")
+    return sets, most
+
+
 def _minimum_blocks(blocks: list[Any], per_movement: int, max_movements: int) -> list[Any]:
     """The ideal's anchors cut to the minimum shape: warm-ups kept, the first `per_movement` working sets."""
     from training import warmup_sets
@@ -452,11 +465,10 @@ def apply_battery(ideal: Any, movements: Mapping[str, Any], due_info: Mapping[st
     """Turn the test-day role's ideal routine into the battery session, in place: the minimum session plus the
     tests in the charter's `order`. Loads on the kept anchor sets are the ideal's (the load floors hold)."""
     from training import warmup_sets
-    from training.training_charter import charter_value, charter_version
+    from training.training_charter import charter_version
 
     p = protocol() if proto is None else proto
-    shape = dict(charter_value("split.minimum_session", {}) or {})
-    lift = _minimum_blocks(list(ideal.exercises), int(shape.get("sets_per_movement") or 2), int(shape.get("max_movements") or 4))
+    lift = _minimum_blocks(list(ideal.exercises), *minimum_shape())
     spec = tests_spec(p)
     order = list(p.get("order") or [*spec, "minimum_session"])
     blocks, unresolved = [], []
@@ -529,6 +541,13 @@ def place_battery(
         ideal.rationale = [f"fitness battery ({ISSUE}): already logged for this block ({latest}) — the usual session"] + list(
             ideal.rationale or []
         )
+        return routines
+    try:
+        minimum_shape()
+    except ValueError:
+        ideal.rationale = [
+            f"fitness battery ({ISSUE}): due week, but UNRESOLVED split.minimum_session in the charter — the usual session"
+        ] + list(ideal.rationale or [])
         return routines
     position = {"week": day_entry.get("week"), "week_opened_on": opened}
     info = due(str(getattr(ideal, "target_date", "")), position, dates, p)
