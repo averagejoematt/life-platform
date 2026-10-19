@@ -154,7 +154,7 @@ def test_the_judge_is_blinded_to_the_engine_its_version_and_the_author():
     rubric = _rubric()
     case = copy.deepcopy(_case("good_charter_plan"))
     for r in case["routines"]:  # plant every identifier a real plan can carry
-        r.update(created_by="nightly_predraft", source_action="draft", routine_id="rt-SECRET-ID", hevy_routine_id="hv-SECRET")
+        r.update(created_by="nightly_predraft", source_action="draft", routine_id="rt-PLANTED-ID", hevy_routine_id="hv-PLANTED")
         r["rationale"] = [f"{plan_engine.ENGINE_VERSION} built this (#5052)"]
         r["notes"] = f"pre-draft by the generator, {plan_engine.ENGINE_VERSION}, critics approved (#4084)"
         r["inputs_snapshot"]["nightly_predraft"] = {"role": "primary", "engine": plan_engine.ENGINE_VERSION}
@@ -164,8 +164,8 @@ def test_the_judge_is_blinded_to_the_engine_its_version_and_the_author():
     forbidden = (
         plan_engine.ENGINE_VERSION,
         "plan-engine",
-        "rt-SECRET-ID",
-        "hv-SECRET",
+        "rt-PLANTED-ID",
+        "hv-PLANTED",
         "nightly",
         "predraft",
         "pre-draft",
