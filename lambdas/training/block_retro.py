@@ -183,9 +183,13 @@ def _anchor_evidence(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _tracker_steps(row: Mapping[str, Any]) -> Mapping[str, Any]:
+    return row.get("steps") or {}  # steps-truth: the May tracker's steps SECTION (built from steps_resolver), not a source row
+
+
 def _steps_evidence(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
     src = "may_tracker steps (training.steps_resolver days vs the charter floor and target)"
-    weeks = [r.get("steps") or {} for r in rows if (r.get("steps") or {}).get("state") == MEASURED]
+    weeks = [w for w in map(_tracker_steps, rows) if w.get("state") == MEASURED]
     if not weeks:
         return {k: cell(ABSENT, None, src) for k in ("days_measured", "days_at_floor", "days_at_target")}
     total = {k: sum(int(w.get(k) or 0) for w in weeks) for k in ("days_measured", "days_at_floor", "days_at_target")}
@@ -584,8 +588,8 @@ def _window_of(measurement: Mapping[str, Any]) -> tuple[str, str]:
 
 def _grade_steps_share(m: Mapping[str, Any], may_rows: list[Mapping[str, Any]], _sup: Mapping[str, Any]) -> tuple[str, Any]:
     start, end = _window_of(m)
-    weeks = [r.get("steps") or {} for r in may_rows if start <= str(r.get("week_start")) and str(r.get("week_end")) <= end]
-    weeks = [w for w in weeks if w.get("state") == MEASURED]
+    in_window = [r for r in may_rows if start <= str(r.get("week_start")) and str(r.get("week_end")) <= end]
+    weeks = [w for w in map(_tracker_steps, in_window) if w.get("state") == MEASURED]
     measured = sum(int(w.get("days_measured") or 0) for w in weeks)
     at = sum(int(w.get("days_at_floor") or 0) for w in weeks)
     if not measured:

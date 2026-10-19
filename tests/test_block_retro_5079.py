@@ -22,6 +22,8 @@ The contract test for `.claude/skills/training-review/SKILL.md` and the determin
 No live AI call and no AWS: the panel transport is a replay; the charter is the bundled file.
 """
 
+# premerge-gate: #5079: os.walk sweep of lambdas/web/ and lambdas/emails/ — no published-surface module names the owner-only block retro
+
 from __future__ import annotations
 
 import copy
@@ -339,13 +341,16 @@ def test_the_retro_row_is_owner_only_and_stamped_and_the_doc_tab_renders():
 
 
 def test_no_published_surface_imports_the_retro():
-    offenders = [
-        p.relative_to(_REPO).as_posix()
-        for d in ("lambdas/web", "lambdas/emails")
-        for p in sorted((_REPO / d).glob("*.py"))
-        if "block_retro" in p.read_text(encoding="utf-8")
-    ]
-    assert not offenders, offenders
+    import os
+
+    offenders = []
+    for d in ("lambdas/web", "lambdas/emails"):
+        for root, _dirs, files in os.walk(_REPO / d):
+            for f in sorted(files):
+                path = pathlib.Path(root) / f
+                if f.endswith(".py") and ("block_retro" in path.read_text(encoding="utf-8")):
+                    offenders.append(path.relative_to(_REPO).as_posix())
+    assert not offenders, f"a published-surface module names the owner-only block retro: {offenders}"
 
 
 # ── 7. the skill ──────────────────────────────────────────────────────────────────────────

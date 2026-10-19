@@ -3661,3 +3661,25 @@ GUARD_PROOFS["guard::scripts/check_synced_skill_drift.py"] = {
     ),
     "proved_on": "2026-10-19",
 }
+
+STRUCTURAL_HAND_PROOFS["structural::test_block_retro_5079.py"] = {
+    "gate_name": "test_block_retro_5079.py",
+    "command": "python3 -m pytest tests/test_block_retro_5079.py -q -p no:cacheprovider   # baseline 12 passed",
+    "mutation": (
+        "two plants, ONE AT A TIME: M1 append `from training import block_retro  # noqa` to lambdas/web/site_api_vitals.py "
+        "(a published module reaches the owner-only retro); M2 create lambdas/emails/_m5079/x.py holding `# block_retro` "
+        "(a NESTED email module names it — the os.walk depth)."
+    ),
+    "observed": (
+        "M1 1 failed / 11 passed (test_no_published_surface_imports_the_retro names site_api_vitals.py). M2 1 failed / 11 passed "
+        "(the same test names lambdas/emails/_m5079/x.py). Restored 12 passed; site_api_vitals.py md5 9ce13aa40d614bc569fd9c3e23046dec "
+        "before and after."
+    ),
+    "scope": (
+        "The sweep is a TEXT match for `block_retro` over every .py under lambdas/web/ and lambdas/emails/ (os.walk, nested "
+        "packages included). The rest of the file is contract tests of lambdas/training/block_retro.py on a fixture block "
+        "(reproducibility, the combine rule, movers, fixes, the prediction graders, the RETRO# row, the skill's wiring) — "
+        "contracts, not mutation-proved gates."
+    ),
+    "proved_on": "2026-10-19",
+}
