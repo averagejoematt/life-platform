@@ -36,7 +36,8 @@ WHAT IT DOES
 
 THE DERIVATION RULES (each stated with its reason)
 
-  * `skill_tier` from Hevy's `equipment` — see `EQUIPMENT_SKILL_TIER`. 382 of 538 titles carry no
+  * `skill_tier` from Hevy's `equipment` — see `EQUIPMENT_SKILL_TIER` — raised for bodyweight-loaded
+    titles (pull-up, chin-up, dip, inverted row; the advanced skills at 3), see `BODYWEIGHT_SKILL_TIER_*`. 382 of 538 titles carry no
     equipment word, so the title cannot carry this; Hevy's own field can.
   * `primary_muscle` / `secondary_muscles` from Hevy's muscle groups through
     `training.muscle_volume.HEVY_MUSCLE_GROUP` — the one table (column 1 is the planner key the
@@ -115,6 +116,26 @@ EQUIPMENT_SKILL_TIER: dict[str, int] = {
     "barbell": 3,
 }
 UNKNOWN_EQUIPMENT_TIER = 3
+
+#: Movements whose load IS the lifter's body, so Hevy's equipment word ("none", or "machine"/band
+#: where Hevy files a pull-up bar or ring under the wrong kit) understates the demand (#5054).
+#: Matched on the TITLE, because the equipment field cannot tell a pull-up from a stretch. Two bands:
+#:   tier 2 — pull-up, chin-up, dip, inverted row: the whole bodyweight must be pulled/pressed and
+#:            stabilised, the same "free or semi-free load" rung as a dumbbell (2), not the
+#:            fixed-path rung (1). Tier 3 stays the barbell's: a loaded barbell carries injury cost a
+#:            bodyweight pull does not.
+#:   tier 3 — muscle-up, pistol squat, Nordic curl, handstand push-up, human flag, one-arm
+#:            push/pull-up: gated skills most lifters cannot do for a work set at all, so they must
+#:            never be auto-picked under the skill ceiling of 2.
+#: An assisted/machine/band-assisted variant (title says "assisted", "machine" or "band") is NOT
+#: bodyweight-loaded — the stack takes part of the load — and keeps its equipment tier; so does
+#: every other equipment-none title (mobility, stretching, plank, push-up) at tier 1.
+BODYWEIGHT_SKILL_TIER_3 = re.compile(
+    r"\bmuscle[\s-]?ups?\b|\bpistol\b|\bnordic\b|\bhandstand\s+push|\bflag\b|\b(?:1|one)[\s-]?arm\s+(?:push|pull|chin)", re.I
+)
+BODYWEIGHT_SKILL_TIER_2 = re.compile(r"\bpull[\s-]?ups?\b|\bchin[\s-]?ups?\b|\bdips?\b|\binverted\s+rows?\b", re.I)
+BODYWEIGHT_ASSISTED = re.compile(r"\bassist|\bmachine\b|\bband(?:ed)?\b|\bcable\b", re.I)
+BODYWEIGHT_EQUIPMENT = frozenset({"none", "machine", "resistance_band", None})
 
 #: Every generated (unreviewed) entry's joint_friendly_score. 1 = below every curated entry
 #: scored 2 or 3, so the muscle selector (which sorts by joint_friendly_score desc) keeps the
@@ -244,6 +265,11 @@ def _skill_tier(equipment: str | None, title: str) -> tuple[int, str]:
     tl = title.lower()
     if re.search(r"\bsmith\b", tl):
         return 3, "title:smith"
+    if equipment in BODYWEIGHT_EQUIPMENT and not BODYWEIGHT_ASSISTED.search(tl):
+        if BODYWEIGHT_SKILL_TIER_3.search(tl):
+            return 3, "title:bodyweight_loaded"
+        if BODYWEIGHT_SKILL_TIER_2.search(tl):
+            return 2, "title:bodyweight_loaded"
     if equipment == "machine" and re.search(r"\bcable\b", tl):
         return 2, "title:cable"  # Hevy files cable exercises under "machine"; the issue's mapping puts cable at 2
     if equipment in EQUIPMENT_SKILL_TIER:
@@ -406,7 +432,9 @@ def build_catalog(current: dict[str, Any], history: dict[str, Any], metadata: di
         "_rules": {
             "skill_tier": "Hevy equipment: machine/resistance_band/none -> 1; dumbbell/kettlebell/plate/suspension/other and "
             "cable (by title) -> 2; barbell and smith (by title) -> 3; metadata unavailable -> 3. See "
-            "deploy/build_movement_catalog.py EQUIPMENT_SKILL_TIER.",
+            "deploy/build_movement_catalog.py EQUIPMENT_SKILL_TIER. Bodyweight-loaded titles (pull/chin-up, dip, inverted row -> 2; "
+            "muscle-up, pistol, Nordic, handstand push-up, flag, one-arm push/pull -> 3; never an assisted/machine/band title) are "
+            "raised above their equipment tier by title (#5054, BODYWEIGHT_SKILL_TIER_*).",
             "joint_friendly_score_unreviewed": UNREVIEWED_JOINT_FRIENDLY_SCORE,
             "primary_muscle": "Hevy primary_muscle_group through training/muscle_volume.HEVY_MUSCLE_GROUP (column 1); "
             "volume_muscle is column 0 (muscle_volume.MUSCLES).",
