@@ -1057,11 +1057,24 @@ def _week_tallies(catalog_movements: dict[str, Any], skill_ceiling: int = 2) -> 
     return by_muscle, sessions_by_muscle
 
 
+def _week_movement_sets(catalog_movements: dict[str, Any], skill_ceiling: int = 2) -> dict[str, int]:
+    """{movement key: hard sets} over the five roles — the per-movement view the movement-counted floors read (#5053)."""
+    out: dict[str, int] = {}
+    for role in SESSION_SEQUENCE["session_roles"]:
+        rx = session_prescription_for_role(role, catalog_movements=catalog_movements, skill_ceiling=skill_ceiling)
+        for e in rx["exposures"]:
+            k = e.get("movement_key") or ""
+            out[k] = out.get(k, 0) + len(e["sets"])
+    return out
+
+
 def volume_floor_coverage(catalog_movements: dict[str, Any], skill_ceiling: int = 2) -> dict[str, Any]:
     """#5053: the charter's MEV floors and `sets_per_wk` bands against the five roles' weekly sets (`training.volume_floors`)."""
     from training import volume_floors
 
     by_muscle, _ = _week_tallies(catalog_movements, skill_ceiling)
+    by_movement = _week_movement_sets(catalog_movements, skill_ceiling)
+    by_muscle = volume_floors.movement_counts(by_muscle, by_movement)
     accs = {r: list(t["accessories"]) for r, t in SESSION_TEMPLATES.items()}
     return {
         "floors": volume_floors.floor_coverage(by_muscle, accs),

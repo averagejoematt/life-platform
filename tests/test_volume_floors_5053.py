@@ -9,8 +9,11 @@ alert (`muscle_volume` counted it; nothing compared the count with the landmark)
   * THE FLAG — `below_mev_14d` rides the coach packet and the plan packet, derived from `get_muscle_volume`'s trailing-14d
     counts (`working_sets_by_muscle`, the one computation) — and a fixture of the 2026-10-04 drop trips it on day 14, not 13.
 
-RESIDUAL (named, shrink-only): the charter bands for lats / upper chest / arms are not reachable inside the 75-set week;
-`KNOWN_BAND_GAPS` pins today's shortfall so it can only shrink — closing it is an owner call on the redline, not a template edit.
+RESIDUAL (named, shrink-only): the charter bands for side/rear delts / lats / upper chest / arms are not reachable inside
+the 75-set week, and side/rear delts (6 direct sets) sit below their MEV of 8; `KNOWN_BAND_GAPS` pins today's shortfall so
+it can only shrink. Carrier: #5162 (gate:owner, the 75-set redline vs the charter bands). The LOGGED Shoulders flag cannot
+see a side/rear-delt drop that continued pressing masks (live 2026-10-05..18: 16 Shoulders sets, 8.0/wk); that follow-on is
+#5164 — so the day-14 trip below is asserted for Calves and Core, and Shoulders is asserted NOT flagged, as it really was.
 """
 
 from __future__ import annotations
@@ -37,7 +40,7 @@ CATALOG = json.loads((REPO / "config" / "movement_catalog.json").read_text())["m
 ROLES = list(program_structure.SESSION_TEMPLATES)
 
 # gap (sets/wk) below each charter band's floor today — may only shrink (#5053 residual; see the module docstring)
-KNOWN_BAND_GAPS = {"side_rear_delts": 0, "lats": 2, "upper_chest": 6, "legs": 0, "arms": 4}
+KNOWN_BAND_GAPS = {"side_rear_delts": 8, "lats": 2, "upper_chest": 6, "legs": 0, "arms": 4}
 
 
 @pytest.fixture(scope="module")
@@ -49,7 +52,12 @@ def test_every_charter_floor_muscle_has_a_slot_and_meets_its_mev(coverage):
     floors = coverage["floors"]
     assert set(floors) == set(charter_value("volume_priorities.mev_floors_in_every_template"))
     for name, row in floors.items():
-        assert row["meets_mev"], (name, row)
+        assert row["slot_roles"], (name, row)
+        if name != "side_rear_delts":  # #5162: 6 direct sets vs MEV 8 — pinned honestly below, not papered over
+            assert row["meets_mev"], (name, row)
+    delts = floors["side_rear_delts"]
+    assert (delts["sets"], delts["mev"], delts["meets_mev"]) == (6, 8, False)  # presses are NOT side/rear-delt work
+    assert floors["traps"]["sets"] == 2  # the shrug slot, not all Back
     assert floors["traps"]["slot_roles"] == ["shoulders_arms"]
     assert floors["calves"]["sets"] >= 8 and floors["core"]["sets"] >= 4
 
@@ -64,11 +72,12 @@ def test_every_floor_movement_is_in_a_role_and_in_the_pool():
     assert "reverse_pec_deck" in accs["upper_heavy"] and "db_lateral_raise" in accs["shoulders_arms"]
 
 
-def test_weekly_sets_by_muscle_delts_sit_in_the_charter_band():
-    lo, hi = charter_value("volume_priorities.sets_per_wk.side_rear_delts")
+def test_weekly_sets_by_muscle_delts_frequency_and_the_real_side_rear_count(coverage):
     delts = program_structure.weekly_sets_by_muscle(CATALOG)["delts"]
-    assert lo <= delts["sets"] <= hi, delts
     assert delts["frequency_per_wk"] >= charter_value("split.frequency.delts_per_wk")
+    # 15 catalog-'shoulders' sets = 9 press + 6 direct; only the 6 count toward the charter's side/rear-delt band (#5162)
+    assert delts["sets"] == 15 and coverage["sets_by_muscle"]["side_rear_delts_direct"] == 6
+    assert coverage["bands"]["side_rear_delts"]["member_sets"] == [6]
 
 
 def test_band_gaps_only_shrink(coverage):
@@ -104,7 +113,8 @@ def test_the_short_lower_sessions_moved_toward_the_low_end():
 
 # ── the flag ───────────────────────────────────────────────────────────────────
 def _flex_day_rows():
-    """2026-10-04, the last day with delt/core/calf work: 16 side/rear-delt sets, 8 core, 16 calf (= MEV over two weeks)."""
+    """2026-10-04, the last day with delt/core/calf work: 16 side/rear-delt sets, 8 core, 16 calf (= MEV over two weeks);
+    then the world as it was: shoulder PRESSING continued (16 sets 2026-10-05..18 = 8.0/wk), the lateral/rear/calf/core did not."""
     return [
         _row(
             "2026-10-04",
@@ -115,7 +125,8 @@ def _flex_day_rows():
                 _ex("Calf Press (Machine)", "91237BDD", 16),
                 _ex("Crunch (Machine)", "CRUNCH001", 8),
             ],
-        )
+        ),
+        _row("2026-10-10", "press-0001", [_ex("Seated Shoulder Press (Machine)", "9237BAD1", 16)]),
     ]
 
 
@@ -124,10 +135,12 @@ def test_the_2026_10_04_drop_trips_the_flag_on_day_14_and_not_day_13(tool):  # n
     day13 = read({"start_date": "2026-10-04", "end_date": "2026-10-17"})["below_mev_14d"]
     day14 = read({"start_date": "2026-10-05", "end_date": "2026-10-18"})["below_mev_14d"]
     assert day13["status"] == day14["status"] == "ok"
-    for m in ("Shoulders", "Calves", "Core"):
+    for m in ("Calves", "Core"):
         assert day13["muscles"][m]["below_mev"] is False, (m, day13["muscles"][m])
         assert day14["muscles"][m]["below_mev"] is True and day14["muscles"][m]["sets_per_wk"] == 0.0, m
-    assert {"Shoulders", "Calves", "Core"} <= set(day14["flagged"]) and not {"Shoulders", "Calves", "Core"} & set(day13["flagged"])
+    assert {"Calves", "Core"} <= set(day14["flagged"]) and not {"Calves", "Core"} & set(day13["flagged"])
+    # the coarse Shoulders flag stays quiet because pressing carried on (the live read: 8.0/wk) — #5164 owns the finer flag
+    assert day14["muscles"]["Shoulders"]["sets_per_wk"] == 8.0 and day14["muscles"]["Shoulders"]["below_mev"] is False
     assert day14["muscles"]["Shoulders"]["mev"] == 8  # the landmark, not a copy
 
 

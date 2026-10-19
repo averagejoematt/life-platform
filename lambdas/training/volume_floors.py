@@ -13,7 +13,10 @@ Two jobs, both reading, neither counting:
 The incident it answers: from 2026-10-04 (the Flex day dropped) delts and core fell to 0 sets and calves sat at 6/wk with
 no alert. Landmarks are keyed by catalog muscle (`shoulders`, `abs`); logged counts by the `MUSCLES` label (`Shoulders`,
 `Core`) — `HEVY_MUSCLE_GROUP` is the one bridge. Granularity caveat: the logged taxonomy has no side/rear/trap split
-(`Shoulders` is all delts, `Back` carries traps), so those floors are checked per `Shoulders` / by template slot.
+(`Shoulders` is all delts, presses included; `Back` carries traps), so the LOGGED flag for side/rear delts is the coarser
+`Shoulders` one and cannot see a drop that pressing masks (carrier: #5164, the movement-level logged flag; the template
+shortfall's carrier is #5162). The TEMPLATE side counts by movement (`FLOOR_MOVEMENTS`), never by catalog muscle — a shoulder press is not
+side/rear-delt work (ADR-104, honest numbers).
 """
 
 from __future__ import annotations
@@ -26,13 +29,31 @@ FLAG_RULE = "a muscle whose trailing-14-day working sets per week sit below its 
 
 # Charter `mev_floors_in_every_template` name -> the landmark key it is counted under
 FLOOR_LANDMARK: dict[str, str] = {"side_rear_delts": "shoulders", "traps": "back", "calves": "calves", "core": "abs"}
-# the trap floor has no landmark of its own (Hevy's taxonomy credits a shrug to Back): it is a SLOT check on these keys
-TRAP_MOVEMENTS = ("shrug_dumbbell", "shrug_barbell")
+# The movements that COUNT toward each charter floor (template side). A catalog 'shoulders' set is not side/rear-delt work:
+# presses are excluded. The trap floor has no landmark of its own (Hevy credits a shrug to Back): a slot check as well.
+FLOOR_MOVEMENTS: dict[str, tuple[str, ...]] = {
+    "side_rear_delts": (
+        "db_lateral_raise",
+        "lateral_raise_machine",
+        "face_pull",
+        "reverse_pec_deck",
+        "rear_delt_reverse_fly_cable",
+        "chest_supported_reverse_fly_dumbbell",
+        "db_rear_delt_rows",
+        "band_pullaparts",
+    ),
+    "traps": ("shrug_dumbbell", "shrug_barbell", "seated_shrugs"),
+    "calves": ("calf_raise_machine",),
+    "core": ("machine_crunch", "cable_pallof_press", "pallof_press"),
+}
+TRAP_MOVEMENTS = FLOOR_MOVEMENTS["traps"]
+# the count key a floor's weekly sets are read under (movement-counted floors get a derived key; the rest are catalog muscles)
+COUNT_KEY = {"side_rear_delts": "side_rear_delts_direct", "traps": "traps_direct"}
 
 # Charter `volume_priorities.sets_per_wk` group -> its members, each a tuple of template-count muscle keys that sum into
 # ONE band member. The charter's legs and arms bands are per member (quads; hamstrings+glutes; biceps; triceps).
 BAND_MEMBERS: dict[str, tuple[tuple[str, ...], ...]] = {
-    "side_rear_delts": (("shoulders",),),
+    "side_rear_delts": (("side_rear_delts_direct",),),
     "lats": (("back",),),
     "upper_chest": (("chest",),),
     "legs": (("quadriceps",), ("hamstrings", "glutes")),
@@ -89,8 +110,8 @@ def floor_coverage(
     out: dict[str, Any] = {}
     for floor in charter_value("volume_priorities.mev_floors_in_every_template") or []:
         key = FLOOR_LANDMARK.get(floor)
-        sets = int(by_muscle.get(key, 0)) if key else 0
-        roles = [r for r, accs in accessories_by_role.items() if floor == "traps" and any(a in TRAP_MOVEMENTS for a in accs)]
+        sets = int(by_muscle.get(COUNT_KEY.get(floor, key or ""), 0))
+        roles = [r for r, accs in accessories_by_role.items() if any(a in FLOOR_MOVEMENTS.get(floor, ()) for a in accs)]
         mev = int((lm.get(key) or {}).get("MEV") or 0) if floor != "traps" else None
         out[floor] = {
             "landmark_key": key,
@@ -99,6 +120,15 @@ def floor_coverage(
             "meets_mev": (sets >= mev) if mev is not None else bool(roles),
             "slot_roles": roles,
         }
+    return out
+
+
+def movement_counts(by_muscle: dict[str, int], by_movement: dict[str, int]) -> dict[str, int]:
+    """`by_muscle` plus the movement-counted floors (`side_rear_delts_direct`, `traps_direct`) tallied from the roles' own
+    per-movement sets — the same exposures, summed by movement instead of by catalog muscle."""
+    out = dict(by_muscle)
+    for floor, key in COUNT_KEY.items():
+        out[key] = sum(int(by_movement.get(m, 0)) for m in FLOOR_MOVEMENTS[floor])
     return out
 
 
