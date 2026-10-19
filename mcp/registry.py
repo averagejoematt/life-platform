@@ -498,7 +498,10 @@ TOOLS = {
                     },
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 30d ago)."},
                     "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "step_target": {"type": "integer", "description": "[movement] Daily step target (default: 8000)."},
+                    "step_target": {
+                        "type": "integer",
+                        "description": "[movement] Daily step target (default: the training charter's steps floor).",
+                    },
                 },
                 "required": [],
             },
