@@ -25,7 +25,7 @@ A field can pass the Hevy API and still never reach the gym floor. #3938 is the 
 | `rest_seconds` | - | `the block's rest` | native | `routine.exercises[].rest_seconds` | the exercise's rest timer | - |
 | `superset_id` | - | `the block's superset` | native | `routine.exercises[].superset_id` | the exercises grouped as a superset | - |
 | `minimum_session` | #5088 | `disruption.to_routine` | note | `routine.exercises[0].notes (head) + routine.exercises[].notes` | the session line and each exercise's 'Minimum:' cue | the title is the convention's at commit (Phase - Type - N - Y); the label rides the session line |
-| `charter_version` | #5068 | `training_charter.charter_version` | not_shown | `none (inputs_snapshot only)` | not shown; the IR carries it | - |
+| `charter_version` | #5068 #5085 | `training_charter.charter_version` | not_shown | `none (inputs_snapshot.charter_version + inputs_snapshot.nightly_predraft.charter_version)` | not shown in any Hevy note or footer; the IR and the pre-draft's draft mark carry it | - |
 
 ## 2. The ordering rule (so a reason line is never the part a cut lands on)
 

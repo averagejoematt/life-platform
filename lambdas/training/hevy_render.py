@@ -42,7 +42,7 @@ from training.cardio_note import LINE1_RE
 from training.hevy_note_types import PINNED_ROUTINE_NOTE_FIELD
 from training.warmup_sets import is_warmup
 
-RENDER_TABLE_VERSION = "hevy-render@1.1.0"
+RENDER_TABLE_VERSION = "hevy-render@1.1.1"
 
 # The owner-observed visible window of a Hevy note (#4070). Sizes the report; never a truncation.
 VISIBLE_NOTE_CHARS = 150
@@ -180,11 +180,11 @@ RENDER_TABLE: tuple[dict[str, str], ...] = (
     },
     {
         "field": "charter_version",
-        "issue": "#5068",
+        "issue": "#5068 #5085",
         "producer": "training_charter.charter_version",
         "home": NOT_SHOWN,
-        "wire": "none (inputs_snapshot only)",
-        "shows": "not shown; the IR carries it",
+        "wire": "none (inputs_snapshot.charter_version + inputs_snapshot.nightly_predraft.charter_version)",
+        "shows": "not shown in any Hevy note or footer; the IR and the pre-draft's draft mark carry it",
         "fallback": "-",
     },
 )
@@ -248,7 +248,9 @@ def expected_reasons(ir: Any) -> list[dict[str, str]]:
         prog = (mv or {}).get("progression") or {}
         if prog.get("changes") and prog.get("reason"):
             out.append({"field": _reason_field(prog["reason"]), "movement_key": key, "text": prog["reason"]})
-    for row in snap.get("step_due") if isinstance(snap.get("step_due"), list) else []:
+    step_due = snap.get("step_due")
+    rows: list[Any] = step_due if isinstance(step_due, list) else []
+    for row in rows:
         if not row.get("carried") and row.get("reason"):
             out.append({"field": "stall_step", "movement_key": str(row.get("movement_key")), "text": f"Step due: {row['reason']}"})
     return out
