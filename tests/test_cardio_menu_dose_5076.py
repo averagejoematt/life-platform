@@ -156,6 +156,29 @@ def test_a_raise_verdict_moves_the_bike_one_level_and_writes_why():
     assert audit["level"] == 12 and audit["hold_level"] == 11
 
 
+def test_a_tempo_day_after_a_raise_is_one_level_up_never_two():
+    """Review round 2: last_level 11 + a `raise` verdict + tempo -> level 12 (baseline + the tempo step),
+    never 13 (the raise AND the tempo step stacked). The easy block on the same facts is also 12."""
+    facts, verdict = {"last_level": 11}, {"verdict": "raise", "basis": "his speed cleared his spread"}
+    tempo = cm.bike_dose("tempo", facts, verdict)
+    assert (tempo["level"], tempo["hold_level"]) == (11 + cm.TEMPO_LEVEL_STEP, 11) == (12, 11), tempo
+    assert "+1 level" not in tempo["reason"], "the raise is not applied on top of the tempo step"
+    assert cm.bike_dose("easy", facts, verdict)["level"] == 12
+    assert cm.bike_dose("tempo", facts, {"verdict": "hold"})["level"] == 12, "tempo is baseline + step with or without a raise"
+
+
+def test_a_missing_charter_default_is_a_loud_error_not_a_fallback(monkeypatch):
+    real = tc.charter_value
+    monkeypatch.setattr(
+        tc, "charter_value", lambda dotted, default=None: None if dotted == "cardio_menu.default" else real(dotted, default)
+    )
+    try:
+        cm.default_kind()
+    except KeyError:
+        return
+    raise AssertionError("default_kind() fell back to a literal when the charter key was missing")
+
+
 def test_two_held_walks_step_the_incline_then_the_top_steps_the_speed():
     def walk(date, inc, mph):
         return {"date": date, "note": f"{inc} incline", "duration_sec": 1800.0, "distance_m": round(mph * 1609.344 / 2, 1)}

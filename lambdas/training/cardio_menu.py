@@ -72,7 +72,11 @@ def block(kind: str) -> dict[str, Any]:
 
 
 def default_kind() -> str:
-    return str(menu().get("default") or "incline_treadmill_walk")
+    """The charter's `cardio_menu.default`, read with no fallback: a missing key is a loud error."""
+    kind = training_charter.charter_value("cardio_menu.default")
+    if not kind:
+        raise KeyError("training charter has no cardio_menu.default")
+    return str(kind)
 
 
 def conditioning_per_wk() -> int:
@@ -417,7 +421,12 @@ def speed_at_level(facts: dict[str, Any] | None, level: int | None) -> float | N
 
 def bike_dose(kind: str, facts: dict[str, Any] | None, verdict: dict[str, Any] | None, *, constrained: bool = False) -> dict[str, Any]:
     """{level, hold_level, mph, reason} for a bike-type block. Progression is the verdict's: same RPE at a
-    higher level only on a `raise` (his speed at the level cleared his own within-level spread)."""
+    higher level only on a `raise` (his speed at the level cleared his own within-level spread).
+
+    One step per block, never two. A `raise` verdict moves the EASY block only (baseline + 1). A tempo
+    block's step IS its dose: tempo = baseline + `TEMPO_LEVEL_STEP`, where the baseline is the held
+    level (the last ride's), so a tempo day after a raise is still one level above the last ride
+    (last_level 11 + raise -> easy 12, tempo 12, never 13). Intervals and hills ride the baseline."""
     from training import cardio_note
 
     level, hold = cardio_note.prescribed_level(facts, verdict, constrained=constrained)
@@ -434,8 +443,8 @@ def bike_dose(kind: str, facts: dict[str, Any] | None, verdict: dict[str, Any] |
     else:
         reason = ""
     if kind == "tempo":
-        level = level + TEMPO_LEVEL_STEP
-        reason = (reason + "; " if reason else "") + f"tempo starts {TEMPO_LEVEL_STEP} level above easy (platform-chosen)"
+        level = hold + TEMPO_LEVEL_STEP  # the tempo step is the dose; a raise never stacks on it
+        reason = f"tempo rides {TEMPO_LEVEL_STEP} level above your last ride (platform-chosen)"
     elif kind in ("intervals", "hills"):
         level = hold  # a harder shape never rides a raised level: the raise and the shape are one step each
         reason = ""
