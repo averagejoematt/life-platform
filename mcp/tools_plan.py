@@ -257,12 +257,63 @@ def _pain_dismissals() -> list[dict[str, Any]]:
     return _dismissal_records()
 
 
+def _pain_instances(flagged: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The flag instances the engine resolves (and the steps ramp's lower-leg hold reads): one per flagged movement."""
+    return [
+        {
+            "movement": r["label"],
+            "exercise": r.get("exercise"),
+            "movement_key": r.get("movement_key"),
+            "note_dates": r.get("pain_dates") or [],
+            "notes": r.get("pain_notes") or [],
+        }
+        for r in flagged
+    ]
+
+
+def _steps_window(target_date: str) -> dict[str, Any]:
+    """The resolver's trailing window the steps ramp starts from (#5082) — the SAME read the coach packet's `steps_7d`
+    makes (`tools_coach_packet._steps_fetch`), over `steps_ramp.window_days`; no second computation of a day's steps."""
+    from training import steps_ramp, steps_resolver
+
+    from mcp.tools_coach_packet import _steps_fetch
+
+    start, end = steps_ramp.window_days(target_date)
+    return steps_resolver.steps_range(start, end, fetch=_steps_fetch, derived=False)
+
+
 def _deload_records() -> list[dict[str, Any]]:
     """The owner's recorded deload words (#5070), read from the SAME module that writes them (like `_pain_dismissals`).
     A raise propagates — `_read` reports it `read_failed`, never as "no deload word on file"."""
     from mcp.tools_training_notes import _deload_records as read
 
     return read()
+
+
+def _disruption_records() -> list[dict[str, Any]]:
+    """His disruption-mode records (#5088), read from the module that writes them; a raise is `read_failed`."""
+    from mcp.tools_training_notes import _disruption_records as read
+
+    return read()
+
+
+def _owner_word_records(status: dict[str, Any]) -> tuple[Any, Any]:
+    """The two owner-word stores stage 1 reads, each status stamped onto `status` (extracted for the #4880 ratchet):
+    #5070's deload word (a deload applies ONLY when one covers the day) and #5088's disruption-mode switch (the mode
+    applies ONLY when his record covers the day; otherwise the block may OFFER it). An empty store is ABSENT, a raise
+    is `read_failed` — never "no word on file"."""
+    from training.plan_engine import ABSENT, READ_FAILED, input_status as st
+
+    out = []
+    for name, reader, absent in (
+        ("deload_records", _deload_records, "no owner deload word on file"),
+        ("disruption_records", _disruption_records, "no disruption-mode record on file"),
+    ):
+        records, status[name] = _read(name, reader)
+        if records == [] and status[name]["state"] != READ_FAILED:
+            status[name] = st(ABSENT, absent)
+        out.append(records)
+    return out[0], out[1]
 
 
 def _training_memory_constraints() -> list[dict[str, Any]]:
@@ -652,10 +703,10 @@ def tool_plan_next_session(args):
     if dismissals == [] and status["pain_dismissals"]["state"] != READ_FAILED:
         status["pain_dismissals"] = st(ABSENT, "no owner dismissal on file")
 
-    # #5070: the owner's recorded deload word — a deload applies ONLY when one covers the day.
-    deload_records, status["deload_records"] = _read("deload_records", _deload_records)
-    if deload_records == [] and status["deload_records"]["state"] != READ_FAILED:
-        status["deload_records"] = st(ABSENT, "no owner deload word on file")
+    deload_records, disruption_records = _owner_word_records(status)
+
+    # #5082: the steps ramp's base — the resolver's trailing window; the ramp itself is computed in the engine
+    steps_window, status["steps_window"] = _read("steps_window", _steps_window, target_date)
 
     # #4077: standing training constraints (RDL gate, toe flag, back flag, …) written from
     # chat via write_platform_memory(category='training') — the durable home that category
@@ -772,16 +823,7 @@ def tool_plan_next_session(args):
         # a movement's notes per site and a note naming no dismissed site stays open.
         # #4519: and the EXERCISE the flag was derived from — a drafted row's label is its slot tag
         # (`anchor:hinge:moderate`), which no dismissal can name.
-        pain_flag_instances=[
-            {
-                "movement": r["label"],
-                "exercise": r.get("exercise"),
-                "movement_key": r.get("movement_key"),
-                "note_dates": r.get("pain_dates") or [],
-                "notes": r.get("pain_notes") or [],
-            }
-            for r in flagged
-        ],
+        pain_flag_instances=_pain_instances(flagged),
         pain_dismissals=dismissals,
         # #4051: what was examined, so `clear` is only reachable from a set that was read.
         pain_evidence_scope=pain_scope,
@@ -793,9 +835,11 @@ def tool_plan_next_session(args):
         block_workouts=block_workouts,
         training_memory_constraints=training_memory,
         deload_records=deload_records,
+        disruption_records=disruption_records,
         fatigue=(evidence or {}).get("fatigue"),
         recent_aerobic=recent_aerobic,
         loss_rate=loss_rate,
+        steps_window=steps_window,
         input_status=status,
     )
     _merge_walking_volume(block, walk_layer)

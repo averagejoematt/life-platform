@@ -151,7 +151,7 @@ def test_the_sequence_is_defined_once_in_program_structure():
     seq = program_structure.SESSION_SEQUENCE
     assert seq["block_start"] == "2026-09-24" and seq["program_version"] == "0.4"
     assert seq["session_roles"] == [UH, LH, UV, LV] and seq["first_role"] == LH
-    assert seq["sessions_per_week"] == 4 and seq["weeks_per_block"] == 6
+    assert seq["sessions_per_week"] == 4 and session_sequence._seq()["weeks_per_block"] == 6  # #5077: from the charter
     assert seq["first_session"]["routine_id"] == "b1b9960468f374e30dcdeca8630dd18f" and seq["first_session"]["target_date"] == FIRST_TARGET
     assert set(seq["session_roles"]) == set(program_structure.SESSION_TEMPLATES)
     assert program_structure.summary()["session_sequence"] is seq

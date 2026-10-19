@@ -74,7 +74,7 @@ SUBTRACT_ONLY_ERROR_CODE = "SUBTRACT_ONLY_VIOLATION"
 
 # Variants that prescribe no load by design (#3927: "a floor stamped on a
 # deliberately-easy variant would be the opposite rule").
-NO_LOAD_VARIANTS = frozenset({"floor", "re_entry"})
+NO_LOAD_VARIANTS = frozenset({"floor", "re_entry", "disruption"})  # #5088: the owner-switched short session is reduced by design
 
 SKIP_NOTE = (
     "subtract-only gate SKIPPED — variant={variant} prescribes a deliberately reduced session and asserts no load "

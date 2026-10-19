@@ -76,6 +76,14 @@ to say. `intensity["basis"]` names a defaulted ceiling `"program_default:accesso
 `"program_default:anchor:<family>"` so a reader can always tell an inherited program number
 from the routine's own words.
 
+A SELF-RAISED LOAD IS PROGRESS, NOT A BREACH (#5052). 20 of 22 graded sessions read
+`as_prescribed: no`, mostly because the owner raised a load and logged it above the routine's
+own RPE note. A working set carried ABOVE the heaviest prescribed load, at or under the
+charter's effort limit for the movement's class (`training.load_progression`, read from
+`effort_ceilings` — ceiling plus `overage_tolerance_rpe`), is graded `progressed`: counted in
+`sets_progressed`, kept out of every percentage, and the session verdict reads `progressed`
+when nothing else failed. A raised set above that limit is still a breach.
+
 ROUTINE-NOTE CEILINGS ARE SCOPED TO THE MOVEMENT THEY NAME (#4160). A routine note that
 names a specific movement — "Squat novel-again: exposure 1 of 3, RPE 7 max." (live,
 09-24) — used to be read by `resolve_ceiling` as a SESSION-WIDE cap: every other
@@ -282,6 +290,29 @@ def _program_default_ceiling(movement_key: str, catalog: dict[str, Any], alias_t
     return {"rpe": _ACCESSORY_DEFAULT_RPE, "basis": "program_default:accessory"}
 
 
+def _progression_for(
+    movement_key: str, ir_sets: Any, catalog: dict[str, Any], alias_titles: dict[str, str], limits: dict[str, Any]
+) -> dict[str, Any]:
+    """#5052: the `grade_sets(progression=...)` input for one programmed movement — its heaviest
+    prescribed working load and the charter's effort limits for its class. A catalog
+    `anchor_family` (or an anchor title) is a compound; anything else an isolation movement."""
+    from training import load_progression as lp
+
+    entry = _catalog_entry_for(movement_key, catalog)
+    cls = lp.movement_class(entry)
+    if cls != lp.CLASS_COMPOUND and classify_movement(_movement_title_for_classification(movement_key, catalog, alias_titles)).startswith(
+        "anchor:"
+    ):
+        cls = lp.CLASS_COMPOUND
+    loads = []
+    for st in ir_sets or []:
+        t = st.get("type") if isinstance(st, dict) else getattr(st, "type", None)
+        w = st.get("weight_kg") if isinstance(st, dict) else getattr(st, "weight_kg", None)
+        if str(t or "normal").lower() != "warmup" and w:
+            loads.append(float(w))
+    return {"prescribed_kg": max(loads) if loads else None, **lp.grading_limits(cls, limits)}
+
+
 # Conservative on purpose (#3929): only orientation/variant words known to describe the
 # SAME movement pattern under a different Hevy catalog entry. Deliberately excludes
 # words like "incline"/"decline" that name a genuinely different movement (see
@@ -351,11 +382,12 @@ def _intensity_rollup(movements: list[dict[str, Any]]) -> dict[str, Any]:
     graded = sum(g["sets_graded"] for g in prescribed)
     over = sum(g["sets_over_ceiling"] for g in prescribed)
     absent = sum(g["sets_rpe_absent"] for g in prescribed)
+    progressed = sum(g.get("sets_progressed") or 0 for g in prescribed)  # #5052: never in the percentage
     overages = [g["max_overage"] for g in prescribed if g.get("max_overage")]
 
     if graded:
         status = "graded"
-        pct: float | None = round((graded - over) / graded * 100, 1)
+        pct: float | None = round((graded - progressed - over) / (graded - progressed) * 100, 1) if graded > progressed else None
     elif prescribed:
         status, pct = "unreadable", None
     else:
@@ -370,6 +402,8 @@ def _intensity_rollup(movements: list[dict[str, Any]]) -> dict[str, Any]:
         "movements_with_ceiling": len(prescribed),
         "max_overage": max(overages) if overages else (0.0 if graded else None),
         "over_ceiling_movements": sorted(m["movement_key"] for m in movements if (m.get("intensity") or {}).get("sets_over_ceiling")),
+        "sets_progressed": progressed,
+        "progressed_movements": sorted(m["movement_key"] for m in movements if (m.get("intensity") or {}).get("sets_progressed")),
     }
 
 
@@ -378,7 +412,9 @@ def _as_prescribed(sets_pct: float, intensity: dict[str, Any], movements: list[d
 
     Never an average. `no` names which dimension failed; `unknown` is returned rather
     than `yes` whenever the intensity half could not be read, because "we couldn't tell"
-    has never been the same claim as "he complied" (ADR-104).
+    has never been the same claim as "he complied" (ADR-104). `progressed` (#5052) is the
+    third named verdict: every set done, no breach, and at least one set carried above the
+    prescribed load at or under the charter effort ceiling — he beat the plan, not broke it.
     """
     reasons: list[str] = []
     if sets_pct < 100.0:
@@ -400,6 +436,14 @@ def _as_prescribed(sets_pct: float, intensity: dict[str, Any], movements: list[d
         return {
             "verdict": "unknown",
             "reasons": [f"intensity: RPE not logged on movements that carried their own ceiling ({', '.join(blind)})"],
+        }
+    if intensity.get("sets_progressed"):
+        # #5052: he raised the load himself and stayed at or under the charter effort ceiling — progress, a named
+        # third verdict, never `no` and never folded into `yes`.
+        names = ", ".join(intensity.get("progressed_movements") or [])
+        return {
+            "verdict": "progressed",
+            "reasons": [f"load: {intensity['sets_progressed']} set(s) above the prescribed load at or under the effort ceiling ({names})"],
         }
     return {"verdict": "yes", "reasons": []}
 
@@ -423,6 +467,9 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
     recovery_branches = ((getattr(ir, "inputs_snapshot", None) or {}) or {}).get("recovery_branches")
     programmed: list[dict[str, Any]] = []
     template_to_key: dict[str, str] = {}
+    from training.load_progression import effort_limits
+
+    limits = effort_limits()  # #5052: the charter's ceilings, read once per session
     for ex in ir.exercises:
         tid = _ir_movement_to_template(catalog, ex.movement_key, cache)
         sets = len(ex.sets)
@@ -437,7 +484,14 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
             # class-level default (accessory / anchor pattern) before calling it ungraded.
             ceiling = _program_default_ceiling(ex.movement_key, catalog, alias_titles)
         programmed.append(
-            {"movement_key": ex.movement_key, "template_id": tid, "sets": sets, "working_sets": _working(ex.sets), "ceiling": ceiling}
+            {
+                "movement_key": ex.movement_key,
+                "template_id": tid,
+                "sets": sets,
+                "working_sets": _working(ex.sets),
+                "ceiling": ceiling,
+                "progression": _progression_for(ex.movement_key, ex.sets, catalog, alias_titles, limits),
+            }
         )
         if tid:
             template_to_key[tid] = ex.movement_key
@@ -461,7 +515,7 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
     for p in programmed:
         performed_sets = performed_by_tid.get(p["template_id"], 0)
         pct = round(min(1.0, performed_sets / p["sets"]) * 100, 1) if p["sets"] else 0.0
-        intensity = grade_sets(p["ceiling"]["rpe"], performed_sets_by_tid.get(p["template_id"], []))
+        intensity = grade_sets(p["ceiling"]["rpe"], performed_sets_by_tid.get(p["template_id"], []), progression=p["progression"])
         intensity["basis"] = p["ceiling"]["basis"]
         movements.append(
             {
