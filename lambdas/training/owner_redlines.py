@@ -387,7 +387,7 @@ REDLINES: dict[str, dict[str, Any]] = {
         # block only (training.green_block), never the gain rule.
         "gain_rule": {"source": "config/training_charter.json#progression.gain_rule", "applied_by": "training.load_progression"},
         "cal_rep_out": "CAL rep-out 2/wk on machine accessories (the existing pushdown / leg curl) until n >= 6, then 1/wk (OD5, OD8c)",
-        "rep_scheme": "heavy exposure 4–6: one top set at RPE 7–8 plus two back-offs at −10 %; moderate 6–10; volume 8–12; accessories 8–15 at RIR 1–2",
+        "rep_scheme": "heavy exposure 4–6: one top set at the charter compound ceiling plus two back-offs at −10 %; moderate 6–10; volume 8–12; accessories 8–15, the last set at the charter isolation ceiling",
         "accessory_rule": "2–3 per session, 2 sets, machines/cables, fixed for the block — none added after week 1; first thing dropped on a bad day",
         # v3.4 (#5070, owner ruling 2026-10-18): NO scheduled or automatic deload. This is the response a deload APPLIES AS
         # WRITTEN when — and only when — the owner's recorded word covers the day (`training.deload_word`); the schedule

@@ -1,0 +1,3580 @@
+{
+ "_README": "#5058 replay: every Hevy session graded `as_prescribed` yes/no with a graded intensity dimension (2026-09-16..2026-10-18), read READ-ONLY from DynamoDB (USER#matthew#SOURCE#hevy, the stored `adherence` block + the logged sets) on 2026-10-19. Per movement: the ceiling the stored grade used (the routine's own words or the program default), its basis, the movement class (catalog), and each performed set's type + RPE only \u2014 no loads, no notes.",
+ "sessions": [
+  {
+   "date": "2026-09-16",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.5,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "lat_pulldown",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.5,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "one_arm_db_row",
+     "sets": [
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "tmpl:D2387AB1",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "tmpl:4E5257DE",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.5,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:BE640BA0",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:7E3BC8B6",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "treadmill",
+     "sets": []
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "tmpl:527DA061",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 95.0,
+   "stored_sets_over_ceiling": 3,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-09-17",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "tmpl:2B4B7310",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.5,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "tmpl:cb2d3813-d5b7-4c2e-a85e-6508c4a18d8b",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:11A123F3",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:75A4F6C4",
+     "sets": [
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:91237BDD",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "tmpl:33EDD7DB",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "tmpl:527DA061",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 100.0,
+   "stored_sets_over_ceiling": 1,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-09-19",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "barbell_bench_press",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "incline_db_press",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 10.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.5,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "db_shoulder_press",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.5,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "cable_tricep_pushdown",
+     "sets": [
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": false,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:21310F5F",
+     "sets": []
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.5,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "db_lateral_raise",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 10.0,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "cycling",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 10.0,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "tmpl:527DA061",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 91.7,
+   "stored_sets_over_ceiling": 3,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-09-20",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "lat_pulldown",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "tmpl:4E5257DE",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.5,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "one_arm_db_row",
+     "sets": [
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "tmpl:D2387AB1",
+     "sets": [
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:BE640BA0",
+     "sets": [
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 9.5,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:7E3BC8B6",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "cycling",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "tmpl:527DA061",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 100.0,
+   "stored_sets_over_ceiling": 1,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-09-22",
+   "movements": [
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "tmpl:2B4B7310",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.5,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "tmpl:cb2d3813-d5b7-4c2e-a85e-6508c4a18d8b",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:11A123F3",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:75A4F6C4",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:91237BDD",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:4eea8956-e0f1-4327-9e7d-e4f4f9a0b1df",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:ce5b0bba-bb9c-4058-b8bb-2339380e8e10",
+     "sets": [
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "tmpl:33EDD7DB",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "tmpl:527DA061",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 100.0,
+   "stored_sets_over_ceiling": 0,
+   "stored_verdict": "yes"
+  },
+  {
+   "date": "2026-09-23",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "barbell_bench_press",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "one_arm_db_row",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "db_shoulder_press",
+     "sets": [
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "lat_pulldown",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 10.0,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 100.0,
+   "stored_sets_over_ceiling": 5,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-09-24",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 7.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "squat_barbell",
+     "sets": [
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 7.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "tmpl:2B4B7310",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 7.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "tmpl:cb2d3813-d5b7-4c2e-a85e-6508c4a18d8b",
+     "sets": [
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 7.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:11A123F3",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 7.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:91237BDD",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 100.0,
+   "stored_sets_over_ceiling": 15,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-09-25",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "barbell_bench_press",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 10.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "one_arm_db_row",
+     "sets": [
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "db_shoulder_press",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 10.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "lat_pulldown",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "cable_chest_fly",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "cable_tricep_pushdown",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "db_curl",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "treadmill",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "tmpl:527DA061",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 100.0,
+   "stored_sets_over_ceiling": 11,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-09-26",
+   "movements": [
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:056a1c53-c778-4ace-bb18-6f72e81b6724",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      },
+      {
+       "rpe": null,
+       "type": "normal"
+      },
+      {
+       "rpe": null,
+       "type": "normal"
+      },
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:A2D838BD",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:4eea8956-e0f1-4327-9e7d-e4f4f9a0b1df",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "tmpl:527DA061",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 100.0,
+   "stored_sets_over_ceiling": 0,
+   "stored_verdict": "yes"
+  },
+  {
+   "date": "2026-09-28",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 7.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "deadlift_trap_bar",
+     "sets": [
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:anchor:squat",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "squat_barbell",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "leg_curl",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "calf_raise_machine",
+     "sets": [
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "machine_crunch",
+     "sets": []
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "cycling",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 83.3,
+   "stored_sets_over_ceiling": 1,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-09-29",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "barbell_bench_press",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      },
+      {
+       "rpe": 6.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "one_arm_db_row",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:anchor:overhead_press",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "db_shoulder_press",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:anchor:vertical_pull",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "lat_pulldown",
+     "sets": [
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "cable_tricep_pushdown",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "db_curl",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "cycling",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 100.0,
+   "stored_sets_over_ceiling": 9,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-10-01",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "tmpl:D04AC939",
+     "sets": [
+      {
+       "rpe": 6.0,
+       "type": "warmup"
+      },
+      {
+       "rpe": 6.0,
+       "type": "warmup"
+      },
+      {
+       "rpe": 6.0,
+       "type": "warmup"
+      },
+      {
+       "rpe": 7.0,
+       "type": "warmup"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "tmpl:2B4B7310",
+     "sets": [
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:anchor:squat",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "tmpl:cb2d3813-d5b7-4c2e-a85e-6508c4a18d8b",
+     "sets": [
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "leg_curl",
+     "sets": [
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "calf_raise_machine",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "cycling",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 100.0,
+   "stored_sets_over_ceiling": 7,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-10-02",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "barbell_bench_press",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 10.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 10.0,
+       "type": "failure"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 6.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "one_arm_db_row",
+     "sets": [
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:anchor:overhead_press",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "db_shoulder_press",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:anchor:vertical_pull",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "lat_pulldown",
+     "sets": [
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "cable_chest_fly",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "cable_tricep_pushdown",
+     "sets": [
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "db_curl",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "cycling",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 100.0,
+   "stored_sets_over_ceiling": 12,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-10-04",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:BE640BA0",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "db_lateral_raise",
+     "sets": [
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:fda0298c-dca2-4b05-9292-c323e7cb0b1d",
+     "sets": [
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:4eea8956-e0f1-4327-9e7d-e4f4f9a0b1df",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "tmpl:A2D838BD",
+     "sets": [
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "treadmill",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "cycling",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "tmpl:527DA061",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 100.0,
+   "stored_sets_over_ceiling": 1,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-10-06",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "deadlift_trap_bar",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "squat_barbell",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "leg_curl",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "calf_raise_machine",
+     "sets": [
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "machine_crunch",
+     "sets": []
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "cycling",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "tmpl:527DA061",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 89.5,
+   "stored_sets_over_ceiling": 0,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-10-07",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "barbell_bench_press",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "one_arm_db_row",
+     "sets": [
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "db_shoulder_press",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "lat_pulldown",
+     "sets": [
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "cable_tricep_pushdown",
+     "sets": [
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "db_curl",
+     "sets": [
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "treadmill",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "tmpl:527DA061",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 100.0,
+   "stored_sets_over_ceiling": 18,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-10-09",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "squat_barbell",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "romanian_deadlift_barbell",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:anchor:squat",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "leg_press",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "leg_curl",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "calf_raise_machine",
+     "sets": [
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "cycling",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "tmpl:527DA061",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 100.0,
+   "stored_sets_over_ceiling": 3,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-10-11",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "barbell_bench_press",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 10.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:anchor:row",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "one_arm_db_row",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:anchor:overhead_press",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "db_shoulder_press",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:anchor:vertical_pull",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "lat_pulldown",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "cable_chest_fly",
+     "sets": [
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "cable_tricep_pushdown",
+     "sets": [
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "db_curl",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "cycling",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "tmpl:527DA061",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 100.0,
+   "stored_sets_over_ceiling": 5,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-10-13",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "deadlift_trap_bar",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "squat_barbell",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "leg_curl",
+     "sets": [
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "calf_raise_machine",
+     "sets": [
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "machine_crunch",
+     "sets": []
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "cycling",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "tmpl:527DA061",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 85.7,
+   "stored_sets_over_ceiling": 0,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-10-15",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "barbell_bench_press",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "one_arm_db_row",
+     "sets": [
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:anchor:overhead_press",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "db_shoulder_press",
+     "sets": [
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 10.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 10.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:anchor:vertical_pull",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "lat_pulldown",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "cable_tricep_pushdown",
+     "sets": [
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "program_default:accessory",
+     "ceiling_rpe": 9.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "db_curl",
+     "sets": [
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "cycling",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": null,
+     "ceiling_rpe": null,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "tmpl:527DA061",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 100.0,
+   "stored_sets_over_ceiling": 15,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-10-16",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "tmpl:D04AC939",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "tmpl:2B4B7310",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "leg_press",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "leg_curl",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "calf_raise_machine",
+     "sets": [
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 7.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "cycling",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "tmpl:527DA061",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 100.0,
+   "stored_sets_over_ceiling": 5,
+   "stored_verdict": "no"
+  },
+  {
+   "date": "2026-10-18",
+   "movements": [
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "barbell_bench_press",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": null,
+       "type": "warmup"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 10.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "one_arm_db_row",
+     "sets": [
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 10.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 10.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "db_shoulder_press",
+     "sets": [
+      {
+       "rpe": 9.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 10.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 9.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "exercise_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "compound",
+     "movement_key": "lat_pulldown",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "cable_chest_fly",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "cable_tricep_pushdown",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "isolation",
+     "movement_key": "db_curl",
+     "sets": [
+      {
+       "rpe": 8.0,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      },
+      {
+       "rpe": 8.5,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "cycling",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    },
+    {
+     "basis": "routine_notes:rpe",
+     "ceiling_rpe": 8.0,
+     "matched_at_grading": true,
+     "movement_class": "unclassified",
+     "movement_key": "tmpl:527DA061",
+     "sets": [
+      {
+       "rpe": null,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "sets_pct": 100.0,
+   "stored_sets_over_ceiling": 14,
+   "stored_verdict": "no"
+  }
+ ],
+ "source": "dynamodb life-platform USER#matthew#SOURCE#hevy, DATE#2026-09-01.. (read-only query)"
+}

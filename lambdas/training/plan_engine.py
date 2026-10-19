@@ -85,6 +85,7 @@ from health import deficit_disclosures
 
 from training import (
     block_model,
+    ceiling_proposal,
     deload_word,
     disruption,
     load_progression,
@@ -745,6 +746,13 @@ def _deload_recommendation(
     return rec
 
 
+def _effort_blocks(date: str, rows: Any, catalog_movements: Any, states: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """`progression` (#5052) + `ceiling_change_proposal` (#5058, over the prescription window's stored adherence)."""
+    st = (states.get("hevy_workouts_prescription_window") or {}).get("state")
+    proposal = ceiling_proposal.for_plan(date, rows, None if st == READ_FAILED else st, catalog_movements)
+    return {"progression": load_progression.rule_summary(), "ceiling_change_proposal": proposal}
+
+
 def _steps_ramp_block(
     date: str,
     window: dict[str, Any] | None,
@@ -1089,8 +1097,8 @@ def constraint_block(
         # (steps, split, rate band, cadences) onto the charter; until then the literals
         # above still come from owner_redlines/program_structure and this is a stamp only.
         "charter_version": training_charter.charter_version(),
-        # #5052: the charter's double progression and effort limits the draft path applied, stamped with its version
-        "progression": load_progression.rule_summary(),
+        # #5052: the double progression + effort limits, stamped; #5058: the ceiling-change proposal (never auto-applied)
+        **_effort_blocks(date, hevy_workouts_prescription_window, catalog_movements, states),
         "critics": dict(_CRITICS_NOT_WIRED),
         "honesty": [
             s

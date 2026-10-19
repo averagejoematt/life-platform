@@ -39,9 +39,9 @@ The load never goes DOWN here. `apply_to_sets` only raises working sets, so the 
 subtract-only guarantee (#3927) holds; a back-off pass that runs after re-derives from the
 raised top set.
 
-THE CEILING (#5058 refines it). The charter states a band per class — compounds, and the last
-set of an isolation movement. Until #5058 assigns the owner's tier, the ceiling is the band's
-LOW end (`progression.ceiling_tier` in the charter says so): a compound is a movement whose
+THE CEILING (#5058). The charter states a band per class — compounds, and the last set of an
+isolation movement (`effort_ceilings.by_movement_class`, the ruled bands); the ceiling is
+the band's HIGH end (`progression.ceiling_tier` in the charter says so): a compound is a movement whose
 catalog entry names an `anchor_family`; anything else is an isolation movement, whose earlier
 sets read the compounds band and whose LAST working set reads the isolation band.
 
@@ -91,21 +91,23 @@ def stall_rule() -> dict[str, Any]:
 
 
 def effort_limits() -> dict[str, Any]:
-    """The ceilings this module grades against, read from `effort_ceilings`.
+    """The ceilings this module grades against, read from `effort_ceilings` through
+    `training.effort_ceilings` (#5058: `effort_ceilings.by_movement_class`, the ruled bands).
 
-    `ceiling` is the band's low end (see the module docstring), `limit` = ceiling + the
-    charter's `overage_tolerance_rpe` — the highest RPE that is NOT a breach. None when
-    the charter is unreadable: absence is absence, never a default ceiling (ADR-105)."""
-    tiers = charter_value("effort_ceilings.by_experience_tier", {}) or {}
-    tol = charter_value("effort_ceilings.overage_tolerance_rpe")
-    out: dict[str, Any] = {"tolerance_rpe": float(tol) if tol is not None else None}
-    for name, key in (("compound", "compounds_rpe"), ("last_isolation_set", "last_isolation_set_rpe")):
-        band = tiers.get(key)
-        ceiling = float(min(band)) if band else None
+    `ceiling` is the HIGH end of the class band (the charter's
+    `effort_ceilings.ceiling_is`), `limit` = ceiling + the charter's `overage_tolerance_rpe` —
+    the highest RPE that is NOT a breach. None when the charter is unreadable: absence is
+    absence, never a default ceiling (ADR-105)."""
+    from training import effort_ceilings as ec
+
+    tol = ec.tolerance_rpe(charter_value)
+    out: dict[str, Any] = {"tolerance_rpe": tol}
+    for name, key in (("compound", ec.COMPOUNDS), ("last_isolation_set", ec.LAST_ISOLATION_SET)):
+        ceiling = ec.ceiling(key, charter_value)
         out[name] = {
             "ceiling_rpe": ceiling,
-            "limit_rpe": (ceiling + out["tolerance_rpe"]) if ceiling is not None and out["tolerance_rpe"] is not None else None,
-            "source": f"effort_ceilings.by_experience_tier.{key} (low end)",
+            "limit_rpe": (ceiling + tol) if ceiling is not None and tol is not None else None,
+            "source": f"effort_ceilings.by_movement_class.{key} (high end)",
         }
     return out
 
