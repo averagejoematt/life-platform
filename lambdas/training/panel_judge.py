@@ -176,6 +176,8 @@ def judge(
     transport = call
 
     def _metered(body: dict[str, Any]) -> dict[str, Any]:
+        if transport is None:  # unreachable: bound before call_json runs; narrows the closure for mypy
+            raise RuntimeError("panel_judge: no transport bound")
         resp = transport(body)
         usage.update((resp or {}).get("usage") or {})
         return resp
