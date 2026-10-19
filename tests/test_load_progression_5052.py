@@ -60,11 +60,9 @@ def test_the_gain_rule_lives_on_the_charter_with_the_redlines_numbers():
 
 def test_effort_limits_are_read_from_the_charter_not_typed():
     lim = lp.effort_limits()
-    # #5058: the owner's experience tier picks the class bands; the ceiling is the band's HIGH end
-    tier = tc.charter_value("effort_ceilings.experience_tier.current")
-    bands = tc.charter_value(f"effort_ceilings.experience_tier.{tier}")
+    # #5058: the ruled class bands (`by_movement_class`); the ceiling is the band's HIGH end
+    bands = tc.charter_value("effort_ceilings.by_movement_class")
     tol = tc.charter_value("effort_ceilings.overage_tolerance_rpe")
-    assert lim["experience_tier"] == tier
     assert lim["compound"]["ceiling_rpe"] == max(bands["compounds_rpe"])
     assert lim["compound"]["limit_rpe"] == max(bands["compounds_rpe"]) + tol
     assert lim["last_isolation_set"]["limit_rpe"] == max(bands["last_isolation_set_rpe"]) + tol
@@ -215,7 +213,7 @@ def test_the_real_2026_10_18_session_regrades_self_raised_loads_from_no_to_progr
     """The live session, re-graded. Pre-#5052 (no progression input) it reproduces the stored verdict
     exactly — `no`, 14 sets over, five movements. Post-#5052 the three loads he raised himself under the
     charter ceiling (lat pulldown 155 -> 160, curl 25 -> 27.5, three of the row's four sets 85 -> 90) are
-    `progressed`. #5058 (the advanced tier's compounds ceiling RPE 9, +1 tolerance): the row's fourth set at
+    `progressed`. #5058 (the charter's compounds ceiling RPE 9, +1 tolerance): the row's fourth set at
     RPE 10 is now inside the limit too (progressed), and the pushdown's 8.5s over its RPE-8 note are within
     tolerance, not breaches. What stays a breach is real: the bench at its PRESCRIBED 185 logged RPE 9.5-10
     against its own RPE-8 note. So the session verdict stays `no`, on one movement."""

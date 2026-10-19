@@ -47,7 +47,7 @@ BAND_THRESHOLDS = {"green_min": 67, "yellow_min": 34}  # green 67-100, yellow 34
 # Base top-set RPE ceiling for a primary lift on a normal (yellow) day. GREEN adds
 # the bonus (the ceiling); YELLOW is base; RED subtracts to a floor. Week-position /
 # deficit / tissue caps can collapse GREEN down to base ("quality, not load").
-# #5058: both read the charter's compounds band for the owner's experience tier
+# #5058: both read the charter's ruled compounds band
 # (`training.effort_ceilings`) — YELLOW is its low end, GREEN its high end (the ceiling).
 _COMPOUNDS_BAND = effort_ceilings.class_bands()[effort_ceilings.COMPOUNDS]
 RPE_BASE_YELLOW = int(_COMPOUNDS_BAND[0])

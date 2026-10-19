@@ -150,11 +150,7 @@ def _patterns() -> Dict[str, Tuple[str, re.Pattern[str]]]:
     rotate = c["rotation"]["accessory_slots_rotate_every_weeks"]
     gate_lb = "|".join(str(n) for n in sorted(_lb_leaves(c["gated_movements"])))
     volume_bands = _ranges(c["volume_priorities"]["sets_per_wk"].values())
-    # #5058: the class bands plus every experience tier's bands (a tier's band typed anywhere is a copy too)
-    tiers = c["effort_ceilings"]["experience_tier"]
-    rpe_bands = _ranges(
-        [*c["effort_ceilings"]["by_movement_class"].values(), *(b for t in tiers.values() if isinstance(t, dict) for b in t.values())]
-    )
+    rpe_bands = _ranges(c["effort_ceilings"]["by_movement_class"].values())  # #5058: renamed from by_experience_tier
     words = {3: "three", 6: "six"}
     return {
         "steps_floor": (
@@ -220,7 +216,7 @@ def _patterns() -> Dict[str, Tuple[str, re.Pattern[str]]]:
         # RPE) assigned a band/number, or an `RPE lo–hi` range prescribed on a code line (the charter's
         # bands and any pre-charter band alike — a range IS a ceiling).
         "effort_ceiling_rpe": (
-            "effort_ceilings.experience_tier",
+            "effort_ceilings.by_movement_class",
             re.compile(
                 rf"\b(?:top|compounds?|isolation|accessor\w*|effort)\w*_rpe\w*\"?\s*[:=]\s*(?:\[\s*\d|\d)"
                 rf"|\bRPE\s*(?:{rpe_bands})\b"

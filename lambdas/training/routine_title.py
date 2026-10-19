@@ -313,7 +313,7 @@ def format_title(ir: RoutineSpec, ctx: dict[str, Any]) -> str:
 
 
 def _compound_band() -> str:
-    """'8-9' — the charter's compounds band for the owner's experience tier (#5058), or 'the charter ceiling'."""
+    """'8-9' — the charter's ruled compounds band (#5058), or 'the charter ceiling'."""
     from training import effort_ceilings
 
     band = effort_ceilings.class_bands().get(effort_ceilings.COMPOUNDS)

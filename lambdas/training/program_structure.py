@@ -541,34 +541,29 @@ HEVY_FOLDERS: dict[str, str] = {"upper": "Upper", "lower": "Lower"}
 must name the same strings (held by a test); a folder is found-or-created at the first commit
 (`ensure_folder`), never created ahead of time. v0.3's "Full Body" is `program_v03.HEVY_FOLDER`."""
 
-# #5058: every RPE here is the charter's — `effort_ceilings.experience_tier.<current>` picks the class bands
-# (`training.effort_ceilings`); the pre-charter `top_rpe` [7, 8] and the accessories' RIR are retired. A compound set
-# (top set, moderate, volume) reads the compounds band, a heavy back-off the back-off band, an accessory's earlier sets
-# the compounds band and its LAST set the last-isolation-set band. The cue names the band and the tier it came from.
+# #5058: every RPE here is the charter's — `effort_ceilings.by_movement_class` (the ruled bands, read through
+# `training.effort_ceilings`); the pre-charter `top_rpe` [7, 8] and the accessories' RIR are retired. A compound set
+# (top set, moderate, volume) reads the compounds band, an accessory's earlier sets the compounds band and its LAST set
+# the last-isolation-set band. Back-offs are prescribed by % of the top set only — the charter rules no back-off RPE.
 _EFFORT = effort_ceilings.class_bands()
-_TIER = effort_ceilings.current_tier() or "charter"
-_C, _B, _L = (
-    f"{_EFFORT[k][0]:g}–{_EFFORT[k][1]:g}"
-    for k in (effort_ceilings.COMPOUNDS, effort_ceilings.BACK_OFF, effort_ceilings.LAST_ISOLATION_SET)
-)
+_C, _L = (f"{_EFFORT[k][0]:g}–{_EFFORT[k][1]:g}" for k in (effort_ceilings.COMPOUNDS, effort_ceilings.LAST_ISOLATION_SET))
 
 EXPOSURES: dict[str, dict[str, Any]] = {
     "heavy": {
         "top_sets": 1,
         "reps": [4, 6],
         "effort": effort_ceilings.COMPOUNDS,
-        "back_off_effort": effort_ceilings.BACK_OFF,
         "back_off_sets": 2,
         "back_off_pct": -10,
         "rest_seconds": 180,
-        "cue": f"HEAVY: 1 top set of 4–6 @ RPE {_C}, then 2 back-offs at −10 % of the top set @ RPE {_B} ({_TIER}-tier ceilings).",
+        "cue": f"HEAVY: 1 top set of 4–6 @ RPE {_C}, then 2 back-offs at −10 % of the top set (charter ceilings).",
     },
     "moderate": {
         "sets": 3,
         "reps": [6, 10],
         "effort": effort_ceilings.COMPOUNDS,
         "rest_seconds": 120,
-        "cue": f"MODERATE: 3 sets of 6–10 @ RPE {_C} ({_TIER}-tier compound ceiling).",
+        "cue": f"MODERATE: 3 sets of 6–10 @ RPE {_C} (charter compound ceiling).",
     },
     # #4147 v0.4: the volume days' anchor exposure (owner: "Volume days: 8–12 reps").
     "volume": {
@@ -576,7 +571,7 @@ EXPOSURES: dict[str, dict[str, Any]] = {
         "reps": [8, 12],
         "effort": effort_ceilings.COMPOUNDS,
         "rest_seconds": 120,
-        "cue": f"VOLUME: 3 sets of 8–12 @ RPE {_C} ({_TIER}-tier compound ceiling).",
+        "cue": f"VOLUME: 3 sets of 8–12 @ RPE {_C} (charter compound ceiling).",
     },
     "accessory": {
         "sets": 2,
@@ -584,7 +579,7 @@ EXPOSURES: dict[str, dict[str, Any]] = {
         "effort": effort_ceilings.COMPOUNDS,
         "last_set_effort": effort_ceilings.LAST_ISOLATION_SET,
         "rest_seconds": 90,
-        "cue": f"ACCESSORY: 2 sets of 8–15 @ RPE {_C}; last set RPE {_L} ({_TIER}-tier ceilings).",
+        "cue": f"ACCESSORY: 2 sets of 8–15 @ RPE {_C}; last set RPE {_L} (charter ceilings).",
     },
 }
 """The rep scheme as numbers (v0.3 §3's heavy / moderate / accessory, plus v0.4's volume). The one PROSE home is `owner_redlines.REDLINES

@@ -41,7 +41,7 @@ What W1 (#5050) is expected to retire, by row:
   * docs/coaching/COACH_SESSION.md movement_gate_lb — the prompt names the charter, not
     the number;
   * owner_redlines.py / program_structure.py / routine_title.py effort_ceiling_rpe — the
-    `top_rpe` band and the `RPE 7–8` top-set prose read `effort_ceilings.experience_tier` (renamed from by_experience_tier by #5058)
+    `top_rpe` band and the `RPE 7–8` top-set prose read `effort_ceilings.by_movement_class` (renamed from by_experience_tier by #5058)
     (the charter's compounds band is 8–9; the pre-charter 7–8 is the stale value);
   * owner_redlines.py / program_structure.py volume_band_sets — the `~10 sets/muscle/wk`
     target reads `volume_priorities.sets_per_wk`;
@@ -60,9 +60,9 @@ Retired since the seed: program_structure.py anchor_block_weeks (3 lines: `ROTAT
 `SESSION_SEQUENCE.weeks_per_block` and the "6-week block" rule prose) — #5077 reads the block length from
 `rotation.anchors_fixed_weeks` through `block_model.block_weeks()`. #5058 retired effort_ceiling_rpe in
 owner_redlines.py (1: the rep-scheme prose names the charter ceilings), program_structure.py (2: `EXPOSURES.heavy.top_rpe`
-and the HEAVY cue — the cues read `effort_ceilings.experience_tier` through `training.effort_ceilings`) and two of
+and the HEAVY cue — the cues read `effort_ceilings.by_movement_class` through `training.effort_ceilings`) and two of
 routine_title.py's three (the v0.4/v1 heavy WHY lines); the one left is the superseded v0.3 full-body WHY line, history.
-The guard's key moved with the charter rename (`by_experience_tier` -> `by_movement_class` + `experience_tier`).
+The guard's key moved with the charter rename (`by_experience_tier` -> `by_movement_class`).
 Already retired at the seed: mcp/tools_health.py's 2.5 lb/wk line (3 rows on the first
 census) — #5115 (charter-w0) replaced it with a bodyweight-relative flag carrying a
 `# charter: governing_goal.rate_band` marker before this ledger was committed, so the row

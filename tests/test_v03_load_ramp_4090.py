@@ -475,7 +475,7 @@ def test_4408_the_0929_bench_is_held_at_205_not_ramped_to_60_percent_of_e1rm():
         BENCH_205_KG * (1 + 7 / 30), abs=1e-3
     )
     cue = load_ramp.render_ramp_cue(row)
-    # #5058: the slot's ceiling is the charter compounds band's high end (9 for the advanced tier; 8 before)
+    # #5058: the slot's ceiling is the charter compounds band's high end (9 since #5058; 8 before)
     assert "205 lb x 5 @ RPE 8 on 2026-09-23" in cue and f"RPE <= {load_ramp.slot_rpe_ceiling('heavy')}" in cue
     assert "never goes under an achieved load" in cue
 

@@ -157,7 +157,6 @@ def compute(
                 {
                     "movement_class": cls,
                     "charter_band": band,
-                    "experience_tier": effort_ceilings.current_tier(read),
                     "text": (
                         f"{cls} sets beat their RPE ceiling on {shares} of graded sets, {weeks} weeks running "
                         f"(charter: more than {float(share):.0%}). Proposal: rule on the {cls} band "

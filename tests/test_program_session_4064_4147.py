@@ -120,7 +120,7 @@ def test_heavy_days_are_a_top_set_plus_two_back_offs_and_volume_days_are_8_to_12
         assert heavy, role
         for e in heavy:
             assert [s["kind"] for s in e["sets"]] == ["top", "back_off", "back_off"]
-            # #5058: the top set's RPE band is the charter's compounds band for the owner's tier (7–8 before the charter)
+            # #5058: the top set's RPE band is the charter's ruled compounds band (7–8 before the charter)
             assert e["sets"][0]["reps"] == [4, 6] and e["sets"][0]["rpe"] == effort_ceilings.class_bands()[effort_ceilings.COMPOUNDS]
             assert all(s["pct_of_top"] == 90 for s in e["sets"][1:])
     for role in (UV, LV):
@@ -142,10 +142,8 @@ def test_exposure_numbers_match_the_redline_rep_scheme_prose():
     assert not any(k in spec for spec in e.values() for k in ("top_rpe", "rir"))
     bands = effort_ceilings.class_bands()
     assert {spec["effort"] for spec in e.values()} == {effort_ceilings.COMPOUNDS} and all(spec["effort"] in bands for spec in e.values())
-    assert (
-        e["accessory"]["last_set_effort"] == effort_ceilings.LAST_ISOLATION_SET
-        and e["heavy"]["back_off_effort"] == effort_ceilings.BACK_OFF
-    )
+    assert e["accessory"]["last_set_effort"] == effort_ceilings.LAST_ISOLATION_SET
+    assert "back_off_effort" not in e["heavy"]  # #5058 review: back-offs are prescribed by % of the top set only
 
 
 def test_sets_per_muscle_per_week_sit_in_the_band_and_the_aesthetic_day_lifts_delts_and_arms():

@@ -8,7 +8,7 @@ from health.adherence_calc import calculate_adherence
 from training import effort_ceilings
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set
 
-# #5058: the program-default ceilings are the charter's (the owner's experience tier picks the class bands)
+# #5058: the program-default ceilings are the charter's (`effort_ceilings.by_movement_class`)
 _COMPOUND_CEILING = effort_ceilings.ceiling(effort_ceilings.COMPOUNDS)
 _LAST_ISOLATION_CEILING = effort_ceilings.ceiling(effort_ceilings.LAST_ISOLATION_SET)
 

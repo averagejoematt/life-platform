@@ -1,9 +1,10 @@
-"""#5058 — effort ceilings by experience tier and movement class, the within-one-point tolerance, the
-ceiling-change proposal, and the replay of the 22 graded sessions.
+"""#5058 — effort ceilings by movement class, the within-one-point tolerance, the ceiling-change
+proposal, and the replay of the 22 graded sessions.
 
-The charter (`config/training_charter.json` `effort_ceilings`) states the class bands
-(`by_movement_class`) and the lifter's tier picks the bands in force (`experience_tier`). Every RPE in
-this file is read from the charter; the tolerance edge is the charter's own number, +0 and +0.5 past it.
+The charter (`config/training_charter.json` `effort_ceilings`) states ONLY the ruled class bands
+(`by_movement_class`: compounds RPE 8-9, the last isolation set RPE 9-10 — owner rulings 2026-10-18);
+no experience tier and no back-off band. Every RPE in this file is read from the charter; the
+tolerance edge is the charter's own number, +0 and +0.5 past it.
 """
 
 from __future__ import annotations
@@ -34,40 +35,49 @@ def _sets(*rpes):
     return [{"type": "normal", "rpe": r} for r in rpes]
 
 
-# ── the charter: the tier picks the class bands ──────────────────────────────────────
-def test_the_tier_picks_the_class_bands_and_the_named_classes_agree_with_the_current_tier():
+# ── the charter: the ruled class bands, nothing more ─────────────────────────────────
+def test_the_charter_states_exactly_the_ruled_bands_and_no_invented_tier():
     c = tc.load_charter()["effort_ceilings"]
     assert "by_experience_tier" not in c, "renamed to by_movement_class (#5058)"
-    tier = c["experience_tier"]["current"]
-    assert tier == "advanced"
-    # must-agree pair: the class bands the charter states ARE the current tier's class bands
-    for key, band in c["by_movement_class"].items():
-        assert c["experience_tier"][tier][key] == band, key
+    # review round 1: the owner ruled ONE band set — no experience tier, no back-off band, nothing unruled
+    assert "experience_tier" not in c and "back_off_rpe" not in json.dumps(tc.load_charter())
+    assert c["by_movement_class"] == {"compounds_rpe": [8, 9], "last_isolation_set_rpe": [9, 10]}
+    assert (c["overage_tolerance_rpe"], c["ceiling_change_proposal"]["share_of_sets"], c["ceiling_change_proposal"]["weeks_running"]) == (
+        1,
+        0.5,
+        2,
+    )
     bands = effort_ceilings.class_bands()
-    assert bands[effort_ceilings.COMPOUNDS] == [8, 9] and bands[effort_ceilings.LAST_ISOLATION_SET] == [9, 10]
-    assert bands[effort_ceilings.BACK_OFF] == [7, 8]
+    assert bands == {effort_ceilings.COMPOUNDS: [8, 9], effort_ceilings.LAST_ISOLATION_SET: [9, 10]}
     assert (COMPOUND, LAST_ISO, TOL) == (9.0, 10.0, 1.0)  # the ceiling is the band's HIGH end
     log = [e for e in tc.charter_value("change_log") if "#5058" in e["by"]]
-    assert len(log) == 1 and "by_movement_class" in log[0]["what"]
+    assert len(log) == 1 and "by_movement_class" in log[0]["what"] and "tier" not in log[0]["by"]
 
 
-def test_a_different_tier_moves_every_reader_without_a_typed_number():
+def test_a_different_ruled_band_moves_every_reader_without_a_typed_number():
     real = tc.charter_value
 
-    def intermediate(path, default=None):
-        return "intermediate" if path == "effort_ceilings.experience_tier.current" else real(path, default)
+    def moved(path, default=None):
+        if path == "effort_ceilings.by_movement_class":
+            return {"compounds_rpe": [7, 8], "last_isolation_set_rpe": [8, 9]}
+        return real(path, default)
 
-    bands = effort_ceilings.class_bands(intermediate)
-    want = real("effort_ceilings.experience_tier.intermediate")
-    assert bands[effort_ceilings.COMPOUNDS] == want["compounds_rpe"] and bands[effort_ceilings.COMPOUNDS] != [8, 9]
-    assert effort_ceilings.ceiling(effort_ceilings.COMPOUNDS, intermediate) == max(want["compounds_rpe"])
+    bands = effort_ceilings.class_bands(moved)
+    assert bands[effort_ceilings.COMPOUNDS] == [7, 8] and effort_ceilings.ceiling(effort_ceilings.COMPOUNDS, moved) == 8.0
 
 
-def test_load_progression_reads_the_tier_not_the_low_end():
+def test_load_progression_reads_the_high_end_not_the_low_end():
     lim = load_progression.effort_limits()
-    assert lim["experience_tier"] == "advanced"
+    assert "experience_tier" not in lim
     assert lim["compound"]["ceiling_rpe"] == COMPOUND and lim["compound"]["limit_rpe"] == COMPOUND + TOL
     assert lim["last_isolation_set"]["ceiling_rpe"] == LAST_ISO
+
+
+def test_a_compound_set_can_never_breach_at_the_ruled_ceiling_and_tolerance():
+    """The owner's ruling read literally: ceiling 9 (top of 8-9) + 1 = 10, the top of the RPE scale, so
+    `progression.self_raised_load.above_the_ceiling` cannot trigger for a compound. Stated, not hidden."""
+    g = grade_sets(COMPOUND, _sets(8, 9, 9.5, 10), tolerance_rpe=TOL)
+    assert g["sets_over_ceiling"] == 0 and COMPOUND + TOL >= 10
 
 
 def test_an_unreadable_charter_names_no_ceiling():
@@ -79,10 +89,10 @@ def test_an_unreadable_charter_names_no_ceiling():
 def test_each_class_cue_names_its_charter_band_and_reads_back_as_its_ceiling():
     e = program_structure.EXPOSURES
     lo, hi = effort_ceilings.class_bands()[effort_ceilings.COMPOUNDS]
-    blo, bhi = effort_ceilings.class_bands()[effort_ceilings.BACK_OFF]
     llo, lhi = effort_ceilings.class_bands()[effort_ceilings.LAST_ISOLATION_SET]
-    # compound top set 8-9, back-offs 7-8 (the rep scheme's -10 %)
-    assert f"top set of 4–6 @ RPE {lo:g}–{hi:g}" in e["heavy"]["cue"] and f"@ RPE {blo:g}–{bhi:g}" in e["heavy"]["cue"]
+    # compound top set 8-9; back-offs by % of the top set ONLY — no back-off RPE (review round 1: none was ruled)
+    assert f"top set of 4–6 @ RPE {lo:g}–{hi:g}" in e["heavy"]["cue"] and e["heavy"]["cue"].count("RPE") == 1
+    assert "back-offs at −10 % of the top set" in e["heavy"]["cue"]
     assert resolve_ceiling("squat_barbell", e["heavy"]["cue"]) == {"rpe": COMPOUND, "basis": "exercise_notes:rpe"}
     for intensity in ("moderate", "volume"):
         assert f"@ RPE {lo:g}–{hi:g}" in e[intensity]["cue"]
@@ -92,7 +102,9 @@ def test_each_class_cue_names_its_charter_band_and_reads_back_as_its_ceiling():
     assert f"last set RPE {llo:g}–{lhi:g}" in e["accessory"]["cue"]
     assert acc == {"rpe": COMPOUND, "basis": "exercise_notes:rpe", "last_set_rpe": LAST_ISO}
     for spec in e.values():
-        assert len(spec["cue"]) <= 150 and "tier" in spec["cue"], spec["cue"]  # short, and it says where the number came from
+        assert len(spec["cue"]) <= 150 and "charter" in spec["cue"] and "tier" not in spec["cue"], spec[
+            "cue"
+        ]  # short, and it says where the number came from
     # the heavy top set's own `rpe` field is the band too
     rx = program_structure.session_prescription_for_role("upper_heavy")
     top = next(x for x in rx["exposures"] if x["intensity"] == "heavy")["sets"][0]
@@ -154,7 +166,7 @@ def test_the_proposal_fires_when_more_than_half_the_sets_beat_the_ceiling_two_we
     out = ceiling_proposal.compute(rows, "2026-10-18")
     assert out["state"] == "proposed" and out["auto_applied"] is False and "owner ruling" in out["applies"]
     (p,) = out["proposals"]
-    assert p["movement_class"] == "compound" and p["charter_band"] == [8, 9] and p["experience_tier"] == "advanced"
+    assert p["movement_class"] == "compound" and p["charter_band"] == [8, 9] and "experience_tier" not in p
     assert "70% and 60%" in p["text"] and "Nothing changes until you rule" in p["text"]
     assert out["charter_version"] == tc.charter_version()
 
@@ -196,7 +208,7 @@ def test_the_plan_carries_the_proposal_and_an_unread_window_is_unknown():
     common = dict(date="2026-10-19", catalog_movements={})
     unread = plan_engine.constraint_block(**common)
     assert unread["ceiling_change_proposal"]["state"] == "unknown" and unread["ceiling_change_proposal"]["auto_applied"] is False
-    assert unread["progression"]["effort_limits"]["experience_tier"] == "advanced"
+    assert unread["progression"]["effort_limits"]["compound"]["ceiling_rpe"] == COMPOUND
     read = plan_engine.constraint_block(**common, hevy_workouts_prescription_window=[_row("2026-10-16", 10, 6), _row("2026-10-09", 10, 7)])
     assert read["ceiling_change_proposal"]["state"] == "proposed"
 
@@ -212,7 +224,7 @@ def _replay(mode: str) -> list[tuple[str, dict]]:
                 g = grade_sets(m["ceiling_rpe"], m["sets"])
             elif mode == "tolerance":  # the same prescriptions, the charter's +1
                 g = grade_sets(m["ceiling_rpe"], m["sets"], tolerance_rpe=TOL)
-            else:  # what the generator writes now: the tier's class ceilings + the tolerance
+            else:  # what the generator writes now: the charter's class ceilings + the tolerance
                 last = LAST_ISO if m["movement_class"] == "isolation" else None
                 g = grade_sets(COMPOUND if m["ceiling_rpe"] is not None else None, m["sets"], tolerance_rpe=TOL, last_set_ceiling=last)
             g["basis"] = m["basis"]
@@ -237,7 +249,7 @@ def test_the_replay_fixture_reproduces_every_stored_verdict_before_5058():
 def test_the_replay_as_prescribed_rate_before_and_after():
     """Before: 2 of 22 as prescribed, 129 breach sets of 383 graded. The charter's +1 on the SAME
     prescriptions: 8 of 22, 29 breaches (the 100 sets within one point are within_tolerance). At the
-    tier's class ceilings (what the generator now writes): 16 of 22 — the six that are not `yes` fail on
+    charter's class ceilings (what the generator now writes): 16 of 22 — the six that are not `yes` fail on
     SET COMPLETION (five) or an unlogged RPE on a movement with its own ceiling (one), never on effort."""
     rates = {mode: sum(r["verdict"] == "yes" for _s, r in _replay(mode)) for mode in ("before", "tolerance", "charter")}
     assert rates == {"before": 2, "tolerance": 8, "charter": 16}
@@ -248,8 +260,22 @@ def test_the_replay_as_prescribed_rate_before_and_after():
             assert s["sets_pct"] < 100.0 or r["verdict"] == "unknown", (s["date"], r)
 
 
-def test_the_replay_never_loses_a_breach_past_the_tolerance():
-    """No session that had a set more than +1 over its own ceiling reads `yes` with the tolerance applied."""
-    for (s, before), (_s, after) in zip(_replay("before"), _replay("tolerance")):
-        if after["verdict"] == "yes":
-            assert before["max_overage"] is None or before["max_overage"] <= TOL, s["date"]
+def test_the_replay_breaches_are_exactly_the_sets_past_ceiling_plus_tolerance_counted_off_the_raw_sets():
+    """Independent of the grader: count straight off the fixture's raw working sets (warm-ups out) the sets
+    above their own stored ceiling + the charter tolerance, and the ones above it but within the tolerance.
+    The grader's tolerance-mode totals must equal those counts — a grader that dropped or invented a
+    breach would differ."""
+    fx = json.loads(_FIXTURE.read_text(encoding="utf-8"))
+    pairs = [
+        (float(m["ceiling_rpe"]), float(st["rpe"]))
+        for s in fx["sessions"]
+        for m in s["movements"]
+        if m["ceiling_rpe"] is not None
+        for st in m["sets"]
+        if st.get("type") != "warmup" and st.get("rpe") is not None
+    ]
+    past = sum(r > c + TOL for c, r in pairs)
+    within = sum(c < r <= c + TOL for c, r in pairs)
+    graded = _replay("tolerance")
+    assert sum(r["sets_over_ceiling"] for _s, r in graded) == past == 29
+    assert sum(r["sets_within_tolerance"] for _s, r in graded) == within == 100

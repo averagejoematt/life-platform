@@ -33,8 +33,8 @@
     {
       "version": "1.4.0",
       "date": "2026-10-19",
-      "by": "the elite-panel training review 2026-10-18 (#5058: compounds RPE 8-9, the last isolation set 9-10, within +1 is not a breach)",
-      "what": "Renames effort_ceilings.by_experience_tier to by_movement_class (it always held MOVEMENT-CLASS bands) and adds effort_ceilings.experience_tier: the lifter's tier (current: advanced) picks the class bands, including the back-off band off a heavy top set (one point under the top set, the rep scheme's -10 % back-off). The intermediate bands are the platform's placement one point lower and are not in force. progression.ceiling_tier now reads the HIGH end of the current tier's band.",
+      "by": "owner rulings 2026-10-18 on #5058 (the elite-panel training review): compounds RPE 8-9; the last isolation set RPE 9-10; an overage within +1 RPE is not a breach; a ceiling beaten on more than 50% of sets two weeks running PROPOSES a change, which the owner applies",
+      "what": "Renames effort_ceilings.by_experience_tier to by_movement_class (it always held the two movement-class bands, not tiers) holding exactly the ruled bands, and states that a set is graded against the HIGH end of its class band (effort_ceilings.ceiling_is; progression.ceiling_tier read the low end until #5058). The tolerance and the proposal rule are the ruled ones, unchanged in value.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -138,13 +138,7 @@
       "compounds_rpe": [8, 9],
       "last_isolation_set_rpe": [9, 10]
     },
-    "experience_tier": {
-      "current": "advanced",
-      "ceiling_is": "the high end of the current tier's band for the set's class: the band is the prescription, its top is the ceiling a set is graded against",
-      "classes": "a compound is a movement whose catalog entry names an anchor_family (or an anchor title); anything else is an isolation movement, whose earlier sets read the compounds band and whose LAST working set reads the last_isolation_set band; a back-off set off a heavy top set reads back_off_rpe",
-      "advanced": {"compounds_rpe": [8, 9], "last_isolation_set_rpe": [9, 10], "back_off_rpe": [7, 8]},
-      "intermediate": {"compounds_rpe": [7, 8], "last_isolation_set_rpe": [8, 9], "back_off_rpe": [6, 7]}
-    },
+    "ceiling_is": "the high end of the set's class band: the band is the prescription, its top is the ceiling a set is graded against",
     "overage_tolerance_rpe": 1,
     "overage_rule": "within +1 RPE of the ceiling is not a breach",
     "ceiling_change_proposal": {
@@ -181,8 +175,8 @@
       "above_the_ceiling": "a raised load logged above the ceiling plus the tolerance is a breach and never becomes a floor"
     },
     "ceiling_tier": {
-      "compounds": "the high end of `effort_ceilings.experience_tier.<current>.compounds_rpe` (#5058 assigned the tier: `experience_tier.current`)",
-      "last_isolation_set": "the high end of `effort_ceilings.experience_tier.<current>.last_isolation_set_rpe`; an isolation movement's earlier sets read the compounds band",
+      "compounds": "the high end of `effort_ceilings.by_movement_class.compounds_rpe` (`effort_ceilings.ceiling_is`, #5058)",
+      "last_isolation_set": "the high end of `effort_ceilings.by_movement_class.last_isolation_set_rpe`; an isolation movement's earlier sets read the compounds band",
       "refs": "#5058"
     }
   },

@@ -32,7 +32,7 @@ subtract-only guarantee (#3927) holds; a back-off pass that runs after re-derive
 raised top set.
 
 THE CEILING (#5058). The charter states a band per class — compounds, and the last set of an
-isolation movement — and the owner's experience tier picks the bands in force; the ceiling is
+isolation movement (`effort_ceilings.by_movement_class`, the ruled bands); the ceiling is
 the band's HIGH end (`progression.ceiling_tier` in the charter says so): a compound is a movement whose
 catalog entry names an `anchor_family`; anything else is an isolation movement, whose earlier
 sets read the compounds band and whose LAST working set reads the isolation band.
@@ -74,23 +74,22 @@ def gain_rule() -> dict[str, Any]:
 
 def effort_limits() -> dict[str, Any]:
     """The ceilings this module grades against, read from `effort_ceilings` through
-    `training.effort_ceilings` (#5058: the owner's experience tier picks the class bands).
+    `training.effort_ceilings` (#5058: `effort_ceilings.by_movement_class`, the ruled bands).
 
-    `ceiling` is the HIGH end of the current tier's band (the charter's
-    `experience_tier.ceiling_is`), `limit` = ceiling + the charter's `overage_tolerance_rpe` —
+    `ceiling` is the HIGH end of the class band (the charter's
+    `effort_ceilings.ceiling_is`), `limit` = ceiling + the charter's `overage_tolerance_rpe` —
     the highest RPE that is NOT a breach. None when the charter is unreadable: absence is
     absence, never a default ceiling (ADR-105)."""
     from training import effort_ceilings as ec
 
     tol = ec.tolerance_rpe(charter_value)
-    tier = ec.current_tier(charter_value)
-    out: dict[str, Any] = {"tolerance_rpe": tol, "experience_tier": tier}
+    out: dict[str, Any] = {"tolerance_rpe": tol}
     for name, key in (("compound", ec.COMPOUNDS), ("last_isolation_set", ec.LAST_ISOLATION_SET)):
         ceiling = ec.ceiling(key, charter_value)
         out[name] = {
             "ceiling_rpe": ceiling,
             "limit_rpe": (ceiling + tol) if ceiling is not None and tol is not None else None,
-            "source": f"effort_ceilings.experience_tier.{tier}.{key} (high end)",
+            "source": f"effort_ceilings.by_movement_class.{key} (high end)",
         }
     return out
 

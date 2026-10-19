@@ -61,8 +61,8 @@ made `grade_sets` report `status: "unprescribed"` and drop the movement out of t
 intensity denominator entirely — so an isolation accessory logged at RPE 9.5 (to-failure
 territory) still read a clean `as_prescribed` verdict, because nothing was ever compared.
 The program itself already names a ceiling for every movement CLASS even when a specific
-session's notes don't repeat it — since #5058 the charter's (`effort_ceilings`, the owner's
-experience tier picks the class bands, read through `training.effort_ceilings`): an anchor
+session's notes don't repeat it — since #5058 the charter's (`effort_ceilings.by_movement_class`, the ruled bands,
+read through `training.effort_ceilings`): an anchor
 pattern reads the compounds band's ceiling, an accessory its earlier sets at the compounds
 ceiling and its LAST set at the last-isolation-set ceiling. `_program_default_ceiling` applies that class-level default
 ONLY when the routine's own prescription is silent (`resolve_ceiling` returned `rpe: None`)
@@ -230,8 +230,8 @@ def canonical_template_ids() -> dict[str, str]:
 
 
 # ── program-default intensity ceiling (#4073; the charter's since #5058) ──────
-# Read through `training.effort_ceilings` at call time, never a module literal — the owner's
-# experience tier picks the class bands, so a tier change moves the default with it.
+# Read through `training.effort_ceilings` at call time, never a module literal — a ruled
+# band change in the charter moves the default with it.
 
 
 def _catalog_entry_for(movement_key: str, catalog: dict[str, Any]) -> dict[str, Any]:
