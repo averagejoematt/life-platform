@@ -908,10 +908,9 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
     routine_id = args.get("routine_id")
     if not routine_id:
         return mcp_error("dry_run requires routine_id", error_code="MISSING_ARG")
-    from training.hevy_compiler import to_create_body
-    from training.routine_repo import get_current
+    from training import hevy_compiler, hevy_render, routine_repo
 
-    ir = get_current(routine_id)
+    ir = routine_repo.get_current(routine_id)
     if not ir:
         return mcp_error(f"routine_id={routine_id} not found", error_code="NOT_FOUND")
     # Preview the title the way commit will actually render it (the compiler
@@ -921,7 +920,7 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
     # #3938: the critics' block already rides on ir.exercises[0].notes (placed at plan time); the
     # compiler puts the WHY line ahead of it there. Composing the block into `why` again would
     # stack it twice on the one channel that lands.
-    body = to_create_body(ir, _make_resolver(), title_context=title_ctx, why_note=why)
+    body = hevy_compiler.to_create_body(ir, _make_resolver(), title_context=title_ctx, why_note=why)
     out = {
         "status": "preview",
         "routine_id": routine_id,
@@ -931,6 +930,7 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
         # #3971 box 1 — dry_run REPORTS what commit will refuse on: the derived load
         # floors and every find_conditional_up hit, before anything reaches Hevy.
         "prescription_audit": prescription_gate(ir),
+        "render_check": hevy_render.render_check(body, session_note=why),  # #5083: each charter field and where Hevy shows it
     }
     # Recovery-adaptive preflight (brief §6.5): show the inputs_current_through line +
     # the per-lift branch blocks Matthew eyeballs in 30s, so he sleeps trusting it.
