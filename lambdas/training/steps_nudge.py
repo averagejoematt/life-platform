@@ -17,6 +17,10 @@ THE PACE LINE (derived, stated on every verdict as `formula`)
                 x ASSUMED_CADENCE_SPM — the charter rule `steps.gym_cardio_minutes_count_toward_movement`. A treadmill
                 walk may ALSO register on the wrist, so this can over-count; that only ever withholds a nudge.
     BEHIND = effective_steps < pace (strictly: exactly on the line is not behind).
+AS-OF TIME: the count is only as fresh as its winning row (Whoop is pulled a few times a day, so at 19:10 PT the row
+    can be 2-3 h old). The pace line is therefore evaluated at the row's own as-of time (`steps_as_of_pt`, its
+    `ingested_at`, clamped to now), and the copy states that time — a stale count is never compared with a live
+    pace line (ADR-104). No as-of time, or a reading older than MAX_READING_AGE_MIN, WITHHOLDS the nudge.
 The walk is sized to close the gap to TODAY'S TARGET, not the pace line: gap / cadence minutes, rounded up to 5.
 
 NOT SENT: an off day (no loaded session), ahead of / on pace, no steps reading (never a nudge built on nothing,
@@ -42,12 +46,13 @@ WINDOW_START_HOUR_PT = 19
 WINDOW_END_HOUR_PT = 21
 BUDGET_SILENCE_TIER = 2  # = coach_nudge_engine.BUDGET_SILENCE_TIER (pinned by the tests)
 ROUND_WALK_MIN = 5
+MAX_READING_AGE_MIN = 240  # a steps reading older than this at tick time is withheld, never compared with the pace line
 KEY_PREFIX = "STEPS_NUDGE#"
 
 FORMULA = (
     "pace = today_target x clamp((now - day_start) / (22:00 PT - day_start), 0, 1); day_start = the earlier of 06:00 PT "
     "and the first Hevy session start; effective = measured steps + gym cardio minutes x 100 steps/min; "
-    "behind = effective < pace (strictly)"
+    "behind = effective < pace (strictly); pace is evaluated at the steps reading's own as-of time"
 )
 
 
@@ -105,8 +110,8 @@ def copy(verdict: Mapping[str, Any]) -> str:
     gap = int(verdict["gap_to_target"])
     mins = int(verdict["walk_minutes"])
     return (
-        f"Steps are at {int(verdict['effective_steps']):,} against a pace of {int(verdict['pace']):,} by now "
-        f"(today's target {int(verdict['today_target']):,}). A {mins}-min walk after dinner closes about "
+        f"Steps were at {int(verdict['effective_steps']):,} as of {verdict['as_of_label']} against a pace of "
+        f"{int(verdict['pace']):,} by then (today's target {int(verdict['today_target']):,}). A {mins}-min walk after dinner closes about "
         f"{min(gap, mins * CADENCE_SPM):,} steps. Fine to skip; this is just where the day stands."
     )
 
@@ -121,6 +126,7 @@ def decide(
     already_sent: bool,
     budget_tier: int,
     first_session_pt: Optional[datetime] = None,
+    steps_as_of_pt: Optional[datetime] = None,
 ) -> dict[str, Any]:
     """One verdict: `send` plus the reason it did or did not, with every number that decided it."""
     out: dict[str, Any] = {
@@ -146,15 +152,24 @@ def decide(
         return {**out, "reason": "no_target"}
     if steps is None:
         return {**out, "reason": "no_steps_reading", "today_target": int(target)}
+    if steps_as_of_pt is None:
+        return {**out, "reason": "no_reading_time", "today_target": int(target)}
+    as_of = min(steps_as_of_pt, now_pt)
+    age_min = (now_pt - as_of).total_seconds() / 60.0
+    if age_min > MAX_READING_AGE_MIN or as_of.date() != now_pt.date():
+        return {**out, "reason": "reading_too_old", "today_target": int(target), "reading_age_min": int(age_min)}
     cardio = gym_cardio(hevy_rows)
     effective = int(steps) + cardio["steps_equivalent"]
-    line = pace(int(target), now_pt, first_session_pt)
+    line = pace(int(target), as_of, first_session_pt)
     out.update(
         today_target=int(target),
         steps=int(steps),
         gym_cardio=cardio,
         effective_steps=effective,
         pace=line,
+        as_of=as_of.isoformat(),
+        as_of_label=as_of.strftime("%-I:%M %p"),
+        reading_age_min=int(age_min),
         gap_to_target=max(0, int(target) - effective),
     )
     if effective >= line:

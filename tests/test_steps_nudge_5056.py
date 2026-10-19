@@ -25,7 +25,9 @@ PACE = 9875  # 12000 x (19:10 - 06:00) / (22:00 - 06:00) = 12000 x 790/960
 
 
 def decide(steps, hevy=LIFT, **kw):
-    args = dict(date=DATE, now_pt=NOW, ramp=RAMP, steps_day={"steps": steps}, hevy_rows=hevy, already_sent=False, budget_tier=0)
+    args = dict(
+        date=DATE, now_pt=NOW, ramp=RAMP, steps_day={"steps": steps}, hevy_rows=hevy, already_sent=False, budget_tier=0, steps_as_of_pt=NOW
+    )
     args.update(kw)
     return sn.decide(**args)
 
@@ -101,6 +103,9 @@ def test_plan_engine_ramp_block_carries_the_line():
     assert out["state"] == "unknown" and "steps_target_line" not in out  # unread -> stated, no line built on nothing
 
 
+NOW_UTC = datetime(2026, 10, 21, 2, 10, tzinfo=timezone.utc)  # 19:10 PDT on 2026-10-20
+
+
 # ── the runner: idempotency, claim before send, eval stamp ────────────────────────────────────────────────────
 class FakeTable:
     def __init__(self):
@@ -125,14 +130,22 @@ class FakeTable:
 @pytest.fixture
 def wired(monkeypatch):
     t = FakeTable()
-    state = {"steps": 7000, "hevy": LIFT}
-    monkeypatch.setattr(runner, "make_fetch", lambda table, user="matthew": lambda s, a, b: state["hevy"] if s == "hevy" else [])
+    state = {"steps": 7000, "hevy": LIFT, "ingested_at": NOW_UTC.isoformat()}
+
+    def whoop_row():  # the wire: a real Whoop DATE# day row with an OPEN vendor cycle (#5002), stamped by the framework
+        row = {"pk": "USER#matthew#SOURCE#whoop", "sk": "DATE#2026-10-20", "date": "2026-10-20", "cycle_start": "2026-10-20T13:00:00Z"}
+        if state["steps"] is not None:
+            row["step_count"] = state["steps"]
+        if state["ingested_at"]:
+            row["ingested_at"] = state["ingested_at"]
+        return [row]
+
+    def fake_make_fetch(table, user="matthew"):
+        return lambda s, a, b: state["hevy"] if s == "hevy" else (whoop_row() if s == "whoop" else [])
+
+    monkeypatch.setattr(runner, "make_fetch", fake_make_fetch)
     monkeypatch.setattr(runner, "read_ramp", lambda table, date, user="matthew": RAMP)
-    monkeypatch.setattr(runner.steps_resolver, "daily_steps", lambda date, fetch, derived=False: {"steps": state["steps"]})
     return t, state
-
-
-NOW_UTC = datetime(2026, 10, 21, 2, 10, tzinfo=timezone.utc)  # 19:10 PDT on 2026-10-20
 
 
 def test_runner_sends_once_per_day(wired):
@@ -231,3 +244,24 @@ def test_brief_line_is_failsoft_and_states_the_floor(monkeypatch):
 
     monkeypatch.setattr(runner, "read_ramp", boom)
     assert brief_lines.steps_line(object(), DATE, logging.getLogger()) is None
+
+
+# ── the as-of time: a stale reading is never compared with a live pace line (ADR-104) ─────────────────────
+def test_stale_whoop_reading_is_paced_at_its_own_time_not_the_tick(wired):
+    t, state = wired
+    # Whoop pulled at 17:00 PT (2h10m before the 19:10 tick) with 9,000 steps: on pace AT 17:00 (8,250), though a live
+    # 19:10 line (9,875) would have called it behind and sent a false nudge.
+    state["steps"], state["ingested_at"] = 9000, datetime(2026, 10, 21, 0, 0, tzinfo=timezone.utc).isoformat()
+    sent = []
+    assert runner.run(t, sent.append, NOW_UTC, 0)["reason"] == "ahead_of_pace" and not sent
+    state["steps"] = 8000  # genuinely behind the 17:00 line
+    out = runner.run(t, sent.append, NOW_UTC, 0)
+    assert out["send"] and "as of 5:00 PM" in sent[0] and "8,250" in sent[0]
+
+
+def test_reading_older_than_the_bound_or_unstamped_is_withheld(wired):
+    t, state = wired
+    state["ingested_at"] = datetime(2026, 10, 20, 21, 0, tzinfo=timezone.utc).isoformat()  # 14:00 PT, 5h10m old
+    assert runner.run(t, lambda s: None, NOW_UTC, 0)["reason"] == "reading_too_old"
+    state["ingested_at"] = None
+    assert runner.run(t, lambda s: None, NOW_UTC, 0)["reason"] == "no_reading_time"

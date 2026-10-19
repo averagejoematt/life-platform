@@ -1465,7 +1465,9 @@ def _get_movement_score(args):
     """Daily movement & NEAT analysis."""
     end_date = args.get("end_date", pacific_today())
     start_date = args.get("start_date", (pacific_now() - timedelta(days=30)).strftime("%Y-%m-%d"))
-    step_target = args.get("step_target") or int(charter_value("steps.floor", 12000))  # #5056: the charter floor, not a hand copy
+    step_target = args.get("step_target") or int(
+        charter_value("steps.floor")
+    )  # #5056: the charter floor, no literal fallback (the charter ships in the bundle)
 
     # DI-1.2: Hevy is the primary "did he train" signal. A step count must never, on
     # its own, drive a sedentary conclusion — has_workout is true if a normalized workout

@@ -31,6 +31,7 @@ logger = logging.getLogger()
 LEDGER_PK = "COACH#steps_nudge"
 EVAL_PREFIX = "EVAL#"
 CHANNEL = "email"
+AS_OF_FIELDS = ("ingested_at", "fetched_at", "webhook_ingested_at")  # the writers' own stamps, in precedence order
 
 
 def _pk(source: str, user: str) -> str:
@@ -82,6 +83,20 @@ def _first_session_pt(hevy_rows: list) -> Optional[datetime]:
     starts = [parse_iso_utc(str(w.get("start_time"))) for w in hevy_rows if w.get("start_time")]
     starts = [s for s in starts if s is not None]
     return min(starts).astimezone(PACIFIC) if starts else None
+
+
+def _steps_as_of_pt(date: str, resolution: dict, fetch) -> Optional[datetime]:
+    """When the winning steps row was written (`ingested_at`, else a sibling stamp), Pacific; None when unknown."""
+    winner = resolution.get("winner")
+    if not winner:
+        return None
+    rows = steps_resolver._day_rows(fetch(winner, date, date)).get(date, [])
+    row = steps_resolver._measured_day_row(rows) or {}
+    for field in AS_OF_FIELDS:
+        parsed = parse_iso_utc(str(row[field])) if row.get(field) else None
+        if parsed is not None:
+            return parsed.astimezone(PACIFIC)
+    return None
 
 
 def _claim(table, date: str, verdict: dict, now_utc: datetime) -> bool:
@@ -147,15 +162,17 @@ def run(table, send: Callable[[str], None], now_utc: datetime, budget_tier: int,
         fetch = make_fetch(table, user)
         hevy_rows = fetch("hevy", date, date)
         sent = bool(table.get_item(Key={"pk": LEDGER_PK, "sk": steps_nudge.idempotency_key(date)}).get("Item"))
+        resolution = steps_resolver.daily_steps(date, fetch=fetch, derived=False)
         verdict = steps_nudge.decide(
             date=date,
             now_pt=now_pt,
             ramp=read_ramp(table, date, user) if not sent else None,
-            steps_day=steps_resolver.daily_steps(date, fetch=fetch, derived=False),
+            steps_day=resolution,
             hevy_rows=hevy_rows,
             already_sent=sent,
             budget_tier=budget_tier,
             first_session_pt=_first_session_pt(hevy_rows),
+            steps_as_of_pt=_steps_as_of_pt(date, resolution, fetch),
         )
     except Exception as e:  # noqa: BLE001
         logger.error("[steps-nudge] evaluation failed: %s", e)
