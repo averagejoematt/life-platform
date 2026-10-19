@@ -20,8 +20,10 @@ THE ORDERING RULE (so a reason line is never the part a cut lands on):
   2. Each exercise's OWN note opens with its prescription line: the progression / stall-step
      reason (`routine_generator._progress_block`, `draft_custom_session.attach_step_due`), the
      cardio dose line (`cardio_note` line 1), the minimum-session cue (`disruption._cue`).
-  3. History cues, the warm-up clause, the branch menu (`hevy_compiler._place_routine_note`) and
-     the critics' block (`tools_plan._place_block_on_first_exercise`) come after.
+  3. History cues, the warm-up clause, the wake-recovery session block (`place_after_prescription`,
+     called by `tools_hevy_routine._apply_recovery_adaptation`), the branch menu
+     (`hevy_compiler._place_routine_note`) and the critics' block
+     (`tools_plan._place_block_on_first_exercise`) come after.
 
 VISIBLE_NOTE_CHARS is evidence, not a contract: the owner observed Hevy showing ~150 characters
 of an exercise note (#4070, `mcp/tools_plan.HEVY_NOTE_OBSERVED_VISIBLE_CHARS`, a must-agree
@@ -40,7 +42,7 @@ from training.cardio_note import LINE1_RE
 from training.hevy_note_types import PINNED_ROUTINE_NOTE_FIELD
 from training.warmup_sets import is_warmup
 
-RENDER_TABLE_VERSION = "hevy-render@1.0.0"
+RENDER_TABLE_VERSION = "hevy-render@1.1.0"
 
 # The owner-observed visible window of a Hevy note (#4070). Sizes the report; never a truncation.
 VISIBLE_NOTE_CHARS = 150
@@ -189,9 +191,12 @@ RENDER_TABLE: tuple[dict[str, str], ...] = (
 
 FIELDS = tuple(r["field"] for r in RENDER_TABLE)
 
-# The producers' own grammars (their lead words), so a field is found by what wrote it.
-_PROGRESSION_RE = re.compile(r"^(?:\+\d+(?:\.\d+)? lb to \d|\+\d+ reps? to \d|hold\b|floor \d|re-entry:)")
-_STALL_RE = re.compile(r"^(?:Step due: )?\+\d+(?:\.\d+)? (?:lb|reps?) to .*self-reported RPE")
+# The producers' own grammars (their lead words), so a field is found by what wrote it. A reason
+# starts a line or a sentence, and it is SEARCHED for anywhere in the note: a reason buried behind
+# another block is reported `not_leading` / `beyond_window`, never `absent` (#5083 review).
+_LEAD = r"(?:^|(?<=\. ))"
+_PROGRESSION_RE = re.compile(_LEAD + r"(?:\+\d+(?:\.\d+)? lb to \d|\+\d+ reps? to \d|hold(?::| \d)|floor \d|re-entry:)", re.M)
+_STALL_RE = re.compile(_LEAD + r"(?:Step due: )?\+\d+(?:\.\d+)? (?:lb|reps?) to [^\n]*self-reported RPE", re.M)
 _RPE_RE = re.compile(r"\bRPE \d")
 _MINIMUM_PREFIX = "Minimum:"  # disruption._cue's lead word
 
@@ -209,8 +214,58 @@ def _own_note(i: int, note: str, session: str) -> tuple[str, int]:
     return note, 0
 
 
-def _hit(where: str, offset: int) -> dict[str, Any]:
-    return {"where": where, "offset": offset, "in_window": offset < VISIBLE_NOTE_CHARS}
+def _hit(where: str, offset: int, leads: bool = True) -> dict[str, Any]:
+    return {"where": where, "offset": offset, "in_window": offset < VISIBLE_NOTE_CHARS, "leads": leads}
+
+
+def _reason_field(text: str) -> str:
+    return "stall_step" if _STALL_RE.match(text) else "progression_reason"
+
+
+def _leads_with_prescription(line: str) -> bool:
+    """Does this line open with a prescription line (a progression / stall reason, a cardio dose, a minimum cue)?"""
+    return bool(_STALL_RE.match(line) or _PROGRESSION_RE.match(line) or LINE1_RE.match(line) or line.startswith(_MINIMUM_PREFIX))
+
+
+def place_after_prescription(note: str | None, block: str) -> str:
+    """The ordering rule for a session block a draft pass adds to exercise 0 (the recovery menu, #3938):
+    it goes AFTER the exercise's own prescription line, never ahead of it, so the reason stays in the
+    visible window. A note that opens with no prescription line takes the block at its head, as before."""
+    note = (note or "").strip()
+    first, _, rest = note.partition("\n")
+    if _leads_with_prescription(first):
+        return "\n\n".join(p for p in (first, block, rest.strip()) if p)
+    return "\n\n".join(p for p in (block, note) if p).strip()
+
+
+def expected_reasons(ir: Any) -> list[dict[str, str]]:
+    """The reason lines the IR says MUST reach the wire, so 'expected but not found' is a problem, not
+    `absent`: every generator progression that changed a set (`inputs_snapshot.load_floors`, #5052) and
+    every chat-draft step authored below the stall step (`inputs_snapshot.step_due`, #5057)."""
+    snap = getattr(ir, "inputs_snapshot", None) or {}
+    out: list[dict[str, str]] = []
+    for key, mv in ((snap.get("load_floors") or {}).get("movements") or {}).items():
+        prog = (mv or {}).get("progression") or {}
+        if prog.get("changes") and prog.get("reason"):
+            out.append({"field": _reason_field(prog["reason"]), "movement_key": key, "text": prog["reason"]})
+    for row in snap.get("step_due") if isinstance(snap.get("step_due"), list) else []:
+        if not row.get("carried") and row.get("reason"):
+            out.append({"field": "stall_step", "movement_key": str(row.get("movement_key")), "text": f"Step due: {row['reason']}"})
+    return out
+
+
+def _reason_hits(where: str, own: str, base: int) -> dict[str, list[dict[str, Any]]]:
+    """Every progression / stall reason in the note, wherever it sits; `leads` says whether it opens the note."""
+    out: dict[str, list[dict[str, Any]]] = {}
+    taken: set[int] = set()
+    for field, rx in (("stall_step", _STALL_RE), ("progression_reason", _PROGRESSION_RE)):
+        for m in rx.finditer(own):
+            if m.start() in taken:
+                continue
+            taken.add(m.start())
+            at = ", first line" if m.start() == 0 else f", char {m.start()}"
+            out.setdefault(field, []).append(_hit(where + at, base + m.start(), leads=m.start() == 0))
+    return out
 
 
 def _note_hits(i: int, own: str, base: int) -> dict[str, list[dict[str, Any]]]:
@@ -226,10 +281,8 @@ def _note_hits(i: int, own: str, base: int) -> dict[str, list[dict[str, Any]]]:
             out["cardio_speed"] = [_hit(where + ", line 1", base)]
         if _RPE_RE.search(m.group("effort") or ""):
             out["cardio_rpe"] = [_hit(where + ", line 1", base)]
-    elif _STALL_RE.match(own):
-        out["stall_step"] = [_hit(where + ", first line", base)]
-    elif _PROGRESSION_RE.match(own):
-        out["progression_reason"] = [_hit(where + ", first line", base)]
+    else:
+        out.update(_reason_hits(where, own, base))
     if own.startswith(_MINIMUM_PREFIX):
         out["minimum_session"] = [_hit(where + ", first line", base)]
     if not m and (rpe := _RPE_RE.search(own)):
@@ -265,14 +318,42 @@ def _warmup_order_problems(i: int, ex: dict[str, Any]) -> list[str]:
     return []
 
 
-def render_check(body: dict[str, Any], session_note: str | None = None) -> dict[str, Any]:
+def _missing(expected: list[dict[str, str]], notes: list[str]) -> dict[str, list[str]]:
+    """field -> the movements whose expected reason text is on no exercise note of the wire."""
+    out: dict[str, list[str]] = {}
+    for e in expected:
+        if not any(e["text"] in n for n in notes):
+            out.setdefault(e["field"], []).append(e["movement_key"])
+    return out
+
+
+def _status(r: dict[str, str], hits: list[dict[str, Any]], missing: list[str]) -> tuple[str, list[str]]:
+    """(the row's status, its problems) — missing > beyond_window > not_leading > lands."""
+    f = r["field"]
+    if r["home"] in (DEFERRED, NOT_SHOWN):
+        return r["home"], []
+    if missing:
+        return "missing", [f"{f}: expected on the wire for {', '.join(missing)} (the IR records it) but not found in any note"]
+    if not hits:
+        return "absent", []
+    if late := [h for h in hits if not h["in_window"]]:
+        return "beyond_window", [f"{f}: starts past the {VISIBLE_NOTE_CHARS}-char visible window at {late[0]['where']}"]
+    if buried := [h for h in hits if not h.get("leads", True)]:
+        return "not_leading", [f"{f}: does not lead its note ({buried[0]['where']}); the ordering rule puts the reason first"]
+    return "lands", []
+
+
+def render_check(body: dict[str, Any], session_note: str | None = None, ir: Any = None) -> dict[str, Any]:
     """Where each charter field of a compiled routine body will show in the Hevy app.
 
     `session_note` is the WHY line the compiler was handed (`why_note`); with it the check can
-    tell exercise 0's own note from the session line ahead of it. Returns `fields` (one row per
-    RENDER_TABLE field: `status` lands | beyond_window | absent | deferred | not_shown, and
-    `found`), the session line's length against the window, and `problems` (a reason line that
-    starts beyond the window, a session line over it, a warm-up set after a working set)."""
+    tell exercise 0's own note from the session line ahead of it. `ir` (the RoutineSpec that was
+    compiled) names the reason lines that MUST be on the wire (`expected_reasons`), so a reason the
+    IR recorded but the wire lacks is a problem, never `absent`. Returns `fields` (one row per
+    RENDER_TABLE field: `status` lands | not_leading | beyond_window | missing | absent | deferred |
+    not_shown, and `found`), the session line's length against the window, and `problems` (a reason
+    line that does not lead its note or starts beyond the window, an expected reason not on the
+    wire, a session line over the window, a warm-up set after a working set)."""
     routine = _routine(body)
     exercises = routine.get("exercises") or []
     session = (session_note or "").strip()
@@ -292,24 +373,20 @@ def render_check(body: dict[str, Any], session_note: str | None = None) -> dict[
             for k, v in by_field.items():
                 found.setdefault(k, []).extend(v)
         problems += _warmup_order_problems(i, ex)
+    expected = expected_reasons(ir) if ir is not None else None
+    missing = _missing(expected or [], [str(ex.get(PINNED_ROUTINE_NOTE_FIELD) or "") for ex in exercises])
     rows = []
     for r in RENDER_TABLE:
         hits = found.get(r["field"], [])
-        if r["home"] in (DEFERRED, NOT_SHOWN):
-            status = r["home"]
-        elif not hits:
-            status = "absent"
-        elif all(h["in_window"] for h in hits):
-            status = "lands"
-        else:
-            status = "beyond_window"
-            problems.append(f"{r['field']}: starts past the {VISIBLE_NOTE_CHARS}-char visible window at {hits[0]['where']}")
+        status, row_problems = _status(r, hits, missing.get(r["field"], []))
+        problems += row_problems
         rows.append({"field": r["field"], "status": status, "wire": r["wire"], "shows": r["shows"], "found": hits})
     return {
         "version": RENDER_TABLE_VERSION,
         "title": routine.get("title", ""),
         "visible_note_chars": VISIBLE_NOTE_CHARS,
         "session_note": {"text": session, "chars": len(session), "under_window": len(session) <= VISIBLE_NOTE_CHARS},
+        "expected_reasons": expected,
         "fields": rows,
         "problems": problems,
     }

@@ -57,7 +57,7 @@ def _fixture() -> tuple[RoutineSpec, str]:
     bench_kg = 185 * LB
     bench = ExerciseBlock(movement_key="bench", sets=_working(bench_kg, 6, 10), rest_seconds=180, notes="Last: 185 lb x 10 on 16 Oct.")
     # the progression reason: two top sets at the top of 6-10 at the ceiling -> the gain rule's step
-    _progress_block(
+    prog = _progress_block(
         bench,
         {"movements": CATALOG},
         {"BENCH01": [_sess("2026-10-16", bench_kg, 10, 8), _sess("2026-10-14", bench_kg, 10, 8)]},
@@ -76,7 +76,8 @@ def _fixture() -> tuple[RoutineSpec, str]:
         archetype="upper",
         title="Upper — 2026-10-20",
         source_action="draft",
-        inputs_snapshot={"calendar": {"session_role": "upper_heavy"}},
+        # the generator's audit, as `_enforce_load_floors` records it — what `expected_reasons` reads
+        inputs_snapshot={"calendar": {"session_role": "upper_heavy"}, "load_floors": {"movements": {"bench": {"progression": prog}}}},
         exercises=[
             bench,
             row,
@@ -112,7 +113,8 @@ def _where(rc: dict, field: str) -> list[str]:
 def test_every_charter_field_lands_where_the_table_says():
     ir, why = _fixture()
     body = _compile(ir, why)
-    rc = hevy_render.render_check(body, session_note=why)
+    rc = hevy_render.render_check(body, session_note=why, ir=ir)
+    assert [e["field"] for e in rc["expected_reasons"]] == ["progression_reason", "stall_step"]
     assert rc["problems"] == [], rc["problems"]
     status = _status(rc)
     expected_absent = {"minimum_session"}  # its own fixture below
@@ -156,21 +158,74 @@ def test_the_wire_carries_each_field_on_its_declared_field():
     assert note.index("+5 lb to") < hevy_render.VISIBLE_NOTE_CHARS
 
 
-def test_a_reason_line_behind_a_long_cue_is_reported_beyond_the_window():
-    """The check can fail: the pre-#5083 order (history cue first, reason appended) is caught."""
+def test_the_daily_draft_path_keeps_the_reason_in_the_window():
+    """The real wire (#5083 review): `_action_draft` runs `_apply_recovery_adaptation`, which adds the
+    multi-line wake-recovery block to exercise 0. It must follow the reason line, never precede it."""
+    from mcp.tools_hevy_routine import _apply_recovery_adaptation
+
+    ir, why = _fixture()
+    _apply_recovery_adaptation(ir, {}, "2026-10-19")
+    body = _compile(ir, why)
+    note = body["routine"]["exercises"][0]["notes"]
+    assert note.startswith(why + "\n\n+5 lb to ")
+    assert note.index("+5 lb to") < hevy_render.VISIBLE_NOTE_CHARS
+    assert note.index("+5 lb to") < note.index("ADAPT BY WAKE RECOVERY") < note.index("CHOOSE YOUR BRANCH")
+    rc = hevy_render.render_check(body, session_note=why, ir=ir)
+    assert rc["problems"] == [], rc["problems"]
+    assert _status(rc)["progression_reason"] == "lands" and _status(rc)["stall_step"] == "lands"
+
+
+def test_the_pre_fix_recovery_order_is_a_problem():
+    """The order the review found on the daily path (the recovery block AHEAD of the reason) must fail the check."""
+    from mcp.recovery_authoring import render_session_block
+
+    ir, why = _fixture()
+    bench = ir.exercises[0]
+    bench.notes = render_session_block({}, "2026-10-19", None) + "\n\n" + bench.notes
+    rc = hevy_render.render_check(_compile(ir, why), session_note=why, ir=ir)
+    assert _status(rc)["progression_reason"] == "beyond_window", rc["fields"]
+    assert any(p.startswith("progression_reason: starts past") for p in rc["problems"]), rc["problems"]
+
+
+def test_a_reason_behind_a_history_cue_is_reported_not_leading():
+    """The pre-#5083 producer order (history cue first, reason appended) is a problem, never `absent`."""
     ir, why = _fixture()
     bench = ir.exercises[0]
     reason = bench.notes.split(". Last:")[0]
-    bench.notes = "Last: 185 lb x 10 on 16 Oct at 281 lb bodyweight; best 190 lb x 8 on 2 Oct; " * 3 + reason + "."
+    bench.notes = "Last: 185 lb x 10 on 16 Oct. " + reason + "."
+    rc = hevy_render.render_check(_compile(ir, why), session_note=why, ir=ir)
+    assert _status(rc)["progression_reason"] == "not_leading", rc["fields"]
+    assert any(p.startswith("progression_reason: does not lead") for p in rc["problems"]), rc["problems"]
+    # without the IR the grammar still finds it: the check is not blind when no audit rode along
     rc = hevy_render.render_check(_compile(ir, why), session_note=why)
-    # the reason no longer leads the note, so it is not recognised as the prescription line at all
-    assert _status(rc)["progression_reason"] == "absent"
-    bench.notes = reason + "."
+    assert _status(rc)["progression_reason"] == "not_leading" and rc["problems"]
+
+
+def test_a_reason_the_ir_records_but_the_wire_lacks_is_missing():
+    ir, why = _fixture()
+    ir.exercises[0].notes = "Last: 185 lb x 10 on 16 Oct."
+    rc = hevy_render.render_check(_compile(ir, why), session_note=why, ir=ir)
+    assert _status(rc)["progression_reason"] == "missing"
+    assert any(p.startswith("progression_reason: expected on the wire for bench") for p in rc["problems"]), rc["problems"]
+
+
+def test_a_session_line_over_the_window_pushes_the_reason_beyond_it():
+    ir, why = _fixture()
     long_why = "x" * (hevy_render.VISIBLE_NOTE_CHARS + 1)
-    rc = hevy_render.render_check(_compile(ir, long_why), session_note=long_why)
+    rc = hevy_render.render_check(_compile(ir, long_why), session_note=long_why, ir=ir)
     assert _status(rc)["progression_reason"] == "beyond_window"
     assert any("over the 150-char visible window" in p for p in rc["problems"]), rc["problems"]
     assert any(p.startswith("progression_reason: starts past") for p in rc["problems"]), rc["problems"]
+
+
+def test_place_after_prescription():
+    assert (
+        hevy_render.place_after_prescription("+5 lb to 190 lb: why. Last: x.\nmore", "BLOCK")
+        == "+5 lb to 190 lb: why. Last: x.\n\nBLOCK\n\nmore"
+    )
+    assert hevy_render.place_after_prescription("Last: 185 lb x 10.", "BLOCK") == "BLOCK\n\nLast: 185 lb x 10."
+    assert hevy_render.place_after_prescription(None, "BLOCK") == "BLOCK"
+    assert hevy_render.place_after_prescription("Minimum: top set 4-6", "B") == "Minimum: top set 4-6\n\nB"
 
 
 def test_a_warmup_after_a_working_set_is_a_problem():

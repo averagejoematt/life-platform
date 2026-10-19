@@ -219,8 +219,8 @@ def _apply_recovery_adaptation(
 
     Tier-agnostic (brief §2.1): the routine carries GREEN/YELLOW/RED in its notes; the
     morning selects one. Renders into EXERCISE notes (#3938: Hevy has no routine-level notes
-    field — the compiler now places the WHY line ahead of this block on exercises[0]). Stashes structured branches in the
-    existing inputs_snapshot so no layer-resident IR schema bump is needed for v1.
+    field — the WHY line leads, then exercise 0's prescription line, then this block, #5083).
+    Stashes structured branches in the existing inputs_snapshot (no IR schema bump for v1).
     """
     # #5000: an active standing constraint (`constraint`) replaces the band block with the ECG + feel
     # gate (`mcp.draft_standing_constraint.apply_gate`); `green_withheld` (a tripped `protein_floor_missed`)
@@ -235,9 +235,10 @@ def _apply_recovery_adaptation(
 
         structured = apply_gate(ir, ctx, inputs_current_through, constraint, green_withheld)
     else:
-        session_block = render_session_block(ctx, inputs_current_through, green_withheld)
+        from training.hevy_render import place_after_prescription  # #5083: the block goes after exercise 0's reason line
+
         first = ir.exercises[0]
-        first.notes = (session_block + ("\n\n" + first.notes if first.notes else "")).strip()
+        first.notes = place_after_prescription(first.notes, render_session_block(ctx, inputs_current_through, green_withheld))
         structured = {"session": ctx, "exercises": {}}
         for ex in [ex for ex in ir.exercises if getattr(ex, "skill_tier", 1) >= 2][:2]:
             branches = build_top_set_branches(RPE_BASE_YELLOW, ctx, green_withheld)
@@ -930,7 +931,7 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
         # #3971 box 1 — dry_run REPORTS what commit will refuse on: the derived load
         # floors and every find_conditional_up hit, before anything reaches Hevy.
         "prescription_audit": prescription_gate(ir),
-        "render_check": hevy_render.render_check(body, session_note=why),  # #5083: each charter field and where Hevy shows it
+        "render_check": hevy_render.render_check(body, session_note=why, ir=ir),  # #5083: each charter field and where it shows
     }
     # Recovery-adaptive preflight (brief §6.5): show the inputs_current_through line +
     # the per-lift branch blocks Matthew eyeballs in 30s, so he sleeps trusting it.
