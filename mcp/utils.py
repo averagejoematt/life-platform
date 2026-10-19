@@ -252,16 +252,16 @@ _DEFAULT_SUGGESTIONS: dict[str, list[str]] = {
         "Use one of the movement keys the error offers under 'Did you mean', or give the exercise's exact Hevy title.",
     ],
     "UNRESOLVED_MOVEMENT": [
-        "Re-draft the routine (draft_custom) with a movement key or exact Hevy title the platform's exercise index resolves.",
+        "Re-draft the routine (manage_hevy_routine draft) with a movement key or exact Hevy title the platform's exercise index resolves.",
     ],
     "LINK_UNVERIFIED": [
         "Give the canonical URL of the page itself (not a search result or a redirect), or omit the link and give the title and author.",
     ],
     "HEVY_PRECHECK_FAILED": [
-        "Fix the named fields in a new draft (draft_custom) — this is Hevy's schema, not a transient — then commit that routine_id.",
+        "Fix the named fields in a new draft (manage_hevy_routine draft) — this is Hevy's schema, not a transient — then commit that routine_id.",
     ],
     "HEVY_BAD_REQUEST": [
-        "Hevy's response body in `error` names the rejected field — fix it in a new draft (draft_custom) and commit that routine_id.",
+        "Hevy's response body in `error` names the rejected field — fix it in a new draft (manage_hevy_routine draft) and commit that routine_id.",
     ],
     "TOOL_CALL_RESIDUE": [
         "Re-issue the call with the plain text of each argument — no `</…>` closers, no `<parameter name=…>`, no `<invoke` markup.",
@@ -303,20 +303,20 @@ _DEFAULT_SUGGESTIONS: dict[str, list[str]] = {
         "Or pass owner_override_redteam=true with override_reason in the owner's own words — the override is stamped into the stored routine and reported as a warning.",
     ],
     "SUBTRACT_ONLY_VIOLATION": [
-        "Raise each named set to at least its floor (the error names the set, the floor and where the floor came from), or remove the conditional up-branch clause, in a new draft (draft_custom) — then run stage 2 and commit that routine_id.",
+        "Raise each named set to at least its floor (the error names the set, the floor and where the floor came from), or remove the conditional up-branch clause, in a new draft (manage_hevy_routine draft) — then run stage 2 and commit that routine_id.",
         "There is no chat override for this gate: a set under its floor is refused until the draft clears it.",
     ],
     "CRITIC_VETO": [
-        "Address the vetoing critic's finding (the error names the critic and its reason) in a new draft (draft_custom), then run plan_next_session with that routine_id (stage 2) and commit what it verdicts.",
+        "Address the vetoing critic's finding (the error names the critic and its reason) in a new draft (manage_hevy_routine draft), then run plan_next_session with that routine_id (stage 2) and commit what it verdicts.",
         "Or overrule THAT critic in the owner's own words: plan_next_session with veto_override={critic, owner_words} on this routine_id — the words are stored verbatim on the verdict.",
     ],
     "HEVY_ROUTINE_DELETED": [
-        "Draft a new routine (draft_custom), red-team it (plan_next_session with routine_id), then commit that new routine_id.",
+        "Draft a new routine (manage_hevy_routine draft), red-team it (plan_next_session with routine_id), then commit that new routine_id.",
         "The stored routine still points at a Hevy id the app deleted — committing the same routine_id refuses the same way.",
     ],
     "HEVY_CONFLICT": [
         "Read the routine back (action=get) — Hevy's copy was edited in the app after the platform last wrote it, and the platform will not overwrite an in-app edit.",
-        "Either keep the in-app edit and leave the platform copy as is, or draft from the current Hevy state (draft_custom) and commit that new routine_id.",
+        "Either keep the in-app edit and leave the platform copy as is, or draft from the current Hevy state (manage_hevy_routine draft) and commit that new routine_id.",
     ],
 }
 

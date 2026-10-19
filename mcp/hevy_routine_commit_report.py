@@ -137,5 +137,5 @@ def discarded_commit_title_warnings(args: dict[str, Any], ir: Any) -> list[str]:
         f"Ignored {'/'.join(supplied)} on commit: both are DRAFT-time arguments, read only from "
         f"the routine's draft snapshot (force_title={forced} there). The title was rendered from "
         f"that snapshot, not from this call. To force a title, re-draft with "
-        f"draft_custom(force_title=true, title=...) then dry_run, then commit."
+        f"draft_custom(force_title=true, title=..., departure_reason=...) then dry_run, then commit."
     ]
