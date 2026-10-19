@@ -15,7 +15,7 @@ Designed so an agent can answer "why" without guessing:
 - **`handovers/`** — the live end-of-session hand-off (`HANDOVER_LATEST.md`) so the next session resumes with full context. Prior sessions live on the **`session-archive`** branch (#1650) — `git show origin/session-archive:handovers/<name>.md`.
 
 **3. Skills — [`.claude/skills/`](skills/)**
-**25 skills** the agent invokes by name, each `‹name›/SKILL.md` with YAML frontmatter
+**24 skills** the agent invokes by name, each `‹name›/SKILL.md` with YAML frontmatter
 (`description`, `argument-hint`, `allowed-tools`) so a session can pick the right one
 without being told. The count is derived from the registry, never hand-listed — this
 paragraph itself used to name two of them. A sample rather than an inventory:
@@ -53,7 +53,7 @@ stop re-improvising briefs from memory prose (#796).
   Every one fails open on a bad payload, because a hook that can crash can halt a session.
 - **Doc-sync pre-commit hook** (`scripts/install_hooks.sh` → `deploy/sync_doc_metadata.py`) — auto-updates doc headers (tool/Lambda/secret/alarm counts, version) on every commit, so docs can't silently drift from code.
 - **Self-healing remediation agent** (`.github/workflows/remediation-agent.yml`, ADR-064/065) — Claude on a schedule via GitHub Actions + Bedrock: triages alarms/CI/DLQ, auto-fixes the provably-safe class behind a deterministic merge gate, opens PRs for the rest. Read-only AWS role; the gate (not the model) holds merge authority.
-- **MCP server** (`mcp/`, `mcp_bridge.py`, `.mcp.json`) — 88 tools that let Claude query the live platform data directly during a session.
+- **MCP server** (`mcp/`, `mcp_bridge.py`, `.mcp.json`) — 89 tools that let Claude query the live platform data directly during a session.
 
 **5. Verification — Claude checks its own work**
 - `qa/visual_qa.py` — a Playwright browser sweep after deploys.
