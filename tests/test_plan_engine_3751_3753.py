@@ -232,7 +232,7 @@ def test_the_rate_tension_is_resolved_as_a_schedule_and_approved():
     assert summ["plan"].endswith("TRAINING_PROGRAM_v0.4.md") and owner_redlines.PLAN_V0_3.endswith("TRAINING_PROGRAM_v0.3.md")
     assert summ["red_team_record"].endswith("TRAINING_PROGRAM_v0.3_redteam.md")
     rate = owner_redlines.rate_target_lb_per_wk(316.9)
-    assert rate["target_lb_wk"] == 3.5 and rate["cap_lb_wk"] == 4.0 and rate["schedule_step_above_lb"] == 295
+    assert rate["target_lb_wk"] == 3.5 and rate["cap_lb_wk"] == 3.5 and rate["schedule_step_above_lb"] == 295
     assert owner_redlines.rate_target_lb_per_wk(250.0)["target_lb_wk"] == 3.5  # #5074: the charter band governs above 240
     assert owner_redlines.rate_target_lb_per_wk(199.0)["target_lb_wk"] == 0.0  # the maintenance block
     # the tripwires the engine cannot compute are named in the block, never silent (ADR-105)
@@ -248,13 +248,13 @@ def test_the_rate_tension_is_resolved_as_a_schedule_and_approved():
 # ── 5b. v3 (#3753 approved 2026-09-21): the §1 table, the landing, the new tripwires ────
 _V3_TABLE = [
     # (weight_lb, target, cap, step_above_lb) — the plan's §1 rows, sampled INSIDE each band
-    (317.0, 3.5, 4.0, 295),
-    (296.0, 3.5, 4.0, 295),
-    # #5074: above the landing the charter band governs — target = the 3.5 ceiling, cap = ceiling + 0.5, every step
-    (290.0, 3.5, 4.0, 275),
-    (276.0, 3.5, 4.0, 275),
-    (270.0, 3.5, 4.0, 260),
-    (250.0, 3.5, 4.0, 240),
+    (317.0, 3.5, 3.5, 295),
+    (296.0, 3.5, 3.5, 295),
+    # #5074: above the landing the charter band governs — target = cap = the 3.5 ceiling (ruling 3: one ceiling, no margin), every step
+    (290.0, 3.5, 3.5, 275),
+    (276.0, 3.5, 3.5, 275),
+    (270.0, 3.5, 3.5, 260),
+    (250.0, 3.5, 3.5, 240),
     (230.0, 2.25, 2.75, 220),
     (215.0, 1.75, 2.25, 210),
     (207.0, 1.25, 1.75, 205),

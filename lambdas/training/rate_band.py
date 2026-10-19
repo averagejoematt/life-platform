@@ -23,10 +23,6 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# The distance between the band's ceiling and the rate at which an overshoot trips (the historical +0.5 lb/wk
-# between his schedule's target and cap). A margin, not a band number.
-OVERSHOOT_MARGIN_LB_WK = 0.5
-
 _PATH = "governing_goal.rate_band_lb_per_wk"
 _CAP_WORDS = re.compile(r"\b(?:cap|capped|max|maximum|limit|no more than|not exceed|at most|up to|under|below|ceiling)\b", re.I)
 _RATE = re.compile(r"(\d+(?:\.\d+)?)\s*(?:lbs?|pounds?)\s*(?:/|per|a|each)\s*(?:wk|week)\b", re.I)
@@ -86,8 +82,9 @@ def guidance_cap_for(table, user_id: str = "matthew") -> Optional[float]:
 
 
 def flag_threshold_lb_wk(weight_lb: Optional[float], guidance_cap: Optional[float] = None) -> Optional[float]:
-    """The "losing too fast" line at a bodyweight: his schedule's CAP there (the charter ceiling + the overshoot
-    margin above the landing, his own taper cap from the landing down), lowered by a guidance cap. None w/o a weight."""
+    """The "losing too fast" line at a bodyweight: his schedule's CAP there (the charter ceiling itself above the
+    landing — ruling 3 names one ceiling, no tolerance on top — his own taper cap from the landing down), lowered by
+    a guidance cap. None w/o a weight."""
     if not weight_lb or weight_lb <= 0:
         return None
     from training import redline_rate

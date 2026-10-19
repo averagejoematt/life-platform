@@ -751,7 +751,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "action": "+150–250 kcal/day and ursodiol on — unless strength, DXA and recovery are ALL clean (`loss_excessive_clean`: hold); overshoot is a failure, not a win",
         "evaluated_by_engine": False,
         "note": (
-            "Cap-based: the cap is the schedule step's `cap` at his current weight (4.0 above 295, 3.75 above 275, …). "
+            "Cap-based: the cap is the schedule step's `cap` at his current weight (the charter band's ceiling above the landing, #5074; his taper caps from the landing down). "
             "`health.nutrition_critics` reads `threshold_weeks` and the overshoot rule's words and offers the +250 as a change; "
             "its week gate is 'after week 4' from v2 and one week looser than v3's 'after week 3' — noted, not silently corrected."
         ),

@@ -13,8 +13,8 @@ from datetime import datetime, timedelta
 
 from training import rate_band
 
-# The "losing too fast" flag is his schedule's cap at the weigh-in's own bodyweight — the charter band's ceiling plus
-# the overshoot margin above the landing (training/rate_band.py, #5074), a percent-of-bodyweight line that moves with
+# The "losing too fast" flag is his schedule's cap at the weigh-in's own bodyweight — the charter band's ceiling
+# above the landing (training/rate_band.py, #5074), a percent-of-bodyweight line that moves with
 # the weight as the landing schedule steps down. It replaced the fixed 1.25 %BW constant (#5060).
 RATE_SLOW_LB_PER_WK = 0.25  # below this the "very slow" nudge fires (absolute, unchanged)
 

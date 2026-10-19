@@ -52,7 +52,7 @@ def test_the_band_follows_the_charter_not_a_copy(monkeypatch):
     )
     assert (rate_band.band(300.0)["floor_lb_wk"], rate_band.band(300.0)["ceiling_lb_wk"]) == (2.0, 2.5)
     rt = owner_redlines.rate_target_lb_per_wk(300.0)
-    assert (rt["low_lb_wk"], rt["high_lb_wk"], rt["target_lb_wk"], rt["cap_lb_wk"]) == (2.0, 2.5, 2.5, 3.0)
+    assert (rt["low_lb_wk"], rt["high_lb_wk"], rt["target_lb_wk"], rt["cap_lb_wk"]) == (2.0, 2.5, 2.5, 2.5)
 
 
 def test_an_unreadable_charter_serves_no_target_rather_than_a_guess(monkeypatch):
@@ -65,7 +65,7 @@ def test_an_unreadable_charter_serves_no_target_rather_than_a_guess(monkeypatch)
 # ── the redline target, and how it composes with the landing ──────────────────────────
 def test_the_redline_target_reads_the_band_above_the_landing_and_his_schedule_below():
     above = owner_redlines.rate_target_lb_per_wk(300.0)
-    assert (above["low_lb_wk"], above["high_lb_wk"], above["target_lb_wk"], above["cap_lb_wk"]) == (3.0, 3.5, 3.5, 4.0)
+    assert (above["low_lb_wk"], above["high_lb_wk"], above["target_lb_wk"], above["cap_lb_wk"]) == (3.0, 3.5, 3.5, 3.5)
     assert above["band"]["floor_pct_bw"] == 1.0 and above["landing_phase"] is False
     at_landing = owner_redlines.rate_target_lb_per_wk(240.0)  # NOT above 240: the landing schedule governs
     assert at_landing["landing_phase"] is True and at_landing["target_lb_wk"] == 2.25 and at_landing["band"]["governs"] is False
@@ -99,7 +99,7 @@ def test_the_rate_advocates_flag_is_graded_against_the_band():
 
 def test_the_deficit_advocate_reads_the_band_and_the_schedule_cap():
     n = nc.build_deficit_advocate_packet({"weight_lb": 300.0})["numbers"]
-    assert (n["rate_band_low_lb_wk"], n["rate_band_high_lb_wk"], n["rate_target_lb_wk"], n["rate_cap_lb_wk"]) == (3.0, 3.5, 3.5, 4.0)
+    assert (n["rate_band_low_lb_wk"], n["rate_band_high_lb_wk"], n["rate_target_lb_wk"], n["rate_cap_lb_wk"]) == (3.0, 3.5, 3.5, 3.5)
     assert (n["rate_band_floor_pct_bw"], n["rate_band_ceiling_pct_bw"]) == (1.0, 1.17)
 
 
@@ -121,7 +121,7 @@ def test_the_guidance_cap_outranks_the_band_in_every_reader():
     q = {"value": 2.6, "provisional": False, "experiment_week": 7}
     assert redline_rate.rate_ceiling_check(q, 300.0)["state"] == "clear"
     assert redline_rate.rate_ceiling_check(q, 300.0, 2.0)["state"] == "tripped"
-    assert rate_band.flag_threshold_lb_wk(300.0, 2.0) == 2.0 and rate_band.flag_threshold_lb_wk(300.0) == 4.0
+    assert rate_band.flag_threshold_lb_wk(300.0, 2.0) == 2.0 and rate_band.flag_threshold_lb_wk(300.0) == 3.5
     v = rate_band.band_view(300.0, 2.6, 2.0)
     assert v["position"] == "above" and v["guidance_capped"] is True
 

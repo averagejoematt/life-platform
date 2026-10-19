@@ -41,7 +41,7 @@ from mcp import shared_quantities as sq  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 GENESIS = "2026-09-06"
 TODAY = "2026-10-18"
-WEIGHT_LB = 302.22  # the 10-17 weigh-in — the schedule step above 295 lb, cap 4.0
+WEIGHT_LB = 302.22  # the 10-17 weigh-in — the schedule step above 295 lb, cap 3.5 (the charter ceiling, #5074; 4.0 on the 10-18 specimen)
 
 _LIVE = {
     "2026-10-03": 310.97,
@@ -128,14 +128,14 @@ def test_rate_ceiling_is_evaluated_and_trips_at_4_12_above_295():
     row = _row(block)
     assert row["state"] == "tripped" and row["observed"] == 4.12
     ev = row["evidence"]
-    assert ev["threshold_lb_wk"] == 4.0 and ev["band_cap_lb_wk"] == 4.0 and ev["band_above_lb"] == 295
+    assert ev["threshold_lb_wk"] == 3.5 and ev["band_cap_lb_wk"] == 3.5 and ev["band_above_lb"] == 295
     assert ev["threshold_provenance"].startswith("owner")
     assert "rate_ceiling" in block["tripped"]
     assert block["shared_quantities"]["loss_rate_lb_wk"]["value"] == 4.12
 
 
 def test_the_threshold_is_the_band_cap_and_never_looser_than_the_absolute_ceiling():
-    """Above the landing the cap is the charter ceiling + the overshoot margin (4.0, #5074); at 221 lb it is his
+    """Above the landing the cap is the charter ceiling itself (3.5, #5074 — one ceiling, no margin); at 221 lb it is his
     own landing step (2.75): 2.8 trips there, 2.7 is clear. Mutation control: compare against the tripwire's
     absolute 4.0 instead of the band cap — 2.8 at 221 reads clear and this reds."""
 
@@ -144,7 +144,7 @@ def test_the_threshold_is_the_band_cap_and_never_looser_than_the_absolute_ceilin
 
     assert at(2.8, 221.0)["state"] == "tripped" and at(2.8, 221.0)["threshold_lb_wk"] == 2.75
     assert at(2.7, 221.0)["state"] == "clear"
-    assert at(3.9, 280.0)["state"] == "clear" and at(4.1, 280.0)["state"] == "tripped"
+    assert at(3.5, 280.0)["state"] == "clear" and at(3.6, 280.0)["state"] == "tripped"
     assert at(4.01, None)["state"] == "tripped" and at(4.01, None)["threshold_lb_wk"] == 4.0
     for w in (330.0, 300.0, 280.0, 262.0, 241.0, 221.0, 211.0, 206.0, 199.0):
         assert at(0.0, w)["threshold_lb_wk"] <= 4.0, w

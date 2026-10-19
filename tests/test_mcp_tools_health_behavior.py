@@ -891,14 +891,14 @@ def _series(start_lbs, per_week, n=4):
 
 
 def test_weight_loss_rate_flag_is_his_schedule_cap_at_that_weight(monkeypatch):
-    """#5074: the line is the schedule's cap at the weigh-in's own weight — the charter ceiling + 0.5 (4.0 lb/wk)
-    above the 240 lb landing, his own taper cap from the landing down. 3.9 lb/wk never flags at 400 or 280; 4.5 flags
-    at both; 3.0 lb/wk flags once he is on the landing schedule (cap 2.25 at 210)."""
+    """#5074: the line is the schedule's cap at the weigh-in's own weight — the charter ceiling itself (3.5 lb/wk, one
+    ceiling, no margin) above the 240 lb landing, his own taper cap from the landing down. 3.4 lb/wk never flags at 400
+    or 280; 3.9 flags at both; 3.0 lb/wk flags once he is on the landing schedule (cap 2.25 at 210)."""
     for start in (400.0, 280.0):
-        install(monkeypatch, _series(start, 3.9))
+        install(monkeypatch, _series(start, 3.4))
         out = th.tool_get_weight_loss_progress({})
         assert not [p for p in out["weight_series"] if "Losing too fast" in p.get("rate_flag", "")], start
-        install(monkeypatch, _series(start, 4.5))
+        install(monkeypatch, _series(start, 3.9))
         flagged = [p for p in th.tool_get_weight_loss_progress({})["weight_series"] if "Losing too fast" in p.get("rate_flag", "")]
         assert len(flagged) == 3, start
         assert "% of bodyweight" in flagged[0]["rate_flag"] and "lb/wk" in flagged[0]["rate_flag"]

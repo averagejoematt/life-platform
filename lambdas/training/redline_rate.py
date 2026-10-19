@@ -22,7 +22,7 @@ def rate_schedule_step(weight_lb: float) -> dict[str, Any]:
 
     A step marked `governed_by: charter` (every step above the landing, #5074) has no literal target/cap: they
     are resolved HERE from the charter band — target = the band's CEILING (he aims at the top; the protein gate's
-    brake of 0.5 lands on the floor), cap = ceiling + the overshoot margin.
+    brake of 0.5 lands on the floor), cap = the same CEILING (ruling 3 names one ceiling; no margin is added).
     From the landing down the step is his own schedule, unchanged. Charter unreadable -> target/cap are None."""
     steps = _redlines()["rate_schedule_lb_wk"]["steps"]
     step = next((s for s in steps if weight_lb > s["above_lb"]), steps[-1])
@@ -36,7 +36,7 @@ def rate_schedule_step(weight_lb: float) -> dict[str, Any]:
     return {
         **step,
         "target": b["ceiling_lb_wk"],
-        "cap": round(b["ceiling_lb_wk"] + rate_band.OVERSHOOT_MARGIN_LB_WK, 2),
+        "cap": b["ceiling_lb_wk"],
         "pct_bw_wk": f"{b['floor_pct_bw']}-{b['ceiling_pct_bw']}",
     }
 
