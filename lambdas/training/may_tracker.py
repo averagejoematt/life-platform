@@ -211,8 +211,19 @@ def target_projection(sunday: str, weight: Optional[float], rate_4wk: Optional[f
     return out
 
 
+def _tape_cadence(rows: Any, sunday: str) -> dict[str, Any]:
+    """#5061: the tape cycle as of Sunday (`training.calibration_cadence`) — state, due date, missed cycles. Dates only."""
+    from common.constants import EXPERIMENT_START_DATE
+
+    from training import calibration_cadence as cc
+
+    r = cc.tape_row(list(rows or ()), sunday, EXPERIMENT_START_DATE)
+    return {k: r.get(k) for k in ("state", "last_logged", "due_on", "missed_cycles", "prompt")}
+
+
 def waist_section(rows: Optional[Iterable[Mapping[str, Any]]], sunday: str, read_error: Optional[str] = None) -> dict[str, Any]:
     """The latest tape row on or before Sunday with any waist site. Absent until a tape exists — never 0."""
+    rows = list(rows) if rows is not None else None
     src = "USER#matthew#SOURCE#measurements (waist_*_in)"
     if read_error:
         return cell(READ_FAILED, None, src, error=read_error)
@@ -225,11 +236,11 @@ def waist_section(rows: Optional[Iterable[Mapping[str, Any]]], sunday: str, read
             best = {**r, "_d": d}
     every = _cv("calibration.tape_and_photos.every_weeks")
     if best is None:
-        return cell(ABSENT, None, src, "no tape row with a waist site yet (#5061 collects it)", every_weeks=every)
+        return cell(ABSENT, None, src, "no tape row with a waist site yet", every_weeks=every, cadence=_tape_cadence(rows, sunday))
     vals = {f: float(best[f]) for f in WAIST_FIELDS if best.get(f) is not None}
     age = _days_between(best["_d"], sunday)
     due = every is not None and age > int(every) * 7
-    return cell(MEASURED, vals, src, date=best["_d"], age_days=age, every_weeks=every, tape_due=due)
+    return cell(MEASURED, vals, src, date=best["_d"], age_days=age, every_weeks=every, tape_due=due, cadence=_tape_cadence(rows, sunday))
 
 
 def _resolved(day_row: Mapping[str, Any]) -> Optional[int]:

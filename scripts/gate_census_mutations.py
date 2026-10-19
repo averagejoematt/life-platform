@@ -522,6 +522,13 @@ _CHARTER_PUBLISHED_READER_PY = (
 
 # #5073: a published module (lambdas/emails) that imports the owner-only May tracker — the target
 # date, the band and the projected weight would then be one call from an email body.
+_CALIBRATION_PUBLISHED_IMPORTER_PY = (
+    '"""census probe — a published importer of the owner-only calibration cadence that must never exist."""\n\n'
+    "from training import calibration_cadence\n\n\n"
+    "def handle(table):\n"
+    "    return calibration_cadence.read(table, '2026-10-19')\n"
+)
+
 _MAY_TRACKER_PUBLISHED_IMPORTER_PY = (
     '"""census probe — a published importer that must never exist."""\n\n'
     "from training import may_tracker\n\n\n"
@@ -1303,6 +1310,18 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
             "for any other gate to have an opinion about"
         ),
         plants=(("lambdas/emails/_census_probe_5073.py", _MAY_TRACKER_PUBLISHED_IMPORTER_PY),),
+        track=False,  # the guard os.walks lambdas/web + lambdas/emails on disk, so an untracked module is in scope
+    ),
+    # #5061: the owner-only calibration cadence (tape / progress photos / DEXA) — no published-surface module imports it.
+    "structural::test_calibration_cadence_5061.py": MutationSpec(
+        gate_id="structural::test_calibration_cadence_5061.py",
+        target="tests/test_calibration_cadence_5061.py",
+        detects=(
+            "a published module (lambdas/emails or lambdas/web) importing the owner-only calibration cadence, which reads the "
+            "progress-photo and tape partitions; the owner ruled 2026-10-03 that no progress body photo reaches a reader "
+            "surface (stored is not published), and the cadence sits one call from the photo index"
+        ),
+        plants=(("lambdas/emails/_census_probe_5061.py", _CALIBRATION_PUBLISHED_IMPORTER_PY),),
         track=False,  # the guard os.walks lambdas/web + lambdas/emails on disk, so an untracked module is in scope
     ),
 }
@@ -2231,6 +2250,18 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "INVISIBLE, stated: a published module handed a tracker row as an argument by an unswept caller (mcp/, "
         "lambdas/coach — the coach-context assembly #5071 is a sanctioned owner-only reader), a dynamic import by "
         "string, a direct DynamoDB read of the partition by a variable-built pk, and the live table.",
+        proved_on="2026-10-19",
+    ),
+    "structural::test_calibration_cadence_5061.py": _proof(
+        "structural::test_calibration_cadence_5061.py",
+        "ARMED 1/1 — baseline: 21 passed in 0.81s | mutated: 1 failed, 20 passed in 0.77s :: "
+        "test_no_published_module_imports_the_cadence | reverted: 21 passed in 0.73s",
+        "lambdas/web/ and lambdas/emails/ on disk (os.walk, every .py): a line-anchored import of `calibration_cadence` or "
+        "`calibration_leg` fails and names the file, and any published-tree module other than the HMAC-gated viewer that names "
+        "`progress_photos` / `progress_capture` fails; a synthetic two-tree root proves both detectors. Also pinned: the cadence "
+        "projects only date fields (no photo key) and the block carries no media path. STILL INVISIBLE, stated: a published "
+        "module handed a cadence block by an unswept caller (mcp/, lambdas/coach), a dynamic import by string, a variable-built "
+        "photo pk, and the live table.",
         proved_on="2026-10-19",
     ),
 }
