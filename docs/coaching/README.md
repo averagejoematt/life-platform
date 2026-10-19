@@ -50,7 +50,7 @@ tracked file ever declares itself PRIVATE again.
 
 ## The files that remain here are deliberately public
 
-`COACH_SESSION.md`, `CHAT_MODES.md`, `READING_CALIBRATION.md`,
+`COACH_SESSION.md` (a pointer since #5086: the session protocol is `.claude/skills/coach-session/SKILL.md`), `CHAT_MODES.md`, `READING_CALIBRATION.md`,
 `WORKORDER_HEVY_COMMIT_HARDENING.md`, and `routines/` were reviewed 2026-08-23
 (#3043) and stay public on purpose: they document *how the coaching system works*
 (session protocol, chat-mode registry, calibration philosophy, engineering work

@@ -3,7 +3,7 @@
 > **Status:** foundation doc. The original scope (through "Why this matters beyond the
 > journal itself" below) covers the connector-capability findings `#1480` verified and is
 > unchanged since. `#1479` (chat-mode command library, same epic — `#1476` chat-journey:
-> conversation as the 4th ingestion channel) adds the "The seven chat modes" section below
+> conversation as the 4th ingestion channel) adds the "The eight chat modes" section below
 > it, which defines the modes themselves and the command files that implement them.
 
 ## Why this exists
@@ -86,7 +86,7 @@ mode once one exists (`#1479`).
 
 ---
 
-# The seven chat modes (#1479)
+# The eight chat modes (#1479)
 
 This section is the follow-through the status note above anticipated — it does not
 change or contradict anything recorded above, it defines what consumes those findings.
@@ -102,7 +102,8 @@ surfaces is generated 1:1 from these filenames).
 
 | Mode | Command file | What it's for | Cadence |
 |---|---|---|---|
-| **Daily debrief** | `.claude/skills/daily-debrief/SKILL.md` | Post-workout review + night-before session authoring (`manage_hevy_routine` draft→dry_run→commit). Condensed from `docs/coaching/COACH_SESSION.md`, which stays the full source. | Nightly, when training |
+| **Daily debrief** | `.claude/skills/daily-debrief/SKILL.md` | Post-workout review + night-before session authoring (`manage_hevy_routine` draft→dry_run→commit). Condensed from the coach-session skill, which is the full source. | Nightly, when training |
+| **Coach session** | `.claude/skills/coach-session/SKILL.md` | The full training coach session — the packet and its `coach_context` first, then the ORDER contract (pre-flight → `plan_next_session` → `manage_hevy_routine` draft). The ONE source for Claude Code AND the claude.ai synced copy Desktop/mobile run (#5086; refresh procedure `docs/coaching/SYNCED_SKILLS.md`, drift check `scripts/check_synced_skill_drift.py`). `docs/coaching/COACH_SESSION.md` is a pointer to it. | Whenever he asks for a session, a routine or a training read |
 | **Journal interview** | `.claude/skills/journal-interview/SKILL.md` | Claude interviews Matthew, composes a journal entry, writes it to the Notion journal DB (Morning / Evening / Weekly Reflection / Stressor / Health Event templates). The `publish` variant (#1567) instead composes a *public* essay from the interview — exact-text in-chat approval gates the PR; no approval → private Notion draft, never published. | Daily / ad hoc |
 | **Speak to coaches** | `.claude/skills/speak-to-coaches/SKILL.md` | Works the open coach check-in queue (`#915`) one question at a time, conversationally; optional habit-reflection pass; weekly Field Notes response. | Ad hoc, whenever Matthew has a few minutes |
 | **Open check-in** | `.claude/skills/open-checkin/SKILL.md` | Free-form talk with no queue to work — Matthew just talks, Claude routes whatever comes up to the right write tool at the close. | Whenever |
@@ -202,5 +203,11 @@ never the reverse.** Concretely:
   CI gate — the kit is deliberately not in git, so no CI job can see it. Its checklist
   can't rot: `tests/test_vlog_mode_contract_1571.py` asserts every rule it checks for is
   still anchored in the mode file.
+- For `coach-session` the claude.ai side is an **account skill**, not a Project prompt: the
+  desktop app syncs it DOWN to `~/.claude/skills/synced/` and nothing pushes it up. It is
+  uploaded whole from `.claude/skills/coach-session/SKILL.md` (no condensation), and
+  **`python3 scripts/check_synced_skill_drift.py`** (#5086) diffs the local synced copies
+  against the repo source. The refresh procedure is `docs/coaching/SYNCED_SKILLS.md`.
+  It is owner-run and not a CI gate; on CI it reports a stated skip.
 - If the two surfaces ever visibly disagree in a live session, the repo file wins — a
   claude.ai Project prompt is never the tiebreaker.

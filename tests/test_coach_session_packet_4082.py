@@ -427,7 +427,8 @@ def test_block_position_before_the_block_start_is_week_0():
 
 
 # ── the instructions point at it ───────────────────────────────────────────────────────
-@pytest.mark.parametrize("path", ["docs/coaching/COACH_SESSION.md", ".claude/skills/daily-debrief/SKILL.md"])
+# #5086: the coach-session skill is the protocol's one source (docs/coaching/COACH_SESSION.md is a pointer to it).
+@pytest.mark.parametrize("path", [".claude/skills/coach-session/SKILL.md", ".claude/skills/daily-debrief/SKILL.md"])
 def test_chat_instructions_call_the_packet_first(path):
     """Mutation: remove the packet from the doc that tells a chat session what to call."""
     assert "get_coach_session_packet" in (ROOT / path).read_text()

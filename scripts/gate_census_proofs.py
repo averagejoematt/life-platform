@@ -3635,3 +3635,29 @@ CI_PROOFS["ci::panel-rubric-gate.yml::gate::3"] = {
     ),
     "proved_on": "2026-10-19",
 }
+
+
+# #5086 (2026-10-19): the synced chat-skill drift check — the claude.ai account copy of coach-session (synced DOWN to
+# this machine in two places) against its one repo source. Proved by hand on the lane, each plant restored from a byte copy.
+GUARD_PROOFS["guard::scripts/check_synced_skill_drift.py"] = {
+    "gate_name": "scripts/check_synced_skill_drift.py",
+    "command": "python3 -m pytest tests/test_synced_skill_drift_5086.py -q -p no:cacheprovider   # baseline 12 passed",
+    "mutation": (
+        "two plants in scripts/check_synced_skill_drift.py, ONE AT A TIME: M1 `_same()` returns True (every copy compares "
+        "in sync — the dark mode); M2 `run()` returns 0 when a copy drifted (drift reported but the exit code says clean)."
+    ),
+    "observed": (
+        "M1 3 failed / 9 passed (a differing copy, a description-only change and a named stale copy each read in sync); the "
+        "CLI against the REAL stale synced copies on this laptop printed `coach-session: 2 of 2 synced copies match the repo "
+        "source`, exit 0 — the false green the test catches. M2 2 failed / 10 passed (the differing-copy and the env/explicit "
+        "path tests). Restored 12 passed; the CLI back to `0 of 2 synced copies match`, exit 1."
+    ),
+    "scope": (
+        "Compares name + description + the whitespace-normalised body only; another frontmatter key differing is NOT drift by "
+        "design (the upload strips allowed-tools). Standalone/manual — not wired into blocking CI, and on CI it reports "
+        "`skipped: no synced copy on this machine` (exit 0) because the synced copy exists only where the desktop app runs. "
+        "It sees the two local copies the app writes, never the claude.ai account itself: a local copy lagging a fresh upload "
+        "reads as drift until the app's next sync round."
+    ),
+    "proved_on": "2026-10-19",
+}
