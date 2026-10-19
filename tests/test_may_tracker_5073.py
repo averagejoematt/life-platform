@@ -48,8 +48,8 @@ FLOOR = float(charter_value("governing_goal.rate_band_lb_per_wk.floor"))
 CEIL = float(charter_value("governing_goal.rate_band_lb_per_wk.ceiling"))
 STEPS_FLOOR = int(charter_value("steps.floor"))
 STEPS_TARGET = int(charter_value("steps.target"))
-GATE_LB = float(charter_value("gated_movements.running.gate_lb"))
-WEIGHT = GATE_LB + 60.0  # above the landing weight, so the band governs
+RUN_AT_LB = float(charter_value("gated_movements.running.gate_lb"))
+WEIGHT = RUN_AT_LB + 60.0  # above the landing weight, so the band governs
 
 
 def _week_rate(rate, counted=True):
@@ -214,8 +214,8 @@ def test_fitness_tests_are_absent_until_the_battery_exists():
 
 
 def test_the_running_gate_is_the_charters():
-    r = mt.running_gate_section(GATE_LB + 12.5)
-    assert r["value"] == 12.5 and r["gate_lb"] == GATE_LB and r["weight_cleared"] is False
+    r = mt.running_gate_section(RUN_AT_LB + 12.5)
+    assert r["value"] == 12.5 and r["gate_lb"] == RUN_AT_LB and r["weight_cleared"] is False
     assert r["prerequisites"] == charter_value("gated_movements.running.prerequisites")
     assert mt.running_gate_section(None)["state"] == "absent"
 
