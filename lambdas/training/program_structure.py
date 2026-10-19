@@ -591,12 +591,14 @@ SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
         "archetype": "upper",
         "anchors": [["bench", "heavy"], ["row", "heavy"], ["overhead_press", "moderate"], ["vertical_pull", "moderate"]],
         "anchor_sets": {"vertical_pull": 2},
-        "accessories": ["cable_tricep_pushdown", "db_curl"],
+        # #5053: the rear-delt slot (delts 14–18/wk, charter `volume_priorities`) — the upper heavy day carries the pec deck
+        "accessories": ["cable_tricep_pushdown", "db_curl", "reverse_pec_deck"],
     },
     "lower_heavy": {
         "archetype": "lower",
         "anchors": [["squat", "heavy"], ["hinge", "moderate"]],
         "accessories": ["leg_press", "leg_curl", "calf_raise_machine"],
+        "accessory_sets": {"calf_raise_machine": 4},  # #5053: calves at their MEV floor (8/wk) across the two lower days
     },
     # #5069 (owner ruling 5, 2026-10-18): the aesthetic day — overhead press, side + rear delts, biceps, triceps, traps.
     # Archetype `upper` (the Upper folder; the sequence credits it like any upper session whose sets reach the delts).
@@ -618,7 +620,10 @@ SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
     "lower_volume": {
         "archetype": "lower",
         "anchors": [["hinge", "volume"], ["squat", "volume"]],
-        "accessories": ["leg_curl", "calf_raise_machine", "machine_crunch"],
+        # #5053: core and calves reach their MEV floors (4 and 8 sets/wk) here; the second leg curl is the week's trade — the
+        # redline's 75-set week is full (`owner_redlines` total_hard_sets_wk) and hamstrings still sit at the 8-set floor
+        "accessories": ["calf_raise_machine", "machine_crunch"],
+        "accessory_sets": {"calf_raise_machine": 4, "machine_crunch": 4},
     },
 }
 """Per role: its archetype, the anchor exposures (pattern, intensity) and the block-fixed accessories, in the charter's order.
@@ -891,6 +896,7 @@ def session_prescription_for_role(
         )
     acc = EXPOSURES["accessory"]
     for k in tmpl["accessories"]:
+        n_acc = int((tmpl.get("accessory_sets") or {}).get(k, acc["sets"]))  # #5053: a floor slot may run more than 2 sets
         # an accessory is named by its catalog key already; without the catalog it is still
         # prescribable by that key, it just has not been checked against the skill ceiling
         key, why = _resolve_movement([k], catalog_movements, skill_ceiling, taken) if catalog_movements is not None else (k, None)
@@ -903,7 +909,7 @@ def session_prescription_for_role(
                 "intensity": "accessory",
                 "movement_key": key,
                 "resolution_note": why,
-                "sets": [{"kind": "working", "reps": list(acc["reps"])} for _ in range(acc["sets"])],
+                "sets": [{"kind": "working", "reps": list(acc["reps"])} for _ in range(n_acc)],
                 "rest_seconds": acc["rest_seconds"],
                 "cue": acc["cue"],
             }
@@ -1023,14 +1029,7 @@ def weekly_sets_by_muscle(catalog_movements: dict[str, Any], skill_ceiling: int 
     from training import owner_redlines
 
     lift = owner_redlines.REDLINES["lifting_sessions_per_wk"]
-    by_muscle: dict[str, int] = {}
-    sessions_by_muscle: dict[str, set[str]] = {}
-    for role in SESSION_SEQUENCE["session_roles"]:
-        rx = session_prescription_for_role(role, catalog_movements=catalog_movements, skill_ceiling=skill_ceiling)
-        for e in rx["exposures"]:
-            muscle = (catalog_movements.get(e.get("movement_key") or "") or {}).get("primary_muscle") or "unresolved"
-            by_muscle[muscle] = by_muscle.get(muscle, 0) + len(e["sets"])
-            sessions_by_muscle.setdefault(muscle, set()).add(role)
+    by_muscle, sessions_by_muscle = _week_tallies(catalog_movements, skill_ceiling)
     out: dict[str, dict[str, Any]] = {}
     for g, spec in REDLINE_MUSCLE_GROUPS.items():
         roles = set().union(*(sessions_by_muscle.get(m, set()) for m in spec["primary_muscles"]))
@@ -1043,6 +1042,33 @@ def weekly_sets_by_muscle(catalog_movements: dict[str, Any], skill_ceiling: int 
             "sessions": [r for r in SESSION_SEQUENCE["session_roles"] if r in roles],
         }
     return out
+
+
+def _week_tallies(catalog_movements: dict[str, Any], skill_ceiling: int = 2) -> tuple[dict[str, int], dict[str, set[str]]]:
+    """({primary muscle: hard sets}, {primary muscle: roles}) over the five roles — the one tally under every weekly view."""
+    by_muscle: dict[str, int] = {}
+    sessions_by_muscle: dict[str, set[str]] = {}
+    for role in SESSION_SEQUENCE["session_roles"]:
+        rx = session_prescription_for_role(role, catalog_movements=catalog_movements, skill_ceiling=skill_ceiling)
+        for e in rx["exposures"]:
+            muscle = (catalog_movements.get(e.get("movement_key") or "") or {}).get("primary_muscle") or "unresolved"
+            by_muscle[muscle] = by_muscle.get(muscle, 0) + len(e["sets"])
+            sessions_by_muscle.setdefault(muscle, set()).add(role)
+    return by_muscle, sessions_by_muscle
+
+
+def volume_floor_coverage(catalog_movements: dict[str, Any], skill_ceiling: int = 2) -> dict[str, Any]:
+    """#5053: the charter's MEV floors and `sets_per_wk` bands against the five roles' weekly sets (`training.volume_floors`)."""
+    from training import volume_floors
+
+    by_muscle, _ = _week_tallies(catalog_movements, skill_ceiling)
+    accs = {r: list(t["accessories"]) for r, t in SESSION_TEMPLATES.items()}
+    return {
+        "floors": volume_floors.floor_coverage(by_muscle, accs),
+        "bands": volume_floors.charter_band_rows(by_muscle),
+        "sets_by_muscle": dict(sorted(by_muscle.items())),
+        "charter_version": CHARTER_VERSION,
+    }
 
 
 def summary() -> dict[str, Any]:

@@ -78,7 +78,8 @@ LAST_SESSION_LOOKBACK_DAYS = 28
 ROUTINE_INDEX_LOOKBACK_DAYS = _ROUTINE_INDEX_LOOKBACK_DAYS  # one value (#4312): the block-read seams read the same lookback
 
 SOURCES: dict[str, str] = {
-    "muscle_volume": "get_muscle_volume (training.muscle_volume.working_sets_by_muscle, #4071) — plan_next_session's window",
+    "muscle_volume": "get_muscle_volume (training.muscle_volume.working_sets_by_muscle, #4071) — plan_next_session's window; "
+    "below_mev_14d = training.volume_floors over that tool's 14d trailing window vs config/training_landmarks.json (#5053)",
     "last_session_by_type": (
         "tools_strength._read_hevy_all_phases + training.muscle_volume.normalize_hevy_items; type = "
         "training.routine_title.resolve_archetype, role = session_sequence.completed_positions (#4110/#4161), loaded = training_streaks.is_loaded_session; "
@@ -164,6 +165,7 @@ def _muscle_volume(target_date: str) -> tuple[Any, dict[str, Any]]:
     value = {
         "window_7d": trailing.get("7d"),
         "window_28d": trailing.get("28d"),
+        "below_mev_14d": vol.get("below_mev_14d"),  # #5053: training.volume_floors over the 14d trailing window — no second count
         "landmark_status_28d": {m: r.get("volume_landmark_status") for m, r in (vol.get("muscle_volume") or {}).items()},
         "unattributed": vol.get("unattributed"),
         "completeness": vol.get("completeness"),
