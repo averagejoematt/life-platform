@@ -114,6 +114,10 @@ _CLAUSE_SPLIT_RE = re.compile(r"[.\n;]+")
 _SCOPE_NAME_RE = re.compile(r"^\s*([A-Za-z][\w/&()'+]*(?:\s+[\w/&()'+-]+){0,3}?)\s*[:\-–—]\s*\S")
 
 
+# #5052: a float-compare guard (Hevy stores kg to 2 dp), the same one `stall_detector` uses — not a threshold.
+PROGRESSED_LOAD_TOLERANCE_KG = 0.05
+
+
 def _clamp(v: float) -> float:
     return max(RPE_MIN, min(RPE_MAX, v))
 
@@ -292,8 +296,32 @@ def is_working_set(s: dict[str, Any]) -> bool:
     return str(s.get("type") or "normal").lower() != "warmup"
 
 
-def grade_sets(ceiling: float | None, sets: list[dict[str, Any]]) -> dict[str, Any]:
+def _progressed(val: float, s: dict[str, Any], i: int, n: int, progression: dict[str, Any] | None) -> bool:
+    """#5052: a set at a load ABOVE the prescribed one, logged at or under the charter effort
+    limit for its class (ceiling + tolerance; an isolation movement's last set reads its own
+    band) — the owner raised it himself and it is progress, not a breach."""
+    if not progression or progression.get("prescribed_kg") is None:
+        return False
+    try:
+        load = float(s.get("weight_kg") or 0)
+    except (TypeError, ValueError):
+        return False
+    if load <= float(progression["prescribed_kg"]) + PROGRESSED_LOAD_TOLERANCE_KG:
+        return False
+    limit = progression.get("last_set_limit_rpe") if i == n - 1 and progression.get("last_set_limit_rpe") is not None else None
+    limit = limit if limit is not None else progression.get("limit_rpe")
+    return limit is not None and val <= float(limit)
+
+
+def grade_sets(ceiling: float | None, sets: list[dict[str, Any]], progression: dict[str, Any] | None = None) -> dict[str, Any]:
     """Grade one movement's PERFORMED sets against its prescribed ceiling.
+
+    `progression` (#5052) is `{prescribed_kg, limit_rpe, last_set_limit_rpe}` — the routine's
+    heaviest prescribed working load and the charter's effort limits for the movement's class
+    (`training.load_progression.grading_limits`). A set carried ABOVE the prescribed load at or
+    under that limit is counted in `sets_progressed`: a third named state, neither within nor
+    over the routine's ceiling, and kept OUT of `pct_within_ceiling`'s denominator — it is
+    never folded into a percentage. A raised set above the limit is still a breach.
 
     ADR-104 absence semantics, three ways:
       • ceiling is None  → status "unprescribed". Not graded, not counted compliant.
@@ -306,8 +334,9 @@ def grade_sets(ceiling: float | None, sets: list[dict[str, Any]]) -> dict[str, A
     """
     working = [s for s in (sets or []) if is_working_set(s)]
     graded: list[float] = []
+    progressed: list[float] = []
     absent = 0
-    for s in working:
+    for i, s in enumerate(working):
         rpe = s.get("rpe")
         try:
             val = float(rpe) if rpe not in (None, "") else None
@@ -315,6 +344,8 @@ def grade_sets(ceiling: float | None, sets: list[dict[str, Any]]) -> dict[str, A
             val = None
         if val is None:
             absent += 1
+        elif _progressed(val, s, i, len(working), progression):
+            progressed.append(val)
         else:
             graded.append(val)
 
@@ -327,12 +358,18 @@ def grade_sets(ceiling: float | None, sets: list[dict[str, Any]]) -> dict[str, A
         "sets_over_ceiling": 0,
         "max_overage": None,
         "pct_within_ceiling": None,
+        "sets_progressed": len(progressed) if ceiling is not None else 0,
+        "progression_limit_rpe": (progression or {}).get("limit_rpe"),
     }
     if ceiling is None:
         out["status"] = "unprescribed"
         return out
+    if progressed:
+        out["sets_graded"] = len(graded) + len(progressed)
+        out["max_rpe"] = max(graded + progressed)
     if not graded:
-        out["status"] = "unreadable"
+        out["status"] = "graded" if progressed else "unreadable"
+        out["max_overage"] = 0.0 if progressed else None
         return out
 
     over = [v for v in graded if v > ceiling]

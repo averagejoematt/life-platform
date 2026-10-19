@@ -5,7 +5,7 @@ Owner rulings, adopted 2026-09-30 (Session BB, the v0.5 red team):
   * OD4 (A): base 60–75 hard sets/wk; 🟢 adds at most +4 sets per upper session and +3 per lower
     session, at most +12 a week; the session ceiling goes from 18 to 20 for the base and 24 with 🟢.
   * OD5 (A): `protein_floor_missed` blocks the 🟢 block ONLY. It no longer stops gains or the base
-    sets (the gain rule itself lives in `owner_redlines.REDLINES['lifting_sessions_per_wk']['gain_rule']`).
+    sets (the gain rule itself lives in the charter, `progression.gain_rule`, applied by `training.load_progression`, #5052).
   * OD8 (a): NO 🟢 tail on the v0.4 locked templates (locked until `program_structure.BLOCK_LOCK`
     'locked_until', 2026-11-04). The locked templates carry no `bonus` exposure, so raising the
     ceiling adds no set to any locked session: the ceiling is a BOUND the generator trims to, never

@@ -260,10 +260,9 @@ def test_the_joints_packet_applies_the_scaled_cap():
 def test_the_stale_constants_carry_their_provenance():
     assert cf.STALE_CAPS == {"short": {1: 2}, "long": {1: 2, 2: 2, 3: 3}}
     assert "Nosaka 2001" in cf.STALE_PROVENANCE["evidence"] and "Chen 2012" in cf.STALE_PROVENANCE["evidence"]
-    assert (
-        "the first three exposures of a novel-again pattern"
-        in owner_redlines.REDLINES["lifting_sessions_per_wk"]["gain_rule"]["refused_when"]
-    )
+    from training import load_progression  # #5052: the gain rule moved to the charter
+
+    assert "the first three exposures of a novel-again pattern" in load_progression.gain_rule()["refused_when"]
 
 
 # ── 3(ii). the fatigue trigger ─────────────────────────────────────────────────────────
