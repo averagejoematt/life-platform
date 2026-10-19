@@ -273,6 +273,9 @@ def bundled_extra_paths(repo_root=REPO_ROOT):
         for name in sorted(os.listdir(coaches_src)):
             if name.endswith(".json") and not name.endswith("_stance.json"):
                 paths.append(f"config/coaches/{name}")
+    charter = os.path.join(repo_root, "config", "training_charter.json")
+    if os.path.isfile(charter):
+        paths.append("config/training_charter.json")
     redirects_map = os.path.join(repo_root, "redirects.map")
     if os.path.isfile(redirects_map):
         paths.append("redirects.map")
@@ -312,6 +315,14 @@ def stage_tree(out_dir):
                 shutil.copy2(os.path.join(coaches_src, name), os.path.join(coaches_out, name))
     else:
         print("⚠️  config/coaches/ missing — voice specs will be S3-only", file=sys.stderr)
+    # #5068 (ADR-164): the public training charter ships in the bundle so the engine's
+    # read of it never depends on a live S3 GetObject (#3675 class). The owner-only
+    # twin is NOT staged — it is never in the repo and arrives by its own channel.
+    charter = os.path.join(REPO_ROOT, "config", "training_charter.json")
+    if os.path.isfile(charter):
+        shutil.copy2(charter, os.path.join(cfg_out, "training_charter.json"))
+    else:
+        print("⚠️  config/training_charter.json missing — the training charter will be S3-only", file=sys.stderr)
     # #1430: redirects.map for qa_smoke_lambda's weekly legacy-redirect spot-check
     # (lambdas/redirect_spotcheck.py searches alongside its own module first, same
     # pattern as food_vocabulary.json above).

@@ -83,7 +83,27 @@ from typing import Any, Callable
 
 from health import deficit_disclosures
 
-from training import owner_redlines, program_structure, recent_aerobic, redline_rate, self_added_volume, training_context_registry
+from training import (
+    owner_redlines,
+    program_structure,
+    recent_aerobic,
+    redline_rate,
+    self_added_volume,
+    training_charter,
+    training_context_registry,
+)
+
+# The v1 critics stub the block carries until #3752 wires the adversarial stage (extracted
+# from constraint_block so the #5068 charter stamp did not grow the function).
+_CRITICS_NOT_WIRED = {
+    "ran": False,
+    "note": (
+        "v1: the deterministic stage only. The adversarial critics (#3752) — muscle-defense, joints/tendons, "
+        "aggressive-rate advocate, blueprint historian, each holding a DIFFERENT evidence packet and each "
+        "returning approve / change X / veto with the number it argued from — are not wired yet. Do not report "
+        "a plan built on this block as red-teamed."
+    ),
+}
 
 ENGINE_VERSION = "plan-engine@1.10.0"  # #4503 OD7: walking_collapse counts standalone walks + carries the named-human actuator mark
 # plan-engine@1.9.0 (#4387): recent_aerobic per activity; walking_collapse + walking_overshoot evaluated, report-only
@@ -959,15 +979,12 @@ def constraint_block(
         "program": program,
         "accessory_rotation_ok": rotation["ok"],
         "accessory_rotation": rotation,
-        "critics": {
-            "ran": False,
-            "note": (
-                "v1: the deterministic stage only. The adversarial critics (#3752) — muscle-defense, joints/tendons, "
-                "aggressive-rate advocate, blueprint historian, each holding a DIFFERENT evidence packet and each "
-                "returning approve / change X / veto with the number it argued from — are not wired yet. Do not report "
-                "a plan built on this block as red-teamed."
-            ),
-        },
+        # #5068 (ADR-164): the charter version this plan was built beside. None means no
+        # charter could be read and the plan says so. W1 (#5050) moves the engine's reads
+        # (steps, split, rate band, cadences) onto the charter; until then the literals
+        # above still come from owner_redlines/program_structure and this is a stamp only.
+        "charter_version": training_charter.charter_version(),
+        "critics": dict(_CRITICS_NOT_WIRED),
         "honesty": [
             s
             for s in [

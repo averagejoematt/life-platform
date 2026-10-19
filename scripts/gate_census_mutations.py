@@ -510,6 +510,16 @@ _LINKED_PRIVATE_ROUTE_HTML = (
 # reader class the isolation sweep exists to refuse (a site endpoint serving a body-fat band
 # that is an estimate as if it were a number). Planted under lambdas/web/, the one tree the
 # gate names as never-acceptable, so it proves both the allowlist leg and the tree leg.
+# #5068 / #5087: the two charter probes. The first hand-copies the step floor the charter owns;
+# the second is a published serving module reading the merged charter instead of public_view().
+_CHARTER_HAND_COPY_PY = '"""census probe — a hand copy that must never exist."""\n\nSTEP_FLOOR = 12000\n'
+_CHARTER_PUBLISHED_READER_PY = (
+    '"""census probe — a published reader that must never exist."""\n\n'
+    "from training.training_charter import load_charter\n\n\n"
+    "def handle():\n"
+    '    return load_charter()["governing_goal"]\n'
+)
+
 _COACH_VISION_READER_PY = (
     '"""census probe — a reader that must never exist."""\n\n\n'
     "def handle(table):\n"
@@ -1245,6 +1255,32 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
             ),
         ),
         track=False,  # the guard rglobs lambdas/ scripts/ deploy/ mcp/ on disk, so an untracked module is in scope
+    ),
+    # #5068 (ADR-164): the training charter derivation guard — a new hand copy of a charter-owned
+    # value (here the step floor) in a swept engine module, outside the shrink-only ledger.
+    "structural::test_training_charter_derivation_5068.py": MutationSpec(
+        gate_id="structural::test_training_charter_derivation_5068.py",
+        target="tests/test_training_charter_derivation_5068.py",
+        detects=(
+            "a module under lambdas/training/ carrying its own copy of a charter-owned value (the 12,000 step floor) "
+            "instead of reading training_charter.charter_value() — the scattered-literal class #5068 exists to end; "
+            "the site has no row in ledgers/training_charter_residue.py, and the ledger may not gain one"
+        ),
+        plants=(("lambdas/training/_census_probe_5068.py", _CHARTER_HAND_COPY_PY),),
+        track=False,  # the guard os.walks lambdas/training on disk, so an untracked module is in scope
+    ),
+    # #5087: the charter's published-surface filter — a module under lambdas/web/ that reads the
+    # merged charter (target date, rate band, the owner twin) instead of public_view().
+    "structural::test_training_charter_privacy_5087.py": MutationSpec(
+        gate_id="structural::test_training_charter_privacy_5087.py",
+        target="tests/test_training_charter_privacy_5087.py",
+        detects=(
+            "a published serving module (lambdas/web) importing load_charter — the merged object that carries the "
+            "May target and, when the owner twin is present, his body and appearance targets; the owner ruled "
+            "2026-10-18 that no May countdown or target reaches the site, so a published surface reads public_view() only"
+        ),
+        plants=(("lambdas/web/_census_probe_5087.py", _CHARTER_PUBLISHED_READER_PY),),
+        track=False,  # the guard os.walks lambdas/web + lambdas/emails on disk, so an untracked module is in scope
     ),
 }
 
@@ -2120,6 +2156,37 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "INVISIBLE, stated: a rebuild reached through another name (an alias, getattr, or **kwargs unpacking) or by "
         "writing the apple_health partition directly.",
         proved_on="2026-10-09",
+    ),
+    "structural::test_training_charter_derivation_5068.py": _proof(
+        "structural::test_training_charter_derivation_5068.py",
+        "ARMED 1/1 — baseline: 4 passed in 0.70s | mutated: 1 failed, 3 passed in 0.73s :: "
+        "test_every_hand_copy_of_a_charter_value_is_a_ledgered_site_and_every_row_is_live | reverted: 4 passed in 0.67s",
+        "lambdas/training/ on disk (os.walk, every .py), lambdas/coach/critics*.py, mcp/tools_plan.py, mcp/tools_health.py, "
+        "mcp/tools_hevy_routine.py and the daily-debrief / speak-to-coaches / coach-session skills — CODE lines only "
+        "(comments cut by tokenize, docstrings and bare string statements dropped by ast; redline_changelog.py skipped whole "
+        "as a dated history of past values). Eight patterns, the numeric ones DERIVED from config/training_charter.json "
+        "(step floor/target, the rate band plus the pre-charter 2.5 line, the lifting-minute budget as a literal assignment, "
+        "the anchor and accessory cadences, the five session names, a scheduled deload week). Every `path::pattern` count is "
+        "held to ledgers/training_charter_residue.py in BOTH directions (a new copy and a stale row both red) and the row "
+        "count may only fall from the pinned seed. Positive controls: each pattern against its own probe line. STILL "
+        "INVISIBLE, stated: a value computed from a different literal (12 * 1000), copies in docs/ or tests/, numbers written "
+        "in words, and a hand copy in a module outside the swept set.",
+        proved_on="2026-10-18",
+    ),
+    "structural::test_training_charter_privacy_5087.py": _proof(
+        "structural::test_training_charter_privacy_5087.py",
+        "ARMED 1/1 — baseline: 8 passed in 0.83s | mutated: 1 failed, 7 passed in 0.86s :: "
+        "test_no_published_surface_reads_the_charter_except_through_public_view | reverted: 8 passed in 0.85s",
+        "lambdas/web/ and lambdas/emails/ on disk (os.walk, every .py): an AST walk flags any name but public_view imported "
+        "from the loader, any attribute read of load_charter / charter_value / charter_version off a loader alias, and a text "
+        "sweep flags the private channel's env var, local filename and S3 key; each shape has a synthetic positive control. "
+        "The tracked legs: the public charter carries none of the twin's keys (recursive, loader constant UNION the example "
+        "file's keys), the example twin holds null/empty placeholders only, the local twin is gitignored and untracked; the "
+        "whitelist names no governing_goal / phase_after_may / private path and every entry resolves; public_view() carries "
+        "no target date, rate band or private key even with a twin loaded through the env channel. STILL INVISIBLE, stated: "
+        "a published surface handed the merged charter as an argument by an unswept caller (mcp/, lambdas/coach), and the live "
+        "S3 objects, which no repo test reads.",
+        proved_on="2026-10-18",
     ),
 }
 

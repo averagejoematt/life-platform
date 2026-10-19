@@ -1122,7 +1122,13 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 266 -> 267 (2026-10-18, #4972): structural::test_rhythm_channel_privacy_4972.py — the owner-only rhythm
         # channel's sweep + /api/* route walk — arrives PROVEN via STRUCTURAL_HAND_PROOFS (two plants in site_api_vitals:
         # 3 failed / 4 and 1 failed / 6; restored 7 passed). Enters exactly that id, leaves {}.
-        <= 267
+        # Upper bound 267 -> 269 (2026-10-18, #5068 + #5087 the training charter, on charter-w0): TWO entrants,
+        # structural::test_training_charter_derivation_5068.py (the charter derivation sweep + shrink-only ledger) and
+        # structural::test_training_charter_privacy_5087.py (the public/private content filter over lambdas/web + lambdas/emails),
+        # both PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS in scripts/gate_census_mutations.py, ARMED 2/2:
+        # baseline 4 passed | mutated 1 failed | reverted 4 passed; baseline 8 passed | mutated 1 failed | reverted 8 passed).
+        # Enter exactly those two ids, leave {}, unproven does NOT move.
+        <= 269
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
