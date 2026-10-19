@@ -520,6 +520,15 @@ _CHARTER_PUBLISHED_READER_PY = (
     '    return load_charter()["governing_goal"]\n'
 )
 
+# #5073: a published module (lambdas/emails) that imports the owner-only May tracker — the target
+# date, the band and the projected weight would then be one call from an email body.
+_MAY_TRACKER_PUBLISHED_IMPORTER_PY = (
+    '"""census probe — a published importer that must never exist."""\n\n'
+    "from training import may_tracker\n\n\n"
+    "def handle(table):\n"
+    "    return may_tracker.latest_row(table)\n"
+)
+
 _COACH_VISION_READER_PY = (
     '"""census probe — a reader that must never exist."""\n\n\n'
     "def handle(table):\n"
@@ -1281,6 +1290,19 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
             "2026-10-18 that no May countdown or target reaches the site, so a published surface reads public_view() only"
         ),
         plants=(("lambdas/web/_census_probe_5087.py", _CHARTER_PUBLISHED_READER_PY),),
+        track=False,  # the guard os.walks lambdas/web + lambdas/emails on disk, so an untracked module is in scope
+    ),
+    # #5073: the owner-only May tracker — no published-surface module (lambdas/web, lambdas/emails) imports it.
+    "structural::test_may_tracker_5073.py": MutationSpec(
+        gate_id="structural::test_may_tracker_5073.py",
+        target="tests/test_may_tracker_5073.py",
+        detects=(
+            "a published module (lambdas/emails or lambdas/web) importing the owner-only May tracker — the target date, "
+            "the rate band and the projected weight at the date; the owner ruled 2026-10-18 that no May countdown or "
+            "target reaches a published surface, and the partition has no route, no site object and no tier projection "
+            "for any other gate to have an opinion about"
+        ),
+        plants=(("lambdas/emails/_census_probe_5073.py", _MAY_TRACKER_PUBLISHED_IMPORTER_PY),),
         track=False,  # the guard os.walks lambdas/web + lambdas/emails on disk, so an untracked module is in scope
     ),
 }
@@ -2198,6 +2220,18 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "a published surface handed the merged charter as an argument by an unswept caller (mcp/, lambdas/coach), and the live "
         "S3 objects, which no repo test reads.",
         proved_on="2026-10-18",
+    ),
+    "structural::test_may_tracker_5073.py": _proof(
+        "structural::test_may_tracker_5073.py",
+        "ARMED 1/1 — baseline: 35 passed in 0.83s | mutated: 1 failed, 34 passed in 0.73s :: "
+        "test_no_published_surface_imports_the_tracker | reverted: 35 passed in 0.70s",
+        "lambdas/web/ and lambdas/emails/ on disk (os.walk, every .py): a line-anchored import of `may_tracker` or "
+        "`tools_may_tracker` (either `import` form) fails and names the file; a synthetic two-tree root proves the "
+        "detector catches both forms. Also pinned: the owner-only tier and the CROSS_PHASE class are declared. STILL "
+        "INVISIBLE, stated: a published module handed a tracker row as an argument by an unswept caller (mcp/, "
+        "lambdas/coach — the coach-context assembly #5071 is a sanctioned owner-only reader), a dynamic import by "
+        "string, a direct DynamoDB read of the partition by a variable-built pk, and the live table.",
+        proved_on="2026-10-19",
     ),
 }
 

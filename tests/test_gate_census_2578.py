@@ -1128,11 +1128,16 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # both PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS in scripts/gate_census_mutations.py, ARMED 2/2:
         # baseline 4 passed | mutated 1 failed | reverted 4 passed; baseline 8 passed | mutated 1 failed | reverted 8 passed).
         # Enter exactly those two ids, leave {}, unproven does NOT move.
-        # Upper bound 269 -> 271 (2026-10-19, #5072 the panel rubric eval harness, on charter-w2): TWO proven entrants,
+        # Upper bound 269 -> 270 (2026-10-19, #5073 the owner-only May tracker, on charter-w2): structural::test_may_tracker_5073.py
+        # (the os.walk sweep of lambdas/web + lambdas/emails for an import of the tracker) arrives PROVEN via the re-runnable harness
+        # (MutationSpec + STRUCTURAL_PROOFS, ARMED 1/1: baseline 35 passed | mutated 1 failed | reverted 35 passed). Enters exactly
+        # that id, leaves {}, unproven does NOT move. Concurrent lanes stack: the driver adds entrants.
+        # Upper bound 270 -> 272 (2026-10-19, #5072 the panel rubric eval harness, on charter-w2, stacked on #5073 above):
+        # TWO proven entrants,
         # guard::scripts/panel_rubric_gate.py (GUARD_PROOFS: three plants, exit 1 / 1 failed of 11 / exit 1; restored exit 0)
         # and ci::panel-rubric-gate.yml::gate::3 (CI_PROOFS: the step's real run: text, M1 + M3 exit 1; restored exit 0). The
         # third entrant, the Live judge step, is ATTEMPTED_UNPROVEN. Enter exactly those ids, leave {}, unproven does NOT move.
-        <= 271
+        <= 272
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

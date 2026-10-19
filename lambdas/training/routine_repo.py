@@ -117,6 +117,15 @@ def put_versioned(ir: RoutineSpec) -> RoutineSpec:
     return ir
 
 
+def stamp_charter_version(ir: RoutineSpec) -> RoutineSpec:
+    """#5085: every drafted plan names the charter version that made it (`inputs_snapshot.charter_version`).
+    Fail-soft — a charter that did not load stamps None, which says so; it never blocks a draft."""
+    from training.training_charter import charter_version
+
+    ir.inputs_snapshot = {**(getattr(ir, "inputs_snapshot", None) or {}), "charter_version": charter_version()}
+    return ir
+
+
 def draft_versioned(ir: RoutineSpec) -> RoutineSpec:
     """Persist a DRAFT idempotently (#3115) — the entry point every drafting path uses.
 
@@ -135,6 +144,7 @@ def draft_versioned(ir: RoutineSpec) -> RoutineSpec:
     been renamed `[archived …]` and moved to the Archive folder in Hevy, so pointing a
     new draft at it would resurrect an archived routine rather than create today's.
     """
+    stamp_charter_version(ir)
     existing = get_current(ir.routine_id)
     if not existing:
         return put_versioned(ir)
