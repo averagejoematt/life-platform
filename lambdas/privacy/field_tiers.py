@@ -299,6 +299,12 @@ SOURCE_TIERS: dict[str, int] = {
     # the first row exists (ADR-154's ordering). Readers are the owner's MCP tool and his own
     # Telegram coach thread; `tests/test_coach_vision_isolation_3759.py` holds that set.
     "coach_vision": TIER_OWNER_ONLY,
+    # #5073: the weekly May tracker — his loss rate against the owner-only band and target date, the
+    # projected weight there, waist, steps, anchor strength and the triggers with their levers. The
+    # target date and the band are owner-only by ruling (no May countdown on any published surface),
+    # so the row takes that tier whole. Declared before the first row exists (ADR-154's ordering).
+    # Readers: the owner's MCP tool `get_may_tracker` and the coach-context assembly (#5071).
+    "may_tracker": TIER_OWNER_ONLY,
     # #4078: chat writes queued for approval. A queued row carries the target write tool's exact
     # arguments — journal-grade text, a pain-site statement, a meal — so it takes the highest tier
     # of anything it can hold. Declared before the first row exists (ADR-154's ordering). MCP-only.

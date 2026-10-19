@@ -144,6 +144,7 @@ def _authoring_freshness_gate(target_date: str) -> dict[str, Any]:
     to author when an input lags the latest ingested session. Reuses the Stage-1
     get_muscle_volume `completeness` signal and the Whoop recovery high-water mark.
     """
+    from mcp.authoring_input_age import add_input_age
     from mcp.recovery_authoring import assess_authoring_freshness
 
     vol_completeness = None
@@ -178,8 +179,8 @@ def _authoring_freshness_gate(target_date: str) -> dict[str, Any]:
         logger.warning("freshness gate: recovery read failed: %s", e)
 
     gate = assess_authoring_freshness(vol_completeness, latest_recovery, target_date)
+    gate = add_input_age(gate, latest_recovery, target_date)  # #5085: a stale Whoop/Hevy refuses by name (registry stale_hours)
     gate["data_current_through"] = data_current_through
-    gate["latest_recovery"] = latest_recovery
     return gate
 
 

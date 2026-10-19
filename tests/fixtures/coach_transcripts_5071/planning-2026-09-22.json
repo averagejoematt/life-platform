@@ -1,0 +1,257 @@
+{
+  "conversation": "planning-2026-09-22",
+  "source": "CloudWatch Logs /aws/lambda/life-platform-mcp, the handler's `Calling tool '<name>' with args` line (read-only filter-log-events, 2026-10-19); one conversation = calls with no gap over 45 minutes",
+  "window_utc": [
+    "2026-09-22T02:09:06Z",
+    "2026-09-22T04:14:55Z"
+  ],
+  "redaction": "tool name only, plus manage_hevy_routine's `action` and whether plan_next_session carried a routine_id; every other argument dropped",
+  "tool_calls": [
+    {
+      "at": "2026-09-22T02:09:06Z",
+      "tool": "get_capture_queues"
+    },
+    {
+      "at": "2026-09-22T02:09:12Z",
+      "tool": "plan_next_session"
+    },
+    {
+      "at": "2026-09-22T02:09:24Z",
+      "tool": "get_workouts"
+    },
+    {
+      "at": "2026-09-22T02:09:29Z",
+      "tool": "get_workout_detail"
+    },
+    {
+      "at": "2026-09-22T02:09:39Z",
+      "tool": "get_workout_detail"
+    },
+    {
+      "at": "2026-09-22T02:09:48Z",
+      "tool": "get_readiness_score"
+    },
+    {
+      "at": "2026-09-22T02:09:54Z",
+      "tool": "get_freshness_status"
+    },
+    {
+      "at": "2026-09-22T02:09:58Z",
+      "tool": "get_coach_thread"
+    },
+    {
+      "at": "2026-09-22T02:13:26Z",
+      "tool": "get_exercise_history"
+    },
+    {
+      "at": "2026-09-22T02:34:29Z",
+      "tool": "get_exercise_history"
+    },
+    {
+      "at": "2026-09-22T02:34:33Z",
+      "tool": "get_exercise_history"
+    },
+    {
+      "at": "2026-09-22T02:40:22Z",
+      "tool": "get_workouts"
+    },
+    {
+      "at": "2026-09-22T02:40:28Z",
+      "tool": "get_workout_detail"
+    },
+    {
+      "at": "2026-09-22T02:40:37Z",
+      "tool": "get_exercise_history"
+    },
+    {
+      "at": "2026-09-22T03:11:57Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "draft_custom"
+      }
+    },
+    {
+      "at": "2026-09-22T03:12:04Z",
+      "tool": "plan_next_session",
+      "args": {
+        "routine_id": "<present>"
+      }
+    },
+    {
+      "at": "2026-09-22T03:15:35Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "draft_custom"
+      }
+    },
+    {
+      "at": "2026-09-22T03:15:42Z",
+      "tool": "plan_next_session",
+      "args": {
+        "routine_id": "<present>"
+      }
+    },
+    {
+      "at": "2026-09-22T03:16:06Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "draft_custom"
+      }
+    },
+    {
+      "at": "2026-09-22T03:16:13Z",
+      "tool": "plan_next_session",
+      "args": {
+        "routine_id": "<present>"
+      }
+    },
+    {
+      "at": "2026-09-22T03:16:26Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "dry_run"
+      }
+    },
+    {
+      "at": "2026-09-22T03:16:41Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "draft_custom"
+      }
+    },
+    {
+      "at": "2026-09-22T03:16:48Z",
+      "tool": "plan_next_session",
+      "args": {
+        "routine_id": "<present>"
+      }
+    },
+    {
+      "at": "2026-09-22T03:16:59Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "dry_run"
+      }
+    },
+    {
+      "at": "2026-09-22T03:17:07Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "commit"
+      }
+    },
+    {
+      "at": "2026-09-22T03:25:23Z",
+      "tool": "log_decision"
+    },
+    {
+      "at": "2026-09-22T03:25:27Z",
+      "tool": "log_decision"
+    },
+    {
+      "at": "2026-09-22T03:25:30Z",
+      "tool": "log_decision"
+    },
+    {
+      "at": "2026-09-22T03:25:35Z",
+      "tool": "save_insight"
+    },
+    {
+      "at": "2026-09-22T03:25:38Z",
+      "tool": "write_platform_memory"
+    },
+    {
+      "at": "2026-09-22T03:25:42Z",
+      "tool": "write_platform_memory"
+    },
+    {
+      "at": "2026-09-22T03:27:02Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "commit"
+      }
+    },
+    {
+      "at": "2026-09-22T03:27:11Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "draft_custom"
+      }
+    },
+    {
+      "at": "2026-09-22T03:27:18Z",
+      "tool": "plan_next_session",
+      "args": {
+        "routine_id": "<present>"
+      }
+    },
+    {
+      "at": "2026-09-22T03:27:30Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "dry_run"
+      }
+    },
+    {
+      "at": "2026-09-22T03:27:37Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "commit"
+      }
+    },
+    {
+      "at": "2026-09-22T03:29:49Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "draft_custom"
+      }
+    },
+    {
+      "at": "2026-09-22T03:29:56Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "commit"
+      }
+    },
+    {
+      "at": "2026-09-22T03:55:19Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "list"
+      }
+    },
+    {
+      "at": "2026-09-22T03:55:29Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "get"
+      }
+    },
+    {
+      "at": "2026-09-22T03:56:11Z",
+      "tool": "plan_next_session"
+    },
+    {
+      "at": "2026-09-22T03:56:30Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "get"
+      }
+    },
+    {
+      "at": "2026-09-22T03:56:42Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "get"
+      }
+    },
+    {
+      "at": "2026-09-22T04:14:24Z",
+      "tool": "plan_next_session"
+    },
+    {
+      "at": "2026-09-22T04:14:55Z",
+      "tool": "get_exercise_history"
+    }
+  ]
+}
