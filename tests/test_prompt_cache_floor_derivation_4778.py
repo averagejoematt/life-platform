@@ -41,11 +41,29 @@ def _prompts():
     from coach.coach_extraction_prompt import EXTRACTION_SYSTEM_PROMPT
     from coach.coach_quality_gate import QUALITY_GATE_SYSTEM_PROMPT
 
+    charter = _charter_prompt()
     return {
         "coach-quality-gate": QUALITY_GATE_SYSTEM_PROMPT,
         "coach-state-updater": EXTRACTION_SYSTEM_PROMPT,
         "daily-brief": daily_brief_shared_system({"date": "2026-10-10"}, {"active_goals": ["lose weight", "build strength"]}, 72, "B"),
+        "charter-judge": charter,
+        "charter-narrative": charter,
+        "charter-retro": charter,
     }
+
+
+def _charter_prompt():
+    """#5084: the owner-only charter block, from the bundled public file (no S3, no twin)."""
+    from unittest import mock
+
+    from training import training_charter as tc
+
+    with mock.patch.object(tc, "_from_s3", lambda key: None), mock.patch.dict("os.environ", {tc.PRIVATE_ENV_VAR: ""}):
+        tc.reset_cache()
+        try:
+            return tc.prompt_prefix(published=False)
+        finally:
+            tc.reset_cache()
 
 
 def _module_env_default(path: Path, env: str):
@@ -93,6 +111,10 @@ def _cdk_env_for(stack_file: str, function_name: str, env_var) -> dict[str, str]
     """`{env_var: value}` from the environment dict the stack passes to `function_name`
     (empty when unset), each value resolved to what synth produces under no shell override
     (stacks/constants.py's own defaults). `env_var` is the route's override channel."""
+    if stack_file is None:
+        # #5084: a registered caller no Lambda hosts yet (the charter callers) — no deployed env, so
+        # the registry default is what it resolves to. The lane that deploys one names its stack.
+        return {}
     path = _CDK_STACKS / stack_file
     tree = ast.parse(path.read_text())
     dicts = {}
@@ -165,7 +187,8 @@ def test_a_registry_tier_swap_reds_every_declined_decision(monkeypatch):
     for fn in prompt_cache.CACHING_DECISIONS:
         problems = prompt_cache.decision_drift(fn, prompts[fn], {})
         assert any("re-measure" in p for p in problems), f"{fn}: a tier swap did not demand a re-measure: {problems}"
-        assert any("now clears" in p for p in problems), f"{fn}: a tier swap to a 512 floor did not red the decline: {problems}"
+        if not prompt_cache.CACHING_DECISIONS[fn]["engaged"]:  # #5084: an engaged caller still clears — the re-measure is its red
+            assert any("now clears" in p for p in problems), f"{fn}: a tier swap to a 512 floor did not red the decline: {problems}"
 
 
 def test_the_call_sites_send_the_derived_model():
@@ -216,6 +239,8 @@ def test_a_five_five_move_reds_every_declined_decision():
         problems = prompt_cache.decision_drift(fn, prompts[fn], _FIVE_FIVE)
         assert any("re-measure" in p for p in problems), f"{fn}: a 5.5 move did not demand a re-measure: {problems}"
         assert prompt_cache.cache_floor(prompt_cache.resolved_model(fn, _FIVE_FIVE)) == 512
+        if prompt_cache.CACHING_DECISIONS[fn]["engaged"]:
+            continue  # #5084: an engaged caller still clears a 512 floor — the re-measure above is its red
         assert any(
             "now clears" in p for p in problems
         ), f"{fn}: every recorded prefix is >=512 tok, so on a 512 floor the declined decision must red: {problems}"

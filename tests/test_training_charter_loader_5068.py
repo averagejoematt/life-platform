@@ -114,14 +114,14 @@ def test_an_absent_twin_is_cached_for_the_full_ttl_not_reprobed_per_call(monkeyp
     tc.load_charter()
     tc.charter_value("steps.floor")
     assert probes == [tc.PRIVATE_S3_KEY], probes
-    assert tc._cache is not None and tc._cache["_ttl"] == tc._CACHE_TTL_SECONDS
+    assert tc._cache is not None and tc._cache_ttl == tc._CACHE_TTL_SECONDS
 
 
 def test_a_missing_public_half_is_reprobed_quickly(monkeypatch):
     monkeypatch.setattr(tc, "_from_local_file", lambda b: None)
     tc.reset_cache()
     tc.load_charter()
-    assert tc._cache is not None and tc._cache["_ttl"] == tc._MISS_TTL_SECONDS
+    assert tc._cache is not None and tc._cache_ttl == tc._MISS_TTL_SECONDS
 
 
 def test_a_denied_s3_read_warns_once_per_container_then_debug(monkeypatch, caplog):
@@ -184,3 +184,36 @@ def test_plan_engine_stamps_the_charter_version():
     assert (
         block["charter_version"] == tc.charter_version() == json.loads((_REPO / "config" / "training_charter.json").read_text())["version"]
     )
+
+
+def test_the_cache_bookkeeping_never_reaches_a_caller():
+    """C1 review nit (#5084): the TTL used to ride the cached object as `_ttl` and came back
+    from load_charter(). It is module state now; no `_`-prefixed key but the file's own note."""
+    c = tc.load_charter()
+    assert "_ttl" not in c
+    assert not [k for k in c if k.startswith("_") and k != "_README"], sorted(c)
+
+
+def test_public_view_reads_through_the_cache(monkeypatch):
+    """C1 review nit (#5084): public_view() called _load_public() directly, re-reading the file on
+    every call. It reads the cached public half now: one public read per TTL, whoever asks."""
+    reads = []
+    monkeypatch.setattr(
+        tc, "_from_local_file", lambda b: reads.append(b) or (_real_from_local_file(b) if b == tc.PUBLIC_BASENAME else None)
+    )
+    tc.reset_cache()
+    tc.load_charter()
+    tc.public_view()
+    tc.public_view()
+    tc.prompt_prefix(published=True)
+    tc.prompt_prefix(published=False)
+    assert reads.count(tc.PUBLIC_BASENAME) == 1, reads
+
+
+def test_public_view_never_carries_a_twin_key_that_shadows_a_public_one(monkeypatch):
+    """Routing public_view() through the MERGED cache must not let the twin in: it reads the
+    cached PUBLIC half, so a twin that overrides a whitelisted public key changes nothing."""
+    monkeypatch.setenv(tc.PRIVATE_ENV_VAR, json.dumps({"steps": {"floor": 1, "target": 2}}))
+    tc.reset_cache()
+    assert tc.load_charter()["steps"]["floor"] == 1, "the merged view takes the twin (that is its contract)"
+    assert tc.public_view()["steps"]["floor"] == 12000
