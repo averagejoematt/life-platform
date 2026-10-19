@@ -508,9 +508,6 @@ def mcp_server() -> list[iam.PolicyStatement]:
                 f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/hevy/cron_enabled",
                 f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/hevy/autoreg_add_load_enabled",
                 f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle",
-                # #5080: the nightly pre-draft's plan-source switch (`v04 | charter`). Read-only; the parameter itself is
-                # NOT CDK-owned (a deploy would re-assert its value and undo a revert) and its absence means `charter`.
-                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/training-plan-source",
             ],
         ),
         iam.PolicyStatement(

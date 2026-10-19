@@ -391,14 +391,9 @@ def test_every_frozen_movement_is_in_the_catalog():
     assert set(program_v04.V04_TEMPLATES) == set(program_v04.SESSION_SEQUENCE["session_roles"])
 
 
-# ── the stack: the read grant is there; the parameter is not CDK-owned ──────────────────
-def test_the_grant_exists_and_the_parameter_is_not_cdk_owned():
-    import sys
-
-    sys.path.insert(0, str(ROOT / "cdk"))
-    from stacks import role_policies_serve as rp
-
-    arns = [r for st in rp.mcp_server() for r in st.resources if ":ssm:" in r]
-    assert any(a.endswith(f"parameter{ps.PARAM_NAME}") for a in arns), arns
+# ── the stack: the parameter is not CDK-owned. The read grant itself is held out of the wave for the owner's
+# attended LifePlatformMcp apply (an additive IAM statement puts the production IAM gate in the deploy path); until
+# it lands the switch reads AccessDenied and fails safe to `charter` (the `no_permission` case of the default test above).
+def test_the_parameter_is_not_cdk_owned():
     stacks = "\n".join(p.read_text(encoding="utf-8") for p in (ROOT / "cdk" / "stacks").glob("*.py"))
     assert "StringParameter" not in stacks, "a CDK-owned value would be re-asserted on every deploy and undo a revert"
