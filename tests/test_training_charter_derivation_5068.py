@@ -81,6 +81,7 @@ SWEEP_FILES = (
     "mcp/tools_plan.py",
     "mcp/tools_health.py",
     "mcp/tools_hevy_routine.py",
+    "mcp/tools_lifestyle.py",  # the movement-score step_target default — a #5056 Set member
     "mcp/tools_benchmark.py",  # RUN_GATE_LB — a #5068 Set member
     "lambdas/web/site_api_nutrition.py",  # _TARGET_RATE_LB_WK — a #5068 / #5087 Set member (a published surface)
     "config/user_goals.json",  # daily_movement_target — a #5068 Set member (a second config carrying a steps target)

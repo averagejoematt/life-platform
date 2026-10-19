@@ -561,7 +561,7 @@ def tool_get_coach_session_packet(args):
         value, status = _wrap(reader)(target_date)
         fields[name] = _field(name, value, status)
     states = {name: f["state"] for name, f in fields.items()}
-    return {
+    out = {
         "target_date": target_date,
         "packet_version": PACKET_VERSION,
         "states": states,
@@ -581,3 +581,6 @@ def tool_get_coach_session_packet(args):
             "Consult a qualified healthcare provider before making health decisions based on this data."
         ),
     }
+    from mcp.plan_helpers import attach_coach_context  # #5071: the pre-flight call carries the guidance, the charter and the May tracker
+
+    return attach_coach_context(out, target_date, packet=out)

@@ -492,6 +492,23 @@ _PACKS = {
 }
 
 
+# The Performance seat's route keys: its thread reads the ONE planning context (#5071) — the charter, the
+# panel synthesis, the clinical guidance as reference context and the May frame — instead of the bare clinical block.
+_TRAINING_ROUTE_KEYS = frozenset({"physical", "training"})
+
+
+def _training_context(today: str, clinical: str) -> str:
+    """`training.coach_context.assemble` for the owner's Telegram thread (published=False), the clinical block passed
+    in as its guidance section. Fail-soft: on any trouble the bare clinical block, as before."""
+    try:
+        from training import coach_context
+
+        return coach_context.assemble(today, packet=None, constraint_block=None, guidance=clinical, published=False)["text"]
+    except Exception as e:  # noqa: BLE001 — the chat runs on the clinical block alone
+        logger.warning("[domain_facts] coach context unavailable: %s", e)
+        return clinical
+
+
 def _persona_id(coach_id: str) -> tuple:
     """(pack key, canonical persona id) for a route id, a short id, or a persona id."""
     raw = (coach_id or "").strip().lower()
@@ -584,6 +601,8 @@ def domain_facts_block(coach_id: str, table, today: Optional[str] = None) -> str
         clinical = clinical_context_block(table, published=False)
     except Exception as e:  # pragma: no cover — bundle edge; the renderer is itself fail-soft
         logger.warning("[domain_facts] clinical context unavailable: %s", e)
+    if key in _TRAINING_ROUTE_KEYS:
+        clinical = _training_context(today, clinical)  # #5071: the one planning context, the clinical block inside it
     if clinical:
         sections.append(clinical)
     track_section = coach_team_texture.track_record_section(track_lines)

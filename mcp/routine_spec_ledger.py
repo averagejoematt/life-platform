@@ -122,6 +122,8 @@ def build_spec(ir: Any, *, committed_at: str | None = None) -> dict[str, Any]:
         # the closest existing field to "which session authored this"; reused
         # rather than inventing a second provenance concept.
         "session_role": ir.created_by,
+        # #5085: the charter version the plan was drafted under (stamped by routine_repo.draft_versioned)
+        "charter_version": (getattr(ir, "inputs_snapshot", None) or {}).get("charter_version"),
         "schema_version": 1,
     }
 

@@ -94,6 +94,7 @@ from training import (
     recent_aerobic,
     redline_rate,
     self_added_volume,
+    steps_nudge,
     steps_ramp,
     training_charter,
     training_context_registry,
@@ -776,7 +777,9 @@ def _steps_ramp_block(
             [] if window is not None else [st.get("detail") or st.get("error") or "the steps window was not read"]
         )
         return {"date": date, "state": "unknown", "reason": "; ".join(why), "charter_version": training_charter.charter_version()}
-    return steps_ramp.compute(date, window, pain_flag_instances=pain_instances, pain_dismissals=dismissals, deload_records=deload_records)
+    out = steps_ramp.compute(date, window, pain_flag_instances=pain_instances, pain_dismissals=dismissals, deload_records=deload_records)
+    out["steps_target_line"] = steps_nudge.target_line(out)  # #5056: the day's floor/target line the coach states every day
+    return out
 
 
 def _walking_block(walk_hr_wk_now: float | None, failed_reads: dict[str, dict[str, Any]]) -> dict[str, Any]:

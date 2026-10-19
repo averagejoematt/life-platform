@@ -154,6 +154,7 @@ from mcp.tools_lifestyle import (
     tool_save_insight,
     tool_update_insight_outcome,
 )
+from mcp.tools_may_tracker import GET_MAY_TRACKER_DESCRIPTION, GET_MAY_TRACKER_INPUT, tool_get_may_tracker  # #5073
 from mcp.tools_memory import (
     tool_delete_platform_memory,
     tool_list_memory_categories,
@@ -345,6 +346,11 @@ TOOLS = {
         "fn": tool_get_coach_vision,
         "schema": {"name": "get_coach_vision", "description": GET_COACH_VISION_DESCRIPTION, "inputSchema": GET_COACH_VISION_INPUT},
     },
+    # #5073: owner-only, the May tracker; the description + input table live in the tool's own module.
+    "get_may_tracker": {
+        "fn": tool_get_may_tracker,
+        "schema": {"name": "get_may_tracker", "description": GET_MAY_TRACKER_DESCRIPTION, "inputSchema": GET_MAY_TRACKER_INPUT},
+    },
     "get_predictions": {
         "fn": tool_get_predictions,
         "schema": {
@@ -492,7 +498,10 @@ TOOLS = {
                     },
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 30d ago)."},
                     "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "step_target": {"type": "integer", "description": "[movement] Daily step target (default: 8000)."},
+                    "step_target": {
+                        "type": "integer",
+                        "description": "[movement] Daily step target (default: the training charter's steps floor).",
+                    },
                 },
                 "required": [],
             },
