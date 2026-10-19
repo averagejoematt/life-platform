@@ -85,10 +85,28 @@ def _daily_brief_prompt():
     return daily_brief_shared_system({"date": "2026-10-10"}, {"active_goals": ["lose weight", "build strength"]}, 72, "B")
 
 
+def _charter_prompt():
+    """#5084: the owner-only charter block all three charter callers cache — rendered from the
+    bundled public file with no S3 probe and no laptop twin (the block never carries the twin)."""
+    from unittest import mock
+
+    from training import training_charter as tc
+
+    with mock.patch.object(tc, "_from_s3", lambda key: None), mock.patch.dict("os.environ", {tc.PRIVATE_ENV_VAR: ""}):
+        tc.reset_cache()
+        try:
+            return tc.prompt_prefix(published=False)
+        finally:
+            tc.reset_cache()
+
+
 _PROMPTS = {
     "coach-quality-gate": _quality_gate_prompt,
     "coach-state-updater": _extraction_prompt,
     "daily-brief": _daily_brief_prompt,
+    "charter-judge": _charter_prompt,
+    "charter-narrative": _charter_prompt,
+    "charter-retro": _charter_prompt,
 }
 
 
