@@ -87,12 +87,12 @@ def baseline(days: list[Mapping[str, Any]]) -> dict[str, Any]:
     """Trailing mean over the resolver's days: measured ones only, the rest counted by reason."""
     counted, excluded = [], {"no_source": 0, "partial_day": 0}
     for d in days:
-        if d.get("steps") is None:
+        if d.get("steps") is None:  # steps-truth: resolve_daily_steps output (training.steps_resolver), already resolved
             excluded["no_source"] += 1
         elif d.get("degraded") == "partial_day":
             excluded["partial_day"] += 1
         else:
-            counted.append(float(d["steps"]))
+            counted.append(float(d["steps"]))  # steps-truth: resolve_daily_steps output (training.steps_resolver), already resolved
     return {
         "trailing_avg": round(sum(counted) / len(counted)) if counted else None,
         "days_counted": len(counted),
@@ -104,7 +104,9 @@ def floor_held_days(days: list[Mapping[str, Any]], floor: int) -> int:
     """Consecutive most-recent days (newest first) whose measured count reached the floor."""
     run = 0
     for d in sorted(days, key=lambda x: str(x.get("date")), reverse=True):
-        if d.get("steps") is None or float(d["steps"]) < floor or d.get("degraded") == "partial_day":
+        if (
+            d.get("steps") is None or float(d["steps"]) < floor or d.get("degraded") == "partial_day"
+        ):  # steps-truth: resolve_daily_steps output (training.steps_resolver), already resolved
             break
         run += 1
     return run
