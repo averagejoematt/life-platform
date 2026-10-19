@@ -290,6 +290,7 @@ def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
     adaptation = gated.pop("adaptation")
     for ir in routines:
         draft_versioned(ir)
+    primary = ideal or short
     return {
         "status": "drafted",
         "target_date": inputs.target_date,
@@ -297,7 +298,7 @@ def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
         "disruption": (short.inputs_snapshot or {}).get("disruption") if short else None,
         "floor_routine_id": getattr(floor, "routine_id", None),
         "variants_persisted": [r.variant for r in routines],
-        "rationale": ((ideal or short).rationale if (ideal or short) else []),
+        "rationale": (primary.rationale if primary is not None else []),
         "freshness_gate": {"ok": gate.get("ok"), "gaps": gate.get("gaps", []), "inputs_current_through": inputs_current_through},
         "recovery_adaptation": {
             "applied": bool(adaptation),
