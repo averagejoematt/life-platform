@@ -1,0 +1,174 @@
+{
+  "_README": "#5079 (epic #5051, charter #5067): the FIXED training scorecard the /training-review block retro re-grades once per block (the block is the charter's rotation.anchors_fixed_weeks; the retro cadence is the charter's calibration.block_retro). Thirteen rows, copied from the owner-private elite-panel review of 2026-10-18 (the rows only: the review, and the grades it gave, stay private — the 2026-10-18 baseline letters are an owner-only DynamoDB row, never this file, because the repo is PUBLIC). Each row names the platform reads that grade it (`inputs`, keys of lambdas/training/block_retro.py's evidence) and, where code can score it, its `code_rules` (ADR-105: deterministic computation before any model verdict); the eight-seat panel re-grade (route charter.retro, one call per seat) scores every row, and lambdas/training/block_retro.py combines the two. Every training TARGET is read from config/training_charter.json at run time, never copied here. Hand-owned; a change is a new version with a change_log line. A grade below `grade_scale.fix_below` becomes a named fix (an issue or a charter change for the owner).",
+  "version": "1.0.0",
+  "change_log": [
+    {"version": "1.0.0", "date": "2026-10-19", "issue": "#5079", "what": "the thirteen rows of the 2026-10-18 elite-panel review, their measurable inputs, the code rules and the grade scale; the baseline letters are owner-only (training_constraints / RETRO#2026-10-18), never in this file"}
+  ],
+  "grade_scale": {
+    "score_range": [0, 10],
+    "rule": "a row score is 0-10; the letter is the highest row whose `min` the score reaches. The scale refines config/panel_rubric.json's letters (A, A-, B+ share their floors; B, C and D are each split into a plus/plain/minus band inside the rubric's own band), so a row score and a panel seat score read on one scale. tests/test_block_retro_5079.py holds the refinement.",
+    "letters": [
+      {"letter": "A", "min": 9.0},
+      {"letter": "A-", "min": 8.5},
+      {"letter": "B+", "min": 8.0},
+      {"letter": "B", "min": 7.5},
+      {"letter": "B-", "min": 7.0},
+      {"letter": "C+", "min": 6.5},
+      {"letter": "C", "min": 6.0},
+      {"letter": "D+", "min": 5.5},
+      {"letter": "D", "min": 5.0},
+      {"letter": "F", "min": 0.0}
+    ],
+    "fix_below": "B"
+  },
+  "combine_rule": "a row's score is the mean of its code score (the mean of its measured code_rules) and the panel's median seat score; with only one of the two it is that one; with neither the row is `ungraded` and carries its last grade, said so. The session may override a row only with a recorded reason (block_retro.apply_overrides).",
+  "baseline": {
+    "date": "2026-10-18",
+    "source": "the owner-private elite-panel training review (day 43)",
+    "store": "the letters are owner-only: USER#matthew#SOURCE#training_constraints / RETRO#2026-10-18 (kind baseline), written once by `scripts/training_block_retro.py baseline --apply` from the private review; the first retro reads it as its prior. No grade letter belongs in this file."
+  },
+  "rows": [
+    {
+      "id": "outcome_weight_body_comp",
+      "label": "Outcome: weight and body composition",
+      "inputs": ["weight.weeks_counted", "weight.weeks_in_band", "weight.positions", "weight.rate_4wk_last", "waist.tape_rows", "waist.latest"],
+      "code_rules": [{"kind": "share", "numerator": "weight.weeks_in_band", "denominator": "weight.weeks_counted"}],
+      "fix_route": "charter"
+    },
+    {
+      "id": "strength_outcome",
+      "label": "Strength outcome",
+      "inputs": ["anchors.measured", "anchors.held", "anchors.down_at_end", "anchors.tripped_any_week"],
+      "code_rules": [{"kind": "share", "numerator": "anchors.held", "denominator": "anchors.measured"}],
+      "fix_route": "issue"
+    },
+    {
+      "id": "consistency",
+      "label": "Consistency",
+      "inputs": ["sessions.logged", "sessions.planned"],
+      "code_rules": [{"kind": "share", "numerator": "sessions.logged", "denominator": "sessions.planned"}],
+      "fix_route": "issue"
+    },
+    {
+      "id": "sleep",
+      "label": "Sleep",
+      "inputs": ["sleep.nights", "sleep.mean_hours", "sleep.consistency"],
+      "code_rules": [],
+      "fix_route": "issue"
+    },
+    {
+      "id": "program_structure",
+      "label": "Program structure",
+      "inputs": ["panel.weeks_graded", "panel.overall_mean", "panel.criteria_means"],
+      "code_rules": [
+        {
+          "kind": "panel_mean",
+          "criteria": [
+            "hollywood_transformation_trainer.five_days",
+            "hollywood_transformation_trainer.session_length",
+            "hollywood_transformation_trainer.delts_frequency",
+            "dan_john.fundamental_patterns",
+            "dan_john.sustainable_length",
+            "nippard.rep_ranges"
+          ]
+        }
+      ],
+      "fix_route": "charter"
+    },
+    {
+      "id": "walking",
+      "label": "Walking",
+      "inputs": ["steps.days_measured", "steps.days_at_floor", "steps.days_at_target"],
+      "code_rules": [{"kind": "share", "numerator": "steps.days_at_floor", "denominator": "steps.days_measured"}],
+      "fix_route": "issue"
+    },
+    {
+      "id": "exercise_selection_variety",
+      "label": "Exercise selection and variety",
+      "inputs": ["panel.criteria_means", "sessions.distinct_movements"],
+      "code_rules": [
+        {
+          "kind": "panel_mean",
+          "criteria": [
+            "nippard.accessory_rotation",
+            "nippard.stretch_position",
+            "athlean_x.single_leg",
+            "athlean_x.carries",
+            "athlean_x.corrective",
+            "athlean_x.pull_push_balance",
+            "dan_john.carries_or_kb"
+          ]
+        }
+      ],
+      "fix_route": "issue"
+    },
+    {
+      "id": "fatigue_management",
+      "label": "Fatigue management",
+      "inputs": ["panel.criteria_means", "deload.records", "deload.recommendations"],
+      "code_rules": [
+        {
+          "kind": "panel_mean",
+          "criteria": [
+            "rp_israetel.no_unrecorded_deload",
+            "rp_israetel.fatigue_management",
+            "galpin.fatigue_flags",
+            "galpin.hard_easy_split",
+            "clinical_exercise_physiologist.no_auto_deload",
+            "sbs_nuckols.effort_by_rpe"
+          ]
+        }
+      ],
+      "fix_route": "issue"
+    },
+    {
+      "id": "response_reference_event",
+      "label": "Response to the 10 Oct event (reference only)",
+      "reference_only": true,
+      "note": "The baseline graded how the plan and the coaching responded to one past interruption. A later block grades the response to any interruption inside it (the disruption-mode records, the step back up); a block with none carries the grade forward and raises no fix.",
+      "inputs": ["disruption.records", "deload.records"],
+      "code_rules": [],
+      "fix_route": "issue"
+    },
+    {
+      "id": "measurement",
+      "label": "Measurement",
+      "inputs": ["calibration.due", "calibration.done", "calibration.detail", "fitness.battery"],
+      "code_rules": [{"kind": "share", "numerator": "calibration.done", "denominator": "calibration.due"}],
+      "fix_route": "issue"
+    },
+    {
+      "id": "planning_loop",
+      "label": "Planning loop (chat plus engine)",
+      "inputs": ["loop.weeks", "loop.weeks_closed", "planning.custom_departures", "planning.committed_plans"],
+      "code_rules": [{"kind": "share", "numerator": "loop.weeks_closed", "denominator": "loop.weeks"}],
+      "fix_route": "issue"
+    },
+    {
+      "id": "cardio_programming",
+      "label": "Cardio programming",
+      "inputs": ["cardio.conditioning_sessions", "cardio.conditioning_target", "panel.criteria_means"],
+      "code_rules": [
+        {"kind": "share", "numerator": "cardio.conditioning_sessions", "denominator": "cardio.conditioning_target"},
+        {
+          "kind": "panel_mean",
+          "criteria": ["galpin.cardio_dosed", "galpin.interference", "clinical_exercise_physiologist.conditioning_by_rpe"]
+        }
+      ],
+      "fix_route": "charter"
+    },
+    {
+      "id": "engine_progression_logic",
+      "label": "Engine progression logic",
+      "inputs": ["progression.steps_taken", "progression.step_due", "progression.stalls", "panel.criteria_means"],
+      "code_rules": [
+        {"kind": "share", "numerator": "progression.steps_taken", "denominator": "progression.step_opportunities"},
+        {
+          "kind": "panel_mean",
+          "criteria": ["nippard.double_progression", "sbs_nuckols.coded_progression", "sbs_nuckols.strength_tripwire"]
+        }
+      ],
+      "fix_route": "issue"
+    }
+  ]
+}
