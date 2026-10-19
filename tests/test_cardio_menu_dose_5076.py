@@ -47,7 +47,8 @@ STRETCHING_TID = "527DA061"
 CONSTRAINT = sc.active_constraint("2026-10-18")
 SEQ = tc.charter_value("split.sequence")
 FIX3700 = REPO / "tests" / "fixtures" / "cardio_progression_3700" / "hevy_cardio_2026-05-31_09-19.json"
-MEDICAL = ("afib", "atrial", "arrhythm", "cardiolog", "ecg", "sinus", "rvr", "metoprolol", "clinician", "diagnos", "heart condition")
+# Generic words only: a specific vocabulary would itself publish what it screens for (ER-06, #2503).
+MEDICAL = ("ecg", "sinus", "clinician", "diagnos")
 
 
 def _live_cardio_index() -> dict:
