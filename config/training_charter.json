@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.3.0",
+  "version": "1.5.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -28,6 +28,20 @@
       "date": "2026-10-19",
       "by": "owner rulings 2026-10-18, ruling 4 (gym cardio is deliberate, from a menu, with level, speed and RPE) and ruling 7 (intervals and conditioning open, by RPE / talk test); #5076",
       "what": "The cardio menu gains its dose: each block's talk test and machines, the incline treadmill walk's starting dose (8-12 % at 2.5-3.0 mph; his treadmill history tops out at 6 % at 2.8 mph, so the walk starts at the floor of the band) and step, the interval set, and the weekly placement rule.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.4.0",
+      "date": "2026-10-19",
+      "by": "the owner-requested elite-panel training review 2026-10-18 (#5057): calf press, leg press and DB curl held the same load x reps for weeks at an easy self-reported RPE",
+      "what": "Adds progression.stall_rule: the same top-set load x reps on 3 consecutive same-type exposures, each at self-reported RPE 8 or lower, is `step_due` (the prescription's failure to progress, not his) and the next draft carries one step: up to 2 more reps below the top of the range, else the gain rule's load step.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.5.0",
+      "date": "2026-10-19",
+      "by": "owner rulings 2026-10-18 on #5058 (the elite-panel training review): compounds RPE 8-9; the last isolation set RPE 9-10; an overage within +1 RPE is not a breach; a ceiling beaten on more than 50% of sets two weeks running PROPOSES a change, which the owner applies",
+      "what": "Renames effort_ceilings.by_experience_tier to by_movement_class (it always held the two movement-class bands, not tiers) holding exactly the ruled bands, and states that a set is graded against the HIGH end of its class band (effort_ceilings.ceiling_is; progression.ceiling_tier read the low end until #5058). The tolerance and the proposal rule are the ruled ones, unchanged in value.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -127,10 +141,11 @@
     "note": "fatigue signals become a recommendation; a deload happens only on his recorded word (owner ruling 2026-10-18)"
   },
   "effort_ceilings": {
-    "by_experience_tier": {
+    "by_movement_class": {
       "compounds_rpe": [8, 9],
       "last_isolation_set_rpe": [9, 10]
     },
+    "ceiling_is": "the high end of the set's class band: the band is the prescription, its top is the ceiling a set is graded against",
     "overage_tolerance_rpe": 1,
     "overage_rule": "within +1 RPE of the ceiling is not a breach",
     "ceiling_change_proposal": {
@@ -167,9 +182,23 @@
       "above_the_ceiling": "a raised load logged above the ceiling plus the tolerance is a breach and never becomes a floor"
     },
     "ceiling_tier": {
-      "compounds": "the low end of `effort_ceilings.by_experience_tier.compounds_rpe` until #5058 assigns the owner's tier",
-      "last_isolation_set": "the low end of `effort_ceilings.by_experience_tier.last_isolation_set_rpe`; an isolation movement's earlier sets read the compounds band",
+      "compounds": "the high end of `effort_ceilings.by_movement_class.compounds_rpe` (`effort_ceilings.ceiling_is`, #5058)",
+      "last_isolation_set": "the high end of `effort_ceilings.by_movement_class.last_isolation_set_rpe`; an isolation movement's earlier sets read the compounds band",
       "refs": "#5058"
+    },
+    "stall_rule": {
+      "verdict": "step_due",
+      "consecutive_exposures": 3,
+      "max_rpe": 8,
+      "rpe_basis": "self-reported: the RPE he logged on the top set (the first working set at the session's heaviest load); an unlogged RPE is not evidence",
+      "trigger": "the top set's load and reps are identical on the last 3 consecutive same-type exposures, each logged at RPE 8 or lower",
+      "rep_step_max": 2,
+      "step": "below the top of the slot's rep range: up to `rep_step_max` more reps at the same load, never past the top; at the top of the range (or with no range on file): the gain rule's load step (`gain_rule.step_pct` in whole `gain_rule.step_lb` steps), reps back to the bottom",
+      "not_a_stall": "step_due is the prescription's failure to progress, not his: it never fires when he fell short of a prescription on file, and it never fires under a refusal (re-entry, a deload the owner applied)",
+      "precedence": "after the gain rule's step; before a floor raise (repeating the same load is what it ends)",
+      "provenance": "owner",
+      "stated": "2026-10-18",
+      "ruling": "owner-requested elite-panel training review 2026-10-18 (#5057)"
     }
   },
   "rotation": {

@@ -60,11 +60,12 @@ def test_the_gain_rule_lives_on_the_charter_with_the_redlines_numbers():
 
 def test_effort_limits_are_read_from_the_charter_not_typed():
     lim = lp.effort_limits()
-    tiers = tc.charter_value("effort_ceilings.by_experience_tier")
+    # #5058: the ruled class bands (`by_movement_class`); the ceiling is the band's HIGH end
+    bands = tc.charter_value("effort_ceilings.by_movement_class")
     tol = tc.charter_value("effort_ceilings.overage_tolerance_rpe")
-    assert lim["compound"]["ceiling_rpe"] == min(tiers["compounds_rpe"])
-    assert lim["compound"]["limit_rpe"] == min(tiers["compounds_rpe"]) + tol
-    assert lim["last_isolation_set"]["limit_rpe"] == min(tiers["last_isolation_set_rpe"]) + tol
+    assert lim["compound"]["ceiling_rpe"] == max(bands["compounds_rpe"])
+    assert lim["compound"]["limit_rpe"] == max(bands["compounds_rpe"]) + tol
+    assert lim["last_isolation_set"]["limit_rpe"] == max(bands["last_isolation_set_rpe"]) + tol
 
 
 # ── the four bases ────────────────────────────────────────────────────────────────
@@ -212,9 +213,10 @@ def test_the_real_2026_10_18_session_regrades_self_raised_loads_from_no_to_progr
     """The live session, re-graded. Pre-#5052 (no progression input) it reproduces the stored verdict
     exactly — `no`, 14 sets over, five movements. Post-#5052 the three loads he raised himself under the
     charter ceiling (lat pulldown 155 -> 160, curl 25 -> 27.5, three of the row's four sets 85 -> 90) are
-    `progressed`; what stays a breach is real: the row's fourth set at RPE 10, the bench at its PRESCRIBED
-    185 logged RPE 9.5-10, and the pushdown at its prescribed load over its RIR-2 note (#5058's tolerance
-    is that lane's change, not this one). So the session verdict stays `no`, on fewer, truer reasons."""
+    `progressed`. #5058 (the charter's compounds ceiling RPE 9, +1 tolerance): the row's fourth set at
+    RPE 10 is now inside the limit too (progressed), and the pushdown's 8.5s over its RPE-8 note are within
+    tolerance, not breaches. What stays a breach is real: the bench at its PRESCRIBED 185 logged RPE 9.5-10
+    against its own RPE-8 note. So the session verdict stays `no`, on one movement."""
     from health import adherence_calc
 
     fx = _fixture()
@@ -233,13 +235,16 @@ def test_the_real_2026_10_18_session_regrades_self_raised_loads_from_no_to_progr
     for key in ("lat_pulldown", "db_curl"):  # flipped: every over-ceiling set was a self-raised load under the charter ceiling
         assert key in stored["over_ceiling_movements"]
         assert by[key]["sets_over_ceiling"] == 0 and by[key]["sets_progressed"] == 3, (key, by[key])
-    assert by["one_arm_db_row"]["sets_progressed"] == 3 and by["one_arm_db_row"]["sets_over_ceiling"] == 1  # the RPE-10 set
+    # #5058: the RPE-10 set is at the compounds limit (9 + 1), so it is progressed too
+    assert by["one_arm_db_row"]["sets_progressed"] == 4 and by["one_arm_db_row"]["sets_over_ceiling"] == 0
     assert by["barbell_bench_press"]["sets_progressed"] == 0  # 185 was the prescription, not a raise
+    assert (by["barbell_bench_press"]["sets_over_ceiling"], by["barbell_bench_press"]["sets_within_tolerance"]) == (3, 2)
+    assert by["cable_tricep_pushdown"]["sets_over_ceiling"] == 0 and by["cable_tricep_pushdown"]["sets_within_tolerance"] == 2
     ia = after["intensity_adherence"]
-    # 9 progressed sets (3 + 3 + 3); 6 of them were among the 14 "over" (lat 1, curl 2, row 3) -> 8 breaches remain
-    assert ia["sets_progressed"] == 9 and ia["sets_over_ceiling"] == 14 - 6
+    # 10 progressed sets (lat 3 + curl 3 + row 4); of the 14 strict "over" only the bench's 9.5 / 10 / 9.5 breach
+    assert ia["sets_progressed"] == 10 and ia["sets_over_ceiling"] == 3
     assert ia["progressed_movements"] == ["db_curl", "lat_pulldown", "one_arm_db_row"]
-    assert set(ia["over_ceiling_movements"]) == {"barbell_bench_press", "cable_tricep_pushdown", "one_arm_db_row"}
+    assert set(ia["over_ceiling_movements"]) == {"barbell_bench_press"}
     assert after["as_prescribed"]["verdict"] == "no"
 
 

@@ -28,6 +28,14 @@ THE VERDICTS
                  inside its own noise band. Names both numbers in ``reason``.
 ``progressing``  net e1RM rose beyond that lift's own session-to-session noise.
 ``regressing``   net e1RM fell beyond it.
+``step_due``     (#5057) the top set's load × reps is identical on the last 3
+                 consecutive exposures, each at self-reported RPE <= 8 (both numbers are
+                 the charter's ``progression.stall_rule``), and none fell short of a
+                 prescription on file. It is NOT a stall: it is the PRESCRIPTION's failure
+                 to progress, not his — so it is callable at a fixed prescription, the one
+                 window ``stall`` refuses. The verdict carries ``step``, the proposed step
+                 from ``training.load_progression.stall_step`` (the one progression), with
+                 the reason naming the dates; ``basis`` is ``self-reported RPE``.
 ``unknown``      every other state — and deliberately the state a matched, fixed
                  prescription lands in. ``unknown`` is a real answer here, not a
                  failure: "we cannot tell from this window" has never been the
@@ -49,7 +57,9 @@ never consulted it carries ``basis: "measured load × reps"``. The field is on t
 verdict, not in prose, so a downstream renderer cannot drop the label while
 keeping the number.
 
-NO I/O. The module is pure: dataclasses in, dict out, no clock, no AWS, no model.
+NO I/O. The module is pure: dataclasses in, dict out, no clock, no AWS, no model. The one
+read is the bundled charter (``step_due``'s thresholds and step size, via
+``training.load_progression``; cached, fail-soft — an unreadable charter is no ``step_due``).
 The fetch half lives at the call site (``mcp/tools_hevy_routine.py`` action
 ``stall_check``), which is what makes every branch below directly fixture-testable.
 """
@@ -64,6 +74,7 @@ VERDICT_STALL = "stall"
 VERDICT_PROGRESSING = "progressing"
 VERDICT_REGRESSING = "regressing"
 VERDICT_UNKNOWN = "unknown"
+VERDICT_STEP_DUE = "step_due"  # #5057: the prescription's failure to progress — never a stall
 
 # ── Bases (the label on the input a verdict actually leaned on) ───────────────
 BASIS_MEASURED = "measured load × reps"
@@ -311,12 +322,34 @@ def _fixed_prescription_label(points: list[SessionPoint]) -> str:
     return f"{round(float(p.prescribed_load_kg or 0), 2)} kg × {int(p.prescribed_reps or 0)}"
 
 
+def _as_session(p: SessionPoint) -> dict[str, Any]:
+    """One detector point in the `exercise_history` session shape `load_progression` reads."""
+    return {
+        "date": p.date,
+        "sets": [{"weight_kg": p.load_kg, "reps": p.reps, "rpe": p.rpe}],
+        "prescribed_kg": p.prescribed_load_kg,
+        "prescribed_reps": p.prescribed_reps,
+    }
+
+
+def step_due(points: list[SessionPoint], rep_range: tuple[int, int] | None = None) -> dict[str, Any] | None:
+    """The stall rule's proposed step for this window (oldest first), or None (#5057).
+
+    Delegates to ``load_progression.stall_step`` — the ONE progression; this module never
+    sizes a step. ``rep_range`` (the slot's bottom/top) picks a rep step below the top; without
+    it the step is the load step at the same reps."""
+    from training import load_progression as lp
+
+    return lp.stall_step([_as_session(p) for p in reversed(points)], rep_range=rep_range)
+
+
 def assess_stall(
     points: Iterable[SessionPoint],
     *,
     movement_key: str = "",
     min_sessions: int = MIN_SESSIONS,
     noise_k: float = NOISE_K,
+    rep_range: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     """Call — or refuse to call — a stall on ONE movement.
 
@@ -349,7 +382,22 @@ def assess_stall(
         result.update(extra or {})
         return result
 
-    # 1. Not enough sessions for any trend claim, in either direction.
+    # 1. #5057: the same top-set load × reps at an easy self-reported RPE, exposure after
+    #    exposure, is the PRESCRIPTION failing to progress — a claim about the plan, so it is
+    #    callable where `stall` (a claim about him) is refused, including with no plan on file.
+    #    It runs BEFORE the trend floor: `stall_step` enforces the charter's own
+    #    `progression.stall_rule.consecutive_exposures`, so lowering that never hides behind MIN_SESSIONS.
+    step = step_due(pts, rep_range)
+    if step is not None:
+        return _out(
+            VERDICT_STEP_DUE,
+            f"Step due, not a stall: {step['reason']}. The prescription held still while he had room "
+            "(RPE is his own rating, not a measurement); the next draft carries the step.",
+            used_rpe=True,
+            extra={"step": step},
+        )
+
+    # 1b. Not enough sessions for any trend claim, in either direction.
     if len(pts) < min_sessions:
         return _out(VERDICT_UNKNOWN, f"{len(pts)} session(s) — below the {min_sessions}-session floor for a trend claim.")
 

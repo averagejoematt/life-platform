@@ -13,7 +13,7 @@ One tool, eleven actions:
   floor         — generate floor variant explicitly
   re_entry      — force re-entry mode regardless of last-workout date
   adherence     — programmed-vs-performed report for a routine_id
-  stall_check   — prescribed-vs-performed stall verdict for ONE movement (#3928)
+  stall_check   — prescribed-vs-performed stall verdict for ONE movement (#3928; `step_due`, #5057)
 
 `draft` is the opinionated, deterministic volume-landmark programmer — it
 builds its own routine from your state and never takes an exercise list.
@@ -44,7 +44,7 @@ from common.pacific_time import pacific_today  # #2798: target_date is a Pacific
 from training import commit_binding  # #4066: the commit is bound to the red-teamed routine
 from training.warmup_sets import working_set_count  # #5049: the set ceilings count working sets
 
-from mcp.draft_custom_session import attach_draft_warmups, stamp_program_slot  # #5005 slot tags; #5049 warm-ups
+from mcp.draft_custom_session import finish_custom_draft  # #5005 slot tags; #5049 warm-ups; #5057 the stall rule's step
 from mcp.hevy_prescription_gate import prescription_gate, refusal as _gate_refusal, summary as _gate_summary
 
 # #3670: everything the commit result must report honestly lives in its own module
@@ -817,8 +817,8 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     # AFTER `_new_routine_id` and BEFORE `draft_versioned`, so the persisted draft carries it.
     cardio_cues = attach_custom_cardio_notes(ir, target_date)
     ir.inputs_snapshot["cardio_cues"] = cardio_cues
-    # #5005: a program-session date re-tags the blocks with the slot's intensity, so the commit gate checks the engine's floors
-    program_slot, warmups = stamp_program_slot(ir), attach_draft_warmups(ir, catalog, args)  # #5049: the generator's climb too
+    # #5005 slot tags (the commit gate checks the engine's floors), #5049 the warm-up climb, #5057 the stall rule's step
+    finished = finish_custom_draft(ir, catalog, args)
     draft_versioned(ir)
     resp = {
         "status": "drafted_custom",
@@ -827,9 +827,8 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         "archetype": archetype,
         "exercise_count": len(blocks),
         "total_sets": total_sets,
-        "warmup_sets": (warmups or {}).get("warmup_sets", 0),
         "cardio_cues": cardio_cues,
-        "program_slot": program_slot,
+        **finished,  # warmup_sets, program_slot, step_due
         "warnings": warnings,
         "note": "Run action=dry_run with this routine_id to preview the exact Hevy "
         "body, then action=commit to push. Commit requires explicit routine_id.",

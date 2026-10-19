@@ -88,12 +88,13 @@ now, `achieved_hold`:
     RPE-adjusted e1RM with Epley on (reps + RIR) — the reps-in-reserve reading of RPE (Zourdos
     et al. 2016, J Strength Cond Res 30(1):267; Helms et al. 2016, Strength Cond J 38(4):42) — and
     the held load is what that e1RM allows at the slot's TARGET reps (the middle of its range) and
-    its RPE CEILING (`slot_rpe_ceiling`, read off `program_structure.EXPOSURES`: heavy top_rpe 8,
-    moderate "leave 2–3" -> 8, volume "leave 1–3" -> 9, accessory RIR 1–2 -> 9), rounded DOWN on
+    its RPE CEILING (`slot_rpe_ceiling`, the charter's class band for the slot's exposure since
+    #5058 — `training.effort_ceilings`, the high end of the ruled class band), rounded DOWN on
     the engine's one 5-lb grid (`rep_scheme.load_step_kg`), and never above the achieved load
     (it is a hold, not a progression). The one helper is Epley here because the repo's e1RM
     helpers (`band_e1rm_kg`, `stall_detector._e1rm_lb`) take no RPE. 205 x 5 @ RPE 8 into the 4–6
-    top set @ <= 8 holds 205; 160 x 8 @ RPE 10 into a 6–10 slot @ <= 8 holds 150, not 160.
+    top set @ <= 9 holds 205; 160 x 8 @ RPE 10 into a 6–10 slot @ <= 9 holds 155, not 160 (the
+    charter compounds ceiling since #5058; at the pre-#5058 ceiling of 8 it held 150).
   * a set with NO logged RPE is read as at the ceiling: its hold is the achieved load, and the row
     says so (`hold.rpe_basis: "absent"`). `hold.rpe_basis` / `hold.e1rm_rpe_adjusted` record the
     basis on every row.
@@ -295,22 +296,18 @@ def _rep_range_of(sets: list[Any] | None) -> tuple[int, int] | None:
 
 
 def slot_rpe_ceiling(intensity: str | None) -> int | None:
-    """The RPE ceiling of a program exposure, read off `program_structure.EXPOSURES` (#4408 review).
+    """The RPE ceiling of a program exposure (#4408 review), read off the charter since #5058.
 
-    heavy: the top set's `top_rpe` upper end; accessory: 10 - the fewest reps in reserve (`rir`);
-    moderate / volume carry their RIR only in the cue ("leave 2–3 in the tank") -> 10 - its lower
-    end. None for an unknown intensity — the caller then gets no hold (the ramp alone)."""
-    import re
-
-    from training import program_structure
+    `program_structure.EXPOSURES[intensity]["effort"]` names the class band the slot is
+    prescribed at (heavy / moderate / volume: the compounds band; accessory: the compounds band
+    for its earlier sets — the slot's load is set by those, the last set's band is a cue); the
+    ceiling is that band's high end (`training.effort_ceilings`, `effort_ceilings.by_movement_class`).
+    None for an unknown intensity or an unreadable charter — the caller then gets no hold (the ramp alone)."""
+    from training import effort_ceilings, program_structure
 
     spec = program_structure.EXPOSURES.get(str(intensity or "")) or {}
-    if spec.get("top_rpe"):
-        return int(max(spec["top_rpe"]))
-    if spec.get("rir"):
-        return 10 - int(min(spec["rir"]))
-    m = re.search(r"leave (\d+)\s*[–-]\s*\d+ in the tank", str(spec.get("cue") or ""))
-    return 10 - int(m.group(1)) if m else None
+    c = effort_ceilings.ceiling(spec["effort"]) if spec.get("effort") else None
+    return int(c) if c is not None else None
 
 
 def slot_of(sets: list[Any] | None, intensity_or_tag: str | None) -> dict[str, Any] | None:
