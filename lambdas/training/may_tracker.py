@@ -354,10 +354,12 @@ def running_gate_section(
     holds: Any = None,
     stage4_done: bool = False,
     onramp: Optional[Mapping[str, Any]] = None,
+    held_since: Optional[str] = None,
 ) -> dict[str, Any]:
     """The run gate (`training.run_onramp.gate_state`, the one gate): `walking_weeks` are the tracked week's
     completed walking weeks (hours + a lower-leg pain flag each); `holds` the strain-hold causes, None = not read;
-    `onramp` the Stage 4 progress (`run_onramp.stage_progress`) from his logged run/walks, None = not read."""
+    `onramp` the Stage 4 progress (`run_onramp.stage_progress`) from his logged run/walks, None = not read;
+    `held_since` the day a standing hold began (no run/walk counts from it)."""
     from training import run_onramp
 
     gate = _cv("gated_movements.running")
@@ -379,6 +381,8 @@ def running_gate_section(
         lb_to_prep=gs["lb_to_prep"],
         walking=gs["walking"],
         holds_read=gs["holds_read"],
+        holds=gs["holds"],
+        held_since=held_since,
         onramp=dict(onramp) if onramp is not None else None,
         prerequisites=list(gate.get("prerequisites") or []),
         refs=gate.get("refs"),

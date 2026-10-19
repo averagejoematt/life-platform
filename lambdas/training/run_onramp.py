@@ -16,8 +16,8 @@ WHAT IT DECIDES (pure: no I/O, no clock — every input is handed in)
     prep     at or under the prep weight: calf + tibialis work and low-amplitude pogo hops on the
              lower days; the on-ramp waits for the gate weight AND the walking weeks;
     held     at or under the prep weight with a lower-leg strain flag (`training.steps_ramp`'s
-             `strain_flag:` / `standing_constraint:` causes): the pogo hops pause and the on-ramp
-             holds at its level;
+             `strain_flag:` / `standing_constraint:` causes): the impact pauses — the pogo hops AND the
+             run/walk (no run is placed) — and the on-ramp keeps its level, never losing it;
     open     at or under the gate weight, the walking weeks met, no hold: the on-ramp runs, and
              continuous running is unlocked once Stage 4 is completed (`stage4_done`);
     unknown  no weigh-in, or no charter — never read as closed or open (ADR-104).
@@ -35,7 +35,8 @@ WHAT IT DECIDES (pure: no I/O, no clock — every input is handed in)
 
   STAGE 4 — `stage_progress` over his logged run/walks (`performed_from_notes` reads the level, the
   RPE and a pain word off each treadmill/running note): two sessions at a level at or under the easy
-  block's top RPE with no pain flag advance one level; a strain hold keeps him at his level;
+  block's top RPE with no pain flag advance one level; a strain hold keeps him at his level (no session
+  dated on or after the hold's start counts; an undated hold covers the whole record);
   `stage4_done` is the last level completed twice. `run_day_verdict` places a run: the gate open,
   under `max_runs_per_wk`, and not on a heavy lower day or the session either side of it in
   `split.sequence` (the day-level reading of "none within 24 h of a heavy lower session").
@@ -75,6 +76,13 @@ def prep_cfg() -> dict[str, Any]:
 
 def onramp() -> dict[str, Any]:
     return running().get("onramp") or {}
+
+
+def history_from() -> Optional[str]:
+    """The first day a run/walk session can exist (`onramp.history_from`): a Stage 4 reader reads back to it, so an
+    early level never ages out of a rolling window."""
+    v = onramp().get("history_from")
+    return str(v)[:10] if v else None
 
 
 def levels() -> list[dict[str, Any]]:
@@ -188,7 +196,11 @@ def gate_state(
             "reason": f"{out['lb_to_prep']:g} lb to the lower-leg prep, {out['lb_to_gate']:g} lb to the on-ramp; {walk_words}",
         }
     if holds:
-        return {**out, "state": HELD, "reason": f"a lower-leg strain flag holds the pogo hops and the on-ramp ({', '.join(holds)})"}
+        return {
+            **out,
+            "state": HELD,
+            "reason": f"a lower-leg strain flag pauses the pogo hops and the run/walk, the on-ramp keeps its level ({', '.join(holds)})",
+        }
     if w > gate or not walk["satisfied"] or holds is None:
         missing = [f"{out['lb_to_gate']:g} lb to go"] if w > gate else []
         missing += [] if walk["satisfied"] else [walk_words]
@@ -322,8 +334,9 @@ def stage_progress(
     performed: Optional[Iterable[Mapping[str, Any]]], holds: Optional[list[str]] = None, held_since: Optional[str] = None
 ) -> dict[str, Any]:
     """Where he is on the on-ramp. Sessions at another level than the current one are ignored; a session with a pain
-    flag resets the count at the level. A hold never erases progress — it stops the next advance: while `holds` stand,
-    no session dated on or after `held_since` (the flag's first note, when the caller knows it) counts."""
+    flag resets the count at the level. While `holds` stand, no session dated on or after `held_since` (the hold's
+    first day) counts, so the level stays where the hold found it; with no `held_since` the hold is read as covering
+    the whole record (the cautious side: nothing counts) — a caller passes the date to keep the earlier progress."""
     table = levels()
     rule = onramp().get("advance_rule") or {}
     need = int(rule.get("sessions_at_level") or 0)
@@ -337,7 +350,7 @@ def stage_progress(
     for s in performed or []:
         if done or s.get("level") != current:
             continue
-        if held and held_since and str(s.get("date") or "") >= held_since:
+        if held and (not held_since or str(s.get("date") or "") >= held_since):
             continue
         if s.get("pain_flag"):
             good = 0
@@ -399,8 +412,9 @@ def run_day_verdict(
     cfg = onramp()
     if not gate:
         return {"eligible": False, "why": "run gate not read"}
-    held = gate.get("state") == HELD and bool(gate.get("onramp_open"))
-    if gate.get("state") != OPEN and not held:
+    if gate.get("state") == HELD:  # the same impact rule that pauses the pogo hops; the level is kept (stage_progress)
+        return {"eligible": False, "why": "a lower-leg strain flag pauses the run/walk, as it pauses the pogo hops; the level is kept"}
+    if gate.get("state") != OPEN:
         return {"eligible": False, "why": f"run gate {gate.get('state')}"}
     cap = int(cfg.get("max_runs_per_wk") or 0)
     if runs_this_week >= cap:
@@ -416,7 +430,7 @@ def run_day_verdict(
     if near[1] in heavy:
         return {"eligible": False, "why": f"within {cfg.get('not_within_h_of_heavy_lower')} h before a heavy lower session"}
     block = run_walk_block(level or int((levels() or [{"level": 1}])[0]["level"]))
-    why = f"run {runs_this_week + 1} of {cap} this week" + ("; held at its level by a strain flag" if held else "")
+    why = f"run {runs_this_week + 1} of {cap} this week"
     return {"eligible": block is not None, "why": why, "block": block}
 
 

@@ -16,9 +16,12 @@ hands them in — it computes nothing of its own:
   run gate   (#5090) the same Hevy rows plus ONE Strava read feed `shared_quantities.walking_layer` (THE walking
              definition) for each of the gate's walking weeks — the walking modality's hours — and each week's
              lower-leg pain flag (a pain-lexicon note naming a lower-leg site, `training.training_notes` +
-             `training.steps_ramp.is_lower_leg`); a lower-leg pain note inside the steps ramp's quiet period
-             (`steps_ramp.RELEASE_QUIET_DAYS`) before the Sunday is the hold. Owner dismissals are not read
-             here (the plan's steps ramp reads them); an unread source is None, never a pain-free week.
+             `training.steps_ramp.is_lower_leg`). The HOLD is the plan's own: the pain notes become flag instances
+             in `tools_plan._pain_instances`' shape and go through `steps_ramp.lower_leg_holds` with the owner's
+             dismissals (`tools_plan._pain_dismissals`, read only when a pain note exists) — so the quiet period,
+             a dismissal and an active standing lower-leg constraint resolve here exactly as on the plan path.
+             Stage 4 reads the run/walk notes back to `onramp.history_from` (the Hevy read reaches that far;
+             every other section reads only its own window). An unread source is None, never a pain-free week.
 
 THE WRITE. `nightly_leg()` rides the nightly pre-draft run (`mcp.nightly_predraft.lambda_entry`,
 02:00Z): it rebuilds the newest COMPLETED Monday-Sunday week (with the week before it, for the
@@ -130,24 +133,65 @@ def _guidance() -> dict[str, Any]:
 
 
 def _rows_in(rows: Optional[list], start: str, end: str) -> list:
-    return [r for r in rows or [] if start <= str(r.get("date") or str(r.get("sk") or "")[5:15])[:10] <= end]
+    return [r for r in rows or [] if start <= _day(r) <= end]
 
 
-def _lower_leg_pain(hevy: Optional[list], start: str, end: str) -> Optional[bool]:
-    """Any Hevy exercise note in [start, end] that the pain net flags AND that names a lower-leg site; None = unread."""
-    from training.steps_ramp import is_lower_leg
+def _day(r: Any) -> str:
+    return str(r.get("date") or str(r.get("sk") or "")[5:15])[:10]
+
+
+def pain_instances(hevy: Optional[list]) -> Optional[list]:
+    """The pain-flag instances in `tools_plan._pain_instances`' shape, one per exercise whose Hevy note the pain net
+    (`training_notes.pain_lexicon_hit`, the layer's deterministic pass) flags; None = Hevy unread."""
     from training.training_notes import pain_lexicon_hit
 
     if hevy is None:
         return None
-    notes = [str(e.get("notes") or e.get("note") or "") for r in _rows_in(hevy, start, end) for e in r.get("exercises") or []]
-    return any(pain_lexicon_hit(n) and is_lower_leg(n) for n in notes)
+    by: dict[str, dict[str, Any]] = {}
+    for r in hevy:
+        for e in r.get("exercises") or []:
+            note = str(e.get("notes") or e.get("note") or "")
+            if pain_lexicon_hit(note):
+                name = str(e.get("name") or e.get("title") or "exercise")
+                inst = by.setdefault(name, {"movement": name, "exercise": name, "note_dates": [], "notes": []})
+                inst["note_dates"].append(_day(r))
+                inst["notes"].append({"date": _day(r), "text": note})
+    return list(by.values())
 
 
-def running_inputs(sunday: str, strava: Optional[list], hevy: Optional[list]) -> dict[str, Any]:
-    """The run gate's walking weeks (newest first) and hold for the week ending `sunday`, from rows already read."""
-    from training import run_onramp
+def _lower_leg_dates(instances: Optional[list]) -> Optional[list[str]]:
+    from training.steps_ramp import is_lower_leg
+
+    if instances is None:
+        return None
+    return sorted({n["date"] for i in instances for n in i["notes"] if is_lower_leg(n.get("text"))})
+
+
+def hold_since(holds: Optional[list], instances: Optional[list], sunday: str) -> Optional[str]:
+    """The day the standing hold began: the earliest active standing lower-leg constraint's `dated`, and the first
+    lower-leg pain note of the unbroken run (gaps under the quiet period) ending at the newest note — the day from
+    which a run/walk stops counting (`run_onramp.stage_progress`). None when nothing holds or no date is known."""
     from training.steps_ramp import RELEASE_QUIET_DAYS
+    from training.training_context_registry import RECORDED_CONSTRAINTS
+
+    if not holds:
+        return None
+    starts = [str(c.get("dated"))[:10] for c in RECORDED_CONSTRAINTS if f"standing_constraint:{c['id']}" in holds and c.get("dated")]
+    dates = [d for d in _lower_leg_dates(instances) or [] if d <= sunday]
+    if any(str(h).startswith("strain_flag:") for h in holds) and dates:
+        start = dates[-1]
+        for d in reversed(dates[:-1]):
+            if mt.shift(d, RELEASE_QUIET_DAYS) <= start:
+                break
+            start = d
+        starts.append(start)
+    return min(starts) if starts else None
+
+
+def running_inputs(sunday: str, strava: Optional[list], hevy: Optional[list], dismissals: Optional[list] = None) -> dict[str, Any]:
+    """The run gate's walking weeks (newest first), hold and Stage 4 progress for the week ending `sunday`, from rows
+    already read. `dismissals` are the owner's pain dismissals (None = none read: a flag then holds, the cautious side)."""
+    from training import run_onramp, steps_ramp
 
     from mcp import shared_quantities
 
@@ -157,35 +201,46 @@ def running_inputs(sunday: str, strava: Optional[list], hevy: Optional[list]) ->
             raise LookupError(f"{source} unread")
         return _rows_in(rows, start, end)
 
+    instances = pain_instances(hevy)
+    pain_dates = _lower_leg_dates(instances)
     walking_weeks = []
     for k in range(int(run_onramp.running().get("walking_weeks") or 0)):
         end = mt.shift(sunday, -7 * k)
         layer = shared_quantities.walking_layer(end, days=7, today=mt.shift(sunday, 1), read=_slice)
         hours = None if not layer or layer.get("total_hr") is None else float((layer.get("by_modality") or {}).get("walking") or 0.0)
-        walking_weeks.append({"week_start": mt.shift(end, -6), "hours": hours, "pain_flag": _lower_leg_pain(hevy, mt.shift(end, -6), end)})
-    recent = _lower_leg_pain(hevy, mt.shift(sunday, -(RELEASE_QUIET_DAYS - 1)), sunday)  # the steps ramp's quiet period
-    holds = None if recent is None else ([f"strain_flag:lower_leg_note_to_{sunday}"] if recent else [])
+        pain = None if pain_dates is None else any(mt.shift(end, -6) <= d <= end for d in pain_dates)
+        walking_weeks.append({"week_start": mt.shift(end, -6), "hours": hours, "pain_flag": pain})
+    # the hold: the plan's own resolution (strain flags in the quiet period, dismissals, active standing constraints)
+    holds = None if instances is None else steps_ramp.lower_leg_holds(sunday, instances, dismissals)
+    since = hold_since(holds, instances, sunday)
     # Stage 4: his logged run/walks (a treadmill or running block whose note names the run/walk, its level and RPE)
     blocks = [
-        {"date": str(r.get("date") or str(r.get("sk") or "")[5:15])[:10], "note": e.get("notes") or e.get("note")}
-        for r in _rows_in(hevy, "0000-00-00", sunday)
+        {"date": _day(r), "note": e.get("notes") or e.get("note")}
+        for r in _rows_in(hevy, run_onramp.history_from() or "0000-00-00", sunday)
         for e in r.get("exercises") or []
         if re.search(r"treadmill|running|\brun\b", str(e.get("name") or ""), re.IGNORECASE)
     ]
-    onramp = run_onramp.stage_progress(run_onramp.performed_from_notes(blocks), holds) if hevy is not None else None
+    onramp = run_onramp.stage_progress(run_onramp.performed_from_notes(blocks), holds, since) if hevy is not None else None
     return {
         "walking_weeks": walking_weeks,
         "holds": holds,
+        "held_since": since,
         "stage4_done": bool((onramp or {}).get("stage4_done")),
         "onramp": onramp,
     }
+
+
+def _plan_dismissals() -> list:
+    from mcp.tools_plan import _pain_dismissals
+
+    return _pain_dismissals()
 
 
 def compute_weeks(last_monday: str, weeks: int = 4) -> list[dict[str, Any]]:
     """`weeks` completed tracker rows ending with the week of `last_monday`, oldest first; each row's
     triggers read the row before it (the first reads none)."""
     from training.muscle_volume import normalize_hevy_items, working_sets_by_muscle
-    from training.run_onramp import running
+    from training.run_onramp import history_from, running
     from training.steps_resolver import steps_range
 
     from mcp import core
@@ -198,10 +253,15 @@ def compute_weeks(last_monday: str, weeks: int = 4) -> list[dict[str, Any]]:
     wrows, w_err = _read(core.query_source, "withings", mt.shift(first, -RATE_4WK_DAYS), last_sunday)
     mrows, m_err = _read(core.query_source, "measurements", "2000-01-01", last_sunday)
     srange, s_err = _read(steps_range, first, last_sunday, fetch=_steps_fetch, derived=False)
-    hevy, h_err = _read(_read_hevy_all_phases, mt.shift(first, -ANCHOR_LOOKBACK_DAYS), last_sunday)
+    lookback = mt.shift(first, -ANCHOR_LOOKBACK_DAYS)
+    # one Hevy read, reaching back to the on-ramp's history_from for Stage 4 alone; the other sections keep their window
+    hevy, h_err = _read(_read_hevy_all_phases, min(lookback, history_from() or lookback), last_sunday)
     # the run gate's walking weeks reach `gated_movements.running.walking_weeks` before the oldest tracked Sunday
     strava, st_err = _read(core.query_source_range, "strava", mt.shift(first, -7 * int(running().get("walking_weeks") or 0)), last_sunday)
-    items = list((hevy or ([], []))[0] or [])
+    all_items = list((hevy or ([], []))[0] or [])
+    items = [r for r in all_items if _day(r) >= lookback]
+    instances = None if h_err else pain_instances(all_items)
+    dismissals = _read(_plan_dismissals)[0] if instances else None  # read only when a pain note exists; unread = a flag holds
     workouts = normalize_hevy_items(items) if not h_err else []
     series, a_err = _read(_anchor_series, items) if not h_err else (None, h_err)
     guidance = _guidance() if not w_err else None
@@ -224,7 +284,7 @@ def compute_weeks(last_monday: str, weeks: int = 4) -> list[dict[str, Any]]:
             fitness=mt.fitness_section(None),
             prior=prior,
             built_at=pacific_today(),
-            running=running_inputs(sun, None if st_err else (strava or []), None if h_err else items),
+            running=running_inputs(sun, None if st_err else (strava or []), None if h_err else all_items, dismissals),
         )
         rows.append(row)
         prior = row

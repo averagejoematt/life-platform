@@ -122,12 +122,19 @@ def test_max_two_runs_a_week():
     assert v["eligible"] is False and f"{CAP} runs" in v["why"]
 
 
-def test_no_run_when_the_gate_is_not_open_but_a_hold_keeps_an_opened_onramp_at_its_level():
+def test_no_run_when_the_gate_is_not_open_and_a_strain_flag_pauses_the_run_like_the_pogo_hops():
+    """HELD pauses ALL impact: no day of the sequence carries a run/walk, the same rule that pauses the pogo hops
+    (`prep_exposures`), and the week placement places none; the level is kept by `stage_progress`."""
     free = next(s for s in SEQ if run_onramp.run_day_verdict(s, gate=_open_gate())["eligible"])
     assert not run_onramp.run_day_verdict(free, gate=run_onramp.gate_state(PREP + 1, _weeks(), []))["eligible"]
     held = run_onramp.gate_state(GATE - 1, _weeks(), ["strain_flag:shin"])
-    v = run_onramp.run_day_verdict(free, gate=held, level=3)
-    assert v["eligible"] and v["block"]["level"] == 3 and "held" in v["why"]
+    assert held["state"] == run_onramp.HELD and held["onramp_open"]
+    for name in SEQ:
+        v = run_onramp.run_day_verdict(name, gate=held, level=3)
+        assert v["eligible"] is False and "pauses the run/walk" in v["why"]
+    days = [{"date": f"2027-03-0{d + 1}", "archetype": SEQ[d]} for d in range(len(SEQ))]
+    assert not any(p and p["kind"] == "run_walk" for p in cardio_menu.place_week(days, run_gate=held, run_level=3))
+    assert "run/walk" in charter_value("gated_movements.running.onramp.held_by")
 
 
 def test_the_week_placement_puts_runs_on_easy_slots_only_within_the_cap_and_the_spacing():
@@ -184,6 +191,13 @@ def test_a_strain_hold_holds_the_onramp_at_its_level():
     assert run_onramp.stage_progress(runs)["level"] == 2  # the same record unheld advances
 
 
+def test_an_undated_hold_never_advances_the_level():
+    """The review's reproduction: a hold with no `held_since` used to count every session (level 2 under a 'held'
+    reason). An undated hold now covers the whole record — the reason and the level agree."""
+    p = run_onramp.stage_progress([_s(1)] * NEED, holds=["strain_flag:x"])
+    assert p["level"] == LEVELS[0]["level"] and p["held"] and "no advance" in p["reason"]
+
+
 def test_stage4_is_done_when_the_last_level_is_completed_twice():
     runs = [_s(lv["level"]) for lv in LEVELS for _ in range(NEED)]
     assert run_onramp.stage_progress(runs[:-1])["stage4_done"] is False
@@ -210,10 +224,12 @@ def test_his_logged_notes_are_read_for_level_rpe_and_a_lower_leg_pain_word():
 def test_every_level_renders_a_short_reasoned_block_whose_minutes_count_toward_movement():
     from training.routine_ir import ExerciseBlock, Set
 
+    from mcp.tools_plan import HEVY_NOTE_OBSERVED_VISIBLE_CHARS
+
     for lv in run_onramp.levels():
         b = run_onramp.run_walk_block(lv["level"])
         line1, line2 = b["note"].split("\n")
-        assert len(line1) <= 150 and f"RPE <= {EASY_TOP}" in line1 and line2.startswith("Why: ")
+        assert len(line1) <= HEVY_NOTE_OBSERVED_VISIBLE_CHARS and f"RPE <= {EASY_TOP}" in line1 and line2.startswith("Why: ")
         assert b["total_min"] == (lv["run_min"] + lv["walk_min"]) * lv["rounds"] == b["movement_minutes"]
         block = ExerciseBlock(movement_key="treadmill", sets=[Set(type="normal", duration_seconds=b["total_min"] * 60)], rest_seconds=0)
         assert cardio_menu.movement_minutes([block]) == b["total_min"]
@@ -384,3 +400,80 @@ def test_the_tracker_reads_stage_4_from_his_logged_run_walk_notes():
 
     sec = mt.running_gate_section(GATE - 1, got["walking_weeks"], got["holds"], got["stage4_done"], got["onramp"])
     assert sec["onramp"]["level"] == LEVELS[1]["level"]
+
+
+# ── the tracker's hold is the plan's hold; Stage 4 survives the rolling window (review round, PR #5179) ──
+def _run_row(day, level, rpe=EASY_TOP, extra=""):
+    return {"date": day, "exercises": [{"name": "Treadmill", "notes": f"run/walk L{level} RPE {rpe}{extra}", "sets": []}]}
+
+
+def test_a_lower_leg_strain_flag_holds_the_onramp_through_the_tracker():
+    """`running_inputs` passes the hold's start, so the strain flag holds the on-ramp on the wired path: the two
+    sessions before the shin note advance the level, the two after it do not."""
+    from mcp import tools_may_tracker as tmt
+
+    sunday = "2027-03-14"
+    hevy = [_run_row("2027-03-01", 1), _run_row("2027-03-03", 1)]
+    hevy.append({"date": "2027-03-06", "exercises": [{"name": "Calf Raise", "notes": "sharp pain in my left shin", "sets": []}]})
+    hevy += [_run_row("2027-03-08", 2), _run_row("2027-03-10", 2)]
+    got = tmt.running_inputs(sunday, [], hevy)
+    assert got["holds"] and all(h.startswith("strain_flag:") for h in got["holds"]) and got["held_since"] == "2027-03-06"
+    assert got["onramp"]["level"] == LEVELS[1]["level"] and got["onramp"]["held"] and "no advance" in got["onramp"]["reason"]
+    unheld = tmt.running_inputs(sunday, [], [r for r in hevy if r["date"] != "2027-03-06"])
+    assert unheld["holds"] == [] and unheld["onramp"]["level"] == LEVELS[2]["level"]
+
+
+def test_the_tracker_hold_and_the_plan_hold_agree_on_dismissals_and_standing_constraints(monkeypatch):
+    """The must-agree pair: the tracker resolves its hold through `steps_ramp.lower_leg_holds` — the plan path's
+    (`attach_prep`) function — so an owner dismissal releases it and an active standing lower-leg constraint holds it."""
+    from training import steps_ramp, training_context_registry as tcr
+
+    from mcp import tools_may_tracker as tmt
+
+    sunday = "2027-03-14"
+    hevy = [{"date": "2027-03-10", "exercises": [{"name": "Calf Raise", "notes": "sharp pain in my left shin", "sets": []}]}]
+    inst = tmt.pain_instances(hevy)
+    assert tmt.running_inputs(sunday, [], hevy)["holds"] == steps_ramp.lower_leg_holds(sunday, inst) != []
+    dismissal = tcr.build_dismissal_record(
+        site="left shin", dismissed_on="2027-03-12", words="the shin is fine", movements=["Calf Raise"],
+        flag_note_date="2027-03-10", recorded_at="2027-03-12T08:00:00Z",
+    )  # fmt: skip
+    assert steps_ramp.lower_leg_holds(sunday, inst, [dismissal]) == []  # the plan path releases it on his word
+    assert tmt.running_inputs(sunday, [], hevy, [dismissal])["holds"] == []  # and so does the tracker
+    standing = {"id": "test_ankle", "kind": "injury", "detail": "ankle", "dated": "2027-02-20", "confirmed": True, "status": "active"}
+    monkeypatch.setattr(tcr, "RECORDED_CONSTRAINTS", [*tcr.RECORDED_CONSTRAINTS, standing])
+    got = tmt.running_inputs(sunday, [], [])
+    assert got["holds"] == steps_ramp.lower_leg_holds(sunday, []) == ["standing_constraint:test_ankle"]
+    assert got["held_since"] == "2027-02-20"
+    assert run_onramp.gate_state(GATE - 1, _weeks(), got["holds"])["state"] == run_onramp.HELD
+
+
+def test_stage_4_survives_its_early_levels_leaving_the_anchor_window(monkeypatch):
+    """The early levels sit before the tracker's anchor lookback; the one Hevy read reaches back to the charter's
+    `onramp.history_from`, so the level and `stage4_done` never fall back as the record ages."""
+    from training import rate_band
+
+    from mcp import core, tools_may_tracker as tmt
+
+    start = run_onramp.history_from()
+    assert start and start <= "2026-10-20"
+    days = [tmt.mt.shift("2026-10-20", 7 * i + d) for i in range(len(LEVELS)) for d in (0, 2)]
+    hevy = [_run_row(day, LEVELS[i // NEED]["level"]) for i, day in enumerate(days)]
+    reads = []
+
+    def read_hevy(s, e):
+        reads.append(s)
+        return [r for r in hevy if s <= r["date"] <= e], []
+
+    monday = "2027-03-01"
+    monkeypatch.setattr(core, "query_source", lambda *a, **k: [])
+    monkeypatch.setattr(core, "query_source_range", lambda *a, **k: [])
+    monkeypatch.setattr(rate_band, "guidance_cap_for", lambda table, user_id="matthew": None)
+    monkeypatch.setattr("mcp.tools_strength._read_hevy_all_phases", read_hevy)
+    monkeypatch.setattr(tmt, "_anchor_series", lambda items: {})
+    monkeypatch.setattr(tmt, "pacific_today", lambda: "2027-03-09")
+    assert days[0] < tmt.mt.shift(monday, -7 - tmt.ANCHOR_LOOKBACK_DAYS)  # L1 is outside the anchor window
+    row = tmt.compute_weeks(monday, weeks=1)[-1]
+    assert reads == [start]
+    gate = row["running_gate"]
+    assert gate["onramp"]["level"] == LEVELS[-1]["level"] and gate["onramp"]["stage4_done"] is True
