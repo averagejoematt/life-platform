@@ -104,9 +104,8 @@ def floor_held_days(days: list[Mapping[str, Any]], floor: int) -> int:
     """Consecutive most-recent days (newest first) whose measured count reached the floor."""
     run = 0
     for d in sorted(days, key=lambda x: str(x.get("date")), reverse=True):
-        if (
-            d.get("steps") is None or float(d["steps"]) < floor or d.get("degraded") == "partial_day"
-        ):  # steps-truth: resolve_daily_steps output (training.steps_resolver), already resolved
+        steps = d.get("steps")  # steps-truth: resolve_daily_steps output (training.steps_resolver), already resolved
+        if steps is None or float(steps) < floor or d.get("degraded") == "partial_day":
             break
         run += 1
     return run
