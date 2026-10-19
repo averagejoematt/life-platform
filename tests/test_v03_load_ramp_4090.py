@@ -475,7 +475,9 @@ def test_4408_the_0929_bench_is_held_at_205_not_ramped_to_60_percent_of_e1rm():
         BENCH_205_KG * (1 + 7 / 30), abs=1e-3
     )
     cue = load_ramp.render_ramp_cue(row)
-    assert "205 lb x 5 @ RPE 8 on 2026-09-23" in cue and "RPE <= 8" in cue and "never goes under an achieved load" in cue
+    # #5058: the slot's ceiling is the charter compounds band's high end (9 for the advanced tier; 8 before)
+    assert "205 lb x 5 @ RPE 8 on 2026-09-23" in cue and f"RPE <= {load_ramp.slot_rpe_ceiling('heavy')}" in cue
+    assert "never goes under an achieved load" in cue
 
 
 def test_4408_mutation_control_without_the_hold_the_bench_reads_the_reported_145_lb():
@@ -495,12 +497,13 @@ def _held(history, slot):
 
 def test_4408_review_the_hold_is_rpe_aware_a_breach_set_is_not_re_prescribed():
     """Driver review (the owner's defect 3: RPE ceilings breached as the norm). 205 x 5 @ 8 into the
-    4–6 top set @ <= 8 holds 205; 160 x 8 @ RPE 10 into a 6–10 slot @ <= 8 holds 150 — what its
-    RPE-adjusted e1RM (160 x (1 + 8/30) = 202.7 lb) allows for 8 reps at RPE 8, rounded DOWN to 5 lb."""
-    assert _held(_one_set(205, 5, 8), HEAVY_SLOT)["floor_kg"] == pytest.approx(205 * LB)
+    4–6 top set @ <= 9 holds 205; 160 x 8 @ RPE 10 into a 6–10 slot @ <= 9 (#5058: the charter compounds
+    ceiling, 8 before) holds 155 — what its RPE-adjusted e1RM (160 x (1 + 8/30) = 202.7 lb) allows for 8
+    reps at RPE 9 (76.9 %), rounded DOWN to 5 lb."""
+    assert _held(_one_set(205, 5, 8), HEAVY_SLOT)["floor_kg"] == pytest.approx(205 * LB, abs=0.01)
     row = _held(_one_set(160, 8, 10), MODERATE_SLOT)
     h = row["ramp"]["hold"]
-    assert row["floor_kg"] == pytest.approx(150 * LB) and row["floor_kg"] < 160 * LB
+    assert row["floor_kg"] == pytest.approx(155 * LB) and row["floor_kg"] < 160 * LB
     assert (
         h["applies"] is True
         and h["rpe_basis"] == "rpe_adjusted"
@@ -523,17 +526,21 @@ def test_4408_review_a_set_with_no_logged_rpe_holds_the_load_itself_and_says_abs
     h = row["ramp"]["hold"]
     assert row["floor_kg"] == pytest.approx(160 * LB) and h["rpe_basis"] == "absent" and h["e1rm_rpe_adjusted"] is None
     assert "no RPE logged" in load_ramp.render_ramp_cue(row)
-    # the RPE ceilings are read off program_structure.EXPOSURES, not typed here
-    assert [load_ramp.slot_rpe_ceiling(i) for i in ("heavy", "moderate", "volume", "accessory", "unknown")] == [8, 8, 9, 9, None]
+    # the RPE ceilings are the charter's (#5058: every program slot reads the compounds band's high end), not typed here
+    from training import effort_ceilings
+
+    c = int(effort_ceilings.ceiling(effort_ceilings.COMPOUNDS))
+    assert [load_ramp.slot_rpe_ceiling(i) for i in ("heavy", "moderate", "volume", "accessory", "unknown")] == [c, c, c, c, None]
 
 
 def test_4408_the_wire_pulldown_is_held_under_its_rpe_9_10_sets():
-    """On the stored record the 09-23 pulldown sets were 160 x 8 @ 9 and @ 10: the 6–10 moderate slot
-    (@ <= 8) holds 155 (from the @ 9 set), not the 160 the unadjusted hold wrote."""
+    """On the stored record the 09-23 pulldown sets were 160 x 8 @ 9 and @ 10. #5058: the 6–10 moderate slot
+    is now @ <= 9 (the charter compounds ceiling), so the @ 9 set sits AT the ceiling and holds its own
+    160 — under the pre-charter @ <= 8 it held 155."""
     history, _ = _wire_history()
     tid = MOVEMENTS["lat_pulldown"]["hevy_template_id_hint"]
     row = load_ramp.v03_floor(tid, history, WIRE_WEIGHTS, 313.7, as_of="2026-09-29", week=1, slot=MODERATE_SLOT)
-    assert row["floor_kg"] == pytest.approx(155 * LB) and row["ramp"]["hold"]["achieved"]["rpe"] == 9.0
+    assert row["floor_kg"] == pytest.approx(160 * LB, abs=0.01) and row["ramp"]["hold"]["achieved"]["rpe"] == 9.0
 
 
 def test_4408_the_hold_is_at_the_sets_rep_floor_never_a_heavier_lower_rep_load():
@@ -560,7 +567,7 @@ def test_4408_a_missed_week_is_not_a_layoff_the_load_is_still_held():
     )
     ev = row["ramp"]["hold"]["layoff_evidence"]
     assert ev["record_gap_days"] == 10 and ev["threshold_days"] == load_ramp.DETRAINING_ANCHOR_AGE_DAYS
-    assert row["ramp"]["hold"]["layoff"] is False and row["floor_kg"] == pytest.approx(205 * LB)
+    assert row["ramp"]["hold"]["layoff"] is False and row["floor_kg"] == pytest.approx(205 * LB, abs=0.01)
 
 
 def test_4408_mutation_control_a_7_day_layoff_line_re_prescribes_the_ramp_after_one_missed_week():
@@ -588,7 +595,7 @@ def test_4503_od1_a_14_day_gap_holds_the_load_instead_of_ramping():
     row = _bench_gap(14)
     h = row["ramp"]["hold"]
     assert h["tier"] == "hold" and h["layoff"] is False and h["layoff_evidence"]["tier_gap_days"] >= 14
-    assert h["layoff_evidence"]["threshold_days"] == 28 and row["floor_kg"] == pytest.approx(205 * LB)
+    assert h["layoff_evidence"]["threshold_days"] == 28 and row["floor_kg"] == pytest.approx(205 * LB, abs=0.01)
 
 
 def test_4503_od1_mutation_control_a_14_day_gap_under_the_old_7_day_line_does_not_hold():
@@ -673,7 +680,7 @@ def test_4408_generator_planner_and_chat_gate_read_one_held_number():
     history, rows = _wire_history()
     with patch.object(routine_generator, "_load_note_indexes", return_value=(history, WIRE_WEIGHTS, {}, {})):
         ideal = routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date="2026-09-29", block_workouts=rows))[0]
-    assert _top(ideal, BENCH) == pytest.approx(205 * LB)
+    assert _top(ideal, BENCH) == pytest.approx(205 * LB, abs=0.01)
     rx = program_structure.planned_session("2026-09-29", block_workouts=rows, catalog_movements=MOVEMENTS)["prescription"]
     load_ramp.annotate_prescription(rx, MOVEMENTS, history, WIRE_WEIGHTS, target_date="2026-09-29", week=1)
     planned = {e["movement_key"]: e["load"]["top_kg"] for e in rx["exposures"]}
@@ -685,7 +692,8 @@ def test_4408_generator_planner_and_chat_gate_read_one_held_number():
         gate = prescription_gate(custom, movements=MOVEMENTS, history_index=history, weight_index=WIRE_WEIGHTS)
     assert gate["verdict"] == "clean", gate["audit"]
     assert gate["load_floors"]["movements"][BENCH]["floor_kg"] == _top(ideal, BENCH)
-    assert gate["load_floors"]["movements"]["lat_pulldown"]["floor_kg"] == _top(ideal, "lat_pulldown") == pytest.approx(155 * LB)
+    # #5058: 160 x 8 @ 9 sits AT the charter compounds ceiling (RPE 9), so the pulldown holds its own 160 (155 at the pre-charter 8)
+    assert gate["load_floors"]["movements"]["lat_pulldown"]["floor_kg"] == _top(ideal, "lat_pulldown") == pytest.approx(160 * LB, abs=0.01)
 
 
 # ── #4397: the ramp's cap is rep-aware — a volume day never carries his 5-rep weight ─────────────
@@ -701,14 +709,15 @@ def _squat_wire(week, slot, as_of="2026-09-29"):
 
 def test_4397_the_rep_table_is_inverse_epley_on_reps_plus_rir():
     """The table (population-derived, ADR-105): 5 reps 85.7 %, 8 = 78.9 %, 10 = 75 %, 12 = 71.4 % at RIR 0;
-    the program's slots at their RPE ceilings: volume 73.2, moderate 75.0, accessory 71.4, heavy 81.1."""
+    the program's slots at their RPE ceilings (#5058: every slot at the charter compounds ceiling, RPE 9 —
+    heavy was 81.1 and moderate 75.0 at the pre-charter RPE 8): volume 73.2, moderate 76.9, accessory 71.4, heavy 83.3."""
     assert [round(load_ramp.rep_ceiling_pct(n, 10), 1) for n in (1, 5, 8, 10, 12)] == [96.8, 85.7, 78.9, 75.0, 71.4]
     slots = {i: load_ramp.slot_of([{"reps": program_structure.EXPOSURES[i]["reps"]}], i) for i in program_structure.EXPOSURES}
     got = {i: round(load_ramp.rep_ceiling_pct(s["target_reps"], s["rpe_ceiling"]), 1) for i, s in slots.items()}
-    assert got == {"heavy": 81.1, "moderate": 75.0, "volume": 73.2, "accessory": 71.4}
+    assert got == {"heavy": 83.3, "moderate": 76.9, "volume": 73.2, "accessory": 71.4}
     # the inverse of the hold's own e1RM: a load moved for (reps, RPE) is exactly its own ceiling at those reps/RPE
     assert load_ramp.rpe_adjusted_e1rm_kg(100.0, 8, 8) * load_ramp.rep_ceiling_pct(8, 8) / 100 == pytest.approx(100.0)
-    assert "population-derived" in load_ramp.REP_TABLE_SOURCE and load_ramp.lowest_program_rpe_ceiling() == 8
+    assert "population-derived" in load_ramp.REP_TABLE_SOURCE and load_ramp.lowest_program_rpe_ceiling() == 9
 
 
 def test_4397_volume_squat_week_1_and_week_6_sit_under_the_rep_table():
@@ -757,12 +766,12 @@ def test_4397_a_heavy_5_rep_anchor_keeps_the_85_percent_redline_owner_ruling_b()
 
 
 def test_4397_mutation_control_a_heavy_slot_without_the_exemption_is_rep_capped_at_81():
-    """The exemption is keyed on the slot's intensity: the same 4–6 @ <= 8 slot under any other name is
-    rep-capped to 81.1 % -> 190 lb at week 6 — the number option (b) declined."""
+    """The exemption is keyed on the slot's intensity: the same 4–6 @ <= 9 slot (#5058; @ <= 8 before) under any
+    other name is rep-capped to 83.3 % -> 195 lb at week 6 — under the ramp's 200 lb the ruling keeps."""
     unexempt = {**HEAVY_SLOT, "intensity": "heavy-without-the-ruling"}
     w6 = _bench_after_layoff(6, unexempt)
-    assert w6["floor_kg"] == pytest.approx(190 * LB) and w6["ramp"]["rep_cap"]["governed_by"] == "rep_cap"
-    assert w6["ramp"]["rep_cap"]["pct_of_band_e1rm"] == 81.1
+    assert w6["floor_kg"] == pytest.approx(195 * LB) and w6["ramp"]["rep_cap"]["governed_by"] == "rep_cap"
+    assert w6["ramp"]["rep_cap"]["pct_of_band_e1rm"] == 83.3
 
 
 ACCESSORY_SLOT = load_ramp.slot_of([{"reps": [8, 15]}], "accessory")  # 8–15 @ RPE <= 9, target 11

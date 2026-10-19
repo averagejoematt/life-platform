@@ -94,8 +94,11 @@ SECTION_GUIDE: dict[str, str] = {
         "correct; deciding one is not yours to do."
     ),
     "effort_ceilings": (
-        "effort_ceilings — the RPE ceilings by experience tier: one band for compound lifts and "
-        "one for the last set of an isolation movement. `overage_tolerance_rpe` and "
+        "effort_ceilings — the RPE ceilings by movement class: one band for compound lifts and "
+        "one for the last set of an isolation movement (`by_movement_class`). `experience_tier` "
+        "names the lifter's tier (`current`) and the class bands each tier is prescribed at, "
+        "including the back-off band off a heavy top set; the ceiling is the HIGH end of the "
+        "current tier's band (`ceiling_is`). `overage_tolerance_rpe` and "
         "`overage_rule` define what does NOT count as a breach: a set within the tolerance above "
         "the ceiling is not a breach and must not be reported as one. "
         "`ceiling_change_proposal` defines when the ceilings themselves should be revisited — a "
@@ -150,8 +153,8 @@ SECTION_GUIDE: dict[str, str] = {
         "step. `self_raised_load` is binding on every grade: a load the owner raised himself at or "
         "under the ceiling (within the tolerance in effort_ceilings) is progress — it becomes the "
         "next floor and is graded `progressed`, never a breach; above the ceiling plus tolerance it "
-        "is a breach. `ceiling_tier` says which end of each effort band is read until the tiers are "
-        "assigned. Never prescribe a load below one he has already carried within the ceiling."
+        "is a breach. `ceiling_tier` says which end of the current tier's effort band is the ceiling. "
+        "Never prescribe a load below one he has already carried within the ceiling."
     ),
     "rotation": (
         "rotation — anchor lifts stay fixed for the number of weeks in `anchors_fixed_weeks`, so "

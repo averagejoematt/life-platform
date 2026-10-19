@@ -60,11 +60,11 @@ returns `{"rpe": None}` on purpose (ADR-105: no invented thresholds). But a `Non
 made `grade_sets` report `status: "unprescribed"` and drop the movement out of the
 intensity denominator entirely — so an isolation accessory logged at RPE 9.5 (to-failure
 territory) still read a clean `as_prescribed` verdict, because nothing was ever compared.
-The program itself (v0.3 §3, `training.program_structure.EXPOSURES`, prose home
-`owner_redlines.REDLINES["lifting_sessions_per_wk"]["rep_scheme"]`) already names a ceiling
-for every movement CLASS even when a specific session's notes don't repeat it: accessories
-are RIR 1-2 (RPE <= 9), and the anchor pattern families train at the heavy exposure's top_rpe
-ceiling (<= 8) at the loosest. `_program_default_ceiling` applies that class-level default
+The program itself already names a ceiling for every movement CLASS even when a specific
+session's notes don't repeat it — since #5058 the charter's (`effort_ceilings`, the owner's
+experience tier picks the class bands, read through `training.effort_ceilings`): an anchor
+pattern reads the compounds band's ceiling, an accessory its earlier sets at the compounds
+ceiling and its LAST set at the last-isolation-set ceiling. `_program_default_ceiling` applies that class-level default
 ONLY when the routine's own prescription is silent (`resolve_ceiling` returned `rpe: None`)
 — an explicit routine/exercise ceiling always wins, this is a fallback, never an override.
 Classification is by the SAME `program_structure.classify_movement` the accessory-rotation
@@ -78,7 +78,9 @@ from the routine's own words.
 
 A SELF-RAISED LOAD IS PROGRESS, NOT A BREACH (#5052). 20 of 22 graded sessions read
 `as_prescribed: no`, mostly because the owner raised a load and logged it above the routine's
-own RPE note. A working set carried ABOVE the heaviest prescribed load, at or under the
+own RPE note. #5058 adds the charter's overage tolerance: a set within
+`overage_tolerance_rpe` above its ceiling is `within_tolerance`, never a breach.
+A working set carried ABOVE the heaviest prescribed load, at or under the
 charter's effort limit for the movement's class (`training.load_progression`, read from
 `effort_ceilings` — ceiling plus `overage_tolerance_rpe`), is graded `progressed`: counted in
 `sets_progressed`, kept out of every percentage, and the session verdict reads `progressed`
@@ -107,8 +109,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 from common.repo_config import config_dir
-from training.intensity_prescription import RIR_RPE_ANCHOR, grade_sets, resolve_ceiling
-from training.program_structure import EXPOSURES, classify_movement
+from training import effort_ceilings
+from training.intensity_prescription import grade_sets, resolve_ceiling
+from training.program_structure import classify_movement
 from training.routine_ir import RoutineSpec
 
 logger = logging.getLogger("adherence_calc")
@@ -226,14 +229,9 @@ def canonical_template_ids() -> dict[str, str]:
     return {str(a).strip().upper(): str(c).strip().upper() for a, c in resolved.items() if a and c}
 
 
-# ── program-default intensity ceiling (#4073) ─────────────────────────────────
-# Derived from training.program_structure.EXPOSURES, never re-typed as a literal — a
-# change to the program's own numbers must move this too, not silently drift from it.
-# The one prose home for both is owner_redlines.REDLINES["lifting_sessions_per_wk"]["rep_scheme"]
-# ("heavy exposure 4-6: one top set at RPE 7-8 plus two back-offs at -10%; moderate 6-10;
-# accessories 8-15 at RIR 1-2").
-_ACCESSORY_DEFAULT_RPE: float = RIR_RPE_ANCHOR - min(EXPOSURES["accessory"]["rir"])  # RIR 1-2 -> RPE <= 9
-_ANCHOR_DEFAULT_RPE: float = float(max(EXPOSURES["heavy"]["top_rpe"]))  # the tightest numeric ceiling EXPOSURES names
+# ── program-default intensity ceiling (#4073; the charter's since #5058) ──────
+# Read through `training.effort_ceilings` at call time, never a module literal — the owner's
+# experience tier picks the class bands, so a tier change moves the default with it.
 
 
 def _catalog_entry_for(movement_key: str, catalog: dict[str, Any]) -> dict[str, Any]:
@@ -285,9 +283,16 @@ def _program_default_ceiling(movement_key: str, catalog: dict[str, Any], alias_t
     cls = classify_movement(title)
     if cls == "cardio":
         return {"rpe": None, "basis": None}
+    compound = effort_ceilings.ceiling(effort_ceilings.COMPOUNDS)
+    if compound is None:
+        return {"rpe": None, "basis": None}  # an unreadable charter names no default (ADR-104)
     if cls.startswith("anchor:"):
-        return {"rpe": _ANCHOR_DEFAULT_RPE, "basis": f"program_default:{cls}"}
-    return {"rpe": _ACCESSORY_DEFAULT_RPE, "basis": "program_default:accessory"}
+        return {"rpe": compound, "basis": f"program_default:{cls}"}
+    return {
+        "rpe": compound,
+        "last_set_rpe": effort_ceilings.ceiling(effort_ceilings.LAST_ISOLATION_SET),
+        "basis": "program_default:accessory",
+    }
 
 
 def _progression_for(
@@ -383,6 +388,7 @@ def _intensity_rollup(movements: list[dict[str, Any]]) -> dict[str, Any]:
     over = sum(g["sets_over_ceiling"] for g in prescribed)
     absent = sum(g["sets_rpe_absent"] for g in prescribed)
     progressed = sum(g.get("sets_progressed") or 0 for g in prescribed)  # #5052: never in the percentage
+    within_tol = sum(g.get("sets_within_tolerance") or 0 for g in prescribed)  # #5058: above the ceiling, not a breach
     overages = [g["max_overage"] for g in prescribed if g.get("max_overage")]
 
     if graded:
@@ -398,6 +404,8 @@ def _intensity_rollup(movements: list[dict[str, Any]]) -> dict[str, Any]:
         "pct": pct,
         "sets_graded": graded,
         "sets_over_ceiling": over,
+        "sets_within_tolerance": within_tol,
+        "sets_beat_ceiling": over + within_tol,
         "sets_rpe_absent": absent,
         "movements_with_ceiling": len(prescribed),
         "max_overage": max(overages) if overages else (0.0 if graded else None),
@@ -515,8 +523,15 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
     for p in programmed:
         performed_sets = performed_by_tid.get(p["template_id"], 0)
         pct = round(min(1.0, performed_sets / p["sets"]) * 100, 1) if p["sets"] else 0.0
-        intensity = grade_sets(p["ceiling"]["rpe"], performed_sets_by_tid.get(p["template_id"], []), progression=p["progression"])
+        intensity = grade_sets(
+            p["ceiling"]["rpe"],
+            performed_sets_by_tid.get(p["template_id"], []),
+            progression=p["progression"],
+            tolerance_rpe=limits.get("tolerance_rpe"),  # #5058: within the charter's tolerance is never a breach
+            last_set_ceiling=p["ceiling"].get("last_set_rpe"),
+        )
         intensity["basis"] = p["ceiling"]["basis"]
+        intensity["movement_class"] = p["progression"].get("movement_class")  # #5058: the ceiling-change proposal groups by it
         movements.append(
             {
                 "movement_key": p["movement_key"],

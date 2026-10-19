@@ -8,9 +8,18 @@ prescription itself named, so a performed set can be compared against it.
 
 THE THRESHOLD PROBLEM (ADR-105). There is no invented cutoff in this file. Nothing
 here says "RPE > 8.5 is non-compliant". The ceiling is READ from the routine's own
-prescription and the comparison is a plain `performed > prescribed` with ZERO
-tolerance — the only number that is not read off the prescription is the RIR→RPE
-anchor below, and that is a definition, not a threshold.
+prescription and the comparison is a plain `performed > prescribed`. The one margin is
+the CHARTER's (#5058): `grade_sets(tolerance_rpe=...)` is the caller's read of
+`effort_ceilings.overage_tolerance_rpe` — a set within it above the ceiling is
+`within_tolerance`, never a breach; this module never types that number and defaults
+to zero. The only number not read off a prescription is the RIR→RPE anchor below, and
+that is a definition, not a threshold.
+
+THE LAST SET (#5058). A cue can name a second ceiling for an isolation movement's last
+working set ("ACCESSORY: 2 sets of 8–15 @ RPE 8–9; last set RPE 9–10."). When a block
+names BOTH a general ceiling and a clause naming the "last set", the last-set clause is
+read apart (`read_last_set_ceiling`) and grades only the last working set; a block that
+names one ceiling reads exactly as before.
 
 WHERE A CEILING CAN LIVE. Three forms, all of them the routine's own words:
 
@@ -154,6 +163,34 @@ def read_ceiling(text: str | None) -> tuple[float | None, str | None]:
     return max(found), form
 
 
+# #5058: a clause naming the LAST set ("last set RPE 9–10") — split on ';', a newline or a
+# sentence-ending '.', never on the decimal point of "RPE 8.5".
+_LAST_SET_SPLIT_RE = re.compile(r";|\n|\.(?=\s|$)")
+_LAST_SET_RE = re.compile(r"\blast\s+(?:working\s+)?set\b", re.IGNORECASE)
+
+
+def _split_last_set(text: str | None) -> tuple[str | None, str | None]:
+    """(general text, last-set text) — split only when BOTH halves name a ceiling; otherwise
+    (text, None), so a block naming one ceiling ("2-3 RIR on the last set") reads as before."""
+    if not text:
+        return text, None
+    clauses = [c for c in _LAST_SET_SPLIT_RE.split(text) if c.strip()]
+    last = [c for c in clauses if _LAST_SET_RE.search(c)]
+    general = [c for c in clauses if not _LAST_SET_RE.search(c)]
+    if not last or not general:
+        return text, None
+    g, lt = ". ".join(general), ". ".join(last)
+    if read_ceiling(g)[0] is None or read_ceiling(lt)[0] is None:
+        return text, None
+    return g, lt
+
+
+def read_last_set_ceiling(text: str | None) -> float | None:
+    """The ceiling a block names for the LAST working set only, or None (#5058)."""
+    _g, last = _split_last_set(text)
+    return read_ceiling(last)[0] if last else None
+
+
 def _normalize_words(s: str | None) -> str:
     return re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
 
@@ -259,7 +296,8 @@ def resolve_ceiling(
     """Resolve ONE movement's prescribed RPE ceiling. Precedence: structured branch →
     the exercise's own notes → the session-level routine notes.
 
-    Returns {"rpe": float|None, "basis": str|None}. `basis` names where the number came
+    Returns {"rpe": float|None, "basis": str|None} (+ `last_set_rpe` when the exercise's own
+    notes name a separate last-set ceiling, #5058). `basis` names where the number came
     from ("recovery_branches:green", "exercise_notes:rir", "routine_notes:rpe", …) so a
     reader can tell a movement-specific ceiling from a session-wide fallback — and so a
     `None` ceiling is legible as "the plan never said", not as "compliant".
@@ -274,9 +312,13 @@ def resolve_ceiling(
     if cap is not None:
         return {"rpe": cap, "basis": "recovery_branches:green"}
 
-    cap, form = read_ceiling(exercise_notes)
+    general, last = _split_last_set(exercise_notes)
+    cap, form = read_ceiling(general)
     if cap is not None:
-        return {"rpe": cap, "basis": f"exercise_notes:{form}"}
+        out: dict[str, Any] = {"rpe": cap, "basis": f"exercise_notes:{form}"}
+        if last:
+            out["last_set_rpe"] = read_ceiling(last)[0]
+        return out
 
     cap, form = _routine_notes_ceiling(routine_notes, movement_title)
     if cap is not None:
@@ -313,7 +355,13 @@ def _progressed(val: float, s: dict[str, Any], i: int, n: int, progression: dict
     return limit is not None and val <= float(limit)
 
 
-def grade_sets(ceiling: float | None, sets: list[dict[str, Any]], progression: dict[str, Any] | None = None) -> dict[str, Any]:
+def grade_sets(
+    ceiling: float | None,
+    sets: list[dict[str, Any]],
+    progression: dict[str, Any] | None = None,
+    tolerance_rpe: float | None = None,
+    last_set_ceiling: float | None = None,
+) -> dict[str, Any]:
     """Grade one movement's PERFORMED sets against its prescribed ceiling.
 
     `progression` (#5052) is `{prescribed_kg, limit_rpe, last_set_limit_rpe}` — the routine's
@@ -323,17 +371,23 @@ def grade_sets(ceiling: float | None, sets: list[dict[str, Any]], progression: d
     over the routine's ceiling, and kept OUT of `pct_within_ceiling`'s denominator — it is
     never folded into a percentage. A raised set above the limit is still a breach.
 
+    `tolerance_rpe` (#5058) is the charter's `effort_ceilings.overage_tolerance_rpe`, read by
+    the caller: a set above its ceiling by AT MOST the tolerance is `within_tolerance`
+    (counted in `sets_within_tolerance`, never a breach); only a set above ceiling +
+    tolerance is `sets_over_ceiling`. `sets_beat_ceiling` is both together — every set
+    logged above the ceiling — the count the ceiling-change proposal reads. None/0 is the
+    strict compare. `last_set_ceiling` (#5058) grades the LAST working set alone (an
+    isolation movement's last-set band); None grades every set against `ceiling`.
+
     ADR-104 absence semantics, three ways:
       • ceiling is None  → status "unprescribed". Not graded, not counted compliant.
       • rpe is None      → counted in `sets_rpe_absent`, kept OUT of the denominator.
                            An unlogged RPE is never evidence of compliance.
       • no working set carried an rpe → status "unreadable", pct None (never 100).
-
-    Comparison is strict `performed > ceiling` with no tolerance band — inventing a
-    "close enough" margin would be inventing the threshold.
     """
+    tol = float(tolerance_rpe or 0.0)
     working = [s for s in (sets or []) if is_working_set(s)]
-    graded: list[float] = []
+    graded: list[tuple[float, float]] = []  # (performed, the set's own ceiling — unused when `ceiling` is None)
     progressed: list[float] = []
     absent = 0
     for i, s in enumerate(working):
@@ -347,15 +401,20 @@ def grade_sets(ceiling: float | None, sets: list[dict[str, Any]], progression: d
         elif _progressed(val, s, i, len(working), progression):
             progressed.append(val)
         else:
-            graded.append(val)
+            own = last_set_ceiling if last_set_ceiling is not None and i == len(working) - 1 else ceiling
+            graded.append((val, float(own) if own is not None else RPE_MAX))
 
     out: dict[str, Any] = {
         "ceiling_rpe": ceiling,
+        "last_set_ceiling_rpe": last_set_ceiling if ceiling is not None else None,
+        "tolerance_rpe": tol,
         "working_sets": len(working),
         "sets_graded": len(graded),
         "sets_rpe_absent": absent,
-        "max_rpe": max(graded) if graded else None,
+        "max_rpe": max(v for v, _c in graded) if graded else None,
         "sets_over_ceiling": 0,
+        "sets_within_tolerance": 0,
+        "sets_beat_ceiling": 0,
         "max_overage": None,
         "pct_within_ceiling": None,
         "sets_progressed": len(progressed) if ceiling is not None else 0,
@@ -366,15 +425,18 @@ def grade_sets(ceiling: float | None, sets: list[dict[str, Any]], progression: d
         return out
     if progressed:
         out["sets_graded"] = len(graded) + len(progressed)
-        out["max_rpe"] = max(graded + progressed)
+        out["max_rpe"] = max([v for v, _c in graded] + progressed)
     if not graded:
         out["status"] = "graded" if progressed else "unreadable"
         out["max_overage"] = 0.0 if progressed else None
         return out
 
-    over = [v for v in graded if v > ceiling]
+    beat = [(v, c) for v, c in graded if v > c]
+    over = [(v, c) for v, c in beat if v > c + tol]
     out["status"] = "graded"
     out["sets_over_ceiling"] = len(over)
-    out["max_overage"] = round(max(over) - ceiling, 1) if over else 0.0
+    out["sets_within_tolerance"] = len(beat) - len(over)
+    out["sets_beat_ceiling"] = len(beat)
+    out["max_overage"] = round(max(v - c for v, c in beat), 1) if beat else 0.0
     out["pct_within_ceiling"] = round((len(graded) - len(over)) / len(graded) * 100, 1)
     return out

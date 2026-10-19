@@ -394,7 +394,9 @@ def _slot_sets(intensity: str, movement: dict[str, Any], pool: str) -> list[dict
     spec = program_structure.EXPOSURES.get(intensity) or program_structure.EXPOSURES["volume"]
     rr = movement.get("default_rep_range") or {}
     reps = list(spec["reps"]) if pool == "gym_minimum" or not rr else [int(rr["start"]), int(rr["end"])]
-    rpe = list(_charter("effort_ceilings.by_experience_tier.compounds_rpe", []) or [])
+    from training import effort_ceilings  # #5058: the owner's experience tier picks the compounds band
+
+    rpe = list(effort_ceilings.class_bands(_charter).get(effort_ceilings.COMPOUNDS) or [])
     return [
         {"kind": "top", "reps": reps, "rpe": rpe},
         {"kind": "back_off", "reps": reps, "pct_of_top": 100 + int(shape.get("back_off_pct") or 0)},

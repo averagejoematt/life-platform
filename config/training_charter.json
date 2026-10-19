@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -21,6 +21,13 @@
       "date": "2026-10-19",
       "by": "owner ruling 2026-10-18 on #5088 (a late-December trip: travel templates, steps held, 2-3 short sessions a week, step back up on return)",
       "what": "Adds split.minimum_session (the 20-minute minimum per role: anchors only, top set + one back-off) and the disruption block (an owner-switched mode that holds habits instead of targets, its travel/busy templates, the step-back-up week and when the coach OFFERS the mode).",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.3.0",
+      "date": "2026-10-19",
+      "by": "the elite-panel training review 2026-10-18 (#5058: compounds RPE 8-9, the last isolation set 9-10, within +1 is not a breach)",
+      "what": "Renames effort_ceilings.by_experience_tier to by_movement_class (it always held MOVEMENT-CLASS bands) and adds effort_ceilings.experience_tier: the lifter's tier (current: advanced) picks the class bands, including the back-off band off a heavy top set (one point under the top set, the rep scheme's -10 % back-off). The intermediate bands are the platform's placement one point lower and are not in force. progression.ceiling_tier now reads the HIGH end of the current tier's band.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -105,9 +112,16 @@
     "note": "fatigue signals become a recommendation; a deload happens only on his recorded word (owner ruling 2026-10-18)"
   },
   "effort_ceilings": {
-    "by_experience_tier": {
+    "by_movement_class": {
       "compounds_rpe": [8, 9],
       "last_isolation_set_rpe": [9, 10]
+    },
+    "experience_tier": {
+      "current": "advanced",
+      "ceiling_is": "the high end of the current tier's band for the set's class: the band is the prescription, its top is the ceiling a set is graded against",
+      "classes": "a compound is a movement whose catalog entry names an anchor_family (or an anchor title); anything else is an isolation movement, whose earlier sets read the compounds band and whose LAST working set reads the last_isolation_set band; a back-off set off a heavy top set reads back_off_rpe",
+      "advanced": {"compounds_rpe": [8, 9], "last_isolation_set_rpe": [9, 10], "back_off_rpe": [7, 8]},
+      "intermediate": {"compounds_rpe": [7, 8], "last_isolation_set_rpe": [8, 9], "back_off_rpe": [6, 7]}
     },
     "overage_tolerance_rpe": 1,
     "overage_rule": "within +1 RPE of the ceiling is not a breach",
@@ -145,8 +159,8 @@
       "above_the_ceiling": "a raised load logged above the ceiling plus the tolerance is a breach and never becomes a floor"
     },
     "ceiling_tier": {
-      "compounds": "the low end of `effort_ceilings.by_experience_tier.compounds_rpe` until #5058 assigns the owner's tier",
-      "last_isolation_set": "the low end of `effort_ceilings.by_experience_tier.last_isolation_set_rpe`; an isolation movement's earlier sets read the compounds band",
+      "compounds": "the high end of `effort_ceilings.experience_tier.<current>.compounds_rpe` (#5058 assigned the tier: `experience_tier.current`)",
+      "last_isolation_set": "the high end of `effort_ceilings.experience_tier.<current>.last_isolation_set_rpe`; an isolation movement's earlier sets read the compounds band",
       "refs": "#5058"
     }
   },

@@ -80,7 +80,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from training import in_block_variant, program_conflicts, program_v03, program_v04
+from training import effort_ceilings, in_block_variant, program_conflicts, program_v03, program_v04
 from training.accessory_check import CARDIO_NAME_HINTS, accessory_rotation, classify_movement  # noqa: F401 — re-exported (#5069 split)
 from training.program_v03 import BLOCK_CALENDAR  # noqa: F401 — v0.3 history; `load_ramp.block_1_start()` reads it (#4107)
 from training.session_shape import (  # noqa: F401 — #5069: a session's length and shape (ruling 5), re-exported from here
@@ -541,23 +541,55 @@ HEVY_FOLDERS: dict[str, str] = {"upper": "Upper", "lower": "Lower"}
 must name the same strings (held by a test); a folder is found-or-created at the first commit
 (`ensure_folder`), never created ahead of time. v0.3's "Full Body" is `program_v03.HEVY_FOLDER`."""
 
+# #5058: every RPE here is the charter's — `effort_ceilings.experience_tier.<current>` picks the class bands
+# (`training.effort_ceilings`); the pre-charter `top_rpe` [7, 8] and the accessories' RIR are retired. A compound set
+# (top set, moderate, volume) reads the compounds band, a heavy back-off the back-off band, an accessory's earlier sets
+# the compounds band and its LAST set the last-isolation-set band. The cue names the band and the tier it came from.
+_EFFORT = effort_ceilings.class_bands()
+_TIER = effort_ceilings.current_tier() or "charter"
+_C, _B, _L = (
+    f"{_EFFORT[k][0]:g}–{_EFFORT[k][1]:g}"
+    for k in (effort_ceilings.COMPOUNDS, effort_ceilings.BACK_OFF, effort_ceilings.LAST_ISOLATION_SET)
+)
+
 EXPOSURES: dict[str, dict[str, Any]] = {
     "heavy": {
         "top_sets": 1,
         "reps": [4, 6],
-        "top_rpe": [7, 8],
+        "effort": effort_ceilings.COMPOUNDS,
+        "back_off_effort": effort_ceilings.BACK_OFF,
         "back_off_sets": 2,
         "back_off_pct": -10,
         "rest_seconds": 180,
-        "cue": "HEAVY: 1 top set of 4–6 @ RPE 7–8, then 2 back-offs at −10 % of the top set.",
+        "cue": f"HEAVY: 1 top set of 4–6 @ RPE {_C}, then 2 back-offs at −10 % of the top set @ RPE {_B} ({_TIER}-tier ceilings).",
     },
-    "moderate": {"sets": 3, "reps": [6, 10], "rest_seconds": 120, "cue": "MODERATE: 3 sets of 6–10, leave 2–3 in the tank."},
+    "moderate": {
+        "sets": 3,
+        "reps": [6, 10],
+        "effort": effort_ceilings.COMPOUNDS,
+        "rest_seconds": 120,
+        "cue": f"MODERATE: 3 sets of 6–10 @ RPE {_C} ({_TIER}-tier compound ceiling).",
+    },
     # #4147 v0.4: the volume days' anchor exposure (owner: "Volume days: 8–12 reps").
-    "volume": {"sets": 3, "reps": [8, 12], "rest_seconds": 120, "cue": "VOLUME: 3 sets of 8–12, leave 1–3 in the tank."},
-    "accessory": {"sets": 2, "reps": [8, 15], "rir": [1, 2], "rest_seconds": 90, "cue": "ACCESSORY: 2 sets of 8–15 at RIR 1–2."},
+    "volume": {
+        "sets": 3,
+        "reps": [8, 12],
+        "effort": effort_ceilings.COMPOUNDS,
+        "rest_seconds": 120,
+        "cue": f"VOLUME: 3 sets of 8–12 @ RPE {_C} ({_TIER}-tier compound ceiling).",
+    },
+    "accessory": {
+        "sets": 2,
+        "reps": [8, 15],
+        "effort": effort_ceilings.COMPOUNDS,
+        "last_set_effort": effort_ceilings.LAST_ISOLATION_SET,
+        "rest_seconds": 90,
+        "cue": f"ACCESSORY: 2 sets of 8–15 @ RPE {_C}; last set RPE {_L} ({_TIER}-tier ceilings).",
+    },
 }
 """The rep scheme as numbers (v0.3 §3's heavy / moderate / accessory, plus v0.4's volume). The one PROSE home is `owner_redlines.REDLINES
-['lifting_sessions_per_wk']['rep_scheme']`; a test holds every number here to that string."""
+['lifting_sessions_per_wk']['rep_scheme']`; a test holds every number here to that string. The effort keys name a charter class band
+(`training.effort_ceilings`, #5058) — the RPE numbers themselves live only in the charter."""
 
 SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
     "upper_heavy": {
@@ -842,7 +874,7 @@ def session_prescription_for_role(
         if key:
             taken.add(key)
         if intensity == "heavy":
-            sets = [{"kind": "top", "reps": list(spec["reps"]), "rpe": list(spec["top_rpe"])}] + [
+            sets = [{"kind": "top", "reps": list(spec["reps"]), "rpe": list(_EFFORT[spec["effort"]])}] + [
                 {"kind": "back_off", "reps": list(spec["reps"]), "pct_of_top": 100 + spec["back_off_pct"]}
                 for _ in range(spec["back_off_sets"])
             ]

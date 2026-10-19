@@ -5,7 +5,12 @@ from __future__ import annotations
 import pytest
 from health import adherence_calc
 from health.adherence_calc import calculate_adherence
+from training import effort_ceilings
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set
+
+# #5058: the program-default ceilings are the charter's (the owner's experience tier picks the class bands)
+_COMPOUND_CEILING = effort_ceilings.ceiling(effort_ceilings.COMPOUNDS)
+_LAST_ISOLATION_CEILING = effort_ceilings.ceiling(effort_ceilings.LAST_ISOLATION_SET)
 
 
 def _ir() -> RoutineSpec:
@@ -215,15 +220,18 @@ def test_0908_session_ceiling_falls_back_to_the_routines_own_session_note():
     lat = next(m for m in result["movements"] if m["movement_key"] == "lat_pulldown")
     assert lat["intensity"]["ceiling_rpe"] == 8.0
     assert lat["intensity"]["basis"] == "exercise_notes:rpe"
-    assert lat["intensity"]["sets_over_ceiling"] == 1
+    assert lat["intensity"]["sets_beat_ceiling"] == 1
 
     curl = next(m for m in result["movements"] if m["movement_key"] == "db_curl")
     assert curl["intensity"]["ceiling_rpe"] == 8.0
     assert curl["intensity"]["basis"] == "routine_notes:rpe"  # inherited, and labelled as inherited
-    assert curl["intensity"]["sets_over_ceiling"] == 4
+    assert curl["intensity"]["sets_beat_ceiling"] == 4
 
     assert result["overall_pct"] == 100.0
-    assert result["as_prescribed"]["verdict"] == "no"
+    # #5058: every set above the RPE-8 cap is within the charter's +1 tolerance — within_tolerance, never a breach
+    assert lat["intensity"]["sets_over_ceiling"] == 0 and lat["intensity"]["sets_within_tolerance"] == 1
+    assert curl["intensity"]["sets_over_ceiling"] == 0 and curl["intensity"]["sets_within_tolerance"] == 4
+    assert result["as_prescribed"]["verdict"] == "yes"
 
 
 def test_absent_rpe_is_absent_not_compliant():
@@ -404,7 +412,7 @@ def test_accessory_with_no_prescribed_ceiling_defaults_to_rpe_9_and_lowers_adher
         archetype="push",
         exercises=[ExerciseBlock(movement_key="tmpl:21310F5F", sets=[Set(), Set(), Set()])],
     )
-    performed = {"exercises": [{"exercise_template_id": "B5EFBF9C", "sets": _sets(8.0, 9.0, 9.5)}]}
+    performed = {"exercises": [{"exercise_template_id": "B5EFBF9C", "sets": _sets(9.5, 9.0, 8.0)}]}
     result = calculate_adherence(ir, performed)
 
     # Alias resolution (#3929) still holds — this is not a regression of that fix.
@@ -413,25 +421,46 @@ def test_accessory_with_no_prescribed_ceiling_defaults_to_rpe_9_and_lowers_adher
     assert result["overall_pct"] == 100.0  # set-count dimension: every set done
 
     movement = result["movements"][0]
-    assert movement["intensity"]["ceiling_rpe"] == 9.0
+    assert movement["intensity"]["ceiling_rpe"] == _COMPOUND_CEILING  # #5058: the charter's, earlier sets at the compounds band
+    assert movement["intensity"]["last_set_ceiling_rpe"] == _LAST_ISOLATION_CEILING  # and the last set at the isolation band
     assert movement["intensity"]["basis"] == "program_default:accessory"
     assert movement["intensity"]["status"] == "graded"
-    assert movement["intensity"]["sets_over_ceiling"] == 1  # the 9.5
+    assert movement["intensity"]["sets_beat_ceiling"] == 1  # the 9.5 on the first set
 
     assert result["intensity_adherence"]["status"] == "graded"
-    assert result["intensity_adherence"]["pct"] is not None and result["intensity_adherence"]["pct"] < 100.0
     # THE MUST-FAIL LINE: before #4073 this read "unprescribed" and the composite verdict
     # was "unknown" no matter how high the logged RPE went — the 93%-reads-fine bug the
-    # owner traced across 8 coaching sessions 2026-09-14 -> 09-22.
+    # owner traced across 8 coaching sessions 2026-09-14 -> 09-22. #5058: the 9.5 is within
+    # the charter's +1, so it is graded and NOT a breach.
+    assert result["as_prescribed"]["verdict"] == "yes"
+    assert movement["intensity"]["sets_within_tolerance"] == 1
+
+
+def test_accessory_default_breach_still_grades_no_when_the_tolerance_is_zero(monkeypatch):
+    """#5058 mutation control on the #4073 specimen: with the charter's tolerance at 0 the 9.5 IS a breach —
+    the tolerance is the only thing that moved the verdict, read from the charter, never typed."""
+    from training import load_progression
+
+    real = load_progression.charter_value
+    monkeypatch.setattr(
+        load_progression, "charter_value", lambda p, d=None: 0 if p == "effort_ceilings.overage_tolerance_rpe" else real(p, d)
+    )
+    ir = RoutineSpec(
+        routine_id="r-accessory-default",
+        target_date="2026-09-15",
+        archetype="push",
+        exercises=[ExerciseBlock(movement_key="tmpl:21310F5F", sets=[Set(), Set(), Set()])],
+    )
+    result = calculate_adherence(ir, {"exercises": [{"exercise_template_id": "B5EFBF9C", "sets": _sets(9.5, 9.0, 8.0)}]})
+    assert result["movements"][0]["intensity"]["sets_over_ceiling"] == 1
     assert result["as_prescribed"]["verdict"] == "no"
     assert any("RPE ceiling" in r for r in result["as_prescribed"]["reasons"])
 
 
-def test_anchor_pattern_with_no_prescribed_ceiling_defaults_to_the_heavy_top_rpe():
+def test_anchor_pattern_with_no_prescribed_ceiling_defaults_to_the_charter_compounds_ceiling():
     """An anchor-pattern movement (vertical pull, via `lat_pulldown`'s catalog title)
-    with no exercise/routine note defaults to the heavy exposure's top_rpe ceiling (8) —
-    the tightest numeric ceiling `program_structure.EXPOSURES` names — rather than the
-    accessory default, and rather than being left ungraded."""
+    with no exercise/routine note defaults to the charter's compounds ceiling (#5058; the
+    heavy exposure's top_rpe 8 before) rather than being left ungraded."""
     ir = RoutineSpec(
         routine_id="r-anchor-default",
         target_date="2026-09-10",
@@ -443,11 +472,13 @@ def test_anchor_pattern_with_no_prescribed_ceiling_defaults_to_the_heavy_top_rpe
     result = calculate_adherence(ir, performed)
 
     lat = result["movements"][0]
-    assert lat["intensity"]["ceiling_rpe"] == 8.0
+    assert lat["intensity"]["ceiling_rpe"] == _COMPOUND_CEILING
     assert lat["intensity"]["basis"] == "program_default:anchor:vertical_pull"
-    assert lat["intensity"]["sets_over_ceiling"] == 3
+    assert lat["intensity"]["last_set_ceiling_rpe"] is None  # a compound reads one band for every set
+    assert lat["intensity"]["sets_beat_ceiling"] == 3
     assert result["intensity_adherence"]["status"] == "graded"
-    assert result["as_prescribed"]["verdict"] == "no"
+    # 9.5 / 9.5 / 10 against RPE 9: all three beat it, none by more than the charter's +1
+    assert lat["intensity"]["sets_over_ceiling"] == 0 and result["as_prescribed"]["verdict"] == "yes"
 
 
 def test_program_default_never_overrides_an_explicit_routine_ceiling():
@@ -466,7 +497,7 @@ def test_program_default_never_overrides_an_explicit_routine_ceiling():
     lat = result["movements"][0]
     assert lat["intensity"]["ceiling_rpe"] == 6.0  # the routine's OWN number, not the 8.0 anchor default
     assert lat["intensity"]["basis"] == "exercise_notes:rpe"
-    assert lat["intensity"]["sets_over_ceiling"] == 3  # every set (7.0) over the explicit 6.0 cap
+    assert lat["intensity"]["sets_beat_ceiling"] == 3  # every set (7.0) over the explicit 6.0 cap
 
 
 def test_movement_with_no_resolvable_title_still_stays_unprescribed():
@@ -504,8 +535,8 @@ def test_a_tmpl_movement_the_catalog_knows_by_template_id_gets_the_default_and_i
 
     movement = result["movements"][0]
     assert movement["intensity"]["basis"] == "program_default:accessory", movement
-    assert movement["intensity"]["ceiling_rpe"] == 9.0
-    assert movement["intensity"]["sets_over_ceiling"] == 1
+    assert movement["intensity"]["ceiling_rpe"] == _COMPOUND_CEILING
+    assert movement["intensity"]["sets_beat_ceiling"] == 0  # 8 / 9 under 9, the last set's 9.5 under the isolation 10
     assert result["per_muscle"] == {"quadriceps": 100.0}, result["per_muscle"]
 
 
@@ -567,16 +598,16 @@ def test_named_routine_note_caps_only_the_named_movement():
     squat = next(m for m in result["movements"] if m["movement_key"] == "squat_barbell")
     assert squat["intensity"]["basis"] == "routine_notes:rpe"
     assert squat["intensity"]["ceiling_rpe"] == 7.0
-    assert squat["intensity"]["sets_over_ceiling"] == 2  # 7.5 and 8.5; the 7.0 set is AT cap, not over
+    assert squat["intensity"]["sets_beat_ceiling"] == 2  # 7.5 and 8.5; the 7.0 set is AT cap, not over
 
 
 @pytest.mark.parametrize(
     "movement_key,expected_basis,expected_ceiling",
     [
-        ("romanian_deadlift_barbell", "program_default:anchor:hinge", 8.0),
-        ("leg_press", "program_default:anchor:squat", 8.0),
-        ("leg_curl", "program_default:accessory", 9.0),
-        ("calf_raise_machine", "program_default:accessory", 9.0),
+        ("romanian_deadlift_barbell", "program_default:anchor:hinge", _COMPOUND_CEILING),
+        ("leg_press", "program_default:anchor:squat", _COMPOUND_CEILING),
+        ("leg_curl", "program_default:accessory", _COMPOUND_CEILING),
+        ("calf_raise_machine", "program_default:accessory", _COMPOUND_CEILING),
     ],
 )
 def test_named_routine_note_does_not_cap_the_other_movements(movement_key, expected_basis, expected_ceiling):
@@ -589,7 +620,8 @@ def test_named_routine_note_does_not_cap_the_other_movements(movement_key, expec
     movement = next(m for m in result["movements"] if m["movement_key"] == movement_key)
     assert movement["intensity"]["basis"] == expected_basis, movement
     assert movement["intensity"]["ceiling_rpe"] == expected_ceiling, movement
-    assert movement["intensity"]["sets_over_ceiling"] == 1  # only the top-end set (8.5 / 9.5) is over ITS OWN ceiling
+    # #5058: at the charter's ceilings (compounds 9, an isolation movement's last set 10) none of 8.5 / 9.5 is over
+    assert movement["intensity"]["sets_beat_ceiling"] == 0
 
 
 def test_named_routine_note_session_rollup_reflects_the_scoped_ceilings():
@@ -599,8 +631,9 @@ def test_named_routine_note_session_rollup_reflects_the_scoped_ceilings():
     intensity = result["intensity_adherence"]
     assert intensity["status"] == "graded"
     assert intensity["sets_graded"] == 15
-    assert intensity["sets_over_ceiling"] == 6  # 2 (squat) + 1 each (RDL, leg press, leg curl, calf press)
-    assert intensity["pct"] == 60.0
+    # #5058: only the squat's two sets beat its own RPE 7 — 7.5 within the charter's +1, 8.5 a breach
+    assert intensity["sets_beat_ceiling"] == 2 and intensity["sets_over_ceiling"] == 1 and intensity["sets_within_tolerance"] == 1
+    assert intensity["pct"] == 93.3
     assert result["as_prescribed"]["verdict"] == "no"
 
 

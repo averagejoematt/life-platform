@@ -38,7 +38,7 @@ What W1 (#5050) is expected to retire, by row:
   * docs/coaching/COACH_SESSION.md movement_gate_lb — the prompt names the charter, not
     the number;
   * owner_redlines.py / program_structure.py / routine_title.py effort_ceiling_rpe — the
-    `top_rpe` band and the `RPE 7–8` top-set prose read `effort_ceilings.by_experience_tier`
+    `top_rpe` band and the `RPE 7–8` top-set prose read `effort_ceilings.experience_tier` (renamed from by_experience_tier by #5058)
     (the charter's compounds band is 8–9; the pre-charter 7–8 is the stale value);
   * owner_redlines.py / program_structure.py volume_band_sets — the `~10 sets/muscle/wk`
     target reads `volume_priorities.sets_per_wk`;
@@ -57,7 +57,11 @@ What W1 (#5050) is expected to retire, by row:
     that re-seeds the pre-registration from the charter.
 Retired since the seed: program_structure.py anchor_block_weeks (3 lines: `ROTATION_RULE.block_weeks`,
 `SESSION_SEQUENCE.weeks_per_block` and the "6-week block" rule prose) — #5077 reads the block length from
-`rotation.anchors_fixed_weeks` through `block_model.block_weeks()`.
+`rotation.anchors_fixed_weeks` through `block_model.block_weeks()`. #5058 retired effort_ceiling_rpe in
+owner_redlines.py (1: the rep-scheme prose names the charter ceilings), program_structure.py (2: `EXPOSURES.heavy.top_rpe`
+and the HEAVY cue — the cues read `effort_ceilings.experience_tier` through `training.effort_ceilings`) and two of
+routine_title.py's three (the v0.4/v1 heavy WHY lines); the one left is the superseded v0.3 full-body WHY line, history.
+The guard's key moved with the charter rename (`by_experience_tier` -> `by_movement_class` + `experience_tier`).
 Already retired at the seed: mcp/tools_health.py's 2.5 lb/wk line (3 rows on the first
 census) — #5115 (charter-w0) replaced it with a bodyweight-relative flag carrying a
 `# charter: governing_goal.rate_band` marker before this ledger was committed, so the row
@@ -75,16 +79,14 @@ SEEDED_ROW_COUNT = 21
 TRAINING_CHARTER_RESIDUE = {
     "config/user_goals.json::steps_floor": 1,
     "docs/coaching/COACH_SESSION.md::movement_gate_lb": 1,
-    "lambdas/training/owner_redlines.py::effort_ceiling_rpe": 1,
     "lambdas/training/owner_redlines.py::movement_gate_lb": 7,
     "lambdas/training/owner_redlines.py::rate_band": 6,
     "lambdas/training/owner_redlines.py::volume_band_sets": 1,
-    "lambdas/training/program_structure.py::effort_ceiling_rpe": 2,
     "lambdas/training/program_structure.py::movement_gate_lb": 2,
     "lambdas/training/program_structure.py::volume_band_sets": 2,
     "lambdas/training/program_v03.py::anchor_block_weeks": 1,
     "lambdas/training/routine_generator.py::session_minutes": 2,
-    "lambdas/training/routine_title.py::effort_ceiling_rpe": 3,
+    "lambdas/training/routine_title.py::effort_ceiling_rpe": 1,
     "lambdas/web/site_api_nutrition.py::rate_band": 1,
     "mcp/tools_benchmark.py::movement_gate_lb": 3,
 }
