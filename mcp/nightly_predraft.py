@@ -310,6 +310,7 @@ def _mark_draft(
                 "session_role": session.get("session_role"),
                 "optional": bool(session.get("optional")),
                 "seam": "plan_engine._scheduled_session",
+                "charter_version": (ir.inputs_snapshot or {}).get("charter_version"),  # #5085: the version that drafted it
             },
         }
         ir.parent_version = ir.version
