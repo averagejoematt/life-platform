@@ -627,9 +627,7 @@ def tool_plan_next_session(args):
 
         ir = _safe(get_current, routine_id)
         if not ir:
-            return mcp_error(
-                f"routine_id={routine_id} not found — draft it first (manage_hevy_routine draft_custom)", error_code="NOT_FOUND"
-            )
+            return mcp_error(f"routine_id={routine_id} not found — draft it first (manage_hevy_routine draft)", error_code="NOT_FOUND")
 
     # #4072: every reader reports HOW it came back — measured / absent / read_failed (with the
     # error class) — so a None the engine receives is never ambiguous. Before this, `_safe`
@@ -874,7 +872,7 @@ def tool_plan_next_session(args):
             "start from it. Its cardio block is `constraint_block.recent_aerobic.cardio_pick` — picked from the last 3 days' "
             "rows, never copied from the last session (#4387). Draft against the block, then say plainly which constraint "
             "shaped which choice. Every line under `reference.must_say` is required in the answer, verbatim in "
-            "substance, not summarised away. Then draft (manage_hevy_routine draft_custom) and call this tool again "
+            "substance, not summarised away. Then draft (manage_hevy_routine draft) and call this tool again "
             "WITH routine_id — stage 2, the red team (#3752). A routine that skipped stage 2 is NOT red-teamed and "
             "its commit says so."
         ),
@@ -1096,7 +1094,7 @@ def _run_stage_2(
     out["notes_preview"] = critics.notes_block(ir)
     if record["veto"]:
         out["next"] = (
-            "VETO — redraft (manage_hevy_routine draft_custom), then run stage 2 again; commit will refuse until no veto "
+            "VETO — redraft (manage_hevy_routine draft), then run stage 2 again; commit will refuse until no veto "
             "stands. If Matthew overrules one critic, re-run with veto_override={critic, owner_words} (#4076)."
         )
     elif overridden:

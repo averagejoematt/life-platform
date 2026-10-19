@@ -160,6 +160,7 @@ def test_draft_custom_unknown_movement_errors_loudly():
     out = t.tool_manage_hevy_routine(
         {
             "action": "draft_custom",
+            "departure_reason": "test: deliberate departure from the engine draft",
             "exercises": [{"movement_key": "jetpack_press", "sets": [{"reps": 10}]}],
         }
     )
@@ -177,6 +178,7 @@ def test_draft_custom_builds_ir_lb_to_kg_count_and_supersets():
 
     args = {
         "action": "draft_custom",
+        "departure_reason": "test: deliberate departure from the engine draft",
         "target_date": "2026-06-01",
         "archetype": "push",
         "notes": "Day 1 push. Leave 1-2 RIR.",
@@ -248,6 +250,7 @@ def test_draft_custom_resolves_arbitrary_exercise_via_index():
         out = t.tool_manage_hevy_routine(
             {
                 "action": "draft_custom",
+                "departure_reason": "test: deliberate departure from the engine draft",
                 "target_date": "2026-06-09",
                 "archetype": "circuit",
                 "exercises": [
@@ -276,6 +279,7 @@ def test_draft_custom_unknown_offers_index_suggestions():
         out = t.tool_manage_hevy_routine(
             {
                 "action": "draft_custom",
+                "departure_reason": "test: deliberate departure from the engine draft",
                 "create_missing": False,
                 "exercises": [{"title": "barbell bench zzz", "sets": [{"reps": 5}]}],
             }
@@ -331,6 +335,7 @@ def test_draft_custom_auto_creates_missing_exercise():
         out = t.tool_manage_hevy_routine(
             {
                 "action": "draft_custom",
+                "departure_reason": "test: deliberate departure from the engine draft",
                 "archetype": "push",
                 "create_missing": True,  # #3718 — must now be explicit
                 "exercises": [
@@ -365,6 +370,7 @@ def test_draft_custom_does_not_create_from_bare_movement_key():
         out = t.tool_manage_hevy_routine(
             {
                 "action": "draft_custom",
+                "departure_reason": "test: deliberate departure from the engine draft",
                 "exercises": [{"movement_key": "jetpack_press", "sets": [{"reps": 5}]}],
             }
         )
@@ -695,6 +701,7 @@ def test_create_missing_refuses_a_template_without_an_explicit_muscle_group():
         out = t.tool_manage_hevy_routine(
             {
                 "action": "draft_custom",
+                "departure_reason": "test: deliberate departure from the engine draft",
                 "archetype": "legs",
                 "create_missing": True,
                 "exercises": [

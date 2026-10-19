@@ -44,7 +44,7 @@ from common.pacific_time import pacific_today  # #2798: target_date is a Pacific
 from training import commit_binding  # #4066: the commit is bound to the red-teamed routine
 from training.warmup_sets import working_set_count  # #5049: the set ceilings count working sets
 
-from mcp.draft_custom_session import finish_custom_draft  # #5005 slot tags; #5049 warm-ups; #5057 the stall rule's step
+from mcp.draft_custom_session import custom_args_refusal, finish_custom_draft  # #5005 slots; #5049 warm-ups; #5057 step; #5055 reason
 from mcp.hevy_prescription_gate import prescription_gate, refusal as _gate_refusal, summary as _gate_summary
 
 # #3670: everything the commit result must report honestly lives in its own module
@@ -664,14 +664,10 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     from training.routine_ir import ExerciseBlock, RoutineSpec
     from training.routine_repo import draft_versioned  # #3115
 
-    raw_exercises = args.get("exercises")
-    if not isinstance(raw_exercises, list) or not raw_exercises:
-        return mcp_error(
-            "draft_custom requires a non-empty 'exercises' list "
-            "[{movement_key|title, sets:[{weight_lbs|weight_kg, reps|rep_range_start/end, "
-            "count?}], rest_seconds?, superset_id?, notes?}]",
-            error_code="MISSING_ARG",
-        )
+    refusal = custom_args_refusal(args)  # the exercises list + #5055's departure_reason
+    if refusal:
+        return mcp_error(refusal[0], error_code=refusal[1])
+    raw_exercises = args["exercises"]
 
     # #3718 — DEFAULT FLIPPED TO FALSE. On 2026-09-08 create_missing invented
     # "Calf Press on Leg Press Machine" and guessed `shoulders` as its muscle
