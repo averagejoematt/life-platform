@@ -517,7 +517,10 @@ def _program_next(today: str) -> "tuple[dict | None, str | None]":
     except Exception as e:  # noqa: BLE001 — named below, never a fabricated position
         logger.warning("handle_session block record read failed: %s", e)
     try:
-        nxt = session_sequence.next_session(today, workouts)
+        from training import deload_word
+
+        # #5070: a recorded-word deload must reach the public session too (only role/archetype/label/deload are read below)
+        nxt = session_sequence.next_session(today, workouts, deload_word.load_records_failsoft())
     except Exception as e:  # noqa: BLE001
         logger.warning("handle_session next_session failed: %s", e)
         return None, "the program's session sequence could not be computed"

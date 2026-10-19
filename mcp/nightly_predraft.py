@@ -157,7 +157,7 @@ def _session_from(
     return plan_engine._scheduled_session(target_date, catalog, ceiling, block_workouts, deload_records)
 
 
-def scheduled_session(target_date: str) -> dict[str, Any] | None:
+def scheduled_session(target_date: str, deload_records: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
     """The session the program serves on `target_date` — the SAME function stage 1 uses (#4064).
 
     #4110 / #4147 (PR #4120 — v0.4 Upper/Lower, ORDER-BASED: the next undone session in the
@@ -172,7 +172,8 @@ def scheduled_session(target_date: str) -> dict[str, Any] | None:
     from training import deload_word
 
     # #5070: the owner's recorded deload word rides the served session; the recommendation (signals) is stage 1's
-    return _session_from(target_date, _block_record(target_date), deload_word.load_records_failsoft())
+    records = deload_records if deload_records is not None else deload_word.load_records_failsoft()
+    return _session_from(target_date, _block_record(target_date), records)
 
 
 def is_lifting_session(session: dict[str, Any] | None) -> bool:

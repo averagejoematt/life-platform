@@ -159,3 +159,27 @@ def test_the_policy_reads_the_charter_and_the_schedule_is_gone():
     cfg = session_sequence.deload_cfg()
     assert cfg["scheduled"] is False and cfg["sets_pct"] == -40
     assert not hasattr(program_structure, "DELOAD_RULE"), "the scheduled-deload rule text is retired"
+
+
+def test_the_packet_states_which_charter_triggers_are_wired():
+    """Event signals have no producer yet (#5146) — the packet must not imply one is being watched."""
+    rec = deload_word.recommendation(day="2026-11-04", records=[])
+    assert rec["triggers_wired"] == ["rpe_drift", "recovery"]
+    assert rec["triggers_unwired"] == ["event_signals"]
+    # control: a caller that wires the extra_reasons hook moves it to wired
+    hooked = deload_word.recommendation(day="2026-11-04", records=[], extra_reasons=["sick day on file"])
+    assert hooked["triggers_unwired"] == [] and "event_signals" in hooked["triggers_wired"]
+
+
+def test_the_generator_takes_the_records_as_an_input_not_a_ddb_read():
+    from training import routine_generator
+
+    with patch.object(deload_word, "load_records_failsoft", side_effect=AssertionError("must not read when injected")):
+        with patch.object(session_sequence, "next_session", return_value=None) as ns:
+            routine_generator._schedule_entry_for_date("2026-11-04", {"schedule": {}}, "module", [], [])
+    assert ns.call_args[0][2] == []
+    # control: not injected -> the one fail-soft read happens here
+    with patch.object(deload_word, "load_records_failsoft", return_value=[{"x": 1}]) as rd:
+        with patch.object(session_sequence, "next_session", return_value=None) as ns:
+            routine_generator._schedule_entry_for_date("2026-11-04", {"schedule": {}}, "module", [])
+    assert rd.called and ns.call_args[0][2] == [{"x": 1}]

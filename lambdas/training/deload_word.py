@@ -35,6 +35,11 @@ def deload_sk(start_date: str) -> str:
     return f"{DELOAD_SK_PREFIX}{str(start_date)[:10]}"
 
 
+# The charter triggers a producer exists for today. `event_signals` has none yet (carrier: #5146), and the packet says so
+# rather than implying an event signal is being watched.
+TRIGGERS_WIRED = ("rpe_drift", "recovery")
+
+
 def policy() -> dict[str, Any]:
     """The charter's deload block plus the proposed response (the cut a recorded word applies as written)."""
     from training import owner_redlines
@@ -151,8 +156,11 @@ def recommendation(
     reasons.extend(extra_reasons or [])
     rec = active_record(records, day)
     pol = policy()
+    wired = [t for t in pol["recommendation_triggers"] if t in TRIGGERS_WIRED or (t == "event_signals" and extra_reasons is not None)]
     return {
         "active": bool(reasons),
+        "triggers_wired": wired,
+        "triggers_unwired": [t for t in pol["recommendation_triggers"] if t not in wired],
         "reasons": reasons,
         "proposed_response": pol["proposed_response"],
         "applied": rec is not None,

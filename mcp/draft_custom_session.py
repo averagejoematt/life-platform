@@ -67,7 +67,9 @@ def inherit_tags(blocks: list[Any], rx: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
-def resolve_program_session(target_date: str, block_workouts: list[dict[str, Any]] | None) -> dict[str, Any] | None:
+def resolve_program_session(
+    target_date: str, block_workouts: list[dict[str, Any]] | None, deload_records: list[dict[str, Any]] | None = None
+) -> dict[str, Any] | None:
     """The program session the sequence serves on `target_date` (with its prescription), or None
     when the date is not a program session (program inactive, before the block start, a
     non-lifting role, or the sequence unreadable). The engine's own inputs: the catalog, the
@@ -84,14 +86,17 @@ def resolve_program_session(target_date: str, block_workouts: list[dict[str, Any
         block_workouts=block_workouts,
         catalog_movements=(_load_json("movement_catalog.json") or {}).get("movements") or {},
         skill_ceiling=int(week.get("skill_ceiling", 2)),
-        deload_records=deload_word.load_records_failsoft(),  # #5070: a deload applies only on his recorded word
+        # #5070: a deload applies only on his recorded word — injected like block_workouts; None = one fail-soft read here
+        deload_records=deload_records if deload_records is not None else deload_word.load_records_failsoft(),
     )
     if planned.get("source") != "session_sequence" or not planned.get("prescription"):
         return None
     return planned
 
 
-def inherit_program_session(blocks: list[Any], target_date: str, block_workouts_reader=None) -> dict[str, Any]:
+def inherit_program_session(
+    blocks: list[Any], target_date: str, block_workouts_reader=None, deload_records: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
     """The draft_custom seam: resolve the slot, re-tag the blocks, and return what to stamp.
 
     `{"status": "inherited", "calendar": {...session_role...}, "movements": [...]}` on a program
@@ -100,7 +105,7 @@ def inherit_program_session(blocks: list[Any], target_date: str, block_workouts_
     if block_workouts_reader is None:
         from mcp.plan_hevy_windows import _block_workouts as block_workouts_reader
     try:
-        planned = resolve_program_session(target_date, block_workouts_reader(target_date))
+        planned = resolve_program_session(target_date, block_workouts_reader(target_date), deload_records)
     except Exception as e:  # noqa: BLE001 — named on the draft, never a lost draft
         return {"status": "read_failed", "error": f"{type(e).__name__}: {e}"[:200], "rule": "#5005: every block stays custom"}
     if planned is None:
@@ -115,12 +120,12 @@ def inherit_program_session(blocks: list[Any], target_date: str, block_workouts_
     }
 
 
-def stamp_program_slot(ir: Any, block_workouts_reader=None) -> dict[str, Any]:
+def stamp_program_slot(ir: Any, block_workouts_reader=None, deload_records: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """`inherit_program_session` on a built draft IR, IN PLACE: re-tags its blocks, stamps
     `inputs_snapshot.program_slot` (always) and `inputs_snapshot.calendar` (on a program session —
     the key `nightly_predraft._routine_role` and the site read the role from), and records one
     rationale line. Runs AFTER the content-derived routine id, so the id never moves with it."""
-    slot = inherit_program_session(list(ir.exercises or []), ir.target_date, block_workouts_reader)
+    slot = inherit_program_session(list(ir.exercises or []), ir.target_date, block_workouts_reader, deload_records)
     ir.inputs_snapshot["program_slot"] = slot
     if slot.get("calendar"):
         ir.inputs_snapshot["calendar"] = slot["calendar"]

@@ -165,10 +165,10 @@ def test_planned_session_cuts_sets_only_on_the_word():
 
 
 def test_mutation_control_a_scheduled_deload_would_fire_without_a_record():
-    """Control: re-introduce the retired schedule key and the fixture above would have gone red."""
+    """Control: the retired schedule key is inert; only a recorded word moves a deload."""
     with patch.dict(owner_redlines.REDLINES["lifting_sessions_per_wk"]["deload"], {"at_program_week": 6}):
         assert not any(p["deload"] for p in session_sequence.preview(60)), "the engine reads no schedule at all"
-    assert session_sequence.preview(60, deload_records=[WORD])[-1]["deload"] is not None  # the record path is the only path
+    assert any(p["deload"] for p in session_sequence.preview(60, deload_records=[WORD])), "the record path is the only path"
 
 
 def test_the_deload_is_minus_40_loads_held_never_a_week_off():

@@ -370,8 +370,8 @@ def test_mutation_control_the_weekday_fallback_serves_a_nominal_lifting_session(
     """Restore the pre-review fallback (weekday entry + a note) and Monday drafts upper-heavy — the divergence."""
     real = routine_generator._schedule_entry_for_date
 
-    def weekday_fallback(target_date, week_cfg, source=None, block_workouts=None):
-        e = real(target_date, week_cfg, source, block_workouts)
+    def weekday_fallback(target_date, week_cfg, source=None, block_workouts=None, deload_records=None):
+        e = real(target_date, week_cfg, source, block_workouts, deload_records)
         if e.get("source") == "sequence_unreadable":
             from datetime import date
 
