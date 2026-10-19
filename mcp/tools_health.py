@@ -16,6 +16,11 @@ from mcp.config import logger
 from mcp.core import decimal_to_float, get_profile, phase_scope_block, query_source, query_source_cross_phase
 from mcp.helpers import normalize_whoop_sleep
 from mcp.tools_training import _get_training_load
+from mcp.weight_rate import (
+    RATE_FLAG_PCT_BW_PER_WK,
+    annotate_weekly_rates,
+    rate_pct_bw,
+)  # noqa: F401 — #5060, split by the size guard
 
 # ── #4978: the readiness formula, stated once and returned with every score ─────────
 READINESS_WEIGHTS = {
@@ -600,57 +605,6 @@ def _rebaselining_result(end_date, components, device_agreement, regime):
     }
 
 
-# Rate flag threshold, relative to bodyweight (#5060, owner ruling 3: every rate is shown in lb/wk AND % of bodyweight).
-# Source: Helms et al. 2014 (J Int Soc Sports Nutr) recommends 0.5-1.0 %BW/wk to preserve lean mass in lean-mass-
-# retaining cuts; the owner's 3.0-3.5 lb/wk band is ~1.0-1.2 %BW/wk at ~300 lb, so the flag is set at 1.25 %BW/wk,
-# above the band's ceiling at his size, and tightens automatically as he gets lighter (a fixed lb/wk number does not).
-# charter: governing_goal.rate_band (#5074 moves the band read to the charter in W1)
-RATE_FLAG_PCT_BW_PER_WK = 1.25
-RATE_SLOW_LB_PER_WK = 0.25  # below this the "very slow" nudge fires (absolute, unchanged)
-
-
-def _rate_pct_bw(rate_lb_per_wk, weight_lbs):
-    """rate / current weight x 100, 2dp; None when either input is missing or the weight is not positive."""
-    if rate_lb_per_wk is None or not weight_lbs or weight_lbs <= 0:
-        return None
-    return round(rate_lb_per_wk / weight_lbs * 100, 2)
-
-
-def _annotate_weekly_rates(weight_series):
-    """Pair each weigh-in with the one ~7 days earlier (4-day tolerance); stamp rate + flag in place; return the rates."""
-    weekly_rates = []
-    for i in range(len(weight_series)):
-        pt = weight_series[i]
-        target_dt = datetime.strptime(pt["date"], "%Y-%m-%d") - timedelta(days=7)
-        prior = None
-        best_gap = 999
-        for j in range(i):
-            d = datetime.strptime(weight_series[j]["date"], "%Y-%m-%d")
-            gap = abs((target_dt - d).days)
-            if gap < best_gap:
-                best_gap = gap
-                prior = weight_series[j]
-        if prior and best_gap <= 4:
-            days_diff = (datetime.strptime(pt["date"], "%Y-%m-%d") - datetime.strptime(prior["date"], "%Y-%m-%d")).days
-            if days_diff > 0:
-                weekly_rate = round((prior["weight_lbs"] - pt["weight_lbs"]) / days_diff * 7, 2)
-                pt["weekly_loss_rate_lbs"] = weekly_rate
-                pt["rate_lb_per_wk"] = weekly_rate
-                pt["rate_pct_bodyweight_per_wk"] = _rate_pct_bw(weekly_rate, pt["weight_lbs"])
-                weekly_rates.append(weekly_rate)
-                pct = pt["rate_pct_bodyweight_per_wk"]
-                if pct is not None and pct > RATE_FLAG_PCT_BW_PER_WK:
-                    pt["rate_flag"] = (
-                        f"⚠️ Losing too fast ({weekly_rate} lb/wk = {pct}% of bodyweight; flag above "
-                        f"{RATE_FLAG_PCT_BW_PER_WK}%/wk) — risk of muscle loss. Check nutrition."
-                    )
-                elif weekly_rate < 0:
-                    pt["rate_flag"] = "↑ Weight gain this week"
-                elif weekly_rate < RATE_SLOW_LB_PER_WK and len(weight_series) > 14:
-                    pt["rate_flag"] = "⏸ Very slow — review deficit"
-    return weekly_rates
-
-
 def tool_get_weight_loss_progress(args):
     end_date = args.get("end_date", pacific_today())
     explicit_start = args.get("start_date")  # None when caller didn't pass one
@@ -726,7 +680,7 @@ def tool_get_weight_loss_progress(args):
         pt["bmi"] = bmi
         pt["bmi_category"] = bmi_category(bmi)
 
-    weekly_rates = _annotate_weekly_rates(weight_series)
+    weekly_rates = annotate_weekly_rates(weight_series)
 
     milestones = {}
     milestone_thresholds = [
@@ -764,7 +718,7 @@ def tool_get_weight_loss_progress(args):
                     "milestone": label,
                     "lbs_to_cross": round(lbs_to_threshold, 1),
                     "recent_pace_lbs_per_week": _recent_mean,
-                    "recent_pace_pct_bodyweight_per_week": _rate_pct_bw(_recent_mean, weight_series[-1]["weight_lbs"]),
+                    "recent_pace_pct_bodyweight_per_week": rate_pct_bw(_recent_mean, weight_series[-1]["weight_lbs"]),
                     "n_recent_rates": len(_recent),
                 }
                 if _recent_mean is not None and _recent_mean > 0:
@@ -845,7 +799,7 @@ def tool_get_weight_loss_progress(args):
             "goal_weight_lbs": goal_weight,
             "lbs_remaining": round(current_weight - goal_weight, 1),
             "avg_weekly_loss_lbs": avg_weekly,
-            "avg_weekly_loss_pct_bodyweight": _rate_pct_bw(avg_weekly, current_weight),
+            "avg_weekly_loss_pct_bodyweight": rate_pct_bw(avg_weekly, current_weight),
             # ADR-105: the n behind the average travels with it — three paired
             # weigh-ins and thirty no longer produce identically-confident output.
             "n_weekly_rates": len(weekly_rates),
@@ -865,9 +819,9 @@ def tool_get_weight_loss_progress(args):
         "current_bmi_category": weight_series[-1].get("bmi_category"),
         "total_lost_lbs": total_lost,
         "avg_weekly_loss_lbs": avg_weekly,
-        "avg_weekly_loss_pct_bodyweight": _rate_pct_bw(avg_weekly, current_weight),
+        "avg_weekly_loss_pct_bodyweight": rate_pct_bw(avg_weekly, current_weight),
         "rate_lb_per_wk": avg_weekly,
-        "rate_pct_bodyweight_per_wk": _rate_pct_bw(avg_weekly, current_weight),
+        "rate_pct_bodyweight_per_wk": rate_pct_bw(avg_weekly, current_weight),
         "projection": projection,
         "plateau_detected": plateau,
         "milestones_achieved": milestones,
