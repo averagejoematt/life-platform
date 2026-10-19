@@ -1132,7 +1132,10 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # (the os.walk sweep of lambdas/web + lambdas/emails for an import of the tracker) arrives PROVEN via the re-runnable harness
         # (MutationSpec + STRUCTURAL_PROOFS, ARMED 1/1: baseline 35 passed | mutated 1 failed | reverted 35 passed). Enters exactly
         # that id, leaves {}, unproven does NOT move. Concurrent lanes stack: the driver adds entrants.
-        <= 270
+        # Upper bound 270 -> 271 (2026-10-19, #5086 the synced chat skills, on charter-w2): guard::scripts/check_synced_skill_drift.py
+        # arrives PROVEN via GUARD_PROOFS (M1 `_same` always True: 3 failed / 9 passed; M2 drift exits 0: 2 failed / 10 passed;
+        # restored 12 passed). Enters exactly that id, leaves {}, unproven does NOT move. Concurrent lanes stack.
+        <= 271
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
