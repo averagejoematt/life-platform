@@ -61,10 +61,11 @@ def _block_rows(date: str) -> list[dict[str, Any]]:
     start = program_structure.SESSION_SEQUENCE["block_start"]
     rows, d = [], start
     while d < date:
-        # #4312: a lower and an upper set, so each generic session matches the role it takes
+        # #4312: a lower and an upper set (and, #5069, a delt set), so each generic session matches the role it takes
         exercises = [
             {"name": "Leg Press", "sets": [{"weight_kg": 90, "reps": 5}]},
             {"name": "Bench Press", "sets": [{"weight_kg": 60, "reps": 5}]},
+            {"name": "Lateral Raise (Dumbbell)", "sets": [{"weight_kg": 10, "reps": 12}]},
         ]
         rows.append({"date": d, "source_workout_id": d, "exercises": exercises})
         d = shift_day_key(d, 1)

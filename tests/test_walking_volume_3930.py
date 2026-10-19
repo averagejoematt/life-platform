@@ -598,18 +598,24 @@ def test_the_collapse_actuator_is_a_mark_read_only_on_a_tripped_row():
 def test_draft_custom_names_a_copied_treadmill_the_pick_would_not_draft():
     """The 09-28 treadmill came through `draft_custom` (the coach copied the last session's block). The
     draft now says so by name — a warning, never a rewrite; the swap is stage 2's. Mutation control:
-    make `draft_cardio_warnings` return [] — this reds."""
+    make `draft_cardio_warnings` return [] — this reds. #5069: the same call now leads with the charter's
+    session-shape flags (`session shape: …`); the modality warnings are the `cardio:` lines."""
     from mcp import plan_cardio_pick, shared_quantities
+
+    def cardio(ws):
+        return [x for x in ws if x.startswith("cardio:")]
 
     ir = _lower_volume_draft()
     with patch.object(shared_quantities, "recent_aerobic_layer", return_value=_ra_block()):
-        (w,) = plan_cardio_pick.draft_cardio_warnings(ir.exercises, "lower", RA_TARGET)
+        (w,) = cardio(plan_cardio_pick.draft_cardio_warnings(ir.exercises, "lower", RA_TARGET))
     assert w.startswith("cardio: treadmill drafted") and "cycling (recumbent)" in w
     with patch.object(shared_quantities, "recent_aerobic_layer", return_value=_ra_block(drop_weekend_walks=True)):
-        assert plan_cardio_pick.draft_cardio_warnings(ir.exercises, "upper", RA_TARGET) == []  # fresh legs, upper day
+        assert cardio(plan_cardio_pick.draft_cardio_warnings(ir.exercises, "upper", RA_TARGET)) == []  # fresh legs, upper day
     with patch.object(shared_quantities, "recent_aerobic_layer", side_effect=RuntimeError("boom")):
-        (w,) = plan_cardio_pick.draft_cardio_warnings(ir.exercises, "lower", RA_TARGET)
+        (w,) = cardio(plan_cardio_pick.draft_cardio_warnings(ir.exercises, "lower", RA_TARGET))
     assert "could not be computed (RuntimeError)" in w
+    shape = [x for x in plan_cardio_pick.draft_cardio_warnings(ir.exercises, "upper", RA_TARGET) if x.startswith("session shape:")]
+    assert all("just flagging" in x for x in shape)
 
 
 # ── #4410: every draft path reads the aerobic minutes; an unread week is unknown, never 0 ────

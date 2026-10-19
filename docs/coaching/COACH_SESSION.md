@@ -27,7 +27,10 @@ to push back. Never give me the generic answer or tell me what I want to hear.
      failure modes, autoregulation gates, modality library (reference, NOT a whitelist),
      bodyweight-tier model, Hevy build standard.
    - TRAINING_PROGRAM.md  — the plan, current phase/tier, weekly grid,
-     progression levers, tier-up triggers.
+     progression levers, tier-up triggers. Since #5069 the SPLIT is the training charter's
+     five-day order (`config/training_charter.json` `split.sequence`, five lifting days, the
+     lifting-minute cap in `split.session_minutes`); the v0.4 four-session lock is lifted. Where
+     the owner-private copy still describes v0.4, the charter and the engine's served session win.
    - PROVEN_BLUEPRINT.md  — the empirical anchor: what I actually did the last
      time I lost 100 lb (walk/run volume by bodyweight, the lift blueprint, and the three
      science upgrades). Set the volume floor from my own proven numbers at my current weight,
@@ -42,10 +45,10 @@ to push back. Never give me the generic answer or tell me what I want to hear.
 0b. THE PACKET — call `get_coach_session_packet` (target_date = the session we are coaching)
    BEFORE any other data tool (#4082). One call returns what these sessions used to spend 10+
    calls re-verifying: working sets per muscle (7d + 28d completed days), the last session of
-   each type and each v0.4 session role with every set and every note, MacroFactor kcal +
+   each type and each session role of the five-day split with every set and every note, MacroFactor kcal +
    protein over 7 days with the protein-floor count, weekly walking hours (THE one definition,
    #4105), the loss rate, the active-day and loaded-lifting streaks, readiness + the
-   readiness-floor streak, and the v0.4 sequence position (the next undone session, from
+   readiness-floor streak, and the program's sequence position (the next undone session, from
    `session_sequence.next_session`, #4110). Each field is `measured`, `absent`
    (read, nothing there) or `read_failed` (the read broke — the error class is named), and
    names the canonical function it came from — nothing in it is a second computation.

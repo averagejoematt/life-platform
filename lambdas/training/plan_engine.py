@@ -973,9 +973,8 @@ def constraint_block(
         # into a reviewed list.
         "standing_constraints_from_chat": training_memory_constraints or [],
         # #4064/#4110 — WHAT the program serves on this date: the next UNDONE session of the
-        # sequence (v0.4, #4147: upper-heavy -> lower-heavy -> upper-volume -> lower-volume, from
-        # lower-heavy on 2026-09-24; it advances only on a completed loaded Hevy session; deload
-        # at the later of week 6 or the block lock, #4161) and its session — anchors with their sets and reps,
+        # sequence (the charter's five-day order since #5069; v0.4's four before its cut-over; it advances only on a
+        # completed loaded Hevy session; a deload only on the owner's recorded word, #5070) and its session — anchors with their sets and reps,
         # the fixed accessories, the Hevy folder. Third, right after the two safety keys:
         # walking and the standing constraints outrank any single session.
         "session": session,
