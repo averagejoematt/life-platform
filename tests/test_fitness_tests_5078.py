@@ -192,6 +192,41 @@ def test_without_a_position_the_calendar_estimates_but_never_claims_due_and_with
     assert none["state"] == ft.UNKNOWN and none["due_on"] is None and none["prompt"] is None
 
 
+# ── the owner-channel prompt rides #5061's calibration cadence ───────────────────────────
+def test_the_due_battery_prompts_once_through_the_calibration_sweep_and_a_stall_never_does():
+    from coach import coach_event_triggers as cet, coach_outbound
+
+    def sweep(row):
+        return cet.detect_calibration({"kinds": {ft.CALIBRATION_KIND: row}}, "2026-10-27")
+
+    due_row = ft.calibration_row("2026-10-27", ft.due("2026-10-27", _pos(6), []))
+    assert due_row["state"] == "due" and due_row["cycle_start"] == "2026-10-26" and due_row["prompt"]
+    (ev,) = sweep(due_row)
+    assert ev["event_id"] == "CALIB_PROMPT#fitness_battery#2026-10-26" and ev["provenance"] == coach_outbound.PROVENANCE_CALIBRATION
+    over = ft.calibration_row("2026-11-03", ft.due("2026-11-03", _pos(7), []))
+    assert over["state"] == "overdue" and sweep(over)[0]["event_id"] == ev["event_id"]  # the same due week: the same key, sent once
+    stalled = ft.calibration_row("2026-11-09", ft.due("2026-11-09", _pos(5, "2026-10-19"), []))
+    assert stalled["state"] == "ok" and stalled["prompt"] is None and sweep(stalled) == []
+    missed = ft.calibration_row("2026-11-10", ft.due("2026-11-10", _pos(8, "2026-11-09"), []))
+    assert missed["state"] == ft.MISSED and sweep(missed) == []  # its dead-man is the fitness-battery-missed alarm, not a second one
+    assert "40" not in json.dumps(ft.calibration_row("2026-10-27", ft.due("2026-10-27", _pos(6), ["2026-10-01"])))
+
+
+def test_the_calibration_block_carries_the_battery_row_and_a_failed_read_is_read_failed(monkeypatch):
+    from training import calibration_cadence as cc
+
+    class Boom:
+        def query(self, **kw):
+            raise RuntimeError("denied")
+
+    row = ft.calibration_row_from_table(Boom(), "2026-10-27")
+    assert row["state"] == cc.READ_FAILED and row["prompt"] is None and row["kind"] == ft.CALIBRATION_KIND
+    monkeypatch.setattr(ft, "calibration_row_from_table", lambda table, today: {"kind": ft.CALIBRATION_KIND, "state": "ok"})
+    monkeypatch.setattr(cc, "table_readers", lambda table: {k: (lambda: []) for k in cc.KINDS})
+    block = cc.read(object(), "2026-10-27")
+    assert set(block["kinds"]) == {*cc.KINDS, ft.CALIBRATION_KIND} and ft.CALIBRATION_KIND not in cc.deadman_kinds(block)
+
+
 # ── storage round trip (the wire) ─────────────────────────────────────────────────────────
 def test_a_battery_round_trips_through_the_wire_and_a_second_write_merges():
     t = FakeTable()

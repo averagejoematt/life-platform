@@ -450,6 +450,72 @@ def due(
     return {**out, "state": state, "detail": detail, "prompt": prompt}
 
 
+# ── the owner-channel prompt (#5061's calibration cadence carries it) ────────────────────
+CALIBRATION_KIND = "fitness_battery"
+"""The battery's row in `training.calibration_cadence`'s block — the ONE prompt path to the owner (the Telegram
+event sweep's `detect_calibration`, keyed `CALIB_PROMPT#fitness_battery#<due week opening>`, once per due week)."""
+
+_CALIBRATION_STATE = {UPCOMING: "ok", DUE: "due", OVERDUE: "overdue", MISSED: MISSED, UNKNOWN: UNKNOWN}
+"""This module's states in the calibration block's vocabulary. `missed` stays `missed` (NOT the block's `missed_2`):
+the battery's dead-man is its own alarm (`fitness-battery-missed`), so the calibration sweep prompts a due or
+overdue battery and never raises a second dead-man for it."""
+
+
+def calibration_row(today: str, cadence: Mapping[str, Any], proto: Optional[Mapping[str, Any]] = None) -> dict[str, Any]:
+    """`due()`'s answer as a `calibration_cadence` row: `kind`, `state`, `due_on`, `last_logged`, `cycle_start` (the due
+    week's ACTUAL opening — the prompt's idempotency stamp; None until the program reaches the week) and `prompt` (due /
+    overdue only). Dates and states only, no test value. Pure."""
+    from training import calibration_cadence as cc
+
+    p = protocol() if proto is None else proto
+    state = str(cadence.get("state") or UNKNOWN)
+    fact = cadence.get("due_on_is_estimate") is False and state in (DUE, OVERDUE, MISSED)
+    row: dict[str, Any] = {
+        "kind": CALIBRATION_KIND,
+        "state": _CALIBRATION_STATE.get(state, UNKNOWN),
+        "battery_state": state,
+        "due_on": cadence.get("due_on"),
+        "due_on_is_estimate": cadence.get("due_on_is_estimate"),
+        "due_program_week": cadence.get("due_program_week"),
+        "last_logged": cadence.get("latest"),
+        "cycle_start": cadence.get("due_on") if fact else None,
+        "detail": cadence.get("detail"),
+        "source": STORE,
+        "issue": ISSUE,
+        "prompt": None,
+    }
+    if state in (DUE, OVERDUE) and fact:
+        labels = ", ".join(str(t.get("label")) for t in tests_spec(p).values())
+        row["prompt"] = (
+            f"Fitness tests are {state} (program week {cadence.get('due_program_week')} closes the block, opened {cadence.get('due_on')}): "
+            f"{labels}. The test-day draft carries them; log each result with your coach. Last battery {cadence.get('latest') or 'never'}."
+        )
+        row["prompt_key"] = cc.prompt_key(CALIBRATION_KIND, str(row["cycle_start"]))
+    return row
+
+
+def calibration_row_from_table(table: Any, today: str) -> dict[str, Any]:
+    """The battery's calibration row from the lambdas-side reads (no MCP import, so the Telegram sweep can carry it):
+    the BATTERY# record on `table`, the block record through `session_sequence.load_block_workouts` and the movement
+    catalog. Never raises — a failed read is a `read_failed` row with no prompt (never an empty history)."""
+    from training import calibration_cadence as cc
+
+    try:
+        from training import session_sequence
+        from training.routine_generator import _load_json
+
+        records = load_records(table)
+        rows = session_sequence.load_block_workouts(today)
+        movements = (_load_json("movement_catalog.json") or {}).get("movements") or {}
+        entry = session_sequence.next_session(today, rows)
+        position = position_from(entry, session_sequence.completed_positions(rows, today) if entry else None)
+        batts = batteries(records, from_hevy(rows, movements))
+        return calibration_row(today, due(today, position, [b["date"] for b in batts]))
+    except Exception as e:  # noqa: BLE001 — named on the row; the other calibration kinds still answer
+        logger.warning(f"fitness_tests: the calibration row read failed ({type(e).__name__})")
+        return {"kind": CALIBRATION_KIND, "state": cc.READ_FAILED, "error": type(e).__name__, "prompt": None, "issue": ISSUE}
+
+
 # ── the test day ─────────────────────────────────────────────────────────────────────────
 def test_day_role(proto: Optional[Mapping[str, Any]] = None) -> Optional[str]:
     """The engine's role id for the charter's `test_day.role` (program_structure.role_id spelling)."""

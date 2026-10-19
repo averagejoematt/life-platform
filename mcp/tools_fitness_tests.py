@@ -22,8 +22,9 @@ own result names that). The alarm on that series is `fitness-battery-missed` (cd
 Maximum >= 1 over one day, missing = not breaching, digest); its liveness is the pre-draft's dead-man.
 
 THE PROMPT: `due()['prompt']` is on the read, on the May tracker's fitness section and on the coach
-packet's `fitness_tests` field. #5061's owner-channel calibration prompt has not landed; it carries the
-instruction (Refs #5078 comment on #5061) to read `cadence()` here rather than a second computation.
+packet's `fitness_tests` field. The OWNER-CHANNEL prompt rides #5061's calibration cadence: `calibration_cadence.read`
+carries a `fitness_battery` row (`fitness_tests.calibration_row_from_table`, the same `due()`), so the Telegram
+event sweep prompts a due or overdue battery once per due week (`CALIB_PROMPT#fitness_battery#<week opening>`).
 
 NEVER on a published surface: the battery is Tier owner-only (`field_tiers.SOURCE_TIERS`).
 """
@@ -120,7 +121,8 @@ def read_view(today: Optional[str] = None, hevy_rows: Optional[list[dict[str, An
 
 
 def cadence(today: Optional[str] = None) -> dict[str, Any]:
-    """The due state alone — the seam #5061's owner-channel prompt reads."""
+    """The due state alone (the dead-man's read; the owner-channel prompt reads the same `due()` through
+    `calibration_cadence.read`'s `fitness_battery` row)."""
     return read_view(today)["due"]
 
 

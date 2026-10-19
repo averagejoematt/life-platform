@@ -4020,6 +4020,34 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/block_retro.py",
+      "partition": "training_constraints",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/calibration_cadence.py",
+      "partition": "dexa",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/calibration_cadence.py",
+      "partition": "measurements",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/calibration_cadence.py",
+      "partition": "progress_photos",
+      "via": "local-seam"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/training/cardio_hr_store.py",
@@ -7921,7 +7949,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 762,
+      "edges": 766,
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
@@ -7935,9 +7963,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 373,
-        "sites_resolved": 960,
-        "sites_total": 1333
+        "sites_dynamic": 377,
+        "sites_resolved": 965,
+        "sites_total": 1342
       },
       "schedule_resolution": {
         "dynamic": 0,
