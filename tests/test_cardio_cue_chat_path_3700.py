@@ -178,19 +178,35 @@ def test_a_chat_drafted_cycling_block_carries_the_SAME_note_the_cron_path_stamps
     assert out["status"] == "drafted_custom"
     bike = next(b for b in ir.exercises if b.movement_key == "cycling")
     facts = cp.cardio_facts(CYCLING_TID, cardio, whoop)
+    # #5076: the kind is the charter menu's placement over the same history (the chat path's layer is unread)
+    from training import cardio_menu as cm, routine_generator as rg
+
+    ctx = cm.history_context(cardio, rg._load_json("movement_catalog.json"), "2026-09-20")
+    pick = cm.choose_kind(
+        target_date="2026-09-20",
+        archetype="push",
+        week_kinds=ctx["week_kinds"],
+        prior_day_kind=ctx["prior_day_kind"],
+        legs_loaded=None,
+        last_tempo_or_hills=ctx["last_tempo_or_hills"],
+        machines=("cycling",),
+    )
     want, _ = cn.compose(
         movement_key="cycling",
         minutes=45,
         target_date="2026-09-20",
         archetype="push",
+        kind=pick["kind"],
         facts=facts,
         verdict=cp.level_verdict(facts["series"], facts["last_level"]),
-        prior_week_shapes=cn.week_shapes(cardio[CYCLING_TID], "2026-09-14", "2026-09-20"),
+        treadmill_sessions=ctx["by_machine"]["treadmill"],
         hr_ceiling_bpm=120,
+        placement_why=pick["why"],
     )
     assert bike.notes == want
     # the level is still DERIVED from the last ride (level 15, 19 Sep) — the "Last: …" sentence is not printed
-    assert bike.notes.startswith("Recumbent bike · 45 min · level 15 ")
+    # (#5076: line 1's level is the placed kind's — a tempo rides one above — so the HELD level is the derivation)
+    assert bike.notes.startswith("Recumbent bike · 45 min · level ") and "hold level 15" in bike.notes
     assert "Last:" not in bike.notes
     # the strength block is untouched by the cardio arm — it never reaches a barbell; the only clause on
     # the bench is #5049's warm-up movement cue (a 155 lb bench gets the climb), never on the cardio block
@@ -212,7 +228,9 @@ def test_a_chat_drafted_treadmill_block_gets_its_OWN_shape_not_the_bikes():
     """
     out, ir = _draft_custom([{"movement_key": "treadmill", "sets": [{"duration_seconds": 3600}]}])
     tread = next(b for b in ir.exercises if b.movement_key == "treadmill")
-    assert tread.notes.split("\n")[0] == "Treadmill · 60 min · flat · talk-test pace, full sentences, average HR ≤ 120 bpm"
+    # #5076: the incline walk's dose — his steepest walk on record (6 % at 2.8 mph, 23 Jun) sits under the
+    # menu's band, so the walk starts at the band's floor incline at that speed
+    assert tread.notes.split("\n")[0] == "Treadmill · 60 min · incline 8% at 2.8 mph walk · RPE 4–6, full sentences, average HR ≤ 120 bpm"
     assert cn.LINE1_RE.match(tread.notes.split("\n")[0])
     assert "level" not in tread.notes.lower()  # no level exists in his treadmill notes; none may be implied
     assert out["cardio_cues"] == 1
@@ -230,7 +248,7 @@ def test_the_authors_own_note_is_replaced_by_the_prescription_and_kept_on_the_sn
         [{"movement_key": "cycling", "notes": "Level 10 flat, 40 min, hold 115-120 bpm", "sets": [{"duration_seconds": 2400}]}]
     )
     bike = ir.exercises[0]
-    assert bike.notes.startswith("Recumbent bike · 40 min · level 15 ")
+    assert bike.notes.startswith("Recumbent bike · 40 min · level 15 ")  # the author's "flat" stands: an easy block
     assert "hold 115-120 bpm" not in bike.notes
     assert ir.inputs_snapshot["cardio_notes_replaced"] == [{"movement_key": "cycling", "notes": "Level 10 flat, 40 min, hold 115-120 bpm"}]
 
@@ -264,7 +282,7 @@ def test_the_cue_is_on_the_PERSISTED_draft_because_that_is_what_commit_pushes():
                 "exercises": [{"movement_key": "cycling", "sets": [{"duration_seconds": 2700}]}],
             }
         )
-    assert persisted["notes"][0].startswith("Recumbent bike · 45 min · level 15 ")
+    assert persisted["notes"][0].startswith("Recumbent bike · 45 min · level ") and "hold level 15" in persisted["notes"][0]
 
 
 def test_a_strength_only_chat_draft_reports_zero_rather_than_omitting_the_count():
@@ -394,7 +412,8 @@ def test_the_chat_path_inherits_the_refusal_rather_than_re_deciding_it():
     indexes = _indexes([_ride("2026-09-07", "Level 9 - 5.6 miles", 1800.0, 9012.0)])
     _, ir = _draft_custom([{"movement_key": "cycling", "sets": [{"duration_seconds": 1800}]}], indexes=indexes)
     note = ir.exercises[0].notes
-    assert note.startswith("Recumbent bike · 30 min · level 9 flat")  # held at the ride's level, never raised at n=1
+    assert "hold level 9" in note  # held at the ride's level, never raised at n=1
+    assert ir.inputs_snapshot["cardio_notes"][0]["verdict"] == "insufficient_n"
     # "hold level 9" is now the recovery instruction (#5048), not a progress claim — every other claim word stays banned
     for banned in [w for w in CLAIM_WORDS if w != "hold level"]:
         assert banned not in note.lower(), (banned, note)

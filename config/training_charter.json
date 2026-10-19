@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -25,6 +25,13 @@
     },
     {
       "version": "1.3.0",
+      "date": "2026-10-19",
+      "by": "owner rulings 2026-10-18, ruling 4 (gym cardio is deliberate, from a menu, with level, speed and RPE) and ruling 7 (intervals and conditioning open, by RPE / talk test); #5076",
+      "what": "The cardio menu gains its dose: each block's talk test and machines, the incline treadmill walk's starting dose (8-12 % at 2.5-3.0 mph; his treadmill history tops out at 6 % at 2.8 mph, so the walk starts at the floor of the band) and step, the interval set, and the weekly placement rule.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.4.0",
       "date": "2026-10-19",
       "by": "the owner-requested elite-panel training review 2026-10-18 (#5057): calf press, leg press and DB curl held the same load x reps for weeks at an easy self-reported RPE",
       "what": "Adds progression.stall_rule: the same top-set load x reps on 3 consecutive same-type exposures, each at self-reported RPE 8 or lower, is `step_due` (the prescription's failure to progress, not his) and the next draft carries one step: up to 2 more reps below the top of the range, else the gain rule's load step.",
@@ -95,13 +102,28 @@
     "every_block_carries": ["level", "speed", "rpe_or_talk_test"],
     "progression": "same RPE at a higher level",
     "blocks": {
-      "easy": {"rpe": [4, 5], "talk_test": "full sentences"},
-      "tempo": {"label": "hard flat 40", "rpe": [6, 7], "minutes": 40},
-      "hills": {"rpe": [5, 7]},
-      "intervals": {"rpe_hard_minutes": 8, "note": "RPE 8 on the hard minutes; open by RPE / talk test"},
-      "incline_treadmill_walk": {"rpe": [4, 6], "default": true},
+      "easy": {"rpe": [4, 5], "talk_test": "full sentences", "machines": ["cycling", "elliptical", "rowing_machine"]},
+      "tempo": {"label": "hard flat 40", "rpe": [6, 7], "minutes": 40, "talk_test": "short phrases", "machines": ["cycling", "elliptical", "rowing_machine"]},
+      "hills": {"rpe": [5, 7], "talk_test": "short phrases on the climbs", "shape": "incline then decline", "machines": ["treadmill", "cycling", "elliptical"]},
+      "intervals": {"rpe_hard_minutes": 8, "note": "RPE 8 on the hard minutes; open by RPE / talk test", "talk_test": "a few words on the hard minutes", "work_easy_minutes": [2, 2], "efforts": 5, "machines": ["cycling", "air_bike", "rowing_machine", "elliptical"]},
+      "incline_treadmill_walk": {
+        "rpe": [4, 6],
+        "default": true,
+        "talk_test": "full sentences",
+        "machines": ["treadmill"],
+        "starting_dose": {"incline_pct": [8, 12], "mph": [2.5, 3.0]},
+        "step": {"incline_pct": 1, "mph": 0.1}
+      },
       "kettlebell_swings_and_circuits": {"available": "now", "prescribed_by": "RPE / talk test"}
-    }
+    },
+    "placement": {
+      "conditioning_order": ["tempo_or_hills", "intervals"],
+      "the_rest": "easy",
+      "recumbent_after": ["a lower day", "a heavy walking weekend"],
+      "never_consecutive": "the same hard shape",
+      "rule": "conditioning 2x/wk (one tempo-or-hills, one intervals), every other block easy; the recumbent after a lower day or a heavy walking weekend; never the same hard shape on consecutive days"
+    },
+    "movement_minutes": "gym cardio minutes count toward the daily steps/movement goal (steps.gym_cardio_minutes_count_toward_movement)"
   },
   "deload": {
     "scheduled": false,

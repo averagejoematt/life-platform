@@ -36,7 +36,7 @@ _HAIKU_4_5 = model_routing.TIER_MODELS[model_routing.WORKHORSE]
 # The bands #5084 decided (ADR-125 audience order): the judge and the retro are internal evals,
 # the narrative is owner-facing coach voice with plan_critics.
 _EXPECTED_BAND = {"charter_judge": 1, "charter_retro": 1, "charter_narrative": 2}
-# estimate_tokens over-estimates (chars/3.6); the wire count was 5,431. Demand 15% over the floor
+# estimate_tokens over-estimates (chars/3.6); the wire count is 7,738 (charter v1.3.0). Demand 15% over the floor
 # so a charter edit that shrinks the block toward the floor reds BEFORE the marker goes inert.
 _MARGIN = 1.15
 

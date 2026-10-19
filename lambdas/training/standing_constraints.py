@@ -46,6 +46,11 @@ STANDING_CONSTRAINTS: list[dict[str, Any]] = [
         "active_until": None,
         "invalidates_hr_tiers": True,
         "hr_prescriptions_allowed": False,
+        # The intensity half of this constraint (the cardio "no push" rule) is retired from this day on:
+        # the owner ruling of 2026-10-18 (ruling 7) and his guidance record of the same day open intervals
+        # and conditioning, prescribed by RPE / talk test. The HR half (no HR-derived tier, no HR target)
+        # stays in force. The lifting gate (`gate_lines`) is #5059's to retire.
+        "intensity_gate_retired_from": "2026-10-18",
         "gate": {
             "kind": "ecg_and_feel",
             "sinus_rpe_cap": 8,
@@ -60,13 +65,10 @@ STANDING_CONSTRAINTS: list[dict[str, Any]] = [
             "not_sinus_rpe_cap": "owner — platform memory 2026-10-10, rule (1)",
             "sinus_rpe_cap": "owner — the 2026-10-18 brief §A2 / issue #5000 (the plan as written, every set at RPE 8 or below)",
             "cardio_minutes": "owner-history — the hand-built 2026-10-18 routine (014e1142…): recumbent, 20 min",
+            "intensity_gate_retired_from": "owner — ruling 7 of 2026-10-18 (#5067): intervals and conditioning open, by RPE / talk test",
         },
     },
 ]
-
-# owner-history: the hand-built 2026-10-18 routine's cardio block (recumbent, 20 min). No program
-# document states a cardio duration; this is the length he chose on the first constrained session.
-CARDIO_BLOCK_MINUTES = 20
 
 
 def active_constraint(target_date: str, constraints: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
@@ -85,6 +87,17 @@ def active_constraint(target_date: str, constraints: list[dict[str, Any]] | None
             continue
         return c
     return None
+
+
+def intensity_gate_active(constraint: dict[str, Any] | None, target_date: str) -> bool:
+    """True when `constraint` still holds cardio to "no push" on `target_date` (#5076).
+
+    False once the entry's `intensity_gate_retired_from` day has come: from then on the constraint
+    shapes only the HR half (no HR tier, no HR target), and the menu's harder blocks are open."""
+    if not constraint:
+        return False
+    retired = constraint.get("intensity_gate_retired_from")
+    return not (retired and str(target_date or "")[:10] >= str(retired))
 
 
 def stop_list_from(summary: Any, rule: int) -> str | None:

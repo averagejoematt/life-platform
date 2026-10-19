@@ -252,9 +252,10 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
     # #5084: the training charter's three callers (lambdas/training/charter_ai.py), ENGAGED BY
     # DESIGN — the first entries here built to clear the floor rather than measured under it.
     # All three send `training_charter.prompt_prefix(published=False)` as the cached system
-    # block: 5,431 tok on the wire (Bedrock CountTokens, base Haiku 4.5 id, system-minus-none,
-    # 2026-10-18; ~5,496 by estimate_tokens) against Haiku 4.5's 4,096 floor — 1.33x, so ordinary
-    # charter edits keep it cached. `cdk_stack` is None: no Lambda hosts these calls yet (the
+    # block: 7,738 tok on the wire (Bedrock CountTokens, base Haiku 4.5 id, system-minus-none,
+    # re-measured 2026-10-19 after charter v1.3.0 — the disruption block #5088 + the cardio menu's
+    # dose #5076; ~7,638 by estimate_tokens; first measured 5,431 at v1.0.0) against Haiku 4.5's
+    # 4,096 floor — 1.89x, so ordinary charter edits keep it cached. `cdk_stack` is None: no Lambda hosts these calls yet (the
     # #5072 / #5079 / #5071 lanes build them), so the guard resolves the registry default — the
     # lane that deploys one names its stack here. `calls_within_ttl` is the DESIGN count each
     # caller must keep (one per charter concession-ledger seat for the judge and the retro, one per
@@ -267,15 +268,15 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_JUDGE_MODEL",
         "cdk_stack": None,
         "measured_on": "haiku-4-5",
-        "prefix_tokens": 5431,
+        "prefix_tokens": 7738,
         "calls_within_ttl": 8,
         "decided": "2026-10-18",
         "issue": 5084,
         "why": (
-            "5,431 tok on the wire, clears Haiku 4.5's 4,096 floor by 1,335. One graded plan = one call per panel "
+            "7,738 tok on the wire (charter v1.3.0), clears Haiku 4.5's 4,096 floor by 3,642. One graded plan = one call per panel "
             "seat (the eight concession-ledger schools), back-to-back inside one 5m TTL: one write at 1.25x then "
-            "seven reads at 0.1x. Priced at ~2,000 tok volatile in / ~400 out per seat: $0.0426 per graded plan "
-            "cached vs $0.0755 uncached (-44%). Golden-case runs grade several plans in one run, so the reads "
+            "seven reads at 0.1x. Priced at ~2,000 tok volatile in / ~400 out per seat: $0.0471 per graded plan "
+            "cached vs $0.0939 uncached (-50%). Golden-case runs grade several plans in one run, so the reads "
             "compound across cases too."
         ),
     },
@@ -286,15 +287,15 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_NARRATIVE_MODEL",
         "cdk_stack": None,
         "measured_on": "haiku-4-5",
-        "prefix_tokens": 5431,
+        "prefix_tokens": 7738,
         "calls_within_ttl": 3,
         "decided": "2026-10-18",
         "issue": 5084,
         "why": (
-            "5,431 tok on the wire, clears the 4,096 floor. A ONE-call-a-night narrative would be a decline (a write "
+            "7,738 tok on the wire, clears the 4,096 floor. A ONE-call-a-night narrative would be a decline (a write "
             "premium nothing reads), so the design batches it: the nightly pre-draft writes the plan, Hevy-note and "
             "Telegram lines back-to-back (charter_ai.NARRATIVE_SURFACES) — one write, two reads. ~1,500 tok volatile "
-            "in / ~200 out per line: $0.0154/night cached vs $0.0238 uncached (-35%). If the caller ships as one call "
+            "in / ~200 out per line: $0.0187/night cached vs $0.0307 uncached (-39%). If the caller ships as one call "
             "a night, flip this to engaged=False and send the block uncached — the guard reds the mismatch."
         ),
     },
@@ -305,14 +306,14 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_RETRO_MODEL",
         "cdk_stack": None,
         "measured_on": "haiku-4-5",
-        "prefix_tokens": 5431,
+        "prefix_tokens": 7738,
         "calls_within_ttl": 8,
         "decided": "2026-10-18",
         "issue": 5084,
         "why": (
-            "5,431 tok on the wire, clears the 4,096 floor. The block retro reuses the judge's panel rubric — one "
+            "7,738 tok on the wire, clears the 4,096 floor. The block retro reuses the judge's panel rubric — one "
             "call per seat, back-to-back in one /training-review run, once per block. ~4,000 tok volatile in "
-            "(the block's evidence) / ~800 out per seat: $0.0746 per retro cached vs $0.1075 uncached (-31%). "
+            "(the block's evidence) / ~800 out per seat: $0.0791 per retro cached vs $0.1259 uncached (-37%). "
             "Runs on a workstation, so the dev AI cap bounds it as well."
         ),
     },
