@@ -886,12 +886,41 @@ def test_weight_loss_reports_hand_derived_rate_bmi_and_projection(monkeypatch):
     assert out["projection"]["pct_complete"] == 7.5
 
 
-def test_weight_loss_flags_a_rate_above_the_acsm_safe_ceiling(monkeypatch):
-    """3.0 lbs/wk > 2.5 -> the lean-mass warning fires on every affected point."""
+def _series(start_lbs, per_week, n=4):
+    return [withings(d("2026-04-01", 7 * i), weight_lbs=start_lbs - per_week * i) for i in range(n)]
+
+
+def test_weight_loss_rate_flag_is_relative_to_bodyweight(monkeypatch):
+    """Same absolute 4.5 lb/wk: at ~400 lb that is ~1.1%/wk (no flag); at ~250 lb it is ~1.8%/wk (flags)."""
+    install(monkeypatch, _series(400.0, 4.5))
+    heavy = th.tool_get_weight_loss_progress({})
+    assert not [p for p in heavy["weight_series"] if "Losing too fast" in p.get("rate_flag", "")]
+    install(monkeypatch, _series(250.0, 4.5))
+    light = th.tool_get_weight_loss_progress({})
+    flagged = [p for p in light["weight_series"] if "Losing too fast" in p.get("rate_flag", "")]
+    assert len(flagged) == 3
+    assert "% of bodyweight" in flagged[0]["rate_flag"] and "lb/wk" in flagged[0]["rate_flag"]
+
+
+def test_weight_loss_reports_both_units_for_every_rate(monkeypatch):
+    """3.0 lb/wk at the last weigh-in of 311 lb -> 3.0/311*100 = 0.96 %BW/wk."""
     install(monkeypatch, WEIGH_INS)
     out = th.tool_get_weight_loss_progress({})
-    flagged = [p for p in out["weight_series"] if "Losing too fast" in p.get("rate_flag", "")]
-    assert len(flagged) == 3
+    assert out["rate_lb_per_wk"] == 3.0
+    assert out["rate_pct_bodyweight_per_wk"] == 0.96
+    assert out["avg_weekly_loss_pct_bodyweight"] == 0.96
+    assert out["projection"]["avg_weekly_loss_pct_bodyweight"] == 0.96
+    assert out["next_milestone"]["recent_pace_pct_bodyweight_per_week"] == 0.96
+    for p in out["weight_series"]:
+        if "weekly_loss_rate_lbs" in p:
+            assert p["rate_lb_per_wk"] == p["weekly_loss_rate_lbs"]
+            assert p["rate_pct_bodyweight_per_wk"] is not None
+
+
+def test_weight_loss_clinical_note_carries_no_fixed_lb_ceiling(monkeypatch):
+    install(monkeypatch, WEIGH_INS)
+    note = th.tool_get_weight_loss_progress({})["clinical_note"]
+    assert "2.5" not in note and "% of bodyweight" in note
 
 
 def test_weight_loss_names_the_next_bmi_milestone_with_the_lbs_to_cross(monkeypatch):
