@@ -2,7 +2,7 @@
 
 Owner direction 2026-10-18 (the elite-panel training review): a battery on a fixed cadence — a 6-minute walk
 for distance, a 20-minute bike at RPE 6 for distance, a dead hang for time, the assistance an assisted pull-up
-needs. Covered here: the charter protocol, the cadence (ok / due / overdue / missed, block-aligned), the
+needs. Covered here: the charter protocol, the cadence (upcoming / due / overdue / missed, counted in the program's own weeks), the
 storage round trip (fixture = the DynamoDB wire: Decimal in, the store's own reader out), the trend direction
 per test, the Hevy reader, the test-day draft placement and the absent path. No clock is read: every day is
 passed in.
@@ -101,39 +101,93 @@ def test_the_test_day_is_the_lightest_role_and_never_a_lower_day():
     assert len(tmpl["anchors"]) == min(len(t["anchors"]) for t in ps.SESSION_TEMPLATES.values())
 
 
-# ── cadence ───────────────────────────────────────────────────────────────────────────────
-POS_W3 = {"week": 3, "week_opened_on": "2026-10-05"}  # week 6 then opens 2026-10-26 at the earliest
+# ── cadence: the PROGRAM's week, never a calendar projection ─────────────────────────────
+OPENINGS = {1: "2026-09-21", 2: "2026-09-28", 3: "2026-10-05", 4: "2026-10-12", 5: "2026-10-19", 6: "2026-10-26", 7: "2026-11-02"}
 
 
-@pytest.mark.parametrize(
-    "today,state",
-    [("2026-10-20", ft.OK), ("2026-10-26", ft.DUE), ("2026-11-01", ft.DUE), ("2026-11-02", ft.OVERDUE), ("2026-11-09", ft.MISSED)],
-)
-def test_the_due_week_closes_the_block_then_overdue_then_missed(today, state):
-    got = ft.due(today, POS_W3, [])
-    assert got["due_on"] == "2026-10-26" and got["due_program_week"] == 6 and got["basis"] == "block"
-    assert got["state"] == state
-    assert (got["prompt"] is None) == (state == ft.OK)
+def _pos(week, opened=None, **openings):
+    """A position as `fitness_tests.position_from` builds it from the ledger (each week's ACTUAL opening day)."""
+    known = {w: d for w, d in OPENINGS.items() if w < week}
+    known[week] = opened or OPENINGS[week]
+    return {"week": week, "week_opened_on": known[week], "floor_days": 7, "week_openings": {**known, **openings}}
+
+
+def test_before_the_block_closes_the_battery_is_upcoming_on_an_estimated_date():
+    got = ft.due("2026-10-07", _pos(3), [])
+    assert got["state"] == ft.UPCOMING and got["prompt"] is None and got["basis"] == "program_week"
+    assert got["due_program_week"] == 6 and got["block"] == 1 and got["week_in_block"] == 3
+    # the earliest week 6 can open: week 4 no sooner than 10-12, then one floor per week — an ESTIMATE, said so
+    assert got["due_on"] == "2026-10-26" and got["due_on_is_estimate"] is True
+
+
+def test_a_normal_advance_runs_due_then_overdue_then_missed_in_program_weeks():
+    due_wk = ft.due("2026-10-27", _pos(6), [])
+    assert due_wk["state"] == ft.DUE and due_wk["due_on"] == "2026-10-26" and due_wk["due_on_is_estimate"] is False
+    assert due_wk["prompt"] and "program week 6" in due_wk["prompt"]
+    over = ft.due("2026-11-03", _pos(7), [])
+    assert over["state"] == ft.OVERDUE and over["due_program_week"] == 6 and over["due_on"] == "2026-10-26"
+    missed = ft.due("2026-11-10", _pos(8, "2026-11-09"), [])
+    assert missed["state"] == ft.MISSED and missed["due_on_is_estimate"] is False
+
+
+def test_a_program_stalled_in_week_5_for_three_calendar_weeks_is_never_overdue():
+    """The blocking review item: the old projection put week 6 at 7 days a week from week 5 and ran the battery
+    `overdue`/`missed` while the program sat in week 5 (travel, a disruption, a missed week)."""
+    from common.pacific_time import shift_day_key
+    from training import session_sequence as ss
+
+    preview = ss.preview(60, start_day="2026-10-19")
+    dates = [e["date"] for e in preview if e["week"] < 5 or (e["week"] == 5 and e["session_in_week"] <= 2)]
+    today = shift_day_key(dates[-1], 21)  # three calendar weeks with no session: the cycle never completes
+    ledger = ss.ledger(dates, today)
+    pos = ft.position_from(ledger[-1], ledger[:-1])
+    assert pos["week"] == 5 and pos["week_openings"][5] == pos["week_opened_on"]
+    got = ft.due(today, pos, [])
+    assert got["state"] == ft.UPCOMING and got["prompt"] is None and got["due_program_week"] == 6
+    assert got["due_on_is_estimate"] is True and got["due_on"] == shift_day_key(today, 1)  # the earliest is after today
+    # and a program stalled IN the due week stays due, never overdue
+    assert ft.due("2026-11-16", _pos(6), [])["state"] == ft.DUE
+
+
+def test_a_normal_advance_through_the_real_ledger_reaches_due_in_week_6():
+    from training import session_sequence as ss
+
+    preview = ss.preview(60, start_day="2026-10-19")
+    first6 = next(e for e in preview if e["week"] == 6)
+    dates = [e["date"] for e in preview if e["date"] < first6["date"]]
+    ledger = ss.ledger(dates, first6["date"])
+    got = ft.due(first6["date"], ft.position_from(ledger[-1], ledger[:-1]), [])
+    assert got["state"] == ft.DUE and got["due_on"] == first6["week_basis"]["week_opened_on"] and got["due_on_is_estimate"] is False
 
 
 def test_a_battery_in_the_due_week_or_a_week_early_covers_it_and_the_next_block_is_due_next():
     for logged in ("2026-10-27", "2026-10-19"):
-        got = ft.due("2026-10-28", POS_W3, [logged])
-        assert got["state"] == ft.OK and got["due_program_week"] == 12 and got["due_on"] == "2026-12-07"
-    assert ft.due("2026-10-28", POS_W3, ["2026-10-18"])["state"] == ft.DUE  # eight days early is the last block's
+        got = ft.due("2026-10-28", _pos(6), [logged])
+        assert got["state"] == ft.UPCOMING and got["due_program_week"] == 12 and got["due_on_is_estimate"] is True
+    assert ft.due("2026-10-28", _pos(6), ["2026-10-18"])["state"] == ft.DUE  # eight days early is the last block's
 
 
 def test_a_missed_battery_stays_missed_into_the_next_block_until_one_is_logged():
-    pos = {"week": 8, "week_opened_on": "2026-11-09"}
+    pos = _pos(8, "2026-11-09")
     got = ft.due("2026-11-12", pos, ["2026-09-30"])
     assert got["due_program_week"] == 6 and got["due_on"] == "2026-10-26" and got["state"] == ft.MISSED
     after = ft.due("2026-11-13", pos, ["2026-09-30", "2026-11-12"])
-    assert after["state"] == ft.OK and after["due_program_week"] == 12
+    assert after["state"] == ft.UPCOMING and after["due_program_week"] == 12
 
 
-def test_without_a_position_the_calendar_places_the_due_week_and_with_nothing_it_is_unknown():
-    cal = ft.due("2026-11-12", None, ["2026-10-01"])
-    assert cal["basis"] == "calendar" and cal["due_on"] == "2026-11-12" and cal["state"] == ft.DUE
+def test_an_unplaced_due_week_or_a_cadence_off_the_block_is_unknown_never_a_state():
+    pos = _pos(8, "2026-11-09")
+    del pos["week_openings"][6]
+    assert ft.due("2026-11-12", pos, [])["state"] == ft.UNKNOWN
+    off = ft.due("2026-11-12", _pos(6), [], {**ft.protocol(), "every_weeks": 4})
+    assert off["state"] == ft.UNKNOWN and "rotation.anchors_fixed_weeks" in off["detail"]
+
+
+def test_without_a_position_the_calendar_estimates_but_never_claims_due_and_with_nothing_it_is_unknown():
+    before = ft.due("2026-11-10", None, ["2026-10-01"])
+    assert before["basis"] == "calendar" and before["due_on"] == "2026-11-12" and before["due_on_is_estimate"] is True
+    assert before["state"] == ft.UPCOMING
+    assert ft.due("2026-11-12", None, ["2026-10-01"])["state"] == ft.UNKNOWN
     none = ft.due("2026-11-12", None, [])
     assert none["state"] == ft.UNKNOWN and none["due_on"] is None and none["prompt"] is None
 

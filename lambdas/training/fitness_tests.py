@@ -20,11 +20,16 @@ THREE PURE PIECES (the DDB read and write take an injected table; the MCP side i
      Hevy is the second reader (`from_hevy`): a workout titled with `BATTERY_TITLE`, or one that logs
      at least `HEVY_MIN_TESTS` of the tests, is read as a battery; the explicit record wins per test.
   2. TREND + CADENCE — `trend()` gives each test's latest and previous value and the delta in the
-     test's better direction. `due()` answers ok / due / overdue / missed for a day: the due week is
-     the program week that closes each block (a whole multiple of `every_weeks`, aligned to the block
-     `block_model` runs), projected from the session sequence's position. `missed` is the dead-man
-     state (the nightly pre-draft run carries the named check). Without a position, the calendar
-     answers from the latest battery; with neither, the state is `unknown`, never `ok`.
+     test's better direction. `due()` answers upcoming / due / overdue / missed from the PROGRAM's
+     week, never a calendar projection: the due week is the program week that closes each block
+     (`block_model`: week_in_block == `rotation.anchors_fixed_weeks`, which `every_weeks` must equal),
+     and the state counts program weeks — a week advances only when its session cycle is complete
+     AND the floor has passed (`session_sequence`'s week rule), so a stalled program (travel, a
+     disruption, a missed week) keeps the battery `upcoming` and never runs it `overdue`. The due
+     date is a fact (the ledger's opening day) once the program reaches the week, else the EARLIEST
+     day it can (`due_on_is_estimate`). `missed` is the dead-man state (the nightly pre-draft run
+     carries the named check). Without a position the date is a calendar estimate that can say
+     `upcoming` but never `due`/`overdue`; with nothing, the state is `unknown`, never `upcoming`.
   3. THE TEST DAY — on the due week the charter's `test_day.role` (the lightest day, never a lower
      day) carries the battery: the generator's ideal session cut to the minimum shape (anchors only,
      `split.minimum_session.sets_per_movement` working sets) with the tests placed in `order`.
@@ -47,7 +52,7 @@ PK = f"USER#matthew#SOURCE#{SOURCE}"
 SK_PREFIX = "BATTERY#"
 STORE = f"{PK} / {SK_PREFIX}<YYYY-MM-DD> — CROSS_PHASE (ADR-077), Tier owner-only"
 
-OK, DUE, OVERDUE, MISSED, UNKNOWN = "ok", "due", "overdue", "missed", "unknown"
+UPCOMING, DUE, OVERDUE, MISSED, UNKNOWN = "upcoming", "due", "overdue", "missed", "unknown"
 MEASURED, ABSENT, READ_FAILED = "measured", "absent", "read_failed"
 EXPLICIT, HEVY = "explicit", "hevy"
 
@@ -292,81 +297,157 @@ def trend(batts: list[Mapping[str, Any]], proto: Optional[Mapping[str, Any]] = N
 
 
 # ── cadence ──────────────────────────────────────────────────────────────────────────────
-def _due_week_opening(position: Mapping[str, Any], due_week: int) -> Optional[str]:
-    """The (earliest) opening day of program week `due_week`, projected 7 days a week from the position."""
-    opened = _day(position.get("week_opened_on"))
-    week = position.get("week")
-    if opened is None or not isinstance(week, int) or week < 1:
+def block_weeks(proto: Optional[Mapping[str, Any]] = None) -> int:
+    """The block's length (`block_model.block_weeks()`, the charter's `rotation.anchors_fixed_weeks`) — the battery
+    closes each block, so the charter's `every_weeks` must name the same span. Raises when they disagree or either
+    is unreadable: a due week is never placed on a guessed block."""
+    from training import block_model
+
+    n, every = block_model.block_weeks(), every_weeks(proto)
+    if n != every:
+        raise ValueError(
+            f"fitness_tests: calibration.fitness_tests.every_weeks is {every} but a block is {n} weeks (rotation.anchors_fixed_weeks) "
+            "— the battery closes a block, so the charter must name one span"
+        )
+    return n
+
+
+def position_from(entry: Optional[Mapping[str, Any]], completed: Optional[Iterable[Mapping[str, Any]]] = None) -> Optional[dict[str, Any]]:
+    """The program position the cadence reads, from the session sequence's own ledger: `entry` is
+    `session_sequence.next_session(day, rows)`, `completed` its `completed_positions(rows, day)`. Each program
+    week's ACTUAL opening day is taken from the ledger (`week_basis.week_opened_on`), never projected."""
+    if not entry:
         return None
-    return shift_day_key(opened, 7 * (due_week - week))
+    basis = entry.get("week_basis") or {}
+    openings: dict[int, str] = {}
+    for pos in [*(completed or []), entry]:
+        w, o = pos.get("week"), _day((pos.get("week_basis") or {}).get("week_opened_on"))
+        if isinstance(w, int) and not isinstance(w, bool) and o:
+            openings.setdefault(w, o)
+    return {
+        "week": entry.get("week"),
+        "week_opened_on": basis.get("week_opened_on"),
+        "floor_days": basis.get("floor_days"),
+        "week_openings": openings,
+    }
+
+
+def _earliest_opening(position: Mapping[str, Any], weeks_ahead: int, today: Optional[str]) -> Optional[str]:
+    """The EARLIEST day program week `week + weeks_ahead` can open under the week rule (a week advances only when its
+    cycle is complete AND >= `floor_days` after the previous advance): a lower bound, never a promise — a stalled
+    week moves it later. The next advance is after `today` (today's session belongs to this week)."""
+    opened, floor = _day(position.get("week_opened_on")), position.get("floor_days")
+    if opened is None or not isinstance(floor, int) or isinstance(floor, bool) or floor < 1 or weeks_ahead < 1:
+        return None
+    first = shift_day_key(opened, floor)
+    if today and _day(today) and first <= today:
+        first = shift_day_key(today, 1)
+    return shift_day_key(first, floor * (weeks_ahead - 1))
 
 
 def due_on(
-    position: Optional[Mapping[str, Any]], battery_dates: Iterable[str], proto: Optional[Mapping[str, Any]] = None
+    position: Optional[Mapping[str, Any]],
+    battery_dates: Iterable[str],
+    proto: Optional[Mapping[str, Any]] = None,
+    today: Optional[str] = None,
 ) -> dict[str, Any]:
-    """The opening day of the due week the latest battery has not yet covered, and how it was found.
+    """Which program week the battery is due in, from the PROGRAM's week (never a calendar projection).
 
-    With a position (`{week, week_opened_on}`, the session sequence's): the due weeks are the program weeks
-    that are whole multiples of `every_weeks`. A battery on/after a due week's opening minus
-    `early_days_credited` covers it. The answer is the PREVIOUS due week when it is uncovered (a missed
-    battery stays missed until one is logged), else the next due week (this week when this week is one).
-    Without a position: the latest battery + `every_weeks` weeks; with neither: None."""
+    With a position (`position_from`: `{week, week_opened_on, floor_days, week_openings}`): the due weeks are the
+    weeks that close a block (`block_model`: week_in_block == block_weeks). A battery dated on/after a due week's
+    actual opening minus `early_days_credited` covers it. The answer is the PREVIOUS block's due week when it is
+    uncovered (a missed battery stays missed until one is logged), else this week when it closes the block and is
+    uncovered, else the next block's. `due_on` is the due week's opening day: a FACT (`due_on_is_estimate` False)
+    for a week the program has reached, else the EARLIEST day the program can reach it (an estimate).
+    Without a position: the latest battery + `every_weeks` weeks, an estimate; with neither: None."""
     p = protocol() if proto is None else proto
-    every = every_weeks(p)
+    n = block_weeks(p)
     early = int(p.get("early_days_credited") or 0)
     dates = sorted(d for d in (_day(x) for x in battery_dates) if d)
     latest = dates[-1] if dates else None
-    week = (position or {}).get("week")
-    if isinstance(week, int) and week >= 1 and _day((position or {}).get("week_opened_on")):
+    pos = position or {}
+    week, opened = pos.get("week"), _day(pos.get("week_opened_on"))
+    if isinstance(week, int) and not isinstance(week, bool) and week >= 1 and opened:
+        openings = {int(k): v for k, v in ((pos.get("week_openings") or {}).items()) if _day(v)}
+        openings.setdefault(week, opened)
+        base = {
+            "basis": "program_week",
+            "latest": latest,
+            "program_week": week,
+            "block": (week - 1) // n + 1,
+            "week_in_block": (week - 1) % n + 1,
+            "block_weeks": n,
+        }
 
         def covered(opening: str) -> bool:
             return latest is not None and latest >= shift_day_key(opening, -early)
 
-        this_due = -(-week // every) * every  # the due week at or after this one
-        prev_due = this_due - every
-        if prev_due >= every:
-            prev_open = _due_week_opening(position or {}, prev_due)
-            if prev_open and not covered(prev_open):
-                return {"due_on": prev_open, "due_program_week": prev_due, "basis": "block", "latest": latest}
-        target = this_due
-        opening = _due_week_opening(position or {}, target)
-        if opening and covered(opening):
-            target += every
-            opening = _due_week_opening(position or {}, target)
-        return {"due_on": opening, "due_program_week": target, "basis": "block", "latest": latest}
+        this_due = -(-week // n) * n  # the week that closes this block
+        prev_due = this_due - n
+        if prev_due >= n:
+            prev_open = openings.get(prev_due)
+            if prev_open is None:
+                return {**base, "due_program_week": prev_due, "due_on": None, "due_on_is_estimate": None, "unplaced": prev_due}
+            if not covered(prev_open):
+                return {**base, "due_program_week": prev_due, "due_on": prev_open, "due_on_is_estimate": False}
+        if this_due == week and not covered(opened):
+            return {**base, "due_program_week": week, "due_on": opened, "due_on_is_estimate": False}
+        target = this_due + (n if this_due == week else 0)
+        return {**base, "due_program_week": target, "due_on": _earliest_opening(pos, target - week, today), "due_on_is_estimate": True}
     if latest:
-        return {"due_on": shift_day_key(latest, 7 * every), "due_program_week": None, "basis": "calendar", "latest": latest}
-    return {"due_on": None, "due_program_week": None, "basis": "none", "latest": None}
+        return {
+            "basis": "calendar",
+            "latest": latest,
+            "due_program_week": None,
+            "due_on": shift_day_key(latest, 7 * n),
+            "due_on_is_estimate": True,
+        }
+    return {"basis": "none", "latest": None, "due_program_week": None, "due_on": None, "due_on_is_estimate": None}
+
+
+def _state(d: Mapping[str, Any], today: str, grace_weeks: int) -> tuple[str, Optional[str]]:
+    """(state, detail). On the program basis the state counts PROGRAM weeks: before the due week upcoming, in it due,
+    `grace_weeks` program weeks past it overdue, beyond that missed — a stalled program never runs past its due week."""
+    if d["basis"] == "program_week":
+        if d.get("unplaced") is not None:
+            return (
+                UNKNOWN,
+                f"program week {d['unplaced']}'s opening day is not on the session ledger — the battery cannot be credited to it",
+            )
+        past = int(d["program_week"]) - int(d["due_program_week"])
+        return (UPCOMING if past < 0 else DUE if past == 0 else OVERDUE if past <= grace_weeks else MISSED), None
+    if d["basis"] == "calendar" and d.get("due_on") and _days(str(d["due_on"]), today) < 0:
+        return UPCOMING, "no program position: the date is the latest battery plus the cadence, an estimate"
+    if d["basis"] == "calendar":
+        return UNKNOWN, "no program position and the calendar estimate has passed — due/overdue is never claimed without the program's week"
+    return UNKNOWN, "no session position and no battery on file — the due week cannot be placed"
 
 
 def due(
     today: str, position: Optional[Mapping[str, Any]], battery_dates: Iterable[str], proto: Optional[Mapping[str, Any]] = None
 ) -> dict[str, Any]:
-    """`{state ok|due|overdue|missed|unknown, due_on, prompt, ...}` for `today` — the prompt and the dead-man read this.
-
-    ok before the due week; due through its 7 days; overdue for `grace_weeks` after; missed beyond (the
-    dead-man state). unknown when neither a position nor a battery can place the due week."""
+    """`{state upcoming|due|overdue|missed|unknown, due_program_week, due_on, due_on_is_estimate, prompt, ...}` for
+    `today` — the prompt and the dead-man read this. The state follows the program's week (`due_on`, `_state`);
+    `unknown` when nothing can place the due week or the charter's cadence and block disagree."""
     p = protocol() if proto is None else proto
-    d = due_on(position, battery_dates, p)
-    grace = 7 * int(p.get("grace_weeks") or 0)
-    out = {**d, "every_weeks": every_weeks(p), "grace_days": grace, "issue": ISSUE}
-    if d["due_on"] is None or _day(today) is None:
-        return {
-            **out,
-            "state": UNKNOWN,
-            "prompt": None,
-            "detail": "no session position and no battery on file — the due week cannot be placed",
-        }
-    age = _days(d["due_on"], today)
-    state = OK if age < 0 else DUE if age < 7 else OVERDUE if age < 7 + grace else MISSED
+    day = _day(today)
+    try:
+        d = due_on(position, battery_dates, p, day)
+    except ValueError as e:
+        return {"state": UNKNOWN, "prompt": None, "detail": str(e), "due_on": None, "basis": "none", "issue": ISSUE}
+    grace = int(p.get("grace_weeks") or 0)
+    out = {**d, "every_weeks": every_weeks(p), "grace_weeks": grace, "issue": ISSUE}
+    if day is None:
+        return {**out, "state": UNKNOWN, "prompt": None, "detail": f"today {today!r} is not a day key"}
+    state, detail = _state(d, day, grace)
     labels = ", ".join(str(t.get("label")) for t in tests_spec(p).values())
     prompt = None
-    if state != OK:
+    if state in (DUE, OVERDUE, MISSED):
         prompt = (
-            f"Fitness battery {state} (due week from {d['due_on']}): {labels}. "
-            "The test-day draft carries it; log each result with get_exercise_notes action='fitness_test'."
+            f"Fitness battery {state} (program week {d['due_program_week']} closes block {int(d['due_program_week']) // int(d['block_weeks'])}, "
+            f"opened {d['due_on']}): {labels}. The test-day draft carries it; log each result with get_exercise_notes action='fitness_test'."
         )
-    return {**out, "state": state, "days_past_due_on": age, "prompt": prompt}
+    return {**out, "state": state, "detail": detail, "prompt": prompt}
 
 
 # ── the test day ─────────────────────────────────────────────────────────────────────────
@@ -390,12 +471,12 @@ def is_test_day(day_entry: Mapping[str, Any], proto: Optional[Mapping[str, Any]]
     p = protocol() if proto is None else proto
     role, week = day_entry.get("session_role"), day_entry.get("week")
     try:
-        every = every_weeks(p)
+        n = block_weeks(p)
     except ValueError:
         return False
     if not role or role != test_day_role(p) or role in never_on_roles(p):
         return False
-    return isinstance(week, int) and week >= 1 and week % every == 0
+    return isinstance(week, int) and week >= 1 and week % n == 0  # the week that closes a block (block_model's week_in_block == n)
 
 
 def _test_block(test_id: str, row: Mapping[str, Any], movements: Mapping[str, Any]) -> Any:
@@ -491,7 +572,7 @@ def apply_battery(ideal: Any, movements: Mapping[str, Any], due_info: Mapping[st
         "fitness_battery": {
             "tests": [s for s in order if s in spec],
             "protocol_version": p.get("protocol_version"),
-            "due": {k: due_info.get(k) for k in ("state", "due_on", "due_program_week", "basis")},
+            "due": {k: due_info.get(k) for k in ("state", "due_on", "due_on_is_estimate", "due_program_week", "basis")},
             "unresolved": unresolved,
             "charter_version": charter_version(),
             "issue": ISSUE,
@@ -549,9 +630,16 @@ def place_battery(
             f"fitness battery ({ISSUE}): due week, but UNRESOLVED split.minimum_session in the charter — the usual session"
         ] + list(ideal.rationale or [])
         return routines
-    position = {"week": day_entry.get("week"), "week_opened_on": opened}
+    basis = day_entry.get("week_basis") or {}
+    position = {"week": day_entry.get("week"), "week_opened_on": opened, "floor_days": basis.get("floor_days")}
     info = due(str(getattr(ideal, "target_date", "")), position, dates, p)
-    apply_battery(ideal, movements, {**info, "due_program_week": day_entry.get("week"), "due_on": opened}, p)
+    # this session IS the due week (is_test_day): its opening is a fact, whatever an earlier block's state says
+    apply_battery(
+        ideal,
+        movements,
+        {**info, "state": DUE, "due_program_week": day_entry.get("week"), "due_on": opened, "due_on_is_estimate": False},
+        p,
+    )
     return routines
 
 

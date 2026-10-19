@@ -6,8 +6,9 @@ them in:
   record     `USER#matthew#SOURCE#fitness_tests / BATTERY#<date>` (`fitness_tests.load_records`);
   Hevy       the program's block record (`plan_hevy_windows._block_workouts`, the ONE sanctioned Hevy
              read via `tools_strength._read_hevy_all_phases`) — a battery logged in Hevy is read from it;
-  position   `session_sequence.next_session` over the same rows — the program week the due week is
-             projected from (the block alignment);
+  position   `session_sequence.next_session` + `completed_positions` over the same rows — the program
+             week and each week's actual opening day (`fitness_tests.position_from`); the cadence counts
+             program weeks, so a stalled program never runs the battery overdue;
   catalog    the movement catalog (`routine_generator._load_json`) — each test's Hevy template id.
 
 THE WRITE rides `get_exercise_notes` (`action='fitness_test'`, a new action on the owner's training-record
@@ -60,12 +61,29 @@ def _err(e: BaseException) -> str:
     return f"{type(e).__name__}: {e}"[:200]
 
 
-def read_view(today: Optional[str] = None) -> dict[str, Any]:
-    """`{batteries, trend, due, states}` as of `today` — every read's state named; a failed record read is
-    `read_failed` and NO cadence state is claimed from Hevy alone."""
+def _program_rows(day: str, hevy_rows: Optional[list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    """The block record the session sequence advances on: `plan_hevy_windows._block_workouts` when no rows are handed
+    in, else the caller's ONE Hevy read cut to [block start, `day`) and annotated the same way (the May tracker's)."""
+    from common.pacific_time import shift_day_key
     from training import session_sequence
+    from training.routine_title import annotate_with_routine_index
 
     from mcp.plan_hevy_windows import _block_workouts
+
+    if hevy_rows is None:
+        return list(_block_workouts(day) or [])
+    start, end = session_sequence.block_start(), shift_day_key(day, -1)
+    if end < start:
+        return []
+    rows = [r for r in hevy_rows if start <= str(r.get("date") or str(r.get("sk") or "")[5:15])[:10] <= end]
+    return list(annotate_with_routine_index(rows, start) or [])
+
+
+def read_view(today: Optional[str] = None, hevy_rows: Optional[list[dict[str, Any]]] = None) -> dict[str, Any]:
+    """`{batteries, trend, due, states}` as of `today` — every read's state named; a failed record read is
+    `read_failed` and NO cadence state is claimed from Hevy alone. `hevy_rows`: a caller's own Hevy read reaching
+    the block start (the May tracker keeps ONE Hevy read); None = this module reads the block record itself."""
+    from training import session_sequence
 
     day = str(today or pacific_today())[:10]
     states: dict[str, Any] = {}
@@ -77,12 +95,11 @@ def read_view(today: Optional[str] = None) -> dict[str, Any]:
     position: Optional[dict[str, Any]] = None
     rows: list[dict[str, Any]] = []
     try:
-        rows = list(_block_workouts(day) or [])
+        rows = _program_rows(day, hevy_rows)
         entry = session_sequence.next_session(day, rows)
-        if entry:
-            position = {"week": entry.get("week"), "week_opened_on": (entry.get("week_basis") or {}).get("week_opened_on")}
+        position = ft.position_from(entry, session_sequence.completed_positions(rows, day) if entry else None)
         states["hevy"] = ft.MEASURED
-    except Exception as e:  # noqa: BLE001 — the calendar then places the due week, and says so
+    except Exception as e:  # noqa: BLE001 — the calendar then estimates the due date, and says so
         states["hevy"] = {"state": ft.READ_FAILED, "error": _err(e)}
     hevy = ft.from_hevy(rows, _movements())
     batts = ft.batteries(records or [], hevy)
@@ -196,7 +213,7 @@ def nightly_leg(today: Optional[str] = None) -> dict[str, Any]:
         logger.warning("[fitness_tests] nightly check failed (%s)", type(e).__name__)
         return {"outcome": "failed", "error": type(e).__name__}
     state = cad.get("state")
-    if state in (ft.OK, ft.DUE, ft.OVERDUE, ft.MISSED):
+    if state in (ft.UPCOMING, ft.DUE, ft.OVERDUE, ft.MISSED):
         print(emf_line(state == ft.MISSED))
     if state == ft.MISSED:
         logger.warning("[fitness_tests] FITNESS_BATTERY_MISSED due_on=%s", cad.get("due_on"))
