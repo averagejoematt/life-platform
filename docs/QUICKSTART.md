@@ -326,7 +326,7 @@ If compute runs before ingestion completes, it uses yesterday's data. If the bri
 - **Mental model**: `docs/ONBOARDING.md`
 - **Architecture catalog**: `docs/ARCHITECTURE.md`
 - **Data model**: `docs/SCHEMA.md`
-- **Decision history**: `docs/DECISIONS.md` (161 ADRs)
+- **Decision history**: `docs/DECISIONS.md` (162 ADRs)
 - **Daily operations**: `docs/RUNBOOK.md`
 - **MCP tool catalog**: `docs/MCP_TOOL_CATALOG.md` (88 tools)
 - **V2 audit findings**: `docs/archive/V2_AUDIT_PLAN.md` (76 findings, ~33 shipped, formally closed in ADR-057)
