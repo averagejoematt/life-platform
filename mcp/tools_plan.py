@@ -243,6 +243,31 @@ def _pain_dismissals() -> list[dict[str, Any]]:
     return _dismissal_records()
 
 
+def _pain_instances(flagged: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The flag instances the engine resolves (and the steps ramp's lower-leg hold reads): one per flagged movement."""
+    return [
+        {
+            "movement": r["label"],
+            "exercise": r.get("exercise"),
+            "movement_key": r.get("movement_key"),
+            "note_dates": r.get("pain_dates") or [],
+            "notes": r.get("pain_notes") or [],
+        }
+        for r in flagged
+    ]
+
+
+def _steps_window(target_date: str) -> dict[str, Any]:
+    """The resolver's trailing window the steps ramp starts from (#5082) — the SAME read the coach packet's `steps_7d`
+    makes (`tools_coach_packet._steps_fetch`), over `steps_ramp.window_days`; no second computation of a day's steps."""
+    from training import steps_ramp, steps_resolver
+
+    from mcp.tools_coach_packet import _steps_fetch
+
+    start, end = steps_ramp.window_days(target_date)
+    return steps_resolver.steps_range(start, end, fetch=_steps_fetch, derived=False)
+
+
 def _deload_records() -> list[dict[str, Any]]:
     """The owner's recorded deload words (#5070), read from the SAME module that writes them (like `_pain_dismissals`).
     A raise propagates — `_read` reports it `read_failed`, never as "no deload word on file"."""
@@ -645,6 +670,9 @@ def tool_plan_next_session(args):
     if deload_records == [] and status["deload_records"]["state"] != READ_FAILED:
         status["deload_records"] = st(ABSENT, "no owner deload word on file")
 
+    # #5082: the steps ramp's base — the resolver's trailing window; the ramp itself is computed in the engine
+    steps_window, status["steps_window"] = _read("steps_window", _steps_window, target_date)
+
     # #4077: standing training constraints (RDL gate, toe flag, back flag, …) written from
     # chat via write_platform_memory(category='training') — the durable home that category
     # used to reject outright.
@@ -760,16 +788,7 @@ def tool_plan_next_session(args):
         # a movement's notes per site and a note naming no dismissed site stays open.
         # #4519: and the EXERCISE the flag was derived from — a drafted row's label is its slot tag
         # (`anchor:hinge:moderate`), which no dismissal can name.
-        pain_flag_instances=[
-            {
-                "movement": r["label"],
-                "exercise": r.get("exercise"),
-                "movement_key": r.get("movement_key"),
-                "note_dates": r.get("pain_dates") or [],
-                "notes": r.get("pain_notes") or [],
-            }
-            for r in flagged
-        ],
+        pain_flag_instances=_pain_instances(flagged),
         pain_dismissals=dismissals,
         # #4051: what was examined, so `clear` is only reachable from a set that was read.
         pain_evidence_scope=pain_scope,
@@ -784,6 +803,7 @@ def tool_plan_next_session(args):
         fatigue=(evidence or {}).get("fatigue"),
         recent_aerobic=recent_aerobic,
         loss_rate=loss_rate,
+        steps_window=steps_window,
         input_status=status,
     )
     _merge_walking_volume(block, walk_layer)

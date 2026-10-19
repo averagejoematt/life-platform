@@ -677,8 +677,10 @@ def test_4503_od8a_no_green_tail_on_the_locked_templates_so_the_ceiling_adds_no_
 
 
 def test_4503_od5_gains_are_rep_triggered_with_no_nutrition_clause_and_protein_gates_only_green():
-    lift = owner_redlines.REDLINES["lifting_sessions_per_wk"]
-    g = lift["gain_rule"]
+    from training import load_progression  # #5052: the gain rule moved to the charter; the redline is a pointer
+
+    assert owner_redlines.REDLINES["lifting_sessions_per_wk"]["gain_rule"]["source"].endswith("progression.gain_rule")
+    g = load_progression.gain_rule()
     assert g["kind"] == "double_progression" and g["consecutive_same_type_exposures"] == 2 and g["nutrition_clause"] is None
     assert "veto only" in g["rpe_role"] and "offered_when" not in g
     assert not any("kcal" in c or "intake" in c for c in g["refused_when"])
