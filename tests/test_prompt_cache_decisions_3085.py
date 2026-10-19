@@ -105,6 +105,7 @@ _PROMPTS = {
     "coach-state-updater": _extraction_prompt,
     "daily-brief": _daily_brief_prompt,
     "charter-judge": _charter_prompt,
+    "charter-judge-gate": _charter_prompt,  # #5072
     "charter-narrative": _charter_prompt,
     "charter-retro": _charter_prompt,
 }

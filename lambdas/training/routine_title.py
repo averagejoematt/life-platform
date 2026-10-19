@@ -343,6 +343,9 @@ def format_why_note(ir: RoutineSpec) -> str:
         # line rather than a generator-flavored rationale that doesn't apply.
         lines = [ln for ln in (ir.notes or "").splitlines() if ln.strip()]
         return lines[0].strip()[:140] if lines else "Custom session — manually programmed."
+    if getattr(ir, "source_action", "") == "disruption" and (ir.notes or "").strip():
+        # #5083: the title is the convention's at commit, so the minimum/travel label rides the session note
+        return (ir.notes or "").strip().splitlines()[0][:140]
     if ir.variant == "re_entry":
         return "Easing back in after a gap. Take it gently today."
     if ir.variant == "floor":

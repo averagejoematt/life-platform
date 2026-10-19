@@ -47,7 +47,10 @@ _S46 = "claude-sonnet-4-6"
 _BEFORE_4770 = {
     "shared.narrative": _S46,  # ai_transport / retry_utils / mcp.config AI_MODEL
     "shared.workhorse": _H45,  # … AI_MODEL_HAIKU
-    "charter.judge": _H45,  # #5084: three NEW routes for the charter's new callers — no model moved
+    # #5084: three NEW routes for the charter's new callers — no model moved. #5072 MOVED the judge (no caller had
+    # shipped, so no live call changes model): the anti-Goodhart rule puts it on a different tier from the planner.
+    "charter.judge": _S46,
+    "charter.judge_gate": _S46,
     "charter.narrative": _H45,
     "charter.retro": _H45,
     "chronicle": _H45,
