@@ -46,6 +46,40 @@ def test_a_fresh_recovery_and_workout_pass():
     assert age.assess_input_age("2026-10-19", "2026-10-18", NOW) == []
 
 
+def test_ages_anchor_each_key_in_the_frame_that_named_it():
+    """#3913: whoop keys are UTC days, hevy keys Pacific days — the age comes from `anchor_day_key`, never a hand tzinfo.
+    Mutation: anchor hevy at UTC midnight -> its age reads 7 h (PDT) high and this reds."""
+    assert age.age_hours("2026-10-18", NOW, "whoop") == 12.0  # UTC day ended 10-19 00:00Z
+    assert age.age_hours("2026-10-18", NOW, "hevy") == 5.0  # Pacific day ended 10-19 07:00Z (PDT)
+
+
+def test_the_hevy_date_read_parses_exactly_the_sk_the_writer_writes():
+    """Two-sided pin for the `hevy::mcp/authoring_input_age.py::read` seam (ledgers/pair_seam_residue.py):
+    the writer's real `normalize_workout` sk goes through the reader's `_latest_hevy_date` parse.
+    Mutation: change the writer's sk shape, or the reader's split -> reds."""
+    from training.hevy_common import normalize_workout
+
+    rec = normalize_workout(
+        {
+            "workout": {
+                "id": "w-5085",
+                "title": "Push",
+                "start_time": "2026-10-18T19:00:00Z",
+                "end_time": "2026-10-18T20:00:00Z",
+                "exercises": [],
+            }
+        }
+    )
+
+    class _Table:
+        def query(self, **kw):
+            assert kw["ProjectionExpression"] == "sk"
+            return {"Items": [{"sk": rec["sk"]}]}
+
+    with patch("mcp.config.table", _Table()):
+        assert age._latest_hevy_date() == rec["date"] == "2026-10-18"
+
+
 def test_a_stale_hevy_workout_is_refused_only_while_lifting_is_expected():
     limit = source_registry.SOURCE_REGISTRY["hevy"]["stale_hours"]
     gaps = age.assess_input_age("2026-10-19", "2026-10-05", NOW)
