@@ -84,6 +84,7 @@ from typing import Any, Callable
 from health import deficit_disclosures
 
 from training import (
+    block_model,
     deload_word,
     load_progression,
     owner_redlines,
@@ -711,6 +712,9 @@ def _scheduled_session(
     elif out.get("prescription"):
         # #4090: the week's direct hard sets per redline muscle, beside the range each must sit in
         out["weekly_sets_by_muscle"] = program_structure.weekly_sets_by_muscle(catalog_movements or {}, skill_ceiling)
+    if out.get("prescription"):
+        # #5077: the block mesocycle model's week — the per-muscle set target, the ramp stage, the next block, no deload week
+        out["block_model"] = block_model.for_session(out, deload_records)
     out["how_to_draft"] = (
         "manage_hevy_routine action=draft target_date=" + day + " builds exactly this session (the generator reads the same "
         "session sequence and prescription); draft_custom only for a deliberate departure"
@@ -1004,12 +1008,15 @@ def constraint_block(
         "standing_constraints_from_chat": training_memory_constraints or [],
         # #4064/#4110 — WHAT the program serves on this date: the next UNDONE session of the
         # sequence (v0.4, #4147: upper-heavy -> lower-heavy -> upper-volume -> lower-volume, from
-        # lower-heavy on 2026-09-24; it advances only on a completed loaded Hevy session; deload
-        # at the later of week 6 or the block lock, #4161) and its session — anchors with their sets and reps,
+        # lower-heavy on 2026-09-24; it advances only on a completed loaded Hevy session; a deload
+        # only on the owner's recorded word, #5070) and its session — anchors with their sets and reps,
         # the fixed accessories, the Hevy folder. Third, right after the two safety keys:
         # walking and the standing constraints outrank any single session.
         "session": session,
         "deload_recommendation": deload_rec,
+        # #5077: the block mesocycle model (sets per muscle this week, ramp stage, next block); None when no session is prescribed.
+        # `with_recommendation` stamps the signals in place, so the served session's copy (the same dict) carries them too.
+        "block_model": block_model.with_recommendation(session.get("block_model"), deload_rec),
         "steps_ramp": _steps_ramp_block(date, steps_window, pain_flag_instances, pain_dismissals, deload_records, input_status),
         # #4387 — the walking total cannot say "yesterday was 2¾ h on foot". These rows can: one
         # per activity over the 3 days through target − 1, each flagged against the walking

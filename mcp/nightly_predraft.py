@@ -479,7 +479,7 @@ def run(target_date: str | None = None) -> dict[str, Any]:
         out["sweep"] = {"error": f"{type(e).__name__}: {e}"[:300]}
 
     session = scheduled_session(target) or {}
-    # #4161: the week counter's basis (sessions AND days) and the deload ride with the pre-draft too
+    # #4161: the week counter's basis (sessions AND days) and the deload ride with the pre-draft too; #5077: the block model
     keys = (
         "label",
         "archetype",
@@ -489,6 +489,7 @@ def run(target_date: str | None = None) -> dict[str, Any]:
         "week",
         "deload",
         "deload_recommendation",
+        "block_model",  # #5077: the block mesocycle week the draft is built in (set targets, ramp stage, next block)
         "week_basis",
         "advance_blocked_by",
         "note",

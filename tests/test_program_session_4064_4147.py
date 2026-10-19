@@ -187,7 +187,11 @@ def test_the_block_is_owner_locked_for_six_weeks_until_2026_11_04():
     assert (lock["weeks"], lock["locked_until"], lock["provenance"]) == (6, "2026-11-04", "owner")
     assert lock["block_start"] == program_structure.SESSION_SEQUENCE["block_start"] == "2026-09-24"
     assert lock["decision_sk"] == program_structure.DECISION_SK
-    assert program_structure.SESSION_SEQUENCE["weeks_per_block"] == lock["weeks"]
+    # #5077: the block length is the charter's `rotation.anchors_fixed_weeks`, added by session_sequence._seq()
+    from training import session_sequence
+
+    assert "weeks_per_block" not in program_structure.SESSION_SEQUENCE
+    assert session_sequence._seq()["weeks_per_block"] == lock["weeks"]
     from datetime import date
 
     span = (date.fromisoformat(lock["locked_until"]) - date.fromisoformat(lock["block_start"])).days

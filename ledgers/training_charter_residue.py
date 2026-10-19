@@ -55,6 +55,9 @@ What W1 (#5050) is expected to retire, by row:
   * config/user_goals.json steps_floor — `daily_movement_target` (a 6–7k steps note that
     predates the 12,000 floor) is retired or re-pointed at `steps.floor` by the W1 lane
     that re-seeds the pre-registration from the charter.
+Retired since the seed: program_structure.py anchor_block_weeks (3 lines: `ROTATION_RULE.block_weeks`,
+`SESSION_SEQUENCE.weeks_per_block` and the "6-week block" rule prose) — #5077 reads the block length from
+`rotation.anchors_fixed_weeks` through `block_model.block_weeks()`.
 Already retired at the seed: mcp/tools_health.py's 2.5 lb/wk line (3 rows on the first
 census) — #5115 (charter-w0) replaced it with a bodyweight-relative flag carrying a
 `# charter: governing_goal.rate_band` marker before this ledger was committed, so the row
@@ -78,7 +81,6 @@ TRAINING_CHARTER_RESIDUE = {
     "lambdas/training/owner_redlines.py::sequence_names": 1,
     "lambdas/training/owner_redlines.py::session_minutes": 1,
     "lambdas/training/owner_redlines.py::volume_band_sets": 1,
-    "lambdas/training/program_structure.py::anchor_block_weeks": 3,
     "lambdas/training/program_structure.py::effort_ceiling_rpe": 4,
     "lambdas/training/program_structure.py::movement_gate_lb": 2,
     "lambdas/training/program_structure.py::sequence_names": 12,
