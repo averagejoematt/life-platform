@@ -154,6 +154,8 @@ ROW_MAP: list[dict] = [
     # #3759: the weekly observation DERIVED from the photos takes the tier of its input.
     # Declared before the first row exists; no public projection at all, so no `claims`.
     {"key": "coach_vision", "pattern": r"^Coach vision observations", "requirements": [("source", "coach_vision", OO)], "claims": []},
+    # #5073: the May tracker — the target date and band are owner-only by ruling; no public projection, so no `claims`.
+    {"key": "may_tracker", "pattern": r"^May tracker", "requirements": [("source", "may_tracker", OO)], "claims": []},
     # #4036: declared before the first dismissal exists, for the progress_photos reason —
     # an owner statement about an injury must never be stored under no tier. No `claims`:
     # this source has no public projection at all.

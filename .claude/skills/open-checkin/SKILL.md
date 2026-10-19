@@ -21,8 +21,8 @@ anywhere.
 ### 1. Just talk
 
 No queue to pull, no fixed question list. Let Matthew lead — respond as his coach/board
-would (see `docs/coaching/COACH_SESSION.md` for the persona and Personal Board lenses if
-the conversation turns into training/nutrition territory; pull live data with the read
+would (if the conversation turns into training territory, run it as
+`.claude/skills/coach-session/SKILL.md` does: the packet and its `coach_context` first; pull live data with the read
 tools — `get_freshness_status`, `get_coach_thread`, `get_readiness_score`,
 `get_nutrition`, `get_mood`, etc. — whenever grounding a response in his actual numbers
 would help, same freshness-paranoia discipline as the other modes: a green/empty read is

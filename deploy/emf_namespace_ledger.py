@@ -567,7 +567,10 @@ LEDGER: dict[str, dict] = {
             "mcp/nightly_predraft.py on the mcp-warmer's 02:00Z rule), the heartbeat behind nightly-predraft-missing — "
             "the warmer's own Invocations cannot see that rule die, because its 17:10Z run keeps them green. "
             "#4568: a FAILED run emits the same series at 0 (no new series, no new dimension), so the alarm's Sum < 1 "
-            "still breaches while SampleCount separates a run that crashed (1) from a run that never happened (0)."
+            "still breaches while SampleCount separates a run that crashed (1) from a run that never happened (0). "
+            "#5072 adds PanelGradeOutcome{Job=panel_weekly_grade} (mcp/panel_weekly_grade.py, the weekly panel-rubric "
+            "grade): 1 for a graded or honestly-empty week, 0 for a failure — the series the job's dead-man alarm reads "
+            "once its EventBridge rule is applied (an owner CDK change)."
         ),
     ),
 }

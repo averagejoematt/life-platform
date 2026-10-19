@@ -218,7 +218,9 @@ def test_the_draft_custom_action_persists_the_inherited_slot():
         patch("mcp.plan_cardio_pick.draft_cardio_warnings", return_value=[]),
         patch("training.routine_generator.attach_cardio_cues", return_value=0),
     ):
-        resp = tools_hevy_routine._action_draft_custom({"exercises": exercises, "target_date": DAY})
+        resp = tools_hevy_routine._action_draft_custom(
+            {"departure_reason": "test: deliberate departure from the engine draft", "exercises": exercises, "target_date": DAY}
+        )
     assert resp["status"] == "drafted_custom" and resp["program_slot"]["status"] == "inherited"
     ir = persisted["ir"]
     assert ir.inputs_snapshot["calendar"]["session_role"] == "upper_volume"

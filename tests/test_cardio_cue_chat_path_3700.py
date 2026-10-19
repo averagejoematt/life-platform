@@ -143,7 +143,13 @@ def _draft_custom(exercises: list[dict[str, Any]], **extra: Any):
     hist, cardio = extra.pop("indexes", None) or _indexes()
     whoop = extra.pop("whoop", None)
     whoop = _whoop_index() if whoop is None else whoop
-    args = {"action": "draft_custom", "target_date": "2026-09-20", "archetype": "push", "exercises": exercises}
+    args = {
+        "action": "draft_custom",
+        "departure_reason": "test: deliberate departure from the engine draft",
+        "target_date": "2026-09-20",
+        "archetype": "push",
+        "exercises": exercises,
+    }
     args.update(extra)
     with (
         patch("training.routine_repo.draft_versioned", side_effect=lambda ir: captured.setdefault("ir", ir)),
@@ -277,6 +283,7 @@ def test_the_cue_is_on_the_PERSISTED_draft_because_that_is_what_commit_pushes():
         t.tool_manage_hevy_routine(
             {
                 "action": "draft_custom",
+                "departure_reason": "test: deliberate departure from the engine draft",
                 "target_date": "2026-09-20",
                 "archetype": "push",
                 "exercises": [{"movement_key": "cycling", "sets": [{"duration_seconds": 2700}]}],
@@ -315,6 +322,7 @@ def test_a_history_load_failure_never_costs_the_chat_draft():
         out = t.tool_manage_hevy_routine(
             {
                 "action": "draft_custom",
+                "departure_reason": "test: deliberate departure from the engine draft",
                 "target_date": "2026-09-20",
                 "archetype": "push",
                 "exercises": [{"movement_key": "cycling", "notes": "easy flush", "sets": [{"duration_seconds": 1200}]}],

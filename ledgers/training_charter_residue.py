@@ -68,6 +68,9 @@ census) — #5115 (charter-w0) replaced it with a bodyweight-relative flag carry
 `# charter: governing_goal.rate_band` marker before this ledger was committed, so the row
 was deleted on the merge: the first ratchet move, made by the guard itself.
 The two coaching skills (daily-debrief, speak-to-coaches) carried no hit at the seed.
+Retired since the seed: docs/coaching/COACH_SESSION.md::movement_gate_lb (#5086, 2026-10-19) — the prompt moved to
+`.claude/skills/coach-session/SKILL.md`, rewritten to name the charter's run gate (`gated_movements`), never its weight;
+COACH_SESSION.md is a pointer to it.
 Retired since the seed: lambdas/training/recent_aerobic.py::sequence_names (#5076, 2026-10-18) — `is_lower`
 reads the lower names from `split.sequence` through `training.cardio_menu.is_lower`.
 
@@ -81,7 +84,6 @@ SEEDED_ROW_COUNT = 21
 
 TRAINING_CHARTER_RESIDUE = {
     "config/user_goals.json::steps_floor": 1,
-    "docs/coaching/COACH_SESSION.md::movement_gate_lb": 1,
     "lambdas/training/owner_redlines.py::movement_gate_lb": 7,
     "lambdas/training/owner_redlines.py::rate_band": 2,
     "lambdas/training/owner_redlines.py::volume_band_sets": 1,

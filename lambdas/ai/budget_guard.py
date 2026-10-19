@@ -353,6 +353,14 @@ _FEATURE_CUTOFF = {
     # pinned by tests/test_budget_guard_ladder.py's _OPERATOR_TRUTH band.
     "reader_truth_qa": 3,
     "visual_ai_qa": 3,
+    # charter_judge_gate (#5072): the panel-rubric judge run as the CI REGRESSION GATE over the golden
+    # plan cases (scripts/panel_rubric_gate.py), on changes to the training charter, the engine
+    # templates, the planning skills or the coach prompts. The same operator-truth question as the two
+    # above ("is the change that just landed safe?"), the same bounded per-run shape (one call per golden
+    # case, ~5, back-to-back inside one cache TTL) — so the same band. The weekly grade of the real plan
+    # is a different feature (charter_judge, band 1). A paused gate reports SKIPPED-BY-BUDGET and its
+    # deterministic half still gates.
+    "charter_judge_gate": 3,
     #
     # website_ai: the PUBLIC /api/ask + /api/board_ask hook — the platform's most
     # differentiating surface. Rate limits (5/hr/IP) + Haiku pricing bound the
@@ -369,7 +377,7 @@ _HARD_STOP_TIER = 3
 # the qa_smoke hook and the tests all read one list instead of re-typing the names
 # (the "guard the SET, not the instance" rule). Membership is asserted against
 # _FEATURE_CUTOFF in tests/test_budget_guard_ladder.py.
-CI_GATE_FEATURES = ("reader_truth_qa", "visual_ai_qa")
+CI_GATE_FEATURES = ("reader_truth_qa", "visual_ai_qa", "charter_judge_gate")  # #5072 added the panel-rubric gate
 
 # #2824 / DIL-036: the features that must fail CLOSED when the budget tier is
 # UNREADABLE (see the module docstring's split contract). Guard the SET, not the

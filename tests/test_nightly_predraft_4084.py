@@ -80,6 +80,15 @@ def _critics_record(model_ran=True, veto=False):
     }
 
 
+@pytest.fixture(autouse=True)
+def _charter_switch_no_shadow():
+    """#5080: the plan-source switch reads SSM and the shadow window reads DDB — here it is the default (`charter`),
+    with no shadow night, so these runs exercise exactly the pre-#5080 path. The switch is tested in its own file."""
+    default = {"source": "charter", "read": "default", "reason": "test", "shadow": {"due": False}}
+    with patch.object(npd, "_switch", return_value=default):
+        yield
+
+
 @pytest.fixture
 def repo():
     r = _Repo()

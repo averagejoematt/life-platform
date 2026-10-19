@@ -4107,6 +4107,20 @@
     {
       "direction": "read",
       "lambda": null,
+      "module": "lambdas/training/may_tracker.py",
+      "partition": "may_tracker",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/may_tracker.py",
+      "partition": "may_tracker",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
       "module": "lambdas/training/routine_repo.py",
       "partition": "hevy_id_map",
       "via": "pk"
@@ -7866,23 +7880,23 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 755,
+      "edges": 757,
       "lambdas": 108,
-      "mcp_tool_modules": 36,
-      "mcp_tools": 88,
-      "partitions": 116,
+      "mcp_tool_modules": 37,
+      "mcp_tools": 89,
+      "partitions": 117,
       "privacy_fields_owner_only": 67,
       "privacy_fields_owner_published": 11,
-      "privacy_sources_owner_only": 18,
+      "privacy_sources_owner_only": 19,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 81,
       "schedules": 96
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 368,
-        "sites_resolved": 952,
-        "sites_total": 1320
+        "sites_dynamic": 369,
+        "sites_resolved": 954,
+        "sites_total": 1323
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8329,6 +8343,11 @@
       "privacy_tier": "public",
       "stale_hours": null
     },
+    "may_tracker": {
+      "class": "cross_phase",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
+    },
     "measurements": {
       "category": "Manual logs",
       "class": "raw_timeseries",
@@ -8747,6 +8766,7 @@
       "hevy": "owner_only",
       "labs": "owner_published",
       "macrofactor": "owner_only",
+      "may_tracker": "owner_only",
       "measurements": "owner_published",
       "named_human_contact": "owner_only",
       "notion": "owner_only",

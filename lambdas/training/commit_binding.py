@@ -204,10 +204,10 @@ def deleted_routine_error(status: int, body_text: str, ir: Any, took_update_bran
     return err(
         f"Refusing to report success — routine_id={ir.routine_id} points at Hevy routine {ir.hevy_routine_id}, which Hevy "
         f"no longer holds (HTTP 404: {body_text[:200] or 'empty body'}) — it was deleted in the app. Nothing was written. "
-        "Draft a new routine (draft_custom), red-team it (plan_next_session with routine_id), then commit that.",
+        "Draft a new routine (manage_hevy_routine draft), red-team it (plan_next_session with routine_id), then commit that.",
         error_code=DELETED_ERROR_CODE,
         suggestions=[  # #4172: a policy refusal names the way forward, never 'retry'
-            "Draft a new routine (draft_custom), red-team it (plan_next_session with the new routine_id), then commit that routine_id.",
+            "Draft a new routine (manage_hevy_routine draft), red-team it (plan_next_session with the new routine_id), then commit that routine_id.",
             f"routine_id={ir.routine_id} still points at Hevy routine {ir.hevy_routine_id}, which the app deleted — committing it again refuses the same way.",
         ],
     )

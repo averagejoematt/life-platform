@@ -56,6 +56,10 @@ import the counting / estimating primitives themselves):
                            the HR ceiling from `owner_redlines`. Labelled PARTIAL while the day is in
                            progress. The one window that is NOT completed days: it is the day a
                            night-before debrief reviews.
+  guidance_freshness       `health.guidance_freshness.read_freshness` (#5059) — the owner guidance record's
+                           `effective` date against his latest logged appointment (`APPT#`): fresh / stale /
+                           no_appointment / unreadable, with the load prompt when stale. REFERENCE ONLY — never a
+                           gate on intensity (owner ruling 7); the same read `plan_next_session` puts on its block.
 
 READ STATES (#4072's vocabulary, `plan_engine.input_status`)
 
@@ -70,7 +74,7 @@ from typing import Any
 from common.pacific_time import pacific_today, shift_day_key
 from training.routine_title import ROUTINE_INDEX_LOOKBACK_DAYS as _ROUTINE_INDEX_LOOKBACK_DAYS
 
-PACKET_VERSION = "coach-session-packet@1.5.0"  # 1.5.0 #5082: steps_ramp; 1.4.0 #5081: steps_7d; 1.3.0 #4189: morning_note field; 1.2.0 #4313: today; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
+PACKET_VERSION = "coach-session-packet@1.6.0"  # 1.6.0 #5059: guidance_freshness (reference only); 1.5.0 #5082: steps_ramp; 1.4.0 #5081: steps_7d; 1.3.0 #4189: morning_note field; 1.2.0 #4313: today; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
 # Long enough that each performed type is found once a block is running (a v0.4 role recurs
 # weekly; an Engine day twice a week), bounded so the read stays one Hevy query.
 LAST_SESSION_LOOKBACK_DAYS = 28
@@ -78,7 +82,8 @@ LAST_SESSION_LOOKBACK_DAYS = 28
 ROUTINE_INDEX_LOOKBACK_DAYS = _ROUTINE_INDEX_LOOKBACK_DAYS  # one value (#4312): the block-read seams read the same lookback
 
 SOURCES: dict[str, str] = {
-    "muscle_volume": "get_muscle_volume (training.muscle_volume.working_sets_by_muscle, #4071) — plan_next_session's window",
+    "muscle_volume": "get_muscle_volume (training.muscle_volume.working_sets_by_muscle, #4071) — plan_next_session's window; "
+    "below_mev_14d = training.volume_floors over that tool's 14d trailing window vs config/training_landmarks.json (#5053)",
     "last_session_by_type": (
         "tools_strength._read_hevy_all_phases + training.muscle_volume.normalize_hevy_items; type = "
         "training.routine_title.resolve_archetype, role = session_sequence.completed_positions (#4110/#4161), loaded = training_streaks.is_loaded_session; "
@@ -104,6 +109,8 @@ SOURCES: dict[str, str] = {
         "de-dup = training.walking_volume.dedup_strava (#4068), walking = mcp.shared_quantities.walking_layer_for_day, "
         "HR ceiling = owner_redlines.REDLINES['walking_floor_hr_wk']['hr_ceiling_bpm']"
     ),
+    "guidance_freshness": "health.guidance_freshness.read_freshness (#5059) — the guidance record's effective date vs the latest "
+    "logged appointment; reference only, never a gate on intensity (plan_next_session's constraint_block carries the same read)",
 }
 
 # Model-facing prose + schema live beside the tool (the #4078 manage_pending_writes precedent), so
@@ -164,6 +171,7 @@ def _muscle_volume(target_date: str) -> tuple[Any, dict[str, Any]]:
     value = {
         "window_7d": trailing.get("7d"),
         "window_28d": trailing.get("28d"),
+        "below_mev_14d": vol.get("below_mev_14d"),  # #5053: training.volume_floors over the 14d trailing window — no second count
         "landmark_status_28d": {m: r.get("volume_landmark_status") for m, r in (vol.get("muscle_volume") or {}).items()},
         "unattributed": vol.get("unattributed"),
         "completeness": vol.get("completeness"),
@@ -527,6 +535,19 @@ def _morning_note(target_date: str) -> tuple[Any, dict[str, Any]]:
     return {k: v for k, v in fact.items() if k != "state"}, _st(MEASURED)
 
 
+def _guidance_freshness(target_date: str) -> tuple[Any, dict[str, Any]]:
+    """#5059: the guidance-record freshness flag, the plan's own read (`tools_plan._guidance_freshness`). A failed
+    partition read is `read_failed`; every other answer (incl. no record on file) is the measured state word."""
+    from training.plan_engine import MEASURED, READ_FAILED
+
+    from mcp.tools_plan import _guidance_freshness as reader
+
+    flag = reader()
+    if flag.get("read_failed"):
+        return flag, _st(READ_FAILED, error="ReadError: the clinical partition read failed")
+    return flag, _st(MEASURED)
+
+
 READERS = {
     "muscle_volume": _muscle_volume,
     "last_session_by_type": _last_sessions_field,
@@ -541,6 +562,7 @@ READERS = {
     "block_position": _block_position,
     "morning_note": _morning_note,
     "today": _today,
+    "guidance_freshness": _guidance_freshness,
 }
 
 
@@ -559,7 +581,7 @@ def tool_get_coach_session_packet(args):
         value, status = _wrap(reader)(target_date)
         fields[name] = _field(name, value, status)
     states = {name: f["state"] for name, f in fields.items()}
-    return {
+    out = {
         "target_date": target_date,
         "packet_version": PACKET_VERSION,
         "states": states,
@@ -579,3 +601,6 @@ def tool_get_coach_session_packet(args):
             "Consult a qualified healthcare provider before making health decisions based on this data."
         ),
     }
+    from mcp.plan_helpers import attach_coach_context  # #5071: the pre-flight call carries the guidance, the charter and the May tracker
+
+    return attach_coach_context(out, target_date, packet=out)

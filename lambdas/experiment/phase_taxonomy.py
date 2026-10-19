@@ -314,6 +314,9 @@ SOURCE_CLASS: dict[str, str] = {
     # row per photo set, keyed on the SET's date, anchored to the nearest DEXA and the tape trend. It
     # follows its input: a before/after read that spans attempts is the comparison the photos exist
     # for, and the model id on each row is what makes an old read re-checkable rather than re-run.
+    "may_tracker": CROSS_PHASE,  # #5073: the weekly May tracker row (WEEK#<monday>) — a trajectory toward a
+    # dated target that spans the whole campaign; every row is recomputable from its RAW inputs, but a
+    # reset that hid the earlier weeks would cut the trend the two-weeks-running triggers read.
     "supplements": CROSS_PHASE,  # ADR-077 dec A: medication-safety — never hide
     "chronicling": CROSS_PHASE,  # ADR-077 dec D: frozen pre-platform "before" archive
     "subscribers": CROSS_PHASE,  # audience identity
@@ -607,7 +610,7 @@ _PK_RULES: list = [
     # sent today". Carrying a reset into them would either destroy a live send counter or
     # re-open a spend window mid-day. "I already sent N today" is not an artifact of the
     # cycle that produced it — the same sentence that settles outbound_events.
-    (lambda pk, sk: pk in ("COACH#nudge_ledger", "COACH#outbound_ledger"), SYSTEM_STATE),
+    (lambda pk, sk: pk in ("COACH#nudge_ledger", "COACH#outbound_ledger", "COACH#steps_nudge"), SYSTEM_STATE),
     # Coach intelligence tier — all experiment-scoped.
     #   #3900 ruling (2026-09-20): COACH#commitments/TALLY#current is EXPERIMENT_SCOPED, not
     #   SYSTEM_STATE. It is a rolling tally, but of THIS cycle's graded commitments (the payload

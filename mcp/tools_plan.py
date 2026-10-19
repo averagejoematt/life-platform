@@ -58,7 +58,9 @@ from mcp.plan_helpers import (  # noqa: F401 (#4149)
     _resolver,
     _safe,
     _union_evidence_rows,
+    attach_coach_context,  # #5071
     attach_morning_note,  # #4189
+    critics_with_charter,  # #5071
 )
 from mcp.plan_hevy_windows import _block_workouts, _prescription_window, _rotation_window  # noqa: F401  (#4110 size fix)
 
@@ -98,6 +100,16 @@ def _read_guidance_cap(status: dict[str, Any]) -> Optional[float]:
     """#5074: the clinical rate cap, its read state recorded in `status` — a broken read is READ_FAILED, never 'no cap'."""
     cap, status["guidance_cap"] = _read("guidance_cap", _guidance_cap)
     return cap
+
+
+def _guidance_freshness() -> dict[str, Any]:
+    """#5059: is the owner's guidance record older than his latest logged appointment? REFERENCE on the block —
+    no critic, generator or ceiling reads it (owner ruling 7); a broken read is `unreadable`, never raised."""
+    from health import guidance_freshness
+
+    from mcp.config import table
+
+    return guidance_freshness.read_freshness(table, pacific_today())
 
 
 def _read(name: str, fn, *a, **kw) -> tuple[Any, dict[str, Any]]:
@@ -615,9 +627,7 @@ def tool_plan_next_session(args):
 
         ir = _safe(get_current, routine_id)
         if not ir:
-            return mcp_error(
-                f"routine_id={routine_id} not found — draft it first (manage_hevy_routine draft_custom)", error_code="NOT_FOUND"
-            )
+            return mcp_error(f"routine_id={routine_id} not found — draft it first (manage_hevy_routine draft)", error_code="NOT_FOUND")
 
     # #4072: every reader reports HOW it came back — measured / absent / read_failed (with the
     # error class) — so a None the engine receives is never ambiguous. Before this, `_safe`
@@ -843,12 +853,14 @@ def tool_plan_next_session(args):
         input_status=status,
     )
     _merge_walking_volume(block, walk_layer)
+    _attach_below_mev(block, volume)  # #5053
     _attach_collapse_actuator(block)  # #4503 OD7: the named-human actuator mark, read only on a tripped collapse
     attach_morning_note(block, target_date, recovery_tier)  # #4189: his four words beside the recovery tier
     _attach_session_loads(block, target_date, catalog_movements)
     # #4112: the accessory half of the two-tier trend split — tracked/reported, never a
     # change/veto flag. Reads the SAME per-exercise rows `_worst_anchor` already built above.
     accessory_strength_trend.attach(block, evidence)
+    block["guidance_freshness"] = _guidance_freshness()  # #5059: reference only — read by nothing that prescribes
 
     out: dict[str, Any] = {
         "target_date": target_date,
@@ -860,7 +872,7 @@ def tool_plan_next_session(args):
             "start from it. Its cardio block is `constraint_block.recent_aerobic.cardio_pick` — picked from the last 3 days' "
             "rows, never copied from the last session (#4387). Draft against the block, then say plainly which constraint "
             "shaped which choice. Every line under `reference.must_say` is required in the answer, verbatim in "
-            "substance, not summarised away. Then draft (manage_hevy_routine draft_custom) and call this tool again "
+            "substance, not summarised away. Then draft (manage_hevy_routine draft) and call this tool again "
             "WITH routine_id — stage 2, the red team (#3752). A routine that skipped stage 2 is NOT red-teamed and "
             "its commit says so."
         ),
@@ -876,6 +888,7 @@ def tool_plan_next_session(args):
     out["nutrition_critics"] = _safe(_nutrition_critics_block) or {"error": "nutrition critics could not be built", "verdicts": []}
     # #4503 OD6: between DXA scans, Body Scan 2 is the lean/regional trend — labelled bioimpedance, never the DXA anchor
     out["between_dxa_lean"] = _safe(_between_dxa_lean, target_date, dxa, status["dxa_scans"]["state"]) or {"state": "read_failed"}
+    attach_coach_context(out, target_date, constraint_block=block)  # #5071: charter + panel + guidance + May frame
     if ir is None:  # #4084: the overnight pre-draft comes FIRST — the evening chat reviews it instead of rebuilding
         from mcp.nightly_predraft import attach_to_stage_1
 
@@ -1015,7 +1028,7 @@ def _run_stage_2(
 
     draft_exercises = [asdict(e) for e in ir.exercises]
     draft = critics.draft_summary(ir)
-    packets = build(draft)
+    packets = critics_with_charter(build(draft), target_date, block)  # #5071: the critics read the one context
     allowed, paused = _model_allowed()
     invoke = None
     if allowed:
@@ -1081,7 +1094,7 @@ def _run_stage_2(
     out["notes_preview"] = critics.notes_block(ir)
     if record["veto"]:
         out["next"] = (
-            "VETO — redraft (manage_hevy_routine draft_custom), then run stage 2 again; commit will refuse until no veto "
+            "VETO — redraft (manage_hevy_routine draft), then run stage 2 again; commit will refuse until no veto "
             "stands. If Matthew overrules one critic, re-run with veto_override={critic, owner_words} (#4076)."
         )
     elif overridden:
@@ -1249,6 +1262,14 @@ def _recovery_tier(readiness: dict) -> str | None:
     if score >= 34:
         return "yellow"
     return "red"
+
+
+def _attach_below_mev(block: dict[str, Any], volume: dict[str, Any]) -> None:
+    """#5053: the 14-day below-MEV flag rides beside the constraint block — `get_muscle_volume`'s own `below_mev_14d`
+    (`training.volume_floors` over its 14d trailing window), never a second count; `unavailable` when the read had none."""
+    from training.volume_floors import below_mev_14d
+
+    block["below_mev_14d"] = volume.get("below_mev_14d") or below_mev_14d(None)
 
 
 def _muscle_sets(volume: dict[str, Any]) -> dict[str, Any]:

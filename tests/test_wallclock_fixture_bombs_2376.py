@@ -167,6 +167,14 @@ EXEMPT_DATED_FIXTURE_FILES: dict[str, str] = {
         "retention_cutoff_iso(now) is a pure function of its argument; the local "
         "`now` exists only to compute the expected value of that same call."
     ),
+    "test_steps_nudge_5056.py": (
+        "every driven entrypoint takes its clock as an argument: steps_nudge.decide(now_pt=NOW, steps_as_of_pt=NOW), "
+        "steps_nudge.pace(target, NOW), steps_nudge_runner.run(table, send, NOW_UTC, tier) and "
+        "nudge_ledger_qa.check_steps_nudge_liveness(..., _pt_now) with an injected now-callable; NOW_UTC is NOW's own "
+        "instant in UTC (19:10 PDT on DATE), and DATE builds every fixture sk. common.pacific_time is imported only "
+        "for the PACIFIC tzinfo constant; none of the driven modules (steps_nudge, steps_nudge_runner, steps_ramp, "
+        "steps_resolver, deload_word, nudge_ledger_qa) reads a wall clock."
+    ),
     "test_som_checkin_frame_3914.py": (
         "_check_how_we_feel(date_str)/_som_count(item) take the Pacific day as an "
         "explicit argument and consult no call-time clock on any asserted path; "

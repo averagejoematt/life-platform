@@ -276,6 +276,9 @@ def bundled_extra_paths(repo_root=REPO_ROOT):
     charter = os.path.join(repo_root, "config", "training_charter.json")
     if os.path.isfile(charter):
         paths.append("config/training_charter.json")
+    rubric = os.path.join(repo_root, "config", "panel_rubric.json")
+    if os.path.isfile(rubric):
+        paths.append("config/panel_rubric.json")
     redirects_map = os.path.join(repo_root, "redirects.map")
     if os.path.isfile(redirects_map):
         paths.append("redirects.map")
@@ -323,6 +326,13 @@ def stage_tree(out_dir):
         shutil.copy2(charter, os.path.join(cfg_out, "training_charter.json"))
     else:
         print("⚠️  config/training_charter.json missing — the training charter will be S3-only", file=sys.stderr)
+    # #5072: the panel rubric ships beside the charter — the weekly grade (mcp/panel_weekly_grade.py) reads it
+    # from the bundle only (no S3 twin); absent, the grade says `no_rubric` rather than inventing a standard.
+    rubric = os.path.join(REPO_ROOT, "config", "panel_rubric.json")
+    if os.path.isfile(rubric):
+        shutil.copy2(rubric, os.path.join(cfg_out, "panel_rubric.json"))
+    else:
+        print("⚠️  config/panel_rubric.json missing — the weekly panel grade will report no_rubric", file=sys.stderr)
     # #1430: redirects.map for qa_smoke_lambda's weekly legacy-redirect spot-check
     # (lambdas/redirect_spotcheck.py searches alongside its own module first, same
     # pattern as food_vocabulary.json above).

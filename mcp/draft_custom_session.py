@@ -206,7 +206,7 @@ def attach_step_due(ir: Any, catalog: dict[str, Any], history_reader=None) -> li
             load_kg, reps = _authored_top(b.sets, _rep_range_of(b.sets))
             carried = load_kg >= step["next_load_kg"] - lp.LOAD_TOLERANCE_KG and reps >= int(step["next_reps"] or 0)
             if not carried:
-                b.notes = f"{b.notes} Step due: {step['reason']}.".strip()
+                b.notes = f"Step due: {step['reason']}. {b.notes}".strip()  # #5083: the step LEADS the note
             rows.append({"movement_key": key, "carried": carried, **step})
         ir.inputs_snapshot["step_due"] = rows
         return rows
@@ -220,6 +220,34 @@ def finish_custom_draft(ir: Any, catalog: dict[str, Any], args: dict[str, Any]) 
     """The draft_custom passes that run after the content-derived id and before `draft_versioned`,
     in order — the slot tags (#5005), the warm-up climb (#5049), the stall rule's step (#5057) —
     returned as the response's `warmup_sets` / `program_slot` / `step_due` fields."""
+    ir.inputs_snapshot["departure_reason"] = departure_reason(args)  # #5055: on the IR, so the spec-ledger row carries it
     program_slot = stamp_program_slot(ir)
     warmups = attach_draft_warmups(ir, catalog, args)
     return {"warmup_sets": (warmups or {}).get("warmup_sets", 0), "program_slot": program_slot, "step_due": attach_step_due(ir, catalog)}
+
+
+MIN_REASON_CHARS = 12
+_EXERCISES_USAGE = (
+    "draft_custom requires a non-empty 'exercises' list "
+    "[{movement_key|title, sets:[{weight_lbs|weight_kg, reps|rep_range_start/end, "
+    "count?}], rest_seconds?, superset_id?, notes?}]"
+)
+_REASON_USAGE = (
+    "draft_custom requires 'departure_reason': the engine authors the loads (manage_hevy_routine action=draft is the default); "
+    f"say in one line (>= {MIN_REASON_CHARS} chars) why this session departs from the engine's draft, or call action=draft instead."
+)
+
+
+def departure_reason(args: dict[str, Any]) -> str:
+    """#5055: the stated reason a chat session authored loads itself instead of taking the engine's `draft`."""
+    return " ".join(str(args.get("departure_reason") or "").split())
+
+
+def custom_args_refusal(args: dict[str, Any]) -> tuple[str, str] | None:
+    """(message, error_code) when `draft_custom`'s args are unusable — no exercises, or no departure_reason (#5055)."""
+    exercises = args.get("exercises")
+    if not isinstance(exercises, list) or not exercises:
+        return _EXERCISES_USAGE, "MISSING_ARG"
+    if len(departure_reason(args)) < MIN_REASON_CHARS:
+        return _REASON_USAGE, "DEPARTURE_REASON_REQUIRED"
+    return None
