@@ -27,17 +27,19 @@ What W1 (#5050) is expected to retire, by row:
   * recent_aerobic.py sequence_names — the lower-session predicate reads `split.sequence`;
   * routine_generator.py session_minutes — the floor/empty-session caps derive from
     `split.session_minutes.lifting`;
-  * mcp/tools_health.py rate_band — the 2.5 lb/wk ACSM line yields to the charter band
-    shown in lb and % of bodyweight.
+Already retired at the seed: mcp/tools_health.py's 2.5 lb/wk line (3 rows on the first
+census) — #5115 (charter-w0) replaced it with a bodyweight-relative flag carrying a
+`# charter: governing_goal.rate_band` marker before this ledger was committed, so the row
+was deleted on the merge: the first ratchet move, made by the guard itself.
 The two coaching skills (daily-debrief, speak-to-coaches) carried no hit at the seed.
 
 Registered in scripts/obligation_carriers.py::RESIDUE_LEDGERS (carrier #5050, expires
 2027-01-15).
 """
 
-MEASURED_AT = "2026-10-18 · lane issue-5068-training-charter off origin/charter-w0 (= main 72020ba25)"
+MEASURED_AT = "2026-10-18 · lane issue-5068-training-charter after merging origin/charter-w0 at 03d34e4d5 (#5115 in)"
 
-SEEDED_ROW_COUNT = 11
+SEEDED_ROW_COUNT = 10
 
 TRAINING_CHARTER_RESIDUE = {
     "lambdas/training/owner_redlines.py::rate_band": 6,
@@ -50,5 +52,4 @@ TRAINING_CHARTER_RESIDUE = {
     "lambdas/training/program_v03.py::anchor_block_weeks": 1,
     "lambdas/training/recent_aerobic.py::sequence_names": 1,
     "lambdas/training/routine_generator.py::session_minutes": 2,
-    "mcp/tools_health.py::rate_band": 3,
 }

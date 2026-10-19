@@ -55,7 +55,7 @@ _ledger_spec.loader.exec_module(_ledger)
 
 # The row count the ledger was born with. Pinned HERE as well as in the ledger so the two
 # must move together, and only downward (charter primitive 3).
-SEEDED_ROW_COUNT_AT_BIRTH = 11
+SEEDED_ROW_COUNT_AT_BIRTH = 10
 
 SWEEP_DIRS = ("lambdas/training",)
 # A dated history of the redlines' PAST values (every line names a superseded number by
