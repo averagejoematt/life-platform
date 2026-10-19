@@ -391,6 +391,11 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
     "lambdas/privacy/content_filter_channel.py:last_channel_errors": (
         "#3609 box 2 widen: exercised only by tests/test_content_filter_channel_errors_2655.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
     ),
+    "lambdas/training/training_charter.py:reset_cache": (
+        "The charter loader's cache reset (#5068, ADR-164) — the same shape as content_filter_channel.reset_cache "
+        "above: called by tests/test_training_charter_loader_5068.py between channel fixtures (env -> local -> S3) and "
+        "by nothing live on purpose; the 15-min TTL is the production reset. Mirrors the content-filter precedent."
+    ),
     "lambdas/privacy/content_filter_channel.py:reset_cache": (
         "#3609 box 2 widen: exercised by tests/test_between_chronicle_scrub_2654.py; named only in a COMMENT in lambdas/privacy/privacy_guard.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
     ),
