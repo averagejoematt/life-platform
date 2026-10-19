@@ -2,7 +2,7 @@
 
 Two jobs, both reading, neither counting:
 
-  * TEMPLATE side — `floor_coverage(by_muscle, sessions_by_muscle)` compares the five roles' weekly set counts
+  * TEMPLATE side — `floor_coverage(by_muscle, accessories_by_role, landmarks=None)` compares the five roles' weekly set counts
     (`program_structure.weekly_sets_by_muscle`'s own tallies) with the landmark MEV for each charter floor muscle
     (`volume_priorities.mev_floors_in_every_template`: side/rear delts, traps, calves, core) and with the charter band
     (`volume_priorities.sets_per_wk`) for each priority group.
@@ -15,8 +15,9 @@ no alert. Landmarks are keyed by catalog muscle (`shoulders`, `abs`); logged cou
 `Core`) — `HEVY_MUSCLE_GROUP` is the one bridge. Granularity caveat: the logged taxonomy has no side/rear/trap split
 (`Shoulders` is all delts, presses included; `Back` carries traps), so the LOGGED flag for side/rear delts is the coarser
 `Shoulders` one and cannot see a drop that pressing masks (carrier: #5164, the movement-level logged flag; the template
-shortfall's carrier is #5162). The TEMPLATE side counts by movement (`FLOOR_MOVEMENTS`), never by catalog muscle — a shoulder press is not
-side/rear-delt work (ADR-104, honest numbers).
+shortfall's carrier is #5162). The TEMPLATE side counts the movement-specific floors and bands by movement
+(`FLOOR_MOVEMENTS`, `BAND_MOVEMENTS`), never by catalog muscle — a shoulder press is not side/rear-delt work, a flat bench
+press is not upper-chest work, a row or a shrug is not a vertical pull (ADR-104, honest numbers).
 """
 
 from __future__ import annotations
@@ -47,15 +48,58 @@ FLOOR_MOVEMENTS: dict[str, tuple[str, ...]] = {
     "core": ("machine_crunch", "cable_pallof_press", "pallof_press"),
 }
 TRAP_MOVEMENTS = FLOOR_MOVEMENTS["traps"]
+# The movements that COUNT toward the two movement-specific charter bands that are not floors.
+#   upper_chest — incline presses and incline flyes only. A flat bench press or a flat/neutral fly is catalog 'chest' but
+#     not upper-chest work; the charter's `rotation.pool.second_press` names the incline barbell press as the upper-chest slot.
+#   lats — vertical pulls (pulldowns, pull-ups, chin-ups) plus the straight-arm lat isolations (straight-arm pulldown,
+#     pullover). ROWS ARE EXCLUDED: the charter files rows and vertical pulls as separate slots (`rotation.pool.rows` vs
+#     `rotation.pool.vertical_pull`) and no charter line or owner ruling credits a row to the lats band; a row's load is
+#     shared with the mid-back/rear delts, so counting it here would overstate the band. Shrugs never count (traps).
+BAND_MOVEMENTS: dict[str, tuple[str, ...]] = {
+    "upper_chest": (
+        "incline_bench_press_barbell",
+        "incline_db_press",
+        "incline_db_squeeze_press",
+        "incline_chest_fly_dumbbell",
+    ),
+    "lats": (
+        "lat_pulldown",
+        "lat_pulldown_machine",
+        "lat_pulldown_close_grip_cable",
+        "lat_pulldown_wide_grip_cable",
+        "front_lat_pulldown",
+        "reverse_grip_lat_pulldown_cable",
+        "underhand_lat_pulldowns",
+        "prone_grip_dual_handle_pulldowns",
+        "dual_handle_underhand_pulldowns",
+        "rocking_pulldown",
+        "pull_up",
+        "pull_up_assisted",
+        "pull_up_weighted",
+        "chin_up_assisted",
+        "chin_up_weighted",
+        "straight_arm_pulldown",
+        "straight_arm_lat_pulldown_cable",
+        "kneeling_straight_arm_pulldown",
+        "pullover_dumbbell",
+        "db_lat_pullovers",
+    ),
+}
 # the count key a floor's weekly sets are read under (movement-counted floors get a derived key; the rest are catalog muscles)
 COUNT_KEY = {"side_rear_delts": "side_rear_delts_direct", "traps": "traps_direct"}
+# every derived (movement-counted) key -> the movements summed into it
+MOVEMENT_COUNTED: dict[str, tuple[str, ...]] = {
+    **{key: FLOOR_MOVEMENTS[floor] for floor, key in COUNT_KEY.items()},
+    "upper_chest_direct": BAND_MOVEMENTS["upper_chest"],
+    "lats_direct": BAND_MOVEMENTS["lats"],
+}
 
 # Charter `volume_priorities.sets_per_wk` group -> its members, each a tuple of template-count muscle keys that sum into
 # ONE band member. The charter's legs and arms bands are per member (quads; hamstrings+glutes; biceps; triceps).
 BAND_MEMBERS: dict[str, tuple[tuple[str, ...], ...]] = {
     "side_rear_delts": (("side_rear_delts_direct",),),
-    "lats": (("back",),),
-    "upper_chest": (("chest",),),
+    "lats": (("lats_direct",),),
+    "upper_chest": (("upper_chest_direct",),),
     "legs": (("quadriceps",), ("hamstrings", "glutes")),
     "arms": (("biceps",), ("triceps",)),
 }
@@ -124,11 +168,11 @@ def floor_coverage(
 
 
 def movement_counts(by_muscle: dict[str, int], by_movement: dict[str, int]) -> dict[str, int]:
-    """`by_muscle` plus the movement-counted floors (`side_rear_delts_direct`, `traps_direct`) tallied from the roles' own
-    per-movement sets — the same exposures, summed by movement instead of by catalog muscle."""
+    """`by_muscle` plus the movement-counted keys (`MOVEMENT_COUNTED`: side/rear delts, traps, upper chest, lats) tallied
+    from the roles' own per-movement sets — the same exposures, summed by movement instead of by catalog muscle."""
     out = dict(by_muscle)
-    for floor, key in COUNT_KEY.items():
-        out[key] = sum(int(by_movement.get(m, 0)) for m in FLOOR_MOVEMENTS[floor])
+    for key, movements in MOVEMENT_COUNTED.items():
+        out[key] = sum(int(by_movement.get(m, 0)) for m in movements)
     return out
 
 

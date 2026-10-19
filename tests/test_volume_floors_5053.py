@@ -4,14 +4,17 @@ THE INCIDENT: 2026-10-04 the Flex day was dropped; side/rear delts and core went
 alert (`muscle_volume` counted it; nothing compared the count with the landmark). Two halves, held here:
 
   * TEMPLATES — every charter MEV floor (`volume_priorities.mev_floors_in_every_template`: side/rear delts, traps, calves,
-    core) has a slot in a role and meets its landmark MEV; side/rear delts sit inside the charter band; the week stays
-    inside the owner's 60–75 hard-set redline and every session inside the charter's lifting-minute cap.
+    core) has a slot in a role, and every floor but side/rear delts meets its landmark MEV (side/rear delts are pinned SHORT:
+    6 direct sets vs MEV 8, below); the week stays inside the owner's 60–75 hard-set redline and every session inside the
+    charter's lifting-minute cap.
   * THE FLAG — `below_mev_14d` rides the coach packet and the plan packet, derived from `get_muscle_volume`'s trailing-14d
     counts (`working_sets_by_muscle`, the one computation) — and a fixture of the 2026-10-04 drop trips it on day 14, not 13.
 
 RESIDUAL (named, shrink-only): the charter bands for side/rear delts / lats / upper chest / arms are not reachable inside
 the 75-set week, and side/rear delts (6 direct sets) sit below their MEV of 8; `KNOWN_BAND_GAPS` pins today's shortfall so
-it can only shrink. Carrier: #5162 (gate:owner, the 75-set redline vs the charter bands). The LOGGED Shoulders flag cannot
+it can only shrink. Side/rear delts, upper chest and lats are counted BY MOVEMENT (`volume_floors.FLOOR_MOVEMENTS` /
+`BAND_MOVEMENTS`): upper chest has 0 incline sets (the 8 catalog-'chest' sets are flat bench + cable fly), lats has 4
+(the lat pulldown; rows and the shrug are not lat work), so the gaps are 14 and 10, not the catalog-muscle 6 and 2. Carrier: #5162 (gate:owner, the 75-set redline vs the charter bands). The LOGGED Shoulders flag cannot
 see a side/rear-delt drop that continued pressing masks (live 2026-10-05..18: 16 Shoulders sets, 8.0/wk); that follow-on is
 #5164 — so the day-14 trip below is asserted for Calves and Core, and Shoulders is asserted NOT flagged, as it really was.
 """
@@ -40,7 +43,7 @@ CATALOG = json.loads((REPO / "config" / "movement_catalog.json").read_text())["m
 ROLES = list(program_structure.SESSION_TEMPLATES)
 
 # gap (sets/wk) below each charter band's floor today — may only shrink (#5053 residual; see the module docstring)
-KNOWN_BAND_GAPS = {"side_rear_delts": 8, "lats": 2, "upper_chest": 6, "legs": 0, "arms": 4}
+KNOWN_BAND_GAPS = {"side_rear_delts": 8, "lats": 10, "upper_chest": 14, "legs": 0, "arms": 4}
 
 
 @pytest.fixture(scope="module")
@@ -78,6 +81,22 @@ def test_weekly_sets_by_muscle_delts_frequency_and_the_real_side_rear_count(cove
     # 15 catalog-'shoulders' sets = 9 press + 6 direct; only the 6 count toward the charter's side/rear-delt band (#5162)
     assert delts["sets"] == 15 and coverage["sets_by_muscle"]["side_rear_delts_direct"] == 6
     assert coverage["bands"]["side_rear_delts"]["member_sets"] == [6]
+
+
+def test_upper_chest_and_lats_are_counted_by_movement_not_catalog_muscle(coverage):
+    by = coverage["sets_by_muscle"]
+    # catalog 'chest' 8 = 6 flat bench + 2 cable fly: none of it is incline, so none of it is upper-chest work
+    assert by["chest"] == 8 and by["upper_chest_direct"] == 0
+    assert coverage["bands"]["upper_chest"]["member_sets"] == [0]
+    # catalog 'back' 12 = 6 machine row + 4 lat pulldown + 2 dumbbell shrug: only the pulldown is a vertical pull
+    assert by["back"] == 12 and by["lats_direct"] == 4
+    assert coverage["bands"]["lats"]["member_sets"] == [4]
+    for excluded in ("barbell_bench_press", "cable_chest_fly", "machine_chest_press"):
+        assert excluded not in volume_floors.BAND_MOVEMENTS["upper_chest"], excluded
+    for excluded in ("machine_row", "seated_cable_row", "t_bar_row", "shrug_dumbbell", "shrug_barbell", "scap_pulldowns"):
+        assert excluded not in volume_floors.BAND_MOVEMENTS["lats"], excluded
+    # every counted movement exists in the catalog (a typo would silently count 0)
+    assert {m for v in volume_floors.BAND_MOVEMENTS.values() for m in v} <= set(CATALOG)
 
 
 def test_band_gaps_only_shrink(coverage):
