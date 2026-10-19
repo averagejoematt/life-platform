@@ -37,7 +37,8 @@ def _fetch(source: str, start: str, end: str):
 
 
 def _real(date: str, **kw):
-    return steps_ramp.steps_ramp_for(date, fetch=_fetch, **kw)
+    start, end = steps_ramp.window_days(date)
+    return steps_ramp.compute(date, steps_resolver.steps_range(start, end, fetch=_fetch, derived=False), **kw)
 
 
 def _synthetic(date: str, counts: list):
@@ -171,3 +172,14 @@ def test_constraint_block_carries_the_ramp_and_states_an_unread_window():
         input_status={"pain_dismissals": plan_engine.input_status(plan_engine.READ_FAILED, error="X")},
     )["steps_ramp"]
     assert failed["state"] == "unknown" and "pain_dismissals read failed" in failed["reason"]
+
+
+def test_an_unreadable_performed_lift_read_is_unknown_not_a_climb():
+    """#4072: a failed pain-evidence read is not an empty flag set. Mutation: drop 'pain_evidence_scope' from the unreadable tuple."""
+    window = steps_resolver.steps_range("2026-10-01", "2026-10-14", fetch=_fetch, derived=False)
+    out = plan_engine.constraint_block(
+        date="2026-10-15",
+        steps_window=window,
+        input_status={"pain_evidence_scope": plan_engine.input_status(plan_engine.READ_FAILED, error="X")},
+    )["steps_ramp"]
+    assert out["state"] == "unknown" and "pain_evidence_scope read failed" in out["reason"] and "today_target" not in out

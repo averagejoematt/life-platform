@@ -720,3 +720,18 @@ def test_steps_ramp_field_is_the_modules_compute_over_the_resolver_window(stub_r
     assert f["state"] == "measured" and f["value"]["window_days"] == 14 and window == ("2026-09-09", "2026-09-22")
     assert f["value"]["days_counted"] == 1 and f["value"]["state"] == "holding" and "no_baseline" in f["value"]["held_by"]
     assert f["source"] == pkt.SOURCES["steps_ramp"] and f["value"]["charter_version"]
+
+
+@pytest.mark.parametrize("seam", ["_deload_records", "_pain_dismissals", "_gather_performed_evidence"])
+def test_steps_ramp_unreadable_input_is_read_failed_not_a_climb(stub_readers, monkeypatch, seam):
+    """#5082/#4072: an unreadable deload / dismissal / performed-lift store must not let the ramp climb — same as the plan."""
+
+    from mcp import tools_plan
+
+    def boom(*a, **k):
+        raise RuntimeError("store down")
+
+    monkeypatch.setattr(tools_plan, seam, boom)
+    f = pkt.tool_get_coach_session_packet({"target_date": "2026-09-23"})["fields"]["steps_ramp"]
+    assert f["state"] == "read_failed"
+    assert f["value"]["state"] == "unknown" and "today_target" not in f["value"]

@@ -751,9 +751,14 @@ def _steps_ramp_block(
 ) -> dict[str, Any]:
     """`constraint_block.steps_ramp` (#5082): the ramp to the charter steps floor, held by a lower-leg strain flag.
     An unread steps window is stated (`state: unknown`), never a target built on nothing; so is an unreadable
-    dismissal store or deload record (a hold cannot be judged released from a read that failed)."""
+    dismissal store, deload record or performed-lift pain read (a hold cannot be judged released, nor a strain flag absent, from a read that failed — #4072).
+    """
     st = (input_status or {}).get("steps_window") or {}
-    unreadable = [k for k in ("pain_dismissals", "deload_records") if ((input_status or {}).get(k) or {}).get("state") == READ_FAILED]
+    unreadable = [
+        k
+        for k in ("pain_dismissals", "deload_records", "pain_evidence_scope")
+        if ((input_status or {}).get(k) or {}).get("state") == READ_FAILED
+    ]
     if window is None or unreadable:
         why = [f"{k} read failed" for k in unreadable] + (
             [] if window is not None else [st.get("detail") or st.get("error") or "the steps window was not read"]

@@ -48,7 +48,7 @@ from typing import Any, Mapping, Optional
 
 from common.pacific_time import parse_day_key, shift_day_key
 
-from training import deload_word, steps_resolver, training_charter, training_context_registry
+from training import deload_word, training_charter, training_context_registry
 
 RAMP_PCT_PER_WEEK = 0.10
 RAMP_MAX_WEEKS = 6
@@ -232,9 +232,3 @@ def compute(
     else:
         out["state"] = "at_floor"
     return out
-
-
-def steps_ramp_for(date: str, *, fetch: steps_resolver.FetchFn, **kw: Any) -> dict[str, Any]:
-    """Read the window through the resolver (the one steps computation) and compute the ramp."""
-    start, end = window_days(date)
-    return compute(date, steps_resolver.steps_range(start, end, fetch=fetch, derived=False), **kw)
