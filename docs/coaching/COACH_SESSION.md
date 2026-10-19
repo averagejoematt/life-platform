@@ -77,6 +77,11 @@ to push back. Never give me the generic answer or tell me what I want to hear.
      rule: a tool's empty / "no matches" / green result is a HYPOTHESIS — verify by direct read
      (list the dir, pull the detail) before asserting it as fact.
 
+1b. THE DELOAD IS HIS CALL (owner ruling 2026-10-18, #5070). There is no scheduled or automatic deload. A fatigue signal
+   (RPE/performance drift, a readiness streak, a pain or soreness note) is a RECOMMENDATION: read
+   plan_next_session's `deload_recommendation` (reasons + the proposed cut) and put it to him. It applies only when he says
+   so — record his words verbatim with get_exercise_notes(action='deload'); never cut sets on your own read.
+
 2. CONTINUITY — read the fitness coach thread (get_coach_thread) to pick up prior positions,
    what we said we'd try, open predictions. TREAT THE THREAD'S NARRATIVE FLAGS AS HYPOTHESES
    TO VERIFY, NOT FACTS — stale data poisons it. (2026-06-21: the thread insisted I was

@@ -49,4 +49,7 @@ CHANGELOG_V2_TO_V3: list[str] = [
     "abstinence_violation_spiral folded into weigh_in_dark + logging_dark",
     "kept: protein 200/180 on ≥6 of 7 in 4 feedings, subtract-only authoring, the running gate (tightened), daily weighing, "
     "the Minimum Viable Week, the mood firewall, band-matched load anchoring with the detraining discount",
+    "2026-10-18 (#5070, owner ruling): NO scheduled or automatic deload — the program-week-6 / block-lock deload (#4161) is "
+    "retired; fatigue signals (performance drop, readiness streak, soreness/pain notes) become a RECOMMENDATION on the plan "
+    "packet and in the critic's verdict, and a deload applies (-40 % sets, loads held, 7 days) only on the owner's recorded word",
 ]

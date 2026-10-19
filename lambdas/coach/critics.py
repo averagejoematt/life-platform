@@ -73,7 +73,7 @@ CRITICS_VERSION = "critics@1.5.0"  # #4161: gap-scaled stale cap, performance/re
 # critics@1.4.0 (#4149): every numeric change computed in code; critic loads clamped to the subtract-only floor
 CRITIC_IDS = ("muscle_defense", "joints_tendons", "rate_advocate", "blueprint_historian")
 VERDICTS = ("approve", "change", "veto")
-_SEVERITY = {"info": 0, "change": 1, "veto": 2}
+_SEVERITY = {"info": 0, "recommend": 0, "change": 1, "veto": 2}  # #5070: `recommend` names a cut and applies nothing
 
 from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
 
@@ -399,6 +399,14 @@ def _deload_total_sets(draft: dict[str, Any]) -> int:
     return max(1, int(round(int(draft.get("total_sets") or 0) * (1 + pct / 100.0))))
 
 
+def _recommend_flag(metric: str, reason: str, provenance: str, cut: dict[str, Any]) -> dict[str, Any]:
+    """#5070 (owner ruling 2026-10-18): a fatigue signal RECOMMENDS the cut, it never applies it. The flag carries the
+    proposed cut under `proposed` and NO `field`/`to`, so neither the deterministic verdict nor a model escalation can apply it."""
+    f = _flag(metric, "recommend", reason, provenance=provenance, governed=True)
+    f["proposed"] = {"field": cut["field"], "to": cut["to"], "applied": False}
+    return f
+
+
 def _fatigue_flags(draft: dict[str, Any], fatigue: dict[str, Any] | None, numbers: dict[str, Any], flags: list, unknown: list) -> None:
     """#4161: the performance/readiness trigger and the 48 h same-region guard, each a governed
     `change` to the one-session −30 % cut (loads held) — the number computed here, never the model's."""
@@ -412,7 +420,7 @@ def _fatigue_flags(draft: dict[str, Any], fatigue: dict[str, Any] | None, number
     numbers["same_region_48h"] = None if region.get("state") in (None, "unknown") else region.get("state") == "triggered"
     prov = critics_fatigue.FATIGUE_PROVENANCE["provenance"]
     cut = {"field": "session.total_sets", "to": _deload_total_sets(draft), "governed": True}
-    tail = "−30 % sets, loads held, THIS session only — then re-test (#4161)"
+    tail = "RECOMMEND −30 % sets, loads held, THIS session only — then re-test; applied only on the owner's recorded word (#5070)"
     resp = fatigue.get("response") or {}
     numbers["fatigue_cut_superseded_by_deload"] = bool(resp.get("superseded_by_deload"))
     if resp.get("superseded_by_deload") and (fatigue.get("triggered") or region.get("state") == "triggered"):
@@ -421,10 +429,10 @@ def _fatigue_flags(draft: dict[str, Any], fatigue: dict[str, Any] | None, number
         msg = f"{why} — inside the deload ({resp.get('deload_sets_pct')} % sets), the larger cut is taken, not both (#4161)"
         flags.append(_flag("fatigue_trigger", "info", msg, provenance=prov, governed=True))
     elif fatigue.get("triggered"):
-        flags.append(_flag("fatigue_trigger", "change", "; ".join(fatigue.get("reasons") or []) + f" — {tail}", provenance=prov, **cut))
+        flags.append(_recommend_flag("fatigue_trigger", "; ".join(fatigue.get("reasons") or []) + f" — {tail}", prov, cut))
     elif region.get("state") == "triggered":
         why = f"{region.get('region')} loaded on {', '.join(region.get('loaded_on') or [])} — under the {critics_fatigue.SAME_REGION_MIN_HOURS} h same-region guard"
-        flags.append(_flag("same_region_48h", "change", f"{why} — {tail}", provenance=prov, **cut))
+        flags.append(_recommend_flag("same_region_48h", f"{why} — {tail}", prov, cut))
 
 
 def _novel_again_flag(ex: dict[str, Any], dk: str, ds: int | None, stale: dict[str, Any] | None) -> dict[str, Any]:
@@ -804,7 +812,7 @@ def deterministic_verdict(packet: dict[str, Any]) -> dict[str, Any]:
         if extra:
             out["additional_changes"] = extra
         return out
-    return {
+    out = {
         "verdict": "approve",
         "metric": None,
         "value": None,
@@ -812,6 +820,11 @@ def deterministic_verdict(packet: dict[str, Any]) -> dict[str, Any]:
         "to": None,
         "reason": "nothing in this packet crosses a stated threshold",
     }
+    # #5070: approve the draft as written; a recommendation travels beside the verdict and applies nothing
+    if recs := [f for f in packet.get("flags", []) if f["severity"] == "recommend"]:
+        out["reason"] += "; a deload is RECOMMENDED, not applied (owner-gated)"
+        out["recommendation"] = {"metric": recs[0]["metric"], "reason": recs[0]["reason"], **recs[0]["proposed"]}
+    return out
 
 
 def _prompt(packet: dict[str, Any], draft: dict[str, Any]) -> dict[str, Any]:

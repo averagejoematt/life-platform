@@ -35,11 +35,10 @@ THE RULE, AS ARITHMETIC (pure — every Hevy row is injected; the numbers are
                 the four but not the seven days is an EXTRA session of the current week
                 (`advance_blocked_by: "calendar_floor"`). The role still rotates by index — the
                 order never waits on the calendar; only the ramp clock does.
-  deload      = one pre-planned deload window (`owner_redlines` `lifting_sessions_per_wk.deload`):
-                it opens on the first session in program week >= 6 dated on/after
-                `program_structure.BLOCK_LOCK['locked_until']` (2026-11-04) — the LATER of the two —
-                and covers `days` (7) calendar days at −40 % sets, loads held, never a week off.
-                The next one is due `every_nth_week` program weeks after the week it opened.
+  deload      = NONE on its own (owner ruling 2026-10-18, #5070). A day is a deload day only when a record of the
+                owner's word (`deload_word`, passed in as `deload_records`) covers it — then `owner_redlines`
+                `lifting_sessions_per_wk.deload` applies as written: −40 % sets, loads held, `days` (7). A fatigue
+                signal is a RECOMMENDATION on the packet (`deload_recommendation`), never a cut.
   block       = (week - 1) // weeks_per_block + 1
 
 RULINGS (#4110/#4147/#4161 — stated so a reader can dispute them, not discover them)
@@ -94,7 +93,7 @@ from typing import Any, Iterable
 
 from common.pacific_time import parse_day_key, shift_day_key
 
-from training import program_structure, training_streaks
+from training import deload_word, program_structure, training_streaks
 
 ISSUE = "#4110"
 PROGRAM_ISSUE = "#4147"
@@ -314,10 +313,11 @@ def uncredited_sessions(workouts: Iterable[dict[str, Any]] | None, before_day: s
 
 # ── the deload and the block lock (#4161) ─────────────────────────────────────────────
 def deload_cfg() -> dict[str, Any]:
-    """The owner's deload, one home (`owner_redlines`), with the lock date resolved from `BLOCK_LOCK`."""
-    cfg = program_structure._deload_cfg()
-    cfg["not_before_date"] = str(program_structure.BLOCK_LOCK["locked_until"])
-    return cfg
+    """The deload's response (`owner_redlines`, one home) and its gate (the charter's `deload` block, #5070).
+
+    There is no schedule: the sequence never enters a deload on its own. A deload exists only on a record of the
+    owner's word (`deload_word`), passed to `ledger` as `deload_records`."""
+    return {**program_structure._deload_cfg(), "scheduled": False}
 
 
 # program_version is NOT structure (#4161 review): a version bump with no structural change must not read `violated`
@@ -385,7 +385,7 @@ def block_lock_state(day: str) -> dict[str, Any]:
 
 
 # ── the ledger: every session's week, in order ─────────────────────────────────────────
-def ledger(dates: list[str], day: str | None = None) -> list[dict[str, Any]]:
+def ledger(dates: list[str], day: str | None = None, deload_records: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     """The program position of each completed session (`dates`, oldest first, one per day) and —
     when `day` is given — of the NEXT session served on `day`, as the last element. Pure.
 
@@ -393,12 +393,7 @@ def ledger(dates: list[str], day: str | None = None) -> list[dict[str, Any]]:
     seq = _seq()
     per = int(seq["sessions_per_week"])
     floor = _floor_days()
-    dl = deload_cfg()
-    dl_days, dl_every = int(dl["days"]), int(dl["every_nth_week"])
-    due_week, not_before = int(dl["at_program_week"]), dl["not_before_date"]
     week, opened, in_week = 1, block_start(), 0
-    dl_start: str | None = None
-    dl_week = 0
     out: list[dict[str, Any]] = []
     for i, d in enumerate(list(dates) + ([day] if day is not None else [])):
         prev_opened, since, before = opened, _days(opened, d), in_week
@@ -409,11 +404,9 @@ def ledger(dates: list[str], day: str | None = None) -> list[dict[str, Any]]:
             else:
                 blocked = "calendar_floor"
         in_week += 1
-        if dl_start is not None and _days(dl_start, d) >= dl_days:
-            dl_start, due_week, not_before = None, dl_week + dl_every, None
-        if dl_start is None and week >= due_week and (not_before is None or d >= not_before):
-            dl_start, dl_week = d, week
-        deload = dl_start is not None and _days(dl_start, d) < dl_days
+        # #5070: a deload is the owner's recorded word covering this day — never the week counter, never a date
+        dl_rec = deload_word.active_record(deload_records, d)
+        deload = dl_rec is not None
         role = _role_at(i)
         label = program_structure._ROLE_LABEL[role].lower()
         if in_week <= per:
@@ -445,18 +438,20 @@ def ledger(dates: list[str], day: str | None = None) -> list[dict[str, Any]]:
                     "advance_blocked_by": blocked,
                     "next_advance_earliest": shift_day_key(opened, floor),
                 },
-                "deload_window": {"started_on": dl_start, "days": dl_days} if deload else None,
+                "deload_window": {"started_on": dl_rec["start_date"], "days": int(dl_rec["days"])} if dl_rec else None,
             }
         )
     return out
 
 
-def preview(n_sessions: int, *, every_days: int = 1, start_day: str | None = None) -> list[dict[str, Any]]:
+def preview(
+    n_sessions: int, *, every_days: int = 1, start_day: str | None = None, deload_records: list[dict[str, Any]] | None = None
+) -> list[dict[str, Any]]:
     """The next `n_sessions` positions assuming one session every `every_days` from `start_day`
     (default: the block start) — the ledger over synthetic dates, so a preview can never use a
     different week rule from the one served."""
     s = start_day or block_start()
-    return ledger([shift_day_key(s, i * max(1, int(every_days))) for i in range(max(0, int(n_sessions)))])
+    return ledger([shift_day_key(s, i * max(1, int(every_days))) for i in range(max(0, int(n_sessions)))], deload_records=deload_records)
 
 
 def completed_positions(workouts: Iterable[dict[str, Any]] | None, before_day: str) -> list[dict[str, Any]]:
@@ -502,7 +497,9 @@ def _spacing(completed: list[dict[str, Any]], day: str) -> dict[str, Any]:
     }
 
 
-def next_session(day: str, workouts: Iterable[dict[str, Any]] | None) -> dict[str, Any] | None:
+def next_session(
+    day: str, workouts: Iterable[dict[str, Any]] | None, deload_records: list[dict[str, Any]] | None = None
+) -> dict[str, Any] | None:
     """The next UNDONE session as of `day`, or None before the block start.
 
     Same shape the generator reads (archetype / session_role / label / week / block / deload)
@@ -527,7 +524,7 @@ def next_session(day: str, workouts: Iterable[dict[str, Any]] | None) -> dict[st
 
     rows = list(workouts)
     done, refused = classify_sessions(rows, day)
-    led = ledger([c["date"] for c in done], day)
+    led = ledger([c["date"] for c in done], day, deload_records)
     pos = {k: v for k, v in led[-1].items() if k != "date"}
     last = done[-1] if done else None
     basis = pos["week_basis"]
@@ -552,13 +549,13 @@ def next_session(day: str, workouts: Iterable[dict[str, Any]] | None) -> dict[st
         # #4161: the week counter's basis, flat, so a reader of the served session sees WHY it is this week
         "days_since_last_advance": basis["days_since_last_advance"],
         "advance_blocked_by": basis["advance_blocked_by"],
+        # #5070: no schedule — signals recommend, the owner's recorded word applies. The plan engine fills `reasons`.
+        "deload_recommendation": deload_word.recommendation(day=day, records=deload_records),
         "deload_plan": {
             "rule": (
-                f"one pre-planned deload at the LATER of program week {dl['at_program_week']} or {dl['not_before_date']} "
-                f"(the block lock): {dl['sets_pct']} % sets for {dl['days']} days, loads {dl['loads']}, never a week off"
+                f"NO scheduled or automatic deload (owner ruling 2026-10-18): a deload applies only on the owner's recorded word — "
+                f"{dl['sets_pct']} % sets for {dl['days']} days, loads {dl['loads']}, never a week off"
             ),
-            "at_program_week": dl["at_program_week"],
-            "not_before": dl["not_before_date"],
             "sets_pct": dl["sets_pct"],
             "days": dl["days"],
             "evidence": dl.get("evidence"),
@@ -596,7 +593,7 @@ def next_session(day: str, workouts: Iterable[dict[str, Any]] | None) -> dict[st
     }
 
 
-def program_week(day: str, workouts: Iterable[dict[str, Any]] | None) -> int | None:
+def program_week(day: str, workouts: Iterable[dict[str, Any]] | None, deload_records: list[dict[str, Any]] | None = None) -> int | None:
     """THE program week for `day` — 0 before the block start, None when the Hevy record was not
     read (or the day key is unreadable). Read by the `not_before_week` gate (#4098) and the load
     ramp (#4090) — one function, so the two can never disagree about which week it is.
@@ -605,7 +602,7 @@ def program_week(day: str, workouts: Iterable[dict[str, Any]] | None) -> int | N
     days have passed since the previous advance (`ledger`, `WEEK_RULE`). The deload and the block lock
     read the same ledger; `BLOCK_LOCK` is enforced as a guard (`block_lock_state`)."""
     try:
-        entry = next_session(day, workouts)
+        entry = next_session(day, workouts, deload_records)
     except ValueError:
         return None
     if entry is None:

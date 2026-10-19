@@ -569,17 +569,10 @@ BLOCK_LOCK: dict[str, Any] = {
 }
 """The owner's 6-week lock on the v0.4 block (~2026-11-04). A test holds the date; since #4161 the engine reads it as a guard."""
 
-DELOAD_RULE: dict[str, Any] = {
-    "rule": (
-        "one pre-planned deload at the LATER of program week 6 (hybrid weeks: 4 sessions AND >= 7 days, #4161) or the block lock "
-        "(2026-11-04): −40 % sets for 7 days (rounded to whole sets, accessories and back-offs first), loads held, never a week off"
-    ),
-    "provenance": "owner",
-    "one_home": "owner_redlines.REDLINES['lifting_sessions_per_wk']['deload']",
-}
-
 
 def _deload_cfg() -> dict[str, Any]:
+    # The deload's RESPONSE (−40 % sets, 7 days, loads held), one home in `owner_redlines`. No schedule (#5070): it applies
+    # only on the owner's recorded word (`deload_word`).
     from training import owner_redlines
 
     return dict(owner_redlines.REDLINES["lifting_sessions_per_wk"]["deload"])
@@ -590,7 +583,7 @@ def _deload_cfg() -> dict[str, Any]:
 # I audible a change" — the sessions are an ORDER, not dates. Owner, 2026-09-23 (#4147): v0.4
 # is Upper-heavy -> Lower-heavy -> Upper-volume -> Lower-volume, repeating. The position advances
 # only on a completed LOADED Hevy session (a walk or an Engine day postpones, never skips). Four
-# completed sessions AND >= 7 days are one program week (#4161); the deload is `owner_redlines` (later of week 6 / the lock).
+# completed sessions AND >= 7 days are one program week (#4161); the deload is the owner's recorded word (`deload_word`, #5070).
 #
 # The sequence STARTS at Lower-heavy: that is the first v0.4 session, already committed from chat
 # (`first_session`). Counting starts on `block_start`, the first Pacific day after the decision
@@ -723,6 +716,7 @@ def session_prescription_for_role(
     skill_ceiling: int = 2,
     anchor_exempt: bool = True,
     in_block: list[dict[str, Any]] | None = None,
+    deload_sets_pct: int | None = None,
 ) -> dict[str, Any]:
     """The session for one v0.4 role, as data: exposures, sets (top / back_off / working), reps.
 
@@ -802,7 +796,7 @@ def session_prescription_for_role(
     in_block_variant.stamp_template_ids(exposures, catalog_movements, in_block)  # #4431: the one slot-template resolver
     deload_info = None
     if deload:
-        deload_info = _deload_trim(exposures, int(_deload_cfg()["sets_pct"]))
+        deload_info = _deload_trim(exposures, int(deload_sets_pct if deload_sets_pct is not None else _deload_cfg()["sets_pct"]))
     return {
         "archetype": tmpl["archetype"],
         "program_version": PROGRAM_VERSION,
@@ -823,6 +817,7 @@ def planned_session(
     block_workouts: list[dict[str, Any]] | None = None,
     catalog_movements: dict[str, Any] | None = None,
     skill_ceiling: int = 2,
+    deload_records: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """What the program serves on `day`: the next UNDONE session of the sequence (#4110), and
     its §3 prescription. Before the block start the weekday grid answers, and the result says
@@ -833,7 +828,7 @@ def planned_session(
     """
     from training import session_sequence
 
-    entry = session_sequence.next_session(day, block_workouts)
+    entry = session_sequence.next_session(day, block_workouts, deload_records)
     if entry is None:
         grid = dict(_SCHEDULE[str(_day(day).weekday())])
         entry = {
@@ -845,8 +840,14 @@ def planned_session(
     role = entry.get("session_role")
     if role in SESSION_TEMPLATES:
         ib = in_block_variant.performed_in_block(block_workouts, catalog_movements, day)  # #4409
+        applied = ((entry.get("deload_recommendation") or {}).get("applied_on")) or {}  # #5070: his recorded word's own cut
         out["prescription"] = session_prescription_for_role(
-            role, deload=bool(entry.get("deload")), catalog_movements=catalog_movements, skill_ceiling=skill_ceiling, in_block=ib
+            role,
+            deload=bool(entry.get("deload")),
+            catalog_movements=catalog_movements,
+            skill_ceiling=skill_ceiling,
+            in_block=ib,
+            deload_sets_pct=applied.get("sets_pct"),
         )
     return out
 

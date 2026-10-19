@@ -129,6 +129,7 @@ def _generator_inputs(args: dict[str, Any]):
         z2_minutes_7d=z2_minutes_7d(target_date),
         days_since_last_workout=int(args.get("days_since_last_workout") or 2),
         add_load_enabled=False,  # never permitted from chat; SSM-gated only
+        deload_records=args.get("deload_records"),  # #5070: injected when the caller read the store; None = read once, fail-soft
     )
 
 

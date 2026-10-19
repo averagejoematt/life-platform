@@ -84,6 +84,7 @@ from typing import Any, Callable
 from health import deficit_disclosures
 
 from training import (
+    deload_word,
     owner_redlines,
     program_structure,
     recent_aerobic,
@@ -146,6 +147,7 @@ ENGINE_INPUTS = (
     "hevy_workouts_prescription_window",
     "block_workouts",
     "training_memory_constraints",
+    "deload_records",  # #5070: the owner's recorded word on a deload (DELOAD#<start>), read like pain_dismissals
     "dxa_scans",  # #4166: the protein gate's body-fat tier
     "recent_aerobic",  # #4387: per-activity aerobic load, 3 days through target − 1
     "loss_rate",  # #5001: THE stated loss rate (`mcp.shared_quantities.loss_rate_lb_wk`) — the rate_ceiling input
@@ -668,7 +670,11 @@ def _tripwire_states(
 
 
 def _scheduled_session(
-    day: str, catalog_movements: dict[str, Any] | None, skill_ceiling: int, block_workouts: list[dict[str, Any]] | None = None
+    day: str,
+    catalog_movements: dict[str, Any] | None,
+    skill_ceiling: int,
+    block_workouts: list[dict[str, Any]] | None = None,
+    deload_records: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The session the program serves on `day` (#4064, #4110). Pure.
 
@@ -688,7 +694,11 @@ def _scheduled_session(
         }
     try:
         out = program_structure.planned_session(
-            day, block_workouts=block_workouts, catalog_movements=catalog_movements, skill_ceiling=skill_ceiling
+            day,
+            block_workouts=block_workouts,
+            catalog_movements=catalog_movements,
+            skill_ceiling=skill_ceiling,
+            deload_records=deload_records,
         )
     except ValueError as e:
         return {"date": day, "source": "unreadable", "archetype": None, "note": str(e)}
@@ -702,6 +712,29 @@ def _scheduled_session(
         "session sequence and prescription); draft_custom only for a deliberate departure"
     )
     return out
+
+
+def _deload_recommendation(
+    date: str,
+    deload_records: list[dict[str, Any]] | None,
+    fatigue: dict[str, Any] | None,
+    readiness_low_streak_days: int | None,
+    tripwires: list[dict[str, Any]],
+    state: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """`constraint_block.deload_recommendation` (#5070): the signals that argue for a deload and whether the owner's
+    recorded word applies one today. NEVER an applied set cut by itself. Pain notes count only while the flag is
+    tripped (a dismissed site is the owner's word that it is resolved). An unreadable record store is stated."""
+    pain = next((t for t in tripwires if t["id"] == "pain_flag_named_site" and t["state"] == "tripped"), None)
+    rec = deload_word.recommendation(
+        day=date,
+        records=deload_records,
+        fatigue=fatigue,
+        readiness_low_streak_days=readiness_low_streak_days,
+        pain_note_sites=[str(x) for x in ((pain or {}).get("observed") or [])],
+    )
+    rec["records_state"] = (state or {}).get("state")
+    return rec
 
 
 def _walking_block(walk_hr_wk_now: float | None, failed_reads: dict[str, dict[str, Any]]) -> dict[str, Any]:
@@ -735,87 +768,8 @@ def _walking_block(walk_hr_wk_now: float | None, failed_reads: dict[str, dict[st
     return walking
 
 
-def constraint_block(
-    *,
-    date: str,
-    weight_lb: float | None = None,
-    walk_hr_wk_now: float | None = None,
-    recovery_tier: str | None = None,
-    acwr_flag: str | None = None,
-    muscle_volume: dict[str, Any] | None = None,
-    days_since_movement: dict[str, int] | None = None,
-    reference: dict[str, Any] | None = None,
-    protein_days_missed_7d: int | None = None,
-    protein_days_measured_7d: int | None = None,
-    protein_window: dict[str, str] | None = None,
-    dxa_scans: list[dict[str, Any]] | None = None,
-    readiness_low_streak_days: int | None = None,
-    anchor_lift_drop_pct: float | None = None,
-    anchor_lift_drop_sessions: int | None = None,
-    pain_flag_sites: list[str] | None = None,
-    pain_layer_status: str | None = None,
-    pain_flag_instances: list[dict[str, Any]] | None = None,
-    pain_dismissals: list[dict[str, Any]] | None = None,
-    pain_evidence_scope: dict[str, Any] | None = None,
-    weight_stall_days: int | None = None,
-    adherence_on_plan: bool | None = None,
-    hevy_workouts_rotation_window: list[dict[str, Any]] | None = None,
-    rotation_window_start: str | None = None,
-    hevy_workouts_prescription_window: list[dict[str, Any]] | None = None,
-    catalog_movements: dict[str, Any] | None = None,
-    skill_ceiling: int = 2,
-    block_workouts: list[dict[str, Any]] | None = None,
-    training_memory_constraints: list[dict[str, Any]] | None = None,
-    input_status: dict[str, dict[str, Any]] | None = None,
-    recent_aerobic: dict[str, Any] | None = None,
-    loss_rate: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """The deterministic inputs to tomorrow's session. No model, no I/O, no hidden state.
-
-    Every argument is a value a caller already fetched, so this function is pure: the same
-    inputs produce the same block, byte for byte, which is what makes it auditable and what
-    lets chat and Claude Code be held to the same answer.
-
-    `input_status` (#4072) is the caller's statement of HOW each value was obtained —
-    `measured` / `absent` / `read_failed` (+ error class) / `not_read`. It is reported per
-    input on `inputs`, and it is what lets a None read `read_failed` instead of `unknown`.
-
-    `block_workouts` (#4110) is the Hevy record since the program's block start. The served session
-    and the program week are derived from it — the completed loaded sessions — so a None
-    (not read) leaves both unknown rather than defaulting to session 1.
-    """
-    states = resolve_input_states(
-        {
-            "walk_hr_wk_now": walk_hr_wk_now,
-            "weight_lb": weight_lb,
-            "recovery_tier": recovery_tier,
-            "readiness_low_streak_days": readiness_low_streak_days,
-            "acwr_flag": acwr_flag,
-            "muscle_volume": muscle_volume,
-            "protein_days_missed_7d": protein_days_missed_7d,
-            "reference": reference,
-            "anchor_lift_drop_pct": anchor_lift_drop_pct,
-            "pain_evidence_scope": pain_evidence_scope,
-            "pain_layer_status": pain_layer_status,
-            "pain_dismissals": pain_dismissals,
-            "weight_stall_days": weight_stall_days,
-            "adherence_on_plan": adherence_on_plan,
-            "hevy_workouts_rotation_window": hevy_workouts_rotation_window,
-            "hevy_workouts_prescription_window": hevy_workouts_prescription_window,
-            "block_workouts": block_workouts,
-            "training_memory_constraints": training_memory_constraints,
-            "dxa_scans": dxa_scans,
-            "recent_aerobic": recent_aerobic,
-            "loss_rate": loss_rate,
-        },
-        input_status,
-    )
-    failed_reads = {k: v for k, v in states.items() if v["state"] == READ_FAILED}
-    redlines = owner_redlines.summary()
-
-    # FIRST, deliberately. See the module docstring.
-    walking = _walking_block(walk_hr_wk_now, failed_reads)
-
+def _reference_block(reference: dict[str, Any] | None) -> dict[str, Any]:
+    """`constraint_block.reference` (extracted for the #4880 function-length ratchet, #5070)."""
     # What the weight-matched reference can and cannot support. These sentences are the
     # SKILL.md §4 rules moved into code, so they cannot be skipped by a caller in a hurry.
     ref_block: dict[str, Any] = {"available": bool(reference)}
@@ -858,6 +812,94 @@ def constraint_block(
         ref_block["must_say"] = [
             "no weight-matched reference was retrieved — do not substitute the current band, which is the period he is trying to escape"
         ]
+    return ref_block
+
+
+def constraint_block(
+    *,
+    date: str,
+    weight_lb: float | None = None,
+    walk_hr_wk_now: float | None = None,
+    recovery_tier: str | None = None,
+    acwr_flag: str | None = None,
+    muscle_volume: dict[str, Any] | None = None,
+    days_since_movement: dict[str, int] | None = None,
+    reference: dict[str, Any] | None = None,
+    protein_days_missed_7d: int | None = None,
+    protein_days_measured_7d: int | None = None,
+    protein_window: dict[str, str] | None = None,
+    dxa_scans: list[dict[str, Any]] | None = None,
+    readiness_low_streak_days: int | None = None,
+    anchor_lift_drop_pct: float | None = None,
+    anchor_lift_drop_sessions: int | None = None,
+    pain_flag_sites: list[str] | None = None,
+    pain_layer_status: str | None = None,
+    pain_flag_instances: list[dict[str, Any]] | None = None,
+    pain_dismissals: list[dict[str, Any]] | None = None,
+    pain_evidence_scope: dict[str, Any] | None = None,
+    weight_stall_days: int | None = None,
+    adherence_on_plan: bool | None = None,
+    hevy_workouts_rotation_window: list[dict[str, Any]] | None = None,
+    rotation_window_start: str | None = None,
+    hevy_workouts_prescription_window: list[dict[str, Any]] | None = None,
+    catalog_movements: dict[str, Any] | None = None,
+    skill_ceiling: int = 2,
+    block_workouts: list[dict[str, Any]] | None = None,
+    training_memory_constraints: list[dict[str, Any]] | None = None,
+    deload_records: list[dict[str, Any]] | None = None,
+    fatigue: dict[str, Any] | None = None,
+    input_status: dict[str, dict[str, Any]] | None = None,
+    recent_aerobic: dict[str, Any] | None = None,
+    loss_rate: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """The deterministic inputs to tomorrow's session. No model, no I/O, no hidden state.
+
+    Every argument is a value a caller already fetched, so this function is pure: the same
+    inputs produce the same block, byte for byte, which is what makes it auditable and what
+    lets chat and Claude Code be held to the same answer.
+
+    `input_status` (#4072) is the caller's statement of HOW each value was obtained —
+    `measured` / `absent` / `read_failed` (+ error class) / `not_read`. It is reported per
+    input on `inputs`, and it is what lets a None read `read_failed` instead of `unknown`.
+
+    `block_workouts` (#4110) is the Hevy record since the program's block start. The served session
+    and the program week are derived from it — the completed loaded sessions — so a None
+    (not read) leaves both unknown rather than defaulting to session 1.
+    """
+    states = resolve_input_states(
+        {
+            "walk_hr_wk_now": walk_hr_wk_now,
+            "weight_lb": weight_lb,
+            "recovery_tier": recovery_tier,
+            "readiness_low_streak_days": readiness_low_streak_days,
+            "acwr_flag": acwr_flag,
+            "muscle_volume": muscle_volume,
+            "protein_days_missed_7d": protein_days_missed_7d,
+            "reference": reference,
+            "anchor_lift_drop_pct": anchor_lift_drop_pct,
+            "pain_evidence_scope": pain_evidence_scope,
+            "pain_layer_status": pain_layer_status,
+            "pain_dismissals": pain_dismissals,
+            "weight_stall_days": weight_stall_days,
+            "adherence_on_plan": adherence_on_plan,
+            "hevy_workouts_rotation_window": hevy_workouts_rotation_window,
+            "hevy_workouts_prescription_window": hevy_workouts_prescription_window,
+            "block_workouts": block_workouts,
+            "training_memory_constraints": training_memory_constraints,
+            "deload_records": deload_records,
+            "dxa_scans": dxa_scans,
+            "recent_aerobic": recent_aerobic,
+            "loss_rate": loss_rate,
+        },
+        input_status,
+    )
+    failed_reads = {k: v for k, v in states.items() if v["state"] == READ_FAILED}
+    redlines = owner_redlines.summary()
+
+    # FIRST, deliberately. See the module docstring.
+    walking = _walking_block(walk_hr_wk_now, failed_reads)
+
+    ref_block = _reference_block(reference)
 
     # #4098/#4110: the sequence's program week decides which redlines are armed (`not_before_week`).
     week = program_week(date, block_workouts)
@@ -882,10 +924,9 @@ def constraint_block(
         loss_rate=loss_rate,
         weight_lb=weight_lb,
     )
-    tripped = [t["id"] for t in tripwires if t["state"] == "tripped"]
-    unknown = [t["id"] for t in tripwires if t["state"] == "unknown"]
-    failed_tripwires = [t["id"] for t in tripwires if t["state"] == READ_FAILED]
-    not_yet_active = [t["id"] for t in tripwires if t["state"] == "not_yet_active"]
+    tripped, unknown, failed_tripwires, not_yet_active = (
+        [t["id"] for t in tripwires if t["state"] == st] for st in ("tripped", "unknown", READ_FAILED, "not_yet_active")
+    )
     # #4036: every dismissal in play, named on the block — a reader never has to dig into
     # the tripwire row to find out that a human overrode a safety flag.
     dismissals_in_play = [d for t in tripwires for d in (t.get("dismissals") or [])]
@@ -904,7 +945,10 @@ def constraint_block(
         block_boundaries=_block_boundaries(block_workouts, date),
     )
 
-    session = _scheduled_session(date, catalog_movements, skill_ceiling, block_workouts)
+    session = _scheduled_session(date, catalog_movements, skill_ceiling, block_workouts, deload_records)
+    # #5070: signals recommend, the owner's recorded word applies — one block, also stamped on the served session
+    deload_rec = _deload_recommendation(date, deload_records, fatigue, readiness_low_streak_days, tripwires, states.get("deload_records"))
+    session["deload_recommendation"] = deload_rec
 
     return {
         "engine_version": ENGINE_VERSION,
@@ -935,6 +979,7 @@ def constraint_block(
         # the fixed accessories, the Hevy folder. Third, right after the two safety keys:
         # walking and the standing constraints outrank any single session.
         "session": session,
+        "deload_recommendation": deload_rec,
         # #4387 — the walking total cannot say "yesterday was 2¾ h on foot". These rows can: one
         # per activity over the 3 days through target − 1, each flagged against the walking
         # redlines, with the session's cardio modality picked FROM them (`cardio_pick`).

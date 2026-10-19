@@ -93,6 +93,7 @@ class GeneratorInputs:
         history_last_dates: dict[str, str] | None = None,  # movement_key -> last YYYY-MM-DD
         add_load_enabled: bool = False,  # SSM gate — default false until N>=30
         block_workouts: list[dict[str, Any]] | None = None,  # #4110: Hevy rows since the program's block start; None = read it here
+        deload_records: list[dict[str, Any]] | None = None,  # #5070: the owner's recorded deload words; None = read it here (fail-soft)
     ) -> None:
         self.target_date = target_date
         self.recovery_tier = recovery_tier
@@ -103,6 +104,7 @@ class GeneratorInputs:
         self.history_last_dates = history_last_dates or {}
         self.add_load_enabled = add_load_enabled
         self.block_workouts = block_workouts
+        self.deload_records = deload_records
 
 
 def _archetype_for_date(target_date: str, week_cfg: dict[str, Any]) -> str:
@@ -111,7 +113,11 @@ def _archetype_for_date(target_date: str, week_cfg: dict[str, Any]) -> str:
 
 
 def _schedule_entry_for_date(
-    target_date: str, week_cfg: dict[str, Any], source: str | None = None, block_workouts: list[dict[str, Any]] | None = None
+    target_date: str,
+    week_cfg: dict[str, Any],
+    source: str | None = None,
+    block_workouts: list[dict[str, Any]] | None = None,
+    deload_records: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The whole schedule entry for the day. #3755: the module grid carries a key the JSON grid
     never had — `session_role` (v0.4: upper_heavy / lower_heavy / upper_volume / lower_volume,
@@ -128,9 +134,10 @@ def _schedule_entry_for_date(
     grid (v0.2 / any inactive program) never consults the sequence."""
     dow = date.fromisoformat(target_date).weekday()
     if source == "module":
-        from training import session_sequence
+        from training import deload_word, session_sequence
 
-        seq = session_sequence.next_session(target_date, block_workouts)
+        records = deload_records if deload_records is not None else deload_word.load_records_failsoft()  # #5070: his word
+        seq = session_sequence.next_session(target_date, block_workouts, records)
         if seq is not None and seq.get("source") == "session_sequence":
             return seq
         if seq is not None:
@@ -790,7 +797,7 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     week_cfg = resolved_week.week
 
     block_workouts = _block_workouts_for(inputs) if resolved_week.source == "module" else None
-    day_entry = _schedule_entry_for_date(inputs.target_date, week_cfg, resolved_week.source, block_workouts)
+    day_entry = _schedule_entry_for_date(inputs.target_date, week_cfg, resolved_week.source, block_workouts, inputs.deload_records)
     archetype = day_entry.get("archetype") or _archetype_for_date(inputs.target_date, week_cfg)
     targets = week_cfg["archetype_targets"].get(archetype, [])
     if archetype in ("rest", "aerobic", "mobility"):
