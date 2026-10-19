@@ -214,8 +214,13 @@ def _verdicts(block: dict) -> list:
 def test_a_stale_flag_changes_no_prescription_and_no_critic_verdict():
     """Build the plan block and run the four critics with a STALE flag on the block and with none: everything
     but the flag itself is identical — the session, the rate target, the progression and effort limits, the
-    tripwires, the steps ramp, the deload recommendation, every verdict. Mutation: have constraint_block or a
-    critic packet read `guidance_freshness` and trim on `stale` — the two sides diverge and this reds."""
+    tripwires, the steps ramp, the deload recommendation, every verdict.
+
+    A contract, not a mutation-proved gate: `stale` is a copy of `plain` plus the flag, and the critic
+    packets are built from named block keys, so neither comparison can diverge as written — and the flag
+    is attached after `constraint_block` returns, so a constraint_block that read it would not red this
+    either. The never-a-gate box is carried by the reader-set sweep in this file (the proven gate); this
+    test pins the shape: the flag is one extra key and the critics see none of it."""
     plain = _block()
     stale = copy.deepcopy(plain)
     stale["guidance_freshness"] = gf.freshness(GUIDANCE, [_appt("2026-10-15")], TODAY)
