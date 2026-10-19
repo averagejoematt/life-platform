@@ -206,7 +206,9 @@ def test_the_draft_custom_action_stamps_the_charter_version():
         patch("mcp.plan_cardio_pick.draft_cardio_warnings", return_value=[]),
         patch("training.routine_generator.attach_cardio_cues", return_value=0),
     ):
-        resp = tools_hevy_routine._action_draft_custom({"exercises": exercises, "target_date": t5005.DAY})
+        resp = tools_hevy_routine._action_draft_custom(
+            {"departure_reason": "test: deliberate departure from the engine draft", "exercises": exercises, "target_date": t5005.DAY}
+        )
     assert resp["status"] == "drafted_custom"
     assert repo.written[-1].inputs_snapshot["charter_version"] == charter_version()
 

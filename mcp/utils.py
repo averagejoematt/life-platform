@@ -139,6 +139,10 @@ _ERROR_CODE_SPECS: dict[str, tuple[str, str]] = {
     "INVALID_ACTION": (KIND_ARGUMENT, "The action is not one this tool offers."),
     "NOT_FOUND": (KIND_ARGUMENT, "No record carries the id the call named."),
     "QUERY_TOO_BROAD": (KIND_ARGUMENT, "Query spans too many days — use a narrower date range."),
+    "DEPARTURE_REASON_REQUIRED": (
+        KIND_ARGUMENT,
+        "draft_custom was called without a departure_reason; the engine's `draft` is the default (#5055).",
+    ),
     "MOVEMENT_UNMAPPABLE": (KIND_ARGUMENT, "An exercise in the draft names no movement the platform's index knows."),
     "UNRESOLVED_MOVEMENT": (KIND_ARGUMENT, "A movement in the routine could not be resolved to a Hevy exercise template."),
     "LINK_UNVERIFIED": (KIND_ARGUMENT, "The link given could not be verified as the page it claims to be."),
@@ -240,6 +244,9 @@ _DEFAULT_SUGGESTIONS: dict[str, list[str]] = {
     ],
     "NOT_FOUND": [
         "The id is an exact string, not a prefix or a title — read it back from the tool's listing action and re-issue the call.",
+    ],
+    "DEPARTURE_REASON_REQUIRED": [
+        "Call manage_hevy_routine action=draft (the engine authors the loads), or re-call draft_custom with a one-line departure_reason.",
     ],
     "MOVEMENT_UNMAPPABLE": [
         "Use one of the movement keys the error offers under 'Did you mean', or give the exercise's exact Hevy title.",
