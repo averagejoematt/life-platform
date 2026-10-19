@@ -1010,7 +1010,7 @@
     }
   ],
   "cost_surface": {
-    "ai_features": 25,
+    "ai_features": 28,
     "alarms": 139,
     "emf_namespaces": 33,
     "schedules": 96,
@@ -7867,8 +7867,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 364,
-        "sites_resolved": 947,
-        "sites_total": 1311
+        "sites_resolved": 948,
+        "sites_total": 1312
       },
       "schedule_resolution": {
         "dynamic": 0,

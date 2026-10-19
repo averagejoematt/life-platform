@@ -40,6 +40,8 @@ _INTERNAL = (
     "conversation_enrichment",  # #1577: conversational-corpus Haiku sweep — analysis layer, pauses first
     "comprehension_qa",  # #4182 M4: advisory newcomer-comprehension judge — a triage signal, not a reader
     # surface and not the operator-truth CI gates below, so it pauses with the rest of band 1
+    "charter_judge",  # #5084: the charter's panel-rubric judge (#5072) — golden cases are an internal regression eval
+    "charter_retro",  # #5084: the block retro (#5079) — a periodic internal review run from a workstation
 )
 _READER_NARRATIVE = (
     "coach_narrative",
@@ -52,6 +54,7 @@ _READER_NARRATIVE = (
     "coach_social_reaction",  # #1675: the same reaction mechanism on the social channel — same audience, same band
     "coach_nudge",  # #1382: proactive decision-moment nudge — band 2, tier ≥2 silences (AC2)
     "plan_critics",  # #3752: the four debrief critics — Matthew-facing coach voice, pauses with the narrative band
+    "charter_narrative",  # #5084: the plan's charter-frame lines on the owner's plan/Hevy note/Telegram — owner coach voice
     "coach_vision",  # #3759: the Monday progress-photo read — owner-facing coach voice, pauses with the narrative band
 )
 _IRREDUCIBLE_READER = ("website_ai", "daily_brief_ai")

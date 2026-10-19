@@ -87,16 +87,20 @@ _MISS_TTL_SECONDS = 60
 _ABSENT_ERROR_CODES = frozenset({"NoSuchKey", "NoSuchBucket", "404"})
 _MISSING = object()
 
-_cache: Optional[Dict[str, Any]] = None
+_cache: Optional[Dict[str, Any]] = None  # the merged charter, exactly as load_charter() returns it
+_cache_public: Dict[str, Any] = {}  # the PUBLIC half of the same load — what public_view() and prompt_prefix() read
 _cache_at: float = 0.0
+_cache_ttl: float = 0.0  # bookkeeping kept OFF the returned object (C1 review: `_ttl` leaked into load_charter())
 _warned_keys: set[str] = set()  # S3 keys whose non-absent failure has been logged in this container
 
 
 def reset_cache() -> None:
     """Test hook: forget the cached charter and the once-per-container warnings."""
-    global _cache, _cache_at
+    global _cache, _cache_public, _cache_at, _cache_ttl
     _cache = None
+    _cache_public = {}
     _cache_at = 0.0
+    _cache_ttl = 0.0
     _warned_keys.clear()
 
 
@@ -171,14 +175,13 @@ def _load_private() -> Optional[Dict[str, Any]]:
 
 
 # ── the merged charter ────────────────────────────────────────────────────────────────────
-def load_charter() -> Dict[str, Any]:
-    """The merged charter: the public file with the owner-only twin's top-level keys laid
-    over it, plus ``public_loaded`` / ``public_source`` / ``private_loaded`` /
-    ``private_keys``. Absent halves are reported, never invented."""
-    global _cache, _cache_at
+def _refresh() -> None:
+    """Load both halves once per TTL. The cache holds the merged charter AND the public half
+    it was built from, so every reader — merged or public-only — shares one probe."""
+    global _cache, _cache_public, _cache_at, _cache_ttl
     now = time.monotonic()
-    if _cache is not None and (now - _cache_at) < _cache.get("_ttl", _MISS_TTL_SECONDS):
-        return copy.deepcopy(_cache)
+    if _cache is not None and (now - _cache_at) < _cache_ttl:
+        return
 
     public, source = _load_public()
     merged: Dict[str, Any] = copy.deepcopy(public)
@@ -194,9 +197,23 @@ def load_charter() -> Dict[str, Any]:
     merged["public_source"] = source
     merged["private_loaded"] = bool(private_keys)
     merged["private_keys"] = sorted(private_keys)
-    merged["_ttl"] = _CACHE_TTL_SECONDS if public else _MISS_TTL_SECONDS  # a missing twin is NOT a miss (see _MISS_TTL_SECONDS)
-    _cache, _cache_at = merged, now
-    return copy.deepcopy(merged)
+    _cache, _cache_public, _cache_at = merged, copy.deepcopy(public), now
+    _cache_ttl = _CACHE_TTL_SECONDS if public else _MISS_TTL_SECONDS  # a missing twin is NOT a miss (see _MISS_TTL_SECONDS)
+
+
+def load_charter() -> Dict[str, Any]:
+    """The merged charter: the public file with the owner-only twin's top-level keys laid
+    over it, plus ``public_loaded`` / ``public_source`` / ``private_loaded`` /
+    ``private_keys``. Absent halves are reported, never invented."""
+    _refresh()
+    return copy.deepcopy(_cache) if _cache is not None else {}
+
+
+def _public_half() -> Dict[str, Any]:
+    """The PUBLIC half of the cached load (a copy). Never the twin: a key the twin carries
+    — even one that shadows a public key — cannot reach a reader of this."""
+    _refresh()
+    return copy.deepcopy(_cache_public)
 
 
 def _get(d: Any, dotted: str) -> Any:
@@ -224,7 +241,7 @@ def charter_version() -> Optional[str]:
 def public_view() -> Dict[str, Any]:
     """The whitelisted subset, taken from the PUBLIC half only — the one object a published
     surface (lambdas/web, lambdas/emails) may read. Nested paths come back nested."""
-    public, _ = _load_public()
+    public = _public_half()  # through the cache (C1 review: this re-read the file on every call)
     out: Dict[str, Any] = {}
     for dotted in PUBLISHED_WHITELIST:
         if dotted.startswith(NEVER_PUBLISHED):
@@ -238,3 +255,48 @@ def public_view() -> Dict[str, Any]:
             cur = cur.setdefault(part, {})
         cur[parts[-1]] = copy.deepcopy(v)
     return out
+
+
+# ── the charter as a cached system block (#5084) ──────────────────────────────────────────
+# Top-level public keys a prompt never carries: the file's own maintainer note (repo
+# housekeeping, not training content). The owner-only twin is excluded structurally — the
+# block is rendered from the PUBLIC half only, in both modes (see prompt_prefix).
+_PROMPT_EXCLUDED_KEYS: tuple[str, ...] = ("_README",)
+
+
+def prompt_prefix(published: bool = True) -> str:
+    """The charter rendered as ONE byte-stable system block for the charter's AI callers
+    (ai.model_routing ``charter.*`` routes; caching decision in ai.prompt_cache.CACHING_DECISIONS).
+
+    Stable by construction: the fixed reading guide (training_charter_prompt) followed by the
+    charter's values as JSON with sorted keys — no clock, no count, no per-call data — so the
+    same charter version renders the same bytes in every container and a cache breakpoint on
+    it can be read. Per-call material (the plan, the week's numbers) goes in a later block.
+
+    ``published=True`` (the DEFAULT — the safe one): ``public_view()`` only, i.e. the
+    PUBLISHED_WHITELIST — no target date, no rate band, no ``governing_goal`` /
+    ``phase_after_may`` paragraph. Use it for any call whose output could reach a published
+    surface. It is the smaller block and does NOT clear the Haiku 4.5 cache floor; no
+    registered caller uses it today.
+
+    ``published=False``: the whole PUBLIC half (change log, governing goal and its rate band,
+    the concession ledger, every section) — for owner-only outputs (the judge's grades, the
+    block retro, the owner's plan/Hevy/Telegram lines). Still never the owner-only twin:
+    the twin's body/appearance targets are not prompt material, and leaving them out keeps
+    the block identical whether or not a container could read the twin.
+
+    An unreadable public charter renders ``""`` — a caller must treat that as "no charter",
+    never send an empty cached block (``prompt_cache.cached_prefix_blocks`` refuses one).
+    """
+    from training import training_charter_prompt as guide  # noqa: PLC0415 — lazy: text only, keeps import cheap
+
+    if published:
+        data = public_view()
+    else:
+        data = {k: v for k, v in _public_half().items() if k not in _PROMPT_EXCLUDED_KEYS and k not in PRIVATE_KEYS}
+    if not data:
+        return ""
+    parts = [guide.PREAMBLE, "READING GUIDE\n"]
+    parts += [guide.SECTION_GUIDE[k] + "\n" for k in sorted(data) if k in guide.SECTION_GUIDE]
+    parts += [guide.RULES, guide.DATA_HEADER, json.dumps(data, indent=2, sort_keys=True, ensure_ascii=False) + "\n"]
+    return "\n".join(parts)

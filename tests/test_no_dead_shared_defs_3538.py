@@ -176,12 +176,6 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
         "qa_check_subscriber_promise); deleting the set the promise is checked AGAINST "
         "would leave the promise asserted only against itself."
     ),
-    "lambdas/ai/prompt_cache.py:cached_prefix_blocks": (
-        "same class as clears_floor: the byte-stable prefix assembler the #2888 tests "
-        "drive directly. Its production callers are the ones #2888/#3085 are still "
-        "converting; the record of which callers have and have not engaged caching lives "
-        "in CACHING_DECISIONS in this same module."
-    ),
     # ── #3609 box 2: the widened-scan batch (101 entries, dated 2026-09-19). ────────
     #
     # SCAN_PACKAGES went from 2 hand-typed packages (common, ai) to ~15 derived from

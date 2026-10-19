@@ -240,7 +240,8 @@ def test_daily_brief_budget_line_names_the_pause(monkeypatch):
     }
     line = budget_guard.format_headroom_line(breakdown)
     assert "Budget: tier 1" in line
-    assert "paused: 6 AI features" in line
-    assert "ensemble" in line or "+3 more" in line
+    assert f"paused: {len(budget_guard.paused_features(1))} AI features" in line  # derived, not pinned (#5084 grew band 1)
+    names = budget_guard.paused_features(1)
+    assert names[0] in line and f"+{len(names) - 3} more" in line  # the first three named, the rest counted
     # ...and at tier 0 the clause is absent entirely — no "0 features paused" noise.
     assert "paused:" not in budget_guard.format_headroom_line(dict(breakdown, tier=0))
