@@ -165,6 +165,13 @@ CONFIG_ANCHOR_REGISTRY: tuple[ConfigAnchor, ...] = (
         "The charter change_log entries' own dates — when a ruling was recorded, a history fact, not an experiment anchor.",
     ),
     ConfigAnchor(
+        "panel_rubric.json",
+        "date",
+        NOT_ANCHORED,
+        "The panel rubric's change_log entry dates (#5072) — when a rubric version was recorded, a history fact, not "
+        "an experiment anchor; a reset must never re-date a rubric version.",
+    ),
+    ConfigAnchor(
         "board_of_directors.json",
         "retired_date",
         NOT_ANCHORED,
