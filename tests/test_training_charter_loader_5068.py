@@ -104,6 +104,50 @@ def test_an_absent_s3_object_is_quiet(monkeypatch, caplog):
     assert not caplog.records
 
 
+def test_an_absent_twin_is_cached_for_the_full_ttl_not_reprobed_per_call(monkeypatch):
+    """The twin's absence is the designed state until the owner uploads it: one S3 probe per
+    TTL per container, not one per plan build (review of PR #5118)."""
+    probes = []
+    monkeypatch.setattr(tc, "_from_s3", lambda key: probes.append(key) or None)
+    tc.reset_cache()
+    tc.load_charter()
+    tc.load_charter()
+    tc.charter_value("steps.floor")
+    assert probes == [tc.PRIVATE_S3_KEY], probes
+    assert tc._cache is not None and tc._cache["_ttl"] == tc._CACHE_TTL_SECONDS
+
+
+def test_a_missing_public_half_is_reprobed_quickly(monkeypatch):
+    monkeypatch.setattr(tc, "_from_local_file", lambda b: None)
+    tc.reset_cache()
+    tc.load_charter()
+    assert tc._cache is not None and tc._cache["_ttl"] == tc._MISS_TTL_SECONDS
+
+
+def test_a_denied_s3_read_warns_once_per_container_then_debug(monkeypatch, caplog):
+    from botocore.exceptions import ClientError
+
+    class _S3:
+        def get_object(self, **kw):
+            raise ClientError({"Error": {"Code": "AccessDenied", "Message": "x"}, "ResponseMetadata": {"HTTPStatusCode": 403}}, "GetObject")
+
+    monkeypatch.setitem(sys.modules, "boto3", type("boto3", (), {"client": staticmethod(lambda *a, **k: _S3())}))
+    with caplog.at_level(logging.DEBUG, logger=tc.__name__):
+        assert _real_from_s3(tc.PRIVATE_S3_KEY) is None
+        assert _real_from_s3(tc.PRIVATE_S3_KEY) is None
+        assert _real_from_s3(tc.PUBLIC_S3_KEY) is None
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 2 and {tc.PRIVATE_S3_KEY in r.getMessage() for r in warnings} == {True, False}, [
+        r.getMessage() for r in warnings
+    ]
+    assert sum(1 for r in caplog.records if r.levelno == logging.DEBUG) == 1
+    tc.reset_cache()
+    with caplog.at_level(logging.WARNING, logger=tc.__name__):
+        caplog.clear()
+        assert _real_from_s3(tc.PRIVATE_S3_KEY) is None
+    assert len(caplog.records) == 1, "reset_cache() forgets the once-per-container set (a new container warns again)"
+
+
 def test_the_import_path_reads_nothing(monkeypatch):
     """#3675 inertness: importing the loader opens no file and no channel."""
     import importlib

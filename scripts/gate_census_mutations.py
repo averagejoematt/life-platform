@@ -512,7 +512,7 @@ _LINKED_PRIVATE_ROUTE_HTML = (
 # gate names as never-acceptable, so it proves both the allowlist leg and the tree leg.
 # #5068 / #5087: the two charter probes. The first hand-copies the step floor the charter owns;
 # the second is a published serving module reading the merged charter instead of public_view().
-_CHARTER_HAND_COPY_PY = '"""census probe — a hand copy that must never exist."""\n\nSTEP_FLOOR = 12000\n'
+_CHARTER_HAND_COPY_PY = '"""census probe — a hand copy that must never exist."""\n\nSTEP_FLOOR = 12000\nRUN_GATE_LB = 240\n'
 _CHARTER_PUBLISHED_READER_PY = (
     '"""census probe — a published reader that must never exist."""\n\n'
     "from training.training_charter import load_charter\n\n\n"
@@ -1262,9 +1262,10 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         gate_id="structural::test_training_charter_derivation_5068.py",
         target="tests/test_training_charter_derivation_5068.py",
         detects=(
-            "a module under lambdas/training/ carrying its own copy of a charter-owned value (the 12,000 step floor) "
-            "instead of reading training_charter.charter_value() — the scattered-literal class #5068 exists to end; "
-            "the site has no row in ledgers/training_charter_residue.py, and the ledger may not gain one"
+            "a module under lambdas/training/ carrying its own copy of a charter-owned value (the 12,000 step floor AND "
+            "a `RUN_GATE_LB = 240` movement gate — the class the PR #5118 review named) instead of reading "
+            "training_charter.charter_value() — the scattered-literal class #5068 exists to end; the site has no row "
+            "in ledgers/training_charter_residue.py, and the ledger may not gain one"
         ),
         plants=(("lambdas/training/_census_probe_5068.py", _CHARTER_HAND_COPY_PY),),
         track=False,  # the guard os.walks lambdas/training on disk, so an untracked module is in scope
@@ -2159,18 +2160,28 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
     ),
     "structural::test_training_charter_derivation_5068.py": _proof(
         "structural::test_training_charter_derivation_5068.py",
-        "ARMED 1/1 — baseline: 4 passed in 0.70s | mutated: 1 failed, 3 passed in 0.73s :: "
-        "test_every_hand_copy_of_a_charter_value_is_a_ledgered_site_and_every_row_is_live | reverted: 4 passed in 0.67s",
+        "ARMED 1/1 — baseline: 4 passed in 0.74s | mutated: 1 failed, 3 passed in 0.72s :: "
+        "test_every_hand_copy_of_a_charter_value_is_a_ledgered_site_and_every_row_is_live | reverted: 4 passed in 0.71s "
+        "(re-proved on the PR #5118 review with the widened plant; a gate-only plant `RUN_GATE_LB = 240` and a band-only plant "
+        '`TOP_RPE = [8, 9]` / `SETS_PER_WK = {"lats": [14, 18]}` each red the guard alone, the line named)',
         "lambdas/training/ on disk (os.walk, every .py), lambdas/coach/critics*.py, mcp/tools_plan.py, mcp/tools_health.py, "
-        "mcp/tools_hevy_routine.py and the daily-debrief / speak-to-coaches / coach-session skills — CODE lines only "
+        "mcp/tools_hevy_routine.py, mcp/tools_benchmark.py, lambdas/web/site_api_nutrition.py, config/user_goals.json, "
+        "docs/coaching/COACH_SESSION.md and the daily-debrief / speak-to-coaches / coach-session skills — CODE lines only "
         "(comments cut by tokenize, docstrings and bare string statements dropped by ast; redline_changelog.py skipped whole "
-        "as a dated history of past values). Eight patterns, the numeric ones DERIVED from config/training_charter.json "
-        "(step floor/target, the rate band plus the pre-charter 2.5 line, the lifting-minute budget as a literal assignment, "
-        "the anchor and accessory cadences, the five session names, a scheduled deload week). Every `path::pattern` count is "
-        "held to ledgers/training_charter_residue.py in BOTH directions (a new copy and a stale row both red) and the row "
-        "count may only fall from the pinned seed. Positive controls: each pattern against its own probe line. STILL "
-        "INVISIBLE, stated: a value computed from a different literal (12 * 1000), copies in docs/ or tests/, numbers written "
-        "in words, and a hand copy in a module outside the swept set.",
+        "as a dated history of past values). Eleven patterns, the numbers DERIVED from config/training_charter.json "
+        "(step floor/target incl. the `daily_movement_target` key, the rate band in float and integer forms plus the pre-charter "
+        "2.5 line, the lifting-minute budget as a literal assignment, the anchor and accessory cadences, the five session names, "
+        "a scheduled deload week, the movement-gate weights from every `*_lb` leaf of `gated_movements` as a gate key, a gate "
+        "record or gate prose, the weekly volume bands from `volume_priorities.sets_per_wk`, the RPE ceilings from "
+        "`effort_ceilings` plus any `RPE lo–hi` range on a code line). Every `path::pattern` count is held to "
+        "ledgers/training_charter_residue.py in BOTH directions (a new copy and a stale row both red) and the row count may "
+        "only fall from the pinned seed (21, re-seeded once inside the creating PR). Positive AND negative controls: every "
+        "shape each pattern claims, and the lines it must not match (a 3.75 taper cap, a 295 lb step, a standing-constraint `*_rpe_cap`, a "
+        "`rpe_max` layoff cap, a computed weekly-sets read). STILL INVISIBLE, stated: a value computed from a different literal "
+        "(12 * 1000), copies in docs/ (COACH_SESSION.md excepted) or tests/, numbers written in words, a pre-charter literal "
+        "whose number differs from the charter and carries no owning key (the taper table's 3.25 / 3.75), a read of a swept "
+        "constant at its use sites, the ~/.claude/skills/synced copy outside the repo, and a hand copy in a module outside the "
+        "swept set.",
         proved_on="2026-10-18",
     ),
     "structural::test_training_charter_privacy_5087.py": _proof(

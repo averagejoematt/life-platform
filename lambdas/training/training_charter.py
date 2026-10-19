@@ -15,8 +15,9 @@ The charter is two halves that read as one:
 
 ``load_charter()`` returns the merged object plus ``public_loaded`` / ``private_loaded`` /
 ``private_keys``; an absent twin is public-only, never a fabricated value. Lazy (nothing is
-read at import), cached, fail-soft (never raises — a plan is stamped ``charter_version: None``
-rather than refused).
+read at import), cached (15 min, the twin's absence included — only a missing public half
+is re-probed after 60 s), fail-soft (never raises — a plan is stamped ``charter_version:
+None`` rather than refused; a denied S3 read is one WARNING per container).
 
 PUBLISHED surfaces (lambdas/web, lambdas/emails) read ``public_view()`` ONLY — the
 ``PUBLISHED_WHITELIST`` subset, which carries no target date, no rate band and nothing
@@ -78,19 +79,25 @@ PUBLISHED_WHITELIST: tuple[str, ...] = (
 )
 
 _CACHE_TTL_SECONDS = 900  # the platform's 15-min config-cache convention
-_MISS_TTL_SECONDS = 60  # a half that could not be read is re-probed quickly, not pinned
+# Only a missing PUBLIC half (the registry — bundled, so its absence is a broken deploy) is
+# re-probed this quickly. A missing or unreadable TWIN is the designed state until the owner
+# uploads it and grants the read, so it is cached for the full TTL like any other load: one
+# S3 probe per 15 min per warm container, not one per plan build (review of PR #5118).
+_MISS_TTL_SECONDS = 60
 _ABSENT_ERROR_CODES = frozenset({"NoSuchKey", "NoSuchBucket", "404"})
 _MISSING = object()
 
 _cache: Optional[Dict[str, Any]] = None
 _cache_at: float = 0.0
+_warned_keys: set[str] = set()  # S3 keys whose non-absent failure has been logged in this container
 
 
 def reset_cache() -> None:
-    """Test hook: forget the cached charter."""
+    """Test hook: forget the cached charter and the once-per-container warnings."""
     global _cache, _cache_at
     _cache = None
     _cache_at = 0.0
+    _warned_keys.clear()
 
 
 # ── channels (each returns a dict or None; none of them raises) ───────────────────────────
@@ -122,8 +129,9 @@ def _from_local_file(basename: str) -> Optional[Dict[str, Any]]:
 
 
 def _from_s3(key: str) -> Optional[Dict[str, Any]]:
-    """Lazy boto3; an absent object is quiet, every other failure is one WARNING line with
-    the error code only (never the body). Never raises."""
+    """Lazy boto3; an absent object is quiet, every other failure is one WARNING line per
+    container with the error code only (never the body) — later probes of the same key log
+    at DEBUG. Never raises."""
     try:
         import boto3  # noqa: PLC0415 — lazy: keeps this module import-safe offline
     except ImportError:
@@ -138,7 +146,13 @@ def _from_s3(key: str) -> Optional[Dict[str, Any]]:
         code = str(response.get("Error", {}).get("Code", "") or "") if isinstance(response, dict) else ""
         code = code or type(e).__name__
         if code not in _ABSENT_ERROR_CODES:
-            logger.warning("training-charter: s3://%s/%s not read (%s) — continuing without it", bucket, key, code)
+            if key in _warned_keys:
+                logger.debug("training-charter: s3://%s/%s still not read (%s)", bucket, key, code)
+            else:
+                _warned_keys.add(key)
+                logger.warning(
+                    "training-charter: s3://%s/%s not read (%s) — continuing without it; logged once per container", bucket, key, code
+                )
         return None
 
 
@@ -180,7 +194,7 @@ def load_charter() -> Dict[str, Any]:
     merged["public_source"] = source
     merged["private_loaded"] = bool(private_keys)
     merged["private_keys"] = sorted(private_keys)
-    merged["_ttl"] = _CACHE_TTL_SECONDS if (public and private_keys) else _MISS_TTL_SECONDS
+    merged["_ttl"] = _CACHE_TTL_SECONDS if public else _MISS_TTL_SECONDS  # a missing twin is NOT a miss (see _MISS_TTL_SECONDS)
     _cache, _cache_at = merged, now
     return copy.deepcopy(merged)
 

@@ -30,10 +30,23 @@ import subprocess
 import sys
 from typing import Any, List
 
+import pytest
+
 _REPO = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "lambdas"))
 
 from training import training_charter as tc  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _no_network(monkeypatch):
+    """No live S3 probe and no laptop twin: the tracked files are the only inputs."""
+    monkeypatch.delenv(tc.PRIVATE_ENV_VAR, raising=False)
+    monkeypatch.setattr(tc, "_from_s3", lambda key: None)
+    tc.reset_cache()
+    yield
+    tc.reset_cache()
+
 
 PUBLIC = _REPO / "config" / "training_charter.json"
 EXAMPLE = _REPO / "config" / tc.PRIVATE_EXAMPLE_BASENAME
