@@ -10,8 +10,8 @@ This module adds that check, with the thresholds read from the registry — neve
 falling back to the registry's own `DEFAULT_STALE_HOURS` where a source declares none. A refusal names
 its reason: `blocked_stale_inputs: whoop recovery 61 h old > 48 h`.
 
-Ages run from the END of the newest stored UTC day (DATE# keys are day-grained and, for whoop, UTC-keyed,
-#3913), so a record dated today is never "old" and the figure never overstates. Hevy counts only while a
+Ages run from the END of the newest stored day, in the frame that NAMED the key (DATE# keys are day-grained;
+whoop is UTC-keyed, hevy Pacific — `anchor_day_key` reads the registry facet, #3913), so a record dated today is never "old" and the figure never overstates. Hevy counts only while a
 lifting session is EXPECTED: an active disruption mode (travel) legitimately has no lifting, and is not
 a dead poller. A layoff with no recorded disruption is refused by name — the owner's `override_freshness_gate`
 is the answer when he really did not train. Pure core (`assess_input_age`); the one DDB read is fail-soft.
@@ -23,6 +23,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from common.pacific_time import anchor_day_key
 from ingestion.source_registry import DEFAULT_STALE_HOURS, SOURCE_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -36,9 +37,12 @@ def threshold_hours(source: str) -> int:
     return int(declared) if declared is not None else int(DEFAULT_STALE_HOURS)
 
 
-def age_hours(date_str: str, now: datetime) -> float:
-    """Hours since the end of UTC day `date_str` (negative while that day is still open)."""
-    day_end = datetime.strptime(date_str[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
+def age_hours(date_str: str, now: datetime, source: str) -> float:
+    """Hours since the end of `source`'s DATE# day `date_str` (negative while that day is still open).
+
+    The day's midnight comes from the registry's `day_key_frame` facet via `anchor_day_key` (#3913) —
+    whoop is UTC-keyed, hevy Pacific-keyed — never a hand-picked tzinfo."""
+    day_end = anchor_day_key(date_str, source) + timedelta(days=1)
     return (now - day_end).total_seconds() / 3600.0
 
 
@@ -46,7 +50,7 @@ def _gap(source: str, label: str, date_str: str | None, now: datetime) -> dict[s
     if not date_str:
         return None  # nothing on record is the existing gate's finding (recovery) or a first-ever session (hevy)
     try:
-        age = age_hours(date_str, now)
+        age = age_hours(date_str, now, source)
     except (ValueError, TypeError):
         return None
     limit = threshold_hours(source)

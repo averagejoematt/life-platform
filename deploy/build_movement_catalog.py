@@ -448,7 +448,8 @@ def build_catalog(current: dict[str, Any], history: dict[str, Any], metadata: di
             "primary_muscle": "Hevy primary_muscle_group through training/muscle_volume.HEVY_MUSCLE_GROUP (column 1); "
             "volume_muscle is column 0 (muscle_volume.MUSCLES).",
             "generator_eligibility": "training/movement_catalog.generator_eligible: skill_tier <= ceiling AND (reviewed OR a "
-            "default_rep_range). No frequency gate (owner ruling C, #4108).",
+            "default_rep_range) AND not plyometric, bar the charter's lower-leg prep carve-out while the prep is on (#5090). "
+            "No frequency gate (owner ruling C, #4108).",
             "anchor_family": "training/movement_catalog.anchor_family: program_structure.classify_movement(title) AND primary "
             "muscle in the anchor's primary_muscles AND loaded (Hevy weight_reps; any rep-based type for vertical_pull).",
             "coach_added": "A never-trained exercise may be added as {title, hevy_template_id_hint, provenance: coach_added}; "

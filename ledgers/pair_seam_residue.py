@@ -383,6 +383,14 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "`calibration_cadence` reads; no other field of the row is read by it. Pinned by "
         "tests/test_calibration_cadence_5061.py::test_the_readers_parse_what_the_real_writers_store.",
     ),
+    "hevy::mcp/authoring_input_age.py::read": (
+        "2026-10-19",
+        "#5085: the authoring gate's input-age check reads ONLY the newest hevy `sk` (ProjectionExpression='sk', "
+        "begins_with 'DATE#', Limit=1, descending) and takes the YYYY-MM-DD after 'DATE#'; it reads no attribute. The "
+        "writer's sk is hevy_common.normalize_workout's DATE#{date}#WORKOUT#{id}. Pinned two-sided on the writer's real "
+        "output by tests/test_authoring_freshness_and_charter_stamp_5085.py::"
+        "test_the_hevy_date_read_parses_exactly_the_sk_the_writer_writes.",
+    ),
     "strava::lambdas/ingestion/strava_lambda.py::read": (
         "2026-10-18",
         "#4626: strava_lambda reads back its OWN day row (strava_id, zoneN_seconds, hr_recovery, elapsed_time_seconds) to skip "

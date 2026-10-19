@@ -147,7 +147,7 @@ def decide(
     if not is_loaded_day(hevy_rows):
         return {**out, "reason": "off_day"}
     target = (ramp or {}).get("today_target")
-    steps = (steps_day or {}).get("steps")
+    steps = (steps_day or {}).get("steps")  # steps-truth: steps_resolver.daily_steps output (the runner), already resolved
     if not target:
         return {**out, "reason": "no_target"}
     if steps is None:

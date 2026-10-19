@@ -520,8 +520,7 @@ _CHARTER_PUBLISHED_READER_PY = (
     '    return load_charter()["governing_goal"]\n'
 )
 
-# #5073: a published module (lambdas/emails) that imports the owner-only May tracker — the target
-# date, the band and the projected weight would then be one call from an email body.
+# #5061: a published module (lambdas/emails) that imports the owner-only calibration cadence (tape / photo / DEXA due dates).
 _CALIBRATION_PUBLISHED_IMPORTER_PY = (
     '"""census probe — a published importer of the owner-only calibration cadence that must never exist."""\n\n'
     "from training import calibration_cadence\n\n\n"
@@ -529,6 +528,8 @@ _CALIBRATION_PUBLISHED_IMPORTER_PY = (
     "    return calibration_cadence.read(table, '2026-10-19')\n"
 )
 
+# #5073: a published module (lambdas/emails) that imports the owner-only May tracker — the target
+# date, the band and the projected weight would then be one call from an email body.
 _MAY_TRACKER_PUBLISHED_IMPORTER_PY = (
     '"""census probe — a published importer that must never exist."""\n\n'
     "from training import may_tracker\n\n\n"

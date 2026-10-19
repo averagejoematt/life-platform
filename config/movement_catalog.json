@@ -35,7 +35,7 @@
     "skill_tier": "Hevy equipment: machine/resistance_band/none -> 1; dumbbell/kettlebell/plate/suspension/other and cable (by title) -> 2; barbell and smith (by title) -> 3; metadata unavailable -> 3. See deploy/build_movement_catalog.py EQUIPMENT_SKILL_TIER. Bodyweight-loaded titles (pull/chin-up, dip, inverted row -> 2; muscle-up, pistol, Nordic, handstand push-up, flag, one-arm push/pull -> 3; never an assisted/machine/band title) are raised above their equipment tier by title (#5054, BODYWEIGHT_SKILL_TIER_*).",
     "joint_friendly_score_unreviewed": 1,
     "primary_muscle": "Hevy primary_muscle_group through training/muscle_volume.HEVY_MUSCLE_GROUP (column 1); volume_muscle is column 0 (muscle_volume.MUSCLES).",
-    "generator_eligibility": "training/movement_catalog.generator_eligible: skill_tier <= ceiling AND (reviewed OR a default_rep_range). No frequency gate (owner ruling C, #4108).",
+    "generator_eligibility": "training/movement_catalog.generator_eligible: skill_tier <= ceiling AND (reviewed OR a default_rep_range) AND not plyometric, bar the charter's lower-leg prep carve-out while the prep is on (#5090). No frequency gate (owner ruling C, #4108).",
     "anchor_family": "training/movement_catalog.anchor_family: program_structure.classify_movement(title) AND primary muscle in the anchor's primary_muscles AND loaded (Hevy weight_reps; any rep-based type for vertical_pull).",
     "coach_added": "A never-trained exercise may be added as {title, hevy_template_id_hint, provenance: coach_added}; the builder fills absent fields from Hevy metadata and keeps every written field. See training/movement_catalog.py."
   },

@@ -522,10 +522,14 @@ def _steps_pass(now_utc: datetime, dry_run: bool) -> dict:
 
 
 def lambda_handler(event: dict, context) -> dict:
-    steps = _steps_pass(datetime.now(timezone.utc), is_dry_run(event))
-    out = _coach_nudge(event, context)
-    out["steps_nudge"] = steps
-    return out
+    try:
+        steps = _steps_pass(datetime.now(timezone.utc), is_dry_run(event))
+        out = _coach_nudge(event, context)
+        out["steps_nudge"] = steps
+        return out
+    except Exception as e:
+        logger.error("[nudge] handler failed: %s", e)
+        raise
 
 
 def _coach_nudge(event: dict, context) -> dict:

@@ -19,7 +19,10 @@ added the fifth, so `program_structure.SESSION_TEMPLATES` is still the definitio
 
 from __future__ import annotations
 
+from datetime import date, timedelta
 from typing import Any
+
+from common.pacific_time import parse_day_key
 
 SUPERSEDED: dict[str, Any] = {
     "program_version": "0.4",
@@ -160,11 +163,17 @@ def v04_role(credited_sessions: int) -> str:
     return roles[(first + max(0, int(credited_sessions))) % len(roles)]
 
 
+def _day(date_str: str) -> date:
+    """A YYYY-MM-DD day through THE calendar-day parse (#3609/#3741); an unparseable day raises, as before."""
+    d = parse_day_key(date_str)
+    if d is None:
+        raise ValueError(f"not a YYYY-MM-DD day: {date_str!r}")
+    return d
+
+
 def v04_week(target_date: str, credited_sessions: int) -> int:
     """v0.4's program week: a week closes when its four sessions are done AND seven days have passed (#4161)."""
-    from datetime import date
-
-    days = (date.fromisoformat(target_date[:10]) - date.fromisoformat(SESSION_SEQUENCE["block_start"])).days
+    days = (_day(target_date[:10]) - _day(SESSION_SEQUENCE["block_start"])).days
     return min(max(0, int(credited_sessions)) // int(SESSION_SEQUENCE["sessions_per_week"]), max(0, days) // 7) + 1
 
 
@@ -189,10 +198,8 @@ def _deload_sets(n: int, sets_pct: int) -> int:
 
 
 def v04_deload_on(target_date: str) -> bool:
-    from datetime import date, timedelta
-
-    start = date.fromisoformat(V04_DELOAD["starts_on"])
-    return start <= date.fromisoformat(target_date[:10]) < start + timedelta(days=int(V04_DELOAD["days"]))
+    start = _day(V04_DELOAD["starts_on"])
+    return start <= _day(target_date[:10]) < start + timedelta(days=int(V04_DELOAD["days"]))
 
 
 def build_session(target_date: str, inputs: dict[str, Any] | None = None) -> dict[str, Any]:
