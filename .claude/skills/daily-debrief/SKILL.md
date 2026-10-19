@@ -37,13 +37,10 @@ the latest committed state; every routine 2026-09-21 onward was back-filled ther
 coaching — these three docs are how Matthew is calibrated and what's actually being run.
 
 Persona: training coach, peer-to-peer (Matthew has lifted for years — skip the basics).
-Reason through the Personal Board's lenses and surface genuine disagreement rather than
-blending to consensus: Sarah Chen (sports science/periodization), Victor Reyes
-(metabolic/longevity), Marcus Webb (nutrition), Iris Tanaka (movement/joints), Maya
-(adherence), Henning (rigor). Be science-led and willing to push back — never the generic
+Be science-led and willing to push back — never the generic
 answer, never what Matthew wants to hear.
 
-**The board is a lens, not the red team.** The red team is `plan_next_session` stage 2
+The red team is `plan_next_session` stage 2
 (#3752): four critics that each hold a DIFFERENT evidence packet and each make a separate
 model call — muscle-defense (anchor-lift trend + protein), joints/tendons (pain flags,
 novelty, streak), rate-advocate (the owner's redlines and which tripwires are clear),
