@@ -89,6 +89,18 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
+    "lambdas/training/cardio_menu.py:performed_movement_minutes": (
+        "#5076's performed side of `movement_minutes` (the gym cardio minutes a performed day adds to the "
+        "steps/movement goal, charter `steps.gym_cardio_minutes_count_toward_movement`), landed fixture-tested "
+        "in tests/test_cardio_menu_dose_5076.py for the #5056 steps-floor lane to read. The first live caller "
+        "is #5056; delete this entry when it lands."
+    ),
+    "lambdas/training/cardio_menu.py:place_week": (
+        "#5076's week-whole reading of the cardio placement rule (`choose_kind` iterated over a week), the "
+        "7-day placement proof in tests/test_cardio_menu_dose_5076.py. The draft path places one day at a "
+        "time through `choose_kind`; the first live caller is a weekly plan surface (the #5073 tracker or the "
+        "#5079 block retro); delete this entry when one lands."
+    ),
     "lambdas/training/workout_identity.py:identity_totals": (
         "#4973's one-workout-identity resolver, landed fixture-tested and deliberately wired into no live "
         "reader: no Apple Watch workout exists in the store yet (#4968 configures the watch), and the one "

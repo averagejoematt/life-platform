@@ -167,8 +167,16 @@ def test_the_cardio_pick_is_appended_with_the_talk_test_and_no_hr_fields(monkeyp
     ir, _, pick, _ = _redraft(monkeypatch)
     cardio = ir.exercises[-1]
     want = HAND["cardio"]
-    assert cardio.movement_key == want["movement_key"] and [s.duration_seconds for s in cardio.sets] == [want["minutes"] * 60]
-    assert "Recumbent" in cardio.notes and "talk test" in cardio.notes and "no HR target" in cardio.notes
+    # #5076: the machine is still his (the recumbent on loaded legs); the kind and the minutes are the charter
+    # menu's placement now, not the hand-built day's 20 min, and the effort is the menu's RPE + talk test
+    from training import cardio_menu
+
+    kind = pick["menu"]["kind"]
+    assert cardio.movement_key == want["movement_key"] and [s.duration_seconds for s in cardio.sets] == [
+        cardio_menu.block_minutes(kind) * 60
+    ]
+    assert cardio.rationale_tag == f"cardio:cycling:menu:{kind}"
+    assert "Recumbent" in cardio.notes and cardio_menu.block(kind)["talk_test"] in cardio.notes and "no HR target" in cardio.notes
     assert "bpm" not in cardio.notes
     assert not set(sc.HR_PICK_FIELDS) & set(pick) and pick["hr_fields_dropped_by"] == "hr_regime_change_2026_10_10"
     # the served stage-1 pick is the same constrained pick
