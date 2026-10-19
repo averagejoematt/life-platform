@@ -1010,7 +1010,7 @@
     }
   ],
   "cost_surface": {
-    "ai_features": 28,
+    "ai_features": 29,
     "alarms": 139,
     "emf_namespaces": 33,
     "schedules": 96,
@@ -4119,6 +4119,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/panel_judge.py",
+      "partition": "training_constraints",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/training/routine_repo.py",
@@ -5668,6 +5675,13 @@
     {
       "direction": "read",
       "lambda": "life-platform-mcp",
+      "module": "mcp/authoring_input_age.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
       "module": "mcp/coach_packet_today.py",
       "partition": "hevy",
       "via": "fixed-seam"
@@ -5797,6 +5811,13 @@
       "module": "mcp/plan_hevy_windows.py",
       "partition": "hevy",
       "via": "fixed-seam"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/predraft_shadow.py",
+      "partition": "training_constraints",
+      "via": "pk"
     },
     {
       "direction": "read",
@@ -7880,7 +7901,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 757,
+      "edges": 760,
       "lambdas": 108,
       "mcp_tool_modules": 37,
       "mcp_tools": 89,
@@ -7894,9 +7915,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 369,
-        "sites_resolved": 954,
-        "sites_total": 1323
+        "sites_dynamic": 372,
+        "sites_resolved": 958,
+        "sites_total": 1330
       },
       "schedule_resolution": {
         "dynamic": 0,
