@@ -133,12 +133,24 @@ def test_the_coach_session_skill_runs_the_order_contract_from_the_packet():
     assert "action `deload`" in SOURCE and "action `disruption`" in SOURCE and "`disruption_end`" in SOURCE
     assert "may_frame" in SOURCE and "`cardio_menu`" in SOURCE and "`effort_ceilings.overage_tolerance_rpe`" in SOURCE
     assert "`deload_recommendation`" in SOURCE and "`steps_ramp`" in SOURCE
+    for key in ("split.lifting_days_per_wk", "split.sequence", "effort_ceilings.ceiling_change_proposal", "governing_goal.target_date"):
+        assert f"`{key}`" in SOURCE, f"the skill names the charter key {key} instead of copying its value"
 
 
 def test_the_skill_carries_no_retired_frame():
     """The synced copy's stale content (#5086 Set): the role-play board, the v0.4 four-session lock and
     the commit-to-git step the commit call replaced."""
-    for stale in ("Personal Board", "Sarah Chen", "v0.4 upper/lower", "4-session", "remind him to git commit"):
+    for stale in (
+        "Personal Board",
+        "Sarah Chen",
+        "v0.4 upper/lower",
+        "4-session",
+        "remind him to git commit",
+        # review round 2: word-form copies of charter values the derivation guard cannot see
+        "five lifting days",
+        "Two weeks of most sets",
+        "May 2027",
+    ):
         assert stale not in SOURCE, stale
 
 

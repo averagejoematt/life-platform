@@ -26,10 +26,11 @@ an older copy of this skill. `tests/test_training_charter_derivation_5068.py` sw
 
 ## The frame
 
-The goal is time-bound: a must-hit target date in May 2027. Every expert school on his panel is
+The goal is time-bound: a must-hit target date, the charter's `governing_goal.target_date`
+(never restate it from memory). Every expert school on his panel is
 synthesized, and each concedes something to the deadline (the charter's concession ledger, in
-the packet's `coach_context` as PANEL SYNTHESIS). Explain every plan in May-target terms: quote
-`coach_context.may_frame` and say which charter line or concession each choice serves. That
+the packet's `coach_context` as PANEL SYNTHESIS). Explain every plan in terms of that target:
+quote `coach_context.may_frame` and say which charter line or concession each choice serves. That
 frame is for this owner chat only. It never goes into a published surface, an issue, a commit
 or anything a reader sees.
 
@@ -115,9 +116,9 @@ End by logging what was decided plus any prediction (`save_insight` / `log_decis
 Computed numbers only; never invent a figure. Start from the packet, then pull only what it
 does not carry:
 
-- **Last 72 hours, before any draft.** `plan_next_session`'s `recent_aerobic` rows (one per
-  activity over the three days before the target, each flagged against the walking redlines,
-  with the session's cardio pick made from them). Name any breach once. Hevy cardio blocks are
+- **The recent days, before any draft.** `plan_next_session`'s `recent_aerobic` rows (one per
+  activity over the engine's look-back window before the target, each flagged against the
+  walking redlines, with the session's cardio pick made from them). Name any breach once. Hevy cardio blocks are
   invisible to Strava; count both.
 - **Readiness and recovery:** `get_readiness_score`, `get_acwr_status`, sleep and HRV.
 - **Streaks, kept apart:** loaded-lifting days (the tendon and volume signal) and active days
@@ -132,16 +133,17 @@ does not carry:
 
 ## 4. The plan
 
-The charter's split: five lifting days in the charter's fixed sequence, the next session is the
-one after the last performed lift whatever the date, delts on the charter's weekly frequency,
-lifting minutes inside `split.session_minutes`. `plan_next_session`'s `session` is what the
+The charter's split: the charter's lifting days (`split.lifting_days_per_wk`), in the charter's
+fixed sequence (`split.sequence`); the next session is the one after the last performed lift
+whatever the date (`split.rule`), delts on the charter's weekly frequency
+(`split.frequency.delts_per_wk`), lifting minutes inside `split.session_minutes`. `plan_next_session`'s `session` is what the
 program serves; argue with it out loud, never silently replace it.
 
 - **Effort ceilings by movement class.** Compounds and the last isolation set each have a
   charter band; the top of the band is the ceiling a set is graded against, and a set above it
   by no more than the charter's `effort_ceilings.overage_tolerance_rpe` (served in
-  `coach_context`) is not a breach. Two weeks of most sets
-  beating a ceiling proposes a ceiling change; only his ruling applies it.
+  `coach_context`) is not a breach. The charter's ceiling-change rule
+  (`effort_ceilings.ceiling_change_proposal`) only PROPOSES a change; only his ruling applies it.
 - **Progression is engine-authored** (double progression, the charter's step): read the load
   the engine wrote and its reason. A stall serves its step; say which.
 - **Cardio is deliberate, from the menu.** Pick the block from the charter's `cardio_menu`
@@ -176,8 +178,8 @@ He authors at night and trains the next morning with **zero chance to adjust.**
 - **Hevy render rules.** The session note is cut at about 150 characters and the red-team
   verdicts are prepended to it: keep it to one short line. Put the tier cues in the first
   exercise's notes (exercise notes render in full). Every cue carries its reason, for example
-  "+<the step the engine wrote>: two top sets at the top of the range, RPE inside the ceiling";
-  quote the load and step the engine wrote, never a number from memory. Hevy stores kg;
+  "+<the step the engine wrote>: the gain rule's trigger met at the top of the range, RPE inside
+  the ceiling"; quote the load and step the engine wrote, never a number from memory. Hevy stores kg;
   convert for display.
 - **Finishers:** read the actual exercise list of the last sessions before programming core,
   carries or a finisher; don't repeat one anti-movement pattern on consecutive days.
