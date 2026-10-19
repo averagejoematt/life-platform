@@ -3,8 +3,8 @@
 Four owner-only, dated predictions, registered before W1 ships and graded by the six-week block retro (#5079).
 Script: `scripts/register_charter_predictions.py` (dry-run default; `--apply` is run by the driver from main).
 
-Store: `USER#matthew#SOURCE#diary_claims`, `PREDICTION#2026-10-18#<slug>` (private, evaluator-scanned, not on any public
-surface). Rows are `status: observation` / `evaluation.type: qualitative`: the daily evaluator skips them and the retro grades
+Store: `USER#matthew#SOURCE#diary_claims`, `PREDICTION#2026-10-18#<slug>` (private, evaluator-scanned; the public diary shelf
+`site_api_diary._claims_by_entry` drops them: no `source_sk`, `visibility: private`). Rows are `status: observation` / `evaluation.type: qualitative`: the daily evaluator skips them and the retro grades
 each from its `measurement` block, then sets confirmed/refuted. Evaluation date: 2026-12-06.
 
 | Key | Prediction | Measured by |

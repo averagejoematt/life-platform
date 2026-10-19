@@ -12,9 +12,11 @@ Two PREDICTION# stores exist:
   calls, and they are owner-only.
 * ``USER#matthew#SOURCE#diary_claims`` / ``PREDICTION#{stated_date}#{slug}`` — the subject-claimed,
   ``visibility: private`` ledger (``privacy/diary_claims.py``). Chosen. The daily
-  ``coach-prediction-evaluator`` scans it (``DIARY_CLAIMS_PK``), ``get_predictions`` lists it, no
-  public surface reads it (``site_api_coach`` reads ``COACH#`` only), and ``coach_id`` is the empty
-  string so no coach's calibration can absorb it.
+  ``coach-prediction-evaluator`` scans it (``DIARY_CLAIMS_PK``), ``get_predictions`` lists it, and
+  ``coach_id`` is the empty string so no coach's calibration can absorb it. The one public reader of
+  this partition, ``site_api_diary._claims_by_entry`` (GET /api/diary_shelf), projects only
+  ``visibility == "public"`` rows that carry a ``source_sk``; these rows have neither (no diary-entry
+  pointer, ``visibility: private``), so they never reach the shelf.
 
 ``tool_evaluate_prediction`` cannot grade either store (it only edits legacy ``coach_thread`` arrays),
 and the daily evaluator can resolve none of these four metrics (e1RM, stall count, a steps *fraction*,
@@ -39,6 +41,7 @@ import sys
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
 
+from coach.prediction_emission import OBSERVATION_STATUS  # noqa: E402
 from privacy import diary_claims as dc  # noqa: E402
 
 TABLE = "life-platform"
@@ -148,7 +151,7 @@ def build_record(spec: dict, user_id: str = USER_ID) -> dict:
         "evaluate_on": EVALUATE_ON,
         "confidence": dc.parse_confidence("medium"),
         "confidence_stated": "medium",
-        "status": "observation",
+        "status": OBSERVATION_STATUS,
         "visibility": "private",
         "schema_version": dc.SCHEMA_VERSION,
     }

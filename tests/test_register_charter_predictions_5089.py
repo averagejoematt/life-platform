@@ -12,6 +12,8 @@ sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
 sys.path.insert(0, os.path.join(_ROOT, "scripts"))
 
 import register_charter_predictions as rcp  # noqa: E402
+from coach.coach_prediction_evaluator import EVALUABLE_STATUSES  # noqa: E402
+from coach.prediction_emission import OBSERVATION_STATUS  # noqa: E402
 from coach.prediction_windows import is_gradeable  # noqa: E402
 from privacy import diary_claims as dc  # noqa: E402
 
@@ -60,13 +62,15 @@ def test_record_shape_is_the_wire_shape():
             assert type(rec[f]) is type(wire[f]), f
         assert rec["pk"] == dc.claims_pk() and rec["sk"].startswith("PREDICTION#2026-10-18#")
         assert rec["coach_id"] == "" and rec["visibility"] == "private"
+        assert "source_sk" not in rec  # site_api_diary._claims_by_entry drops rows without one
         assert rec["sk"] == dc.claim_sk(rec["stated_date"], rec["claim_natural"])
 
 
 def test_evaluator_skips_but_never_retires():
     for rec in rcp.build_records():
         assert not is_gradeable(rec["evaluation"])  # structurally skipped by the daily grader
-        assert rec["status"] == "observation"  # not in EVALUABLE_STATUSES => never retired as ungradeable-pending
+        assert rec["status"] not in EVALUABLE_STATUSES  # => never retired as ungradeable-pending
+        assert rec["status"] == OBSERVATION_STATUS
 
 
 def test_apply_is_idempotent():
