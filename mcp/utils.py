@@ -252,16 +252,16 @@ _DEFAULT_SUGGESTIONS: dict[str, list[str]] = {
         "Use one of the movement keys the error offers under 'Did you mean', or give the exercise's exact Hevy title.",
     ],
     "UNRESOLVED_MOVEMENT": [
-        "Re-draft the routine (manage_hevy_routine draft) with a movement key or exact Hevy title the platform's exercise index resolves.",
+        "In a routine: use a movement key or exact Hevy title the platform's exercise index resolves, via manage_hevy_routine draft (the default) or draft_custom with departure_reason when the session is a deliberate departure. From stall_check: pass template_id.",
     ],
     "LINK_UNVERIFIED": [
         "Give the canonical URL of the page itself (not a search result or a redirect), or omit the link and give the title and author.",
     ],
     "HEVY_PRECHECK_FAILED": [
-        "Fix the named fields in a new draft (manage_hevy_routine draft) — this is Hevy's schema, not a transient — then commit that routine_id.",
+        "Fix the named fields in a new routine — manage_hevy_routine draft (the default), or draft_custom with departure_reason when the session is a deliberate departure — this is Hevy's schema, not a transient — then commit that routine_id.",
     ],
     "HEVY_BAD_REQUEST": [
-        "Hevy's response body in `error` names the rejected field — fix it in a new draft (manage_hevy_routine draft) and commit that routine_id.",
+        "Hevy's response body in `error` names the rejected field — fix it in a new routine — manage_hevy_routine draft (the default), or draft_custom with departure_reason when the session is a deliberate departure — and commit that routine_id.",
     ],
     "TOOL_CALL_RESIDUE": [
         "Re-issue the call with the plain text of each argument — no `</…>` closers, no `<parameter name=…>`, no `<invoke` markup.",
@@ -303,7 +303,7 @@ _DEFAULT_SUGGESTIONS: dict[str, list[str]] = {
         "Or pass owner_override_redteam=true with override_reason in the owner's own words — the override is stamped into the stored routine and reported as a warning.",
     ],
     "SUBTRACT_ONLY_VIOLATION": [
-        "Raise each named set to at least its floor (the error names the set, the floor and where the floor came from), or remove the conditional up-branch clause, in a new draft (manage_hevy_routine draft) — then run stage 2 and commit that routine_id.",
+        "Raise each named set to at least its floor (the error names the set, the floor and where the floor came from), or remove the conditional up-branch clause, in a new routine — manage_hevy_routine draft (the default), or draft_custom with departure_reason when the session is a deliberate departure — then run stage 2 and commit that routine_id.",
         "There is no chat override for this gate: a set under its floor is refused until the draft clears it.",
     ],
     "CRITIC_VETO": [
@@ -316,7 +316,7 @@ _DEFAULT_SUGGESTIONS: dict[str, list[str]] = {
     ],
     "HEVY_CONFLICT": [
         "Read the routine back (action=get) — Hevy's copy was edited in the app after the platform last wrote it, and the platform will not overwrite an in-app edit.",
-        "Either keep the in-app edit and leave the platform copy as is, or draft from the current Hevy state (manage_hevy_routine draft) and commit that new routine_id.",
+        "Either keep the in-app edit and leave the platform copy as is, or draft_custom with a departure_reason (keeping his in-app edit is the departure) and commit that new routine_id.",
     ],
 }
 

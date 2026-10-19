@@ -466,13 +466,14 @@ def refusal_suggestions(gate: dict[str, Any] | None) -> list[str]:
     for v in (gate.get("audit") or {}).get("violations") or []:
         if v.get("kind") == "conditional_up":
             out.append(
-                f"Remove the conditional up-branch from {v.get('where')}'s notes (\"{v.get('clause')}\") in a new draft "
-                "(draft) — progression is the platform's job, never his to trigger mid-set."
+                f"Remove the conditional up-branch from {v.get('where')}'s notes (\"{v.get('clause')}\") in a new routine "
+                "(manage_hevy_routine draft by default; draft_custom + departure_reason to keep a deliberate departure) — "
+                "progression is the platform's job, never his to trigger mid-set."
             )
         else:
             out.append(
                 f"Prescribe {v.get('where')} set {v.get('set')} at or above its floor of {_fmt(v.get('floor_kg'))} "
-                f"(now {_fmt(v.get('prescribed_kg'))}; {_provenance(gate, v)}) in a new draft (draft)"
+                f"(now {_fmt(v.get('prescribed_kg'))}; {_provenance(gate, v)}) in a new routine (draft by default; draft_custom + departure_reason to keep a departure at or above the floor)"
                 + (" — or mark it a prescribed back-off in the set notes if it is one." if not v.get("back_off_note") else ".")
             )
     out.append(
