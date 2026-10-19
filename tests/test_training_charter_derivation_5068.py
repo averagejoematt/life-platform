@@ -89,6 +89,7 @@ SWEEP_FILES = (
     ".claude/skills/daily-debrief/SKILL.md",
     ".claude/skills/speak-to-coaches/SKILL.md",
     ".claude/skills/coach-session/SKILL.md",  # swept when present
+    ".claude/skills/training-review/SKILL.md",  # #5079: the block retro reads its targets from the charter
 )
 
 
