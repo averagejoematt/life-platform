@@ -101,9 +101,9 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 2. DynamoDB Partitions (ADR-077 census)
 
-### cross_phase (20)
+### cross_phase (21)
 
-`benchmarks`, `calibration`, `chronicling`, `clinical`, `coach_corrections`, `coach_vision`, `dexa`, `effect_fits`, `eyeball_estimate`, `genome`, `labs`, `may_tracker`, `milestones`, `progress_photos`, `recall_embeddings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
+`benchmarks`, `calibration`, `chronicling`, `clinical`, `coach_corrections`, `coach_vision`, `dexa`, `effect_fits`, `eyeball_estimate`, `fitness_tests`, `genome`, `labs`, `may_tracker`, `milestones`, `progress_photos`, `recall_embeddings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
 
 ### experiment_scoped (34)
 
@@ -119,7 +119,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-757 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+762 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -170,6 +170,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `eyeball_estimate` | — | — |
 | `felt_probe` | — | site_api_fulfillment.py |
 | `field_notes` | field_notes_lambda.py, tools_lifestyle.py | ai_expert_analyzer_lambda.py, chronicle_data.py, field_notes_lambda.py, site_api_thirdwall.py, tools_lifestyle.py |
+| `fitness_tests` | fitness_tests.py | — |
 | `flourishing` | flourishing.py | site_api_fulfillment.py, theme_river.py, tools_journal.py |
 | `food_delivery` | food_delivery_lambda.py | digest_utils.py, site_api_meals.py, site_api_nutrition.py |
 | `food_responses` | — | — |
@@ -180,7 +181,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `habit_scores` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coach_prediction_evaluator.py, failure_pattern_compute_lambda.py, monday_compass_lambda.py, recap_data.py, site_api_ai_context.py, site_api_habits.py, site_api_mind.py |
 | `habitify` | — | ai_expert_analyzer_lambda.py, habitify_lambda.py, intelligence_common.py, journal_analyzer_lambda.py, site_api_data.py, site_api_habits.py, site_api_nutrition.py |
 | `health_check` | pipeline_health_check_lambda.py | site_api_status.py |
-| `hevy` | hevy_common.py | ai_expert_analyzer_lambda.py, cardio_hr_store.py, coach_packet_today.py, daily_metrics_compute_lambda.py, plan_draft_evidence.py, plan_hevy_windows.py, recap_data.py, site_api_autonomic.py, site_api_nutrition.py, site_api_pulse.py, site_api_training.py, tools_coach_packet.py, tools_correlation.py, tools_health.py, tools_nutrition.py, tools_plan.py, tools_strength.py, tools_training.py, tools_training_notes.py, training_notes.py, vacation_fund.py |
+| `hevy` | hevy_common.py | ai_expert_analyzer_lambda.py, authoring_input_age.py, cardio_hr_store.py, coach_packet_today.py, daily_metrics_compute_lambda.py, plan_draft_evidence.py, plan_hevy_windows.py, recap_data.py, site_api_autonomic.py, site_api_nutrition.py, site_api_pulse.py, site_api_training.py, tools_coach_packet.py, tools_correlation.py, tools_health.py, tools_nutrition.py, tools_plan.py, tools_strength.py, tools_training.py, tools_training_notes.py, training_notes.py, vacation_fund.py |
 | `hevy_id_map` | routine_repo.py | routine_repo.py |
 | `hypotheses` | hypothesis_engine_lambda.py | challenge_generator_lambda.py, hypothesis_engine_lambda.py, state_of_matthew_lambda.py, tools_lifestyle.py |
 | `ingest_liveness` | pipeline_health_check_lambda.py | — |
@@ -241,7 +242,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 
 ## 4. MCP Layer
 
-**89 tools across 37 modules** (AST-counted from `mcp/registry.py`;
+**89 tools across 38 modules** (AST-counted from `mcp/registry.py`;
 the same counter `deploy/sync_doc_metadata.py` uses). MCP modules appear in §3 as
 readers under the `life-platform-mcp` lambda.
 
@@ -449,6 +450,7 @@ Default: public — an unlisted source/field is TIER_PUBLIC by omission (field_t
 | `coach_vision` | owner_only |
 | `dexa` | owner_published |
 | `felt_probe` | owner_only |
+| `fitness_tests` | owner_only |
 | `flourishing` | owner_only |
 | `genome` | owner_only |
 | `hevy` | owner_only |
@@ -560,10 +562,10 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1323 total · 954 resolved · 369 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1333 total · 960 resolved · 373 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (108 lambdas total)
 - Alarms: 139 literal-named declarations across three idioms, 4 composite; routing digest 95 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
-- Privacy: 19 owner-only + 3 owner-published sources; 67 owner-only + 11 owner-published fields — non-default entries only
+- Privacy: 20 owner-only + 3 owner-published sources; 67 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 96 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
@@ -578,7 +580,7 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 
 | Surface | Count | Registry |
 |---------|-------|----------|
-| ai_features | 28 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
+| ai_features | 29 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
 | alarms | 139 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 33 | `deploy/emf_namespace_ledger.py::LEDGER` |
 | schedules | 96 | this model's schedules plane (CDK AST) |

@@ -74,7 +74,7 @@ from typing import Any
 from common.pacific_time import pacific_today, shift_day_key
 from training.routine_title import ROUTINE_INDEX_LOOKBACK_DAYS as _ROUTINE_INDEX_LOOKBACK_DAYS
 
-PACKET_VERSION = "coach-session-packet@1.6.0"  # 1.6.0 #5059: guidance_freshness (reference only); 1.5.0 #5082: steps_ramp; 1.4.0 #5081: steps_7d; 1.3.0 #4189: morning_note field; 1.2.0 #4313: today; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
+PACKET_VERSION = "coach-session-packet@1.7.0"  # 1.7.0 #5078: fitness_tests; 1.6.0 #5059: guidance_freshness (reference only); 1.5.0 #5082: steps_ramp; 1.4.0 #5081: steps_7d; 1.3.0 #4189: morning_note field; 1.2.0 #4313: today; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
 # Long enough that each performed type is found once a block is running (a v0.4 role recurs
 # weekly; an Engine day twice a week), bounded so the read stays one Hevy query.
 LAST_SESSION_LOOKBACK_DAYS = 28
@@ -109,6 +109,8 @@ SOURCES: dict[str, str] = {
         "de-dup = training.walking_volume.dedup_strava (#4068), walking = mcp.shared_quantities.walking_layer_for_day, "
         "HR ceiling = owner_redlines.REDLINES['walking_floor_hr_wk']['hr_ceiling_bpm']"
     ),
+    "fitness_tests": "mcp.tools_fitness_tests.read_view -> training.fitness_tests (#5078): the BATTERY# record + Hevy over "
+    "plan_hevy_windows._block_workouts, each test's trend in its better direction and the cadence state (ok/due/overdue/missed) with its prompt",
     "guidance_freshness": "health.guidance_freshness.read_freshness (#5059) — the guidance record's effective date vs the latest "
     "logged appointment; reference only, never a gate on intensity (plan_next_session's constraint_block carries the same read)",
 }
@@ -548,6 +550,21 @@ def _guidance_freshness(target_date: str) -> tuple[Any, dict[str, Any]]:
     return flag, _st(MEASURED)
 
 
+def _fitness_tests(target_date: str) -> tuple[Any, dict[str, Any]]:
+    """#5078: the battery's trend and cadence (owner-only). A failed record read is `read_failed`, never 'no battery'."""
+    from training.plan_engine import ABSENT, MEASURED, READ_FAILED
+
+    from mcp.tools_fitness_tests import packet_value
+
+    value = packet_value(target_date)
+    rec = (value.get("reads") or {}).get("record")
+    if isinstance(rec, dict):
+        return value, _st(READ_FAILED, error=rec.get("error"))
+    if not value["batteries_on_file"]:
+        return value, _st(ABSENT, "no fitness-test battery on file yet")
+    return value, _st(MEASURED)
+
+
 READERS = {
     "muscle_volume": _muscle_volume,
     "last_session_by_type": _last_sessions_field,
@@ -563,6 +580,7 @@ READERS = {
     "morning_note": _morning_note,
     "today": _today,
     "guidance_freshness": _guidance_freshness,
+    "fitness_tests": _fitness_tests,
 }
 
 

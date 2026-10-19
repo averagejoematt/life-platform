@@ -698,6 +698,15 @@ def _may_tracker_leg() -> dict[str, Any]:
     return nightly_leg()
 
 
+def _fitness_battery_leg() -> dict[str, Any]:
+    """#5078: the battery's dead-man — a named, fail-soft check on the same run; never the pre-draft's outcome."""
+    try:
+        from mcp.tools_fitness_tests import nightly_leg
+    except Exception as e:  # noqa: BLE001 — an import failure is named on the result, never raised into the pre-draft
+        return {"outcome": "failed", "error": type(e).__name__}
+    return nightly_leg()
+
+
 def lambda_entry(event: dict[str, Any]) -> dict[str, Any]:
     """The scheduled entry. Never raises: a failure is logged with its class and emits the
     datapoint at 0 (#4568), so the dead-man — not a misattributed warmer Errors alarm — reports it."""
@@ -707,6 +716,7 @@ def lambda_entry(event: dict[str, Any]) -> dict[str, Any]:
         logger.exception("nightly pre-draft failed")
         result = {"job": JOB["name"], "outcome": FAILED, "error": f"{type(e).__name__}: {e}"[:300]}
     result["may_tracker"] = _may_tracker_leg()  # #5073: the newest completed week's tracker row; fail-soft, never the outcome
+    result["fitness_battery"] = _fitness_battery_leg()  # #5078: ok|due|overdue|missed + FitnessBatteryMissed; never the outcome
     print(emf_line(result.get("outcome") or FAILED))
     logger.info("NIGHTLY_PREDRAFT %s", json.dumps(result, default=str)[:4000])
     return {"statusCode": 200, "body": json.dumps(result, default=str), "headers": {"Content-Type": "application/json"}}

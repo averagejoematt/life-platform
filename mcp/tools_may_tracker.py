@@ -10,6 +10,7 @@ hands them in — it computes nothing of its own:
   waist      the measurements partition;
   steps      `training.steps_resolver.steps_range` (measured candidates only — the Strava-walk
              derived estimate is not a step count);
+  fitness    `mcp.tools_fitness_tests.read_view` (#5078): the battery record, Hevy and the cadence state;
   Hevy       ONE read (`tools_strength._read_hevy_all_phases`) serves the week's working sets
              (`muscle_volume.working_sets_by_muscle`) and the four core anchors' e1RM series
              (`strength_helpers.extract_hevy_sessions` over `plan_draft_evidence._core_anchor_identities`).
@@ -122,6 +123,20 @@ def _guidance() -> dict[str, Any]:
     return {"state": mt.MEASURED if cap is not None else mt.ABSENT, "cap_lb_wk": cap}
 
 
+def _fitness_view(as_of: str) -> dict[str, Any]:
+    """#5078: the battery read (record + Hevy + the sequence position) through its own module, once per build."""
+    from mcp.tools_fitness_tests import read_view
+
+    return read_view(as_of)
+
+
+def _fitness_as_of(view: Optional[dict[str, Any]], sunday: str, last_sunday: str) -> Optional[dict[str, Any]]:
+    """The newest week carries the cadence state; an earlier week carries its trend only (no due state is back-dated)."""
+    if view is None:
+        return None
+    return {"batteries": view.get("batteries") or [], "due": view.get("due") if sunday == last_sunday else None}
+
+
 def compute_weeks(last_monday: str, weeks: int = 4) -> list[dict[str, Any]]:
     """`weeks` completed tracker rows ending with the week of `last_monday`, oldest first; each row's
     triggers read the row before it (the first reads none)."""
@@ -143,6 +158,7 @@ def compute_weeks(last_monday: str, weeks: int = 4) -> list[dict[str, Any]]:
     workouts = normalize_hevy_items(items) if not h_err else []
     series, a_err = _read(_anchor_series, items) if not h_err else (None, h_err)
     guidance = _guidance() if not w_err else None
+    fitness, f_err = _read(_fitness_view, last_sunday)
     days = (srange or {}).get("days") or []
 
     rows: list[dict[str, Any]] = []
@@ -159,7 +175,7 @@ def compute_weeks(last_monday: str, weeks: int = 4) -> list[dict[str, Any]]:
             steps=mt.steps_section([d for d in days if mon <= d["date"] <= sun], s_err),
             anchors=mt.anchors_section(series, sun, a_err),
             volume=mt.volume_section(None if h_err else working_sets_by_muscle(workouts, mon, sun), h_err),
-            fitness=mt.fitness_section(None),
+            fitness=mt.fitness_section(_fitness_as_of(fitness, sun, last_sunday), sun, f_err),
             prior=prior,
             built_at=pacific_today(),
         )

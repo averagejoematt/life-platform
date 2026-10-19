@@ -156,6 +156,8 @@ ROW_MAP: list[dict] = [
     {"key": "coach_vision", "pattern": r"^Coach vision observations", "requirements": [("source", "coach_vision", OO)], "claims": []},
     # #5073: the May tracker — the target date and band are owner-only by ruling; no public projection, so no `claims`.
     {"key": "may_tracker", "pattern": r"^May tracker", "requirements": [("source", "may_tracker", OO)], "claims": []},
+    # #5078: the fitness test battery — feeds the owner-only May tracker; no public projection, so no `claims`.
+    {"key": "fitness_tests", "pattern": r"^Fitness test battery", "requirements": [("source", "fitness_tests", OO)], "claims": []},
     # #4036: declared before the first dismissal exists, for the progress_photos reason —
     # an owner statement about an injury must never be stored under no tier. No `claims`:
     # this source has no public projection at all.

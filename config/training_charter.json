@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -42,6 +42,13 @@
       "date": "2026-10-19",
       "by": "owner rulings 2026-10-18 on #5058 (the elite-panel training review): compounds RPE 8-9; the last isolation set RPE 9-10; an overage within +1 RPE is not a breach; a ceiling beaten on more than 50% of sets two weeks running PROPOSES a change, which the owner applies",
       "what": "Renames effort_ceilings.by_experience_tier to by_movement_class (it always held the two movement-class bands, not tiers) holding exactly the ruled bands, and states that a set is graded against the HIGH end of its class band (effort_ceilings.ceiling_is; progression.ceiling_tier read the low end until #5058). The tolerance and the proposal rule are the ruled ones, unchanged in value.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.6.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on #5078 (the elite-panel training review: a fitness test battery every 6 weeks)",
+      "what": "calibration.fitness_tests gains its protocol: each test's machine, unit, better direction and how it is logged (the explicit record or Hevy), the protocol version, the block alignment and grace for the due week (overdue, then missed: the dead-man state), and the test day (the lightest role carries the tests on its minimum session, never a lower day).",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -262,7 +269,61 @@
     "dexa": {"every_weeks_approx": 12},
     "fitness_tests": {
       "every_weeks": 6,
-      "battery": ["6-minute walk", "20-minute bike at RPE 6", "dead hang", "assisted pull-up assistance"]
+      "battery": ["6-minute walk", "20-minute bike at RPE 6", "dead hang", "assisted pull-up assistance"],
+      "protocol_version": "1",
+      "aligned_to": "the block: a battery is due in the program week that closes each block (program week a whole multiple of every_weeks)",
+      "early_days_credited": 7,
+      "grace_weeks": 1,
+      "dead_man": "a due week passed with no battery is overdue for grace_weeks, then missed; missed is the dead-man state",
+      "test_day": {
+        "role": "Shoulders+arms",
+        "never_on": ["Lower-heavy", "Lower-volume"],
+        "session": "the role's minimum session (split.minimum_session) plus the tests in `order`",
+        "why": "the lightest day of the split carries the tests, so no heavy leg work blunts the walk or the bike"
+      },
+      "order": ["six_minute_walk", "dead_hang", "assisted_pull_up", "minimum_session", "bike_20min_rpe6"],
+      "tests": {
+        "six_minute_walk": {
+          "label": "6-minute walk",
+          "catalog_key": "treadmill",
+          "unit": "m",
+          "better": "higher",
+          "duration_s": 360,
+          "hevy_field": "distance_m",
+          "protocol": "Treadmill at 0 % incline, no handrails, no running: the fastest steady walk you can hold for 6 minutes. Log the distance.",
+          "hevy": "a Treadmill set of about 6 minutes with a distance"
+        },
+        "bike_20min_rpe6": {
+          "label": "20-minute bike at RPE 6",
+          "catalog_key": "cycling",
+          "unit": "m",
+          "better": "higher",
+          "duration_s": 1200,
+          "hevy_field": "distance_m",
+          "protocol": "The same bike every time (note which). 20 minutes held at RPE 6, short sentences only. Log the distance.",
+          "hevy": "a Cycling set of about 20 minutes with a distance"
+        },
+        "dead_hang": {
+          "label": "dead hang",
+          "catalog_key": "dead_hang",
+          "unit": "s",
+          "better": "higher",
+          "hevy_field": "duration_sec",
+          "protocol": "Overhand grip, shoulder width, feet off the floor, one attempt until the grip goes. Log the seconds.",
+          "hevy": "the longest Dead Hang set"
+        },
+        "assisted_pull_up": {
+          "label": "assisted pull-up assistance",
+          "catalog_key": "pull_up_assisted",
+          "unit": "lb",
+          "better": "lower",
+          "reps": 5,
+          "hevy_field": "weight_lb",
+          "protocol": "Assisted pull-up machine: the least assistance at which 5 clean reps (full hang, chin over the bar) complete. Start at the last test's assistance. Log the assistance.",
+          "hevy": "the least assistance on a Pull Up (Assisted) set of at least 5 reps"
+        }
+      },
+      "provenance": "the battery and its cadence: owner direction 2026-10-18 (#5078); the protocol detail (units, machines, order, test day): platform-proposed for the owner's review"
     },
     "block_retro": {"every_weeks": 6, "scorecard_rows": 13}
   },
