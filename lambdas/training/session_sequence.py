@@ -36,7 +36,7 @@ THE RULE, AS ARITHMETIC (pure — every Hevy row is injected; the numbers are
                 (`advance_blocked_by: "calendar_floor"`). The role still rotates by index — the
                 order never waits on the calendar; only the ramp clock does.
   deload      = NONE on its own (owner ruling 2026-10-18, #5070). A day is a deload day only when a record of the
-                owner's word (`deload_gate`, passed in as `deload_records`) covers it — then `owner_redlines`
+                owner's word (`deload_word`, passed in as `deload_records`) covers it — then `owner_redlines`
                 `lifting_sessions_per_wk.deload` applies as written: −40 % sets, loads held, `days` (7). A fatigue
                 signal is a RECOMMENDATION on the packet (`deload_recommendation`), never a cut.
   block       = (week - 1) // weeks_per_block + 1
@@ -93,7 +93,7 @@ from typing import Any, Iterable
 
 from common.pacific_time import parse_day_key, shift_day_key
 
-from training import deload_gate, program_structure, training_streaks
+from training import deload_word, program_structure, training_streaks
 
 ISSUE = "#4110"
 PROGRAM_ISSUE = "#4147"
@@ -316,7 +316,7 @@ def deload_cfg() -> dict[str, Any]:
     """The deload's response (`owner_redlines`, one home) and its gate (the charter's `deload` block, #5070).
 
     There is no schedule: the sequence never enters a deload on its own. A deload exists only on a record of the
-    owner's word (`deload_gate`), passed to `ledger` as `deload_records`."""
+    owner's word (`deload_word`), passed to `ledger` as `deload_records`."""
     return {**program_structure._deload_cfg(), "scheduled": False}
 
 
@@ -405,7 +405,7 @@ def ledger(dates: list[str], day: str | None = None, deload_records: list[dict[s
                 blocked = "calendar_floor"
         in_week += 1
         # #5070: a deload is the owner's recorded word covering this day — never the week counter, never a date
-        dl_rec = deload_gate.active_record(deload_records, d)
+        dl_rec = deload_word.active_record(deload_records, d)
         deload = dl_rec is not None
         role = _role_at(i)
         label = program_structure._ROLE_LABEL[role].lower()
@@ -550,7 +550,7 @@ def next_session(
         "days_since_last_advance": basis["days_since_last_advance"],
         "advance_blocked_by": basis["advance_blocked_by"],
         # #5070: no schedule — signals recommend, the owner's recorded word applies. The plan engine fills `reasons`.
-        "deload_recommendation": deload_gate.recommendation(day=day, records=deload_records),
+        "deload_recommendation": deload_word.recommendation(day=day, records=deload_records),
         "deload_plan": {
             "rule": (
                 f"NO scheduled or automatic deload (owner ruling 2026-10-18): a deload applies only on the owner's recorded word — "

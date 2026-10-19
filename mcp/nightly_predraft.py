@@ -169,10 +169,10 @@ def scheduled_session(target_date: str) -> dict[str, Any] | None:
     session is draftable iff it carries a `prescription` (`is_lifting_session`), whatever its
     archetype (`upper`, `lower`; `full` for v0.3 history).
     """
-    from training import deload_gate
+    from training import deload_word
 
     # #5070: the owner's recorded deload word rides the served session; the recommendation (signals) is stage 1's
-    return _session_from(target_date, _block_record(target_date), deload_gate.load_records_failsoft())
+    return _session_from(target_date, _block_record(target_date), deload_word.load_records_failsoft())
 
 
 def is_lifting_session(session: dict[str, Any] | None) -> bool:

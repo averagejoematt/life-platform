@@ -315,10 +315,10 @@ def test_generator_deload_week_holds_loads_and_cuts_sets():
     # #5070 (owner ruling 2026-10-18): no scheduled deload — it applies only on a record of his word. A word starting
     # 11-04 covers 7 days; index 44 (11-07, week 7) is lower-heavy inside it. Without the record the same day is whole.
     word = [{"start_date": "2026-11-04", "days": 7, "sets_pct": -40, "words": "deload this week"}]
-    with patch("training.deload_gate.load_records_failsoft", return_value=[]):
+    with patch("training.deload_word.load_records_failsoft", return_value=[]):
         whole = _generate("2026-11-07", block_workouts=_done(44))[0]
     assert "DELOAD" not in whole.title and sum(len(b.sets) for b in whole.exercises) == 12
-    with patch("training.deload_gate.load_records_failsoft", return_value=word):
+    with patch("training.deload_word.load_records_failsoft", return_value=word):
         ideal = _generate("2026-11-07", block_workouts=_done(44))[0]
     assert "DELOAD" in ideal.title and ideal.title.startswith("LOWER-HEAVY — W7")
     assert any("deload: sets 12 -> 7" in r for r in ideal.rationale)

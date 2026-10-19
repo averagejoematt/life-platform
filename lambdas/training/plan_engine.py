@@ -84,7 +84,7 @@ from typing import Any, Callable
 from health import deficit_disclosures
 
 from training import (
-    deload_gate,
+    deload_word,
     owner_redlines,
     program_structure,
     recent_aerobic,
@@ -726,7 +726,7 @@ def _deload_recommendation(
     recorded word applies one today. NEVER an applied set cut by itself. Pain notes count only while the flag is
     tripped (a dismissed site is the owner's word that it is resolved). An unreadable record store is stated."""
     pain = next((t for t in tripwires if t["id"] == "pain_flag_named_site" and t["state"] == "tripped"), None)
-    rec = deload_gate.recommendation(
+    rec = deload_word.recommendation(
         day=date,
         records=deload_records,
         fatigue=fatigue,

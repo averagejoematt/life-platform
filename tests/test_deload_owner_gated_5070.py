@@ -16,7 +16,7 @@ os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
 from common.pacific_time import shift_day_key  # noqa: E402
-from training import deload_gate, plan_engine, program_structure, session_sequence  # noqa: E402
+from training import deload_word, plan_engine, program_structure, session_sequence  # noqa: E402
 
 START = "2026-09-24"
 WORD = {"sk": "DELOAD#2026-11-04", "start_date": "2026-11-04", "days": 7, "sets_pct": -40, "loads": "held", "words": "deload this week"}
@@ -73,7 +73,7 @@ def test_week_6_and_the_old_lock_date_fire_nothing_without_a_record():
         b = plan_engine.constraint_block(date=day, block_workouts=_rows(n), deload_records=[])
         assert b["session"]["deload"] is False and b["deload_recommendation"]["applied"] is False, day
     # an expired record covers nothing either
-    assert deload_gate.active_record([WORD], "2026-11-11") is None and deload_gate.active_record([WORD], "2026-11-03") is None
+    assert deload_word.active_record([WORD], "2026-11-11") is None and deload_word.active_record([WORD], "2026-11-03") is None
 
 
 def test_pain_note_counts_only_while_the_flag_is_tripped():
@@ -111,7 +111,7 @@ def test_the_predraft_session_carries_the_recommendation_key():
     assert '"deload_recommendation"' in inspect.getsource(npd.run)
     with (
         patch.object(npd, "_block_record", return_value=_rows(41)),
-        patch.object(deload_gate, "load_records_failsoft", return_value=[WORD]),
+        patch.object(deload_word, "load_records_failsoft", return_value=[WORD]),
         patch("mcp.plan_helpers._catalog_and_ceiling", return_value=({}, 2)),
     ):
         s = npd.scheduled_session("2026-11-04")
@@ -119,7 +119,7 @@ def test_the_predraft_session_carries_the_recommendation_key():
 
 
 def test_the_record_shape_validates():
-    rec = deload_gate.build_deload_record(start_date="2026-11-04", words="  deload this week ", recorded_at="2026-11-04T00:00:00Z")
+    rec = deload_word.build_deload_record(start_date="2026-11-04", words="  deload this week ", recorded_at="2026-11-04T00:00:00Z")
     assert (rec["sk"], rec["days"], rec["sets_pct"], rec["loads"], rec["words"]) == (
         "DELOAD#2026-11-04",
         7,
@@ -134,7 +134,7 @@ def test_the_record_shape_validates():
         {"start_date": "2026-11-04", "words": "x", "sets_pct": 10},
     ):
         with pytest.raises(ValueError):
-            deload_gate.build_deload_record(recorded_at="t", **bad)
+            deload_word.build_deload_record(recorded_at="t", **bad)
 
 
 def test_the_chat_writer_records_the_word_and_refuses_a_blank_one():
@@ -147,13 +147,13 @@ def test_the_chat_writer_records_the_word_and_refuses_a_blank_one():
         ok = tn.tool_get_exercise_notes({"action": "deload", "start_date": "2026-11-04", "words": "take the week lighter"})
     assert ok["wrote"] is True and ok["sk"] == "DELOAD#2026-11-04"
     item = fake.put_item.call_args.kwargs["Item"]
-    assert item["pk"] == deload_gate.DELOAD_PK == "USER#matthew#SOURCE#training_constraints"
+    assert item["pk"] == deload_word.DELOAD_PK == "USER#matthew#SOURCE#training_constraints"
     assert item["words"] == "take the week lighter" and item["sets_pct"] == -40 and item["days"] == 7
-    assert deload_gate.DELOAD_SK_PREFIX == "DELOAD#" and not deload_gate.DELOAD_SK_PREFIX.startswith("DISMISSAL")
+    assert deload_word.DELOAD_SK_PREFIX == "DELOAD#" and not deload_word.DELOAD_SK_PREFIX.startswith("DISMISSAL")
 
 
 def test_the_policy_reads_the_charter_and_the_schedule_is_gone():
-    pol = deload_gate.policy()
+    pol = deload_word.policy()
     assert (pol["scheduled"], pol["automatic"], pol["owner_gated"]) == (False, False, True)
     assert "rpe_drift" in pol["recommendation_triggers"]
     cfg = session_sequence.deload_cfg()

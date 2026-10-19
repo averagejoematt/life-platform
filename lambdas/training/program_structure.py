@@ -572,7 +572,7 @@ BLOCK_LOCK: dict[str, Any] = {
 
 def _deload_cfg() -> dict[str, Any]:
     # The deload's RESPONSE (−40 % sets, 7 days, loads held), one home in `owner_redlines`. No schedule (#5070): it applies
-    # only on the owner's recorded word (`deload_gate`).
+    # only on the owner's recorded word (`deload_word`).
     from training import owner_redlines
 
     return dict(owner_redlines.REDLINES["lifting_sessions_per_wk"]["deload"])
@@ -583,7 +583,7 @@ def _deload_cfg() -> dict[str, Any]:
 # I audible a change" — the sessions are an ORDER, not dates. Owner, 2026-09-23 (#4147): v0.4
 # is Upper-heavy -> Lower-heavy -> Upper-volume -> Lower-volume, repeating. The position advances
 # only on a completed LOADED Hevy session (a walk or an Engine day postpones, never skips). Four
-# completed sessions AND >= 7 days are one program week (#4161); the deload is the owner's recorded word (`deload_gate`, #5070).
+# completed sessions AND >= 7 days are one program week (#4161); the deload is the owner's recorded word (`deload_word`, #5070).
 #
 # The sequence STARTS at Lower-heavy: that is the first v0.4 session, already committed from chat
 # (`first_session`). Counting starts on `block_start`, the first Pacific day after the decision

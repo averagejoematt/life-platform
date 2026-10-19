@@ -466,16 +466,16 @@ def _dismiss_pain_flag(args):
 # No schedule, no automatic deload: fatigue signals RECOMMEND (plan_next_session's `deload_recommendation`), and a
 # deload applies only on a record of his word — `USER#matthew#SOURCE#training_constraints / DELOAD#<start_date>`,
 # the same partition and the same chat path as the pain-flag dismissal, so this is one more ACTION on this existing
-# owner tool (no new tool, so no generated count moves). The rule and the record shape live in `training.deload_gate`.
+# owner tool (no new tool, so no generated count moves). The rule and the record shape live in `training.deload_word`.
 
 
 def _deload_records() -> list:
     """Every recorded deload word, newest first. Paginated (#3729) — read by `mcp.tools_plan._deload_records`."""
-    from training import deload_gate
+    from training import deload_word
 
     items: list = []
     kwargs = {
-        "KeyConditionExpression": Key("pk").eq(deload_gate.DELOAD_PK) & Key("sk").begins_with(deload_gate.DELOAD_SK_PREFIX),
+        "KeyConditionExpression": Key("pk").eq(deload_word.DELOAD_PK) & Key("sk").begins_with(deload_word.DELOAD_SK_PREFIX),
         "ScanIndexForward": False,
     }
     while True:
@@ -489,12 +489,12 @@ def _deload_records() -> list:
 
 def _list_deload_words():
     """action='deloads' — every recorded deload word (OWNER-ONLY: verbatim words)."""
-    from training import deload_gate
+    from training import deload_word
 
     return {
         "count": len(_deload_records()),
-        "store": deload_gate.DELOAD_STORE,
-        "policy": deload_gate.policy(),
+        "store": deload_word.DELOAD_STORE,
+        "policy": deload_word.policy(),
         "deloads": [
             {k: r.get(k) for k in ("sk", "start_date", "days", "sets_pct", "loads", "words", "recorded_at")} for r in _deload_records()
         ],
@@ -505,10 +505,10 @@ def _record_deload_word(args):
     """action='deload' — record the owner's word that a deload starts on `start_date` (default today, Pacific)."""
     from datetime import datetime, timezone
 
-    from training import deload_gate
+    from training import deload_word
 
     try:
-        record = deload_gate.build_deload_record(
+        record = deload_word.build_deload_record(
             start_date=args.get("start_date") or pacific_now().date().isoformat(),
             words=args.get("words") or "",
             days=args.get("days"),
@@ -516,10 +516,10 @@ def _record_deload_word(args):
             recorded_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         )
     except ValueError as e:
-        return {"error": f"refused: {e}", "policy": deload_gate.policy(), "wrote": False}
+        return {"error": f"refused: {e}", "policy": deload_word.policy(), "wrote": False}
     table.put_item(
         Item={
-            # literal (orphan-gate greppable); == training.deload_gate.DELOAD_PK
+            # literal (orphan-gate greppable); == training.deload_word.DELOAD_PK
             "pk": "USER#matthew#SOURCE#training_constraints",
             **record,
         }

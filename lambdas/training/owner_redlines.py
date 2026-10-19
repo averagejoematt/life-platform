@@ -85,7 +85,7 @@ loss-rate target is CONDITIONAL ON PROTEIN ADHERENCE (`rate_protein_gate`) — t
 carried before); the risk is adherence, not the floor, so a week of misses serves the envelope's LOWER band instead of the schedule step.
 
 v3.4 (2026-10-18, #5070): owner ruling — NO scheduled or automatic deload; v3.3's week-6 / block-lock deload is retired and a
-deload applies only on his recorded word (`training.deload_gate`; the response is `lifting_sessions_per_wk.deload`)."""
+deload applies only on his recorded word (`training.deload_word`; the response is `lifting_sessions_per_wk.deload`)."""
 
 RED_TEAM_RECORD = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.3_redteam.md"
 PLAN = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.4.md"  # #4147; written by the driver, owner-private
@@ -408,7 +408,7 @@ REDLINES: dict[str, dict[str, Any]] = {
         "rep_scheme": "heavy exposure 4–6: one top set at RPE 7–8 plus two back-offs at −10 %; moderate 6–10; volume 8–12; accessories 8–15 at RIR 1–2",
         "accessory_rule": "2–3 per session, 2 sets, machines/cables, fixed for the block — none added after week 1; first thing dropped on a bad day",
         # v3.4 (#5070, owner ruling 2026-10-18): NO scheduled or automatic deload. This is the response a deload APPLIES AS
-        # WRITTEN when — and only when — the owner's recorded word covers the day (`training.deload_gate`); the schedule
+        # WRITTEN when — and only when — the owner's recorded word covers the day (`training.deload_word`); the schedule
         # (v3.3's program-week-6 / block-lock deload, #4161) is retired. Whether one may run is the charter's `deload` block.
         "deload": {
             "sets_pct": -40,
