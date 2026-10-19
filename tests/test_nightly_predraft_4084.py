@@ -399,6 +399,28 @@ def test_the_seam_is_the_function_stage_1_uses():
     picker.assert_called_once_with(TARGET, {"m": {}}, 3, done, [])
 
 
+def test_the_seam_serves_the_fifth_role_through_the_real_picker_5069():
+    """#5069 (owner ruling 5: "Sequence Upper-heavy, Lower-heavy, Shoulders+arms, Upper-volume, Lower-volume"): through
+    the REAL stage-1 picker, a record whose last credited v0.4 session is lower-heavy (09-24, the block's first) followed
+    by nothing until the cut-over serves shoulders+arms on 10-19 — archetype upper, a prescription, so it is draftable."""
+    catalog = json.loads((Path(__file__).resolve().parents[1] / "config" / "movement_catalog.json").read_text())["movements"]
+    lh = {
+        "date": "2026-09-24",
+        "source_workout_id": "lh",
+        "exercises": [{"name": "Squat (Barbell)", "sets": [{"type": "normal", "weight_kg": 100, "reps": 5}]}],
+    }
+    with (
+        patch("mcp.plan_helpers._catalog_and_ceiling", return_value=(catalog, 2)),
+        patch("mcp.plan_hevy_windows._block_workouts", return_value=[lh]),
+        patch("training.deload_word.load_records_failsoft", return_value=[]),
+    ):
+        session = npd.scheduled_session("2026-10-19")
+    assert (session["session_role"], session["archetype"], session["program_version"]) == ("shoulders_arms", "upper", "1.0")
+    assert npd.is_lifting_session(session)
+    anchors = [e["pattern"] for e in session["prescription"]["exposures"] if e["kind"] == "anchor"]
+    assert anchors == ["overhead_press"] and session["prescription"]["session_minutes"]["within_cap"]
+
+
 def test_an_unread_sequence_record_is_named_never_a_silent_session_one():
     """A failed Hevy read hands the picker None: the real picker then says `sequence_unreadable`
     and carries no prescription, so the predraft reads `no_session` — it never drafts session 1."""

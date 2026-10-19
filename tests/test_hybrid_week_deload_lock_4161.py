@@ -14,7 +14,9 @@ fixture AND a mutation control that shows the fixture can fail:
      scheduled week-6 / 2026-11-04 deload: "No scheduled or automatic deload. Fatigue signals become a
      recommendation; a deload happens only on the owner's recorded word." The response (−40 % sets for 7
      days, loads held, never a week off — Coleman 2024) is unchanged and applies as written, only on a
-     record. The lock is a guard the engine reads, and a structural edit before the date reds here.
+     record. The LOCK half is REWRITTEN to owner ruling 6 of 2026-10-18 (#5069), quoted: "Structure lock:
+     the v0.4 lock to 2026-11-04 is lifted now." The lock is history (`program_v04.BLOCK_LOCK`); the
+     structure fingerprint is a measurement on the served session, and a structural edit refuses nothing.
   3. CRITICS — (i) the stale-lift cap scales with the gap (Nosaka 2001; Chen 2012); (ii) the
      fatigue trigger is performance or readiness, not a loaded-day count (Bell 2023; Rogerson
      2024; Kataoka 2022; Yang 2018), −30 % sets for one session, plus the 48 h same-region guard;
@@ -50,7 +52,7 @@ START = "2026-09-24"
 
 
 def lift(day: str, name: str = "Linear Leg Press", wid: str | None = None) -> dict:
-    # #4312: `name` plus a bench set, so the generic lift reaches an anchor muscle of whichever role it takes
+    # #4312: `name` plus a bench set (and, #5069, a delt set), so the generic lift reaches an anchor muscle of whichever role it takes
     return {
         "date": day,
         "sk": f"DATE#{day}#WORKOUT#{wid or day}",
@@ -58,6 +60,7 @@ def lift(day: str, name: str = "Linear Leg Press", wid: str | None = None) -> di
         "exercises": [
             {"name": name, "sets": [{"type": "normal", "weight_kg": 90, "reps": 5}]},
             {"name": "Bench Press (Barbell)", "sets": [{"type": "normal", "weight_kg": 60, "reps": 5}]},
+            {"name": "Lateral Raise (Dumbbell)", "sets": [{"type": "normal", "weight_kg": 10, "reps": 12}]},
         ],
     }
 
@@ -181,23 +184,29 @@ def test_the_deload_is_minus_40_loads_held_never_a_week_off():
         assert rx["total_sets"] >= 1 and all(len(e["sets"]) >= 1 for e in rx["exposures"]), "a deload is lighter, never a week off"
 
 
-def test_no_structural_edit_before_the_lock_date():
-    """THE refusal: before 2026-11-04 the v0.4 structure (split, order, templates, accessories) must
-    fingerprint to what was recorded at the lock. Loads, deloads, catalog keys are not structure."""
-    state = session_sequence.block_lock_state(pacific_today())
-    if pacific_today() < program_structure.BLOCK_LOCK["locked_until"]:
-        assert state["state"] == "locked", state.get("refusal")
-    assert session_sequence.block_lock_state("2026-11-03")["recorded_fingerprint"] == program_structure.BLOCK_LOCK["structure_fingerprint"]
+def test_the_lock_is_lifted_and_the_fingerprint_is_only_a_measurement():
+    """Ruling 6 (2026-10-18, #5069): "the v0.4 lock to 2026-11-04 is lifted now". No guard is left to read: the lock is a
+    dated record, and the served session carries the live fingerprint marked as a measurement."""
+    from training import program_v04
+
+    for gone in ("block_lock_state", "fingerprint_record_problems"):
+        assert not hasattr(session_sequence, gone), gone
+    assert not hasattr(program_structure, "BLOCK_LOCK")
+    assert program_v04.BLOCK_LOCK["locked_until"] == "2026-11-04" and program_v04.BLOCK_LOCK["lifted"]["on"] == "2026-10-18"
+    for day in ("2026-10-10", pacific_today(), "2026-11-04"):
+        st = session_sequence.next_session(max(day, START), [])["structure"]
+        assert st["lock"] == "lifted" and st["structure_fingerprint"] == session_sequence.structure_fingerprint()
+        assert "never a guard" in st["note"]
 
 
-def test_mutation_control_a_structural_edit_is_flagged_on_the_served_session():
+def test_mutation_control_a_structural_edit_moves_the_measurement_and_refuses_nothing():
+    """Before the ruling this edit read `violated` on the served session until 2026-11-04. Now the fingerprint moves (the
+    measurement can see it) and the session is served exactly as before."""
+    before = session_sequence.next_session("2026-10-10", [])
     with patch.dict(program_structure.SESSION_TEMPLATES["lower_heavy"], {"accessories": ["leg_press"]}):
-        state = session_sequence.block_lock_state("2026-10-10")
         e = session_sequence.next_session("2026-10-10", [])
-        after = session_sequence.block_lock_state("2026-11-04")
-    assert state["state"] == "violated" and "block lock" in state["refusal"]
-    assert e["block_lock"]["state"] == "violated"
-    assert after["state"] == "open"
+    assert e["structure"]["structure_fingerprint"] != before["structure"]["structure_fingerprint"]
+    assert e["session_role"] == before["session_role"] and "refusal" not in e and "block_lock" not in e
 
 
 # ── 3(i). the stale-lift cap scales with the gap ───────────────────────────────────────
@@ -635,19 +644,11 @@ def test_the_stage_2_evidence_marks_a_deload_session_superseded():
     assert ev["fatigue"]["response"]["superseded_by_deload"] is True and ev["fatigue"]["response"]["deload_sets_pct"] == -40
 
 
-def test_a_version_bump_is_not_a_structural_edit():
-    with patch.dict(program_structure.SESSION_SEQUENCE, {"program_version": "0.4.1"}):
-        assert session_sequence.block_lock_state("2026-10-10")["state"] == "locked"
-
-
-def test_a_fingerprint_re_record_without_the_owner_note_reds():
-    assert session_sequence.fingerprint_record_problems() == []
-    with patch.dict(program_structure.BLOCK_LOCK, {"structure_fingerprint": "deadbeefdeadbeef"}):
-        assert session_sequence.fingerprint_record_problems(), "a bare re-record must not pass"
-        assert session_sequence.block_lock_state("2026-10-10")["state"] == "violated"
-    bad = {**program_structure.BLOCK_LOCK["structure_fingerprint_record"], "provenance": "platform"}
-    with patch.dict(program_structure.BLOCK_LOCK, {"structure_fingerprint_record": bad}):
-        assert "record provenance is not 'owner'" in session_sequence.fingerprint_record_problems()
+def test_a_version_bump_is_not_a_structural_change():
+    """program_version is not structure (#4161 review): a bump leaves the measured fingerprint where it was."""
+    fp = session_sequence.structure_fingerprint()
+    with patch.dict(program_structure.SESSION_SEQUENCE, {"program_version": "1.0.1"}):
+        assert session_sequence.structure_fingerprint() == fp
 
 
 def test_the_gated_target_is_one_data_field():

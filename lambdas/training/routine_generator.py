@@ -122,8 +122,8 @@ def _schedule_entry_for_date(
     deload_records: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The whole schedule entry for the day. #3755: the module grid carries a key the JSON grid
-    never had — `session_role` (v0.4: upper_heavy / lower_heavy / upper_volume / lower_volume,
-    #4147) — which routes the day to the program's session and rides on the rationale and title.
+    never had — `session_role` (the five roles of the charter's split, #5069; v0.4's four, #4147) —
+    which routes the day to the program's session and rides on the rationale and title.
 
     #4110 (replacing #4064's weekday calendar): when the seam served the MODULE grid
     (`source == "module"`, i.e. the program is ACTIVE), the session SEQUENCE answers first —
@@ -857,8 +857,8 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
 
         return disruption.routines(inputs.target_date, day_entry["session_role"], mode, catalog, int(week_cfg.get("skill_ceiling", 2)))
     if day_entry.get("session_role") in program_structure.SESSION_TEMPLATES:
-        # #4064/#4147 — a program role (v0.4: upper/lower heavy/volume) is the program's session
-        # (anchors at heavy/moderate/volume, fixed accessories, the #4161 deload at the later of week 6 or the block lock),
+        # #4064/#4147/#5069 — a program role (the five-day split's) is the program's session
+        # (anchors at heavy/moderate/volume, fixed accessories, the deload only on the owner's recorded word — #5070),
         # not a muscle-budget session with a role label on it. Only the module grid carries a
         # `session_role`; the JSON grid's upper/lower days still take the muscle-budget path.
         from training.full_body_session import full_body_routines

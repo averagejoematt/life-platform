@@ -1028,9 +1028,8 @@ def constraint_block(
         # into a reviewed list.
         "standing_constraints_from_chat": training_memory_constraints or [],
         # #4064/#4110 — WHAT the program serves on this date: the next UNDONE session of the
-        # sequence (v0.4, #4147: upper-heavy -> lower-heavy -> upper-volume -> lower-volume, from
-        # lower-heavy on 2026-09-24; it advances only on a completed loaded Hevy session; a deload
-        # only on the owner's recorded word, #5070) and its session — anchors with their sets and reps,
+        # sequence (the charter's five-day order since #5069; v0.4's four before its cut-over; it advances only on a
+        # completed loaded Hevy session; a deload only on the owner's recorded word, #5070) and its session — anchors with their sets and reps,
         # the fixed accessories, the Hevy folder. Third, right after the two safety keys:
         # walking and the standing constraints outrank any single session.
         "session": session,
@@ -1148,23 +1147,7 @@ def constraint_block(
                     if program["active"]
                     else f"TRAINING_PROGRAM v{program['program_version']} ({program['split']}) is PROPOSED, not approved — the engine is still running on the live week grid (#3755)"
                 ),
-                (
-                    "the program has UNRESOLVED conflicts with the owner's own redlines: "
-                    + ", ".join(c["id"] for c in program["conflicts"] if not c.get("resolved"))
-                    if any(not c.get("resolved") for c in program["conflicts"])
-                    else None
-                ),
-                # #4080: a conflict resolved by owner ruling stays NAMED (audit trail — see
-                # program_structure.conflicts()) rather than silently dropping out of the
-                # block; it must never read as "UNRESOLVED" once it isn't.
-                (
-                    "the program's conflict(s) RESOLVED by owner ruling: "
-                    + ", ".join(
-                        f"{c['id']} ({c.get('resolution_source', 'no source recorded')})" for c in program["conflicts"] if c.get("resolved")
-                    )
-                    if any(c.get("resolved") for c in program["conflicts"])
-                    else None
-                ),
+                *_program_conflict_lines(program["conflicts"]),
                 (
                     f"the accessory layer is {rotation['state']}: {rotation['detail']}"
                     if rotation["ok"] is None
@@ -1184,6 +1167,18 @@ def constraint_block(
             if s
         ],
     }
+
+
+def _program_conflict_lines(conflicts: list[dict[str, Any]]) -> list[str | None]:
+    """The honesty lines for the program's conflicts with the owner's redlines: the UNRESOLVED ones, then the ones
+    resolved by owner ruling. #4080: a resolved conflict stays NAMED (audit trail — see `program_structure.conflicts()`)
+    rather than silently dropping out of the block; it must never read as "UNRESOLVED" once it isn't."""
+    unresolved = [c["id"] for c in conflicts if not c.get("resolved")]
+    resolved = [f"{c['id']} ({c.get('resolution_source', 'no source recorded')})" for c in conflicts if c.get("resolved")]
+    return [
+        "the program has UNRESOLVED conflicts with the owner's own redlines: " + ", ".join(unresolved) if unresolved else None,
+        "the program's conflict(s) RESOLVED by owner ruling: " + ", ".join(resolved) if resolved else None,
+    ]
 
 
 def _recent_aerobic_view(

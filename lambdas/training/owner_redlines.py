@@ -86,6 +86,10 @@ carried before); the risk is adherence, not the floor, so a week of misses serve
 
 v3.4 (2026-10-18, #5070): owner ruling — NO scheduled or automatic deload; v3.3's week-6 / block-lock deload is retired and a
 deload applies only on his recorded word (`training.deload_word`; the response is `lifting_sessions_per_wk.deload`)."""
+# Same day (#5069), owner rulings 5 + 6: five lifting days in the charter's order, 60-75 min of lifting, and the v0.4 lock
+# lifted. `lifting_sessions_per_wk` low/high, `structure` and `session_minutes` are READ from the training charter
+# (`split.lifting_days_per_wk`, `split.sequence`, `split.session_minutes.lifting`). The v0.4 values — 3–4 sessions/wk, the
+# four-session order (`training.program_v04`), 55–70 min, and v0.4's 50–65 hard sets/wk — are this comment's history.
 
 RED_TEAM_RECORD = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.3_redteam.md"
 PLAN = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.4.md"  # #4147; written by the driver, owner-private
@@ -96,6 +100,7 @@ from common.constants import PLAN_DAILY_PROTEIN_MIN_G as _PLAN_PROTEIN_FLOOR_G  
 
 from training.green_block import SESSION_SET_CEILINGS  # noqa: E402  (#4503 OD4)
 from training.redline_changelog import CHANGELOG_V1_TO_V2, CHANGELOG_V2_TO_V3  # noqa: E402
+from training.training_charter import charter_value as _charter_value  # noqa: E402  (#5069: the split is the charter's)
 
 LAST_REVIEWED_BY_OWNER: str | None = "2026-09-23"
 """ISO date the owner last read this file. None means never."""
@@ -358,23 +363,22 @@ REDLINES: dict[str, dict[str, Any]] = {
         ),
     },
     "lifting_sessions_per_wk": {
-        "low": 3,
-        "high": 4,
-        # #4147 (owner, 2026-09-23, DECISION#2026-09-24T03:10:59): v0.4 Upper/Lower replaced v0.3 full-body. The v0.3
-        # structure string is kept below as history; the numbers it did not touch are unchanged.
+        # #5069 (owner ruling 5, 2026-10-18): five lifting days — the charter's `split.lifting_days_per_wk`; was 3–4 (v3/v0.4)
+        "low": int(_charter_value("split.lifting_days_per_wk") or 0),
+        "high": int(_charter_value("split.lifting_days_per_wk") or 0),
+        # #5069: the charter's order (ruling 5) and its split.frequency; v0.4's four-session order is `training.program_v04`
         "structure": (
-            "upper/lower in ORDER: upper-heavy -> lower-heavy -> upper-volume -> lower-volume, repeating; the next session is the one "
-            "after the last performed lift, whatever the date (a walk audible postpones, never skips); each muscle 2x/wk"
+            " -> ".join(str(n).lower() for n in _charter_value("split.sequence") or []) + ", repeating, in ORDER; the next session is "
+            "the one after the last performed lift, whatever the date (a walk audible postpones, never skips); frequency: split.frequency"
         ),
         "structure_v0_3": "full-body: heavy / moderate / heavy-moderate on non-consecutive days; the optional 4th only after two green recovery days",
         "sets_per_muscle_wk": [8, 12],
         "sets_per_muscle_wk_provenance": "owner 2026-09-23 (#4147, v0.4): ~10 hard sets/muscle/wk; was [6, 10] under v0.3 (red team 2026-09-22)",
         "sets_per_muscle_wk_small": [4, 6],
-        # #4503 OD4 (A, owner 2026-09-30): base 60–75, was v0.4's 50–65. The locked v0.4 block (56/wk, no 🟢 tail — OD8a) runs
-        # under it until `program_structure.BLOCK_LOCK['locked_until']`; the band governs the next block's templates.
+        # #4503 OD4 (A, owner 2026-09-30): base 60–75, was v0.4's 50–65. The five-day week (#5069) sits inside it; the v0.4
+        # lock that held the four-session week under it is lifted (ruling 6; history: `program_v04.BLOCK_LOCK`).
         "total_hard_sets_wk": [60, 75],
-        "total_hard_sets_wk_v0_4": [50, 65],
-        "session_minutes": [55, 70],
+        "session_minutes": list(_charter_value("split.session_minutes.lifting") or []),  # #5069: the charter's lifting minutes
         "anchors_per_week": 2,
         "load_rule": "hold — gains are rep-triggered (double progression, #4503 OD5)",
         "load_entry": {

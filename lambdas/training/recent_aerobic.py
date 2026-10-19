@@ -402,7 +402,11 @@ def legs_loaded(block: dict[str, Any] | None) -> tuple[bool | None, str]:
 
 
 def is_lower(archetype: Any) -> bool:
-    return str(archetype or "").strip().lower() in ("lower", "legs", "lower-heavy", "lower-volume")
+    """A lower-body session: the `lower` / `legs` archetypes, or a charter `split.sequence` name that opens with 'lower' (#5069)."""
+    from training.training_charter import charter_value
+
+    names = {str(n).strip().lower() for n in charter_value("split.sequence") or [] if str(n).strip().lower().startswith("lower")}
+    return str(archetype or "").strip().lower() in {"lower", "legs"} | names
 
 
 def cardio_pick(block: dict[str, Any] | None, archetype: Any, target_date: str | None = None) -> dict[str, Any]:
