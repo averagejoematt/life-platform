@@ -531,6 +531,13 @@ for _extracted in (CI_PROOFS, GUARD_PROOFS, QA_PROOFS, REGISTRY_PROOFS, STRUCTUR
 # is how the assumption survives. Nothing here is a claim that the gate is dark.
 # ─────────────────────────────────────────────────────────────────────────────
 ATTEMPTED_UNPROVEN: dict[str, str] = {
+    "ci::panel-rubric-gate.yml::gate::5": (
+        "#5072 Live judge — NOT PROVED. It runs only when the OIDC credential step resolves, and the role it assumes "
+        "(github-actions-golden-eval-role) carries no Sonnet 4.6 grant until the owner applies one; a lane may not mutate "
+        "IAM or call Bedrock. Its code path is the recorded step's (same script, same exit) with the replay swapped for "
+        "the live judge, so the recorded step's proof covers the verdict plumbing; the live half is unwatched until the "
+        "first live run after the owner's grant."
+    ),
     "ci::ci-lint.yml::lint::10": (
         "Secret scan (gitleaks) — NOT PROVED. `gitleaks` is not installed on this machine and "
         "the gate's semantics are the ACTION's, not a binary's: gitleaks-action scans the "

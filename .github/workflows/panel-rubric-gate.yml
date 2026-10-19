@@ -1,0 +1,82 @@
+# The panel rubric's regression gate (#5072, epic #5067) — OWNER-APPROVED WORKFLOW CHANGE.
+#
+# A change to the training charter, the engine templates, the planning skills or the coach prompts
+# can make the plan worse with every unit test green. `scripts/panel_rubric_gate.py` grades the golden
+# plan cases (tests/fixtures/panel_golden_5072/) against config/panel_rubric.json and fails when the
+# good charter plan drops below the charter's panel_target or a negative control passes what it must fail.
+#
+# Two steps:
+#   * --recorded (gating, free, no AWS): the code pre-score + the replayed judge. The unit suite runs the
+#     same mode on every PR (tests/test_panel_rubric_5072.py), so this step is the path-filtered echo of it.
+#   * --live (gating once the role is applied): the blinded judge on route charter.judge_gate — budget
+#     feature charter_judge_gate, a band-3 CI gate (budget_guard.CI_GATE_FEATURES): it pauses only at the
+#     hard stop, and a pause prints SKIPPED-BY-BUDGET + a ::warning:: while the code half still gates.
+#     ~$0.15 a run (one Sonnet call per golden case, back-to-back on the cached charter block). The OIDC
+#     role must allow bedrock:InvokeModel on the Sonnet 4.6 inference profile; until the owner applies
+#     that grant the credential step degrades softly and only the recorded verdict gates.
+#
+# Path filter = the #5072 issue's `## Set` (the charter, engine templates, skills, coach prompts) plus the
+# gate's own inputs.
+
+name: Panel rubric gate
+
+on:
+  pull_request:
+    paths:
+      - 'config/training_*.json'
+      - 'config/panel_rubric.json'
+      - 'config/coaches/physical_coach*.json'
+      - 'lambdas/training/program_structure.py'
+      - 'lambdas/training/routine_generator.py'
+      - 'lambdas/training/panel_rubric.py'
+      - 'lambdas/training/panel_judge.py'
+      - 'lambdas/coach/critics*.py'
+      - '.claude/skills/daily-debrief/SKILL.md'
+      - 'docs/coaching/COACH_SESSION.md'
+      - 'scripts/panel_rubric_gate.py'
+      - 'tests/fixtures/panel_golden_5072/**'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write # OIDC for the live judge only
+
+concurrency:
+  group: panel-rubric-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-west-2
+  AWS_ACCOUNT_ID: "205930651321"
+
+jobs:
+  gate:
+    name: Panel rubric gate (golden plan cases)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-ci
+
+      - name: Install dependencies (boto3, botocore)
+        run: |
+          PINS=$(python3 scripts/ci_pins.py boto3 botocore)
+          pip install --quiet $PINS
+
+      - name: Recorded judge (gating, free)
+        # Unpiped: the script's own exit code is the verdict (the #3103 class).
+        run: python3 scripts/panel_rubric_gate.py --recorded
+
+      - name: Configure AWS (live judge)
+        id: judge-creds
+        continue-on-error: true # the Sonnet grant is an owner apply — degrade softly until it exists
+        uses: ./.github/actions/setup-ci
+        with:
+          python: 'false'
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-golden-eval-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Live judge (gating when credentials resolve)
+        if: ${{ steps.judge-creds.outcome == 'success' }}
+        run: python3 scripts/panel_rubric_gate.py --live

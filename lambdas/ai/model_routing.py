@@ -72,7 +72,8 @@ TIERS = tuple(TIER_MODELS)
 # ── Feature → default tier: EXACTLY budget_guard._FEATURE_CUTOFF's keys ─────────────────
 FEATURE_TIERS: dict[str, str] = {
     "broadcast_sensitivity": WORKHORSE,  # #4769 restores its Haiku call
-    "charter_judge": WORKHORSE,  # #5084: the charter's panel-rubric judge (#5072)
+    "charter_judge": NARRATIVE,  # #5084/#5072: the panel-rubric judge — NOT the planner's tier (plan_critics is WORKHORSE)
+    "charter_judge_gate": NARRATIVE,  # #5072: the same judge as the CI regression gate over the golden cases
     "charter_narrative": WORKHORSE,  # #5084: the plan's charter-frame explanation lines
     "charter_retro": WORKHORSE,  # #5084: the block retro (#5079)
     "chronicle": WORKHORSE,
@@ -126,7 +127,10 @@ ROUTES: dict[str, Route] = {
     # #5084: the training charter's three callers, bound in lambdas/training/charter_ai.py. Each reads
     # the workhorse channel (AI_MODEL_HAIKU) like the other Haiku callers; their cached charter block
     # was measured on Haiku 4.5 (prompt_cache.CACHING_DECISIONS "charter-*"), so a move re-measures.
-    "charter.judge": Route(feature="charter_judge", env="AI_MODEL_HAIKU"),
+    # #5072: the judge reads the NARRATIVE channel (AI_MODEL) — the plan's red team (plan_critics) is WORKHORSE, and the
+    # anti-Goodhart rule on #5072 puts the judge on a different tier from the planner. Its cache decision is re-recorded.
+    "charter.judge": Route(feature="charter_judge", env="AI_MODEL"),
+    "charter.judge_gate": Route(feature="charter_judge_gate", env="AI_MODEL"),
     "charter.narrative": Route(feature="charter_narrative", env="AI_MODEL_HAIKU"),
     "charter.retro": Route(feature="charter_retro", env="AI_MODEL_HAIKU"),
     "chronicle": Route(feature="chronicle", env="AI_MODEL_HAIKU"),  # wednesday_chronicle (+ chronicle_personas)
