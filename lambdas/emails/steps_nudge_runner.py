@@ -24,6 +24,7 @@ from typing import Any, Callable, Optional
 from boto3.dynamodb.conditions import Key
 from common.numeric import floats_to_decimal
 from common.pacific_time import PACIFIC, parse_iso_utc
+from common.strava_read_seam import strava_read_seam
 from training import deload_word, steps_nudge, steps_ramp, steps_resolver
 
 logger = logging.getLogger()
@@ -50,7 +51,7 @@ def make_fetch(table, user: str = "matthew") -> Callable[[str, str, str], list]:
             resp = table.query(**kwargs)
             items.extend(i for i in resp.get("Items", []) if not i.get("tombstone"))
             if "LastEvaluatedKey" not in resp:
-                return items
+                return strava_read_seam(source, items)  # #4419: a no-op for every non-strava steps source
             kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
     return fetch
