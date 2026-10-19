@@ -5,18 +5,17 @@
 # plan cases (tests/fixtures/panel_golden_5072/) against config/panel_rubric.json and fails when the
 # good charter plan drops below the charter's panel_target or a negative control passes what it must fail.
 #
-# Two steps:
-#   * --recorded (gating, free, no AWS): the code pre-score + the replayed judge. The unit suite runs the
-#     same mode on every PR (tests/test_panel_rubric_5072.py), so this step is the path-filtered echo of it.
-#   * --live (gating once the role is applied): the blinded judge on route charter.judge_gate — budget
-#     feature charter_judge_gate, a band-3 CI gate (budget_guard.CI_GATE_FEATURES): it pauses only at the
-#     hard stop, and a pause prints SKIPPED-BY-BUDGET + a ::warning:: while the code half still gates.
-#     ~$0.15 a run (one Sonnet call per golden case, back-to-back on the cached charter block). The OIDC
-#     role must allow bedrock:InvokeModel on the Sonnet 4.6 inference profile; until the owner applies
-#     that grant the credential step degrades softly and only the recorded verdict gates.
-#
-# Path filter = the #5072 issue's `## Set` (the charter, engine templates, skills, coach prompts) plus the
-# gate's own inputs.
+# Two steps (the script's docstring is the full contract):
+#   * --recorded (gating, free, no AWS): the code pre-score + the replayed judge (also in the unit suite).
+#   * --live (gating): the blinded judge on route charter.judge_gate (band-3 CI feature charter_judge_gate),
+#     ~$0.15 a run. Soft ONLY on a budget pause (SKIPPED-BY-BUDGET + ::warning::). A judge that errors or
+#     replies with nothing gradeable is FAIL + ::error:: on every case, exit 1 — never a code-only green.
+# Degrade points today (read-only `aws iam get-role`/`get-role-policy`, 2026-10-19): the role EXISTS
+# (golden-brief-eval.yml, eval-harvest.yml assume it) but (a) its trust admits refs/heads/main only, so a
+# pull_request is refused at the OIDC step and the live step prints "live judge NOT run" + ::warning::;
+# (b) it grants Haiku only, so a dispatch on main reaches the JUDGE CALL, is denied (AccessDeniedException)
+# and the live step is RED ("0 of 5 cases behaved") until the owner's Sonnet 4.6 grant (PR #5169).
+# Path filter = the #5072 `## Set` (charter, engine templates, skills, coach prompts) + the gate's own inputs.
 
 name: Panel rubric gate
 
@@ -70,13 +69,14 @@ jobs:
 
       - name: Configure AWS (live judge)
         id: judge-creds
-        continue-on-error: true # the Sonnet grant is an owner apply — degrade softly until it exists
+        continue-on-error: true # refused on pull_request (trust = main only); the live step reports it
         uses: ./.github/actions/setup-ci
         with:
           python: 'false'
           aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-golden-eval-role
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Live judge (gating when credentials resolve)
-        if: ${{ steps.judge-creds.outcome == 'success' }}
+      - name: Live judge (red when the judge errors; soft only on a budget pause)
+        env:
+          PANEL_JUDGE_CREDS: ${{ steps.judge-creds.outcome }}
         run: python3 scripts/panel_rubric_gate.py --live

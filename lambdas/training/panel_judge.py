@@ -172,15 +172,17 @@ def judge(
         ok, why = _allowed(route)
         if not ok:
             return {"status": "paused", "judged": None, "usage": {}, "reason": why}
-        call = _bedrock_call(route)
     usage: dict[str, Any] = {}
+    transport = call
 
     def _metered(body: dict[str, Any]) -> dict[str, Any]:
-        resp = call(body)
+        resp = transport(body)
         usage.update((resp or {}).get("usage") or {})
         return resp
 
     try:
+        if transport is None:  # inside the try: a missing boto3 / unknown route is an error status, never a raise
+            transport = _bedrock_call(route)
         parsed = structured_json.call_json(_metered, build_body(case, rubric, route, catalog), response_schema(rubric), label="panel_judge")
     except Exception as e:  # noqa: BLE001 — a failed judge degrades the grade, it never fails the plan
         logger.warning("panel_judge: judge call failed (%s: %s)", type(e).__name__, str(e)[:200])

@@ -532,11 +532,13 @@ for _extracted in (CI_PROOFS, GUARD_PROOFS, QA_PROOFS, REGISTRY_PROOFS, STRUCTUR
 # ─────────────────────────────────────────────────────────────────────────────
 ATTEMPTED_UNPROVEN: dict[str, str] = {
     "ci::panel-rubric-gate.yml::gate::5": (
-        "#5072 Live judge — NOT PROVED. It runs only when the OIDC credential step resolves, and the role it assumes "
-        "(github-actions-golden-eval-role) carries no Sonnet 4.6 grant until the owner applies one; a lane may not mutate "
-        "IAM or call Bedrock. Its code path is the recorded step's (same script, same exit) with the replay swapped for "
-        "the live judge, so the recorded step's proof covers the verdict plumbing; the live half is unwatched until the "
-        "first live run after the owner's grant."
+        "#5072 Live judge — NOT PROVED in CI. The role it assumes (github-actions-golden-eval-role) exists but its trust "
+        "admits refs/heads/main only (a pull_request is refused at the OIDC step, a visible ::warning:: step) and its "
+        "policy grants Haiku only (a dispatch on main reaches the judge and is denied); a lane may not mutate IAM or call "
+        "Bedrock. Proved OFFLINE 2026-10-19: with the transport raising AccessDeniedException the script exits 1, every "
+        "case FAIL + ::error:: (tests/test_panel_rubric_5072.py::test_the_live_gate_reds_when_the_judge_cannot_grade); "
+        "with the live-judge-failure branch mutated out that test reds ('5 of 5 cases behaved', exit 0). The live half "
+        "is unwatched until the first live run after the owner's grants."
     ),
     "ci::ci-lint.yml::lint::10": (
         "Secret scan (gitleaks) — NOT PROVED. `gitleaks` is not installed on this machine and "

@@ -214,6 +214,51 @@ def test_a_paused_or_failed_judge_degrades_and_never_fabricates(monkeypatch):
     assert not problems, "\n".join(problems)
 
 
+def test_the_live_gate_reds_when_the_judge_cannot_grade(monkeypatch, capsys):
+    """Review of PR #5169: a live judge that errors (the Sonnet grant missing -> AccessDeniedException) or
+    replies with nothing gradeable must red the live step with an ::error:: — never a code-only green.
+    The budget pause stays the one soft path."""
+    from ai import budget_guard
+
+    monkeypatch.setattr(budget_guard, "allow", lambda feature: True)
+
+    def denied(body):
+        raise RuntimeError("AccessDeniedException: not authorized to perform bedrock:InvokeModel")
+
+    def no_boto(route):
+        raise ImportError("No module named 'boto3'")
+
+    problems = []
+    for name, factory in (
+        ("transport raises", lambda route: denied),
+        ("factory raises", no_boto),
+        ("garbled reply", lambda route: (lambda b: {"content": [{"type": "text", "text": "not json"}], "usage": {}})),
+    ):
+        monkeypatch.setattr(panel_judge, "_bedrock_call", factory)
+        code, lines = gate.run("live")
+        out = capsys.readouterr().out
+        n_cases = len(gate.golden_cases())
+        if code != 1:
+            problems.append(f"{name}: exit {code}, want 1 — {lines[-1]}")
+        if sum(ln.startswith("FAIL ") for ln in lines) != n_cases:
+            problems.append(f"{name}: not every case FAILed: {[ln for ln in lines if not ln.startswith('     ')]}")
+        if out.count("::error title=panel rubric gate::") != n_cases:
+            problems.append(f"{name}: {out.count('::error')} ::error:: annotations for {n_cases} cases")
+    monkeypatch.setattr(budget_guard, "allow", lambda feature: False)
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 3)
+    code, lines = gate.run("live")
+    out = capsys.readouterr().out
+    if code != 0 or "::error" in out or "::warning title=panel rubric gate::judge paused" not in out:
+        problems.append(f"paused: exit {code}, the pause must stay soft and warned — {lines[-1]}")
+    monkeypatch.setenv("PANEL_JUDGE_CREDS", "failure")  # CI: the OIDC step refused (pull_request subject)
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    code = gate.main(["--live"])
+    out = capsys.readouterr().out
+    if code != 0 or "live judge NOT run" not in out or "::warning title=panel rubric gate::" not in out:
+        problems.append(f"creds refused: exit {code}, must be a visible, warned skip — {out[-200:]}")
+    assert not problems, "\n".join(problems)
+
+
 def test_the_weekly_grade_judges_the_plan_and_every_control_back_to_back_and_trends():
     rubric = _rubric()
     good = _case("good_charter_plan")
