@@ -119,7 +119,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-757 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+764 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -153,7 +153,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `day_grade` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coherence_sentinel_lambda.py, failure_pattern_compute_lambda.py, monday_compass_lambda.py |
 | `decisions` | — | site_api_thirdwall.py |
 | `deletion_log` | delete_user_data_lambda.py | — |
-| `dexa` | — | ai_expert_analyzer_lambda.py, nutrition_review_lambda.py, shared_quantities.py, site_api_physical.py |
+| `dexa` | — | ai_expert_analyzer_lambda.py, calibration_cadence.py, nutrition_review_lambda.py, shared_quantities.py, site_api_physical.py |
 | `diary_claims` | tools_journal.py | site_api_diary.py, tools_coach_intelligence.py |
 | `diary_reactions` | coach_diary_reaction.py | coach_diary_reaction.py, site_api_thirdwall.py |
 | `discovery_annotations` | — | site_api_journey.py |
@@ -180,7 +180,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `habit_scores` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coach_prediction_evaluator.py, failure_pattern_compute_lambda.py, monday_compass_lambda.py, recap_data.py, site_api_ai_context.py, site_api_habits.py, site_api_mind.py |
 | `habitify` | — | ai_expert_analyzer_lambda.py, habitify_lambda.py, intelligence_common.py, journal_analyzer_lambda.py, site_api_data.py, site_api_habits.py, site_api_nutrition.py |
 | `health_check` | pipeline_health_check_lambda.py | site_api_status.py |
-| `hevy` | hevy_common.py | ai_expert_analyzer_lambda.py, cardio_hr_store.py, coach_packet_today.py, daily_metrics_compute_lambda.py, plan_draft_evidence.py, plan_hevy_windows.py, recap_data.py, site_api_autonomic.py, site_api_nutrition.py, site_api_pulse.py, site_api_training.py, tools_coach_packet.py, tools_correlation.py, tools_health.py, tools_nutrition.py, tools_plan.py, tools_strength.py, tools_training.py, tools_training_notes.py, training_notes.py, vacation_fund.py |
+| `hevy` | hevy_common.py | ai_expert_analyzer_lambda.py, authoring_input_age.py, cardio_hr_store.py, coach_packet_today.py, daily_metrics_compute_lambda.py, plan_draft_evidence.py, plan_hevy_windows.py, recap_data.py, site_api_autonomic.py, site_api_nutrition.py, site_api_pulse.py, site_api_training.py, tools_coach_packet.py, tools_correlation.py, tools_health.py, tools_nutrition.py, tools_plan.py, tools_strength.py, tools_training.py, tools_training_notes.py, training_notes.py, vacation_fund.py |
 | `hevy_id_map` | routine_repo.py | routine_repo.py |
 | `hypotheses` | hypothesis_engine_lambda.py | challenge_generator_lambda.py, hypothesis_engine_lambda.py, state_of_matthew_lambda.py, tools_lifestyle.py |
 | `ingest_liveness` | pipeline_health_check_lambda.py | — |
@@ -197,7 +197,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `macrofactor_meals` | — | — |
 | `macrofactor_workouts` | — | — |
 | `may_tracker` | — | may_tracker.py |
-| `measurements` | measurements_ingestion_lambda.py | ai_expert_analyzer_lambda.py, site_api_physical.py |
+| `measurements` | measurements_ingestion_lambda.py | ai_expert_analyzer_lambda.py, calibration_cadence.py, site_api_physical.py |
 | `milestones` | — | — |
 | `morning_note` | site_api_social_note.py | morning_note.py |
 | `notion` | freshness_checker_lambda.py, notion_lambda.py | adaptive_mode_lambda.py, circadian_compliance_lambda.py, daily_insight_compute_lambda.py, daily_metrics_compute_lambda.py, evening_nudge_lambda.py, field_notes_lambda.py, freshness_checker_lambda.py, intelligence_common.py, notion_lambda.py, recap_data.py, site_api_fulfillment.py, site_api_mind.py, site_api_pulse.py, story_dossier.py, tools_journal.py, tools_social_connection.py |
@@ -207,7 +207,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `pending_writes` | — | — |
 | `platform_memory` | daily_insight_compute_lambda.py, failure_pattern_compute_lambda.py, hypothesis_engine_lambda.py, weekly_plate_lambda.py | daily_insight_compute_lambda.py, weekly_plate_lambda.py |
 | `private_intake` | — | intake_response.py |
-| `progress_photos` | progress_capture.py | progress_capture.py |
+| `progress_photos` | progress_capture.py | calibration_cadence.py, progress_capture.py |
 | `protocols` | — | site_api_protocols.py |
 | `qa_hook_matrix` | hook_liveness_qa.py | — |
 | `qa_predict_dark` | qa_smoke_lambda.py | qa_smoke_lambda.py |
@@ -560,7 +560,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1323 total · 954 resolved · 369 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1339 total · 963 resolved · 376 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (108 lambdas total)
 - Alarms: 139 literal-named declarations across three idioms, 4 composite; routing digest 95 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 19 owner-only + 3 owner-published sources; 67 owner-only + 11 owner-published fields — non-default entries only
@@ -578,7 +578,7 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 
 | Surface | Count | Registry |
 |---------|-------|----------|
-| ai_features | 28 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
+| ai_features | 29 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
 | alarms | 139 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 33 | `deploy/emf_namespace_ledger.py::LEDGER` |
 | schedules | 96 | this model's schedules plane (CDK AST) |
