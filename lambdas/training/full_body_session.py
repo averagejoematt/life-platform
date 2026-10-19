@@ -178,6 +178,36 @@ def _fit_session_shape(
     return shape
 
 
+def _session_loads(
+    blocks: list[ExerciseBlock],
+    load_catalog: dict[str, Any],
+    history_index: dict[str, list],
+    weight_index: dict[str, float],
+    inputs: GeneratorInputs,
+    week_cfg: dict[str, Any],
+    rationale: list[str],
+    ramp_week: int,
+    ramp_p: dict[str, Any],
+    deload: bool,
+) -> dict[str, Any]:
+    """The floor (#4107: the ONE v0.3 load path, `load_ramp.v03_floor`) and then the double
+    progression (#5052) — held on a deload the owner applied, whose loads are held as written."""
+    load_floors = _enforce_load_floors(
+        blocks,
+        load_catalog,
+        history_index,
+        weight_index,
+        target_date=inputs.target_date,
+        days_since_last_workout=inputs.days_since_last_workout,
+        layoff_days=int(week_cfg.get("re_entry_days_threshold", LAYOFF_DAYS_DEFAULT)),
+        rationale=rationale,
+        floor_fn=functools.partial(load_ramp.v03_floor, week=ramp_week),
+        hold_reason="a deload the owner applied holds every load" if deload else None,
+    )
+    load_floors["load_rule"] = {"rule": "v0.3 §3 entry ramp", "week": ramp_week, "params": ramp_p}
+    return load_floors
+
+
 def full_body_routines(
     inputs: GeneratorInputs,
     day_entry: dict[str, Any],
@@ -247,18 +277,7 @@ def full_body_routines(
         "a load already moved at the set's rep floor at this band this cycle, no layoff, is held — never ramped under (#4408); "
         "back-offs −10 % of the top set"
     )
-    load_floors = _enforce_load_floors(
-        blocks,
-        load_catalog,
-        history_index,
-        weight_index,
-        target_date=inputs.target_date,
-        days_since_last_workout=inputs.days_since_last_workout,
-        layoff_days=int(week_cfg.get("re_entry_days_threshold", LAYOFF_DAYS_DEFAULT)),
-        rationale=rationale,
-        floor_fn=functools.partial(load_ramp.v03_floor, week=ramp_week),  # #4107: the ONE v0.3 load path
-    )
-    load_floors["load_rule"] = {"rule": "v0.3 §3 entry ramp", "week": ramp_week, "params": ramp_p}
+    load_floors = _session_loads(blocks, load_catalog, history_index, weight_index, inputs, week_cfg, rationale, ramp_week, ramp_p, deload)
     warmups = _back_offs_then_warmups(blocks, used, rationale, load_floors, load_catalog.get("movements") or {})
 
     caps = {

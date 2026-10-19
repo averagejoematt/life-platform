@@ -1,0 +1,436 @@
+{
+ "_source": "read-only DynamoDB 2026-10-18 (#5052): USER#matthew#SOURCE#hevy DATE#2026-10-18#WORKOUT#d8c4408d-6eef-453e-8f31-34220936549a (the performed sets, verbatim: type, weight_kg, reps, rpe; its stored adherence verdict) and its matched routine USER#matthew#ROUTINE#014e1142aaad30b3b3b1fb5e90046dc2 VERSION#current (v3, draft_custom). Loads and rep ranges are verbatim; each exercise's notes and the routine notes are reduced to their training clauses (the stored notes also carry owner-only context, not reproduced in this public repo) — every RPE/RIR clause the grader reads is kept, so the stored verdict reproduces.",
+ "target_date": "2026-10-18",
+ "routine_notes": "Upper-volume W4·S2. 17 sets, every set ≤ RPE 8.",
+ "routine": [
+  {
+   "movement_key": "barbell_bench_press",
+   "notes": "Bench: 3×8–12 @ 185. Stop at RPE 8 even if under 12. Volume slot — no ramps to 225, no back-off at 135.",
+   "sets": [
+    {
+     "type": "normal",
+     "weight_kg": 83.91458845000001,
+     "rep_range_start": 8,
+     "rep_range_end": 12
+    },
+    {
+     "type": "normal",
+     "weight_kg": 83.91458845000001,
+     "rep_range_start": 8,
+     "rep_range_end": 12
+    },
+    {
+     "type": "normal",
+     "weight_kg": 83.91458845000001,
+     "rep_range_start": 8,
+     "rep_range_end": 12
+    }
+   ]
+  },
+  {
+   "movement_key": "one_arm_db_row",
+   "notes": "3×8–12 @ 85. ≤ RPE 8. Three sets, not four.",
+   "sets": [
+    {
+     "type": "normal",
+     "weight_kg": 38.55535145,
+     "rep_range_start": 8,
+     "rep_range_end": 12
+    },
+    {
+     "type": "normal",
+     "weight_kg": 38.55535145,
+     "rep_range_start": 8,
+     "rep_range_end": 12
+    },
+    {
+     "type": "normal",
+     "weight_kg": 38.55535145,
+     "rep_range_start": 8,
+     "rep_range_end": 12
+    }
+   ]
+  },
+  {
+   "movement_key": "db_shoulder_press",
+   "notes": "3×8–12 @ 70. 10/15 ended 6 reps @ RPE 10 twice — not today. Stop at RPE 8, exhale on the drive.",
+   "sets": [
+    {
+     "type": "normal",
+     "weight_kg": 31.751465900000003,
+     "rep_range_start": 8,
+     "rep_range_end": 12
+    },
+    {
+     "type": "normal",
+     "weight_kg": 31.751465900000003,
+     "rep_range_start": 8,
+     "rep_range_end": 12
+    },
+    {
+     "type": "normal",
+     "weight_kg": 31.751465900000003,
+     "rep_range_start": 8,
+     "rep_range_end": 12
+    }
+   ]
+  },
+  {
+   "movement_key": "lat_pulldown",
+   "notes": "2×8–12 @ 155. ≤ RPE 8. No jump to 180.",
+   "sets": [
+    {
+     "type": "normal",
+     "weight_kg": 70.30681735,
+     "rep_range_start": 8,
+     "rep_range_end": 12
+    },
+    {
+     "type": "normal",
+     "weight_kg": 70.30681735,
+     "rep_range_start": 8,
+     "rep_range_end": 12
+    }
+   ]
+  },
+  {
+   "movement_key": "cable_chest_fly",
+   "notes": "2×8–15 @ 33. RIR 2.",
+   "sets": [
+    {
+     "type": "normal",
+     "weight_kg": 14.968566011376112,
+     "rep_range_start": 8,
+     "rep_range_end": 15
+    },
+    {
+     "type": "normal",
+     "weight_kg": 14.968566011376112,
+     "rep_range_start": 8,
+     "rep_range_end": 15
+    }
+   ]
+  },
+  {
+   "movement_key": "cable_tricep_pushdown",
+   "notes": "2×8–15 @ 95. RIR 2.",
+   "sets": [
+    {
+     "type": "normal",
+     "weight_kg": 43.091326396385774,
+     "rep_range_start": 8,
+     "rep_range_end": 15
+    },
+    {
+     "type": "normal",
+     "weight_kg": 43.091326396385774,
+     "rep_range_start": 8,
+     "rep_range_end": 15
+    }
+   ]
+  },
+  {
+   "movement_key": "db_curl",
+   "notes": "2×8–15 @ 25. RIR 2.",
+   "sets": [
+    {
+     "type": "normal",
+     "weight_kg": 11.33980925,
+     "rep_range_start": 8,
+     "rep_range_end": 15
+    },
+    {
+     "type": "normal",
+     "weight_kg": 11.33980925,
+     "rep_range_start": 8,
+     "rep_range_end": 15
+    }
+   ]
+  },
+  {
+   "movement_key": "cycling",
+   "notes": "Recumbent, 20 min, talk test — full sentences throughout.",
+   "sets": [
+    {
+     "type": "normal",
+     "weight_kg": null,
+     "rep_range_start": null,
+     "rep_range_end": null
+    }
+   ]
+  },
+  {
+   "movement_key": "tmpl:527DA061",
+   "notes": "10 min.",
+   "sets": [
+    {
+     "type": "normal",
+     "weight_kg": null,
+     "rep_range_start": null,
+     "rep_range_end": null
+    }
+   ]
+  }
+ ],
+ "workout": {
+  "exercises": [
+   {
+    "exercise_template_id": "79D0BB3A",
+    "title": "Bench Press (Barbell)",
+    "sets": [
+     {
+      "type": "warmup",
+      "weight_kg": 20.41168092460379,
+      "reps": 12,
+      "rpe": null
+     },
+     {
+      "type": "warmup",
+      "weight_kg": 61.235042773811365,
+      "reps": 10,
+      "rpe": null
+     },
+     {
+      "type": "warmup",
+      "weight_kg": 70.30690096252415,
+      "reps": 5,
+      "rpe": null
+     },
+     {
+      "type": "normal",
+      "weight_kg": 83.91468824559335,
+      "reps": 12,
+      "rpe": 9.5
+     },
+     {
+      "type": "normal",
+      "weight_kg": 83.91468824559335,
+      "reps": 7,
+      "rpe": 10
+     },
+     {
+      "type": "normal",
+      "weight_kg": 83.91468824559335,
+      "reps": 7,
+      "rpe": 9.5
+     },
+     {
+      "type": "normal",
+      "weight_kg": 74.84283005688056,
+      "reps": 8,
+      "rpe": 9
+     },
+     {
+      "type": "normal",
+      "weight_kg": 61.235042773811365,
+      "reps": 12,
+      "rpe": 8
+     },
+     {
+      "type": "normal",
+      "weight_kg": 61.235042773811365,
+      "reps": 12,
+      "rpe": 8.5
+     }
+    ]
+   },
+   {
+    "exercise_template_id": "F1E57334",
+    "title": "Dumbbell Row",
+    "sets": [
+     {
+      "type": "normal",
+      "weight_kg": 40.82336184920758,
+      "reps": 10,
+      "rpe": 9
+     },
+     {
+      "type": "normal",
+      "weight_kg": 40.82336184920758,
+      "reps": 10,
+      "rpe": 8.5
+     },
+     {
+      "type": "normal",
+      "weight_kg": 40.82336184920758,
+      "reps": 10,
+      "rpe": 9
+     },
+     {
+      "type": "normal",
+      "weight_kg": 40.82336184920758,
+      "reps": 10,
+      "rpe": 10
+     }
+    ]
+   },
+   {
+    "exercise_template_id": "878CD1D0",
+    "title": "Shoulder Press (Dumbbell)",
+    "sets": [
+     {
+      "type": "normal",
+      "weight_kg": 31.75150366049478,
+      "reps": 10,
+      "rpe": 9
+     },
+     {
+      "type": "normal",
+      "weight_kg": 31.75150366049478,
+      "reps": 10,
+      "rpe": 10
+     },
+     {
+      "type": "normal",
+      "weight_kg": 31.75150366049478,
+      "reps": 10,
+      "rpe": 9.5
+     },
+     {
+      "type": "normal",
+      "weight_kg": 18.14371637742559,
+      "reps": 12,
+      "rpe": 8
+     }
+    ]
+   },
+   {
+    "exercise_template_id": "651F844C",
+    "title": "Cable Fly Crossovers",
+    "sets": [
+     {
+      "type": "normal",
+      "weight_kg": 14.968566011376112,
+      "reps": 12,
+      "rpe": 8
+     },
+     {
+      "type": "normal",
+      "weight_kg": 14.968566011376112,
+      "reps": 12,
+      "rpe": 8
+     },
+     {
+      "type": "normal",
+      "weight_kg": 14.968566011376112,
+      "reps": 12,
+      "rpe": 8
+     }
+    ]
+   },
+   {
+    "exercise_template_id": "6A6C31A5",
+    "title": "Lat Pulldown (Cable)",
+    "sets": [
+     {
+      "type": "normal",
+      "weight_kg": 72.57486550970236,
+      "reps": 8,
+      "rpe": 8
+     },
+     {
+      "type": "normal",
+      "weight_kg": 72.57486550970236,
+      "reps": 8,
+      "rpe": 8
+     },
+     {
+      "type": "normal",
+      "weight_kg": 72.57486550970236,
+      "reps": 8,
+      "rpe": 8.5
+     }
+    ]
+   },
+   {
+    "exercise_template_id": "93A552C6",
+    "title": "Triceps Pushdown",
+    "sets": [
+     {
+      "type": "normal",
+      "weight_kg": 43.091326396385774,
+      "reps": 15,
+      "rpe": 8
+     },
+     {
+      "type": "normal",
+      "weight_kg": 43.091326396385774,
+      "reps": 15,
+      "rpe": 8.5
+     },
+     {
+      "type": "normal",
+      "weight_kg": 43.091326396385774,
+      "reps": 15,
+      "rpe": 8.5
+     }
+    ]
+   },
+   {
+    "exercise_template_id": "37FCC2BB",
+    "title": "Bicep Curl (Dumbbell)",
+    "sets": [
+     {
+      "type": "normal",
+      "weight_kg": 12.473805009480094,
+      "reps": 12,
+      "rpe": 8
+     },
+     {
+      "type": "normal",
+      "weight_kg": 12.473805009480094,
+      "reps": 12,
+      "rpe": 8.5
+     },
+     {
+      "type": "normal",
+      "weight_kg": 12.473805009480094,
+      "reps": 12,
+      "rpe": 8.5
+     }
+    ]
+   },
+   {
+    "exercise_template_id": "D8F7F851",
+    "title": "Cycling",
+    "sets": [
+     {
+      "type": "normal",
+      "weight_kg": null,
+      "reps": null,
+      "rpe": null
+     }
+    ]
+   },
+   {
+    "exercise_template_id": "527DA061",
+    "title": "Stretching",
+    "sets": [
+     {
+      "type": "normal",
+      "weight_kg": null,
+      "reps": null,
+      "rpe": null
+     }
+    ]
+   }
+  ]
+ },
+ "stored_adherence": {
+  "as_prescribed": {
+   "verdict": "no",
+   "reasons": [
+    "intensity: 14 set(s) above the prescribed RPE ceiling (barbell_bench_press, cable_tricep_pushdown, db_curl, lat_pulldown, one_arm_db_row)"
+   ]
+  },
+  "sets_over_ceiling": 14,
+  "sets_graded": 26,
+  "over_ceiling_movements": [
+   "barbell_bench_press",
+   "cable_tricep_pushdown",
+   "db_curl",
+   "lat_pulldown",
+   "one_arm_db_row"
+  ]
+ }
+}

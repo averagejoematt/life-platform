@@ -37,6 +37,10 @@ import the counting / estimating primitives themselves):
                            (the registry's METRIC_TRUTH winner rule), losers kept, a no-source day null, the
                            Strava-walk figure a separate DERIVED estimate. Rows via `core.query_source_range`
                            (Hevy via the one sanctioned Hevy read).
+  steps_ramp               `plan_engine._steps_ramp_block` -> `training.steps_ramp.compute` (#5082) over the SAME resolver window the plan's
+                           constraint block reads (`tools_plan._steps_window`, the packet's `_steps_fetch`) —
+                           the ramp to the charter floor, held by a lower-leg strain flag; no second computation. An unreadable
+                           window / dismissal / deload / performed-lift read is `read_failed` (value state `unknown`), as in the plan.
   loss_rate                `tools_benchmark._loss_rate_block` -> `shared_quantities.loss_rate_from_rows`.
   streaks                  `tools_plan._training_streaks` -> `training_streaks.streaks` (#4067).
   readiness                `get_readiness_score`, tiered by `tools_plan._recovery_tier`.
@@ -66,7 +70,7 @@ from typing import Any
 from common.pacific_time import pacific_today, shift_day_key
 from training.routine_title import ROUTINE_INDEX_LOOKBACK_DAYS as _ROUTINE_INDEX_LOOKBACK_DAYS
 
-PACKET_VERSION = "coach-session-packet@1.4.0"  # 1.4.0 #5081: steps_7d; 1.3.0 #4189: morning_note field; 1.2.0 #4313: today; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
+PACKET_VERSION = "coach-session-packet@1.5.0"  # 1.5.0 #5082: steps_ramp; 1.4.0 #5081: steps_7d; 1.3.0 #4189: morning_note field; 1.2.0 #4313: today; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
 # Long enough that each performed type is found once a block is running (a v0.4 role recurs
 # weekly; an Engine day twice a week), bounded so the read stays one Hevy query.
 LAST_SESSION_LOOKBACK_DAYS = 28
@@ -84,6 +88,9 @@ SOURCES: dict[str, str] = {
     "walking_hours_7d": "tools_plan._walking_volume_last_7d -> mcp.shared_quantities.walking_layer (#4068/#4105)",
     "steps_7d": "training.steps_resolver.steps_range (#5081) -> common.metric_truth.resolve_steps (the METRIC_TRUTH steps facet) — "
     "the 7 completed days before target_date, one winner per day, losers kept, no-source days null, Strava walks a DERIVED estimate",
+    "steps_ramp": "training.plan_engine._steps_ramp_block -> training.steps_ramp.compute (#5082) over tools_plan._steps_window (training.steps_resolver.steps_range, the same read as "
+    "steps_7d) — the ramp to the charter steps floor from the trailing average, held by a lower-leg strain flag; the plan's constraint_block "
+    "carries the same object",
     "loss_rate": "tools_benchmark._loss_rate_block -> mcp.shared_quantities.loss_rate_from_rows (#4068)",
     "streaks": "tools_plan._training_streaks -> training.training_streaks.streaks (#4067)",
     "readiness": "get_readiness_score, tier by tools_plan._recovery_tier",
@@ -364,6 +371,31 @@ def _steps(target_date: str) -> tuple[Any, dict[str, Any]]:
     return out, _st(MEASURED)
 
 
+def _steps_ramp(target_date: str) -> tuple[Any, dict[str, Any]]:
+    """The steps ramp (#5082) — `training.steps_ramp.compute` over the resolver window and the plan's own pain/deload reads."""
+    from training import plan_engine as _plan_engine
+    from training.plan_engine import READ_FAILED
+
+    from mcp.core import LAYER_UNKNOWN
+    from mcp.tools_plan import _deload_records, _gather_performed_evidence, _pain_dismissals, _pain_instances, _read, _steps_window
+
+    window, status = _read("steps_window", _steps_window, target_date)
+    if window is None:
+        return None, status
+    dismissals, dis_st = _read("pain_dismissals", _pain_dismissals)
+    deload, del_st = _read("deload_records", _deload_records)
+    performed, perf_st = _read("pain_evidence_scope", _gather_performed_evidence, target_date, LAYER_UNKNOWN)
+    flagged = [r for r in (performed or {}).get("exercises") or [] if r.get("pain_flag_any")]
+    states = {"pain_dismissals": dis_st, "deload_records": del_st, "pain_evidence_scope": perf_st, "steps_window": status}
+    out = _plan_engine._steps_ramp_block(target_date, window, _pain_instances(flagged), dismissals, deload, states)
+    out["input_states"] = {k: v["state"] for k, v in states.items() if k != "steps_window"}
+    if out.get("state") == "unknown":
+        return out, _st(READ_FAILED, error=out.get("reason"))
+    if not out["days_counted"]:
+        return out, _st("absent", "no measured steps day in the ramp window")
+    return out, _st("measured")
+
+
 def _loss_rate(target_date: str) -> tuple[Any, dict[str, Any]]:
     from training.plan_engine import ABSENT, MEASURED, READ_FAILED
 
@@ -501,6 +533,7 @@ READERS = {
     "nutrition_7d": _nutrition,
     "walking_hours_7d": _walking,
     "steps_7d": _steps,
+    "steps_ramp": _steps_ramp,
     "loss_rate": _loss_rate,
     "streaks": _streaks,
     "readiness": _readiness,

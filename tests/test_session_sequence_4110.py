@@ -196,7 +196,9 @@ def test_the_sequence_is_defined_once_in_program_structure():
     assert seq["block_start"] == "2026-09-24" and seq["program_version"] == "1.0"
     assert seq["session_roles"] == [UH, LH, SA, UV, LV] and seq["first_role"] == UH
     assert seq["sessions_per_week"] == charter_value("split.lifting_days_per_wk") == 5
-    assert seq["weeks_per_block"] == charter_value("rotation.anchors_fixed_weeks") == 6
+    # #5077: no `weeks_per_block` copy on the sequence — `_seq()` adds it from the charter
+    assert "weeks_per_block" not in seq
+    assert session_sequence._seq()["weeks_per_block"] == charter_value("rotation.anchors_fixed_weeks") == 6
     assert seq["cutover"]["on"] == CUTOVER and seq["cutover"]["from_program"] == "0.4"
     v04 = program_v04.SESSION_SEQUENCE
     assert v04["session_roles"] == [UH, LH, UV, LV] and v04["first_role"] == LH and v04["sessions_per_week"] == 4

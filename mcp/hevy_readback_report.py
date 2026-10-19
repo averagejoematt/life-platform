@@ -59,6 +59,22 @@ def _template_map_for(ir: Any) -> dict[str, str]:
     return out
 
 
+def _limits_for(ir: Any) -> dict[str, float | None]:
+    """#5052: movement_key -> the charter effort limit for its class (top-set reading), so a
+    heavier top set at or under it reads `progressed`, not `deviated`. Fail-soft: an unreadable
+    catalog or charter is an empty map (the pre-#5052 three states), never a guessed limit."""
+    try:
+        from health.adherence_calc import _catalog_entry_for, _load_catalog
+        from training import load_progression as lp
+
+        catalog, limits = _load_catalog(), lp.effort_limits()
+        keys = [getattr(ex, "movement_key", "") or "" for ex in getattr(ir, "exercises", []) or []]
+        return {k: lp.grading_limits(lp.movement_class(_catalog_entry_for(k, catalog)), limits)["limit_rpe"] for k in keys if k}
+    except Exception as e:  # noqa: BLE001 — a stall check never fails on the progression read
+        logger.warning("progression limits unavailable (non-fatal): %s", e)
+        return {}
+
+
 def _prescription_for(workout: dict[str, Any]) -> tuple[Any | None, str | None]:
     """The routine IR that was pushed for this workout, or (None, None).
 
@@ -160,7 +176,7 @@ def stall_check(args: dict[str, Any], *, get_workouts: Any = None) -> dict[str, 
             ir, method = _prescription_for(w)
             row: dict[str, Any] = {}
             if ir is not None:
-                diff = diff_prescribed_vs_performed(ir, grouped, _template_map_for(ir))
+                diff = diff_prescribed_vs_performed(ir, grouped, _template_map_for(ir), limit_for=_limits_for(ir))
                 for key, candidate in diff.items():
                     if str(candidate.get("template_id") or "") == template_id:
                         row = candidate

@@ -128,7 +128,7 @@ STALE_REASON = "stale_untouched"
 AUTO_ARCHIVE_KEY = "auto_archived"
 """Where a non-pre-draft archive is stamped — NEVER `MARKER`, which would make the row read as ours."""
 """#4732: the index Query page the sweep reads — the same bound `routine_repo.stale_draft_census` uses."""
-GENERATOR_VARIANTS = ("ideal", "floor", "re_entry")
+GENERATOR_VARIANTS = ("ideal", "floor", "re_entry", "disruption")  # #5088: the owner-switched short session
 """The variants `routine_generator` persists for a lifting session — with the date and the archetype,
 each is one routine PARTITION (`_new_routine_id`, #3115)."""
 
@@ -317,6 +317,19 @@ def _mark_draft(
         put_versioned(ir)
 
 
+def _disruption(target_date: str) -> dict[str, Any]:
+    """#5088: his disruption mode on the date (a fail-soft read — no record is the full plan). The draft path serves
+    the short session itself; this only decides whether an ACTIVE mode's weekly band is already met (travel: two or
+    three a week), in which case nothing is drafted. The Hevy record is read only when the mode is on."""
+    from training import disruption
+
+    st = disruption.state(disruption.load_records_failsoft(), target_date)
+    out = {k: st.get(k) for k in ("phase", "template", "until")}
+    if st["phase"] == disruption.PHASE_ACTIVE:
+        out.update(disruption.sessions_due(st, target_date, _block_record(target_date)))
+    return out
+
+
 def _draft(target_date: str) -> dict[str, Any]:
     """`manage_hevy_routine draft` for the date — the action function itself, never the dispatcher."""
     from mcp.tools_hevy_routine import _action_draft
@@ -479,7 +492,7 @@ def run(target_date: str | None = None) -> dict[str, Any]:
         out["sweep"] = {"error": f"{type(e).__name__}: {e}"[:300]}
 
     session = scheduled_session(target) or {}
-    # #4161: the week counter's basis (sessions AND days) and the deload ride with the pre-draft too
+    # #4161: the week counter's basis (sessions AND days) and the deload ride with the pre-draft too; #5077: the block model
     keys = (
         "label",
         "archetype",
@@ -489,6 +502,7 @@ def run(target_date: str | None = None) -> dict[str, Any]:
         "week",
         "deload",
         "deload_recommendation",
+        "block_model",  # #5077: the block mesocycle week the draft is built in (set targets, ramp stage, next block)
         "week_basis",
         "advance_blocked_by",
         "note",
@@ -498,6 +512,14 @@ def run(target_date: str | None = None) -> dict[str, Any]:
         out.update(
             outcome=NO_SESSION,
             reason=f"the program serves no lifting session on {target} ({session.get('label') or session.get('note') or 'no session returned'})",
+        )
+        return out
+
+    out["disruption"] = mode = _disruption(target)
+    if mode.get("due") is False:
+        out.update(
+            outcome=NO_SESSION,
+            reason=f"disruption mode ({mode['template']}): {mode['done_7d']} session(s) in the last 7 days meets the week's {mode['band']}",
         )
         return out
 

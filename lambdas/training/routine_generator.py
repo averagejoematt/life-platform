@@ -94,6 +94,7 @@ class GeneratorInputs:
         add_load_enabled: bool = False,  # SSM gate — default false until N>=30
         block_workouts: list[dict[str, Any]] | None = None,  # #4110: Hevy rows since the program's block start; None = read it here
         deload_records: list[dict[str, Any]] | None = None,  # #5070: the owner's recorded deload words; None = read it here (fail-soft)
+        disruption_records: list[dict[str, Any]] | None = None,  # #5088: his disruption-mode records; None = read it here (fail-soft)
     ) -> None:
         self.target_date = target_date
         self.recovery_tier = recovery_tier
@@ -105,6 +106,7 @@ class GeneratorInputs:
         self.add_load_enabled = add_load_enabled
         self.block_workouts = block_workouts
         self.deload_records = deload_records
+        self.disruption_records = disruption_records
 
 
 def _archetype_for_date(target_date: str, week_cfg: dict[str, Any]) -> str:
@@ -593,8 +595,10 @@ def _enforce_load_floors(
     layoff_days: int,
     rationale: list[str],
     floor_fn: Callable[..., dict[str, Any]] | None = None,
+    hold_reason: str | None = None,
 ) -> dict[str, Any]:
-    """Derive and APPLY the prescription floor for every block. Returns the audit dict.
+    """Derive and APPLY the prescription floor for every block, then the double progression
+    (#5052, `_progress_block`) on top of it. Returns the audit dict.
 
     `floor_fn` (#4090/#4107) replaces `prescription_floor` with a function of the same
     signature — the v0.3 path passes `load_ramp.v03_floor` (band anchor -> nearest-band
@@ -661,10 +665,47 @@ def _enforce_load_floors(
             "fallback": floor.get("fallback"),
             "fallback_detail": floor.get("fallback_detail"),
             "corrections": corrections,
+            "progression": _progress_block(block, catalog, history_index, floor, hold_reason, rationale),
         }
         if corrections:
             rationale.append(f"{block.movement_key}: floor applied — " + "; ".join(corrections))
     return audit
+
+
+def _progress_block(
+    block: ExerciseBlock,
+    catalog: dict[str, Any],
+    history_index: dict[str, list],
+    floor: dict[str, Any],
+    hold_reason: str | None,
+    rationale: list[str],
+) -> dict[str, Any]:
+    """#5052: the charter's double progression, AFTER the floor and BEFORE the back-offs and warm-ups.
+
+    Reads the movement's performed sessions from the same history index the floor read, raises
+    (never lowers) the working sets on a `step` / `floor_raise`, and writes the reason into the
+    exercise note — the cue pass's channel, so the note says why the load moved or held."""
+    from training import load_progression as lp
+    from training.load_ramp import _rep_range_of
+
+    entry = (catalog.get("movements") or {}).get(block.movement_key) or {}
+    tid = entry.get("hevy_template_id_hint")
+    current = max((float(s.weight_kg) for s in block.sets if s.weight_kg and str(s.type or "normal") != "warmup"), default=None)
+    prog = lp.next_prescription(
+        list((history_index or {}).get(tid) or []) if tid else [],
+        current_kg=current,
+        rep_range=_rep_range_of(block.sets),
+        cls=lp.movement_class(entry),
+        exposure=str(block.rationale_tag).split(":")[-1] if ":" in str(block.rationale_tag or "") else None,
+        re_entry_reason=floor.get("layoff_reason"),
+        hold_reason=hold_reason,
+    )
+    prog["changes"] = lp.apply_to_sets(block.sets, prog)
+    if prog["reason"] and (prog["changes"] or prog["basis"] != lp.BASIS_HOLD or current):
+        block.notes = f"{block.notes} {prog['reason']}.".strip() if block.notes else f"{prog['reason']}."
+    if prog["changes"]:
+        rationale.append(f"{block.movement_key}: {prog['basis']} — {prog['reason']}")
+    return prog
 
 
 def _portfolio_guard(z2_minutes_7d: float | None, z2_floor: float) -> bool:
@@ -781,6 +822,14 @@ def _load_note_indexes(
     return history_index, weight_index, cardio_index, whoop_index
 
 
+def _disruption_mode(inputs: GeneratorInputs) -> dict[str, Any]:
+    """#5088: the owner's disruption mode on the target day — injected records, else one fail-soft read (no record = off)."""
+    from training import disruption
+
+    records = inputs.disruption_records if inputs.disruption_records is not None else disruption.load_records_failsoft()
+    return disruption.state(records, inputs.target_date)
+
+
 def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     """Returns 1-3 RoutineSpec IR records (ideal, floor, optional re-entry).
 
@@ -803,6 +852,10 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     if archetype in ("rest", "aerobic", "mobility"):
         # Non-lifting day — return a minimal placeholder ideal + floor.
         return _non_lifting_pair(inputs, archetype, week_cfg, landmarks, catalog, day_entry=day_entry)
+    if day_entry.get("session_role") and (mode := _disruption_mode(inputs)).get("phase") != "off":
+        from training import disruption  # #5088: his switched-on mode (or its step-back-up week) serves the short session
+
+        return disruption.routines(inputs.target_date, day_entry["session_role"], mode, catalog, int(week_cfg.get("skill_ceiling", 2)))
     if day_entry.get("session_role") in program_structure.SESSION_TEMPLATES:
         # #4064/#4147/#5069 — a program role (the five-day split's) is the program's session
         # (anchors at heavy/moderate/volume, fixed accessories, the deload only on the owner's recorded word — #5070),

@@ -103,7 +103,7 @@ from typing import Any, Iterable
 
 from common.pacific_time import parse_day_key, shift_day_key
 
-from training import deload_word, program_structure, program_v04, training_streaks
+from training import block_model, deload_word, program_structure, program_v04, training_streaks
 
 ISSUE = "#4110"
 PROGRAM_ISSUE = "#4147"
@@ -131,7 +131,8 @@ WEEK_RULE: dict[str, Any] = {
 
 
 def _seq() -> dict[str, Any]:
-    return program_structure.SESSION_SEQUENCE
+    """`program_structure.SESSION_SEQUENCE` plus the block length, read from the charter (#5077: `rotation.anchors_fixed_weeks`)."""
+    return {**program_structure.SESSION_SEQUENCE, "weeks_per_block": block_model.block_weeks()}
 
 
 def block_start() -> str:

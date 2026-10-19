@@ -83,7 +83,9 @@ def test_the_split_is_the_charters_five_sessions_in_the_owners_order():
     assert program_structure.SPLIT == "five_day" and program_structure.PROGRAM_VERSION == "1.0"
     assert seq["session_roles"] == [program_structure.role_id(n) for n in charter_value("split.sequence")] == [UH, LH, SA, UV, LV]
     assert seq["sessions_per_week"] == charter_value("split.lifting_days_per_wk") == 5
-    assert seq["weeks_per_block"] == charter_value("rotation.anchors_fixed_weeks")
+    from training import session_sequence  # #5077: the block length is added from the charter by `_seq()`, never copied
+
+    assert session_sequence._seq()["weeks_per_block"] == charter_value("rotation.anchors_fixed_weeks")
     assert seq["charter_version"] == charter_value("version")
     assert {r: program_structure.SESSION_TEMPLATES[r]["archetype"] for r in seq["session_roles"]} == {
         UH: "upper",
@@ -234,6 +236,11 @@ def test_the_v04_lock_is_lifted_and_kept_only_as_history():
     """Ruling 6: "the v0.4 lock to 2026-11-04 is lifted now". The lock is a dated record (`program_v04.BLOCK_LOCK`),
     the guard functions are gone, and the served session carries the fingerprint as a MEASUREMENT."""
     from training import session_sequence
+
+    # #5077: the block length is the charter's `rotation.anchors_fixed_weeks`, added by session_sequence._seq() — no copy
+    # on the sequence; the lifted v0.4 lock's six weeks are the same number, kept as history
+    assert "weeks_per_block" not in program_structure.SESSION_SEQUENCE
+    assert session_sequence._seq()["weeks_per_block"] == program_v04.BLOCK_LOCK["weeks"] == 6
 
     assert not hasattr(program_structure, "BLOCK_LOCK")
     assert not hasattr(session_sequence, "block_lock_state") and not hasattr(session_sequence, "fingerprint_record_problems")
@@ -867,8 +874,10 @@ def test_4503_od8a_no_template_carries_a_green_tail_so_the_ceiling_adds_no_set()
 
 
 def test_4503_od5_gains_are_rep_triggered_with_no_nutrition_clause_and_protein_gates_only_green():
-    lift = owner_redlines.REDLINES["lifting_sessions_per_wk"]
-    g = lift["gain_rule"]
+    from training import load_progression  # #5052: the gain rule moved to the charter; the redline is a pointer
+
+    assert owner_redlines.REDLINES["lifting_sessions_per_wk"]["gain_rule"]["source"].endswith("progression.gain_rule")
+    g = load_progression.gain_rule()
     assert g["kind"] == "double_progression" and g["consecutive_same_type_exposures"] == 2 and g["nutrition_clause"] is None
     assert "veto only" in g["rpe_role"] and "offered_when" not in g
     assert not any("kcal" in c or "intake" in c for c in g["refused_when"])

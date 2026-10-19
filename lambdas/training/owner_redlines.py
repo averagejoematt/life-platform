@@ -389,25 +389,11 @@ REDLINES: dict[str, dict[str, Any]] = {
             "max_pct_of_band_e1rm_until_week_8": 85,
             "then": "hold",
         },
-        # #4503 OD5 (A, owner 2026-09-30): rep-triggered double progression; RPE is a veto only; NO nutrition clause (v0.4's
-        # "prior-day intake logged >= 1,800 kcal" is retired); `protein_floor_missed` gates the 🟢 block only (training.green_block).
-        "gain_rule": {
-            "kind": "double_progression",
-            "trigger": "the top of the slot's rep range on 2 consecutive same-type exposures (heavy -> heavy, volume -> volume)",
-            "consecutive_same_type_exposures": 2,
-            "size": "one 5-lb step (~+2.5 %), reps back to the bottom of the range",
-            "rpe_role": "veto only — a top-of-range set logged above the slot's RPE ceiling does not count toward the trigger",
-            "nutrition_clause": None,
-            "refused_when": [
-                "recovery < 50",
-                "sleep < 6.5 h",
-                "the week after a rate-over-cap flag",
-                "the first three exposures of a novel-again pattern",
-            ],
-            "provenance": "owner",
-            "stated": "2026-09-30",
-            "v0_4": "+2.5 % or +1 rep, one anchor at a time, <= every 14 d; offered after two top sets <= RPE 7, no pain flag 14 d, prior-day intake >= 1,800 kcal",
-        },
+        # #4503 OD5 (owner 2026-09-30): rep-triggered double progression. #5052 moved the rule to the charter
+        # (`config/training_charter.json` `progression.gain_rule`, v1.1.0) and `training.load_progression` applies it —
+        # this is a pointer, never a second copy (the charter is the registry, ADR-164). `protein_floor_missed` gates the 🟢
+        # block only (training.green_block), never the gain rule.
+        "gain_rule": {"source": "config/training_charter.json#progression.gain_rule", "applied_by": "training.load_progression"},
         "cal_rep_out": "CAL rep-out 2/wk on machine accessories (the existing pushdown / leg curl) until n >= 6, then 1/wk (OD5, OD8c)",
         "rep_scheme": "heavy exposure 4–6: one top set at RPE 7–8 plus two back-offs at −10 %; moderate 6–10; volume 8–12; accessories 8–15 at RIR 1–2",
         "accessory_rule": "2–3 per session, 2 sets, machines/cables, fixed for the block — none added after week 1; first thing dropped on a bad day",

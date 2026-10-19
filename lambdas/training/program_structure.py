@@ -297,9 +297,9 @@ shoulders+arms day's face pull and dumbbell shrug, #5069); not a rotation menu (
 session carries it at 2 x 8–10 beside the barbell squat. v0.3's single `full` pool is `program_v03.ACCESSORY_POOL`."""
 
 ROTATION_RULE: dict[str, Any] = {
-    "rule": "accessories are FIXED for the 6-week block: 2–3 per session, 2 sets, machines/cables, none added after week 1; the set changes only at a block boundary",
+    "rule": "accessories are FIXED for the block: 2–3 per session, 2 sets, machines/cables, none added after week 1; the set changes only at a block boundary",
     "window_days": 14,
-    "block_weeks": 6,
+    # #5077: the block's length is the charter's `rotation.anchors_fixed_weeks` (`block_model.block_weeks()`), not a copy here
     "per_session": [2, 3],
     "sets_each": 2,
     "anchors_exempt": True,
@@ -671,7 +671,6 @@ SESSION_SEQUENCE: dict[str, Any] = {
     # only when no v0.4 session was credited before the cut-over (otherwise the order continues from the last one)
     "first_role": SPLIT_ROLES[0] if SPLIT_ROLES else None,
     "sessions_per_week": int(charter_value("split.lifting_days_per_wk") or 0),
-    "weeks_per_block": int(charter_value("rotation.anchors_fixed_weeks") or 0),
     "cutover": {
         "on": "2026-10-19",
         "from_program": "0.4",
@@ -684,6 +683,7 @@ SESSION_SEQUENCE: dict[str, Any] = {
         "ruling": "owner rulings 5 + 6, 2026-10-18 (#5067)",
         "issue": "#5069",
     },
+    # #5077: no `weeks_per_block` copy — `session_sequence._seq()` adds it from the charter (`block_model.block_weeks()`)
     "advances_on": "a loaded Hevy session (training_streaks.is_loaded_session), one per Pacific day, dated on/after block_start, whose routine archetype is a program archetype and whose loaded sets reach the role's anchor muscles (session_sequence.classify_sessions, #4312) — an off-program complement (Flex) never advances it",
     "provenance": "owner",
     "stated": "2026-10-18",
