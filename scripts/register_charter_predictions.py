@@ -61,7 +61,7 @@ STEPS_FLOOR = 12000
 
 PREDICTIONS = [
     {
-        "key": "anchor_e1rm_up",
+        "metric": "anchor_e1rm_up",
         "claim": "By 2026-12-06 the estimated 1RM of every anchor lift is above its 2026-10-18 baseline.",
         "measurement": {
             "function": "coach.coach_event_triggers.session_bests (Hevy workouts; Epley e1rm_lb, best set per lift per session)",
@@ -75,7 +75,7 @@ PREDICTIONS = [
         },
     },
     {
-        "key": "zero_accessory_stalls",
+        "metric": "zero_accessory_stalls",
         "claim": "In the last two weeks of the block (2026-11-23 to 2026-12-06) no accessory movement stalls across any 3 consecutive sessions.",
         "measurement": {
             "function": "training.stall_detector.assess_stall over each accessory's sessions (training.accessory_strength_trend lists the accessories)",
@@ -88,7 +88,7 @@ PREDICTIONS = [
         },
     },
     {
-        "key": "steps_floor_90pct",
+        "metric": "steps_floor_90pct",
         "claim": f"The {STEPS_FLOOR:,}-step daily floor is met on at least 90% of days from 2026-10-19 to 2026-12-06.",
         "measurement": {
             "function": "common.metric_truth.steps_by_date (the per-day resolved steps; METRIC_TRUTH facet)",
@@ -102,7 +102,7 @@ PREDICTIONS = [
         },
     },
     {
-        "key": "rate_in_band_4_of_6",
+        "metric": "rate_in_band_4_of_6",
         "claim": f"The 7-day loss rate sits inside {RATE_FLOOR_LB_WK}-{RATE_CEILING_LB_WK} lb/wk on at least 4 of the 6 weekly reads ending 2026-11-01 .. 2026-12-06 (Sundays).",
         "measurement": {
             "function": "training.prescription_forecast.measured_week_rate (rate_lb_wk per week_end)",
@@ -136,12 +136,12 @@ def build_record(spec: dict, user_id: str = USER_ID) -> dict:
         "stated_date": BASELINE_DATE,
         "claim_natural": claim,
         "criterion": m["pass_rule"],
-        "metric": spec["key"],
+        "metric": spec["metric"],
         "subdomain": "training",
         # qualitative => the daily evaluator skips it (never retires it); #5079 grades via `measurement`.
         "evaluation": {
             "type": "qualitative",
-            "metric": spec["key"],
+            "metric": spec["metric"],
             "evaluation_window_days": HORIZON_DAYS,
             "graded_by": "block_retro_5079",
         },
