@@ -187,7 +187,11 @@ def test_the_block_is_owner_locked_for_six_weeks_until_2026_11_04():
     assert (lock["weeks"], lock["locked_until"], lock["provenance"]) == (6, "2026-11-04", "owner")
     assert lock["block_start"] == program_structure.SESSION_SEQUENCE["block_start"] == "2026-09-24"
     assert lock["decision_sk"] == program_structure.DECISION_SK
-    assert program_structure.SESSION_SEQUENCE["weeks_per_block"] == lock["weeks"]
+    # #5077: the block length is the charter's `rotation.anchors_fixed_weeks`, added by session_sequence._seq()
+    from training import session_sequence
+
+    assert "weeks_per_block" not in program_structure.SESSION_SEQUENCE
+    assert session_sequence._seq()["weeks_per_block"] == lock["weeks"]
     from datetime import date
 
     span = (date.fromisoformat(lock["locked_until"]) - date.fromisoformat(lock["block_start"])).days
@@ -673,8 +677,10 @@ def test_4503_od8a_no_green_tail_on_the_locked_templates_so_the_ceiling_adds_no_
 
 
 def test_4503_od5_gains_are_rep_triggered_with_no_nutrition_clause_and_protein_gates_only_green():
-    lift = owner_redlines.REDLINES["lifting_sessions_per_wk"]
-    g = lift["gain_rule"]
+    from training import load_progression  # #5052: the gain rule moved to the charter; the redline is a pointer
+
+    assert owner_redlines.REDLINES["lifting_sessions_per_wk"]["gain_rule"]["source"].endswith("progression.gain_rule")
+    g = load_progression.gain_rule()
     assert g["kind"] == "double_progression" and g["consecutive_same_type_exposures"] == 2 and g["nutrition_clause"] is None
     assert "veto only" in g["rpe_role"] and "offered_when" not in g
     assert not any("kcal" in c or "intake" in c for c in g["refused_when"])
