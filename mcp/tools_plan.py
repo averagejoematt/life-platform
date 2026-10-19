@@ -845,6 +845,7 @@ def tool_plan_next_session(args):
         input_status=status,
     )
     _merge_walking_volume(block, walk_layer)
+    _attach_below_mev(block, volume)  # #5053
     _attach_collapse_actuator(block)  # #4503 OD7: the named-human actuator mark, read only on a tripped collapse
     attach_morning_note(block, target_date, recovery_tier)  # #4189: his four words beside the recovery tier
     _attach_session_loads(block, target_date, catalog_movements)
@@ -1252,6 +1253,14 @@ def _recovery_tier(readiness: dict) -> str | None:
     if score >= 34:
         return "yellow"
     return "red"
+
+
+def _attach_below_mev(block: dict[str, Any], volume: dict[str, Any]) -> None:
+    """#5053: the 14-day below-MEV flag rides beside the constraint block — `get_muscle_volume`'s own `below_mev_14d`
+    (`training.volume_floors` over its 14d trailing window), never a second count; `unavailable` when the read had none."""
+    from training.volume_floors import below_mev_14d
+
+    block["below_mev_14d"] = volume.get("below_mev_14d") or below_mev_14d(None)
 
 
 def _muscle_sets(volume: dict[str, Any]) -> dict[str, Any]:

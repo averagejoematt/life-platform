@@ -62,7 +62,7 @@ COMMITTED_LOWER_HEAVY = [
     ("romanian_deadlift_barbell", 3),
     ("leg_press", 2),
     ("leg_curl", 2),
-    ("calf_raise_machine", 2),
+    ("calf_raise_machine", 4),  # #5053: calves at their MEV floor (8/wk) across the two lower days
 ]
 
 
@@ -157,10 +157,10 @@ def test_sets_per_muscle_per_week_sit_in_the_band_and_the_aesthetic_day_lifts_de
     got = program_structure.weekly_sets_by_muscle(CATALOG["movements"])
     assert {g: v["sets"] for g, v in got.items()} == {
         "quads": 8,
-        "hams_glutes": 10,
+        "hams_glutes": 8,  # #5053: the lower-volume second leg curl traded for the calves/core floors (the 75-set week is full)
         "chest": 8,
         "back": 12,
-        "delts": 13,
+        "delts": 15,  # #5053: + the rear-delt pec deck on the upper heavy day
         "biceps": 6,
         "triceps": 6,
     }
@@ -202,11 +202,11 @@ def test_mutation_control_three_more_pulldown_sets_push_back_over_the_band_top()
 def test_sessions_fit_the_ceiling_and_the_week_total_sits_in_the_redline_band():
     ceiling = program_structure.week_grid()["session_set_ceiling"]
     totals = {r: _rx(r)["total_sets"] for r in program_structure.SESSION_TEMPLATES}
-    assert totals == {UH: 15, LH: 12, SA: 13, UV: 17, LV: 12}
+    assert totals == {UH: 17, LH: 14, SA: 13, UV: 17, LV: 14}  # #5053: floors
     assert all(t <= ceiling for t in totals.values()), totals
     # #4503 OD4: v0.5's base 60–75 hard sets/wk — the five-day week (69) sits inside it with no 🟢 tail
     lo, hi = owner_redlines.REDLINES["lifting_sessions_per_wk"]["total_hard_sets_wk"]
-    assert lo <= sum(totals.values()) == 69 <= hi
+    assert lo <= sum(totals.values()) == 75 <= hi
     for role, tmpl in program_structure.SESSION_TEMPLATES.items():
         assert set(tmpl["accessories"]) <= set(program_structure.ACCESSORY_POOL[tmpl["archetype"]]), role
         if role == SA:
@@ -308,7 +308,7 @@ def test_every_session_fits_the_charters_lifting_minutes_untrimmed():
     cap = charter_value("split.session_minutes.lifting")[1]
     assert program_structure.lifting_minutes_cap() == cap == 75
     got = {r: _rx(r)["session_minutes"]["lifting_minutes"] for r in program_structure.SESSION_TEMPLATES}
-    assert got == {UH: 63.0, LH: 47.0, SA: 39.0, UV: 57.5, LV: 41.0}
+    assert got == {UH: 67.5, LH: 51.5, SA: 39.0, UV: 57.5, LV: 45.5}  # #5053: were 63 / 47 / 39 / 57.5 / 41
     for role in program_structure.SESSION_TEMPLATES:
         rx = _rx(role)
         assert rx["time_trim"] is None and rx["session_minutes"]["within_cap"] and rx["session_minutes"]["cap"] == cap, role
@@ -342,7 +342,7 @@ def test_anchors_are_never_cut_for_time_an_anchors_only_overrun_is_flagged():
     with patch.dict(program_structure.EXPOSURES["heavy"], {"rest_seconds": 900}):
         rx = _rx(UH)
     t = rx["time_trim"]
-    assert t["over_cap_after_trim"] is True and t["dropped_accessories"] == ["db_curl", "cable_tricep_pushdown"]
+    assert t["over_cap_after_trim"] is True and t["dropped_accessories"] == ["reverse_pec_deck", "db_curl", "cable_tricep_pushdown"]
     assert [e["pattern"] for e in rx["exposures"]] == ["bench", "row", "overhead_press", "vertical_pull"]
 
 
@@ -523,12 +523,12 @@ def test_generator_deload_week_holds_loads_and_cuts_sets():
     word = [{"start_date": "2026-11-04", "days": 7, "sets_pct": -40, "words": "deload this week"}]
     with patch("training.deload_word.load_records_failsoft", return_value=[]):
         whole = _generate("2026-11-07", block_workouts=_done(44))[0]
-    assert "DELOAD" not in whole.title and sum(len(b.sets) for b in whole.exercises) == 12
+    assert "DELOAD" not in whole.title and sum(len(b.sets) for b in whole.exercises) == 14
     with patch("training.deload_word.load_records_failsoft", return_value=word):
         ideal = _generate("2026-11-07", block_workouts=_done(44))[0]
     assert "DELOAD" in ideal.title and ideal.title.startswith("LOWER-HEAVY — W7")
-    assert any("deload: sets 12 -> 7" in r for r in ideal.rationale)
-    assert sum(len(b.sets) for b in ideal.exercises) == 7
+    assert any("deload: sets 14 -> 8" in r for r in ideal.rationale)
+    assert sum(len(b.sets) for b in ideal.exercises) == 8
 
 
 def test_red_recovery_drops_accessories_not_anchors():
@@ -645,7 +645,7 @@ def test_plan_next_session_through_the_mcp_handler_serves_lower_heavy_first():
         ("squat", "heavy", "squat_barbell"),
         ("hinge", "moderate", "romanian_deadlift_barbell"),
     ]
-    assert rx["total_sets"] == 12
+    assert rx["total_sets"] == 14
     assert out["constraint_block"]["program"]["program_version"] == "1.0"
 
 
@@ -875,7 +875,7 @@ def test_4503_od8a_no_template_carries_a_green_tail_so_the_ceiling_adds_no_set()
     for role in program_structure.SESSION_TEMPLATES:
         rx = _rx(role)
         assert not [e for e in rx["exposures"] if e["kind"] == green_block.BONUS_KIND], role
-    assert {r: _rx(r)["total_sets"] for r in program_structure.SESSION_TEMPLATES} == {UH: 15, LH: 12, SA: 13, UV: 17, LV: 12}
+    assert {r: _rx(r)["total_sets"] for r in program_structure.SESSION_TEMPLATES} == {UH: 17, LH: 14, SA: 13, UV: 17, LV: 14}
 
 
 def test_4503_od5_gains_are_rep_triggered_with_no_nutrition_clause_and_protein_gates_only_green():
