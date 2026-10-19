@@ -29,6 +29,12 @@ WHAT A RUN DOES — nothing a chat turn could not already do, in the same order
      `primary`, its floor / re-entry siblings as `sibling` (one version bump each) — BEFORE stage 2,
      because stage 2's commit binding (#4066) binds the version it writes — a stamp after it
      would un-bind the verdict.
+  3b. #5080 THE SWITCH + SHADOW (`mcp/predraft_shadow.py`): SSM `/life-platform/training-plan-source` (`v04 | charter`,
+     60-s cache, FAIL-SAFE to `charter` when absent or unreadable) picks which plan step 3 persists — the charter draft,
+     or the FROZEN v0.4 plan (`program_v04.build_session`) through `draft_custom`'s action function. Only one is ever
+     persisted; a v04 draft lands on the CHARTER's lifting days and never applies v0.4's calendar deload (#5070). For the
+     first `SHADOW_NIGHTS` nights the other is built too and an owner-only diff row is written
+     (`SHADOW#<date>`); fail-soft, never the outcome. Revert: `predraft_shadow.REVERT_COMMAND`.
   5. `plan_next_session(routine_id=…)` — stage 2, the four critics. Their model calls are
      gated by `budget_guard` feature `plan_critics` INSIDE stage 2 (`tools_plan._model_allowed`):
      at a paused tier the deterministic layer still runs and the record says the model did
@@ -270,6 +276,7 @@ def _mark_draft(
     run_at: str,
     before: dict[str, int] | None = None,
     owner_ids: frozenset[str] = frozenset(),
+    plan_source: str = "charter",
 ) -> None:
     """Stamp the marker on EVERY routine the draft just persisted (ideal + its floor / re-entry
     siblings — `_action_draft` writes all of them), each as its next version, before stage 2 (see
@@ -311,8 +318,9 @@ def _mark_draft(
                 "session_label": session.get("label"),
                 "session_role": session.get("session_role"),
                 "optional": bool(session.get("optional")),
-                "seam": "plan_engine._scheduled_session",
+                "seam": "program_v04.build_session" if plan_source == "v04" else "plan_engine._scheduled_session",
                 "charter_version": (ir.inputs_snapshot or {}).get("charter_version"),  # #5085: the version that drafted it
+                "plan_source": plan_source,  # #5080: which engine this draft is (`charter`, or the frozen `v04` revert)
             },
         }
         ir.parent_version = ir.version
@@ -338,6 +346,45 @@ def _draft(target_date: str) -> dict[str, Any]:
     from mcp.tools_hevy_routine import _action_draft
 
     return _action_draft({"target_date": target_date})
+
+
+def _switch(target_date: str) -> dict[str, Any]:
+    """#5080: the plan-source switch (fail-safe to the default) and whether tonight is a shadow night. Never raises."""
+    from mcp import predraft_shadow as ps
+
+    src = ps.plan_source()
+    return {**src, "shadow": ps.shadow_due(target_date)}
+
+
+def _draft_by_source(target_date: str, switch: dict[str, Any]) -> dict[str, Any]:
+    """#5080: persist ONE plan — the charter draft (`_draft`), or the frozen v0.4 plan when the switch says `v04`."""
+    if switch.get("source") != "v04":
+        return _draft(target_date)
+    from mcp import predraft_shadow as ps
+
+    plan = ps.v04_plan(target_date, _block_record(target_date))
+    return {**ps.draft_v04(target_date, plan), "v04_plan": plan}
+
+
+def _v04_marked(plan: dict[str, Any]) -> dict[str, Any]:
+    """#5080: the marker's session for a v0.4 draft — the frozen plan's own role, so `_routine_role` reads what was drafted."""
+    return {
+        "label": f"v0.4 {plan['session_role']}",
+        "session_role": plan["session_role"],
+        "archetype": plan["archetype"],
+        "optional": False,
+    }
+
+
+def _shadow(target: str, switch: dict[str, Any], session: dict[str, Any], routine_id: str, run_at: str, v04: Any) -> dict[str, Any]:
+    """#5080: the side NOT persisted, diffed against the one that was — owner-only, fail-soft, never the outcome."""
+    if not (switch.get("shadow") or {}).get("due"):
+        return {"outcome": "not_due", "reason": (switch.get("shadow") or {}).get("reason")}
+    from mcp import predraft_shadow as ps
+
+    ir = next((r for r in _routines_for(target) if r.routine_id == routine_id), None)
+    blocks = None if v04 else _block_record(target)
+    return ps.shadow_leg(target, switch.get("source") or ps.DEFAULT_SOURCE, session, ir, blocks, run_at, v04_built=v04)
 
 
 def _stage_2(target_date: str, routine_id: str) -> dict[str, Any]:
@@ -518,6 +565,7 @@ def run(target_date: str | None = None) -> dict[str, Any]:
         )
         return out
 
+    out["plan_source"] = switch = _switch(target)  # #5080: which ONE plan persists, and whether tonight shadows the other
     out["disruption"] = mode = _disruption(target)
     if mode.get("due") is False:
         out.update(
@@ -553,6 +601,7 @@ def run(target_date: str | None = None) -> dict[str, Any]:
         out.update(outcome=EXISTS, routine_id=r.routine_id, routine_version=int(r.version), critics=_critics_summary(_critics(r)))
         return out
 
+    v04_built = None
     if mine:  # a run that died between the draft and stage 2 — resume, never redraft
         routine_id = mine[0].routine_id
         out["resumed"] = True
@@ -573,7 +622,8 @@ def run(target_date: str | None = None) -> dict[str, Any]:
                 routines=[{"routine_id": r.routine_id, "status": r.status, "hevy_linked": bool(r.hevy_routine_id)} for r in in_the_way],
             )
             return out
-        drafted = _draft(target)
+        drafted = _draft_by_source(target, switch)
+        v04_built = drafted.pop("v04_plan", None)
         if drafted.get("status") != "drafted" or not drafted.get("ideal_routine_id"):
             out.update(
                 outcome=BLOCKED_STALE_INPUTS if drafted.get("status") == "blocked_stale_inputs" else FAILED,
@@ -585,12 +635,14 @@ def run(target_date: str | None = None) -> dict[str, Any]:
         _mark_draft(
             target,
             routine_id,
-            session,
+            _v04_marked(v04_built) if v04_built else session,  # #5080: a v0.4 draft carries ITS role, never the charter's
             run_at,
             {r.routine_id: int(r.version) for r in existing},
             frozenset(r.routine_id for r in others),
+            "v04" if v04_built else "charter",
         )
 
+    out["shadow"] = _shadow(target, switch, session, routine_id, run_at, v04_built)
     res = _stage_2(target, routine_id)
     rec = (res or {}).get("critics") or {}
     if not rec:
@@ -678,6 +730,7 @@ def predraft_for(target_date: str) -> dict[str, Any]:
     rec = _critics(r)
     base = {"target_date": target_date, "routine_id": r.routine_id, "routine_version": int(r.version), "status_in_repo": r.status}
     base["drafted_at"] = ((r.inputs_snapshot or {}).get(MARKER) or {}).get("drafted_at")
+    base["plan_source"] = ((r.inputs_snapshot or {}).get(MARKER) or {}).get("plan_source") or "charter"  # #5080: which engine drafted it
     if not _red_teamed(r):
         return {**base, "status": "drafted_not_red_teamed", "how_to_use": "Run stage 2 on this routine_id before anything else."}
     summary = _critics_summary(rec)
