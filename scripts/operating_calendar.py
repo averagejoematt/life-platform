@@ -539,6 +539,15 @@ EXEMPT: dict[str, tuple[str, str]] = {
         "judgment would manufacture runs with nothing to judge; the accuracy-full entry "
         "owns the site's monthly truth pass.",
     ),
+    "training-review": (
+        "2026-10-19",
+        "#5079: the training block retro — an owner-attended ritual run at the end of each training block, whose "
+        "cadence is the training charter's calibration.block_retro, not a repo clock. Its run artifacts are "
+        "owner-only by ruling (the RETRO# row on training_constraints and a tab in his private review doc) and never "
+        "land in this repo, so a repo-artifact probe here could only ever read NEVER-RUN. A missed block shows in the "
+        "next retro's compared_with (it names the retro it compared against) — revive as an entry if a repo-side "
+        "dated artifact is ever ruled acceptable.",
+    ),
     "journey": (
         "2026-08-22",
         "Re-audits the chat↔platform integration after integration work, event-driven by "

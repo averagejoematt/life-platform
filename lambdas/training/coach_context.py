@@ -44,7 +44,7 @@ from __future__ import annotations
 import json
 from typing import Any, Iterable, Optional
 
-CONTEXT_VERSION = "coach-context@1.1.0"  # 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only)
+CONTEXT_VERSION = "coach-context@1.2.0"  # 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
 
 # ── the order contract, as data ───────────────────────────────────────────────────────────
 ORDER: tuple[str, ...] = ("pre_flight", "plan_next_session", "manage_hevy_routine draft")
@@ -68,6 +68,7 @@ SRC_PACKET = "get_coach_session_packet (mcp.tools_coach_packet)"
 SRC_BLOCK = "plan_next_session stage 1 (training.plan_engine.constraint_block)"
 SRC_TRACKER = "the May tracker (#5073)"
 SRC_MAY = "config/training_charter.json governing_goal.target_date (owner-only)"
+SRC_RUN_GATE = "training.run_onramp.gate_state (the May tracker's running_gate, #5090)"
 
 NOT_SUPPLIED = "not_supplied"
 _VALUE_CHARS = 160  # one packet value in the text block is clipped here; the dict keeps it whole
@@ -177,6 +178,18 @@ def _tracker_section(tracker: Any) -> dict[str, Any]:
     return {"source": SRC_TRACKER, "state": "measured", "value": tracker}
 
 
+def run_gate(tracker: Any) -> dict[str, Any]:
+    """#5090: the run gate line (owner channel). Measured from the tracker row's `running_gate` when one is supplied
+    (a row, or `may_tracker.latest_row`'s `{state, row}`); otherwise the charter's rule, stated as not supplied."""
+    from training import run_onramp  # noqa: PLC0415
+
+    row = tracker.get("row") if isinstance(tracker, dict) and "row" in tracker else tracker
+    rg = row.get("running_gate") if isinstance(row, dict) else None
+    if isinstance(rg, dict) and rg.get("line"):
+        return {"source": SRC_RUN_GATE, "state": "measured", "gate_state": rg.get("gate_state"), "line": rg["line"]}
+    return {"source": SRC_RUN_GATE, "state": NOT_SUPPLIED, "gate_state": None, "line": run_onramp.rule_line()}
+
+
 # ── the May frame (owner-only) ───────────────────────────────────────────────────────────
 def _band_of(block: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
     return (((block or {}).get("rate_target") or {}).get("band")) or None
@@ -257,6 +270,7 @@ def assemble(
         "order": list(ORDER),
         "sections": sections,
         "may_frame": frame,
+        "run_gate": None if published else run_gate(tracker),
         "not_supplied": sorted(k for k, s in sections.items() if s.get("state") == NOT_SUPPLIED),
     }
     out["text"] = render(out)
@@ -271,6 +285,7 @@ def summary(ctx: dict[str, Any]) -> dict[str, Any]:
         "states": {k: s.get("state") for k, s in (ctx.get("sections") or {}).items()},
         "not_supplied": ctx.get("not_supplied"),
         "may_frame": (ctx.get("may_frame") or {}).get("line"),
+        "run_gate": (ctx.get("run_gate") or {}).get("line"),
         "order": ctx.get("order"),
         "text": ctx.get("text"),
     }
@@ -374,6 +389,9 @@ def render(ctx: dict[str, Any]) -> str:
         parts.append(_render_fields("MAY TRACKER", tr, [("value", tr.get("value"))] if tr.get("state") == "measured" else []))
     if ctx.get("may_frame"):
         parts.append([f"MAY FRAME (owner-only) [{ctx['may_frame']['source']}]", ctx["may_frame"]["line"]])
+    if ctx.get("run_gate"):  # #5090: owner channel only (assemble sets None when published)
+        rg = ctx["run_gate"]
+        parts.append([f"RUN GATE (owner-only) [{rg['source']}; {rg['state']}]", rg["line"]])
     if not ctx["published"]:  # the order contract is the owner's planning conversation's, never a reader prompt's
         parts.append(["ORDER: " + " -> ".join(ctx["order"]) + " (pre-flight = " + ", ".join(PRE_FLIGHT) + ")"])
     return "\n\n".join("\n".join(p) for p in parts)

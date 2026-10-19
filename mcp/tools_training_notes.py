@@ -204,10 +204,14 @@ def tool_get_exercise_notes(args):
         return _list_deload_words()
     if action in ("disruption", "disruption_end", "disruptions"):
         return {"disruption": _record_disruption, "disruption_end": _end_disruption, "disruptions": _list_disruptions}[action](args)
+    if action in ("fitness_test", "fitness_tests"):  # #5078: the battery's owner write + its read (mcp/tools_fitness_tests.py)
+        from mcp import tools_fitness_tests as ftt
+
+        return (ftt.action_log if action == "fitness_test" else ftt.action_list)(args)
     if action != "read":
         return {
             "error": f"Unknown action '{action}'.",
-            "valid_actions": ["read", "dismiss", "dismissals", "deload", "deloads", *_DISRUPTION_ACTIONS],
+            "valid_actions": ["read", "dismiss", "dismissals", "deload", "deloads", *_DISRUPTION_ACTIONS, "fitness_test", "fitness_tests"],
         }
     exercise = args.get("exercise") or args.get("template_id") or ""
     lookback_days = int(args.get("lookback_days") or PREFLIGHT_LOOKBACK_DAYS)

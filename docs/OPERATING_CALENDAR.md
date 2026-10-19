@@ -81,12 +81,14 @@ implements) unwritable rather than merely noticed.
 | platform | `.claude/skills/review/references/platform.md` | EXEMPT (2026-08-22) |
 | sdlc | `.claude/skills/review/references/sdlc.md` | `sdlc-review` |
 | site | `.claude/skills/review/references/site.md` | EXEMPT (2026-08-22) |
+| training-review | `.claude/skills/training-review/SKILL.md` | EXEMPT (2026-10-19) |
 
 ### Dated exemptions (the set guard's other half)
 
 - **journey** (2026-08-22) — Re-audits the chat↔platform integration after integration work, event-driven by construction. The #2832 calendar cadences standing judgment; a ritual whose trigger is 'the seam changed' has an event for a clock already.
 - **platform** (2026-08-22) — Not in the #2832 adopted calendar: its ground (a broad defect sweep) is covered by the monthly fullreview-full entry's panel, which grades the same surface with anchors and a trend line; it never ran as a command in its own right. Revive deliberately with its own entry if that panel proves too narrow for a defect hunt — do not let it half-exist off-calendar.
 - **site** (2026-08-22) — Owner-attended editorial walkthrough of the public site — run when the site's story changes (a redesign, a new door), not on a clock. Cadencing an editorial judgment would manufacture runs with nothing to judge; the accuracy-full entry owns the site's monthly truth pass.
+- **training-review** (2026-10-19) — #5079: the training block retro — an owner-attended ritual run at the end of each training block, whose cadence is the training charter's calibration.block_retro, not a repo clock. Its run artifacts are owner-only by ruling (the RETRO# row on training_constraints and a tab in his private review doc) and never land in this repo, so a repo-artifact probe here could only ever read NEVER-RUN. A missed block shows in the next retro's compared_with (it names the retro it compared against) — revive as an entry if a repo-side dated artifact is ever ruled acceptable.
 
 ## Scheduled first occurrences (a ritual whose clock starts later, #3378)
 

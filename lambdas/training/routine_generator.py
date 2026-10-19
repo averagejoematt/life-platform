@@ -95,6 +95,7 @@ class GeneratorInputs:
         block_workouts: list[dict[str, Any]] | None = None,  # #4110: Hevy rows since the program's block start; None = read it here
         deload_records: list[dict[str, Any]] | None = None,  # #5070: the owner's recorded deload words; None = read it here (fail-soft)
         disruption_records: list[dict[str, Any]] | None = None,  # #5088: his disruption-mode records; None = read it here (fail-soft)
+        fitness_batteries: list[dict[str, Any]] | None = None,  # #5078: the battery records; None = read it here on a test day only
     ) -> None:
         self.target_date = target_date
         self.recovery_tier = recovery_tier
@@ -107,6 +108,7 @@ class GeneratorInputs:
         self.block_workouts = block_workouts
         self.deload_records = deload_records
         self.disruption_records = disruption_records
+        self.fitness_batteries = fitness_batteries
 
 
 def _archetype_for_date(target_date: str, week_cfg: dict[str, Any]) -> str:
@@ -510,7 +512,7 @@ def _select_movements_for_muscle(
         for k, v in catalog["movements"].items()
         # #4108: the skill ceiling AND the prescribable-shape rule (reviewed, or carries a rep
         # range) — one predicate in training.movement_catalog, no frequency gate (owner ruling C).
-        if v.get("primary_muscle") == muscle and generator_eligible(v, skill_ceiling) and k not in chosen_so_far
+        if v.get("primary_muscle") == muscle and generator_eligible(v, skill_ceiling, key=k) and k not in chosen_so_far
     ]
     if not candidates:
         return []
@@ -831,6 +833,18 @@ def _disruption_mode(inputs: GeneratorInputs) -> dict[str, Any]:
     return disruption.state(records, inputs.target_date)
 
 
+def _with_fitness_battery(
+    inputs: GeneratorInputs, day_entry: dict[str, Any], routines: list[RoutineSpec], catalog: dict[str, Any], block_workouts: Any
+) -> list[RoutineSpec]:
+    """#5078: on the block's due week the test-day role's ideal carries the fitness battery. The record is read only on a test day."""
+    from training import fitness_tests
+
+    if not fitness_tests.is_test_day(day_entry):
+        return routines
+    records = inputs.fitness_batteries if inputs.fitness_batteries is not None else fitness_tests.load_records_failsoft()
+    return fitness_tests.place_battery(routines, day_entry, records, block_workouts, catalog.get("movements") or {})
+
+
 def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     """Returns 1-3 RoutineSpec IR records (ideal, floor, optional re-entry).
 
@@ -864,7 +878,8 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
         # `session_role`; the JSON grid's upper/lower days still take the muscle-budget path.
         from training.full_body_session import full_body_routines
 
-        return full_body_routines(inputs, day_entry, week_cfg, landmarks, catalog, resolved_week, targets, block_workouts=block_workouts)
+        out = full_body_routines(inputs, day_entry, week_cfg, landmarks, catalog, resolved_week, targets, block_workouts=block_workouts)
+        return _with_fitness_battery(inputs, day_entry, out, catalog, block_workouts)
 
     autoreg = _autoreg_multiplier(inputs.recovery_tier, inputs.acwr_flag)
     z2_ok = _portfolio_guard(inputs.z2_minutes_7d, week_cfg.get("z2_floor_minutes", 90))

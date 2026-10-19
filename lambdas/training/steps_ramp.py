@@ -153,6 +153,14 @@ def _standing_lower_leg() -> tuple[list[str], list[dict[str, Any]]]:
     return [r["id"] for r in read if r["id"] in active], read
 
 
+def lower_leg_holds(date: str, pain_flag_instances: Any, pain_dismissals: Any = None) -> list[str]:
+    """The lower-leg causes alone — the strain flags that hold on `date` and the active standing lower-leg constraints,
+    named as `compute` names them in `held_by` (no deload or baseline cause). The run on-ramp and the lower-leg prep
+    read this (#5090)."""
+    events = _strain_events(date, pain_flag_instances, pain_dismissals)
+    return [f"strain_flag:{e['site']}" for e in events if e["holds"]] + [f"standing_constraint:{i}" for i in _standing_lower_leg()[0]]
+
+
 def compute(
     date: str,
     window: Mapping[str, Any],

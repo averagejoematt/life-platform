@@ -67,7 +67,10 @@ GET_EXERCISE_NOTES_DESCRIPTION = (
     "start_date/days/sets_pct) — the ONLY way a deload ever applies; action='deloads' lists them. "
     "action='disruption' (#5088, OWNER-ONLY): record his word that disruption mode is ON (words VERBATIM, "
     "template travel|busy, until, optional start_date) — habits held instead of targets, the short session "
-    "served; action='disruption_end' switches it OFF (step back up); action='disruptions' lists them."
+    "served; action='disruption_end' switches it OFF (step back up); action='disruptions' lists them. "
+    "action='fitness_test' (#5078, OWNER-ONLY): record fitness-battery results — results {test: value} "
+    "(six_minute_walk m, bike_20min_rpe6 m, dead_hang s, assisted_pull_up lb of assistance), optional notes and "
+    "date; action='fitness_tests' lists the batteries, each test's trend and whether the battery is due."
 )
 
 # ── the inputSchema that lives beside its description (the #3692 ceiling) ────────────
@@ -83,13 +86,26 @@ GET_EXERCISE_NOTES_INPUT = {
     "properties": {
         "action": {
             "type": "string",
-            "enum": ["read", "dismiss", "dismissals", "deload", "deloads", "disruption", "disruption_end", "disruptions"],
+            "enum": [
+                "read",
+                "dismiss",
+                "dismissals",
+                "deload",
+                "deloads",
+                "disruption",
+                "disruption_end",
+                "disruptions",
+                "fitness_test",
+                "fitness_tests",
+            ],
             "description": (
                 "read (default) = the note timeline. dismiss = record HIS dismissal of a pain flag on this "
                 "movement (#4036, OWNER-ONLY WRITE). dismissals = list every dismissal on the record. "
                 "deload = record HIS word that a deload starts (#5070, OWNER-ONLY WRITE; `words` verbatim, optional "
                 "`start_date`, `days`, `sets_pct`). deloads = list them. disruption / disruption_end = HIS switch for "
-                "disruption mode (#5088, OWNER-ONLY WRITE; `words` verbatim, `template`, `until` / `ended_on`). disruptions = list."
+                "disruption mode (#5088, OWNER-ONLY WRITE; `words` verbatim, `template`, `until` / `ended_on`). disruptions = list. "
+                "fitness_test = record fitness-battery results (#5078, OWNER-ONLY WRITE; `results`, optional `notes`, `date`). "
+                "fitness_tests = the batteries, trend and due state."
             ),
         },
         "exercise": {
@@ -124,6 +140,15 @@ GET_EXERCISE_NOTES_INPUT = {
         "template": {"type": "string", "enum": ["travel", "busy"], "description": "action='disruption': travel or busy."},
         "until": {"type": "string", "description": "action='disruption': YYYY-MM-DD, the last day the mode covers. Required."},
         "ended_on": {"type": "string", "description": "action='disruption_end': YYYY-MM-DD, the first day back. Defaults to today."},
+        "results": {
+            "type": "object",
+            "description": (
+                "action='fitness_test': {test: value} — six_minute_walk (m), bike_20min_rpe6 (m), dead_hang (s), "
+                "assisted_pull_up (lb of assistance; lower is better). Any subset; a second call on the same date merges."
+            ),
+        },
+        "notes": {"type": "object", "description": "action='fitness_test': {test: note} — e.g. which bike, the grip."},
+        "date": {"type": "string", "description": "action='fitness_test': YYYY-MM-DD of the battery. Defaults to today (Pacific)."},
     },
     "required": [],
 }

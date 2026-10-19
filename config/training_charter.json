@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.5.0",
+  "version": "1.7.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -42,6 +42,20 @@
       "date": "2026-10-19",
       "by": "owner rulings 2026-10-18 on #5058 (the elite-panel training review): compounds RPE 8-9; the last isolation set RPE 9-10; an overage within +1 RPE is not a breach; a ceiling beaten on more than 50% of sets two weeks running PROPOSES a change, which the owner applies",
       "what": "Renames effort_ceilings.by_experience_tier to by_movement_class (it always held the two movement-class bands, not tiers) holding exactly the ruled bands, and states that a set is graded against the HIGH end of its class band (effort_ceilings.ceiling_is; progression.ceiling_tier read the low end until #5058). The tolerance and the proposal rule are the ruled ones, unchanged in value.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.6.0",
+      "date": "2026-10-19",
+      "by": "owner ruling 2026-10-18 (second round, #5090): running is in the May plan; cleared with no exercise restrictions; effort by RPE / talk test",
+      "what": "Builds the run gate's missing Stage 4. gated_movements.running gains the walking condition as numbers (4 consecutive weeks of >= 8.5 h weight-bearing walking, each without a lower-leg pain flag — the owner_redlines run_gate_lb tissue clause, now read here), the reading (the gate opens the run/walk on-ramp; continuous running is unlocked when the on-ramp is completed) and the on-ramp itself: treadmill first, eight levels from 1 min run / 2 min walk to 30 min continuous, two sessions at a level at or under the easy block's RPE with no pain flag to advance, max 2 runs a week, none on a heavy lower day or the session either side of it; a lower-leg strain flag pauses the run/walk (as it pauses the pogo hops) and holds the on-ramp at its level; the Stage 4 record is read back to history_from (the ruling day). lower_leg_prep gains its prescription (calf work, tibialis work, low-amplitude pogo hops on lower days from the prep weight; brisk incline walking is the menu's default block) and the catalog keys of the carve-out — the ONLY plyometric keys the generator may place; every other plyometric entry stays excluded. cardio_menu.blocks gains run_walk (placed by training.run_onramp once the gate is open, never by the weekly menu rule). The level table, the prep doses and the spacing rule's sequence reading are platform-chosen within the ruling.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.7.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on #5078 (the elite-panel training review: a fitness test battery every 6 weeks)",
+      "what": "calibration.fitness_tests gains its protocol: each test's machine, unit, better direction and how it is logged (the explicit record or Hevy), the protocol version, the block alignment and grace for the due week (overdue, then missed: the dead-man state), and the test day (the lightest role carries the tests on its minimum session, never a lower day).",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -121,7 +135,15 @@
         "starting_dose": {"incline_pct": [8, 12], "mph": [2.5, 3.0]},
         "step": {"incline_pct": 1, "mph": 0.1}
       },
-      "kettlebell_swings_and_circuits": {"available": "now", "prescribed_by": "RPE / talk test"}
+      "kettlebell_swings_and_circuits": {"available": "now", "prescribed_by": "RPE / talk test"},
+      "run_walk": {
+        "on": "treadmill",
+        "rpe_from": "easy",
+        "talk_test": "full sentences on the walk, short phrases on the run",
+        "gated_by": "gated_movements.running",
+        "placed_by": "training.run_onramp once the run gate is open: an easy slot only, never a conditioning slot",
+        "dose": "gated_movements.running.onramp.levels"
+      }
     },
     "placement": {
       "conditioning_order": ["tempo_or_hills", "intervals"],
@@ -223,11 +245,53 @@
     "running": {
       "gate_lb": 240,
       "prerequisites": ["four weeks pain-free walking", "Stage 4 of the run/walk on-ramp completed"],
+      "walking_weeks": 4,
+      "walking_hours_per_wk": 8.5,
+      "walking_basis": "weight-bearing walking hours (training.walking_volume, the walking modality: Strava walks/hikes plus Hevy treadmill/walking blocks, de-duplicated), consecutive completed weeks, each without a lower-leg pain flag",
+      "reading": "at or under the gate weight with the walking weeks met, the gate OPENS the run/walk on-ramp (Stage 4); continuous running is unlocked when Stage 4 is completed (onramp.complete_when)",
+      "onramp": {
+        "stage": 4,
+        "where": "treadmill first",
+        "levels": [
+          {"level": 1, "run_min": 1, "walk_min": 2, "rounds": 7},
+          {"level": 2, "run_min": 2, "walk_min": 2, "rounds": 6},
+          {"level": 3, "run_min": 3, "walk_min": 2, "rounds": 5},
+          {"level": 4, "run_min": 5, "walk_min": 2, "rounds": 4},
+          {"level": 5, "run_min": 8, "walk_min": 2, "rounds": 3},
+          {"level": 6, "run_min": 12, "walk_min": 2, "rounds": 2},
+          {"level": 7, "run_min": 20, "walk_min": 0, "rounds": 1},
+          {"level": 8, "run_min": 30, "walk_min": 0, "rounds": 1}
+        ],
+        "advance_rule": {
+          "sessions_at_level": 2,
+          "rpe_max_from": "cardio_menu.blocks.easy.rpe (its top)",
+          "pain_free": true,
+          "rule": "two sessions at a level, each logged at or under the easy block's top RPE and with no lower-leg pain flag, advance one level; an unlogged RPE is not evidence"
+        },
+        "complete_when": "the last level completed twice under the advance rule",
+        "max_runs_per_wk": 2,
+        "not_within_h_of_heavy_lower": 24,
+        "spacing_rule": "no run on a heavy lower day, nor on the session before or after it in split.sequence (day-level reading of 24 h)",
+        "held_by": "a lower-leg strain flag (training.steps_ramp: a strain flag or an active standing constraint) pauses the run/walk — no run is placed, the same impact rule that pauses the pogo hops — and holds the on-ramp at its level: no session dated on or after the flag counts, and the level earned before it is kept",
+        "history_from": "2026-10-18",
+        "history_from_why": "the owner's ruling that put running in the plan: no on-ramp session exists before it, so a Stage 4 reader reads back to this day and an early level never ages out of a rolling window",
+        "counts_toward_movement": "run/walk minutes count toward the daily movement goal (steps.gym_cardio_minutes_count_toward_movement)",
+        "provenance": "owner ruling 2026-10-18 (running in the May plan, by RPE / talk test); the level table and the spacing reading are platform-chosen"
+      },
       "refs": "#5090"
     },
     "lower_leg_prep": {
       "from_lb": 260,
       "carve_out_from_plyometrics_exclusion": ["low-amplitude pogo hops", "calf work", "tibialis work", "brisk incline walking"],
+      "carve_out_catalog_keys": ["low_pogos"],
+      "prescription": [
+        {"item": "calf work", "catalog_keys": ["standing_calf_raise_machine", "calf_raise_machine", "seated_calf_raise"], "sets": 2, "reps": [12, 20], "rpe": [6, 7]},
+        {"item": "tibialis work", "catalog_keys": [], "sets": 2, "reps": [15, 20], "rpe": [5, 6], "cue": "toes-up raises, back to a wall"},
+        {"item": "low-amplitude pogo hops", "catalog_keys": ["low_pogos"], "sets": 2, "reps": [15, 20], "rpe": [3, 4], "cue": "ankle-only bounce, heels barely leave the floor; stop on any shin or heel pain"}
+      ],
+      "incline_walking": "the menu's default block (cardio_menu.blocks.incline_treadmill_walk) is the brisk incline walking",
+      "placement": "lower days (the split.sequence names opening 'lower'), after the lifting",
+      "held_by": "a lower-leg strain flag holds the pogo hops (the calf and tibialis work stay)",
       "note": "the carve-out is limited to the list; everything else plyometric stays excluded"
     },
     "kettlebell_swings_and_circuits": {"available": "now", "prescribed_by": "RPE / talk test"}
@@ -262,7 +326,61 @@
     "dexa": {"every_weeks_approx": 12},
     "fitness_tests": {
       "every_weeks": 6,
-      "battery": ["6-minute walk", "20-minute bike at RPE 6", "dead hang", "assisted pull-up assistance"]
+      "battery": ["6-minute walk", "20-minute bike at RPE 6", "dead hang", "assisted pull-up assistance"],
+      "protocol_version": "1",
+      "aligned_to": "the block: a battery is due in the program week that closes each block (program week a whole multiple of every_weeks)",
+      "early_days_credited": 7,
+      "grace_weeks": 1,
+      "dead_man": "a due week passed with no battery is overdue for grace_weeks, then missed; missed is the dead-man state",
+      "test_day": {
+        "role": "Shoulders+arms",
+        "never_on": ["Lower-heavy", "Lower-volume"],
+        "session": "the role's minimum session (split.minimum_session) plus the tests in `order`",
+        "why": "the lightest day of the split carries the tests, so no heavy leg work blunts the walk or the bike"
+      },
+      "order": ["six_minute_walk", "dead_hang", "assisted_pull_up", "minimum_session", "bike_20min_rpe6"],
+      "tests": {
+        "six_minute_walk": {
+          "label": "6-minute walk",
+          "catalog_key": "treadmill",
+          "unit": "m",
+          "better": "higher",
+          "duration_s": 360,
+          "hevy_field": "distance_m",
+          "protocol": "Treadmill at 0 % incline, no handrails, no running: the fastest steady walk you can hold for 6 minutes. Log the distance.",
+          "hevy": "a Treadmill set of about 6 minutes with a distance"
+        },
+        "bike_20min_rpe6": {
+          "label": "20-minute bike at RPE 6",
+          "catalog_key": "cycling",
+          "unit": "m",
+          "better": "higher",
+          "duration_s": 1200,
+          "hevy_field": "distance_m",
+          "protocol": "The same bike every time (note which). 20 minutes held at RPE 6, short sentences only. Log the distance.",
+          "hevy": "a Cycling set of about 20 minutes with a distance"
+        },
+        "dead_hang": {
+          "label": "dead hang",
+          "catalog_key": "dead_hang",
+          "unit": "s",
+          "better": "higher",
+          "hevy_field": "duration_sec",
+          "protocol": "Overhand grip, shoulder width, feet off the floor, one attempt until the grip goes. Log the seconds.",
+          "hevy": "the longest Dead Hang set"
+        },
+        "assisted_pull_up": {
+          "label": "assisted pull-up assistance",
+          "catalog_key": "pull_up_assisted",
+          "unit": "lb",
+          "better": "lower",
+          "reps": 5,
+          "hevy_field": "weight_lb",
+          "protocol": "Assisted pull-up machine: the least assistance at which 5 clean reps (full hang, chin over the bar) complete. Start at the last test's assistance. Log the assistance.",
+          "hevy": "the least assistance on a Pull Up (Assisted) set of at least 5 reps"
+        }
+      },
+      "provenance": "the battery and its cadence: owner direction 2026-10-18 (#5078); the protocol detail (units, machines, order, test day): platform-proposed for the owner's review"
     },
     "block_retro": {"every_weeks": 6, "scorecard_rows": 13}
   },
