@@ -1761,14 +1761,13 @@ def tool_log_evening_intake(args):
       `updated` + `previous_count` (via ReturnValues=UPDATED_OLD) so the flow
       can say "updated tonight's count 2 -> 1" instead of silently re-writing.
     """
+    from coach.evening_checkin import mcp_count, mcp_log  # #5106: the evening check-in rides the same call
     from coach.intake_response import PRIVATE_INTAKE_PK
 
-    from mcp.tools_evening_checkin import evening_count, log_checkin_part  # #5106: the check-in rides the same call
-
-    count = evening_count(args)  # validated 0-4; None only when a check-in field carries the call
+    count = mcp_count(args)  # validated 0-4; None only when a check-in field carries the call
     date_str = (args.get("date") or pacific_today()).strip()
     datetime.strptime(date_str, "%Y-%m-%d")  # validate; raises on junk
-    checkin = log_checkin_part(args, table, date_str)
+    checkin = mcp_log(args, table, date_str)
     if count is None:
         return checkin
 

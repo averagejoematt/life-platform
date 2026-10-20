@@ -115,6 +115,7 @@ from mcp.tools_descriptions import (
     LOG_COACH_CORRECTION_INPUT,
     LOG_DECISION_DESCRIPTION,
     LOG_EVENING_INTAKE_DESCRIPTION,
+    LOG_EVENING_INTAKE_INPUT,
     LOG_FIELD_NOTE_RESPONSE_DESCRIPTION,
     LOG_HABIT_REFLECTION_DESCRIPTION,
     MANAGE_DIARY_CLAIMS_DESCRIPTION,
@@ -131,7 +132,6 @@ from mcp.tools_descriptions import (
     UPDATE_TODOIST_TASK_DESCRIPTION,
     WRITE_PLATFORM_MEMORY_DESCRIPTION,
 )
-from mcp.tools_evening_checkin import LOG_EVENING_INTAKE_INPUT  # #5106
 from mcp.tools_habits import tool_get_habit_reflection_queue, tool_log_habit_reflection
 from mcp.tools_health import tool_get_daily_metrics, tool_get_readiness_score, tool_get_weight_loss_progress
 
@@ -751,7 +751,7 @@ TOOLS = {
             },
         },
     },
-    # #5106: the input table (count + the evening check-in fields) lives beside its door in mcp/tools_evening_checkin.py.
+    # #5106: the input table (count + the evening check-in fields) is LOG_EVENING_INTAKE_INPUT in mcp/tools_descriptions.py.
     "log_evening_intake": {
         "fn": tool_log_evening_intake,
         "schema": {"name": "log_evening_intake", "description": LOG_EVENING_INTAKE_DESCRIPTION, "inputSchema": LOG_EVENING_INTAKE_INPUT},

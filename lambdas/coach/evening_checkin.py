@@ -11,7 +11,8 @@ THE CHANNELS (no new surface).
     with one line — ``2 3 1 tired`` — or ``/checkin 2 3 1 tired`` at any time. A bare reply is a check-in
     only on an evening whose prompt went out, and only in a 1:1 chat (never the board room). Deterministic:
     no model call, so no budget gate and no grounding gate apply.
-  * MCP: ``log_evening_intake`` takes the same fields (Claude-side entry), through ``write`` below.
+  * MCP: ``log_evening_intake`` takes the same fields (Claude-side entry) through ``mcp_count`` / ``mcp_log`` ->
+    ``write`` below; its input table is ``mcp/tools_descriptions.LOG_EVENING_INTAKE_INPUT``.
 
 IDEMPOTENT PER DAY. One row per Pacific evening (``DATE#<day>``); a second answer overwrites the fields it
 names in place and the reply says it updated (``ReturnValues=UPDATED_OLD``). A reply before 04:00 PT
@@ -45,8 +46,8 @@ FIELDS = ("hunger", "stress", "cravings")
 SCALE_MIN, SCALE_MAX = 0, 4  # the 0-4 scale log_evening_intake and the felt probe already use
 WORD_MAX_CHARS = 24
 ROLLOVER_HOUR_PT = 4  # a reply before 04:00 PT belongs to the previous evening
-# Who texts the prompt: the nutrition coach's bot, else the lead's (persona ids, resolved by the worker's seat).
-PROMPT_PERSONAS = ("nutrition_coach", "eli_marsh")
+# Who texts the prompt: the nutrition coach's bot, else the lead's (persona_registry.LEAD_PERSONA_ID), resolved by the worker's seat.
+PROMPT_PERSONA = "nutrition_coach"
 PROMPT_TEXT = "Evening check-in, 20 seconds: hunger, stress, cravings (0-4 each) and one word for today. Reply like: 2 3 1 tired"
 USAGE_TEXT = "Check-in format: three numbers 0-4 (hunger, stress, cravings) and one word, e.g. /checkin 2 3 1 tired"
 
@@ -119,6 +120,26 @@ def write(table, day: str, values: Mapping[str, Any], source: str, now_utc: Opti
     return {"logged": True, "date": day, **clean, "updated": bool(previous), "previous": previous or None, "private": True}
 
 
+def mcp_count(args: Mapping[str, Any]) -> Optional[int]:
+    """For MCP ``log_evening_intake``: the drinks count validated 0-4, or None when it is absent and a check-in field
+    carries the call. Raises ValueError for a bad count, a bad check-in value, or a call with neither (nothing written)."""
+    has_checkin = bool(validate(args))
+    if args.get("count") is None and has_checkin:
+        return None
+    try:
+        count = int(args.get("count"))
+    except (TypeError, ValueError):
+        raise ValueError("count is required (integer 0-4; 4 = four or more) unless hunger/stress/cravings/word is given")
+    if not (0 <= count <= 4):
+        raise ValueError("count must be between 0 and 4 (4 = four or more)")
+    return count
+
+
+def mcp_log(args: Mapping[str, Any], table, day: str) -> Optional[dict[str, Any]]:
+    """For MCP ``log_evening_intake``: write the check-in fields in ``args`` (if any); None when the call carries none."""
+    return write(table, day, args, "mcp") if validate(args) else None
+
+
 def read_day(table, day: str) -> Optional[dict[str, Any]]:
     return table.get_item(Key={"pk": PK, "sk": f"DATE#{day}"}).get("Item")
 
@@ -185,7 +206,9 @@ def decide(table, day: str, now_pt: datetime, seat: Callable[[str], tuple]) -> t
     row = read_day(table, day) or {}
     if all(row.get(f) is not None for f in FIELDS):
         return "already_logged", None
-    for persona in PROMPT_PERSONAS:
+    from coach.persona_registry import LEAD_PERSONA_ID
+
+    for persona in (PROMPT_PERSONA, LEAD_PERSONA_ID):
         token, chat = seat(persona)
         if token and chat is not None:
             return "send", (token, chat)

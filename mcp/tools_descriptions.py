@@ -329,6 +329,24 @@ LOG_EVENING_INTAKE_DESCRIPTION = (
     "Use for: 'check-in: hunger 2 stress 3 cravings 1, tired'."
 )
 
+# #5106: the input table rides beside its description (the #3759 extraction shape) so mcp/registry.py, at its size
+# ceiling, pays for the evening check-in fields instead of growing; the writer is coach.evening_checkin.
+LOG_EVENING_INTAKE_INPUT = {
+    "type": "object",
+    "properties": {
+        "count": {
+            "type": "integer",
+            "description": "Evening drinks count, 0-4 (4 = four or more). Optional when a check-in field is given.",
+        },
+        "hunger": {"type": "integer", "description": "#5106 evening check-in: hunger 0-4."},
+        "stress": {"type": "integer", "description": "#5106 evening check-in: stress 0-4."},
+        "cravings": {"type": "integer", "description": "#5106 evening check-in: cravings 0-4."},
+        "word": {"type": "string", "description": "#5106 evening check-in: one word for the day."},
+        "date": {"type": "string", "description": "YYYY-MM-DD (default: tonight, the Pacific calendar day)."},
+    },
+    "required": [],
+}
+
 GET_INTAKE_RESPONSE_DESCRIPTION = (
     "PRIVATE (#1405): the intake→next-morning dose-response read. Lagged pairs "
     "vs HRV / recovery / REM with effective-n correction (Pyper-Peterman), p on "
