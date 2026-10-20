@@ -832,7 +832,7 @@ Note: `macrofactor_export` is a **read-side alias only** — no Lambda writes `s
 
 Quarterly CSV import with multiple item types per session. Source: `USER#matthew#SOURCE#food_delivery`.
 
-**PAUSED 2026-10-19 (#5108/#5006, ADR-074 posture; pending owner confirmation):** no orders logged since 2026-03-28. Data and the raw prefix are kept; the registry marks the source `paused`, `get_food_delivery_streak_state` returns None (so the Nutrition-pillar modifier is neutral and the brief/digest lines are absent), and it is never a check-in question context. Un-pause = delete `paused`/`paused_since` in `source_registry.py`.
+**PAUSED 2026-10-19 (#5108/#5006, ADR-074 posture; pending owner confirmation):** no orders logged since 2026-03-28. Data and the raw prefix are kept; the registry marks the source `paused`, `get_food_delivery_streak_state` returns None (so the Nutrition-pillar modifier is neutral and the brief/digest lines are absent), and it is never a check-in question context. Un-pause = delete `paused`/`paused_since` and restore `posture` to `portfolio` in `source_registry.py`.
 
 **Transaction items** (`sk = DATE#YYYY-MM-DD#TXN#NNN`):
 | Field | Type | Description |
