@@ -1,7 +1,7 @@
 {
   "_meta": {
     "generated_by": "scripts/v4_build_data_sources.py — from lambdas/source_registry.py (#498); never hand-edit",
-    "updated": "2026-10-18",
+    "updated": "2026-10-20",
     "count": 21
   },
   "sources": [
@@ -94,14 +94,6 @@
       "posture": "portfolio"
     },
     {
-      "id": "food_delivery",
-      "name": "Food delivery",
-      "category": "Manual logs",
-      "metrics": "Delivery-order behavioral signal (incl. longest-ever streak)",
-      "method": "Manual log",
-      "posture": "portfolio"
-    },
-    {
       "id": "notion",
       "name": "Notion",
       "category": "Inputs",
@@ -132,6 +124,14 @@
       "metrics": "Temperature, precipitation, daylight, conditions, sunrise/sunset, AQI",
       "method": "Open-Meteo API pull, 2x daily",
       "posture": "portfolio"
+    },
+    {
+      "id": "food_delivery",
+      "name": "Food delivery",
+      "category": "Manual logs",
+      "metrics": "Delivery-order behavioral signal (incl. longest-ever streak)",
+      "method": "Manual log (paused: no orders logged since March)",
+      "posture": "paused"
     },
     {
       "id": "garmin",

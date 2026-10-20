@@ -2595,3 +2595,16 @@ class TestRecordEmailSend:
         wd.record_email_send(table, "weekly_digest", "week:2026-W34")
         row = table.puts[0]
         assert row["ttl"] == int(datetime.fromisoformat(row["sent_at"]).timestamp()) + 90 * 86400
+
+
+import pytest as _pytest_5108  # noqa: E402
+
+
+@_pytest_5108.fixture(autouse=True)
+def _food_delivery_unpaused_5108(monkeypatch):
+    """#5108: the real registry now PAUSES food_delivery (reader returns None). These tests
+    exercise the LIVE-source behaviour, so they un-pause it; the paused contract is pinned in
+    tests/test_food_delivery_paused_5108.py."""
+    from ingestion.source_registry import SOURCE_REGISTRY
+
+    monkeypatch.setitem(SOURCE_REGISTRY, "food_delivery", {**SOURCE_REGISTRY["food_delivery"], "paused": False})

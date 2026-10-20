@@ -1041,9 +1041,19 @@ def test_a_sub_source_uptime_bar_reflects_that_sub_sources_own_data(monkeypatch)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _paused(source_id):
+    """A paused source (ADR-074 posture; food_delivery since #5108) renders the PAUSED comment, not a cadence."""
+    from ingestion.source_registry import SOURCE_REGISTRY
+
+    return bool(SOURCE_REGISTRY.get(source_id, {}).get("paused"))
+
+
 def _manual_source(min_due_months=0):
     return pick_data_source(
-        lambda r: r["category"] == "manual" and DUE_MONTHS.get(r["id"], 6) >= min_due_months and r["field_check"] is None,
+        lambda r: r["category"] == "manual"
+        and not _paused(r["id"])
+        and DUE_MONTHS.get(r["id"], 6) >= min_due_months
+        and r["field_check"] is None,
         f"a manual source with a cadence of at least {min_due_months} months",
     )
 
