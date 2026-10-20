@@ -69,8 +69,7 @@ def test_behavioral_classification_complete():
         "macrofactor",
         "hevy",
         "measurements",
-        "food_delivery",
-    }
+    }  # food_delivery left the set when it was paused (#5108, ADR-074 posture): a paused source is not watched
 
 
 def test_passive_pipes_stay_infra():

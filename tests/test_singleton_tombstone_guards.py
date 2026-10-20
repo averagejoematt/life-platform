@@ -995,6 +995,10 @@ _GENERATION_GET_ITEM_EXEMPT: dict = {
         "sk",
     ): "guarded via _docket_row_stands (applies singleton_visible), which also clears tombstoned rows out of the finite open-docket key space (#1801)",
     ("coach/intake_response.py", "f'DATE#{nxt}'"): "whoop is RAW_TIMESERIES — kept forever, never tombstoned",
+    # #5106: the evening check-in — the DATE# row is RAW_TIMESERIES (a self-report fact, never tombstoned) and the
+    # PROMPT# row lives under COACH#evening_checkin, SYSTEM_STATE (once-a-day send bookkeeping a reset must not touch).
+    ("coach/evening_checkin.py", "f'DATE#{day}'"): "evening_checkin is RAW_TIMESERIES — kept forever, never tombstoned",
+    ("coach/evening_checkin.py", "f'{PROMPT_PREFIX}{day}'"): "COACH#evening_checkin is SYSTEM_STATE — never tombstoned",
     ("coach/inter_coach_dialogue_lambda.py", "'CONFIG#v1'"): "ENSEMBLE#influence_graph static config — system_state, no phase attr",
     (
         "coach/voice_fidelity_harness.py",

@@ -78,6 +78,11 @@ _LAMBDAS = _REPO / "lambdas"
 # files also use the constant for date arithmetic / row-building / assertion
 # text, which is what keeps them in the scan.
 EXEMPT_DATED_FIXTURE_FILES: dict[str, str] = {
+    "test_food_delivery_paused_5108.py": (
+        "the reader get_food_delivery_streak_state is called with now=_NOW passed EXPLICITLY and every "
+        "expected value is derived from _NOW or from the pause itself (the reader returns None before it "
+        "touches the table); source_registry is read only for its facets, so no handler wall clock is reached"
+    ),
     "test_watch_metrics_registry_4970.py": (
         "NOW is passed EXPLICITLY to every dead-man call (evaluate/check_dead_men(table, NOW)) and the "
         "expected ages are derived from it (NOW.timestamp() - h*3600); source_registry is read only for "

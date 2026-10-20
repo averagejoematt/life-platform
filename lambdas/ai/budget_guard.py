@@ -153,6 +153,12 @@ _FEATURE_CUTOFF = {
     # periodic internal review, not a surface: band 1, pauses first. A paused retro is postponed
     # and says so; the previous retro stays the comparison baseline.
     "charter_retro": 1,
+    # nutrition_critics (#5114, epic #5094): the model layer over the three nutrition critics
+    # (health/nutrition_critics_ai.py) — up to three short Haiku calls per get_deficit_sustainability
+    # call, one narrative per critic. It NARRATES verdicts the deterministic layer already decided and
+    # may never move one, so nothing ships differently when it is paused: band 1, it pauses FIRST. A
+    # paused layer writes `paused` with the tier on every verdict, never a fabricated narrative.
+    "nutrition_critics": 1,
     # ── Band 2: reader NARRATIVE content — pauses only under real pressure, a full
     #    tier AFTER all internal AI. The biggest recurring daily bucket, so it's
     #    the real cost lever, but the reader product is never the first sacrifice.

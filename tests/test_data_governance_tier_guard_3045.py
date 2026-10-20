@@ -165,6 +165,13 @@ ROW_MAP: list[dict] = [
         "requirements": [("source", "nutrition_titration", OO)],
         "claims": [],
     },
+    # #5106: the evening check-in and its weekly read against intake — behavioural self-report; no public projection.
+    {
+        "key": "evening_checkin",
+        "pattern": r"^Evening check-in",
+        "requirements": [("source", "evening_checkin", OO), ("source", "checkin_intake_pairs", OO)],
+        "claims": [],
+    },
     # #4036: declared before the first dismissal exists, for the progress_photos reason —
     # an owner statement about an injury must never be stored under no tier. No `claims`:
     # this source has no public projection at all.

@@ -478,11 +478,19 @@ def _letter_rank(letter: str, rubric: dict[str, Any]) -> int:
     return len(order) - order.index(letter) if letter in order else 0
 
 
-def combine(code: dict[str, Any], judged: dict[str, Any] | None, rubric: dict[str, Any]) -> dict[str, Any]:
+def combine(
+    code: dict[str, Any],
+    judged: dict[str, Any] | None,
+    rubric: dict[str, Any],
+    concession_of: Callable[[str], dict[str, Any] | None] | None = None,
+) -> dict[str, Any]:
     """Seat scores (the mean of each seat's criteria), the overall score + letter, and the target verdict.
 
     `judged` is `panel_judge.parse_response`'s seat -> {scores, why, concession_held}, or None when the judge did
-    not run — then each seat is the mean of its CODE criteria only and the grade is `degraded`."""
+    not run — then each seat is the mean of its CODE criteria only and the grade is `degraded`. `concession_of`
+    reads a seat's concession (default: the training ledger; the food panel passes its own, #5110). A seat with no
+    concession NAMED fails the target ("every seat ... with its concession named")."""
+    concession_of = concession_of or concession
     tgt = target()
     floor = float(tgt.get("every_seat_at_least") or 0)
     seats: dict[str, Any] = {}
@@ -499,12 +507,13 @@ def combine(code: dict[str, Any], judged: dict[str, Any] | None, rubric: dict[st
                 unscored.append(f"{seat}.{c['id']}")
         scores = [v["score"] for v in crit.values()]
         mean = round(sum(scores) / len(scores), 2) if scores else 0.0
-        seats[seat] = {"score": mean, "criteria": crit, "concession": concession(seat), "concession_held": j.get("concession_held")}
+        seats[seat] = {"score": mean, "criteria": crit, "concession": concession_of(seat), "concession_held": j.get("concession_held")}
     overall = round(sum(s["score"] for s in seats.values()) / len(seats), 2) if seats else 0.0
     letter = letter_for(overall, rubric)
     below = sorted(s for s, v in seats.items() if v["score"] < floor)
     broken = sorted(s for s, v in seats.items() if v["concession_held"] is False)
-    met = _letter_rank(letter, rubric) >= _letter_rank(str(tgt.get("overall") or "A"), rubric) and not below and not broken
+    unnamed = sorted(s for s, v in seats.items() if not v["concession"])
+    met = _letter_rank(letter, rubric) >= _letter_rank(str(tgt.get("overall") or "A"), rubric) and not (below or broken or unnamed)
     return {
         "seats": seats,
         "overall": {"score": overall, "letter": letter},
@@ -512,6 +521,7 @@ def combine(code: dict[str, Any], judged: dict[str, Any] | None, rubric: dict[st
         "target_met": bool(met),
         "seats_below_floor": below,
         "concessions_not_held": broken,
+        "concessions_unnamed": unnamed,
         "unscored": unscored,
         "degraded": bool(unscored),
     }

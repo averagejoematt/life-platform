@@ -190,7 +190,7 @@ def coach_context_for(
 ) -> dict[str, Any]:
     """The full context dict (owner channel), or ``{"state": "read_failed", ...}``."""
     try:
-        from training import coach_context
+        from training import coach_context, lab_priorities
 
         guidance = _clinical_guidance()
         return coach_context.assemble(
@@ -199,6 +199,7 @@ def coach_context_for(
             constraint_block=constraint_block,
             guidance=guidance,
             guidance_freshness=_freshness_from(guidance, target_date),
+            lab_priorities=lab_priorities.from_rows(guidance),
             published=False,
         )
     except Exception as e:  # noqa: BLE001

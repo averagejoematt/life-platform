@@ -1,0 +1,21 @@
+{
+  "_README": "#5109: a nutrition-coach output that cites only figures the engines serve. The {placeholders} are filled by tests/test_nutrition_coach_context_5109.py from the SAME run: the calorie resolver's target (health.calorie_target.resolve), the protein engine's day total (health.protein_engine.evaluate_day) and the charter's protein floor. The day row is synthetic (round numbers, no owner data). `mutants` are the texts the served-fact gate must flag.",
+  "day": "2026-10-19",
+  "day_row": {
+    "date": "2026-10-18",
+    "total_protein_g": 150,
+    "total_fat_g": 70,
+    "total_carbs_g": 130,
+    "total_fiber_g": 30,
+    "food_log": [
+      {"time": "08:00", "protein_g": 45, "calories_kcal": 450},
+      {"time": "13:00", "protein_g": 50, "calories_kcal": 600},
+      {"time": "19:00", "protein_g": 55, "calories_kcal": 700}
+    ]
+  },
+  "text": "You came in at {protein_total_g} g of protein on Sunday, October 18, short of the {protein_floor_g} g floor. Calories sit against the {calorie_target_kcal} kcal target this week. One ask: add a fourth feeding of {feeding_threshold_g} g or more tomorrow.",
+  "mutants": {
+    "stale_protein_target": "Your protein target of 190 g is the line to hold this week.",
+    "legacy_per_meal_line": "Aim for a 30 g protein threshold at every meal."
+  }
+}

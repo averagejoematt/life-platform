@@ -273,6 +273,10 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
     # onto the combined charter (v1.11.0: nutrition.calories + nutrition.expenditure + nutrition.protein
     # and its reading guide); 14,287 (est 14,102) on the #5096 lane (v1.12.0: nutrition.titration, the
     # calories block's titration keys moved into it). The wave's other nutrition blocks move it again: re-scale at restack.
+    # #5110 (charter v1.18.0, nutrition.concession_ledger + its reading-guide sentence) re-scaled all four charter
+    # entries together to 16,831 (est 16,613 x 7,738/7,638), and moved the judge's batch to 8: the weekly run now grades
+    # the food plan + its 2 negative controls after the training plan + its 4 (panel_judge.WEEKLY_CALLS_PER_RUN), and the
+    # CI gate carries 3 food golden cases beside the 5 training ones.
     "charter-judge": {
         "engaged": True,
         "route": "charter.judge",
@@ -280,17 +284,16 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_JUDGE_MODEL",
         "cdk_stack": None,
         "measured_on": "sonnet-4-6",
-        "prefix_tokens": 14287,
-        "calls_within_ttl": 5,
+        "prefix_tokens": 16831,
+        "calls_within_ttl": 8,
         "decided": "2026-10-19",
         "issue": 5072,
         "why": (
-            "~14,287 tok (charter + nutrition.calories + nutrition.expenditure + nutrition.protein + nutrition.titration, "
-            "estimate scaled to the "
-            "Haiku wire ratio) against Sonnet 4.6's 1,024 floor. "
-            "One weekly run = the real plan + 4 negative controls, back-to-back inside one 5m TTL: one write at 1.25x "
-            "then four reads at 0.1x. ~4,500 tok volatile in (rubric + blinded plan) / ~700 out per plan: ~$0.18 a run "
-            "cached vs ~$0.31 uncached (-42%)."
+            "~16,831 tok (charter v1.18.0 with the nutrition blocks and the food panel's concession ledger, estimate "
+            "scaled to the Haiku wire ratio) against Sonnet 4.6's 1,024 floor. "
+            "One weekly run = the real training plan + 4 negative controls, then the food plan + 2 (#5110), back-to-back "
+            "inside one 5m TTL: one write at 1.25x then seven reads at 0.1x. ~4,500 tok volatile in (rubric + blinded "
+            "plan) / ~700 out per plan: ~$0.30 a run cached vs ~$0.55 uncached (-45%)."
         ),
     },
     "charter-judge-gate": {
@@ -300,13 +303,14 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_JUDGE_GATE_MODEL",
         "cdk_stack": None,
         "measured_on": "sonnet-4-6",
-        "prefix_tokens": 14287,
-        "calls_within_ttl": 5,
+        "prefix_tokens": 16831,
+        "calls_within_ttl": 8,
         "decided": "2026-10-19",
         "issue": 5072,
         "why": (
             "The CI regression gate's copy of the judge (scripts/panel_rubric_gate.py --live): one call per golden "
-            "case (5), back-to-back in one run. Same block, same floor, same arithmetic as charter-judge: ~$0.18 a run."
+            "case (8: 5 training, 3 food since #5110), back-to-back in one run. Same block, same floor, same arithmetic "
+            "as charter-judge: ~$0.30 a run."
         ),
     },
     "charter-narrative": {
@@ -316,12 +320,12 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_NARRATIVE_MODEL",
         "cdk_stack": None,
         "measured_on": "haiku-4-5",
-        "prefix_tokens": 16023,
+        "prefix_tokens": 16831,
         "calls_within_ttl": 3,
         "decided": "2026-10-19",
         "issue": 5084,
         "why": (
-            "~16,023 tok (estimate 15,816 scaled to the Haiku wire ratio 7,738/7,638 on 2026-10-20 when the nutrition charter wave grew the charter to v1.16.0 — re-measure with Bedrock CountTokens; 11,602 on the wire 2026-10-19 after the #5090 run on-ramp and #5078 fitness battery "
+            "~16,831 tok (estimate 16,613 scaled to the Haiku wire ratio 7,738/7,638 at charter v1.18.0, #5110; 16,023 at v1.16.0 — re-measure with Bedrock CountTokens; 11,602 on the wire 2026-10-19 after the #5090 run on-ramp and #5078 fitness battery "
             "grew the charter; 7,738 on 2026-10-18), clears the 4,096 floor. A ONE-call-a-night narrative would be a decline (a write "
             "premium nothing reads), so the design batches it: the nightly pre-draft writes the plan, Hevy-note and "
             "Telegram lines back-to-back (charter_ai.NARRATIVE_SURFACES) — one write, two reads. ~1,500 tok volatile "
@@ -336,16 +340,41 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_RETRO_MODEL",
         "cdk_stack": None,
         "measured_on": "haiku-4-5",
-        "prefix_tokens": 16023,
+        "prefix_tokens": 16831,
         "calls_within_ttl": 8,
         "decided": "2026-10-19",
         "issue": 5084,
         "why": (
-            "~16,023 tok (estimate-scaled with charter-narrative on 2026-10-20; 11,602 on the wire 2026-10-19), clears the 4,096 "
+            "~16,831 tok (estimate-scaled with charter-narrative at v1.18.0; 11,602 on the wire 2026-10-19), clears the 4,096 "
             "floor. The block retro reuses the judge's panel rubric — one "
             "call per seat, back-to-back in one /training-review run, once per block. ~4,000 tok volatile in "
             "(the block's evidence) / ~800 out per seat: $0.0866 per retro cached vs $0.1568 uncached (-45%). "
             "Runs on a workstation, so the dev AI cap bounds it as well."
+        ),
+    },
+    # #5114: the nutrition critics' model layer (health/nutrition_critics_ai.py), DECLINED by design. Its
+    # stable prefix is the fixed SYSTEM_PROMPT alone; the user turn is one critic's verdict + packet,
+    # volatile by construction. prefix_tokens is estimate_tokens on that literal (no wire count taken: the
+    # lane made no Bedrock call) — under EVERY floor in the registry, the 512 tier included, so no model
+    # move re-opens this decision on size alone. `cdk_stack` is None: the host is life-platform-mcp, whose
+    # function_name is a module constant the env derivation cannot read, and whose environment sets no
+    # AI_MODEL_HAIKU, so the registry default is what it runs on.
+    "nutrition-critics": {
+        "engaged": False,
+        "route": "nutrition.critics",
+        "caller": "health/nutrition_critics_ai.py",
+        "caller_var": "NUTRITION_CRITICS_MODEL",
+        "cdk_stack": None,
+        "measured_on": "haiku-4-5",
+        "prefix_tokens": 199,
+        "calls_within_ttl": 3,
+        "decided": "2026-10-19",
+        "issue": 5114,
+        "why": (
+            "~199 tok (estimate_tokens on SYSTEM_PROMPT; re-measure from the first live call's usage block) against "
+            "Haiku 4.5's 4,096 floor — 5% of it, and under the 512 floor of the 5.5 tier too. Three calls land in "
+            "one TTL (one per critic), but a breakpoint on a sub-floor prefix is a silent no-op, and padding a "
+            "narrator to 4,096 tok would cost more than the ~$0.006 a call it narrates. No cache_control is sent."
         ),
     },
 }

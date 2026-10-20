@@ -531,6 +531,14 @@ _CALIBRATION_PUBLISHED_IMPORTER_PY = (
 # #5095: a module that grades against a hand-typed 1,500 kcal calorie target instead of the ONE resolver.
 _CALORIE_LITERAL_PY = '"""census probe — a second calorie target that must never exist."""\n\n\ndef grade(cal):\n    cal_target = 1500\n    return cal <= cal_target\n'
 
+# #5106: a published module (lambdas/web) that reads the owner-only evening check-in partition — his stress and
+# hunger ratings would then be one call from a served page.
+_CHECKIN_PUBLISHED_READER_PY = (
+    '"""census probe — a published reader that must never exist."""\n\n\n'
+    "def handle(table):\n"
+    "    return table.get_item(Key={'pk': 'USER#matthew#SOURCE#evening_checkin', 'sk': 'DATE#2026-10-28'})\n"
+)
+
 # #5073: a published module (lambdas/emails) that imports the owner-only May tracker — the target
 # date, the band and the projected weight would then be one call from an email body.
 _MAY_TRACKER_PUBLISHED_IMPORTER_PY = (
@@ -1301,6 +1309,19 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
             "2026-10-18 that no May countdown or target reaches the site, so a published surface reads public_view() only"
         ),
         plants=(("lambdas/web/_census_probe_5087.py", _CHARTER_PUBLISHED_READER_PY),),
+        track=False,  # the guard os.walks lambdas/web + lambdas/emails on disk, so an untracked module is in scope
+    ),
+    # #5106: the owner-only evening check-in — no published-surface module (lambdas/web, lambdas/emails) names either partition.
+    "structural::test_evening_checkin_5106.py": MutationSpec(
+        gate_id="structural::test_evening_checkin_5106.py",
+        target="tests/test_evening_checkin_5106.py",
+        detects=(
+            "a published module (lambdas/web or lambdas/emails) reading the owner-only evening check-in partition — his "
+            "hunger, stress and cravings ratings and the word for the day, a behavioural self-report with no public "
+            "projection; the weekly read against intake is stored apart from the served weekly_correlations record for "
+            "the same reason"
+        ),
+        plants=(("lambdas/web/_census_probe_5106.py", _CHECKIN_PUBLISHED_READER_PY),),
         track=False,  # the guard os.walks lambdas/web + lambdas/emails on disk, so an untracked module is in scope
     ),
     # #5073: the owner-only May tracker — no published-surface module (lambdas/web, lambdas/emails) imports it.
@@ -2254,6 +2275,17 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "a published surface handed the merged charter as an argument by an unswept caller (mcp/, lambdas/coach), and the live "
         "S3 objects, which no repo test reads.",
         proved_on="2026-10-18",
+    ),
+    "structural::test_evening_checkin_5106.py": _proof(
+        "structural::test_evening_checkin_5106.py",
+        "ARMED 1/1 — baseline: 27 passed in 1.06s | mutated: 1 failed, 26 passed in 0.92s :: "
+        "test_no_published_module_reads_either_partition | reverted: 27 passed in 0.92s",
+        "lambdas/web/ and lambdas/emails/ on disk (os.walk, every .py): any mention of `evening_checkin` or "
+        "`checkin_intake_pairs` fails and names the file. Also pinned in the same file: the owner-only tier and the "
+        "phase classes of both partitions, the schedule row before quiet hours, the rule + the scoped grant, the "
+        "dead-man's registration. STILL INVISIBLE, stated: a published module handed a check-in row as an argument by "
+        "an unswept caller (mcp/, lambdas/coach), a pk assembled from fragments, and the live table.",
+        proved_on="2026-10-19",
     ),
     "structural::test_may_tracker_5073.py": _proof(
         "structural::test_may_tracker_5073.py",

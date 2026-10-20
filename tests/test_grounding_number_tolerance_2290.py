@@ -129,7 +129,8 @@ def test_no_other_caller_was_tightened_by_accident():
     ).stdout.split()
     assert sorted(out) == [
         "lambdas/ai/grounded_generation.py",  # where it is defined
-        "lambdas/web/site_api_ai_lambda.py",  # /api/explain, the one opted-in surface
+        "lambdas/health/nutrition_critics_ai.py",  # #5114 (decision recorded): the critics' narrative restates its packet exactly
+        "lambdas/web/site_api_ai_lambda.py",  # /api/explain, the first opted-in surface
     ], f"the exact window spread beyond /api/explain without a recorded decision: {sorted(out)}"
 
 

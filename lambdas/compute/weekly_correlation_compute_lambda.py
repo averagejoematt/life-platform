@@ -445,8 +445,9 @@ EXPECTED_DIRECTIONS = {
 }
 
 
-def compute_correlations(series):
-    """Compute all pairs from the daily series dict.
+def compute_correlations(series, pairs=None):
+    """Compute all pairs from the daily series dict (``pairs`` defaults to CORRELATION_PAIRS; #5106 passes
+    the owner-only check-in family through this same pipeline).
 
     Handles both cross-sectional (lag=0) and lagged (lag>0) pairs.
     Lagged pairs: xs from day D, ys from day D+lag_days.
@@ -458,7 +459,7 @@ def compute_correlations(series):
     dates = sorted(series.keys())
     results = {}
 
-    for pair in CORRELATION_PAIRS:
+    for pair in pairs or CORRELATION_PAIRS:
         # Support old 3-tuple format (no lag) and new 4-tuple format (with lag)
         if len(pair) == 4:
             metric_a, metric_b, label, lag_days = pair
@@ -1184,6 +1185,22 @@ def lambda_handler(event, context):
         store_what_changed(week_key, _deltas, _unlocked, _first_sig, end_date, computed_at)
     except Exception as e:
         logger.warning("SS-08 failed (non-fatal): %s", e)
+
+    # #5106: the owner-only evening check-in -> intake family (non-fatal), stored APART from the public record.
+    try:
+        from health import checkin_intake_pairs
+
+        checkin_intake_pairs.run(
+            fetch=fetch_range,
+            correlate=compute_correlations,
+            put_item=table.put_item,
+            week_key=week_key,
+            start_date=start_date,
+            end_date=end_date,
+            computed_at=computed_at,
+        )
+    except Exception as e:
+        logger.warning("#5106 check-in pairs failed (non-fatal): %s", e)
 
     elapsed = time.time() - t0
     significant = {k: v for k, v in correlations.items() if v.get("pearson_r") is not None and abs(v["pearson_r"]) >= 0.3}

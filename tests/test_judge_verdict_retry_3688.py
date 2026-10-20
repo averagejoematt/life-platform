@@ -392,6 +392,14 @@ _RESIDUAL = {
         "is missing is the same thing #3828 box 1 names — a live truncation is recorded on the verdict "
         "(`model.error`) and in the routine's inputs_snapshot, but counted nowhere an operator reads.",
     ),
+    "lambdas/health/nutrition_critics_ai.py": (
+        "#3828",
+        "#5114's nutrition critics' narrator — not a judge: the verdict is the deterministic layer's and the "
+        "model only narrates it, so `_parse` naming a `max_tokens` stop as an error loses the narrative, never "
+        "the verdict. No retry for the reason the two rows above give (fixed MAX_TOKENS + fixed packet = a "
+        "deterministic truncation). Recorded on the verdict (`model.error`); counted nowhere an operator reads "
+        "— the #3828 box 1 gap, folded there.",
+    ),
     "lambdas/ai/bedrock_client.py": (
         "#2893",
         "the fleet-wide truncation METER (_meter_truncation) — it WARNs and returns the response "

@@ -21,6 +21,10 @@ THE ANTI-GOODHART RULES (the owner's comment on #5072), each held by code or a t
   * OUTCOMES OUTRANK THE RUBRIC. A tripped outcome tripwire (anchor strength, the loss rate, walking)
     on a plan the rubric passes reads `rubric_outranked`, never a clean A.
 
+THE FOOD PANEL (#5110). The week's food plan is graded by the food seats (`food_panel`, the charter's
+`nutrition.concession_ledger`) through the same `judge` and `grade_scored`, on the same routes and budget, with
+its own blinded body and negative controls; the weekly run grades the food plan after the training plan.
+
 BUDGET. The weekly grade spends under `charter_judge` (band 1: an internal eval, pauses first); the CI
 regression gate under `charter_judge_gate` (band 3 with the other operator-truth CI gates, pausing only at
 the hard stop). A paused or failed judge leaves the CODE scores standing and marks the grade `degraded`
@@ -33,15 +37,16 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
-from training import charter_ai, panel_rubric
+from training import charter_ai, food_panel, panel_rubric
 
 logger = logging.getLogger(__name__)
 
 WEEKLY_ROUTE = "charter.judge"
 CI_ROUTE = "charter.judge_gate"
 PLANNER_ROUTE = "plan_critics"  # the tier the plan's own red team runs on — the judge must not share it
-# One weekly run = the real plan + every negative control, back-to-back (the cache register's calls_within_ttl).
-WEEKLY_CALLS_PER_RUN = 1 + len(panel_rubric.CONTROL_MUTATIONS)
+# One weekly run = the real training plan + its negative controls, then the week's food plan + its negative controls
+# (#5110), back-to-back on the one cached charter block (the cache register's calls_within_ttl).
+WEEKLY_CALLS_PER_RUN = 1 + len(panel_rubric.CONTROL_MUTATIONS) + 1 + len(food_panel.CONTROL_MUTATIONS)
 MAX_TOKENS = 2000
 PANEL_SK_PREFIX = "PANEL#"
 
@@ -161,11 +166,13 @@ def judge(
     route: str = WEEKLY_ROUTE,
     call: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     catalog: dict[str, Any] | None = None,
+    body: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """One judge call for one plan: {status, judged (seat -> scores), usage, reason}. Never raises.
 
     `call` is the transport (default: `bedrock_client.invoke_with_retry` on the route's model); tests and the
-    gate's recorded mode pass a replay. Budget is checked here only for the real transport — a replay spends nothing."""
+    gate's recorded mode pass a replay. Budget is checked here only for the real transport — a replay spends nothing.
+    `body` is a prebuilt request (the food panel's, #5110); default: the training plan's `build_body`."""
     from ai import structured_json  # noqa: PLC0415
 
     if call is None:
@@ -185,7 +192,9 @@ def judge(
     try:
         if transport is None:  # inside the try: a missing boto3 / unknown route is an error status, never a raise
             transport = _bedrock_call(route)
-        parsed = structured_json.call_json(_metered, build_body(case, rubric, route, catalog), response_schema(rubric), label="panel_judge")
+        parsed = structured_json.call_json(
+            _metered, body or build_body(case, rubric, route, catalog), response_schema(rubric), label="panel_judge"
+        )
     except Exception as e:  # noqa: BLE001 — a failed judge degrades the grade, it never fails the plan
         logger.warning("panel_judge: judge call failed (%s: %s)", type(e).__name__, str(e)[:200])
         return {"status": "error", "judged": None, "usage": usage, "reason": f"{type(e).__name__}: {str(e)[:200]}"}
@@ -223,12 +232,30 @@ def grade_case(
 ) -> dict[str, Any]:
     """The full grade of one plan: the code pre-score, the judge, the combination, the outcome check."""
     code = panel_rubric.prescore(case, rubric, catalog)
-    j = judge(case, rubric, route=route, call=call, catalog=catalog)
-    graded = panel_rubric.combine(code, j["judged"], rubric)
+    return grade_scored(
+        case, rubric, code, build_body(case, rubric, route, catalog), route=route, call=call, outcome=panel_rubric.outcome_disagreement
+    )
+
+
+def grade_scored(
+    case: dict[str, Any],
+    rubric: dict[str, Any],
+    code: dict[str, Any],
+    body: dict[str, Any],
+    *,
+    route: str,
+    call: Callable[[dict[str, Any]], dict[str, Any]] | None,
+    concession_of: Callable[[str], dict[str, Any] | None] | None = None,
+    outcome: Callable[[dict[str, Any], dict[str, Any]], list[str]] | None = None,
+) -> dict[str, Any]:
+    """The judge + the combination for a plan whose code criteria are already scored — shared by the training
+    plan and the food plan (#5110: `rubric` is then the food panel's view, `concession_of` its ledger)."""
+    j = judge(case, rubric, route=route, call=call, body=body)
+    graded = panel_rubric.combine(code, j["judged"], rubric, concession_of)
     reasons = [f"judge {j['status']}: {j['reason']}"] if j["status"] != "ok" else []
     if j["status"] == "ok" and graded["unscored"]:
         reasons.append(f"judge left {len(graded['unscored'])} criteria unscored")
-    disagree = panel_rubric.outcome_disagreement(case, graded)
+    disagree = outcome(case, graded) if outcome else []
     graded.update(
         case_id=case.get("case_id"),
         rubric_version=rubric.get("version"),
@@ -281,10 +308,12 @@ def grade_committed_week(
     history: list[dict[str, Any]] | None = None,
     catalog: dict[str, Any] | None = None,
     week_start: str | None = None,
+    food_plan: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The WEEKLY real-plan grade: the committed routines + the latest constraint block, then the four negative
-    controls made from them — `WEEKLY_CALLS_PER_RUN` judge calls back-to-back. Readers are injected (the MCP
-    side wires the routine repo, the plan engine and the PANEL# history), so this stays testable offline."""
+    controls made from them, then the week's FOOD plan and its controls (#5110, `food_panel.grade_week`) —
+    `WEEKLY_CALLS_PER_RUN` judge calls back-to-back. Readers are injected (the MCP side wires the routine repo,
+    the plan engine, the food plan and the PANEL# history), so this stays testable offline."""
     rubric = rubric or panel_rubric.load_rubric()
     if rubric is None:
         return {"week_end": week_end, "status": "no_rubric", "degraded": True, "degraded_reasons": ["config/panel_rubric.json unreadable"]}
@@ -308,6 +337,9 @@ def grade_committed_week(
         real["degraded_reasons"].append("the constraint block was not read — the block-level criteria scored as absent")
     if leaky:
         real["degraded_reasons"].append(f"negative control(s) passed what they must fail: {leaky}")
+    real["food"] = food_panel.grade_week(food_plan, rubric, call=call) if food_plan else None
+    if not food_plan:
+        real["degraded_reasons"].append("the food plan was not read — the food panel did not grade")
     real.update(
         week_end=week_end,
         week_start=week_start,
@@ -344,4 +376,5 @@ def panel_item(grade: dict[str, Any], user_pk: str) -> dict[str, Any]:
         "calibration": grade.get("calibration"),
         "rubric_version": grade.get("rubric_version"),
         "charter_version": charter_ai.training_charter.charter_version(),
+        "food": food_panel.row_summary(grade.get("food")),
     }

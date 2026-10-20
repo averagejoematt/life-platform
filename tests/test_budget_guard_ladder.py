@@ -42,6 +42,7 @@ _INTERNAL = (
     # surface and not the operator-truth CI gates below, so it pauses with the rest of band 1
     "charter_judge",  # #5084: the charter's panel-rubric judge (#5072) — golden cases are an internal regression eval
     "charter_retro",  # #5084: the block retro (#5079) — a periodic internal review run from a workstation
+    "nutrition_critics",  # #5114: the nutrition critics' narrator — narrates decided verdicts, never moves one
 )
 _READER_NARRATIVE = (
     "coach_narrative",

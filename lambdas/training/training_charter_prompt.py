@@ -138,7 +138,9 @@ SECTION_GUIDE: dict[str, str] = {
         "merge window of its first row; a day with no timed rows has an unknown feeding count, never "
         "zero. `breakfast_nudge` is an owner-only morning note, at most one a day, and it is "
         "information, never a command. Judge protein against these fields, not against a remembered "
-        "number."
+        "number. `concession_ledger` is the FOOD panel: the nutrition schools and roles that grade the "
+        "week's food plan, each with what it concedes to the deadline and what it gets in return; grade a "
+        "food plan seat by seat against it the way the training plan is graded against the top-level ledger."
     ),
     "panel_target": (
         "panel_target — the bar a plan is graded against: the overall letter it must reach, and "
