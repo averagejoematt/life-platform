@@ -29,8 +29,8 @@ measured is listed under `unevaluated`, never read as green (ADR-104).
 
 PRIVACY. The target date and the band are owner-only by ruling (no May countdown on any published
 surface). The row is stored at `USER#matthew#SOURCE#may_tracker / WEEK#<monday>` (Tier owner-only,
-CROSS_PHASE); the only readers are the owner's MCP tool `get_may_tracker` and `latest_row()` for
-the coach-context assembly (#5071). `tests/test_may_tracker_5073.py` holds that no `lambdas/web/`
+CROSS_PHASE); the only readers are the owner's MCP tool `get_may_tracker` and `latest_completed_row()`
+for the coach-context assembly (#5071, read on every planning caller path since #5200). `tests/test_may_tracker_5073.py` holds that no `lambdas/web/`
 or `lambdas/emails/` module imports this one.
 
 Pure core (`build_week`, `evaluate_triggers`); the store helpers take an injected table.
@@ -566,3 +566,38 @@ def latest_row(table: Any) -> dict[str, Any]:
     if not rows:
         return {"state": ABSENT, "row": None, "detail": "no May-tracker week is stored yet"}
     return {"state": MEASURED, "row": rows[0]}
+
+
+STALE = "stale"
+
+
+def latest_completed_row(table: Any, target_date: str) -> dict[str, Any]:
+    """#5200: the newest stored week whose Sunday is BEFORE `target_date` — what every planning caller's coach
+    context reads (plan_next_session, the nightly pre-draft, the session packet). `{state, row, expected_week_start}`:
+    `measured` when it is the newest completed week, `stale` when an older week is the newest stored one (supplied,
+    and said), `absent` with no stored week, `read_failed` with the exception class — never an empty tracker."""
+    from common.numeric import decimals_to_float
+
+    expected = last_completed_monday(target_date)
+    try:
+        resp = table.query(
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :lo AND :hi",
+            ExpressionAttributeValues={":pk": PK, ":lo": SK_PREFIX, ":hi": SK_PREFIX + expected},
+            ScanIndexForward=False,
+            Limit=1,
+        )
+    except Exception as e:  # noqa: BLE001 — reported by class; the context states it
+        return {"state": READ_FAILED, "row": None, "error": type(e).__name__, "expected_week_start": expected}
+    items = resp.get("Items") or []
+    if not items:
+        return {
+            "state": ABSENT,
+            "row": None,
+            "detail": f"no May-tracker week through {expected} is stored",
+            "expected_week_start": expected,
+        }
+    row = decimals_to_float(items[0])
+    if row.get("week_start") == expected:
+        return {"state": MEASURED, "row": row, "expected_week_start": expected}
+    detail = f"the newest stored week is {row.get('week_start')}; the newest completed week is {expected} (the nightly leg writes it)"
+    return {"state": STALE, "row": row, "detail": detail, "expected_week_start": expected}

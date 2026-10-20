@@ -44,7 +44,7 @@ from __future__ import annotations
 import json
 from typing import Any, Iterable, Optional
 
-CONTEXT_VERSION = "coach-context@1.3.0"  # 1.3.0 #5111: lab_priorities (owner channel, seam only); 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
+CONTEXT_VERSION = "coach-context@1.4.0"  # 1.4.0 #5200: the May tracker read on every caller path + not_supplied_reason; 1.3.0 #5111: lab_priorities (owner channel, seam only); 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
 
 # ── the order contract, as data ───────────────────────────────────────────────────────────
 ORDER: tuple[str, ...] = ("pre_flight", "plan_next_session", "manage_hevy_routine draft")
@@ -140,13 +140,13 @@ def _guidance_body(guidance: Any, published: bool) -> dict[str, Any]:
     return {"source": SRC_GUIDANCE, "state": "measured" if text else "absent", "text": text, "role": "reference"}
 
 
-def _packet_section(packet: Optional[dict[str, Any]]) -> dict[str, Any]:
+def _packet_section(packet: Optional[dict[str, Any]], reason: Optional[str] = None) -> dict[str, Any]:
     if not isinstance(packet, dict) or not isinstance(packet.get("fields"), dict):
         return {
             "source": SRC_PACKET,
             "state": NOT_SUPPLIED,
             "fields": {},
-            "detail": "this caller read no plan packet (get_coach_session_packet carries it in a planning chat)",
+            "detail": reason or "this caller read no plan packet (get_coach_session_packet carries it in a planning chat)",
         }
     fields = {
         name: {"state": (f or {}).get("state"), "source": (f or {}).get("source"), "value": (f or {}).get("value")}
@@ -168,14 +168,56 @@ def _block_section(block: Optional[dict[str, Any]]) -> dict[str, Any]:
     return {"source": SRC_BLOCK, "state": "measured", **{k: block.get(k) for k in _BLOCK_KEYS if k in block}}
 
 
+_TRACKER_ENVELOPE_STATES = frozenset({"measured", "stale", "absent", "read_failed"})
+
+
 def _tracker_section(tracker: Any) -> dict[str, Any]:
+    """`tracker` is `may_tracker.latest_completed_row`'s `{state, row}` envelope (#5200), a bare week row, or None
+    (the caller read none). A stored week is supplied (`measured`, or `stale` with the gap said); no stored week is
+    not_supplied with that said; a broken read is `read_failed` with its class — never an empty tracker."""
     if tracker is None:
         return {
             "source": SRC_TRACKER,
             "state": NOT_SUPPLIED,
-            "detail": "no May tracker was supplied to this context (#5073 lands it); nothing here stands in for one",
+            "detail": "this caller read no May tracker; nothing here stands in for one",
         }
-    return {"source": SRC_TRACKER, "state": "measured", "value": tracker}
+    env = isinstance(tracker, dict) and tracker.get("state") in _TRACKER_ENVELOPE_STATES and "row" in tracker
+    row, state = (tracker.get("row"), tracker["state"]) if env else (tracker, "measured")
+    sec: dict[str, Any] = {"source": SRC_TRACKER, "state": state}
+    if state in ("absent", "read_failed") or not row:
+        sec["state"] = "read_failed" if state == "read_failed" else NOT_SUPPLIED
+        sec["detail"] = (tracker.get("error") if state == "read_failed" else tracker.get("detail")) or "no May-tracker week is stored"
+        return sec
+    sec["value"] = row
+    if isinstance(row, dict) and row.get("week_start"):
+        sec["week_start"] = row["week_start"]
+    if env and tracker.get("detail"):
+        sec["detail"] = tracker["detail"]
+    return sec
+
+
+def _tracker_rows(tr: dict[str, Any]) -> list[tuple[str, Any]]:
+    """The tracker week as prompt lines: the trajectory, the steps and every fired trigger WITH its lever."""
+    row = tr.get("value")
+    if not isinstance(row, dict) or not row.get("week_start"):
+        return [("value", row)]
+    w, trig = row.get("weight") or {}, row.get("triggers") or {}
+    rate = w.get("rate_week") or {}
+    out: list[tuple[str, Any]] = [
+        ("week", f"{row.get('week_start')}..{row.get('week_end')} (charter v{row.get('charter_version')})"),
+        (
+            "rate",
+            f"{rate.get('value')} lb/wk ({rate.get('pct_bodyweight_per_wk')}% of bodyweight); band position {w.get('band_position_week')}",
+        ),
+        ("steps", f"{(row.get('steps') or {}).get('value')} ({(row.get('steps') or {}).get('state')})"),
+        ("status", trig.get("status")),
+    ]
+    out += [(f"trigger {t.get('id')} ({t.get('level')})", f"{t.get('condition')} -> {t.get('lever')}") for t in trig.get("fired") or []]
+    if trig.get("unevaluated"):
+        out.append(("unevaluated", ", ".join(str(u.get("id")) for u in trig["unevaluated"])))
+    if tr.get("detail"):
+        out.append(("note", tr["detail"]))
+    return out
 
 
 def run_gate(tracker: Any) -> dict[str, Any]:
@@ -247,6 +289,7 @@ def assemble(
     guidance_freshness: Any = None,
     lab_priorities: Optional[dict[str, Any]] = None,
     published: bool = False,
+    packet_reason: Optional[str] = None,
 ) -> dict[str, Any]:
     """The planning context for `target_date`: a dict for code and ``text`` for a prompt.
 
@@ -258,7 +301,7 @@ def assemble(
         "charter": charter_section(published),
         "panel_synthesis": _panel_section(published),
         "clinical_guidance": _guidance_section(guidance, published, guidance_freshness),
-        "plan_packet": _packet_section(packet),
+        "plan_packet": _packet_section(packet, packet_reason),
         "constraint_block": _block_section(constraint_block),
         "may_tracker": {"source": "omitted", "state": "omitted_published"} if published else _tracker_section(tracker),
     }
@@ -275,6 +318,7 @@ def assemble(
         "lab_priorities": None if published else lab_priorities,  # #5111: owner-only; absent -> nothing is said
         "not_supplied": sorted(k for k, s in sections.items() if s.get("state") == NOT_SUPPLIED),
     }
+    out["not_supplied_reason"] = {k: sections[k].get("detail") for k in out["not_supplied"]}  # #5200: each absence says why
     out["text"] = render(out)
     return out
 
@@ -286,6 +330,8 @@ def summary(ctx: dict[str, Any]) -> dict[str, Any]:
         "charter_version": ctx.get("charter_version"),
         "states": {k: s.get("state") for k, s in (ctx.get("sections") or {}).items()},
         "not_supplied": ctx.get("not_supplied"),
+        "not_supplied_reason": ctx.get("not_supplied_reason"),
+        "may_tracker_week": ((ctx.get("sections") or {}).get("may_tracker") or {}).get("week_start"),
         "may_frame": (ctx.get("may_frame") or {}).get("line"),
         "run_gate": (ctx.get("run_gate") or {}).get("line"),
         "order": ctx.get("order"),
@@ -388,7 +434,11 @@ def render(ctx: dict[str, Any]) -> str:
     parts.append(_render_fields("CONSTRAINT BLOCK", cb, ((k, cb[k]) for k in _BLOCK_KEYS if k in cb)))
     tr = s["may_tracker"]
     if not ctx["published"]:  # the May target never reaches a published prompt (owner ruling 2026-10-18)
-        parts.append(_render_fields("MAY TRACKER", tr, [("value", tr.get("value"))] if tr.get("state") == "measured" else []))
+        parts.append(
+            _render_fields(
+                "MAY TRACKER", tr, _tracker_rows(tr) if "value" in tr else [("state", f"{tr.get('state')} — {tr.get('detail')}")]
+            )
+        )
     if ctx.get("may_frame"):
         parts.append([f"MAY FRAME (owner-only) [{ctx['may_frame']['source']}]", ctx["may_frame"]["line"]])
     if ctx.get("run_gate"):  # #5090: owner channel only (assemble sets None when published)

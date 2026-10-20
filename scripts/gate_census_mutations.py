@@ -539,6 +539,15 @@ _CHECKIN_PUBLISHED_READER_PY = (
     "    return table.get_item(Key={'pk': 'USER#matthew#SOURCE#evening_checkin', 'sk': 'DATE#2026-10-28'})\n"
 )
 
+# #5200: a planning caller that assembles the coach context without reading the May tracker — the section would
+# be `not_supplied` on that path although the weekly row exists (the specimen: plan_next_session, 2026-10-20).
+_ASSEMBLE_WITHOUT_TRACKER_PY = (
+    '"""census probe — a planning caller that must never exist."""\n\n'
+    "from training import coach_context\n\n\n"
+    "def handle(day):\n"
+    "    return coach_context.assemble(day, packet=None, constraint_block=None)\n"
+)
+
 # #5073: a published module (lambdas/emails) that imports the owner-only May tracker — the target
 # date, the band and the projected weight would then be one call from an email body.
 _MAY_TRACKER_PUBLISHED_IMPORTER_PY = (
@@ -1323,6 +1332,17 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         plants=(("lambdas/web/_census_probe_5106.py", _CHECKIN_PUBLISHED_READER_PY),),
         track=False,  # the guard os.walks lambdas/web + lambdas/emails on disk, so an untracked module is in scope
+    ),
+    # #5200: every coach-context assembly caller outside the module passes the May tracker.
+    "structural::test_may_tracker_coach_context_5200.py": MutationSpec(
+        gate_id="structural::test_may_tracker_coach_context_5200.py",
+        target="tests/test_may_tracker_coach_context_5200.py",
+        detects=(
+            "a planning caller (lambdas/ or mcp/) that calls coach_context.assemble without a tracker — its coach context "
+            "lists may_tracker as not supplied although the weekly row exists, the #5200 specimen on plan_next_session"
+        ),
+        plants=(("lambdas/training/_census_probe_5200.py", _ASSEMBLE_WITHOUT_TRACKER_PY),),
+        track=False,  # the sweep rglobs lambdas/ + mcp/ on disk, so an untracked module is in scope
     ),
     # #5073: the owner-only May tracker — no published-surface module (lambdas/web, lambdas/emails) imports it.
     "structural::test_may_tracker_5073.py": MutationSpec(
@@ -2275,6 +2295,17 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "a published surface handed the merged charter as an argument by an unswept caller (mcp/, lambdas/coach), and the live "
         "S3 objects, which no repo test reads.",
         proved_on="2026-10-18",
+    ),
+    "structural::test_may_tracker_coach_context_5200.py": _proof(
+        "structural::test_may_tracker_coach_context_5200.py",
+        "ARMED 1/1 — baseline: 8 passed in 3.17s | mutated: 1 failed, 7 passed in 3.09s :: "
+        "test_every_assemble_call_outside_the_module_passes_a_tracker | reverted: 8 passed in 3.01s",
+        "lambdas/ and mcp/ on disk (rglob, every .py outside tests/ and coach_context.py): a `coach_context.assemble(...)` "
+        "call with no `tracker=` keyword fails and names the file and line. Also held in the same file: each MCP caller path "
+        "(plan_next_session, the nightly pre-draft, the session packet) and the Telegram training route supply the stored "
+        "week over a fake table and state the honest not_supplied with none. STILL INVISIBLE, stated: a caller that passes "
+        "`tracker=None` explicitly, an assemble imported under another name, and the live table.",
+        proved_on="2026-10-20",
     ),
     "structural::test_evening_checkin_5106.py": _proof(
         "structural::test_evening_checkin_5106.py",

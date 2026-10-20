@@ -721,13 +721,15 @@ def _titration_leg() -> dict[str, Any]:
 
 def lambda_entry(event: dict[str, Any]) -> dict[str, Any]:
     """The scheduled entry. Never raises: a failure is logged with its class and emits the
-    datapoint at 0 (#4568), so the dead-man — not a misattributed warmer Errors alarm — reports it."""
+    datapoint at 0 (#4568), so the dead-man — not a misattributed warmer Errors alarm — reports it.
+    #5200: the tracker leg runs FIRST so the draft's coach context reads the week this run just wrote."""
+    tracker = _may_tracker_leg()  # #5073: the newest completed week's tracker row; fail-soft, never the outcome
     try:
         result = run((event or {}).get("target_date"))
     except Exception as e:  # noqa: BLE001 — reported by name; the dead-man reads the 0
         logger.exception("nightly pre-draft failed")
         result = {"job": JOB["name"], "outcome": FAILED, "error": f"{type(e).__name__}: {e}"[:300]}
-    result["may_tracker"] = _may_tracker_leg()  # #5073: the newest completed week's tracker row; fail-soft, never the outcome
+    result["may_tracker"] = tracker
     result["fitness_battery"] = _fitness_battery_leg()  # #5078: upcoming|due|overdue|missed + FitnessBatteryMissed; never the outcome
     result["calibration"] = _calibration_leg()  # #5061: the tape/photo dead-man witness; fail-soft, never the outcome
     result["titration"] = _titration_leg()  # #5096: the coming week's calorie titration record; never the outcome
