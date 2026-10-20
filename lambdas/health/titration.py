@@ -165,6 +165,7 @@ NEED = (
     "trend_days",
     "steps_window_days",
     "steps_floor",
+    "minimum_kcal",
 )
 
 
@@ -341,7 +342,7 @@ def decide(
     if walked is None:
         return hold(
             "walking_first",
-            f"{side} with steps at the floor: walking first ({str(c.get('walking_first_action') or 'feet before fork').split(';')[0]}); "
+            f"{side} with steps at the floor: walking first ({str(c.get('walking_first_action') or 'redline tripwire loss_insufficient_adherent, unreadable').split(';')[0]}); "
             f"food comes down no sooner than {int(c['spacing_days'])} days on, if the trend is still under the floor",
             detail,
         )
@@ -351,8 +352,7 @@ def decide(
             f"{side}: the walking-first week ({walked}) is inside the {int(c['spacing_days'])}-day spacing, so food holds",
             detail,
         )
-    minimum = c.get("minimum_kcal")
-    new = base - step if minimum is None else max(base - step, minimum)
+    new = max(base - step, c["minimum_kcal"])
     if new >= base:
         return hold("at_minimum", f"{side}, but the target is already at the planned minimum", detail)
     taken = int(base - new)
