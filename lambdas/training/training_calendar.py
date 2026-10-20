@@ -52,6 +52,13 @@ RULE = (
 )
 
 
+def _weekday(day: str) -> int:
+    parsed = parse_day_key(day)
+    if parsed is None:  # week_dates only yields valid keys; a junk key is a bug, never a rest day
+        raise ValueError(f"not a day key: {day!r}")
+    return parsed.weekday()
+
+
 def week_dates(day: str) -> list[str]:
     """The Monday-to-Sunday Pacific day keys of the week holding `day`."""
     d = parse_day_key(day)
@@ -110,7 +117,7 @@ def week_calendar(
     remaining = max(0, count - len(done))
     nominal = set(_nominal_weekdays() if nominal_weekdays is None else nominal_weekdays)
     candidates = [d for d in dates if d >= today and d not in done and d not in away]
-    laid = set(sorted(candidates, key=lambda d: (parse_day_key(d).weekday() not in nominal, d))[:remaining])
+    laid = set(sorted(candidates, key=lambda d: (_weekday(d) not in nominal, d))[:remaining])
     days = []
     for d in dates:
         if d in done:
