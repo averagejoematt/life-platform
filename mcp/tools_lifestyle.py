@@ -1763,14 +1763,14 @@ def tool_log_evening_intake(args):
     """
     from coach.intake_response import PRIVATE_INTAKE_PK
 
-    try:
-        count = int(args.get("count"))
-    except (TypeError, ValueError):
-        raise ValueError("count is required (integer 0-4; 4 = four or more)")
-    if not (0 <= count <= 4):
-        raise ValueError("count must be between 0 and 4 (4 = four or more)")
+    from mcp.tools_evening_checkin import evening_count, log_checkin_part  # #5106: the check-in rides the same call
+
+    count = evening_count(args)  # validated 0-4; None only when a check-in field carries the call
     date_str = (args.get("date") or pacific_today()).strip()
     datetime.strptime(date_str, "%Y-%m-%d")  # validate; raises on junk
+    checkin = log_checkin_part(args, table, date_str)
+    if count is None:
+        return checkin
 
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
     resp = table.update_item(
@@ -1780,8 +1780,7 @@ def tool_log_evening_intake(args):
         ExpressionAttributeValues={":v": Decimal(count), ":ts": now_iso, ":src": "mcp"},
         ReturnValues="UPDATED_OLD",
     )
-    old = (resp or {}).get("Attributes") or {}
-    previous_count = old.get("intake_count")
+    previous_count = ((resp or {}).get("Attributes") or {}).get("intake_count")
     previous_count = int(previous_count) if previous_count is not None else None
     updated = previous_count is not None
     logger.info(f"log_evening_intake: date={date_str} count={count} updated={updated} previous={previous_count}")
@@ -1792,6 +1791,7 @@ def tool_log_evening_intake(args):
         "private": True,
         "updated": updated,  # True = this evening was already logged; row updated in place, never double-counted
         "previous_count": previous_count,
+        **({"checkin": checkin} if checkin else {}),
     }
 
 
@@ -1806,4 +1806,4 @@ def tool_get_intake_response(args):
 
     window_days = int(args.get("window_days") or 180)
     window_days = max(30, min(730, window_days))
-    return compute_intake_response(table, window_days=window_days)
+    return compute_intake_response(table, window_days=window_days, include_checkin=True)

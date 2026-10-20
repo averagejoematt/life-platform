@@ -254,6 +254,17 @@ def check_protein_nudge_liveness(table, Check, tier, pt_now, *, lookback_days=ST
     return _eval_liveness(table, Check, tier, pt_now, PROTEIN_LEDGER_PK, "protein", "#5098 - the breakfast pass", lookback_days, armed_on)
 
 
+# #5106: the evening check-in prompt's dead-man — the same shape on `COACH#evening_checkin / EVAL#<date>`, stamped by
+# every scheduled 20:00 PT run (sent, dark, quiet, already logged), so a completed day with no row = the rule stopped.
+EVENING_CHECKIN_LEDGER_PK = "COACH#evening_checkin"  # = coach.evening_checkin.LEDGER_PK (contract test)
+EVENING_CHECKIN_ARMED_ON = "2026-10-27"  # first Pacific day the rule can exist on (the nutrition wave + the Serve apply)
+
+
+def check_evening_checkin_liveness(table, Check, tier, pt_now, *, lookback_days=STEPS_LOOKBACK_DAYS, armed_on=EVENING_CHECKIN_ARMED_ON):
+    what = "#5106 - the 20:00 PT check-in prompt"
+    return _eval_liveness(table, Check, tier, pt_now, EVENING_CHECKIN_LEDGER_PK, "evening_checkin", what, lookback_days, armed_on)
+
+
 def _eval_liveness(table, Check, tier, pt_now, ledger_pk, name, what, lookback_days, armed_on):
     c = Check(f"{name}_nudge:eval_liveness", "Data Freshness", tier)
     today = pt_now().date()

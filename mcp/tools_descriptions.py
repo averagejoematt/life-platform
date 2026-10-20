@@ -323,7 +323,10 @@ LOG_EVENING_INTAKE_DESCRIPTION = (
     "PRIVATE (#1405): log this evening's drinks count (0-4; 4 = four or more) "
     "to the Matthew-private intake ledger. One tap, no free text. Idempotent: "
     "re-logging the same evening updates it (returns previous_count), never double-counts. "
-    "Use for: 'log 2 drinks tonight', 'zero drinks yesterday' (pass date)."
+    "Use for: 'log 2 drinks tonight', 'zero drinks yesterday' (pass date). "
+    "Also the 20-second evening check-in (#5106): hunger, stress, cravings (0-4 each) and one word, "
+    "to the private evening_checkin ledger (count is then optional; same idempotent overwrite). "
+    "Use for: 'check-in: hunger 2 stress 3 cravings 1, tired'."
 )
 
 GET_INTAKE_RESPONSE_DESCRIPTION = (
@@ -331,7 +334,9 @@ GET_INTAKE_RESPONSE_DESCRIPTION = (
     "vs HRV / recovery / REM with effective-n correction (Pyper-Peterman), p on "
     "n_eff, zero-vs-nonzero block-bootstrap CI, and dose bins (0/1/2+) once 15 "
     "nonzero evenings exist. Reports arming progress below the floors (ADR-105). "
-    "Use for: 'what do drinks do to my HRV?', 'intake dose-response so far'."
+    "Use for: 'what do drinks do to my HRV?', 'intake dose-response so far'. "
+    "Also carries `checkin_intake`: the newest weekly read of the evening check-in against intake "
+    "(stress/hunger/cravings/mood vs calories over target, protein, late eating; ADR-105 verdicts) (#5106)."
 )
 
 GET_INSIGHTS_DESCRIPTION = (
