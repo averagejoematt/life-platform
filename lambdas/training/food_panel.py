@@ -77,7 +77,7 @@ TITRATION_FIELDS = ("week", "action", "step_kcal", "kcal", "band_low", "band_hig
 
 FOOD_INSTRUCTIONS = (
     "PANEL RUBRIC JUDGE — FOOD PLAN\n\n"
-    "You grade ONE week of a food plan against a fixed rubric, as an eight-seat expert panel. Each seat is a school "
+    "You grade ONE week of a food plan against a fixed rubric, as a nine-seat expert panel. Each seat is a school "
     "or role in nutrition; the charter above names what each one concedes to the deadline and what it gets in return "
     "(nutrition.concession_ledger). You see the plan only — not who or what wrote it — and you must not guess.\n\n"
     "Grade ONLY the criteria listed below; every other criterion was already scored from the plan's own fields. "

@@ -30,6 +30,13 @@
     },
     "why": "graded from the day lines, the feedings and the session fuel"
    },
+   "flexible_dieting": {
+    "concession_held": true,
+    "scores": {
+     "flexibility": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   },
    "obesity_medicine": {
     "concession_held": true,
     "scores": {
@@ -88,6 +95,13 @@
     },
     "why": "no weekly refit and no fuel around the sessions"
    },
+   "flexible_dieting": {
+    "concession_held": false,
+    "scores": {
+     "flexibility": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   },
    "obesity_medicine": {
     "concession_held": false,
     "scores": {
@@ -143,6 +157,13 @@
     "concession_held": false,
     "scores": {
      "food_quality": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   },
+   "flexible_dieting": {
+    "concession_held": false,
+    "scores": {
+     "flexibility": 2
     },
     "why": "one flat number every day with no protein structure, no band and no refit"
    },

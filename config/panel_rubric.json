@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "change_log": [
     {"version": "1.0.0", "date": "2026-10-19", "issue": "#5072", "what": "the eight seats, 40 criteria (32 by code, 8 by the judge), the letter scale"},
-    {"version": "1.1.0", "date": "2026-10-19", "issue": "#5110", "what": "food_panel: eight nutrition seats (five schools, three roles) from the charter's nutrition.concession_ledger, 40 criteria (32 by code against the resolved food plan, 8 by the judge), graded on the same letter scale and the same panel_target; built on the panel defaults, pending R1 and R2 (#5091)"}
+    {"version": "1.1.0", "date": "2026-10-19", "issue": "#5110", "what": "food_panel: nine nutrition seats (six schools, three roles) from the charter's nutrition.concession_ledger, 45 criteria (36 by code against the resolved food plan, 9 by the judge), graded on the same letter scale and the same panel_target; built on the panel defaults, pending R1 and R2 (#5091)"}
   ],
   "scale": {"min": 0, "max": 10},
   "letters": [
@@ -22,7 +22,7 @@
     "rule": "the judge is uncalibrated until the owner has graded this many plans by hand and the judge's seat scores sit within 1 point of his on each; every grade carries its calibration state"
   },
   "food_panel": {
-    "_README": "#5110 (epic #5094): the FOOD panel — the same harness grading the week's food plan, one seat per school or role of the charter's nutrition.concession_ledger (the seat keys must equal the ledger's keys; tests/test_food_panel_5110.py holds it). A CODE criterion names a check in lambdas/training/food_panel.py CHECKS, read from the food plan the platform resolves (health.calorie_target.resolve per day, the protein engine's range and feedings, the macro floors, the week's titration record); a JUDGE criterion is graded by the same blinded judge (training/panel_judge.py) on the same routes. Seats name schools and roles, never people. The bar is the charter's panel_target, the letters above. Built on the panel defaults R1 (eat up to the band, weekly refit) and R2 (the range in four feedings), pending the owner (#5091).",
+    "_README": "#5110 (epic #5094): the FOOD panel — the same harness grading the week's food plan, one seat per school or role of the charter's nutrition.concession_ledger (the seat keys must equal the ledger's keys; tests/test_food_panel_5110.py holds it). A CODE criterion names a check in lambdas/training/food_panel.py CHECKS, read from the food plan the platform resolves (health.calorie_target.resolve per day, the protein engine's range and feedings, the macro floors, the week's titration record); a JUDGE criterion is graded by the same blinded judge (training/panel_judge.py) on the same routes. Seats name schools and roles, never people: issue #5110 names six schools by their leading figure and each gets its own seat (the person-to-seat map is on PR #5206), plus the three roles. The bar is the charter's panel_target, the letters above. Built on the panel defaults R1 (eat up to the band, weekly refit) and R2 (the range in four feedings), pending the owner (#5091).",
     "plan_shape": "lambdas/training/food_panel.py build_food_plan: {case_id, panel: food, week_start, charter_version, days: [7 x the resolver's day (date, day_type, kcal, base_kcal, uplift_kcal, band, floors, source, provenance, balance_held, split, pre_post_session) + the day's intended feedings], protein: the engine's range and feeding rule, floors: the macro floors, titration: the week's record or null}",
     "calibration": {
       "owner_graded_plans_required": 5,
@@ -38,6 +38,16 @@
           {"id": "training_day_fuel", "by": "code", "check": "training_day_fuel", "text": "lifting days carry the uplift and the pre and post session fuel"},
           {"id": "in_band", "by": "code", "check": "week_in_band", "text": "each day's base target sits inside its stated calorie band"},
           {"id": "food_quality", "by": "judge", "text": "the plan protects lean mass in a deficit the way the evidence does: protein, fat and carbohydrate each sized for training, nothing cut to zero, no day built to starve a lift"}
+        ]
+      },
+      "flexible_dieting": {
+        "school": "flexible dieting (daily totals first)",
+        "criteria": [
+          {"id": "target_resolved", "by": "code", "check": "calorie_target_resolved", "text": "every day's total comes from the one resolver, so the day's number is the plan, not a meal rule"},
+          {"id": "split_accounts", "by": "code", "check": "split_accounts_for_kcal", "text": "each day's protein, fat and carbohydrate add up to the day's calories"},
+          {"id": "protein_range", "by": "code", "check": "protein_range_every_day", "text": "the protein range is the one fixed priority every day"},
+          {"id": "steady_week", "by": "code", "check": "week_balanced", "text": "the week averages its base target, so one day over is paid back inside the week"},
+          {"id": "flexibility", "by": "judge", "text": "the plan sets totals and a protein priority and leaves the food inside them flexible, so the week holds on an imperfect day without a rule broken"}
         ]
       },
       "protein_lean_mass": {

@@ -3,7 +3,7 @@
 What each test holds (each iterates its whole set and reports every offender):
 
   1. THE FOOD RUBRIC IS THE CHARTER'S FOOD PANEL: the food seats are exactly the charter's
-     `nutrition.concession_ledger`, eight of them, 4-6 criteria each with a judge criterion; every CODE criterion
+     `nutrition.concession_ledger`, nine of them, 4-6 criteria each with a judge criterion; every CODE criterion
      names a check in `food_panel.CHECKS` and every check is used; each concession is readable.
   2. THE PLAN IS THE WIRE: `build_food_plan` produces the golden fixture's shape (every day the resolver's own
      fields), stamps the charter version, and reads the protein range and floors from the engines.
@@ -79,7 +79,7 @@ def test_the_food_rubric_is_the_charters_food_panel_and_every_check_resolves():
     seats = food_panel.view(rubric)["seats"]
     ledger = set(tc.charter_value(food_panel.LEDGER_PATH, {}) or {})
     problems = []
-    if set(seats) != ledger or len(ledger) != 8:
+    if set(seats) != ledger or len(ledger) != 9:
         problems.append(f"food seats {sorted(seats)} != charter {food_panel.LEDGER_PATH} {sorted(ledger)}")
     if set(seats) & set(rubric["seats"]):
         problems.append(f"a food seat shares a key with a training seat: {sorted(set(seats) & set(rubric['seats']))}")

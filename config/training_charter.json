@@ -104,7 +104,7 @@
       "version": "1.18.0",
       "date": "2026-10-19",
       "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5110, epic #5094): the food plan is graded by a fixed panel like the training plan; built on the panel defaults, pending R1 and R2 (#5091)",
-      "what": "nutrition.concession_ledger: the food panel's eight seats (five schools and three roles) and what each concedes to the deadline and gets in return. config/panel_rubric.json food_panel holds one fixed rubric per seat (criteria by code against the resolved food plan, one by the judge each); the seat keys must equal this ledger's keys, the concession is READ from here at grade time (lambdas/training/food_panel.py), and the bar is panel_target (overall A, every seat 9 of 10 or better with its concession named).",
+      "what": "nutrition.concession_ledger: the food panel's nine seats (six schools and three roles: the six schools #5110 names, one seat each, plus a sports dietitian, a behaviour-change psychologist and a studio nutritionist) and what each concedes to the deadline and gets in return. config/panel_rubric.json food_panel holds one fixed rubric per seat (criteria by code against the resolved food plan, one by the judge each); the seat keys must equal this ledger's keys, the concession is READ from here at grade time (lambdas/training/food_panel.py), and the bar is panel_target (overall A, every seat 9 of 10 or better with its concession named).",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -564,6 +564,7 @@
     },
     "concession_ledger": {
       "evidence_based_hypertrophy_nutrition": {"concedes": "a deeper deficit than a muscle-first cut would pick", "in_return": "the protein range every day, the fat and carbohydrate floors held, training-day fuel"},
+      "flexible_dieting": {"concedes": "a fixed feeding count on top of the daily totals", "in_return": "daily totals that come from the one resolver, a split that adds up to them and a week that balances"},
       "protein_lean_mass": {"concedes": "protein counted from a log, not a weighed meal plan", "in_return": "four feedings at the per-feeding threshold, the post-session protein counted as one"},
       "appetite_food_environment": {"concedes": "a calorie target instead of a food-quality-only approach", "in_return": "the fibre floor, a fixed feeding rhythm and no day under its floor"},
       "energy_balance_metabolism": {"concedes": "a population-derived starting target", "in_return": "a weekly refit against the measured trend in small, bounded steps"},

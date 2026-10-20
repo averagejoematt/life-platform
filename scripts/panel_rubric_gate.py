@@ -29,7 +29,7 @@ TWO MODES.
              PANEL_JUDGE_CREDS: anything but `success` (the role's trust admits refs/heads/main only, so a
              pull_request is refused) prints "live judge NOT run" + a ::warning:: and exits 0 — the recorded
              step already gated that run. Unset (a laptop run) means the ambient credentials are used.
-             Cost: one Sonnet call per case, back-to-back on the cached charter block (~$0.25 a run, 8 cases);
+             Cost: one Sonnet call per case, back-to-back on the cached charter block (~$0.30 a run, 8 cases);
              a laptop run is also held by the dev-session cap ($5 a run).
 
 EXIT: 0 every case behaved; 1 a case did not (each named); 2 the gate could not run (rubric/fixtures unreadable).
