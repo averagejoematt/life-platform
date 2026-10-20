@@ -7,6 +7,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 from health import (
+    calorie_target as calorie_resolver,  # #5095: the ONE calorie target
     deficit_disclosures,  # #3754: BS-12 cutoff provenance + the ADR-104 sentence
     protein_engine,  # #5098: THE protein hit, the charter range and the feedings
     tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
@@ -85,8 +86,9 @@ def _latest_weight_lbs(wt_items):
     return None
 
 
-#: Last-resort calorie target when neither a weigh-in nor a profile height exists.
-#: Kept flat and labelled as such — it is the "we could not compute one" branch.
+#: Last-resort MAINTENANCE stand-in for the deficit views when neither a weigh-in nor a profile
+#: height exists — the "we could not compute one" branch. #5095: it is no longer anyone's calorie
+#: TARGET (the name is historical); the macros view grades against health.calorie_target.
 _DEFAULT_CALORIE_TARGET = 2400
 
 
@@ -613,14 +615,12 @@ def _get_macro_targets(args):
     _logged = [float(i["total_calories_kcal"]) for i in items if i.get("total_calories_kcal") not in (None, "")]
     _intake_avg = round(sum(_logged) / len(_logged), 1) if _logged else None
 
+    # #5095: the graded target is the ONE calorie target (health.calorie_target — the number scoring,
+    # the emails, the coach and the critics use), never TDEE minus a flat deficit. The ADR-152 budget
+    # still ships beside it as MAINTENANCE context (TDEE + its trend check), not as a target.
     budget = None if calorie_target else _energy_budget(end_date, intake_avg=_intake_avg)
-    # #3931 box 4: where the check refused, `budget["target"]` is None and the surface
-    # says REFUSED. It does NOT silently fall through to the flat default — that would
-    # republish a number under a different label, which is the failure this closes.
-    refused = bool(budget) and not budget.get("target_published", True)
-    if budget and not refused:
-        calorie_target = budget["target"]
-    calorie_target = None if refused else (calorie_target or _DEFAULT_CALORIE_TARGET)
+    resolved = calorie_resolver.resolve(end_date)
+    calorie_target = calorie_target or resolved["kcal"]
     protein_target = protein_target or protein_engine.range_low()  # the charter range low = the plan's floor (#4540, #5098)
 
     def measured(item, field):
@@ -692,32 +692,20 @@ def _get_macro_targets(args):
             "calories_kcal": calorie_target,
             "protein_g": protein_target,
             "fiber_g": _FIBER_TARGET_G,
-            # ADR-105: the target ships with its method and its inputs, so the number is
-            # checkable without reading this source. `None` when it was overridden by the
-            # caller or fell back to the flat default — see `calorie_target_basis`.
-            "calorie_target_detail": budget,
-            # #3931: the method name is DERIVED, never re-typed, so a rename can never
-            # leave a surface publishing the old number under the old label again.
-            "calorie_target_method": tdee_core.METHOD if budget else None,
-            "calorie_target_basis": (
-                "caller_override"
-                if args.get("calorie_target")
-                else (budget.get("target_basis") if budget else "flat_default_no_weight_or_height")
-            ),
+            # ADR-105: the target ships with its source and provenance (#5095: the ONE resolver).
+            "calorie_target_detail": None if args.get("calorie_target") else resolved,
+            "calorie_target_method": "health.calorie_target.resolve",
+            "calorie_target_basis": "caller_override" if args.get("calorie_target") else resolved["source"],
+            # The ADR-152 energy budget: MAINTENANCE context (TDEE, method, inputs, trend check) — not the target.
+            "energy_budget": budget,
             "calorie_target_check": _labelled_trend_check(budget.get("trend_check")) if budget else None,
             "note": (
-                "REFUSED: the deficit this model implies cannot be reconciled with the measured weight trend, so no "
-                "calorie target is published and calorie adherence is not graded. Both figures are in "
-                "calorie_target_check. Protein (the plan's floor) is unaffected and remains the primary nutrition gate."
-                if refused
-                else (
-                    "Calorie target = TDEE − deficit, where TDEE is Mifflin-St Jeor BMR plus the WORKED-SET exercise "
-                    "term (#3931: rest between sets is no longer charged; a weight-rep set with no logged duration is "
-                    "assumed to be 40 s of work). It is the same figure get_daily_metrics(view='energy') publishes as "
-                    "calorie_target_based_on_7d. Adherence below is graded against this target."
-                    if budget
-                    else "No weigh-in or profile height available, so no TDEE could be computed — this is a flat default, not an estimate."
-                )
+                "Calorie target = the platform's ONE calorie target (health.calorie_target: the week's titration record "
+                "when one exists, else the charter's nutrition.calories target, clamped at the any-day floor) — the same "
+                "number scoring, the emails, the coach and the critics use. Adherence below is graded against it. "
+                "energy_budget is maintenance context (TDEE), not a target."
+                if calorie_target
+                else "No calorie target could be resolved (charter unreadable) — calorie adherence is not graded."
             ),
         },
         "adherence": {

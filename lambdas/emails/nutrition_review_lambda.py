@@ -39,11 +39,10 @@ from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.constants import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
     EXPERIMENT_START_DATE,
-    PLAN_DAILY_CALORIES_TARGET,
     PLAN_DAILY_PROTEIN_MIN_G,
 )  # ADR-058
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
-from health import nutrient_intake  # #4244: THE food + supplements micronutrient join (shared with the public door)
+from health import calorie_target, nutrient_intake  # #4244: THE food + supplements micronutrient join (shared with the public door)
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
@@ -703,7 +702,7 @@ def build_user_message(data):
         "genome_nutrient_snps": extract_genome_context(data["genome_snps"]),
         "dexa": extract_dexa_context(data["latest_dexa"]),
         "profile_targets": {
-            "calorie_target": PLAN_DAILY_CALORIES_TARGET,
+            "calorie_target": calorie_target.target_kcal(),  # #5095: the ONE calorie target
             "protein_target_g": PLAN_DAILY_PROTEIN_MIN_G,
             "goal_weight_lbs": data["profile"].get("goal_weight_lbs", 185),
         },
@@ -780,7 +779,7 @@ def _micro_column_scope(days):
 def build_summary_table(days, profile):
     if not days:
         return ""
-    cal_target = PLAN_DAILY_CALORIES_TARGET
+    cal_target = calorie_target.target_kcal() or 0  # #5095; 0 = none resolved: every intake reads amber/red, never green
     protein_target = PLAN_DAILY_PROTEIN_MIN_G
 
     def _cal_color(v):
@@ -855,7 +854,7 @@ def build_summary_table(days, profile):
         </tr>
         {rows}
         <tr><td colspan="7" style="padding:4px 8px;color:#6b7280;font-size:10px;">
-            Targets: {int(cal_target)} kcal | {int(protein_target)}g protein | 38g fiber | Micro = avg sufficiency % of {micro_basis}{_unconverted_note(days)}
+            Targets: {cal_target or "—"} kcal | {int(protein_target)}g protein | 38g fiber | Micro = avg sufficiency % of {micro_basis}{_unconverted_note(days)}
         </td></tr>
     </table>"""
 
@@ -1037,7 +1036,7 @@ def lambda_handler(event, context):
     user_message = build_user_message(data)
     logger.info(f"Prompt size: {len(user_message)} chars")
 
-    cal_target = PLAN_DAILY_CALORIES_TARGET
+    cal_target = calorie_target.target_kcal() or "—"  # #5095: the ONE calorie target; "—" = none resolved
     pro_target = PLAN_DAILY_PROTEIN_MIN_G
 
     # Try config-driven prompt first, fall back to hardcoded

@@ -17,7 +17,7 @@ import statistics
 from collections import defaultdict
 from datetime import datetime
 
-from common.constants import PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
+from common.constants import PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's floor, never the profile row
 from common.digest_utils import (
     _normalize_whoop_sleep,
     avg,
@@ -28,6 +28,7 @@ from common.digest_utils import (
 )
 from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
+from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 from health.protein_floor import met_floor  # #5098: THE protein hit predicate (strict, #5003)
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -259,7 +260,7 @@ def ex_macrofactor(recs_dict, profile):
     recs = list(recs_dict.values()) if recs_dict else []
     if not recs:
         return None
-    cal_target = PLAN_DAILY_CALORIES_TARGET
+    cal_target = target_kcal()
     prot_target = PLAN_DAILY_PROTEIN_MIN_G
     cals = [float(r["total_calories_kcal"]) for r in recs if "total_calories_kcal" in r]
     prots = [float(r["total_protein_g"]) for r in recs if "total_protein_g" in r]
@@ -274,7 +275,7 @@ def ex_macrofactor(recs_dict, profile):
         "fiber_avg_g": avg(fibers),
         "days_logged": len(recs),
         "protein_hit_rate": round(sum(1 for p in prots if met_floor(p, prot_target)) / len(prots) * 100) if prots else None,
-        "calorie_hit_rate": round(sum(1 for c in cals if c <= cal_target * 1.10) / len(cals) * 100) if cals else None,
+        "calorie_hit_rate": round(sum(1 for c in cals if c <= cal_target * 1.10) / len(cals) * 100) if (cals and cal_target) else None,
         # ADR-105 (#2221): each hit rate's own denominator, so the renderer can state it.
         # NOT re-based on the 7-day week: an unlogged day is absence, and dividing by the
         # week would publish it as a MISS — the ADR-104 error the sibling habitify fix in

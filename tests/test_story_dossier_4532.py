@@ -304,7 +304,9 @@ def test_the_dossier_carries_the_plan_roots_targets(no_network):
     facts = load_plan_facts()
     dossier, _ = _build()
     t = dossier["nutrition"]["targets_from_plan"]
-    assert (t["calories_kcal"], t["protein_floor_g"]) == (facts["daily_calories_target"], facts["daily_protein_min_g"])
+    # #5095: calories are the ONE resolver's target (plan_facts carries it); the sealed root figure rides as the genesis key
+    assert (t["calories_kcal"], t["protein_floor_g"]) == (facts["calorie_target_kcal"], facts["daily_protein_min_g"])
+    assert t["genesis_calories_kcal"] == facts["daily_calories_target"]
     assert (t["calories_kcal"], t["protein_floor_g"]) != (1800, 190)
     assert story_dossier.plan_facts_findings(dossier, facts) == []
     # the 186 g day is AT the plan's 170 g floor, not "4 g short" of the profile's 190

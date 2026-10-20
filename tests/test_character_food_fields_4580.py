@@ -19,7 +19,7 @@ LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), "..", "lambdas")
 sys.path.insert(0, os.path.abspath(LAMBDAS_DIR))
 
 from common import macrofactor_fields as mff  # noqa: E402
-from common.constants import PLAN_DAILY_CALORIES_TARGET  # noqa: E402
+from health.calorie_target import target_kcal  # noqa: E402
 from health.character_engine import compute_nutrition_raw  # noqa: E402
 
 _CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "character_sheet.json")
@@ -83,15 +83,16 @@ def test_logged_day_has_no_absent_food_behaviors():
 
 def test_food_components_score_the_wire_row():
     d = _details()
-    # |1561 - 1500| / 1500 = 4.07 % against a 20 % band -> 79.7
-    assert PLAN_DAILY_CALORIES_TARGET == 1500
-    assert d["calorie_adherence"]["score"] == 79.7
+    # #5095: the reference is the ONE calorie target (charter nutrition.calories, 2,100 at v1.8.0, was the
+    # retired 1,500 constant): |1561 - 2100| / 2100 = 25.7 % against a 20 % band -> clamped to 0.0
+    assert target_kcal("2026-10-17") == 2100
+    assert d["calorie_adherence"]["score"] == 0.0
     # 133 g / 170 g target, perfect at 1.2x -> 65.2
     assert d["protein_total"]["score"] == 65.2
     # 1 meal at >= 30 g of a 4-meal target, perfect at 1.25x -> 20.0
     assert d["protein_distribution"]["score"] == 20.0
-    # 8 of 14 days within 10 % of 1,500 kcal
-    assert d["consistency"]["score"] == 57.1
+    # 2 of 14 days (1,911 and 1,935) within 10 % of 2,100 kcal
+    assert d["consistency"]["score"] == 14.3
 
 
 def test_shared_accessor_resolves_by_presence():

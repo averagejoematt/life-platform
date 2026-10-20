@@ -254,7 +254,7 @@ class TestScoreNutrition:
     def _plan_targets(self, monkeypatch):
         # #4540: targets are the plan's generated constants, not the profile row. Pin them to
         # the figures this class's arithmetic was written against.
-        monkeypatch.setattr(se, "PLAN_DAILY_CALORIES_TARGET", 2000)
+        monkeypatch.setattr(se, "target_kcal", lambda *a, **k: 2000)  # #5095: the ONE resolver, pinned
         monkeypatch.setattr(se.protein_engine, "range_low", lambda: 180)  # #5098: the floor is the charter range low
 
     def _profile(self):

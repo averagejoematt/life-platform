@@ -392,7 +392,7 @@ def test_gather_all_mood_aggregates_fall_back_through_the_field_ladder(monkeypat
 def test_gather_all_nutrition_hit_rates_use_the_ten_percent_calorie_grace(monkeypatch):
     # #4540: targets are the plan's generated constants (the profile row is not read); pinned
     # here to the figures this fixture's arithmetic was written against.
-    monkeypatch.setattr(partner, "PLAN_DAILY_CALORIES_TARGET", 1800)
+    monkeypatch.setattr(partner, "target_kcal", lambda *a, **k: 1800)  # #5095: the ONE resolver, pinned
     monkeypatch.setattr(partner, "PLAN_DAILY_PROTEIN_MIN_G", 190)
     _wire_gather(monkeypatch)
     nu = partner.gather_all()["nutrition"]

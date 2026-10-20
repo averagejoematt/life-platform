@@ -528,6 +528,9 @@ _CALIBRATION_PUBLISHED_IMPORTER_PY = (
     "    return calibration_cadence.read(table, '2026-10-19')\n"
 )
 
+# #5095: a module that grades against a hand-typed 1,500 kcal calorie target instead of the ONE resolver.
+_CALORIE_LITERAL_PY = '"""census probe — a second calorie target that must never exist."""\n\n\ndef grade(cal):\n    cal_target = 1500\n    return cal <= cal_target\n'
+
 # #5073: a published module (lambdas/emails) that imports the owner-only May tracker — the target
 # date, the band and the projected weight would then be one call from an email body.
 _MAY_TRACKER_PUBLISHED_IMPORTER_PY = (
@@ -1324,6 +1327,17 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         plants=(("lambdas/emails/_census_probe_5061.py", _CALIBRATION_PUBLISHED_IMPORTER_PY),),
         track=False,  # the guard os.walks lambdas/web + lambdas/emails on disk, so an untracked module is in scope
+    ),
+    # #5095: ONE calorie target — no module under lambdas/ mcp/ deploy/ scripts/ names the retired constant or retypes 1,500.
+    "structural::test_calorie_target_one_resolver_5095.py": MutationSpec(
+        gate_id="structural::test_calorie_target_one_resolver_5095.py",
+        target="tests/test_calorie_target_one_resolver_5095.py",
+        detects=(
+            "a module carrying its own 1,500 kcal calorie target (`cal_target = 1500`) instead of reading "
+            "health.calorie_target — the second-target class #5095 retired (scoring, emails, coach and critics disagreed)"
+        ),
+        plants=(("lambdas/health/_census_probe_5095.py", _CALORIE_LITERAL_PY),),
+        track=False,  # the guard rglobs lambdas/ mcp/ deploy/ scripts/ on disk, so an untracked module is in scope
     ),
 }
 
@@ -2263,6 +2277,17 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "projects only date fields (no photo key) and the block carries no media path. STILL INVISIBLE, stated: a published "
         "module handed a cadence block by an unswept caller (mcp/, lambdas/coach), a dynamic import by string, a variable-built "
         "photo pk, and the live table.",
+        proved_on="2026-10-19",
+    ),
+    "structural::test_calorie_target_one_resolver_5095.py": _proof(
+        "structural::test_calorie_target_one_resolver_5095.py",
+        "ARMED 1/1 — baseline: 12 passed in 2.65s | mutated: 1 failed, 11 passed in 2.65s :: "
+        "test_no_module_reads_the_retired_constant_or_retypes_the_1500_target | reverted: 12 passed in 2.70s",
+        "lambdas/ mcp/ deploy/ scripts/ on disk (rglob, every .py): any mention of the retired generated calorie constant's name, "
+        "and any code line carrying a 1,500 NUMBER token beside a calorie word (`cal`, `kcal`, `calorie(s)` in a name or string; "
+        "comments dropped) fails and names the line; in-test controls prove each shape and the clean ones (a token cap, a "
+        "comment, prose, `_call_`). STILL INVISIBLE, stated: a target in prose, a target computed from other literals, the "
+        "sealed plan root's genesis figure (config/user_goals.json), and a calorie target at a different number.",
         proved_on="2026-10-19",
     ),
 }

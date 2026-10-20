@@ -30,6 +30,10 @@ import re
 from typing import Any, Dict, Optional, Set
 
 PLAN_SOURCE = "config/user_goals.json"
+# #5095: the live calorie target + band, added by `load_plan_facts` (never sealed into a freeze).
+LIVE_CALORIE_KEY = "calorie_target_live_kcal"
+# The resolved target alone (no band) — what a surface holding a stated target to the live one compares with.
+LIVE_CALORIE_TARGET_KEY = "calorie_target_kcal"
 
 # "roughly 6,000-7,000 steps" / "8,000+ steps" / "6,000 steps" inside the movement target
 # prose — the plan root states the step floor as a RANGE in free text, so it is parsed
@@ -108,6 +112,11 @@ def plan_figures(facts: Optional[Dict[str, Any]]) -> Dict[str, Set[float]]:
             out["protein_g"].add(float(g))
     if isinstance(facts.get("daily_calories_target"), (int, float)):
         out["calories"].add(float(facts["daily_calories_target"]))
+    # #5095: the LIVE calorie target and its band (health.calorie_target) are plan figures too — the
+    # genesis figure above is the sealed pre-registration's; `load_plan_facts` adds the live ones.
+    for kcal in facts.get(LIVE_CALORIE_KEY) or ():
+        if isinstance(kcal, (int, float)) and not isinstance(kcal, bool):
+            out["calories"].add(float(kcal))
     if isinstance(facts.get("daily_fiber_min_g"), (int, float)):
         out["fiber_g"].add(float(facts["daily_fiber_min_g"]))
     return out
@@ -123,7 +132,7 @@ def load_plan_facts(bucket: Optional[str] = None) -> Optional[Dict[str, Any]]:
 
         path = config_path("user_goals.json")
         with open(path, encoding="utf-8") as fh:
-            return plan_facts_from_goals(json.load(fh))
+            return _with_live_calories(plan_facts_from_goals(json.load(fh)))
     except Exception:  # noqa: BLE001 — no local file: fall through to S3
         pass
     try:
@@ -133,6 +142,24 @@ def load_plan_facts(bucket: Optional[str] = None) -> Optional[Dict[str, Any]]:
 
         s3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2"))
         resp = s3.get_object(Bucket=bucket or os.environ.get("S3_BUCKET", "matthew-life-platform"), Key=PLAN_SOURCE)
-        return plan_facts_from_goals(json.loads(resp["Body"].read()))
+        return _with_live_calories(plan_facts_from_goals(json.loads(resp["Body"].read())))
     except Exception:  # noqa: BLE001 — fail-soft by contract (see module docstring)
         return None
+
+
+def _with_live_calories(facts: Dict[str, Any]) -> Dict[str, Any]:
+    """#5095: add the ONE calorie target and its band (health.calorie_target) under LIVE_CALORIE_KEY, so a
+    narrative stating the live target is not graded against the genesis figure alone. Fail-soft: an
+    unresolvable target adds nothing."""
+    try:
+        from health.calorie_target import resolve  # noqa: PLC0415 — lazy: keeps this module pure at import
+
+        r = resolve()
+        live = [v for v in (r.get("kcal"), r.get("band_low"), r.get("band_high")) if isinstance(v, (int, float))]
+        kcal = r.get("kcal") if isinstance(r.get("kcal"), (int, float)) else None
+    except Exception:  # noqa: BLE001 — a gate never takes a surface down (#1691)
+        live, kcal = [], None
+    out = {**facts, LIVE_CALORIE_KEY: live} if live else dict(facts)
+    if kcal is not None:
+        out[LIVE_CALORIE_TARGET_KEY] = kcal
+    return out

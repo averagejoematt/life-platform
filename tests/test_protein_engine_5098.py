@@ -65,7 +65,7 @@ def test_the_charter_owns_the_protein_block():
     assert p["feedings_per_day"] == 4 and p["feeding_threshold_g"] == 40  # R2's panel default (four feedings of 40 g+)
     assert "pending R2" in p["basis"]
     entry = next(e for e in training_charter.charter_value("change_log") if "#5098" in e.get("by", "") + e.get("what", ""))
-    assert entry["version"] == "1.9.0"
+    assert entry["version"] == "1.11.0"  # restacked above #5095 (1.8.0) and #5097 (1.10.0)
 
 
 def test_the_range_low_and_the_plan_floor_are_one_number():

@@ -29,6 +29,7 @@ from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific
 from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 from experiment import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
+from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 
 from intelligence.inventory_window import inventory_row, inventory_window_start, out_of_window_line  # #3728
 
@@ -418,12 +419,12 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict, inventory: d
         "behavioral.journal_entries_per_week": "Journal entries/week",
     }
     for path, label in _target_map.items():
-        keys = path.split(".")
         val = targets
-        for k in keys:
+        for k in path.split("."):
             val = val.get(k) if isinstance(val, dict) else None
             if val is None:
                 break
+        val = target_kcal() if path == "nutrition.daily_calories_target" else val  # #5095: the ONE calorie target
         target_lines.append(f"  - {label}: {val if val is not None else 'not yet set'}")
     parts.append("DEFINED TARGETS:\n" + "\n".join(target_lines) + "\n")
 
