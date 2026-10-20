@@ -584,13 +584,6 @@
       "facing": "reader",
       "purpose": "Daily event-triggered coach outbound sweep (celebration + soft concern; dark until the coaches' bots are registered)"
     },
-    "telegram-coach-worker#TelegramEveningCheckin": {
-      "function": "telegram-coach-worker",
-      "stack": "LifePlatformServe",
-      "expression": "cron(0 3 * * ? *)",
-      "facing": "reader",
-      "purpose": "#5106: the owner's 20-second evening check-in prompt, 20:00 PDT / 19:00 PST (deterministic; dark until a coach bot is registered)"
-    },
     "telegram-coach-worker#TelegramMorningCheckin": {
       "function": "telegram-coach-worker",
       "stack": "LifePlatformServe",
