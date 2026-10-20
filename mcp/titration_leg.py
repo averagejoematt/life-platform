@@ -8,10 +8,12 @@ only matter when Friday's run failed. Every other night it returns `not_decision
 
 THE READS (the sanctioned ones, each failure named and turned into `insufficient_data`, never a guess):
   trend      `mcp.shared_quantities.loss_rate_lb_wk` — the shared 14-day least-squares rate over the
-             completed days (the window ends yesterday), its newest weigh-in is the band's bodyweight;
+             completed days (the window ends yesterday), its newest weigh-in is the band's bodyweight; the
+             charter's `trend_days` must equal its window, or the trend is withheld (`trend_window_mismatch`);
   guidance   `training.rate_band.guidance_cap_for` — the clinical record's bare cap (it outranks the band);
   steps      `training.steps_resolver.steps_range` over the charter's steps window, measured counts only;
-  logs       the MacroFactor day rows in the last 7 completed days with a calorie total;
+  logs       complete MacroFactor days (a calorie total at or above the redlines' dark-day line) in the
+             last 7 completed days, and in the redlines' first-step window;
   model      `tools_nutrition.expenditure_reconciliation` — which burn model matches the scale (context);
   history    the titration records of the last eight weeks (`titration.read_history`).
 
@@ -47,6 +49,22 @@ def _steps_fetch(source: str, start: str, end: str) -> list:
     return list(core.query_source_range(source, start, end) or [])
 
 
+def complete_days(rows: Optional[list], min_kcal: Optional[float], value) -> Optional[set]:
+    """The day keys whose logged calories are at or above `min_kcal` (the redlines' dark-day line: a day under it is
+    dark, not complete). None when the rows or the line are unreadable."""
+    if rows is None or min_kcal is None:
+        return None
+    per: Dict[str, float] = {}
+    for r in rows:
+        day = str(r.get("date") or r.get("sk") or "")[-10:]
+        per[day] = max(per.get(day, 0.0), float(value(r, "calories") or 0))
+    return {d for d, kcal in per.items() if kcal >= min_kcal}
+
+
+def _count(days: Optional[set], end: str, window: int) -> Optional[int]:
+    return None if days is None else sum(1 for d in days if shift_day_key(end, -(window - 1)) <= d <= end)
+
+
 def gather(today: str) -> Dict[str, Any]:
     """Every input `titration.decide` takes, read for a run on `today`. Never raises."""
     from common.constants import EXPERIMENT_START_DATE
@@ -73,14 +91,18 @@ def gather(today: str) -> Dict[str, Any]:
     else:
         band = titration.band_for(float(weight) if weight else None, cap)
     cfg = titration.settings()
-    sw = int(cfg.get("steps_window_days") or 7)
-    srange, err = _read(steps_range, shift_day_key(end, -(sw - 1)), end, fetch=_steps_fetch, derived=False)
-    if err:
-        errors["steps"] = err
-    mf, err = _read(core.query_source, "macrofactor", shift_day_key(end, -(LOG_WINDOW_DAYS - 1)), end)
+    if cfg.get("trend_days") is not None and int(cfg["trend_days"]) != shared_quantities.LOSS_RATE_WINDOW_DAYS:
+        errors["trend"], lr = "trend_window_mismatch", {}  # the charter and the shared window disagree: no trend, a hold
+    sw, srange = cfg.get("steps_window_days"), None
+    if sw:  # an unreadable window reads nothing; decide holds on the missing rule value
+        srange, err = _read(steps_range, shift_day_key(end, -(int(sw) - 1)), end, fetch=_steps_fetch, derived=False)
+        if err:
+            errors["steps"] = err
+    first = int(cfg.get("first_step_complete_days") or 0)
+    mf, err = _read(core.query_source, "macrofactor", shift_day_key(end, -(max(LOG_WINDOW_DAYS, first) - 1)), end)
     if err:
         errors["logs"] = err
-    logs = None if mf is None else len({str(r.get("date") or r.get("sk"))[-10:] for r in mf if (macro_value(r, "calories") or 0) > 0})
+    days = complete_days(mf, cfg.get("complete_log_kcal"), macro_value)
     rec, err = _read(tools_nutrition.expenditure_reconciliation, end)
     if err:
         errors["expenditure"] = err
@@ -95,7 +117,8 @@ def gather(today: str) -> Dict[str, Any]:
         "weight_lb": float(weight) if weight else None,
         "band": band,
         "steps_avg": ((srange or {}).get("summary") or {}).get("mean_steps"),
-        "complete_log_days": logs,
+        "complete_log_days": _count(days, end, LOG_WINDOW_DAYS),
+        "complete_days_trailing": _count(days, end, first) if first else None,
         "history": history or [],
         "expenditure_best_match": (rec or {}).get("best_match") if (rec or {}).get("best_match_actionable") else None,
         "experiment_day": (wk - start).days + 1 if (start and wk) else None,

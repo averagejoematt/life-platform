@@ -8,20 +8,24 @@ moves are ``nutrition.calories``; the band it steers into is the charter rate ba
 THE DECISION (``decide``, pure — every input is a value the caller already read):
 
   insufficient data  no measured trend, a provisional trend window, no weigh-in, no band, too few
-                     complete food logs, or an unreadable charter -> ``hold`` / ``insufficient_data``,
-                     never a guess (ADR-104)
+                     complete food logs (a day under the redlines' dark-day line is not complete), or ANY
+                     rule value unreadable (``NEED`` — no fallback literal) -> ``hold`` /
+                     ``insufficient_data``, never a guess (ADR-104)
   too early          the experiment day is before ``not_before_day`` -> ``hold`` / ``too_early``
   in the band        -> ``hold`` / ``in_band``
   out of the band    counted in consecutive weekly reads on the same side; fewer than
                      ``consecutive_out_of_band_reads`` -> ``hold`` / ``awaiting_confirmation``
   spacing            a step inside ``min_days_between_steps`` of the last one -> ``hold`` / ``spacing``
+  first step         no step yet and fewer than the redlines' ``complete_days_before_first_titration``
+                     complete days in the trailing window -> ``hold`` / ``logs_before_first_step``
   above the ceiling  (losing faster than the band) -> ``up`` by the step (panel default R1: eat up to
                      the band now, refit weekly — built on the panel default, pending R1)
-  below the floor    (losing slower) -> STEPS BEFORE FOOD: the trailing steps mean must be at the
-                     charter's ``steps.floor`` before food comes down; under it -> ``hold`` /
-                     ``steps_first``; unknown -> ``hold`` / ``steps_unknown``; at it -> ``down`` by the
-                     step, never under ``nutrition.calories.planned_minimum_any_weight_kcal``
-                     (``hold`` / ``at_minimum`` when already there)
+  below the floor    (losing slower) -> FEET BEFORE FORK, in order: steps unknown -> ``steps_unknown``;
+                     the trailing steps mean under ``steps.floor`` -> ``steps_first``; then the redlines'
+                     owner rule (walking FIRST, then food, never both inside the spacing): the first
+                     confirmed read is a ``walking_first`` hold, the run waits ``min_days_between_steps``
+                     (``walking_first_wait``), and only then ``down`` by the step, never under
+                     ``nutrition.calories.planned_minimum_any_weight_kcal`` (``at_minimum`` when there)
 
 THE STEP: the miss outside the band edge (lb/wk) x ``kcal_per_lb_wk`` (3500 kcal per lb over 7 days),
 rounded to ``step_rounding_kcal`` and held inside ``min_step_kcal``..``max_step_kcal`` (100..150).
@@ -83,9 +87,25 @@ def _default_charter_reader(dotted: str) -> Any:
     return charter_value(dotted)
 
 
+def _redline(path: str) -> Any:
+    """A value the redlines own (``"<redline id>.<key>"`` or ``"tripwire:<id>.<key>"``), or None. Read, never copied."""
+    try:
+        from training import owner_redlines as orl  # noqa: PLC0415 — lazy: import-safe offline
+
+        rid, key = path.split(".", 1)
+        if rid.startswith("tripwire:"):
+            return next((t for t in orl.TRIPWIRES if t.get("id") == rid[9:]), {}).get(key)
+        return (orl.REDLINES.get(rid) or {}).get(key)
+    except Exception as e:  # noqa: BLE001 — an unreadable redline is None, and None holds the week
+        logger.warning("[titration] redline read failed (%s)", type(e).__name__)
+        return None
+
+
 def settings(charter_reader: Optional[CharterReader] = None) -> Dict[str, Any]:
-    """The titration rule + the calorie values it moves + the steps floor, from the charter. A value the charter
-    cannot supply is None; ``readable`` is False when the rule block itself is missing."""
+    """The titration rule + the calorie values it moves + the steps floor, from the charter; the logging bars and the
+    walking-first cue from the redlines (paths named in the charter block). A value that cannot be read is None — no
+    fallback literal — and ``decide`` holds the week as ``insufficient_data``; ``readable`` is False when the rule
+    block itself is missing."""
     read = charter_reader or _default_charter_reader
     t = read(CHARTER_PATH)
     t = t if isinstance(t, dict) else {}
@@ -93,26 +113,59 @@ def settings(charter_reader: Optional[CharterReader] = None) -> Dict[str, Any]:
     cal = cal if isinstance(cal, dict) else {}
     sbf_raw = t.get("steps_before_food")
     sbf: Dict[str, Any] = sbf_raw if isinstance(sbf_raw, dict) else {}
+    logs_raw = t.get("complete_logs")
+    logs: Dict[str, Any] = logs_raw if isinstance(logs_raw, dict) else {}
+    walk_raw = t.get("walking_first")
+    walk: Dict[str, Any] = walk_raw if isinstance(walk_raw, dict) else {}
     band = cal.get("prescribed_band_kcal")
     version = read("version")
+    reads = _num(t.get("consecutive_out_of_band_reads"))
+    window = _num(sbf.get("steps_window_days"))
+
+    def via(src: Dict[str, Any], key: str, reader: Callable[[str], Any]) -> Any:
+        path = src.get(key)
+        return reader(path) if isinstance(path, str) and path else None
+
     return {
         "readable": bool(t),
         "not_before_day": _num(t.get("not_before_day")),
+        "trend_days": _num(t.get("trend_days")),
         "min_complete_logs": _num(t.get("never_on_a_week_with_fewer_complete_logs_than")),
-        "reads_required": int(_num(t.get("consecutive_out_of_band_reads")) or 1),
+        "complete_log_kcal": _num(via(logs, "complete_day_min_kcal_path", _redline)),
+        "first_step_complete_days": _num(via(logs, "complete_days_before_first_step_path", _redline)),
+        "reads_required": int(reads) if reads is not None else None,
         "min_step_kcal": _num(t.get("min_step_kcal")),
         "max_step_kcal": _num(t.get("max_step_kcal")),
-        "rounding_kcal": _num(t.get("step_rounding_kcal")) or 1.0,
+        "rounding_kcal": _num(t.get("step_rounding_kcal")),
         "kcal_per_lb_wk": _num(t.get("kcal_per_lb_wk")),
         "spacing_days": _num(t.get("min_days_between_steps")),
-        "steps_window_days": int(_num(sbf.get("steps_window_days")) or 7),
-        "steps_floor": _num(read(str(sbf.get("steps_floor_path") or "steps.floor"))),
+        "steps_window_days": int(window) if window is not None else None,
+        "steps_floor": _num(via(sbf, "steps_floor_path", read)),
+        "walking_first_action": via(walk, "action_path", _redline),
         "target_kcal": _num(cal.get("target_kcal")),
         "band_kcal": [_num(band[0]), _num(band[1])] if isinstance(band, (list, tuple)) and len(band) == 2 else None,
         "minimum_kcal": _num(cal.get("planned_minimum_any_weight_kcal")),
         "dead_man_armed_from": (t.get("dead_man") or {}).get("armed_from") if isinstance(t.get("dead_man"), dict) else None,
         "charter_version": version if isinstance(version, str) else None,
     }
+
+
+# every key ``decide`` needs; a None among them holds the week as insufficient_data (never a fallback literal)
+NEED = (
+    "min_step_kcal",
+    "max_step_kcal",
+    "rounding_kcal",
+    "kcal_per_lb_wk",
+    "spacing_days",
+    "reads_required",
+    "min_complete_logs",
+    "complete_log_kcal",
+    "first_step_complete_days",
+    "not_before_day",
+    "trend_days",
+    "steps_window_days",
+    "steps_floor",
+)
 
 
 def target_week(run_day: Any) -> str:
@@ -177,6 +230,7 @@ def decide(
     expenditure_best_match: Optional[str] = None,
     experiment_day: Optional[int] = None,
     read_errors: Optional[Mapping[str, str]] = None,
+    complete_days_trailing: Optional[int] = None,
     cfg: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """THE weekly decision for ``week`` (an ISO Monday). Pure. See the module docstring for the rules."""
@@ -206,6 +260,7 @@ def decide(
             "steps_avg": int(round(steps_avg)) if steps_avg is not None else None,
             "steps_floor": int(c["steps_floor"]) if c.get("steps_floor") else None,
             "complete_log_days": complete_log_days,
+            "complete_days_trailing": complete_days_trailing,
             "expenditure_best_match": expenditure_best_match,
             "last_step_date": last_step_date,
             "base_source": f"titration record WEEK#{last.get('week')}" if last else "charter nutrition.calories.target_kcal",
@@ -220,9 +275,13 @@ def decide(
         out.update(reason_code=code, reason=reason, detail=detail)
         return _with_band(out, c)
 
-    need = ("min_step_kcal", "max_step_kcal", "kcal_per_lb_wk", "spacing_days", "min_complete_logs", "not_before_day")
-    if not c.get("readable") or any(c.get(k) is None for k in need) or base is None:
-        return hold("insufficient_data", "insufficient data: the charter's titration rule or calorie target is unreadable")
+    missing = [k for k in NEED if c.get(k) is None]
+    if not c.get("readable") or missing or base is None:
+        return hold(
+            "insufficient_data",
+            "insufficient data: the charter's titration rule or calorie target is unreadable",
+            f"unreadable: {', '.join(missing) or 'the rule block or the base target'}",
+        )
     if experiment_day is not None and experiment_day < c["not_before_day"]:
         return hold("too_early", f"too early: no titration before experiment day {int(c['not_before_day'])}")
     if trend_lb_wk is None or trend_provisional or trend_provisional is None:
@@ -254,6 +313,16 @@ def decide(
     if last_step_date and (_day(week) - _day(last_step_date)).days < c["spacing_days"]:
         return hold("spacing", f"{side}, but the last step ({last_step_date}) is inside the {int(c['spacing_days'])}-day spacing", detail)
 
+    first = last_step is None and (last is None or _num(last.get("kcal")) == c.get("target_kcal"))
+    need_days = int(c["first_step_complete_days"])
+    if first and (complete_days_trailing is None or complete_days_trailing < need_days):
+        return hold(
+            "logs_before_first_step",
+            f"{side}, but the first step waits for {need_days} complete days of food logs in a row",
+            detail
+            + f"; complete days in the last {need_days}: {complete_days_trailing if complete_days_trailing is not None else 'unreadable'}",
+        )
+
     miss = (trend_lb_wk - ceiling) if position == "above" else (floor - trend_lb_wk)
     step = step_size(miss, c)
     if position == "above":
@@ -262,11 +331,25 @@ def decide(
 
     if steps_avg is None:
         return hold("steps_unknown", f"{side}, steps unreadable: steps come before food, so food holds", detail)
-    if c.get("steps_floor") and steps_avg < c["steps_floor"]:
+    if steps_avg < c["steps_floor"]:
         return hold(
             "steps_first",
             f"{side}, steps mean under the {int(c['steps_floor']):,} floor: walk to the floor before food comes down",
             detail + f"; steps mean {int(round(steps_avg)):,} over {c['steps_window_days']} days",
+        )
+    walked = _walking_first_since(prior, week)
+    if walked is None:
+        return hold(
+            "walking_first",
+            f"{side} with steps at the floor: walking first ({str(c.get('walking_first_action') or 'feet before fork').split(';')[0]}); "
+            f"food comes down no sooner than {int(c['spacing_days'])} days on, if the trend is still under the floor",
+            detail,
+        )
+    if (_day(week) - _day(walked)).days < c["spacing_days"]:
+        return hold(
+            "walking_first_wait",
+            f"{side}: the walking-first week ({walked}) is inside the {int(c['spacing_days'])}-day spacing, so food holds",
+            detail,
         )
     minimum = c.get("minimum_kcal")
     new = base - step if minimum is None else max(base - step, minimum)
@@ -274,7 +357,20 @@ def decide(
         return hold("at_minimum", f"{side}, but the target is already at the planned minimum", detail)
     taken = int(base - new)
     out.update(action=DOWN, step_kcal=-taken, new_target_kcal=int(new))
-    return _stepped(out, c, f"-{taken} kcal: {side} on {reads} weekly reads with steps at the floor", detail)
+    return _stepped(out, c, f"-{taken} kcal: {side} on {reads} weekly reads, steps at the floor, walking first from {walked}", detail)
+
+
+def _walking_first_since(prior: List[Mapping[str, Any]], week: str) -> Optional[str]:
+    """The week of the walking-first hold in the unbroken run of weekly below-floor holds just before ``week``, or None
+    (the run broke: back in the band, a step, a missing week -> walking comes first again)."""
+    expect = _day(week)
+    for r in prior:
+        expect -= timedelta(days=7)
+        if str(r.get("week")) != expect.isoformat() or r.get("position") != "below" or r.get("action") != HOLD:
+            return None
+        if r.get("reason_code") == "walking_first":
+            return str(r.get("week"))
+    return None
 
 
 def _stepped(out: Dict[str, Any], c: Mapping[str, Any], reason: str, detail: str) -> Dict[str, Any]:

@@ -40,7 +40,10 @@ BAND = {"floor_lb_wk": 3.0, "ceiling_lb_wk": 3.5, "source": "charter rate band",
 CFG = {
     "readable": True,
     "not_before_day": 21,
+    "trend_days": 14,
     "min_complete_logs": 6,
+    "complete_log_kcal": 600,
+    "first_step_complete_days": 14,
     "reads_required": 2,
     "min_step_kcal": 100,
     "max_step_kcal": 150,
@@ -49,6 +52,7 @@ CFG = {
     "spacing_days": 14,
     "steps_window_days": 7,
     "steps_floor": 12000,
+    "walking_first_action": "walking first; then food",
     "target_kcal": 2100,
     "band_kcal": [2000, 2100],
     "minimum_kcal": 1700,
@@ -69,8 +73,13 @@ def _public_charter_only(monkeypatch):
     ti._CACHE.clear()
 
 
-def prev_hold(position, reads=1, week=PREV, kcal=2100):
-    return {"week": week, "action": "hold", "kcal": kcal, "position": position, "out_of_band_reads": reads}
+def prev_hold(position, reads=1, week=PREV, kcal=2100, code=None):
+    return {"week": week, "action": "hold", "kcal": kcal, "position": position, "out_of_band_reads": reads, "reason_code": code}
+
+
+def walked(kcal=2100):
+    """Below the floor for three reads, the walking-first hold 14 days back: food may now come down."""
+    return [prev_hold("below", reads=3, kcal=kcal), prev_hold("below", reads=2, week="2026-10-12", kcal=kcal, code="walking_first")]
 
 
 def decide(**kw):
@@ -82,6 +91,7 @@ def decide(**kw):
         band=BAND,
         steps_avg=12500,
         complete_log_days=7,
+        complete_days_trailing=14,
         history=[],
         expenditure_best_match="macrofactor_adaptive",
         experiment_day=50,
@@ -153,7 +163,7 @@ def test_the_step_is_sized_from_the_miss_and_never_exceeds_the_charter_cap():
     assert decide(trend_lb_wk=3.75, history=[prev_hold("above")])["step_kcal"] == 150  # 125 rounds half-up to 150
     assert decide(trend_lb_wk=3.55, history=[prev_hold("above")])["step_kcal"] == 100  # 25 -> held at the 100 minimum
     assert decide(trend_lb_wk=9.0, history=[prev_hold("above")])["step_kcal"] == 150  # 2750 -> capped at 150
-    assert decide(trend_lb_wk=-2.0, history=[prev_hold("below")], steps_avg=13000)["step_kcal"] == -150  # gaining: capped too
+    assert decide(trend_lb_wk=-2.0, history=walked(), steps_avg=13000)["step_kcal"] == -150  # gaining: capped too
 
 
 def test_spacing_blocks_a_second_step_inside_fourteen_days():
@@ -175,15 +185,60 @@ def test_steps_before_food_under_the_floor():
     assert (d["action"], d["reason_code"]) == ("hold", "steps_unknown")
 
 
-def test_under_the_floor_with_steps_at_the_floor_steps_down():
+def test_the_steps_floor_is_required_never_skipped():
+    """Review probe (#5193): with the steps floor unreadable the old engine stepped down at 3,000 steps."""
+    d = decide(trend_lb_wk=2.5, history=walked(), steps_avg=3000, cfg={**CFG, "steps_floor": None})
+    assert (d["action"], d["reason_code"], d["step_kcal"]) == ("hold", "insufficient_data", 0)
+    assert "steps_floor" in d["detail"]
+
+
+@pytest.mark.parametrize("key", ti.NEED)
+def test_every_rule_value_is_required_a_missing_one_holds(key):
+    """No fallback literal: each value the rule needs, missing, holds the week (a step-up and a step-down case)."""
+    for kw in ({"trend_lb_wk": 4.0, "history": [prev_hold("above")]}, {"trend_lb_wk": 2.5, "history": walked()}):
+        d = decide(cfg={**CFG, key: None}, **kw)
+        assert (d["action"], d["reason_code"]) == ("hold", "insufficient_data"), key
+        assert key in d["detail"]
+
+
+def test_the_settings_carry_no_fallback_literals():
+    """A charter with an empty rule block yields None for every rule value, not a copy of the charter's number."""
+    c = ti.settings(lambda path: {"nutrition.titration": {"min_step_kcal": 100}}.get(path))
+    assert all(c[k] is None for k in ti.NEED if k != "min_step_kcal")
+
+
+def test_walking_comes_first_then_food_after_the_spacing():
+    """The redlines' owner rule: walking FIRST, then food, never both inside 14 days."""
     d = decide(trend_lb_wk=2.7, history=[prev_hold("below")], steps_avg=12000)
+    assert (d["action"], d["reason_code"], d["step_kcal"]) == ("hold", "walking_first", 0) and "walking first" in d["reason"]
+    d = decide(trend_lb_wk=2.7, history=[prev_hold("below", reads=2, code="walking_first")], steps_avg=12000)
+    assert (d["action"], d["reason_code"]) == ("hold", "walking_first_wait")
+    gap = [
+        prev_hold("below", reads=3),
+        prev_hold("in", reads=0, week="2026-10-12"),
+        prev_hold("below", week="2026-10-05", code="walking_first"),
+    ]
+    assert decide(trend_lb_wk=2.7, history=gap, steps_avg=12000)["reason_code"] == "walking_first"  # a broken run walks again
+
+
+def test_under_the_floor_with_steps_at_the_floor_steps_down():
+    d = decide(trend_lb_wk=2.7, history=walked(), steps_avg=12000)
     assert (d["action"], d["reason_code"], d["step_kcal"], d["new_target_kcal"]) == ("down", "step_down", -150, 1950)
+    assert "walking first from 2026-10-12" in d["reason"]
+
+
+def test_the_first_step_waits_for_the_redlines_run_of_complete_days():
+    d = decide(trend_lb_wk=4.0, history=[prev_hold("above")], complete_days_trailing=13)
+    assert (d["action"], d["reason_code"]) == ("hold", "logs_before_first_step")
+    assert decide(trend_lb_wk=4.0, history=[prev_hold("above")], complete_days_trailing=None)["action"] == "hold"
+    later = [prev_hold("above", kcal=2250), {"week": "2026-10-05", "action": "up", "kcal": 2250, "position": "above"}]
+    assert decide(trend_lb_wk=4.0, history=later, complete_days_trailing=10)["action"] == "up"  # not the first step
 
 
 def test_a_step_down_never_goes_under_the_planned_minimum():
-    d = decide(trend_lb_wk=2.0, history=[prev_hold("below", kcal=1750)])
+    d = decide(trend_lb_wk=2.0, history=walked(kcal=1750))
     assert (d["action"], d["step_kcal"], d["new_target_kcal"]) == ("down", -50, 1700)
-    d = decide(trend_lb_wk=2.0, history=[prev_hold("below", kcal=1700)])
+    d = decide(trend_lb_wk=2.0, history=walked(kcal=1700))
     assert (d["action"], d["reason_code"], d["kcal"]) == ("hold", "at_minimum", 1700)
 
 
@@ -221,6 +276,33 @@ def test_the_rule_is_the_charters_nutrition_titration_block():
     assert c["target_kcal"] == tc.charter_value("nutrition.calories.target_kcal")
     assert c["charter_version"] == tc.charter_version()
     assert tc.charter_value("nutrition.calories.titration") is None, "the rule moved to nutrition.titration — one copy"
+
+
+def test_the_trend_window_is_the_shared_loss_rate_window():
+    from mcp import shared_quantities
+
+    assert ti.settings()["trend_days"] == shared_quantities.LOSS_RATE_WINDOW_DAYS == tc.charter_value("nutrition.titration.trend_days")
+    assert tc.charter_value("nutrition.titration.step_kcal") is None, "max_step_kcal is the one step-size key"
+
+
+def test_the_logging_bars_are_read_from_the_redlines_not_copied():
+    from training import owner_redlines
+
+    lc = owner_redlines.REDLINES["logging_completeness"]
+    c = ti.settings()
+    assert (c["complete_log_kcal"], c["first_step_complete_days"]) == (lc["dark_day_kcal"], lc["complete_days_before_first_titration"])
+    adherent = next(t for t in owner_redlines.TRIPWIRES if t["id"] == "loss_insufficient_adherent")
+    assert c["walking_first_action"] == adherent["action"]
+
+
+def test_a_day_under_the_dark_day_line_is_not_a_complete_log():
+    from common.macrofactor_fields import macro_value
+
+    from mcp import titration_leg as tl
+
+    rows = [{"date": "2026-10-20", "total_calories_kcal": 300}, {"date": "2026-10-21", "total_calories_kcal": 1900}]
+    assert tl.complete_days(rows, 600, macro_value) == {"2026-10-21"}
+    assert tl.complete_days(rows, None, macro_value) is None and tl.complete_days(None, 600, macro_value) is None
 
 
 def test_the_redlines_read_the_titration_rule_from_the_charter():
@@ -440,3 +522,29 @@ def test_the_owner_email_shows_the_decision_and_its_reason(monkeypatch):
     assert "CALORIE TARGET" in nr.build_email_html(
         "<table></table>", "<div></div>", {"this_start": "2026-10-17", "this_end": "2026-10-23"}, None, html
     )
+
+
+def test_gather_counts_complete_days_and_withholds_a_mismatched_trend_window(monkeypatch):
+    """The leg's real reads, stubbed at their modules: dark days do not count, and a charter trend window that
+    disagrees with the shared loss-rate window withholds the trend (the week then holds)."""
+    from training import rate_band, steps_resolver
+
+    from mcp import core, shared_quantities, titration_leg as tl, tools_nutrition
+
+    monkeypatch.setattr(core, "table", FakeTable(), raising=False)
+    weigh = {"value": 4.0, "provisional": False, "window": {"end": "2026-10-22"}, "validation": {"weigh_ins": [{"weight_lbs": 300}]}}
+    monkeypatch.setattr(shared_quantities, "loss_rate_lb_wk", lambda day, today=None: weigh)
+    monkeypatch.setattr(rate_band, "guidance_cap_for", lambda table: None)
+    monkeypatch.setattr(steps_resolver, "steps_range", lambda *a, **k: {"summary": {"mean_steps": 12500}})
+    monkeypatch.setattr(tools_nutrition, "expenditure_reconciliation", lambda end: {})
+    days = [f"2026-10-{d:02d}" for d in range(9, 23)]  # 14 completed days ending 10-22
+    rows = [{"date": d, "total_calories_kcal": 300 if d == "2026-10-20" else 1900} for d in days]
+    monkeypatch.setattr(core, "query_source", lambda src, lo, hi: [r for r in rows if lo <= r["date"] <= hi])
+    g = tl.gather("2026-10-23")
+    assert (g["complete_log_days"], g["complete_days_trailing"], g["trend_lb_wk"]) == (6, 13, 4.0)
+    assert ti.decide(**{**g, "complete_days_trailing": 14})["reason_code"] == "awaiting_confirmation"
+    real = ti.settings
+    monkeypatch.setattr(ti, "settings", lambda: {**real(), "trend_days": 21})
+    g = tl.gather("2026-10-23")
+    assert g["trend_lb_wk"] is None and g["read_errors"]["trend"] == "trend_window_mismatch"
+    assert ti.decide(**g)["reason_code"] == "insufficient_data"
