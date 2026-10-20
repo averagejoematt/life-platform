@@ -294,7 +294,7 @@ def _gate_signals() -> dict:
     try:
         from mcp.tools_nutrition import _get_metabolic_adaptation, tool_get_deficit_sustainability
 
-        ds = tool_get_deficit_sustainability({})
+        ds = tool_get_deficit_sustainability({"critics_model": False})
         out["deficit_sustainability"] = {"available": "error" not in ds, "note": ds.get("error")} if isinstance(ds, dict) else {}
         ma = _get_metabolic_adaptation({})
         out["metabolic_adaptation"] = {"available": "error" not in ma, "note": ma.get("error")} if isinstance(ma, dict) else {}
