@@ -1445,7 +1445,7 @@ def test_get_intake_response_clamps_the_window_silently(table, monkeypatch):
     the only tell is that the echoed value differs from the request."""
     seen = {}
 
-    def _fake(tbl, window_days=180):
+    def _fake(tbl, window_days=180, **kw):  # #5106: the tool also asks for the check-in read (include_checkin)
         seen["window_days"] = window_days
         return {"window_days": window_days, "logged_evenings": 0, "nonzero_evenings": 0}
 

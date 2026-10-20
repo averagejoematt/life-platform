@@ -154,9 +154,24 @@ def _dose_bins(intake_by_date, metrics_by_date):
     return out
 
 
-def compute_intake_response(table, window_days=180, today=None):
+def compute_intake_response(table, window_days=180, today=None, include_checkin=False):
     """The full private payload for MCP / the daily brief. Never raises on thin
-    data — an unarmed instrument reports its arming progress (ADR-104/105)."""
+    data — an unarmed instrument reports its arming progress (ADR-104/105).
+
+    ``include_checkin`` (#5106, the MCP tool only) adds ``checkin_intake``: the newest stored weekly
+    read of the evening check-in against intake (``health.checkin_intake_pairs``), or an honest absence."""
+    payload = _intake_payload(table, window_days, today)
+    if include_checkin:
+        try:
+            from health.checkin_intake_pairs import latest_summary
+
+            payload["checkin_intake"] = latest_summary(table) or {"state": "no weekly read stored yet"}
+        except Exception as e:  # noqa: BLE001 — the drinks read stands; the absence is named, never silent
+            payload["checkin_intake"] = {"state": "read_failed", "error": type(e).__name__}
+    return payload
+
+
+def _intake_payload(table, window_days, today):
     intake = fetch_intake_by_date(table, window_days=window_days, today=today)
     nonzero_evenings = sum(1 for c in intake.values() if c > 0)
     payload = {

@@ -1129,4 +1129,8 @@ class TestLambdaHandler:
         out = wc.lambda_handler({"force": True}, None)
         # The correlations — the run's actual product — still land.
         assert out["statusCode"] == 200
-        assert [p["sk"] for p in fake.puts] == ["WEEK#2026-W27"]
+        # #5106: the owner-only check-in family lands beside it, in its own partition (never the public record).
+        assert [(p["pk"].rsplit("#", 1)[-1], p["sk"]) for p in fake.puts] == [
+            ("weekly_correlations", "WEEK#2026-W27"),
+            ("checkin_intake_pairs", "WEEK#2026-W27"),
+        ]

@@ -115,6 +115,7 @@ from mcp.tools_descriptions import (
     LOG_COACH_CORRECTION_INPUT,
     LOG_DECISION_DESCRIPTION,
     LOG_EVENING_INTAKE_DESCRIPTION,
+    LOG_EVENING_INTAKE_INPUT,
     LOG_FIELD_NOTE_RESPONSE_DESCRIPTION,
     LOG_HABIT_REFLECTION_DESCRIPTION,
     MANAGE_DIARY_CLAIMS_DESCRIPTION,
@@ -750,20 +751,10 @@ TOOLS = {
             },
         },
     },
+    # #5106: the input table (count + the evening check-in fields) is LOG_EVENING_INTAKE_INPUT in mcp/tools_descriptions.py.
     "log_evening_intake": {
         "fn": tool_log_evening_intake,
-        "schema": {
-            "name": "log_evening_intake",
-            "description": LOG_EVENING_INTAKE_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "count": {"type": "integer", "description": "Evening count, 0-4 (4 = four or more)."},
-                    "date": {"type": "string", "description": "YYYY-MM-DD (default: tonight, the Pacific calendar day)."},
-                },
-                "required": ["count"],
-            },
-        },
+        "schema": {"name": "log_evening_intake", "description": LOG_EVENING_INTAKE_DESCRIPTION, "inputSchema": LOG_EVENING_INTAKE_INPUT},
     },
     "get_intake_response": {
         "fn": tool_get_intake_response,

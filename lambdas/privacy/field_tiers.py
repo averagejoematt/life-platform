@@ -316,6 +316,11 @@ SOURCE_TIERS: dict[str, int] = {
     # calorie resolver (`health.calorie_target`, which states only the kcal), the owner's nutrition-review email
     # and the calibration sweep's dead-man (owner Telegram).
     "nutrition_titration": TIER_OWNER_ONLY,
+    # #5106: the evening check-in (hunger, stress, cravings, one word) and its weekly read against intake. Behavioural
+    # self-report about him, so owner-only with no public projection; the weekly read is stored APART from the public
+    # weekly_correlations record for exactly that reason. Declared before the first row exists (ADR-154's ordering).
+    "evening_checkin": TIER_OWNER_ONLY,
+    "checkin_intake_pairs": TIER_OWNER_ONLY,
     # #4078: chat writes queued for approval. A queued row carries the target write tool's exact
     # arguments — journal-grade text, a pain-site statement, a meal — so it takes the highest tier
     # of anything it can hold. Declared before the first row exists (ADR-154's ordering). MCP-only.

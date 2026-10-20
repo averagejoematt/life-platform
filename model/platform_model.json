@@ -1019,7 +1019,7 @@
     "ai_features": 29,
     "alarms": 140,
     "emf_namespaces": 33,
-    "schedules": 96,
+    "schedules": 97,
     "secrets": 30
   },
   "edges": [
@@ -1245,6 +1245,27 @@
       "lambda": null,
       "module": "lambdas/coach/critics.py",
       "partition": "coach_thread",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/coach/evening_checkin.py",
+      "partition": "evening_checkin",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/evening_checkin.py",
+      "partition": "evening_checkin",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/coach/evening_checkin.py",
+      "partition": "evening_checkin",
       "via": "pk"
     },
     {
@@ -3117,6 +3138,20 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/health/checkin_intake_pairs.py",
+      "partition": "checkin_intake_pairs",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/health/checkin_intake_pairs.py",
+      "partition": "checkin_intake_pairs",
+      "via": "pk"
+    },
+    {
       "direction": "unknown",
       "lambda": null,
       "module": "lambdas/health/clinical_facts.py",
@@ -4048,10 +4083,24 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/calibration_cadence.py",
+      "partition": "clinical",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/training/calibration_cadence.py",
       "partition": "dexa",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/calibration_cadence.py",
+      "partition": "labs",
       "via": "local-seam"
     },
     {
@@ -7747,6 +7796,11 @@
           "resolution": "table"
         },
         {
+          "expr": "cron(0 3 * * ? *)",
+          "key": "telegram-coach-worker#TelegramEveningCheckin",
+          "resolution": "table"
+        },
+        {
           "expr": "cron(15 17 ? * MON-FRI *)",
           "key": "telegram-coach-worker#TelegramMorningCheckin",
           "resolution": "table"
@@ -7970,23 +8024,23 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 769,
+      "edges": 776,
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
-      "partitions": 119,
+      "partitions": 121,
       "privacy_fields_owner_only": 67,
       "privacy_fields_owner_published": 11,
-      "privacy_sources_owner_only": 21,
+      "privacy_sources_owner_only": 23,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 81,
-      "schedules": 96
+      "schedules": 97
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 377,
-        "sites_resolved": 969,
-        "sites_total": 1346
+        "sites_dynamic": 378,
+        "sites_resolved": 976,
+        "sites_total": 1354
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8095,6 +8149,11 @@
       "class": "experiment_scoped",
       "ingestion": false,
       "privacy_tier": "public"
+    },
+    "checkin_intake_pairs": {
+      "class": "cross_phase",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
     },
     "chronicle": {
       "class": "experiment_scoped",
@@ -8239,6 +8298,11 @@
       "ingestion": false,
       "privacy_tier": "public"
     },
+    "evening_checkin": {
+      "class": "raw_timeseries",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
+    },
     "evening_ritual": {
       "class": "raw_timeseries",
       "ingestion": false,
@@ -8288,7 +8352,7 @@
       "category": "Manual logs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "Manual log",
+      "method": "Manual log (paused: no orders logged since March)",
       "privacy_tier": "public",
       "stale_hours": 336
     },
@@ -8857,9 +8921,11 @@
     },
     "sources": {
       "cgm_readings": "owner_only",
+      "checkin_intake_pairs": "owner_only",
       "clinical": "internal",
       "coach_vision": "owner_only",
       "dexa": "owner_published",
+      "evening_checkin": "owner_only",
       "felt_probe": "owner_only",
       "fitness_tests": "owner_only",
       "flourishing": "owner_only",
@@ -8937,6 +9003,13 @@
       "lambda": "site-stats-refresh",
       "resolution": "table",
       "stack": "operational_stack",
+      "utc": "03:00"
+    },
+    {
+      "expr": "cron(0 3 * * ? *)",
+      "lambda": "telegram-coach-worker",
+      "resolution": "table",
+      "stack": "serve_stack",
       "utc": "03:00"
     },
     {
