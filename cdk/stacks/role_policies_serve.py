@@ -865,14 +865,6 @@ def telegram_worker() -> list[iam.PolicyStatement]:
                 },
             },
         ),
-        # #5106: the evening check-in row. Its own statement for the #3758 reason (removable alone;
-        # one more pattern in a ForAllValues list would widen the other grant). One partition, named in full.
-        iam.PolicyStatement(
-            sid="DynamoDBEveningCheckinWrite",
-            actions=["dynamodb:UpdateItem"],
-            resources=[TABLE_ARN],
-            conditions={"ForAllValues:StringLike": {"dynamodb:LeadingKeys": ["USER#matthew#SOURCE#evening_checkin"]}},
-        ),
         # #3758: the photo itself. The worker's FIRST S3 write of any kind, scoped to
         # the one prefix the source registry declares for it (`raw_layout.prefix`).
         # No ListBucket and no delete: a capture path writes, and a capture path that

@@ -79,6 +79,7 @@ _BEFORE_4770 = {
     "horizons_retrospective": _S46,
     "broadcast_sensitivity": _H45,
     "journal_enrichment": _H45,
+    "nutrition.critics": _H45,  # #5114: a NEW route for a new caller (the nutrition critics' narrator) — no model moved
     "plan_critics": _H45,
     "reader_truth_qa": _H45,
     "semantic_recall.embed": "amazon.titan-embed-text-v2:0",

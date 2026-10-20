@@ -352,6 +352,31 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
             "Runs on a workstation, so the dev AI cap bounds it as well."
         ),
     },
+    # #5114: the nutrition critics' model layer (health/nutrition_critics_ai.py), DECLINED by design. Its
+    # stable prefix is the fixed SYSTEM_PROMPT alone; the user turn is one critic's verdict + packet,
+    # volatile by construction. prefix_tokens is estimate_tokens on that literal (no wire count taken: the
+    # lane made no Bedrock call) — under EVERY floor in the registry, the 512 tier included, so no model
+    # move re-opens this decision on size alone. `cdk_stack` is None: the host is life-platform-mcp, whose
+    # function_name is a module constant the env derivation cannot read, and whose environment sets no
+    # AI_MODEL_HAIKU, so the registry default is what it runs on.
+    "nutrition-critics": {
+        "engaged": False,
+        "route": "nutrition.critics",
+        "caller": "health/nutrition_critics_ai.py",
+        "caller_var": "NUTRITION_CRITICS_MODEL",
+        "cdk_stack": None,
+        "measured_on": "haiku-4-5",
+        "prefix_tokens": 199,
+        "calls_within_ttl": 3,
+        "decided": "2026-10-19",
+        "issue": 5114,
+        "why": (
+            "~199 tok (estimate_tokens on SYSTEM_PROMPT; re-measure from the first live call's usage block) against "
+            "Haiku 4.5's 4,096 floor — 5% of it, and under the 512 floor of the 5.5 tier too. Three calls land in "
+            "one TTL (one per critic), but a breakpoint on a sub-floor prefix is a silent no-op, and padding a "
+            "narrator to 4,096 tok would cost more than the ~$0.006 a call it narrates. No cache_control is sent."
+        ),
+    },
 }
 
 

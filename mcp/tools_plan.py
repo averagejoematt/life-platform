@@ -922,7 +922,7 @@ def _nutrition_critics_block() -> dict[str, Any]:
     from mcp import nutrition_critics_inputs
     from mcp.tools_nutrition import _nutrition_through_date, tool_get_deficit_sustainability
 
-    res = _safe(tool_get_deficit_sustainability, {})
+    res = _safe(tool_get_deficit_sustainability, {"critics_model": False})  # #5114: no narrative on the plan surface
     if isinstance(res, dict) and isinstance(res.get("critics"), dict):
         block = dict(res["critics"])
         block["via"] = "get_deficit_sustainability"
