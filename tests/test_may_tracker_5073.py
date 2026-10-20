@@ -380,6 +380,29 @@ def test_compute_weeks_wires_every_read_into_its_section(monkeypatch):
     assert last["weight"]["guidance"]["state"] == "absent"
 
 
+def test_rate_week_stays_the_7_day_slope_when_it_differs_from_the_14_day_trend(monkeypatch):
+    """#5100: the critics count the 14-day trend; the tracker cell (and the block retro's registered prediction) stays the 7-day slope."""
+    from training import rate_band
+
+    from mcp import core, shared_quantities as sq, tools_may_tracker as tmt
+
+    weighins = [{"date": mt.shift("2026-09-01", i), "weight_lbs": WEIGHT + 30 - i * 0.4 + ((i % 7) - 3)} for i in range(48)]
+    monkeypatch.setattr(
+        core, "query_source", lambda s, a, b, *x, **k: [r for r in weighins if a <= r["date"] <= b] if s == "withings" else []
+    )
+    monkeypatch.setattr(core, "query_source_range", lambda *a, **k: [])
+    monkeypatch.setattr(rate_band, "guidance_cap_for", lambda table, user_id="matthew": None)
+    monkeypatch.setattr("mcp.tools_strength._read_hevy_all_phases", lambda s, e: ([], []))
+    monkeypatch.setattr(tmt, "_anchor_series", lambda items: {})
+    monkeypatch.setattr(tmt, "pacific_today", lambda: "2026-10-19")
+    sun = mt.shift(MON, 6)
+    slope7 = sq.loss_rate_from_rows(weighins, sun, window_days=7)["rate_lb_wk"]
+    trend14 = sq.loss_rate_from_rows(weighins, sun)["rate_lb_wk"]
+    assert abs(slope7 - trend14) > 1.0  # the fixture can tell the two apart
+    cell = tmt.compute_weeks(MON, weeks=1)[-1]["weight"]["rate_week"]
+    assert cell["state"] == "measured" and cell["value"] == pytest.approx(slope7, abs=0.01)
+
+
 def test_a_failed_hevy_read_is_read_failed_in_both_hevy_sections(monkeypatch):
     from training import rate_band
 

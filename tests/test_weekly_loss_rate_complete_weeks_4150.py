@@ -152,8 +152,10 @@ def test_consecutive_counts_back_from_the_newest_counted_week():
 
 # ── 6. mutation control ─────────────────────────────────────────────────────
 def test_mutation_control_counting_partial_weeks_reds_the_specimen():
-    def _pre_4150(rows, end, *, weeks=2, genesis=None):
-        rated = [w["rate_lb_wk"] for w in sq.weekly_loss_rate_weeks_from_rows(rows, end, weeks=weeks, genesis=genesis)]
+    def _pre_4150(rows, end, *, weeks=2, genesis=None, trend_days=7):
+        rated = [
+            w["rate_lb_wk"] for w in sq.weekly_loss_rate_weeks_from_rows(rows, end, weeks=weeks, genesis=genesis, trend_days=trend_days)
+        ]
         return [r for r in rated if r is not None] or None
 
     with patch.object(sq, "weekly_loss_rates_from_rows", _pre_4150):
