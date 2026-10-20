@@ -44,7 +44,7 @@ SRC = {
     "tape": "USER#matthew#SOURCE#measurements (DATE# rows)",
     "photos": "USER#matthew#SOURCE#progress_photos (DATE#<day>#<pose> index rows; dates only, never a key)",
     "dexa": "USER#matthew#SOURCE#dexa (scan_date)",
-    "lab_draw": "USER#matthew#SOURCE#labs (draw_date; dates only, never a result)",
+    "lab_draw": "USER#matthew#SOURCE#labs (draw_date) + USER#matthew#SOURCE#clinical (LABS#<date> sort keys); dates only, never a result",
 }
 PROMPTS = {
     "tape": "Tape day: measure waist (navel, narrowest, iliac crest) and the other sites, then log it with your coach. Last tape {last}.",
@@ -240,6 +240,31 @@ def _dates(table: Any, source: str, field: str) -> list[str]:
         kw["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
 
+def _clinical_draw_dates(table: Any) -> list[str]:
+    """The `LABS#<date>` sort-key dates of the clinical partition — the key only, no attribute is projected (#5111)."""
+    from boto3.dynamodb.conditions import Key
+
+    out: list[str] = []
+    kw: dict[str, Any] = {
+        "KeyConditionExpression": Key("pk").eq("USER#matthew#SOURCE#clinical") & Key("sk").begins_with("LABS#"),
+        "ProjectionExpression": "sk",
+    }
+    while True:
+        resp = table.query(**kw)
+        for it in resp.get("Items") or []:
+            v = str(it.get("sk") or "").replace("LABS#", "")
+            if _day(v):
+                out.append(v[:10])
+        if not resp.get("LastEvaluatedKey"):
+            return out
+        kw["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+
+
+def draw_dates(table: Any) -> list[str]:
+    """Every known draw date: the labs partition's plus the clinical record's — the latest draw may live in either."""
+    return sorted(set(_dates(table, "labs", "draw_date")) | set(_clinical_draw_dates(table)))
+
+
 def table_readers(table: Any) -> dict[str, Callable[[], list[str]]]:
     """The three readers over one table: tape rows (`date`), photo index rows (the `date` of each pose row —
     nothing else is projected, so no key or path ever leaves the read), DEXA rows (`scan_date`)."""
@@ -247,7 +272,7 @@ def table_readers(table: Any) -> dict[str, Callable[[], list[str]]]:
         "tape": lambda: _dates(table, "measurements", "date"),
         "photos": lambda: _dates(table, "progress_photos", "date"),
         "dexa": lambda: _dates(table, "dexa", "scan_date"),
-        "lab_draw": lambda: _dates(table, "labs", "draw_date"),
+        "lab_draw": lambda: draw_dates(table),
     }
 
 

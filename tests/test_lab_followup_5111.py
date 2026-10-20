@@ -45,7 +45,7 @@ def lab(today, draws=()):
 
 
 def test_the_cadence_is_the_charters():
-    assert (CYCLE, LEAD) == (84, 14)
+    assert (CYCLE, LEAD) == (112, 14)
     assert lab(plus(LAST, 1), [LAST])["due_on"] == plus(LAST, CYCLE)
 
 
@@ -129,3 +129,40 @@ def test_the_clinical_renderer_ignores_the_priorities_row():
 
     assert "Neutral fixture" not in render_clinical_block([ROW], published=False)
     assert "Neutral fixture" not in render_clinical_block([ROW], published=True)
+
+
+class _Table:
+    """A minimal injected table: pk -> rows, honouring the sk begins_with condition."""
+
+    def __init__(self, parts):
+        self.parts = parts
+
+    def query(self, **kw):
+        cond = kw["KeyConditionExpression"]
+        flat = []
+
+        def walk(c):
+            for v in getattr(c, "_values", []):
+                if hasattr(v, "_values"):
+                    walk(v)
+                else:
+                    flat.append(v)
+
+        walk(cond)
+        pk = next(v for v in flat if isinstance(v, str) and v.startswith("USER#"))
+        pref = next((v for v in flat if isinstance(v, str) and not v.startswith("USER#")), "")
+        return {"Items": [r for r in self.parts.get(pk, []) if str(r["sk"]).startswith(pref)]}
+
+
+def test_the_latest_draw_may_live_in_the_clinical_record():
+    t = _Table(
+        {
+            "USER#matthew#SOURCE#labs": [{"sk": "DATE#2026-04-03", "draw_date": "2026-04-03"}],
+            "USER#matthew#SOURCE#clinical": [{"sk": "LABS#2026-10-10"}, {"sk": "MED#x"}],
+        }
+    )
+    assert cc.draw_dates(t) == ["2026-04-03", "2026-10-10"]
+    row = cc.compute("2026-10-19", cc.table_readers(t), anchor="2026-09-06")["kinds"]["lab_draw"]
+    assert row["last_logged"] == "2026-10-10"
+    assert row["due_on"] == plus("2026-10-10", CYCLE)
+    assert row["state"] == "ok" and row["prompt"] is None
