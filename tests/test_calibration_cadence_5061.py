@@ -245,8 +245,10 @@ def test_the_packet_reads_the_cadence():
 # ── privacy: owner-only, never a photo on a published surface ───────────────────
 PUBLISHED = ("lambdas/web", "lambdas/emails")
 IMPORT_RE = re.compile(
-    r"^\s*(?:from|import)\s+[\w.]*\bcalibration_(?:cadence|leg)\b|^\s*from\s+[\w.]+\s+import\s+[^#\n]*\bcalibration_(?:cadence|leg)\b", re.M
+    r"^\s*(?:from|import)\s+[\w.]*\b(?:calibration_(?:cadence|leg)|lab_priorities)\b|^\s*from\s+[\w.]+\s+import\s+[^#\n]*\b(?:calibration_(?:cadence|leg)|lab_priorities)\b",
+    re.M,
 )
+LAB_PRIORITIES_RE = re.compile(r"PRIORITIES#current|lab_priorities")  # #5111
 PHOTO_RE = re.compile(r"progress_photos|progress_capture")
 OWNER_GATED_VIEWER = {"lambdas/web/progress_viewer_lambda.py"}  # the signed-link, HMAC-session viewer (#3760)
 
@@ -274,12 +276,18 @@ def test_only_the_owner_gated_viewer_names_the_photo_partition_in_a_published_tr
     assert "progress_access" in src, "the viewer must stay behind the signed-link gate"
 
 
+def test_no_published_module_names_the_lab_priorities_row():  # #5111: the seam is owner-only
+    assert scan(ROOT, LAB_PRIORITIES_RE) == []
+
+
 def test_the_sweep_catches_a_planted_reader(tmp_path):
     for t in PUBLISHED:
         (tmp_path / t).mkdir(parents=True)
     (tmp_path / "lambdas/web/a.py").write_text("from training import calibration_cadence\n")
     (tmp_path / "lambdas/emails/b.py").write_text("KEY = 'raw/matthew/progress_photos/x'\n")
-    assert scan(tmp_path, IMPORT_RE) == ["lambdas/web/a.py"] and scan(tmp_path, PHOTO_RE) == ["lambdas/emails/b.py"]
+    (tmp_path / "lambdas/web/c.py").write_text("from training import lab_priorities\n")
+    assert scan(tmp_path, LAB_PRIORITIES_RE) == ["lambdas/web/c.py"]
+    assert scan(tmp_path, IMPORT_RE) == ["lambdas/web/a.py", "lambdas/web/c.py"] and scan(tmp_path, PHOTO_RE) == ["lambdas/emails/b.py"]
 
 
 def test_the_block_is_owner_tier_and_carries_no_media_path():

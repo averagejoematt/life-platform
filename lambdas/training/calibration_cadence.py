@@ -33,8 +33,8 @@ from __future__ import annotations
 import datetime as _dt
 from typing import Any, Callable, Mapping, Optional
 
-VERSION = "calibration-cadence@1.0.0"
-KINDS = ("tape", "photos", "dexa")
+VERSION = "calibration-cadence@1.1.0"  # 1.1.0 #5111: lab_draw
+KINDS = ("tape", "photos", "dexa", "lab_draw")
 OK, DUE, OVERDUE, MISSED_2, UNKNOWN, READ_FAILED = "ok", "due", "overdue", "missed_2", "unknown", "read_failed"
 PROMPT_PREFIX = "CALIB_PROMPT"
 DEADMAN_PREFIX = "CALIB_DEADMAN"
@@ -44,11 +44,13 @@ SRC = {
     "tape": "USER#matthew#SOURCE#measurements (DATE# rows)",
     "photos": "USER#matthew#SOURCE#progress_photos (DATE#<day>#<pose> index rows; dates only, never a key)",
     "dexa": "USER#matthew#SOURCE#dexa (scan_date)",
+    "lab_draw": "USER#matthew#SOURCE#labs (draw_date; dates only, never a result)",
 }
 PROMPTS = {
     "tape": "Tape day: measure waist (navel, narrowest, iliac crest) and the other sites, then log it with your coach. Last tape {last}.",
     "photos": "Photo day: front, side and back, same light and spot as last time; send each to the bot as /progress front (side, back). Last set {last}.",
     "dexa": "DEXA is due about now ({due}). Book the scan; the labs/DEXA ingest (#4639) is not built, so tell your coach the date once it is done.",
+    "lab_draw": "The follow-up draw is due about {due}. Book it; tell your coach the date once it is done. Last draw {last}.",
 }
 
 
@@ -153,6 +155,27 @@ def _dexa(readers: Mapping[str, Callable], today: str) -> dict[str, Any]:
     return out
 
 
+def _lab_draw(readers: Mapping[str, Callable], today: str) -> dict[str, Any]:
+    """#5111: the follow-up draw cadence — the last draw date (`labs`, dates only) + `nutrition.labs.follow_up_weeks`.
+    No draw readable: the owner-only `lab_followup.next_draw_on` (the private twin) is the due date; neither → unknown.
+    The reminder window opens `reminder_lead_days` before the due day (state `due`); nothing here reads a result."""
+    weeks, lead = _cv("nutrition.labs.follow_up_weeks"), _cv("nutrition.labs.reminder_lead_days", 0)
+    base = {"kind": "lab_draw", "source": SRC["lab_draw"], "cycle_weeks": weeks, "cadence": "approximate", "reminder_lead_days": lead}
+    dates, err = _read(readers.get("lab_draw"))
+    if err:
+        return {**base, "state": READ_FAILED, "error": err, "ingest": {"issue": DEXA_INGEST_ISSUE}}
+    if not weeks:
+        return {**base, "state": UNKNOWN, "detail": "the charter names no follow-up draw cadence"}
+    days, fixed = int(weeks) * 7, _day(_cv("lab_followup.next_draw_on"))
+    anchor = (fixed - _dt.timedelta(days=days)).isoformat() if fixed and not dates else None
+    out = {**base, **cycle_state("lab_draw", dates, today, days, anchor=anchor, dead_cycles=None)}
+    if out["state"] == OK and out["days_until_due"] <= int(lead or 0):
+        out["state"] = DUE  # the reminder window: at most one prompt per cycle (the prompt key is the cycle start)
+    if out["state"] == UNKNOWN:
+        out["detail"] = "no draw date is readable and no owner-only follow-up date is set"
+    return out
+
+
 def _prompt(row: dict[str, Any]) -> Optional[str]:
     if row.get("state") not in (DUE, OVERDUE, MISSED_2):
         return None
@@ -165,6 +188,7 @@ def compute(today: str, readers: Mapping[str, Callable[[], Any]], *, anchor: Opt
     the cycle start of a kind never logged. Each reader returns the dates logged or raises."""
     rows = {"tape": _behavioural("tape", readers, today, anchor), "photos": _behavioural("photos", readers, today, anchor)}
     rows["dexa"] = _dexa(readers, today)
+    rows["lab_draw"] = _lab_draw(readers, today)
     for r in rows.values():
         r["prompt"] = _prompt(r)
         if r.get("cycle_start"):
@@ -223,6 +247,7 @@ def table_readers(table: Any) -> dict[str, Callable[[], list[str]]]:
         "tape": lambda: _dates(table, "measurements", "date"),
         "photos": lambda: _dates(table, "progress_photos", "date"),
         "dexa": lambda: _dates(table, "dexa", "scan_date"),
+        "lab_draw": lambda: _dates(table, "labs", "draw_date"),
     }
 
 

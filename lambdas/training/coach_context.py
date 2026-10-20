@@ -44,7 +44,7 @@ from __future__ import annotations
 import json
 from typing import Any, Iterable, Optional
 
-CONTEXT_VERSION = "coach-context@1.2.0"  # 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
+CONTEXT_VERSION = "coach-context@1.3.0"  # 1.3.0 #5111: lab_priorities (owner channel, seam only); 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
 
 # ── the order contract, as data ───────────────────────────────────────────────────────────
 ORDER: tuple[str, ...] = ("pre_flight", "plan_next_session", "manage_hevy_routine draft")
@@ -245,6 +245,7 @@ def assemble(
     tracker: Any = None,
     guidance: Any = None,
     guidance_freshness: Any = None,
+    lab_priorities: Optional[dict[str, Any]] = None,
     published: bool = False,
 ) -> dict[str, Any]:
     """The planning context for `target_date`: a dict for code and ``text`` for a prompt.
@@ -271,6 +272,7 @@ def assemble(
         "sections": sections,
         "may_frame": frame,
         "run_gate": None if published else run_gate(tracker),
+        "lab_priorities": None if published else lab_priorities,  # #5111: owner-only; absent -> nothing is said
         "not_supplied": sorted(k for k, s in sections.items() if s.get("state") == NOT_SUPPLIED),
     }
     out["text"] = render(out)
@@ -392,6 +394,9 @@ def render(ctx: dict[str, Any]) -> str:
     if ctx.get("run_gate"):  # #5090: owner channel only (assemble sets None when published)
         rg = ctx["run_gate"]
         parts.append([f"RUN GATE (owner-only) [{rg['source']}; {rg['state']}]", rg["line"]])
+    lp = ctx.get("lab_priorities")
+    if lp and not ctx["published"]:  # #5111: the owner's own priorities, from his owner-only record (training.lab_priorities)
+        parts.append([f"LAB-DRIVEN PRIORITIES (owner-only) [{lp.get('source')}]", lp["text"]])
     if not ctx["published"]:  # the order contract is the owner's planning conversation's, never a reader prompt's
         parts.append(["ORDER: " + " -> ".join(ctx["order"]) + " (pre-flight = " + ", ".join(PRE_FLIGHT) + ")"])
     return "\n\n".join("\n".join(p) for p in parts)

@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.16.0",
+  "version": "1.20.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -98,6 +98,13 @@
       "date": "2026-10-19",
       "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5096, epic #5091: the redlines' titration rule gets a reader); weekly refit built on the panel default, pending R1",
       "what": "nutrition.titration: the weekly titration engine's rule (lambdas/health/titration.py), MOVED here from nutrition.calories.titration (same rule values: 150 kcal step, 14-day spacing, never on a week with fewer than 6 complete logs, not before day 21, two consecutive out-of-band reads, steps before food) and nutrition.calories.titration_record. The band it reads is the charter rate band (governing_goal.rate_band_lb_per_wk through training.rate_band, the clinical guidance cap applied) above the landing, and the redlines' own landing schedule step (target to cap) from the landing down: the redlines' old 'target +/- 0.5 lb/wk' band is retired, so one band governs both the rate target and the titration. The step is sized from the miss (500 kcal/day per lb/wk, 3500 kcal per lb over 7 days), rounded to 50 and held inside min_step_kcal..max_step_kcal. owner_redlines energy_floor_kcal.titration reads this block (max_step_kcal is the one step-size key; the old step_kcal duplicate is dropped). Every rule value is required: a missing one holds the week as insufficient_data, never a fallback. trend_days must equal the shared loss-rate window. A complete log is a day at or above the redlines' dark-day line, and the first step waits for the redlines' complete_days_before_first_titration (both read from owner_redlines, not copied). The redlines' owner rule 'walking FIRST, then food, never both inside 14 days' is kept as a walking-first hold; the steps-floor precondition on top of it is the panel interpretation, pending an owner ruling on epic #5091. The modelled `expected_path` moves with the block; `insufficient_loss_with_logging_intact` is carried by the walking_first rule and the redlines tripwire loss_insufficient_adherent.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.20.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5111, epic #5094)",
+      "what": "nutrition.labs (#5111): the follow-up draw cadence only — follow_up_weeks and reminder_lead_days. Read by training.calibration_cadence (kind lab_draw): next draw due = the last draw date + the cadence, a reminder on the owner channel once per cycle (CALIB_PROMPT#lab_draw#<cycle_start>), state ok|due|overdue. The owner-only fallback due date (no draw readable) lives in the private twin, never here. Links the labs ingest #4639.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -545,6 +552,11 @@
       "day_type": "lifting | rest | travel | unknown: travel from a travel disruption or charter travel window; else lifting/rest from the planned routine for the date; else unknown (base target, never a guessed rest day: the split sequence has no calendar, so the plan states the lifting uplift and the rest offset as conditional until a per-date calendar exists)",
       "surface": "owner-only: the plan_next_session constraint block (training_day_fuel) and the coach packet; no public surface",
       "basis": "built on the panel default, pending R1 (#5091)"
+    },
+    "labs": {
+      "_note": "The follow-up draw cadence only (#5111). Dates and weeks; no result, name or priority lives here. The owner-only due date, when no draw is readable, is the private twin's lab_followup.next_draw_on.",
+      "follow_up_weeks": 12,
+      "reminder_lead_days": 14
     },
     "floors": {
       "fat": {"floor_g": 65, "unit": "g", "per_meal_g": 10, "meals_with_fat": 3, "epa_dha_g": 2},
