@@ -62,7 +62,7 @@
       "version": "1.9.0",
       "date": "2026-10-19",
       "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5098, epic #5091); the four-feeding structure and the relaxed fasting window are built on the panel default, pending R2",
-      "what": "nutrition.protein: the daily range (low = the plan's floor, held equal to config/user_goals.json and common.constants by tests/test_protein_engine_5098.py; high = the redlines' target), the days-of-7 bar, four feedings with a per-feeding threshold and a target band, the merge window that groups food-log rows into one feeding, THE hit definition (strictly total >= range low), and the breakfast nudge (a cut-off and a send window in Pacific time, at most one a day, owner-only). owner_redlines.protein_floor_g reads target_g, days_of_7, feedings and feeding_g from here; lambdas/health/protein_engine.py is the one reader.",
+      "what": "nutrition.protein: the daily range (low = the plan's floor, held equal to config/user_goals.json and common.constants by tests/test_protein_engine_5098.py; high = the redlines' target), the days-of-7 bar, four feedings with a per-feeding threshold and a target band, the merge window that groups food-log rows into one feeding, THE hit definition (strictly total >= range low), and the breakfast nudge (a cut-off and a send window in Pacific time, at most one a day, owner-only; a day with no food-log row yet withholds, because the food log is an end-of-day upload). owner_redlines.protein_floor_g reads target_g, days_of_7, feedings and feeding_g from here; lambdas/health/protein_engine.py is the one reader.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -424,7 +424,7 @@
         "window_end_pt": "12:00",
         "max_per_day": 1,
         "channel": "owner email on the coach-nudge hourly tick",
-        "rule": "behind when no feeding at or above feeding_threshold_g is logged at or before the later of the cut-off and the tick; an absent food log for the day counts as nothing logged and the note says the log may not be uploaded yet; untimed rows withhold the note (unknown)"
+        "rule": "behind when no feeding at or above feeding_threshold_g is logged at or before the later of the cut-off and the tick; no food-log row for the day withholds the note (no_same_day_log): the food log is an end-of-day upload, so an absent row at breakfast is upload lag, not a missed feeding; untimed rows withhold the note (unknown). Armed but silent until a same-day food source exists (#5187)"
       },
       "basis": "built on the panel default, pending R2 (#5091)"
     }

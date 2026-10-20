@@ -183,10 +183,25 @@ def test_a_feeding_after_the_cutoff_but_before_the_tick_counts():
     assert decide(_row(("10:30", _threshold() + 5)))["send"]  # logged for later than the tick: not eaten yet
 
 
-def test_no_log_yet_sends_and_says_so_untimed_withholds():
-    v = decide(None)
-    assert v["send"] and v["reason"] == "behind_nothing_logged" and "not be uploaded" in v["text"]
+def test_no_same_day_row_withholds_untimed_withholds():
+    """The food log is an end-of-day upload: no row at breakfast is the upload's lag, not a missed feeding.
+    The nudge withholds (no daily unconditional reminder) — the review's blocking finding on PR #5186."""
+    for absent in (None, {}):
+        v = decide(absent)
+        assert not v["send"] and v["reason"] == "no_same_day_log" and "text" not in v
     assert decide(_row((None, 60)))["reason"] == "feedings_unknown"
+
+
+def test_a_malformed_total_is_unknown_never_a_crash():
+    for bad in ("n/a", "12g", [1]):
+        day = pe.evaluate_day({"date": DAY, "total_protein_g": bad, "food_log": []})
+        assert day["total_g"] is None and day["hit"] is None
+
+
+def test_no_charter_merge_rule_means_unknown_feedings(monkeypatch):
+    real = pe._cv
+    monkeypatch.setattr(pe, "_cv", lambda path, default=None: None if path == "feeding_merge_minutes" else real(path, default))
+    assert pe.feedings([{"time": "08:00", "protein_g": 50}]) is None
 
 
 def test_rails_window_budget_already_sent():
@@ -226,7 +241,7 @@ def _mf(row):
 
 
 def test_runner_sends_at_most_once_a_day_and_stamps_every_tick():
-    t, sent = _Table(), []
+    t, sent = _Table([_mf(_row(("08:15", _threshold() - 5)))]), []
     first = runner.run(t, sent.append, TICK_UTC, 0)
     second = runner.run(t, sent.append, TICK_UTC.replace(minute=40), 0)
     assert first["send"] and first["key"] == f"PROTEIN_NUDGE#{DAY}"
@@ -246,6 +261,14 @@ def test_runner_on_track_sends_nothing_but_stamps():
     assert t.items[(runner.LEDGER_PK, f"EVAL#{DAY}")]["send"] is False
 
 
+def test_runner_no_same_day_row_sends_nothing_but_feeds_the_dead_man():
+    t, sent = _Table(), []
+    assert runner.run(t, sent.append, TICK_UTC, 0)["reason"] == "no_same_day_log" and not sent
+    stamp = t.items[(runner.LEDGER_PK, f"EVAL#{DAY}")]
+    assert stamp["send"] is False and stamp["reason"] == "no_same_day_log"
+    assert (runner.LEDGER_PK, f"PROTEIN_NUDGE#{DAY}") not in t.items
+
+
 def test_runner_outside_window_touches_nothing():
     t = _Table()
     assert runner.run(t, lambda s: None, TICK_UTC.replace(hour=3), 0)["reason"] == "outside_window" and not t.items
@@ -255,7 +278,7 @@ def test_runner_send_failure_is_recorded_not_raised():
     def boom(_):
         raise RuntimeError("ses down")
 
-    t = _Table()
+    t = _Table([_mf(_row(("08:15", _threshold() - 5)))])
     assert runner.run(t, boom, TICK_UTC, 0)["reason"] == "send_failed"
     assert t.items[(runner.LEDGER_PK, f"PROTEIN_NUDGE#{DAY}")]["status"] == "failed"
 

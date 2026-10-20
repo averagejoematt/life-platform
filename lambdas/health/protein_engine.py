@@ -15,7 +15,9 @@ row are one feeding (the same grouping the ingest's protein-distribution score u
 
 THE BREAKFAST NUDGE (`nudge_decide`). Behind = no feeding at or above `feeding_threshold_g` logged at or before the
 later of the charter cut-off and the tick. Owner-only, at most once a Pacific day (`PROTEIN_NUDGE#<date>`), sent by
-`emails.protein_nudge_runner` on the coach-nudge hourly tick. The copy is information, never a command.
+`emails.protein_nudge_runner` on the coach-nudge hourly tick. The copy is information, never a command. NO ROW FOR
+TODAY WITHHOLDS (`no_same_day_log`): the only protein source is an end-of-day upload, so an absent row at breakfast
+is the upload's lag, not a missed feeding; armed but silent until a same-day food source exists (#5187).
 """
 
 from __future__ import annotations
@@ -29,7 +31,7 @@ from training import training_charter
 from health.protein_floor import met_floor
 
 ENGINE_VERSION = "protein-engine@1.0.0"
-NUDGE_VERSION = "protein-nudge@1.0.0"
+NUDGE_VERSION = "protein-nudge@1.1.0"
 KEY_PREFIX = "PROTEIN_NUDGE#"
 BUDGET_SILENCE_TIER = 2  # = steps_nudge.BUDGET_SILENCE_TIER: a deterministic owner note, silenced with the coach nudge
 _P = "nutrition.protein."
@@ -68,7 +70,10 @@ def _hhmm(minutes: int) -> str:
 
 def feedings(food_log: Optional[list], merge_minutes: Optional[int] = None) -> Optional[list[dict[str, Any]]]:
     """The day's feedings `[{time, g}]` in time order, or None when no row carries a time and a protein figure."""
-    merge = int(merge_minutes if merge_minutes is not None else _cv("feeding_merge_minutes", 30))
+    merge = merge_minutes if merge_minutes is not None else _cv("feeding_merge_minutes")
+    if merge is None:
+        return None  # no charter grouping rule: the feeding count is unknown, never a guessed window
+    merge = int(merge)
     timed = []
     for row in food_log or []:
         t, g = _minutes((row or {}).get("time")), (row or {}).get("protein_g")
@@ -103,7 +108,10 @@ def evaluate_day(row: Optional[Mapping[str, Any]], *, floor: Optional[float] = N
     """One day from its MacroFactor row (None = no row): the total, the range, THE hit and the feedings."""
     row = row or {}
     raw = row.get("total_protein_g")
-    total = float(raw) if raw not in (None, "") else None
+    try:
+        total = float(raw) if raw not in (None, "") else None
+    except (TypeError, ValueError):
+        total = None  # a malformed rollup is unknown (the macros view's `measured()` rule), never a crash
     fed = feedings(row.get("food_log"))
     threshold = _cv("feeding_threshold_g")
     return {
@@ -132,13 +140,8 @@ def in_window(now_pt: datetime) -> bool:
 
 
 def copy(verdict: Mapping[str, Any]) -> str:
-    lead = (
-        "Nothing is in today's food log yet (it may just not be uploaded)."
-        if verdict["reason"] == "behind_nothing_logged"
-        else f"No feeding of {verdict['threshold_g']} g or more is logged by {verdict['by']}."
-    )
     return (
-        f"{lead} The plan's protein is {verdict['feedings_target']} feedings of {verdict['threshold_g']} g or more; "
+        f"No feeding of {verdict['threshold_g']} g or more is logged by {verdict['by']}. The plan's protein is {verdict['feedings_target']} feedings of {verdict['threshold_g']} g or more; "
         "a protein-first breakfast now keeps the other three in reach. Fine to skip; this is just where the morning stands."
     )
 
@@ -165,15 +168,14 @@ def nudge_decide(*, date: str, now_pt: datetime, row: Optional[Mapping[str, Any]
     if out["threshold_g"] is None or out["feedings_target"] is None:
         return {**out, "reason": "no_charter_rule"}
     if not row:
-        out["send"], out["reason"] = True, "behind_nothing_logged"
-    else:
-        fed = feedings(row.get("food_log"))
-        out["feedings"] = fed
-        behind = first_feeding_behind(fed, by)
-        if behind is None:
-            return {**out, "reason": "feedings_unknown"}
-        if not behind:
-            return {**out, "reason": "on_track"}
-        out["send"], out["reason"] = True, "behind_logged_below"
+        return {**out, "reason": "no_same_day_log"}  # the upload's lag, not a miss: withhold (the EVAL stamp still lands)
+    fed = feedings(row.get("food_log"))
+    out["feedings"] = fed
+    behind = first_feeding_behind(fed, by)
+    if behind is None:
+        return {**out, "reason": "feedings_unknown"}
+    if not behind:
+        return {**out, "reason": "on_track"}
+    out["send"], out["reason"] = True, "behind_logged_below"
     out["text"] = copy(out)
     return out

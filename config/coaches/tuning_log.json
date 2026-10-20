@@ -325,7 +325,7 @@
       "date": "2026-10-19",
       "coach": "nutrition_coach",
       "change_type": "few_shot",
-      "summary": "One few-shot example (#5098): the protein line no longer names a stale 190 g target (the plan states one protein line, a floor, #4540) and the per-meal line names the charter's 40 g feeding threshold instead of 30 g. No rule, register or decision style changed.",
+      "summary": "One few-shot example (#5098): the protein line no longer names a stale 190 g target (the plan states one protein line, a floor, #4540) and the per-meal line names the per-feeding line without a number (the charter's nutrition.protein.feeding_threshold_g owns the value). No rule, register or decision style changed.",
       "rationale": "A few-shot example is copied by the model as much as any rule. The example stated a target the plan never set and a per-meal bar the protein engine (#5098, charter nutrition.protein) does not use, so the coach would have graded against a third definition beside the engine's one hit and its feeding threshold.",
       "ref": "#5098 (epic #5091)",
       "observed_effect": null
