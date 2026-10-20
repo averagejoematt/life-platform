@@ -36,6 +36,7 @@ from common.metric_truth import STEPS  # #4630: the resolved steps key build_dat
 from common.pacific_time import pacific_today
 from health.calorie_target import target_kcal, target_phrase  # #5095: the ONE calorie target
 from health.scoring_engine import habitify_reading  # #4362
+from training.coach_context import charter_goal_lines  # #5109: the standing targets are the charter's, never typed here
 
 from ai import structured_json as _structured_json  # #4276: the one door for model JSON
 
@@ -1835,9 +1836,8 @@ VOICE: Write in FIRST PERSON. You ARE {voice_spec['display_name']}. Say "I", nev
 MATTHEW'S GOALS (standing targets — the fixed backdrop, not your read):
 - Target weight: 185 lbs (starting {int(round(EXPERIMENT_BASELINE_WEIGHT_LBS))})
 - Body composition: reduce body fat, preserve lean mass
-- Training philosophy: building from walking + Zone 2 base; structured strength training planned but not yet started
 - Timeline: 12-month experiment, genesis {EXPERIMENT_START_DATE}
-- Key priorities: sleep quality, protein adherence (190g/day target), consistent movement (8,000+ steps/day)
+{charter_goal_lines()}
 
 {_facts_block}
 
