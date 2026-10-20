@@ -24,6 +24,7 @@ from stacks.role_policies_base import (
     TABLE_ARN,
     _bedrock_statement,
     _bedrock_telemetry_statement,
+    _charter_twin_list,
     _s3,
     _secret_arn,
 )
@@ -321,6 +322,7 @@ def site_api_ai() -> list[iam.PolicyStatement]:
             actions=["s3:GetObject"],
             resources=[f"{BUCKET_ARN}/config/*", f"{BUCKET_ARN}/site/config/*"],
         ),
+        _charter_twin_list(),
         # #2824: board_ask's write-back (_write_board_interaction) stamps each stored
         # COACH#/INTERACTION# row through phase_taxonomy.experiment_stamp() ->
         # coach_checkin.read_cycle(). This role carried NO SSM statement at all (site_api()
@@ -455,6 +457,7 @@ def mcp_server() -> list[iam.PolicyStatement]:
             actions=["s3:GetObject"],
             resources=_s3("claude-memory-backup/_backup_heartbeat.json"),
         ),
+        _charter_twin_list(),
         iam.PolicyStatement(
             sid="S3ListCGM",
             # Scoped list for fasting_glucose_validation tool (paginates raw/matthew/cgm_readings/)
@@ -574,6 +577,7 @@ def hevy_routine_cron() -> list[iam.PolicyStatement]:
             actions=["s3:GetObject"],
             resources=_s3("config/*"),
         ),
+        _charter_twin_list(),
         iam.PolicyStatement(
             sid="S3TemplateCacheWrite",
             actions=["s3:PutObject"],
@@ -630,6 +634,7 @@ def hevy_restamp() -> list[iam.PolicyStatement]:
             actions=["s3:GetObject"],
             resources=_s3("config/*"),
         ),
+        _charter_twin_list(),
         iam.PolicyStatement(
             sid="S3TemplateCacheWrite",
             actions=["s3:PutObject"],
@@ -906,6 +911,7 @@ def telegram_worker() -> list[iam.PolicyStatement]:
             actions=["s3:GetObject"],
             resources=[f"{BUCKET_ARN}/config/*"],
         ),
+        _charter_twin_list(),
         # Fail-loud partner of the same fix: an empty persona/registry now emits
         # TelegramPersonaMissing instead of a WARN nobody reads.
         iam.PolicyStatement(

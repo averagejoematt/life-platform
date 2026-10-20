@@ -67,6 +67,18 @@ def _secret_arn(name: str) -> str:
     return f"arn:aws:secretsmanager:{REGION}:{ACCT}:secret:{name}*"
 
 
+def _charter_twin_list() -> "iam.PolicyStatement":
+    """#5220: s3:ListBucket scoped to config/coaching/ so an ABSENT optional object (the private
+    charter twin) answers 404 instead of 403 AccessDenied -- the loader then logs `absent`, and the
+    swallowed-permission-denial filter fires only on a real denial. Lists key NAMES under one prefix."""
+    return iam.PolicyStatement(
+        sid="CharterTwinList",
+        actions=["s3:ListBucket"],
+        resources=[BUCKET_ARN],
+        conditions={"StringLike": {"s3:prefix": ["config/coaching/*"]}},
+    )
+
+
 def _s3(*prefixes: str) -> list[str]:
     """S3 object ARNs for the given key prefixes."""
     return [f"{BUCKET_ARN}/{p}" for p in prefixes]
