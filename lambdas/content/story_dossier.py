@@ -34,6 +34,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from common.constants import EXPERIMENT_START_DATE as GENESIS  # noqa: E402 — one genesis (ADR-058)
 from common.metric_truth import resolve_steps, steps_sources  # #4630: the ONE steps resolver
+from health.protein_floor import met_floor  # #5098: THE protein hit predicate (strict, #5003)
 
 USER = "matthew"
 
@@ -433,7 +434,7 @@ def _nutrition(table, wk: Dict[str, Any], plan: Dict[str, Any], wm: Optional[Dic
         },
         "per_day": per,
         "days_logged": len(per),
-        "days_protein_at_or_over_floor": sum(1 for p in per if prot_t and (p["protein_g"] or 0) >= prot_t),
+        "days_protein_at_or_over_floor": sum(1 for p in per if prot_t and met_floor(p["protein_g"], prot_t)),
         "days_calories_at_or_under_target": sum(1 for p in per if kcal_t and (p["kcal"] or 1e9) <= kcal_t),
         "protein_mean_g": _mean([p["protein_g"] for p in per]),
         "calories_mean_kcal": _mean([p["kcal"] for p in per]),

@@ -55,7 +55,7 @@ from typing import Any
 from coach.critics import deterministic_verdict, reconcile
 from training import owner_redlines
 
-from health import deficit_disclosures
+from health import deficit_disclosures, protein_engine  # #5098: THE protein hit
 
 CRITICS_VERSION = "nutrition-critics@1.0.0"
 CRITIC_IDS = ("deficit_advocate", "muscle_defense", "adherence")
@@ -482,7 +482,7 @@ def build_muscle_defense_packet(inputs: dict[str, Any]) -> dict[str, Any]:
             unknown += ["protein_days_missed_7d", "protein_target_days_7d"]
         else:
             missed = owner_redlines.protein_days_missed(grams)[0] or 0  # #4161: THE count, shared with the rate gate
-            at_target = sum(1 for g in grams if g >= protein["target_g"])
+            at_target = sum(1 for g in grams if protein_engine.hit(g, protein["target_g"]))  # #5098: the one predicate, at the range high
             n["protein_days_missed_7d"] = missed
             n["protein_target_days_7d"] = at_target
             n["mean_protein_g_7d"] = _mean(grams)
@@ -815,7 +815,7 @@ def decisions_offered(
         logged14 = _logged(intake14)
         mean14 = _mean(logged14)
         grams7 = _logged(protein14[-7:])
-        prot_ok_days = sum(1 for g in grams7 if g >= protein["value"])
+        prot_ok_days = sum(1 for g in grams7 if protein_engine.hit(g))  # #5098: THE hit (the charter range low)
         lift_days = sum(1 for f in lifting14[-7:] if f)
         flat = loss < STALL_FLAT_LB_WK
         in_band = mean14 is not None and lo <= mean14 <= hi

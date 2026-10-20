@@ -6,13 +6,12 @@ import math
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-from common.constants import PLAN_DAILY_PROTEIN_MIN_G
 from health import (
     deficit_disclosures,  # #3754: BS-12 cutoff provenance + the ADR-104 sentence
+    protein_engine,  # #5098: THE protein hit, the charter range and the feedings
     tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
     training_output_channel,  # #3754: THE training-output input (daily training load, never Strava kJ)
 )
-from health.protein_floor import met_floor
 
 from mcp.core import (
     get_profile,
@@ -527,7 +526,7 @@ def _get_nutrition_summary(args):
     # Matthew-specific targets: 2400 kcal deficit; protein is the plan's floor (common.constants, #4540)
     TARGETS = {
         "calories_kcal": 2400,
-        "protein_g": PLAN_DAILY_PROTEIN_MIN_G,
+        "protein_g": protein_engine.range_low(),
         "fiber_g": _FIBER_TARGET_G,
         "fiber_per_1000kcal": 14,  # Board rec 1A (Norton): minimum fiber density
         "sodium_mg": 2300,
@@ -595,7 +594,7 @@ def _get_macro_targets(args):
     if budget and not refused:
         calorie_target = budget["target"]
     calorie_target = None if refused else (calorie_target or _DEFAULT_CALORIE_TARGET)
-    protein_target = protein_target or PLAN_DAILY_PROTEIN_MIN_G  # the plan's floor (#4540)
+    protein_target = protein_target or protein_engine.range_low()  # the charter range low = the plan's floor (#4540, #5098)
 
     def measured(item, field):
         """The day's rollup for `field`, or None when the day carries none.
@@ -624,7 +623,8 @@ def _get_macro_targets(args):
         carbs = measured(item, "total_carbs_g")
 
         hit_cal = (0.85 <= cal / calorie_target <= 1.10) if (cal is not None and calorie_target) else None
-        hit_prot = met_floor(prot, protein_target)  # #5003: strictly at/above the floor - the tripwire's definition
+        prot_day = protein_engine.evaluate_day(item, floor=protein_target)  # #5098: THE hit (strict, #5003) + the feedings
+        hit_prot = prot_day["hit"]
         hit_fiber = (fiber >= _FIBER_TARGET_G) if fiber is not None else None
         for axis, hit in (("calorie", hit_cal), ("protein", hit_prot), ("fiber", hit_fiber)):
             if hit is not None:
@@ -643,6 +643,8 @@ def _get_macro_targets(args):
                 "fiber_g": round(fiber, 1) if fiber is not None else None,
                 "hit_calorie_target": hit_cal,
                 "hit_protein_target": hit_prot,
+                "protein_feedings_40g": prot_day["feedings_40g"],  # None = no timed food-log rows (unknown, never 0)
+                "protein_first_feeding_behind": prot_day["first_feeding_behind"],
                 "hit_fiber_target": hit_fiber,
             }
         )

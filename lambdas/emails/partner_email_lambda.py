@@ -49,6 +49,7 @@ from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from health.protein_floor import met_floor  # #5098: THE protein hit predicate (strict, #5003)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -258,7 +259,7 @@ def gather_all():
     cal_target = PLAN_DAILY_CALORIES_TARGET
     prot_target = PLAN_DAILY_PROTEIN_MIN_G
     cal_hit_rate = round(sum(1 for c in cals if c <= cal_target * 1.1) / len(cals) * 100) if cals else None
-    prot_hit_rate = round(sum(1 for p in prots if p >= prot_target) / len(prots) * 100) if prots else None
+    prot_hit_rate = round(sum(1 for p in prots if met_floor(p, prot_target)) / len(prots) * 100) if prots else None
     days_logged = len(raw["macrofactor"])
 
     # ── Training ──

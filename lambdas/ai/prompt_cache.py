@@ -267,6 +267,8 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
     # gate's golden cases (tests/fixtures/panel_golden_5072/). prefix_tokens is NOT a Sonnet wire count:
     # it is estimate_tokens on charter v1.5.0 (8,442) scaled by the measured Haiku wire/estimate ratio
     # (7,738 / 7,638) — the 4.x family shares a tokenizer; re-measure from the first run's usage block.
+    # #5098 re-scaled both judge entries the same way after charter v1.9.0 (the nutrition.protein block + its reading
+    # guide): estimate_tokens 12,203 x (7,738 / 7,638) = 12,363.
     "charter-judge": {
         "engaged": True,
         "route": "charter.judge",
@@ -274,15 +276,15 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_JUDGE_MODEL",
         "cdk_stack": None,
         "measured_on": "sonnet-4-6",
-        "prefix_tokens": 8550,
+        "prefix_tokens": 12363,
         "calls_within_ttl": 5,
         "decided": "2026-10-19",
         "issue": 5072,
         "why": (
-            "~8,550 tok (charter v1.5.0, estimate scaled to the Haiku wire ratio) against Sonnet 4.6's 1,024 floor. "
+            "~12,363 tok (charter v1.9.0, estimate scaled to the Haiku wire ratio) against Sonnet 4.6's 1,024 floor. "
             "One weekly run = the real plan + 4 negative controls, back-to-back inside one 5m TTL: one write at 1.25x "
-            "then four reads at 0.1x. ~4,500 tok volatile in (rubric + blinded plan) / ~700 out per plan: ~$0.15 a run "
-            "cached vs ~$0.27 uncached (-44%)."
+            "then four reads at 0.1x. ~4,500 tok volatile in (rubric + blinded plan) / ~700 out per plan: ~$0.18 a run "
+            "cached vs ~$0.31 uncached (-42%)."
         ),
     },
     "charter-judge-gate": {
@@ -292,13 +294,13 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_JUDGE_GATE_MODEL",
         "cdk_stack": None,
         "measured_on": "sonnet-4-6",
-        "prefix_tokens": 8550,
+        "prefix_tokens": 12363,
         "calls_within_ttl": 5,
         "decided": "2026-10-19",
         "issue": 5072,
         "why": (
             "The CI regression gate's copy of the judge (scripts/panel_rubric_gate.py --live): one call per golden "
-            "case (5), back-to-back in one run. Same block, same floor, same arithmetic as charter-judge: ~$0.15 a run."
+            "case (5), back-to-back in one run. Same block, same floor, same arithmetic as charter-judge: ~$0.18 a run."
         ),
     },
     "charter-narrative": {

@@ -166,6 +166,7 @@ from common.constants import (
     PLAN_DAILY_PROTEIN_MIN_G,  # #4540: the plan's targets
 )
 from health.pillar_absence import absence_gate_map, nutrition_absence_facts  # #2756
+from health.protein_floor import met_floor  # #5098: THE protein hit predicate (strict, #5003)
 
 from intelligence import labelled_facts as _lf  # #4580 B-01/A-X1: labelled-fact + reader-surface findings
 
@@ -340,7 +341,7 @@ def gather_data_for_expert(expert_key):
         # #4540: the plan's floor (generated from the plan root), the same figure scoring_engine
         # and canonical_facts carry — not the profile row, not a stored copy of it.
         protein_target = PLAN_DAILY_PROTEIN_MIN_G
-        adherence = round(sum(1 for v in pro_vals if v >= protein_target) / len(pro_vals) * 100) if pro_vals else None
+        adherence = round(sum(1 for v in pro_vals if met_floor(v, protein_target)) / len(pro_vals) * 100) if pro_vals else None
         zero_cal_days = sum(1 for i in items if i.get("total_calories_kcal") is not None and float(i.get("total_calories_kcal", 0)) == 0)
         # #914 anti-dilution: recency alongside the whole-window averages.
         _f_since, _f_14 = _recency_stats(_item_dates(items), today)

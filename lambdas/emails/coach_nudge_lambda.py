@@ -491,12 +491,13 @@ def _mark_ledger_failed(date_pt: str, nudge_item: dict, error: Exception) -> Non
         logger.error("[nudge] could not stamp ledger DAY#%s as failed: %s", date_pt, e)
 
 
-def _send_steps_email(text: str, dry_run: bool = False) -> None:
-    """#5056: the owner-only steps note — plain, no coach persona (it is deterministic, no model)."""
+def _send_steps_email(text: str, dry_run: bool = False, subject: str = "Steps today", label: str = "Steps note") -> None:
+    """#5056: the owner-only steps note — plain, no coach persona (it is deterministic, no model). #5098: the protein
+    breakfast note reuses it with its own subject and label."""
     html = (
         "<div style='font-family:Georgia,serif;max-width:540px;margin:0 auto;padding:24px;color:#1a1a1a'>"
         f"<p style='font-size:16px;line-height:1.6'>{text}</p>"
-        "<p style='font-size:12px;color:#999;margin-top:16px'>Steps note · deterministic · once a day at most · "
+        f"<p style='font-size:12px;color:#999;margin-top:16px'>{label} · deterministic · once a day at most · "
         "fine to ignore.</p></div>"
     )
     guarded_send_email(
@@ -504,7 +505,7 @@ def _send_steps_email(text: str, dry_run: bool = False) -> None:
         dry_run,
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [RECIPIENT]},
-        Content={"Simple": {"Subject": {"Data": "Steps today", "Charset": "UTF-8"}, "Body": {"Html": {"Data": html, "Charset": "UTF-8"}}}},
+        Content={"Simple": {"Subject": {"Data": subject, "Charset": "UTF-8"}, "Body": {"Html": {"Data": html, "Charset": "UTF-8"}}}},
     )
 
 
@@ -521,11 +522,27 @@ def _steps_pass(now_utc: datetime, dry_run: bool) -> dict:
         return {"send": False, "reason": f"error:{type(e).__name__}"}
 
 
+def _protein_pass(now_utc: datetime, dry_run: bool) -> dict:
+    """#5098: the protein breakfast nudge — an independent pass on this hourly tick (own ledger row; fail-soft)."""
+    try:
+        from emails import protein_nudge_runner
+
+        def send(text: str) -> None:
+            _send_steps_email(text, dry_run, subject="Protein this morning", label="Protein note")
+
+        return protein_nudge_runner.run(_table(), send, now_utc, budget_guard.current_tier(), user=USER_ID, dry_run=dry_run)
+    except Exception as e:  # noqa: BLE001 — never let the protein pass break the coach nudge tick
+        logger.error("[protein-nudge] pass failed: %s", e)
+        return {"send": False, "reason": f"error:{type(e).__name__}"}
+
+
 def lambda_handler(event: dict, context) -> dict:
     try:
         steps = _steps_pass(datetime.now(timezone.utc), is_dry_run(event))
+        protein = _protein_pass(datetime.now(timezone.utc), is_dry_run(event))
         out = _coach_nudge(event, context)
         out["steps_nudge"] = steps
+        out["protein_nudge"] = protein
         return out
     except Exception as e:
         logger.error("[nudge] handler failed: %s", e)

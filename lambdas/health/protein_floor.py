@@ -5,8 +5,11 @@ Two callers answered this question two ways: the MCP `get_nutrition view=macros`
 `protein_floor_missed` tripwire (`training.redline_rate.protein_days_missed`) counted `g < floor`.
 Both now call `met_floor`.
 
-The floor itself is `common.constants.PLAN_DAILY_PROTEIN_MIN_G` (provenance: owner, ruling
-2026-10-11 #4540 - ADR-105); `owner_redlines.REDLINES["protein_floor_g"]` re-exports that same value.
+The floor itself is the charter's `nutrition.protein.range_g.low` (#5098), read by
+`health.protein_engine.hit` — the engine every hit-decider calls; this predicate is what it
+applies. The plan constant `common.constants.PLAN_DAILY_PROTEIN_MIN_G` (provenance: owner,
+ruling 2026-10-11 #4540 - ADR-105) is held equal to it by tests/test_protein_engine_5098.py,
+so a published surface that passes the constant here grades the same day the same way.
 
 TOLERANCE: `tolerance_g` defaults to 0 and NO caller sets it. Whether any shortfall below the floor
 should count as a hit is the owner's ruling (#5003, gate:owner) - his word is a one-line change at

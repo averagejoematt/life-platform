@@ -159,7 +159,7 @@ class TestScoreNutrition:
         # against; `_NUTRITION_PROFILE`'s own target fields are deliberately still present
         # (and deliberately ignored — see the last test).
         monkeypatch.setattr(se, "PLAN_DAILY_CALORIES_TARGET", 2000)
-        monkeypatch.setattr(se, "PLAN_DAILY_PROTEIN_MIN_G", 170)
+        monkeypatch.setattr(se.protein_engine, "range_low", lambda: 170)  # #5098: the floor is the charter range low
 
     def test_no_nutrition_record_drops_the_component(self):
         assert se.score_nutrition({}, _NUTRITION_PROFILE) == (None, {})

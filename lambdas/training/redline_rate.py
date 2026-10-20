@@ -46,11 +46,10 @@ def protein_days_missed(grams_by_day: list[Any] | None) -> tuple[int | None, int
 
     THE count (#4161): an unlogged day is unmeasured, never missed. `mcp.tools_plan._protein_days_7d`
     and `health.nutrition_critics` both read it, so the gate and the critics count one way."""
-    floor = float(_redlines()["protein_floor_g"]["value"])
-    from health.protein_floor import met_floor  # #5003: the one definition, shared with get_nutrition view=macros
+    from health.protein_engine import hit  # #5098: THE hit (the charter's range low, strict) — shared with get_nutrition view=macros
 
     grams = [float(g) for g in (grams_by_day or []) if g is not None]
-    return (sum(1 for g in grams if not met_floor(g, floor)) if grams else None), len(grams)
+    return (sum(1 for g in grams if not hit(g)) if grams else None), len(grams)
 
 
 def protein_window(target_date: str, today: str) -> dict[str, str]:
