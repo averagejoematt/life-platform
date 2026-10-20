@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from health import (
     calorie_target as calorie_resolver,  # #5095: the ONE calorie target
     deficit_disclosures,  # #3754: BS-12 cutoff provenance + the ADR-104 sentence
+    macro_floors,
     protein_engine,  # #5098: THE protein hit, the charter range and the feedings
     tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
     training_output_channel,  # #3754: THE training-output input (daily training load, never Strava kJ)
@@ -268,7 +269,6 @@ def expenditure_reconciliation(end_date, model_measured_kcal=None, read=None):
 
 # RDA: NIH DRI for adult males 31-50. "optimal": longevity targets per Attia/Patrick (not official guidelines). "upper": NIH Tolerable Upper Intake Level.
 _LEUCINE_MPS_THRESHOLD = 2.5  # g leucine per meal to trigger MPS (Phillips / Attia)
-_FIBER_TARGET_G = 30
 
 
 def _avg_sleep_onset_hour(start_date, end_date):
@@ -556,7 +556,7 @@ def _get_nutrition_summary(args):
     TARGETS = {
         "calories_kcal": 2400,
         "protein_g": protein_engine.range_low(),
-        "fiber_g": _FIBER_TARGET_G,
+        "fiber_g": macro_floors.floor_g("fibre"),  # #5102: the charter floor, not a second 30 g literal
         "fiber_per_1000kcal": 14,  # Board rec 1A (Norton): minimum fiber density
         "sodium_mg": 2300,
         "omega3_total_g": 2.0,
@@ -652,7 +652,8 @@ def _get_macro_targets(args):
         hit_cal = (0.85 <= cal / calorie_target <= 1.10) if (cal is not None and calorie_target) else None
         prot_day = protein_engine.evaluate_day(item, floor=protein_target)  # #5098: THE hit (strict, #5003) + the feedings
         hit_prot = prot_day["hit"]
-        hit_fiber = (fiber >= _FIBER_TARGET_G) if fiber is not None else None
+        floors_day = macro_floors.evaluate_day(item)
+        hit_fiber = floors_day["fibre"]["met"]  # ONE fibre hit: the charter floor (#5102)
         for axis, hit in (("calorie", hit_cal), ("protein", hit_prot), ("fiber", hit_fiber)):
             if hit is not None:
                 measured_days[axis] += 1
@@ -673,6 +674,7 @@ def _get_macro_targets(args):
                 "protein_feedings_40g": prot_day["feedings_40g"],  # None = no timed food-log rows (unknown, never 0)
                 "protein_first_feeding_behind": prot_day["first_feeding_behind"],
                 "hit_fiber_target": hit_fiber,
+                "floors": floors_day,  # #5102: fat / carb / fibre floor, value + floor + met + unknown
             }
         )
 
@@ -691,7 +693,8 @@ def _get_macro_targets(args):
         "targets": {
             "calories_kcal": calorie_target,
             "protein_g": protein_target,
-            "fiber_g": _FIBER_TARGET_G,
+            "fiber_g": macro_floors.floor_g("fibre"),  # #5102: the charter floor, not a second 30 g literal
+            "macro_floors_g": {m: macro_floors.floor_g(m) for m in macro_floors.MACROS},  # #5102: the charter's floors
             # ADR-105: the target ships with its source and provenance (#5095: the ONE resolver).
             "calorie_target_detail": None if args.get("calorie_target") else resolved,
             "calorie_target_method": "health.calorie_target.resolve",

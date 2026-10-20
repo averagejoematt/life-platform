@@ -82,6 +82,15 @@ def macrofactor_series(rows: list[dict[str, Any]] | None, keys: list[str]) -> tu
     return intake, protein
 
 
+def macro_floor_series(rows: list[dict[str, Any]] | None, keys: list[str]) -> dict[str, list[float | None] | None]:
+    """(#5102) fat / carbohydrate / fibre g by day over `keys`; None per unlogged day; None series when unreadable."""
+    fields = (("fat_g_by_day", "total_fat_g"), ("carb_g_by_day", "total_carbs_g"), ("fiber_g_by_day", "total_fiber_g"))
+    if rows is None:
+        return {k: None for k, _ in fields}
+    by_day = {str(r.get("date") or str(r.get("sk") or "").replace("DATE#", ""))[:10]: r for r in rows}
+    return {k: [_num((by_day.get(d) or {}).get(f)) for d in keys] for k, f in fields}
+
+
 def lifting_day_flags(workouts: list[dict[str, Any]] | None, keys: list[str]) -> list[bool] | None:
     """True on a day with at least one Hevy exercise that is NOT a cardio modality and carries
     a set — the same modality lexicon `training.walking_volume` uses, so a treadmill-only
@@ -231,6 +240,7 @@ def resolve(
         "window_end": end_date,
         "intake_kcal_by_day": intake,
         "protein_g_by_day": protein,
+        **macro_floor_series(mf, keys),
         "lifting_day_flags": lifting_day_flags(hevy, keys),
         **trend,
         "weeks_since_genesis": ((dn - 1) // 7) if dn else 0,

@@ -24,7 +24,7 @@ from common.habit_pause import is_paused_on  # #5007: a paused habit is not sche
 from training.owner_redlines import REDLINES  # ADR-163: the walking floor the movement target defaults from
 from training.walking_volume import WALKING_VOLUME_VERSION, walking_minutes_for_day  # ADR-163: the ONE walking definition
 
-from health import protein_engine  # #5098: THE protein hit and the charter's range low
+from health import macro_floors, protein_engine  # #5098: THE protein hit and the charter's range low
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 from health.habit_identity import day_name_for  # #4632: id first, then names, then ingest-derived aliases
 
@@ -171,13 +171,13 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
         parts.append(prot_score * 0.40)
         weights.append(0.40)
         details["protein_score"] = prot_score
-    fat_target = profile.get("fat_target_g", 60)
-    carb_target = profile.get("carb_target_g", 125)
-    if fat is not None and carbs is not None:
-        fat_diff = abs(fat - fat_target) / fat_target if fat_target else 0
-        carb_diff = abs(carbs - carb_target) / carb_target if carb_target else 0
-        # 50x multiplier: 100% off target on both macros = score 0
-        macro_score = clamp(round(100 - (fat_diff + carb_diff) * 50))
+    # #5102: the 0.20 macro slot grades the charter's fat, carbohydrate and fibre FLOORS (health.macro_floors), one-sided:
+    # met = 100, below = 80 * value / floor; a missing field is unknown and drops out of the slot's mean, never a miss.
+    floors = macro_floors.evaluate_day(mf)
+    macro_score = macro_floors.score(floors)
+    details["macro_floors"] = floors
+    if macro_score is not None:
+        macro_score = clamp(macro_score)
         parts.append(macro_score * 0.20)
         weights.append(0.20)
         details["macro_score"] = macro_score
