@@ -135,8 +135,8 @@ def _apply_day_type(
     if base is None:
         return
     uplift = _num(cfg.get("lifting_uplift_kcal")) or 0.0
-    n_lift = (list(week_types).count("lifting") if week_types else None) or _num(read("split.lifting_days_per_wk")) or 0
-    n_rest = list(week_types).count("rest") if week_types else 7 - n_lift
+    n_lift = list(week_types).count("lifting") if week_types is not None else (_num(read("split.lifting_days_per_wk")) or 0)
+    n_rest = list(week_types).count("rest") if week_types is not None else 7 - n_lift
     delta = 0.0
     if dt == "lifting":
         delta = uplift

@@ -62,6 +62,14 @@ def test_a_travel_week_still_balances_around_its_base_days():
     assert abs(sum(kcal) - 7 * base) <= 2
 
 
+def test_a_week_with_no_lifting_days_averages_the_base():
+    # a count of 0 is a real count, never "fall back to the charter's lifting days"
+    types = ["travel"] * 5 + ["rest", "rest"]
+    kcal = [_res(MON, t, week_day_types=types)["kcal"] for t in types]
+    base = ct.resolve(MON)["kcal"]
+    assert kcal == [base] * 7, kcal
+
+
 def test_split_holds_protein_and_fat_and_moves_carbohydrate():
     lift, rest, unk = _res(MON, "lifting"), _res(MON, "rest"), ct.resolve(MON)
     for r in (lift, rest, unk):
