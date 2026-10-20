@@ -171,6 +171,11 @@ def _block_section(block: Optional[dict[str, Any]]) -> dict[str, Any]:
 _TRACKER_ENVELOPE_STATES = frozenset({"measured", "stale", "absent", "read_failed"})
 
 
+def _tracker_steps(row: dict) -> str:
+    st = row.get("steps") or {}  # steps-truth: the May tracker row's steps, resolved by training.steps_resolver when written
+    return f"{st.get('value')} ({st.get('state')})"
+
+
 def _tracker_section(tracker: Any) -> dict[str, Any]:
     """`tracker` is `may_tracker.latest_completed_row`'s `{state, row}` envelope (#5200), a bare week row, or None
     (the caller read none). A stored week is supplied (`measured`, or `stale` with the gap said); no stored week is
@@ -209,7 +214,7 @@ def _tracker_rows(tr: dict[str, Any]) -> list[tuple[str, Any]]:
             "rate",
             f"{rate.get('value')} lb/wk ({rate.get('pct_bodyweight_per_wk')}% of bodyweight); band position {w.get('band_position_week')}",
         ),
-        ("steps", f"{(row.get('steps') or {}).get('value')} ({(row.get('steps') or {}).get('state')})"),
+        ("steps", _tracker_steps(row)),
         ("status", trig.get("status")),
     ]
     out += [(f"trigger {t.get('id')} ({t.get('level')})", f"{t.get('condition')} -> {t.get('lever')}") for t in trig.get("fired") or []]
