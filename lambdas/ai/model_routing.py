@@ -92,6 +92,7 @@ FEATURE_TIERS: dict[str, str] = {
     "eyeball_estimate": VISION,
     "horizons_retrospective": NARRATIVE,  # #4769 restores its Sonnet call
     "journal_enrichment": WORKHORSE,
+    "nutrition_critics": WORKHORSE,  # #5114: one narrative per nutrition critic, structured JSON
     "plan_critics": WORKHORSE,
     "reader_truth_qa": WORKHORSE,
     "semantic_recall": EMBED,
@@ -159,6 +160,7 @@ ROUTES: dict[str, Route] = {
     "horizons_retrospective": Route(feature="horizons_retrospective"),
     "broadcast_sensitivity": Route(feature="broadcast_sensitivity"),
     "journal_enrichment": Route(feature="journal_enrichment", env="MODEL"),
+    "nutrition.critics": Route(feature="nutrition_critics", env="AI_MODEL_HAIKU"),  # #5114: health/nutrition_critics_ai.py
     "plan_critics": Route(feature="plan_critics"),
     "reader_truth_qa": Route(feature="reader_truth_qa", env="READER_TRUTH_MODEL"),
     "semantic_recall.embed": Route(feature="semantic_recall", env="TITAN_EMBED_MODEL_ID"),

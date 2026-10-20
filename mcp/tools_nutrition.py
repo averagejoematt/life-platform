@@ -1041,16 +1041,20 @@ def tool_get_deficit_sustainability(args):
         # surface for HIM to log — this tool never writes one. Resolved by the MCP layer
         # (`mcp/nutrition_critics_inputs.py`) from the same window plus the trailing-14-day
         # Withings trend; a reader that fails is named in `critics.unknown`, never a crash.
-        **_nutrition_critics_block(end_date, severity, degraded_count, tdee_estimate if _deficit_published else None),
+        **_nutrition_critics_block(end_date, severity, degraded_count, tdee_estimate if _deficit_published else None, args),
     }
 
 
-def _nutrition_critics_block(end_date, severity, degraded_count, maintenance_kcal):
-    """`{"critics": ..., "decisions_offered": [...]}` for the deficit view (#3754 boxes 3+4)."""
+def _nutrition_critics_block(end_date, severity, degraded_count, maintenance_kcal, args=None):
+    """`{"critics": ..., "decisions_offered": [...]}` for the deficit view (#3754 boxes 3+4). The critics'
+    narrative layer (#5114) runs on the owner's own call; an internal reader of this tool passes
+    `critics_model: False` and gets the deterministic block alone."""
     from mcp import nutrition_critics_inputs
 
+    model = args is not None and args.get("critics_model", True) is not False
+
     block = nutrition_critics_inputs.block(
-        end_date, deficit_severity=severity, degraded_count=degraded_count, estimated_maintenance_kcal=maintenance_kcal
+        end_date, model=model, deficit_severity=severity, degraded_count=degraded_count, estimated_maintenance_kcal=maintenance_kcal
     )
     return {"critics": block, "decisions_offered": block.get("decisions_offered", [])}
 

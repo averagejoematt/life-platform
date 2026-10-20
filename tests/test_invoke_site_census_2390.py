@@ -167,6 +167,14 @@ EXEMPTIONS: dict[str, dict[str, str]] = {
         "so the model cannot introduce a number. The only free text is a single <=200-char sentence that lands in Matthew's own Hevy routine "
         "notes and the training coach thread (owner-only surfaces, never rendered publicly).",
     ),
+    "mcp/nutrition_critics_inputs.py": _ex(
+        OWNER_CHAT_MCP,
+        "#5114: the nutrition critics' narrator (health.nutrition_critics_ai) — one JSON reply per critic {narrative, agrees, "
+        "dissent}; the verdict is the deterministic layer's and the model writes only the verdict's `model` record. A "
+        "narrative citing any number outside the verdict + packet is WITHHELD (grounded_generation.fabricated_numbers, exact "
+        "tolerance), so the model cannot introduce a number. It lands in get_deficit_sustainability's `critics` block, an "
+        "MCP-only owner surface; no /api/ route, site page or email reads it (#3754's owner-only import sweep holds the block).",
+    ),
     "lambdas/intelligence/intelligence_common.py": _ex(
         OWNER_CHAT_MCP,
         # THE ISSUE'S PREMISE CORRECTION — see test_extract_thread_is_guard_wrapped below.

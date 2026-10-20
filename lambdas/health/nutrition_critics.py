@@ -25,8 +25,10 @@ ONE VERDICT RULE IN THE CODEBASE
 `coach.critics.deterministic_verdict` and `coach.critics.reconcile` are imported and
 reused, never copied. `coach.critics.run_critics` is NOT reused: it iterates the training
 `CRITIC_IDS` by name, so this module runs the same two functions over its own ids. v1 is
-deterministic only (ADR-105: computation before any LLM verdict) — every verdict records
-`model = {"paused": MODEL_PAUSED_REASON}`; a critic that did not run a model says so.
+deterministic (ADR-105: computation before any LLM verdict) — every verdict records
+`model = {"paused": MODEL_PAUSED_REASON}`; a critic that did not run a model says so. The
+model layer is a SEPARATE step, `health.nutrition_critics_ai` (#5114): it narrates these
+verdicts under the `nutrition_critics` budget feature and may never move one.
 
 WHERE EVERY THRESHOLD COMES FROM
 
@@ -64,7 +66,7 @@ from health import (
 
 CRITICS_VERSION = "nutrition-critics@1.0.0"
 CRITIC_IDS = ("deficit_advocate", "muscle_defense", "adherence")
-MODEL_PAUSED_REASON = "not wired for nutrition (v1)"
+MODEL_PAUSED_REASON = "model layer not requested on this surface (#5114: it narrates on get_deficit_sustainability)"
 DECISION_SOURCE = "nutrition_critics"
 DECISION_PILLARS = ["nutrition"]
 
@@ -743,8 +745,8 @@ def build_packets(inputs: dict[str, Any]) -> dict[str, dict[str, Any]]:
 # ── verdicts ───────────────────────────────────────────────────────────────────────────
 def run(inputs: dict[str, Any], *, model_allowed: bool = False) -> dict[str, Any]:
     """Three verdicts over three packets, through `coach.critics`' deterministic layer and
-    `reconcile` (the ONE verdict rule). v1 never runs a model: `model_allowed` is accepted
-    for shape parity and refused — a critic that did not run a model says so."""
+    `reconcile` (the ONE verdict rule). This never runs a model: `model_allowed` is accepted
+    for shape parity and refused — the narrative is `health.nutrition_critics_ai.apply` (#5114)."""
     inputs = inputs or {}
     packets = build_packets(inputs)
     verdicts: list[dict[str, Any]] = []

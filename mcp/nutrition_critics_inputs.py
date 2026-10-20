@@ -261,9 +261,25 @@ def resolve(
     return {"inputs": inputs, "unresolved": unresolved}
 
 
-def block(end_date: str, **kw: Any) -> dict[str, Any]:
+def model_layer(out: dict[str, Any], inputs: dict[str, Any], *, guard: Any = None, invoke: Callable | None = None) -> None:
+    """#5114: the critics' narrative, under the `nutrition_critics` budget feature (band 1). Reads the tier,
+    never moves it; the chokepoint is `bedrock_client.invoke` (ADR-062) unless a test hands one in. Never
+    raises — a failure here leaves the deterministic block exactly as it was and says why."""
+    from health import nutrition_critics_ai
+
+    try:
+        state = nutrition_critics_ai.gate(guard)
+        if state["allowed"] and invoke is None:
+            from ai.bedrock_client import invoke
+        nutrition_critics_ai.apply(out, nutrition_critics.build_packets(inputs), invoke=invoke, gate_state=state)
+    except Exception as e:  # noqa: BLE001
+        out["model_layer"] = {"state": "error", "error": f"{type(e).__name__}: {e}"[:200]}
+
+
+def block(end_date: str, *, model: bool = False, **kw: Any) -> dict[str, Any]:
     """The owner-facing block both surfaces embed: verdicts + decisions_offered + what could
-    not be read. Never raises — a resolver failure is reported in the block."""
+    not be read. Never raises — a resolver failure is reported in the block. `model=True` adds
+    the narrative layer (#5114); the verdicts and the decisions are identical either way."""
     try:
         resolved = resolve(end_date, **kw)
         logged = already_logged()
@@ -272,6 +288,8 @@ def block(end_date: str, **kw: Any) -> dict[str, Any]:
         out["inputs_unresolved"] = resolved["unresolved"]
         if logged is None:
             out["inputs_unresolved"]["decisions"] = "get_decisions could not be read — dedup against prior decisions did not run"
+        if model:
+            model_layer(out, resolved["inputs"])
         return out
     except Exception as e:  # noqa: BLE001 — the surface still ships; the block says why it is empty
         return {
