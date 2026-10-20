@@ -20,11 +20,11 @@ import logging
 from datetime import datetime
 from typing import Any, Iterable, Optional, Union
 
-from common.constants import PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's floor, never the profile row
 from common.habit_pause import is_paused_on  # #5007: a paused habit is not scheduled
 from training.owner_redlines import REDLINES  # ADR-163: the walking floor the movement target defaults from
 from training.walking_volume import WALKING_VOLUME_VERSION, walking_minutes_for_day  # ADR-163: the ONE walking definition
 
+from health import protein_engine  # #5098: THE protein hit and the charter's range low
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 from health.habit_identity import day_name_for  # #4632: id first, then names, then ingest-derived aliases
 
@@ -134,7 +134,8 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
     cal_target = target_kcal(data.get("date"))
     # #4540: the plan states ONE protein line, a floor. The profile row's separate 190 g
     # "target" was never the plan; a day at or over the floor has met it.
-    protein_target = protein_floor = PLAN_DAILY_PROTEIN_MIN_G
+    # #5098: the floor is the charter's protein range low and the hit is the protein engine's — one definition.
+    protein_target = protein_floor = protein_engine.range_low()
     cal_tolerance = profile.get("calorie_tolerance_pct", 10) / 100
     cal_penalty = profile.get("calorie_penalty_threshold_pct", 25) / 100
     details = {
@@ -162,7 +163,7 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
         weights.append(0.40)
         details["cal_score"] = cal_score
     if protein is not None:
-        if protein >= protein_floor:
+        if protein_engine.hit(protein, protein_floor):
             prot_score = 100
         else:
             prot_score = max(0, 80 * protein / protein_floor)

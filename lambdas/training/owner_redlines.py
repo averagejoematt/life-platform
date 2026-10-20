@@ -226,10 +226,10 @@ REDLINES: dict[str, dict[str, Any]] = {
     },
     "protein_floor_g": {
         "value": _PLAN_PROTEIN_FLOOR_G,
-        "target_g": 200,
-        "days_of_7": 6,
-        "feedings": 4,
-        "feeding_g": [45, 55],
+        "target_g": int(_charter_value("nutrition.protein.range_g.high") or 0),  # #5098: the charter's protein block
+        "days_of_7": int(_charter_value("nutrition.protein.days_of_7") or 0),
+        "feedings": int(_charter_value("nutrition.protein.feedings_per_day") or 0),
+        "feeding_g": list(_charter_value("nutrition.protein.feeding_target_g") or []),
         "g_per_kg_dxa_lean": {"target": 2.6, "floor": 2.3, "lean_kg": 77.4, "lean_source": "DXA 2026-03-30 (170.6 lb lean)"},
         "timing": "one feeding ≥ 40 g within 2 h of lifting; one pre-sleep",
         "provenance": "owner",

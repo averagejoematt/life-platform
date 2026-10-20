@@ -165,7 +165,7 @@ from common.constants import (
     EXPERIMENT_START_DATE as EXPERIMENT_START,  # ADR-058
     PLAN_DAILY_PROTEIN_MIN_G,  # #4540: the plan's targets
 )
-from health.calorie_target import target_kcal  # #5095: the ONE calorie target
+from health import calorie_target, protein_floor as _pf  # #5095: the ONE calorie target; #5098: THE protein hit (strict, #5003)
 from health.pillar_absence import absence_gate_map, nutrition_absence_facts  # #2756
 
 from intelligence import labelled_facts as _lf  # #4580 B-01/A-X1: labelled-fact + reader-surface findings
@@ -341,7 +341,7 @@ def gather_data_for_expert(expert_key):
         # #4540: the plan's floor (generated from the plan root), the same figure scoring_engine
         # and canonical_facts carry — not the profile row, not a stored copy of it.
         protein_target = PLAN_DAILY_PROTEIN_MIN_G
-        adherence = round(sum(1 for v in pro_vals if v >= protein_target) / len(pro_vals) * 100) if pro_vals else None
+        adherence = round(sum(1 for v in pro_vals if _pf.met_floor(v, protein_target)) / len(pro_vals) * 100) if pro_vals else None
         zero_cal_days = sum(1 for i in items if i.get("total_calories_kcal") is not None and float(i.get("total_calories_kcal", 0)) == 0)
         # #914 anti-dilution: recency alongside the whole-window averages.
         _f_since, _f_14 = _recency_stats(_item_dates(items), today)
@@ -895,7 +895,7 @@ def _build_shared_system_prompt():
                     val = val.get(k) if isinstance(val, dict) else None
                     if val is None:
                         break
-                val = target_kcal() if path == "nutrition.daily_calories_target" else val  # #5095: the ONE calorie target
+                val = calorie_target.target_kcal() if path == "nutrition.daily_calories_target" else val  # #5095: the ONE calorie target
                 target_lines.append(f"  - {label}: {val if val is not None else 'not set'}")
             parts.append("TARGETS:\n" + "\n".join(target_lines))
 

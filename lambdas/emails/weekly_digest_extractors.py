@@ -29,6 +29,7 @@ from common.digest_utils import (
 from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
+from health.protein_floor import met_floor  # #5098: THE protein hit predicate (strict, #5003)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PURE CELL FORMATTERS — summary dict → the HTML fragment a table cell carries.
@@ -273,7 +274,7 @@ def ex_macrofactor(recs_dict, profile):
         "carbs_avg_g": avg(carbs),
         "fiber_avg_g": avg(fibers),
         "days_logged": len(recs),
-        "protein_hit_rate": round(sum(1 for p in prots if p >= prot_target) / len(prots) * 100) if prots else None,
+        "protein_hit_rate": round(sum(1 for p in prots if met_floor(p, prot_target)) / len(prots) * 100) if prots else None,
         "calorie_hit_rate": round(sum(1 for c in cals if c <= cal_target * 1.10) / len(cals) * 100) if (cals and cal_target) else None,
         # ADR-105 (#2221): each hit rate's own denominator, so the renderer can state it.
         # NOT re-based on the 7-day week: an unlogged day is absence, and dividing by the

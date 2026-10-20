@@ -1700,7 +1700,8 @@ def test_macros_and_the_protein_tripwire_count_the_same_week_the_same_way(monkey
 
 def test_a_lenient_macros_comparison_is_caught_by_the_agreement_test(monkeypatch):
     """Mutation control: restore the old `>= floor * 0.95` and the view marks 166 g a hit -> disagrees with the tripwire."""
-    monkeypatch.setattr(tn, "met_floor", lambda g, floor, tolerance_g=0.0: None if g is None else g >= floor * 0.95)
+    # #5098: the macros view grades through the protein engine's one hit, so the mutation restores the tolerance THERE
+    monkeypatch.setattr(tn.protein_engine, "hit", lambda g, floor=None: None if g is None else g >= floor * 0.95)
     out = _macros_week(monkeypatch)
     hits = [d["date"] for d in out["daily_breakdown"] if d["hit_protein_target"]]
     assert hits == ["2026-10-11", "2026-10-13", "2026-10-16"]  # the 42.9 % the owner saw
