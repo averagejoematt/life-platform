@@ -46,9 +46,9 @@ THE DEFINITIONS (each stated once, here, and imported by every critic and tool)
               number is reported, and no critic argues a change from it.
 
   WEEKLY LOSS RATES (#4150, #5100 — what the overshoot rule counts)
-    weeks     the weekly checkpoints `end`, `end - 7`, ...; the RATE at each is the 14-day trend
-              ending there (`loss_rate_from_rows`, same estimator and water floor as the loss
-              rate — #5100: the redline says "14-day weight trend", not each week's own slope);
+    weeks     the weekly checkpoints `end`, `end - 7`, ...; the RATE at each is over `trend_days`
+              ending there: 7 by default (each week's own slope — the May tracker and its registered
+              prediction), 14 for the critics (#5100: the redline says "14-day weight trend");
               completeness and the weigh-in floor are judged on the checkpoint's 7-day week;
     counted   a week's rate is COUNTED (returned by `weekly_loss_rates_from_rows`, the list
               `rate_over_cap_consecutive_weeks` reads) only when the week is COMPLETE — all 7
@@ -324,6 +324,7 @@ def weekly_loss_rate_weeks_from_rows(
     *,
     weeks: int = 2,
     genesis: str | None = None,
+    trend_days: int = WEEK_DAYS,
 ) -> list[dict[str, Any]]:
     """PURE: every trailing 7-day week ending `end`, `end - 7`, ..., oldest -> newest, each
     with its rate, its evidence and whether it is COUNTED (#4150).
@@ -340,7 +341,9 @@ def weekly_loss_rate_weeks_from_rows(
         week_end = shift_day_key(end, -WEEK_DAYS * k)
         nominal_start = shift_day_key(week_end, -(WEEK_DAYS - 1))
         wk = loss_rate_from_rows(rows, week_end, window_days=WEEK_DAYS, genesis=genesis)  # the WEEK: completeness + weigh-in floor
-        r = loss_rate_from_rows(rows, week_end, genesis=genesis)  # the RATE: the 14-day trend at this checkpoint (#5100)
+        # the RATE: `trend_days` ending at this checkpoint — 7 (the week's own slope, the May tracker + its registered
+        # prediction) by default; the critics pass LOSS_RATE_WINDOW_DAYS (14) so the overshoot rule counts the trend (#5100)
+        r = wk if trend_days == WEEK_DAYS else loss_rate_from_rows(rows, week_end, window_days=trend_days, genesis=genesis)
         start = wk["window"]["start"]
         days_measured = max(0, _days(start, week_end) + 1) if start <= week_end else 0
         row: dict[str, Any] = {
@@ -377,12 +380,16 @@ def weekly_loss_rate_weeks_from_rows(
 
 
 def weekly_loss_rates_from_rows(
-    rows: list[dict[str, Any]] | None, end: str, *, weeks: int = 2, genesis: str | None = None
+    rows: list[dict[str, Any]] | None, end: str, *, weeks: int = 2, genesis: str | None = None, trend_days: int = WEEK_DAYS
 ) -> list[float] | None:
     """PURE: the COUNTED weekly rates, oldest -> newest — only complete 7-day post-water weeks
     with >= MIN_WEEKLY_WEIGHINS weigh-ins (#4150). A partial or thin week is dropped here and
     reported by `weekly_loss_rate_weeks_from_rows`. None when no week is counted."""
-    rates = [w["rate_lb_wk"] for w in weekly_loss_rate_weeks_from_rows(rows, end, weeks=weeks, genesis=genesis) if w["counted"]]
+    rates = [
+        w["rate_lb_wk"]
+        for w in weekly_loss_rate_weeks_from_rows(rows, end, weeks=weeks, genesis=genesis, trend_days=trend_days)
+        if w["counted"]
+    ]
     return rates or None
 
 

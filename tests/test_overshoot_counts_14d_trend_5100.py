@@ -39,8 +39,8 @@ def _series(drift, saw, n=24):
 
 
 def _packet(rows):
-    weeks = sq.weekly_loss_rate_weeks_from_rows(rows, END, genesis=GENESIS)
-    rates = sq.weekly_loss_rates_from_rows(rows, END, genesis=GENESIS)
+    weeks = sq.weekly_loss_rate_weeks_from_rows(rows, END, genesis=GENESIS, trend_days=14)
+    rates = sq.weekly_loss_rates_from_rows(rows, END, genesis=GENESIS, trend_days=14)
     inputs = {
         "weight_lb": SYN_WEIGHT,
         "weight_trend_lb_wk": -(sq.loss_rate_from_rows(rows, END, genesis=GENESIS)["rate_lb_wk"]),
@@ -65,7 +65,8 @@ def test_checkpoint_rates_are_the_14_day_trend_not_the_7_day_slope():
     slope7 = [sq.loss_rate_from_rows(rows, e, window_days=7, genesis=GENESIS)["rate_lb_wk"] for e in ("2026-10-06", END)]
     trend14 = [sq.loss_rate_from_rows(rows, e, genesis=GENESIS)["rate_lb_wk"] for e in ("2026-10-06", END)]
     assert rates == trend14 and all(s > t + 2 for s, t in zip(slope7, trend14)), (slope7, trend14)
-    assert all(w["counted"] and w["trend_window"]["days"] == 14 for w in weeks)
+    assert all(w["counted"] for w in weeks)
+    assert [w["trend_window"]["start"] for w in weeks] == ["2026-09-23", "2026-09-30"]  # the effective 14-day span, not a nominal copy
 
 
 def test_the_critic_quotes_the_14_day_checkpoint_trends_and_the_plan_side_agrees():
@@ -93,11 +94,26 @@ def test_negative_control_trend_under_cap_with_noisy_weekly_slopes_does_not_fire
     assert not [f for f in packets["deficit_advocate"]["flags"] if f["metric"] == "rate_over_cap_consecutive_weeks"]
 
 
+def test_default_is_the_7_day_slope_the_may_tracker_and_its_prediction_read():
+    rows = _series(0.4, 1.0)
+    (w,) = sq.weekly_loss_rate_weeks_from_rows(rows, END, weeks=1, genesis=GENESIS)
+    slope7 = sq.loss_rate_from_rows(rows, END, window_days=7, genesis=GENESIS)["rate_lb_wk"]
+    trend14 = sq.loss_rate_from_rows(rows, END, genesis=GENESIS)["rate_lb_wk"]
+    assert w["rate_lb_wk"] == slope7 and slope7 > trend14 + 2
+    (w14,) = sq.weekly_loss_rate_weeks_from_rows(rows, END, weeks=1, genesis=GENESIS, trend_days=14)
+    assert w14["rate_lb_wk"] == trend14
+
+
+def test_the_inputs_builder_asks_for_the_14_day_trend():
+    src = (REPO / "mcp/nutrition_critics_inputs.py").read_text()
+    assert src.count("trend_days=shared_quantities.LOSS_RATE_WINDOW_DAYS") == 2
+
+
 def test_a_thin_window_is_unknown_never_a_pass():
     rows = [r for i, r in enumerate(_series(0.4, 1.0)) if i % 7 in (0, 1)]  # 2 weigh-ins a week
-    weeks = sq.weekly_loss_rate_weeks_from_rows(rows, END, genesis=GENESIS)
+    weeks = sq.weekly_loss_rate_weeks_from_rows(rows, END, genesis=GENESIS, trend_days=14)
     assert not any(w["counted"] for w in weeks)
-    assert sq.weekly_loss_rates_from_rows(rows, END, genesis=GENESIS) is None
+    assert sq.weekly_loss_rates_from_rows(rows, END, genesis=GENESIS, trend_days=14) is None
 
 
 def test_no_critic_module_reads_the_endpoint_trend():
