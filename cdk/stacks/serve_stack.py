@@ -602,22 +602,6 @@ class ServeStack(Stack):
             )
         )
 
-        # #5106: the owner's 20-second evening check-in (hunger, stress, cravings, one word). Its
-        # config/schedules.json row UTC = 20:00 PDT / 19:00 PST, both before coach_outbound's 21:00 PT
-        # quiet hours. Deterministic (no model); same constant-input shape as the morning check-in.
-        # Dead-man: the run stamps COACH#evening_checkin/EVAL#<day> every evening and qa-smoke's
-        # `evening_checkin_nudge:eval_liveness` reds a completed day with no stamp.
-        evening_checkin_rule = events.Rule(
-            self,
-            "TelegramEveningCheckin",
-            rule_name="telegram-coach-evening-checkin",
-            description="Owner evening check-in prompt (#5106; dark until a coach Telegram bot is registered)",
-            schedule=table_schedule("telegram-coach-worker#TelegramEveningCheckin"),
-        )
-        evening_checkin_rule.add_target(
-            targets.LambdaFunction(telegram_worker_fn, event=events.RuleTargetInput.from_object({"kind": "evening_checkin"}))
-        )
-
         # The event-triggered outbound sweep (#2490) — the data's chance to start a
         # conversation. its config/schedules.json row UTC = 09:00 PDT / 08:00 PST, UTC-fixed.
         #
