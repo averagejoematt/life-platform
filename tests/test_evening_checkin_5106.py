@@ -323,8 +323,8 @@ def test_the_schedule_row_lands_before_quiet_hours_in_both_offsets():
         assert (3 - offset) % 24 < QUIET_START_HOUR
     stack = open(os.path.join(REPO, "cdk", "stacks", "serve_stack.py"), encoding="utf-8").read()
     assert '"TelegramEveningCheckin"' in stack and '{"kind": "evening_checkin"}' in stack
-    # the worker's write grant (DynamoDBEveningCheckinWrite) is additive IAM, held for the owner's attended
-    # `cdk_deploy.sh LifePlatformServe` in its own PR; that PR restores this assertion with the grant
+    grants = open(os.path.join(REPO, "cdk", "stacks", "role_policies_serve.py"), encoding="utf-8").read()
+    assert '"USER#matthew#SOURCE#evening_checkin"' in grants
 
 
 # ── the pair join ───────────────────────────────────────────────────────────────────────────────
