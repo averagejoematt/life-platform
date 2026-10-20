@@ -7,11 +7,12 @@ import re
 from datetime import datetime, timedelta
 
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_PROTEIN_MIN_G
 from common.digest_utils import d2f, safe_float
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from content import story_checks  # #4538: the off-record label is the story door's, not a second copy
 from experiment.phase_filter import singleton_visible
+from health.calorie_target import target_phrase  # #5095: the ONE calorie target
 from privacy import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection + prompt block
 
 # ── #2422: model-authored prose must not widen the grounding allow-list ───────
@@ -516,7 +517,7 @@ def build_data_packet(data):
             # a day that DID log calories — degrade that one clause honestly.
             prot_str = f"{prot:.0f}g protein" if prot is not None else "protein not logged"
             packet.append(f"{d}: {cal:.0f} cal, {prot_str}")
-    packet.append(f"Targets: {PLAN_DAILY_CALORIES_TARGET} cal, {PLAN_DAILY_PROTEIN_MIN_G}g protein")
+    packet.append(f"Targets: {target_phrase()}, {PLAN_DAILY_PROTEIN_MIN_G}g protein")
     packet.append("")
 
     # --- Journal entries (DEEP BACKGROUND — never quote directly) ---

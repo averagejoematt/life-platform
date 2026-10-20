@@ -817,14 +817,14 @@ class TestUserMessage:
 
     def test_the_prompt_carries_the_plan_targets_not_the_profile_rows(self):
         targets = _payload(profile={"calorie_target": 2000, "protein_target_g": 210, "goal_weight_lbs": 190})["profile_targets"]
-        assert targets["calorie_target"] == wp.PLAN_DAILY_CALORIES_TARGET
+        assert targets["calorie_target"] == wp.target_kcal()
         assert targets["protein_target_g"] == wp.PLAN_DAILY_PROTEIN_MIN_G
         assert targets["goal_weight_lbs"] == 190
 
     def test_absent_profile_targets_change_nothing_about_the_plan_targets(self):
         targets = _payload(profile={})["profile_targets"]
         assert (targets["calorie_target"], targets["protein_target_g"], targets["goal_weight_lbs"]) == (
-            wp.PLAN_DAILY_CALORIES_TARGET,
+            wp.target_kcal(),
             wp.PLAN_DAILY_PROTEIN_MIN_G,
             185,
         )
@@ -850,13 +850,13 @@ class TestSystemPrompt:
 
     def test_the_system_prompt_carries_the_calorie_and_protein_targets(self):
         rendered = wp.build_system_prompt({"calorie_target": 2000, "protein_target_g": 210}, WITHINGS)
-        assert f"{wp.PLAN_DAILY_CALORIES_TARGET} cal/day" in rendered
+        assert f"{wp.target_kcal()} cal/day" in rendered
         assert f"{wp.PLAN_DAILY_PROTEIN_MIN_G}g protein" in rendered
         assert "2000 cal/day" not in rendered and "210g protein" not in rendered  # #4540: the row is not read
 
     def test_absent_profile_targets_render_the_plan_targets(self):
         rendered = wp.build_system_prompt({}, WITHINGS)
-        assert f"{wp.PLAN_DAILY_CALORIES_TARGET} cal/day" in rendered and f"{wp.PLAN_DAILY_PROTEIN_MIN_G}g protein" in rendered
+        assert f"{wp.target_kcal()} cal/day" in rendered and f"{wp.PLAN_DAILY_PROTEIN_MIN_G}g protein" in rendered
 
     def test_the_system_prompt_states_the_grounding_rules_that_keep_meals_honest(self):
         """The 'no invented pairings' instruction is the module's own

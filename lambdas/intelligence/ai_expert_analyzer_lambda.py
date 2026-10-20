@@ -165,6 +165,7 @@ from common.constants import (
     EXPERIMENT_START_DATE as EXPERIMENT_START,  # ADR-058
     PLAN_DAILY_PROTEIN_MIN_G,  # #4540: the plan's targets
 )
+from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 from health.pillar_absence import absence_gate_map, nutrition_absence_facts  # #2756
 
 from intelligence import labelled_facts as _lf  # #4580 B-01/A-X1: labelled-fact + reader-surface findings
@@ -894,6 +895,7 @@ def _build_shared_system_prompt():
                     val = val.get(k) if isinstance(val, dict) else None
                     if val is None:
                         break
+                val = target_kcal() if path == "nutrition.daily_calories_target" else val  # #5095: the ONE calorie target
                 target_lines.append(f"  - {label}: {val if val is not None else 'not set'}")
             parts.append("TARGETS:\n" + "\n".join(target_lines))
 

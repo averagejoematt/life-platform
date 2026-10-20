@@ -268,7 +268,8 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
     # it is estimate_tokens on the charter scaled by the measured Haiku wire/estimate ratio (7,738 / 7,638)
     # — the 4.x family shares a tokenizer; re-measure from the first run's usage block. First recorded
     # 8,550 (v1.5.0, est 8,442); re-scaled 2026-10-19 to 11,755 (est 11,603) when #5097 added the
-    # nutrition.expenditure block. The wave's other nutrition blocks move it again: re-scale at restack.
+    # nutrition.expenditure block; 12,496 (est 12,335) when #5095 added nutrition.calories (charter v1.8.0
+    # entry). The wave's other nutrition blocks move it again: re-scale at restack.
     "charter-judge": {
         "engaged": True,
         "route": "charter.judge",
@@ -276,12 +277,12 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_JUDGE_MODEL",
         "cdk_stack": None,
         "measured_on": "sonnet-4-6",
-        "prefix_tokens": 11755,
+        "prefix_tokens": 12496,
         "calls_within_ttl": 5,
         "decided": "2026-10-19",
         "issue": 5072,
         "why": (
-            "~11,755 tok (charter + nutrition.expenditure, estimate scaled to the Haiku wire ratio) against Sonnet 4.6's 1,024 floor. "
+            "~12,496 tok (charter + nutrition.calories + nutrition.expenditure, estimate scaled to the Haiku wire ratio) against Sonnet 4.6's 1,024 floor. "
             "One weekly run = the real plan + 4 negative controls, back-to-back inside one 5m TTL: one write at 1.25x "
             "then four reads at 0.1x. ~4,500 tok volatile in (rubric + blinded plan) / ~700 out per plan: ~$0.18 a run "
             "cached vs ~$0.30 uncached (-40%)."
@@ -294,7 +295,7 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_JUDGE_GATE_MODEL",
         "cdk_stack": None,
         "measured_on": "sonnet-4-6",
-        "prefix_tokens": 11755,
+        "prefix_tokens": 12496,
         "calls_within_ttl": 5,
         "decided": "2026-10-19",
         "issue": 5072,

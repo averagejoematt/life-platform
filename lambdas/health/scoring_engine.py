@@ -20,11 +20,12 @@ import logging
 from datetime import datetime
 from typing import Any, Iterable, Optional, Union
 
-from common.constants import PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
+from common.constants import PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's floor, never the profile row
 from common.habit_pause import is_paused_on  # #5007: a paused habit is not scheduled
 from training.owner_redlines import REDLINES  # ADR-163: the walking floor the movement target defaults from
 from training.walking_volume import WALKING_VOLUME_VERSION, walking_minutes_for_day  # ADR-163: the ONE walking definition
 
+from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 from health.habit_identity import day_name_for  # #4632: id first, then names, then ingest-derived aliases
 
 logger = logging.getLogger(__name__)
@@ -130,7 +131,7 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
     protein = safe_float(mf, "total_protein_g")
     fat = safe_float(mf, "total_fat_g")
     carbs = safe_float(mf, "total_carbs_g")
-    cal_target = PLAN_DAILY_CALORIES_TARGET
+    cal_target = target_kcal(data.get("date"))
     # #4540: the plan states ONE protein line, a floor. The profile row's separate 190 g
     # "target" was never the plan; a day at or over the floor has met it.
     protein_target = protein_floor = PLAN_DAILY_PROTEIN_MIN_G

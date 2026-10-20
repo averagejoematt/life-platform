@@ -49,7 +49,8 @@ FACTS (absolute):
   introduce them to a cold reader.
 - Never mention the machinery behind this series: no "desk", "dossier", "budget", "ledger", "flagged". Report what
   the data shows and what the team said, as a journalist would.
-- Plan targets are the dossier's "targets_from_plan" (the sealed plan). Use no other target.
+- Plan targets are the dossier's "targets_from_plan". Its calories_kcal is the calorie target; genesis_calories_kcal is
+  the day-one baseline, history only — never state it as the target. Use no other target.
 - The training sessions are programmed by the coaching team; describe volume as the programme being executed.
 - A date listed under not_yet_exported is not yet exported — say so plainly if it matters, never call it silence.
 - Recovery, HRV and resting heart rate describe the night before; workouts and meals describe the day.
