@@ -1756,18 +1756,21 @@ def tool_log_evening_intake(args):
       a UTC default would key "tonight" one day forward of the nudge email's
       signed-link write (which keys by PT), splitting one evening across two
       DATE# rows and double-counting evenings in the dose-response arming ledger.
+    - #5106: with no `date`, the check-in fields key to `evening_day(pacific_now())` —
+      the Telegram door's 04:00 PT rollover — so a 00:30 check-in files to last evening.
     - Idempotent and OBSERVABLY so: re-logging the same evening updates the one
       row in place (SET overwrite, unchanged), and the response now reports
       `updated` + `previous_count` (via ReturnValues=UPDATED_OLD) so the flow
       can say "updated tonight's count 2 -> 1" instead of silently re-writing.
     """
-    from coach.evening_checkin import mcp_count, mcp_log  # #5106: the evening check-in rides the same call
+    from coach.evening_checkin import evening_day, mcp_count, mcp_log  # #5106: the evening check-in rides the same call
     from coach.intake_response import PRIVATE_INTAKE_PK
 
     count = mcp_count(args)  # validated 0-4; None only when a check-in field carries the call
-    date_str = (args.get("date") or pacific_today()).strip()
+    given = (args.get("date") or "").strip()
+    date_str = given or pacific_today()
     datetime.strptime(date_str, "%Y-%m-%d")  # validate; raises on junk
-    checkin = mcp_log(args, table, date_str)
+    checkin = mcp_log(args, table, given or evening_day(pacific_now()))  # #5106: the check-in keeps the 04:00 PT rollover
     if count is None:
         return checkin
 

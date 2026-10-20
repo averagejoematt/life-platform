@@ -191,6 +191,7 @@ def test_mcp_door_writes_the_same_row_and_count_becomes_optional(monkeypatch):
     table = Table()
     monkeypatch.setattr(tl, "table", table)
     monkeypatch.setattr(tl, "pacific_today", lambda: DAY)
+    monkeypatch.setattr(tl, "pacific_now", lambda: EVENING)
     fn = TOOLS["log_evening_intake"]["fn"]
     out = fn({"stress": 3, "word": "Busy"})
     assert out["logged"] and out["date"] == DAY and out["stress"] == 3 and out["word"] == "busy"
@@ -207,6 +208,27 @@ def test_mcp_door_writes_the_same_row_and_count_becomes_optional(monkeypatch):
         fn({"count": 1, "stress": 9})
     schema = TOOLS["log_evening_intake"]["schema"]["inputSchema"]
     assert {"hunger", "stress", "cravings", "word", "count"} <= set(schema["properties"]) and schema["required"] == []
+
+
+def test_mcp_door_after_midnight_files_last_evening_and_the_next_prompt_still_goes_out(monkeypatch):
+    """00:30 PT with no date: the check-in keys to the previous evening (the Telegram door's rollover), so the
+    next evening's 20:00 run is not fooled into `already_logged`. An explicit date is honoured as given."""
+    from mcp import tools_lifestyle as tl
+    from mcp.registry import TOOLS
+
+    table = Table()
+    after_midnight = EVENING + timedelta(hours=4, minutes=30)  # 00:30 PT the next calendar day
+    monkeypatch.setattr(tl, "table", table)
+    monkeypatch.setattr(tl, "pacific_today", lambda: after_midnight.date().isoformat())
+    monkeypatch.setattr(tl, "pacific_now", lambda: after_midnight)
+    out = TOOLS["log_evening_intake"]["fn"]({"hunger": 2, "stress": 3, "cravings": 1, "word": "late"})
+    assert out["date"] == DAY and (ec.PK, f"DATE#{DAY}") in table.store
+    assert (ec.PK, f"DATE#{after_midnight.date().isoformat()}") not in table.store
+    next_evening = EVENING + timedelta(days=1)
+    seat = _seat_for({"nutrition_coach": ("tok-n", 4242)})
+    assert ec.decide(table, next_evening.date().isoformat(), next_evening, seat)[0] == "send"  # not `already_logged`
+    explicit = TOOLS["log_evening_intake"]["fn"]({"stress": 2, "date": "2026-10-20"})
+    assert explicit["date"] == "2026-10-20"
 
 
 # ── the scheduled prompt ────────────────────────────────────────────────────────────────────────

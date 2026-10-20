@@ -342,7 +342,10 @@ LOG_EVENING_INTAKE_INPUT = {
         "stress": {"type": "integer", "description": "#5106 evening check-in: stress 0-4."},
         "cravings": {"type": "integer", "description": "#5106 evening check-in: cravings 0-4."},
         "word": {"type": "string", "description": "#5106 evening check-in: one word for the day."},
-        "date": {"type": "string", "description": "YYYY-MM-DD (default: tonight, the Pacific calendar day)."},
+        "date": {
+            "type": "string",
+            "description": "YYYY-MM-DD (default: tonight, the Pacific calendar day; check-in fields given before 04:00 PT file to the previous evening).",
+        },
     },
     "required": [],
 }
