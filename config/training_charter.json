@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.20.0",
+  "version": "1.17.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -101,7 +101,7 @@
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     },
     {
-      "version": "1.20.0",
+      "version": "1.17.0",
       "date": "2026-10-19",
       "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5111, epic #5094)",
       "what": "nutrition.labs (#5111): the follow-up draw cadence only — follow_up_weeks and reminder_lead_days. Read by training.calibration_cadence (kind lab_draw): next draw due = the last draw date + the cadence, a reminder on the owner channel once per cycle (CALIB_PROMPT#lab_draw#<cycle_start>), state ok|due|overdue. The owner-only fallback due date (no draw readable) lives in the private twin, never here. Links the labs ingest #4639. follow_up_weeks 16 puts the next draw about late January from the October draw (the issue's date); the draw date is read from the labs partition and the clinical LABS# keys, latest wins.",
