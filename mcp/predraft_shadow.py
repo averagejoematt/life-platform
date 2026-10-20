@@ -257,13 +257,18 @@ def _minutes(blocks: list[Any], catalog: dict[str, Any]) -> dict[str, Any]:
 
 def charter_side(ir: Any, session: dict[str, Any], catalog: dict[str, Any]) -> dict[str, Any]:
     """The charter plan, summarised off its routine IR (what was, or would be, persisted)."""
+    from training.session_shape import _block_kind
     from training.training_charter import charter_value, charter_version
 
     exercises = []
     for b in getattr(ir, "exercises", None) or []:
+        if _block_kind(b, catalog) != "lifting":  # #5202: the cardio/stretch block is not a working set — the IR's count excludes it
+            continue
         work = [s for s in b.sets or [] if str(getattr(s, "type", "normal")).lower() not in ("warmup", "warm_up", "warm-up")]
         loads = [float(s.weight_kg) * _KG_TO_LB for s in work if getattr(s, "weight_kg", None)]
-        exercises.append({"movement_key": b.movement_key, "sets": len(work), "top_load_lb": round(max(loads)) if loads else None})
+        exercises.append(
+            {"movement_key": b.movement_key, "sets": len(work), "top_load_lb": round(max(loads), 1) if loads else None}
+        )  # #5202: routine precision
     mins = _minutes(list(getattr(ir, "exercises", None) or []), catalog)
     rec = session.get("deload_recommendation") or {}
     return {
