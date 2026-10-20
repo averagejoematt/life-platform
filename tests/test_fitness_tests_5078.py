@@ -224,7 +224,10 @@ def test_the_calibration_block_carries_the_battery_row_and_a_failed_read_is_read
     monkeypatch.setattr(ft, "calibration_row_from_table", lambda table, today: {"kind": ft.CALIBRATION_KIND, "state": "ok"})
     monkeypatch.setattr(cc, "table_readers", lambda table: {k: (lambda: []) for k in cc.KINDS})
     block = cc.read(object(), "2026-10-27")
-    assert set(block["kinds"]) == {*cc.KINDS, ft.CALIBRATION_KIND} and ft.CALIBRATION_KIND not in cc.deadman_kinds(block)
+    # #5096: the titration dead-man row rides the same block (`health.titration.CALIBRATION_KIND`)
+    assert set(block["kinds"]) == {*cc.KINDS, ft.CALIBRATION_KIND, "nutrition_titration"} and ft.CALIBRATION_KIND not in cc.deadman_kinds(
+        block
+    )
 
 
 # ── storage round trip (the wire) ─────────────────────────────────────────────────────────

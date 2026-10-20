@@ -271,7 +271,8 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
     # nutrition.expenditure block; 12,496 (est 12,335) when #5095 added nutrition.calories (charter v1.8.0
     # entry); 12,768 (est 12,603) on the #5098 lane alone; then 13,510 (est 13,335) at the #5098 restack
     # onto the combined charter (v1.11.0: nutrition.calories + nutrition.expenditure + nutrition.protein
-    # and its reading guide). The wave's other nutrition blocks move it again: re-scale at restack.
+    # and its reading guide); 14,287 (est 14,102) on the #5096 lane (v1.12.0: nutrition.titration, the
+    # calories block's titration keys moved into it). The wave's other nutrition blocks move it again: re-scale at restack.
     "charter-judge": {
         "engaged": True,
         "route": "charter.judge",
@@ -279,12 +280,13 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_JUDGE_MODEL",
         "cdk_stack": None,
         "measured_on": "sonnet-4-6",
-        "prefix_tokens": 13510,
+        "prefix_tokens": 14287,
         "calls_within_ttl": 5,
         "decided": "2026-10-19",
         "issue": 5072,
         "why": (
-            "~13,510 tok (charter + nutrition.calories + nutrition.expenditure + nutrition.protein, estimate scaled to the "
+            "~14,287 tok (charter + nutrition.calories + nutrition.expenditure + nutrition.protein + nutrition.titration, "
+            "estimate scaled to the "
             "Haiku wire ratio) against Sonnet 4.6's 1,024 floor. "
             "One weekly run = the real plan + 4 negative controls, back-to-back inside one 5m TTL: one write at 1.25x "
             "then four reads at 0.1x. ~4,500 tok volatile in (rubric + blinded plan) / ~700 out per plan: ~$0.18 a run "
@@ -298,7 +300,7 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_JUDGE_GATE_MODEL",
         "cdk_stack": None,
         "measured_on": "sonnet-4-6",
-        "prefix_tokens": 13510,
+        "prefix_tokens": 14287,
         "calls_within_ttl": 5,
         "decided": "2026-10-19",
         "issue": 5072,

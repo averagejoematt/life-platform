@@ -316,6 +316,8 @@ SOURCE_CLASS: dict[str, str] = {
     # for, and the model id on each row is what makes an old read re-checkable rather than re-run.
     "fitness_tests": CROSS_PHASE,  # #5078: the fitness test battery (BATTERY#<date>) — a measurement taken by hand
     # on a fixed cadence and unrecomputable (no API re-runs a 6-minute walk); the trend across blocks is the point.
+    "nutrition_titration": CROSS_PHASE,  # #5096: the weekly calorie titration decision (WEEK#<monday>) — a decision
+    # trail the next week's step reads (spacing, consecutive reads); like may_tracker it spans the campaign.
     "may_tracker": CROSS_PHASE,  # #5073: the weekly May tracker row (WEEK#<monday>) — a trajectory toward a
     # dated target that spans the whole campaign; every row is recomputable from its RAW inputs, but a
     # reset that hid the earlier weeks would cut the trend the two-weeks-running triggers read.

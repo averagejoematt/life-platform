@@ -42,7 +42,11 @@ from common.constants import (
     PLAN_DAILY_PROTEIN_MIN_G,
 )  # ADR-058
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
-from health import calorie_target, nutrient_intake  # #4244: THE food + supplements micronutrient join (shared with the public door)
+from health import (  # #4244: THE food + supplements micronutrient join (shared with the public door)
+    calorie_target,
+    nutrient_intake,
+    titration,  # #5096: the weekly calorie titration decision (owner-only; this email is an owner surface)
+)
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
@@ -859,7 +863,31 @@ def build_summary_table(days, profile):
     </table>"""
 
 
-def build_email_html(summary_table, ai_content, dates, weight_info):
+def build_titration_html(today, read=None):
+    """#5096: the coming week's calorie titration decision and its reason — owner-only (this email goes to him alone).
+    A failed read is said, never a blank; no decision yet is said with when it is made."""
+    read = read or (lambda week: titration.read_record(table, week))
+    week = titration.target_week(today)
+    style = 'style="color:#e0e0e0;font-size:13px;margin-bottom:24px;padding:12px;border:1px solid #2a2d4a;border-radius:8px;"'
+    try:
+        rec = read(week)
+    except Exception as e:  # noqa: BLE001 — the email still ships; the absence is named
+        return f"<div {style}>Calorie titration for the week of {week}: the record read failed ({type(e).__name__}).</div>"
+    if not rec:
+        return (
+            f"<div {style}>Calorie titration for the week of {week}: no decision on file yet — the nightly titration run decides "
+            "on Friday night and retries over the weekend; until then the current target stands.</div>"
+        )
+    step = int(rec.get("step_kcal") or 0)
+    head = f"{rec.get('kcal')} kcal ({rec.get('action')}{f' {step:+d}' if step else ''})"
+    detail = f'<div style="color:#9ca3af;font-size:11px;margin-top:4px;">{rec.get("detail")}</div>' if rec.get("detail") else ""
+    return (
+        f'<div {style}><div style="font-size:12px;letter-spacing:1px;color:#9ca3af;font-weight:600;margin-bottom:6px;">'
+        f"CALORIE TARGET · WEEK OF {week}</div>{head} — {rec.get('reason')}{detail}</div>"
+    )
+
+
+def build_email_html(summary_table, ai_content, dates, weight_info, titration_html=""):
     try:
         dt_start = datetime.strptime(dates["this_start"], "%Y-%m-%d")
         dt_end = datetime.strptime(dates["this_end"], "%Y-%m-%d")
@@ -887,7 +915,7 @@ def build_email_html(summary_table, ai_content, dates, weight_info):
         <div style="font-size:12px;letter-spacing:1px;color:#9ca3af;font-weight:600;margin-bottom:10px;">WEEKLY SNAPSHOT</div>
         {summary_table}
     </div>
-    {ai_content}
+    {titration_html}{ai_content}
     <div style="text-align:center;padding:16px 0;border-top:1px solid #2a2d4a;margin-top:24px;">
         <div style="color:#6b7280;font-size:11px;">Life Platform - Saturday Nutrition Review</div>
         <div style="color:#9ca3af;font-size:9px;margin-top:6px;">&#9874;&#65039; Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your diet, exercise, or supplement regimen.</div>
@@ -1114,7 +1142,7 @@ def lambda_handler(event, context):
             logger.warning(f"[AI-3] Nutrition review warnings: {_val.warnings}")
 
     weight_info = extract_weight_trend(data["withings"])
-    html = build_email_html(summary_table, ai_content, dates, weight_info)
+    html = build_email_html(summary_table, ai_content, dates, weight_info, build_titration_html(pacific_now().date().isoformat()))
 
     summary = compute_weekly_summary(days_this)
     # #2221: a week of records that carry no totals (the partial-record case, and

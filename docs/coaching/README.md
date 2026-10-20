@@ -75,3 +75,14 @@ note (#5056, `training.steps_nudge`) and the protein breakfast note (#5098,
 `nutrition.protein` block — the range, four feedings at or above the feeding threshold, the
 breakfast cut-off — and the same engine owns the one definition of a protein hit that the
 scoring engine, the macros view, the critics and the `protein_floor_missed` tripwire share.
+
+## The weekly calorie titration
+
+The calorie target moves weekly by a rule the owner can read (#5096, `health.titration`): the
+charter's `nutrition.titration` block — the shared 14-day trend against the charter rate band,
+two consecutive weekly reads on the same side before a step, 14 days between steps, a step of
+at most 150 kcal sized from the miss, steps before food (below the band, food comes down only
+once the steps mean is at the floor), and a hold whenever the data is insufficient. The decision
+is made Friday night for the coming week, carried by every calorie surface through
+`health.calorie_target`, and shown with its reason in the Saturday nutrition-review email. The
+weekly refit itself is built on the panel default, pending R1 (#5091).
