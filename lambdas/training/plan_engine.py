@@ -81,7 +81,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from health import deficit_disclosures
+from health import calorie_target, deficit_disclosures
 
 from training import (
     block_model,
@@ -786,6 +786,17 @@ def _steps_ramp_block(
     return out
 
 
+def _training_day_fuel(date: str, session: dict[str, Any], disruption_records: list[dict[str, Any]] | None) -> dict[str, Any]:
+    """`constraint_block.training_day_fuel` (#5101, owner-only): the day's kcal, uplift, macro split and pre/post session
+    targets, all from `health.calorie_target.resolve` (the one resolver) with the day type the plan knows."""
+    dis = disruption.state(disruption_records, date) if disruption_records is not None else None
+    seq = session if session.get("source") == "session_sequence" else None
+    typed = calorie_target.classify_day_type(date, sequence_entry=seq, as_of=date, disruption=dis)
+    out = calorie_target.resolve(date, day_type=typed["day_type"])
+    out["day_type_basis"] = typed["basis"]
+    return out
+
+
 def _walking_block(walk_hr_wk_now: float | None, failed_reads: dict[str, dict[str, Any]]) -> dict[str, Any]:
     """The walking block — the largest lever, read FIRST (see the module docstring); extracted from
     `constraint_block` (#5001, the #4880 function-length ratchet). A failed read is not a zero (#4072)."""
@@ -1057,6 +1068,7 @@ def constraint_block(
         # `with_recommendation` stamps the signals in place, so the served session's copy (the same dict) carries them too.
         "block_model": block_model.with_recommendation(session.get("block_model"), deload_rec),
         "steps_ramp": _steps_ramp_block(date, steps_window, pain_flag_instances, pain_dismissals, deload_records, input_status),
+        "training_day_fuel": _training_day_fuel(date, session, disruption_records),  # #5101: lifting-day fuel, owner-only
         # #5088 — his disruption mode (habits held, not targets) or the coach's OFFER of it; never self-applied
         "disruption": disruption.constraint(date, disruption_records, block_workouts, None, states["disruption_records"]["state"]),
         # #4387 — the walking total cannot say "yesterday was 2¾ h on foot". These rows can: one
@@ -1099,10 +1111,8 @@ def constraint_block(
         "program": program,
         "accessory_rotation_ok": rotation["ok"],
         "accessory_rotation": rotation,
-        # #5068 (ADR-164): the charter version this plan was built beside. None means no
-        # charter could be read and the plan says so. W1 (#5050) moves the engine's reads
-        # (steps, split, rate band, cadences) onto the charter; until then the literals
-        # above still come from owner_redlines/program_structure and this is a stamp only.
+        # #5068 (ADR-164): the charter version this plan was built beside (None = no charter could be read, and the plan says so).
+        # W1 (#5050) moves the engine's reads onto the charter; until then the literals above still come from owner_redlines/program_structure.
         "charter_version": training_charter.charter_version(),
         # #5052: the double progression + effort limits, stamped; #5058: the ceiling-change proposal (never auto-applied)
         **_effort_blocks(date, hevy_workouts_prescription_window, catalog_movements, states),
