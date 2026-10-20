@@ -4083,10 +4083,24 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/calibration_cadence.py",
+      "partition": "clinical",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/training/calibration_cadence.py",
       "partition": "dexa",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/calibration_cadence.py",
+      "partition": "labs",
       "via": "local-seam"
     },
     {
@@ -8010,7 +8024,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 774,
+      "edges": 776,
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
@@ -8024,9 +8038,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 377,
-        "sites_resolved": 974,
-        "sites_total": 1351
+        "sites_dynamic": 378,
+        "sites_resolved": 976,
+        "sites_total": 1354
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8338,7 +8352,7 @@
       "category": "Manual logs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "Manual log",
+      "method": "Manual log (paused: no orders logged since March)",
       "privacy_tier": "public",
       "stale_hours": 336
     },
