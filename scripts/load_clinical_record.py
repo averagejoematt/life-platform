@@ -19,6 +19,7 @@ INPUT SHAPE -> SORT KEYS  (pk `USER#matthew#SOURCE#clinical`)
     labs_<anything>{}      -> LABS#<collection_date>
     patient_history_<YYYY_MM_DD>{} -> HISTORY#<YYYY-MM-DD>
     coach_guidance{}       -> GUIDANCE#current
+    lab_priorities{}       -> PRIORITIES#current    (`text`: plain lines for the owner-only coach context, #5111)
     appointments[]         -> APPT#<date>#<slug>    (a logged appointment: `date`, optional `kind`/`title`;
                               `health/guidance_freshness.py` reads only the date, #5059)
     documents[]            -> s3://matthew-life-platform/raw/matthew/clinical/<YYYY-MM-DD>/<file>
@@ -139,6 +140,9 @@ def build_items(record: dict, now: Optional[str] = None) -> list:
     guidance = record.get("coach_guidance")
     if isinstance(guidance, dict):
         items.append(_stamp("GUIDANCE#current", guidance, now))
+    priorities = record.get("lab_priorities")
+    if isinstance(priorities, dict):
+        items.append(_stamp("PRIORITIES#current", priorities, now))
     seen: set = set()
     for it in items:
         if it["sk"] in seen:
