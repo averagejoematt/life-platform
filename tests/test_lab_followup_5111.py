@@ -166,3 +166,25 @@ def test_the_latest_draw_may_live_in_the_clinical_record():
     assert row["last_logged"] == "2026-10-10"
     assert row["due_on"] == plus("2026-10-10", CYCLE)
     assert row["state"] == "ok" and row["prompt"] is None
+
+
+def test_the_loader_writes_the_priorities_row_the_reader_reads():
+    """The owner's paved road (scripts/load_clinical_record.py) and the reader agree on ONE row."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("load_clinical_record", ROOT / "scripts" / "load_clinical_record.py")
+    loader = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(loader)
+
+    items = loader.build_items({"lab_priorities": {"text": "first flag  second flag"}}, now="2026-10-20T00:00:00+00:00")
+    rows = [i for i in items if str(i.get("sk")) == lab_priorities.SK]
+    assert len(rows) == 1, items
+    assert rows[0]["sk"] == "PRIORITIES#current" and rows[0]["text"] and rows[0]["updated_at"]
+    got = lab_priorities.from_rows(items)
+    assert got is not None and got["text"] == "first flag second flag"
+
+    assert [
+        i
+        for i in loader.build_items({"lab_priorities": "not a dict"}, now="2026-10-20T00:00:00+00:00")
+        if str(i.get("sk")) == lab_priorities.SK
+    ] == []
