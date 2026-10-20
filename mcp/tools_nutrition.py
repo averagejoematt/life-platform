@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from health import (
     calorie_target as calorie_resolver,  # #5095: the ONE calorie target
     deficit_disclosures,  # #3754: BS-12 cutoff provenance + the ADR-104 sentence
+    macro_floors,
     protein_engine,  # #5098: THE protein hit, the charter range and the feedings
     tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
     training_output_channel,  # #3754: THE training-output input (daily training load, never Strava kJ)
@@ -673,6 +674,7 @@ def _get_macro_targets(args):
                 "protein_feedings_40g": prot_day["feedings_40g"],  # None = no timed food-log rows (unknown, never 0)
                 "protein_first_feeding_behind": prot_day["first_feeding_behind"],
                 "hit_fiber_target": hit_fiber,
+                "floors": macro_floors.evaluate_day(item),  # #5102: fat / carb / fibre floor, value + floor + met + unknown
             }
         )
 
@@ -692,6 +694,7 @@ def _get_macro_targets(args):
             "calories_kcal": calorie_target,
             "protein_g": protein_target,
             "fiber_g": _FIBER_TARGET_G,
+            "macro_floors_g": {m: macro_floors.floor_g(m) for m in macro_floors.MACROS},  # #5102: the charter's floors
             # ADR-105: the target ships with its source and provenance (#5095: the ONE resolver).
             "calorie_target_detail": None if args.get("calorie_target") else resolved,
             "calorie_target_method": "health.calorie_target.resolve",

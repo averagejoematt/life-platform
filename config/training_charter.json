@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.11.0",
+  "version": "1.14.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -77,6 +77,13 @@
       "date": "2026-10-19",
       "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5098, epic #5091); the four-feeding structure and the relaxed fasting window are built on the panel default, pending R2",
       "what": "nutrition.protein: the daily range (low = the plan's floor, held equal to config/user_goals.json and common.constants by tests/test_protein_engine_5098.py; high = the redlines' target), the days-of-7 bar, four feedings with a per-feeding threshold and a target band, the merge window that groups food-log rows into one feeding, THE hit definition (strictly total >= range low), and the breakfast nudge (a cut-off and a send window in Pacific time, at most one a day, owner-only; a day with no food-log row yet withholds, because the food log is an end-of-day upload). owner_redlines.protein_floor_g reads target_g, days_of_7, feedings and feeding_g from here; lambdas/health/protein_engine.py is the one reader.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.14.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5102, epic #5091): 'all items worked now'",
+      "what": "nutrition.floors: the fat, carbohydrate and fibre floors the redlines defined in prose (65 g / 120 g / 35 g, the values the redlines already carried), moved here as data. owner_redlines.fat_floor_g / carb_floor_g read them; lambdas/health/macro_floors.py is the one reader and the one hit definition (strictly at or above the floor; a missing field is unknown, never a miss). The critics and the daily grade call it.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -472,6 +479,15 @@
         "rule": "behind when no feeding at or above feeding_threshold_g is logged at or before the later of the cut-off and the tick; no food-log row for the day withholds the note (no_same_day_log): the food log is an end-of-day upload, so an absent row at breakfast is upload lag, not a missed feeding; untimed rows withhold the note (unknown). Armed but silent until a same-day food source exists (#5187)"
       },
       "basis": "built on the panel default, pending R2 (#5091)"
+    },
+    "floors": {
+      "fat": {"floor_g": 65, "unit": "g", "per_meal_g": 10, "meals_with_fat": 3, "epa_dha_g": 2},
+      "carb": {"floor_g": 120, "unit": "g", "typical_g": [150, 180]},
+      "fibre": {"floor_g": 35, "unit": "g", "target_range_g": [35, 40]},
+      "hit": "a day meets a floor when its logged total is at or above it, strictly. A missing field is unknown, never a miss (health.macro_floors)",
+      "grade_weight": "the three floors share the nutrition component's macro-split slot (0.20); calories 0.40 and protein 0.40 are untouched (docs/engines/SCORING.md)",
+      "provenance": "population-derived",
+      "derived_by": "red-team consensus 2026-09-22 (nutritionist, physician and S&C coach); moved from owner_redlines.py by #5102"
     }
   }
 }
