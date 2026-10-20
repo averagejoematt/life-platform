@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.14.0",
+  "version": "1.15.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -84,6 +84,13 @@
       "date": "2026-10-19",
       "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5102, epic #5091): 'all items worked now'",
       "what": "nutrition.floors: the fat, carbohydrate and fibre floors the redlines defined in prose (65 g / 120 g / 35 g, the values the redlines already carried), moved here as data. owner_redlines.fat_floor_g / carb_floor_g read them; lambdas/health/macro_floors.py is the one reader and the one hit definition (strictly at or above the floor; a missing field is unknown, never a miss). The critics and the daily grade call it.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.15.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5101, epic #5091); built on the panel default, pending R1",
+      "what": "nutrition.training_day (#5101): a lifting-day calorie uplift balanced by the rest days so the week averages the base target, the carbohydrate split (protein and fat held, carbohydrate moves), pre and post session carbohydrate and protein targets, and the travel-day rule. Read by health.calorie_target.resolve (day_type seam) and printed in the plan's training_day_fuel block.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -479,6 +486,30 @@
         "rule": "behind when no feeding at or above feeding_threshold_g is logged at or before the later of the cut-off and the tick; no food-log row for the day withholds the note (no_same_day_log): the food log is an end-of-day upload, so an absent row at breakfast is upload lag, not a missed feeding; untimed rows withhold the note (unknown). Armed but silent until a same-day food source exists (#5187)"
       },
       "basis": "built on the panel default, pending R2 (#5091)"
+    },
+    "training_day": {
+      "lifting_uplift_kcal": 150,
+      "balance": "the week averages the base target: a rest day takes -(uplift x lifting days / rest days) so the uplift is paid for inside the week (5 lifting / 2 rest: -375); travel and unknown days stay at the base. A day clamped by its floor is reported balance_held false",
+      "fat_pct_of_base_kcal": 30,
+      "split_rule": "protein = nutrition.protein.range_g.low and fat = fat_pct of the base target, both held every day; the uplift and the offset are carbohydrate",
+      "pre_session": {
+        "carb_g": 40,
+        "protein_g": 20,
+        "minutes_before": [
+          60,
+          90
+        ]
+      },
+      "post_session": {
+        "carb_g": 60,
+        "protein_g": 40,
+        "minutes_after": 60,
+        "note": "the post-session protein is one of the four feedings (nutrition.protein.feeding_threshold_g)"
+      },
+      "travel_day": "no uplift and no rest-day offset: the base target holds; pre and post targets still apply when a session is done",
+      "day_type": "lifting | rest | travel | unknown: travel from a travel disruption or charter travel window; else lifting/rest from the planned routine for the date; else unknown (base target, never a guessed rest day: the split sequence has no calendar, so the plan states the lifting uplift and the rest offset as conditional until a per-date calendar exists)",
+      "surface": "owner-only: the plan_next_session constraint block (training_day_fuel) and the coach packet; no public surface",
+      "basis": "built on the panel default, pending R1 (#5091)"
     },
     "floors": {
       "fat": {"floor_g": 65, "unit": "g", "per_meal_g": 10, "meals_with_fat": 3, "epa_dha_g": 2},
