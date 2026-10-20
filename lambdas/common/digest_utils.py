@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
-from ingestion.source_registry import stale_hours_overrides  # #2235: one staleness threshold, not three copies
+from ingestion.source_registry import SOURCE_REGISTRY, stale_hours_overrides  # #2235: one staleness threshold, not three copies
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
 from common.pacific_time import pacific_now, parse_iso_utc  # #2811 pacific_now; #3609 the canonical ISO-8601 parser
@@ -227,6 +227,10 @@ def get_food_delivery_streak_state(table, user_id="matthew", now=None):
     behavior of the three read sites this replaces.
     """
     try:
+        # #5108: a PAUSED source (ADR-074) contributes nothing — no read, so the character-sheet
+        # modifier is neutral (1.0) and the brief/digest lines are absent. Un-pausing restores it.
+        if SOURCE_REGISTRY.get("food_delivery", {}).get("paused"):
+            return None
         resp = table.get_item(Key={"pk": f"USER#{user_id}#SOURCE#food_delivery", "sk": "STREAK#current"})
         item = resp.get("Item")
         if not item:
