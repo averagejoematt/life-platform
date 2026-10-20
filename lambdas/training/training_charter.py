@@ -259,13 +259,9 @@ def public_view() -> Dict[str, Any]:
 
 # ── the charter as a cached system block (#5084) ──────────────────────────────────────────
 # Top-level public keys a prompt never carries: the file's own maintainer note (repo
-# housekeeping, not training content) and the `nutrition` block (#5095) — the charter's
-# training callers (judge / narrative / retro) grade no food, and a surface that states a
-# calorie target gets it from health.calorie_target, so the cached training block stays
-# byte-stable (and under its measured size) as the nutrition lanes grow the block. The
-# owner-only twin is excluded structurally — the block is rendered from the PUBLIC half
-# only, in both modes (see prompt_prefix).
-_PROMPT_EXCLUDED_KEYS: tuple[str, ...] = ("_README", "nutrition")
+# housekeeping, not training content). The owner-only twin is excluded structurally — the
+# block is rendered from the PUBLIC half only, in both modes (see prompt_prefix).
+_PROMPT_EXCLUDED_KEYS: tuple[str, ...] = ("_README",)
 
 
 def prompt_prefix(published: bool = True) -> str:

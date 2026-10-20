@@ -238,6 +238,33 @@ def _energy_budget(end_date, deficit_kcal=tdee_core.DEFAULT_DEFICIT_KCAL, weight
     )
 
 
+def expenditure_reconciliation(end_date, model_measured_kcal=None, read=None):
+    """#5097: which of the three burn estimates matches the scale, for `end_date`.
+
+    The MCP binding of `health.expenditure_reconciler.reconcile_window`: the shared
+    loss rate (`shared_quantities.loss_rate_lb_wk`, through `read`), the macrofactor
+    rows, the ADR-152 TDEE (`model_measured_kcal`, or this module's `_energy_budget`)
+    and the platform-flat estimate. The calorie resolver (#5095) and the titration
+    engine (#5096) call this; `get_daily_metrics view=energy` carries it. A failed read
+    is named in the payload, never raised into the view that carries it."""
+    from health import expenditure_reconciler
+
+    from mcp import shared_quantities
+
+    read = read or query_source_cross_phase
+    try:
+        if model_measured_kcal is None:
+            model_measured_kcal = (_energy_budget(end_date) or {}).get("tdee")
+        return expenditure_reconciler.reconcile_window(
+            end_date,
+            read_loss_rate=lambda d: shared_quantities.loss_rate_lb_wk(d, read=read),
+            read_macrofactor=lambda s, e: read("macrofactor", s, e),
+            model_measured_kcal=model_measured_kcal,
+        )
+    except Exception as e:  # noqa: BLE001 — an unreadable reconciliation is unknown, never a verdict
+        return {"method": expenditure_reconciler.METHOD, "read_failed": f"{type(e).__name__}: {e}"[:160]}
+
+
 # ── MacroFactor reference data ──
 
 # RDA: NIH DRI for adult males 31-50. "optimal": longevity targets per Attia/Patrick (not official guidelines). "upper": NIH Tolerable Upper Intake Level.

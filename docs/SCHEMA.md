@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-10-19 (v8.6.0 — 89 MCP tools, 20 data sources, 108 Lambdas, 12 cached tools)
+**Last updated:** 2026-10-20 (v8.6.0 — 89 MCP tools, 20 data sources, 108 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -807,15 +807,23 @@ Note: `food_log` is a nested list within each day record. Access via `get_food_l
 
 Note: the `total_*` nutrient rows above are a representative subset — the diary parser maps ~55 nutrient columns (`NUTRIENT_COLUMNS` in `macrofactor_lambda.py`), each written as a `total_*` field when present.
 
-**Daily-summary CSV format (current MacroFactor default export, `_format: "daily_summary"`):** one row per day with daily totals and no per-meal food log. Detected by `detect_csv_type` (Expenditure + Date + Calories columns). Writes the same `DATE#` partition with `schema_version: 2`, `_format: "daily_summary"`, empty `food_log`, `entries_count: 0`, plus:
+**Daily-summary CSV format (`_format: "daily_summary"` on a day it owns; #5097):** one row per day with the vendor's daily totals, no per-meal food log. Detected by `detect_csv_type` (Expenditure + Date + Calories columns). It is the ONLY MacroFactor export that carries the adaptive expenditure — the routine diary export (58 of the 59 uploads archived 2026-02..2026-10) has no such column. It arrives through the same Dropbox drop (MacroFactor's XLSX quick export, converted to CSV by `dropbox-poll`; dates arrive as Excel serials).
+
+**Write semantics (#5097):** the summary is applied with UpdateItem, never PutItem. It OWNS a day with no diary food log (no row, a summary-only row, or an emptied tombstone — `entries_count` absent or 0): every field below plus `total_*`, `schema_version: 2`, `_format`, empty `food_log`, `entries_count: 0`, tombstone fields removed. On a day a diary owns it MERGES only the summary-owned fields, so the diary's `food_log`, `total_*` and derived scores stay. A diary re-write carries the stored summary-owned fields forward (`macrofactor_lambda.carry_summary_fields`). A summary row with no logged macros is not written even when it carries an expenditure (a food-less row would read as a logged day). Summary-owned fields (`macrofactor_lambda.is_summary_owned`), each one vendor column — capture-all, nothing picked:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `weight_lbs_macrofactor` | number | Scale weight from MacroFactor (lbs) |
+| `expenditure_kcal` | number | MacroFactor adaptive expenditure (kcal/day) — vendor column `Expenditure`. Freshness: the `field_feeds` facet `adaptive_expenditure` of `macrofactor` in `source_registry.py` (7 days); the source-level `stale_hours` is kept fresh by the diary and cannot see this feed go dark |
+| `tdee_kcal` | number | Alias of `expenditure_kcal` (#484: readers key off it) |
 | `trend_weight_lbs` | number | MacroFactor trend weight (lbs) |
-| `expenditure_kcal` | number | MacroFactor estimated TDEE |
-| `target_calories_kcal` | number | the MacroFactor APP's own calorie target — a drift signal only (`common.macrofactor_fields.app_target_kcal`), never the platform's target, which is `health.calorie_target` (#5095) |
-| `target_protein_g` | number | Protein target |
+| `weight_lbs_macrofactor` | number | Scale weight as MacroFactor holds it (lbs) |
+| `target_calories_kcal` / `target_protein_g` / `target_fat_g` / `target_carbs_g` | number | MacroFactor's own targets (absent when 0 / not set). The APP's calorie target is a drift signal only (`common.macrofactor_fields.app_target_kcal`, read by the character engine) — never the platform's target, which is `health.calorie_target` (#5095) |
+| `steps_macrofactor` | number | Steps as MacroFactor holds them |
+| `summary_total_<nutrient>` | number | The vendor's day total for every nutrient column (same `<nutrient>` names as `total_*`), kept beside the diary-derived `total_*` |
+| `summary_unmapped_columns` | map | Any column the parser does not know, verbatim `{header: text}` — never dropped |
+| `summary_ingested_at` | string | ISO timestamp of the last summary applied to the day |
+
+**Read side:** `health/expenditure_reconciler.py` sets `expenditure_kcal` (window mean), the ADR-152 TDEE and the flat Mifflin estimate against the scale-implied expenditure (mean intake + 3500 kcal x the shared 14-day loss rate); served as `expenditure_reconciliation` on `get_daily_metrics view=energy` (`mcp/tools_nutrition.expenditure_reconciliation`). Tunables: `nutrition.expenditure` in `config/training_charter.json`.
 
 Note: `macrofactor_export` is a **read-side alias only** — no Lambda writes `source=macrofactor_export`; the MCP read layer maps `macrofactor_workouts` → `macrofactor_export` (`mcp/tools_hevy.py`).
 

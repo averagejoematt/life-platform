@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.8.0",
+  "version": "1.10.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -63,6 +63,13 @@
       "date": "2026-10-19",
       "by": "owner direction 2026-10-18 on the nutrition panel review (#5095, epic #5091: one calorie target everywhere); the level is the panel default R1 (eat up to the prescribed band now, refit weekly), pending the owner's R1 answer",
       "what": "nutrition.calories: the ONE calorie target every surface reads through health.calorie_target.resolve. The energy floors, the prescribed band, the opening target and the titration rule MOVE here from training.owner_redlines energy_floor_kcal (same values; the redlines now read them from this block). The 1,500 kcal generated constant is retired. A weekly titration record (USER#matthew#SOURCE#nutrition_titration / WEEK#<iso-monday>, written by the #5096 titration engine, not yet built) outranks target_kcal for its week; the any-day floor clamps any resolved target.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.10.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition panel review (epic #5091: 'all items worked now'); the 300 kcal bar is #5097's own acceptance line",
+      "what": "nutrition.expenditure (#5097): the reconciliation that sets MacroFactor's adaptive expenditure and both platform burn models against the scale-trend-implied expenditure (mean intake + 3500 kcal per lb of the shared 14-day loss rate). disagreement_threshold_kcal is the spread between the models above which the read says which one matches the scale; min_logged_days is the fewest logged intake days in the loss-rate window before a scale-implied figure is computed at all.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -391,6 +398,16 @@
     },
     "block_retro": {"every_weeks": 6, "scorecard_rows": 13}
   },
+  "concession_ledger": {
+    "nippard": {"concedes": "a faster deficit than it would pick", "in_return": "double progression, stretch-position work, rotation"},
+    "athlean_x": {"concedes": "looks-first over athletic carryover", "in_return": "corrective work, carries, single-leg work"},
+    "rp_israetel": {"concedes": "no scheduled deload and legs at maintenance", "in_return": "rising volume on shoulders, lats and upper chest plus MEV floors"},
+    "sbs_nuckols": {"concedes": "a deadline-set loss rate", "in_return": "coded progression and strength tracking that catches muscle loss early"},
+    "galpin": {"concedes": "no deload rhythm", "in_return": "weekly fatigue flags and a real hard/easy cardio split"},
+    "dan_john": {"concedes": "machines and isolation in the mix", "in_return": "carries and kettlebell work weekly"},
+    "hollywood_transformation_trainer": {"concedes": "nothing", "in_return": "gets the frame, the deadline, the steps and the session length"},
+    "clinical_exercise_physiologist": {"concedes": "fast loss alongside 5 lifting days", "in_return": "weekly strength, sleep and fat-free-mass tracking, effort by RPE"}
+  },
   "nutrition": {
     "calories": {
       "target_kcal": 2100,
@@ -415,17 +432,14 @@
       "provenance": "population-derived",
       "derived_by": "red-team consensus 2026-09-22 (physician + nutritionist floors; the calibrated model's 'highest intake that reproduces the trajectory')",
       "stated": "2026-09-22"
+    },
+    "expenditure": {
+      "disagreement_threshold_kcal": 300,
+      "min_logged_days": 7,
+      "compared": ["macrofactor_adaptive", "platform_measured", "platform_flat"],
+      "against": "scale-trend-implied expenditure: mean logged intake over the shared 14-day loss-rate window + 3500 kcal per lb of that rate, per day",
+      "owner": "health/expenditure_reconciler.py (#5097)"
     }
-  },
-  "concession_ledger": {
-    "nippard": {"concedes": "a faster deficit than it would pick", "in_return": "double progression, stretch-position work, rotation"},
-    "athlean_x": {"concedes": "looks-first over athletic carryover", "in_return": "corrective work, carries, single-leg work"},
-    "rp_israetel": {"concedes": "no scheduled deload and legs at maintenance", "in_return": "rising volume on shoulders, lats and upper chest plus MEV floors"},
-    "sbs_nuckols": {"concedes": "a deadline-set loss rate", "in_return": "coded progression and strength tracking that catches muscle loss early"},
-    "galpin": {"concedes": "no deload rhythm", "in_return": "weekly fatigue flags and a real hard/easy cardio split"},
-    "dan_john": {"concedes": "machines and isolation in the mix", "in_return": "carries and kettlebell work weekly"},
-    "hollywood_transformation_trainer": {"concedes": "nothing", "in_return": "gets the frame, the deadline, the steps and the session length"},
-    "clinical_exercise_physiologist": {"concedes": "fast loss alongside 5 lifting days", "in_return": "weekly strength, sleep and fat-free-mass tracking, effort by RPE"}
   },
   "panel_target": {
     "overall": "A",

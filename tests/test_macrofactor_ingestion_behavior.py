@@ -90,10 +90,42 @@ class FakeTable:
     def __init__(self):
         self.items = {}
         self.puts = []
+        self.updates = []
 
     def put_item(self, Item):  # noqa: N803 — boto3's kwarg name
         self.puts.append(Item)
         self.items[(Item.get("pk"), Item.get("sk"))] = Item
+
+    def query(self, **kw):  # the diary's stored-range read: every row of the partition, one page
+        return {"Items": [dict(v) for v in self.items.values()]}
+
+    def update_item(self, **req):
+        """#5097: apply the SET/REMOVE update the summary writer emits, honouring its
+        ownership condition the way DynamoDB does (ConditionalCheckFailedException)."""
+        self.updates.append(req)
+        return apply_update(self.items, req)
+
+
+class _ConditionFailed(Exception):
+    response = {"Error": {"Code": "ConditionalCheckFailedException"}}
+
+
+def apply_update(items, req):
+    """A bounded interpreter for the exact `SET #a = :v, ... [REMOVE #r, ...]` shape
+    `macrofactor_lambda._update_request` emits — not a general DynamoDB emulator."""
+    key = (req["Key"]["pk"], req["Key"]["sk"])
+    names, values = req["ExpressionAttributeNames"], req["ExpressionAttributeValues"]
+    row = dict(items.get(key) or req["Key"])
+    if req.get("ConditionExpression") and key in items and row.get("entries_count"):
+        raise _ConditionFailed()
+    set_part, _, remove_part = req["UpdateExpression"].partition(" REMOVE ")
+    for clause in set_part[len("SET ") :].split(", "):
+        n, v = clause.split(" = ")
+        row[names[n]] = values[v]
+    for n in filter(None, remove_part.split(", ")):
+        row.pop(names[n], None)
+    items[key] = row
+    return {}
 
 
 class _Body:
@@ -1182,7 +1214,8 @@ def test_no_native_float_reaches_the_write_on_the_workout_path(monkeypatch):
 def test_no_native_float_reaches_the_write_on_the_summary_path(monkeypatch):
     rows = [summary_row(cal="2000.5", **{"Weight (lbs)": "321.6", "Expenditure": "3100.4"})]
     _, table, _ = invoke(monkeypatch, csv_bytes(SUMMARY_HEADERS, rows))
-    assert table.puts and find_floats(table.puts[0]) == []
+    # #5097: the summary path writes through UpdateItem — the VALUES map is what boto3 serialises.
+    assert table.updates and find_floats(table.updates[0]["ExpressionAttributeValues"]) == []
 
 
 def test_a_pre_genesis_day_is_stamped_as_pilot_data(monkeypatch):
@@ -1346,7 +1379,7 @@ def test_the_nutrition_writer_emits_every_field_the_validator_requires(monkeypat
 def test_the_summary_writer_emits_every_field_the_validator_requires(monkeypatch):
     schema = _SCHEMAS["macrofactor"]
     _, table, _ = invoke(monkeypatch, csv_bytes(SUMMARY_HEADERS, [summary_row()]))
-    written = table.puts[0]
+    written = table.items[(mf.PK, "DATE#2026-08-05")]  # #5097: written by UpdateItem, read back whole
     missing = [f for f in schema["required_fields"] if f not in written]
     assert missing == []
 
