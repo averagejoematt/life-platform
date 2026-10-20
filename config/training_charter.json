@@ -101,6 +101,13 @@
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     },
     {
+      "version": "1.17.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5111, epic #5094)",
+      "what": "nutrition.labs (#5111): the follow-up draw cadence only — follow_up_weeks and reminder_lead_days. Read by training.calibration_cadence (kind lab_draw): next draw due = the last draw date + the cadence, a reminder on the owner channel once per cycle (CALIB_PROMPT#lab_draw#<cycle_start>), state ok|due|overdue. The owner-only fallback due date (no draw readable) lives in the private twin, never here. Links the labs ingest #4639. follow_up_weeks 16 puts the next draw about late January from the October draw (the issue's date); the draw date is read from the labs partition and the clinical LABS# keys, latest wins.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
       "version": "1.18.0",
       "date": "2026-10-19",
       "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5110, epic #5094): the food plan is graded by a fixed panel like the training plan; built on the panel defaults, pending R1 and R2 (#5091)",
@@ -552,6 +559,11 @@
       "day_type": "lifting | rest | travel | unknown: travel from a travel disruption or charter travel window; else lifting/rest from the planned routine for the date; else unknown (base target, never a guessed rest day: the split sequence has no calendar, so the plan states the lifting uplift and the rest offset as conditional until a per-date calendar exists)",
       "surface": "owner-only: the plan_next_session constraint block (training_day_fuel) and the coach packet; no public surface",
       "basis": "built on the panel default, pending R1 (#5091)"
+    },
+    "labs": {
+      "_note": "The follow-up draw cadence only (#5111). Dates and weeks; no result, name or priority lives here. The owner-only due date, when no draw is readable, is the private twin's lab_followup.next_draw_on.",
+      "follow_up_weeks": 16,
+      "reminder_lead_days": 14
     },
     "floors": {
       "fat": {"floor_g": 65, "unit": "g", "per_meal_g": 10, "meals_with_fat": 3, "epa_dha_g": 2},

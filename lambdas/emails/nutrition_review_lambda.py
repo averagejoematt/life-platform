@@ -45,6 +45,7 @@ from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny p
 from health import (  # #4244: THE food + supplements micronutrient join (shared with the public door)
     calorie_target,
     nutrient_intake,
+    protein_engine,
     titration,  # #5096: the weekly calorie titration decision (owner-only; this email is an owner surface)
 )
 
@@ -307,8 +308,9 @@ def extract_daily_nutrition(mf_data, supplements=None, habitify=None):
             "total_sugars_g": safe_float(rec, "total_sugars_g"),
             "total_sugars_added_g": safe_float(rec, "total_sugars_added_g"),
             "total_cholesterol_mg": safe_float(rec, "total_cholesterol_mg"),
-            "meals_above_30g_protein": safe_float(rec, "meals_above_30g_protein"),
-            "protein_distribution_score": safe_float(rec, "protein_distribution_score"),
+            # #5109: the protein engine's count of feedings at its per-feeding line (charter nutrition.protein), not the
+            # ingest's legacy 30 g-per-meal score (macrofactor_lambda.compute_protein_distribution). None = untimed day.
+            "feedings_at_threshold": protein_engine.evaluate_day(rec)["feedings_40g"],
             "total_meals": safe_float(rec, "total_meals"),
             # #4244: the JOINED figures — per nutrient {actual, target, pct, from_food,
             # from_supplements, channels_counted[, uncounted_supplements]}; the label fields

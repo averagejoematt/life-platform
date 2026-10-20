@@ -258,7 +258,8 @@ def test_long_threshold_sources_no_longer_false_alarm_every_cycle(monkeypatch):
     stale food-delivery pipe for 76 days).
     """
     last_seen = {src: _TODAY - timedelta(days=1) for src in brief.STALENESS_SOURCES}
-    for _long in ("food_delivery", "measurements"):
+    # food_delivery was paused (#5108) and left the long-threshold set; measurements remains
+    for _long in ("measurements",):
         _inside = max(1, int(brief.STALENESS_THRESHOLD_OVERRIDE_DAYS[_long]) - 1)
         last_seen[_long] = _TODAY - timedelta(days=_inside)
     monkeypatch.setattr(brief, "table", PhaseAwareFakeTable(_brief_rows(last_seen)))

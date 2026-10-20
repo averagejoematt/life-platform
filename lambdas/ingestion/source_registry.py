@@ -1331,9 +1331,17 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "active_api": False,
         "expected_days": None,
         "qa_tier": None,
-        "method": "Manual log",
+        "method": "Manual log (paused: no orders logged since March)",
         "metrics": "Delivery-order behavioral signal (incl. longest-ever streak)",
-        "posture": "portfolio",
+        # PAUSED 2026-10-19 (#5108/#5006; built on the evidence, pending the owner's confirmation):
+        # no delivery orders logged since 2026-03-28 (>200 days; the only S3 imports are the
+        # 03-28 backfill CSVs). ADR-074 posture: off by design, shown as paused, never counted
+        # stale, never a coach check-in context, no nudge, no "dark N days" stamp, and
+        # get_food_delivery_streak_state returns None so the Nutrition-pillar modifier is neutral.
+        # Data, raw prefix and the ingestion Lambda are untouched. Un-pause = delete `paused` and `paused_since` and restore `posture` to "portfolio".
+        "paused": True,
+        "paused_since": "2026-10-19",
+        "posture": "paused",
         "raw_layout": None,
         "capture_channel": "mcp",  # #746: logged by hand in an MCP conversation
     },

@@ -1196,3 +1196,16 @@ class TestHandlerFullCompute:
         assert out["statusCode"] == 500
         assert "Validation failed" in out["body"]
         assert [p for p in table.puts if p["sk"] == "DATE#" + DATE] == []
+
+
+import pytest as _pytest_5108  # noqa: E402
+
+
+@_pytest_5108.fixture(autouse=True)
+def _food_delivery_unpaused_5108(monkeypatch):
+    """#5108: the real registry now PAUSES food_delivery (reader returns None). These tests
+    exercise the LIVE-source behaviour, so they un-pause it; the paused contract is pinned in
+    tests/test_food_delivery_paused_5108.py."""
+    from ingestion.source_registry import SOURCE_REGISTRY
+
+    monkeypatch.setitem(SOURCE_REGISTRY, "food_delivery", {**SOURCE_REGISTRY["food_delivery"], "paused": False})

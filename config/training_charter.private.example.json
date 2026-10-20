@@ -5,5 +5,8 @@
     "waist_in": null,
     "photo_pose": null
   },
-  "appearance_brief": null
+  "appearance_brief": null,
+  "lab_followup": {
+    "next_draw_on": null
+  }
 }

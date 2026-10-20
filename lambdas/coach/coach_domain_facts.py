@@ -518,6 +518,19 @@ def _training_context(today: str, clinical: str) -> str:
         return clinical
 
 
+def _nutrition_context(today: str) -> str:
+    """#5109: `training.coach_context.nutrition_context` for the owner's nutrition thread (published=False): the
+    charter's nutrition block, the redlines' rules and the ONE calorie target with its provenance. The day grade is
+    the brief's (this thread reads no single day row). Fail-soft: "" on any trouble."""
+    try:
+        from training import coach_context
+
+        return coach_context.nutrition_context(today, published=False)["text"]
+    except Exception as e:  # noqa: BLE001 — the chat runs on its domain facts alone
+        logger.warning("[domain_facts] nutrition context unavailable: %s", e)
+        return ""
+
+
 def _persona_id(coach_id: str) -> tuple:
     """(pack key, canonical persona id) for a route id, a short id, or a persona id."""
     raw = (coach_id or "").strip().lower()
@@ -612,6 +625,8 @@ def domain_facts_block(coach_id: str, table, today: Optional[str] = None) -> str
         logger.warning("[domain_facts] clinical context unavailable: %s", e)
     if key in _TRAINING_ROUTE_KEYS:
         clinical = _training_context(today, clinical)  # #5071: the one planning context, the clinical block inside it
+    elif key == "nutrition":
+        clinical = "\n\n".join(x for x in (clinical, _nutrition_context(today)) if x)  # #5109: the same assembly
     if clinical:
         sections.append(clinical)
     track_section = coach_team_texture.track_record_section(track_lines)
