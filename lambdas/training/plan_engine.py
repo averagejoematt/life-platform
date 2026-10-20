@@ -751,11 +751,18 @@ def _deload_recommendation(
     return rec
 
 
-def _effort_blocks(date: str, rows: Any, catalog_movements: Any, states: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    """`progression` (#5052) + `ceiling_change_proposal` (#5058, over the prescription window's stored adherence)."""
+def _effort_blocks(
+    date: str, rows: Any, catalog_movements: Any, states: dict[str, dict[str, Any]], fuel_inputs: tuple[Any, Any]
+) -> dict[str, Any]:
+    """`progression` (#5052) + `ceiling_change_proposal` (#5058, over the prescription window's stored adherence)
+    + `training_day_fuel` (#5101: the served session and the disruption records the day type is read from)."""
     st = (states.get("hevy_workouts_prescription_window") or {}).get("state")
     proposal = ceiling_proposal.for_plan(date, rows, None if st == READ_FAILED else st, catalog_movements)
-    return {"progression": load_progression.rule_summary(), "ceiling_change_proposal": proposal}
+    return {
+        "progression": load_progression.rule_summary(),
+        "ceiling_change_proposal": proposal,
+        "training_day_fuel": _training_day_fuel(date, *fuel_inputs),
+    }
 
 
 def _steps_ramp_block(
@@ -1068,7 +1075,6 @@ def constraint_block(
         # `with_recommendation` stamps the signals in place, so the served session's copy (the same dict) carries them too.
         "block_model": block_model.with_recommendation(session.get("block_model"), deload_rec),
         "steps_ramp": _steps_ramp_block(date, steps_window, pain_flag_instances, pain_dismissals, deload_records, input_status),
-        "training_day_fuel": _training_day_fuel(date, session, disruption_records),  # #5101: lifting-day fuel, owner-only
         # #5088 — his disruption mode (habits held, not targets) or the coach's OFFER of it; never self-applied
         "disruption": disruption.constraint(date, disruption_records, block_workouts, None, states["disruption_records"]["state"]),
         # #4387 — the walking total cannot say "yesterday was 2¾ h on foot". These rows can: one
@@ -1115,7 +1121,7 @@ def constraint_block(
         # W1 (#5050) moves the engine's reads onto the charter; until then the literals above still come from owner_redlines/program_structure.
         "charter_version": training_charter.charter_version(),
         # #5052: the double progression + effort limits, stamped; #5058: the ceiling-change proposal (never auto-applied)
-        **_effort_blocks(date, hevy_workouts_prescription_window, catalog_movements, states),
+        **_effort_blocks(date, hevy_workouts_prescription_window, catalog_movements, states, (session, disruption_records)),
         "critics": dict(_CRITICS_NOT_WIRED),
         "honesty": [
             s
