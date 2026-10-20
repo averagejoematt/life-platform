@@ -16,6 +16,7 @@ from mcp import core as _mcp_core
 from mcp.config import logger
 from mcp.core import decimal_to_float, get_profile, phase_scope_block, query_source, query_source_cross_phase
 from mcp.helpers import normalize_whoop_sleep
+from mcp.tools_nutrition import expenditure_reconciliation  # #5097: the three burn estimates vs the scale
 from mcp.tools_training import _get_training_load
 from mcp.weight_rate import (
     annotate_weekly_rates,
@@ -1035,6 +1036,7 @@ def _get_energy_expenditure(args):
         "exercise_kcal_by_basis_30d": ex_30d["kcal_by_basis"],
         "tdee_7d_avg": tdee_7d_avg,
         "tdee_30d_avg": tdee_30d_avg,
+        "expenditure_reconciliation": expenditure_reconciliation(end_date, tdee_7d_avg, read=query_source_cross_phase),
         "target_deficit_kcal": target_deficit_kcal,
         "calorie_target_based_on_7d": calorie_target_7d,
         "calorie_target_based_on_30d": calorie_target_30d,

@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.7.0",
+  "version": "1.10.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -56,6 +56,13 @@
       "date": "2026-10-19",
       "by": "owner direction 2026-10-18 on #5078 (the elite-panel training review: a fitness test battery every 6 weeks)",
       "what": "calibration.fitness_tests gains its protocol: each test's machine, unit, better direction and how it is logged (the explicit record or Hevy), the protocol version, the block alignment and grace for the due week (overdue, then missed: the dead-man state), and the test day (the lightest role carries the tests on its minimum session, never a lower day).",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.10.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition panel review (epic #5091: 'all items worked now'); the 300 kcal bar is #5097's own acceptance line",
+      "what": "nutrition.expenditure (#5097): the reconciliation that sets MacroFactor's adaptive expenditure and both platform burn models against the scale-trend-implied expenditure (mean intake + 3500 kcal per lb of the shared 14-day loss rate). disagreement_threshold_kcal is the spread between the models above which the read says which one matches the scale; min_logged_days is the fewest logged intake days in the loss-rate window before a scale-implied figure is computed at all.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -393,6 +400,15 @@
     "dan_john": {"concedes": "machines and isolation in the mix", "in_return": "carries and kettlebell work weekly"},
     "hollywood_transformation_trainer": {"concedes": "nothing", "in_return": "gets the frame, the deadline, the steps and the session length"},
     "clinical_exercise_physiologist": {"concedes": "fast loss alongside 5 lifting days", "in_return": "weekly strength, sleep and fat-free-mass tracking, effort by RPE"}
+  },
+  "nutrition": {
+    "expenditure": {
+      "disagreement_threshold_kcal": 300,
+      "min_logged_days": 7,
+      "compared": ["macrofactor_adaptive", "platform_measured", "platform_flat"],
+      "against": "scale-trend-implied expenditure: mean logged intake over the shared 14-day loss-rate window + 3500 kcal per lb of that rate, per day",
+      "owner": "health/expenditure_reconciler.py (#5097)"
+    }
   },
   "panel_target": {
     "overall": "A",
