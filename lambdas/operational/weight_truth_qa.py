@@ -358,6 +358,31 @@ def _quantity_matches(sentence: str, patterns, lo: float, hi: float) -> list[flo
     return out
 
 
+# #5183: how far AFTER a from-to pair its keyword may sit when none precedes it ("from 78 to 84, recovery ...").
+_FROM_TO_KEYWORD_AFTER_CHARS = 40
+
+
+def _from_to_owners(sentence: str, quantities) -> dict:
+    """#5183: ``{quantity: [from-to match]}`` — each "from X to Y" pair in `sentence` belongs to the ONE quantity
+    whose keyword is nearest before its "from" and after the previous pair (else, within
+    `_FROM_TO_KEYWORD_AFTER_CHARS` after it). Before this, every quantity named anywhere in the sentence took the FIRST
+    pair: "Recovery dropped from 78.7% to 71.9% ... the opposite of what I predicted when he committed to escalating
+    protein" read 71.9 as a protein figure, and `cross_surface:coach_vs_engine` held a recovery trend against the
+    engine's protein average (2026-10-19). A pair no keyword names belongs to nobody."""
+    owners: dict = {}
+    pairs = list(_FROM_TO_NUMBERS.finditer(sentence))
+    hits = [(k.start(), k.end(), q) for q in quantities if _QUANTITY_KEYWORD.get(q) for k in _QUANTITY_KEYWORD[q].finditer(sentence)]
+    for i, m in enumerate(pairs):
+        prev_end = pairs[i - 1].end() if i else 0
+        next_start = pairs[i + 1].start() if i + 1 < len(pairs) else len(sentence)
+        before = [(e, q) for s0, e, q in hits if prev_end <= s0 and e <= m.start()]
+        after = [(-s0, q) for s0, _e, q in hits if m.end() <= s0 < min(next_start, m.end() + _FROM_TO_KEYWORD_AFTER_CHARS)]
+        best = max(before) if before else (max(after) if after else None)
+        if best is not None:
+            owners.setdefault(best[1], []).append(m)
+    return owners
+
+
 def classify_claims(prose: str, patterns: dict, domain: dict):
     """The ONE seam #4180 and #4186 share: every quantity a blob of prose states,
     split three ways so a caller can never mis-compare a figure that was never a
@@ -393,18 +418,18 @@ def classify_claims(prose: str, patterns: dict, domain: dict):
         if _VITALS_TARGET_SENTENCE.search(sentence) or _DATED_SENTENCE.search(sentence):
             continue
         is_trend = bool(_TREND_SENTENCE.search(sentence))
-        from_to = _FROM_TO_NUMBERS.search(sentence) if is_trend else None
+        owned = _from_to_owners(sentence, _QUANTITY_KEYWORD) if is_trend else {}
         for quantity, pats in patterns.items():
             lo, hi = domain[quantity]
-            keyword = _QUANTITY_KEYWORD.get(quantity)
-            if is_trend and from_to and keyword is not None and keyword.search(sentence):
-                start = float(from_to.group(1).replace("−", "-"))
-                end = float(from_to.group(2).replace("−", "-"))
-                if lo <= start <= hi:
-                    trend_start.append((quantity, start))
-                if lo <= end <= hi:
-                    trend_end.setdefault(quantity, []).append(end)
-                continue  # from-to consumed this quantity for this sentence — never double-count
+            if quantity in owned:
+                for from_to in owned[quantity]:
+                    start = float(from_to.group(1).replace("−", "-"))
+                    end = float(from_to.group(2).replace("−", "-"))
+                    if lo <= start <= hi:
+                        trend_start.append((quantity, start))
+                    if lo <= end <= hi:
+                        trend_end.setdefault(quantity, []).append(end)
+                continue  # its from-to pairs consumed this quantity for this sentence — never double-count
             vals = _quantity_matches(sentence, pats, lo, hi)
             if not vals:
                 continue

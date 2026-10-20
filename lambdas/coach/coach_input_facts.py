@@ -179,6 +179,12 @@ def nutrition_record(rows: list, today: str) -> dict:
     }
 
 
+def current_run_facts() -> Optional[dict]:
+    """THIS run's facts, never a read (#5109): what the quality gate grades against. Its own function so a caller that
+    only grades (the diary reaction's gate) does not reach the fact BUILD's config reads in the call graph."""
+    return _run.get("facts")
+
+
 def served_run_facts(data: Optional[dict] = None, *, table=None, today: Optional[str] = None) -> Optional[dict]:
     """This run's served facts: ``{"data_through", "nutrition", "protein_series"}``.
 
@@ -188,7 +194,7 @@ def served_run_facts(data: Optional[dict] = None, *, table=None, today: Optional
     never reads anything: that is how the quality gate sees the facts the coach was given.
     """
     if data is None:
-        return _run.get("facts")
+        return current_run_facts()
     today = today or pacific_today()
     key = (data_through(data), today)
     supplied = data.get("macrofactor_window")
@@ -211,6 +217,10 @@ def served_run_facts(data: Optional[dict] = None, *, table=None, today: Optional
         # `published=True`: a coach read can reach a public page, so the block tells the
         # coach not to name its contents. "" (fail-soft) when absent or unreadable.
         "clinical": _cf.clinical_context_block(table, published=True),
+        # #5109: the nutrition coach's charter context (training.coach_context.nutrition_context), built once per run;
+        # its `served_figures` license a target/floor figure in the served-fact gate below.
+        "nutrition_context": nutrition_charter_context(data, today),
+        "plan_facts": _plan_facts(),
     }
     # The table itself is held (not its id) so an identity check can never match a
     # different object that happens to reuse a freed id.
@@ -237,6 +247,32 @@ def weight_fact(src: Optional[dict]) -> Optional[dict]:
     return out if out["latest_weight"] is not None or out["weekly_rate_lbs"] is not None else None
 
 
+def _plan_facts() -> Optional[dict]:
+    """The plan root's figures (`ai.plan_facts_gate.cached_plan_facts`, once per container), read HERE — on the coach-input
+    build — so the gate below grades against facts the run already holds and never reads config itself. None disarms."""
+    try:
+        from ai.plan_facts_gate import cached_plan_facts  # noqa: PLC0415
+
+        return cached_plan_facts()
+    except Exception as e:  # noqa: BLE001 — the target class is disarmed, never the coach
+        print(f"[COACH-INPUT-FACTS] plan facts unavailable (target check disarmed): {type(e).__name__}: {e}")
+        return None
+
+
+def nutrition_charter_context(data: Optional[dict], today: str) -> Optional[dict]:
+    """#5109: `training.coach_context.nutrition_context` for this run (published: the nutrition text reaches the
+    site), from the brief's MacroFactor day row. None on any failure — the coach then runs without it, and the
+    served-fact gate grades no target figure (absence disarms, never guesses)."""
+    try:
+        from training import coach_context  # noqa: PLC0415 — lazy: the charter read stays off the import path
+
+        row = (data or {}).get("macrofactor") or (data or {}).get("nutrition")
+        return coach_context.nutrition_context(today, day_row=row if isinstance(row, dict) else None, published=True)
+    except Exception as e:  # noqa: BLE001 — a coach input is never load-bearing on this assembly
+        print(f"[COACH-INPUT-FACTS] nutrition charter context unavailable (omitted): {type(e).__name__}: {e}")
+        return None
+
+
 def coach_inputs(coach_id: str, domain_data: Any, data: Optional[dict], *, table=None) -> Any:
     """THE coach-input boundary (`ai_calls._run_coach_v2_pipeline`, before the upstream
     change-gate hashes anything): every coach's domain data has its sleep instants
@@ -245,6 +281,9 @@ def coach_inputs(coach_id: str, domain_data: Any, data: Optional[dict], *, table
     out = localize_sleep_instants(domain_data)
     if coach_id == "nutrition_coach" and isinstance(out, dict):
         out = {**out, "logging_record": (facts or {}).get("nutrition")}
+        ctx = (facts or {}).get("nutrition_context")
+        if ctx:  # #5109: the charter, the redlines' rules, the ONE calorie target and the engines' day, as one block
+            out = {**out, "charter_context": {k: ctx[k] for k in ("context_version", "charter_version", "sections", "rule")}}
     if isinstance(out, dict):
         # #4189: every coach reads the owner's four words — the sleep and mind coaches asked
         # for them by name; the rest see the same fact so no coach narrates a morning he
@@ -534,6 +573,31 @@ def weight_findings(sentence: str, weight: Optional[dict]) -> list:
 
 SERVED_FACT_REPORT_KEY = "served_fact_violations"
 
+# #5109: the quantities whose TARGET figures a coach may state only as an engine serves them. A plan-framed figure
+# ("a 190 g target", "a 1,650-calorie budget") must be the plan root's (`ai.plan_facts_gate`, the #3518 class) or one
+# the nutrition context serves (`training.coach_context.served_figures`: the charter's targets and floors, the ONE
+# calorie target, the protein engine's day) or an observed protein figure of this run. Steps stay with the
+# condensation gate (coach_state_updater), whose plan root still names its own step range.
+TARGET_QUANTITIES = ("calories", "protein_g", "fiber_g")
+
+
+def target_findings(text: str, facts: Optional[dict]) -> list:
+    """Every plan-framed calorie / protein / fibre figure in `text` that no engine serves. Empty (disarmed) when the
+    run has no nutrition context or no plan root — absence is never a finding."""
+    ctx = (facts or {}).get("nutrition_context")
+    if not text or not isinstance(ctx, dict):
+        return []
+    from ai.plan_facts_gate import plan_figure_findings  # noqa: PLC0415 — pure; the plan facts ride the run's facts
+
+    observed = {q: list(v) for q, v in (ctx.get("served_figures") or {}).items()}
+    protein = observed.setdefault("protein_g", [])
+    protein.extend(float(g) for _d, g in (facts or {}).get("protein_series") or [])
+    avg = ((facts or {}).get("nutrition") or {}).get("protein_avg_g")
+    if avg is not None:
+        protein.append(float(avg))
+    found = plan_figure_findings(text, (facts or {}).get("plan_facts"), observed=observed, quantities=TARGET_QUANTITIES)
+    return [{**f, "metric": f["quantity"], "cited": f["claimed"], "canonical": f["plan"], "excerpt": f["claim"]} for f in found]
+
 
 def served_fact_gate(report: dict, text: str, facts: Optional[dict]) -> dict:
     """Fold served-fact findings into a quality-gate report (ADR-108): a finding fails the
@@ -542,7 +606,7 @@ def served_fact_gate(report: dict, text: str, facts: Optional[dict]) -> dict:
     judge's own verdict. Logged with the figure. Never raises — a failure here leaves the
     report as the gate returned it."""
     try:
-        found = served_fact_findings(text, facts)
+        found = served_fact_findings(text, facts) + target_findings(text, facts)
     except Exception as e:  # noqa: BLE001
         print(f"[COACH-INPUT-FACTS] served-fact check unavailable (non-blocking): {e}")
         return report
@@ -563,4 +627,4 @@ def gated(invoke_gate, lambda_client, coach_id: str, output_text: str, generatio
     (`invoke_gate` — `ai_calls._invoke_quality_gate_sync`, passed in so a test that
     patches it still patches THIS path) with the served-fact check folded in against the
     facts this run's coach inputs were built from (`served_run_facts()`)."""
-    return served_fact_gate(invoke_gate(lambda_client, coach_id, output_text, generation_brief), output_text, served_run_facts())
+    return served_fact_gate(invoke_gate(lambda_client, coach_id, output_text, generation_brief), output_text, current_run_facts())
