@@ -210,7 +210,7 @@ REDLINES: dict[str, dict[str, Any]] = {
         "planned_minimum_any_weight": _charter_value("nutrition.calories.planned_minimum_any_weight_kcal"),
         "opening_kcal": _charter_value("nutrition.calories.target_kcal"),
         "prescribed": _charter_value("nutrition.calories.prescribed_band_kcal"),
-        "titration": _charter_value("nutrition.calories.titration"),
+        "titration": _charter_value("nutrition.titration"),  # #5096: the weekly engine's rule (health.titration)
         "provenance": "population-derived",
         "derived_by": "red-team consensus 2026-09-22 (physician + nutritionist floors; the calibrated model's 'highest intake that reproduces the trajectory')",
         "stated": "2026-09-22",
@@ -219,9 +219,8 @@ REDLINES: dict[str, dict[str, Any]] = {
             "exactly the measured record; at a 13 h base the same intake gives ~3.3. 1,500 kcal reproduces 3.5 only at today's 8.4 h "
             "and cannot hold it below 260; its cost is ~30 g of carbohydrate a day for training and an estimated 3–6 lb more lean lost "
             "(from practice, not a citation). There is no prize for eating 1,500: the same trajectory is available at ~2,000–2,100 with "
-            "the feet. `prescribed` is the OPENING band; a titration step moves it by a charter edit or the week's titration record, never silently. `floor_any_day` "
-            "and `floor_lifting_day` are what the nutrition critics grade single days against; the 7-day-mean floor is not yet computed by "
-            "any module and is reported, not enforced."
+            "the feet. `prescribed` is the OPENING band; the weekly titration record (health.titration) moves it, never silently. "
+            "`floor_any_day` and `floor_lifting_day` grade single days; the 7-day-mean floor is reported, not enforced."
         ),
     },
     "protein_floor_g": {

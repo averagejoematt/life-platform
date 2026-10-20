@@ -271,7 +271,8 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
     # nutrition.expenditure block; 12,496 (est 12,335) when #5095 added nutrition.calories (charter v1.8.0
     # entry); 12,768 (est 12,603) on the #5098 lane alone; then 13,510 (est 13,335) at the #5098 restack
     # onto the combined charter (v1.11.0: nutrition.calories + nutrition.expenditure + nutrition.protein
-    # and its reading guide). The wave's other nutrition blocks move it again: re-scale at restack.
+    # and its reading guide); 14,287 (est 14,102) on the #5096 lane (v1.12.0: nutrition.titration, the
+    # calories block's titration keys moved into it). The wave's other nutrition blocks move it again: re-scale at restack.
     "charter-judge": {
         "engaged": True,
         "route": "charter.judge",
@@ -279,12 +280,13 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_JUDGE_MODEL",
         "cdk_stack": None,
         "measured_on": "sonnet-4-6",
-        "prefix_tokens": 13510,
+        "prefix_tokens": 14287,
         "calls_within_ttl": 5,
         "decided": "2026-10-19",
         "issue": 5072,
         "why": (
-            "~13,510 tok (charter + nutrition.calories + nutrition.expenditure + nutrition.protein, estimate scaled to the "
+            "~14,287 tok (charter + nutrition.calories + nutrition.expenditure + nutrition.protein + nutrition.titration, "
+            "estimate scaled to the "
             "Haiku wire ratio) against Sonnet 4.6's 1,024 floor. "
             "One weekly run = the real plan + 4 negative controls, back-to-back inside one 5m TTL: one write at 1.25x "
             "then four reads at 0.1x. ~4,500 tok volatile in (rubric + blinded plan) / ~700 out per plan: ~$0.18 a run "
@@ -298,7 +300,7 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_JUDGE_GATE_MODEL",
         "cdk_stack": None,
         "measured_on": "sonnet-4-6",
-        "prefix_tokens": 13510,
+        "prefix_tokens": 14287,
         "calls_within_ttl": 5,
         "decided": "2026-10-19",
         "issue": 5072,
@@ -314,12 +316,12 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_NARRATIVE_MODEL",
         "cdk_stack": None,
         "measured_on": "haiku-4-5",
-        "prefix_tokens": 11602,
+        "prefix_tokens": 16023,
         "calls_within_ttl": 3,
         "decided": "2026-10-19",
         "issue": 5084,
         "why": (
-            "11,602 tok on the wire (Bedrock CountTokens 2026-10-19, after the #5090 run on-ramp and #5078 fitness battery "
+            "~16,023 tok (estimate 15,816 scaled to the Haiku wire ratio 7,738/7,638 on 2026-10-20 when the nutrition charter wave grew the charter to v1.16.0 — re-measure with Bedrock CountTokens; 11,602 on the wire 2026-10-19 after the #5090 run on-ramp and #5078 fitness battery "
             "grew the charter; 7,738 on 2026-10-18), clears the 4,096 floor. A ONE-call-a-night narrative would be a decline (a write "
             "premium nothing reads), so the design batches it: the nightly pre-draft writes the plan, Hevy-note and "
             "Telegram lines back-to-back (charter_ai.NARRATIVE_SURFACES) — one write, two reads. ~1,500 tok volatile "
@@ -334,12 +336,12 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_RETRO_MODEL",
         "cdk_stack": None,
         "measured_on": "haiku-4-5",
-        "prefix_tokens": 11602,
+        "prefix_tokens": 16023,
         "calls_within_ttl": 8,
         "decided": "2026-10-19",
         "issue": 5084,
         "why": (
-            "11,602 tok on the wire (Bedrock CountTokens 2026-10-19, re-measured with charter-narrative), clears the 4,096 "
+            "~16,023 tok (estimate-scaled with charter-narrative on 2026-10-20; 11,602 on the wire 2026-10-19), clears the 4,096 "
             "floor. The block retro reuses the judge's panel rubric — one "
             "call per seat, back-to-back in one /training-review run, once per block. ~4,000 tok volatile in "
             "(the block's evidence) / ~800 out per seat: $0.0866 per retro cached vs $0.1568 uncached (-45%). "

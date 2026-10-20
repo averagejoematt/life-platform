@@ -310,6 +310,12 @@ SOURCE_TIERS: dict[str, int] = {
     # Declared before the first row exists (ADR-154's ordering). Readers: get_exercise_notes
     # action='fitness_tests', the May tracker and the coach packet (all owner channels).
     "fitness_tests": TIER_OWNER_ONLY,
+    # #5096: the weekly calorie titration decision (WEEK#<monday>) — the week's target, the step and its inputs
+    # (his loss rate against the owner-only band, the steps mean, his bodyweight). The band is owner-only by ruling,
+    # so the row takes that tier whole. Declared before the first row exists (ADR-154's ordering). Readers: the
+    # calorie resolver (`health.calorie_target`, which states only the kcal), the owner's nutrition-review email
+    # and the calibration sweep's dead-man (owner Telegram).
+    "nutrition_titration": TIER_OWNER_ONLY,
     # #4078: chat writes queued for approval. A queued row carries the target write tool's exact
     # arguments — journal-grade text, a pain-site statement, a meal — so it takes the highest tier
     # of anything it can hold. Declared before the first row exists (ADR-154's ordering). MCP-only.

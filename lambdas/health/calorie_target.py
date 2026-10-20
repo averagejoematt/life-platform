@@ -7,10 +7,12 @@ TDEE minus 500 (the macros tool and the coach's domain facts). Every one of them
 ``resolve()`` — or the thin ``target_kcal()`` — so they cannot disagree.
 
 ORDER (first hit wins):
-  1. the week's TITRATION record, when a reader is injected and returns one. The record lives at
+  1. the week's TITRATION record, when a reader returns one. The record lives at
      ``USER#matthew#SOURCE#nutrition_titration`` / ``WEEK#<iso-monday>`` (docs/SCHEMA.md); its
-     writer is the weekly titration engine (#5096), which is NOT built yet — this module defines
-     the seam and the record shape only, so no production caller injects a reader today.
+     writer is the weekly titration engine (``health.titration``, #5096). A caller may inject a
+     reader; when none is injected, a resolve INSIDE A LAMBDA uses ``titration.lambda_default_reader``
+     (a cached, fail-soft table read), so every surface states the titrated target. Outside a Lambda
+     (a unit test, a laptop) no reader is used unless one is injected.
   2. the charter's ``nutrition.calories`` block (config/training_charter.json): ``target_kcal``
      inside ``prescribed_band_kcal`` (the panel default R1, pending the owner's answer: eat up to
      the prescribed band now, refit weekly).
@@ -18,7 +20,7 @@ The any-day floor (``floor_any_day_kcal``) clamps whatever was resolved, and the
 ``provenance``. An unreadable charter resolves to ``kcal: None`` with ``source: "unavailable"`` —
 never a remembered number (ADR-104); every reader treats None as "no target", not zero.
 
-PURE: no table handle, no clock unless ``day`` is omitted (then Pacific today, the platform's day).
+PURE outside a Lambda: no table handle, no clock unless ``day`` is omitted (then Pacific today, the platform's day).
 The charter read goes through ``training.training_charter`` — bundled, read once per container and
 cached 15 min — so a per-request caller does no S3 read per call.
 """
@@ -200,6 +202,10 @@ def resolve(
     ``source`` is ``"titration"``, ``"charter"`` or ``"unavailable"``. ``provenance`` says where the
     number came from in words, including a floor clamp when one applied."""
     read = charter_reader or _default_charter_reader
+    if titration_reader is None:
+        from health.titration import lambda_default_reader  # noqa: PLC0415 — lazy: titration imports this module
+
+        titration_reader = lambda_default_reader()
     block = read(CHARTER_PATH)
     block = block if isinstance(block, dict) else {}
     week = week_monday(day) if (day or titration_reader is not None) else None  # no clock read unless a week is needed
