@@ -122,3 +122,30 @@ def test_no_critic_module_reads_the_endpoint_trend():
         src = (REPO / rel).read_text()
         code = "\n".join(ln for ln in src.splitlines() if not ln.lstrip().startswith("#"))
         assert not re.search(r"\.weight_trend_lb_per_wk\(|import[^\n]*weight_trend_lb_per_wk", code), rel
+
+
+def test_the_inputs_fetch_reaches_back_far_enough_for_the_oldest_checkpoint(monkeypatch):
+    """Live 2026-10-20: the oldest checkpoint's '14-day' trend saw only its own week's weigh-ins
+    because the withings fetch was 14 days, so it quoted the 7-day slope again. The fetch must
+    cover the oldest checkpoint's full trend window."""
+    from mcp import nutrition_critics_inputs as nci
+
+    asked = {}
+
+    def fake_query(source, start, end):
+        asked[source] = start
+        return [] if source != "withings" else _series(0.5, 0.0, n=40)
+
+    monkeypatch.setattr(nci, "query_source", fake_query)
+    nci.resolve(END, include_metabolic=False)
+    weeks = 2
+    oldest_end = sq.shift_day_key(sq.completed_end(END), -sq.WEEK_DAYS * (weeks - 1))
+    needed_start = sq.shift_day_key(oldest_end, -(sq.LOSS_RATE_WINDOW_DAYS - 1))
+    assert asked["withings"] <= needed_start, (asked["withings"], needed_start)
+
+
+def test_the_oldest_checkpoint_trend_uses_its_full_window():
+    rows = _series(0.5, 0.0, n=40)
+    weeks = sq.weekly_loss_rate_weeks_from_rows(rows, END, genesis=GENESIS, trend_days=14)
+    oldest = weeks[0]
+    assert oldest["trend_n_weighins"] > oldest["n_weighins"], oldest
