@@ -1016,7 +1016,7 @@
     }
   ],
   "cost_surface": {
-    "ai_features": 29,
+    "ai_features": 30,
     "alarms": 140,
     "emf_namespaces": 33,
     "schedules": 97,
