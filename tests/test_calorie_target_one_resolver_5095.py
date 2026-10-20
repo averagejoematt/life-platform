@@ -19,12 +19,17 @@ hypothesis engines), the redlines' prescribed band (the nutrition critics only) 
   (d) the character engine reads the row's MacroFactor-app target by its STORED name
       (`target_calories_kcal`, was misspelt `target_calories`) — as a drift signal only.
 
+The weekly story dossier is a surface in (c) too: its `targets_from_plan.calories_kcal` and its
+at-or-under count are the resolver's; the sealed root figure rides beside them, labelled
+`genesis_calories_kcal` (history only), and the dossier's plan-facts check holds each to its own.
+
 NOT SEEN, stated: a calorie target written in prose ("1,500 kcal" inside a string — the
 sealed pre-registration and the redlines' history notes say it legitimately); a target
-computed at runtime from other literals; the sealed plan root `config/user_goals.json`
-`daily_calories_target` (hash-stamped in the frozen pre-registration — the genesis figure,
-history, read by story_dossier as "the sealed plan"); and the site's published energy budget
-(lambdas/web/site_api_nutrition.py), a published surface this lane does not re-point.
+computed at runtime from other literals; and the sealed plan root `config/user_goals.json`
+`daily_calories_target` itself (hash-stamped in the frozen pre-registration — the genesis
+figure, history; no surface states it as the target). The site states NO calorie target:
+lambdas/web/site_api_nutrition.py publishes maintenance only (`energy_budget(..., deficit_kcal=0)`,
+returning `tdee`), so there is no published target here to re-point.
 """
 
 from __future__ import annotations
@@ -286,6 +291,17 @@ def test_every_surface_states_the_same_kcal_for_one_day(monkeypatch):
     got["macros_tool"] = tn.tool_get_nutrition({"view": "macros", "start_date": FIXTURE_DAY, "end_date": FIXTURE_DAY})["targets"][
         "calories_kcal"
     ]
+
+    from content import story_dossier
+    from experiment.plan_facts import load_plan_facts
+
+    monkeypatch.setattr(story_dossier, "_days", lambda table, src, start, end: {FIXTURE_DAY: MF_ROW} if src == "macrofactor" else {})
+    plan = story_dossier.load_plan(load_plan_facts())
+    nut = story_dossier._nutrition(None, {"start": FIXTURE_DAY, "end": FIXTURE_DAY}, plan, {})
+    got["story_dossier"] = nut["targets_from_plan"]["calories_kcal"]
+    assert nut["targets_from_plan"]["genesis_calories_kcal"] != want, "the genesis figure is labelled apart, never the target"
+    logged = float(MF_ROW["total_calories_kcal"])
+    assert nut["days_calories_at_or_under_target"] == (1 if logged <= want else 0), "the dossier counts against the resolver's kcal"
 
     assert {k: v for k, v in got.items() if v != want} == {}, f"surfaces disagree with the resolver's {want}: {got}"
 
