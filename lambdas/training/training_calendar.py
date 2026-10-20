@@ -35,7 +35,7 @@ typing; when a postponement changes the count, the past day's offset and the rem
 
 from __future__ import annotations
 
-from datetime import date as _date, timedelta
+from datetime import timedelta
 from typing import Any, Iterable
 
 from common.pacific_time import parse_day_key, shift_day_key
@@ -110,7 +110,7 @@ def week_calendar(
     remaining = max(0, count - len(done))
     nominal = set(_nominal_weekdays() if nominal_weekdays is None else nominal_weekdays)
     candidates = [d for d in dates if d >= today and d not in done and d not in away]
-    laid = set(sorted(candidates, key=lambda d: (_date.fromisoformat(d).weekday() not in nominal, d))[:remaining])
+    laid = set(sorted(candidates, key=lambda d: (parse_day_key(d).weekday() not in nominal, d))[:remaining])
     days = []
     for d in dates:
         if d in done:
