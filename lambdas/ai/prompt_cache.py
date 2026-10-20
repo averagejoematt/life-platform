@@ -265,10 +265,11 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
     # is WORKHORSE) and to ONE call per plan with every seat in it, so its batch is the plans of one
     # run — the weekly real plan + its negative controls (panel_judge.WEEKLY_CALLS_PER_RUN), and the CI
     # gate's golden cases (tests/fixtures/panel_golden_5072/). prefix_tokens is NOT a Sonnet wire count:
-    # it is estimate_tokens on charter v1.5.0 (8,442) scaled by the measured Haiku wire/estimate ratio
-    # (7,738 / 7,638) — the 4.x family shares a tokenizer; re-measure from the first run's usage block.
-    # #5098 re-scaled both judge entries the same way after charter v1.9.0 (the nutrition.protein block + its reading
-    # guide): estimate_tokens 12,203 x (7,738 / 7,638) = 12,363.
+    # it is estimate_tokens on the charter scaled by the measured Haiku wire/estimate ratio (7,738 / 7,638)
+    # — the 4.x family shares a tokenizer; re-measure from the first run's usage block. First recorded
+    # 8,550 (v1.5.0, est 8,442); re-scaled 2026-10-19 to 11,755 (est 11,603) when #5097 added the
+    # nutrition.expenditure block, then to 12,768 (est 12,603) when #5098 added nutrition.protein + its
+    # reading guide. The wave's other nutrition blocks move it again: re-scale at restack.
     "charter-judge": {
         "engaged": True,
         "route": "charter.judge",
@@ -276,12 +277,13 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_JUDGE_MODEL",
         "cdk_stack": None,
         "measured_on": "sonnet-4-6",
-        "prefix_tokens": 12363,
+        "prefix_tokens": 12768,
         "calls_within_ttl": 5,
         "decided": "2026-10-19",
         "issue": 5072,
         "why": (
-            "~12,363 tok (charter v1.9.0, estimate scaled to the Haiku wire ratio) against Sonnet 4.6's 1,024 floor. "
+            "~12,768 tok (charter + nutrition.expenditure + nutrition.protein, estimate scaled to the Haiku wire ratio) "
+            "against Sonnet 4.6's 1,024 floor. "
             "One weekly run = the real plan + 4 negative controls, back-to-back inside one 5m TTL: one write at 1.25x "
             "then four reads at 0.1x. ~4,500 tok volatile in (rubric + blinded plan) / ~700 out per plan: ~$0.18 a run "
             "cached vs ~$0.31 uncached (-42%)."
@@ -294,7 +296,7 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_JUDGE_GATE_MODEL",
         "cdk_stack": None,
         "measured_on": "sonnet-4-6",
-        "prefix_tokens": 12363,
+        "prefix_tokens": 12768,
         "calls_within_ttl": 5,
         "decided": "2026-10-19",
         "issue": 5072,
