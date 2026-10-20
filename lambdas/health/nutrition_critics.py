@@ -55,7 +55,7 @@ from typing import Any
 from coach.critics import deterministic_verdict, reconcile
 from training import owner_redlines
 
-from health import deficit_disclosures
+from health import calorie_target, deficit_disclosures
 
 CRITICS_VERSION = "nutrition-critics@1.0.0"
 CRITIC_IDS = ("deficit_advocate", "muscle_defense", "adherence")
@@ -101,6 +101,19 @@ INPUT_KEYS = (
 # ── helpers ────────────────────────────────────────────────────────────────────────────
 def _redline(rid: str) -> dict[str, Any]:
     return owner_redlines.REDLINES[rid]
+
+
+def _energy(inputs: dict[str, Any] | None = None) -> dict[str, Any]:
+    """The `energy_floor_kcal` redline with its band, floors and target from the ONE calorie resolver
+    (health.calorie_target, #5095) for the window's week — a titration week moves the critics too."""
+    e = dict(_redline("energy_floor_kcal"))
+    r = calorie_target.resolve((inputs or {}).get("window_end") or None)
+    if r["band_low"] is not None and r["band_high"] is not None:
+        e["prescribed"] = [r["band_low"], r["band_high"]]
+    e["floor_any_day"] = r["floor_any_day_kcal"] or e["floor_any_day"]
+    e["floor_lifting_day"] = r["floor_lifting_day_kcal"] or e["floor_lifting_day"]
+    e["target_kcal"], e["target_source"] = r["kcal"], r["source"]
+    return e
 
 
 def _tripwire(tid: str) -> dict[str, Any]:
@@ -210,7 +223,7 @@ def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
     p = _new_packet("deficit_advocate")
     n, flags, unknown = p["numbers"], p["flags"], p["unknown"]
     sched = _redline("rate_schedule_lb_wk")
-    energy = _redline("energy_floor_kcal")
+    energy = _energy(inputs)
     overshoot_t = _tripwire("rate_overshoot")
     weight = _num(inputs.get("weight_lb"))
     # v3.3 ruling "B" (#4161): the target this critic argues against is the SERVED one — gated by protein adherence
@@ -383,7 +396,7 @@ def build_muscle_defense_packet(inputs: dict[str, Any]) -> dict[str, Any]:
     mass goes. Trailing 7 days, measured days only."""
     p = _new_packet("muscle_defense")
     n, flags, unknown = p["numbers"], p["flags"], p["unknown"]
-    energy = _redline("energy_floor_kcal")
+    energy = _energy(inputs)
     protein = _redline("protein_floor_g")
     floor_t = _tripwire("intake_floor_breached")
     prot_t = _tripwire("protein_floor_missed")
@@ -767,7 +780,7 @@ def _break_options(inputs: dict[str, Any]) -> list[str]:
         if maint is not None
         else "estimated maintenance (TDEE unpublished — derive it from the 14-day trend first, #3931)"
     )
-    energy = _redline("energy_floor_kcal")
+    energy = _energy(inputs)
     return [
         f"diet break: 7-14 days at {at} (IC-29's own MODERATE recommendation)",
         f"refeed: 2 days at {at}, then resume the prescribed {energy['prescribed'][0]}-{energy['prescribed'][1]} band",
@@ -783,7 +796,7 @@ def decisions_offered(
     whose inputs cannot be read is returned `unevaluable` with the missing names."""
     inputs = inputs or {}
     out: list[dict[str, Any]] = []
-    energy = _redline("energy_floor_kcal")
+    energy = _energy(inputs)
     protein = _redline("protein_floor_g")
     lifts = _redline("lifting_sessions_per_wk")
     stall_t = _tripwire("weight_stall_with_adherence")

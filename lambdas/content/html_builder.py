@@ -10,10 +10,11 @@ Exports:
   _section_error_html()  — graceful section error placeholder
 """
 
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_PROTEIN_MIN_G
 from common.digest_utils import compute_confidence
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.pacific_time import day_in_words, shift_day_key  # #4182: dates in words, one PT spelling
+from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 from health.scoring_engine import habitify_reading  # #4362
 
 _HAS_CONFIDENCE = True
@@ -984,7 +985,7 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
         carbs = safe_float(mf, "total_carbs_g")
         fiber = safe_float(mf, "total_fiber_g")
 
-        cal_target = PLAN_DAILY_CALORIES_TARGET
+        cal_target = target_kcal(data.get("date"))
         protein_target = PLAN_DAILY_PROTEIN_MIN_G
 
         if cals is not None:
@@ -995,7 +996,7 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
 
             out += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">'
             macro_items = [
-                ("Calories", fmt_num(cals), "/" + str(cal_target), cal_color),
+                ("Calories", fmt_num(cals), "/" + str(cal_target or "—"), cal_color),
                 ("Protein", str(round(protein)) + "g" if protein else "—", "/" + str(protein_target) + "g", prot_color),
                 ("Fat", str(round(fat)) + "g" if fat else "—", "", "#94a3b8"),
                 ("Carbs", str(round(carbs)) + "g" if carbs else "—", "", "#94a3b8"),

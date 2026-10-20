@@ -1292,7 +1292,7 @@ class TestGeneration:
         assert "started 340 lbs, goal 200 lbs" in prompt
         assert "140 lb weight loss" in prompt
         # #4540: the nutrition targets are the plan's; the profile row's copies are not read.
-        assert f"{eng.PLAN_DAILY_CALORIES_TARGET} cal/day, protein target: {eng.PLAN_DAILY_PROTEIN_MIN_G}g/day" in prompt
+        assert f"{eng.target_phrase()}/day, protein target: {eng.PLAN_DAILY_PROTEIN_MIN_G}g/day" in prompt  # #5095
         assert "2000 cal/day" not in prompt and "210g/day" not in prompt
 
     def test_the_system_prompt_demands_a_pre_registered_machine_checkable_spec(self):

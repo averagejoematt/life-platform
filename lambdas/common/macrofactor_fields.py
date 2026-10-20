@@ -2,8 +2,9 @@
 
 The writer is ``lambdas/ingestion/macrofactor_lambda.py`` and the authoritative table is
 ``docs/SCHEMA.md`` § macrofactor: a day row carries ``total_calories_kcal`` and ``total_protein_g``
-(plus ``meals_above_30g_protein`` from the ingest's meal grouping). It carries NO calorie target —
-the target is the plan's (``common.constants.PLAN_DAILY_CALORIES_TARGET``).
+(plus ``meals_above_30g_protein`` from the ingest's meal grouping). The row may carry the MacroFactor
+APP's own target as ``target_calories_kcal`` — that is not the platform's target: the platform's ONE
+calorie target is ``health.calorie_target`` (#5095), and the app's is read only as a drift signal.
 
 Why this module exists: ``health/character_engine.py`` read ``calories``/``total_calories`` and
 ``protein``/``total_protein`` — names the row has never carried under schema v1 — so four Food
@@ -35,6 +36,16 @@ def _num(v: Any) -> Optional[float]:
     except (TypeError, ValueError):
         return None
     return f if f == f else None  # NaN is absent
+
+
+# The MacroFactor app's own calorie target as the ingest stores it (SCHEMA.md § macrofactor).
+APP_TARGET_CALORIES_FIELD = "target_calories_kcal"
+
+
+def app_target_kcal(row: Optional[dict]) -> Optional[float]:
+    """The MacroFactor app's calorie target stored on the day row, or None. A drift signal against
+    health.calorie_target, never a scoring reference (#5095)."""
+    return _num((row or {}).get(APP_TARGET_CALORIES_FIELD))
 
 
 def macro_value(row: Optional[dict], quantity: str) -> Optional[float]:

@@ -31,11 +31,13 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET  # ADR-058
-from common.macrofactor_fields import macro_value, protein_meals_at  # #4580 B-22: the row's declared field names
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.macrofactor_fields import app_target_kcal, macro_value, protein_meals_at  # #4580 B-22: the row's declared field names
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_today  # #2811: the character sheet's DAY is the Pacific day
+
+from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 
 logger = logging.getLogger(__name__)
 
@@ -540,9 +542,14 @@ def compute_nutrition_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
     # Calorie adherence
     # #4580 B-22: the row's macro names come from common.macrofactor_fields (SCHEMA.md § macrofactor) —
     # this read spelled `calories`/`protein`, names a v1 row never carries, so every logged day scored
-    # ABSENT. The row carries no target; the plan's target is the reference (#4540).
+    # ABSENT. #5095: the reference is the ONE calorie target (health.calorie_target). The row's MacroFactor-app
+    # target is read by its STORED name (`target_calories_kcal` — this read spelled `target_calories`, a name the
+    # row never carries) and only as a drift signal: scoring against it would be a second target.
     cals = macro_value(mf, "calories")
-    cal_target = _safe_float(mf, "calorie_target") or _safe_float(mf, "target_calories") or PLAN_DAILY_CALORIES_TARGET
+    cal_target = target_kcal(data.get("date"))
+    app_target = app_target_kcal(mf)
+    if app_target and cal_target and abs(app_target - cal_target) > 50:
+        logger.warning("[character_engine] MacroFactor app target %.0f kcal != platform target %d kcal (#5095)", app_target, cal_target)
     if cals is not None and cal_target and cal_target > 0:
         deviation = abs(cals - cal_target) / cal_target
         scores["calorie_adherence"] = _clamp(round(100 - (deviation / 0.20) * 100, 1))
@@ -571,7 +578,7 @@ def compute_nutrition_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
         tracked_count = 0
         for day in mf_14d:
             dc = macro_value(day, "calories")
-            dt_target = _safe_float(day, "calorie_target") or _safe_float(day, "target_calories") or cal_target
+            dt_target = target_kcal(day.get("date") or data.get("date"))  # #5095: that day's week's target
             if dc is not None and dt_target and dt_target > 0:
                 tracked_count += 1
                 if abs(dc - dt_target) / dt_target <= 0.10:

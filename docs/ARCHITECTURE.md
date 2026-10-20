@@ -251,6 +251,8 @@ Compute → store → read pattern. Standalone Lambdas run before Daily Brief, s
 
 **Live:** IC-1 (anomaly), IC-2 (training load), IC-3 (nutrition), IC-6 (CGM correlation), IC-7 (cross-pillar), IC-8 (intent vs execution), IC-15 (insights persistence), IC-16 (progressive context), IC-17 (readiness synthesis), IC-18 (hypothesis engine), IC-19 (N=1 experiments + slow drift + sustained anomaly), IC-23 (Character Sheet), IC-24 (adaptive mode), IC-25 (decisions), IC-29 (metabolic adaptation / deficit sustainability — TDEE divergence tracking, deployed v3.7.67), IC-30 (autonomic balance score — HRV + RHR + RR + sleep quality → 4-quadrant nervous system state, deployed v3.7.67).
 
+**One calorie target (#5095, epic #5091):** every surface that states or grades a calorie target — scoring, the character sheet, the daily brief, the weekly / monthly / nutrition-review / partner emails, the insight and hypothesis engines, the coach's domain facts, `get_nutrition view=macros`, the energy view's `calorie_target_platform` and the nutrition critics — reads `health.calorie_target.resolve(day)`: the week's titration record (`…SOURCE#nutrition_titration` / `WEEK#<iso-monday>`, written by the #5096 engine once built) else the charter's `nutrition.calories` block (`config/training_charter.json`), clamped at the any-day floor, with its source and provenance. The generated 1,500 kcal constant is retired and `tests/test_calorie_target_one_resolver_5095.py` guards the set. TDEE (ADR-152, `health.tdee`) stays MAINTENANCE context, never a target.
+
 **Data-gated next:** IC-4 (failure patterns, ~Apr 18), IC-5 (momentum warning, ~Apr 18), IC-26 (temporal mining, ~May), IC-27 (multi-resolution handoff, ~May).
 
 ### Site API Lambda (us-west-2)

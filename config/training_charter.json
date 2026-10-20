@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -56,6 +56,13 @@
       "date": "2026-10-19",
       "by": "owner direction 2026-10-18 on #5078 (the elite-panel training review: a fitness test battery every 6 weeks)",
       "what": "calibration.fitness_tests gains its protocol: each test's machine, unit, better direction and how it is logged (the explicit record or Hevy), the protocol version, the block alignment and grace for the due week (overdue, then missed: the dead-man state), and the test day (the lightest role carries the tests on its minimum session, never a lower day).",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.8.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition panel review (#5095, epic #5091: one calorie target everywhere); the level is the panel default R1 (eat up to the prescribed band now, refit weekly), pending the owner's R1 answer",
+      "what": "nutrition.calories: the ONE calorie target every surface reads through health.calorie_target.resolve. The energy floors, the prescribed band, the opening target and the titration rule MOVE here from training.owner_redlines energy_floor_kcal (same values; the redlines now read them from this block). The 1,500 kcal generated constant is retired. A weekly titration record (USER#matthew#SOURCE#nutrition_titration / WEEK#<iso-monday>, written by the #5096 titration engine, not yet built) outranks target_kcal for its week; the any-day floor clamps any resolved target.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -383,6 +390,32 @@
       "provenance": "the battery and its cadence: owner direction 2026-10-18 (#5078); the protocol detail (units, machines, order, test day): platform-proposed for the owner's review"
     },
     "block_retro": {"every_weeks": 6, "scorecard_rows": 13}
+  },
+  "nutrition": {
+    "calories": {
+      "target_kcal": 2100,
+      "prescribed_band_kcal": [2000, 2100],
+      "floor_any_day_kcal": 1600,
+      "floor_lifting_day_kcal": 1900,
+      "floor_7d_mean_kcal": 1800,
+      "planned_minimum_any_weight_kcal": 1700,
+      "titration": {
+        "read": "14-day trend of daily weigh-ins, read weekly",
+        "not_before_day": 21,
+        "never_on_a_week_with_fewer_complete_logs_than": 6,
+        "act_on": "two consecutive out-of-band reads (band = target ± 0.5 lb/wk)",
+        "step_kcal": 150,
+        "min_days_between_steps": 14,
+        "insufficient_loss_with_logging_intact": "walking hours FIRST (+2 h), then −150 — feet before fork",
+        "expected_path": "2,100 to 275 → 2,000 to 240 → 1,950 to 220 → rising to 2,000–2,150 through the landing → ~2,700–2,800 at maintenance (model; measure RMR)"
+      },
+      "titration_record": {"pk": "USER#matthew#SOURCE#nutrition_titration", "sk": "WEEK#<iso-monday>", "writer": "the #5096 titration engine (not yet built)"},
+      "resolver": "health.calorie_target.resolve",
+      "reading": "target_kcal is the day's calorie target (panel default R1: eat up to the prescribed band now). A titration record for the week outranks it; the any-day floor clamps any resolved value. The lifting-day and any-day floors grade single days; the 7-day-mean floor is reported, not enforced.",
+      "provenance": "population-derived",
+      "derived_by": "red-team consensus 2026-09-22 (physician + nutritionist floors; the calibrated model's 'highest intake that reproduces the trajectory')",
+      "stated": "2026-09-22"
+    }
   },
   "concession_ledger": {
     "nippard": {"concedes": "a faster deficit than it would pick", "in_return": "double progression, stretch-position work, rotation"},
