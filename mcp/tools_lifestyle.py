@@ -1756,8 +1756,7 @@ def tool_log_evening_intake(args):
       a UTC default would key "tonight" one day forward of the nudge email's
       signed-link write (which keys by PT), splitting one evening across two
       DATE# rows and double-counting evenings in the dose-response arming ledger.
-    - #5106: with no `date`, the check-in fields key to `evening_day(pacific_now())` —
-      the Telegram door's 04:00 PT rollover — so a 00:30 check-in files to last evening.
+    - #5106: no `date` -> the check-in keys to evening_day(pacific_now()), the 04:00 PT rollover.
     - Idempotent and OBSERVABLY so: re-logging the same evening updates the one
       row in place (SET overwrite, unchanged), and the response now reports
       `updated` + `previous_count` (via ReturnValues=UPDATED_OLD) so the flow
