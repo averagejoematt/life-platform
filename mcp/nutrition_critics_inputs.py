@@ -210,7 +210,9 @@ def resolve(
     unresolved: dict[str, str] = {}
     mf = _safe(query_source, "macrofactor", start, end_date)
     hevy = _safe(query_source, "hevy", start, end_date)
-    wt = _safe(query_source, "withings", start, end_date)
+    # the oldest weekly checkpoint (`end - 7`) reads its own 14-day trend, so weigh-ins reach back
+    # LOSS_RATE_WINDOW_DAYS + 7 days; a 14-day fetch left it the week's own slope (#5100, live 10-20)
+    wt = _safe(query_source, "withings", shift_day_key(start, -shared_quantities.WEEK_DAYS), end_date)
     for name, rows in (("macrofactor", mf), ("hevy", hevy), ("withings", wt)):
         if rows is None:
             unresolved[name] = "partition read raised"
