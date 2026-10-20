@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.17.0",
+  "version": "1.18.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -105,6 +105,13 @@
       "date": "2026-10-19",
       "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5111, epic #5094)",
       "what": "nutrition.labs (#5111): the follow-up draw cadence only — follow_up_weeks and reminder_lead_days. Read by training.calibration_cadence (kind lab_draw): next draw due = the last draw date + the cadence, a reminder on the owner channel once per cycle (CALIB_PROMPT#lab_draw#<cycle_start>), state ok|due|overdue. The owner-only fallback due date (no draw readable) lives in the private twin, never here. Links the labs ingest #4639. follow_up_weeks 16 puts the next draw about late January from the October draw (the issue's date); the draw date is read from the labs partition and the clinical LABS# keys, latest wins.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.18.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5110, epic #5094): the food plan is graded by a fixed panel like the training plan; built on the panel defaults, pending R1 and R2 (#5091)",
+      "what": "nutrition.concession_ledger: the food panel's nine seats (six schools and three roles: the six schools #5110 names, one seat each, plus a sports dietitian, a behaviour-change psychologist and a studio nutritionist) and what each concedes to the deadline and gets in return. config/panel_rubric.json food_panel holds one fixed rubric per seat (criteria by code against the resolved food plan, one by the judge each); the seat keys must equal this ledger's keys, the concession is READ from here at grade time (lambdas/training/food_panel.py), and the bar is panel_target (overall A, every seat 9 of 10 or better with its concession named).",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -566,6 +573,17 @@
       "grade_weight": "the three floors share the nutrition component's macro-split slot (0.20); calories 0.40 and protein 0.40 are untouched (docs/engines/SCORING.md)",
       "provenance": "population-derived",
       "derived_by": "red-team consensus 2026-09-22 (nutritionist, physician and S&C coach); moved from owner_redlines.py by #5102"
+    },
+    "concession_ledger": {
+      "evidence_based_hypertrophy_nutrition": {"concedes": "a deeper deficit than a muscle-first cut would pick", "in_return": "the protein range every day, the fat and carbohydrate floors held, training-day fuel"},
+      "flexible_dieting": {"concedes": "a fixed feeding count on top of the daily totals", "in_return": "daily totals that come from the one resolver, a split that adds up to them and a week that balances"},
+      "protein_lean_mass": {"concedes": "protein counted from a log, not a weighed meal plan", "in_return": "four feedings at the per-feeding threshold, the post-session protein counted as one"},
+      "appetite_food_environment": {"concedes": "a calorie target instead of a food-quality-only approach", "in_return": "the fibre floor, a fixed feeding rhythm and no day under its floor"},
+      "energy_balance_metabolism": {"concedes": "a population-derived starting target", "in_return": "a weekly refit against the measured trend in small, bounded steps"},
+      "obesity_medicine": {"concedes": "a faster rate than it would start with", "in_return": "floors on every day and on the week, and steps before food"},
+      "sports_dietitian": {"concedes": "no per-session periodised carbohydrate plan", "in_return": "a lifting-day uplift with pre and post session fuel, paid back inside the week"},
+      "behaviour_change_psychologist": {"concedes": "numeric targets over intuitive eating", "in_return": "a few repeatable rules, calorie changes no bigger than the step cap, every number with its reason"},
+      "studio_nutritionist": {"concedes": "nothing", "in_return": "gets the deadline pace, the weekly refit and the training-day fuel"}
     }
   }
 }

@@ -119,7 +119,7 @@ def test_the_golden_gate_passes_on_the_recorded_judge(capsys):
 def test_negative_controls_fail_on_code_alone_and_the_good_plan_does_not():
     rubric = _rubric()
     problems = []
-    for case in gate.golden_cases():
+    for case in gate.golden_cases(panel=gate.TRAINING_PANEL):  # the food cases: tests/test_food_panel_5110.py
         graded = panel_rubric.combine(panel_rubric.prescore(case, rubric), None, rubric)
         graded["target"] = panel_rubric.target()
         if case.get("kind") == gate.GOOD_KIND:
@@ -136,7 +136,9 @@ def test_negative_controls_fail_on_code_alone_and_the_good_plan_does_not():
 def test_the_weekly_mutations_fail_what_the_hand_built_fixtures_fail():
     rubric = _rubric()
     good = _case("good_charter_plan")
-    fixture_fails = sorted(tuple(sorted(c["expect_fail"])) for c in gate.golden_cases() if c.get("kind") == gate.CONTROL_KIND)
+    fixture_fails = sorted(
+        tuple(sorted(c["expect_fail"])) for c in gate.golden_cases(panel=gate.TRAINING_PANEL) if c.get("kind") == gate.CONTROL_KIND
+    )
     mutation_fails = sorted(tuple(sorted(must)) for _, must in panel_rubric.CONTROL_MUTATIONS.values())
     assert fixture_fails == mutation_fails, "the fixtures and CONTROL_MUTATIONS must cover the same four defects"
     problems = []
@@ -259,6 +261,20 @@ def test_the_live_gate_reds_when_the_judge_cannot_grade(monkeypatch, capsys):
     assert not problems, "\n".join(problems)
 
 
+def _by_panel(calls=None):
+    """A replay that answers a food-plan body with the food reply and anything else with the training one (#5110)."""
+    rec = _recorded()
+
+    def call(body):
+        if calls is not None:
+            calls.append(body)
+        food = "FOOD PLAN UNDER REVIEW" in json.dumps(body["messages"])
+        reply = rec["food_good_week" if food else "good_charter_plan"]
+        return {"content": [{"type": "text", "text": json.dumps(reply)}], "stop_reason": "end_turn", "usage": {}}
+
+    return call
+
+
 def test_the_weekly_grade_judges_the_plan_and_every_control_back_to_back_and_trends():
     rubric = _rubric()
     good = _case("good_charter_plan")
@@ -270,8 +286,9 @@ def test_the_weekly_grade_judges_the_plan_and_every_control_back_to_back_and_tre
         routines=good["routines"],
         constraint_block=good["constraint_block"],
         rubric=rubric,
-        call=_replay(_recorded()["good_charter_plan"], calls),
+        call=_by_panel(calls),
         history=history,
+        food_plan=_case("food_good_week"),
     )
     assert len(calls) == panel_judge.WEEKLY_CALLS_PER_RUN, len(calls)
     assert all(c["system"][0].get("cache_control") for c in calls), "every call carries the cached charter block"
@@ -281,6 +298,7 @@ def test_the_weekly_grade_judges_the_plan_and_every_control_back_to_back_and_tre
     item = panel_judge.panel_item(g, "USER#matthew")
     assert (item["pk"], item["sk"]) == ("USER#matthew#SOURCE#training_constraints", "PANEL#2026-10-18")
     assert "routines" not in item and item["overall_letter"] == "A" and set(item["seat_scores"]) == set(rubric["seats"])
+    assert item["food"]["overall_letter"] == "A" and item["food"]["target_met"], item["food"]
     empty = panel_judge.grade_committed_week("2026-10-18", routines=[], constraint_block=None, rubric=rubric, call=_replay({}))
     assert empty["status"] == "no_plan" and empty["degraded"]
 
@@ -318,10 +336,10 @@ def test_the_mcp_job_wires_readers_stores_one_row_and_never_raises(monkeypatch, 
     monkeypatch.setattr(pwg, "read_routines", lambda s, e: good["routines"])
     monkeypatch.setattr(pwg, "read_constraint_block", lambda e: good["constraint_block"])
     monkeypatch.setattr(pwg, "read_history", lambda: [])
+    monkeypatch.setattr(pwg, "read_food_plan", lambda start, routines: _case("food_good_week"))
     monkeypatch.setattr(pwg, "store", lambda g: stored.append(g["week_end"]) or {"written": True})
-    reply = _recorded()["good_charter_plan"]
     real_grade = panel_judge.grade_committed_week
-    monkeypatch.setattr(panel_judge, "grade_committed_week", lambda *a, **k: real_grade(*a, call=_replay(reply), **k))
+    monkeypatch.setattr(panel_judge, "grade_committed_week", lambda *a, **k: real_grade(*a, call=_by_panel(), **k))
     out = json.loads(pwg.lambda_entry({"job": "panel_weekly_grade", "week_end": "2026-10-18"})["body"])
     assert out["status"] == "graded" and out["target_met"] and stored == ["2026-10-18"], out
     monkeypatch.setattr(pwg, "run", lambda week_end=None: (_ for _ in ()).throw(RuntimeError("boom")))

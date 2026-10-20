@@ -1,0 +1,309 @@
+{
+  "case_id": "food_neg_no_refit_no_fuel",
+  "panel": "food",
+  "week_start": "2026-10-19",
+  "charter_version": "1.18.0",
+  "days": [
+    {
+      "date": "2026-10-19",
+      "day_type": "unknown",
+      "kcal": 2250,
+      "base_kcal": 2250,
+      "uplift_kcal": 0,
+      "band_low": 2150,
+      "band_high": 2250,
+      "floor_any_day_kcal": 1600,
+      "floor_lifting_day_kcal": 1900,
+      "source": "titration",
+      "provenance": "titration record WEEK#2026-10-19 (in the band: hold); lifting day +150 kcal (training_day rule, panel default R1)",
+      "charter_version": "1.18.0",
+      "balance_held": true,
+      "split": {
+        "protein_g": 170,
+        "fat_g": 75,
+        "carb_g": 261,
+        "rule": "protein and fat held at the base day's grams; the uplift and the rest-day offset are carbohydrate"
+      },
+      "pre_post_session": null,
+      "feedings": [
+        {
+          "when": "first",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 40
+        }
+      ]
+    },
+    {
+      "date": "2026-10-20",
+      "day_type": "unknown",
+      "kcal": 2250,
+      "base_kcal": 2250,
+      "uplift_kcal": 0,
+      "band_low": 2150,
+      "band_high": 2250,
+      "floor_any_day_kcal": 1600,
+      "floor_lifting_day_kcal": 1900,
+      "source": "titration",
+      "provenance": "titration record WEEK#2026-10-19 (in the band: hold); lifting day +150 kcal (training_day rule, panel default R1)",
+      "charter_version": "1.18.0",
+      "balance_held": true,
+      "split": {
+        "protein_g": 170,
+        "fat_g": 75,
+        "carb_g": 261,
+        "rule": "protein and fat held at the base day's grams; the uplift and the rest-day offset are carbohydrate"
+      },
+      "pre_post_session": null,
+      "feedings": [
+        {
+          "when": "first",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 40
+        }
+      ]
+    },
+    {
+      "date": "2026-10-21",
+      "day_type": "unknown",
+      "kcal": 2250,
+      "base_kcal": 2250,
+      "uplift_kcal": 0,
+      "band_low": 2150,
+      "band_high": 2250,
+      "floor_any_day_kcal": 1600,
+      "floor_lifting_day_kcal": 1900,
+      "source": "titration",
+      "provenance": "titration record WEEK#2026-10-19 (in the band: hold); lifting day +150 kcal (training_day rule, panel default R1)",
+      "charter_version": "1.18.0",
+      "balance_held": true,
+      "split": {
+        "protein_g": 170,
+        "fat_g": 75,
+        "carb_g": 261,
+        "rule": "protein and fat held at the base day's grams; the uplift and the rest-day offset are carbohydrate"
+      },
+      "pre_post_session": null,
+      "feedings": [
+        {
+          "when": "first",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 40
+        }
+      ]
+    },
+    {
+      "date": "2026-10-22",
+      "day_type": "unknown",
+      "kcal": 2250,
+      "base_kcal": 2250,
+      "uplift_kcal": 0,
+      "band_low": 2150,
+      "band_high": 2250,
+      "floor_any_day_kcal": 1600,
+      "floor_lifting_day_kcal": 1900,
+      "source": "titration",
+      "provenance": "titration record WEEK#2026-10-19 (in the band: hold); lifting day +150 kcal (training_day rule, panel default R1)",
+      "charter_version": "1.18.0",
+      "balance_held": true,
+      "split": {
+        "protein_g": 170,
+        "fat_g": 75,
+        "carb_g": 261,
+        "rule": "protein and fat held at the base day's grams; the uplift and the rest-day offset are carbohydrate"
+      },
+      "pre_post_session": null,
+      "feedings": [
+        {
+          "when": "first",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 40
+        }
+      ]
+    },
+    {
+      "date": "2026-10-23",
+      "day_type": "unknown",
+      "kcal": 2250,
+      "base_kcal": 2250,
+      "uplift_kcal": 0,
+      "band_low": 2150,
+      "band_high": 2250,
+      "floor_any_day_kcal": 1600,
+      "floor_lifting_day_kcal": 1900,
+      "source": "titration",
+      "provenance": "titration record WEEK#2026-10-19 (in the band: hold); lifting day +150 kcal (training_day rule, panel default R1)",
+      "charter_version": "1.18.0",
+      "balance_held": true,
+      "split": {
+        "protein_g": 170,
+        "fat_g": 75,
+        "carb_g": 261,
+        "rule": "protein and fat held at the base day's grams; the uplift and the rest-day offset are carbohydrate"
+      },
+      "pre_post_session": null,
+      "feedings": [
+        {
+          "when": "first",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 40
+        }
+      ]
+    },
+    {
+      "date": "2026-10-24",
+      "day_type": "unknown",
+      "kcal": 2250,
+      "base_kcal": 2250,
+      "uplift_kcal": 0,
+      "band_low": 2150,
+      "band_high": 2250,
+      "floor_any_day_kcal": 1600,
+      "floor_lifting_day_kcal": 1900,
+      "source": "titration",
+      "provenance": "titration record WEEK#2026-10-19 (in the band: hold); rest day -375 kcal (training_day rule, panel default R1)",
+      "charter_version": "1.18.0",
+      "balance_held": true,
+      "split": {
+        "protein_g": 170,
+        "fat_g": 75,
+        "carb_g": 130,
+        "rule": "protein and fat held at the base day's grams; the uplift and the rest-day offset are carbohydrate"
+      },
+      "pre_post_session": null,
+      "feedings": [
+        {
+          "when": "first",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        }
+      ]
+    },
+    {
+      "date": "2026-10-25",
+      "day_type": "unknown",
+      "kcal": 2250,
+      "base_kcal": 2250,
+      "uplift_kcal": 0,
+      "band_low": 2150,
+      "band_high": 2250,
+      "floor_any_day_kcal": 1600,
+      "floor_lifting_day_kcal": 1900,
+      "source": "titration",
+      "provenance": "titration record WEEK#2026-10-19 (in the band: hold); rest day -375 kcal (training_day rule, panel default R1)",
+      "charter_version": "1.18.0",
+      "balance_held": true,
+      "split": {
+        "protein_g": 170,
+        "fat_g": 75,
+        "carb_g": 130,
+        "rule": "protein and fat held at the base day's grams; the uplift and the rest-day offset are carbohydrate"
+      },
+      "pre_post_session": null,
+      "feedings": [
+        {
+          "when": "first",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        }
+      ]
+    }
+  ],
+  "protein": {
+    "range_low": 170.0,
+    "range_high": 200.0,
+    "feedings_per_day": 4.0,
+    "feeding_threshold_g": 40.0,
+    "feeding_target_g": [
+      45,
+      55
+    ]
+  },
+  "floors": {
+    "fat": 65.0,
+    "carb": 120.0,
+    "fibre": 35.0
+  },
+  "titration": null,
+  "kind": "negative_control",
+  "expect_fail": [
+    "energy_balance_metabolism.weekly_refit",
+    "sports_dietitian.training_day_fuel"
+  ]
+}
