@@ -878,18 +878,24 @@ def test_the_two_nutrition_views_agree_on_the_fiber_target(monkeypatch):
     """Self-inconsistency: `_get_nutrition_summary` published fiber_g = 30, `_get_macro_targets`
     published 25 under `targets`, and the macros view's `hit_fiber` compared against a THIRD
     literal 25 — so 27 g/day was simultaneously 90% of target and a hit. One tool, one set of
-    arguments, one target: `_FIBER_TARGET_G`. The scoring threshold is asserted too, since a
+    arguments, one target: the charter fibre floor (#5102). The scoring threshold is asserted too, since a
     published target the hit test does not use is the same defect wearing a different hat."""
     install(monkeypatch, SUMMARY_ROWS)
     summary_target = tn.tool_get_nutrition(SUMMARY_ARGS)["target_comparison"]["fiber_g"]["target"]
     macros = tn.tool_get_nutrition(dict(SUMMARY_ARGS, view="macros"))
-    assert summary_target == macros["targets"]["fiber_g"] == tn._FIBER_TARGET_G
+    assert summary_target == macros["targets"]["fiber_g"] == macros["targets"]["macro_floors_g"]["fibre"]
     # a day exactly ON the published target is a hit; one under it is not
-    at_target = tn._FIBER_TARGET_G
+    at_target = macros["targets"]["macro_floors_g"]["fibre"]
     install(monkeypatch, [mf("2026-05-01", total_calories_kcal=2000, total_fiber_g=at_target)])
     assert tn.tool_get_nutrition(dict(SUMMARY_ARGS, view="macros"))["daily_breakdown"][0]["hit_fiber_target"] is True
     install(monkeypatch, [mf("2026-05-01", total_calories_kcal=2000, total_fiber_g=at_target - 1)])
     assert tn.tool_get_nutrition(dict(SUMMARY_ARGS, view="macros"))["daily_breakdown"][0]["hit_fiber_target"] is False
+    # #5102: a day between the old 30 g literal and the charter floor is a miss on BOTH the hit flag and the floors row
+    install(monkeypatch, [mf("2026-05-01", total_calories_kcal=2000, total_fiber_g=at_target - 3)])
+    out = tn.tool_get_nutrition(dict(SUMMARY_ARGS, view="macros"))
+    day = out["daily_breakdown"][0]
+    assert day["hit_fiber_target"] is False and day["floors"]["fibre"]["met"] is False
+    assert out["adherence"]["fiber_target_hit_pct"] == 0.0
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -897,16 +903,16 @@ def test_the_two_nutrition_views_agree_on_the_fiber_target(monkeypatch):
 # ──────────────────────────────────────────────────────────────────────────────
 
 MACRO_ROWS = [
-    mf("2026-05-01", total_calories_kcal=2000, total_protein_g=150, total_fiber_g=30, total_fat_g=70, total_carbs_g=200),
+    mf("2026-05-01", total_calories_kcal=2000, total_protein_g=150, total_fiber_g=36, total_fat_g=70, total_carbs_g=200),
     mf("2026-05-02", total_calories_kcal=1500, total_protein_g=100, total_fiber_g=20, total_fat_g=50, total_carbs_g=150),
 ]
 MACRO_ARGS = {"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02", "calorie_target": 2000, "protein_target": 150}
 
 
 def test_macros_scores_daily_adherence_against_the_given_targets(monkeypatch):
-    """target 2000 kcal / 150 g protein / 25 g fiber
-    day 1: 2000/2000 = 100.0% (0.85 <= 1.00 <= 1.10 -> hit); 150 >= 142.5 -> hit; 30 >= 25 -> hit
-    day 2: 1500/2000 =  75.0% (miss);  100/150 = 66.7% (miss);  20 < 25 (miss)
+    """target 2000 kcal / 150 g protein / the charter fibre floor
+    day 1: 2000/2000 = 100.0% (0.85 <= 1.00 <= 1.10 -> hit); 150 >= 142.5 -> hit; 36 >= the charter fibre floor -> hit
+    day 2: 1500/2000 =  75.0% (miss);  100/150 = 66.7% (miss);  20 < the floor (miss)
     -> 1 of 2 on every axis = 50.0%
     """
     install(monkeypatch, MACRO_ROWS)
