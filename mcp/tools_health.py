@@ -840,13 +840,25 @@ def tool_get_weight_loss_progress(args):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _model_check_state(budget):
+    """#5198 (ADR-104): tri-state, so a window no check ran on never reads as passed. `refused` when the
+    impossibility check refused, `passed` only when the measured weight trend agreed, else `not_run`
+    (no trend check, or a `published_unverified_*` basis)."""
+    tc = budget.get("trend_check")
+    if not tc:
+        return "not_run"
+    if not tc.get("publish", True):
+        return "refused"
+    return "passed" if str(tc.get("basis") or "").startswith("agrees_with_measured_weight_trend") else "not_run"
+
+
 def _maintenance_context(budget, check=None):
     """#5198: one deficit-model window as maintenance context. Deliberately carries no key or flag
     named target (the view's single calorie target is `calorie_target_platform`)."""
     out = {
         "estimated_maintenance_kcal": budget["tdee"],
         "deficit_kcal": budget["deficit"],
-        "model_check_passed": budget.get("target_published", True),
+        "model_check": _model_check_state(budget),
         "method": budget["method"],
         "basis": budget.get("target_basis"),
         "inputs": budget["inputs"],
@@ -1063,8 +1075,8 @@ def _get_energy_expenditure(args):
         "maintenance_context_30d": _maintenance_context(budget_30d),
         # #3931 box 4: the method name (DERIVED from health.tdee, never re-typed) and the
         # impossibility verdict, on the surface that publishes the number. When `basis`
-        # begins with "refused: ", `maintenance_context_7d.model_check_passed` is False — the trend contradicts
-        # the modelled deficit; the TDEE-minus-deficit figure is not emitted, only the maintenance estimate.
+        # begins with "refused: ", `maintenance_context_7d.model_check` is "refused" — the impossibility check
+        # refused; the TDEE-minus-deficit figure is not emitted, only the maintenance estimate.
         "maintenance_method": tdee_core.METHOD,
         # #3931 box 3: the SECOND method, offered alongside rather than folded in. It
         # never touches a MET table or a Mifflin coefficient, so it fails in different
