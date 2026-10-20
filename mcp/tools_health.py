@@ -846,7 +846,7 @@ def _maintenance_context(budget, check=None):
     out = {
         "estimated_maintenance_kcal": budget["tdee"],
         "deficit_kcal": budget["deficit"],
-        "estimate_published": budget.get("target_published", True),
+        "model_check_passed": budget.get("target_published", True),
         "method": budget["method"],
         "basis": budget.get("target_basis"),
         "inputs": budget["inputs"],
@@ -1057,12 +1057,14 @@ def _get_energy_expenditure(args):
         # model's windows are MAINTENANCE CONTEXT (estimated maintenance + the modelled deficit): no key
         # or flag in them is called a target, and the TDEE-minus-deficit figure is not published.
         "calorie_target_platform": calorie_resolver.resolve(end_date),
+        # ADR-152/ADR-105: maintenance context carries its method and inputs, so a reader can check
+        # the number without reading this source.
         "maintenance_context_7d": _maintenance_context(budget_7d, check_7d),
         "maintenance_context_30d": _maintenance_context(budget_30d),
         # #3931 box 4: the method name (DERIVED from health.tdee, never re-typed) and the
         # impossibility verdict, on the surface that publishes the number. When `basis`
-        # begins with "refused: ", `maintenance_context_7d.estimate_published` is False — the surface says
-        # refused rather than publishing a figure the weight trend contradicts.
+        # begins with "refused: ", `maintenance_context_7d.model_check_passed` is False — the trend contradicts
+        # the modelled deficit; the TDEE-minus-deficit figure is not emitted, only the maintenance estimate.
         "maintenance_method": tdee_core.METHOD,
         # #3931 box 3: the SECOND method, offered alongside rather than folded in. It
         # never touches a MET table or a Mifflin coefficient, so it fails in different
@@ -1070,9 +1072,6 @@ def _get_energy_expenditure(args):
         # `maintenance_context_7d.check` below is what refuses. `None` when no intake average or
         # no measured trend exists to back-solve from (ADR-104: absent, not zero).
         "tdee_second_method": tdee_core.tdee_from_trend(intake_avg, trend_lb_wk, days=trend_days),
-        # ADR-152/ADR-105: the same target, with its method and its inputs attached, so a
-        # reader can check the number without reading this source — and so this tool and
-        # `get_nutrition view=macros` are visibly answering from ONE definition.
         "implied_weekly_loss_lbs": implied_weekly_loss_lbs,
         "bmr_change_since_start": bmr_change,
         "coaching_note": "Recalculate targets every 10 lbs lost as BMR decreases. Eating below 1200 kcal (women) or 1500 kcal (men) risks lean mass loss even with adequate protein.",

@@ -342,7 +342,7 @@ def test_the_published_tdee_and_calorie_target_are_computed_across_phases(wired)
     # finally has the >=7 trend days it needs to run at all, and it disagrees. The filtered
     # arm published a number precisely because it could not see enough of the record to
     # check it (see the mutation control below).
-    assert out["maintenance_context_7d"]["estimate_published"] is False
+    assert out["maintenance_context_7d"]["model_check_passed"] is False
     assert out["maintenance_context_7d"]["basis"].startswith("refused: model_and_trend_disagree")
     assert out["maintenance_context_7d"]["check"]["trend_days"] == 12
 
@@ -484,7 +484,7 @@ def test_mutation_restoring_the_phase_filter_reproduces_the_bug(wired, hevy_seen
     # rather than refusing. The truncation did not just move the number — it disarmed the
     # guard that would have caught it.
     assert out["maintenance_context_7d"]["estimated_maintenance_kcal"] == 2381
-    assert out["maintenance_context_7d"]["estimate_published"] is True
+    assert out["maintenance_context_7d"]["model_check_passed"] is True
     assert out["maintenance_context_7d"]["basis"] == "published_unverified_no_measured_weight_trend"
 
     # The filter really is back on the wire, on every partition.
