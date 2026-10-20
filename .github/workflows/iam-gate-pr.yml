@@ -1,0 +1,60 @@
+# The additive-IAM gate at PR time (#5221). `deploy/iam_additive_gate.py` (#2834) ran only in main's Plan, after
+# merge: PR #5217 passed every PR check, merged, and its EventBridge rule's implicit AWS::Lambda::Permission
+# stranded main's Plan ~70 min (2026-10-20). This job runs the SAME gate on the PR's own delta: the PR's tree
+# synthesized against the base tip synthesized (`deploy/check_iam_additive_pr.py` — its docstring is the contract).
+#   * NO AWS. The base synth stands in for the deployed side, so no OIDC role is needed (the readonly role trusts
+#     refs/heads/main only, and a fork/Dependabot PR gets no token anyway). Deployed-vs-main drift stays main's
+#     Plan's report.
+#   * RED on OWNER-REQUIRED (the Plan precedent: it fails closed on the same verdict), every stack + statement
+#     named as ::error. An INTENDED owner change (a held owner PR) carries the `owner-required-ack` label: the
+#     same lines print as ::warning and the job passes. A synth/gate breakage is red whatever the label says.
+# Path filter = what changes a synthesized template (cdk/, the schedule table + budget ceilings the stacks read) +
+# the gate, its registry (derived from ci/lambda_map.json), this driver and this workflow.
+
+name: IAM additive gate (PR)
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    paths:
+      - 'cdk/**'
+      - 'config/schedules.json'
+      - 'ci/lambda_map.json'
+      - 'scripts/budget_ceilings.py'
+      - 'deploy/iam_additive_gate.py'
+      - 'deploy/iam_additive_registry.py'
+      - 'deploy/check_iam_additive_pr.py'
+      - '.github/workflows/iam-gate-pr.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iam-gate-pr-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: IAM additive gate (PR delta vs base synth)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the base tip must be present for `git archive`
+
+      - uses: ./.github/actions/setup-ci
+
+      - name: CDK toolchain (the CLI pin of record is cdk/package.json, the lib pin cdk/requirements.txt)
+        run: |
+          CDK_CLI_VERSION=$(node -p "require('./cdk/package.json').devDependencies['aws-cdk']")
+          npm install -g "aws-cdk@${CDK_CLI_VERSION}" --quiet
+          pip install --quiet -r cdk/requirements.txt
+
+      - name: IAM additive gate on the PR delta (red on OWNER-REQUIRED unless labelled owner-required-ack)
+        # Unpiped: the script's own exit code is the verdict (the #3103 class).
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          IAM_GATE_ACK: ${{ contains(github.event.pull_request.labels.*.name, 'owner-required-ack') }}
+        run: python3 deploy/check_iam_additive_pr.py --base-sha "$BASE_SHA" --step-summary "$GITHUB_STEP_SUMMARY"

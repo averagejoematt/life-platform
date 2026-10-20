@@ -3683,3 +3683,50 @@ STRUCTURAL_HAND_PROOFS["structural::test_block_retro_5079.py"] = {
     ),
     "proved_on": "2026-10-19",
 }
+
+
+# #5221 (2026-10-20): the additive-IAM gate at PR time — the PR's synth against the base tip's synth, no AWS.
+# Proved on the lane, each plant restored from a byte copy (md5 checked).
+GUARD_PROOFS["guard::deploy/check_iam_additive_pr.py"] = {
+    "gate_name": "deploy/check_iam_additive_pr.py",
+    "command": "python3 -m pytest tests/test_iam_gate_pr_5221.py -q -p no:cacheprovider   # baseline 12 passed",
+    "mutation": (
+        "three plants in deploy/check_iam_additive_pr.py, ONE AT A TIME: M1 decide()'s unacknowledged OWNER-REQUIRED branch "
+        "`return 1, lines` -> `return 0, lines` (the finding prints but the exit says clean); M2 `if ack:` -> `if True:` (every "
+        "finding reads as acknowledged); M3 findings() `!= OWNER` -> `== OWNER` (the owner-required stacks are the ones skipped). "
+        "md5 2d94abbfcf8977d571dad78d861f88be before and after each restore."
+    ),
+    "observed": (
+        "2026-10-20. M1 3 failed / 9 passed (the EventBridge-rule negative control, the new-stack fail-closed case, decide()). "
+        "M2 3 failed / 9 passed (the same three). M3 3 failed / 9 passed (the negative control, the ack warning naming the "
+        "statement, the new-stack case). RESTORED 12 passed."
+    ),
+    "scope": (
+        "Proves the driver carries the gate's OWNER-REQUIRED verdict to its exit code, names stack + statement, and lets the "
+        "`owner-required-ack` label downgrade only an evaluated finding. The `cdk synth` + `git archive` legs are proved by the "
+        "CI step's proof below (a real synth), not by this unit file."
+    ),
+    "proved_on": "2026-10-20",
+}
+CI_PROOFS["ci::iam-gate-pr.yml::gate::3"] = {
+    "gate_name": "gate / IAM additive gate on the PR delta (red on OWNER-REQUIRED unless labelled owner-required-ack)",
+    "command": 'BASE_SHA=$(git rev-parse HEAD) IAM_GATE_ACK=false bash -eo pipefail -c "$(the step\'s run: text read from .github/workflows/iam-gate-pr.yml)"   # baseline exit 0',  # noqa: E501
+    "mutation": (
+        "The step's REAL `run:` text (read from the workflow YAML, unpiped) under `bash -eo pipefail`, with real `cdk synth` of "
+        "both sides. Plant: the incident itself — `git show 4a39ffc57 -- cdk/stacks/serve_stack.py config/schedules.json | git "
+        "apply -R` puts PR #5217's evening check-in rule back in the working tree, so head = rule + its implicit "
+        "Lambda::Permission and base = HEAD without it. Restored with `git checkout --` (md5 serve_stack.py "
+        "e6b57a4f19f5690f331dbfef1950959f, schedules.json f1ce2eff80ca1b9abab0801b7733c192 before and after)."
+    ),
+    "observed": (
+        "2026-10-20. Planted: step exit 1, `::error title=IAM gate OWNER-REQUIRED: LifePlatformServe::new-iam-resource "
+        "TelegramEveningCheckinAllowEventRuleLifePlatformServeTelegramCoachWorker18474C2793320252: AWS::Lambda::Permission` — the "
+        "line main's Plan printed with --live at 04:05Z. Planted with IAM_GATE_ACK=true: exit 0 (warning). RESTORED: exit 0."
+    ),
+    "scope": (
+        "Proves the step reds on the incident shape with no AWS and that the label path is the only soft one. It does not prove "
+        "the GitHub `paths:` filter fires — tests/test_iam_gate_pr_5221.py checks it through deploy/workflow_path_checks.py's "
+        "derivation — and its first live run on a PR is the issue's live proof."
+    ),
+    "proved_on": "2026-10-20",
+}
