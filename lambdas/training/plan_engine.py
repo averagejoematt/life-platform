@@ -81,7 +81,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from health import deficit_disclosures
+from health import calorie_target, deficit_disclosures
 
 from training import (
     block_model,
@@ -751,11 +751,12 @@ def _deload_recommendation(
     return rec
 
 
-def _effort_blocks(date: str, rows: Any, catalog_movements: Any, states: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    """`progression` (#5052) + `ceiling_change_proposal` (#5058, over the prescription window's stored adherence)."""
+def _effort_blocks(date: str, rows: Any, catalog_movements: Any, states: dict[str, dict[str, Any]], dis_records: Any) -> dict[str, Any]:
+    """`progression` (#5052) + `ceiling_change_proposal` (#5058) + `training_day_fuel` (#5101, owner-only)."""
     st = (states.get("hevy_workouts_prescription_window") or {}).get("state")
     proposal = ceiling_proposal.for_plan(date, rows, None if st == READ_FAILED else st, catalog_movements)
-    return {"progression": load_progression.rule_summary(), "ceiling_change_proposal": proposal}
+    fuel = calorie_target.plan_block(date, disruption.state(dis_records, date) if dis_records is not None else None)
+    return {"progression": load_progression.rule_summary(), "ceiling_change_proposal": proposal, "training_day_fuel": fuel}
 
 
 def _steps_ramp_block(
@@ -1099,13 +1100,11 @@ def constraint_block(
         "program": program,
         "accessory_rotation_ok": rotation["ok"],
         "accessory_rotation": rotation,
-        # #5068 (ADR-164): the charter version this plan was built beside. None means no
-        # charter could be read and the plan says so. W1 (#5050) moves the engine's reads
-        # (steps, split, rate band, cadences) onto the charter; until then the literals
-        # above still come from owner_redlines/program_structure and this is a stamp only.
+        # #5068 (ADR-164): the charter version this plan was built beside (None = no charter could be read, and the plan says so).
+        # W1 (#5050) moves the engine's reads onto the charter; until then the literals above still come from owner_redlines/program_structure.
         "charter_version": training_charter.charter_version(),
         # #5052: the double progression + effort limits, stamped; #5058: the ceiling-change proposal (never auto-applied)
-        **_effort_blocks(date, hevy_workouts_prescription_window, catalog_movements, states),
+        **_effort_blocks(date, hevy_workouts_prescription_window, catalog_movements, states, disruption_records),
         "critics": dict(_CRITICS_NOT_WIRED),
         "honesty": [
             s

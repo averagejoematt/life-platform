@@ -313,7 +313,7 @@ def test_the_redlines_read_the_titration_rule_from_the_charter():
 
 def test_the_charter_change_log_names_this_issue():
     log = tc.charter_value("change_log")
-    assert any(e.get("version") == "1.12.0" and "#5096" in e.get("by", "") for e in log)
+    assert any(e.get("version") == "1.16.0" and "#5096" in e.get("by", "") for e in log)
 
 
 # ── the record: the DynamoDB wire, written once ───────────────────────────────────────────
