@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.11.0",
+  "version": "1.16.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -77,6 +77,27 @@
       "date": "2026-10-19",
       "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5098, epic #5091); the four-feeding structure and the relaxed fasting window are built on the panel default, pending R2",
       "what": "nutrition.protein: the daily range (low = the plan's floor, held equal to config/user_goals.json and common.constants by tests/test_protein_engine_5098.py; high = the redlines' target), the days-of-7 bar, four feedings with a per-feeding threshold and a target band, the merge window that groups food-log rows into one feeding, THE hit definition (strictly total >= range low), and the breakfast nudge (a cut-off and a send window in Pacific time, at most one a day, owner-only; a day with no food-log row yet withholds, because the food log is an end-of-day upload). owner_redlines.protein_floor_g reads target_g, days_of_7, feedings and feeding_g from here; lambdas/health/protein_engine.py is the one reader.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.14.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5102, epic #5091): 'all items worked now'",
+      "what": "nutrition.floors: the fat, carbohydrate and fibre floors the redlines defined in prose (65 g / 120 g / 35 g, the values the redlines already carried), moved here as data. owner_redlines.fat_floor_g / carb_floor_g read them; lambdas/health/macro_floors.py is the one reader and the one hit definition (strictly at or above the floor; a missing field is unknown, never a miss). The critics and the daily grade call it.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.15.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5101, epic #5091); built on the panel default, pending R1",
+      "what": "nutrition.training_day (#5101): a lifting-day calorie uplift balanced by the rest days so the week averages the base target, the carbohydrate split (protein and fat held, carbohydrate moves), pre and post session carbohydrate and protein targets, and the travel-day rule. Read by health.calorie_target.resolve (day_type seam) and printed in the plan's training_day_fuel block.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.16.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5096, epic #5091: the redlines' titration rule gets a reader); weekly refit built on the panel default, pending R1",
+      "what": "nutrition.titration: the weekly titration engine's rule (lambdas/health/titration.py), MOVED here from nutrition.calories.titration (same rule values: 150 kcal step, 14-day spacing, never on a week with fewer than 6 complete logs, not before day 21, two consecutive out-of-band reads, steps before food) and nutrition.calories.titration_record. The band it reads is the charter rate band (governing_goal.rate_band_lb_per_wk through training.rate_band, the clinical guidance cap applied) above the landing, and the redlines' own landing schedule step (target to cap) from the landing down: the redlines' old 'target +/- 0.5 lb/wk' band is retired, so one band governs both the rate target and the titration. The step is sized from the miss (500 kcal/day per lb/wk, 3500 kcal per lb over 7 days), rounded to 50 and held inside min_step_kcal..max_step_kcal. owner_redlines energy_floor_kcal.titration reads this block (max_step_kcal is the one step-size key; the old step_kcal duplicate is dropped). Every rule value is required: a missing one holds the week as insufficient_data, never a fallback. trend_days must equal the shared loss-rate window. A complete log is a day at or above the redlines' dark-day line, and the first step waits for the redlines' complete_days_before_first_titration (both read from owner_redlines, not copied). The redlines' owner rule 'walking FIRST, then food, never both inside 14 days' is kept as a walking-first hold; the steps-floor precondition on top of it is the panel interpretation, pending an owner ruling on epic #5091. The modelled `expected_path` moves with the block; `insufficient_loss_with_logging_intact` is carried by the walking_first rule and the redlines tripwire loss_insufficient_adherent.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -429,17 +450,6 @@
       "floor_lifting_day_kcal": 1900,
       "floor_7d_mean_kcal": 1800,
       "planned_minimum_any_weight_kcal": 1700,
-      "titration": {
-        "read": "14-day trend of daily weigh-ins, read weekly",
-        "not_before_day": 21,
-        "never_on_a_week_with_fewer_complete_logs_than": 6,
-        "act_on": "two consecutive out-of-band reads (band = target ± 0.5 lb/wk)",
-        "step_kcal": 150,
-        "min_days_between_steps": 14,
-        "insufficient_loss_with_logging_intact": "walking hours FIRST (+2 h), then −150 — feet before fork",
-        "expected_path": "2,100 to 275 → 2,000 to 240 → 1,950 to 220 → rising to 2,000–2,150 through the landing → ~2,700–2,800 at maintenance (model; measure RMR)"
-      },
-      "titration_record": {"pk": "USER#matthew#SOURCE#nutrition_titration", "sk": "WEEK#<iso-monday>", "writer": "the #5096 titration engine (not yet built)"},
       "resolver": "health.calorie_target.resolve",
       "reading": "target_kcal is the day's calorie target (panel default R1: eat up to the prescribed band now). A titration record for the week outranks it; the any-day floor clamps any resolved value. The lifting-day and any-day floors grade single days; the 7-day-mean floor is reported, not enforced.",
       "provenance": "population-derived",
@@ -472,6 +482,78 @@
         "rule": "behind when no feeding at or above feeding_threshold_g is logged at or before the later of the cut-off and the tick; no food-log row for the day withholds the note (no_same_day_log): the food log is an end-of-day upload, so an absent row at breakfast is upload lag, not a missed feeding; untimed rows withhold the note (unknown). Armed but silent until a same-day food source exists (#5187)"
       },
       "basis": "built on the panel default, pending R2 (#5091)"
+    },
+    "titration": {
+      "read": "the shared 14-day least-squares loss rate (mcp.shared_quantities.loss_rate_lb_wk, water weeks excluded), read weekly",
+      "trend_days": 14,
+      "trend_days_rule": "must equal mcp.shared_quantities.LOSS_RATE_WINDOW_DAYS (the window the trend is read over); on a mismatch the run withholds the trend and the week holds (trend_window_mismatch), and tests/test_titration_engine_5096.py asserts they agree",
+      "not_before_day": 21,
+      "never_on_a_week_with_fewer_complete_logs_than": 6,
+      "consecutive_out_of_band_reads": 2,
+      "act_on": "consecutive_out_of_band_reads weekly reads on the same side of the band",
+      "min_step_kcal": 100,
+      "max_step_kcal": 150,
+      "step_rounding_kcal": 50,
+      "kcal_per_lb_wk": 500,
+      "step_sizing": "the miss (lb/wk outside the band edge) x kcal_per_lb_wk, rounded to step_rounding_kcal, held inside min_step_kcal..max_step_kcal",
+      "min_days_between_steps": 14,
+      "steps_before_food": {
+        "rule": "below the band floor, food comes down only when the trailing steps mean is at or above steps.floor; otherwise the week holds and the cue is the steps floor. This precondition is added ON TOP of walking_first, built on the panel interpretation, pending an owner ruling (#5091)",
+        "steps_window_days": 7,
+        "steps_floor_path": "steps.floor"
+      },
+      "walking_first": {
+        "rule": "the redlines' owner rule (feet before fork): below the floor with steps at the floor, the first confirmed read is a walking-first hold (the cue is the rule's walking action); food comes down only on a later read at least min_days_between_steps after it, with the run unbroken (never both inside the spacing)",
+        "action_path": "tripwire:loss_insufficient_adherent.action"
+      },
+      "complete_logs": {
+        "rule": "a complete day is one whose logged calories are at or above the redlines' dark-day line (a day under it is dark, not complete); the first step also waits for the redlines' run of complete days before the first titration",
+        "complete_day_min_kcal_path": "logging_completeness.dark_day_kcal",
+        "complete_days_before_first_step_path": "logging_completeness.complete_days_before_first_titration"
+      },
+      "band_source": {
+        "above_landing": "governing_goal.rate_band_lb_per_wk (training.rate_band.band, the clinical guidance cap applied)",
+        "from_landing_down": "owner_redlines rate_schedule_lb_wk step at the bodyweight (training.redline_rate.rate_schedule_step): target to cap"
+      },
+      "expected_path": "2,100 to 275 → 2,000 to 240 → 1,950 to 220 → rising to 2,000–2,150 through the landing → ~2,700–2,800 at maintenance (model; measure RMR)",
+      "never_below": "nutrition.calories.planned_minimum_any_weight_kcal",
+      "insufficient_data": "no measured trend, a provisional trend window, no weigh-in, an unreadable band or guidance record, an unreadable rule value, or too few complete logs: the week holds with reason insufficient_data, never a guess",
+      "record": {"pk": "USER#matthew#SOURCE#nutrition_titration", "sk": "WEEK#<iso-monday>", "writer": "lambdas/health/titration.py via mcp/titration_leg.py on the nightly pre-draft run (Friday to Sunday nights, the first write for the coming week stands)"},
+      "dead_man": {"armed_from": "2026-11-03", "rule": "no record for the current week once armed: an owner-only alert (the calibration sweep's dead-man, token NUTRITION_TITRATION_MISSED)"},
+      "basis": "the redlines' titration rule, owner-approved v0.3 (#3753); the weekly refit built on the panel default, pending R1 (#5091)"
+    },
+    "training_day": {
+      "lifting_uplift_kcal": 150,
+      "balance": "the week averages the base target: a rest day takes -(uplift x lifting days / rest days) so the uplift is paid for inside the week (5 lifting / 2 rest: -375); travel and unknown days stay at the base. A day clamped by its floor is reported balance_held false",
+      "fat_pct_of_base_kcal": 30,
+      "split_rule": "protein = nutrition.protein.range_g.low and fat = fat_pct of the base target, both held every day; the uplift and the offset are carbohydrate",
+      "pre_session": {
+        "carb_g": 40,
+        "protein_g": 20,
+        "minutes_before": [
+          60,
+          90
+        ]
+      },
+      "post_session": {
+        "carb_g": 60,
+        "protein_g": 40,
+        "minutes_after": 60,
+        "note": "the post-session protein is one of the four feedings (nutrition.protein.feeding_threshold_g)"
+      },
+      "travel_day": "no uplift and no rest-day offset: the base target holds; pre and post targets still apply when a session is done",
+      "day_type": "lifting | rest | travel | unknown: travel from a travel disruption or charter travel window; else lifting/rest from the planned routine for the date; else unknown (base target, never a guessed rest day: the split sequence has no calendar, so the plan states the lifting uplift and the rest offset as conditional until a per-date calendar exists)",
+      "surface": "owner-only: the plan_next_session constraint block (training_day_fuel) and the coach packet; no public surface",
+      "basis": "built on the panel default, pending R1 (#5091)"
+    },
+    "floors": {
+      "fat": {"floor_g": 65, "unit": "g", "per_meal_g": 10, "meals_with_fat": 3, "epa_dha_g": 2},
+      "carb": {"floor_g": 120, "unit": "g", "typical_g": [150, 180]},
+      "fibre": {"floor_g": 35, "unit": "g", "target_range_g": [35, 40]},
+      "hit": "a day meets a floor when its logged total is at or above it, strictly. A missing field is unknown, never a miss (health.macro_floors)",
+      "grade_weight": "the three floors share the nutrition component's macro-split slot (0.20); calories 0.40 and protein 0.40 are untouched (docs/engines/SCORING.md)",
+      "provenance": "population-derived",
+      "derived_by": "red-team consensus 2026-09-22 (nutritionist, physician and S&C coach); moved from owner_redlines.py by #5102"
     }
   }
 }

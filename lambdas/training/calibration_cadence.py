@@ -185,6 +185,8 @@ def prompts_due(block: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 
 def deadman_alert(row: Mapping[str, Any]) -> str:
+    if row.get("alert"):  # a row that names its own alert (#5096: the titration dead-man is a missed run, not a missed log)
+        return str(row["alert"])
     return (
         f"{row['kind']} has gone {row.get('missed_cycles')} cycles with nothing logged (last {row.get('last_logged') or 'never'}). "
         "The calibration the May plan rests on is running blind; log one this week."
@@ -226,11 +228,14 @@ def table_readers(table: Any) -> dict[str, Callable[[], list[str]]]:
 
 def read(table: Any, today: str) -> dict[str, Any]:
     """The block over one table, plus the fitness battery's row (#5078): its due date and prompt come from
-    `training.fitness_tests` (the program's own week), carried here so the owner channel has ONE prompt path."""
+    `training.fitness_tests` (the program's own week), carried here so the owner channel has ONE prompt path —
+    and the weekly calorie titration's dead-man row (#5096, `health.titration`: no decision for the week)."""
     from common.constants import EXPERIMENT_START_DATE
+    from health import titration
 
     from training import fitness_tests
 
     block = compute(today, table_readers(table), anchor=EXPERIMENT_START_DATE)
     block["kinds"][fitness_tests.CALIBRATION_KIND] = fitness_tests.calibration_row_from_table(table, today)
+    block["kinds"][titration.CALIBRATION_KIND] = titration.calibration_row_from_table(table, today)
     return block

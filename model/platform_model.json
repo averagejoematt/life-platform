@@ -3209,6 +3209,13 @@
     },
     {
       "direction": "read",
+      "lambda": null,
+      "module": "lambdas/health/titration.py",
+      "partition": "nutrition_titration",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
       "lambda": "dropbox-poll",
       "module": "lambdas/ingestion/dropbox_poll_lambda.py",
       "partition": "dropbox_tracker",
@@ -7963,14 +7970,14 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 768,
+      "edges": 769,
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
-      "partitions": 118,
+      "partitions": 119,
       "privacy_fields_owner_only": 67,
       "privacy_fields_owner_published": 11,
-      "privacy_sources_owner_only": 20,
+      "privacy_sources_owner_only": 21,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 81,
       "schedules": 96
@@ -7978,8 +7985,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 377,
-        "sites_resolved": 967,
-        "sites_total": 1344
+        "sites_resolved": 969,
+        "sites_total": 1346
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -7991,7 +7998,6 @@
       "coach_thread",
       "intelligence_quality",
       "journal",
-      "nutrition_titration",
       "platform_memory",
       "zone2_efficiency"
     ],
@@ -8478,6 +8484,11 @@
       "ingestion": false,
       "privacy_tier": "public"
     },
+    "nutrition_titration": {
+      "class": "cross_phase",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
+    },
     "owner_words": {
       "class": "raw_timeseries",
       "ingestion": false,
@@ -8860,6 +8871,7 @@
       "measurements": "owner_published",
       "named_human_contact": "owner_only",
       "notion": "owner_only",
+      "nutrition_titration": "owner_only",
       "pending_writes": "owner_only",
       "private_intake": "owner_only",
       "progress_photos": "owner_only",

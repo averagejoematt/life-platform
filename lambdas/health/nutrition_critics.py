@@ -55,7 +55,12 @@ from typing import Any
 from coach.critics import deterministic_verdict, reconcile
 from training import owner_redlines
 
-from health import calorie_target, deficit_disclosures, protein_engine  # #5098: THE protein hit; #5095: the ONE calorie target
+from health import (
+    calorie_target,
+    deficit_disclosures,
+    macro_floors,
+    protein_engine,
+)  # #5098: THE protein hit; #5095: the ONE calorie target
 
 CRITICS_VERSION = "nutrition-critics@1.0.0"
 CRITIC_IDS = ("deficit_advocate", "muscle_defense", "adherence")
@@ -78,6 +83,9 @@ INPUT_KEYS = (
     "window_end",  # YYYY-MM-DD, the last day of the 14-day series (informational)
     "intake_kcal_by_day",  # 14 entries oldest->newest, None for an unlogged day
     "protein_g_by_day",  # 14 entries oldest->newest, None for an unlogged day
+    "fat_g_by_day",  # 14 entries oldest->newest, None for an unlogged day (#5102)
+    "carb_g_by_day",  # same shape (#5102)
+    "fiber_g_by_day",  # same shape (#5102): graded against the charter's fibre floor
     "lifting_day_flags",  # 14 entries oldest->newest, True/False/None
     "weight_lb",  # latest weigh-in
     "weight_trend_lb_wk",  # SIGNED 14-day trend, negative = losing (health.tdee.weight_trend_lb_per_wk)
@@ -391,6 +399,41 @@ def _energy_floor_days(intake7: list[Any], lifting7: list[Any] | None, energy: d
     return (below if measured else None), measured, breaches
 
 
+def _macro_floor_flags(p: dict[str, Any], inputs: dict[str, Any]) -> None:
+    """#5102: the fat, carbohydrate and fibre floors over the trailing 7 days (health.macro_floors, the charter's
+    `nutrition.floors`). A miss is reported WITH the floor and the value; an unlogged day is unknown, never a miss."""
+    n, flags, unknown = p["numbers"], p["flags"], p["unknown"]
+    prov = "population-derived (the charter's nutrition.floors; red-team consensus 2026-09-22)"
+    for macro, key in (("fat", "fat_g_by_day"), ("carb", "carb_g_by_day"), ("fibre", "fiber_g_by_day")):
+        s = _series(inputs, key)
+        n[f"{macro}_floor_g"] = macro_floors.floor_g(macro)
+        if s is None:
+            n[f"{macro}_days_missed_7d"] = None
+            unknown.append(f"{macro}_days_missed_7d")
+            continue
+        graded = [macro_floors.grade(macro, v) for v in s[-7:]]
+        measured = [g for g in graded if g["met"] is not None]
+        if not measured:
+            n[f"{macro}_days_missed_7d"] = None
+            unknown.append(f"{macro}_days_missed_7d")
+            continue
+        missed = [g for g in measured if g["met"] is False]
+        n[f"{macro}_days_measured_7d"] = len(measured)
+        n[f"{macro}_days_missed_7d"] = len(missed)
+        if missed:
+            worst = min(missed, key=lambda g: g["value_g"])
+            flags.append(
+                _flag(
+                    f"{macro}_days_missed_7d",
+                    "info",
+                    f"{len(missed)} of {len(measured)} measured days below the {macro} floor — lowest: {macro_floors.miss_text(macro, worst)}",
+                    provenance=prov,
+                    field=f"{macro}_g_per_day",
+                    to=worst["floor_g"],
+                )
+            )
+
+
 def build_muscle_defense_packet(inputs: dict[str, Any]) -> dict[str, Any]:
     """The energy floor and the protein floor — the two redlines whose breach is where lean
     mass goes. Trailing 7 days, measured days only."""
@@ -398,8 +441,7 @@ def build_muscle_defense_packet(inputs: dict[str, Any]) -> dict[str, Any]:
     n, flags, unknown = p["numbers"], p["flags"], p["unknown"]
     energy = _energy(inputs)
     protein = _redline("protein_floor_g")
-    floor_t = _tripwire("intake_floor_breached")
-    prot_t = _tripwire("protein_floor_missed")
+    floor_t, prot_t = _tripwire("intake_floor_breached"), _tripwire("protein_floor_missed")
     intake14 = _series(inputs, "intake_kcal_by_day")
     protein14 = _series(inputs, "protein_g_by_day")
     lifting14 = _series(inputs, "lifting_day_flags")
@@ -432,8 +474,7 @@ def build_muscle_defense_packet(inputs: dict[str, Any]) -> dict[str, Any]:
             )
         )
 
-    # energy floor
-    if intake7 is None:
+    if intake7 is None:  # energy floor
         n["energy_floor_days_below_7d"] = None
         n["mean_intake_kcal_7d"] = None
         unknown += ["energy_floor_days_below_7d", "mean_intake_kcal_7d"]
@@ -534,7 +575,7 @@ def build_muscle_defense_packet(inputs: dict[str, Any]) -> dict[str, Any]:
                     )
                 )
 
-    # the deficit tool's composite — its OWN recommendation, labelled with its provenance
+    _macro_floor_flags(p, inputs)  # #5102; below, the deficit tool's composite — its OWN recommendation, labelled with its provenance
     sev = inputs.get("deficit_severity")
     bands = deficit_disclosures.CONCURRENT_DEGRADATION_BANDS
     if sev is None:

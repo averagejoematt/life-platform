@@ -210,7 +210,7 @@ REDLINES: dict[str, dict[str, Any]] = {
         "planned_minimum_any_weight": _charter_value("nutrition.calories.planned_minimum_any_weight_kcal"),
         "opening_kcal": _charter_value("nutrition.calories.target_kcal"),
         "prescribed": _charter_value("nutrition.calories.prescribed_band_kcal"),
-        "titration": _charter_value("nutrition.calories.titration"),
+        "titration": _charter_value("nutrition.titration"),  # #5096: the weekly engine's rule (health.titration)
         "provenance": "population-derived",
         "derived_by": "red-team consensus 2026-09-22 (physician + nutritionist floors; the calibrated model's 'highest intake that reproduces the trajectory')",
         "stated": "2026-09-22",
@@ -219,9 +219,8 @@ REDLINES: dict[str, dict[str, Any]] = {
             "exactly the measured record; at a 13 h base the same intake gives ~3.3. 1,500 kcal reproduces 3.5 only at today's 8.4 h "
             "and cannot hold it below 260; its cost is ~30 g of carbohydrate a day for training and an estimated 3–6 lb more lean lost "
             "(from practice, not a citation). There is no prize for eating 1,500: the same trajectory is available at ~2,000–2,100 with "
-            "the feet. `prescribed` is the OPENING band; a titration step moves it by a charter edit or the week's titration record, never silently. `floor_any_day` "
-            "and `floor_lifting_day` are what the nutrition critics grade single days against; the 7-day-mean floor is not yet computed by "
-            "any module and is reported, not enforced."
+            "the feet. `prescribed` is the OPENING band; the weekly titration record (health.titration) moves it, never silently. "
+            "`floor_any_day` and `floor_lifting_day` grade single days; the 7-day-mean floor is reported, not enforced."
         ),
     },
     "protein_floor_g": {
@@ -287,25 +286,25 @@ REDLINES: dict[str, dict[str, Any]] = {
         "evidence": f"Helms 2014 JISSN 11:20 doi:10.1186/1550-2783-11-20 (2.3–3.1 g/kg FFM in a deficit; {_PLAN_PROTEIN_FLOOR_G} g = {_PLAN_PROTEIN_FLOOR_G / 77.4:.2f} g/kg of 77.4 kg DXA lean)",
         "note": "missed >= 3 of the trailing 7 MEASURED days -> the lower band; < 3 -> the step target returns; < 4 measured days -> unknown, target unchanged",
     },
-    "fat_floor_g": {
-        "value": 65,
-        "per_meal_g": 10,
-        "meals_with_fat": 3,
-        "epa_dha_g": 2,
+    "fat_floor_g": {  # #5102: fat/carb/fibre floors are the charter's nutrition.floors
+        "value": _charter_value("nutrition.floors.fat.floor_g"),
+        "per_meal_g": _charter_value("nutrition.floors.fat.per_meal_g"),
+        "meals_with_fat": _charter_value("nutrition.floors.fat.meals_with_fat"),
+        "epa_dha_g": _charter_value("nutrition.floors.fat.epa_dha_g"),
         "provenance": "population-derived",
         "derived_by": "red-team consensus 2026-09-22 (nutritionist + physician: gallbladder emptying, Gebhard 1996; testosterone 361, Whittaker & Wu 2021)",
         "stated": "2026-09-22",
-        "note": "≥ 10 g at each of ≥ 3 meals is the gallbladder-emptying rule that pairs with ursodiol above 3.0 lb/wk. NEW in v3; no module grades it yet.",
+        "note": "≥ 10 g at each of ≥ 3 meals is the gallbladder-emptying rule that pairs with ursodiol above 3.0 lb/wk. The daily total is graded by health.macro_floors (#5102).",
     },
     "carb_floor_g": {
-        "value": 120,
-        "typical_g": [150, 180],
+        "value": _charter_value("nutrition.floors.carb.floor_g"),
+        "typical_g": _charter_value("nutrition.floors.carb.typical_g"),
         "bias": "toward lifting days; a high-carb refeed (300–350 g at maintenance) only below 240 and only when an anchor drops ≥ 5 % over two sessions with adherence intact",
-        "fibre_g": [35, 40],
+        "fibre_g": _charter_value("nutrition.floors.fibre.target_range_g"),
         "provenance": "population-derived",
         "derived_by": "red-team consensus 2026-09-22 (nutritionist + S&C coach)",
         "stated": "2026-09-22",
-        "note": "Carbohydrate is the remainder after protein and fat; 1,500 kcal leaves ~30 g, which is why the floor moved to 1,800. NEW in v3; no module grades it yet.",
+        "note": "Carbohydrate is the remainder after protein and fat. The daily totals (carb and fibre) are graded by health.macro_floors (#5102).",
     },
     "walking_floor_hr_wk": {
         "value": 8.5,
