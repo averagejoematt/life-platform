@@ -940,6 +940,15 @@ where an operator will be standing when they hit them.
    ```json iam-additive-gate-baseline``` block in the ADR-065 amendment
    (`tests/test_iam_additive_gate_guards_2834.py`) — a widening lands where the owner reads.
 
+   **Run the gate BEFORE merging any PR that touches `cdk/` or `config/schedules.json`**
+   (2026-10-20 incident): PR checks do not include Plan, so an OWNER-REQUIRED change is
+   invisible until it has already stranded main. From a checkout of the PR head:
+   `cd cdk && npx cdk synth -q && cd .. && python3 deploy/iam_additive_gate.py --synth-dir cdk/cdk.out --live`
+   (read-only). Any stack reading `OWNER-REQUIRED` moves out of the PR into an owner PR
+   applied with `cdk_deploy.sh`. Remember the IMPLICIT resource policies: an EventBridge
+   rule (or SNS subscription, S3 notification) that TARGETS a Lambda creates an
+   `AWS::Lambda::Permission` — a new schedule row is owner-required CDK, not a config edit.
+
 3. **Phantom deploy wedge — the #2052 shape.** The run's `Deploy` job is blocked in the
    `ci-cd-deploy-<ref>` concurrency group by an entry that corresponds to **no real
    run**. Since #2009 moved that group from the workflow onto the `deploy` job, this no
