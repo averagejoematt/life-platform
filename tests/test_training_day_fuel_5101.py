@@ -107,21 +107,28 @@ def test_classify_day_type():
         ]
         == "lifting"
     )
-    seq = {"session_role": "upper_heavy"}
-    assert c(WEEK[0], sequence_entry=seq, as_of=WEEK[0])["day_type"] == "lifting"
-    assert c(WEEK[1], sequence_entry=seq, as_of=WEEK[0])["day_type"] == "unknown"  # the sequence has no calendar
+    # the sequence has no calendar: it serves the next undone session every day, so it never types a date
     assert c(WEEK[0])["day_type"] == "unknown"
 
 
 def test_plan_block_carries_the_day_and_the_pre_post_targets():
-    from training import disruption, plan_engine
+    from training import disruption
 
-    out = plan_engine._training_day_fuel(MON, {"source": "session_sequence", "session_role": "upper_heavy"}, None)
-    assert out["day_type"] == "lifting" and out["pre_post_session"]["pre"]["carb_g"] and out["pre_post_session"]["post"]["protein_g"]
-    unread = plan_engine._training_day_fuel(MON, {"source": "sequence_unreadable"}, None)
-    assert unread["day_type"] == "unknown" and unread["uplift_kcal"] == 0
+    out = ct.plan_block(MON, None)
+    assert out["day_type"] == "unknown" and out["uplift_kcal"] == 0 and out["kcal"] == out["base_kcal"]
+    # a non-lifting date served by the sequence does NOT get the uplift; the uplift is stated as conditional
+    assert out["if_lifting_day"]["kcal"] > out["kcal"] > out["if_rest_day"]["kcal"]
+    pp = out["if_lifting_day"]["pre_post_session"]
+    assert pp["pre"]["carb_g"] and pp["post"]["protein_g"]
     rec = disruption.build_disruption_record(
         start_date=MON, until="2026-11-05", words="w", template="travel", recorded_at="2026-11-02T00:00:00Z"
     )
-    away = plan_engine._training_day_fuel(MON, {"source": "session_sequence", "session_role": "x"}, [rec])
+    away = ct.plan_block(MON, disruption.state([rec], MON))
     assert away["day_type"] == "travel" and away["uplift_kcal"] == 0 and away["pre_post_session"] is not None
+
+
+def test_plan_engine_wires_the_block_without_typing_a_date_lifting():
+    from training import plan_engine
+
+    blk = plan_engine._effort_blocks(MON, [], [], {}, None)["training_day_fuel"]
+    assert blk["day_type"] == "unknown" and blk["uplift_kcal"] == 0

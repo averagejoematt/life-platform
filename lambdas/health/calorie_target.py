@@ -93,15 +93,14 @@ def classify_day_type(
     day: DayLike,
     *,
     planned_dates: Optional[Iterable[str]] = None,
-    sequence_entry: Optional[Dict[str, Any]] = None,
-    as_of: DayLike = None,
     disruption: Optional[Dict[str, Any]] = None,
     charter_reader: Optional[CharterReader] = None,
 ) -> Dict[str, str]:
     """``{day_type, basis}`` for a date: ``travel`` (an active travel disruption, or a charter travel window),
     else ``lifting``/``rest`` from the PLAN (``planned_dates`` = the dates with a planned routine, when the plan was
-    read), else ``lifting`` when the split's sequence serves a session on the as-of day itself, else ``unknown``.
-    A plan that was not read is an absence, never ``rest``."""
+    read), else ``unknown``. The split sequence has no calendar (it serves the next undone session every day, a rest day
+    only postpones it), so it cannot type a date and never yields ``lifting`` or ``rest``; a plan that was not read
+    is an absence, never ``rest``."""
     read = charter_reader or _default_charter_reader
     d = _day(day).isoformat()
     dis = disruption or {}
@@ -116,9 +115,10 @@ def classify_day_type(
     if planned_dates is not None:
         planned = {str(x)[:10] for x in planned_dates}
         return {"day_type": "lifting" if d in planned else "rest", "basis": "planned routine for the date"}
-    if sequence_entry and sequence_entry.get("session_role") and as_of is not None and _day(as_of).isoformat() == d:
-        return {"day_type": "lifting", "basis": "split sequence: the next undone session is served today"}
-    return {"day_type": "unknown", "basis": "no plan for the date and no sequence position served on it"}
+    return {
+        "day_type": "unknown",
+        "basis": "no per-date plan calendar (the sequence cannot type a date): base target, lifting uplift conditional",
+    }
 
 
 def _grams(kcal: float, protein_g: float, fat_g: float) -> float:
@@ -168,6 +168,20 @@ def _apply_day_type(
     if dt in ("lifting", "travel"):
         pre, post = cfg.get("pre_session"), cfg.get("post_session")
         out["pre_post_session"] = {"pre": pre, "post": post} if isinstance(pre, dict) and isinstance(post, dict) else None
+
+
+def plan_block(date: str, disruption: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """The plan's `training_day_fuel` (#5101, owner-only): today's resolution (no per-date calendar exists yet, so a
+    non-travel date is `unknown` at the base target) plus `if_lifting_day` / `if_rest_day`, stated as conditional."""
+    typed = classify_day_type(date, disruption=disruption)
+    out = resolve(date, day_type=typed["day_type"])
+    out["day_type_basis"] = typed["basis"]
+    if typed["day_type"] == "unknown":
+        out["if_lifting_day"] = {
+            k: v for k, v in resolve(date, day_type="lifting").items() if k in ("kcal", "uplift_kcal", "split", "pre_post_session")
+        }
+        out["if_rest_day"] = {k: v for k, v in resolve(date, day_type="rest").items() if k in ("kcal", "uplift_kcal", "split")}
+    return out
 
 
 def resolve(

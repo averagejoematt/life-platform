@@ -500,7 +500,7 @@
         "note": "the post-session protein is one of the four feedings (nutrition.protein.feeding_threshold_g)"
       },
       "travel_day": "no uplift and no rest-day offset: the base target holds; pre and post targets still apply when a session is done",
-      "day_type": "lifting | rest | travel | unknown: travel from a travel disruption or charter travel window; else lifting/rest from the planned routine for the date; else lifting when the split sequence serves a session today; else unknown (base target, never a guessed rest day)",
+      "day_type": "lifting | rest | travel | unknown: travel from a travel disruption or charter travel window; else lifting/rest from the planned routine for the date; else unknown (base target, never a guessed rest day: the split sequence has no calendar, so the plan states the lifting uplift and the rest offset as conditional until a per-date calendar exists)",
       "surface": "owner-only: the plan_next_session constraint block (training_day_fuel) and the coach packet; no public surface",
       "basis": "built on the panel default, pending R1 (#5091)"
     }

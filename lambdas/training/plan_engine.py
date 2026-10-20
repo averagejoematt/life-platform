@@ -751,18 +751,12 @@ def _deload_recommendation(
     return rec
 
 
-def _effort_blocks(
-    date: str, rows: Any, catalog_movements: Any, states: dict[str, dict[str, Any]], fuel_inputs: tuple[Any, Any]
-) -> dict[str, Any]:
-    """`progression` (#5052) + `ceiling_change_proposal` (#5058, over the prescription window's stored adherence)
-    + `training_day_fuel` (#5101: the served session and the disruption records the day type is read from)."""
+def _effort_blocks(date: str, rows: Any, catalog_movements: Any, states: dict[str, dict[str, Any]], dis_records: Any) -> dict[str, Any]:
+    """`progression` (#5052) + `ceiling_change_proposal` (#5058) + `training_day_fuel` (#5101, owner-only)."""
     st = (states.get("hevy_workouts_prescription_window") or {}).get("state")
     proposal = ceiling_proposal.for_plan(date, rows, None if st == READ_FAILED else st, catalog_movements)
-    return {
-        "progression": load_progression.rule_summary(),
-        "ceiling_change_proposal": proposal,
-        "training_day_fuel": _training_day_fuel(date, *fuel_inputs),
-    }
+    fuel = calorie_target.plan_block(date, disruption.state(dis_records, date) if dis_records is not None else None)
+    return {"progression": load_progression.rule_summary(), "ceiling_change_proposal": proposal, "training_day_fuel": fuel}
 
 
 def _steps_ramp_block(
@@ -790,17 +784,6 @@ def _steps_ramp_block(
         return {"date": date, "state": "unknown", "reason": "; ".join(why), "charter_version": training_charter.charter_version()}
     out = steps_ramp.compute(date, window, pain_flag_instances=pain_instances, pain_dismissals=dismissals, deload_records=deload_records)
     out["steps_target_line"] = steps_nudge.target_line(out)  # #5056: the day's floor/target line the coach states every day
-    return out
-
-
-def _training_day_fuel(date: str, session: dict[str, Any], disruption_records: list[dict[str, Any]] | None) -> dict[str, Any]:
-    """`constraint_block.training_day_fuel` (#5101, owner-only): the day's kcal, uplift, macro split and pre/post session
-    targets, all from `health.calorie_target.resolve` (the one resolver) with the day type the plan knows."""
-    dis = disruption.state(disruption_records, date) if disruption_records is not None else None
-    seq = session if session.get("source") == "session_sequence" else None
-    typed = calorie_target.classify_day_type(date, sequence_entry=seq, as_of=date, disruption=dis)
-    out = calorie_target.resolve(date, day_type=typed["day_type"])
-    out["day_type_basis"] = typed["basis"]
     return out
 
 
@@ -1121,7 +1104,7 @@ def constraint_block(
         # W1 (#5050) moves the engine's reads onto the charter; until then the literals above still come from owner_redlines/program_structure.
         "charter_version": training_charter.charter_version(),
         # #5052: the double progression + effort limits, stamped; #5058: the ceiling-change proposal (never auto-applied)
-        **_effort_blocks(date, hevy_workouts_prescription_window, catalog_movements, states, (session, disruption_records)),
+        **_effort_blocks(date, hevy_workouts_prescription_window, catalog_movements, states, disruption_records),
         "critics": dict(_CRITICS_NOT_WIRED),
         "honesty": [
             s
