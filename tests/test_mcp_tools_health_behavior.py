@@ -1306,7 +1306,8 @@ def test_energy_derives_the_calorie_target_and_implied_loss_rate(monkeypatch):
     out = th.tool_get_daily_metrics({"view": "energy"})
     assert out["exercise_kcal_7d_daily_avg"] == 86.0
     assert out["tdee_7d_avg"] == 2057.0
-    assert out["calorie_target_based_on_7d"] == 1557.0
+    assert out["maintenance_context_7d"]["estimated_maintenance_kcal"] == 2057.0
+    assert out["maintenance_context_7d"]["deficit_kcal"] == 500.0
     assert out["implied_weekly_loss_lbs"] == 1.0
 
 
@@ -1344,7 +1345,7 @@ def test_energy_honours_a_custom_deficit_target(monkeypatch):
     install(monkeypatch, ENERGY_ROWS)
     out = th.tool_get_daily_metrics({"view": "energy", "target_deficit_kcal": 750})
     assert out["implied_weekly_loss_lbs"] == 1.5
-    assert out["calorie_target_based_on_7d"] == 1307.0
+    assert out["maintenance_context_7d"]["deficit_kcal"] == 750.0
 
 
 def test_energy_uses_day_level_kilojoules_when_the_field_is_present(monkeypatch):
