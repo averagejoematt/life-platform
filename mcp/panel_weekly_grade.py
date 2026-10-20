@@ -11,6 +11,10 @@ routine repo already live:
                 plan was drafted beside (fatigue signals, the steps ramp, the tripwires). Fail-soft: an
                 unreadable block is named on the grade (`degraded`), never a fabricated one.
   * history     the earlier `PANEL#` rows, for the trend.
+  * the food    `training.food_panel.build_food_plan(week_start)` (#5110): the week's resolved calorie targets
+                (`health.calorie_target.resolve`, titration over charter, each day typed lifting/rest from the
+                committed routines' dates) + the intended feedings + the week's titration record. Fail-soft: an
+                unreadable food plan is named on the grade (`degraded`), the training grade still stands.
   * the write   ONE owner-only row, `USER#<id>#SOURCE#training_constraints / PANEL#<week_end>` (docs/SCHEMA.md):
                 scores, letters, reasons, the controls' verdicts and the trend — never the plan itself.
 
@@ -70,6 +74,24 @@ def read_constraint_block(week_end: str) -> dict[str, Any] | None:
         return None
 
 
+def read_food_plan(week_start: str, routines: list[dict[str, Any]]) -> dict[str, Any] | None:
+    try:
+        from health import titration
+        from training import food_panel
+
+        from mcp.config import table
+
+        return food_panel.build_food_plan(
+            week_start,
+            planned_dates=[str(r.get("target_date") or "")[:10] for r in routines],
+            titration_reader=lambda week: titration.read_record(table, week),
+            case_id=f"food::{week_start}",
+        )
+    except Exception as e:  # noqa: BLE001 — the grade names the missing food plan; it never invents one
+        logger.warning("panel weekly grade: food plan unreadable (%s: %s)", type(e).__name__, str(e)[:200])
+        return None
+
+
 def read_history() -> list[dict[str, Any]]:
     from boto3.dynamodb.conditions import Key
     from training.panel_judge import PANEL_SK_PREFIX
@@ -104,8 +126,14 @@ def run(week_end: str | None = None) -> dict[str, Any]:
 
     end = week_end or shift_day_key(pacific_today(), -1)
     start = shift_day_key(end, -(JOB["week_days"] - 1))
+    routines = read_routines(start, end)
     grade = panel_judge.grade_committed_week(
-        end, week_start=start, routines=read_routines(start, end), constraint_block=read_constraint_block(end), history=read_history()
+        end,
+        week_start=start,
+        routines=routines,
+        constraint_block=read_constraint_block(end),
+        history=read_history(),
+        food_plan=read_food_plan(start, routines),
     )
     grade["stored"] = store(grade) if grade.get("status") == "graded" else {"written": False, "reason": grade.get("status")}
     return grade

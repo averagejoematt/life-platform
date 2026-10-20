@@ -11,6 +11,11 @@ This gate grades the golden cases in `tests/fixtures/panel_golden_5072/` with th
     with no dose) meets the target, or scores at/above the seat floor on a criterion it exists to fail —
     a rubric that cannot tell the bad plan from the good one is not a gate.
 
+THE FOOD PANEL (#5110). A case with `"panel": "food"` is a week's FOOD plan (`training.food_panel`'s shape) and is
+graded by the food seats (`food_panel` in the rubric) on the same judge, letters and bar: the good food week must
+grade A, and the negative controls — the old flat calorie constant with no protein structure, and a week with no
+weekly refit and no session fuel — must fail.
+
 TWO MODES.
   --recorded (default) replays `recorded_judge.json` for the judge's criteria: offline, free, no AWS. The
              unit suite runs this mode on every PR (tests/test_panel_rubric_5072.py), so the deterministic
@@ -24,7 +29,7 @@ TWO MODES.
              PANEL_JUDGE_CREDS: anything but `success` (the role's trust admits refs/heads/main only, so a
              pull_request is refused) prints "live judge NOT run" + a ::warning:: and exits 0 — the recorded
              step already gated that run. Unset (a laptop run) means the ambient credentials are used.
-             Cost: one Sonnet call per case, back-to-back on the cached charter block (~$0.15 a run, 5 cases);
+             Cost: one Sonnet call per case, back-to-back on the cached charter block (~$0.25 a run, 8 cases);
              a laptop run is also held by the dev-session cap ($5 a run).
 
 EXIT: 0 every case behaved; 1 a case did not (each named); 2 the gate could not run (rubric/fixtures unreadable).
@@ -46,13 +51,30 @@ FIXTURES = ROOT / "tests" / "fixtures" / "panel_golden_5072"
 RECORDED = "recorded_judge.json"
 GOOD_KIND = "good"
 CONTROL_KIND = "negative_control"
+FOOD_PANEL = "food"
+TRAINING_PANEL = "training"
 JUDGE_FAILED = ("error", "unparsed")  # live mode: a red. "paused" (the budget guard) is the only soft path.
 
 
-def golden_cases(fixtures: Path = FIXTURES) -> list[dict[str, Any]]:
-    """Every plan case in the fixture dir (not the recorded replies), good plans first, then by name."""
+def panel_of(case: dict[str, Any]) -> str:
+    return str(case.get("panel") or TRAINING_PANEL)
+
+
+def golden_cases(fixtures: Path = FIXTURES, panel: str | None = None) -> list[dict[str, Any]]:
+    """Every plan case in the fixture dir (not the recorded replies), good plans first, then by name; `panel`
+    narrows to the training or the food cases."""
     cases = [json.loads(p.read_text(encoding="utf-8")) for p in sorted(fixtures.glob("*.json")) if p.name != RECORDED]
+    cases = [c for c in cases if panel is None or panel_of(c) == panel]
     return sorted(cases, key=lambda c: (c.get("kind") != GOOD_KIND, c.get("case_id") or ""))
+
+
+def grade_golden(case: dict[str, Any], rubric: dict[str, Any], call: Any) -> dict[str, Any]:
+    """The case's panel: the food seats for a food plan (#5110), the training seats otherwise."""
+    from training import food_panel, panel_judge  # noqa: PLC0415
+
+    if panel_of(case) == FOOD_PANEL:
+        return food_panel.grade_case(case, rubric, route=panel_judge.CI_ROUTE, call=call)
+    return panel_judge.grade_case(case, rubric, route=panel_judge.CI_ROUTE, call=call)
 
 
 def _replay(reply: Any):
@@ -71,23 +93,25 @@ def case_failures(case: dict[str, Any], grade: dict[str, Any]) -> list[str]:
         tgt = grade["target"]
         out.append(
             f"overall {grade['overall']['letter']} ({grade['overall']['score']}) / seats below {tgt.get('every_seat_at_least')}: "
-            f"{grade['seats_below_floor']} / concessions not held: {grade['concessions_not_held']} (target {tgt.get('overall')})"
+            f"{grade['seats_below_floor']} / concessions not held: {grade['concessions_not_held']} / unnamed: {grade.get('concessions_unnamed')} "
+            f"(target {tgt.get('overall')})"
         )
     return out
 
 
 def run(mode: str, fixtures: Path = FIXTURES) -> tuple[int, list[str]]:
-    from training import panel_judge, panel_rubric  # noqa: PLC0415
+    from training import panel_rubric  # noqa: PLC0415
 
     rubric = panel_rubric.load_rubric()
     cases = golden_cases(fixtures)
-    if rubric is None or not cases or not any(c.get("kind") == GOOD_KIND for c in cases):
+    goods = {panel_of(c) for c in cases if c.get("kind") == GOOD_KIND}
+    if rubric is None or not cases or not goods >= {panel_of(c) for c in cases}:
         return 2, [f"cannot run: rubric {'ok' if rubric else 'UNREADABLE'}, {len(cases)} golden case(s) in {fixtures}"]
     recorded = json.loads((fixtures / RECORDED).read_text(encoding="utf-8")).get("responses") or {} if mode == "recorded" else {}
     lines, failed, cost = [], 0, 0.0
     for case in cases:
         call = _replay(recorded.get(case["case_id"])) if mode == "recorded" else None
-        grade = panel_judge.grade_case(case, rubric, route=panel_judge.CI_ROUTE, call=call)
+        grade = grade_golden(case, rubric, call)
         why = case_failures(case, grade)
         cost += float(grade["judge"].get("cost_usd") or 0)
         judge_state = grade["judge"]["status"]
