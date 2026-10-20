@@ -44,7 +44,7 @@ from __future__ import annotations
 import json
 from typing import Any, Iterable, Optional
 
-CONTEXT_VERSION = "coach-context@1.2.0"  # 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
+CONTEXT_VERSION = "coach-context@1.3.0"  # 1.3.0 #5111: lab_priorities (owner channel, seam only); 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
 
 # ── the order contract, as data ───────────────────────────────────────────────────────────
 ORDER: tuple[str, ...] = ("pre_flight", "plan_next_session", "manage_hevy_routine draft")
@@ -245,6 +245,7 @@ def assemble(
     tracker: Any = None,
     guidance: Any = None,
     guidance_freshness: Any = None,
+    lab_priorities: Optional[dict[str, Any]] = None,
     published: bool = False,
 ) -> dict[str, Any]:
     """The planning context for `target_date`: a dict for code and ``text`` for a prompt.
@@ -271,6 +272,7 @@ def assemble(
         "sections": sections,
         "may_frame": frame,
         "run_gate": None if published else run_gate(tracker),
+        "lab_priorities": None if published else lab_priorities,  # #5111: owner-only; absent -> nothing is said
         "not_supplied": sorted(k for k, s in sections.items() if s.get("state") == NOT_SUPPLIED),
     }
     out["text"] = render(out)
@@ -392,8 +394,241 @@ def render(ctx: dict[str, Any]) -> str:
     if ctx.get("run_gate"):  # #5090: owner channel only (assemble sets None when published)
         rg = ctx["run_gate"]
         parts.append([f"RUN GATE (owner-only) [{rg['source']}; {rg['state']}]", rg["line"]])
+    lp = ctx.get("lab_priorities")
+    if lp and not ctx["published"]:  # #5111: the owner's own priorities, from his owner-only record (training.lab_priorities)
+        parts.append([f"LAB-DRIVEN PRIORITIES (owner-only) [{lp.get('source')}]", lp["text"]])
     if not ctx["published"]:  # the order contract is the owner's planning conversation's, never a reader prompt's
         parts.append(["ORDER: " + " -> ".join(ctx["order"]) + " (pre-flight = " + ", ".join(PRE_FLIGHT) + ")"])
+    return "\n\n".join("\n".join(p) for p in parts)
+
+
+# ── the nutrition coach's context (#5109, epic #5094) ───────────────────────────────────
+# The nutrition coach (the daily brief's `nutrition_coach`, `coach.coach_input_facts.coach_inputs`) reads the SAME
+# assembly: the charter's nutrition block, the redlines' nutrition rules, the ONE calorie target with its provenance,
+# and the protein engine's and the macro floors' grade of the data day. Before this it read none of them: its persona
+# carried example numbers that predated the charter and its only target was the system prompt's stale protein line.
+# PURE like `assemble`: the caller hands in the MacroFactor day row it already read; the resolver's own titration read
+# (inside a Lambda, cached) is the one I/O, and a failure there is a stated absence.
+NUTRITION_CONTEXT_VERSION = "nutrition-context@1.0.0"
+SRC_NUTRITION = "config/training_charter.json nutrition (training.training_charter)"
+SRC_REDLINES = "training.owner_redlines REDLINES (the nutrition rules; values read from the charter)"
+SRC_CALORIE = "health.calorie_target.resolve (the ONE calorie target: titration, else the charter)"
+SRC_PROTEIN = "health.protein_engine.evaluate_day (#5098)"
+SRC_FLOORS = "health.macro_floors.evaluate_day (#5102)"
+
+# The charter nutrition paths a PUBLISHED nutrition context states. Not on `PUBLISHED_WHITELIST` (that list is what
+# the site renders of the charter); each is a daily figure the coach grades a logged day against. Never a
+# `NEVER_PUBLISHED` prefix (tests/test_nutrition_coach_context_5109.py).
+NUTRITION_PUBLISHED_PATHS: tuple[str, ...] = (
+    "nutrition.protein.range_g.low",
+    "nutrition.protein.range_g.high",
+    "nutrition.protein.days_of_7",
+    "nutrition.protein.feedings_per_day",
+    "nutrition.protein.feeding_threshold_g",
+    "nutrition.protein.feeding_target_g",
+    "nutrition.calories.floor_any_day_kcal",
+    "nutrition.calories.floor_lifting_day_kcal",
+    "nutrition.floors.fat.floor_g",
+    "nutrition.floors.carb.floor_g",
+    "nutrition.floors.fibre.floor_g",
+    "nutrition.floors.fibre.target_range_g",
+)
+# Owner channel only: the opening band, the reported 7-day floor and the training-day rule (its `surface` is owner-only).
+NUTRITION_OWNER_PATHS: tuple[str, ...] = (
+    "nutrition.calories.prescribed_band_kcal",
+    "nutrition.calories.floor_7d_mean_kcal",
+    "nutrition.training_day.lifting_uplift_kcal",
+)
+# The redlines' nutrition rules: (REDLINES key, the fields a context states). Notes and derivations are not rules.
+REDLINE_NUTRITION_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("energy_floor_kcal", ("floor_any_day", "floor_lifting_day", "floor_7d_mean")),
+    ("protein_floor_g", ("value", "target_g", "days_of_7", "feedings", "feeding_g", "timing")),
+    ("fat_floor_g", ("value",)),
+    ("carb_floor_g", ("value",)),
+)
+# The calorie resolver fields a published context carries: the kcal and where it came from, never the titration
+# record's reason or band (USER#…#SOURCE#nutrition_titration is TIER_OWNER_ONLY, privacy.field_tiers).
+_CALORIE_PUBLISHED_KEYS = ("kcal", "base_kcal", "resolved_from", "floor_any_day_kcal", "floor_lifting_day_kcal", "charter_version")
+_CALORIE_OWNER_KEYS = _CALORIE_PUBLISHED_KEYS + ("band_low", "band_high", "provenance", "week", "day_type", "uplift_kcal")
+# The protein engine's day fields a published context carries: counts, never the feedings' clock times.
+_PROTEIN_PUBLISHED_KEYS = ("date", "total_g", "range_low", "range_high", "hit", "feedings_40g", "feedings_target", "charter_version")
+
+NUTRITION_CITE_RULE = (
+    "Cite a calorie or protein target, floor or day total only from this context or from logging_record; "
+    "a figure that is in neither is not one any engine serves: leave it out."
+)
+
+
+def _charter_nutrition(published: bool) -> dict[str, Any]:
+    from training import training_charter as tc  # noqa: PLC0415
+
+    paths = NUTRITION_PUBLISHED_PATHS + (() if published else NUTRITION_OWNER_PATHS)
+    values = {p: tc.charter_value(p) for p in paths}
+    values = {p: v for p, v in values.items() if v is not None}
+    return {"source": SRC_NUTRITION, "charter_version": tc.charter_version(), "state": "measured" if values else "absent", "values": values}
+
+
+def _redline_rules() -> dict[str, Any]:
+    from training import owner_redlines  # noqa: PLC0415
+
+    rules = {}
+    for key, fields in REDLINE_NUTRITION_RULES:
+        rec = owner_redlines.REDLINES.get(key) or {}
+        rules[key] = {f: rec.get(f) for f in fields if rec.get(f) not in (None, [], "", 0)}
+    return {"source": SRC_REDLINES, "version": owner_redlines.REDLINES_VERSION, "state": "measured", "rules": rules}
+
+
+def _public_provenance(cal: dict[str, Any]) -> str:
+    if cal.get("source") == "titration":
+        return "the week's titration record (health.titration), clamped by the charter's any-day floor"
+    return str(cal.get("provenance") or "")
+
+
+def _calorie_section(target_date: str, published: bool, calorie: Optional[dict[str, Any]]) -> dict[str, Any]:
+    if calorie is None:
+        from health.calorie_target import resolve  # noqa: PLC0415
+
+        calorie = resolve(target_date)
+    keys = _CALORIE_PUBLISHED_KEYS if published else _CALORIE_OWNER_KEYS
+    calorie = {**calorie, "resolved_from": calorie.get("source")}  # the resolver's `source`; the section's is SRC_CALORIE
+    out = {k: calorie.get(k) for k in keys if k in calorie}
+    if published:
+        out["provenance"] = _public_provenance(calorie)
+    return {"source": SRC_CALORIE, "state": "measured" if calorie.get("kcal") is not None else "absent", **out}
+
+
+def _day_sections(row: Optional[dict[str, Any]], published: bool) -> tuple[dict[str, Any], dict[str, Any]]:
+    from health import macro_floors, protein_engine  # noqa: PLC0415
+
+    if not isinstance(row, dict) or not row:
+        absent = {"state": NOT_SUPPLIED, "detail": "no MacroFactor day row was supplied: the day is unknown, never a miss"}
+        return {"source": SRC_PROTEIN, **absent}, {"source": SRC_FLOORS, **absent}
+    day = protein_engine.evaluate_day(row)
+    protein = {k: day.get(k) for k in _PROTEIN_PUBLISHED_KEYS} if published else dict(day)
+    return {"source": SRC_PROTEIN, "state": "measured", **protein}, {
+        "source": SRC_FLOORS,
+        "state": "measured",
+        "date": row.get("date"),
+        **macro_floors.evaluate_day(row),
+    }
+
+
+def nutrition_context(
+    target_date: str,
+    *,
+    day_row: Optional[dict[str, Any]] = None,
+    calorie: Optional[dict[str, Any]] = None,
+    published: bool = True,
+) -> dict[str, Any]:
+    """The nutrition coach's context for `target_date` (#5109): a dict for code and ``text`` for a prompt.
+
+    ``published=True`` (the DEFAULT: the daily brief's nutrition text reaches /api/coaching-dashboard) carries
+    ``NUTRITION_PUBLISHED_PATHS``, the redlines' rules, the resolver's kcal and its public provenance, and the
+    engines' grade of `day_row` without clock times. ``published=False`` (the owner's Telegram thread) adds the
+    owner-only paths, the resolver's band and provenance and the feedings' times. `calorie` is a resolver result the
+    caller already holds (tests); None resolves it here."""
+    from training import training_charter as tc  # noqa: PLC0415
+
+    protein, floors = _day_sections(day_row, published)
+    sections = {
+        "charter_nutrition": _charter_nutrition(published),
+        "redlines": _redline_rules(),
+        "calorie_target": _calorie_section(target_date, published, calorie),
+        "protein_day": protein,
+        "floors_day": floors,
+    }
+    out: dict[str, Any] = {
+        "context_version": NUTRITION_CONTEXT_VERSION,
+        "target_date": target_date,
+        "charter_version": tc.charter_version(),
+        "published": published,
+        "sections": sections,
+        "rule": NUTRITION_CITE_RULE,
+    }
+    out["served_figures"] = served_figures(out)
+    out["text"] = render_nutrition(out)
+    return out
+
+
+def charter_goal_lines() -> str:
+    """The daily coaches' standing training + priorities lines (`ai.ai_calls._run_coach_v2_pipeline`'s system prompt),
+    read from the charter (#5109). They were typed into the prompt before the charter existed (a 190 g protein target
+    and an 8,000-step line the charter never set, and strength training "planned but not yet started"). The steps and
+    the split come from `public_view()` (the prompt's output is published); the protein range is a daily figure the
+    published nutrition context states (`NUTRITION_PUBLISHED_PATHS`). An unreadable charter says so in words."""
+    from training import training_charter as tc  # noqa: PLC0415
+
+    pv = tc.public_view()
+    split, steps = pv.get("split") or {}, pv.get("steps") or {}  # steps-truth: the charter's steps TARGETS, not a reading
+    lo, hi = tc.charter_value("nutrition.protein.range_g.low"), tc.charter_value("nutrition.protein.range_g.high")
+    days = tc.charter_value("nutrition.protein.days_of_7")
+    if not (split.get("sequence") and steps.get("floor") and lo and hi):
+        return "- Training and priorities: the training charter could not be read; state no target from memory"
+    return (
+        f"- Training: {split.get('lifting_days_per_wk')} lifting days a week in the sequence {', '.join(split['sequence'])}, plus daily walking\n"
+        f"- Key priorities: sleep quality, protein adherence (at or above the {lo:g} g floor on {days} of 7 days; range {lo:g}-{hi:g} g), "
+        f"consistent movement ({steps['floor']:,} steps/day floor, {steps.get('target'):,} target)"
+    )
+
+
+def _numbers(v: Any) -> list[float]:
+    if isinstance(v, bool) or v is None:
+        return []
+    if isinstance(v, (int, float)):
+        return [float(v)]
+    if isinstance(v, (list, tuple)):
+        return [x for item in v for x in _numbers(item)]
+    return []
+
+
+def served_figures(ctx: dict[str, Any]) -> dict[str, list[float]]:
+    """``{"calories": [...], "protein_g": [...], "fiber_g": [...]}`` — every target, floor and day figure this
+    context serves, by the plan-figure gate's quantity names (`ai.plan_facts_gate`). The served-fact gate passes them
+    as `observed`, so a coach stating one of them is licensed and a target no engine serves is not."""
+    s = ctx.get("sections") or {}
+    vals = (s.get("charter_nutrition") or {}).get("values") or {}
+    cal = s.get("calorie_target") or {}
+    rules = (s.get("redlines") or {}).get("rules") or {}
+    protein, floors = s.get("protein_day") or {}, s.get("floors_day") or {}
+    kcal = [cal.get(k) for k in ("kcal", "base_kcal", "floor_any_day_kcal", "floor_lifting_day_kcal", "band_low", "band_high")]
+    kcal += [vals.get(p) for p in vals if p.startswith("nutrition.calories.")] + [rules.get("energy_floor_kcal")]
+    grams = [vals.get(p) for p in vals if p.startswith("nutrition.protein.") and "_g" in p]  # grams, not day/feeding counts
+    grams += [protein.get(k) for k in ("total_g", "range_low", "range_high")]
+    grams += [rules.get("protein_floor_g", {}).get(k) for k in ("value", "target_g", "feeding_g")]
+    fibre = [vals.get(p) for p in vals if p.startswith("nutrition.floors.fibre.")] + [(floors.get("fibre") or {}).get("value_g")]
+    out = {"calories": kcal, "protein_g": grams, "fiber_g": fibre}
+    return {
+        q: sorted({x for v in vs for x in (_numbers(v) if not isinstance(v, dict) else _numbers(list(v.values())))})
+        for q, vs in out.items()
+    }
+
+
+def render_nutrition(ctx: dict[str, Any]) -> str:
+    """The nutrition context's text block: every section headed with its source; absence stated."""
+    s = ctx["sections"]
+    cn = s["charter_nutrition"]
+    parts = [[f"NUTRITION CHARTER v{cn.get('charter_version')} [{cn['source']}] ({ctx['context_version']})"]]
+    parts[0] += [f"- {p}: {_clip(v)}" for p, v in (cn.get("values") or {}).items()] or ["- the charter's nutrition block could not be read"]
+    rl = s["redlines"]
+    parts.append(
+        [f"REDLINES v{rl.get('version')}: the nutrition rules [{rl['source']}]"] + [f"- {k}: {_clip(v)}" for k, v in rl["rules"].items()]
+    )
+    cal = s["calorie_target"]
+    head = f"CALORIE TARGET [{cal['source']}]"
+    parts.append(
+        [head, f"- {cal['kcal']} kcal ({cal.get('provenance')})" if cal.get("kcal") is not None else "- no calorie target resolved: say so"]
+    )
+    pr = s["protein_day"]
+    parts.append(
+        _render_fields(
+            f"PROTEIN — the engine's day {pr.get('date') or ''}".strip(),
+            pr,
+            ((k, pr.get(k)) for k in _PROTEIN_PUBLISHED_KEYS if k != "date"),
+        )
+    )
+    fl = s["floors_day"]
+    parts.append(_render_fields("FLOORS — the engine's day", fl, ((m, fl.get(m)) for m in ("fat", "carb", "fibre") if m in fl)))
+    parts.append([f"RULE: {ctx['rule']}"])
     return "\n\n".join("\n".join(p) for p in parts)
 
 

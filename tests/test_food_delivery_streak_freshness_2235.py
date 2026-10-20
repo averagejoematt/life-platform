@@ -249,3 +249,16 @@ def test_the_three_known_consumers_no_longer_carry_the_raw_literal():
 
 
 # premerge-gate: structural gate that sweeps the repo tree (#2372)
+
+
+import pytest as _pytest_5108  # noqa: E402
+
+
+@_pytest_5108.fixture(autouse=True)
+def _food_delivery_unpaused_5108(monkeypatch):
+    """#5108: the real registry now PAUSES food_delivery (reader returns None). These tests
+    exercise the LIVE-source behaviour, so they un-pause it; the paused contract is pinned in
+    tests/test_food_delivery_paused_5108.py."""
+    from ingestion.source_registry import SOURCE_REGISTRY
+
+    monkeypatch.setitem(SOURCE_REGISTRY, "food_delivery", {**SOURCE_REGISTRY["food_delivery"], "paused": False})

@@ -1,6 +1,201 @@
 {
- "_README": "#5072: RECORDED judge replies for the golden cases \u2014 hand-authored to the response schema (panel_judge.response_schema), NOT a live model output. The unit tests and `scripts/panel_rubric_gate.py --recorded` replay them so no test reaches Bedrock. The gate's --live mode re-asks the model; a live run's replies may be pasted over these after review.",
+ "_README": "#5072: RECORDED judge replies for the golden cases \u2014 hand-authored to the response schema (panel_judge.response_schema), NOT a live model output. The unit tests and `scripts/panel_rubric_gate.py --recorded` replay them so no test reaches Bedrock. The gate's --live mode re-asks the model; a live run's replies may be pasted over these after review. #5110 added the three food-panel cases (food_*), same rules.",
  "responses": {
+  "food_good_week": {
+   "appetite_food_environment": {
+    "concession_held": true,
+    "scores": {
+     "environment": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   },
+   "behaviour_change_psychologist": {
+    "concession_held": true,
+    "scores": {
+     "repeatable": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   },
+   "energy_balance_metabolism": {
+    "concession_held": true,
+    "scores": {
+     "honest_model": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   },
+   "evidence_based_hypertrophy_nutrition": {
+    "concession_held": true,
+    "scores": {
+     "food_quality": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   },
+   "flexible_dieting": {
+    "concession_held": true,
+    "scores": {
+     "flexibility": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   },
+   "obesity_medicine": {
+    "concession_held": true,
+    "scores": {
+     "sustainable_pace": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   },
+   "protein_lean_mass": {
+    "concession_held": true,
+    "scores": {
+     "distribution": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   },
+   "sports_dietitian": {
+    "concession_held": true,
+    "scores": {
+     "timing": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   },
+   "studio_nutritionist": {
+    "concession_held": true,
+    "scores": {
+     "the_frame": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   }
+  },
+  "food_neg_no_refit_no_fuel": {
+   "appetite_food_environment": {
+    "concession_held": false,
+    "scores": {
+     "environment": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   },
+   "behaviour_change_psychologist": {
+    "concession_held": false,
+    "scores": {
+     "repeatable": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   },
+   "energy_balance_metabolism": {
+    "concession_held": false,
+    "scores": {
+     "honest_model": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   },
+   "evidence_based_hypertrophy_nutrition": {
+    "concession_held": false,
+    "scores": {
+     "food_quality": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   },
+   "flexible_dieting": {
+    "concession_held": false,
+    "scores": {
+     "flexibility": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   },
+   "obesity_medicine": {
+    "concession_held": false,
+    "scores": {
+     "sustainable_pace": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   },
+   "protein_lean_mass": {
+    "concession_held": false,
+    "scores": {
+     "distribution": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   },
+   "sports_dietitian": {
+    "concession_held": false,
+    "scores": {
+     "timing": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   },
+   "studio_nutritionist": {
+    "concession_held": false,
+    "scores": {
+     "the_frame": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   }
+  },
+  "food_neg_old_constant": {
+   "appetite_food_environment": {
+    "concession_held": false,
+    "scores": {
+     "environment": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   },
+   "behaviour_change_psychologist": {
+    "concession_held": false,
+    "scores": {
+     "repeatable": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   },
+   "energy_balance_metabolism": {
+    "concession_held": false,
+    "scores": {
+     "honest_model": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   },
+   "evidence_based_hypertrophy_nutrition": {
+    "concession_held": false,
+    "scores": {
+     "food_quality": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   },
+   "flexible_dieting": {
+    "concession_held": false,
+    "scores": {
+     "flexibility": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   },
+   "obesity_medicine": {
+    "concession_held": false,
+    "scores": {
+     "sustainable_pace": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   },
+   "protein_lean_mass": {
+    "concession_held": false,
+    "scores": {
+     "distribution": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   },
+   "sports_dietitian": {
+    "concession_held": false,
+    "scores": {
+     "timing": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   },
+   "studio_nutritionist": {
+    "concession_held": false,
+    "scores": {
+     "the_frame": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   }
+  },
   "good_charter_plan": {
    "athlean_x": {
     "concession_held": true,
