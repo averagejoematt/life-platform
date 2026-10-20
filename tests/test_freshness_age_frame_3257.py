@@ -201,7 +201,8 @@ def test_every_board_source_resolves_a_frame_and_the_default_is_pacific():
     """Guard the SET. A new board source that nobody classified must land on the platform
     default (Pacific, the framework's pacific_today() stamp), not on undefined behaviour."""
     board = set(public_board_sources())
-    assert len(board) >= 12, f"the board shrank to {len(board)} sources — re-derive before trusting this test"
+    # floor 12 -> 11: food_delivery was paused (#5108) and a paused source leaves the public board
+    assert len(board) >= 11, f"the board shrank to {len(board)} sources — re-derive before trusting this test"
     for source in board:
         assert day_key_frame_for(source) in ("pacific", "utc")
     assert board - utc_day_key_source_ids(), "every board source became UTC-keyed — that contradicts ingestion_framework"
