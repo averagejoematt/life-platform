@@ -203,22 +203,14 @@ REDLINES: dict[str, dict[str, Any]] = {
         ),
     },
     "energy_floor_kcal": {
-        "floor_7d_mean": 1800,
-        "floor_lifting_day": 1900,
-        "floor_any_day": 1600,
-        "planned_minimum_any_weight": 1700,
-        "opening_kcal": 2100,
-        "prescribed": [2000, 2100],
-        "titration": {
-            "read": "14-day trend of daily weigh-ins, read weekly",
-            "not_before_day": 21,
-            "never_on_a_week_with_fewer_complete_logs_than": 6,
-            "act_on": "two consecutive out-of-band reads (band = target ± 0.5 lb/wk)",
-            "step_kcal": 150,
-            "min_days_between_steps": 14,
-            "insufficient_loss_with_logging_intact": "walking hours FIRST (+2 h), then −150 — feet before fork",
-            "expected_path": "2,100 to 275 → 2,000 to 240 → 1,950 to 220 → rising to 2,000–2,150 through the landing → ~2,700–2,800 at maintenance (model; measure RMR)",
-        },
+        # #5095: the values are the charter's `nutrition.calories` (one calorie target; health.calorie_target resolves it)
+        "floor_7d_mean": _charter_value("nutrition.calories.floor_7d_mean_kcal"),
+        "floor_lifting_day": _charter_value("nutrition.calories.floor_lifting_day_kcal"),
+        "floor_any_day": _charter_value("nutrition.calories.floor_any_day_kcal"),
+        "planned_minimum_any_weight": _charter_value("nutrition.calories.planned_minimum_any_weight_kcal"),
+        "opening_kcal": _charter_value("nutrition.calories.target_kcal"),
+        "prescribed": _charter_value("nutrition.calories.prescribed_band_kcal"),
+        "titration": _charter_value("nutrition.calories.titration"),
         "provenance": "population-derived",
         "derived_by": "red-team consensus 2026-09-22 (physician + nutritionist floors; the calibrated model's 'highest intake that reproduces the trajectory')",
         "stated": "2026-09-22",
@@ -227,17 +219,17 @@ REDLINES: dict[str, dict[str, Any]] = {
             "exactly the measured record; at a 13 h base the same intake gives ~3.3. 1,500 kcal reproduces 3.5 only at today's 8.4 h "
             "and cannot hold it below 260; its cost is ~30 g of carbohydrate a day for training and an estimated 3–6 lb more lean lost "
             "(from practice, not a citation). There is no prize for eating 1,500: the same trajectory is available at ~2,000–2,100 with "
-            "the feet. `prescribed` is the OPENING band; a titration step moves it by a dated edit here, never silently. `floor_any_day` "
+            "the feet. `prescribed` is the OPENING band; a titration step moves it by a charter edit or the week's titration record, never silently. `floor_any_day` "
             "and `floor_lifting_day` are what the nutrition critics grade single days against; the 7-day-mean floor is not yet computed by "
             "any module and is reported, not enforced."
         ),
     },
     "protein_floor_g": {
         "value": _PLAN_PROTEIN_FLOOR_G,
-        "target_g": 200,
-        "days_of_7": 6,
-        "feedings": 4,
-        "feeding_g": [45, 55],
+        "target_g": int(_charter_value("nutrition.protein.range_g.high") or 0),  # #5098: the charter's protein block
+        "days_of_7": int(_charter_value("nutrition.protein.days_of_7") or 0),
+        "feedings": int(_charter_value("nutrition.protein.feedings_per_day") or 0),
+        "feeding_g": list(_charter_value("nutrition.protein.feeding_target_g") or []),
         "g_per_kg_dxa_lean": {"target": 2.6, "floor": 2.3, "lean_kg": 77.4, "lean_source": "DXA 2026-03-30 (170.6 lb lean)"},
         "timing": "one feeding ≥ 40 g within 2 h of lifting; one pre-sleep",
         "provenance": "owner",

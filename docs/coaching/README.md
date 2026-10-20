@@ -65,3 +65,13 @@ owner-only per `docs/DATA_GOVERNANCE.md`'s `progress_photos` entry. A working
 copy also lives at `s3://matthew-life-platform/config/coaching/PROGRESS_PHOTO_PROTOCOL.md`
 beside the rest of the owner-private corpus, for convenience — this repo copy is
 the source of truth.
+
+## Owner notes on the coach-nudge tick
+
+Two deterministic, owner-only notes ride the hourly `coach-nudge` tick beside the coach's own
+nudge, each on its own ledger row and each at most once a Pacific day: the lifting-day steps
+note (#5056, `training.steps_nudge`) and the protein breakfast note (#5098,
+`health.protein_engine.nudge_decide`). The protein note reads the charter's
+`nutrition.protein` block — the range, four feedings at or above the feeding threshold, the
+breakfast cut-off — and the same engine owns the one definition of a protein hit that the
+scoring engine, the macros view, the critics and the `protein_floor_missed` tripwire share.

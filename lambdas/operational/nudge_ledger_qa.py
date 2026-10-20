@@ -241,27 +241,39 @@ STEPS_ARMED_ON = "2026-10-23"  # first Pacific day the pass can exist on (merge 
 
 
 def check_steps_nudge_liveness(table, Check, tier, pt_now, *, lookback_days=STEPS_LOOKBACK_DAYS, armed_on=STEPS_ARMED_ON):
-    c = Check("steps_nudge:eval_liveness", "Data Freshness", tier)
+    return _eval_liveness(table, Check, tier, pt_now, STEPS_LEDGER_PK, "steps", "#5056 - the 19:00 PT pass", lookback_days, armed_on)
+
+
+# #5098: the protein breakfast-nudge dead-man — the same shape on its own ledger row (`COACH#protein_nudge / EVAL#<date>`),
+# stamped on every tick inside the charter's breakfast window (`nutrition.protein.breakfast_nudge`).
+PROTEIN_LEDGER_PK = "COACH#protein_nudge"
+PROTEIN_ARMED_ON = "2026-10-27"  # first Pacific day the pass can exist on (the nutrition wave merges + deploys after 10-22)
+
+
+def check_protein_nudge_liveness(table, Check, tier, pt_now, *, lookback_days=STEPS_LOOKBACK_DAYS, armed_on=PROTEIN_ARMED_ON):
+    return _eval_liveness(table, Check, tier, pt_now, PROTEIN_LEDGER_PK, "protein", "#5098 - the breakfast pass", lookback_days, armed_on)
+
+
+def _eval_liveness(table, Check, tier, pt_now, ledger_pk, name, what, lookback_days, armed_on):
+    c = Check(f"{name}_nudge:eval_liveness", "Data Freshness", tier)
     today = pt_now().date()
     days = [(today - timedelta(days=n)).isoformat() for n in range(1, lookback_days + 1)]
     days = [d for d in days if d >= armed_on]
     if not days:
-        c.ok(f"steps nudge pending: armed on {armed_on}, no completed day to judge yet")
+        c.ok(f"{name} nudge pending: armed on {armed_on}, no completed day to judge yet")
         return [c]
     try:
         resp = table.query(
-            KeyConditionExpression=Key("pk").eq(STEPS_LEDGER_PK)
+            KeyConditionExpression=Key("pk").eq(ledger_pk)
             & Key("sk").between(f"{STEPS_EVAL_PREFIX}{min(days)}", f"{STEPS_EVAL_PREFIX}{max(days)}")
         )
         have = {str(r.get("sk"))[len(STEPS_EVAL_PREFIX) :] for r in resp.get("Items") or []}
     except Exception as exc:  # noqa: BLE001
-        c.fail(f"steps nudge ledger - DDB error: {exc}")
+        c.fail(f"{name} nudge ledger - DDB error: {exc}")
         return [c]
     missing = [d for d in days if d not in have]
     if missing:
-        c.fail(
-            f"steps nudge evaluated on none of {len(missing)} completed day(s): {', '.join(sorted(missing))} (#5056 - the 19:00 PT pass did not run)"
-        )
+        c.fail(f"{name} nudge evaluated on none of {len(missing)} completed day(s): {', '.join(sorted(missing))} ({what} did not run)")
     else:
-        c.ok(f"steps nudge evaluated on each of the last {len(days)} completed day(s)")
+        c.ok(f"{name} nudge evaluated on each of the last {len(days)} completed day(s)")
     return [c]

@@ -23,6 +23,7 @@ from health import (
     tdee as health_tdee,  # ADR-152 / #2310: THE one TDEE definition
     training_output_channel,  # #3754: THE training-output input (daily training load, never Strava kJ)
 )
+from health.protein_floor import met_floor  # #5098: THE protein hit predicate (strict, #5003)
 
 from web.site_api_common import (
     PT,
@@ -455,9 +456,9 @@ def nutrition_overview(*, _g) -> dict:
     # empty — days logged with no protein cell — and that is still a rate with no
     # denominator. The old `else 0` published "0% of days cleared the floor" for a set
     # nobody graded, which the front-end then rendered as an active failure.
-    protein_hit_days = sum(1 for v in pro_vals if v >= protein_target)
+    protein_hit_days = sum(1 for v in pro_vals if met_floor(v, protein_target))
     protein_hit_pct = round(protein_hit_days / len(pro_vals) * 100) if pro_vals else None
-    floor_hit_days = sum(1 for v in pro_vals if v >= protein_floor)
+    floor_hit_days = sum(1 for v in pro_vals if met_floor(v, protein_floor))
     floor_hit_pct = round(floor_hit_days / len(pro_vals) * 100) if pro_vals else None
 
     # Latest day. #4185: days_logged / latest_date / today_pending / lag_days / stalled come
@@ -565,7 +566,7 @@ def nutrition_overview(*, _g) -> dict:
         # key. Returning 0 made "no weekend data" render as "cleared the target on 0%
         # of weekend days."
         vals = [v for v in (_mf(x, "protein_g", "total_protein_g") for x in group) if v is not None]
-        return round(sum(1 for v in vals if v >= protein_target) / len(vals) * 100) if vals else None
+        return round(sum(1 for v in vals if met_floor(v, protein_target)) / len(vals) * 100) if vals else None
 
     weekday_vs_weekend = {
         "weekday": {
@@ -1278,7 +1279,7 @@ def edition_nutrition(*, _g) -> dict:
         "nutrition": {
             "nutrition": {
                 "protein_floor_g": protein_floor,
-                "protein_floor_hit_days": sum(1 for v in pro_vals if v >= protein_floor),
+                "protein_floor_hit_days": sum(1 for v in pro_vals if met_floor(v, protein_floor)),
                 "days_logged": log_rec["days_logged"],
                 "latest_date": log_rec["latest_date"],
             },

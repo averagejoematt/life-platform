@@ -7,6 +7,7 @@ from typing import Any, Optional
 
 from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from health import (
+    calorie_target as calorie_resolver,  # #5095: the ONE calorie target
     hr_regime,  # #4999: THE dated HR regime markers (re-baselining window, post-marker baselines, AF days)
     tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
 )
@@ -16,6 +17,7 @@ from mcp import core as _mcp_core
 from mcp.config import logger
 from mcp.core import decimal_to_float, get_profile, phase_scope_block, query_source, query_source_cross_phase
 from mcp.helpers import normalize_whoop_sleep
+from mcp.tools_nutrition import expenditure_reconciliation  # #5097: the three burn estimates vs the scale
 from mcp.tools_training import _get_training_load
 from mcp.weight_rate import (
     annotate_weekly_rates,
@@ -1035,9 +1037,13 @@ def _get_energy_expenditure(args):
         "exercise_kcal_by_basis_30d": ex_30d["kcal_by_basis"],
         "tdee_7d_avg": tdee_7d_avg,
         "tdee_30d_avg": tdee_30d_avg,
+        "expenditure_reconciliation": expenditure_reconciliation(end_date, tdee_7d_avg, read=query_source_cross_phase),
         "target_deficit_kcal": target_deficit_kcal,
+        # #5095: these two are the DEFICIT MODEL's what-if (TDEE − target_deficit_kcal), not the platform's
+        # calorie target. The one target every surface grades against is `calorie_target_platform`.
         "calorie_target_based_on_7d": calorie_target_7d,
         "calorie_target_based_on_30d": calorie_target_30d,
+        "calorie_target_platform": calorie_resolver.resolve(end_date),
         # #3931 box 4: the method name (DERIVED from health.tdee, never re-typed) and the
         # impossibility verdict, on the surface that publishes the number. When `basis`
         # begins with "refused: ", `calorie_target_based_on_7d` is None — the surface says

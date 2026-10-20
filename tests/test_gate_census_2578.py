@@ -1149,7 +1149,11 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 274 -> 275 (2026-10-19, #5079 the block retro, on charter-w3): structural::test_block_retro_5079.py — the
         # os.walk sweep of lambdas/web + lambdas/emails for a module naming the owner-only retro — arrives PROVEN via
         # STRUCTURAL_HAND_PROOFS (two plants, each 1 failed / 12 passed; restored 13 passed). Enters exactly that id, leaves {}.
-        <= 276
+        # Upper bound 276 -> 277 (2026-10-19, #5095 one calorie target, on nutrition-w0): structural::test_calorie_target_one_resolver_5095.py
+        # (the rglob sweep of lambdas/ mcp/ deploy/ scripts/ for the retired constant or a 1,500 calorie literal) arrives PROVEN via the
+        # re-runnable harness (MutationSpec + STRUCTURAL_PROOFS, ARMED 1/1: baseline 12 passed | mutated 1 failed | reverted 12 passed).
+        # Enters exactly that id, leaves {}, unproven does NOT move. A concurrent lane bumping this bound stacks, never max'd.
+        <= 277
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

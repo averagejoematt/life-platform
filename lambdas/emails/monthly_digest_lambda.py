@@ -25,8 +25,10 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from ai.model_routing import model_for  # #4770: the one model registry
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_PROTEIN_MIN_G  # ADR-058
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
+from health.calorie_target import target_kcal  # #5095: the ONE calorie target, resolved per call
+from health.protein_floor import met_floor  # #5098: THE protein hit predicate (strict, #5003)
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
@@ -112,9 +114,9 @@ from emails.weekly_digest_extractors import ex_hevy_workouts  # #4636: the ONE p
 RECIPIENT = os.environ["EMAIL_RECIPIENT"]
 SENDER = os.environ["EMAIL_SENDER"]
 GOAL_WEIGHT_LBS = 220.0
-# Nutrition targets — the plan's (#4540), never the profile row
+# Nutrition targets — the plan's protein floor (#4540), never the profile row; the calorie
+# target is health.calorie_target's, resolved per call (#5095), never a module-level copy
 PROTEIN_TARGET_G = PLAN_DAILY_PROTEIN_MIN_G
-CALORIE_TARGET = PLAN_DAILY_CALORIES_TARGET
 
 # The sources `gather_all` reads for BOTH arms. Every entry must reach the letter:
 # `eightsleep` sat here with no extractor and no reader, so two full DynamoDB range
@@ -293,14 +295,14 @@ def ex_hevy(recs):
 def ex_macrofactor(recs, profile=None):
     """Extract MacroFactor nutrition summary.
 
-    Targets are the plan's (module-level CALORIE_TARGET / PROTEIN_TARGET_G, derived from
-    common.constants); `profile` is accepted for call compatibility and not read for them.
+    Targets: PROTEIN_TARGET_G (common.constants) and the ONE calorie target (health.calorie_target,
+    #5095); `profile` is accepted for call compatibility and not read for them.
     Field names match the actual DynamoDB schema (total_calories_kcal, total_protein_g).
     """
     if not recs:
         return None
     prot_target = PROTEIN_TARGET_G
-    cal_target = CALORIE_TARGET
+    cal_target = target_kcal()
     cals = [float(r["total_calories_kcal"]) for r in recs if "total_calories_kcal" in r]
     prots = [float(r["total_protein_g"]) for r in recs if "total_protein_g" in r]
     # ADR-104/105 (#1658): each rate is computed over the days it was MEASURED on,
@@ -317,8 +319,8 @@ def ex_macrofactor(recs, profile=None):
         "protein_target": prot_target,
         "days_logged": days_logged,
         "days_in_window": len(recs),
-        "protein_hit_rate": round(sum(1 for p in prots if p >= prot_target) / len(prots) * 100) if prots else None,
-        "calorie_hit_rate": round(sum(1 for c in cals if c <= cal_target) / len(cals) * 100) if cals else None,
+        "protein_hit_rate": round(sum(1 for p in prots if met_floor(p, prot_target)) / len(prots) * 100) if prots else None,
+        "calorie_hit_rate": round(sum(1 for c in cals if c <= cal_target) / len(cals) * 100) if (cals and cal_target) else None,
         "protein_hit_rate_n": len(prots),
         "calorie_hit_rate_n": len(cals),
     }

@@ -158,8 +158,8 @@ class TestScoreNutrition:
         # not the profile row. Pinned to the figures this class's arithmetic was written
         # against; `_NUTRITION_PROFILE`'s own target fields are deliberately still present
         # (and deliberately ignored — see the last test).
-        monkeypatch.setattr(se, "PLAN_DAILY_CALORIES_TARGET", 2000)
-        monkeypatch.setattr(se, "PLAN_DAILY_PROTEIN_MIN_G", 170)
+        monkeypatch.setattr(se, "target_kcal", lambda *a, **k: 2000)  # #5095: the ONE resolver, pinned
+        monkeypatch.setattr(se.protein_engine, "range_low", lambda: 170)  # #5098: the floor is the charter range low
 
     def test_no_nutrition_record_drops_the_component(self):
         assert se.score_nutrition({}, _NUTRITION_PROFILE) == (None, {})

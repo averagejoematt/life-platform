@@ -45,7 +45,9 @@ def build_muscle_defense_packet(
     by_id = {t["id"]: t for t in owner_redlines.TRIPWIRES}
     drop_t = by_id["anchor_lift_strength_drop"]
     prot_t = by_id["protein_floor_missed"]
-    floor_g = owner_redlines.REDLINES["protein_floor_g"]["value"]
+    from health import protein_engine  # #5098: the charter range low — the floor THE hit is graded against
+
+    floor_g = protein_engine.range_low()
     numbers: dict[str, Any] = {
         "protein_floor_g": floor_g,
         "protein_days_missed_7d": protein_days_missed_7d,

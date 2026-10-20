@@ -31,9 +31,10 @@ from typing import Any, Optional
 import boto3
 import coach.coach_presence_gate as _presence  # #4217 — the absent coach is not asked
 from coach import coach_brief_input_gate as _in_gate  # #3107 — the upstream change-gate + the shared data-inventory block
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_PROTEIN_MIN_G
 from common.metric_truth import STEPS  # #4630: the resolved steps key build_data_summary fills
 from common.pacific_time import pacific_today
+from health.calorie_target import target_kcal, target_phrase  # #5095: the ONE calorie target
 from health.scoring_engine import habitify_reading  # #4362
 
 from ai import structured_json as _structured_json  # #4276: the one door for model JSON
@@ -254,7 +255,7 @@ def daily_brief_shared_system(
         phase_block,
         "",
         "## Profile snapshot (stable across this brief)",
-        f"- Calorie target: {PLAN_DAILY_CALORIES_TARGET} kcal",
+        f"- Calorie target: {target_phrase((data or {}).get('date'))}",
         f"- Protein floor: {PLAN_DAILY_PROTEIN_MIN_G} g",
         f"- Goals: {', '.join(profile.get('active_goals', [])) or 'unspecified'}",
     ]
@@ -411,7 +412,7 @@ def call_training_nutrition_coach(
     # IC-24: Data quality (critical for nutrition coaching)
     data_quality_block, _quality_scores = _compute_data_quality(data, profile)
 
-    cal_target = PLAN_DAILY_CALORIES_TARGET
+    cal_target = target_phrase(data.get("date"))  # #5095: "<n> kcal", or the absence stated
     protein_target = PLAN_DAILY_PROTEIN_MIN_G
     fat_target = profile.get("fat_target_g", 60)
     carb_target = profile.get("carb_target_g", 125)
@@ -439,7 +440,7 @@ FOOD LOG YESTERDAY (with timestamps):
 {food_summary}
 
 MACRO TOTALS: {json.dumps({k: data_summary[k] for k in ["calories", "protein_g", "fat_g", "carbs_g", "fiber_g"] if k in data_summary}, default=str)}
-TARGETS: {cal_target} cal, P{protein_target}g, F{fat_target}g, C{carb_target}g
+TARGETS: {cal_target}, P{protein_target}g, F{fat_target}g, C{carb_target}g
 
 TRAINING COACHING RULES (READ CAREFULLY):
 - You are coaching someone at Week {pctx['week_num']} of transformation, starting weight {pctx['start_weight']} lbs.
@@ -602,9 +603,9 @@ def _bod_phase_targets(data, profile):
         deficit = phase.get("deficit_target_kcal") or phase.get("calorie_deficit_target")
         if deficit:
             targets.append(f"{int(float(deficit))} kcal deficit")
-        # #4540: the plan's calorie target (generated into common/constants.py from the plan root),
-        # not the profile row's `calorie_target` — the row said 1,800 against a plan of 1,500.
-        targets.append(f"{PLAN_DAILY_CALORIES_TARGET} cal daily")
+        # #4540/#5095: the ONE calorie target (health.calorie_target), never the profile row's `calorie_target`.
+        if target_kcal(data.get("date")):
+            targets.append(f"{target_kcal(data.get('date'))} cal daily")
 
         return f"{label}: {', '.join(targets)}." if targets else f"{label}."
     except Exception as e:

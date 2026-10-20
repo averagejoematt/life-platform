@@ -128,9 +128,13 @@ def withings_trend(rows: list[dict[str, Any]] | None, keys: list[str]) -> dict[s
         out["weight_trend_lb_wk"] = round(-rate["rate_lb_wk"], 2)  # SIGNED, negative = losing — the critic's contract
         out["rate_provisional"] = rate["provisional"]
     out["loss_rate"] = rate
-    out["weekly_loss_rates_lb_wk"] = shared_quantities.weekly_loss_rates_from_rows(usable, end)
+    out["weekly_loss_rates_lb_wk"] = shared_quantities.weekly_loss_rates_from_rows(
+        usable, end, trend_days=shared_quantities.LOSS_RATE_WINDOW_DAYS
+    )
     # #4150: every trailing week with its status — a partial/thin week is REPORTED here and never counted above
-    out["weekly_loss_rate_weeks"] = shared_quantities.weekly_loss_rate_weeks_from_rows(usable, end)
+    out["weekly_loss_rate_weeks"] = shared_quantities.weekly_loss_rate_weeks_from_rows(
+        usable, end, trend_days=shared_quantities.LOSS_RATE_WINDOW_DAYS
+    )
     return out
 
 

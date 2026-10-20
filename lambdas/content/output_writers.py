@@ -20,10 +20,11 @@ import json
 import re
 from datetime import datetime, timedelta, timezone
 
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.metric_truth import steps_series  # #4630: the ONE steps resolver
 from common.pacific_time import PACIFIC
+from health.calorie_target import target_kcal  # #5095: the ONE calorie target — masked like the intake
 
 from content import labs_scope  # #3728 — the /api/labs scope block
 
@@ -320,7 +321,9 @@ def sanitize_for_demo(html, data, profile):
         cal = mf.get("total_calories_kcal")
         if cal:
             html = html.replace(str(round(float(cal))), mask)
-        html = html.replace(str(PLAN_DAILY_CALORIES_TARGET), mask)
+        target = target_kcal(data.get("date"))
+        if target:
+            html = html.replace(str(target), mask)
 
     if "protein" in rv:
         mask = rv["protein"]

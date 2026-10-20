@@ -613,8 +613,8 @@ def test_nutrition_averages_are_the_mean_of_the_logged_days():
 
 
 def test_hit_rates_are_the_share_of_days_that_met_the_target(monkeypatch):
-    # Pinned for the arithmetic below: CALORIE_TARGET 1800, PROTEIN_TARGET_G 180.
-    monkeypatch.setattr(m, "CALORIE_TARGET", 1800)
+    # Pinned for the arithmetic below: calorie target 1800 (#5095: the ONE resolver), PROTEIN_TARGET_G 180.
+    monkeypatch.setattr(m, "target_kcal", lambda *a, **k: 1800)
     monkeypatch.setattr(m, "PROTEIN_TARGET_G", 180)
     # calories <= 1800 on 2 of 3 (1700, 1800); protein >= 180 on 2 of 3 (180, 200).
     recs = [_mf(1700, 180), _mf(1900, 200), _mf(1800, 170)]
@@ -624,20 +624,24 @@ def test_hit_rates_are_the_share_of_days_that_met_the_target(monkeypatch):
 
 
 def test_the_targets_are_the_plans_whatever_the_profile_row_says():
-    """#4540: the profile row held 1,800 / 190 against a plan of 1,500 / 170."""
+    """#4540: the profile row held 1,800 / 190 against the plan; #5095: the calorie target is the ONE resolver's."""
     from common import constants
+    from health.calorie_target import target_kcal
 
-    assert (m.CALORIE_TARGET, m.PROTEIN_TARGET_G) == (constants.PLAN_DAILY_CALORIES_TARGET, constants.PLAN_DAILY_PROTEIN_MIN_G)
-    recs = [_mf(m.CALORIE_TARGET + 100, m.PROTEIN_TARGET_G)]
+    kcal = target_kcal()
+    assert m.PROTEIN_TARGET_G == constants.PLAN_DAILY_PROTEIN_MIN_G and kcal
+    recs = [_mf(kcal + 100, m.PROTEIN_TARGET_G)]
     s = m.ex_macrofactor(recs, {"calorie_target": 9999, "protein_target_g": 1})
-    assert (s["calorie_target"], s["protein_target"]) == (m.CALORIE_TARGET, m.PROTEIN_TARGET_G)
+    assert (s["calorie_target"], s["protein_target"]) == (kcal, m.PROTEIN_TARGET_G)
     assert s["calorie_hit_rate"] == 0  # 100 over the plan's target
     assert s["protein_hit_rate"] == 100  # at the plan's floor
 
 
 def test_missing_profile_targets_fall_back_to_the_module_defaults():
+    from health.calorie_target import target_kcal
+
     s = m.ex_macrofactor([_mf(1700, 180)], {})
-    assert (s["calorie_target"], s["protein_target"]) == (m.CALORIE_TARGET, m.PROTEIN_TARGET_G)
+    assert (s["calorie_target"], s["protein_target"]) == (target_kcal(), m.PROTEIN_TARGET_G)
 
 
 # FIXED #1658 (found as a tranche-3 xfail, P2 / ADR-104+105): monthly_digest_lambda.ex_macrofactor (lines 247-248) divides the
