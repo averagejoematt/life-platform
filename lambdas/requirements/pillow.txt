@@ -16,7 +16,7 @@
 #   PILLOW_LAYER_VERSION -> cdk deploy LifePlatformOperational -> --promote back to here.
 #
 # ── BUILD TARGET — top-level pins the next build installs (spec, hand-edited there)
-#   layer-build-target: Pillow==12.3.0
+#   layer-build-target: Pillow==13.0.0
 #   layer-build-platform: manylinux2014_x86_64 manylinux_2_28_x86_64 · cp312
 #
 # Pillow 12.x publishes manylinux_2_27/_2_28 wheels only — a manylinux2014-only
