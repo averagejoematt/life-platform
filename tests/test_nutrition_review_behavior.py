@@ -890,6 +890,9 @@ def test_the_snapshot_states_the_targets_it_is_grading_against():
     assert f"{m.calorie_target.target_kcal()} kcal" in footer
     assert f"{m.PLAN_DAILY_PROTEIN_MIN_G}g protein" in footer
     assert "2000 kcal" not in footer and "175g" not in footer
+    # #5204: the footer's fibre figure is the one the MICRO column grades against (the charter floor), never a literal
+    fiber = m.nutrient_intake.MICRONUTRIENT_TARGETS["fiber_g"]["target"]
+    assert f"{fiber:g}g fiber" in footer and "38g fiber" not in footer
 
 
 def test_a_profile_with_no_targets_still_states_the_plans():

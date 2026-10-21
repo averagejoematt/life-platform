@@ -848,6 +848,7 @@ def build_summary_table(days, profile):
     </tr>"""
 
     micro_scope, micro_basis = _micro_column_scope(days)
+    fiber_target = nutrient_intake.MICRONUTRIENT_TARGETS["fiber_g"]["target"] or 0
     return f"""<table style="width:100%;border-collapse:collapse;background:#16213e;border-radius:8px;overflow:hidden;margin-bottom:20px;">
         <tr style="background:#0f1127;">
             <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:left;">DAY</th>
@@ -860,7 +861,7 @@ def build_summary_table(days, profile):
         </tr>
         {rows}
         <tr><td colspan="7" style="padding:4px 8px;color:#6b7280;font-size:10px;">
-            Targets: {cal_target or "—"} kcal | {int(protein_target)}g protein | 38g fiber | Micro = avg sufficiency % of {micro_basis}{_unconverted_note(days)}
+            Targets: {cal_target or "—"} kcal | {int(protein_target)}g protein | {fiber_target:g}g fiber | Micro = avg sufficiency % of {micro_basis}{_unconverted_note(days)}
         </td></tr>
     </table>"""
 
