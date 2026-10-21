@@ -113,6 +113,7 @@ except ImportError:
 from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
+from training.training_charter import charter_value  # #5214
 
 
 def query_range(source, start_date, end_date):
@@ -482,6 +483,12 @@ def compute_weekly_summary(days):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _feeding_threshold_text():
+    """#5214: THE per-feeding protein threshold (charter nutrition.protein.feeding_threshold_g) as prompt text."""
+    t = charter_value("nutrition.protein.feeding_threshold_g")
+    return f"{t:g}" if isinstance(t, (int, float)) else "the plan's"
+
+
 def _build_nutrition_prompt_from_config(calorie_target, protein_target_g):
     """Build nutrition review system prompt from S3 board config.
 
@@ -532,6 +539,7 @@ def _render_board_prompt(calorie_target, protein_target_g):
         section = _rescope_micro_rule(section, mid)
         section = section.replace("{calorie_target}", str(calorie_target))
         section = section.replace("{protein_target_g}", str(protein_target_g))
+        section = section.replace("{feeding_threshold_g}", _feeding_threshold_text())  # #5214: the charter's, at build time
 
         expert_blocks.append(section)
 
@@ -633,7 +641,7 @@ _FALLBACK_SYSTEM_PROMPT = (
 Write as three distinct expert voices analyzing the week's nutrition data, followed by a unified tactical section.
 
 ### Marcus Webb - Macros, Protein & Adherence
-Analyze: Weekly calorie avg vs target ({calorie_target} kcal) and deficit consistency. Protein total AND distribution (flag meals <30g, praise >40g). Target: {protein_target_g}g. Protein source diversity. Carb/fat balance relative to training. Meal frequency and eating window. Fiber trend.
+Analyze: Weekly calorie avg vs target ({calorie_target} kcal) and deficit consistency. Protein total AND distribution (a feeding is {feeding_threshold_g} g or more of protein: flag days short of the plan's feedings, praise days that reach them). Target: {protein_target_g}g. Protein source diversity. Carb/fat balance relative to training. Meal frequency and eating window. Fiber trend.
 Tone: Direct, evidence-based. Reference HIS actual food log entries by deduced meal name.
 Principle: "Build from what's working. Don't overhaul - optimize."
 
@@ -1079,6 +1087,7 @@ def lambda_handler(event, context):
         system = _FALLBACK_SYSTEM_PROMPT.format(
             calorie_target=cal_target,
             protein_target_g=pro_target,
+            feeding_threshold_g=_feeding_threshold_text(),
         )
 
     # P2: Dynamic journey context — panel must know stage for appropriate coaching

@@ -36,7 +36,9 @@ from common.macrofactor_fields import app_target_kcal, macro_value, protein_meal
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_today  # #2811: the character sheet's DAY is the Pacific day
+from training.training_charter import charter_value  # #5214: the feeding threshold is the charter's
 
+from health import protein_engine  # #5214: THE per-feeding definition
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 
 logger = logging.getLogger(__name__)
@@ -567,9 +569,10 @@ def compute_nutrition_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
     scores["protein_total"] = _pct_of_target(protein, protein_target, 1.2)
 
     # Protein distribution — #4580 B-22: a v1 row has no `meals` list; the ingest's own meal grouping stores the count
-    dist_threshold = components.get("protein_distribution", {}).get("threshold_grams", 30)
+    # #5214: ONE feeding definition — the protein engine's (charter nutrition.protein.feeding_threshold_g, merged by
+    # feeding_merge_minutes), read through charter_value(). No per-meal gram default here; an untimed day is unknown.
     dist_target = components.get("protein_distribution", {}).get("target_meals", 4)
-    scores["protein_distribution"] = _pct_of_target(protein_meals_at(mf, dist_threshold), dist_target, 1.25)
+    scores["protein_distribution"] = _pct_of_target(_protein_feedings(mf), dist_target, 1.25)
 
     # Consistency (14d)
     mf_14d = data.get("macrofactor_14d", [])
@@ -591,6 +594,16 @@ def compute_nutrition_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
     scores["body_composition_progress"] = _body_comp_score(data.get("latest_weight"), config)
 
     return _weighted_pillar_score(scores, components)
+
+
+def _protein_feedings(mf: dict[str, Any]) -> Optional[float]:
+    """Feedings at the charter threshold: the engine's count from the food log; else a legacy ``meals`` list at the
+    same threshold; None (unknown, never 0) when neither applies or the charter names no threshold."""
+    threshold = charter_value("nutrition.protein.feeding_threshold_g")
+    if threshold is None:
+        return None
+    counted = protein_engine.evaluate_day(mf)["feedings_40g"]
+    return float(counted) if counted is not None else protein_meals_at(mf, float(threshold))
 
 
 def compute_metabolic_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[float, dict[str, Any]]:
