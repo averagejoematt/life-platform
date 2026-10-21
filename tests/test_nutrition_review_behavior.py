@@ -375,8 +375,8 @@ def test_daily_nutrition_carries_the_logged_totals_verbatim():
     assert (d["total_calories"], d["total_protein_g"], d["total_carbs_g"]) == (1743.0, 187.0, 61.0 * 0 + 142.0)
     assert (d["total_fat_g"], d["total_fiber_g"]) == (61.0, 33.5)
     # #4244: the micro figure is DERIVED from the day's totals (+ the supplement record), not the
-    # stored food-only avg — here fiber alone is logged, 33.5 / 38 = 88.2%, and no supplement row.
-    assert d["micronutrient_avg_pct"] == 88.2
+    # stored food-only avg — here fiber alone is logged, 33.5 / 35 = 95.7% (the charter fibre floor, #5204), and no supplement row.
+    assert d["micronutrient_avg_pct"] == 95.7
     assert d["micronutrient_intake_channels"] == ["food", "supplements"]
     assert d["supplements_state"] == "absent"
 
@@ -821,9 +821,9 @@ def test_a_field_no_day_logged_is_reported_absent_not_zero():
 
 
 def test_weekly_summary_averages_micronutrient_sufficiency():
-    # #4244: derived from the totals — fiber 22.8 g = 60%, 30.4 g = 80% of the 38 g target.
+    # #4244: derived from the totals — fiber 22.8 g = 65.1%, 30.4 g = 86.9% of the 35 g charter floor (#5204).
     days = m.extract_daily_nutrition({"2026-06-06": _mf_day(fiber=22.8), "2026-06-07": _mf_day(fiber=30.4)})
-    assert m.compute_weekly_summary(days)["avg_micronutrient_pct"] == 70.0
+    assert m.compute_weekly_summary(days)["avg_micronutrient_pct"] == 76.0
 
 
 def test_a_single_logged_day_averages_to_itself():
@@ -868,8 +868,8 @@ def test_a_day_whose_date_cannot_be_parsed_still_appears_labelled_by_its_key():
 def test_the_snapshot_shows_each_days_actual_numbers():
     html = _table({"2026-06-06": _mf_day(cal=1743, protein=187, carbs=142, fat=61, fiber=33, micro=71)})
     row = _day_row(html, "Sat 06/06")
-    # #4244: MICRO is the derived food + supplements figure (fiber 33 / 38 = 87%), not the stored 71.
-    assert row[1:] == ["1743", "187g", "142g", "61g", "33g", "87%"]
+    # #4244: MICRO is the derived food + supplements figure (fiber 33 / 35 = 94%), not the stored 71.
+    assert row[1:] == ["1743", "187g", "142g", "61g", "33g", "94%"]
 
 
 def test_the_average_row_is_the_mean_of_the_shown_days():
@@ -879,8 +879,8 @@ def test_the_average_row_is_the_mean_of_the_shown_days():
             "2026-06-07": _mf_day(cal=1900, protein=200, carbs=160, fat=70, fiber=34, micro=80),
         }
     )
-    # #4244: MICRO derived per day from fiber (30 -> 78.9%, 34 -> 89.5%), mean 84%.
-    assert _avg_row(html)[1:] == ["1800", "190g", "150g", "65g", "32g", "84%"]
+    # #4244: MICRO derived per day from fiber (30 -> 85.7%, 34 -> 97.1%), mean 91%.
+    assert _avg_row(html)[1:] == ["1800", "190g", "150g", "65g", "32g", "91%"]
 
 
 def test_the_snapshot_states_the_targets_it_is_grading_against():
@@ -890,6 +890,9 @@ def test_the_snapshot_states_the_targets_it_is_grading_against():
     assert f"{m.calorie_target.target_kcal()} kcal" in footer
     assert f"{m.PLAN_DAILY_PROTEIN_MIN_G}g protein" in footer
     assert "2000 kcal" not in footer and "175g" not in footer
+    # #5204: the footer's fibre figure is the one the MICRO column grades against (the charter floor), never a literal
+    fiber = m.nutrient_intake.MICRONUTRIENT_TARGETS["fiber_g"]["target"]
+    assert f"{fiber:g}g fiber" in footer and "38g fiber" not in footer
 
 
 def test_a_profile_with_no_targets_still_states_the_plans():

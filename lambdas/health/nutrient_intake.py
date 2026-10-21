@@ -33,10 +33,32 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Optional
 
+from training import training_charter
+
+
+class _CharterFloor(dict):
+    """A target entry whose `target` is resolved from the charter's published view at READ time (#5204): nothing is read at
+    import, the charter's own 15-min cache and 60 s re-probe apply, and a charter change reaches a warm container."""
+
+    def __getitem__(self, k):
+        if k == "target":
+            return self._floor()
+        return super().__getitem__(k)
+
+    def get(self, k, default=None):
+        return self[k] if k == "target" else super().get(k, default)
+
+    def _floor(self):
+        v = training_charter.public_view()
+        for part in ("nutrition", "floors", "fibre", "floor_g"):
+            v = v.get(part) if isinstance(v, dict) else None
+        return v
+
+
 # ── Targets (moved here from macrofactor_lambda; re-exported there) ────────────────────
 # Board of Directors consensus targets for adult male, active, weight-loss phase.
 MICRONUTRIENT_TARGETS: dict[str, dict[str, Any]] = {
-    "fiber_g": {"target": 38, "label": "Fiber"},
+    "fiber_g": _CharterFloor(label="Fiber"),  # #5204: the charter floor (published view), resolved at call time
     "potassium_mg": {"target": 3400, "label": "Potassium"},
     "magnesium_mg": {"target": 420, "label": "Magnesium"},
     "vitamin_d_mcg": {"target": 100, "label": "Vitamin D"},  # 4000 IU
@@ -238,6 +260,8 @@ def food_sufficiency(totals_prefixed: Mapping[str, Any]) -> tuple[Optional[dict[
         if actual is None:
             continue
         target = config["target"]
+        if not target:  # the charter carried no floor for it: unknown, never a divide
+            continue
         pct = min(round(actual / target * 100, 1), 100.0)
         sufficiency[nutrient_key] = {"actual": round(actual, config.get("decimals", 1)), "target": target, "pct": pct}
         pcts.append(pct)
@@ -414,6 +438,8 @@ def nutrient_intake(
             total += s
             channels.append("supplements")
         target = cfg["target"]
+        if not target:  # #5204: a charter-read floor can be None (no public half) — skip, never divide by it
+            continue
         pct = min(round(total / target * 100, 1), 100.0)
         dp = cfg.get("decimals", 1)
         entry: dict[str, Any] = {

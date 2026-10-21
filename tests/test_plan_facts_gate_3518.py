@@ -88,7 +88,7 @@ def test_an_absent_plan_disarms_rather_than_guesses():
         ("Target: 8000 steps daily", [("steps", 8000.0)]),
         ("a 1,500 kcal target and a 170 g protein floor", [("calories", 1500.0), ("protein_g", 170.0)]),
         ("protein target of 190g", [("protein_g", 190.0)]),
-        ("25 g of fiber", [("fiber_g", 25.0)]),
+        ("35 g of fiber", [("fiber_g", 35.0)]),
         ("12 steps up the stairs", []),  # below the unitless floor
         ("120 steps per minute cadence", []),  # cadence, not a daily count
         ("three miles minimum", []),
@@ -112,7 +112,7 @@ def test_the_live_specimen_fails_and_its_control_passes():
         "I want him at 6,500 steps as a floor.",  # inside the plan's range
         "The 1,500 kcal target is a baseline, not a ceiling. He logged 1,850 kcal on Tuesday.",
         "His protein averaged 132 g against the 170 g floor.",  # `floor` binds to 170, not 132
-        "Aim for 25 g of fiber; he averages 17 g fiber.",
+        "Aim for 35 g of fiber; he averages 17 g fiber.",
     ],
 )
 def test_observations_and_in_plan_figures_never_flag(text):

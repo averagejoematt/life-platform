@@ -1515,7 +1515,7 @@ def test_the_live_wire_row_joins_the_supplement_record_into_vitamin_d():
     assert (mg["from_supplements"], mg["channels_counted"]) == (None, ["food"])
     assert sorted(mg["uncounted_supplements"]) == ["Electrolytes", "Multivitamin"]
     # Ingest stored 36.4 under the retired single omega-3 target (3.3%); the ALA target scores 6.2%.
-    assert out["food_only_avg_pct"] == 37.0
+    assert out["food_only_avg_pct"] == 37.8  # fibre at the 35 g charter floor (#5204)
     assert out["avg_pct"] > out["food_only_avg_pct"]
 
 
