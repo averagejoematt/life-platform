@@ -318,8 +318,8 @@ def test_the_worked_set_input_reaches_across_the_genesis_in_both_windows(wired, 
     # 7 pre-genesis sets + 3 current; and 5 more from the 08-28 session in the 30d window.
     assert _sets(d7_hevy) == 10
     assert _sets(d30_hevy) == 15
-    assert out["calorie_target"]["inputs"]["lifting"]["sets"] == 10
-    assert out["calorie_target_30d_basis"]["inputs"]["lifting"]["sets"] == 15
+    assert out["maintenance_context_7d"]["inputs"]["lifting"]["sets"] == 10
+    assert out["maintenance_context_30d"]["inputs"]["lifting"]["sets"] == 15
 
 
 def test_the_published_tdee_and_calorie_target_are_computed_across_phases(wired):
@@ -335,17 +335,18 @@ def test_the_published_tdee_and_calorie_target_are_computed_across_phases(wired)
     assert out["exercise_kcal_30d_daily_avg"] == 30
     assert out["tdee_7d_avg"] == 2426
     assert out["tdee_30d_avg"] == 2371
-    assert out["calorie_target_based_on_30d"] == 1871
+    assert out["maintenance_context_30d"]["estimated_maintenance_kcal"] == 2371 and out["maintenance_context_30d"]["deficit_kcal"] == 500
 
     # The 7d target is REFUSED here, and that is the fix working rather than a wobble: with
     # three weigh-ins visible instead of one, `implied_deficit_vs_measured_weight_trend`
     # finally has the >=7 trend days it needs to run at all, and it disagrees. The filtered
     # arm published a number precisely because it could not see enough of the record to
     # check it (see the mutation control below).
-    assert out["calorie_target_based_on_7d"] is None
-    assert out["calorie_target_published"] is False
-    assert out["calorie_target_basis"].startswith("refused: model_and_trend_disagree")
-    assert out["calorie_target_check"]["trend_days"] == 12
+    assert out["maintenance_context_7d"]["model_check"] == "refused"
+    # #5198: the 30d window never gets a trend check, so it can never read as passed.
+    assert out["maintenance_context_30d"]["model_check"] == "not_run"
+    assert out["maintenance_context_7d"]["basis"].startswith("refused: model_and_trend_disagree")
+    assert out["maintenance_context_7d"]["check"]["trend_days"] == 12
 
 
 def test_every_partition_this_tool_reads_is_read_unfiltered(wired):
@@ -468,8 +469,8 @@ def test_mutation_restoring_the_phase_filter_reproduces_the_bug(wired, hevy_seen
     # Both windows collapse to the cycle's AGE — one workout, three sets.
     assert sorted(r["date"] for r in hevy_seen[0]) == ["2026-09-19"], "mutation did not bite"
     assert sorted(r["date"] for r in hevy_seen[1]) == ["2026-09-19"]
-    assert out["calorie_target"]["inputs"]["lifting"]["sets"] == 3
-    assert out["calorie_target_30d_basis"]["inputs"]["lifting"]["sets"] == 3
+    assert out["maintenance_context_7d"]["inputs"]["lifting"]["sets"] == 3
+    assert out["maintenance_context_30d"]["inputs"]["lifting"]["sets"] == 3
 
     # …and the published numbers move with it. These are the "before" figures: a TDEE 45
     # kcal/day low on the 7d window and 21 low on the 30d, off 3 sets instead of 10/15 and
@@ -478,15 +479,16 @@ def test_mutation_restoring_the_phase_filter_reproduces_the_bug(wired, hevy_seen
     assert out["exercise_kcal_30d_daily_avg"] == 9
     assert out["tdee_7d_avg"] == 2381
     assert out["tdee_30d_avg"] == 2350
-    assert out["calorie_target_based_on_30d"] == 1850
+    assert out["maintenance_context_30d"]["estimated_maintenance_kcal"] - out["maintenance_context_30d"]["deficit_kcal"] == 1850
 
     # The sharpest edge of the defect: with only one weigh-in visible the impossibility
     # check has no trend to judge against, so it PUBLISHES 1881 kcal/day as "unverified"
     # rather than refusing. The truncation did not just move the number — it disarmed the
     # guard that would have caught it.
-    assert out["calorie_target_based_on_7d"] == 1881
-    assert out["calorie_target_published"] is True
-    assert out["calorie_target_basis"] == "published_unverified_no_measured_weight_trend"
+    assert out["maintenance_context_7d"]["estimated_maintenance_kcal"] == 2381
+    # #5198 (ADR-104): published unverified is NOT a passed check.
+    assert out["maintenance_context_7d"]["model_check"] == "not_run"
+    assert out["maintenance_context_7d"]["basis"] == "published_unverified_no_measured_weight_trend"
 
     # The filter really is back on the wire, on every partition.
     assert [pk for pk, fe in wired.filters_by_pk if fe is None] == []

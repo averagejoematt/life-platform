@@ -324,8 +324,10 @@ def test_the_draft_path_with_no_history_starts_the_week_on_conditioning(monkeypa
         "2026-10-19", SEQ[0], None, layer={"state": "read", "totals": {"weight_bearing_hr_48h": 0.0}}, cardio_index=None
     )
     assert pick["menu"]["kind"] == "tempo" and block.rationale_tag == "cardio:cycling:menu:tempo"
-    assert [s.duration_seconds for s in block.sets] == [tc.charter_value("cardio_menu.blocks.tempo.minutes") * 60]
-    assert "hard flat 40: RPE" in block.notes
+    # #5201: the menu names 40, the split caps one cardio block at 30 — the block is the capped one and its note
+    # drops the label that would claim 40
+    assert [s.duration_seconds for s in block.sets] == [tc.charter_value("split.session_minutes.cardio_block_max") * 60]
+    assert "tempo: RPE" in block.notes and "hard flat 40" not in block.notes
 
 
 # ── movement minutes ──────────────────────────────────────────────────────────────────

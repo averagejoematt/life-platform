@@ -1098,18 +1098,23 @@ def test_the_macro_target_and_the_energy_view_agree_on_todays_calorie_target(mon
     macros = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": PT_TODAY})
     energy = th.tool_get_daily_metrics({"view": "energy"})
     # #5095: the calorie TARGET both surfaces name is the ONE resolver's; the energy view's
-    # `calorie_target_based_on_7d` is its deficit model's what-if (TDEE - 500 = 1557), labelled so.
+    # `maintenance_context_7d` is its deficit model's maintenance context (TDEE 2057, deficit 500), not a target (#5198).
     assert macros["targets"]["calories_kcal"] == energy["calorie_target_platform"]["kcal"] == _one_target(PT_TODAY)
-    assert energy["calorie_target_based_on_7d"] == 1557
+    assert energy["maintenance_context_7d"]["deficit_kcal"] == 500
     # ...and the maintenance budget underneath is the same: TDEE, deficit, method and inputs.
     # #3931 added a per-surface `trend_check`/`target_basis` pair, and the two surfaces measure
     # intake over DIFFERENT windows by construction, so those keys are not folded in.
-    _shared = ("tdee", "deficit", "target", "method", "inputs", "target_published")
-    assert {k: macros["targets"]["energy_budget"][k] for k in _shared} == {k: energy["calorie_target"][k] for k in _shared}
+    eb, ctx = macros["targets"]["energy_budget"], energy["maintenance_context_7d"]
+    assert (eb["tdee"], eb["deficit"], eb["method"], eb["inputs"]) == (
+        ctx["estimated_maintenance_kcal"],
+        ctx["deficit_kcal"],
+        ctx["method"],
+        ctx["inputs"],
+    )
     assert macros["targets"]["energy_budget"]["target_published"] is True
-    assert energy["calorie_target_method"] == macros["targets"]["energy_budget"]["method"]
-    assert energy["calorie_target"]["tdee"] == energy["tdee_7d_avg"] == 2057
-    assert energy["calorie_target"]["inputs"]["exercise_energy_days"] == 1
+    assert energy["maintenance_method"] == macros["targets"]["energy_budget"]["method"]
+    assert energy["maintenance_context_7d"]["estimated_maintenance_kcal"] == energy["tdee_7d_avg"] == 2057
+    assert energy["maintenance_context_7d"]["inputs"]["exercise_energy_days"] == 1
 
 
 # ──────────────────────────────────────────────────────────────────────────────

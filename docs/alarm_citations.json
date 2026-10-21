@@ -151,10 +151,10 @@
     "note": "Prior entry (2026-10-04, issue 4593, closed): week 4 published by the season promote, which bypasses chronicle-approve, the only path that invokes the email sender; cleared when week 5 delivered through the approve path 2026-10-09 18:00Z. The current episode is a different cause on the same heartbeat."
   },
   "swallowed-permission-denial": {
-    "added": "2026-10-04",
-    "cause": "qa-smoke-share-kit-accessdenied",
-    "cause_observed": "2026-10-03T18:32Z",
-    "citation": "#4593 — one episode, ALARM 2026-10-03T18:32Z, OK 18:47Z (describe-alarm-history). It coincides with the 18:31Z qa-smoke run's AccessDenied GetObject on the missing week-07 share kit; that link is inferred from the timestamps, not read from the metric's source line."
+    "added": "2026-10-20",
+    "cause": "charter-private-twin-absent-403",
+    "cause_observed": "2026-10-20T05:10:19Z",
+    "citation": "#5220 — the loader's 'training_charter.private.json not read (AccessDenied)' line, once per cold container: the owner-only twin does not exist and the roles lack s3:ListBucket on config/, so S3 answers absence with 403. The nutrition charter waves made more filtered functions read the charter (coach-nudge at 05:10:19Z), so cold starts after the 2026-10-20 deploys lit it. The prior episode (2026-10-03, a qa-smoke share-kit read) was a different cause."
   },
   "nightly-predraft-missing": {
     "added": "2026-10-04",

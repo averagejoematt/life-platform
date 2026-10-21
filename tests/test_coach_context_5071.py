@@ -96,7 +96,7 @@ def test_owner_context_carries_every_section_with_its_source_and_the_may_frame()
 def test_absent_inputs_are_stated_never_invented():
     ctx = cc.assemble("2026-10-20", packet=None, constraint_block=None)
     assert ctx["not_supplied"] == ["clinical_guidance", "constraint_block", "may_tracker", "plan_packet"]
-    assert "not supplied: no May tracker was supplied" in ctx["text"]
+    assert "not supplied: this caller read no May tracker" in ctx["text"]
     # without a weight the % of bodyweight is named as missing, not computed from a default
     assert "% of bodyweight needs a weight" in ctx["may_frame"]["line"]
     tracked = cc.assemble("2026-10-20", packet=None, constraint_block=None, tracker={"weeks_on_band": 3})
@@ -199,6 +199,7 @@ def test_mcp_attach_puts_the_context_on_the_payload_and_leads_with_the_may_terms
     from mcp import plan_helpers as r
 
     monkeypatch.setattr(r, "_clinical_guidance", lambda: GUIDANCE_ROWS)
+    monkeypatch.setattr(r, "_may_tracker", lambda d: None)  # #5200: no live table read in a test
     out = r.attach_coach_context({"how_to_use": "Stage 1."}, "2026-10-20", constraint_block=BLOCK)
     assert out["how_to_use"].startswith(r.EXPLAIN_IN_MAY_TERMS) and out["how_to_use"].endswith("Stage 1.")
     assert out["coach_context"]["charter_version"] == tc.charter_version()
