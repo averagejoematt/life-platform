@@ -12,6 +12,8 @@ detail. See the block comment inside `compute_habit_streaks`.
 
 from datetime import datetime, timedelta
 
+from common.habit_registry import habit_tier  # #5232
+
 from health.scoring_engine import habitify_reading
 
 # #2221: a run of missing habitify days longer than this is treated as the end of
@@ -30,7 +32,7 @@ def compute_habit_streaks(profile, yesterday_str, fetch_date):
     for name, meta in registry.items():
         if meta.get("status") != "active":
             continue
-        tier = meta.get("tier", 2)
+        tier = habit_tier(meta)
         if tier == 0:
             tier0_habits.append(name)
             tier01_habits.append(name)

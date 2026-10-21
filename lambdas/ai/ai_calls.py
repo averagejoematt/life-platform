@@ -32,6 +32,7 @@ import boto3
 import coach.coach_presence_gate as _presence  # #4217 — the absent coach is not asked
 from coach import coach_brief_input_gate as _in_gate  # #3107 — the upstream change-gate + the shared data-inventory block
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_PROTEIN_MIN_G
+from common.habit_registry import habit_tier  # #5232
 from common.metric_truth import STEPS  # #4630: the resolved steps key build_data_summary fills
 from common.pacific_time import pacific_today
 from health.calorie_target import target_kcal, target_phrase  # #5095: the ONE calorie target
@@ -716,7 +717,7 @@ def call_board_of_directors(
     missed_t1 = []
     for h_name, meta in missed:
         why = meta.get("why_matthew", "")
-        tier = meta.get("tier", 2)
+        tier = habit_tier(meta)
         if tier == 0:
             missed_t0.append(h_name + (" — " + why[:80] if why else ""))
         elif tier == 1:
@@ -917,12 +918,12 @@ def call_tldr_and_guidance(
     missed_context = []
     if registry:
         for h_name, meta in _missed_registry_habits(registry, habitify):
-            if meta.get("tier", 2) > 1:
+            if habit_tier(meta) > 1:
                 continue
             missed_mvp.append(h_name)
             why = meta.get("why_matthew", "")
             if why:
-                missed_context.append(h_name + " (T" + str(meta.get("tier", "?")) + "): " + why[:60])
+                missed_context.append(h_name + " (T" + str(habit_tier(meta)) + "): " + why[:60])
     else:
         # mvp_habits is the pre-registry legacy list of bare names (no meta, no vendor id) — out of
         # #4632's id-keyed scope, carried on the issue; it never reads when a registry exists.

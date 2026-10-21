@@ -26,6 +26,7 @@ from datetime import datetime
 from typing import Any, Mapping, Optional
 
 from common.constants import PLAN_DAILY_PROTEIN_MIN_G
+from common.macrofactor_fields import protein_meals_at
 from training import training_charter
 
 from health.protein_floor import met_floor
@@ -127,6 +128,16 @@ def evaluate_day(row: Optional[Mapping[str, Any]], *, floor: Optional[float] = N
         "charter_version": training_charter.charter_version(),
         "version": ENGINE_VERSION,
     }
+
+
+def feedings_at_threshold(row: Optional[Mapping[str, Any]]) -> Optional[float]:
+    """Feedings at the charter threshold: the engine's count from the food log; else a legacy ``meals`` list at the
+    same threshold; None (unknown, never 0) when neither applies or the charter names no threshold (#5214)."""
+    threshold = _cv("feeding_threshold_g")
+    if threshold is None:
+        return None
+    counted = evaluate_day(row)["feedings_40g"]
+    return float(counted) if counted is not None else protein_meals_at(dict(row or {}), float(threshold))
 
 
 def idempotency_key(date: str) -> str:
