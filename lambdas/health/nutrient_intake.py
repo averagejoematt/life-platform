@@ -438,6 +438,8 @@ def nutrient_intake(
             total += s
             channels.append("supplements")
         target = cfg["target"]
+        if not target:  # #5204: a charter-read floor can be None (no public half) — skip, never divide by it
+            continue
         pct = min(round(total / target * 100, 1), 100.0)
         dp = cfg.get("decimals", 1)
         entry: dict[str, Any] = {
