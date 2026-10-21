@@ -709,3 +709,9 @@ def test_fat_floor_miss_is_stated_with_floor_and_value_and_leaves_the_verdict_al
     assert f"{floor:g} g floor" in line and f"{floor - 25:g} g" in line
     assert any(v.get("floor_misses") == [line] for v in res["verdicts"])
     assert base["floor_misses"] == [] and not any("floor_misses" in v for v in base["verdicts"])
+
+
+def test_a_protein_miss_below_the_tripwire_is_not_a_floor_miss_line():
+    res = nc.run(_inputs(protein_g_by_day=[205] * 13 + [150]))
+    assert res["floor_misses"] == []
+    assert not any("floor_misses" in v for v in res["verdicts"])

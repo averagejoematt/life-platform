@@ -746,7 +746,8 @@ def build_packets(inputs: dict[str, Any]) -> dict[str, dict[str, Any]]:
 def _floor_miss_lines(packet: dict[str, Any]) -> list[str]:
     """#5102: the fat / carbohydrate / fibre floor-miss lines of one packet — each states the floor and the measured value.
     Approve-side information like `recommendation`: the flags are `info`, so they never touch the verdict."""
-    return [f["reason"] for f in packet.get("flags", []) if f["severity"] == "info" and str(f["metric"]).endswith("_days_missed_7d")]
+    metrics = {f"{m}_days_missed_7d" for m in macro_floors.MACROS}
+    return [f["reason"] for f in packet.get("flags", []) if f["severity"] == "info" and f["metric"] in metrics]
 
 
 def run(inputs: dict[str, Any], *, model_allowed: bool = False) -> dict[str, Any]:
