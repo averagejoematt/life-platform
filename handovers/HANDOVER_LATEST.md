@@ -92,6 +92,7 @@
   - #5220: after #5226.
 - **Filed follow-up:** #5247 (P3).
 - **Next lanes (Now, startable):** #5211 and #5187 from Next if promoted; the BZ later-list proofs #5055, #5056, #5072, #5078, #5079, #5083, #5084, #5086 and #5090.
+- **Next plan:** `~/.claude/plans/next-session-proofs-and-owner-acts-2026-10-22.md` (not-work — a pointer).
 - **Gated:** W3 (#5103, #5104, #5105, #5107, #5112 and #5113) waits on R3–R8. #5075 waits on Fable.
 - **Owner-attended CDK:** #5218, #5181 and #5226. not-work — owner-attended IAM/CDK acts, listed under owner acts.
 
