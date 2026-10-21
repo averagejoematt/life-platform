@@ -55,6 +55,7 @@ WEEK_DAYS = timedelta(weeks=1).days
 RESOLVED_SOURCES = ("titration", "charter")
 TITRATION_ACTIONS = ("hold", "up", "down")
 POST_SESSION = "post_session"
+DISRUPTED = "disrupted"
 # Rounding slack when the resolver's whole-gram split is turned back into kcal (three macros, each rounded).
 SPLIT_TOLERANCE_KCAL = 10
 DAY_FIELDS = (
@@ -175,24 +176,37 @@ def build_food_plan(
     *,
     planned_dates: list[str] | None = None,
     disruption: dict[str, Any] | None = None,
+    disruption_records: list[dict[str, Any]] | None = None,
     titration_reader: Callable[[str], dict[str, Any] | None] | None = None,
     case_id: str | None = None,
 ) -> dict[str, Any]:
     """The week's food plan as the platform resolves it: 7 x `calorie_target.resolve` (titration over charter, the
     day typed from the plan's routines, training-day fuel) + the intended feedings + the protein rule, the macro
     floors and the week's titration record. `titration_reader(iso_monday)` is injected (the MCP job wires the table);
-    with none, no record is read and every day resolves from the charter."""
+    with none, no record is read and every day resolves from the charter.
+
+    `disruption_records` (#5215; the #5088 records, read by the caller through `disruption.load_records_failsoft`):
+    a date inside an ACTIVE record is typed `disrupted`, ahead of the routine-derived type and the travel window; the
+    panel's code half then grades that day as the minimum viable day. A record outside the week changes nothing."""
     from health import calorie_target  # noqa: PLC0415
+
+    from training import disruption as disruption_mode  # noqa: PLC0415
 
     reader = titration_reader or (lambda week: None)
     start = datetime.strptime(str(week_start)[:10], "%Y-%m-%d").date()  # a calendar-day key, not an instant
     dates = [(start + timedelta(days=i)).isoformat() for i in range(WEEK_DAYS)]
     planned = [str(d)[:10] for d in planned_dates or [] if d] if planned_dates is not None else None
     types = [calorie_target.classify_day_type(d, planned_dates=planned, disruption=disruption)["day_type"] for d in dates]
+    modes = [disruption_mode.state(disruption_records, d) for d in dates] if disruption_records else []
+    for i, st in enumerate(modes):
+        if st.get("phase") == disruption_mode.PHASE_ACTIVE:
+            types[i] = DISRUPTED
     days = []
-    for d, t in zip(dates, types):
+    for i, (d, t) in enumerate(zip(dates, types)):
         r = calorie_target.resolve(d, titration_reader=reader, day_type=t, week_day_types=types)
         row = {"date": d, **{k: r.get(k) for k in DAY_FIELDS}}
+        if t == DISRUPTED:
+            row["disruption_template"] = modes[i].get("template")
         row["feedings"] = intended_feedings(t, r.get("pre_post_session"))
         days.append(row)
     r = rules()
@@ -287,18 +301,40 @@ def check_protein_range(f: dict[str, Any]) -> tuple[float, str]:
     return _over_week(len(ok), f), f"{len(ok)} of {len(f['days'])} days plan protein at or above the range low {low:g} g"
 
 
+def minimum_day_held(d: dict[str, Any], r: dict[str, Any]) -> bool:
+    """The reduced day a disruption mode grades (#5215): the mode HOLDS the protein floor (charter `disruption.holds`),
+    so a disrupted day is met when it plans the any-day calorie floor and the protein range's low end — no four feedings,
+    no fat or carbohydrate floor. Absent evidence is not met."""
+    kcal, floor, low = _n(d.get("kcal")), r["floor_any"], r["protein_low"]
+    protein = _n((d.get("split") or {}).get("protein_g"))
+    return floor is not None and low is not None and kcal is not None and kcal >= floor and protein is not None and protein >= low
+
+
+def _reduced(d: dict[str, Any]) -> bool:
+    return d.get("day_type") == DISRUPTED
+
+
+def _note(f: dict[str, Any]) -> str:
+    n = sum(1 for d in f["days"] if _reduced(d))
+    return f"; {n} disrupted day(s) graded as the minimum viable day" if n else ""
+
+
 def check_four_feedings(f: dict[str, Any]) -> tuple[float, str]:
     want, thr = f["rules"]["feedings"], f["rules"]["threshold"]
     if not want or thr is None:
         return 0.0, "the charter carries no feeding rule"
-    ok = [d for d in f["days"] if sum(1 for g in _feeding_g(d) if g >= thr) >= want]
-    return _over_week(len(ok), f), f"{len(ok)} of {len(f['days'])} days plan {int(want)} feedings at or above {thr:g} g"
+    ok = [d for d in f["days"] if (minimum_day_held(d, f["rules"]) if _reduced(d) else sum(1 for g in _feeding_g(d) if g >= thr) >= want)]
+    return _over_week(len(ok), f), f"{len(ok)} of {len(f['days'])} days plan {int(want)} feedings at or above {thr:g} g{_note(f)}"
 
 
 def check_feedings_cover(f: dict[str, Any]) -> tuple[float, str]:
     low = f["rules"]["protein_low"]
-    ok = [d for d in f["days"] if low is not None and _feeding_g(d) and sum(_feeding_g(d)) >= low]
-    return _over_week(len(ok), f), f"{len(ok)} of {len(f['days'])} days whose feedings add up to the range low {low!r} g"
+    ok = [
+        d
+        for d in f["days"]
+        if (minimum_day_held(d, f["rules"]) if _reduced(d) else low is not None and _feeding_g(d) and sum(_feeding_g(d)) >= low)
+    ]
+    return _over_week(len(ok), f), f"{len(ok)} of {len(f['days'])} days whose feedings add up to the range low {low!r} g{_note(f)}"
 
 
 def check_post_session(f: dict[str, Any]) -> tuple[float, str]:
@@ -321,13 +357,15 @@ def check_macro_floors(f: dict[str, Any]) -> tuple[float, str]:
         return 0.0, f"the plan does not carry the fibre floor ({f['floors'].get('fibre')!r} vs {r['fibre']!r})"
     miss, short_days = [], set()
     for d in f["days"]:
+        if _reduced(d) and minimum_day_held(d, r):
+            continue
         s = d.get("split") or {}
         for macro, key in (("fat", "fat_g"), ("carb", "carb_g")):
             if r[macro] is None or (_n(s.get(key)) or 0) < r[macro]:
                 miss.append(f"{d.get('date')} {macro} {s.get(key)!r}")
                 short_days.add(d.get("date"))
     ok = len(f["days"]) - len(short_days)
-    return _over_week(ok, f), f"{ok} of {len(f['days'])} days hold the fat and carbohydrate floors" + (
+    return _over_week(ok, f), f"{ok} of {len(f['days'])} days hold the fat and carbohydrate floors{_note(f)}" + (
         f"; under: {miss[:7]}" if miss else ""
     )
 
