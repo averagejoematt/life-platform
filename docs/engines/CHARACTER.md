@@ -12,13 +12,13 @@ character mood. Runs in the `character-sheet` compute Lambda (daily, before 11 A
 
 ## The pillar model
 
-Six primary pillars (`PILLAR_COMPUTERS`, `character_engine.py:1704-1711`): sleep, movement,
+Six primary pillars (`PILLAR_COMPUTERS`, `character_engine.py:1693-1700`): sleep, movement,
 nutrition, metabolic, mind, relationships — plus the **consistency** meta-pillar computed from
 the others. Config pillar weights (live `config/character_sheet.json`): sleep 0.20,
 movement 0.18, nutrition 0.18, mind 0.15, metabolic 0.12, consistency 0.10, relationships 0.07.
 
 Each pillar raw score is a weighted mean of components with a **confidence blend**
-(`_weighted_pillar_score`, :1046-1114):
+(`_weighted_pillar_score`, :1035-1103):
 
 ```
 raw        = Σ(scoreᵢ·wᵢ)/Σwᵢ            over components with data
@@ -46,12 +46,12 @@ always the number the engine leveled on; nothing mutates it post-compute.
   0–10 scale via `(m−1)/4×10` (`character_sheet_lambda._enriched_mood_to_10`, :233-254).
 - #910/#911: categorical `enriched_social_quality` → `social_score` 0–10 by rank,
   `rank/3×10` (alone→0, surface→3.33, meaningful→6.67, deep→10;
-  `character_engine._social_quality_to_10`, :807-833), averaged across the day's entries. The
+  `character_engine._social_quality_to_10`, :796-822), averaged across the day's entries. The
   numeric `social_connection_score` fields remain the primary path (no producer writes them yet).
 - #962: `vice_streaks` is lifted from the day's habit_scores record (daily_metrics_compute has
   always written it) into the top-level key the mind pillar's vice_control component reads;
   `streak_all_above_30th` + `weekend_weekday_ratio` are derived by
-  `character_engine.derive_consistency_inputs` (:909-987) from the same 21-day record window
+  `character_engine.derive_consistency_inputs` (:898-976) from the same 21-day record window
   the EMA histories already fetch. `buddy_engagement` was removed (B-3 precedent — no producer
   ever wrote `buddy_freshness_days`); relationships weights renormalized (.45/.35/.20).
 
@@ -83,7 +83,7 @@ hand-authored config target; `_weighted_pillar_score` surfaces each target's der
 provenance into component details. Target values still live in CONFIG, so a baselines refresh
 shows as labeled `config_drift`, never `engine_drift`, in progression-receipt replay.
 
-## EMA smoothing (`compute_ema_level_score`, :1122-1143)
+## EMA smoothing (`compute_ema_level_score`, :1111-1132)
 
 Exponentially weighted mean over the last `ema_window_days` (21) raw scores, most-recent
 heaviest, per-pillar decay `ema_lambda` (live: sleep 0.85, movement 0.90, nutrition 0.88,
@@ -93,7 +93,7 @@ metabolic 0.95, mind 0.85, relationships 0.93, consistency 0.93):
 level_score = Σ(rawᵢ · λ^age) / Σ λ^age        (empty history → 50)
 ```
 
-## Anti-flip-flop level rules (`evaluate_level_changes`, :1286-1512)
+## Anti-flip-flop level rules (`evaluate_level_changes`, :1275-1501)
 
 `target_level = round(level_score)`. Movement requires consecutive-day streaks, harder by tier
 (live `tier_streak_overrides`: Foundation up 3/down 5 … Elite up 14/down 21; tier-boundary
@@ -130,7 +130,7 @@ Gates, in order:
    failure mode) and recovers ~28 days after resuming. Kill-switch:
    `leveling.neglect_decay.persistent_down_streak`.
 
-## XP and debt (`_compute_xp`, :200-259; buffer `_roll_xp_buffer`, :284-310)
+## XP and debt (`_compute_xp`, :199-258; buffer `_roll_xp_buffer`, :283-309)
 
 Bands on raw score: ≥80 ⇒ +3, ≥60 ⇒ +2, ≥40 ⇒ +1, ≥20 ⇒ 0, else −1; minus `daily_xp_decay`
 (**1** since ADR-134 — the zero-point sits at "a decent day": raw 40–59 nets 0, 60+ grows,
@@ -149,13 +149,13 @@ record stores successfully.
 
 ## Neglect atrophy + mood (#913)
 
-- `neglect_decay_state` (:1166-1200): when `engagement_state.presence_class == "dark"` (and not a
+- `neglect_decay_state` (:1155-1189): when `engagement_state.presence_class == "dark"` (and not a
   planned pause), after `n_grace_days` (3) the level score of pillars whose behavioral weight
   share ≥ 0.3 is multiplied by `0.98^(gap−3)`, floored at the day's own raw score and the config
   floor (0). Models detraining/evidence loss, never punishment (ADR-104). Knobs live in
   `config/character_sheet.json` under `leveling.neglect_decay`
   (`n_grace_days` / `rate` / `floor` / `min_behavioral_share` / `persistent_down_streak`).
-- `compute_character_mood` (:1207-1266), pure code (ADR-105), first match wins:
+- `compute_character_mood` (:1196-1255), pure code (ADR-105), first match wins:
   dark ⇒ **dormant**; quiet or 7d-composite trend ≤ −5 ⇒ **fading**; present/light AND trend ≥ +3
   AND composite ≥ 55 ⇒ **thriving**; else **steady**. Trend = mean(last 3 d) − mean(prior 4 d).
 
@@ -165,7 +165,7 @@ Config `cross_pillar_effects` conditions evaluate EMA level_**scores** — delib
 ADR-134/#963: effects model current-state physiology synergies (poor sleep drags today's
 training capacity), not tier achievements; the config narrative is worded to match. The
 `any_vice_streak` conditions are data-driven since #962 (`compute_cross_pillar_effects`,
-:1573-1628, takes the day's vice_streaks — the Vice Shield can actually fire). Modifiers are
+:1562-1617, takes the day's vice_streaks — the Vice Shield can actually fire). Modifiers are
 multiplicative: `adjusted = level_score × (1 + Σ mod)` [F-05]. **#1411 (ADR-105):** every fired
 effect carries a `fit_status` badge — config can only declare `authored-prior`; `fitted` is
 earned from data by the quarterly `effect_fitter` re-fit (lagged pairs, block-bootstrap CI,
@@ -183,7 +183,7 @@ honestly. Excluded pillars ride the record as `headline_excluded_pillars`. Tiers
 ## Outputs / config surface
 
 Record → `USER#matthew#SOURCE#character_sheet / DATE#<date>` (`store_character_sheet`,
-:2097-2119; pre-genesis dates tagged `phase=pilot`), EXPERIMENT_SCOPED — wiped + rebuilt at
+:2086-2108; pre-genesis dates tagged `phase=pilot`), EXPERIMENT_SCOPED — wiped + rebuilt at
 reset. Per-pillar output carries raw_score, level_score, level, tier, xp_total/xp_delta/xp_debt,
 `raw_modifier`, `challenge_bonus_xp`, confidence, data_coverage, `not_instrumented`,
 `absent_behaviors`, `drivers` (ADR-104 provenance), `coverage_hold`, `neglect_decay`. Config:
