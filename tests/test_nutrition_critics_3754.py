@@ -694,3 +694,24 @@ def test_the_resolver_block_never_raises_when_every_reader_raises(monkeypatch):
 
 
 # premerge-gate: 3754 boxes 3+4: os.walk sweep of lambdas/ for any importer of health.nutrition_critics outside the MCP layer — the block is OWNER-ONLY (a refeed decision with a `log_decision` payload must never reach site-api, a narrative or an email). A new importer is a repo-shape change that must red on the PR that adds it.
+
+
+# ── #5102: a floor miss reaches the deterministic output, never the verdict ───────────────
+def test_fat_floor_miss_is_stated_with_floor_and_value_and_leaves_the_verdict_alone():
+    from health import macro_floors
+
+    floor = macro_floors.floor_g("fat")
+    base = nc.run(_inputs(fat_g_by_day=[floor + 20] * 14))
+    res = nc.run(_inputs(fat_g_by_day=[floor + 20] * 11 + [floor - 25] * 3))
+    assert [v["verdict"] for v in res["verdicts"]] == [v["verdict"] for v in base["verdicts"]]
+    assert res["veto"] == base["veto"]
+    (line,) = res["floor_misses"]
+    assert f"{floor:g} g floor" in line and f"{floor - 25:g} g" in line
+    assert any(v.get("floor_misses") == [line] for v in res["verdicts"])
+    assert base["floor_misses"] == [] and not any("floor_misses" in v for v in base["verdicts"])
+
+
+def test_a_protein_miss_below_the_tripwire_is_not_a_floor_miss_line():
+    res = nc.run(_inputs(protein_g_by_day=[205] * 13 + [150]))
+    assert res["floor_misses"] == []
+    assert not any("floor_misses" in v for v in res["verdicts"])

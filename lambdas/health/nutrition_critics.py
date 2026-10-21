@@ -743,6 +743,13 @@ def build_packets(inputs: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 # ── verdicts ───────────────────────────────────────────────────────────────────────────
+def _floor_miss_lines(packet: dict[str, Any]) -> list[str]:
+    """#5102: the fat / carbohydrate / fibre floor-miss lines of one packet — each states the floor and the measured value.
+    Approve-side information like `recommendation`: the flags are `info`, so they never touch the verdict."""
+    metrics = {f"{m}_days_missed_7d" for m in macro_floors.MACROS}
+    return [f["reason"] for f in packet.get("flags", []) if f["severity"] == "info" and f["metric"] in metrics]
+
+
 def run(inputs: dict[str, Any], *, model_allowed: bool = False) -> dict[str, Any]:
     """Three verdicts over three packets, through `coach.critics`' deterministic layer and
     `reconcile` (the ONE verdict rule). This never runs a model: `model_allowed` is accepted
@@ -756,6 +763,8 @@ def run(inputs: dict[str, Any], *, model_allowed: bool = False) -> dict[str, Any
         v = reconcile(det, None, packet)
         v["model"] = {"paused": MODEL_PAUSED_REASON}
         v["unknown"] = list(packet.get("unknown", []))
+        if lines := _floor_miss_lines(packet):
+            v["floor_misses"] = lines
         if v.get("verdict") == "veto":
             # ADR-105: a population-derived redline keeps its label even once it is a veto —
             # coach.critics stamps violations "owner" (his calibration doc); ours carry their own.
@@ -772,6 +781,7 @@ def run(inputs: dict[str, Any], *, model_allowed: bool = False) -> dict[str, Any
         "redlines_version": owner_redlines.REDLINES_VERSION,
         "verdicts": verdicts,
         "veto": any(v.get("verdict") == "veto" for v in verdicts),
+        "floor_misses": [line for v in verdicts for line in v.get("floor_misses", [])],  # #5102: also on the deterministic path
         "packet_numbers": {cid: p["numbers"] for cid, p in packets.items()},
         "unknown": {cid: p["unknown"] for cid, p in packets.items() if p["unknown"]},
     }
