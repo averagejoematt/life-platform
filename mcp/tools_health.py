@@ -840,6 +840,34 @@ def tool_get_weight_loss_progress(args):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _model_check_state(budget):
+    """#5198 (ADR-104): tri-state, so a window no check ran on never reads as passed. `refused` when the
+    impossibility check refused, `passed` only when the measured weight trend agreed, else `not_run`
+    (no trend check, or a `published_unverified_*` basis)."""
+    tc = budget.get("trend_check")
+    if not tc:
+        return "not_run"
+    if not tc.get("publish", True):
+        return "refused"
+    return "passed" if str(tc.get("basis") or "").startswith("agrees_with_measured_weight_trend") else "not_run"
+
+
+def _maintenance_context(budget, check=None):
+    """#5198: one deficit-model window as maintenance context. Deliberately carries no key or flag
+    named target (the view's single calorie target is `calorie_target_platform`)."""
+    out = {
+        "estimated_maintenance_kcal": budget["tdee"],
+        "deficit_kcal": budget["deficit"],
+        "model_check": _model_check_state(budget),
+        "method": budget["method"],
+        "basis": budget.get("target_basis"),
+        "inputs": budget["inputs"],
+    }
+    if check is not None:
+        out["check"] = check
+    return out
+
+
 def _get_energy_expenditure(args):
     end_date = args.get("end_date", pacific_today())
     try:
@@ -972,8 +1000,6 @@ def _get_energy_expenditure(args):
     ex_daily_30d_avg = budget_30d["inputs"]["exercise_kcal_daily_avg"]
     tdee_7d_avg = budget_7d["tdee"]
     tdee_30d_avg = budget_30d["tdee"]
-    calorie_target_7d = budget_7d["target"]
-    calorie_target_30d = budget_30d["target"]
     implied_weekly_loss_lbs = tdee_core.implied_weekly_loss_lbs(target_deficit_kcal)
 
     journey_start_wt = profile.get("journey_start_weight_lbs")
@@ -1039,30 +1065,25 @@ def _get_energy_expenditure(args):
         "tdee_30d_avg": tdee_30d_avg,
         "expenditure_reconciliation": expenditure_reconciliation(end_date, tdee_7d_avg, read=query_source_cross_phase),
         "target_deficit_kcal": target_deficit_kcal,
-        # #5095: these two are the DEFICIT MODEL's what-if (TDEE − target_deficit_kcal), not the platform's
-        # calorie target. The one target every surface grades against is `calorie_target_platform`.
-        "calorie_target_based_on_7d": calorie_target_7d,
-        "calorie_target_based_on_30d": calorie_target_30d,
+        # #5198: `calorie_target_platform` is the ONE calorie target on this view (#5095). The deficit
+        # model's windows are MAINTENANCE CONTEXT (estimated maintenance + the modelled deficit): no key
+        # or flag in them is called a target, and the TDEE-minus-deficit figure is not published.
         "calorie_target_platform": calorie_resolver.resolve(end_date),
+        # ADR-152/ADR-105: maintenance context carries its method and inputs, so a reader can check
+        # the number without reading this source.
+        "maintenance_context_7d": _maintenance_context(budget_7d, check_7d),
+        "maintenance_context_30d": _maintenance_context(budget_30d),
         # #3931 box 4: the method name (DERIVED from health.tdee, never re-typed) and the
         # impossibility verdict, on the surface that publishes the number. When `basis`
-        # begins with "refused: ", `calorie_target_based_on_7d` is None — the surface says
-        # refused rather than publishing a figure the weight trend contradicts.
-        "calorie_target_method": tdee_core.METHOD,
+        # begins with "refused: ", `maintenance_context_7d.model_check` is "refused" — the impossibility check
+        # refused; the TDEE-minus-deficit figure is not emitted, only the maintenance estimate.
+        "maintenance_method": tdee_core.METHOD,
         # #3931 box 3: the SECOND method, offered alongside rather than folded in. It
         # never touches a MET table or a Mifflin coefficient, so it fails in different
-        # directions than `calorie_target_method` does — and when the two disagree,
-        # `calorie_target_check` below is what refuses. `None` when no intake average or
+        # directions than `maintenance_method` does — and when the two disagree,
+        # `maintenance_context_7d.check` below is what refuses. `None` when no intake average or
         # no measured trend exists to back-solve from (ADR-104: absent, not zero).
         "tdee_second_method": tdee_core.tdee_from_trend(intake_avg, trend_lb_wk, days=trend_days),
-        "calorie_target_basis": budget_7d.get("target_basis"),
-        "calorie_target_published": budget_7d.get("target_published", True),
-        "calorie_target_check": check_7d,
-        # ADR-152/ADR-105: the same target, with its method and its inputs attached, so a
-        # reader can check the number without reading this source — and so this tool and
-        # `get_nutrition view=macros` are visibly answering from ONE definition.
-        "calorie_target": budget_7d,
-        "calorie_target_30d_basis": budget_30d,
         "implied_weekly_loss_lbs": implied_weekly_loss_lbs,
         "bmr_change_since_start": bmr_change,
         "coaching_note": "Recalculate targets every 10 lbs lost as BMR decreases. Eating below 1200 kcal (women) or 1500 kcal (men) risks lean mass loss even with adequate protein.",
