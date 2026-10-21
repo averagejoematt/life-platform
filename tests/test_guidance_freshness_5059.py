@@ -307,6 +307,7 @@ def test_the_context_derives_the_flag_from_the_rows_it_already_read(monkeypatch)
     from mcp import plan_helpers
 
     monkeypatch.setattr(plan_helpers, "_clinical_guidance", lambda: [GUIDANCE, _appt("2026-10-15")])
+    monkeypatch.setattr(plan_helpers, "_may_tracker", lambda d: None)  # #5200: no live table read in a test
     ctx = plan_helpers.coach_context_for(TODAY)
     assert ctx["sections"]["clinical_guidance"]["freshness"]["state"] == gf.STALE
     monkeypatch.setattr(plan_helpers, "_clinical_guidance", lambda: {"state": "read_failed", "error": "ClientError"})
