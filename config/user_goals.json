@@ -99,8 +99,6 @@
       "calorie_approach": "Heavy deficit to start, guided by MacroFactor adaptive TDEE. Matthew tolerates aggressive deficits well based on prior experience. He does not starve himself \u2014 if genuinely hungry, depleted, or struggling, he eats. The 1,500 target is a baseline, not a ceiling on days the body needs more.",
       "daily_protein_min_g": 170,
       "protein_note": "Matthew prioritizes protein above all other macros. At 1,500 kcal, hitting 180g is mechanically difficult (~48% of calories from protein). 170g is the realistic floor. Coaches should celebrate days above 180g rather than criticize days at 160g.",
-      "daily_fiber_min_g": 25,
-      "fiber_note": "Currently averaging 17g. This is a known gap. Difficult to hit 25g at 1,500 kcal without deliberate food choices.",
       "eating_window": {
         "type": "intermittent_fasting",
         "window": "11:30am-7:30pm",
