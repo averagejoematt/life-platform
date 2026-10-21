@@ -1157,7 +1157,10 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # (the os.walk sweep of lambdas/web + lambdas/emails for a module naming the owner-only check-in partitions) arrives PROVEN via
         # the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS, ARMED 1/1: baseline 27 passed | mutated 1 failed | reverted 27
         # passed). Enters exactly that id, leaves {}, unproven does NOT move. A concurrent lane bumping this bound stacks, never max'd.
-        <= 279
+        # 278 -> 279 (2026-10-20, #5213): ONE entrant, `structural::test_nutrition_critics_ai_5114.py`, PROVEN via MutationSpec +
+        # STRUCTURAL_PROOFS (ARMED 1/1: baseline 11 passed | mutated 1 failed | reverted 11 passed). Stacked, never max'd.
+        # 279 -> 280 (2026-10-20, #5232): structural::test_habit_tier_set_guard_5232.py (STRUCTURAL_HAND_PROOFS). Stacked, never max'd.
+        <= 280
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

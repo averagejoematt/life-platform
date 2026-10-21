@@ -43,7 +43,7 @@ CharterReader = Callable[[str], Any]
 DayLike = Union[str, date, None]
 
 TRAINING_DAY_PATH = "nutrition.training_day"
-DAY_TYPES = ("lifting", "rest", "travel", "unknown")
+DAY_TYPES = ("lifting", "rest", "travel", "disrupted", "unknown")  # disrupted: a recorded disruption covers the date (#5215)
 
 
 def _day(day: DayLike) -> date:

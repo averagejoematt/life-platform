@@ -77,13 +77,14 @@ def read_constraint_block(week_end: str) -> dict[str, Any] | None:
 def read_food_plan(week_start: str, routines: list[dict[str, Any]]) -> dict[str, Any] | None:
     try:
         from health import titration
-        from training import food_panel
+        from training import disruption, food_panel
 
         from mcp.config import table
 
         return food_panel.build_food_plan(
             week_start,
             planned_dates=[str(r.get("target_date") or "")[:10] for r in routines],
+            disruption_records=disruption.load_records_failsoft(),  # #5215: no record = the full-day rubric
             titration_reader=lambda week: titration.read_record(table, week),
             case_id=f"food::{week_start}",
         )
