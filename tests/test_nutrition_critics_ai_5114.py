@@ -255,8 +255,13 @@ def _deficit_tool_uses_without_opt_out(source: str, label: str) -> tuple[int, li
     tree = ast.parse(source)
     parents = {c: n for n in ast.walk(tree) for c in ast.iter_child_nodes(n)}
     found, bad = 0, []
+    names = {_DEFICIT_TOOL} | {
+        a.asname for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) for a in n.names if a.name == _DEFICIT_TOOL and a.asname
+    }
     for node in ast.walk(tree):
-        if not (isinstance(node, ast.Name) and node.id == _DEFICIT_TOOL and isinstance(node.ctx, ast.Load)):
+        is_name = isinstance(node, ast.Name) and node.id in names and isinstance(node.ctx, ast.Load)
+        is_attr = isinstance(node, ast.Attribute) and node.attr == _DEFICIT_TOOL  # `module.tool(...)`
+        if not (is_name or is_attr):
             continue
         found += 1
         call = parents.get(node)
@@ -288,7 +293,7 @@ def test_only_the_owners_own_deficit_call_runs_the_layer():
     for top in ("mcp", "lambdas"):
         for f in sorted((repo / top).rglob("*.py")):
             rel = f.relative_to(repo).as_posix()
-            if rel == "mcp/registry.py" or rel == "mcp/tools_nutrition.py":
+            if rel == "mcp/registry.py":
                 continue
             text = f.read_text()
             if _DEFICIT_TOOL not in text:
@@ -311,3 +316,10 @@ def test_the_sweep_goes_red_on_a_caller_without_the_opt_out():
     assert _deficit_tool_uses_without_opt_out(wrapped, "x") == (1, [])
     assert _deficit_tool_uses_without_opt_out(bare, "x") == (1, ["x:2"])
     assert _deficit_tool_uses_without_opt_out(bare_wrapped, "x") == (1, ["x:2"])
+    attr_ok = "import m\n\n\ndef f():\n    return m.tool_get_deficit_sustainability({'critics_model': False})\n"
+    attr_bare = "import m\n\n\ndef f():\n    return m.tool_get_deficit_sustainability({})\n"
+    alias = "from mcp.tools_nutrition import tool_get_deficit_sustainability as ds\n\n\ndef f():\n    return ds(%s)\n"
+    assert _deficit_tool_uses_without_opt_out(attr_ok, "x") == (1, [])
+    assert _deficit_tool_uses_without_opt_out(attr_bare, "x") == (1, ["x:5"])
+    assert _deficit_tool_uses_without_opt_out(alias % "{'critics_model': False}", "x") == (1, [])
+    assert _deficit_tool_uses_without_opt_out(alias % "{}", "x") == (1, ["x:5"])

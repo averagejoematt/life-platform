@@ -1438,13 +1438,13 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
     "structural::test_nutrition_critics_ai_5114.py": _proof(
         "structural::test_nutrition_critics_ai_5114.py",
-        "ARMED 1/1 — baseline: 11 passed in 0.75s | mutated: 1 failed, 10 passed in 0.74s :: "
-        "test_only_the_owners_own_deficit_call_runs_the_layer | reverted: 11 passed in 0.72s",
-        "mcp/ and lambdas/ on disk (rglob, every .py, registry wiring and the tool's own module excepted): every use of "
-        "tool_get_deficit_sustainability, called directly or handed to a wrapper, must pass a dict literal with "
+        "ARMED 1/1 — baseline: 11 passed in 0.75s | mutated: 1 failed, 10 passed in 0.79s :: "
+        "test_only_the_owners_own_deficit_call_runs_the_layer | reverted: 11 passed in 0.76s",
+        "mcp/ and lambdas/ on disk (rglob, every .py, the registry wiring alone excepted): every use of "
+        "tool_get_deficit_sustainability, called directly, via module attribute, via an `as` alias, or handed to a wrapper, must pass a dict literal with "
         "critics_model False; zero callers found fails loudly; a synthetic source pair proves the detector red on a bare caller. "
         "STILL INVISIBLE, stated: a caller reaching the tool through getattr/importlib by string, an args dict built in a "
-        "variable, and the registry-wired owner call, which opts in on purpose.",
+        "variable (an alias via plain assignment, `f = tool`, also), and the registry-wired owner call, which opts in on purpose.",
         proved_on="2026-10-20",
     ),
     "structural::test_obligation_carriers_3597.py": _proof(
