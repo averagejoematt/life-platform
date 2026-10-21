@@ -82,3 +82,21 @@ def test_outcome_context_and_streaks_read_string_tiers():
     ctx = ai_context._build_habit_outcome_context({"habitify_7d": [HABITIFY]}, {"habit_registry": REGISTRY})
     assert "T0" in ctx
     assert habit_streaks.habit_tier is habit_tier
+
+
+def test_the_read_boundary_leaves_a_non_number_raw_so_the_4704_drift_report_still_names_it():
+    """Review hold on #5232: coercing a bool/garbage value to the default at fetch_profile silenced
+    `registry_type_drift` on the live path. Only a value that parses as a number is converted."""
+    from common.habit_registry import coerce_profile
+    from health import scoring_engine as se
+
+    registry = {
+        "Meditate": {"status": "active", "tier": "0"},
+        "B": {"status": "active", "tier": "2", "target_frequency": "weekly", "scoring_weight": True},
+    }
+    profile = coerce_profile({"habit_registry": registry})
+    assert profile["habit_registry"]["B"]["tier"] == 2  # a numeric string still becomes a number
+    assert profile["habit_registry"]["Meditate"]["tier"] == 0
+    data = {"date": "2026-10-06", "habitify": {"habits": {"Meditate": 1, "B": 1}}, "habitify_7d": [{"habits": {"Meditate": 1, "B": 1}}] * 6}
+    _, details = se.score_habits_registry(data, profile)
+    assert details["registry_type_drift"] == ["B.scoring_weight", "B.target_frequency"]

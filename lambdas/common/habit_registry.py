@@ -6,8 +6,10 @@ with an int raised. #4704 fixed the scorer only; this module is the shared bound
 reader has to: `coerce_registry` normalises a whole registry once where the profile is
 read, and `habit_tier` is the accessor for a reader holding a single meta dict.
 
-A value that is not a plain number (a bool, "weekly", None) reads as the default - the
-read never raises, and never invents a tier for a habit.
+`coerce_registry` converts only a value that PARSES as a plain number (a str or Decimal holding
+one); a bool or garbage value is left raw, so the scorer's #4704 `registry_type_drift` report
+still names it. `habit_tier` reads such a value as the default - it never raises, and never
+invents a tier for a habit.
 """
 
 from typing import Any
@@ -15,14 +17,22 @@ from typing import Any
 NUMERIC_FIELDS = {"tier": 2, "scoring_weight": 1.0, "target_frequency": 7}
 
 
-def _number(raw: Any, default: Any) -> Any:
+def _parse(raw: Any) -> Any:
+    """`raw` as an int/float, or None when it is not a plain number (bool, "weekly", None, nan)."""
     if isinstance(raw, bool):
-        return default
+        return None
     try:
         n = float(raw)
     except (TypeError, ValueError):
-        return default
+        return None
+    if n != n or n in (float("inf"), float("-inf")):
+        return None
     return int(n) if n == int(n) else n
+
+
+def _number(raw: Any, default: Any) -> Any:
+    n = _parse(raw)
+    return default if n is None else n
 
 
 def habit_tier(meta: dict | None, default: int = 2) -> int:
@@ -39,9 +49,10 @@ def coerce_registry(registry: Any) -> Any:
     for name, meta in registry.items():
         if isinstance(meta, dict):
             meta = dict(meta)
-            for key, default in NUMERIC_FIELDS.items():
-                if key in meta:
-                    meta[key] = _number(meta[key], default)
+            for key in NUMERIC_FIELDS:
+                n = _parse(meta[key]) if key in meta else None
+                if n is not None:  # a non-number stays raw: the scorer's drift report must still see it
+                    meta[key] = n
         out[name] = meta
     return out
 
