@@ -113,7 +113,7 @@ except ImportError:
 from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
-from training.training_charter import charter_value  # #5214
+from training.training_charter import public_view  # #5214 (a published surface reads the whitelist only, #5087)
 
 
 def query_range(source, start_date, end_date):
@@ -485,7 +485,7 @@ def compute_weekly_summary(days):
 
 def _feeding_threshold_text():
     """#5214: THE per-feeding protein threshold (charter nutrition.protein.feeding_threshold_g) as prompt text."""
-    t = charter_value("nutrition.protein.feeding_threshold_g")
+    t = ((public_view().get("nutrition") or {}).get("protein") or {}).get("feeding_threshold_g")
     return f"{t:g}" if isinstance(t, (int, float)) else "the plan's"
 
 

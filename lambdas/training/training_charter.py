@@ -76,6 +76,7 @@ PUBLISHED_WHITELIST: tuple[str, ...] = (
     "deload.automatic",
     "deload.owner_gated",
     "concession_ledger",
+    "nutrition.protein.feeding_threshold_g",  # #5214: the one per-feeding protein threshold the review email prompt names (a rule, nothing private)
     "nutrition.floors.fibre.floor_g",  # #5204: the one fibre floor the nutrition door and review email grade against (35 g, nothing private)
 )
 
