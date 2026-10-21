@@ -119,7 +119,7 @@ def classify_day_type(
         return {"day_type": "lifting" if d in planned else "rest", "basis": "planned routine for the date"}
     return {
         "day_type": "unknown",
-        "basis": "no per-date plan calendar (the sequence cannot type a date): base target, lifting uplift conditional",
+        "basis": "no per-date calendar was read (the sequence alone cannot type a date): base target, lifting uplift conditional",
     }
 
 
@@ -148,6 +148,9 @@ def _apply_day_type(
     floor_any, floor_lift = _num(out.get("floor_any_day_kcal")), _num(out.get("floor_lifting_day_kcal"))
     floor = floor_lift if (dt == "lifting" and floor_lift is not None) else floor_any
     out["balance_held"] = True
+    if dt == "lifting" and delta and n_rest == 0:  # #5191: a typed week with no rest day (travel fills it) cannot pay the uplift
+        out["provenance"] += "; no rest day in the typed week pays the lifting uplift — the weekly balance is NOT held"
+        out["balance_held"] = False
     if floor is not None and final < floor:
         out[
             "provenance"
@@ -172,17 +175,42 @@ def _apply_day_type(
         out["pre_post_session"] = {"pre": pre, "post": post} if isinstance(pre, dict) and isinstance(post, dict) else None
 
 
-def plan_block(date: str, disruption: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """The plan's `training_day_fuel` (#5101, owner-only): today's resolution (no per-date calendar exists yet, so a
-    non-travel date is `unknown` at the base target) plus `if_lifting_day` / `if_rest_day`, stated as conditional."""
+def plan_block(date: str, disruption: Optional[Dict[str, Any]] = None, calendar: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """The plan's `training_day_fuel` (#5101, owner-only). With a typed `calendar` (`training.training_calendar`,
+    #5191) the date is lifting/rest/travel and the block carries the typed week (`week_days`, `week_mean_kcal`), whose
+    mean is the base target while `week_balance_held`. Without one (the Hevy record or the count unread) a non-travel
+    date is `unknown` at the base target plus `if_lifting_day` / `if_rest_day`, stated as conditional."""
+    planned = (calendar or {}).get("planned_dates")
+    if planned is not None:
+        return _typed_block(date, disruption, calendar or {}, planned)
     typed = classify_day_type(date, disruption=disruption)
     out = resolve(date, day_type=typed["day_type"])
-    out["day_type_basis"] = typed["basis"]
+    out["day_type_basis"] = typed["basis"] + (f" ({calendar.get('reason')})" if calendar and calendar.get("reason") else "")
     if typed["day_type"] == "unknown":
         out["if_lifting_day"] = {
             k: v for k, v in resolve(date, day_type="lifting").items() if k in ("kcal", "uplift_kcal", "split", "pre_post_session")
         }
         out["if_rest_day"] = {k: v for k, v in resolve(date, day_type="rest").items() if k in ("kcal", "uplift_kcal", "split")}
+    return out
+
+
+def _typed_block(date: str, disruption: Optional[Dict[str, Any]], calendar: Dict[str, Any], planned: Sequence[str]) -> Dict[str, Any]:
+    """`plan_block` on a typed week (#5191): every date of the calendar's week resolved against the same week types."""
+    dates = list(calendar.get("dates") or [])
+    basis = {x["date"]: x["basis"] for x in calendar.get("days") or []}
+    typed = {d: classify_day_type(d, planned_dates=planned, disruption=disruption) for d in dates}
+    types = [typed[d]["day_type"] for d in dates]
+    week = [resolve(d, day_type=t, week_day_types=types) for d, t in zip(dates, types)]
+    me = classify_day_type(date, planned_dates=planned, disruption=disruption)
+    out = resolve(date, day_type=me["day_type"], week_day_types=types)
+    out["day_type_basis"] = f"per-date calendar: {basis.get(date)}" if me["day_type"] != "travel" else me["basis"]
+    out["week_days"] = [{"date": d, "day_type": t, "kcal": r["kcal"]} for d, t, r in zip(dates, types, week)]
+    kcal = [r["kcal"] for r in week]
+    out["week_mean_kcal"] = round(sum(kcal) / len(kcal), 1) if kcal and None not in kcal else None
+    out["week_balance_held"] = all(r.get("balance_held") for r in week)
+    out["calendar"] = {
+        k: calendar.get(k) for k in ("lifting_days_per_wk", "credited_this_week", "typed_lifting_days", "reaches_count", "rule")
+    }
     return out
 
 

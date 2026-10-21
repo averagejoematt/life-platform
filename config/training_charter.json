@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.18.0",
+  "version": "1.19.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -112,6 +112,13 @@
       "date": "2026-10-19",
       "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5110, epic #5094): the food plan is graded by a fixed panel like the training plan; built on the panel defaults, pending R1 and R2 (#5091)",
       "what": "nutrition.concession_ledger: the food panel's nine seats (six schools and three roles: the six schools #5110 names, one seat each, plus a sports dietitian, a behaviour-change psychologist and a studio nutritionist) and what each concedes to the deadline and gets in return. config/panel_rubric.json food_panel holds one fixed rubric per seat (criteria by code against the resolved food plan, one by the judge each); the seat keys must equal this ledger's keys, the concession is READ from here at grade time (lambdas/training/food_panel.py), and the bar is panel_target (overall A, every seat 9 of 10 or better with its concession named).",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.19.0",
+      "date": "2026-10-20",
+      "by": "owner ruling 5 (2026-10-18: five lifting days a week) and the #5101 known limit (#5191, epic #5091); built on the panel default, pending R1",
+      "what": "nutrition.training_day prose only (no number changes): day_type now names the per-date training calendar (training.training_calendar, #5191) that types each date of the week lifting or rest from split.lifting_days_per_wk and the week's credited sessions, so the plan's training_day_fuel block is typed and its weekly mean is the base target; balance adds that a typed week with no rest day to pay the uplift reports balance_held false.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -538,7 +545,7 @@
     },
     "training_day": {
       "lifting_uplift_kcal": 150,
-      "balance": "the week averages the base target: a rest day takes -(uplift x lifting days / rest days) so the uplift is paid for inside the week (5 lifting / 2 rest: -375); travel and unknown days stay at the base. A day clamped by its floor is reported balance_held false",
+      "balance": "the week averages the base target: a rest day takes -(uplift x lifting days / rest days) so the uplift is paid for inside the week (5 lifting / 2 rest: -375); travel and unknown days stay at the base. A day clamped by its floor is reported balance_held false. A typed week with lifting days but no rest day (travel fills the rest) cannot pay the uplift and is reported balance_held false too",
       "fat_pct_of_base_kcal": 30,
       "split_rule": "protein = nutrition.protein.range_g.low and fat = fat_pct of the base target, both held every day; the uplift and the offset are carbohydrate",
       "pre_session": {
@@ -556,7 +563,7 @@
         "note": "the post-session protein is one of the four feedings (nutrition.protein.feeding_threshold_g)"
       },
       "travel_day": "no uplift and no rest-day offset: the base target holds; pre and post targets still apply when a session is done",
-      "day_type": "lifting | rest | travel | unknown: travel from a travel disruption or charter travel window; else lifting/rest from the planned routine for the date; else unknown (base target, never a guessed rest day: the split sequence has no calendar, so the plan states the lifting uplift and the rest offset as conditional until a per-date calendar exists)",
+      "day_type": "lifting | rest | travel | unknown: travel from a travel disruption or charter travel window; else lifting/rest from the per-date training calendar (training.training_calendar, #5191: the week's credited program sessions are lifting days, the sessions still owed to split.lifting_days_per_wk are laid on the remaining dates, nominal lifting weekdays first, every other date rest; a rest-day postponement moves a session inside the week and does not change the week's count while days remain); else unknown (base target, never a guessed rest day) when the Hevy record or the count cannot be read, with the lifting uplift and the rest offset stated as conditional",
       "surface": "owner-only: the plan_next_session constraint block (training_day_fuel) and the coach packet; no public surface",
       "basis": "built on the panel default, pending R1 (#5091)"
     },

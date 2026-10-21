@@ -179,15 +179,20 @@ def build_food_plan(
     disruption_records: list[dict[str, Any]] | None = None,
     titration_reader: Callable[[str], dict[str, Any] | None] | None = None,
     case_id: str | None = None,
+    block_workouts: list[dict[str, Any]] | None = None,
+    today: str | None = None,
 ) -> dict[str, Any]:
     """The week's food plan as the platform resolves it: 7 x `calorie_target.resolve` (titration over charter, the
-    day typed from the plan's routines, training-day fuel) + the intended feedings + the protein rule, the macro
-    floors and the week's titration record. `titration_reader(iso_monday)` is injected (the MCP job wires the table);
-    with none, no record is read and every day resolves from the charter.
+    day typed lifting/rest, training-day fuel) + the intended feedings + the protein rule, the macro floors and the
+    week's titration record. `titration_reader(iso_monday)` is injected (the MCP job wires the table); with none, no
+    record is read and every day resolves from the charter. With `block_workouts` (the Hevy record) the days are typed
+    by the per-date calendar (`training_calendar`, #5191; `today` splits credited from planned) and supersede
+    `planned_dates` (the committed routines' dates, the fallback).
 
     `disruption_records` (#5215; the #5088 records, read by the caller through `disruption.load_records_failsoft`):
-    a date inside an ACTIVE record is typed `disrupted`, ahead of the routine-derived type and the travel window; the
-    panel's code half then grades that day as the minimum viable day. A record outside the week changes nothing."""
+    a date inside an ACTIVE record is typed `disrupted`, ahead of the calendar/routine-derived type and the travel
+    window; the panel's code half then grades that day as the minimum viable day. A record outside the week changes
+    nothing."""
     from health import calorie_target  # noqa: PLC0415
 
     from training import disruption as disruption_mode  # noqa: PLC0415
@@ -196,6 +201,14 @@ def build_food_plan(
     start = datetime.strptime(str(week_start)[:10], "%Y-%m-%d").date()  # a calendar-day key, not an instant
     dates = [(start + timedelta(days=i)).isoformat() for i in range(WEEK_DAYS)]
     planned = [str(d)[:10] for d in planned_dates or [] if d] if planned_dates is not None else None
+    if block_workouts is not None:
+        from common.pacific_time import shift_day_key  # noqa: PLC0415
+
+        from training import training_calendar  # noqa: PLC0415
+
+        after = today or shift_day_key(dates[-1], 1)  # default: a retrospective week, every date typed by its credit
+        cal = training_calendar.planned_dates_over(dates, training_calendar.credited_dates(block_workouts, dates[-1]), after)
+        planned = cal if cal is not None else planned
     types = [calorie_target.classify_day_type(d, planned_dates=planned, disruption=disruption)["day_type"] for d in dates]
     modes = [disruption_mode.state(disruption_records, d) for d in dates] if disruption_records else []
     for i, st in enumerate(modes):

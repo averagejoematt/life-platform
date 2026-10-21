@@ -1157,10 +1157,18 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # (the os.walk sweep of lambdas/web + lambdas/emails for a module naming the owner-only check-in partitions) arrives PROVEN via
         # the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS, ARMED 1/1: baseline 27 passed | mutated 1 failed | reverted 27
         # passed). Enters exactly that id, leaves {}, unproven does NOT move. A concurrent lane bumping this bound stacks, never max'd.
-        # 278 -> 279 (2026-10-20, #5213): ONE entrant, `structural::test_nutrition_critics_ai_5114.py`, PROVEN via MutationSpec +
+        # Upper bound 278 -> 279 (2026-10-20, #5200 the May tracker on every coach-context caller path, on followups-a):
+        # structural::test_may_tracker_coach_context_5200.py (the rglob sweep of lambdas/ + mcp/ for an assemble call with no
+        # tracker) arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS, ARMED 1/1: baseline 8 passed |
+        # mutated 1 failed | reverted 8 passed). Enters exactly that id, leaves {}. A concurrent lane bumping this bound stacks.
+        # Upper bound 279 -> 281 (2026-10-20, #5221 the additive-IAM gate at PR time, on followups-a, stacked on #5200 above): TWO proven entrants,
+        # guard::deploy/check_iam_additive_pr.py (GUARD_PROOFS: three plants, each 3 failed / 9 passed; restored 12 passed) and
+        # ci::iam-gate-pr.yml::gate::3 (CI_PROOFS: the step's real run: text with the incident rule planted back, exit 1; restored
+        # exit 0). Enter exactly those ids, leave {}, unproven does NOT move. A concurrent lane bumping this bound stacks, never max'd.
+        # 281 -> 282 (2026-10-20, #5213, restacked onto #5200 + #5221): ONE entrant, `structural::test_nutrition_critics_ai_5114.py`, PROVEN via MutationSpec +
         # STRUCTURAL_PROOFS (ARMED 1/1: baseline 11 passed | mutated 1 failed | reverted 11 passed). Stacked, never max'd.
-        # 279 -> 280 (2026-10-20, #5232): structural::test_habit_tier_set_guard_5232.py (STRUCTURAL_HAND_PROOFS). Stacked, never max'd.
-        <= 280
+        # 282 -> 283 (2026-10-20, #5232): structural::test_habit_tier_set_guard_5232.py (STRUCTURAL_HAND_PROOFS). Stacked, never max'd.
+        <= 283
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

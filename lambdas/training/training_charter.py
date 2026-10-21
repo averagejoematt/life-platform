@@ -150,7 +150,14 @@ def _from_s3(key: str) -> Optional[Dict[str, Any]]:
         response = getattr(e, "response", None)
         code = str(response.get("Error", {}).get("Code", "") or "") if isinstance(response, dict) else ""
         code = code or type(e).__name__
-        if code not in _ABSENT_ERROR_CODES:
+        if code in ("403", "Forbidden"):
+            code = "AccessDenied"  # a bare HTTP status is still a real denial: keep the literal the alarm filters on
+        if code in _ABSENT_ERROR_CODES:
+            # An absent optional object is the designed state (#5220): say so WITHOUT the denial literal, once.
+            if key not in _warned_keys:
+                _warned_keys.add(key)
+                logger.info("training-charter: s3://%s/%s absent — continuing without it; logged once per container", bucket, key)
+        else:
             if key in _warned_keys:
                 logger.debug("training-charter: s3://%s/%s still not read (%s)", bucket, key, code)
             else:
