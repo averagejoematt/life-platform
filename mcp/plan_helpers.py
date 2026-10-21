@@ -185,8 +185,23 @@ def _freshness_from(guidance: Any, target_date: str) -> dict[str, Any]:
     return guidance_freshness.from_rows(guidance if isinstance(guidance, list) else None, target_date)
 
 
+def _may_tracker(target_date: str) -> dict[str, Any]:
+    """#5200: the newest COMPLETED May-tracker week before `target_date` (`may_tracker.latest_completed_row`), read
+    HERE so every caller path (plan_next_session, the nightly pre-draft, the session packet) is supplied the same row.
+    Before this no caller passed one, so the section was always not_supplied although the weekly row existed."""
+    from training import may_tracker
+
+    from mcp.config import table
+
+    return may_tracker.latest_completed_row(table, target_date)
+
+
 def coach_context_for(
-    target_date: str, *, packet: dict[str, Any] | None = None, constraint_block: dict[str, Any] | None = None
+    target_date: str,
+    *,
+    packet: dict[str, Any] | None = None,
+    constraint_block: dict[str, Any] | None = None,
+    packet_reason: str | None = None,
 ) -> dict[str, Any]:
     """The full context dict (owner channel), or ``{"state": "read_failed", ...}``."""
     try:
@@ -197,6 +212,8 @@ def coach_context_for(
             target_date,
             packet=packet,
             constraint_block=constraint_block,
+            tracker=_may_tracker(target_date),
+            packet_reason=packet_reason,
             guidance=guidance,
             guidance_freshness=_freshness_from(guidance, target_date),
             lab_priorities=lab_priorities.from_rows(guidance),
@@ -208,17 +225,30 @@ def coach_context_for(
 
 
 def attach_coach_context(
-    out: dict[str, Any], target_date: str, *, packet: dict[str, Any] | None = None, constraint_block: dict[str, Any] | None = None
+    out: dict[str, Any],
+    target_date: str,
+    *,
+    packet: dict[str, Any] | None = None,
+    constraint_block: dict[str, Any] | None = None,
+    packet_reason: str | None = None,
 ) -> dict[str, Any]:
     """Put ``coach_context`` (the compact summary + its text block) on a tool payload and lead its
     ``how_to_use`` with the May-terms instruction. Returns ``out``."""
     from training import coach_context
 
-    ctx = coach_context_for(target_date, packet=packet, constraint_block=constraint_block)
+    ctx = coach_context_for(target_date, packet=packet, constraint_block=constraint_block, packet_reason=packet_reason)
     out["coach_context"] = ctx if ctx.get("state") == "read_failed" else coach_context.summary(ctx)
     if "how_to_use" in out:
         out["how_to_use"] = f"{EXPLAIN_IN_MAY_TERMS} {out['how_to_use']}"
     return out
+
+
+# #5200: why the packet is absent on the two callers that do not read it — stated in `not_supplied_reason`.
+PACKET_NOT_REREAD = (
+    "plan_next_session does not re-read the plan packet: get_coach_session_packet is the pre-flight call that carries it, "
+    "and stage 1 reads its own inputs into constraint_block"
+)
+PACKET_NOT_READ_PREDRAFT = "the nightly pre-draft reads no plan packet: its inputs are stage 1's constraint block (no chat pre-flight runs)"
 
 
 def coach_context_brief(target_date: str) -> dict[str, Any]:
@@ -226,7 +256,7 @@ def coach_context_brief(target_date: str) -> dict[str, Any]:
     line is clipped: the charter version, each section's state, the May frame line and the order."""
     from training import coach_context
 
-    ctx = coach_context_for(target_date)
+    ctx = coach_context_for(target_date, packet_reason=PACKET_NOT_READ_PREDRAFT)
     return ctx if ctx.get("state") == "read_failed" else {k: v for k, v in coach_context.summary(ctx).items() if k != "text"}
 
 

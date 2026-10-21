@@ -12,8 +12,9 @@ routine repo already live:
                 unreadable block is named on the grade (`degraded`), never a fabricated one.
   * history     the earlier `PANEL#` rows, for the trend.
   * the food    `training.food_panel.build_food_plan(week_start)` (#5110): the week's resolved calorie targets
-                (`health.calorie_target.resolve`, titration over charter, each day typed lifting/rest from the
-                committed routines' dates) + the intended feedings + the week's titration record. Fail-soft: an
+                (`health.calorie_target.resolve`, titration over charter, each day typed lifting/rest by the
+                per-date calendar `training.training_calendar` (#5191) — the committed routines' dates when the Hevy
+                record is unreadable) + the intended feedings + the week's titration record. Fail-soft: an
                 unreadable food plan is named on the grade (`degraded`), the training grade still stands.
   * the write   ONE owner-only row, `USER#<id>#SOURCE#training_constraints / PANEL#<week_end>` (docs/SCHEMA.md):
                 scores, letters, reasons, the controls' verdicts and the trend — never the plan itself.
@@ -74,18 +75,36 @@ def read_constraint_block(week_end: str) -> dict[str, Any] | None:
         return None
 
 
+def _block_workouts_or_none(week_end: str) -> list[dict[str, Any]] | None:
+    """The Hevy record through `week_end` for the per-date calendar (#5191); None on a failed read (the committed
+    routines' dates then type the days, as before)."""
+    try:
+        from common.pacific_time import shift_day_key
+
+        from mcp.plan_hevy_windows import _block_workouts
+
+        return _block_workouts(shift_day_key(week_end, 1))
+    except Exception as e:  # noqa: BLE001 — the routines' dates are the named fallback
+        logger.warning("panel weekly grade: Hevy record unreadable for the calendar (%s: %s)", type(e).__name__, str(e)[:200])
+        return None
+
+
 def read_food_plan(week_start: str, routines: list[dict[str, Any]]) -> dict[str, Any] | None:
     try:
+        from common.pacific_time import pacific_today, shift_day_key
         from health import titration
         from training import food_panel
 
         from mcp.config import table
 
+        week_end = shift_day_key(week_start, JOB["week_days"] - 1)
         return food_panel.build_food_plan(
             week_start,
             planned_dates=[str(r.get("target_date") or "")[:10] for r in routines],
             titration_reader=lambda week: titration.read_record(table, week),
             case_id=f"food::{week_start}",
+            block_workouts=_block_workouts_or_none(week_end),
+            today=pacific_today(),
         )
     except Exception as e:  # noqa: BLE001 — the grade names the missing food plan; it never invents one
         logger.warning("panel weekly grade: food plan unreadable (%s: %s)", type(e).__name__, str(e)[:200])

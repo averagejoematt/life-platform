@@ -46,7 +46,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Optional
 
 from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
@@ -506,13 +506,17 @@ _PACKS = {
 _TRAINING_ROUTE_KEYS = frozenset({"physical", "training"})
 
 
-def _training_context(today: str, clinical: str) -> str:
+def _training_context(today: str, clinical: str, table: Any = None) -> str:
     """`training.coach_context.assemble` for the owner's Telegram thread (published=False), the clinical block passed
-    in as its guidance section. Fail-soft: on any trouble the bare clinical block, as before."""
+    in as its guidance section and (#5200) the newest completed May-tracker week read from `table`. Fail-soft: on any
+    trouble the bare clinical block, as before."""
     try:
-        from training import coach_context
+        from training import coach_context, may_tracker
 
-        return coach_context.assemble(today, packet=None, constraint_block=None, guidance=clinical, published=False)["text"]
+        tracker = may_tracker.latest_completed_row(table, today) if table is not None else None
+        return coach_context.assemble(today, packet=None, constraint_block=None, tracker=tracker, guidance=clinical, published=False)[
+            "text"
+        ]
     except Exception as e:  # noqa: BLE001 — the chat runs on the clinical block alone
         logger.warning("[domain_facts] coach context unavailable: %s", e)
         return clinical
@@ -624,7 +628,7 @@ def domain_facts_block(coach_id: str, table, today: Optional[str] = None) -> str
     except Exception as e:  # pragma: no cover — bundle edge; the renderer is itself fail-soft
         logger.warning("[domain_facts] clinical context unavailable: %s", e)
     if key in _TRAINING_ROUTE_KEYS:
-        clinical = _training_context(today, clinical)  # #5071: the one planning context, the clinical block inside it
+        clinical = _training_context(today, clinical, table)  # #5071: the one planning context, the clinical block inside it
     elif key == "nutrition":
         clinical = "\n\n".join(x for x in (clinical, _nutrition_context(today)) if x)  # #5109: the same assembly
     if clinical:

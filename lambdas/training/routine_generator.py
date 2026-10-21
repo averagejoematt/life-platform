@@ -669,6 +669,9 @@ def _enforce_load_floors(
             "corrections": corrections,
             "progression": _progress_block(block, catalog, history_index, floor, hold_reason, rationale),
         }
+        if cue and audit["movements"][block.movement_key]["progression"].get("changes"):
+            # #5202: the progression moved the load, so the floor/ramp line (an older rule's rationale) is superseded
+            block.notes = " ".join(block.notes.replace(cue, "").split())
         if corrections:
             rationale.append(f"{block.movement_key}: floor applied — " + "; ".join(corrections))
     return audit

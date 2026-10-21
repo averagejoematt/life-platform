@@ -217,3 +217,31 @@ def test_public_view_never_carries_a_twin_key_that_shadows_a_public_one(monkeypa
     tc.reset_cache()
     assert tc.load_charter()["steps"]["floor"] == 1, "the merged view takes the twin (that is its contract)"
     assert tc.public_view()["steps"]["floor"] == 12000
+
+
+def test_an_absent_twin_is_logged_absent_without_the_denial_literal_5220(monkeypatch, caplog):
+    from botocore.exceptions import ClientError
+
+    class _S3:
+        def get_object(self, **kw):
+            raise ClientError({"Error": {"Code": "404", "Message": "x"}, "ResponseMetadata": {"HTTPStatusCode": 404}}, "GetObject")
+
+    monkeypatch.setitem(sys.modules, "boto3", type("boto3", (), {"client": staticmethod(lambda *a, **k: _S3())}))
+    with caplog.at_level(logging.DEBUG, logger=tc.__name__):
+        assert _real_from_s3(tc.PRIVATE_S3_KEY) is None
+    text = " ".join(r.getMessage() for r in caplog.records)
+    assert "absent" in text and "AccessDenied" not in text, "the swallowed-permission-denial filter matches that literal"
+
+
+def test_a_bare_403_keeps_the_denial_literal_5220(monkeypatch, caplog):
+    from botocore.exceptions import ClientError
+
+    class _S3:
+        def get_object(self, **kw):
+            raise ClientError({"Error": {"Code": "403", "Message": "x"}, "ResponseMetadata": {"HTTPStatusCode": 403}}, "GetObject")
+
+    monkeypatch.setitem(sys.modules, "boto3", type("boto3", (), {"client": staticmethod(lambda *a, **k: _S3())}))
+    tc.reset_cache()
+    with caplog.at_level(logging.WARNING, logger=tc.__name__):
+        assert _real_from_s3(tc.PRIVATE_S3_KEY) is None
+    assert any("AccessDenied" in r.getMessage() for r in caplog.records)
