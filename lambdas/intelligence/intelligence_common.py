@@ -29,6 +29,7 @@ from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific
 from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 from experiment import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
+from health import macro_floors  # #5204: the ONE fibre floor (the charter's)
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 
 from intelligence.inventory_window import inventory_row, inventory_window_start, out_of_window_line  # #3728
@@ -364,6 +365,13 @@ _STEPS_TRUTH_RULE = (
 )
 
 
+def _resolved_target(path: str, val: Any) -> Any:
+    """A DEFINED TARGETS line's value: the calorie target and the fibre floor come from their one resolver, the rest from the goals doc."""
+    if path == "nutrition.daily_calories_target":
+        return target_kcal()
+    return macro_floors.floor_g("fibre") if path == "nutrition.daily_fiber_min_g" else val
+
+
 def build_coach_preamble(coach_name: str, domain: str, goals: dict, inventory: dict, maturity: dict, action_history: list = None) -> str:
     """
     Build the standard context preamble injected into every coach prompt.
@@ -424,7 +432,7 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict, inventory: d
             val = val.get(k) if isinstance(val, dict) else None
             if val is None:
                 break
-        val = target_kcal() if path == "nutrition.daily_calories_target" else val  # #5095: the ONE calorie target
+        val = _resolved_target(path, val)  # #5095 the ONE calorie target; #5204 the ONE fibre floor
         target_lines.append(f"  - {label}: {val if val is not None else 'not yet set'}")
     parts.append("DEFINED TARGETS:\n" + "\n".join(target_lines) + "\n")
 

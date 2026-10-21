@@ -62,6 +62,9 @@ FROZEN_PATH = REPO_ROOT / "deploy" / "generated" / "genesis_preregistration.json
 STAMP_PATH = REPO_ROOT / "deploy" / "generated" / "genesis_preregistration.sha256.json"
 
 REGION = "us-west-2"
+# The fibre minimum the genesis pre-registration SEALED (#5204): a dated historical figure the published artifact states, not a live
+# target — the live floor is the charter's (nutrition.floors.fibre). It left user_goals.json when that file stopped carrying a second one.
+GENESIS_FIBER_MIN_G = 25
 S3_BUCKET = "matthew-life-platform"
 SITE_URL = "https://averagejoematt.com"
 
