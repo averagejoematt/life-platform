@@ -203,7 +203,7 @@ def effort_rule(
         rule = f"the hill program, {words}"
     elif kind == "tempo":
         # the menu's label names its own minutes ("hard flat 40"); a block of another length is just "tempo"
-        label = cardio_menu.block("tempo").get("label") if minutes == cardio_menu.block_minutes("tempo") else None
+        label = cardio_menu.block("tempo").get("label") if minutes == cardio_menu.own_minutes("tempo") else None
         rule = f"{label or 'tempo'}: {words}"
     else:
         rule = words
@@ -358,7 +358,7 @@ def compose(
                 else ("his calibration note's easy span" if dose.get("level") is not None else "no level on the record")
             )
         ),
-        "verdict": (verdict or {}).get("verdict"),
+        "verdict": _verdict_word(verdict, dose, is_walk),
         "rpe": list(cardio_menu.rpe_band(kind) or ()),
         "minutes": int(minutes),
         "constraint": (constraint or {}).get("id"),
@@ -367,6 +367,16 @@ def compose(
         "labels": {**LABELS, **cardio_menu.LABELS},
     }
     return note, audit
+
+
+def _verdict_word(verdict: dict[str, Any] | None, dose: dict[str, Any], is_walk: bool) -> str | None:
+    """The audit's verdict. `level_verdict` reads only the last ride's level, so it says `no_level` when the dose's level
+    came from his calibration note's easy span (#5201): a given level reads `calibration_level`, never `no_level`.
+    It still claims no improvement (that is `claims_improvement`, True only on `raise`)."""
+    word = (verdict or {}).get("verdict")
+    if word == "no_level" and not is_walk and dose.get("level") is not None:
+        return "calibration_level"
+    return word
 
 
 def _charter_version() -> str | None:

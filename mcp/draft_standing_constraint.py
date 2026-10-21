@@ -147,19 +147,25 @@ def cardio_block(
         logger.warning("cardio block: pick failed: %s", e)
         return None, {"state": "failed", "error": type(e).__name__}
     key, kind = menu["machine"], menu["kind"]
-    minutes = cardio_menu.block_minutes(kind)
-    notes, audit = cardio_note.compose(
+    compose = lambda k, m: cardio_note.compose(  # noqa: E731 — one call shape, used twice below
         movement_key=key,
-        minutes=minutes,
+        minutes=m,
         target_date=target_date,
         archetype=archetype,
-        kind=kind,
+        kind=k,
         treadmill_sessions=hist["by_machine"].get(cardio_menu.TREADMILL),
         aerobic_block=layer,
         constraint=constraint,
         hr_ceiling_bpm=pick.get("hr_ceiling_bpm"),
         placement_why=menu["why"],
     )
+    minutes = cardio_menu.block_minutes(kind)
+    notes, audit = compose(kind, minutes)
+    if audit["kind"] != kind:  # the no-push gate demoted a hard kind: the minutes and the pick follow the kind the note carries
+        kind = audit["kind"]
+        minutes = cardio_menu.block_minutes(kind)
+        notes, audit = compose(kind, minutes)
+    pick = cardio_menu.align_pick(pick, kind, key)  # #5201: pick, block and note name one modality and one cue
     block = ExerciseBlock(
         movement_key=key,
         sets=[Set(duration_seconds=minutes * 60)],
@@ -184,6 +190,20 @@ def _cardio_index_failsoft() -> dict[str, list] | None:
     except Exception as e:  # noqa: BLE001 — the placement then counts no conditioning this week
         logger.warning("cardio block: history read failed: %s", e)
         return None
+
+
+def _refresh_session_shape(ideal: Any) -> None:
+    """#5201: the shape the generator stamped was computed BEFORE this path appended the cardio block, so its
+    `cardio_blocks` read empty. Re-run the charter's shape enforcement over the routine as it now stands (one cardio
+    block, the cap) and fold the answer into `inputs_snapshot["session_shape"]`. Fail-soft: the block keeps its minutes."""
+    try:
+        from training import program_structure
+
+        shape = program_structure.enforce_session_shape(ideal.exercises, _catalog().get("movements") or {})
+        snap = ideal.inputs_snapshot or {}
+        ideal.inputs_snapshot = {**snap, "session_shape": {**(snap.get("session_shape") or {}), **shape}}
+    except Exception as e:  # noqa: BLE001 — named, never a lost draft
+        logger.warning("cardio block: session shape refresh failed: %s", e)
 
 
 def _is_accessory(ex: Any) -> bool:
@@ -256,6 +276,7 @@ def gate_draft(ideal: Any, target_date: str, adapt: Callable[[dict[str, Any] | N
     cardio, pick = cardio_block(target_date, getattr(ideal, "archetype", "") or "", constraint, layer=layer, cardio_index=cardio_index)
     if cardio is not None:
         ideal.exercises.append(cardio)
+        _refresh_session_shape(ideal)
         # #5048: the level comes from his ride history (fail-soft: a failed load keeps the note, no level)
         try:
             from training.routine_generator import attach_cardio_cues

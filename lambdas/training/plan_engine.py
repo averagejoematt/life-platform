@@ -81,7 +81,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from health import calorie_target, deficit_disclosures
+from health import deficit_disclosures
 
 from training import (
     block_model,
@@ -97,6 +97,7 @@ from training import (
     self_added_volume,
     steps_nudge,
     steps_ramp,
+    training_calendar,
     training_charter,
     training_context_registry,
 )
@@ -751,11 +752,13 @@ def _deload_recommendation(
     return rec
 
 
-def _effort_blocks(date: str, rows: Any, catalog_movements: Any, states: dict[str, dict[str, Any]], dis_records: Any) -> dict[str, Any]:
-    """`progression` (#5052) + `ceiling_change_proposal` (#5058) + `training_day_fuel` (#5101, owner-only)."""
+def _effort_blocks(
+    date: str, rows: Any, catalog_movements: Any, states: dict[str, dict[str, Any]], dis_records: Any, block_workouts: Any = None
+) -> dict[str, Any]:
+    """`progression` (#5052) + `ceiling_change_proposal` (#5058) + `training_day_fuel` (#5101, typed by the #5191 calendar)."""
     st = (states.get("hevy_workouts_prescription_window") or {}).get("state")
     proposal = ceiling_proposal.for_plan(date, rows, None if st == READ_FAILED else st, catalog_movements)
-    fuel = calorie_target.plan_block(date, disruption.state(dis_records, date) if dis_records is not None else None)
+    fuel = training_calendar.plan_fuel(date, disruption.state(dis_records, date) if dis_records is not None else None, block_workouts)
     return {"progression": load_progression.rule_summary(), "ceiling_change_proposal": proposal, "training_day_fuel": fuel}
 
 
@@ -1104,7 +1107,7 @@ def constraint_block(
         # W1 (#5050) moves the engine's reads onto the charter; until then the literals above still come from owner_redlines/program_structure.
         "charter_version": training_charter.charter_version(),
         # #5052: the double progression + effort limits, stamped; #5058: the ceiling-change proposal (never auto-applied)
-        **_effort_blocks(date, hevy_workouts_prescription_window, catalog_movements, states, disruption_records),
+        **_effort_blocks(date, hevy_workouts_prescription_window, catalog_movements, states, disruption_records, block_workouts),
         "critics": dict(_CRITICS_NOT_WIRED),
         "honesty": [
             s
