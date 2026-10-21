@@ -11,8 +11,8 @@ import re
 from datetime import date as _date_cls
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, EXPERIMENT_TZ  # noqa: F401
-from common.habit_pause import count_scheduled
-from common.habit_registry import habit_tier  # #5232  # #5007: a paused habit is not scheduled
+from common.habit_pause import count_scheduled  # #5007: a paused habit is not scheduled
+from common.habit_registry import habit_tier  # #5232
 from common.metric_truth import resolve_steps, steps_series  # #4630: the ONE steps resolver
 from common.pacific_time import pacific_now  # #2811: THE Pacific frame — journey days are PT days
 from health.calorie_target import target_kcal, target_phrase  # #5095: the ONE calorie target

@@ -11,24 +11,18 @@ Exports:
 """
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_PROTEIN_MIN_G
-from common.digest_utils import compute_confidence
+from common.digest_utils import compute_confidence, safe_float  # safe_float: shared bundled helper (#970; the local d2f copy was unused)
 from common.habit_registry import habit_tier  # #5232
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.pacific_time import day_in_words, shift_day_key  # #4182: dates in words, one PT spelling
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 from health.scoring_engine import habitify_reading  # #4362
 
-_HAS_CONFIDENCE = True
+from content.brief_format import esc, supplement_timing_label, supplement_timing_order, v2_coach_header_titles, weather_context_cells
 
 # ==============================================================================
 # INLINE UTILITIES (tiny — avoids import dependency on daily_brief_lambda)
 # ==============================================================================
-
-
-from common.digest_utils import safe_float  # shared bundled helpers (#970; the local d2f copy was unused)
-
-from content.brief_format import esc, supplement_timing_label, supplement_timing_order, v2_coach_header_titles, weather_context_cells
-
 # S2-T1-10 Weekly Habit Review — compute + render live in their own module (#1654 shape).
 # Re-exported here because `daily_brief_lambda` and the behavior suite both reach for
 # `html_builder._compute_weekly_habit_review`.

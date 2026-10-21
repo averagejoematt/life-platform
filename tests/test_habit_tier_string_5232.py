@@ -44,8 +44,9 @@ class _ModelReached(Exception):
     """Raised by the stubbed model call: the context builder ran to the call without a TypeError."""
 
 
-def _stub(monkeypatch):
+def _stub(monkeypatch, prompts):
     def boom(*a, **k):
+        prompts.append(repr((a, k)))
         raise _ModelReached
 
     monkeypatch.setattr(ai_calls, "call_anthropic", boom)
@@ -53,14 +54,18 @@ def _stub(monkeypatch):
 
 
 def test_board_of_directors_context_builds_with_string_tiers(monkeypatch):
-    _stub(monkeypatch)
+    prompts = []
+    _stub(monkeypatch, prompts)
     data = {"habitify": HABITIFY, "date": "2026-10-19"}
     with pytest.raises(_ModelReached):
         ai_calls.call_board_of_directors(data, {"habit_registry": REGISTRY}, None, "B", {}, api_key="x")
+    # a string tier left uncoerced misclassifies under `==` (no raise): the prompt must still carry T0/T1 misses
+    text = " ".join(prompts)
+    assert "Meditate" in text and "Stretch" in text
 
 
 def test_tldr_context_builds_with_string_tiers(monkeypatch, capsys):
-    _stub(monkeypatch)
+    _stub(monkeypatch, [])
     data = {"habitify": HABITIFY, "date": "2026-10-19"}
     try:
         ai_calls.call_tldr_and_guidance(data, {"habit_registry": REGISTRY}, None, "B", {}, {}, 70, "green", "x")
