@@ -11,7 +11,8 @@ import re
 from datetime import date as _date_cls
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, EXPERIMENT_TZ  # noqa: F401
-from common.habit_pause import count_scheduled  # #5007: a paused habit is not scheduled
+from common.habit_pause import count_scheduled
+from common.habit_registry import habit_tier  # #5232  # #5007: a paused habit is not scheduled
 from common.metric_truth import resolve_steps, steps_series  # #4630: the ONE steps resolver
 from common.pacific_time import pacific_now  # #2811: THE Pacific frame — journey days are PT days
 from health.calorie_target import target_kcal, target_phrase  # #5095: the ONE calorie target
@@ -387,8 +388,8 @@ def _build_habit_outcome_context(data, profile):
         "exercise": "movement",
     }
 
-    tier0_names = [n for n, m in registry.items() if m.get("tier") == 0 and m.get("status") == "active"]
-    tier1_names = [n for n, m in registry.items() if m.get("tier") == 1 and m.get("status") == "active"]
+    tier0_names = [n for n, m in registry.items() if habit_tier(m) == 0 and m.get("status") == "active"]
+    tier1_names = [n for n, m in registry.items() if habit_tier(m) == 1 and m.get("status") == "active"]
 
     # 7-day completion trend
     trend_lines = []
@@ -403,7 +404,7 @@ def _build_habit_outcome_context(data, profile):
     # Known habit-outcome relationships to surface to the AI
     causal_pairs = []
     for h_name, meta in registry.items():
-        if meta.get("status") != "active" or meta.get("tier", 2) > 1:
+        if meta.get("status") != "active" or habit_tier(meta) > 1:
             continue
         outcome = HABIT_OUTCOME_MAP.get(h_name.lower().replace(" ", "_"))
         why = meta.get("why_matthew", "")

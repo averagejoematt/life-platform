@@ -24,6 +24,7 @@ from boto3.dynamodb.conditions import Attr, Key
 from coach.reading_date_fidelity import guard_derived_summary  # #2343: derived-summary day correspondence
 from coach.voice_register_guard import sanitize_summary  # #1987: deterministic voice-register check
 from common.digest_utils import is_day_row  # #3442: whoop inventory counts day rows, not #WORKOUT# fragments
+from common.habit_registry import coerce_profile  # #5232
 from common.metric_truth import steps_series, steps_sources  # #4630: the ONE steps resolver
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
@@ -80,7 +81,7 @@ def fetch_profile(table, user_id: str = "matthew") -> dict:
     """
     try:
         r = table.get_item(Key={"pk": f"USER#{user_id}", "sk": "PROFILE#v1"})
-        return _decimal_to_float(r.get("Item", {}))
+        return coerce_profile(_decimal_to_float(r.get("Item", {})))  # #5232: numeric registry fields as numbers
     except Exception as e:
         logging.getLogger("intelligence-common").error(f"fetch_profile: {e}")
         return {}

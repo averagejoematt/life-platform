@@ -12,6 +12,7 @@ Exports:
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_PROTEIN_MIN_G
 from common.digest_utils import compute_confidence
+from common.habit_registry import habit_tier  # #5232
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.pacific_time import day_in_words, shift_day_key  # #4182: dates in words, one PT spelling
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
@@ -627,7 +628,7 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
         tier0_status = tier_status.get(0, tier_status.get("0", {}))
         registry = profile.get("habit_registry", {})
 
-        tier0_names = [n for n, m in registry.items() if m.get("tier") == 0 and m.get("status") == "active"]
+        tier0_names = [n for n, m in registry.items() if habit_tier(m) == 0 and m.get("status") == "active"]
         if not tier0_names:
             tier0_names = list(profile.get("mvp_habits", []))
 
@@ -766,7 +767,7 @@ def _habits_deep_dive(data, profile):
             ("TIER 1 — HIGH PRIORITY", 1, "#f59e0b"),
             ("TIER 2 — GOOD TO DO", 2, "#64748b"),
         ]:
-            tier_habits = [(n, m) for n, m in registry.items() if m.get("tier", 2) == tier_num and m.get("status") == "active"]
+            tier_habits = [(n, m) for n, m in registry.items() if habit_tier(m) == tier_num and m.get("status") == "active"]
             if not tier_habits:
                 continue
             out += '<p style="color:' + tier_color + ';font-size:9px;margin:8px 0 4px;font-weight:700;">' + tier_label + "</p>"
