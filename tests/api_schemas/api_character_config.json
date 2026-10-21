@@ -685,9 +685,6 @@
                       "target_meals": {
                         "type": "integer"
                       },
-                      "threshold_grams": {
-                        "type": "integer"
-                      },
                       "weight": {
                         "type": "number"
                       }

@@ -1183,7 +1183,7 @@ def test_both_panel_prompt_paths_state_which_channel_each_micronutrient_number_c
     board config AND the hardcoded fallback) now carry the scope note."""
     _with_board(monkeypatch, BOARD)
     board = m._build_nutrition_prompt_from_config(1800, 190)
-    fallback = m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1800, protein_target_g=190)
+    fallback = m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1800, protein_target_g=190, feeding_threshold_g=m._feeding_threshold_text())
     for prompt in (board, fallback):
         assert m.MICRONUTRIENT_SCOPE_NOTE in prompt
         assert "from_supplements" in prompt
@@ -1205,7 +1205,9 @@ def test_the_served_board_config_prompt_carries_no_food_only_micro_rule(monkeypa
     assert m.MICRO_GAP_RULE in prompt
     assert any("food-only micro rule" in w for w in warned), warned
     # The hardcoded fallback states the same re-scoped rule, word for word.
-    assert m.MICRO_GAP_RULE in m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1800, protein_target_g=190)
+    assert m.MICRO_GAP_RULE in m._FALLBACK_SYSTEM_PROMPT.format(
+        calorie_target=1800, protein_target_g=190, feeding_threshold_g=m._feeding_threshold_text()
+    )
 
 
 def test_a_supplement_covered_nutrient_is_not_a_gap_in_the_weekly_table():
@@ -1261,14 +1263,14 @@ def test_a_scheduled_supplement_miss_reaches_the_weekly_rows_as_a_zero_not_an_ab
 
 
 def test_the_panel_is_told_omega3_is_two_targets_and_what_a_scheduled_miss_means():
-    fallback = m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1800, protein_target_g=190)
+    fallback = m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1800, protein_target_g=190, feeding_threshold_g=m._feeding_threshold_text())
     for needle in ("omega3_epa_dha_g", "omega3_ala_g", "scheduled_miss", "supplements_not_taken"):
         assert needle in m.MICRONUTRIENT_SCOPE_NOTE and needle in fallback, needle
     assert "`species`" not in m.MICRONUTRIENT_SCOPE_NOTE  # the retired field is not described to the panel
 
 
 def test_the_hardcoded_fallback_prompt_renders_the_live_targets():
-    rendered = m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1650, protein_target_g=205)
+    rendered = m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1650, protein_target_g=205, feeding_threshold_g=m._feeding_threshold_text())
     assert "1650 kcal" in rendered
     assert "205g" in rendered
     assert "{" not in rendered.replace("{calorie_target}", "").replace("{protein_target_g}", "")

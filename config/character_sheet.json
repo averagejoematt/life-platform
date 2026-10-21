@@ -95,7 +95,6 @@
         },
         "protein_distribution": {
           "weight": 0.1,
-          "threshold_grams": 30,
           "target_meals": 4,
           "behavioral": true
         },

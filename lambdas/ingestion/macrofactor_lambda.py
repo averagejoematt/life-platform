@@ -204,8 +204,8 @@ def parse_entry(row):
 # Snacks (<400 kcal) excluded — only real meals count toward the score.
 # LEGACY since #5109: THE per-feeding definition is the protein engine's (health.protein_engine.feedings, charter
 # nutrition.protein.feeding_threshold_g / feeding_merge_minutes). This 30 g / meals-only score is kept for the stored
-# rows' readers (the site's meal-rhythm average, the character sheet's distribution slot) and has NO reader in coach
-# or panel text: tests/test_nutrition_coach_context_5109.py holds the AI producers off both stored fields.
+# rows' readers (the site's meal-rhythm average) and has NO reader in coach, panel text or grading (#5214: the character
+# sheet's distribution slot now counts the protein engine's feedings): tests/test_nutrition_coach_context_5109.py holds the AI producers off both stored fields.
 MEAL_CALORIE_THRESHOLD = 400  # kcal — eating occasions below this are "snacks"
 PROTEIN_MPS_THRESHOLD = 30  # grams — minimum per meal for MPS
 
