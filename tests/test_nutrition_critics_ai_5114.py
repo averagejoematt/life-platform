@@ -25,6 +25,8 @@ import json
 import os
 import sys
 
+# premerge-gate: sweeps every mcp/ + lambdas/ module for a caller of the deficit tool with no critics_model opt-out (#5213)
+
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 for _p in ("lambdas", ""):
     sys.path.insert(0, os.path.join(_REPO, _p))
@@ -242,17 +244,82 @@ def test_the_mcp_layer_gates_through_the_guard_and_never_raises(monkeypatch):
     assert out["model_layer"]["state"] == "error" and out["verdicts"], "the deterministic block survives a layer failure"
 
 
+_DEFICIT_TOOL = "tool_get_deficit_sustainability"
+
+
+def _deficit_tool_uses_without_opt_out(source: str, label: str) -> tuple[int, list[str]]:
+    """(callers found, offenders) for one module: every use of the tool as a call or as the callable
+    handed to a wrapper (`_safe(tool, {...})`) must carry a dict literal with `"critics_model": False`."""
+    import ast
+
+    tree = ast.parse(source)
+    parents = {c: n for n in ast.walk(tree) for c in ast.iter_child_nodes(n)}
+    found, bad = 0, []
+    names = {_DEFICIT_TOOL} | {
+        a.asname for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) for a in n.names if a.name == _DEFICIT_TOOL and a.asname
+    }
+    for node in ast.walk(tree):
+        is_name = isinstance(node, ast.Name) and node.id in names and isinstance(node.ctx, ast.Load)
+        is_attr = isinstance(node, ast.Attribute) and node.attr == _DEFICIT_TOOL  # `module.tool(...)`
+        if not (is_name or is_attr):
+            continue
+        found += 1
+        call = parents.get(node)
+        if isinstance(call, ast.Call):
+            args = list(call.args) + [k.value for k in call.keywords]
+        else:
+            args = []
+        ok = any(
+            isinstance(a, ast.Dict)
+            and any(
+                isinstance(k, ast.Constant) and k.value == "critics_model" and isinstance(v, ast.Constant) and v.value is False
+                for k, v in zip(a.keys, a.values)
+            )
+            for a in args
+        )
+        if not ok:
+            bad.append(f"{label}:{node.lineno}")
+    return found, bad
+
+
 def test_only_the_owners_own_deficit_call_runs_the_layer():
-    """The internal readers of get_deficit_sustainability opt out, so a nightly or plan-time read of
-    that tool never spends; the owner's direct call (no flag) runs the layer."""
+    """#5213: SWEEP every use of the deficit tool under mcp/ and lambdas/ (the registry wiring excepted);
+    each internal reader opts out of the critics' model layer, so a nightly or plan-time read never
+    spends. The owner's direct call (no flag) runs the layer."""
     import pathlib
 
-    root = pathlib.Path(_REPO) / "mcp"
-    offenders = [
-        f
-        for f in ("tools_plan.py", "tools_hevy_routine.py", "tools_benchmark.py")
-        if "tool_get_deficit_sustainability" in (root / f).read_text() and '{"critics_model": False}' not in (root / f).read_text()
-    ]
+    repo = pathlib.Path(_REPO)
+    found, offenders = 0, []
+    for top in ("mcp", "lambdas"):
+        for f in sorted((repo / top).rglob("*.py")):
+            rel = f.relative_to(repo).as_posix()
+            if rel == "mcp/registry.py":
+                continue
+            text = f.read_text()
+            if _DEFICIT_TOOL not in text:
+                continue
+            n, bad = _deficit_tool_uses_without_opt_out(text, rel)
+            found += n
+            offenders += bad
+    assert found >= 3, f"the sweep found {found} callers, expected the 3 known (plan, hevy routine, benchmark): a broken glob is not a pass"
     assert not offenders, f"an internal reader of the deficit tool would run the critics' model layer: {offenders}"
-    src = (root / "tools_nutrition.py").read_text()
+    src = (repo / "mcp" / "tools_nutrition.py").read_text()
     assert 'args.get("critics_model", True) is not False' in src
+
+
+def test_the_sweep_goes_red_on_a_caller_without_the_opt_out():
+    ok = "def f():\n    return tool_get_deficit_sustainability({'critics_model': False})\n"
+    wrapped = "def f():\n    return _safe(tool_get_deficit_sustainability, {'critics_model': False})\n"
+    bare = "def f():\n    return tool_get_deficit_sustainability({})\n"
+    bare_wrapped = "def f():\n    return _safe(tool_get_deficit_sustainability, {})\n"
+    assert _deficit_tool_uses_without_opt_out(ok, "x") == (1, [])
+    assert _deficit_tool_uses_without_opt_out(wrapped, "x") == (1, [])
+    assert _deficit_tool_uses_without_opt_out(bare, "x") == (1, ["x:2"])
+    assert _deficit_tool_uses_without_opt_out(bare_wrapped, "x") == (1, ["x:2"])
+    attr_ok = "import m\n\n\ndef f():\n    return m.tool_get_deficit_sustainability({'critics_model': False})\n"
+    attr_bare = "import m\n\n\ndef f():\n    return m.tool_get_deficit_sustainability({})\n"
+    alias = "from mcp.tools_nutrition import tool_get_deficit_sustainability as ds\n\n\ndef f():\n    return ds(%s)\n"
+    assert _deficit_tool_uses_without_opt_out(attr_ok, "x") == (1, [])
+    assert _deficit_tool_uses_without_opt_out(attr_bare, "x") == (1, ["x:5"])
+    assert _deficit_tool_uses_without_opt_out(alias % "{'critics_model': False}", "x") == (1, [])
+    assert _deficit_tool_uses_without_opt_out(alias % "{}", "x") == (1, ["x:5"])
