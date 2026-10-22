@@ -1165,6 +1165,7 @@ def check_steps():
         ("steps_nudge_liveness", lambda: nudge_ledger_qa.check_steps_nudge_liveness(table, Check, CONTENT_TRUTH, pt_now)),
         ("protein_nudge_liveness", lambda: nudge_ledger_qa.check_protein_nudge_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5098
         ("evening_checkin_liveness", lambda: nudge_ledger_qa.check_evening_checkin_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5106
+        ("checkin_pair_liveness", lambda: nudge_ledger_qa.check_checkin_pair_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5211
         # #3829 dead-man: coach-ensemble-digest writes exactly one ENSEMBLE#digest row per cycle on EVERY
         # non-crashing path (including the budget-tier pause), so a missing CYCLE# row is unambiguous. Two of
         # four cycles were missing for eight days with nothing reporting it but a DLQ alarm a human read at wrap.

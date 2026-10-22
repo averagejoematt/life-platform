@@ -24,6 +24,17 @@ the Pyper-Peterman effective n, the moving-block bootstrap CI, p on n_eff, Benja
 family, the n-gated interpretation. ``verdict`` adds the plain words: below the engine's minimum n, or with
 no variation yet, it is "too early to say" — never an early verdict (ADR-105). Correlational, never causal.
 
+THE NEXT-MORNING DAY ROW (#5211, the "pairs are written daily" box of #5106). The paragraph above is why no row is
+written at check-in time; the settled day IS written the next morning, by ``write_day``, which the nightly
+``scenario-explorer`` run (12:10Z, after 04:00 PT) calls over the previous Pacific day: ``DATE#<day>`` beside the
+weekly ``WEEK#`` record, one row per day, idempotent overwrite (the same sk every run). It is the SAME join, not a
+second one: ``write_day`` calls ``join_day`` and ``build_series`` calls it too, and ``tests/test_checkin_intake_day_5211.py``
+proves a stored day row equals the weekly series row for the same inputs. A day with NO check-in still gets a row
+(``has_checkin`` false, the check-in fields None, the settled intake beside it) — an explicit absent marker rather than
+no row, because the row's existence is what the ``checkin_pair:day_row_liveness`` dead-man in ``nudge_ledger_qa`` reads: a
+completed day with no row means the writer stopped, which a missing check-in must never be confused with. The weekly run
+keeps joining the window itself (it must, to cover days older than the writer and to re-settle a late food upload).
+
 PRIVACY. Owner-only, stored apart from the public ``weekly_correlations`` record (which the site serves):
 ``USER#matthew#SOURCE#checkin_intake_pairs`` / ``WEEK#<iso-week>``. No web or email module imports this.
 """
@@ -36,6 +47,7 @@ ENGINE_VERSION = "checkin-intake-pairs@1.0.0"
 SOURCE = "checkin_intake_pairs"
 PK = f"USER#matthew#SOURCE#{SOURCE}"
 SK_PREFIX = "WEEK#"
+DAY_SK_PREFIX = "DATE#"
 
 # (x, y, label, lag_days) — the weekly engine's own pair shape. Same-day unless lagged.
 PAIRS = [
@@ -109,6 +121,56 @@ def build_series(
     ci, fo, ap = _by_date(checkins), _by_date(foods), _by_date(apples)
     days = sorted(set(ci) | {d for d, r in ap.items() if _num(r.get("som_avg_valence")) is not None})
     return {d: join_day(ci.get(d), fo.get(d), ap.get(d), target_for(d), complete_log_kcal, protein_hit) for d in days}
+
+
+def day_item(
+    day: str,
+    checkin: Optional[Mapping[str, Any]],
+    food: Optional[Mapping[str, Any]],
+    apple: Optional[Mapping[str, Any]],
+    target_kcal: Optional[float],
+    complete_log_kcal: Optional[float],
+    protein_hit: Callable[[Optional[float]], Optional[bool]],
+    computed_at: str,
+) -> dict[str, Any]:
+    """The stored ``DATE#<day>`` row: ``join_day``'s row plus the marker that says whether a check-in existed."""
+    row = join_day(checkin, food, apple, target_kcal, complete_log_kcal, protein_hit)
+    has_checkin = any(row.get(f) is not None for f in CHECKIN_FIELDS)
+    return {
+        "pk": PK,
+        "sk": DAY_SK_PREFIX + day,
+        "date": day,
+        **row,
+        "has_checkin": has_checkin,
+        "state": "checkin" if has_checkin else "no_checkin",
+        "complete_log_kcal": complete_log_kcal,
+        "engine_version": ENGINE_VERSION,
+        "computed_at": computed_at,
+        "tier": "owner_only",
+    }
+
+
+def write_day(
+    day: str,
+    *,
+    fetch: Callable[[str, str, str], list],
+    put_item: Callable[..., Any],
+    computed_at: str,
+    target_for: Optional[Callable[[str], Optional[float]]] = None,
+) -> dict[str, Any]:
+    """Join the settled ``day`` (a Pacific date) and overwrite its one owner-only row. Returns the item (floats)."""
+    from common.numeric import floats_to_decimal
+
+    from health import protein_engine, titration
+
+    if target_for is None:
+        from health.calorie_target import target_kcal
+
+        target_for = target_kcal  # THE target, titration > charter
+    ci, fo, ap = (_by_date(fetch(s, day, day)).get(day) for s in ("evening_checkin", "macrofactor", "apple_health"))
+    item = day_item(day, ci, fo, ap, target_for(day), titration.settings().get("complete_log_kcal"), protein_engine.hit, computed_at)
+    put_item(Item=floats_to_decimal(dict(item)))
+    return item
 
 
 def verdict(result: Mapping[str, Any], min_n: int) -> str:
