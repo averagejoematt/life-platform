@@ -186,6 +186,9 @@ FIELD_TIERS: dict[str, dict[str, int]] = {
         "sleep_source_apple": TIER_OWNER_ONLY,
         "sleep_record_kind_apple": TIER_OWNER_ONLY,
         "_rd_sleep_apple": TIER_OWNER_ONLY,
+        # ── #5187: the timed protein entries HAE delivers intraday (ingestion/health_auto_export_protein.py).
+        #    Owner-only like every nutrition detail (the nutrition-flags rule): per-entry food timing is never served publicly. ──
+        "_rd_protein_hae": TIER_OWNER_ONLY,
     },
     # ADR-097 reading keyspace (BOOK#/READING# pks — a pseudo-source, see SOURCE_TIERS
     # note). The two named private fields from DATA_GOVERNANCE's reading row that exist

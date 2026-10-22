@@ -221,7 +221,7 @@ class _Table:
         for r in rows or []:
             self.items[(r["pk"], r["sk"])] = dict(r)
 
-    def get_item(self, Key):
+    def get_item(self, Key, **_kw):
         it = self.items.get((Key["pk"], Key["sk"]))
         return {"Item": dict(it)} if it else {}
 
