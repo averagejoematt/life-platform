@@ -194,13 +194,14 @@ def _write_checkin_pair(today_str: str) -> str:
     at ERROR and returns "failed:<ExcType>"; the missing ``DATE#`` row is what turns the nightly
     ``checkin_pair:day_row_liveness`` dead-man (nudge_ledger_qa) red."""
     try:
-        from datetime import date, timedelta, timezone
+        from datetime import timezone
 
         from common import digest_utils
+        from common.pacific_time import shift_day_key
         from experiment.phase_filter import source_reads_cross_phase
         from health import checkin_intake_pairs
 
-        day = (date.fromisoformat(today_str) - timedelta(days=1)).isoformat()
+        day = shift_day_key(today_str, -1)
 
         def fetch(source, start, end):
             return digest_utils.query_range_list(table, source, start, end, user_id=USER_ID, include_pilot=source_reads_cross_phase(source))
