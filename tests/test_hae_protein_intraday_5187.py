@@ -82,6 +82,8 @@ def test_a_resend_with_jittered_seconds_and_a_redrawn_split_overwrites_never_add
     write(t, payload(("2026-10-22 08:59:49 -0700", 8.8), ("2026-10-22 09:00:49 -0700", 6.2)))
     rd = t.items[(PK, f"DATE#{DAY}")][hp.RD_FIELD]
     assert len(rd) == 2 and round(sum(e["g"] for e in rd.values()), 1) == 15.0
+    # latest delivery wins: the stored grams are the second write's, not the first's
+    assert sorted(float(e["g"]) for e in rd.values()) == [6.2, 8.8]
 
 
 def test_the_daily_field_is_never_written_and_the_generic_path_still_skips_protein():

@@ -1560,7 +1560,10 @@ def lambda_handler(event, context):
     sleep_nights = _sleep.write_apple_sleep(metrics, table, is_apple_device, parse_date_str, lambda d: {"pk": PK, "sk": f"DATE#{d}"})
 
     # #5187: `protein` skips the generic path (SKIP_METRICS: the DAILY figure is MacroFactor's) and lands here as timed entries.
-    _protein.write_hae_protein(metrics, table, parse_date_str, lambda d: {"pk": PK, "sk": f"DATE#{d}"})
+    try:
+        _protein.write_hae_protein(metrics, table, parse_date_str, lambda d: {"pk": PK, "sk": f"DATE#{d}"})
+    except Exception as e:  # optional owner-only feed: never abort the rest of the webhook (blood pressure follows)
+        logger.warning(f"HAE protein capture failed (non-fatal): {e}")
 
     # ── Process blood pressure individual readings (v1.4.0 + v1.4.1 combined format) ──
     bp_readings_new = 0
