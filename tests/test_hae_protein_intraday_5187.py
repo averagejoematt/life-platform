@@ -168,3 +168,11 @@ def test_the_macrofactor_row_outranks_the_intraday_entries_when_present():
 def test_pacific_morning_instant_is_the_same_utc_day():
     at = datetime(2026, 10, 22, 10, 10, tzinfo=PACIFIC).astimezone(timezone.utc)
     assert at.date().isoformat() == DAY
+
+
+def test_a_failed_update_skips_the_day_and_never_raises():
+    class Boom(Table):
+        def update_item(self, **kw):
+            raise RuntimeError("throttled")
+
+    assert write(Boom(), payload(("2026-10-22 12:47:38 -0700", 20.0))) == 0

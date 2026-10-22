@@ -103,7 +103,7 @@ def write_hae_protein(metrics, table, day_of, key_of, now=None):
     """Merge each day's protein samples into its apple_health row's `_rd_protein_hae`. Returns days written.
 
     Read-merge-write per day; an unreadable stored map SKIPS the day (a partial payload must never overwrite
-    a fuller stored map — the sleep writer's #3119 lesson); the next re-send heals it."""
+    a fuller stored map — the sleep writer's #3119 lesson); a failed write also skips the day, never raises; the next re-send heals it."""
     seen_at = (now or datetime.now(timezone.utc)).isoformat()
     written = 0
     for day, new_entries in sorted(entries_from_metrics(metrics, day_of, seen_at).items()):
@@ -114,12 +114,16 @@ def write_hae_protein(metrics, table, day_of, key_of, now=None):
             logger.warning("[HAE protein] %s: stored map unreadable, day skipped: %s", day, e)
             continue
         merged = {**_plain(stored.get(RD_FIELD) or {}), **new_entries}
-        table.update_item(
-            Key=key,
-            UpdateExpression="SET #rd = :rd, #src = if_not_exists(#src, :src), #dt = if_not_exists(#dt, :dt)",
-            ExpressionAttributeNames={"#rd": RD_FIELD, "#src": "source", "#dt": "date"},
-            ExpressionAttributeValues={":rd": _to_ddb(merged), ":src": "apple_health", ":dt": day},
-        )
+        try:
+            table.update_item(
+                Key=key,
+                UpdateExpression="SET #rd = :rd, #src = if_not_exists(#src, :src), #dt = if_not_exists(#dt, :dt)",
+                ExpressionAttributeNames={"#rd": RD_FIELD, "#src": "source", "#dt": "date"},
+                ExpressionAttributeValues={":rd": _to_ddb(merged), ":src": "apple_health", ":dt": day},
+            )
+        except Exception as e:  # noqa: BLE001 — an optional owner-only feed never aborts the webhook handler (blood pressure follows)
+            logger.warning("[HAE protein] %s: write failed, day skipped: %s", day, e)
+            continue
         written += 1
     if written:
         logger.info("[HAE protein] intraday protein: %d day(s) written", written)
