@@ -3978,6 +3978,20 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/operational/nudge_ledger_qa.py",
+      "partition": "checkin_intake_pairs",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/operational/nudge_ledger_qa.py",
+      "partition": "checkin_intake_pairs",
+      "via": "pk"
+    },
+    {
       "direction": "write",
       "lambda": "pipeline-health-check",
       "module": "lambdas/operational/pipeline_health_check_lambda.py",
@@ -8026,7 +8040,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 777,
+      "edges": 779,
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
@@ -8041,8 +8055,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 378,
-        "sites_resolved": 978,
-        "sites_total": 1356
+        "sites_resolved": 980,
+        "sites_total": 1358
       },
       "schedule_resolution": {
         "dynamic": 0,
