@@ -148,6 +148,7 @@ except ImportError:
 from ingestion import (
     health_auto_export_additive as _additive,  # #4628: the archived day sum
     health_auto_export_archive as _archive,
+    health_auto_export_protein as _protein,  # #5187: the same-day protein feed for the breakfast nudge
     health_auto_export_sleep as _sleep,  # #4971: Apple's own night, sleep_*_apple fields
     health_auto_export_units as _units,  # #4970: day-field units + derived totals
     health_auto_export_watch as _watch,  # #4970: the Apple Watch's daily-metric map
@@ -621,7 +622,7 @@ SKIP_METRICS = {
     # Nutrition — MacroFactor is SOT (these flow into HealthKit from MF app)
     "dietary_energy",
     "Dietary Energy",
-    "protein",
+    "protein",  # the DAILY figure is MacroFactor's; timed entries are captured by health_auto_export_protein (#5187)
     "Protein",
     "carbohydrates",
     "Carbohydrates",
@@ -1557,6 +1558,9 @@ def lambda_handler(event, context):
         logger.info(f"Other metrics: {other_days} days updated, fields: {sorted(set().union(*other_daily.values()))}")
     # #4971: sleep_analysis skips the generic path (SKIP_METRICS) and lands here, Apple devices only.
     sleep_nights = _sleep.write_apple_sleep(metrics, table, is_apple_device, parse_date_str, lambda d: {"pk": PK, "sk": f"DATE#{d}"})
+
+    # #5187: `protein` skips the generic path (SKIP_METRICS: the DAILY figure is MacroFactor's) and lands here as timed entries.
+    _protein.write_hae_protein(metrics, table, parse_date_str, lambda d: {"pk": PK, "sk": f"DATE#{d}"})
 
     # ── Process blood pressure individual readings (v1.4.0 + v1.4.1 combined format) ──
     bp_readings_new = 0

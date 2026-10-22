@@ -720,6 +720,15 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "tests/test_walking_volume_3930.py::test_no_overlap_or_thin_coverage_is_unknown_never_zero and "
         "::test_the_0925_treadmill_replays_joined_on_the_live_fixture (the live-row fixture).",
     ),
+    # #5187 (2026-10-22): the breakfast nudge reads the apple_health day row's `_rd_protein_hae` map.
+    "apple_health::lambdas/emails/protein_nudge_runner.py::read": (
+        "2026-10-22",
+        "#5187: the runner projects ONE attribute, `_rd_protein_hae`, whose name is imported from the writer "
+        "(`ingestion.health_auto_export_protein.RD_FIELD`, the same constant both sides use), and hands the map unparsed to "
+        "`health.protein_engine.hae_feeding_rows`, which reads only the entry keys `t` and `g` that the writer stores. A drift cannot "
+        "fabricate a number: an entry missing either key is skipped, and no entries means the nudge withholds (`no_same_day_log`). "
+        "VERIFIED: tests/test_hae_protein_intraday_5187.py drives the writer's real output through the runner end to end.",
+    ),
 }
 
 __all__ = ["PAIR_SEAM_RESIDUE", "PAIR_SEAM_DECISIONS", "SEED_DATE"]

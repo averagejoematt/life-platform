@@ -17,7 +17,9 @@ THE BREAKFAST NUDGE (`nudge_decide`). Behind = no feeding at or above `feeding_t
 later of the charter cut-off and the tick. Owner-only, at most once a Pacific day (`PROTEIN_NUDGE#<date>`), sent by
 `emails.protein_nudge_runner` on the coach-nudge hourly tick. The copy is information, never a command. NO ROW FOR
 TODAY WITHHOLDS (`no_same_day_log`): the only protein source is an end-of-day upload, so an absent row at breakfast
-is the upload's lag, not a missed feeding; armed but silent until a same-day food source exists (#5187).
+is the upload's lag, not a missed feeding. SAME-DAY SOURCE (#5187): when the day's MacroFactor row is absent the
+runner hands in the timed protein entries Health Auto Export delivers intraday (`hae_feeding_rows`); the verdict's
+`source` names which read decided it. Only when neither exists does the note withhold.
 """
 
 from __future__ import annotations
@@ -27,12 +29,13 @@ from typing import Any, Mapping, Optional
 
 from common.constants import PLAN_DAILY_PROTEIN_MIN_G
 from common.macrofactor_fields import protein_meals_at
+from common.pacific_time import PACIFIC, parse_iso_utc
 from training import training_charter
 
 from health.protein_floor import met_floor
 
 ENGINE_VERSION = "protein-engine@1.0.0"
-NUDGE_VERSION = "protein-nudge@1.1.0"
+NUDGE_VERSION = "protein-nudge@1.2.0"
 KEY_PREFIX = "PROTEIN_NUDGE#"
 BUDGET_SILENCE_TIER = 2  # = steps_nudge.BUDGET_SILENCE_TIER: a deterministic owner note, silenced with the coach nudge
 _P = "nutrition.protein."
@@ -93,6 +96,25 @@ def feedings(food_log: Optional[list], merge_minutes: Optional[int] = None) -> O
             start, total = t, g
     out.append({"time": _hhmm(start), "g": round(total, 1)})
     return out
+
+
+def hae_feeding_rows(entries: Optional[Mapping[str, Any]], date: str) -> Optional[dict[str, Any]]:
+    """A food-log-shaped row `{food_log, row_source}` from the HAE `_rd_protein_hae` map for Pacific `date`, or None.
+
+    Each entry carries its own instant (`t`, ISO with the device offset) and grams (`g`); the Pacific date of the
+    instant decides membership, so the UTC-framed row can hold entries of the next Pacific day without leaking."""
+    rows = []
+    for e in (entries or {}).values():
+        try:
+            parsed, g = parse_iso_utc(e["t"]), float(e["g"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if parsed is None:
+            continue
+        at = parsed.astimezone(PACIFIC)
+        if at.date().isoformat() == date:
+            rows.append({"time": at.strftime("%H:%M"), "protein_g": g})
+    return {"food_log": sorted(rows, key=lambda r: r["time"]), "row_source": "hae_intraday"} if rows else None
 
 
 def first_feeding_behind(fed: Optional[list], by: Optional[str] = None) -> Optional[bool]:
@@ -182,6 +204,7 @@ def nudge_decide(*, date: str, now_pt: datetime, row: Optional[Mapping[str, Any]
         return {**out, "reason": "no_same_day_log"}  # the upload's lag, not a miss: withhold (the EVAL stamp still lands)
     fed = feedings(row.get("food_log"))
     out["feedings"] = fed
+    out["source"] = row.get("row_source", "macrofactor_day_row")
     behind = first_feeding_behind(fed, by)
     if behind is None:
         return {**out, "reason": "feedings_unknown"}
