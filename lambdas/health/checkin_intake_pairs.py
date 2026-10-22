@@ -167,7 +167,9 @@ def write_day(
         from health.calorie_target import target_kcal
 
         target_for = target_kcal  # THE target, titration > charter
-    ci, fo, ap = (_by_date(fetch(s, day, day)).get(day) for s in ("evening_checkin", "macrofactor", "apple_health"))
+    ci = _by_date(fetch("evening_checkin", day, day)).get(day)  # the same three reads as run_week, one per source
+    fo = _by_date(fetch("macrofactor", day, day)).get(day)
+    ap = _by_date(fetch("apple_health", day, day)).get(day)
     item = day_item(day, ci, fo, ap, target_for(day), titration.settings().get("complete_log_kcal"), protein_engine.hit, computed_at)
     put_item(Item=floats_to_decimal(dict(item)))
     return item
