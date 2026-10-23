@@ -202,7 +202,7 @@ def test_no_public_api_module_or_site_script_names_the_regime():
 
 def test_public_og_form_status_never_reads_rebaselining():
     src = open(os.path.join(LAMBDAS, "emails", "daily_brief_lambda.py"), encoding="utf-8").read()
-    assert '"form_status": ("neutral" if _cm.get("acwr_zone") == hr_regime.REBASELINING else _cm.get("acwr_zone", "neutral"))' in src
+    assert '"form_status": "neutral" if (_z := _cm.get("acwr_zone", "neutral")) == hr_regime.REBASELINING else _z,' in src
 
 
 def test_public_debrief_omits_the_rebaselining_zone(monkeypatch):
@@ -245,7 +245,7 @@ def test_daily_insight_acwr_signal_makes_no_optimal_claim_when_rebaselining():
 
 def test_weekly_digest_acwr_colour_greys_a_rebaselining_zone():
     src = open(os.path.join(LAMBDAS, "emails", "weekly_digest_lambda.py"), encoding="utf-8").read()
-    assert '"#e74c3c" if _acwr_alert else "#94a3b8" if _zone == "RE-BASELINING"' in src
+    assert '"#e74c3c" if _acwr_alert else "#94a3b8" if "BASELINING" in _zone' in src
 
 
 def test_mcp_zone2_breakdown_reads_the_marker():

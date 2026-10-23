@@ -1211,7 +1211,7 @@ def build_html(data, commentary, profile):
     bl_rows = row("CTL — Fitness (42d)", fmt(tl.get("ctl")), highlight=True)
     bl_rows += row("ATL — Fatigue (7d)", fmt(tl.get("atl")))
     bl_rows += row("TSB — Form", f'<span style="color:{tcol};font-weight:700;">{fmt(tl.get("tsb"))} ({tlabel})</span>')
-    # BS-09: ACWR from computed_metrics
+    # BS-09: ACWR from computed_metrics (#5029: an HR-regime RE-BASELINING zone is grey; an alert stays red)
     try:
         _acwr_data = data.get("acwr_data") or {}
         _acwr_val = _acwr_data.get("acwr")
@@ -1219,9 +1219,7 @@ def build_html(data, commentary, profile):
             _av = float(_acwr_val)
             _zone = str(_acwr_data.get("zone", "")).upper()
             _acwr_alert = bool(_acwr_data.get("alert", False))
-            _acol = (
-                "#e74c3c" if _acwr_alert else "#94a3b8" if _zone == "RE-BASELINING" else "#e67e22" if _av > 1.3 or _av < 0.8 else "#27ae60"
-            )
+            _acol = "#e74c3c" if _acwr_alert else "#94a3b8" if "BASELINING" in _zone else "#e67e22" if not 0.8 <= _av <= 1.3 else "#27ae60"
             bl_rows += row(
                 "ACWR — Training Load",
                 f'<span style="color:{_acol};font-weight:700;">{round(_av, 2)}{" — " + _zone if _zone else ""}</span>',
