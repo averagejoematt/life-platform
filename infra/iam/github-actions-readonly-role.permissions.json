@@ -100,6 +100,18 @@
       "Resource": "*"
     },
     {
+      "Sid": "SchedulerScheduleRead",
+      "Effect": "Allow",
+      "Action": "scheduler:GetSchedule",
+      "Resource": "arn:aws:scheduler:us-west-2:205930651321:schedule/default/LifePlatform*"
+    },
+    {
+      "Sid": "SchedulerList",
+      "Effect": "Allow",
+      "Action": "scheduler:ListSchedules",
+      "Resource": "*"
+    },
+    {
       "Sid": "CloudWatchAlarmRead",
       "Effect": "Allow",
       "Action": "cloudwatch:DescribeAlarms",
