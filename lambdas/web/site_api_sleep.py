@@ -65,6 +65,13 @@ def _eight_night_discounted(raw, hours, whoop_quality):
     return round(raw_f, 0) < 40 and (hrs >= 6 or wq >= 70)
 
 
+def _trend_eightsleep(date, r, w, row_score):
+    block = _eightsleep_block(date, r, row_score)
+    if _eight_night_discounted(r.get("sleep_score"), w.get("sleep_duration_hours"), w.get("sleep_quality_score")):
+        return _discount_eightsleep_block(block)
+    return block
+
+
 def _trend_efficiency(r, w):
     """#4935 — per-field source rule for a trend row's top-level `efficiency`: Eight Sleep's own
     figure, EXCEPT on a night `_eight_night_discounted` flags, where it is Whoop's
@@ -181,6 +188,29 @@ def _eightsleep_block(date, r, sleep_score):
         # every average on this endpoint.
         "vendor_incomplete": _vendor_incomplete(r),
     }
+
+
+_EIGHT_MEASURED_KEYS = (
+    "sleep_score",
+    "sleep_efficiency_pct",
+    "total_sleep_hours",
+    "deep_hours",
+    "rem_hours",
+    "light_hours",
+    "deep_pct",
+    "rem_pct",
+    "light_pct",
+)
+
+
+def _discount_eightsleep_block(block):
+    """#4935 — a trend row's nested `eightsleep` block on a night `_eight_night_discounted` flags
+    carries NO Eight Sleep measurement (hours, efficiency, stages, score are absent — never 0):
+    the non-detect 1.7 h / 16.9 % must not sit beside Whoop's 8.6 h / 83. The block keeps its
+    frame (`as_of_date`, `night_of`, `vendor_incomplete`) plus `discounted: true`."""
+    out = {k: v for k, v in block.items() if k not in _EIGHT_MEASURED_KEYS}
+    out["discounted"] = True
+    return out
 
 
 def _whoop_block(date, w):
@@ -638,7 +668,7 @@ def sleep_detail(*, _g) -> dict:
                 # stops a trend row's Whoop `sleep_start` (a raw UTC instant)
                 # from sitting in a device-ambiguous flat row with no frame of
                 # its own — nested under `whoop`, it carries its OWN night_of.
-                "eightsleep": _eightsleep_block(date, r, _row_score),
+                "eightsleep": _trend_eightsleep(date, r, w, _row_score),
                 "whoop": _whoop_block(date, w),
             }
         )

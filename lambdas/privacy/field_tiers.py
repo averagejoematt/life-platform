@@ -147,6 +147,49 @@ FIELD_TIERS: dict[str, dict[str, int]] = {
         "time_awake_hours": TIER_OWNER_ONLY,
         "sleep_consistency_percentage": TIER_OWNER_ONLY,
     },
+    # #4970 (ADR-154 step 3, declared BEFORE the first watch reading is merged): the
+    # Apple Watch's daily fields in the apple_health partition. Whoop's twins set the
+    # posture — its SpO2 and skin temperature are owner-only, so the watch's are too, and
+    # breathing disturbances (the sleep-apnea screen) is diagnostic-class like afib_result.
+    # The watch's HRV / resting / walking HR, respiratory rate and cardio recovery are
+    # INTERNAL: safe in AI context, not published — Whoop's HRV/RHR publication consent
+    # (ADR-155) does not extend to a second instrument; #4980 owns any publication ruling.
+    # Activity, daylight, audio, VO2 max and physical effort stay TIER_PUBLIC by omission
+    # (behavioural / fitness numbers the site already publishes in kind).
+    # Heart-RHYTHM data (AFib burden, ECG, notifications, medications) is #4972's lane.
+    "apple_health": {
+        "spo2_pct_apple": TIER_OWNER_ONLY,
+        "wrist_temp_sleep_c_apple": TIER_OWNER_ONLY,
+        "breathing_disturbances_apple": TIER_OWNER_ONLY,
+        "hrv_sdnn_apple": TIER_INTERNAL,
+        "resting_heart_rate_apple": TIER_INTERNAL,
+        "walking_heart_rate_avg": TIER_INTERNAL,
+        "respiratory_rate_apple": TIER_INTERNAL,
+        "cardio_recovery_bpm_apple": TIER_INTERNAL,
+        "walking_steadiness_pct": TIER_INTERNAL,
+        "watch_last_reading_epoch_apple": TIER_INTERNAL,
+        # ── #4971: the Apple Watch's own night (ingestion/health_auto_export_sleep.py
+        #    APPLE_SLEEP_FIELDS). Owner-only like Whoop's unpublished sleep fields
+        #    (time_awake_hours): raw biometrics no public surface serves, declared before
+        #    the first watch night lands (ADR-154 step 3). Publication is a new ADR-155 stamp. ──
+        "sleep_total_hours_apple": TIER_OWNER_ONLY,
+        "sleep_in_bed_hours_apple": TIER_OWNER_ONLY,
+        "sleep_core_min_apple": TIER_OWNER_ONLY,
+        "sleep_deep_min_apple": TIER_OWNER_ONLY,
+        "sleep_rem_min_apple": TIER_OWNER_ONLY,
+        "sleep_awake_min_apple": TIER_OWNER_ONLY,
+        "sleep_unspecified_min_apple": TIER_OWNER_ONLY,
+        "sleep_start_apple": TIER_OWNER_ONLY,
+        "sleep_end_apple": TIER_OWNER_ONLY,
+        "sleep_in_bed_start_apple": TIER_OWNER_ONLY,
+        "sleep_in_bed_end_apple": TIER_OWNER_ONLY,
+        "sleep_source_apple": TIER_OWNER_ONLY,
+        "sleep_record_kind_apple": TIER_OWNER_ONLY,
+        "_rd_sleep_apple": TIER_OWNER_ONLY,
+        # ── #5187: the timed protein entries HAE delivers intraday (ingestion/health_auto_export_protein.py).
+        #    Owner-only like every nutrition detail (the nutrition-flags rule): per-entry food timing is never served publicly. ──
+        "_rd_protein_hae": TIER_OWNER_ONLY,
+    },
     # ADR-097 reading keyspace (BOOK#/READING# pks — a pseudo-source, see SOURCE_TIERS
     # note). The two named private fields from DATA_GOVERNANCE's reading row that exist
     # as literal item attributes; the rest of the row (RECALL# records, calibration
@@ -155,6 +198,33 @@ FIELD_TIERS: dict[str, dict[str, int]] = {
     "reading": {
         "retentionScore": TIER_OWNER_ONLY,
         "moodSnapshot": TIER_OWNER_ONLY,
+    },
+    # #4972 (owner ruling (c), 2026-10-17: heart-rhythm data is owner-only): the
+    # heart-rhythm event channel's `RHYTHM#` rows inside the clinical partition. The
+    # partition itself is TIER_INTERNAL (ADR-155 amendment — coach context admitted); these
+    # fields are STRICTER, owner-only, so no AI narrative context and no public surface may
+    # carry them, and every row dumper strips them (`strip_map`). Declared before the first
+    # row exists (ADR-154's ordering). `tests/test_rhythm_channel_privacy_4972.py` holds
+    # this set equal to `health.rhythm_channel.CHANNEL_FIELDS`.
+    "clinical": {
+        f: TIER_OWNER_ONLY
+        for f in (
+            "rhythm_ecg_classification",
+            "rhythm_ecg_avg_hr_bpm",
+            "rhythm_ecg_sample_start",
+            "rhythm_ecg_device",
+            "cross_device_same_day",
+            "rhythm_notification_kind",
+            "rhythm_notification_kind_inferred",
+            "rhythm_notification_at",
+            "rhythm_notification_bpm",
+            "rhythm_notification_threshold_bpm",
+            "rhythm_notification_device",
+            "rhythm_med_name",
+            "rhythm_med_dose_text",
+            "rhythm_med_at",
+            "rhythm_med_status",
+        )
     },
 }
 
@@ -232,6 +302,28 @@ SOURCE_TIERS: dict[str, int] = {
     # the first row exists (ADR-154's ordering). Readers are the owner's MCP tool and his own
     # Telegram coach thread; `tests/test_coach_vision_isolation_3759.py` holds that set.
     "coach_vision": TIER_OWNER_ONLY,
+    # #5073: the weekly May tracker — his loss rate against the owner-only band and target date, the
+    # projected weight there, waist, steps, anchor strength and the triggers with their levers. The
+    # target date and the band are owner-only by ruling (no May countdown on any published surface),
+    # so the row takes that tier whole. Declared before the first row exists (ADR-154's ordering).
+    # Readers: the owner's MCP tool `get_may_tracker` and the coach-context assembly (#5071).
+    "may_tracker": TIER_OWNER_ONLY,
+    # #5078: the fitness test battery (BATTERY#<date>) — his walk and bike distances, hang time and pull-up
+    # assistance, trended toward the owner-only May target. Feeds the May tracker, so it takes that tier.
+    # Declared before the first row exists (ADR-154's ordering). Readers: get_exercise_notes
+    # action='fitness_tests', the May tracker and the coach packet (all owner channels).
+    "fitness_tests": TIER_OWNER_ONLY,
+    # #5096: the weekly calorie titration decision (WEEK#<monday>) — the week's target, the step and its inputs
+    # (his loss rate against the owner-only band, the steps mean, his bodyweight). The band is owner-only by ruling,
+    # so the row takes that tier whole. Declared before the first row exists (ADR-154's ordering). Readers: the
+    # calorie resolver (`health.calorie_target`, which states only the kcal), the owner's nutrition-review email
+    # and the calibration sweep's dead-man (owner Telegram).
+    "nutrition_titration": TIER_OWNER_ONLY,
+    # #5106: the evening check-in (hunger, stress, cravings, one word) and its weekly read against intake. Behavioural
+    # self-report about him, so owner-only with no public projection; the weekly read is stored APART from the public
+    # weekly_correlations record for exactly that reason. Declared before the first row exists (ADR-154's ordering).
+    "evening_checkin": TIER_OWNER_ONLY,
+    "checkin_intake_pairs": TIER_OWNER_ONLY,
     # #4078: chat writes queued for approval. A queued row carries the target write tool's exact
     # arguments — journal-grade text, a pain-site statement, a meal — so it takes the highest tier
     # of anything it can hold. Declared before the first row exists (ADR-154's ordering). MCP-only.

@@ -39,6 +39,8 @@ import sys
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 for _p in (os.path.join(ROOT, "lambdas"), os.path.join(ROOT, "lambdas", "emails"), os.path.dirname(__file__)):
     if _p not in sys.path:
@@ -79,9 +81,11 @@ def _rules(tree, rule_id):
 
 
 def _cron_of(rule):
+    # #4284: the rule reads `table_schedule("<key>")`; the clock is that config/schedules.json row.
     sched = next(kw.value for kw in rule.keywords if kw.arg == "schedule")
-    assert getattr(sched.func, "attr", None) == "cron", "the Tuesday rule is no longer a Schedule.cron(...)"
-    return {kw.arg: kw.value.value for kw in sched.keywords}
+    assert getattr(sched.func, "id", None) == "table_schedule", "the Tuesday rule no longer reads the schedule table"
+    fields = schedule_rows.expr(sched.args[0].value)[len("cron(") : -1].split()
+    return {"minute": fields[0], "hour": fields[1], "week_day": fields[4]}
 
 
 _DAYS = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
@@ -123,7 +127,8 @@ def test_the_tuesday_rule_targets_the_chronicle_sender_with_its_own_payload():
     # The comment the triage required: the UTC cron and the DST caveat are stated beside the rule.
     head = src[: src.index(f'"{RULE_ID}"')]
     comment = head[head.rindex("# #4584") :]
-    assert "cron(0 1 ? * WED *)" in comment and "PDT" in comment and "PST" in comment
+    assert "Wednesday 01:00 UTC" in comment and "PDT" in comment and "PST" in comment
+    assert schedule_rows.expr(f"wednesday-chronicle#{RULE_ID}") == "cron(0 1 ? * WED *)"
 
 
 def test_the_tuesday_question_is_fixed_rotates_and_passes_the_desks_own_screens():

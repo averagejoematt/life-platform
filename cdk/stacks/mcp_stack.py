@@ -31,7 +31,7 @@ from aws_cdk import (
 
 from stacks import role_policies as rp
 from stacks.constants import TABLE_NAME  # CONF-01 / #936: one source for the table name (DR cutover)
-from stacks.lambda_helpers import create_platform_lambda
+from stacks.lambda_helpers import create_platform_lambda, table_schedule
 
 REGION = "us-west-2"
 ACCT = "205930651321"
@@ -133,7 +133,7 @@ class McpStack(Stack):
             source_file="mcp_server.py",
             handler="mcp_server.lambda_handler",
             code=mcp_code,
-            schedule="cron(10 17 * * ? *)",  # 10:10 AM PT daily (staggered from daily-brief)
+            # schedule: config/schedules.json (#4284) — 10:10 AM PT daily (staggered from daily-brief)
             timeout_seconds=300,
             memory_mb=768,  # R5: matched to MCP server power-tuned value
             alarm_name="mcp-warmer-error",
@@ -246,7 +246,7 @@ class McpStack(Stack):
         predraft_rule = events.Rule(
             self,
             "NightlyPredraft",
-            schedule=events.Schedule.expression("cron(0 2 * * ? *)"),
+            schedule=table_schedule("life-platform-mcp-warmer#NightlyPredraft"),
             description="#4084: draft + red-team tomorrow's session (never commits to Hevy)",
         )
         predraft_rule.add_target(targets.LambdaFunction(warmer, event=events.RuleTargetInput.from_object({"job": "nightly_predraft"})))
@@ -284,6 +284,35 @@ class McpStack(Stack):
             treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
         )
         predraft_missing_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
+        # ── #5078: the fitness battery's missed alarm ─────────────────────────────────
+        # mcp/tools_fitness_tests.nightly_leg rides the 02:00Z pre-draft and emits
+        # FitnessBatteryMissed{Job=fitness_battery} = 1 when the battery's due window closed
+        # with no BATTERY# record, 0 on every other known state. Its liveness is the pre-draft's
+        # dead-man above (same run), so missing data here is NOT a breach. Digest: a missed
+        # battery is a missing calibration point, never a wrong session.
+        battery_missed_alarm = cloudwatch.Alarm(
+            self,
+            "FitnessBatteryMissed",
+            alarm_name="fitness-battery-missed",
+            alarm_description=(
+                "#5078: the fitness test battery's due window closed with no battery on file. Log it with "
+                "get_exercise_notes action='fitness_test' (or log the tests in Hevy); the FITNESS_BATTERY_MISSED "
+                "log line in /aws/lambda/life-platform-mcp-warmer names the due date."
+            ),
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/HevyRoutine",
+                metric_name="FitnessBatteryMissed",
+                dimensions_map={"Job": "fitness_battery"},
+                period=Duration.seconds(86400),
+                statistic="Maximum",
+            ),
+            evaluation_periods=1,
+            threshold=1,
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        battery_missed_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
         # ── #809: recursive-invocation guard (adopted from the 2026-05-25 orphan batch) ──
         # AWS drops Lambda invocations it detects as recursive; a nonzero

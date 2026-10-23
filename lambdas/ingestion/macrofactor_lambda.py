@@ -6,6 +6,13 @@ Trigger: S3 ObjectCreated on s3://matthew-life-platform/uploads/macrofactor/*.cs
 Auto-detects CSV type from headers:
   - "Food Name" header → nutrition diary (one row per food entry)
   - "Exercise" + "Set Type" header → workout log (one row per set)
+  - "Expenditure" + "Date" + "Calories (kcal)" → daily summary (one row per day)
+
+#5097: the diary is the routine upload and carries NO expenditure column; the daily
+summary is the only format that carries MacroFactor's adaptive expenditure. Both arrive
+through the same Dropbox drop and land on the same DATE# row, so neither may erase the
+other: a summary MERGES its fields onto the day (UpdateItem), and a diary re-write
+carries the stored summary fields forward (`carry_summary_fields`).
 
 Each invocation processes the full uploaded CSV and upserts one DynamoDB
 item per day. Fully idempotent.
@@ -192,9 +199,13 @@ def parse_entry(row):
     return date_str, entry
 
 
-# ── Protein Distribution (Derived Metrics Phase 1d) ──────────────────────────
+# ── Protein Distribution (Derived Metrics Phase 1d) — a LEGACY score (#5109) ──
 # Norton/Galpin: ≥30g protein per meal to maximize MPS via leucine threshold.
 # Snacks (<400 kcal) excluded — only real meals count toward the score.
+# LEGACY since #5109: THE per-feeding definition is the protein engine's (health.protein_engine.feedings, charter
+# nutrition.protein.feeding_threshold_g / feeding_merge_minutes). This 30 g / meals-only score is kept for the stored
+# rows' readers (the site's meal-rhythm average) and has NO reader in coach, panel text or grading (#5214: the character
+# sheet's distribution slot now counts the protein engine's feedings): tests/test_nutrition_coach_context_5109.py holds the AI producers off both stored fields.
 MEAL_CALORIE_THRESHOLD = 400  # kcal — eating occasions below this are "snacks"
 PROTEIN_MPS_THRESHOLD = 30  # grams — minimum per meal for MPS
 
@@ -407,13 +418,13 @@ def absent_day_items(rows, stored_items, ingested_at=None):
 
 def stored_days_in_range(first, last):
     """The macrofactor rows stored between `first` and `last` (inclusive), paginated.
-    Narrow projection: only what `absent_day_items` reads."""
+    Whole items: `absent_day_items` reads the ownership marks and #5097's
+    `carry_summary_fields` reads every summary-owned field (a prefix family, so no
+    fixed projection can name it). The diary window is ~7 days, so the read is small."""
     from boto3.dynamodb.conditions import Key
 
     kwargs = {
         "KeyConditionExpression": Key("pk").eq(PK) & Key("sk").between(f"DATE#{first}", f"DATE#{last}~"),
-        "ProjectionExpression": "sk, #d, #f, tombstone, entries_count",
-        "ExpressionAttributeNames": {"#d": "date", "#f": "_format"},
     }
     items = []
     while True:
@@ -582,64 +593,87 @@ def detect_csv_type(headers):
     return "unknown"
 
 
-def build_summary_day_items(rows):
-    """Parse MacroFactor daily-summary CSV → DDB items.
+# ── #5097: the daily-summary export — capture every vendor field, merge, never clobber ──
+# The summary is the ONLY export carrying MacroFactor's adaptive expenditure (the routine
+# diary export has no such column — 58 of the 59 uploads archived 2026-02..2026-10 are
+# diaries). Each summary column lands under its OWN field name; nothing is picked or
+# combined here (the read-side resolver is health/expenditure_reconciler.py).
+#
+# Summary-owned per-day fields, beyond the nutrient columns. The existing names are kept
+# (#484: readers key off `tdee_kcal`, the alias of `expenditure_kcal`).
+SUMMARY_SCALAR_COLUMNS = OrderedDict(
+    [
+        ("Expenditure", "expenditure_kcal"),
+        ("Trend Weight (lbs)", "trend_weight_lbs"),
+        ("Weight (lbs)", "weight_lbs_macrofactor"),
+        ("Target Calories (kcal)", "target_calories_kcal"),
+        ("Target Protein (g)", "target_protein_g"),
+        ("Target Fat (g)", "target_fat_g"),
+        ("Target Carbs (g)", "target_carbs_g"),
+        ("Steps", "steps_macrofactor"),
+    ]
+)
+#: The vendor's own day total for nutrient X, kept beside the diary-derived `total_X`.
+SUMMARY_TOTAL_PREFIX = "summary_total_"
+#: Columns this parser does not know yet — stored verbatim, never dropped (capture-all).
+SUMMARY_UNMAPPED_FIELD = "summary_unmapped_columns"
+SUMMARY_INGESTED_FIELD = "summary_ingested_at"
+#: Every field the summary owns on a DATE# row. A diary re-write carries these forward.
+SUMMARY_OWNED_FIELDS = frozenset(set(SUMMARY_SCALAR_COLUMNS.values()) | {"tdee_kcal", SUMMARY_UNMAPPED_FIELD, SUMMARY_INGESTED_FIELD})
+_SUMMARY_KNOWN_COLUMNS = frozenset({"Date"} | set(SUMMARY_SCALAR_COLUMNS) | set(NUTRIENT_COLUMNS))
+_TOMBSTONE_FIELDS = ("tombstone", "tombstoned_at", "tombstoned_reason")
 
-    Reentry sweep (2026-05-03): one row per date with daily totals (no per-meal
-    food log). Writes the same DATE# partition as the nutrition format with the
-    same total_* field names. We use UpdateItem patterns implicitly via the
-    standard PutItem path — for days that previously had food_log entries from
-    a diary export, the food_log will be lost. This is acceptable: (a) Matthew
-    rarely uses both formats for the same day, (b) the totals are what
-    daily-metrics-compute consumes, and (c) the spec explicitly removed
-    nutrition diary as MacroFactor's default in favor of summary.
+
+def is_summary_owned(field):
+    """True for a field the daily-summary export owns on a shared DATE# row."""
+    return field in SUMMARY_OWNED_FIELDS or field.startswith(SUMMARY_TOTAL_PREFIX)
+
+
+def _summary_date(raw):
+    """ISO date from a summary `Date` cell: an Excel serial (the XLSX export, converted
+    to CSV by dropbox-poll, keeps the raw serial — 46110 = 2026-03-29) or any form
+    `normalize_date` reads. None when unreadable."""
+    from datetime import timedelta as _td
+
+    date_str = (raw or "").strip()
+    try:
+        n = float(date_str)
+        if 30000 < n < 80000:  # Excel serial range covering 1982 → 2119
+            excel_epoch = datetime(1899, 12, 30, tzinfo=timezone.utc)  # Excel-1900 system, accounting for 1900 leap-year bug
+            date_str = (excel_epoch + _td(days=int(n))).strftime("%Y-%m-%d")
+    except (ValueError, TypeError):
+        pass
+    return normalize_date(date_str) if date_str else None
+
+
+def build_summary_day_items(rows):
+    """Parse MacroFactor daily-summary CSV → one logical DDB item per day.
+
+    Every column lands under its own field (#5097 capture-all): the nutrient columns as
+    `total_X` (what readers consume when no diary owns the day) AND `summary_total_X`
+    (the vendor's own figure, kept when a diary does own it), the scalar columns per
+    `SUMMARY_SCALAR_COLUMNS`, unknown columns verbatim in `summary_unmapped_columns`.
+    How the item reaches the table — owning a summary-only day, merging onto a diary
+    day — is `summary_update_requests`.
+
+    A row with no logged macros is skipped even when it carries an expenditure: a
+    food-less row would read as a logged day on every presence surface (macrofactor is
+    the primary engagement anchor). Such rows are counted in the log line.
     """
     ingested_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     day_items = {}
-    skipped = 0
-    from datetime import timedelta as _td
-
-    EXCEL_EPOCH = datetime(1899, 12, 30, tzinfo=timezone.utc)  # Excel-1900 system, accounting for 1900 leap-year bug
+    skipped = expenditure_only = 0
     for row in rows:
-        date_str = (row.get("Date") or "").strip()
-        if not date_str:
+        date_str = _summary_date(row.get("Date"))
+        if date_str is None:
             skipped += 1
             continue
-        # Reentry sweep (2026-05-03): MacroFactor's XLSX export stores dates as
-        # Excel serial numbers (e.g. 46110 = 2026-04-04). Our XLSX→CSV converter
-        # in dropbox-poll preserves the raw value. Detect numeric date values
-        # and convert to YYYY-MM-DD here.
-        try:
-            n = float(date_str)
-            if 30000 < n < 80000:  # Excel serial range covering 1982 → 2119
-                d = EXCEL_EPOCH + _td(days=int(n))
-                date_str = d.strftime("%Y-%m-%d")
-        except (ValueError, TypeError):
-            pass
-        # One date contract with the diary + workout parsers (normalize_date):
-        # slash forms, a trailing time component, and a real calendar check. The
-        # old inline handling built the ISO string with int() casts and then only
-        # asserted "length >= 10 with dashes at 4 and 7", so '2026-08-05 00:00:00'
-        # and '13/04/2026' -> '2026-13-04' both passed straight into the sort key.
-        iso_date = normalize_date(date_str)
-        if iso_date is None:
-            skipped += 1
-            continue
-        date_str = iso_date
-
-        cal = safe_float(row.get("Calories (kcal)"))
-        prot = safe_float(row.get("Protein (g)"))
-        fat = safe_float(row.get("Fat (g)"))
-        carbs = safe_float(row.get("Carbs (g)"))
-        weight = safe_float(row.get("Weight (lbs)"))
-        trend_weight = safe_float(row.get("Trend Weight (lbs)"))
-        expenditure = safe_float(row.get("Expenditure"))
-        target_cal = safe_float(row.get("Target Calories (kcal)"))
-        target_prot = safe_float(row.get("Target Protein (g)"))
-
+        nutrients = {f: safe_float(row.get(col)) for col, f in NUTRIENT_COLUMNS.items() if col in row}
+        nutrients = {f: v for f, v in nutrients.items() if v is not None}
         # Skip rows with no nutrition data (MacroFactor sometimes exports empty future days)
-        if all(v is None or v == 0 for v in (cal, prot, fat, carbs)):
+        if all(not nutrients.get(f) for f in ("calories_kcal", "protein_g", "fat_g", "carbs_g")):
             skipped += 1
+            expenditure_only += bool(safe_float(row.get("Expenditure")))
             continue
 
         item = {
@@ -650,36 +684,102 @@ def build_summary_day_items(rows):
             "schema_version": 2,  # bumped from 1 to mark summary-format records
             "_format": "daily_summary",
             "ingested_at": ingested_at,
+            SUMMARY_INGESTED_FIELD: ingested_at,
             # Validator (DATA-2) requires entries_count + food_log fields; daily-
             # summary format has no per-meal data, so emit empty placeholders.
             "entries_count": 0,
             "food_log": [],
         }
-        if cal is not None:
-            item["total_calories_kcal"] = round(cal, 2)
-        if prot is not None:
-            item["total_protein_g"] = round(prot, 2)
-        if fat is not None:
-            item["total_fat_g"] = round(fat, 2)
-        if carbs is not None:
-            item["total_carbs_g"] = round(carbs, 2)
-        if weight is not None and weight > 0:
-            item["weight_lbs_macrofactor"] = round(weight, 2)
-        if trend_weight is not None and trend_weight > 0:
-            item["trend_weight_lbs"] = round(trend_weight, 2)
-        if expenditure is not None and expenditure > 0:
-            item["expenditure_kcal"] = round(expenditure, 2)
+        for f, v in nutrients.items():
+            item[f"total_{f}"] = round(v, 2)
+            item[f"{SUMMARY_TOTAL_PREFIX}{f}"] = round(v, 2)
+        for col, f in SUMMARY_SCALAR_COLUMNS.items():
+            v = safe_float(row.get(col))
+            if v is not None and v > 0:  # a 0 weight/target/expenditure is "not set", never a reading
+                item[f] = round(v, 2)
+        if "expenditure_kcal" in item:
             # (#484) Canonical name: readers (daily_insight, ai_context) and the
             # correlation engine key off `tdee_kcal`. Write it here so the deficit
             # chain converges forward without a per-reader backfill.
-            item["tdee_kcal"] = round(expenditure, 2)
-        if target_cal is not None and target_cal > 0:
-            item["target_calories_kcal"] = round(target_cal, 2)
-        if target_prot is not None and target_prot > 0:
-            item["target_protein_g"] = round(target_prot, 2)
+            item["tdee_kcal"] = item["expenditure_kcal"]
+        unmapped = {k: str(v).strip() for k, v in row.items() if k and k not in _SUMMARY_KNOWN_COLUMNS and str(v or "").strip()}
+        if unmapped:
+            item[SUMMARY_UNMAPPED_FIELD] = unmapped
         day_items[date_str] = item
-    print(f"Summary parser: {len(day_items)} days, skipped {skipped} blank/invalid rows")
+    print(
+        f"Summary parser: {len(day_items)} days, skipped {skipped} blank/invalid rows "
+        f"({expenditure_only} carried an expenditure but no logged food — not written)"
+    )
     return day_items
+
+
+def summary_update_requests(item):
+    """The two UpdateItem requests for one summary day (#5097), tried in order.
+
+    1. OWN — the day has no diary food log (no row, a summary-only row, or an emptied
+       tombstone): SET the whole logical item, REMOVE any tombstone and any `total_X`
+       the vendor no longer reports. Conditional on `entries_count` being absent or 0.
+    2. MERGE — the condition failed, so a diary owns the day: SET only the
+       summary-owned fields. The diary's `food_log`, totals and derived scores stay.
+
+    Before #5097 the summary PutItem replaced the whole row and erased a diary day's
+    food_log. Pure: returns request kwargs, writes nothing."""
+    key = {"pk": item["pk"], "sk": item["sk"]}
+    owned = {k: v for k, v in item.items() if is_summary_owned(k)}
+    own_set = {k: v for k, v in item.items() if k not in key}
+    stale_totals = [f"total_{f}" for f in NUTRIENT_FIELD_NAMES if f"total_{f}" not in item]
+    return (
+        _update_request(key, own_set, remove=list(_TOMBSTONE_FIELDS) + sorted(stale_totals), owner_condition=True),
+        _update_request(key, owned),
+    )
+
+
+def _update_request(key, sets, remove=(), owner_condition=False):
+    names, values, set_parts = {}, {}, []
+    for i, (k, v) in enumerate(sorted(sets.items())):
+        names[f"#s{i}"] = k
+        values[f":s{i}"] = v
+        set_parts.append(f"#s{i} = :s{i}")
+    expr = "SET " + ", ".join(set_parts)
+    if remove:
+        for i, k in enumerate(remove):
+            names[f"#r{i}"] = k
+        expr += " REMOVE " + ", ".join(f"#r{i}" for i in range(len(remove)))
+    req = {"Key": key, "UpdateExpression": expr, "ExpressionAttributeNames": names, "ExpressionAttributeValues": values}
+    if owner_condition:
+        names["#ec"] = "entries_count"
+        values[":zero"] = 0
+        req["ConditionExpression"] = "attribute_not_exists(#ec) OR #ec = :zero"
+    return req
+
+
+def write_summary_day(tbl, item):
+    """Apply `summary_update_requests` — OWN, else MERGE. Returns 'owned' or 'merged'."""
+    own, merge = summary_update_requests(item)
+    try:
+        tbl.update_item(**own)
+        return "owned"
+    except Exception as exc:  # noqa: BLE001 — only the ownership condition falls through
+        code = (getattr(exc, "response", None) or {}).get("Error", {}).get("Code")
+        if code != "ConditionalCheckFailedException":
+            raise
+    tbl.update_item(**merge)
+    return "merged"
+
+
+def carry_summary_fields(day_items, stored_items):
+    """#5097: a diary PutItem replaces the whole row, so copy the summary-owned fields
+    of each stored day onto the diary's (or the empty record's) replacement item. A
+    field the diary item already carries is never overwritten. Mutates `day_items`;
+    returns `(day_items, days_that_carried_a_field)`."""
+    by_date = {str(s.get("date") or str(s.get("sk", "")).replace("DATE#", ""))[:10]: s for s in stored_items or ()}
+    carried = 0
+    for date_str, item in day_items.items():
+        fields = {k: v for k, v in (by_date.get(date_str) or {}).items() if is_summary_owned(k) and k not in item}
+        if fields:
+            item.update(fields)
+            carried += 1
+    return day_items, carried
 
 
 def archive_raw(bucket, source_key, content_bytes, subfolder=""):
@@ -736,14 +836,19 @@ def lambda_handler(event, context):
         first, last, _present = file_date_range(rows)
         if first is not None:
             try:
-                emptied = absent_day_items(rows, stored_days_in_range(first, last))
+                stored = stored_days_in_range(first, last)
+                emptied = absent_day_items(rows, stored)
             except Exception as exc:  # noqa: BLE001 — the import's writes outrank the clean-up
                 print(f"[#4638] ERROR: stored-range read failed ({type(exc).__name__}: {exc}); no empty days written")
-                emptied = {}
+                print("[#5097] ERROR: summary fields on these days cannot be carried forward; the next summary upload restores them")
+                stored, emptied = [], {}
             for date_str in emptied:
                 print(f"[#4638] {date_str}: stored but absent from the export's {first}..{last} range — writing an empty record")
             days_emptied = len(emptied)
             day_items.update(emptied)
+            # #5097: the diary PutItem replaces the row — keep the summary's expenditure & co.
+            _, days_carried = carry_summary_fields(day_items, stored)
+            print(f"[#5097] carried summary-owned fields forward on {days_carried} day(s)")
     elif csv_type == "workout":
         archive_raw(bucket, source_key, content_bytes, subfolder="workouts")
         day_items = build_workout_day_items(rows)
@@ -802,8 +907,11 @@ def lambda_handler(event, context):
                 continue
             if _vr.warnings:
                 print(f"[DATA-2] Validation warnings for {source_label}/{date_str_key}: {_vr.warnings}")
+        # #5097: a summary MERGES onto the day (OWN a food-less day, else MERGE onto the diary's).
+        if csv_type == "daily_summary":
+            print(f"[#5097] {date_str_key}: summary {write_summary_day(table, _mf_item)}")
         # ── REL-3: safe_put_item handles 400KB limit, CW metrics, and truncation ──
-        if _use_safe_put:
+        elif _use_safe_put:
             _safe_put(table, _mf_item, source=source_label, date_str=date_str_key)
         else:
             table.put_item(Item=_mf_item)

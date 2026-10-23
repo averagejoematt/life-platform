@@ -39,6 +39,7 @@ STRUCTURE
 
 import ast
 import datetime as _dt
+import importlib.util
 import re
 from pathlib import Path
 
@@ -136,8 +137,8 @@ def ingestion_paused_sources(path: Path = SOURCE_REGISTRY_PATH) -> dict:
 
 
 def ingestion_scheduled_lambda_count(path: Path = INGESTION_STACK_PATH) -> int | None:
-    """Count `create_platform_lambda(...)` calls in ingestion_stack.py that carry a
-    `schedule=` kwarg — the live EventBridge-scheduled ingestion fleet (#2003).
+    """Count `create_platform_lambda(...)` calls in ingestion_stack.py whose function has a
+    factory row in config/schedules.json — the live EventBridge-scheduled ingestion fleet (#2003, #4284).
 
     AST-parsed, not imported: the stack module drags in aws_cdk at import time. This
     deliberately EXCLUDES:
@@ -155,20 +156,30 @@ def ingestion_scheduled_lambda_count(path: Path = INGESTION_STACK_PATH) -> int |
     """
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"))
-    except (OSError, SyntaxError):
+        rows = _schedule_rows()
+    except (OSError, SyntaxError, ValueError, KeyError):
         return None
+    # #4284: a factory-built function is scheduled iff config/schedules.json carries its
+    # factory row (key == function name) — the factory reads it by function_name.
     total = scheduled = 0
     for node in ast.walk(tree):
         if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "create_platform_lambda"):
             continue
         total += 1
-        for kw in node.keywords:
-            if kw.arg == "schedule" and not (isinstance(kw.value, ast.Constant) and kw.value.value is None):
-                scheduled += 1
-                break
+        fn = next((kw.value.value for kw in node.keywords if kw.arg == "function_name" and isinstance(kw.value, ast.Constant)), None)
+        if fn in rows:
+            scheduled += 1
     if total == 0:
         return None
     return scheduled
+
+
+def _schedule_rows() -> dict:
+    """config/schedules.json via cdk/stacks/schedule_table.py, loaded by path (stdlib only, #4284)."""
+    spec = importlib.util.spec_from_file_location("_schedule_table_for_ops", ROOT / "cdk" / "stacks" / "schedule_table.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.load()
 
 
 _CDK_FUNC_RE = re.compile(r'function_name\s*=\s*["\']([a-z0-9_-]+)["\']')

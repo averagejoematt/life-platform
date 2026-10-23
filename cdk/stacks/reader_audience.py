@@ -7,7 +7,7 @@ and taught two READERS of the alarm board (the `/wrap` citation gate and
 after 72h. It deliberately added no notification surface.
 
 The consequence #3499 found: both of those readers run on a *slower or inverted* clock
-than the detector. The AI canary fires `cron(20 16 ? * MON,WED,FRI *)`; the remediation
+than the detector. The AI canary fires its config/schedules.json row; the remediation
 agent's own schedule was `45 14 * * 1,3,5` — **95 minutes BEFORE it**, so the responder
 read Friday's board before Friday's probe had run. The only other reader is the daily
 15:00Z digest. In a no-session week a Friday `/api/board_ask` outage was detected

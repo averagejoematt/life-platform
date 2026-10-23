@@ -33,7 +33,7 @@ be re-dated to that manifest in the same change — tests/test_kit_fixtures_fres
 tests/fixtures/edition_contract_4582/editions.json`` and the scorecard fixture the JS test reads.
 The next recapture is dated on docs/OPERATING_CALENDAR.md (ritual ``preview-fixture-recapture``).
 
-Last recaptured: 2026-10-17 (#4839, #4864). tests/test_kit_fixtures_fresh_4839.py reds when
+Last recaptured: 2026-10-18 (#4839, #4864; the post-#4988 deploy recapture, #4580). tests/test_kit_fixtures_fresh_4839.py reds when
 ``_capture.json`` is more than ``MAX_AGE_DAYS`` (30) days old, and when this line and the
 manifest name different days — re-run the script, then change the date here.
 

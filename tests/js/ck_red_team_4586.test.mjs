@@ -21,6 +21,7 @@ const EDITION = load("edition");
 const B = EDITION.blocks;
 const POSTS = load("posts");
 const later = (iso, days) => new Date(Date.parse(`${iso}T12:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
+const inWords = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
 const chapter = { ...B.chapter, state: "stale" };
 const latestDate = chapter.data.date;
 const n = P.weekNumberOf(chapter.data.week_label);
@@ -102,7 +103,7 @@ test("Coaches: a coach sitting out since before day one says what its counted ca
   const body = { coaches: [{ persona_id: "glucose_coach", name: "Amara Patel", absent: true, reason: "no sensor since 2026-08-27", record: { confirmed: 1, refuted: 6, n: 7 } }] };
   const start = B.today.data.start_date;
   assert.ok(start > "2026-08-27");
-  assert.match(P.teamHTML(body, "", "", { startDate: start }), /no sensor since August 27, before day one, so the calls counted here were checked on other readings\./);
+  assert.match(P.teamHTML(body, "", "", { startDate: start }), /no glucose monitor reading since August 27, before day one, so the calls counted here were checked on other readings\./);
   assert.doesNotMatch(P.teamHTML(body, "", "", { startDate: "2026-08-01" }), /before day one/, "a sitting-out date inside the run is not called pre-start");
   assert.doesNotMatch(P.teamHTML(body), /before day one/, "no start date served: no claim");
 });
@@ -137,7 +138,7 @@ test("Start: a chapter row prints the chapter's own change, the window named, no
   // Each row is a kit chapter row whose title is a door; each prologue says what it is.
   assert.match(html, /<ul class="ck-rows ck-rows--chapters">/);
   assert.match(html, /<a href="\/journal\/posts\/week-05\/">Nine Days and No Rest<\/a>/);
-  assert.match(html, /Who he was before the record\./);
+  assert.match(html, /Who he was before any of it was measured\./);
   assert.match(html, /The plan, written before day one\./);
   assert.doesNotMatch(html, /Before day one\./, "no prologue falls back to the shared line on the capture");
 });
@@ -165,12 +166,16 @@ test("Coaches: one rule for every row — the count, no bar; the lead says no ch
 
 test("Story on the capture's own day: the latest chapter and its date, the next date ahead, and no inferred held week", () => {
   const html = P.storyChapterHTML(EDITION, B, POSTS, load("episodes"));
-  assert.match(html, new RegExp(`Latest chapter · Week ${n} \\(written [A-Z][a-z]+ \\d+\\)`), "the dated fact the served data supports");
-  assert.doesNotMatch(html, new RegExp(`Week ${n + 1}|waiting for Matthew’s approval|held before publishing`), "no held week is inferred (week 6 published 2026-10-18T04:29Z)");
+  // The 2026-10-18 capture: week 6 is served `ok` with `latest.status` "published", five days after it was written,
+  // so the accent badge is right on the capture's own day; the written date is the byline's.
+  assert.match(html, new RegExp(`New this week · Week ${n}`), "the served chapter is fresh on the capture's day");
+  assert.match(html, new RegExp(`Dated ${inWords(latestDate)}\\. Written by AI from what the devices and logs recorded\\.`), "the dated fact the served data supports");
+  assert.doesNotMatch(html, new RegExp(`Week ${n + 1}|waiting for Matthew’s approval|waiting for approval|held before publishing`), "no held week is inferred (week 6 published 2026-10-18T04:29Z)");
+  assert.equal(B.chapter.data.latest.status, "published", "the held line binds chronicle.latest.status, which is published");
   assert.match(html, /The next draft is due [A-Z][a-z]+day, [A-Z][a-z]+ \d+; it publishes once Matthew approves it\./);
   const due = B.next.data.chapter.data.date;
   assert.ok(due > EDITION.as_of, `${due} is after ${EDITION.as_of}`);
-  assert.doesNotMatch(html, /New this week/);
+  assert.doesNotMatch(P.storyChapterHTML({ ...EDITION, as_of: later(latestDate, 11) }, B, POSTS, load("episodes")), /New this week/, "eleven days on, the badge is gone");
 });
 
 // ── round 3 ─────────────────────────────────────────────────────────────────────
@@ -225,16 +230,14 @@ test("Front, no bet and no exchange: the newest quotable line keeps the coaches'
 const V8 = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "site", "next", "v8");
 const shell = (page) => readFileSync(join(V8, page, "index.html"), "utf8");
 
-test("item 1: the two premise sentences are the drafts posted on #4590, marked as drafts until his word", () => {
+test("item 1: the two premise sentences are his approved copy (#4590), unmarked", () => {
   const front = shell("");
   const start = shell("start");
-  assert.match(front, /<p class="ck-premise" data-ck-draft="premise">I’m Matthew\. I’m trying to get from 327 pounds to 185 and to get my life back with it, in public, because I do better when someone is watching\. A team of AI coaches I built predicts how it will go, and code checks every call\.<\/p>/);
-  assert.match(start, /<p class="ck-premise" data-ck-draft="premise">I’m Matthew\. The weight was never really about food, so this is me measuring the whole thing out loud: what my scale, wrist strap, bed sensor and food log record each day, what the AI coaches I built with Claude make of it, and whether they were right\.<\/p>/);
+  assert.match(front, /<p class="ck-premise">I’m Matthew\. I’m trying to get from 327 pounds to 185 and to get my life back with it, in public, because I do better when someone is watching\. A team of AI coaches I built predicts how it will go, and code checks every call\.<\/p>/);
+  assert.match(start, /<p class="ck-premise">I’m Matthew\. The weight was never really about food, so this is me measuring the whole thing out loud: what my scale, wrist strap, bed sensor and food log record each day, what the AI coaches I built with Claude make of it, and whether they were right\.<\/p>/);
   for (const html of [front, start]) {
-    const note = /<p class="ck-small">(Preview\. [^<]*)<\/p>\s*<\/div>/.exec(html);
-    assert.ok(note, "the footer keeps its draft note");
-    assert.equal((note[1].match(/[.!?](\s|$)/g) || []).length, 2, `one short sentence after "Preview.": ${note[1]}`);
-    assert.match(note[1], /draft/i);
+    assert.doesNotMatch(html, /data-ck-draft/, "no draft mark on an approved sentence");
+    assert.doesNotMatch(html, /drafts until Matthew approves/, "the draft footer note is gone");
   }
   assert.doesNotMatch(front, /a program grades/, "front:F8 — the grader is code");
   assert.match(front, /<p class="ck-label">Graded by code<\/p>/);
@@ -245,11 +248,12 @@ test("item 3: one sayable guess sentence on the front and Start, the exact rate 
   assert.match(html, /^<a class="ck-link" href="\/next\/v8\/coaches\/">76 of 183 checked calls right\.<\/a> The coaches do not beat a simple guess yet\.<details class="ck-small"><summary>The exact rate<\/summary><p>A guess that every call has a 42% chance of coming true does about as well\.<\/p><\/details>$/);
   assert.equal(P.frontSlots(EDITION, B, "/next/v8/")["ck-record"], html);
   assert.equal(P.recordHTML(B.record).startsWith("76 of 183 checked calls right. The coaches"), true, "Start: no door on the count, the page has its own");
-  assert.equal(P.guessSentence({ ...B.record.data, beats_simple_guess: true }), "The coaches beat a simple guess.");
-  assert.equal(P.guessSentence({ ...B.record.data, brier_skill: null }), "There is no comparison with a guess yet.");
+  assert.equal(P.guessSentence({ ...B.record.data, comparison_text: "", beats_simple_guess: true }), "The coaches beat a simple guess.");
+  assert.equal(P.guessSentence({ ...B.record.data, comparison_text: "", brier_skill: null }), "There is no comparison with a guess yet.");
   // Lane E's served shapes (lambdas/web/record_words.py): comparison_text is the one sentence, baseline.text the exact rate.
   assert.equal(P.guessSentence({ ...B.record.data, comparison_text: "Too few checked calls yet to compare the coaches with a simple guess." }), "Too few checked calls yet to compare the coaches with a simple guess.", "lane E's served sentence wins");
-  assert.equal(P.guessSentence(B.record.data), "The coaches do not beat a simple guess yet.", "the capture's older 'So far they…' form is re-said");
+  assert.equal(P.guessSentence(B.record.data), B.record.data.comparison_text, "the 2026-10-18 capture serves lane E's sentence, and it is printed as served");
+  assert.equal(P.guessSentence({ ...B.record.data, comparison_text: "So far they do not beat a simple guess." }), "The coaches do not beat a simple guess yet.", "the pre-deploy 'So far they…' form is re-said");
   const served = { ...B.record.data, comparison_text: "The coaches do not beat a simple guess yet.", baseline: { rule: "base_rate", rate: 0.415, rate_pct: 42, text: "A guess that every call has a 42% chance of coming true does about as well." } };
   assert.match(P.recordHTML({ ...B.record, data: served }), /<details class="ck-small"><summary>The exact rate<\/summary><p>A guess that every call has a 42% chance of coming true does about as well\.<\/p><\/details>$/);
   assert.equal(P.exactRateText({ ...B.record.data, baseline: { rate: 0.42 } }), P.guessClause(B.record.data), "a baseline with no text: the clause computed here");
@@ -261,7 +265,10 @@ test("item 4: Go deeper leads with the latest chapter — chronicle.latest when 
   const front = shell("");
   const deeper = /<ul class="ck-rows ck-rows--deeper">\s*<li id="ck-chapter-row">/.test(front);
   assert.ok(deeper, "the chapter row is the first row");
-  assert.equal(P.latestChapterBlock(B), B.chapter, "no served latest: the chapter block as today");
+  const unserved = { ...B, chapter: { ...B.chapter, data: { ...B.chapter.data, latest: null } } };
+  assert.equal(P.latestChapterBlock(unserved), unserved.chapter, "no served latest: the chapter block as today");
+  assert.deepEqual(B.chapter.data.latest, { week: 6, label: "Week 6", date: "2026-10-13", status: "published" }, "the 2026-10-18 capture serves chronicle.latest");
+  assert.equal(P.latestChapterBlock(B).data.date, B.chapter.data.latest.date, "the served latest's date leads");
   // Lane E: chapter.data.latest {week, label, date, status} over the block's own label and date.
   const latest = { week: 6, label: "Week 6", date: "2026-10-13", status: "published" };
   const served = { ...B, chapter: { ...B.chapter, data: { ...B.chapter.data, title: "The Quiet Accumulation", url: "/journal/posts/week-09/", read_minutes: 7, latest, held: null, next_due: "2026-10-21" } } };
@@ -301,21 +308,22 @@ test("item 6: Start carries the Follow block, the same markup as the front page,
   for (const page of ["", "start"]) assert.match(shell(page), /<link rel="alternate" type="application\/rss\+xml"[^>]*href="\/panelcast\/feed\.xml">/);
 });
 
-test("item 8 / round 2 (front): the mark names its floor in ONE line under it — top is the start, floor is the goal — never a left/right pair that reads as a time axis", () => {
+test("item 8 / round 2 (front): the mark names its frame in ONE line under it — the year from the start, top the start weight, floor the goal — never a left/right pair that reads as a time axis (C, #4646)", () => {
   const t = B.today.data;
-  const ends = F.markEndsHTML(t.start_weight_lbs, t.goal_weight_lbs);
-  assert.equal(ends, '<div class="ck-ends"><span>Each column runs from 327.3 lb, the start, at the top to 185 lb, the goal, at the floor.</span></div>');
+  const ends = F.markEndsHTML(t.start_weight_lbs, t.goal_weight_lbs, t.start_date);
+  assert.equal(ends, '<div class="ck-ends"><span>The frame is one year from September 6; its top is 327.3 lb, the start, and its floor 185 lb, the goal.</span></div>');
   assert.equal((ends.match(/<span>/g) || []).length, 1, "one span, one line");
-  // The legend's "grey" is the kit's faint ink, not the hairline colour that did not read as grey.
+  // The columns are the kit's soft ink and the frame its hairline: the accent claims progress, a column is weight still to lose.
   const css = readFileSync(join(SITE, "assets", "css", "clean.css"), "utf8");
-  assert.match(css, /\.ck-mark__left \{ fill: var\(--ck-faint\); \}/);
-  assert.match(shell(""), /green is gone, grey is left to 185/);
+  assert.match(css, /\.ck-mark__day \{ fill: var\(--ck-soft\); \}/);
+  assert.match(css, /\.ck-mark__frame \{ fill: none; stroke: var\(--ck-line\); \}/);
+  assert.match(shell(""), /One column per weigh-in, as tall as the weight still above 185\./);
   assert.ok(P.frontSlots(EDITION, B, "/next/v8/")["ck-mark"].endsWith(ends));
   assert.equal(F.markEndsHTML(null, 185), "");
   assert.equal(F.markEndsHTML(180, 185), "", "a start under the goal names no floor");
   // front:F5: the caption sits under the mark, then the record — not the record between them.
   const front = shell("");
-  assert.ok(front.indexOf('id="ck-mark"') < front.indexOf("One column a day") && front.indexOf("One column a day") < front.indexOf('id="ck-record"'));
+  assert.ok(front.indexOf('id="ck-mark"') < front.indexOf("One column per weigh-in") && front.indexOf("One column per weigh-in") < front.indexOf('id="ck-record"'));
 });
 
 // ── site-to-A round 1 (2026-10-18, the verified shared-helper defects of #4580, lane J) ──────
@@ -335,9 +343,9 @@ test("Start: the weight chart is framed start to goal, as the front page's mark 
   // Round 2 (start, G10): no text inside the SVG — it scaled with the viewBox to ~6 px on a phone.
   // The frame's two rules are named in one kit text row under the dates.
   assert.doesNotMatch(html, /<text/, "no text inside the drawing");
-  assert.ok(html.includes(`<div class="ck-ends"><span>The top rule is ${String(t.start_weight_lbs)} lb, the start; the dashed rule is ${String(Number(t.goal_weight_lbs))} lb, the goal.</span></div>`), html.slice(-300));
-  assert.ok(html.indexOf("October 17 · ") < html.indexOf("The top rule is"), "the dates row first, the frame line under it");
-  assert.doesNotMatch(P.chartHTML(series), /The top rule/, "no frame served: no frame line");
+  assert.ok(html.includes(`<div class="ck-ends"><span>The top line is ${String(t.start_weight_lbs)} lb, the start; the dashed line is ${String(Number(t.goal_weight_lbs))} lb, the goal.</span></div>`), html.slice(-300));
+  assert.ok(html.indexOf("October 17 · ") < html.indexOf("The top line is"), "the dates row first, the frame line under it");
+  assert.doesNotMatch(P.chartHTML(series), /The top line/, "no frame served: no frame line");
   // The same frame as the mark: the latest point sits the same share of the way down the frame
   // as the mark says is gone.
   const pts = [...series].sort((a, b) => a.date.localeCompare(b.date));
@@ -354,21 +362,30 @@ test("Start: the weight chart is framed start to goal, as the front page's mark 
   assert.match(bare, /ck-chart__line/);
 });
 
-test("one quantity, one unit: recovery is a percentage on the day line, the trend and the call card; a served unit wins", () => {
-  assert.equal(F.recoveryShown("recovery 62 out of 100"), "recovery 62%");
-  assert.equal(D.MEASURES.recovery.write(62), "62%");
-  assert.equal(D.MEASURES.recovery.unit, "%");
-  assert.doesNotMatch(D.MEASURES.recovery.about, /out of 100/);
+test("one quantity, one unit: recovery is printed out of 100 on the day line, the trend and the call card; a served unit wins", () => {
+  // Re-grade 2026-10-18: the route serves " out of 100" beside every recovery measure (lane E), and that
+  // served string is the one fallback too — so the band, the day page, the trend and the call card agree.
+  assert.equal(D.RECOVERY_UNIT, "out of 100");
+  assert.equal(F.recoveryShown("recovery 62 out of 100"), "recovery 62 out of 100");
+  assert.equal(F.recoveryShown("recovery 62%"), "recovery 62 out of 100", "an older percent form takes the one unit");
+  assert.equal(F.recoveryShown("recovery 62 out of 100", "%"), "recovery 62%", "a served unit wins over the fallback");
+  assert.equal(D.MEASURES.recovery.write(62), "62 out of 100");
+  assert.equal(D.MEASURES.recovery.unit, "out of 100");
+  assert.doesNotMatch(D.MEASURES.recovery.about, /percentage/);
   const calls = load("calls").calls;
   const recovery = calls.find((c) => c.kind === "number" && /recovery score/.test(c.called) && /^\d+(\.\d+)?$/.test(c.tolerance.text));
-  assert.match(V.ruleFor(recovery, recovery.verdict === "right"), /^(not )?within [\d.]+% either way$/);
-  assert.doesNotMatch(V.ruleFor(recovery, true), /points|out of 100/);
-  assert.match(TERMS.find(([, term]) => term === "Recovery")[2], /percentage/);
+  assert.match(V.ruleFor(recovery, recovery.verdict === "right"), /^(not )?within [\d.]+ out of 100 either way$/);
+  assert.doesNotMatch(V.ruleFor(recovery, true), /points|%/);
+  assert.match(TERMS.find(([, term]) => term === "Recovery")[2], /out of 100/);
   // The served unit, when the route names one (lane E of #4580), is read before any of this.
   assert.equal(V.ruleFor({ ...recovery, tolerance: { ...recovery.tolerance, unit: "points" } }, true), `within ${recovery.tolerance.text} points either way`);
+  assert.equal(V.ruleFor({ ...recovery, actual: { ...recovery.actual, unit: "%" } }, true), `within ${recovery.tolerance.text}% either way`, "the call's served actual.unit is read");
   assert.equal(D.servedUnit("recovery", { pulse: { units: { recovery_pct: "points" } } }), "points");
+  assert.equal(D.servedUnit("recovery", { edition: EDITION.blocks }), "out of 100", "the edition week's served unit is read");
+  assert.equal(D.servedUnit("weight", { edition: EDITION.blocks }), "lb");
   assert.equal(D.writerFor("recovery", { pulse: { units: { recovery_pct: "points" } } })(62), "62 points");
-  assert.equal(D.writerFor("recovery", { pulse: {} })(62), "62%");
+  assert.equal(D.writerFor("recovery", { pulse: { units: { recovery_pct: "%" } } })(62), "62%");
+  assert.equal(D.writerFor("recovery", { pulse: {} })(62), "62 out of 100");
   // A unit in parentheses beside a number survives the rule reader; a gloss in parentheses does not.
   const bet = { kind: "bet", called: "Two coaches bet on whether his weight (lb) would be below 305 on October 16. Max Reyes said yes." };
   assert.equal(V.ruleFor(bet, true), "on whether his weight (lb) would be below 305 on October 16");
@@ -376,13 +393,53 @@ test("one quantity, one unit: recovery is a percentage on the day line, the tren
   assert.equal(V.ruleFor(gloss, true), "on whether his morning recovery score would be below 70 on September 30");
 });
 
+// Re-grade 2026-10-18: the front page's call line and the call pages said "out of 100", the front band and
+// the day page "62%". One case over the real fixtures: the same recovery reading, the same unit string, on all three.
+test("one unit for recovery on the front band, the day page and the call card, from the served fixtures", () => {
+  const detail = B.week.data.detail.find((d) => d.facts.some((f) => f.recovery && typeof f.recovery.value === "number"));
+  assert.ok(detail, "the capture's week carries a day with a served recovery reading");
+  const fact = detail.facts.find((f) => f.recovery);
+  const served = fact.recovery.unit;
+  assert.equal(served, " out of 100", "the route's served recovery unit (prediction_reason.MEASURE_UNITS)");
+  assert.equal(served.trim(), D.RECOVERY_UNIT, "the kit's fallback IS the served string, so a page with no unit served agrees");
+  const n = Math.round(fact.recovery.value);
+  const expected = `${n} out of 100`;
+  // Front band: yesterday's facts line.
+  const front = F.factLine(detail.facts);
+  assert.match(front, new RegExp(`recovery ${expected}(?:\\b|$)`), `front: ${front}`);
+  assert.doesNotMatch(front, /recovery \d+%/);
+  // Day page: the measured facts, read from the pulse body with no unit served — the fallback.
+  const pulse = load("pulse_history");
+  const day = D.dayFactsHTML(detail.date, { pulse }, "/next/v8/");
+  assert.ok(day.includes(`Recovery: ${expected}`), `day: ${day}`);
+  assert.doesNotMatch(day, /Recovery: \d+%/);
+  // Life row: the same served shape on the longer view.
+  const life = B.life.data.rows.sleep.data.recovery;
+  assert.equal(life.unit, served, "life.rows.sleep.recovery carries the same served unit");
+  // Call card: a recovery call's served actual.unit, and the rule's unit, are the same string.
+  const call = B.calls.data.calls.find((c) => c.kind === "number" && /recovery score/.test(c.called) && c.actual && c.actual.unit);
+  assert.ok(call, "the capture's calls carry a recovery call with a served actual.unit");
+  assert.equal(call.actual.unit, served, "calls[].actual.unit is the served recovery unit");
+  assert.equal(V.servedUnit(call), D.RECOVERY_UNIT);
+  assert.match(V.ruleFor(call, call.verdict === "right"), /^(not )?within [\d.]+ out of 100 either way$/);
+  // The served sentences on the call pages already say it the same way.
+  const bet = B.calls.data.calls.find((c) => c.kind === "bet" && /recovery score/.test(c.called_short || ""));
+  if (bet) assert.match(bet.called_short, /\d+ out of 100/);
+  assert.doesNotMatch([front, day, V.ruleFor(call, true)].join(" "), /\d%|percentage/, "no percent form of recovery anywhere");
+});
+
 test("Week: a row with too little data takes the hollow dot and says so; every scored row has a dot", () => {
-  const html = F.scorecardHTML(B.scorecard, "/next/v8/");
+  // The 2026-10-17 capture served a thin Food row ("2 days logged; 5 are needed."); the 2026-10-18 capture's Food row
+  // is scored (not_yet), so the thin case is that served shape planted on the same row, and the served card has no hollow dot.
+  assert.equal(B.scorecard.data.rows.food.data.verdict, "not_yet", "this capture's Food row is scored");
+  assert.equal((F.scorecardHTML(B.scorecard, "/next/v8/").match(/ck-dot--none/g) || []).length, 0, "no thin row on the served card");
+  const foodRow = B.scorecard.data.rows.food;
+  const thin = { ...B.scorecard, data: { ...B.scorecard.data, rows: { ...B.scorecard.data.rows, food: { ...foodRow, data: { ...foodRow.data, verdict: "not_enough_data", verdict_text: "Too few days logged", text: "2 days logged; 5 are needed." } } } } };
+  const html = F.scorecardHTML(thin, "/next/v8/");
   const food = /<li><a class="ck-rows__key" href="[^"]*">Food<\/a><span>(.*?)<\/span><\/li>/.exec(html);
   assert.ok(food, "the Food row");
-  assert.equal(B.scorecard.data.rows.food.data.verdict, "not_enough_data", "the capture's Food row is the thin one");
   assert.match(food[1], /^<i class="ck-dot ck-dot--off ck-dot--none" aria-hidden="true"><\/i><b>Too few days logged\.<\/b> 2 days logged; 5 are needed\. <span class="ck-small">Not enough data for a verdict\.<\/span>/);
-  const rows = F.scorecardRows(B.scorecard).filter(({ row }) => row.state === "ok" && row.data && row.data.verdict_text);
+  const rows = F.scorecardRows(thin).filter(({ row }) => row.state === "ok" && row.data && row.data.verdict_text);
   assert.equal((html.match(/<i class="ck-dot/g) || []).length, rows.length, "one dot per scored row, the thin one included");
   assert.equal((html.match(/ck-dot--none/g) || []).length, 1);
 });
@@ -396,9 +453,9 @@ test("Trend index: each row carries its latest served reading and the day, and t
     const pts = D.seriesOf(key, src, today);
     const last = pts[pts.length - 1];
     assert.ok(last, `${key} has a served reading`);
-    assert.ok(html.includes(`>${m.name} · ${m.write(last.value)} <span>${new Date(`${last.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" })} `), `${key}: its latest value and day`);
+    assert.ok(html.includes(`>${m.source ? `${m.name} (${m.source})` : m.name} · ${m.write(last.value)} <span>${new Date(`${last.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" })} `), `${key}: its latest value and day`);
   }
-  assert.match(D.trendIndexDay(src), /^Saturday, October 17 · Day 42$/);
+  assert.match(D.trendIndexDay(src), /^Sunday, October 18 · Day 43$/);
   assert.equal(D.trendIndexDay({}), "");
   assert.doesNotMatch(D.trendIndexHTML("/next/v8/"), / · /, "with no bodies, the names alone");
   assert.doesNotMatch(html, /\d{4}-\d{2}-\d{2}|undefined|NaN/);
@@ -461,7 +518,8 @@ const plain = (html) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(
 
 test("Story ST10: one frame sentence under the chapter title says what the site is", () => {
   const html = P.storyChapterHTML(EDITION, B, POSTS, EPISODES);
-  assert.match(html, new RegExp(`</h1><p class="ck-soft">${P.STORY_FRAME.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/’/g, "(?:’|&#39;|&rsquo;)")}</p>`));
+  // Red team round 3 (A-16): his sentence opens the lead, above the chapter's label and title.
+  assert.match(html, new RegExp(`^<p class="ck-soft">${P.STORY_FRAME.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/’/g, "(?:’|&#39;|&rsquo;)")}</p><span class="ck-(badge|label)">`));
   assert.match(P.STORY_FRAME, /predicts how it will go, and code checks every call\.$/);
 });
 
@@ -475,7 +533,8 @@ test("Story ST1: the newest published episode plays under the chapter when this 
   const html = P.storyChapterHTML(EDITION, B, POSTS, EPISODES);
   const newest = [...EPISODES.episodes].sort((a, b) => b.date.localeCompare(a.date))[0];
   assert.match(html, new RegExp(`<audio controls preload="none" src="${newest.url}"`));
-  assert.match(html, new RegExp(`The newest episode, for week ${newest.week}: ${newest.guest_name} · ${Math.round(newest.duration_sec / 60)} min\\.`));
+  // Red team round 3 (A-17): the weeks between the newest episode and this held chapter's are said.
+  assert.match(html, new RegExp(`No episode yet for week ${newest.week + 1}; the newest, for week ${newest.week}: ${newest.guest_name} · ${Math.round(newest.duration_sec / 60)} min\\.`));
   assert.match(html, /This chapter’s own episode is recorded and held for review\./);
   const rows = P.episodeRowsHTML(EPISODES, { playing: newest.url });
   assert.doesNotMatch(rows, /href="[^"]*\.mp3"/, "no bare .mp3 link");
@@ -515,12 +574,24 @@ test("Coaches C2/C5: a lagging record says its day, the lead's row says why ther
   const row = (name) => html.split("<li>").find((li) => li.includes(name));
   const lag = COACHES.coaches.filter((c) => c.record && c.record.through < EDITION.as_of);
   const current = COACHES.coaches.filter((c) => c.record && c.record.through === EDITION.as_of);
-  assert.ok(lag.length >= 1 && current.length >= 1, "the capture has both kinds");
-  for (const c of lag) assert.match(row(c.name), new RegExp(`${c.record.confirmed} of ${c.record.n}<br><span class="ck-small">through [A-Z][a-z]+ \\d+</span>`), c.name);
-  for (const c of current) assert.doesNotMatch(row(c.name), /through/, c.name);
+  // The 2026-10-18 capture is from 00:15 Pacific: every record is through the day before, so the current kind is
+  // the served Lisa Park row read as of her own `through` day.
+  assert.ok(lag.length >= 1, "the capture has a lagging record");
+  // Red team round 3 (A-25): the record cell is the count alone; the lagging days are ONE note under the list,
+  // each day naming its coaches, never an orphan "through October 14" line in a cell.
+  const note = (h) => (/<\/ul><p class="ck-small">(Counted through [^<]+|Every record above is counted through [^<]+)<\/p>/.exec(h) || [])[1] || "";
+  for (const c of lag) {
+    assert.match(row(c.name), new RegExp(`ck-coach__record">${c.record.confirmed} of ${c.record.n}</span>`), c.name);
+    assert.ok(note(html).includes(c.name), `${c.name} is named in the lag note`);
+  }
+  assert.doesNotMatch(html.split("</ul>")[0], /through/, "no lag line inside the list");
+  for (const c of current) assert.ok(!note(html).includes(c.name), c.name);
+  const lisa = COACHES.coaches.find((c) => c.name === "Lisa Park");
+  const onHerDay = P.teamHTML(COACHES, "", "", { asOf: lisa.record.through });
+  assert.ok(!note(onHerDay).includes("Lisa Park"), "a record through the page's day is not named in the lag note");
   assert.match(row("Eli Marsh"), /ck-coach__job">Lead, the day's plan; runs the program, so no checked calls<\/span><span class="ck-coach__record">none<\/span>/);
   assert.doesNotMatch(row("Amara Patel").split("</li>")[0], /sitting out/i, "not in the row");
-  assert.match(html, /<\/ul><p class="ck-small">Amara Patel is sitting out: no sensor since August 27\.<\/p>$/, "one line under the list");
+  assert.match(html, /<p class="ck-small">Amara Patel is sitting out: no glucose monitor reading since August 27\.<\/p>$/, "one line under the list");
   assert.doesNotMatch(html, /ck-meter/);
   assert.doesNotMatch(P.teamHTML(COACHES), /through/, "no edition day: no lag claim");
 });
@@ -569,26 +640,31 @@ test("Week W4: the page ends on a dated next line from the served next block, el
 });
 
 test("Day D1: no lifts and a walk say the absence first, and the walk is the served modality minutes", () => {
-  const iso = EDITION.as_of;
-  const row = SRC.training.daily_modality_minutes_30d.find((r) => r.date === iso);
-  assert.ok(row && row.walking_min > 0 && !SRC.workouts.workouts.some((w) => w.date === iso), "the capture's day has a walk and no session");
+  // The capture is from 00:15 Pacific: its own day has no minutes yet, so the day is the newest served row with a walk and no session.
+  const row = [...SRC.training.daily_modality_minutes_30d].reverse().find((r) => r.walking_min > 0 && !SRC.workouts.workouts.some((w) => w.date === r.date));
+  assert.ok(row, "the capture has a day with a walk and no session");
+  const iso = row.date;
   const html = D.dayLiftsHTML(iso, SRC, "/next/v8/");
   assert.equal(html, `<p class="ck-soft">No lifting logged that day.</p><p class="ck-soft">Also that day: ${row.walking_min} minutes of walking.</p>`);
   assert.match(D.dayLiftsHTML("2026-01-01", SRC, "/next/v8/"), /^<p class="ck-soft">No training was recorded on this day\.<\/p>$/);
 });
 
 test("Day D2: the checked call carries the day of its reading — observed_on when served, the served sentence's day until then", () => {
-  const call = CALLS.calls.find((c) => c.settled_date === EDITION.as_of && c.kind === "number");
-  assert.ok(call, "a number call settled on the capture's day");
-  assert.match(D.daySettledHTML(EDITION.as_of, CALLS, "/next/v8/"), /Graded on the reading for [A-Z][a-z]+ \d+\./);
+  // The capture is from 00:15 Pacific: nothing settled on its own day yet, so the day is the newest settled number call's.
+  const call = CALLS.calls.filter((c) => c.kind === "number").sort((a, b) => (a.settled_date < b.settled_date ? 1 : -1))[0];
+  assert.ok(call && call.observed_on_text, "a settled number call in the capture, with lane E's observed_on_text served");
+  assert.match(D.daySettledHTML(call.settled_date, CALLS, "/next/v8/"), /Graded on [A-Z][a-z]+day’s reading, [A-Z][a-z]+ \d+\./, "the served observed_on day");
   assert.equal(D.observedOnText({ ...call, observed_on: "2026-10-16" }), "Graded on Friday’s reading, October 16.");
   assert.equal(D.observedOnText({ ...call, observed_on: null, observed_on_text: "Friday, October 16" }), "Graded on Friday’s reading, October 16.", "lane E's served words");
-  assert.equal(D.observedOnText({ ...call, called: "Max Reyes called his weight at about 304.5 lb.", observed_on: null }), "");
+  assert.equal(D.observedOnText({ ...call, called: "Max Reyes called his weight at about 304.5 lb.", observed_on: null, observed_on_text: null }), "", "nothing served and no day in the sentence: no line");
 });
 
 test("Day D3: a 'call' with no date and no number in it is labelled a note", () => {
-  const moves = load("coach_moves_2026-10-17");
-  const html = D.daySaidHTML(EDITION.as_of, moves, "/next/v8/");
+  // The 2026-10-17 day file carried Nathan Reeves's dateless, numberless 'call'; the 2026-10-18 pass no longer captures
+  // that day (the script writes the gate's days and the newest), so the case is that line planted on a captured day.
+  const captured = load("coach_moves_2026-10-07");
+  const moves = { ...captured, lines: [{ ...captured.lines[0], coach_id: "mind_coach", coach: "Nathan Reeves", move: "call", move_label: "A call", text: "I expect the silence continues until he names what he's avoiding." }] };
+  const html = D.daySaidHTML("2026-10-07", moves, "/next/v8/");
   assert.match(html, /Nathan Reeves<\/a> · A note<\/span>/);
   assert.doesNotMatch(html, /· A call/);
   assert.equal(D.datedCall("Weight will be around 304.5 pounds tomorrow morning"), true);
@@ -596,7 +672,7 @@ test("Day D3: a 'call' with no date and no number in it is labelled a note", () 
   assert.equal(D.datedCall("I expect the silence continues until he names what he's avoiding."), false);
   assert.equal(D.datedCall("Protein will rise next week."), false, "a date word with no number is not a checkable call");
   const dated = { ...moves, lines: [{ ...moves.lines[0], text: "Weight will be around 304.5 pounds tomorrow morning" }] };
-  assert.match(D.daySaidHTML(EDITION.as_of, dated, "/next/v8/"), /· A call<\/span>/);
+  assert.match(D.daySaidHTML("2026-10-07", dated, "/next/v8/"), /· A call<\/span>/);
 });
 
 // ── site-to-A round 1, lane D (2026-10-18): the sheet, how it's built, the appendix, a call, a coach ──
@@ -756,8 +832,10 @@ test("Appendix: an earlier version of a v8 page says so, and a codename is small
 
 test("Call: a bet's short sentence carries the unit its long sentence names; a short sentence with no unit in the long one is left alone", () => {
   const bet = load("calls").calls.find((c) => c.id.startsWith("bet-20261016"));
-  assert.ok(bet && /as a percentage/.test(bet.called) && /at or above 26 on/.test(bet.called_short), "the capture's bet drops the unit on the short form");
-  assert.equal(C.calledShortWithUnit(bet), bet.called_short.replace("at or above 26 on", "at or above 26% on"));
+  // Lane E's deploy (2026-10-18): the served short sentence carries the unit; the pre-deploy form that dropped it is the mutation.
+  assert.ok(bet && /as a percentage/.test(bet.called) && /at or above 26% on/.test(bet.called_short), "the capture's bet carries the unit on the short form");
+  assert.equal(C.calledShortWithUnit(bet), bet.called_short, "a served unit is not doubled");
+  assert.equal(C.calledShortWithUnit({ ...bet, called_short: bet.called_short.replace("at or above 26% on", "at or above 26 on") }), bet.called_short, "the dropped unit is restored from the long sentence");
   assert.equal(C.calledShortWithUnit({ called_short: "X bet on whether it would be at or above 26 on October 16.", called: "X bet on whether the share would be at or above 26 on October 16." }), "X bet on whether it would be at or above 26 on October 16.", "no unit named, none invented");
   assert.equal(C.calledShortWithUnit({ called_short: "at or above 190 g on October 16.", called: "(in grams) at or above 190 g" }), "at or above 190 g on October 16.", "a unit already there is not doubled");
   assert.equal(C.calledShortWithUnit({ called_short: "below 305 by October 20.", called: "his weight (in pounds) below 305" }), "below 305 lb by October 20.");
@@ -805,13 +883,13 @@ test("round 2 (week, item 4): 'faster than planned' takes the hollow dot and its
 
 test("round 2 (story, item 5): a stale chapter takes the neutral label, never the accent badge", () => {
   const stale = P.chapterHTML({ ...B.chapter, state: "stale" }, B.next, { asOf: EDITION.as_of });
-  assert.match(stale, /^<span class="ck-label">Latest chapter · Week 5 \(written October 6\)<\/span><h1>/);
+  assert.match(stale, /^<span class="ck-label">Latest chapter · Week 6 \(written October 13\)<\/span><h1>/);
   assert.doesNotMatch(stale, /ck-badge/);
   const old = P.chapterHTML(B.chapter, B.next, { asOf: later(B.chapter.data.date, 11) });
   assert.match(old, /^<span class="ck-label">Latest chapter/, "ok but eleven days old: the same neutral label");
   assert.doesNotMatch(old, /ck-badge/);
   const fresh = P.chapterHTML({ ...B.chapter, state: "ok" }, B.next, { asOf: later(B.chapter.data.date, 3) });
-  assert.match(fresh, /^<span class="ck-badge">New this week · Week 5<\/span><h1>/, "fresh: the accent badge, as before");
+  assert.match(fresh, /^<span class="ck-badge">New this week · Week 6<\/span><h1>/, "fresh: the accent badge, as before");
   assert.doesNotMatch(P.storyChapterHTML({ ...EDITION, as_of: later(B.chapter.data.date, 11) }, { ...B, chapter: { ...B.chapter, state: "stale" } }, POSTS, load("episodes")), /ck-badge/);
 });
 
@@ -842,5 +920,106 @@ test("round 2 (coaches, item 8): until the served sentence lands, the big record
   // Lane E's served sentence wins here as it does on the front; its baseline text is the exact rate.
   const served = { ...B.record, data: { ...B.record.data, comparison_text: "Too few checked calls yet to compare the coaches with a simple guess.", baseline: { text: "A guess that every call has a 42% chance of coming true does about as well." } } };
   assert.match(P.recordBigHTML(served), /<p>Too few checked calls yet to compare the coaches with a simple guess\.<\/p><details class="ck-small"><summary>The exact rate<\/summary>/);
-  assert.doesNotMatch(P.recordBigHTML({ ...B.record, data: { ...B.record.data, brier_skill: null } }), /The exact rate/, "no skill served: no fold");
+  assert.doesNotMatch(P.recordBigHTML({ ...B.record, data: { ...B.record.data, brier_skill: null, baseline: null } }), /The exact rate/, "no skill and no served baseline: no fold");
+});
+
+// ── red team round 3 (2026-10-18, the verified site findings; Refs #4580 #4586) ──────────────────
+// The capture is from 00:15 Pacific on October 18, before that day's Strava WeightTraining was served, so the
+// strength-only day below is the captured row shape with the live day's served value (41 minutes) set on it.
+// A recapture after the day is served would make this pin wire-bound.
+test("round 3 B-06/B-02/B-11: a strength session the strap recorded is training on the day page, never 'no training'", () => {
+  const live = structuredClone(SRC);
+  const day = live.training.daily_modality_minutes_30d.find((r) => r.date === "2026-10-18");
+  Object.assign(day, { strength_min: 41, total_min: 41 });
+  assert.ok(!live.workouts.workouts.some((w) => w.date === "2026-10-18"), "no lifting session logged that day");
+  const html = D.dayLiftsHTML("2026-10-18", live, "/next/v8/");
+  assert.equal(html, '<p class="ck-soft">No lifting logged that day.</p><p class="ck-soft">Also that day: 41 minutes of strength.</p>');
+  // the trend counts the same minutes the day page now names
+  const pts = D.seriesOf("training", live, "2026-10-18");
+  assert.equal(pts[pts.length - 1].value, 41);
+  // On a day with a logged session the strength minutes ARE the session: never said twice.
+  const lifted = live.training.daily_modality_minutes_30d.find((r) => r.strength_min > 0 && live.workouts.workouts.some((w) => w.date === r.date && (w.exercises || []).length));
+  assert.ok(lifted, "the capture has a lifting day");
+  assert.doesNotMatch(D.dayLiftsHTML(lifted.date, live, "/next/v8/"), /minutes of strength/);
+});
+
+test("round 3 B-12: a running count's partial today is said as today so far, outside the lowest and highest", () => {
+  const write = (v) => `${v} minutes`;
+  const pts = [{ date: "2026-10-16", value: 158 }, { date: "2026-10-17", value: 168 }, { date: "2026-10-18", value: 41 }];
+  assert.equal(D.trendSentence(pts, write, { today: "2026-10-18" }), "2 readings from October 16 to October 17. Lowest 158 minutes, highest 168 minutes, average 163 minutes. Today so far: 41 minutes.");
+  assert.match(D.trendSentence(pts, write), /Lowest 41 minutes/, "no today named: every reading counts, as before");
+});
+
+test("round 3 B-10: the trend index says whose step count it prints", () => {
+  const src = { pulse: load("pulse_history"), nutrition: load("nutrition_overview"), training: load("training_overview") };
+  assert.match(D.trendIndexHTML("/next/v8/", src, EDITION.as_of), />Steps \(wrist strap, else phone\) · [\d,]+ <span>/);
+  assert.doesNotMatch(D.MEASURES.steps.about, /as my phone and watch counted them/, "the old line named the wrong device first");
+});
+
+test("round 3 B-07: the week's silence line names its own record, not the journal a coach counts from", () => {
+  const html = P.weekSlots(EDITION, B, "/next/v8/")["ck-words-absent"];
+  assert.equal(B.his_words.state, "stale");
+  assert.match(html, /^Nothing new in his own words since [A-Z][a-z]+day, [A-Z][a-z]+ \d+\. Counted from his replies and his notes on the plan, not the journal\.$/);
+  assert.equal(P.wordsSourceNote({ source: "/api/journal" }), "", "another record is not named as this one");
+  const fresh = { ...B, his_words: { state: "ok", source: "/api/owner_words", data: { text: "x", date: "2026-10-18" }, absent_text: "" } };
+  assert.equal(P.weekSlots(EDITION, fresh, "/next/v8/")["ck-words-absent"], null, "fresh words: no silence line");
+});
+
+test("round 3 A-12: Start's served numbers sit under the approved opening", () => {
+  assert.match(shell("start"), /whether they were right\.<\/p>\s*<p class="ck-soft" id="ck-start-line"><\/p>/);
+  const t = B.today.data;
+  const line = P.startNumbersLine(t, EDITION);
+  assert.match(line, new RegExp(`^From ${t.start_weight_lbs.toFixed(1).replace(".", "\\.")} lb toward ${Number(t.goal_weight_lbs)}, since [A-Z][a-z]+ \\d+\\. (Day \\d+|On [A-Z][a-z]+ \\d+): ${t.weight_lbs.toFixed(1).replace(".", "\\.")} lb\\.$`));
+  assert.equal(P.startNumbersLine({ ...t, date: EDITION.as_of }, { ...EDITION, day_n: 43 }).endsWith(`Day 43: ${t.weight_lbs.toFixed(1)} lb.`), true);
+  assert.equal(P.startNumbersLine({}, EDITION), "", "nothing served: no line");
+});
+
+test("round 3 A-17: under a chapter with no episode, the weeks without one are said", () => {
+  const eps = { episodes: [{ url: "/panelcast/wk4.mp3", title: "EP4", week: 4, date: "2026-10-01", guest_name: "Marcus Webb", duration_sec: 420 }] };
+  assert.equal(P.newestEpisode(eps, { chapterWeek: 6 }).caption, "No episode yet for weeks 5 and 6; the newest, for week 4: Marcus Webb · 7 min.");
+  assert.equal(P.newestEpisode(eps, { chapterWeek: 6, held: true }).caption, "No episode yet for week 5; the newest, for week 4: Marcus Webb · 7 min.");
+  assert.equal(P.newestEpisode(eps, { chapterWeek: 4 }).caption, "The newest episode, for week 4: Marcus Webb · 7 min.");
+  assert.equal(P.newestEpisode(eps).caption, "The newest episode, for week 4: Marcus Webb · 7 min.");
+});
+
+test("round 3 A-11: an old-format stats line is never printed as a 'Label:' fragment", () => {
+  const week6 = POSTS.posts.find((p) => /^Weight:/.test(String(p.stats_line || "")));
+  if (week6) assert.match(P.chapterStatLine(week6), /^\d+(\.\d)? lb at the chapter\.$/, "the captured week 6 line");
+  assert.equal(P.chapterStatLine({ label: "Week 6", stats_line: "Weight: 305.4 lbs | Week Grade: avg 70 | T0 Streak: 1 days" }), "305.4 lb at the chapter.");
+  assert.equal(P.chapterStatLine({ label: "Week 7", stats_line: "Week Grade: avg 70" }), "", "any other labelled fragment is not printed");
+  assert.doesNotMatch(P.recapHTML(P.postsInOrder(POSTS)), /\b[A-Z][a-z]+( [A-Z][a-z]+)?: \d/);
+});
+
+test("round 3 A-15/A-27: Story's frame is the owner-approved premise word for word; the draft footers stay", () => {
+  const premise = /<p class="ck-premise">([^<]+)<\/p>/.exec(shell(""))[1];
+  assert.equal(P.STORY_FRAME, premise);
+  for (const page of ["story", "coaches", "week", "day", "trend"]) assert.match(shell(page), /A first-person line with no date on it is draft wording/, `${page}: the footer is his decision`);
+});
+
+test("round 3 copy: the podcast line, the coaches' door, Claude on the front, the start's record words, the chart's lines", () => {
+  assert.match(shell("story"), /When a chapter publishes, the AI that wrote it interviews one of the coaches about it\./);
+  assert.doesNotMatch(shell("story"), /Each week the AI that writes the chapter/);
+  assert.match(shell("coaches"), /<p id="ck-verdicts-more"><a class="ck-link" href="\/next\/v8\/call\/">Every prediction, right and wrong<\/a><\/p>/);
+  assert.match(shell(""), /software built with Claude/);
+  assert.doesNotMatch(shell("start"), /from the record\./);
+  assert.match(P.chartFrameLine(327.3, 185), /^The top line is 327\.3 lb, the start; the dashed line is 185 lb, the goal\.$/);
+});
+
+test("round 3 B-19/A-07: the allowed distance in plain words, with its count when the count fits its window", () => {
+  const call = { kind: "number", tolerance: { text: "14.8", statistic: "one standard deviation of his readings over the 30 days before the call", window_days: 30, n: 28 } };
+  assert.equal(V.toleranceNote(call), "The allowed distance is the usual spread of his readings over the 30 days before the call (one standard deviation, 28 readings).");
+  assert.equal(V.toleranceNote({ ...call, tolerance: { ...call.tolerance, n: 31 } }), "The allowed distance is the usual spread of his readings over the 30 days before the call (one standard deviation).", "a count past its window is not printed beside it");
+  assert.equal(V.sharedToleranceNote([call, { ...call, tolerance: { ...call.tolerance, n: 29 } }]), "Each allowed distance is the usual spread of his readings over the 30 days before the call (one standard deviation, 28 and 29 readings).");
+});
+
+test("round 3 B-26/B-28: the tier's one-step cap is said beside a forecast past a higher line; a month of ordinary days is not a forecast", () => {
+  const rc = { ...load("receipts"), tier: 1, month_to_date_usd: 136.96, projected_month_end_usd: 188.05 };
+  const html = BU.costHTML(rc);
+  const t1 = (rc.ceiling_usd * 55) / 75;
+  const t2 = (rc.ceiling_usd * 65) / 75;
+  assert.ok(188.05 >= t2, "the forecast is past tier 2's line");
+  assert.match(html, new RegExp(`The forecast is past tier 2’s line of \\$${t2.toFixed(2).replace(".", "\\.")}, and the tier is still 1: a forecast can raise the tier only one step above what has actually been spent\\. Tier 2 needs \\$${t1.toFixed(2).replace(".", "\\.")} actually spent; \\$136\\.96 is spent so far\\.`));
+  assert.doesNotMatch(BU.costHTML({ ...rc, month_to_date_usd: t1 + 1, tier: 2 }), /and the tier is still/, "the tier the forecast implies: no cap sentence");
+  assert.match(html, /days like it come to \$[\d,.]+, (under|above) the ceiling; that is not a forecast\./);
+  assert.match(shell("built"), /A forecast can raise the tier only one step above what has actually been spent\./);
 });

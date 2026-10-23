@@ -44,6 +44,7 @@ s3 = boto3.client("s3", region_name=REGION)
 # withings/strava read as infrastructure, so a quiet logging stretch paged.
 # Per-source rationale (thresholds, pause reasons) lives in source_registry.py.
 from ingestion.source_registry import behavioral_source_keys, checker_sources, stale_hours_overrides
+from ingestion.watch_presence import check_dead_men as check_watch_dead_men, not_ok as watch_dead_men_not_ok  # #4970
 from operational.output_artifact_registry import check_all as check_output_artifacts, not_ok as artifacts_not_ok
 from training.training_notes import training_notes_health  # #3768: a derived layer can be dark while its raw source is fresh
 
@@ -549,6 +550,57 @@ FIELD_COMPLETENESS_CHECKS: dict[str, list[str]] = {
 }
 
 
+def _append_derived_layer_findings(table, now, stale_sources, source_status):
+    """Derived-layer and device dead-man findings, folded into the handler's stale list.
+
+    Extracted from lambda_handler (#4970, the #4880 length guard): the training-note
+    extractor (#3768) and the Apple Watch dead-man (#4970) are both INFRASTRUCTURE
+    staleness inside a partition that looks fresh, so both join `stale_sources` and
+    count toward StaleSourceCount. Mutates the two lists in place.
+    """
+    # ── Derived layers: a projection can be dark while its RAW source is fresh ───
+    # #3768: `hevy` reported fresh every single day while the derived training-note
+    # layer had been dark since the day it shipped — the Bedrock tail raised
+    # AccessDenied, extract_signals swallowed it into `degraded: true`, and the only
+    # place that said so was `training_notes_health`, reachable ONLY by calling the MCP
+    # tool by hand. Nobody calls a health field by hand for months. Folded in here so a
+    # dark derived layer rides the same SNS + email + SLO path as a dead pipeline: it is
+    # INFRASTRUCTURE staleness (the extractor is broken), not a behavioral lapse.
+    try:
+        tn_health = training_notes_health(table)
+        if tn_health.get("checked") and tn_health.get("extractor_dark"):
+            stale_sources.append(
+                (
+                    "Training-note extractor",
+                    f"Notes present but the derived layer is dark — {tn_health.get('noted_exercise_sessions')} noted sessions "
+                    f"in {tn_health.get('lookback_days')}d, {tn_health.get('degraded')} degraded, "
+                    f"{tn_health.get('missing_records')} missing. Degrade reasons: "
+                    f"{tn_health.get('degraded_reasons_note') or 'none recorded'}. Check the Bedrock grant and the Haiku cap.",
+                )
+            )
+        elif not tn_health.get("checked"):
+            stale_sources.append(
+                ("Training-note extractor", f"The check itself failed ({tn_health.get('error')}) — status unknown, not fresh.")
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.error("Training-note health check failed: %s", e)
+        stale_sources.append(("Training-note extractor", f"The check itself failed ({type(e).__name__}: {e}) — status unknown, not fresh."))
+
+    # ── #4970: device dead-men — a silent Apple Watch inside a "fresh" partition ─────
+    # The phone keeps apple_health fresh on its own, so a dead watch is invisible to the
+    # partition loop above. The registry's `dead_man` facets (apple_health.hae_datatypes)
+    # are evaluated here and a not-ok row joins stale_sources — INFRASTRUCTURE staleness,
+    # counted in StaleSourceCount, so it rides the existing slo-source-freshness alarm.
+    # An unreadable check is reported as not-fresh, never dropped (the #2662 rule).
+    try:
+        for _dm in watch_dead_men_not_ok(check_watch_dead_men(table, now, USER_ID)):
+            stale_sources.append((f"{_dm['label']} dead-man", _dm["detail"]))
+            source_status.append(f"  ⚠️  {_dm['label']}: {_dm['detail']}")
+    except Exception as e:  # noqa: BLE001
+        logger.error("Watch dead-man check failed: %s", e)
+        stale_sources.append(("Apple Watch dead-man", f"The check itself failed ({type(e).__name__}: {e}) — status unknown, not fresh."))
+
+
 def lambda_handler(event, context):
     table = dynamodb.Table(TABLE_NAME)
     # #2817: the PACIFIC frame. Every `now.date()` below is compared against a
@@ -698,33 +750,7 @@ def lambda_handler(event, context):
     # (which does alarm), but never in that direct publish. A derived layer going
     # dark should read exactly like a pipeline going dark, so this one runs first.
 
-    # ── Derived layers: a projection can be dark while its RAW source is fresh ───
-    # #3768: `hevy` reported fresh every single day while the derived training-note
-    # layer had been dark since the day it shipped — the Bedrock tail raised
-    # AccessDenied, extract_signals swallowed it into `degraded: true`, and the only
-    # place that said so was `training_notes_health`, reachable ONLY by calling the MCP
-    # tool by hand. Nobody calls a health field by hand for months. Folded in here so a
-    # dark derived layer rides the same SNS + email + SLO path as a dead pipeline: it is
-    # INFRASTRUCTURE staleness (the extractor is broken), not a behavioral lapse.
-    try:
-        tn_health = training_notes_health(table)
-        if tn_health.get("checked") and tn_health.get("extractor_dark"):
-            stale_sources.append(
-                (
-                    "Training-note extractor",
-                    f"Notes present but the derived layer is dark — {tn_health.get('noted_exercise_sessions')} noted sessions "
-                    f"in {tn_health.get('lookback_days')}d, {tn_health.get('degraded')} degraded, "
-                    f"{tn_health.get('missing_records')} missing. Degrade reasons: "
-                    f"{tn_health.get('degraded_reasons_note') or 'none recorded'}. Check the Bedrock grant and the Haiku cap.",
-                )
-            )
-        elif not tn_health.get("checked"):
-            stale_sources.append(
-                ("Training-note extractor", f"The check itself failed ({tn_health.get('error')}) — status unknown, not fresh.")
-            )
-    except Exception as e:  # noqa: BLE001
-        logger.error("Training-note health check failed: %s", e)
-        stale_sources.append(("Training-note extractor", f"The check itself failed ({type(e).__name__}: {e}) — status unknown, not fresh."))
+    _append_derived_layer_findings(table, now, stale_sources, source_status)
 
     if stale_sources:
         stale_list = "\n".join([f"  - {name}: {detail}" for name, detail in stale_sources])

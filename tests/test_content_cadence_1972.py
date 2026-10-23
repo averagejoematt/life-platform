@@ -24,6 +24,8 @@ import re
 import sys
 from datetime import datetime, timezone
 
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
+
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
@@ -104,9 +106,8 @@ def test_podcast_display_never_claims_an_independent_schedule():
 
 
 def test_module_constants_match_the_live_cdk_cron_literal():
-    email_stack = os.path.join(_REPO, "cdk", "stacks", "email_stack.py")
-    src = open(email_stack, encoding="utf-8").read()
-    assert content_cadence.CHRONICLE_CRON_LITERAL in src, (
+    src = schedule_rows.expr("wednesday-chronicle")  # #4284: the table row
+    assert content_cadence.CHRONICLE_CRON_LITERAL == src, (
         "common/content_cadence.py's CHRONICLE_CRON_LITERAL no longer matches any literal "
         "in cdk/stacks/email_stack.py — the WednesdayChronicle schedule moved; update both."
     )

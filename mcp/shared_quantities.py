@@ -45,9 +45,11 @@ THE DEFINITIONS (each stated once, here, and imported by every critic and tool)
     honesty   a window spanning fewer than `tdee.MIN_TREND_DAYS` days is `provisional`: the
               number is reported, and no critic argues a change from it.
 
-  WEEKLY LOSS RATES (#4150 — what the overshoot rule counts)
-    weeks     the trailing 7-day windows ending `end`, `end - 7`, ... — same estimator, same
-              water floor as the loss rate;
+  WEEKLY LOSS RATES (#4150, #5100 — what the overshoot rule counts)
+    weeks     the weekly checkpoints `end`, `end - 7`, ...; the RATE at each is over `trend_days`
+              ending there: 7 by default (each week's own slope — the May tracker and its registered
+              prediction), 14 for the critics (#5100: the redline says "14-day weight trend");
+              completeness and the weigh-in floor are judged on the checkpoint's 7-day week;
     counted   a week's rate is COUNTED (returned by `weekly_loss_rates_from_rows`, the list
               `rate_over_cap_consecutive_weeks` reads) only when the week is COMPLETE — all 7
               days lie after water weeks 1-2, so the water floor did not clip it — AND it
@@ -57,6 +59,12 @@ THE DEFINITIONS (each stated once, here, and imported by every critic and tool)
               on 2026-09-23 the week 09-16..09-22 was clipped to 09-20..09-22 (3 weigh-ins,
               6.82 lb/wk) and counted as a full week over the cap — one week toward the
               "2 consecutive weeks" overshoot clock, on 3 days of evidence.
+
+  THE STATED LOSS RATE (#5001 — `loss_rate_lb_wk`)
+    the loss rate above, carried as ONE dict under `shared_quantities.loss_rate_lb_wk` by both
+    `plan_next_session`'s constraint block (its `rate_ceiling` row is evaluated over it) and
+    `get_nutrition`: `value`, `method`, `window_days`, `n_weigh_ins`, `source: withings`, and the
+    partition's own DATE# weigh-ins with the window's days that carry none.
 
   The TDEE back-solve's endpoint trend (`health.tdee.weight_trend_lb_per_wk`, #3931) is a
   DIFFERENT quantity — "could this intake have produced this much change" — and is left alone.
@@ -316,6 +324,7 @@ def weekly_loss_rate_weeks_from_rows(
     *,
     weeks: int = 2,
     genesis: str | None = None,
+    trend_days: int = WEEK_DAYS,
 ) -> list[dict[str, Any]]:
     """PURE: every trailing 7-day week ending `end`, `end - 7`, ..., oldest -> newest, each
     with its rate, its evidence and whether it is COUNTED (#4150).
@@ -331,21 +340,26 @@ def weekly_loss_rate_weeks_from_rows(
     for k in range(weeks - 1, -1, -1):
         week_end = shift_day_key(end, -WEEK_DAYS * k)
         nominal_start = shift_day_key(week_end, -(WEEK_DAYS - 1))
-        r = loss_rate_from_rows(rows, week_end, window_days=WEEK_DAYS, genesis=genesis)
-        start = r["window"]["start"]
+        wk = loss_rate_from_rows(rows, week_end, window_days=WEEK_DAYS, genesis=genesis)  # the WEEK: completeness + weigh-in floor
+        # the RATE: `trend_days` ending at this checkpoint — 7 (the week's own slope, the May tracker + its registered
+        # prediction) by default; the critics pass LOSS_RATE_WINDOW_DAYS (14) so the overshoot rule counts the trend (#5100)
+        r = wk if trend_days == WEEK_DAYS else loss_rate_from_rows(rows, week_end, window_days=trend_days, genesis=genesis)
+        start = wk["window"]["start"]
         days_measured = max(0, _days(start, week_end) + 1) if start <= week_end else 0
         row: dict[str, Any] = {
             "start": nominal_start,
             "end": week_end,
             "measured_start": start if start <= week_end else None,
             "days_measured": days_measured,
-            "n_weighins": r["n_weighins"],
+            "n_weighins": wk["n_weighins"],
+            "trend_window": r["window"],
+            "trend_n_weighins": r["n_weighins"],
             "rate_lb_wk": r["rate_lb_wk"],
             "counted": False,
             "min_weighins": MIN_WEEKLY_WEIGHINS,
         }
         if start > week_end:
-            row["status"], row["reason"] = "water", r.get("reason")
+            row["status"], row["reason"] = "water", wk.get("reason")
         elif days_measured < WEEK_DAYS:
             row["status"] = "partial"
             row["reason"] = (
@@ -353,9 +367,12 @@ def weekly_loss_rate_weeks_from_rows(
             )
         elif r["rate_lb_wk"] is None:
             row["status"], row["reason"] = "no_rate", r.get("reason")
-        elif r["n_weighins"] < MIN_WEEKLY_WEIGHINS:
+        elif wk["n_weighins"] < MIN_WEEKLY_WEIGHINS or r["n_weighins"] < MIN_WEEKLY_WEIGHINS:
             row["status"] = "insufficient_weighins"
-            row["reason"] = f"{r['n_weighins']} weigh-in(s) in {start}..{week_end}, under the {MIN_WEEKLY_WEIGHINS} a counted week needs"
+            row["reason"] = (
+                f"{wk['n_weighins']} weigh-in(s) in {start}..{week_end} ({r['n_weighins']} in the trend window), "
+                f"under the {MIN_WEEKLY_WEIGHINS} a counted week needs"
+            )
         else:
             row["status"], row["counted"] = "complete", True
         out.append(row)
@@ -363,13 +380,77 @@ def weekly_loss_rate_weeks_from_rows(
 
 
 def weekly_loss_rates_from_rows(
-    rows: list[dict[str, Any]] | None, end: str, *, weeks: int = 2, genesis: str | None = None
+    rows: list[dict[str, Any]] | None, end: str, *, weeks: int = 2, genesis: str | None = None, trend_days: int = WEEK_DAYS
 ) -> list[float] | None:
     """PURE: the COUNTED weekly rates, oldest -> newest — only complete 7-day post-water weeks
     with >= MIN_WEEKLY_WEIGHINS weigh-ins (#4150). A partial or thin week is dropped here and
     reported by `weekly_loss_rate_weeks_from_rows`. None when no week is counted."""
-    rates = [w["rate_lb_wk"] for w in weekly_loss_rate_weeks_from_rows(rows, end, weeks=weeks, genesis=genesis) if w["counted"]]
+    rates = [
+        w["rate_lb_wk"]
+        for w in weekly_loss_rate_weeks_from_rows(rows, end, weeks=weeks, genesis=genesis, trend_days=trend_days)
+        if w["counted"]
+    ]
     return rates or None
+
+
+# ── THE stated loss-rate quantity (#5001) ─────────────────────────────────────────────
+# On 2026-10-18 the plan's stage-2 packet carried 4.12 lb/wk (this module's least-squares rate over
+# 10-04..10-17) while `get_nutrition` printed -4.38 (the TDEE back-solve's first-vs-last endpoint over
+# 10-03..10-17) — two numbers, neither stating which it was. `loss_rate_lb_wk` is the ONE stated
+# quantity both carry under `shared_quantities.loss_rate_lb_wk`: the value, its method, its window,
+# its n and its source, with the Withings partition rows it was computed from listed date by date so
+# a reader can hold it against `get_date_range source=withings` (the brief's validation rule: a
+# weigh-in list that is not the partition's own DATE# rows is not evidence).
+LOSS_RATE_SOURCE = "withings"
+LOSS_RATE_PARTITION = "USER#matthew#SOURCE#withings"
+# ADR-105 label for the WINDOW: owner — v0.3 §1, his plan's own words ("the 14-day weigh-in average is
+# the number; single days are noise"); the water-week floor is his schedule's step note.
+LOSS_RATE_WINDOW_PROVENANCE = "owner (v0.3 §1: 'the 14-day weigh-in average is the number'; weeks 1-2 excluded as water)"
+LOSS_RATE_METHOD = "ols_slope_14d_post_water"
+
+
+def loss_rate_quantity_from_rows(rows: list[dict[str, Any]] | None, end: str, *, genesis: str | None = None) -> dict[str, Any]:
+    """PURE: THE stated loss rate (#5001) over the rows of the Withings partition — `loss_rate_from_rows`'
+    number with its method, window, n, source, the weigh-ins it read and the days in the window that
+    carry none. `value` is POSITIVE when losing; None = unknown, never 0."""
+    g = genesis or _genesis()
+    base = loss_rate_from_rows(rows, end, genesis=g)
+    win = base["window"]
+    pts = [(d, w) for d, w in _weighins(rows) if win["start"] <= d <= win["end"]]
+    have = {d for d, _ in pts}
+    n_days = _days(win["start"], win["end"]) + 1 if win["start"] <= win["end"] else 0
+    missing = [d for d in (shift_day_key(win["start"], i) for i in range(n_days)) if d not in have]
+    return {
+        "value": base["rate_lb_wk"],
+        "unit": "lb/wk, positive = losing",
+        "method": LOSS_RATE_METHOD,
+        "estimator": base["estimator"],
+        "window_days": win["days"],
+        "window": {"start": win["start"], "end": win["end"]},
+        "window_provenance": LOSS_RATE_WINDOW_PROVENANCE,
+        "water_weeks_excluded_through": base["water_weeks_excluded_through"],
+        "n_weigh_ins": base["n_weighins"],
+        "span_days": base["span_days"],
+        "provisional": base["provisional"],
+        "reason": base.get("reason"),
+        "experiment_week": _days(g, end) // WEEK_DAYS + 1 if end >= g else None,
+        "source": LOSS_RATE_SOURCE,
+        "validation": {
+            "partition": LOSS_RATE_PARTITION,
+            "weigh_ins": [{"date": d, "weight_lbs": w} for d, w in pts],
+            "days_without_a_weigh_in": missing,
+        },
+        "definition": SHARED_QUANTITIES_VERSION + ": loss_rate_lb_wk (see mcp/shared_quantities.py, #5001)",
+    }
+
+
+def loss_rate_lb_wk(day: str, *, today: str | None = None, read: Callable[[str, str, str], list[dict[str, Any]]] | None = None) -> dict:
+    """THE stated loss rate for a plan or a nutrition read on `day` (#5001): the 14 completed days ending
+    `completed_end(day)`, read straight off the Withings partition. Raises on a failed read (the caller
+    reports it) — an unreadable partition is never an empty one."""
+    end = completed_end(day, today)
+    rows = (read or _core.query_source)(LOSS_RATE_SOURCE, shift_day_key(end, -(LOSS_RATE_WINDOW_DAYS - 1)), end)
+    return loss_rate_quantity_from_rows(rows, end)
 
 
 # #4166: THE DXA read the protein gate's body-fat tier derives from — every scan on or before `end_day`

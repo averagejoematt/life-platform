@@ -2,9 +2,13 @@
 // The coach page glosses every one that appears (ck_coach.js termsHTML / glossLines); the front
 // page quotes no line that uses one (ck_front.js plainLanguage, round 3 of the 10-17 red team).
 // One list, two readers: a term added here is glossed on the coach page AND kept off the front.
+// THE recovery unit when no body serves one (re-grade 2026-10-18): the route's own string, trimmed —
+// prediction_reason.MEASURE_UNITS serves " out of 100" beside every recovery measure (PR #4964), so the
+// band, the day page, the trend and the call card all print "62 out of 100" with or without it served.
+export const RECOVERY_UNIT = "out of 100";
 export const TERMS = [
-  // One unit for recovery on every kit page (site-to-A round 1): the score is printed as a percentage.
-  [/\brecovery\b/i, "Recovery", "his wrist strap’s morning score, as a percentage"],
+  // One unit for recovery on every kit page (site-to-A round 1, re-graded 2026-10-18): the score is printed out of 100, as served.
+  [/\brecovery\b/i, "Recovery", "his wrist strap’s morning score out of 100"],
   [/\bHRV\b|heart-rate variability/i, "HRV", "heart-rate variability: how much the gap between heartbeats changes overnight, as the wrist strap measures it"],
   [/deep[- ]sleep|slow-wave/i, "Deep sleep", "also called slow-wave sleep: the share of the night spent in the deepest stage"],
   [/\bREM\b|dreaming sleep/i, "REM", "the dreaming stage of sleep"],

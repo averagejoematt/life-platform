@@ -14,6 +14,8 @@ import tempfile
 from datetime import date
 from pathlib import Path
 
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
+
 ROOT = Path(__file__).resolve().parent.parent
 
 sys.path.insert(0, str(ROOT / "tests"))
@@ -407,14 +409,9 @@ def test_cdk_cron_map_discovers_from_source():
     facts = _load("scripts/check_doc_facts.py")
     cmap = facts._cdk_cron_map()
     assert cmap, "CDK cron map is empty — discovery broke"
-    compute = (ROOT / "cdk" / "stacks" / "compute_stack.py").read_text(encoding="utf-8")
-    m = re.search(r'function_name="character-sheet-compute".*?schedule="(cron\([^"]*\))"', compute, re.S)
-    assert m, "could not locate character-sheet-compute schedule in compute_stack.py"
-    assert cmap.get("character-sheet-compute") == [m.group(1)]
-    email = (ROOT / "cdk" / "stacks" / "email_stack.py").read_text(encoding="utf-8")
-    mb = re.search(r'function_name="daily-brief".*?schedule="(cron\([^"]*\))"', email, re.S)
-    assert mb, "could not locate daily-brief schedule in email_stack.py"
-    assert cmap.get("daily-brief") == [mb.group(1)]
+    # #4284: the source of truth is config/schedules.json (the stacks carry no cron literal).
+    assert cmap.get("character-sheet-compute") == [schedule_rows.expr("character-sheet-compute")]
+    assert cmap.get("daily-brief") == [schedule_rows.expr("daily-brief")]
 
 
 def test_cdk_cron_map_whoop_multi_schedule():
@@ -748,10 +745,7 @@ def test_governor_cadence_ground_truth_is_discovered():
     literal — re-derive it independently from source and assert the discoverer agrees."""
     facts = _load("scripts/check_doc_facts.py")
     cdk_map = facts._cdk_cron_map()
-    stack = (ROOT / "cdk" / "stacks" / "operational_stack.py").read_text(encoding="utf-8")
-    m = re.search(r'function_name="life-platform-cost-governor".*?schedule="(cron\([^"]*\))"', stack, re.S)
-    assert m, "could not locate life-platform-cost-governor's schedule in operational_stack.py"
-    assert cdk_map.get("life-platform-cost-governor") == [m.group(1)]
+    assert cdk_map.get("life-platform-cost-governor") == [schedule_rows.expr("life-platform-cost-governor")]  # #4284
     step = facts._governor_cadence_hours(cdk_map)
     assert step == 8, f"expected the governor's true cadence to be every 8h, discovered {step}"
 

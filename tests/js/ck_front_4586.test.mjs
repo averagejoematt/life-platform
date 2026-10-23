@@ -14,6 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const F = await import("../../site/assets/js/ck_front.js");
+const { dayInWords } = await import("../../site/assets/js/entry_age.js");
 const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit_pages_4586");
 const load = (name) => JSON.parse(readFileSync(join(FIX, `${name}.json`), "utf8"));
 const edition = load("edition");
@@ -22,7 +23,7 @@ const TODAY = edition.as_of;
 const SERIES = B.week.data.weight_series;
 const GONE = { state: "unavailable", absent_text: "Not served right now.", data: null };
 
-// The captured chapter (week 5) has no podcast episode yet: WITH_POD carries the week 4 episode
+// The captured chapter (week 6) has no podcast episode yet: WITH_POD carries the week 4 episode
 // as the edition served it on October 3. The captured lead read is null (the route served no
 // weekly priority at capture time): LEAD_READ is the read it served on September 28.
 const POD = { state: "ok", as_of: "2026-10-01", source: "/panelcast/episodes.json", absent_text: "No podcast episode for this chapter yet.", data: { title: "EP4 · The Body Answers Back", guest: "Marcus Webb", guest_domain: "food", duration_sec: 420, duration_minutes: 7, mp3_url: "/panelcast/wk4.mp3", date: "2026-10-01" } };
@@ -51,13 +52,31 @@ test("a column's green is the share of the whole distance gone that day; a misse
   assert.equal(F.markDays(SERIES, TODAY, START, null)[27].gone, null, "no goal: no drawing");
 });
 
-test("the mark draws two rects per weighed day and says what it shows to a screen reader", () => {
-  const html = F.markHTML(SERIES, TODAY, START, GOAL);
-  const weighed = F.markDays(SERIES, TODAY, START, GOAL).filter((c) => c.gone !== null).length;
-  assert.equal((html.match(/<rect /g) || []).length, 2 * weighed);
-  assert.ok(html.includes(`role="img" aria-label="The last 28 days: ${fmt1(START - SERIES[SERIES.length - 1].lbs)} of the ${fmt1(START - GOAL)} pounds to the goal are gone as of the latest weigh-in`));
+test("the mark is C, the year frame: one frame one year wide from the first day, one neutral column per weigh-in, as tall as the weight still above the goal (#4646)", () => {
+  const html = F.markHTML(SERIES, TODAY, START, GOAL, { startIso: B.today.data.start_date });
+  const frame = F.yearFrame(SERIES, TODAY, START, GOAL, B.today.data.start_date);
+  const weighed = new Set(SERIES.filter((w) => w.date <= TODAY && w.date >= frame.from).map((w) => w.date)).size;
+  assert.equal(frame.from, B.today.data.start_date, "the frame starts on the experiment's first day");
+  assert.equal(frame.cols.length, weighed);
+  assert.equal((html.match(/<rect class="ck-mark__day" /g) || []).length, weighed, "one column per weigh-in");
+  assert.equal((html.match(/<rect class="ck-mark__frame" /g) || []).length, 1, "one frame");
+  assert.doesNotMatch(html, /ck-mark__gone|ck-accent/, "a column is the weight still to lose: never the accent");
+  const last = frame.cols[frame.cols.length - 1];
+  assert.ok(html.includes(`role="img" aria-label="One year from ${dayInWords(frame.from, { weekday: false })}, one column per weigh-in: ${weighed} weigh-ins so far, the latest ${fmt1(last.lbs)} lb, with ${fmt1(START - last.lbs)} of the ${fmt1(START - GOAL)} pounds to the goal gone.`), html.slice(0, 400));
   assert.equal(F.markHTML([], TODAY, START, GOAL), "", "no weigh-ins: no drawing");
   assert.equal(F.markHTML(SERIES, "", START, GOAL), "");
+  assert.equal(F.markHTML(SERIES, TODAY, START, null), "", "no goal: no drawing");
+});
+
+test("the year frame: a column's height is the weight above the goal on the start-to-goal scale, its x the day from the frame's start; past a year the frame is the 365 days ending today", () => {
+  const f = F.yearFrame([{ date: "2026-01-01", lbs: 350 }, { date: "2026-01-03", lbs: 250 }, { date: "2026-01-04", lbs: 360 }, { date: "2026-01-09", lbs: 100 }], "2026-01-04", 350, 150, "2026-01-01");
+  assert.deepEqual(f.cols.map((c) => [c.day, c.height]), [[0, 1], [2, 0.5], [3, 1]], "above the start is a full column, a future weigh-in is not drawn");
+  const html = F.markHTML([{ date: "2026-01-03", lbs: 250 }], "2026-01-04", 350, 150, { startIso: "2026-01-01", width: 365, height: 100 });
+  assert.match(html, /<rect class="ck-mark__day" x="2\.00" y="50\.0" width="1\.00" height="50\.0"\/>/);
+  const late = F.yearFrame([{ date: "2027-03-01", lbs: 200 }], "2027-03-01", 350, 150, "2026-01-01");
+  assert.equal(late.from, "2026-03-02", "the year ending today");
+  assert.equal(late.cols[0].day, F.YEAR_DAYS - 1);
+  assert.equal(F.yearFrame([{ date: "2026-01-03", lbs: 250 }], "2026-01-04", 350, 150, null).from, "2026-01-03", "no start served: the first weigh-in");
 });
 
 test("the mark's caption carries the day, the weight and the distance, from served numbers", () => {
@@ -69,24 +88,32 @@ test("the mark's caption carries the day, the weight and the distance, from serv
 });
 
 test("this morning's weight is set against the weigh-in before it", () => {
+  // The capture is from 00:15 Pacific: no weigh-in yet on its own day, so that morning's line is empty and
+  // the served weigh-in (B.today.data.date) is the morning the rule is read on.
+  assert.equal(F.morningLine(B.week, TODAY), "", "no weigh-in yet on the capture's day");
+  const WEIGH_DAY = B.today.data.date;
   const values = B.week.data.measures.weight.data.values;
-  const at = B.week.data.days.indexOf(TODAY);
+  const at = B.week.data.days.indexOf(WEIGH_DAY);
   const prev = values.slice(0, at).reverse().find((v) => v !== null);
   const move = Math.abs(WEIGHT - prev) < 0.05 ? "the same as" : WEIGHT < prev ? `down ${fmt1(prev - WEIGHT)} from` : `up ${fmt1(WEIGHT - prev)} from`;
-  assert.match(F.morningLine(B.week, TODAY), new RegExp(`^${fmt1(WEIGHT)} lb, ${move} ${weekday}\\.$`));
+  assert.match(F.morningLine(B.week, WEIGH_DAY), new RegExp(`^${fmt1(WEIGHT)} lb, ${move} ${weekday}\\.$`));
   assert.equal(F.morningLine(GONE, TODAY), "");
 });
 
 test("the Today band is this morning, yesterday and the plan, one line each, with yesterday's full day", () => {
   const html = F.todayBandHTML(edition, B, "/next/v8/");
   const yesterday = dayShift(TODAY, -1);
-  assert.match(html, new RegExp(`<span class="ck-rows__key">Today so far</span><span>${fmt1(WEIGHT)} lb, (up|down) [\\d.]+ from ${weekday}( ·|\\.)`));
+  // The capture is from 00:15 Pacific: nothing is recorded yet on its own day, and the served sentence says so.
+  assert.match(html, new RegExp(`<span class="ck-rows__key">Today so far</span><span>Nothing recorded yet today\\. <a class="ck-link" href="/next/v8/day/\\?d=${TODAY}">The full day</a>`));
+  // Read on the morning of the served weigh-in, the row leads with the weight against the one before it.
+  const weighed = F.todayBandHTML({ ...edition, as_of: B.today.data.date }, B, "/next/v8/");
+  assert.match(weighed, new RegExp(`<span class="ck-rows__key">Today so far</span><span>${fmt1(WEIGHT)} lb, (up|down) [\\d.]+ from ${weekday}( ·|\\.)`));
   assert.doesNotMatch(html, new RegExp(`${weekday}\\. ·`), "no stop before a middle dot");
   assert.match(html, new RegExp(`\\. <a class="ck-link" href="/next/v8/day/\\?d=${TODAY}">The full day`), "a stop before the link to the full day");
   assert.match(html, new RegExp(`<span class="ck-rows__key">Yesterday, ${weekday}</span>`));
   assert.match(html, new RegExp(`href="/next/v8/day/\\?d=${yesterday}">The full day</a>`));
   assert.doesNotMatch(html, /Steps|steps/, "step counts stay off the front page");
-  assert.match(html, /Recovery is the wrist strap’s morning score, as a percentage\./);
+  assert.match(html, /Recovery is the wrist strap’s morning score out of 100\./);
   assert.doesNotMatch(html, new RegExp(`d=${dayShift(TODAY, -2)}`), "nothing older than yesterday");
   // Yesterday carries its food when the food log has it: read the morning after a logged day.
   const logged = B.week.data.detail.find((d) => d.facts.some((f) => f.label === "Food"));
@@ -141,7 +168,11 @@ test("first sentences are whole sentences inside the limit", () => {
 });
 
 test("the lead coach's read is quoted with its author, as an AI, and its date; unserved, it is nothing, and the page drops the section", () => {
-  assert.equal(F.leadReadHTML(load("weekly_priority"), "/next/v8/"), "", "the captured read is null: nothing, so no heading apologises under itself (round 8)");
+  // The 2026-10-18 capture serves the lead's read (data through October 17); a null read is nothing, so no heading apologises under itself (round 8).
+  const captured = load("weekly_priority");
+  const live = F.leadReadHTML(captured, "/next/v8/");
+  assert.match(live, /^<p class="ck-small">Eli Marsh, the AI lead coach, on Saturday, October 17<\/p><p>“I'm watching Matthew execute at a steady clip/);
+  assert.equal(F.leadReadHTML({ ...captured, weekly_priority: null }, "/next/v8/"), "", "a null read: nothing");
   const html = F.leadReadHTML(LEAD_READ, "/next/v8/");
   assert.match(html, /Eli Marsh, the AI lead coach, on Monday, September 28/);
   assert.match(html, /“The one priority I've asked him to address next is his protein intake/);
@@ -161,9 +192,10 @@ test("the podcast line is the guest's own first turn, verbatim, and absent when 
 
 test("the chapter and podcast lines are labelled as AI-written and carry Read and Listen", () => {
   const html = F.quotesHTML(WITH_POD, load("transcript_wk4"), "/next/v8/");
-  assert.match(html, /Written by AI from the record on October 6; Matthew reads each chapter before it publishes\./);
+  // Red team round 3 (B-03/A-10): the chapter's date is its dateline, and "the record" is said plainly.
+  assert.match(html, /“The Quiet Accumulation”, the chapter, dated October 13\. Written by AI from what the devices and logs recorded; Matthew reads each chapter before it publishes\./);
   assert.match(html, /Marcus Webb, the AI food coach, on the podcast/);
-  assert.match(html, /<a class="ck-btn" href="\/journal\/posts\/week-08\/">Read · 6 min<\/a>/);
+  assert.match(html, /<a class="ck-btn" href="\/journal\/posts\/week-09\/">Read · 7 min<\/a>/);
   assert.doesNotMatch(F.quotesHTML(B.chapter, load("transcript_wk4"), "/"), /on the podcast|Listen/, "as captured, no episode: no podcast line");
   assert.match(html, /<a class="ck-btn ck-btn--ghost" href="\/next\/v8\/story\/">Listen · 7 min<\/a>/);
   assert.doesNotMatch(F.quotesHTML(B.chapter, null, "/"), /on the podcast/, "no transcript: no podcast line");

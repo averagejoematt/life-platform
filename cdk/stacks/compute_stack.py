@@ -5,19 +5,7 @@ v2.0 (v3.4.0): CDK-managed IAM roles replace existing_role_arn references.
   All 7 Lambdas now have dedicated CDK-owned roles with least-privilege policies.
   DLQ managed normally for all Lambdas (no more shared-role SQS workaround).
 
-Lambdas (8+):
-  anomaly-detector          cron(5 15 * * ? *)    — 8:05 AM PT daily
-  character-sheet-compute   cron(30 16 * * ? *)   — 9:30 AM PT daily (ADR-052)
-  adaptive-mode-compute     cron(35 16 * * ? *)   — 9:35 AM PT daily (ADR-052)
-  daily-metrics-compute     cron(40 16 * * ? *)   — 9:40 AM PT daily (ADR-052)
-  daily-insight-compute     cron(45 16 * * ? *)   — 9:45 AM PT daily (ADR-052)
-  hypothesis-engine         cron(0 19 ? * SUN *)  — Sunday 12:00 PM PT
-  state-of-matthew          cron(30 19 ? * SUN *) — Sunday 12:30 PM PT (#552)
-  coach-vision              cron(0 17 ? * MON *)  — Monday 10:00 AM PT (#3759)
-  weekly-correlation-compute cron(30 18 ? * SUN *) — Sunday 11:30 AM PT
-  dashboard-refresh         cron(0 21 * * ? *)    — 2:00 PM PDT + 6:00 PM PDT
-  challenge-generator       cron(0 22 ? * SUN *)  — Sunday 3:00 PM PT
-  personal-baselines-compute cron(0 8 1 * ? *)    — 1st of month 08:00 UTC (#543, ADR-105 r4)
+Schedules: every one is a row in config/schedules.json (#4284) — the stack carries no cron literal.
 
 V2 P2.9 (2026-05-17): docstring corrected to match actual ADR-052 reordering
 (was 17:35-17:50, now 16:30-16:45 to run BEFORE daily-brief at 17:00).
@@ -39,7 +27,7 @@ from constructs import Construct
 
 from stacks import role_policies as rp
 from stacks.constants import ACCT, AI_MODEL_HAIKU, REGION, S3_BUCKET, TABLE_NAME  # CONF-01, CONF-04
-from stacks.lambda_helpers import create_platform_lambda
+from stacks.lambda_helpers import create_platform_lambda, table_schedule
 
 INGESTION_DLQ_ARN = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
 LIFE_PLATFORM_TABLE = TABLE_NAME
@@ -107,7 +95,6 @@ class ComputeStack(Stack):
             # new week note at the same first opportunity the daily rule did, and no
             # serving surface renders the arc with a sub-weekly freshness expectation
             # (record TTLs are 8-10 days; the weekly surfaces use weeklyAsOf, 8d).
-            schedule="cron(0 14 ? * MON *)",
             # 2026-06-17: 120s → 600s. The handler analyzes ~8 experts sequentially,
             # each a multi-second Bedrock call; 120s timed out mid-run (~15 errors/day),
             # so the async EventBridge events exhausted retries into the ingestion DLQ
@@ -127,7 +114,7 @@ class ComputeStack(Stack):
             function_name="field-notes-generate",
             handler="intelligence.field_notes_lambda.lambda_handler",
             source_file="lambdas/intelligence/field_notes_lambda.py",
-            schedule="cron(0 18 ? * SUN *)",  # 11:00 AM PT Sundays
+            # schedule: config/schedules.json (#4284) — 11:00 AM PT Sundays
             timeout_seconds=120,
             memory_mb=256,
             custom_policies=rp.intelligence_field_notes(),
@@ -140,7 +127,7 @@ class ComputeStack(Stack):
             function_name="journal-analyzer",
             handler="intelligence.journal_analyzer_lambda.lambda_handler",
             source_file="lambdas/intelligence/journal_analyzer_lambda.py",
-            schedule="cron(0 10 * * ? *)",  # 3:00 AM PT daily (nightly journal sweep)
+            # schedule: config/schedules.json (#4284) — 3:00 AM PT daily (nightly journal sweep)
             timeout_seconds=180,
             memory_mb=256,
             custom_policies=rp.intelligence_journal_analyzer(),
@@ -158,7 +145,7 @@ class ComputeStack(Stack):
             function_name="coach-daily-reflection",
             handler="compute.coach_daily_reflection_lambda.lambda_handler",
             source_file="lambdas/compute/coach_daily_reflection_lambda.py",
-            schedule="cron(0 19 * * ? *)",  # 19:00 UTC = 12:00 PM PT, after the daily brief
+            # schedule: config/schedules.json (#4284) — 19:00 UTC = 12:00 PM PT, after the daily brief
             timeout_seconds=300,
             memory_mb=256,
             custom_policies=rp.compute_coach_daily_reflection(),
@@ -178,7 +165,6 @@ class ComputeStack(Stack):
             function_name="coach-memoir",
             handler="compute.coach_memoir_lambda.lambda_handler",
             source_file="lambdas/compute/coach_memoir_lambda.py",
-            schedule="cron(0 15 1 1,4,7,10 ? *)",
             timeout_seconds=300,
             memory_mb=256,
             custom_policies=rp.compute_coach_memoir(),
@@ -191,7 +177,6 @@ class ComputeStack(Stack):
             function_name="anomaly-detector",
             handler="emails.anomaly_detector_lambda.lambda_handler",
             source_file="lambdas/emails/anomaly_detector_lambda.py",
-            schedule="cron(5 15 * * ? *)",
             timeout_seconds=90,
             memory_mb=256,
             custom_policies=rp.compute_anomaly_detector(),
@@ -204,7 +189,7 @@ class ComputeStack(Stack):
             function_name="character-sheet-compute",
             handler="compute.character_sheet_lambda.lambda_handler",
             source_file="lambdas/compute/character_sheet_lambda.py",
-            schedule="cron(30 16 * * ? *)",  # Phase 3.1 (2026-05-16): 17:35→16:30 (9:30 AM PT) so character_sheet completes BEFORE daily-brief at 17:00 UTC. Was reading yesterday's sheet.
+            # schedule: config/schedules.json (#4284) — Phase 3.1 (2026-05-16): 17:35→16:30 (9:30 AM PT) so character_sheet completes BEFORE daily-brief at 17:00 UTC. Was reading yesterday's sheet.
             timeout_seconds=60,
             memory_mb=512,
             custom_policies=rp.compute_character_sheet(),
@@ -217,7 +202,7 @@ class ComputeStack(Stack):
             function_name="daily-metrics-compute",
             handler="compute.daily_metrics_compute_lambda.lambda_handler",
             source_file="lambdas/compute/daily_metrics_compute_lambda.py",
-            schedule="cron(40 16 * * ? *)",  # Phase 3.1 (2026-05-16): 17:40→16:40 (9:40 AM PT) so daily-metrics completes BEFORE daily-brief.
+            # schedule: config/schedules.json (#4284) — Phase 3.1 (2026-05-16): 17:40→16:40 (9:40 AM PT) so daily-metrics completes BEFORE daily-brief.
             timeout_seconds=120,
             memory_mb=512,
             custom_policies=rp.compute_daily_metrics(),
@@ -235,7 +220,7 @@ class ComputeStack(Stack):
             function_name="forecast-engine",
             handler="compute.forecast_engine_lambda.lambda_handler",
             source_file="lambdas/compute/forecast_engine_lambda.py",
-            schedule="cron(50 16 * * ? *)",  # 9:50 AM PT daily (fixed UTC, no DST drift)
+            # schedule: config/schedules.json (#4284) — 9:50 AM PT daily (fixed UTC, no DST drift)
             timeout_seconds=120,
             memory_mb=512,
             custom_policies=rp.compute_forecast_engine(),
@@ -252,7 +237,7 @@ class ComputeStack(Stack):
             function_name="scenario-explorer",
             handler="compute.scenario_explorer_lambda.lambda_handler",
             source_file="lambdas/compute/scenario_explorer_lambda.py",
-            schedule="cron(10 12 * * ? *)",  # fixed UTC, no DST drift
+            # schedule: config/schedules.json (#4284) — fixed UTC, no DST drift
             timeout_seconds=120,
             memory_mb=512,
             custom_policies=rp.compute_scenario_explorer(),
@@ -268,7 +253,7 @@ class ComputeStack(Stack):
         events.Rule(
             self,
             "DailyMetricsComputeEvening",
-            schedule=events.Schedule.expression("cron(0 0 * * ? *)"),
+            schedule=table_schedule("daily-metrics-compute#DailyMetricsComputeEvening"),
         ).add_target(targets.LambdaFunction(daily_metrics_fn))
 
         # BENCH-1.2: episode-detect — weekly cut/regain benchmarking (Viktor's
@@ -281,7 +266,7 @@ class ComputeStack(Stack):
             function_name="episode-detect",
             handler="compute.episode_detect_lambda.lambda_handler",
             source_file="lambdas/compute/episode_detect_lambda.py",
-            schedule="cron(0 17 ? * SUN *)",  # weekly, Sunday ~10:00 AM PT (fixed UTC, no DST drift)
+            # schedule: config/schedules.json (#4284) — weekly, Sunday ~10:00 AM PT (fixed UTC, no DST drift)
             timeout_seconds=120,
             memory_mb=512,
             custom_policies=rp.compute_episode_detect(),
@@ -294,7 +279,7 @@ class ComputeStack(Stack):
             function_name="daily-insight-compute",
             handler="compute.daily_insight_compute_lambda.lambda_handler",
             source_file="lambdas/compute/daily_insight_compute_lambda.py",
-            schedule="cron(45 16 * * ? *)",  # Phase 3.1 (2026-05-16): 17:45→16:45 (9:45 AM PT) so daily-insight completes BEFORE daily-brief.
+            # schedule: config/schedules.json (#4284) — Phase 3.1 (2026-05-16): 17:45→16:45 (9:45 AM PT) so daily-insight completes BEFORE daily-brief.
             timeout_seconds=120,
             memory_mb=512,
             custom_policies=rp.compute_daily_insight(),
@@ -307,7 +292,7 @@ class ComputeStack(Stack):
             function_name="adaptive-mode-compute",
             handler="compute.adaptive_mode_lambda.lambda_handler",
             source_file="lambdas/compute/adaptive_mode_lambda.py",
-            schedule="cron(35 16 * * ? *)",  # Phase 3.1 (2026-05-16): 17:50→16:35 (9:35 AM PT) so adaptive-mode completes BEFORE daily-brief.
+            # schedule: config/schedules.json (#4284) — Phase 3.1 (2026-05-16): 17:50→16:35 (9:35 AM PT) so adaptive-mode completes BEFORE daily-brief.
             timeout_seconds=120,
             memory_mb=256,
             custom_policies=rp.compute_adaptive_mode(),
@@ -320,7 +305,6 @@ class ComputeStack(Stack):
             function_name="hypothesis-engine",
             handler="compute.hypothesis_engine_lambda.lambda_handler",
             source_file="lambdas/compute/hypothesis_engine_lambda.py",
-            schedule="cron(0 19 ? * SUN *)",
             timeout_seconds=120,
             memory_mb=256,
             custom_policies=rp.compute_hypothesis_engine(),
@@ -338,7 +322,6 @@ class ComputeStack(Stack):
             function_name="state-of-matthew",
             handler="compute.state_of_matthew_lambda.lambda_handler",
             source_file="lambdas/compute/state_of_matthew_lambda.py",
-            schedule="cron(30 19 ? * SUN *)",
             timeout_seconds=60,
             memory_mb=256,
             custom_policies=rp.compute_state_of_matthew(),
@@ -358,7 +341,6 @@ class ComputeStack(Stack):
             function_name="coach-vision",
             handler="coach.coach_vision_lambda.lambda_handler",
             source_file="lambdas/coach/coach_vision_lambda.py",
-            schedule="cron(0 17 ? * MON *)",
             timeout_seconds=180,
             memory_mb=512,
             custom_policies=rp.compute_coach_vision(),
@@ -394,7 +376,7 @@ class ComputeStack(Stack):
             function_name="weekly-correlation-compute",
             handler="compute.weekly_correlation_compute_lambda.lambda_handler",
             source_file="lambdas/compute/weekly_correlation_compute_lambda.py",
-            schedule="cron(30 18 ? * SUN *)",  # Sunday 11:30 AM PT (30 min before hypothesis engine)
+            # schedule: config/schedules.json (#4284) — Sunday 11:30 AM PT (30 min before hypothesis engine)
             timeout_seconds=120,
             memory_mb=256,
             custom_policies=rp.compute_weekly_correlations(),
@@ -407,7 +389,6 @@ class ComputeStack(Stack):
             function_name="dashboard-refresh",
             handler="compute.dashboard_refresh_lambda.lambda_handler",
             source_file="lambdas/compute/dashboard_refresh_lambda.py",
-            schedule="cron(0 21 * * ? *)",
             timeout_seconds=60,
             memory_mb=256,
             custom_policies=rp.compute_dashboard_refresh(),
@@ -417,7 +398,7 @@ class ComputeStack(Stack):
         evening_rule = events.Rule(
             self,
             "DashboardRefreshEveningRule",
-            schedule=events.Schedule.expression("cron(0 1 * * ? *)"),
+            schedule=table_schedule("dashboard-refresh#DashboardRefreshEveningRule"),
             # #1781: was "6:00 PM PDT" — the fixed-UTC cron only reads 6:00 PM during
             # PDT (summer); it reads 5:00 PM once the clocks fall back to PST. An
             # out-of-band console edit already corrected this live (caught by the
@@ -439,7 +420,6 @@ class ComputeStack(Stack):
             function_name="acwr-compute",
             handler="compute.acwr_compute_lambda.lambda_handler",
             source_file="lambdas/compute/acwr_compute_lambda.py",
-            schedule="cron(55 16 * * ? *)",
             timeout_seconds=60,
             memory_mb=256,
             custom_policies=rp.compute_acwr(),
@@ -457,7 +437,7 @@ class ComputeStack(Stack):
             function_name="personal-baselines-compute",
             handler="compute.personal_baselines_lambda.lambda_handler",
             source_file="lambdas/compute/personal_baselines_lambda.py",
-            schedule="cron(0 8 1 * ? *)",  # 1st of every month, 08:00 UTC (fixed UTC, no DST drift)
+            # schedule: config/schedules.json (#4284) — 1st of every month, 08:00 UTC (fixed UTC, no DST drift)
             timeout_seconds=120,
             memory_mb=256,
             custom_policies=rp.compute_personal_baselines(),
@@ -479,7 +459,7 @@ class ComputeStack(Stack):
             function_name="circadian-compliance",
             handler="compute.circadian_compliance_lambda.lambda_handler",
             source_file="lambdas/compute/circadian_compliance_lambda.py",
-            schedule="cron(0 2 * * ? *)",  # 7:00 PM PT daily (02:00 UTC)
+            # schedule: config/schedules.json (#4284) — 7:00 PM PT daily (02:00 UTC)
             timeout_seconds=60,
             memory_mb=256,
             custom_policies=rp.compute_circadian_compliance(),
@@ -492,7 +472,6 @@ class ComputeStack(Stack):
             function_name="failure-pattern-compute",
             handler="compute.failure_pattern_compute_lambda.lambda_handler",
             source_file="lambdas/compute/failure_pattern_compute_lambda.py",
-            schedule="cron(50 17 ? * SUN *)",
             timeout_seconds=300,
             memory_mb=256,
             environment={
@@ -513,7 +492,7 @@ class ComputeStack(Stack):
             function_name="challenge-generator",
             handler="intelligence.challenge_generator_lambda.lambda_handler",
             source_file="lambdas/intelligence/challenge_generator_lambda.py",
-            schedule="cron(0 22 ? * SUN *)",  # Sunday 3:00 PM PT (22:00 UTC)
+            # schedule: config/schedules.json (#4284) — Sunday 3:00 PM PT (22:00 UTC)
             timeout_seconds=120,
             memory_mb=512,
             environment={
@@ -646,7 +625,7 @@ class ComputeStack(Stack):
             function_name="inter-coach-dialogue",
             handler="coach.inter_coach_dialogue_lambda.lambda_handler",
             source_file="lambdas/coach/inter_coach_dialogue_lambda.py",
-            schedule="cron(0 18 ? * SUN *)",  # Sunday 11:00 AM PT (fixed UTC)
+            # schedule: config/schedules.json (#4284) — Sunday 11:00 AM PT (fixed UTC)
             timeout_seconds=300,
             memory_mb=256,
             environment={"AI_MODEL_HAIKU": AI_MODEL_HAIKU},
@@ -667,7 +646,6 @@ class ComputeStack(Stack):
             function_name="voice-fidelity-harness",
             handler="coach.voice_fidelity_harness.lambda_handler",
             source_file="lambdas/coach/voice_fidelity_harness.py",
-            schedule="cron(0 15 1 * ? *)",
             timeout_seconds=600,
             memory_mb=256,
             environment={
@@ -684,7 +662,7 @@ class ComputeStack(Stack):
             function_name="coach-history-summarizer",
             handler="coach.coach_history_summarizer.lambda_handler",
             source_file="lambdas/coach/coach_history_summarizer.py",
-            schedule="cron(0 17 ? * SUN *)",  # Sunday 10:00 AM PT (before weekly digest)
+            # schedule: config/schedules.json (#4284) — Sunday 10:00 AM PT (before weekly digest)
             # 120s was too tight for the Haiku history-summarization call — the Sunday
             # run timed out and dumped its scheduled event into the ingestion DLQ
             # (reddening the I9 post-deploy check). 600s matches the ai-expert-analyzer
@@ -733,7 +711,7 @@ class ComputeStack(Stack):
             function_name="coach-prediction-evaluator",
             handler="coach.coach_prediction_evaluator.lambda_handler",
             source_file="lambdas/coach/coach_prediction_evaluator.py",
-            schedule="cron(0 16 * * ? *)",  # 9:00 AM PT daily (before daily brief at 11 AM)
+            # schedule: config/schedules.json (#4284) — 9:00 AM PT daily (before daily brief at 11 AM)
             # 60s -> 90s (#534): the event-driven stance-refresh detection tacked onto
             # the end of this run adds a handful of extra GetItem/Query reads (sick
             # day, habit_scores, weight) plus up to 2 fire-and-forget async Lambda

@@ -34,6 +34,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -61,6 +62,15 @@ def _live_hevy() -> list[dict[str, Any]]:
 
 def _live_whoop() -> list[dict[str, Any]]:
     return json.loads((FIXTURES / "whoop_workouts_2026-05-31_09-19.json").read_text())
+
+
+def _cue(template_id, cardio, whoop):
+    """facts -> verdict -> cue (the retired `cardio_progression.cardio_cue`, #5048: the Hevy note is now
+    `training.cardio_note`'s; the "Last: …" render stays for `exercise_history.render_history_cue`)."""
+    facts = cp.cardio_facts(template_id, cardio, whoop)
+    if facts.get("sessions_count", 0) == 0:
+        return ""
+    return cp.render_cardio_cue(facts, cp.level_verdict(facts.get("series"), facts.get("last_level")))
 
 
 def _live_routine() -> dict[str, Any]:
@@ -440,7 +450,7 @@ def test_the_athletes_own_calibration_is_carried_into_the_cue():
     Mutation control: stop appending the calibration clause — this reds.
     """
     _, cardio = _indexes()
-    cue = cp.cardio_cue(CYCLING_TID, cardio, _whoop_index())
+    cue = _cue(CYCLING_TID, cardio, _whoop_index())
     assert "his calibration: L9-10 is easy" in cue, cue
 
 
@@ -449,8 +459,8 @@ def test_the_athletes_own_calibration_is_carried_into_the_cue():
 
 def test_the_cue_lands_on_the_cycling_block_of_the_live_stored_routine():
     """The 2026-09-19 push routine as it is stored in DynamoDB today, cycling block and
-    all. Its note was hand-written by a coaching session; the deterministic baseline now
-    rides in front of it.
+    all. Its note was hand-written by a coaching session; since #5048 the prescription-first
+    note replaces it (the replaced text is kept on the snapshot).
 
     Mutation control: drop the `tmpl:` / catalog template resolution in
     `attach_cardio_cues` — nothing is stamped and this reds.
@@ -461,6 +471,8 @@ def test_the_cue_lands_on_the_cycling_block_of_the_live_stored_routine():
         def __init__(self, d):
             self.movement_key = d.get("movement_key")
             self.notes = d.get("notes") or ""
+            # the fixture is a field projection without sets; the stored note says 40 min (#5048 reads minutes off the sets)
+            self.sets = [SimpleNamespace(duration_seconds=2400)] if self.movement_key == "cycling" else []
 
     class Spec:
         pass
@@ -470,10 +482,13 @@ def test_the_cue_lands_on_the_cycling_block_of_the_live_stored_routine():
     stamped = rg.attach_cardio_cues(spec, cardio_index=cardio, whoop_index=_whoop_index())
     assert stamped == 1
     cycling = [b for b in spec.exercises if b.movement_key == "cycling"][0]
-    assert cycling.notes.startswith("Last: level 15,")
-    assert "Level 10 flat, 40 min, hold 115-120 bpm" in cycling.notes  # the coach's own note survives
-    # and a re-draft never stacks a second cue
-    assert rg.attach_cardio_cues(spec, cardio_index=cardio, whoop_index=_whoop_index()) == 0
+    # #5048: the level is derived from the template's history (level 15), the coach's prose is replaced
+    assert cycling.notes.startswith("Recumbent bike · 40 min · level 15 at 14.3 mph flat · ")  # #5076: + his speed at the level
+    assert spec.inputs_snapshot["cardio_notes_replaced"][0]["notes"].startswith("Level 10 flat, 40 min")
+    # and a re-draft never stacks a second cue: it recomposes the same note
+    first = cycling.notes
+    assert rg.attach_cardio_cues(spec, cardio_index=cardio, whoop_index=_whoop_index()) == 1
+    assert cycling.notes == first
 
 
 def test_a_duration_only_block_renders_no_cue_at_all():
@@ -486,7 +501,7 @@ def test_a_duration_only_block_renders_no_cue_at_all():
     """
     _, cardio = _indexes()
     assert cardio[STRETCH_TID], "the fixture must contain the stretching blocks"
-    assert cp.cardio_cue(STRETCH_TID, cardio, _whoop_index()) == ""
+    assert _cue(STRETCH_TID, cardio, _whoop_index()) == ""
 
 
 def test_a_failed_index_load_leaves_every_note_untouched():
@@ -501,6 +516,8 @@ def test_a_failed_index_load_leaves_every_note_untouched():
         def __init__(self, d):
             self.movement_key = d.get("movement_key")
             self.notes = d.get("notes") or ""
+            # the fixture is a field projection without sets; the stored note says 40 min (#5048 reads minutes off the sets)
+            self.sets = [SimpleNamespace(duration_seconds=2400)] if self.movement_key == "cycling" else []
 
     class Spec:
         pass

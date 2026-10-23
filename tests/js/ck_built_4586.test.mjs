@@ -101,7 +101,7 @@ test("the cost paragraphs add up: an ordinary day, the high days with dates, and
   const td = rc.typical_day;
   const hd = rc.high_days;
   assert.match(html, new RegExp(`The ceiling is \\$${rc.base_ceiling_usd} a month for the whole cloud bill, AI included\\. It rises to \\$${rc.surge_ceiling_usd} when reader traffic is high\\. As of [A-Z][a-z]+ \\d+, \\${usd(rc.month_to_date_usd)} is spent this month, and the forecast for [A-Z][a-z]+ \\d+ is \\${usd(rc.projected_month_end_usd)}, (under|above) the ceiling\\. (Nothing is paused\\.|The system is at tier \\d: [^.]+\\.)`));
-  assert.match(html, new RegExp(`An ordinary day costs \\${usd(td.usd)}, AI included: the middle day of the ${td.days_counted} days to [A-Z][a-z]+ \\d+\\. ${td.month_days} days like it come to \\${usd(td.month_usd)}, (under|over) the ceiling\\.`));
+  assert.match(html, new RegExp(`An ordinary day costs \\${usd(td.usd)}, AI included: the middle day of the ${td.days_counted} days to [A-Z][a-z]+ \\d+\\. ${td.month_days} days like it come to \\${usd(td.month_usd)}, (under|over|above) the ceiling; that is not a forecast\\.`));
   if (hd.days.length > 1) {
     assert.match(html, new RegExp(`${hd.days.length} days this month each cost more than twice that: [A-Z][a-z]+ [\\d, and]+, \\${usd(hd.total_usd)} together, \\${usd(hd.above_typical_usd)} more than ${hd.days.length} ordinary days\\.</p>`));
   }

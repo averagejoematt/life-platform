@@ -241,11 +241,15 @@ def test_edition_every_block_carries_the_contract_on_the_wire():
         "goal_weight_lbs": j["goal_weight_lbs"],
         "change_lbs": round(j["current_weight_lbs"] - j["start_weight_lbs"], 1),
     }
-    # #4583: a dashboard whose moves are the edition's own day speaks in moves; otherwise the restated text.
+    # #4583: a dashboard whose moves are a current day — the edition's own day or one within COACH_STALE_DAYS of
+    # it (the 2026-10-18 capture is from 00:15 Pacific, its moves day the day before) — speaks in moves, dated
+    # to the moves' own day; otherwise the restated text.
     moves_day = (wire["dashboard"].get("moves") or {}).get("date")
-    assert (
-        b["coach_lines"]["voice"] == ("move" if moves_day == _CAPTURE_DAY else "restated") and len(b["coach_lines"]["data"]["lines"]) <= 3
-    )
+    age = (_dt.fromisoformat(_CAPTURE_DAY) - _dt.fromisoformat(moves_day)).days if moves_day else None
+    current = age is not None and 0 <= age <= _ed.COACH_STALE_DAYS
+    if current:
+        assert b["coach_lines"]["as_of"] == moves_day
+    assert b["coach_lines"]["voice"] == ("move" if current else "restated") and len(b["coach_lines"]["data"]["lines"]) <= 3
     assert all("Dr." not in ln["coach"] for ln in b["coach_lines"]["data"]["lines"])
     # #4595: the scorecard is served, one row per area, each decided by a written rule.
     assert b["scorecard"]["state"] == "ok" and b["scorecard"]["data"]["order"] == ["body", "training", "sleep", "food", "mind", "ai"]
@@ -692,8 +696,14 @@ def test_each_of_the_seven_days_opens_to_what_was_recorded_that_day():
     detail = _edition(wire)["blocks"]["week"]["data"]["detail"]
     assert [d["date"] for d in detail] == _days_back(_CAPTURE_DAY) and len(detail) == 7
     newest = detail[0]
-    assert re.fullmatch(r"\d+\.\d lb( · trained)?( · slept \d+(\.\d)? h)?", newest["summary"]), newest["summary"]
-    assert [f["label"] for f in newest["facts"]][:1] == ["Weight"]
+    # The 2026-10-18 capture is from 00:15 Pacific: nothing is recorded on its own day yet, and the day says so;
+    # the newest day WITH a weigh-in carries the summary rule.
+    weighed_today = any(r.get("date") == _CAPTURE_DAY and r.get("weight_lbs") is not None for r in wire["pulse"]["pulse_history"])
+    if not weighed_today:
+        assert newest["summary"] == "Nothing recorded yet." and newest["facts"] == [], newest
+    weighed = newest if weighed_today else detail[1]
+    assert re.fullmatch(r"\d+\.\d lb( · trained)?( · slept \d+(\.\d)? h)?", weighed["summary"]), weighed["summary"]
+    assert [f["label"] for f in weighed["facts"]][:1] == ["Weight"]
     # Steps stay off the front page's day (unreliable on days the phone is not carried).
     assert "Steps" not in [f["label"] for d in detail for f in d["facts"]]
     # A day carries a Food fact exactly when the wire has a food row for it: the day must not invent one,

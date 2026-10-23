@@ -32,7 +32,7 @@ from aws_cdk.aws_apigatewayv2_integrations import HttpLambdaIntegration
 
 from stacks import role_policies as rp
 from stacks.constants import ACCT, REGION, S3_BUCKET, TABLE_NAME  # CONF-01
-from stacks.lambda_helpers import create_platform_lambda
+from stacks.lambda_helpers import create_platform_lambda, table_schedule
 
 # ── #2806/#2807/#2808: the social-enrichment channel set, derived at synth time ──
 # from lambdas/ingestion/source_registry.py — the ONE registry vocabulary for
@@ -46,22 +46,23 @@ from ingestion.source_registry import social_channel_source_ids  # noqa: E402
 
 SOCIAL_CHANNELS_ENV = ",".join(social_channel_source_ids())
 
+# ── The cadence rationale below is for the hour lists that live in config/schedules.json (#4284) ──
 # ── Hourly ingestion with 10pm-4am PST maintenance window ──
 # Active hours: 4am-10pm PST = UTC 12-6 (next day) = 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23
 # Skipped: UTC 6,7,8,9,10,11 = 10pm-4am PST (maintenance window — no user activity expected)
 # Cost: ~$0/month — gap-aware Lambdas short-circuit in <50ms when no new data exists
-INGEST_HOURLY = "0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23"
+# -> config/schedules.json: strava-data-ingestion runs these hours.
 
 # ── #4641: the low-yield sources run at their data's real cadence, not INGEST_HOURLY ──
 # 14-day measurements (2026-10-04): Notion 0 of 252 runs found a page, the three social
 # feeds 0 of 756 rows, Dropbox 6 of 672 polls found a file, Withings ~5% of runs changed a
 # row, Eight Sleep ~5%. Each hour is vendor-API churn and (for the rotating-token sources)
 # a token exchange. The hours are UTC; PT in the comments (PDT = UTC-7).
-NOTION_HOURS = "14,21,3"  # 07:00, 14:00, 20:00 PT — journal entries are rare; 3/day
+# notion-journal-ingestion: UTC 14,21,3 = 07:00, 14:00, 20:00 PT — journal entries are rare; 3/day
 # The three social feeds (youtube/bluesky/mastodon) have NO schedule: owner Q39, 2026-10-17 (#4644) — "no — retire the
 # three schedules". The functions stay deployed (invokable by hand) until accounts exist; see the registry tombstones.
-WITHINGS_HOURS = "14,17,21,0"  # 07:00, 10:00, 14:00, 17:00 PT; site-stats-refresh adds 4 more invokes
-EIGHTSLEEP_HOURS = "14,16,18,20"  # 07:00-13:00 PT — the nightly record lands in the morning
+# withings-data-ingestion: UTC 14,17,21,0 = 07:00, 10:00, 14:00, 17:00 PT; site-stats-refresh adds 4 more invokes
+# eightsleep-data-ingestion: UTC 14,16,18,20 = 07:00-13:00 PT — the nightly record lands in the morning
 
 # ── Habitify runs the FULL 24 hours (#3666) ──
 # The maintenance-window assumption above — "10pm-4am PT, no user activity expected" —
@@ -71,7 +72,7 @@ EIGHTSLEEP_HOURS = "14,16,18,20"  # 07:00-13:00 PT — the nightly record lands 
 # same-day freshness: the day is never finalised, he ticks as he goes, and every coach
 # and narrative surface reads the day's record. So it opts out of the window.
 # Cost: +6 invocations/day (18 -> 24), 256 MB, ~25-40s each = under $0.03/month.
-HABITIFY_HOURLY = "*"
+# -> config/schedules.json: habitify-data-ingestion runs every hour (hour field `*`).
 
 # ── Whoop cadence (#2204) — deliberately NOT hourly ──
 # Whoop's access token lives 3599s, one second SHORTER than an hourly interval, so
@@ -83,7 +84,7 @@ HABITIFY_HOURLY = "*"
 # active window + the 17:30 UTC recovery refresh ⇒ N ≈ 19 → 6, expected
 # time-to-loss ~5 days → ~16 days. Gap-aware backfill makes the coarser cadence
 # lossless for data completeness.
-WHOOP_HOURS = "0,4,12,16,20"
+# -> config/schedules.json: whoop-data-ingestion runs UTC 0,4,12,16,20.
 
 INGESTION_DLQ_ARN = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
 LIFE_PLATFORM_TABLE = TABLE_NAME
@@ -133,7 +134,6 @@ class IngestionStack(Stack):
             function_name="whoop-data-ingestion",
             source_file="lambdas/ingestion/whoop_lambda.py",
             handler="ingestion.whoop_lambda.lambda_handler",
-            schedule=f"cron(0 {WHOOP_HOURS} * * ? *)",
             timeout_seconds=300,
             # No async retry: Whoop rotates its refresh token on every refresh, so
             # a failed run is almost always a token-rotation race (HTTP 400). The
@@ -153,7 +153,7 @@ class IngestionStack(Stack):
         whoop_recovery = events.Rule(
             self,
             "WhoopRecoverySchedule",
-            schedule=events.Schedule.expression("cron(30 17 * * ? *)"),
+            schedule=table_schedule("whoop-data-ingestion#WhoopRecoverySchedule"),
             description="Whoop recovery refresh — 9:30 AM PT",
         )
         whoop_recovery.add_target(targets.LambdaFunction(whoop))
@@ -174,7 +174,7 @@ class IngestionStack(Stack):
         whoop_reconcile_rule = events.Rule(
             self,
             "WhoopReconciliation",
-            schedule=events.Schedule.cron(hour="18", minute="20"),
+            schedule=table_schedule("whoop-data-ingestion#WhoopReconciliation"),
             description="DI-2/TR-07: diff stored Whoop sleeps+workouts vs the Whoop API (trailing 14d) — emits MissingActivityCount{whoop}",
         )
         whoop_reconcile_rule.add_target(
@@ -197,7 +197,6 @@ class IngestionStack(Stack):
             function_name="notion-journal-ingestion",
             source_file="lambdas/ingestion/notion_lambda.py",
             handler="ingestion.notion_lambda.lambda_handler",
-            schedule=f"cron(0 {NOTION_HOURS} * * ? *)",
             timeout_seconds=120,
             environment={"NOTION_SECRET_NAME": "life-platform/ingestion-keys"},
             custom_policies=rp.ingestion_notion(),
@@ -271,21 +270,19 @@ class IngestionStack(Stack):
             function_name="withings-data-ingestion",
             source_file="lambdas/ingestion/withings_lambda.py",
             handler="ingestion.withings_lambda.lambda_handler",
-            schedule=f"cron(5 {WITHINGS_HOURS} * * ? *)",
             timeout_seconds=120,
             custom_policies=rp.ingestion_withings(),
             **shared,
         )
         withings.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
 
-        # ── 5. Habitify — every hour, all 24 (:05 stagger). See HABITIFY_HOURLY (#3666).
+        # ── 5. Habitify — every hour, all 24 (:05 stagger). See the #3666 note above.
         create_platform_lambda(
             self,
             "HabitifyIngestion",
             function_name="habitify-data-ingestion",
             source_file="lambdas/ingestion/habitify_lambda.py",
             handler="ingestion.habitify_lambda.lambda_handler",
-            schedule=f"cron(5 {HABITIFY_HOURLY} * * ? *)",
             # #3666: one extra GET /logs/{habit_id} per habit per invocation (memoised
             # across the dates one run ingests). Measured pre-change duration was avg
             # 22-26s / max 59s against this 180s timeout; the logs pass adds roughly half
@@ -310,7 +307,7 @@ class IngestionStack(Stack):
             function_name="strava-data-ingestion",
             source_file="lambdas/ingestion/strava_lambda.py",
             handler="ingestion.strava_lambda.lambda_handler",
-            schedule=f"cron(10 {INGEST_HOURLY} * * ? *)",  # RE-ENABLED 2026-06-20
+            # schedule: config/schedules.json (#4284) — RE-ENABLED 2026-06-20
             timeout_seconds=300,
             custom_policies=rp.ingestion_strava(),
             **shared,
@@ -330,7 +327,7 @@ class IngestionStack(Stack):
         strava_reconcile_rule = events.Rule(
             self,
             "StravaReconciliation",
-            schedule=events.Schedule.cron(hour="17", minute="20"),
+            schedule=table_schedule("strava-data-ingestion#StravaReconciliation"),
             description="DI-2: diff stored Strava activities vs the Strava API (trailing 14d) — emits MissingActivityCount",
         )
         strava_reconcile_rule.add_target(
@@ -367,7 +364,7 @@ class IngestionStack(Stack):
             function_name="hevy-backfill",
             source_file="lambdas/ingestion/hevy_backfill_lambda.py",
             handler="ingestion.hevy_backfill_lambda.lambda_handler",
-            schedule="cron(0 * * * ? *)",  # hourly :00, 24h — #3720
+            # schedule: config/schedules.json (#4284) — hourly :00, 24h — #3720
             timeout_seconds=300,
             memory_mb=256,
             environment={
@@ -388,7 +385,7 @@ class IngestionStack(Stack):
         hevy_index_rule = events.Rule(
             self,
             "HevyTemplateIndexRebuild",
-            schedule=events.Schedule.cron(hour="13", minute="40"),  # 06:40 PT, fixed UTC
+            schedule=table_schedule("hevy-backfill#HevyTemplateIndexRebuild"),
             description="#3764: republish config/hevy_template_index.json from the live Hevy catalogue",
         )
         hevy_index_rule.add_target(
@@ -409,7 +406,7 @@ class IngestionStack(Stack):
         hevy_reconcile_rule = events.Rule(
             self,
             "HevyReconciliation",
-            schedule=events.Schedule.cron(hour="18", minute="30"),
+            schedule=table_schedule("hevy-backfill#HevyReconciliation"),
             description="#4643: compare the Hevy workout count with stored rows — emits MissingActivityCount{hevy}",
         )
         hevy_reconcile_rule.add_target(
@@ -430,7 +427,7 @@ class IngestionStack(Stack):
         # So none of the obvious watches work here. A Lambda Errors alarm sees zero of the
         # three (nothing raises). An Invocations heartbeat on hevy-backfill sees zero of
         # the three either, and would be the worse kind of wrong — it is GREEN by
-        # construction, because the same function also runs the hourly poll (cron(0 * * * ? *)
+        # construction, because the same function also runs the hourly poll (its config/schedules.json row
         # above) and would keep invoking 24x a day with this rule stone dead. That is an
         # alarm that cannot fail.
         # What separates all three from a healthy day is the ABSENCE of a success, so the
@@ -479,7 +476,6 @@ class IngestionStack(Stack):
             function_name="journal-enrichment",
             source_file="lambdas/ingestion/journal_enrichment_lambda.py",
             handler="ingestion.journal_enrichment_lambda.lambda_handler",
-            schedule="cron(30 14 * * ? *)",
             timeout_seconds=300,
             environment={"ANTHROPIC_SECRET": "life-platform/ai-keys"},
             custom_policies=rp.ingestion_journal_enrichment(),
@@ -504,7 +500,6 @@ class IngestionStack(Stack):
             function_name="social-enrichment",
             source_file="lambdas/ingestion/social_enrichment_lambda.py",
             handler="ingestion.social_enrichment_lambda.lambda_handler",
-            schedule="cron(45 14 * * ? *)",
             timeout_seconds=300,
             environment={"ANTHROPIC_SECRET": "life-platform/ai-keys", "SOCIAL_CHANNELS": SOCIAL_CHANNELS_ENV},
             custom_policies=rp.ingestion_social_enrichment(),
@@ -518,14 +513,13 @@ class IngestionStack(Stack):
         # accountability platform — Matthew isn't refreshing a dashboard hoping for
         # real-time task additions. Future work: webhook migration alongside other
         # sources (Notion, Whoop, Habitify).
-        # cron(0 14 * * ? *) = 14:00 UTC = 6 AM PST / 7 AM PDT (UTC-fixed per CLAUDE.md).
+        # its config/schedules.json row = 14:00 UTC = 6 AM PST / 7 AM PDT (UTC-fixed per CLAUDE.md).
         create_platform_lambda(
             self,
             "TodoistIngestion",
             function_name="todoist-data-ingestion",
             source_file="lambdas/ingestion/todoist_lambda.py",
             handler="ingestion.todoist_lambda.lambda_handler",
-            schedule="cron(0 14 * * ? *)",
             timeout_seconds=120,
             environment={"SECRET_NAME": "life-platform/ingestion-keys"},
             custom_policies=rp.ingestion_todoist(),
@@ -539,7 +533,6 @@ class IngestionStack(Stack):
             function_name="eightsleep-data-ingestion",
             source_file="lambdas/ingestion/eightsleep_lambda.py",
             handler="ingestion.eightsleep_lambda.lambda_handler",
-            schedule=f"cron(15 {EIGHTSLEEP_HOURS} * * ? *)",
             timeout_seconds=120,
             custom_policies=rp.ingestion_eightsleep(),
             **shared,
@@ -553,14 +546,13 @@ class IngestionStack(Stack):
             function_name="activity-enrichment",
             source_file="lambdas/ingestion/enrichment_lambda.py",
             handler="ingestion.enrichment_lambda.lambda_handler",
-            schedule="cron(30 15 * * ? *)",
             timeout_seconds=300,
             custom_policies=rp.ingestion_activity_enrichment(),
             **shared,
         )
 
         # ── 11. MacroFactor — S3-trigger only (upload via dropbox_poll or manual).
-        # #469 (B-7): the old daily cron(0 16) was a guaranteed no-op — the handler
+        # #469 (B-7): the old daily its config/schedules.json row was a guaranteed no-op — the handler
         # requires an S3 record and 400'd every scheduled invoke (365 dead runs/year
         # masquerading as coverage). The real paths are the S3 event notification
         # below + dropbox_poll's upload; liveness is dropbox's ER-01 sentinel.
@@ -588,7 +580,6 @@ class IngestionStack(Stack):
             function_name="weather-data-ingestion",
             source_file="lambdas/ingestion/weather_lambda.py",
             handler="ingestion.weather_lambda.lambda_handler",
-            schedule="cron(0 14,2 * * ? *)",
             timeout_seconds=60,
             custom_policies=rp.ingestion_weather(),
             alerts_topic=None,
@@ -602,7 +593,6 @@ class IngestionStack(Stack):
             function_name="dropbox-poll",
             source_file="lambdas/ingestion/dropbox_poll_lambda.py",
             handler="ingestion.dropbox_poll_lambda.lambda_handler",
-            schedule="rate(2 hours)",
             timeout_seconds=120,
             environment={"SECRET_NAME": "life-platform/ingestion-keys"},
             custom_policies=rp.ingestion_dropbox(),

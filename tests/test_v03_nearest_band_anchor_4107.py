@@ -87,6 +87,11 @@ WEIGHTS = {
 }
 
 
+def _ws(block):
+    """The block's WORKING sets — #5049 prepends `warmup` sets to a qualifying compound."""
+    return [s for s in block.sets if s.type != "warmup"]
+
+
 def _s(day: str, lb: float, reps: int = 8) -> dict:
     return {"date": day, "top_weight_kg": lb * LB, "sets": [{"weight_kg": lb * LB, "reps": reps}]}
 
@@ -153,6 +158,8 @@ def _completed(n: int) -> list[dict]:
                 "exercises": [
                     {"name": "Lat Pulldown (Cable)", "sets": [{"type": "normal", "weight_kg": 50, "reps": 8}]},
                     {"name": "Leg Press", "sets": [{"type": "normal", "weight_kg": 90, "reps": 5}]},
+                    # #5069: a delt set, so the generic session also matches shoulders+arms
+                    {"name": "Lateral Raise (Dumbbell)", "sets": [{"type": "normal", "weight_kg": 10, "reps": 12}]},
                 ],
             }
         )
@@ -173,7 +180,7 @@ def test_the_heavy_squat_with_no_in_band_history_gets_a_week_1_load_from_the_nea
     assert row["anchor_band"] == "270-279" and row["anchor_date"] == "2024-11-03"
     assert row["fallback_detail"]["current_band_counts"] == {"sessions_in_band": 0, "sessions_other_band": 4, "sessions_unweighed": 0}
     assert row["fallback_detail"]["band_requested"] == "310-319"
-    top = _block(ideal, "squat_barbell").sets[0].weight_kg
+    top = _ws(_block(ideal, "squat_barbell"))[0].weight_kg
     # 2024-11-03 is > 28 d before block 1, so the 10 % detraining discount applies; week 1 = 60 %
     discounted = 265 * LB * 0.90
     assert top == load_ramp.load_step_kg(discounted * 0.60), top / discounted  # nearest 5 lb (#4388)
@@ -187,9 +194,9 @@ def test_every_heavy_anchor_of_the_first_v04_week_is_loaded_from_its_nearest_ban
         rows = ideal.inputs_snapshot["load_floors"]["movements"]
         band, day, lb = NEAREST[key]
         assert (rows[key]["anchor_band"], rows[key]["anchor_date"], rows[key]["fallback"]) == (band, day, "nearest_band"), key
-        top = _block(ideal, key).sets[0].weight_kg
+        top = _ws(_block(ideal, key))[0].weight_kg
         assert top and top == load_ramp.load_step_kg(lb * LB * 0.90 * 0.60), key  # nearest 5 lb (#4388)
-        assert [s.weight_kg for s in _block(ideal, key).sets[1:]] == [routine_generator._floor_half_kg(top * 0.9)] * 2
+        assert [s.weight_kg for s in _ws(_block(ideal, key))[1:]] == [routine_generator._floor_half_kg(top * 0.9)] * 2
 
 
 def test_mutation_control_without_the_fallback_the_heavy_anchors_come_out_unloaded():
@@ -266,15 +273,16 @@ def test_a_this_cycle_anchor_ramps_from_the_undiscounted_load():
     # #4408: seven days on, same band, no layoff (the discount line is 28 d) — the ramp never goes under
     # the 140 lb x 10 he moved; the fixture logs no RPE, so the hold is the load itself (rpe_basis absent)
     assert row["ramp"]["hold"]["applies"] is True and row["ramp"]["hold"]["rpe_basis"] == "absent"
-    assert _block(ideal, "lat_pulldown").sets[0].weight_kg == pytest.approx(140 * LB)
+    assert _ws(_block(ideal, "lat_pulldown"))[0].weight_kg == pytest.approx(140 * LB)
     assert "no RPE logged" in _block(ideal, "lat_pulldown").notes
 
 
 def test_the_discount_decision_is_fixed_for_the_program_not_re_aged_each_session():
     """Week 9 reads the SAME discount ruling as week 1 — an age measured to the session date
     would discount the 09-20 anchor from late October and cut the load mid-ramp."""
-    # #4161: hybrid weeks (4 sessions AND >= 7 days) — lifting daily, index 59 (11-22) is week 9's upper-heavy
-    w9 = _generate("2026-11-22", weights={**WEIGHTS, "2026-11-21": 314.0}, block_workouts=_completed(59))[0].inputs_snapshot["load_floors"][
+    # #4161: hybrid weeks (the cycle AND >= 7 days) — lifting daily, week 9 opens 11-19; #5069: past the cut-over the
+    # five-day order runs, and index 58 (11-21) is week 9's upper-heavy
+    w9 = _generate("2026-11-21", weights={**WEIGHTS, "2026-11-20": 314.0}, block_workouts=_completed(58))[0].inputs_snapshot["load_floors"][
         "movements"
     ]["lat_pulldown"]
     assert w9["ramp"]["week"] == 9 and w9["ramp"]["discount_pct"] == 0
@@ -329,7 +337,7 @@ def test_the_chat_gate_derives_the_generator_rows_and_commits_its_loads(which):
 
 def test_the_chat_gate_refuses_a_top_set_under_the_ramped_load():
     ideal = _generate()[0]
-    _block(ideal, "squat_barbell").sets[0].weight_kg -= 5
+    _ws(_block(ideal, "squat_barbell"))[0].weight_kg -= 5
     gate = _gate(ideal)
     assert gate["verdict"] == "refuse"
     assert {v["where"] for v in gate["audit"]["violations"]} == {"squat_barbell"}
@@ -421,7 +429,7 @@ def test_plan_next_session_loads_the_heavy_anchor_from_the_nearest_band(key):
     by_key = {e["movement_key"]: e["load"] for e in session["prescription"]["exposures"]}
     load = by_key[key]
     assert load["fallback"] == "nearest_band" and load["anchor_band"] == NEAREST[key][0], key
-    assert load["top_kg"] == _block(ideal, key).sets[0].weight_kg, "planner and draft disagree"
+    assert load["top_kg"] == _ws(_block(ideal, key))[0].weight_kg, "planner and draft disagree"
 
 
 # premerge-gate: 4107: an AST sweep asserting `load_ramp.v03_floor` is the ONE v0.3 load path (generator + chat gate). Pure repo shape: a second load path is exactly a PR's own diff, so it must red pre-merge.

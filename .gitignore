@@ -114,6 +114,9 @@ config/pii_denylist.local.json
 # lives in the same non-committed channel. Only content_filter.example.json is
 # tracked; the runtime source of truth stays the private S3 copy.
 config/content_filter.local.json
+# #5087: the owner-only half of the training charter (body/appearance targets) lives in
+# the same non-committed channel. Only training_charter.private.example.json is tracked.
+config/training_charter.private.local.json
 cdk/_bundle_staging/
 .worktrees/
 # Agent worktrees. These were ignored ONLY via .git/info/exclude, which is untracked —

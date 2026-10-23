@@ -27,6 +27,8 @@ imports from ``health`` (see ``health.pillar_absence`` in the expert analyzer).
 
 from typing import Any, Dict, Optional
 
+from health.lab_units import spellings_of
+
 
 def is_draw_record(item: Any) -> bool:
     """True only for a draw record (sk ``DATE#...``).
@@ -70,4 +72,18 @@ def marker_numeric(entry: Any) -> Optional[float]:
             return float(raw)
         except (ValueError, TypeError):
             continue
+    return None
+
+
+def biomarker_entry(item: Any, key: str) -> Optional[Dict[str, Any]]:
+    """One analyte's marker object off a draw, whichever spelling that draw was written under.
+
+    Two live draws spell high-sensitivity CRP differently (`hs_crp` / `crp_hs`, ``health.lab_units
+    .MARKER_ALIASES``); an exact-key read silently misses one of them. The canonical spelling wins
+    when a (hypothetical) record holds both. ``None`` when the draw holds the analyte under none.
+    """
+    bm = biomarker_map(item)
+    for spelling in spellings_of(key):
+        if spelling in bm:
+            return bm[spelling]
     return None

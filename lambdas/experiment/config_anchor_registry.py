@@ -150,6 +150,35 @@ CONFIG_ANCHOR_REGISTRY: tuple[ConfigAnchor, ...] = (
         path=("start_date",),
     ),
     ConfigAnchor(
+        "training_charter.json",
+        "target_date",
+        DELIBERATE_CARRY,
+        "The May 2027 charter target (owner ruling 2026-10-18, ADR-164): a time-bound, must-hit date the owner set, "
+        "independent of any experiment cycle — a reset never moves it; only an owner ruling recorded in the charter's "
+        "change_log does. The cycle is terminal by the 2026-09-21 ruling, so no reset should reach it either way.",
+        path=("governing_goal", "target_date"),
+    ),
+    ConfigAnchor(
+        "training_charter.json",
+        "date",
+        NOT_ANCHORED,
+        "The charter change_log entries' own dates — when a ruling was recorded, a history fact, not an experiment anchor.",
+    ),
+    ConfigAnchor(
+        "panel_rubric.json",
+        "date",
+        NOT_ANCHORED,
+        "The panel rubric's change_log entry dates (#5072) — when a rubric version was recorded, a history fact, not "
+        "an experiment anchor; a reset must never re-date a rubric version.",
+    ),
+    ConfigAnchor(
+        "training_scorecard.json",
+        "date",
+        NOT_ANCHORED,
+        "#5079: the scorecard's change_log dates and its baseline date (the day of the owner's panel review the first "
+        "block retro compares against) — history facts, not an experiment anchor; a reset never moves either.",
+    ),
+    ConfigAnchor(
         "board_of_directors.json",
         "retired_date",
         NOT_ANCHORED,

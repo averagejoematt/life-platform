@@ -6,19 +6,9 @@ v2.1 (v3.4.0): CDK-managed IAM roles + CDK-managed EventBridge rules.
   EventBridge rules created via schedule= (no more add_permission workaround).
   Freshness-checker and insight-email-parser added (previously unmanaged).
 
-Lambdas (11):
-  life-platform-freshness-checker   cron(45 16 * * ? *)     — 9:45 AM PT daily
-  life-platform-dlq-consumer        rate(6 hours)
-  life-platform-canary              rate(4 hours)
-  life-platform-pip-audit           cron(0 15 ? * MON *)    — Every Monday (#2835: before the 16:00 UTC ops pack)
-  life-platform-qa-smoke            cron(30 18 ? * * *)     — Daily 11:30 AM PT
-  life-platform-key-rotator         (Secrets Manager rotation trigger only)
-  life-platform-data-export         (on-demand only)
-  life-platform-data-reconciliation cron(30 7 ? * MON *)    — Monday 12:30 AM PT
-  insight-email-parser              (SES inbound trigger only)
-  site-stats-refresh                4x/day (15:00, 19:00, 23:00, 03:00 UTC) — no AI calls
-  og-image-generator                cron(30 19 * * ? *)     — 11:30 AM PT daily (HP-13)
-  reading-cover-pipeline            (on-demand only)        — Mind pillar covers (ADR-097)
+Schedules: every one is a row in config/schedules.json (#4284) — the stack carries no cron literal.
+Unscheduled here: life-platform-key-rotator (Secrets Manager rotation), life-platform-data-export
+(on-demand), insight-email-parser (SES inbound), reading-cover-pipeline (on-demand).
 """
 
 import aws_cdk as cdk
@@ -45,7 +35,7 @@ from stacks import (
     role_policies_permanence as rpp,  # #1400 — sibling module; role_policies.py is at its size ceiling
 )
 from stacks.constants import PILLOW_LAYER_ARN, TABLE_NAME  # CONF-01 / #936: one source for the table name (DR cutover)
-from stacks.lambda_helpers import create_platform_lambda
+from stacks.lambda_helpers import create_platform_lambda, table_enabled, table_schedule
 
 # ── #793 (2026-07-08): the public serving path moved OUT of this stack ───────
 # site-api + site-api-ai (functions, Function URLs, roles, alarms, outputs) now
@@ -97,7 +87,6 @@ class OperationalStack(Stack):
             function_name="life-platform-freshness-checker",
             source_file="lambdas/emails/freshness_checker_lambda.py",
             handler="emails.freshness_checker_lambda.lambda_handler",
-            schedule="cron(45 16 * * ? *)",
             timeout_seconds=30,
             memory_mb=128,
             environment={
@@ -122,7 +111,6 @@ class OperationalStack(Stack):
             function_name="life-platform-dlq-consumer",
             source_file="lambdas/operational/dlq_consumer_lambda.py",
             handler="operational.dlq_consumer_lambda.lambda_handler",
-            schedule="rate(6 hours)",
             timeout_seconds=120,
             memory_mb=256,
             environment={
@@ -171,8 +159,7 @@ class OperationalStack(Stack):
             function_name="life-platform-alert-digest",
             source_file="lambdas/operational/alert_digest_lambda.py",
             handler="operational.alert_digest_lambda.lambda_handler",
-            # cron(0 15 * * ? *) = 15:00 UTC = 8 AM PT (UTC-fixed, no DST drift).
-            schedule="cron(0 15 * * ? *)",
+            # its config/schedules.json row = 15:00 UTC = 8 AM PT (UTC-fixed, no DST drift).
             timeout_seconds=60,
             memory_mb=128,
             environment={
@@ -215,8 +202,7 @@ class OperationalStack(Stack):
             function_name="life-platform-traffic-digest",
             source_file="lambdas/operational/traffic_digest_lambda.py",
             handler="operational.traffic_digest_lambda.lambda_handler",
-            # cron(0 16 ? * MON *) = 16:00 UTC Mondays = 9 AM PT (UTC-fixed, no DST drift).
-            schedule="cron(0 16 ? * MON *)",
+            # its config/schedules.json row = 16:00 UTC Mondays = 9 AM PT (UTC-fixed, no DST drift).
             timeout_seconds=120,
             memory_mb=256,
             environment={
@@ -266,7 +252,7 @@ class OperationalStack(Stack):
         # signal that requires a living person. Both halves are published to
         # generated/archive/*, which CloudFront serves at /archive/*.
         #
-        # cron(0 6 * * ? *) = 06:00 UTC = 11 PM PT — the end of the Pacific day,
+        # its config/schedules.json row = 06:00 UTC = 11 PM PT — the end of the Pacific day,
         # after the daily brief (17:00 UTC), the OG cards (18:30 UTC) and the
         # nightly QA sweep have all landed, so the archive captures a finished
         # day rather than a half-written one. UTC-fixed, no DST drift.
@@ -281,7 +267,6 @@ class OperationalStack(Stack):
             function_name="life-platform-permanence",
             source_file="lambdas/operational/permanence_lambda.py",
             handler="operational.permanence_lambda.lambda_handler",
-            schedule="cron(0 6 * * ? *)",
             timeout_seconds=600,
             memory_mb=1024,
             environment={
@@ -339,7 +324,6 @@ class OperationalStack(Stack):
             function_name="life-platform-canary",
             source_file="lambdas/operational/canary_lambda.py",
             handler="operational.canary_lambda.lambda_handler",
-            schedule="rate(4 hours)",
             timeout_seconds=60,
             memory_mb=256,
             environment={
@@ -371,7 +355,7 @@ class OperationalStack(Stack):
             function_name="life-platform-cost-governor",
             source_file="lambdas/operational/cost_governor_lambda.py",
             handler="operational.cost_governor_lambda.lambda_handler",
-            schedule="cron(0 0/8 * * ? *)",  # every 8h (3x/day) — CE self-cost: each run = 1 Cost Explorer call ($0.01). Non-AI spend is slow-moving + Bedrock is tracked via free CloudWatch token metrics, so 3x/day is ample; the actual-mtd cap in _decide_tier still catches a real runaway within a day.
+            # schedule: config/schedules.json (#4284) — every 8h (3x/day) — CE self-cost: each run = 1 Cost Explorer call ($0.01). Non-AI spend is slow-moving + Bedrock is tracked via free CloudWatch token metrics, so 3x/day is ample; the actual-mtd cap in _decide_tier still catches a real runaway within a day.
             timeout_seconds=60,
             memory_mb=256,
             # 2026-05-29: enforcement ENABLED — the projection fix makes the
@@ -490,7 +474,6 @@ class OperationalStack(Stack):
             function_name="life-platform-pip-audit",
             source_file="lambdas/operational/pip_audit_lambda.py",
             handler="operational.pip_audit_lambda.lambda_handler",
-            schedule="cron(0 15 ? * MON *)",
             timeout_seconds=300,
             memory_mb=512,
             custom_policies=rp.operational_pip_audit(),
@@ -507,7 +490,6 @@ class OperationalStack(Stack):
             function_name="life-platform-qa-smoke",
             source_file="lambdas/operational/qa_smoke_lambda.py",
             handler="operational.qa_smoke_lambda.lambda_handler",
-            schedule="cron(30 18 ? * * *)",
             # 120 → 240 (#1096): the Reader Truth pass adds 6 HTTPS fetches + one
             # or two Haiku batches (~20-60s) on top of the existing checks.
             timeout_seconds=240,
@@ -611,7 +593,7 @@ class OperationalStack(Stack):
         subscriber_retention_rule = events.Rule(
             self,
             "SubscriberRetentionSweep",
-            schedule=events.Schedule.expression("cron(0 8 ? * MON *)"),
+            schedule=table_schedule("life-platform-delete-user-data#SubscriberRetentionSweep"),
             description="#1350: anonymize unsubscribed subscriber emails past the signed 18-month retention window",
         )
         subscriber_retention_rule.add_target(
@@ -630,7 +612,6 @@ class OperationalStack(Stack):
             function_name="life-platform-data-reconciliation",
             source_file="lambdas/operational/data_reconciliation_lambda.py",
             handler="operational.data_reconciliation_lambda.lambda_handler",
-            schedule="cron(30 7 ? * MON *)",
             timeout_seconds=120,
             memory_mb=256,
             custom_policies=rp.operational_data_reconciliation(),
@@ -653,7 +634,6 @@ class OperationalStack(Stack):
             function_name="life-platform-coherence-sentinel",
             source_file="lambdas/operational/coherence_sentinel_lambda.py",
             handler="operational.coherence_sentinel_lambda.lambda_handler",
-            schedule="cron(45 18 ? * * *)",
             timeout_seconds=120,
             memory_mb=256,
             custom_policies=rp.operational_coherence_sentinel(),
@@ -676,7 +656,7 @@ class OperationalStack(Stack):
             function_name="life-platform-ai-quality-canary",
             source_file="lambdas/operational/ai_quality_canary_lambda.py",
             handler="operational.ai_quality_canary_lambda.lambda_handler",
-            schedule="cron(20 16 ? * MON,WED,FRI *)",  # 3×/week, 16:20 UTC (09:20 AM PDT), UTC-fixed
+            # schedule: config/schedules.json (#4284) — 3×/week, 16:20 UTC (09:20 AM PDT), UTC-fixed
             timeout_seconds=120,
             memory_mb=256,
             custom_policies=rp.operational_ai_quality_canary(),
@@ -1034,11 +1014,12 @@ class OperationalStack(Stack):
             # #794: same staged full-tree bundle as site-api above — no layer (ADR-131).
         )
         # Four EventBridge cron rules — UTC equivalents of 8am/12pm/4pm/8pm Pacific (no DST drift)
-        for utc_hour, label in [(15, "8amPT"), (19, "12pmPT"), (23, "4pmPT"), (3, "8pmPT")]:
+        # (the four rows site-stats-refresh#SiteStatsRefresh<label> in config/schedules.json, #4284)
+        for label in ("8amPT", "12pmPT", "4pmPT", "8pmPT"):
             rule = events.Rule(
                 self,
                 f"SiteStatsRefresh{label}",
-                schedule=events.Schedule.cron(hour=str(utc_hour), minute="0"),
+                schedule=table_schedule(f"site-stats-refresh#SiteStatsRefresh{label}"),
             )
             rule.add_target(targets.LambdaFunction(site_stats_fn))
 
@@ -1070,7 +1051,7 @@ class OperationalStack(Stack):
             function_name="og-image-generator",
             source_file="lambdas/web/og_image_lambda.py",
             handler="web.og_image_lambda.lambda_handler",
-            schedule="cron(30 19 * * ? *)",  # 11:30 AM PT daily, after the daily brief refreshes public_stats
+            # schedule: config/schedules.json (#4284) — 11:30 AM PT daily, after the daily brief refreshes public_stats
             timeout_seconds=60,
             memory_mb=512,
             additional_layers=[pillow_layer],
@@ -1108,7 +1089,7 @@ class OperationalStack(Stack):
             function_name="recap-card-generator",
             source_file="lambdas/web/recap_card_lambda.py",
             handler="web.recap_card_lambda.lambda_handler",
-            schedule="cron(30 19 * * ? *)",  # 11:30 AM PT daily — the same clock as the OG cards
+            # schedule: config/schedules.json (#4284) — 11:30 AM PT daily — the same clock as the OG cards
             # ── TEMPORARY HOLD (owner ruling 2026-09-14) ───────────────────────────────
             # The owner has not yet reviewed the v2 campaign cards, so the schedule renders
             # and stores but sends NOTHING. Delete this line to resume delivery — the
@@ -1219,7 +1200,6 @@ class OperationalStack(Stack):
             function_name="reading-recall-sweep",
             source_file="lambdas/reading/reading_recall_sweep_lambda.py",
             handler="reading.reading_recall_sweep_lambda.lambda_handler",
-            schedule="cron(0 16 * * ? *)",
             timeout_seconds=60,
             memory_mb=256,
             custom_policies=rp.operational_reading_recall_sweep(),
@@ -1241,7 +1221,7 @@ class OperationalStack(Stack):
             function_name="pipeline-health-check",
             source_file="lambdas/operational/pipeline_health_check_lambda.py",
             handler="operational.pipeline_health_check_lambda.lambda_handler",
-            schedule="cron(30 2,6,14,18,22 * * ? *)",  # 5x daily, 30 min after ingestion
+            # schedule: config/schedules.json (#4284) — 5x daily, 30 min after ingestion
             timeout_seconds=300,
             memory_mb=256,
             environment={"SNS_ARN": DIGEST_TOPIC_ARN},
@@ -1265,7 +1245,7 @@ class OperationalStack(Stack):
         compute_check_rule = events.Rule(
             self,
             "PipelineHealthComputeCheck",
-            schedule=events.Schedule.cron(hour="16", minute="58"),
+            schedule=table_schedule("pipeline-health-check#PipelineHealthComputeCheck"),
             description="Phase 3.2: verify today's compute records exist before daily-brief",
         )
         compute_check_rule.add_target(
@@ -1284,7 +1264,7 @@ class OperationalStack(Stack):
         liveness_check_rule = events.Rule(
             self,
             "PipelineHealthIngestLiveness",
-            schedule=events.Schedule.cron(hour="17", minute="10"),
+            schedule=table_schedule("pipeline-health-check#PipelineHealthIngestLiveness"),
             description="ER-01: assert each active source's ingestion Lambda ran + 200'd (infra-liveness)",
         )
         liveness_check_rule.add_target(
@@ -1334,8 +1314,8 @@ class OperationalStack(Stack):
             "HevyRoutineCronRule",
             rule_name="hevy-routine-cron-weekly",
             description="ADR-066 ships disabled; operator enables after Phase 1 use justifies it.",
-            schedule=events.Schedule.expression("cron(30 13 ? * SUN *)"),
-            enabled=False,
+            schedule=table_schedule("hevy-routine-cron#HevyRoutineCronRule"),
+            enabled=table_enabled("hevy-routine-cron#HevyRoutineCronRule"),
         )
         hevy_routine_cron_rule.add_target(targets.LambdaFunction(hevy_routine_cron))
 
@@ -1385,7 +1365,7 @@ class OperationalStack(Stack):
             "HevyRestampRule",
             rule_name="hevy-restamp-daily",
             description="#417 TR-05: re-stamps on fresh Whoop recovery (~17:30 UTC refresh); enabled post PR #711 decision 2a.",
-            schedule=events.Schedule.expression("cron(0 18 * * ? *)"),
+            schedule=table_schedule("hevy-restamp#HevyRestampRule"),
             enabled=True,
         )
         hevy_restamp_rule.add_target(targets.LambdaFunction(hevy_restamp))

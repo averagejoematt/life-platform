@@ -150,7 +150,7 @@ def test_squat_barbell_fixture():
         ("deadlift_barbell", "hinge", 3),
         ("bent_over_row_barbell", "row", 3),
         ("barbell_bench_press", "bench", 3),
-        ("pull_up", "vertical_pull", 1),
+        ("pull_up", "vertical_pull", 2),  # #5054: bodyweight-loaded, not the easiest tier
     ],
 )
 def test_the_anchor_lifts_he_has_trained_are_tagged(key, family, tier):
@@ -181,8 +181,51 @@ def test_every_generated_skill_tier_follows_the_stated_equipment_rule():
             assert v["skill_tier"] == 2 and v["equipment"] == "cable", key
         elif src == "title:smith":
             assert v["skill_tier"] == 3, key
+        elif src == "title:bodyweight_loaded":
+            assert v["skill_tier"] == bmc._skill_tier(None, v["title"])[0] >= 2, key
         else:
             assert v["skill_tier"] == bmc.UNKNOWN_EQUIPMENT_TIER, key
+
+
+def test_bodyweight_loaded_movements_are_above_the_easiest_tier_5054():
+    """Equipment `none` is not tier 1 when the load is the lifter's body (#5054); mobility stays at 1."""
+    for equipment, title, tier in [
+        ("none", "Pull Up", 2),
+        ("machine", "Pull Up", 2),  # Hevy files a bar under the wrong kit
+        ("none", "Chin Up", 2),
+        ("none", "Chin Up (Weighted)", 2),
+        ("none", "Triceps Dip", 2),
+        ("none", "Inverted Row", 2),
+        ("resistance_band", "Ring Inverted Rows", 2),
+        ("none", "Muscle Up", 3),
+        ("none", "Pistol Squat", 3),
+        ("none", "Nordic Hamstring Curl", 3),
+        ("none", "Handstand Push Up", 3),
+        ("none", "Human Flag", 3),
+        # not bodyweight-loaded: the stack takes part of the load, or nothing is loaded at all
+        ("machine", "Pull Up (Assisted)", 1),
+        ("machine", "Triceps Dip (Assisted)", 1),
+        ("none", "Stretching", 1),
+        ("none", "90/90 Hip Stretch", 1),
+        ("none", "Thoracic Extension", 1),
+        ("none", "Inverted Chin Curls", 1),
+        ("none", "Push Up", 1),
+        ("none", "Plank", 1),
+        ("none", "1 Arm Pushdown", 1),  # over-match probe: not a one-arm push-up
+        ("none", "One Arm Pull Down", 1),
+        ("none", "One Arm Pull Up", 3),
+    ]:
+        assert bmc._skill_tier(equipment, title)[0] == tier, (equipment, title)
+    assert bmc._skill_tier("none", "Pull Up")[1] == "title:bodyweight_loaded"
+
+
+def test_pull_up_and_chin_up_are_generator_eligible_at_the_skill_ceiling_5054():
+    """Tier 2 sits AT the interim ceiling of 2 (still auto-programmable) and above ceiling 1 (the minimum-viable floor)."""
+    for key in ("pull_up", "pull_up_weighted", "chin_up_weighted"):
+        entry = CATALOG[key]
+        assert entry["skill_tier"] == 2, key
+        assert mc.generator_eligible(entry, 2) and not mc.generator_eligible(entry, 1), key
+    assert not mc.generator_eligible(CATALOG["pistol_squat"], 2)
 
 
 def test_every_generated_muscle_is_the_one_tables_mapping():
@@ -350,6 +393,15 @@ def test_a_reviewed_generated_entry_is_preserved_verbatim():
     first["movements"]["face_pull_cable"] |= {"reviewed": True, "joint_friendly_score": 3, "notes": "owner reviewed"}
     again = bmc.build_catalog(first, hist, _META)["movements"]["face_pull_cable"]
     assert again["reviewed"] is True and again["joint_friendly_score"] == 3 and again["notes"] == "owner reviewed"
+
+
+def test_regeneration_carries_forward_a_hand_written_note_5054():
+    """A note on an unreviewed hevy_history entry (#4169/#4176 provenance) survives the rebuild."""
+    hist = _history(AAAA0001=3)
+    first = bmc.build_catalog({"movements": {}}, hist, _META)
+    first["movements"]["face_pull_cable"]["notes"] = "provenance line"
+    again = bmc.build_catalog(first, hist, _META)["movements"]["face_pull_cable"]
+    assert again["notes"] == "provenance line"
 
 
 def test_a_coach_added_entry_is_enriched_kept_and_eligible():

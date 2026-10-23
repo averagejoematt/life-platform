@@ -628,14 +628,14 @@ def test_a_second_stage_2_run_re_evaluates_the_coachs_draft_not_its_own_cut():
     low = patch("mcp.tools_plan._readiness_low_streak", return_value=(2, {"state": "measured"}))
     with low:
         out1, _, _ = _run(ir, ev, invoke=cut_by_4)
-    # #4149: the cut is the owner's −30 % computed in code (20 -> 14), not the model's -4;
-    # the relative fake still matters — it is what compounded live, and it must not leak in.
-    assert out1["critics"]["recheck"]["total_sets"] == 14
+    # #5070: the fatigue cut (20 -> 14, computed in code, not the model's -4) is a RECOMMENDATION now — nothing is cut
+    # without the owner's recorded word, so the draft stays whole and the model's relative -4 must still not leak in.
+    assert out1["critics"]["recheck"]["total_sets"] == 20
     assert len(out1["critics"]["draft_exercises"]) == 5 and sum(len(e["sets"]) for e in out1["critics"]["draft_exercises"]) == 20
     with low:
         out2, _, _ = _run(ir, ev, invoke=cut_by_4)
-    assert out2["critics"]["recheck"]["total_sets"] == 14, "a re-run must land on the same cut, not cut again"
-    assert sum(len(e.sets) for e in ir.exercises) == 14
+    assert out2["critics"]["recheck"]["total_sets"] == 20, "a re-run lands on the same answer: nothing is cut"
+    assert sum(len(e.sets) for e in ir.exercises) == 20
 
 
 @pytest.fixture(autouse=True)

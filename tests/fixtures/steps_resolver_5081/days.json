@@ -1,0 +1,748 @@
+{
+ "_provenance": "Field-projected copies of live DynamoDB rows (read-only query, 2026-10-18 ~23:30Z): USER#matthew#SOURCE#{whoop,apple_health,strava,hevy}. Values verbatim; only fields the steps resolver and the walking layer read are kept. Numbers load as Decimal (the boto3 wire type).",
+ "days": {
+  "2026-09-20": {
+   "apple_health": {
+    "date": "2026-09-20",
+    "delivered_readings_only": true,
+    "distance_walk_run_miles": 1.47,
+    "pk": "USER#matthew#SOURCE#apple_health",
+    "sk": "DATE#2026-09-20",
+    "source": "apple_health",
+    "steps": 3463.28
+   },
+   "hevy": [
+    {
+     "date": "2026-09-20",
+     "end_time": "2026-09-20T21:43:34+00:00",
+     "exercises": [
+      {
+       "name": "Lat Pulldown (Cable)",
+       "sets": [
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        }
+       ]
+      },
+      {
+       "name": "Lat Pulldown - Close Grip (Cable)",
+       "sets": [
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        }
+       ]
+      },
+      {
+       "name": "Dumbbell Row",
+       "sets": [
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        }
+       ]
+      },
+      {
+       "name": "Straight Arm Lat Pulldown (Cable)",
+       "sets": [
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        }
+       ]
+      },
+      {
+       "name": "Face Pull",
+       "sets": [
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        }
+       ]
+      },
+      {
+       "name": "Hammer Curl (Dumbbell)",
+       "sets": [
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        }
+       ]
+      },
+      {
+       "name": "Cycling",
+       "sets": [
+        {
+         "duration_sec": 2700
+        }
+       ]
+      },
+      {
+       "name": "Treadmill",
+       "sets": [
+        {
+         "duration_sec": 3600
+        }
+       ]
+      },
+      {
+       "name": "Stretching",
+       "sets": [
+        {
+         "duration_sec": 1200
+        }
+       ]
+      }
+     ],
+     "pk": "USER#matthew#SOURCE#hevy",
+     "sk": "DATE#2026-09-20#WORKOUT#fb535f38-df8a-4396-a38d-015e68e362e7",
+     "source": "hevy",
+     "start_time": "2026-09-20T18:18:09+00:00",
+     "title": "Foundation - Pull - 4 - 14"
+    }
+   ],
+   "strava": [
+    {
+     "activities": [
+      {
+       "device_name": "Hevy",
+       "distance_miles": null,
+       "elapsed_time_seconds": 12325,
+       "moving_time_seconds": 12325,
+       "name": "Foundation - Pull - 4 - 14",
+       "sport_type": "WeightTraining",
+       "start_date": "2026-09-20T18:18:09Z",
+       "type": "WeightTraining"
+      },
+      {
+       "device_name": "WHOOP",
+       "distance_miles": null,
+       "elapsed_time_seconds": 2099,
+       "moving_time_seconds": 2099,
+       "name": "Lunch Weight Training",
+       "sport_type": "WeightTraining",
+       "start_date": "2026-09-20T18:48:00Z",
+       "type": "WeightTraining"
+      },
+      {
+       "device_name": "WHOOP",
+       "distance_miles": null,
+       "elapsed_time_seconds": 3779,
+       "moving_time_seconds": 3779,
+       "name": "Afternoon Walk",
+       "sport_type": "Walk",
+       "start_date": "2026-09-20T20:15:00Z",
+       "type": "Walk"
+      }
+     ],
+     "activity_count": 3,
+     "date": "2026-09-20",
+     "pk": "USER#matthew#SOURCE#strava",
+     "sk": "DATE#2026-09-20",
+     "source": "strava"
+    }
+   ],
+   "whoop": {
+    "date": "2026-09-20",
+    "pk": "USER#matthew#SOURCE#whoop",
+    "sk": "DATE#2026-09-20",
+    "source": "whoop"
+   }
+  },
+  "2026-10-01": {
+   "apple_health": {
+    "date": "2026-10-01",
+    "delivered_readings_only": true,
+    "distance_walk_run_miles": 3.6,
+    "pk": "USER#matthew#SOURCE#apple_health",
+    "sk": "DATE#2026-10-01",
+    "source": "apple_health",
+    "steps": 8510.61
+   },
+   "hevy": [
+    {
+     "date": "2026-10-01",
+     "end_time": "2026-10-02T00:23:34+00:00",
+     "exercises": [
+      {
+       "name": "Squat (Barbell)",
+       "sets": [
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        }
+       ]
+      },
+      {
+       "name": "Romanian Deadlift (Barbell)",
+       "sets": [
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        }
+       ]
+      },
+      {
+       "name": "Linear Leg Press",
+       "sets": [
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        }
+       ]
+      },
+      {
+       "name": "Calf Press (Machine)",
+       "sets": [
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        }
+       ]
+      },
+      {
+       "name": "Seated Leg Curl (Machine)",
+       "sets": [
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        }
+       ]
+      },
+      {
+       "name": "Cycling",
+       "sets": [
+        {
+         "duration_sec": 3000
+        }
+       ]
+      },
+      {
+       "name": "Stretching",
+       "sets": [
+        {
+         "duration_sec": 900
+        }
+       ]
+      }
+     ],
+     "pk": "USER#matthew#SOURCE#hevy",
+     "sk": "DATE#2026-10-01#WORKOUT#b12e3088-d3ae-4953-9aaf-322dd2779079",
+     "source": "hevy",
+     "start_time": "2026-10-01T22:06:07+00:00",
+     "title": "Foundation - Lower - 3 - 24"
+    }
+   ],
+   "strava": [
+    {
+     "activities": [
+      {
+       "device_name": "Hevy",
+       "distance_miles": null,
+       "elapsed_time_seconds": 8247,
+       "moving_time_seconds": 8247,
+       "name": "Foundation - Lower - 3 - 24",
+       "sport_type": "WeightTraining",
+       "start_date": "2026-10-01T22:06:07Z",
+       "type": "WeightTraining"
+      },
+      {
+       "device_name": "WHOOP",
+       "distance_miles": null,
+       "elapsed_time_seconds": 779,
+       "moving_time_seconds": 779,
+       "name": "Afternoon Weight Training",
+       "sport_type": "WeightTraining",
+       "start_date": "2026-10-01T22:27:00Z",
+       "type": "WeightTraining"
+      }
+     ],
+     "activity_count": 2,
+     "date": "2026-10-01",
+     "pk": "USER#matthew#SOURCE#strava",
+     "sk": "DATE#2026-10-01",
+     "source": "strava"
+    }
+   ],
+   "whoop": {
+    "date": "2026-10-01",
+    "pk": "USER#matthew#SOURCE#whoop",
+    "sk": "DATE#2026-10-01",
+    "source": "whoop",
+    "step_count": 3420
+   }
+  },
+  "2026-10-05": {
+   "apple_health": {
+    "date": "2026-10-05",
+    "delivered_readings_only": true,
+    "distance_walk_run_miles": 0.49,
+    "pk": "USER#matthew#SOURCE#apple_health",
+    "sk": "DATE#2026-10-05",
+    "source": "apple_health",
+    "steps": 1255
+   },
+   "hevy": [],
+   "strava": [
+    {
+     "activities": [
+      {
+       "device_name": "Garmin epix (Gen2)",
+       "distance_miles": 4.01,
+       "elapsed_time_seconds": 4287,
+       "moving_time_seconds": 4287,
+       "name": "Afternoon Walk",
+       "sport_type": "Walk",
+       "start_date": "2026-10-06T00:41:29Z",
+       "type": "Walk"
+      }
+     ],
+     "activity_count": 1,
+     "date": "2026-10-05",
+     "pk": "USER#matthew#SOURCE#strava",
+     "sk": "DATE#2026-10-05",
+     "source": "strava"
+    }
+   ],
+   "whoop": {
+    "date": "2026-10-05",
+    "pk": "USER#matthew#SOURCE#whoop",
+    "sk": "DATE#2026-10-05",
+    "source": "whoop",
+    "step_count": 9057
+   }
+  },
+  "2026-10-14": {
+   "apple_health": {
+    "date": "2026-10-14",
+    "delivered_readings_only": true,
+    "distance_walk_run_miles": 5.92,
+    "pk": "USER#matthew#SOURCE#apple_health",
+    "sk": "DATE#2026-10-14",
+    "source": "apple_health",
+    "steps": 13157.82
+   },
+   "hevy": [],
+   "strava": [
+    {
+     "activities": [
+      {
+       "device_name": "Garmin epix (Gen2)",
+       "distance_miles": 8.16,
+       "elapsed_time_seconds": 10111,
+       "moving_time_seconds": 10057,
+       "name": "Afternoon Walk",
+       "sport_type": "Walk",
+       "start_date": "2026-10-14T21:58:49Z",
+       "type": "Walk"
+      }
+     ],
+     "activity_count": 1,
+     "date": "2026-10-14",
+     "pk": "USER#matthew#SOURCE#strava",
+     "sk": "DATE#2026-10-14",
+     "source": "strava"
+    }
+   ],
+   "whoop": {
+    "date": "2026-10-14",
+    "pk": "USER#matthew#SOURCE#whoop",
+    "sk": "DATE#2026-10-14",
+    "source": "whoop",
+    "step_count": 17739
+   }
+  },
+  "2026-10-17": {
+   "apple_health": {
+    "date": "2026-10-17",
+    "delivered_readings_only": true,
+    "distance_walk_run_miles": 5.79,
+    "pk": "USER#matthew#SOURCE#apple_health",
+    "sk": "DATE#2026-10-17",
+    "source": "apple_health",
+    "steps": 13856
+   },
+   "hevy": [],
+   "strava": [
+    {
+     "activities": [
+      {
+       "device_name": "Garmin epix (Gen2)",
+       "distance_miles": 8.23,
+       "elapsed_time_seconds": 14600,
+       "moving_time_seconds": 10097,
+       "name": "Lunch Walk",
+       "sport_type": "Walk",
+       "start_date": "2026-10-17T18:15:11Z",
+       "type": "Walk"
+      },
+      {
+       "device_name": "WHOOP",
+       "distance_miles": null,
+       "elapsed_time_seconds": 2099,
+       "moving_time_seconds": 2099,
+       "name": "Afternoon Walk",
+       "sport_type": "Walk",
+       "start_date": "2026-10-17T20:59:00Z",
+       "type": "Walk"
+      },
+      {
+       "device_name": "WHOOP",
+       "distance_miles": null,
+       "elapsed_time_seconds": 1919,
+       "moving_time_seconds": 1919,
+       "name": "Afternoon Walk",
+       "sport_type": "Walk",
+       "start_date": "2026-10-17T21:46:00Z",
+       "type": "Walk"
+      }
+     ],
+     "activity_count": 3,
+     "date": "2026-10-17",
+     "pk": "USER#matthew#SOURCE#strava",
+     "sk": "DATE#2026-10-17",
+     "source": "strava"
+    }
+   ],
+   "whoop": {
+    "cycle_end": "2026-10-18T06:24:10.610Z",
+    "cycle_id": 1881434574,
+    "cycle_start": "2026-10-17T06:08:38.930Z",
+    "date": "2026-10-17",
+    "pk": "USER#matthew#SOURCE#whoop",
+    "sk": "DATE#2026-10-17",
+    "source": "whoop",
+    "step_count": 17866
+   }
+  },
+  "2026-10-18": {
+   "apple_health": {
+    "date": "2026-10-18",
+    "delivered_readings_only": true,
+    "distance_walk_run_miles": 1.93,
+    "pk": "USER#matthew#SOURCE#apple_health",
+    "sk": "DATE#2026-10-18",
+    "source": "apple_health",
+    "steps": 4719.36
+   },
+   "hevy": [
+    {
+     "date": "2026-10-18",
+     "end_time": "2026-10-18T20:31:05+00:00",
+     "exercises": [
+      {
+       "name": "Bench Press (Barbell)",
+       "sets": [
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        }
+       ]
+      },
+      {
+       "name": "Dumbbell Row",
+       "sets": [
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        }
+       ]
+      },
+      {
+       "name": "Shoulder Press (Dumbbell)",
+       "sets": [
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        }
+       ]
+      },
+      {
+       "name": "Cable Fly Crossovers",
+       "sets": [
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        }
+       ]
+      },
+      {
+       "name": "Lat Pulldown (Cable)",
+       "sets": [
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        }
+       ]
+      },
+      {
+       "name": "Triceps Pushdown",
+       "sets": [
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        }
+       ]
+      },
+      {
+       "name": "Bicep Curl (Dumbbell)",
+       "sets": [
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        },
+        {
+         "duration_sec": null
+        }
+       ]
+      },
+      {
+       "name": "Cycling",
+       "sets": [
+        {
+         "duration_sec": 2700
+        }
+       ]
+      },
+      {
+       "name": "Stretching",
+       "sets": [
+        {
+         "duration_sec": 1200
+        }
+       ]
+      }
+     ],
+     "pk": "USER#matthew#SOURCE#hevy",
+     "sk": "DATE#2026-10-18#WORKOUT#d8c4408d-6eef-453e-8f31-34220936549a",
+     "source": "hevy",
+     "start_time": "2026-10-18T17:48:24+00:00",
+     "title": "Foundation - Upper - 9 - 34"
+    }
+   ],
+   "strava": [
+    {
+     "activities": [
+      {
+       "device_name": "Hevy",
+       "distance_miles": null,
+       "elapsed_time_seconds": 9758,
+       "moving_time_seconds": 9749,
+       "name": "Foundation - Upper - 9 - 34",
+       "sport_type": "WeightTraining",
+       "start_date": "2026-10-18T17:48:24Z",
+       "type": "WeightTraining"
+      },
+      {
+       "device_name": "WHOOP",
+       "distance_miles": null,
+       "elapsed_time_seconds": 2459,
+       "moving_time_seconds": 2459,
+       "name": "Lunch Weight Training",
+       "sport_type": "WeightTraining",
+       "start_date": "2026-10-18T18:21:00Z",
+       "type": "WeightTraining"
+      },
+      {
+       "device_name": "WHOOP",
+       "distance_miles": null,
+       "elapsed_time_seconds": 1019,
+       "moving_time_seconds": 1019,
+       "name": "Lunch Weight Training",
+       "sport_type": "WeightTraining",
+       "start_date": "2026-10-18T19:14:00Z",
+       "type": "WeightTraining"
+      },
+      {
+       "device_name": "Apple Watch Ultra 4",
+       "distance_miles": null,
+       "elapsed_time_seconds": 1349,
+       "moving_time_seconds": 1349,
+       "name": "Lunch Ride",
+       "sport_type": "Ride",
+       "start_date": "2026-10-18T19:23:38Z",
+       "type": "Ride"
+      },
+      {
+       "device_name": "WHOOP",
+       "distance_miles": null,
+       "elapsed_time_seconds": 2703,
+       "moving_time_seconds": 2703,
+       "name": "Lunch Weight Training",
+       "sport_type": "WeightTraining",
+       "start_date": "2026-10-18T19:46:07Z",
+       "type": "WeightTraining"
+      },
+      {
+       "device_name": "WHOOP",
+       "distance_miles": null,
+       "elapsed_time_seconds": 1019,
+       "moving_time_seconds": 1019,
+       "name": "Afternoon Walk",
+       "sport_type": "Walk",
+       "start_date": "2026-10-18T22:03:00Z",
+       "type": "Walk"
+      },
+      {
+       "device_name": "WHOOP",
+       "distance_miles": null,
+       "elapsed_time_seconds": 959,
+       "moving_time_seconds": 959,
+       "name": "Afternoon Walk",
+       "sport_type": "Walk",
+       "start_date": "2026-10-18T22:53:00Z",
+       "type": "Walk"
+      }
+     ],
+     "activity_count": 7,
+     "date": "2026-10-18",
+     "pk": "USER#matthew#SOURCE#strava",
+     "sk": "DATE#2026-10-18",
+     "source": "strava"
+    }
+   ],
+   "whoop": {
+    "cycle_id": 1884132144,
+    "cycle_start": "2026-10-18T06:24:10.610Z",
+    "date": "2026-10-18",
+    "pk": "USER#matthew#SOURCE#whoop",
+    "sk": "DATE#2026-10-18",
+    "source": "whoop",
+    "step_count": 6436
+   }
+  }
+ }
+}

@@ -1549,7 +1549,10 @@ class TestGaitFullDayMean:
 
     def test_gait_is_not_under_the_additive_guard(self):
         assert not (hae._AVG_DEDUP_FIELDS & (hae._ACTIVITY_MAX_FIELDS | hae._READING_COUNT_GUARD_FIELDS))
-        assert hae._AVG_DEDUP_FIELDS == set(_GAIT_FIELDS.values())
+        # #4970: the gait four are now one named subset; the watch's averages joined the
+        # same timestamp-mean path and are equally outside the additive guard.
+        assert hae._GAIT_AVG_DEDUP_FIELDS == set(_GAIT_FIELDS.values())
+        assert hae._AVG_DEDUP_FIELDS == hae._GAIT_AVG_DEDUP_FIELDS | hae._WATCH_AVG_DEDUP_FIELDS
 
 
 # ──────────────────────────────────────────────────────────────────────────────

@@ -15,103 +15,103 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 | Lambda | Stack | Schedule (UTC) | Resolution |
 |--------|-------|----------------|------------|
-| `activity-enrichment` | ingestion_stack | `cron(30 15 * * ? *)` | constant |
-| `acwr-compute` | compute_stack | `cron(55 16 * * ? *)` | constant |
-| `adaptive-mode-compute` | compute_stack | `cron(35 16 * * ? *)` | constant |
-| `ai-expert-analyzer` | compute_stack | `cron(0 14 ? * MON *)` | constant |
-| `ai-review-pack` | email_stack | `cron(0 18 ? * SUN *)` | constant |
-| `anomaly-detector` | compute_stack | `cron(5 15 * * ? *)` | constant |
-| `between-chronicle` | email_stack | `cron(0 17 ? * SUN *)` | constant |
-| `challenge-generator` | compute_stack | `cron(0 22 ? * SUN *)` | constant |
-| `character-sheet-compute` | compute_stack | `cron(30 16 * * ? *)` | constant |
-| `chronicle-approve` | email_stack | `cron(0 18 * * ? *)` | constant |
-| `chronicle-email-sender` | email_stack | `cron(10 15 ? * WED *)` | constant |
-| `circadian-compliance` | compute_stack | `cron(0 2 * * ? *)` | constant |
-| `coach-daily-reflection` | compute_stack | `cron(0 19 * * ? *)` | constant |
-| `coach-history-summarizer` | compute_stack | `cron(0 17 ? * SUN *)` | constant |
-| `coach-memoir` | compute_stack | `cron(0 15 1 1,4,7,10 ? *)` | constant |
-| `coach-nudge` | email_stack | `cron(10 0-5,15-23 * * ? *)` | constant |
-| `coach-panel-podcast` | email_stack | `cron(0 18 * * MON,WED *)` | constructed |
-| `coach-prediction-evaluator` | compute_stack | `cron(0 16 * * ? *)` | constant |
-| `coach-vision` | compute_stack | `cron(0 17 ? * MON *)` | constant |
-| `daily-brief` | email_stack | `cron(0 10 * * ? *)` (America/Los_Angeles, not UTC) | constant |
-| `daily-debrief` | email_stack | `cron(0 19 * * ? *)` | constant |
-| `daily-insight-compute` | compute_stack | `cron(45 16 * * ? *)` | constant |
-| `daily-metrics-compute` | compute_stack | `cron(40 16 * * ? *)` | constant |
-| `dashboard-refresh` | compute_stack | `cron(0 1 * * ? *)` + `cron(0 21 * * ? *)` | constant, constant |
-| `dropbox-poll` | ingestion_stack | `rate(2 hours)` | constant |
-| `eightsleep-data-ingestion` | ingestion_stack | `cron(15 14,16,18,20 * * ? *)` | resolved |
-| `episode-detect` | compute_stack | `cron(0 17 ? * SUN *)` | constant |
-| `evening-nudge` | email_stack | `cron(0 3 * * ? *)` | constant |
-| `failure-pattern-compute` | compute_stack | `cron(50 17 ? * SUN *)` | constant |
-| `field-notes-generate` | compute_stack | `cron(0 18 ? * SUN *)` | constant |
-| `forecast-engine` | compute_stack | `cron(50 16 * * ? *)` | constant |
-| `habit-skip-review` | email_stack | `cron(0 16 ? * SAT *)` | constant |
-| `habitify-data-ingestion` | ingestion_stack | `cron(5 * * * ? *)` | resolved |
-| `hevy-backfill` | ingestion_stack | `cron(0 * * * ? *)` + `cron(30 18 * * ? *)` + `cron(40 13 * * ? *)` | constant, constructed, constructed |
-| `hevy-restamp` | operational_stack | `cron(0 18 * * ? *)` | constant |
-| `hevy-routine-cron` | operational_stack | `cron(30 13 ? * SUN *)` | constant |
-| `hypothesis-engine` | compute_stack | `cron(0 19 ? * SUN *)` | constant |
-| `inter-coach-dialogue` | compute_stack | `cron(0 18 ? * SUN *)` | constant |
-| `journal-analyzer` | compute_stack | `cron(0 10 * * ? *)` | constant |
-| `journal-enrichment` | ingestion_stack | `cron(30 14 * * ? *)` | constant |
-| `life-platform-ai-quality-canary` | operational_stack | `cron(20 16 ? * MON,WED,FRI *)` | constant |
-| `life-platform-alert-digest` | operational_stack | `cron(0 15 * * ? *)` | constant |
-| `life-platform-canary` | operational_stack | `rate(4 hours)` | constant |
-| `life-platform-coherence-sentinel` | operational_stack | `cron(45 18 ? * * *)` | constant |
-| `life-platform-cost-governor` | operational_stack | `cron(0 0/8 * * ? *)` | constant |
-| `life-platform-data-reconciliation` | operational_stack | `cron(30 7 ? * MON *)` | constant |
-| `life-platform-delete-user-data` | operational_stack | `cron(0 8 ? * MON *)` | constant |
-| `life-platform-dlq-consumer` | operational_stack | `rate(6 hours)` | constant |
-| `life-platform-freshness-checker` | operational_stack | `cron(45 16 * * ? *)` | constant |
-| `life-platform-permanence` | operational_stack | `cron(0 6 * * ? *)` | constant |
-| `life-platform-pip-audit` | operational_stack | `cron(0 15 ? * MON *)` | constant |
-| `life-platform-qa-smoke` | operational_stack | `cron(30 18 ? * * *)` | constant |
-| `life-platform-traffic-digest` | operational_stack | `cron(0 16 ? * MON *)` | constant |
-| `milestone-digest` | email_stack | `cron(15 17 * * ? *)` | constant |
-| `monday-compass` | email_stack | `cron(0 15 ? * MON *)` | constant |
-| `monthly-digest` | email_stack | `cron(0 16 ? * 1#1 *)` | constant |
-| `notion-journal-ingestion` | ingestion_stack | `cron(0 14,21,3 * * ? *)` | resolved |
-| `nutrition-review` | email_stack | `cron(0 17 ? * SAT *)` | constant |
-| `og-image-generator` | operational_stack | `cron(30 19 * * ? *)` | constant |
-| `partner-weekly-email` | email_stack | `cron(30 17 ? * 1 *)` | constant |
-| `personal-baselines-compute` | compute_stack | `cron(0 8 1 * ? *)` | constant |
-| `pipeline-health-check` | operational_stack | `cron(10 17 * * ? *)` + `cron(30 2,6,14,18,22 * * ? *)` + `cron(58 16 * * ? *)` | constructed, constant, constructed |
-| `reading-recall-sweep` | operational_stack | `cron(0 16 * * ? *)` | constant |
-| `recap-card-generator` | operational_stack | `cron(30 19 * * ? *)` | constant |
-| `scenario-explorer` | compute_stack | `cron(10 12 * * ? *)` | constant |
-| `site-stats-refresh` | operational_stack | `cron(0 * * * ? *)` | constructed |
-| `social-enrichment` | ingestion_stack | `cron(45 14 * * ? *)` | constant |
-| `state-of-matthew` | compute_stack | `cron(30 19 ? * SUN *)` | constant |
-| `strava-data-ingestion` | ingestion_stack | `cron(10 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` + `cron(20 17 * * ? *)` | resolved, constructed |
-| `subscriber-onboarding` | email_stack | `cron(5 17 * * ? *)` | constant |
-| `telegram-coach-worker` | serve_stack | `cron(0 16 * * ? *)` + `cron(15 17 ? * MON-FRI *)` | constant, constant |
-| `todoist-data-ingestion` | ingestion_stack | `cron(0 14 * * ? *)` | constant |
-| `voice-fidelity-harness` | compute_stack | `cron(0 15 1 * ? *)` | constant |
-| `weather-data-ingestion` | ingestion_stack | `cron(0 14,2 * * ? *)` | constant |
-| `wednesday-chronicle` | email_stack | `cron(0 1 * * WED *)` + `cron(0 15 ? * WED *)` + `cron(0 16 * * MON *)` | constructed, constant, constructed |
-| `weekly-correlation-compute` | compute_stack | `cron(30 18 ? * SUN *)` | constant |
-| `weekly-digest` | email_stack | `cron(0 16 ? * SUN *)` | constant |
-| `weekly-plate` | email_stack | `cron(0 2 ? * SAT *)` | constant |
-| `weekly-signal` | email_stack | `cron(30 16 ? * SUN *)` | constant |
-| `whoop-data-ingestion` | ingestion_stack | `cron(0 0,4,12,16,20 * * ? *)` + `cron(20 18 * * ? *)` + `cron(30 17 * * ? *)` | resolved, constructed, constant |
-| `withings-data-ingestion` | ingestion_stack | `cron(5 14,17,21,0 * * ? *)` | resolved |
+| `activity-enrichment` | ingestion_stack | `cron(30 15 * * ? *)` | table |
+| `acwr-compute` | compute_stack | `cron(55 16 * * ? *)` | table |
+| `adaptive-mode-compute` | compute_stack | `cron(35 16 * * ? *)` | table |
+| `ai-expert-analyzer` | compute_stack | `cron(0 14 ? * MON *)` | table |
+| `ai-review-pack` | email_stack | `cron(0 18 ? * SUN *)` | table |
+| `anomaly-detector` | compute_stack | `cron(5 15 * * ? *)` | table |
+| `between-chronicle` | email_stack | `cron(0 17 ? * SUN *)` | table |
+| `challenge-generator` | compute_stack | `cron(0 22 ? * SUN *)` | table |
+| `character-sheet-compute` | compute_stack | `cron(30 16 * * ? *)` | table |
+| `chronicle-approve` | email_stack | `cron(0 18 * * ? *)` | table |
+| `chronicle-email-sender` | email_stack | `cron(10 15 ? * WED *)` | table |
+| `circadian-compliance` | compute_stack | `cron(0 2 * * ? *)` | table |
+| `coach-daily-reflection` | compute_stack | `cron(0 19 * * ? *)` | table |
+| `coach-history-summarizer` | compute_stack | `cron(0 17 ? * SUN *)` | table |
+| `coach-memoir` | compute_stack | `cron(0 15 1 1,4,7,10 ? *)` | table |
+| `coach-nudge` | email_stack | `cron(10 0-5,15-23 * * ? *)` | table |
+| `coach-panel-podcast` | email_stack | `cron(0 18 ? * MON,WED *)` | table |
+| `coach-prediction-evaluator` | compute_stack | `cron(0 16 * * ? *)` | table |
+| `coach-vision` | compute_stack | `cron(0 17 ? * MON *)` | table |
+| `daily-brief` | email_stack | `cron(0 10 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `daily-debrief` | email_stack | `cron(0 19 * * ? *)` | table |
+| `daily-insight-compute` | compute_stack | `cron(45 16 * * ? *)` | table |
+| `daily-metrics-compute` | compute_stack | `cron(0 0 * * ? *)` + `cron(40 16 * * ? *)` | table, table |
+| `dashboard-refresh` | compute_stack | `cron(0 1 * * ? *)` + `cron(0 21 * * ? *)` | table, table |
+| `dropbox-poll` | ingestion_stack | `rate(2 hours)` | table |
+| `eightsleep-data-ingestion` | ingestion_stack | `cron(15 14,16,18,20 * * ? *)` | table |
+| `episode-detect` | compute_stack | `cron(0 17 ? * SUN *)` | table |
+| `evening-nudge` | email_stack | `cron(0 3 * * ? *)` | table |
+| `failure-pattern-compute` | compute_stack | `cron(50 17 ? * SUN *)` | table |
+| `field-notes-generate` | compute_stack | `cron(0 18 ? * SUN *)` | table |
+| `forecast-engine` | compute_stack | `cron(50 16 * * ? *)` | table |
+| `habit-skip-review` | email_stack | `cron(0 16 ? * SAT *)` | table |
+| `habitify-data-ingestion` | ingestion_stack | `cron(5 * * * ? *)` | table |
+| `hevy-backfill` | ingestion_stack | `cron(0 * * * ? *)` + `cron(30 18 * * ? *)` + `cron(40 13 * * ? *)` | table, table, table |
+| `hevy-restamp` | operational_stack | `cron(0 18 * * ? *)` | table |
+| `hevy-routine-cron` | operational_stack | `cron(30 13 ? * SUN *)` | table |
+| `hypothesis-engine` | compute_stack | `cron(0 19 ? * SUN *)` | table |
+| `inter-coach-dialogue` | compute_stack | `cron(0 18 ? * SUN *)` | table |
+| `journal-analyzer` | compute_stack | `cron(0 10 * * ? *)` | table |
+| `journal-enrichment` | ingestion_stack | `cron(30 14 * * ? *)` | table |
+| `life-platform-ai-quality-canary` | operational_stack | `cron(20 16 ? * MON,WED,FRI *)` | table |
+| `life-platform-alert-digest` | operational_stack | `cron(0 15 * * ? *)` | table |
+| `life-platform-canary` | operational_stack | `rate(4 hours)` | table |
+| `life-platform-coherence-sentinel` | operational_stack | `cron(45 18 ? * * *)` | table |
+| `life-platform-cost-governor` | operational_stack | `cron(0 0/8 * * ? *)` | table |
+| `life-platform-data-reconciliation` | operational_stack | `cron(30 7 ? * MON *)` | table |
+| `life-platform-delete-user-data` | operational_stack | `cron(0 8 ? * MON *)` | table |
+| `life-platform-dlq-consumer` | operational_stack | `rate(6 hours)` | table |
+| `life-platform-freshness-checker` | operational_stack | `cron(45 16 * * ? *)` | table |
+| `life-platform-permanence` | operational_stack | `cron(0 6 * * ? *)` | table |
+| `life-platform-pip-audit` | operational_stack | `cron(0 15 ? * MON *)` | table |
+| `life-platform-qa-smoke` | operational_stack | `cron(30 18 ? * * *)` | table |
+| `life-platform-traffic-digest` | operational_stack | `cron(0 16 ? * MON *)` | table |
+| `milestone-digest` | email_stack | `cron(15 17 * * ? *)` | table |
+| `monday-compass` | email_stack | `cron(0 15 ? * MON *)` | table |
+| `monthly-digest` | email_stack | `cron(0 16 ? * 1#1 *)` | table |
+| `notion-journal-ingestion` | ingestion_stack | `cron(0 14,21,3 * * ? *)` | table |
+| `nutrition-review` | email_stack | `cron(0 17 ? * SAT *)` | table |
+| `og-image-generator` | operational_stack | `cron(30 19 * * ? *)` | table |
+| `partner-weekly-email` | email_stack | `cron(30 17 ? * 1 *)` | table |
+| `personal-baselines-compute` | compute_stack | `cron(0 8 1 * ? *)` | table |
+| `pipeline-health-check` | operational_stack | `cron(10 17 * * ? *)` + `cron(30 2,6,14,18,22 * * ? *)` + `cron(58 16 * * ? *)` | table, table, table |
+| `reading-recall-sweep` | operational_stack | `cron(0 16 * * ? *)` | table |
+| `recap-card-generator` | operational_stack | `cron(30 19 * * ? *)` | table |
+| `scenario-explorer` | compute_stack | `cron(10 12 * * ? *)` | table |
+| `site-stats-refresh` | operational_stack | `cron(0 15 * * ? *)` + `cron(0 19 * * ? *)` + `cron(0 23 * * ? *)` + `cron(0 3 * * ? *)` | table, table, table, table |
+| `social-enrichment` | ingestion_stack | `cron(45 14 * * ? *)` | table |
+| `state-of-matthew` | compute_stack | `cron(30 19 ? * SUN *)` | table |
+| `strava-data-ingestion` | ingestion_stack | `cron(10 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` + `cron(20 17 * * ? *)` | table, table |
+| `subscriber-onboarding` | email_stack | `cron(5 17 * * ? *)` | table |
+| `telegram-coach-worker` | serve_stack | `cron(0 16 * * ? *)` + `cron(15 17 ? * MON-FRI *)` | table, table |
+| `todoist-data-ingestion` | ingestion_stack | `cron(0 14 * * ? *)` | table |
+| `voice-fidelity-harness` | compute_stack | `cron(0 15 1 * ? *)` | table |
+| `weather-data-ingestion` | ingestion_stack | `cron(0 14,2 * * ? *)` | table |
+| `wednesday-chronicle` | email_stack | `cron(0 1 ? * WED *)` + `cron(0 15 ? * WED *)` + `cron(0 16 ? * MON *)` | table, table, table |
+| `weekly-correlation-compute` | compute_stack | `cron(30 18 ? * SUN *)` | table |
+| `weekly-digest` | email_stack | `cron(0 16 ? * SUN *)` | table |
+| `weekly-plate` | email_stack | `cron(0 2 ? * SAT *)` | table |
+| `weekly-signal` | email_stack | `cron(30 16 ? * SUN *)` | table |
+| `whoop-data-ingestion` | ingestion_stack | `cron(0 0,4,12,16,20 * * ? *)` + `cron(20 18 * * ? *)` + `cron(30 17 * * ? *)` | table, table, table |
+| `withings-data-ingestion` | ingestion_stack | `cron(5 14,17,21,0 * * ? *)` | table |
 
 **Unscheduled lambdas (27)** — webhook/S3-trigger/invoked-on-demand: `bluesky-social-ingestion`, `chronicle-podcast`, `coach-computation-engine`, `coach-ensemble-digest`, `coach-narrative-orchestrator`, `coach-observatory-renderer`, `coach-quality-gate`, `coach-state-updater`, `elena-state-updater`, `email-subscriber`, `food-delivery-ingestion`, `health-auto-export-webhook`, `inbound-auth-gate`, `insight-email-parser`, `life-platform-data-export`, `life-platform-key-rotator`, `life-platform-og-image`, `life-platform-remediation-dispatcher`, `life-platform-site-api`, `life-platform-site-api-ai`, `macrofactor-data-ingestion`, `mastodon-social-ingestion`, `measurements-ingestion`, `progress-viewer`, `reading-cover-pipeline`, `telegram-webhook`, `youtube-social-ingestion`
 
 ## 2. DynamoDB Partitions (ADR-077 census)
 
-### cross_phase (19)
+### cross_phase (23)
 
-`benchmarks`, `calibration`, `chronicling`, `clinical`, `coach_corrections`, `coach_vision`, `dexa`, `effect_fits`, `eyeball_estimate`, `genome`, `labs`, `milestones`, `progress_photos`, `recall_embeddings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
+`benchmarks`, `calibration`, `checkin_intake_pairs`, `chronicling`, `clinical`, `coach_corrections`, `coach_vision`, `dexa`, `effect_fits`, `eyeball_estimate`, `fitness_tests`, `genome`, `labs`, `may_tracker`, `milestones`, `nutrition_titration`, `progress_photos`, `recall_embeddings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
 
 ### experiment_scoped (34)
 
 `achievements`, `adaptive_mode`, `ai_analysis`, `anomalies`, `centenarian_progress`, `challenges`, `character_receipt`, `character_sheet`, `chronicle`, `circadian`, `coach_actions`, `computed_insights`, `computed_metrics`, `decisions`, `diary_claims`, `diary_reactions`, `discovery_annotations`, `engagement_state`, `experiments`, `field_notes`, `forecast`, `habit_scores`, `hypotheses`, `insights`, `ledger`, `nutrition_review`, `panelcast`, `protocols`, `recap_cards`, `rewards`, `scenarios`, `state_of_matthew`, `weekly_correlations`, `what_changed`
 
-### raw_timeseries (43)
+### raw_timeseries (44)
 
-`apple_health`, `bluesky`, `day_grade`, `eightsleep`, `evening_ritual`, `exposures`, `felt_probe`, `flourishing`, `food_delivery`, `food_responses`, `garmin`, `habit_causality`, `habitify`, `hevy`, `instagram`, `interactions`, `journal_quotes`, `life_events`, `macrofactor`, `macrofactor_meals`, `macrofactor_workouts`, `mastodon`, `measurements`, `mood`, `morning_note`, `notion`, `owner_words`, `private_intake`, `ruck_log`, `sick_days`, `state_of_mind`, `strava`, `temptations`, `tiktok`, `time_affluence`, `todoist`, `training_notes`, `travel`, `weather`, `whoop`, `withings`, `x`, `youtube`
+`apple_health`, `bluesky`, `day_grade`, `eightsleep`, `evening_checkin`, `evening_ritual`, `exposures`, `felt_probe`, `flourishing`, `food_delivery`, `food_responses`, `garmin`, `habit_causality`, `habitify`, `hevy`, `instagram`, `interactions`, `journal_quotes`, `life_events`, `macrofactor`, `macrofactor_meals`, `macrofactor_workouts`, `mastodon`, `measurements`, `mood`, `morning_note`, `notion`, `owner_words`, `private_intake`, `ruck_log`, `sick_days`, `state_of_mind`, `strava`, `temptations`, `tiktok`, `time_affluence`, `todoist`, `training_notes`, `travel`, `weather`, `whoop`, `withings`, `x`, `youtube`
 
 ### system_state (20)
 
@@ -119,7 +119,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-748 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+779 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -132,13 +132,14 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `adaptive_mode` | adaptive_mode_lambda.py | tools_coach_checkin.py, tools_reading.py |
 | `ai_analysis` | ai_expert_analyzer_lambda.py | ai_expert_analyzer_lambda.py, chronicle_data.py, coherence_sentinel_lambda.py, site_api_coach_narrative.py, site_api_coach_stance.py, state_of_matthew_lambda.py |
 | `anomalies` | anomaly_detector_lambda.py | anomaly_detector_lambda.py, daily_brief_lambda.py |
-| `apple_health` | freshness_checker_lambda.py, health_auto_export_lambda.py | ai_expert_analyzer_lambda.py, evening_nudge_lambda.py, freshness_checker_lambda.py, health_auto_export_lambda.py, instrument_presence.py, qa_smoke_lambda.py, site_api_biomarkers.py, site_api_body.py, site_api_fingerprint.py, site_api_journey.py, site_api_meals.py, site_api_mind.py, site_api_physical.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, site_stats_refresh_lambda.py, tools_cgm.py, tools_health.py, tools_lifestyle.py |
+| `apple_health` | freshness_checker_lambda.py, health_auto_export_lambda.py | ai_expert_analyzer_lambda.py, evening_nudge_lambda.py, freshness_checker_lambda.py, health_auto_export_lambda.py, instrument_presence.py, protein_nudge_runner.py, qa_smoke_lambda.py, site_api_biomarkers.py, site_api_body.py, site_api_fingerprint.py, site_api_freshness.py, site_api_journey.py, site_api_meals.py, site_api_mind.py, site_api_physical.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, site_stats_refresh_lambda.py, tools_cgm.py, tools_health.py, tools_lifestyle.py |
 | `benchmarks` | — | site_api_training.py |
 | `calibration` | — | state_of_matthew_lambda.py |
 | `centenarian_progress` | weekly_correlation_compute_lambda.py | — |
 | `challenges` | challenge_generator_lambda.py, character_sheet_lambda.py, site_api_social_challenges.py | challenge_generator_lambda.py, site_api_social_challenges.py |
 | `character_receipt` | — | qa_smoke_lambda.py, site_api_character.py |
 | `character_sheet` | — | challenge_generator_lambda.py, coherence_sentinel_lambda.py, field_notes_lambda.py, monday_compass_lambda.py, monthly_digest_lambda.py, site_api_ai_context.py, site_api_character.py, site_api_discovery.py, site_api_fulfillment.py, site_api_habits.py, site_api_journey.py, site_api_mind.py, site_api_rollups.py, site_stats_refresh_lambda.py, spiral_breaker.py |
+| `checkin_intake_pairs` | — | checkin_intake_pairs.py, nudge_ledger_qa.py |
 | `chronicle` | chronicle_approve_lambda.py, chronicle_email_sender_lambda.py, chronicle_store.py, wednesday_chronicle_lambda.py | ask_retrieval.py, chronicle_approve_lambda.py, chronicle_data.py, chronicle_email_sender_lambda.py, chronicle_podcast_lambda.py, chronicle_store.py, coach_panel_podcast_lambda.py, panelcast_desk.py, site_api_coach_narrative.py, site_writer.py, wednesday_chronicle_lambda.py |
 | `circadian` | circadian_compliance_lambda.py | — |
 | `clinical` | — | — |
@@ -153,16 +154,17 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `day_grade` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coherence_sentinel_lambda.py, failure_pattern_compute_lambda.py, monday_compass_lambda.py |
 | `decisions` | — | site_api_thirdwall.py |
 | `deletion_log` | delete_user_data_lambda.py | — |
-| `dexa` | — | ai_expert_analyzer_lambda.py, nutrition_review_lambda.py, shared_quantities.py, site_api_physical.py |
+| `dexa` | — | ai_expert_analyzer_lambda.py, calibration_cadence.py, nutrition_review_lambda.py, shared_quantities.py, site_api_physical.py |
 | `diary_claims` | tools_journal.py | site_api_diary.py, tools_coach_intelligence.py |
 | `diary_reactions` | coach_diary_reaction.py | coach_diary_reaction.py, site_api_thirdwall.py |
 | `discovery_annotations` | — | site_api_journey.py |
 | `dropbox_tracker` | dropbox_poll_lambda.py | dropbox_poll_lambda.py |
 | `effect_fits` | — | — |
-| `eightsleep` | — | ai_expert_analyzer_lambda.py, site_api_sleep.py, tools_nutrition.py, tools_training.py |
+| `eightsleep` | — | ai_expert_analyzer_lambda.py, site_api_sleep.py, tools_health.py, tools_nutrition.py, tools_training.py |
 | `email_digest` | between_chronicle_lambda.py | between_chronicle_lambda.py |
 | `email_log` | ai_review_pack_lambda.py, anomaly_detector_lambda.py, between_chronicle_lambda.py, chronicle_email_sender_lambda.py, chronicle_store.py, daily_brief_lambda.py, evening_nudge_lambda.py, insight_email_parser_lambda.py, milestone_digest_lambda.py, monday_compass_lambda.py, nutrition_review_lambda.py, partner_email_lambda.py, weekly_digest_lambda.py, weekly_plate_lambda.py, weekly_signal_lambda.py | ai_review_pack_lambda.py, anomaly_detector_lambda.py, between_chronicle_lambda.py, daily_brief_lambda.py, evening_nudge_lambda.py, insight_email_parser_lambda.py, milestone_digest_lambda.py, monday_compass_lambda.py, nutrition_review_lambda.py, partner_email_lambda.py, send_ledger.py, weekly_digest_lambda.py, weekly_plate_lambda.py, weekly_signal_lambda.py |
 | `engagement_state` | adaptive_mode_lambda.py | ai_expert_analyzer_lambda.py, character_sheet_lambda.py, coach_chat_grounding.py, coach_panel_podcast_lambda.py, daily_brief_lambda.py, daily_debrief_lambda.py, monday_compass_lambda.py, monthly_digest_lambda.py, site_api_ai_context.py, site_api_freshness.py, state_of_matthew_lambda.py, tools_coach_checkin.py, weekly_digest_lambda.py |
+| `evening_checkin` | evening_checkin.py | evening_checkin.py |
 | `evening_ritual` | — | site_api_fulfillment.py |
 | `experiment_suggestions` | site_api_social_experiments.py | — |
 | `experiments` | tools_lifestyle.py | ai_expert_analyzer_lambda.py, chronicle_data.py, coach_nudge_lambda.py, daily_insight_compute_lambda.py, site_api_discovery.py, site_api_journey.py, site_api_protocols.py, site_api_rollups.py, tools_lifestyle.py |
@@ -170,17 +172,18 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `eyeball_estimate` | — | — |
 | `felt_probe` | — | site_api_fulfillment.py |
 | `field_notes` | field_notes_lambda.py, tools_lifestyle.py | ai_expert_analyzer_lambda.py, chronicle_data.py, field_notes_lambda.py, site_api_thirdwall.py, tools_lifestyle.py |
+| `fitness_tests` | fitness_tests.py | — |
 | `flourishing` | flourishing.py | site_api_fulfillment.py, theme_river.py, tools_journal.py |
 | `food_delivery` | food_delivery_lambda.py | digest_utils.py, site_api_meals.py, site_api_nutrition.py |
 | `food_responses` | — | — |
 | `forecast` | forecast_engine_lambda.py | ai_calls.py, site_api_foresight.py, state_of_matthew_lambda.py |
-| `garmin` | — | ai_expert_analyzer_lambda.py, site_api_fingerprint.py, site_api_freshness.py, site_api_physical.py, site_api_pulse.py, site_api_training.py, site_api_vitals_depth.py, tools_health.py, tools_training.py |
+| `garmin` | — | ai_expert_analyzer_lambda.py, site_api_fingerprint.py, site_api_physical.py, site_api_pulse.py, site_api_training.py |
 | `genome` | — | nutrition_review_lambda.py, site_api_biomarkers.py |
 | `habit_causality` | — | site_api_habits.py |
 | `habit_scores` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coach_prediction_evaluator.py, failure_pattern_compute_lambda.py, monday_compass_lambda.py, recap_data.py, site_api_ai_context.py, site_api_habits.py, site_api_mind.py |
 | `habitify` | — | ai_expert_analyzer_lambda.py, habitify_lambda.py, intelligence_common.py, journal_analyzer_lambda.py, site_api_data.py, site_api_habits.py, site_api_nutrition.py |
 | `health_check` | pipeline_health_check_lambda.py | site_api_status.py |
-| `hevy` | hevy_common.py | ai_expert_analyzer_lambda.py, cardio_hr_store.py, coach_packet_today.py, daily_metrics_compute_lambda.py, plan_draft_evidence.py, plan_hevy_windows.py, recap_data.py, site_api_autonomic.py, site_api_nutrition.py, site_api_pulse.py, site_api_training.py, tools_coach_packet.py, tools_correlation.py, tools_health.py, tools_nutrition.py, tools_plan.py, tools_strength.py, tools_training.py, tools_training_notes.py, training_notes.py, vacation_fund.py |
+| `hevy` | hevy_common.py | ai_expert_analyzer_lambda.py, authoring_input_age.py, cardio_hr_store.py, coach_packet_today.py, daily_metrics_compute_lambda.py, plan_draft_evidence.py, plan_hevy_windows.py, recap_data.py, site_api_autonomic.py, site_api_nutrition.py, site_api_pulse.py, site_api_training.py, tools_coach_packet.py, tools_correlation.py, tools_health.py, tools_nutrition.py, tools_plan.py, tools_strength.py, tools_training.py, tools_training_notes.py, training_notes.py, vacation_fund.py |
 | `hevy_id_map` | routine_repo.py | routine_repo.py |
 | `hypotheses` | hypothesis_engine_lambda.py | challenge_generator_lambda.py, hypothesis_engine_lambda.py, state_of_matthew_lambda.py, tools_lifestyle.py |
 | `ingest_liveness` | pipeline_health_check_lambda.py | — |
@@ -190,23 +193,25 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `journal` | — | site_api_rollups.py |
 | `journal_analysis` | — | ai_expert_analyzer_lambda.py, hypothesis_engine_lambda.py, site_api_mind.py |
 | `journal_quotes` | tools_journal.py | site_api_diary.py, site_api_thirdwall.py |
-| `labs` | — | ai_expert_analyzer_lambda.py, nutrition_review_lambda.py |
+| `labs` | — | ai_expert_analyzer_lambda.py, calibration_cadence.py, nutrition_review_lambda.py |
 | `ledger` | — | site_api_ledger.py |
 | `life_events` | — | site_api_journey.py |
-| `macrofactor` | — | ai_expert_analyzer_lambda.py, freshness_checker_lambda.py, nutrition_micronutrients.py, recap_data.py, site_api_body.py, site_api_meals.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_health.py, tools_labs.py, tools_nutrition.py, weekly_digest_extractors.py |
+| `macrofactor` | — | ai_expert_analyzer_lambda.py, freshness_checker_lambda.py, nutrition_micronutrients.py, protein_nudge_runner.py, recap_data.py, site_api_body.py, site_api_meals.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_health.py, tools_labs.py, tools_nutrition.py, weekly_digest_extractors.py |
 | `macrofactor_meals` | — | — |
 | `macrofactor_workouts` | — | — |
-| `measurements` | measurements_ingestion_lambda.py | ai_expert_analyzer_lambda.py, site_api_physical.py |
+| `may_tracker` | — | may_tracker.py |
+| `measurements` | measurements_ingestion_lambda.py | ai_expert_analyzer_lambda.py, calibration_cadence.py, site_api_physical.py |
 | `milestones` | — | — |
 | `morning_note` | site_api_social_note.py | morning_note.py |
 | `notion` | freshness_checker_lambda.py, notion_lambda.py | adaptive_mode_lambda.py, circadian_compliance_lambda.py, daily_insight_compute_lambda.py, daily_metrics_compute_lambda.py, evening_nudge_lambda.py, field_notes_lambda.py, freshness_checker_lambda.py, intelligence_common.py, notion_lambda.py, recap_data.py, site_api_fulfillment.py, site_api_mind.py, site_api_pulse.py, story_dossier.py, tools_journal.py, tools_social_connection.py |
 | `nutrition_review` | nutrition_review_lambda.py | nutrition_review_lambda.py |
+| `nutrition_titration` | — | titration.py |
 | `owner_words` | — | owner_words.py |
 | `panelcast` | coach_panel_podcast_lambda.py, podcast_script_v2.py | coach_panel_podcast_lambda.py, podcast_script_v2.py, site_api_coach_ledger.py |
 | `pending_writes` | — | — |
 | `platform_memory` | daily_insight_compute_lambda.py, failure_pattern_compute_lambda.py, hypothesis_engine_lambda.py, weekly_plate_lambda.py | daily_insight_compute_lambda.py, weekly_plate_lambda.py |
 | `private_intake` | — | intake_response.py |
-| `progress_photos` | progress_capture.py | progress_capture.py |
+| `progress_photos` | progress_capture.py | calibration_cadence.py, progress_capture.py |
 | `protocols` | — | site_api_protocols.py |
 | `qa_hook_matrix` | hook_liveness_qa.py | — |
 | `qa_predict_dark` | qa_smoke_lambda.py | qa_smoke_lambda.py |
@@ -220,7 +225,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `sick_days` | sick_day_checker.py, tools_sick_days.py | sick_day_checker.py, tools_sick_days.py |
 | `state_of_matthew` | — | site_api_foresight.py |
 | `state_of_mind` | — | site_api_mind.py, site_api_pulse.py |
-| `strava` | enrichment_lambda.py | ai_expert_analyzer_lambda.py, cardio_hr_store.py, enrichment_lambda.py, intelligence_common.py, monthly_digest_lambda.py, recap_data.py, site_api_autonomic.py, site_api_nutrition.py, site_api_physical.py, site_api_pulse.py, site_api_training.py, site_api_vitals_depth.py, site_stats_refresh_lambda.py, tools_benchmark.py, tools_correlation.py, tools_health.py, tools_nutrition.py, tools_training.py, vacation_fund.py |
+| `strava` | enrichment_lambda.py | ai_expert_analyzer_lambda.py, cardio_hr_store.py, enrichment_lambda.py, intelligence_common.py, labelled_facts.py, monthly_digest_lambda.py, recap_data.py, site_api_autonomic.py, site_api_nutrition.py, site_api_physical.py, site_api_pulse.py, site_api_training.py, site_api_vitals_depth.py, site_stats_refresh_lambda.py, strava_lambda.py, tools_benchmark.py, tools_correlation.py, tools_health.py, tools_nutrition.py, tools_training.py, vacation_fund.py |
 | `subscribers` | canary_lambda.py, delete_user_data_lambda.py, email_subscriber_lambda.py | canary_lambda.py, delete_user_data_lambda.py, email_subscriber_lambda.py, site_api_social.py, site_api_social_engage.py, site_api_social_ladder.py, subscriber_onboarding_lambda.py, weekly_digest_lambda.py |
 | `supplements` | habitify_lambda.py | habitify_lambda.py, site_api_nutrition.py, site_api_protocols.py |
 | `temptations` | — | site_api_mind.py |
@@ -234,13 +239,13 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `weekly_correlations` | weekly_correlation_compute_lambda.py | ai_expert_analyzer_lambda.py, daily_insight_compute_lambda.py, site_api_ai_context.py, site_api_discovery.py, site_api_journey.py, site_api_ledger.py, weekly_correlation_compute_lambda.py |
 | `weight_episodes` | — | — |
 | `what_changed` | weekly_correlation_compute_lambda.py | between_chronicle_lambda.py, site_api_ai_context.py, site_api_ledger.py, weekly_correlation_compute_lambda.py |
-| `whoop` | whoop_lambda.py | ai_expert_analyzer_lambda.py, cardio_hr_store.py, enrichment_lambda.py, failure_pattern_compute_lambda.py, hevy_restamp_lambda.py, intake_response.py, monday_compass_lambda.py, site_api_autonomic.py, site_api_body.py, site_api_fingerprint.py, site_api_freshness.py, site_api_lambda.py, site_api_nutrition.py, site_api_physical.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, tools_correlation.py, tools_health.py, tools_hevy_routine.py, tools_plan.py, tools_training.py, weight_truth_qa.py, whoop_lambda.py |
-| `withings` | — | adaptive_mode_lambda.py, ai_expert_analyzer_lambda.py, progress_viewer_lambda.py, recap_data.py, site_api_body.py, site_api_coach_profile.py, site_api_journey.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_benchmark.py, tools_health.py, tools_nutrition.py |
+| `whoop` | whoop_lambda.py | ai_expert_analyzer_lambda.py, cardio_hr_store.py, enrichment_lambda.py, failure_pattern_compute_lambda.py, hevy_restamp_lambda.py, intake_response.py, monday_compass_lambda.py, site_api_autonomic.py, site_api_body.py, site_api_fingerprint.py, site_api_freshness.py, site_api_lambda.py, site_api_nutrition.py, site_api_physical.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, tools_correlation.py, tools_health.py, tools_hevy_routine.py, tools_plan.py, tools_training.py, weight_truth_qa.py, whoop_cycle_day.py, whoop_lambda.py |
+| `withings` | — | adaptive_mode_lambda.py, ai_expert_analyzer_lambda.py, progress_viewer_lambda.py, recap_data.py, rhythm_channel.py, site_api_body.py, site_api_coach_profile.py, site_api_journey.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_benchmark.py, tools_health.py, tools_nutrition.py |
 | `zone2_efficiency` | weekly_correlation_compute_lambda.py | — |
 
 ## 4. MCP Layer
 
-**88 tools across 36 modules** (AST-counted from `mcp/registry.py`;
+**89 tools across 38 modules** (AST-counted from `mcp/registry.py`;
 the same counter `deploy/sync_doc_metadata.py` uses). MCP modules appear in §3 as
 readers under the `life-platform-mcp` lambda.
 
@@ -277,7 +282,7 @@ traced through the stack, the factory body under that call's own arguments, or t
 helper the alarm variable is handed to. `via-composite` = the member routes nowhere
 itself; its composite does. `unresolved` is stated, never guessed.
 
-Routing: digest 95 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 — of 139 alarms (4 composite)
+Routing: digest 96 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 — of 140 alarms (4 composite)
 
 | Alarm | Stack | Kind | Routing | Via | Audience |
 |-------|-------|------|---------|-----|----------|
@@ -315,6 +320,7 @@ Routing: digest 95 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 
 | `daily-debrief-no-invocations-24h` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `email-subscriber-errors` | web_stack | metric | urgent | helper:add_web_alarms |  |
 | `expert-gate-infra-hold` | monitoring_silence_alarms | metric | digest | declaration |  |
+| `fitness-battery-missed` | mcp_stack | metric | digest | declaration |  |
 | `freshness-checker-errors` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
 | `freshness-interior-gap` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `freshness-interior-gap-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |  |
@@ -444,18 +450,23 @@ Default: public — an unlisted source/field is TIER_PUBLIC by omission (field_t
 | Source (partition) | Tier |
 |--------------------|------|
 | `cgm_readings` | owner_only |
+| `checkin_intake_pairs` | owner_only |
 | `clinical` | internal |
 | `coach_vision` | owner_only |
 | `dexa` | owner_published |
+| `evening_checkin` | owner_only |
 | `felt_probe` | owner_only |
+| `fitness_tests` | owner_only |
 | `flourishing` | owner_only |
 | `genome` | owner_only |
 | `hevy` | owner_only |
 | `labs` | owner_published |
 | `macrofactor` | owner_only |
+| `may_tracker` | owner_only |
 | `measurements` | owner_published |
 | `named_human_contact` | owner_only |
 | `notion` | owner_only |
+| `nutrition_titration` | owner_only |
 | `pending_writes` | owner_only |
 | `private_intake` | owner_only |
 | `progress_photos` | owner_only |
@@ -470,6 +481,46 @@ Field-level rulings (only non-default fields are declared):
 
 | Source | Field | Tier |
 |--------|-------|------|
+| `apple_health` | `_rd_protein_hae` | owner_only |
+| `apple_health` | `_rd_sleep_apple` | owner_only |
+| `apple_health` | `breathing_disturbances_apple` | owner_only |
+| `apple_health` | `cardio_recovery_bpm_apple` | internal |
+| `apple_health` | `hrv_sdnn_apple` | internal |
+| `apple_health` | `respiratory_rate_apple` | internal |
+| `apple_health` | `resting_heart_rate_apple` | internal |
+| `apple_health` | `sleep_awake_min_apple` | owner_only |
+| `apple_health` | `sleep_core_min_apple` | owner_only |
+| `apple_health` | `sleep_deep_min_apple` | owner_only |
+| `apple_health` | `sleep_end_apple` | owner_only |
+| `apple_health` | `sleep_in_bed_end_apple` | owner_only |
+| `apple_health` | `sleep_in_bed_hours_apple` | owner_only |
+| `apple_health` | `sleep_in_bed_start_apple` | owner_only |
+| `apple_health` | `sleep_record_kind_apple` | owner_only |
+| `apple_health` | `sleep_rem_min_apple` | owner_only |
+| `apple_health` | `sleep_source_apple` | owner_only |
+| `apple_health` | `sleep_start_apple` | owner_only |
+| `apple_health` | `sleep_total_hours_apple` | owner_only |
+| `apple_health` | `sleep_unspecified_min_apple` | owner_only |
+| `apple_health` | `spo2_pct_apple` | owner_only |
+| `apple_health` | `walking_heart_rate_avg` | internal |
+| `apple_health` | `walking_steadiness_pct` | internal |
+| `apple_health` | `watch_last_reading_epoch_apple` | internal |
+| `apple_health` | `wrist_temp_sleep_c_apple` | owner_only |
+| `clinical` | `cross_device_same_day` | owner_only |
+| `clinical` | `rhythm_ecg_avg_hr_bpm` | owner_only |
+| `clinical` | `rhythm_ecg_classification` | owner_only |
+| `clinical` | `rhythm_ecg_device` | owner_only |
+| `clinical` | `rhythm_ecg_sample_start` | owner_only |
+| `clinical` | `rhythm_med_at` | owner_only |
+| `clinical` | `rhythm_med_dose_text` | owner_only |
+| `clinical` | `rhythm_med_name` | owner_only |
+| `clinical` | `rhythm_med_status` | owner_only |
+| `clinical` | `rhythm_notification_at` | owner_only |
+| `clinical` | `rhythm_notification_bpm` | owner_only |
+| `clinical` | `rhythm_notification_device` | owner_only |
+| `clinical` | `rhythm_notification_kind` | owner_only |
+| `clinical` | `rhythm_notification_kind_inferred` | owner_only |
+| `clinical` | `rhythm_notification_threshold_bpm` | owner_only |
 | `reading` | `moodSnapshot` | owner_only |
 | `reading` | `retentionScore` | owner_only |
 | `whoop` | `hrv` | owner_published |
@@ -519,11 +570,11 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1303 total · 940 resolved · 363 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1358 total · 980 resolved · 378 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (108 lambdas total)
-- Alarms: 139 literal-named declarations across three idioms, 4 composite; routing digest 95 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
-- Privacy: 18 owner-only + 3 owner-published sources; 35 owner-only + 11 owner-published fields — non-default entries only
-- Schedules: 92 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
+- Alarms: 140 literal-named declarations across three idioms, 4 composite; routing digest 96 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
+- Privacy: 23 owner-only + 3 owner-published sources; 68 owner-only + 11 owner-published fields — non-default entries only
+- Schedules: 96 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
 
@@ -537,10 +588,10 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 
 | Surface | Count | Registry |
 |---------|-------|----------|
-| ai_features | 25 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
-| alarms | 139 | this model's alarms plane (CDK AST) |
+| ai_features | 30 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
+| alarms | 140 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 33 | `deploy/emf_namespace_ledger.py::LEDGER` |
-| schedules | 92 | this model's schedules plane (CDK AST) |
+| schedules | 96 | this model's schedules plane (CDK AST) |
 | secrets | 30 | `tests/test_secret_references.py::KNOWN_SECRETS` |
 
 Scope cut (#3447 leg d, the alarms scope-cut pattern applied to secrets): `secrets` counts CODE REFERENCES (KNOWN_SECRETS, scanned lambdas/+mcp/ source only), never the live billable Secrets Manager estate — the two have already drifted (28 registry vs 26 live, 2026-09-02); a secret referenced only from `deploy/` (e.g. `life-platform/github-billing`, live+billed) is invisible to this count. `scripts/monthly_close.py` emits a read-only registry-vs-estate reconciliation at close.

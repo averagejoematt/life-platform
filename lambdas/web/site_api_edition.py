@@ -304,6 +304,9 @@ def _podcast_part(panelcast: dict | None, week: Any, persona_of: Callable[[str],
         return _unavailable(src, "The podcast list")
     eps = [e for e in panelcast.get("episodes") or [] if isinstance(e, dict) and e.get("week") == week and e.get("url")]
     if not eps:
+        retired = {str(r.get("week")) for r in panelcast.get("retired") or [] if isinstance(r, dict)}
+        if str(week) in retired:  # #4536: retired by name — there will be no episode, so never "yet"
+            return _block("absent", None, src, "This chapter has no podcast episode.")
         return _block("absent", None, src, "No podcast episode for this chapter yet.")
     ep = max(eps, key=lambda e: str(e.get("date") or ""))
     secs = ep.get("duration_sec")

@@ -20,9 +20,11 @@ import json
 import re
 from datetime import datetime, timedelta, timezone
 
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.metric_truth import steps_series  # #4630: the ONE steps resolver
 from common.pacific_time import PACIFIC
+from health.calorie_target import target_kcal  # #5095: the ONE calorie target — masked like the intake
 
 from content import labs_scope  # #3728 — the /api/labs scope block
 
@@ -79,6 +81,8 @@ def _safe_float(rec, field, default=None):
 
 
 from common.digest_utils import d2f as _d2f, dedup_activities_multidevice as _dedup_activities  # shared bundled helpers (#970, #2816)
+
+from content.dexa_fields import dexa_body_comp  # live DEXA field names (epic #4625)
 
 
 def _get_current_phase(profile, current_weight_lbs):
@@ -317,7 +321,9 @@ def sanitize_for_demo(html, data, profile):
         cal = mf.get("total_calories_kcal")
         if cal:
             html = html.replace(str(round(float(cal))), mask)
-        html = html.replace(str(PLAN_DAILY_CALORIES_TARGET), mask)
+        target = target_kcal(data.get("date"))
+        if target:
+            html = html.replace(str(target), mask)
 
     if "protein" in rv:
         mask = rv["protein"]
@@ -520,7 +526,7 @@ def write_dashboard_json(
         try:
             week_start = today - timedelta(days=today.weekday())
             strava_week = _fetch_range("strava", week_start.isoformat(), yesterday)
-            max_hr = profile.get("max_heart_rate", 184)
+            max_hr = max_hr_from_profile(profile)
             z2_lo = max_hr * 0.60
             z2_hi = max_hr * 0.70
             z2_total = 0.0
@@ -709,17 +715,7 @@ def write_clinical_json(data, profile, yesterday):
             )
             if resp.get("Items"):
                 dexa = resp["Items"][0]
-                bc = dexa.get("body_composition", {})
-                bd = dexa.get("bone_density", {})
-                body_comp = {
-                    "scan_date": dexa.get("scan_date"),
-                    "body_fat_pct": _d2f(bc.get("body_fat_pct")),
-                    "ffmi": _d2f(dexa.get("interpretations", {}).get("ffmi")),
-                    "lean_mass_lbs": _d2f(bc.get("lean_mass_lbs")),
-                    "fat_mass_lbs": _d2f(bc.get("fat_mass_lbs")),
-                    "visceral_fat_area": _d2f(bc.get("visceral_fat_g")),
-                    "bmd": _d2f(bd.get("t_score")),
-                }
+                body_comp = dexa_body_comp(dexa)
         except Exception as e:
             print("[WARN] Clinical: DEXA query failed: " + str(e))
 
@@ -773,7 +769,7 @@ def write_clinical_json(data, profile, yesterday):
         strava_28d = _fetch_range("strava", (today - timedelta(days=28)).isoformat(), yesterday)
         apple_28d = _fetch_range("apple_health", (today - timedelta(days=28)).isoformat(), yesterday)
 
-        max_hr = profile.get("max_heart_rate", 184)
+        max_hr = max_hr_from_profile(profile)
         z2_lo = max_hr * 0.60
         z2_hi = max_hr * 0.70
         total_sessions = 0

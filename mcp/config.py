@@ -44,17 +44,20 @@ _LEAN_STRIP = {"activities", "sport_types", "pk", "sk", "ingested_at", "source"}
 # #498 (X-10): derived from the registry — every partition-bearing registry source
 # plus the non-ingestion partitions (labs/dexa/genome/…). Gains hevy, measurements,
 # and food_delivery, which the hand-rolled list had silently omitted.
-from ingestion.source_registry import mcp_source_ids
+from ingestion.source_registry import mcp_source_ids, metric_truth
 
 SOURCES = mcp_source_ids()
 
 # ── Source-of-truth domain ownership ──
+# #4975: a domain whose owner is a METRIC_TRUTH metric's truth source READS it from the
+# registry facet rather than restating it — "physiology" is the HRV facet's, "sleep" the
+# sleep facet's. Change the truth there and this map follows; nothing here names Whoop.
 _DEFAULT_SOURCE_OF_TRUTH = {
     "cardio": "strava",
     "strength": "hevy",
-    "physiology": "whoop",
+    "physiology": metric_truth("hrv_ms")["truth_source"],
     "nutrition": "macrofactor",
-    "sleep": "whoop",
+    "sleep": metric_truth("sleep_hours")["truth_source"],
     # sleep_environment (eightsleep bed-temp) retired — ADR-118, #489
     "journal": "notion",
     "body": "withings",
@@ -74,7 +77,8 @@ _DEFAULT_SOURCE_OF_TRUTH = {
 # Public alias: the static domain map (the stored profile's `source_of_truth` overrides it).
 SOURCE_OF_TRUTH = _DEFAULT_SOURCE_OF_TRUTH
 
-P40_GROUPS = ["Data", "Discipline", "Growth", "Hygiene", "Nutrition", "Performance", "Recovery", "Supplements", "Wellbeing"]
+# P40_GROUPS retired (#4624): zero readers, and the nine-area list predates the owner's Core / Optimize / Vice regroup.
+# The groups come from the live Habitify /areas response (ingestion/habitify_lambda.py), never a list here.
 
 FIELD_ALIASES = {
     "strava": {

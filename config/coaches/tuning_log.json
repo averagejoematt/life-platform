@@ -320,6 +320,24 @@
       "rationale": "Owner ruling 2026-10-02 after two red-team reads (an AI-skeptic reader, a growth strategist): the coaches are AI personas with domains and track records, and a doctor's title on an AI persona is a credential claim a cold reader takes literally. The registry (config/personas.json) carries the plain name and every surface derives from it; a voice spec that kept the title would put it back in every first-person prompt.",
       "ref": "#4564 (epic #4531)",
       "observed_effect": null
+    },
+    {
+      "date": "2026-10-19",
+      "coach": "nutrition_coach",
+      "change_type": "few_shot",
+      "summary": "One few-shot example (#5098): the protein line no longer names a stale 190 g target (the plan states one protein line, a floor, #4540) and the per-meal line names the per-feeding line without a number (the charter's nutrition.protein.feeding_threshold_g owns the value). No rule, register or decision style changed.",
+      "rationale": "A few-shot example is copied by the model as much as any rule. The example stated a target the plan never set and a per-meal bar the protein engine (#5098, charter nutrition.protein) does not use, so the coach would have graded against a third definition beside the engine's one hit and its feeding threshold.",
+      "ref": "#5098 (epic #5091)",
+      "observed_effect": null
+    },
+    {
+      "date": "2026-10-19",
+      "coach": "nutrition_coach",
+      "change_type": "few_shot",
+      "summary": "Three few-shot examples (#5109): every calorie, protein-gram, fibre and loss-rate figure removed. The calorie-cut example now says the cut would put a lifting day under its floor, the steady-week example says the rate is inside the band and fibre drifted under its floor, and the per-meal example names no gram figure. No rule, register or decision style changed.",
+      "rationale": "The examples predated the training charter and named figures it contradicts: a training-day intake below the charter's lifting-day calorie floor and a weekly loss rate far below the charter band. A few-shot figure is copied by the model and sits outside the grounding allow-list, so the targets now reach the coach only from the charter context (training.coach_context.nutrition_context); tests/test_nutrition_coach_context_5109.py fails if a persona figure disagrees with the charter.",
+      "ref": "#5109 (epic #5094)",
+      "observed_effect": null
     }
   ]
 }

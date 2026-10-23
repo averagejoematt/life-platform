@@ -12,15 +12,17 @@ from common.pacific_time import (  # #1964/#3257: THE one Pacific frame + parser
 )
 from experiment.phase_filter import singleton_visible, with_phase_filter
 from health import instrument_presence  # #4217: the ONE liveness derivation — the coach absence gate reads these same functions
-from ingestion.source_registry import availability_facet, caveated_source_ids  # #3615/#3516: one absence story
+from ingestion.source_registry import SOURCE_REGISTRY, availability_facet, caveated_source_ids  # #3615/#3516: one absence story
 
 from web.site_api_common import USER_PREFIX, _decimal_to_float, _error, _ok, logger
 from web.site_api_phase_frame import archival_frame  # #2957 — cross-phase framing
 
-_DEVICE_AGREEMENT_START = "2020-01-01"  # generous floor; predates any real device data
-
-
+_APPLE_RHR_FIELD = "resting_heart_rate_apple"  # health_auto_export_lambda tier-2 field (Apple Watch only)
+_DEVICE_AGREEMENT_HRV_NOTE = "HRV is not compared: Whoop reports RMSSD and Apple reports SDNN — two different statistics."
 _DEVICE_AGREEMENT_DAILY_CAP = 90  # most-recent N overlap days in the payload; aggregates cover the full window
+# #5042: the agreement study's floor (#4974 — 30 dual-wear nights). Below it the payload states
+# n and the era start and returns no verdict: a 100% agreement rate over 3 nights is not a finding.
+_DEVICE_AGREEMENT_MIN_NIGHTS = 30
 
 
 _PRESENCE_LOUD = {"light", "quiet", "dark"}
@@ -342,100 +344,102 @@ def source_freshness(*, _g) -> dict:
 
 
 def device_agreement(*, _g) -> dict:
-    """GET /api/device_agreement — Whoop vs Garmin cross-device agreement on HRV + RHR.
+    """GET /api/device_agreement — Whoop vs Apple Watch cross-device agreement on resting HR.
 
-    Garmin ingestion has been paused since 2026-06 (vendor anti-automation, ADR-074),
-    so recent days may show no overlap — the historical window still stands as evidence.
+    #4976: re-pointed from Garmin (its direct feed is retired, #4640 — the stored garmin rows
+    stay, they are just no longer the second wrist) to the Apple Watch, worn nightly (owner
+    ruling 2026-10-17 b). HRV is NOT compared: Whoop reports RMSSD and Apple reports SDNN, two
+    different statistics, so a delta between them would be a unit error dressed as evidence.
+    The `hrv_agreement` key stays in the payload as null with `hrv_note` saying why.
     Always a shaped 200 (ADR-104 honest-gaps semantics): a thin/empty window says so
     explicitly rather than silently rendering nothing.
     """
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
     _query_source = _g["_query_source"]
     EXPERIMENT_START = _g["EXPERIMENT_START"]
+    # #5042: the WATCH era only. The stored apple_health rows carry no device, and before the
+    # watch the partition's resting HR came from other writers (Whoop's own app among them —
+    # the live 83-night window agreed 100%, Whoop against itself). The era start is the
+    # registry's `watch_first_day` facet; `_g` may override it (tests only).
+    era = SOURCE_REGISTRY["apple_health"]["watch_first_day"]
+    watch_start = _g.get("APPLE_WATCH_FIRST_DAY") or era["date"]
+    watch_era = {"start": watch_start, "determined_by": era["determined_by"]}
     today = datetime.now(PT).strftime("%Y-%m-%d")
     try:
-        whoop_items = _query_source("whoop", _DEVICE_AGREEMENT_START, today, include_pilot=True)
-        garmin_items = _query_source("garmin", _DEVICE_AGREEMENT_START, today, include_pilot=True)
+        whoop_items = _query_source("whoop", watch_start, today, include_pilot=True)
+        apple_items = _query_source("apple_health", watch_start, today, include_pilot=True)
     except Exception as e:
         logger.error(f"[site_api] /api/device_agreement query failed: {e}")
         return _error(500, "device agreement unavailable")
 
     # Day-summary records only — Whoop workout sub-items (sk DATE#...#WORKOUT#...)
     # never carry resting_heart_rate/hrv, so this filter drops them for free.
-    whoop_by_date = {i["date"]: i for i in whoop_items if i.get("date") and i.get("resting_heart_rate") is not None}
-    garmin_by_date = {i["date"]: i for i in garmin_items if i.get("date") and i.get("resting_heart_rate") is not None}
-    garmin_last_date = max((i.get("date") for i in garmin_items if i.get("date")), default=None)
+    # The date floor is applied HERE too, not only in the query, so a reader that hands back
+    # rows outside the window (or a future caller with a wider query) still cannot let a
+    # phone-era night in.
+    whoop_by_date = {
+        i["date"]: i for i in whoop_items if i.get("date") and i["date"] >= watch_start and i.get("resting_heart_rate") is not None
+    }
+    apple_by_date = {
+        i["date"]: i for i in apple_items if i.get("date") and i["date"] >= watch_start and i.get(_APPLE_RHR_FIELD) is not None
+    }
+    apple_first_date = min(apple_by_date, default=None)
 
-    all_dates = sorted(set(whoop_by_date) & set(garmin_by_date))
+    all_dates = sorted(set(whoop_by_date) & set(apple_by_date))
 
     if not all_dates:
         return _ok(
             {
                 "status": "unavailable",
-                "reason": "No overlapping Whoop + Garmin days recorded.",
-                "garmin_last_date": garmin_last_date,
+                "devices": ["Whoop", "Apple Watch"],
+                "reason": f"No overlapping Whoop + Apple Watch resting-heart-rate nights recorded yet (the watch from {watch_start}).",
+                "apple_first_date": apple_first_date,
+                "n_nights": 0,
+                "min_nights": _DEVICE_AGREEMENT_MIN_NIGHTS,
+                "watch_era": watch_era,
+                "hrv_note": _DEVICE_AGREEMENT_HRV_NOTE,
             },
             cache_seconds=3600,
         )
 
-    hrv_agree = hrv_minor = hrv_flag = 0
     rhr_agree = rhr_minor = rhr_flag = 0
     daily = []
     flagged = []
 
     for date in all_dates:
         w = whoop_by_date[date]
-        g = garmin_by_date[date]
+        a = apple_by_date[date]
         row = {"date": date}
         flags = []
 
-        whoop_hrv = w.get("hrv")
-        garmin_hrv = g.get("hrv_last_night")
-        if whoop_hrv is not None and garmin_hrv is not None:
-            wh, gh = float(whoop_hrv), float(garmin_hrv)
-            diff = abs(wh - gh)
-            row.update({"whoop_hrv_ms": round(wh, 1), "garmin_hrv_ms": round(gh, 1), "hrv_abs_diff_ms": round(diff, 1)})
-            if diff <= 10:
-                row["hrv_agreement"] = "agree"
-                hrv_agree += 1
-            elif diff <= 20:
-                row["hrv_agreement"] = "minor_variance"
-                hrv_minor += 1
-            else:
-                row["hrv_agreement"] = "flag"
-                hrv_flag += 1
-                flags.append(f"HRV diff {diff:.0f}ms")
-
-        whoop_rhr = w.get("resting_heart_rate")
-        garmin_rhr = g.get("resting_heart_rate")
-        if whoop_rhr is not None and garmin_rhr is not None:
-            wr, gr = float(whoop_rhr), float(garmin_rhr)
-            diff = abs(wr - gr)
-            row.update({"whoop_rhr_bpm": round(wr, 1), "garmin_rhr_bpm": round(gr, 1), "rhr_abs_diff_bpm": round(diff, 1)})
-            if diff <= 3:
-                row["rhr_agreement"] = "agree"
-                rhr_agree += 1
-            elif diff <= 6:
-                row["rhr_agreement"] = "minor_variance"
-                rhr_minor += 1
-            else:
-                row["rhr_agreement"] = "flag"
-                rhr_flag += 1
-                flags.append(f"RHR diff {diff:.0f}bpm")
+        wr, ar = float(w["resting_heart_rate"]), float(a[_APPLE_RHR_FIELD])
+        diff = abs(wr - ar)
+        row.update({"whoop_rhr_bpm": round(wr, 1), "apple_rhr_bpm": round(ar, 1), "rhr_abs_diff_bpm": round(diff, 1)})
+        if diff <= 3:
+            row["rhr_agreement"] = "agree"
+            rhr_agree += 1
+        elif diff <= 6:
+            row["rhr_agreement"] = "minor_variance"
+            rhr_minor += 1
+        else:
+            row["rhr_agreement"] = "flag"
+            rhr_flag += 1
+            flags.append(f"RHR diff {diff:.0f}bpm")
 
         daily.append(row)
         if flags:
             flagged.append({"date": date, "flags": flags})
 
     n = len(all_dates)
-    hrv_days = hrv_agree + hrv_minor + hrv_flag
     rhr_days = rhr_agree + rhr_minor + rhr_flag
-    hrv_rate = round(hrv_agree / hrv_days * 100, 1) if hrv_days else None
-    rhr_rate = round(rhr_agree / rhr_days * 100, 1) if rhr_days else None
-    rates = [r for r in (hrv_rate, rhr_rate) if r is not None]
-    combined = round(sum(rates) / len(rates), 1) if rates else None
+    too_few = n < _DEVICE_AGREEMENT_MIN_NIGHTS
+    # #5042: below the study's floor there is no rate and no verdict — only the nights.
+    rhr_rate = round(rhr_agree / rhr_days * 100, 1) if rhr_days and not too_few else None
+    combined = rhr_rate
 
-    if combined is None:
+    if too_few:
+        confidence = None
+    elif combined is None:
         confidence = "UNKNOWN — insufficient overlapping data"
     elif combined >= 80:
         confidence = "HIGH — devices closely agree; composite readiness score is reliable"
@@ -450,19 +454,20 @@ def device_agreement(*, _g) -> dict:
 
     return _ok(
         {
-            "status": "ok",
+            "status": "too_few_nights" if too_few else "ok",
             "period": {"start": all_dates[0], "end": all_dates[-1], "overlapping_days": n},
-            "hrv_agreement": (
-                {
-                    "agree_days": hrv_agree,
-                    "minor_days": hrv_minor,
-                    "flagged_days": hrv_flag,
-                    "agreement_rate_pct": hrv_rate,
-                    "threshold_note": "Agree: <=10ms delta; minor: 10-20ms; flag: >20ms",
-                }
-                if hrv_days
+            "n_nights": n,
+            "min_nights": _DEVICE_AGREEMENT_MIN_NIGHTS,
+            "watch_era": watch_era,
+            "too_few_reason": (
+                f"Too few nights to compare yet: {n} of the {_DEVICE_AGREEMENT_MIN_NIGHTS} the agreement study needs, "
+                f"the Apple Watch from {watch_start}."
+                if too_few
                 else None
             ),
+            "devices": ["Whoop", "Apple Watch"],
+            "hrv_agreement": None,
+            "hrv_note": _DEVICE_AGREEMENT_HRV_NOTE,
             "rhr_agreement": (
                 {
                     "agree_days": rhr_agree,
@@ -471,17 +476,16 @@ def device_agreement(*, _g) -> dict:
                     "agreement_rate_pct": rhr_rate,
                     "threshold_note": "Agree: <=3bpm delta; minor: 3-6bpm; flag: >6bpm",
                 }
-                if rhr_days
+                if rhr_days and not too_few
                 else None
             ),
             "device_confidence": confidence,
             "combined_agreement_rate_pct": combined,
             "daily": daily_recent,
             "flagged_disagreement_days": flagged_recent if flagged_recent else None,
-            "garmin_last_date": garmin_last_date,
-            "garmin_paused": bool(garmin_last_date and garmin_last_date < today),
-            # #2957: `garmin_paused` explains WHY the window stopped moving, but says
-            # nothing about whether it belongs to the live cycle — a 30-row "night by
+            "apple_first_date": apple_first_date,
+            # #2957: a stopped window (once Garmin's pause) says nothing about whether it
+            # belongs to the live cycle — a 30-row "night by
             # night" table read as current on a Day-8 cycle-14 page even with the pause
             # note above it. Frame the window itself, off its own newest night (the
             # most favorable date for still being in-cycle): if even that predates the
@@ -490,8 +494,7 @@ def device_agreement(*, _g) -> dict:
             # frame either way.
             "archival": archival_frame(all_dates[-1], EXPERIMENT_START),
             "interpretation": (
-                "HRV delta is expected between devices (different sampling windows and algorithms); "
-                "10-15ms variance is normal. RHR should agree within 3-5bpm; larger gaps suggest sensor "
+                "RHR should agree within 3-5bpm; larger gaps suggest sensor "
                 "placement or motion artifacts. Consistent small disagreement, not perfect agreement, is "
                 "what real independent sensors produce — identical numbers would be the red flag."
             ),

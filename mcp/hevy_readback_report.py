@@ -59,6 +59,32 @@ def _template_map_for(ir: Any) -> dict[str, str]:
     return out
 
 
+def _limits_for(ir: Any) -> dict[str, float | None]:
+    """#5052: movement_key -> the charter effort limit for its class (top-set reading), so a
+    heavier top set at or under it reads `progressed`, not `deviated`. Fail-soft: an unreadable
+    catalog or charter is an empty map (the pre-#5052 three states), never a guessed limit."""
+    try:
+        from health.adherence_calc import _catalog_entry_for, _load_catalog
+        from training import load_progression as lp
+
+        catalog, limits = _load_catalog(), lp.effort_limits()
+        keys = [getattr(ex, "movement_key", "") or "" for ex in getattr(ir, "exercises", []) or []]
+        return {k: lp.grading_limits(lp.movement_class(_catalog_entry_for(k, catalog)), limits)["limit_rpe"] for k in keys if k}
+    except Exception as e:  # noqa: BLE001 — a stall check never fails on the progression read
+        logger.warning("progression limits unavailable (non-fatal): %s", e)
+        return {}
+
+
+def _rep_range_for(ir: Any, movement_key: str) -> tuple[int, int] | None:
+    """The (bottom, top) rep range one IR prescribed for `movement_key` (#5057), or None."""
+    from training.load_ramp import _rep_range_of
+
+    for ex in getattr(ir, "exercises", []) or []:
+        if (getattr(ex, "movement_key", "") or "") == movement_key:
+            return _rep_range_of(getattr(ex, "sets", None))
+    return None
+
+
 def _prescription_for(workout: dict[str, Any]) -> tuple[Any | None, str | None]:
     """The routine IR that was pushed for this workout, or (None, None).
 
@@ -147,6 +173,7 @@ def stall_check(args: dict[str, Any], *, get_workouts: Any = None) -> dict[str, 
 
     points: list[Any] = []
     provenance: list[dict[str, Any]] = []
+    rep_range: tuple[int, int] | None = None  # #5057: the latest prescription's range sizes a step_due
     for page in range(1, MAX_PAGES + 1):
         workouts = (get_workouts(page=page, page_size=PAGE_SIZE) or {}).get("workouts") or []
         if not workouts:
@@ -160,11 +187,12 @@ def stall_check(args: dict[str, Any], *, get_workouts: Any = None) -> dict[str, 
             ir, method = _prescription_for(w)
             row: dict[str, Any] = {}
             if ir is not None:
-                diff = diff_prescribed_vs_performed(ir, grouped, _template_map_for(ir))
+                diff = diff_prescribed_vs_performed(ir, grouped, _template_map_for(ir), limit_for=_limits_for(ir))
                 for key, candidate in diff.items():
                     if str(candidate.get("template_id") or "") == template_id:
                         row = candidate
                         movement_key = movement_key or key
+                        rep_range = rep_range or _rep_range_for(ir, key)
                         break
             if not row:
                 # No plan on file for this session (unmatched, ambiguous, or the movement
@@ -187,7 +215,7 @@ def stall_check(args: dict[str, Any], *, get_workouts: Any = None) -> dict[str, 
 
     points.reverse()  # the detector reads OLDEST first
     provenance.reverse()
-    verdict = assess_stall(points, movement_key=movement_key or f"tmpl:{template_id}")
+    verdict = assess_stall(points, movement_key=movement_key or f"tmpl:{template_id}", rep_range=rep_range)
     return {
         "status": "ok",
         "movement_key": movement_key or None,
@@ -196,6 +224,8 @@ def stall_check(args: dict[str, Any], *, get_workouts: Any = None) -> dict[str, 
         "sessions_requested": wanted,
         "prescription_provenance": provenance,
         "stall": verdict,
+        # #5057: the prescription's own failure to progress, with the step the next draft carries
+        "step_due": verdict.get("step") if verdict.get("verdict") == "step_due" else None,
     }
 
 

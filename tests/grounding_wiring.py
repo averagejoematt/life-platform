@@ -944,10 +944,11 @@ SURFACE_FACETS = {
     "lambdas/emails/coach_nudge_lambda.py::_gate": _facet(
         INTERNAL,
         FAIL_CLOSED,
-        "lambda_handler@findings",
+        "_coach_nudge@findings",
         "The nudge is an email to Matthew alone. Fail-closed regardless, by the AC4 rule: a non-empty finding list means "
         "DROP SILENTLY — the handler writes the copy verbatim as a BLOCKED row for audit, never delivers it, never "
-        "regenerates, and the day stays consumed so the anti-nag contract holds.",
+        "regenerates, and the day stays consumed so the anti-nag contract holds. (#5056 moved the coach-nudge body, and "
+        "this disposition with it, from lambda_handler into _coach_nudge; the handler now runs the steps pass, then it.)",
     ),
     "lambdas/emails/daily_debrief_lambda.py::narrate": _facet(
         PUBLIC,

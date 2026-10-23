@@ -224,9 +224,9 @@ def test_every_served_specimen_is_refused(sheet):
 
 
 GOOD = {
-    "call": "I expect the journal to stay quiet through the weekend, and I think that matters more than a recovery of 98 does.",
-    "question": "My question for Matthew: what would make the journal feel worth opening again this week?",
-    "reply": "I disagree with Nathan Reeves here: I think the quiet journal says more about a busy week than about his mood.",
+    "call": "I expect his protein to hold through the weekend, and I think that matters more than a recovery of 98 does.",
+    "question": "My question for Matthew: what would make the Saturday long run feel worth doing again this week?",
+    "reply": "I disagree with Nathan Reeves here: I think the lighter training says more about a busy week than about his mood.",
     "reaction": "I called it right on recovery holding up, and I think the long nights helped it hold so well.",
     "change_of_mind": "I used to think the scale would stall this month; I now think a loss of 3.6 lb a week can hold a while longer.",
 }
@@ -840,7 +840,7 @@ def _run_round8(monkeypatch, cast, lines, yesterday):
 
 # The 10-08 wire question's shape on the test sheet (2026-10-03: journal quiet 24 days). The wire text itself also
 # trips today's absence binding on this sheet ("logged"), so the run tests use this form, which only the repeat refuses.
-_AGAIN = "Is the 24-day journal silence something Matthew chose, or something that simply crept up on him this month?"
+_AGAIN = "Is the journal something Matthew set aside on purpose, or something that simply slipped away from him this month?"
 _NEW_QUESTION = "Does Matthew plan his dinners ahead, or take them as they come each night?"
 
 
@@ -1036,3 +1036,48 @@ def test_both_public_surfaces_carry_absent_beside_the_lines():
     assert block["state"] == "ok" and block["as_of"] == "2026-10-12"
     assert [ln["coach"] for ln in block["data"]["lines"]] == ["James Okafor"]
     assert block["data"]["absent"] == EXPECTED_1012
+
+
+# ── journal silence is not reader copy (#4583, #4580) ─────────────────────────
+
+# served on the public front page 2026-10-18 (/api/edition blocks.coach_lines, Nathan Reeves)
+SERVED_JOURNAL_SILENCE = "Intake held steady, yet 39 days of journal silence. My read is the block was never nutritional."
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        SERVED_JOURNAL_SILENCE,
+        "The journal has been blank for a month and that worries me.",
+        "He hasn't written in weeks, so I would ask why.",
+        "A blank page where the diary used to be.",
+        "No journal entries since the reset says something.",
+    ],
+)
+def test_journal_silence_is_refused(sheet, text):
+    assert "journal_silence" in S.check_line(text, "call", sheet, today=TODAY), text
+
+
+@pytest.mark.parametrize("text", ["I expect his protein to hold through the weekend.", "The long run on Saturday was the right call."])
+def test_protein_and_training_lines_do_not_trip_it(text):
+    assert S.journal_silence_findings(text) == []
+
+
+def test_the_retry_names_the_journal_refusal():
+    assert "off the record" in S.retry_note(["journal_silence"])
+
+
+def test_mutation_control_the_desk_and_the_daily_gate_share_one_pattern(sheet, monkeypatch):
+    import re
+
+    from common import journal_silence
+    from content import story_desk
+
+    budget = {
+        "lead": {"thread_id": "t", "angle": "he hasn't written in weeks", "evidence": []}
+    }  # no "journal" word: only the shared pattern sees it
+    assert S.journal_silence_findings(SERVED_JOURNAL_SILENCE) == ["journal_silence"]
+    assert story_desk.absence_lead_findings(budget, {})
+    monkeypatch.setattr(journal_silence, "JOURNAL_SILENCE", re.compile(r"(?!x)x"))
+    assert S.journal_silence_findings(SERVED_JOURNAL_SILENCE) == []
+    assert story_desk.absence_lead_findings(budget, {}) == []

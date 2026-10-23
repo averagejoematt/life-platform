@@ -195,6 +195,20 @@ _SCHEMAS: dict[str, dict] = {
             "bp_diastolic": (30, 200),
             "blood_pressure_systolic": (50, 300),
             "blood_pressure_diastolic": (30, 200),
+            # #4970: the Apple Watch's daily metrics — WARNING bands only (log, keep):
+            # a new instrument's first weeks must never drop a reading on a guessed bound.
+            "spo2_pct_apple": (70, 100),
+            "wrist_temp_sleep_c_apple": (30, 42),
+            "respiratory_rate_apple": (4, 40),
+            "breathing_disturbances_apple": (0, 60),
+            "cardio_recovery_bpm_apple": (0, 100),
+            "hrv_sdnn_apple": (1, 300),
+            "resting_heart_rate_apple": (25, 150),
+            "exercise_minutes_apple": (0, 1_440),
+            "stand_minutes_apple": (0, 1_440),
+            "stand_hours_apple": (0, 24),
+            "daylight_minutes_apple": (0, 1_440),
+            "environmental_audio_db_apple": (0, 140),
         },
         "critical_range_checks": {
             "blood_glucose_avg": (30, 600),

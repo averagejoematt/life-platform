@@ -73,7 +73,7 @@ CRITICS_VERSION = "critics@1.5.0"  # #4161: gap-scaled stale cap, performance/re
 # critics@1.4.0 (#4149): every numeric change computed in code; critic loads clamped to the subtract-only floor
 CRITIC_IDS = ("muscle_defense", "joints_tendons", "rate_advocate", "blueprint_historian")
 VERDICTS = ("approve", "change", "veto")
-_SEVERITY = {"info": 0, "change": 1, "veto": 2}
+_SEVERITY = {"info": 0, "recommend": 0, "change": 1, "veto": 2}  # #5070: `recommend` names a cut and applies nothing
 
 from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
 
@@ -164,7 +164,9 @@ def draft_summary(ir: Any) -> dict[str, Any]:
         "routine_id": getattr(ir, "routine_id", None),
         "target_date": getattr(ir, "target_date", None),
         "archetype": getattr(ir, "archetype", None),
-        "total_sets": sum(e["n_sets"] for e in exercises),
+        # #5049: WORKING sets — the −30 % cut and the session ceilings are about hard sets, and a programmed
+        # warm-up is the climb to the first one, never a set a cut may take
+        "total_sets": sum(e["n_working_sets"] for e in exercises),
         "exercises": exercises,
     }
 
@@ -397,6 +399,14 @@ def _deload_total_sets(draft: dict[str, Any]) -> int:
     return max(1, int(round(int(draft.get("total_sets") or 0) * (1 + pct / 100.0))))
 
 
+def _recommend_flag(metric: str, reason: str, provenance: str, cut: dict[str, Any]) -> dict[str, Any]:
+    """#5070 (owner ruling 2026-10-18): a fatigue signal RECOMMENDS the cut, it never applies it. The flag carries the
+    proposed cut under `proposed` and NO `field`/`to`, so neither the deterministic verdict nor a model escalation can apply it."""
+    f = _flag(metric, "recommend", reason, provenance=provenance, governed=True)
+    f["proposed"] = {"field": cut["field"], "to": cut["to"], "applied": False}
+    return f
+
+
 def _fatigue_flags(draft: dict[str, Any], fatigue: dict[str, Any] | None, numbers: dict[str, Any], flags: list, unknown: list) -> None:
     """#4161: the performance/readiness trigger and the 48 h same-region guard, each a governed
     `change` to the one-session −30 % cut (loads held) — the number computed here, never the model's."""
@@ -410,7 +420,7 @@ def _fatigue_flags(draft: dict[str, Any], fatigue: dict[str, Any] | None, number
     numbers["same_region_48h"] = None if region.get("state") in (None, "unknown") else region.get("state") == "triggered"
     prov = critics_fatigue.FATIGUE_PROVENANCE["provenance"]
     cut = {"field": "session.total_sets", "to": _deload_total_sets(draft), "governed": True}
-    tail = "−30 % sets, loads held, THIS session only — then re-test (#4161)"
+    tail = "RECOMMEND −30 % sets, loads held, THIS session only — then re-test; applied only on the owner's recorded word (#5070)"
     resp = fatigue.get("response") or {}
     numbers["fatigue_cut_superseded_by_deload"] = bool(resp.get("superseded_by_deload"))
     if resp.get("superseded_by_deload") and (fatigue.get("triggered") or region.get("state") == "triggered"):
@@ -419,10 +429,10 @@ def _fatigue_flags(draft: dict[str, Any], fatigue: dict[str, Any] | None, number
         msg = f"{why} — inside the deload ({resp.get('deload_sets_pct')} % sets), the larger cut is taken, not both (#4161)"
         flags.append(_flag("fatigue_trigger", "info", msg, provenance=prov, governed=True))
     elif fatigue.get("triggered"):
-        flags.append(_flag("fatigue_trigger", "change", "; ".join(fatigue.get("reasons") or []) + f" — {tail}", provenance=prov, **cut))
+        flags.append(_recommend_flag("fatigue_trigger", "; ".join(fatigue.get("reasons") or []) + f" — {tail}", prov, cut))
     elif region.get("state") == "triggered":
         why = f"{region.get('region')} loaded on {', '.join(region.get('loaded_on') or [])} — under the {critics_fatigue.SAME_REGION_MIN_HOURS} h same-region guard"
-        flags.append(_flag("same_region_48h", "change", f"{why} — {tail}", provenance=prov, **cut))
+        flags.append(_recommend_flag("same_region_48h", f"{why} — {tail}", prov, cut))
 
 
 def _novel_again_flag(ex: dict[str, Any], dk: str, ds: int | None, stale: dict[str, Any] | None) -> dict[str, Any]:
@@ -524,8 +534,13 @@ def build_rate_advocate_packet(
         "walking_hr_wk_hevy": (((walking or {}).get("sources") or {}).get("hevy") or {}).get("hours"),
         "rate_band_high_lb_wk": (rate_target or {}).get("high_lb_wk"),
         "rate_band_low_lb_wk": (rate_target or {}).get("low_lb_wk"),
+        # ruling 3: both units; % of bodyweight per week = rate (lb/wk) / current weight (lb) x 100 (#3725: name the base)
+        "rate_band_floor_pct_bodyweight_per_wk": ((rate_target or {}).get("band") or {}).get("floor_pct_bodyweight_per_wk"),
+        "rate_band_ceiling_pct_bodyweight_per_wk": ((rate_target or {}).get("band") or {}).get("ceiling_pct_bodyweight_per_wk"),
         "current_rate_lb_wk": current_rate_lb_wk,
         "current_rate_provisional": rate_provisional,
+        # #5001: the engine's `rate_ceiling` row over THE stated loss rate — tripped / clear / unknown / not_yet_active
+        "rate_ceiling": next((t.get("state") for t in tw if t.get("id") == "rate_ceiling"), None),
         "lifting_sessions_7d": lifting_sessions_7d,
         "draft_total_sets": draft.get("total_sets"),
     }
@@ -600,6 +615,7 @@ def build_rate_advocate_packet(
                 provenance=rt.get("provenance", "owner"),
             )
         )
+    _rate_ceiling_flag(tw, flags)
     if lifting_sessions_7d is not None and lifting_sessions_7d >= sessions_hi:
         flags.append(
             _flag(
@@ -610,6 +626,29 @@ def build_rate_advocate_packet(
             )
         )
     return {"critic": "rate_advocate", "numbers": numbers, "flags": flags, "unknown": unknown, "violations": []}
+
+
+def _rate_ceiling_flag(tw: list[dict[str, Any]], flags: list[dict[str, Any]]) -> None:
+    """#5001 — a TRIPPED `rate_ceiling` is a `change` naming it, computed here, never a model's call: on
+    2026-10-18 4.12 lb/wk against the 4.0 cap reached this critic with the tripwire unevaluated and it
+    approved, "within bounds". `governed` — the model can neither soften it to approve (the deterministic
+    floor holds) nor escalate it to a veto (an advocate is not a gate); the action is the tripwire's own."""
+    row = next((t for t in tw if t.get("id") == "rate_ceiling" and t.get("state") == "tripped"), None)
+    if row is None:
+        return
+    ev = row.get("evidence") or {}
+    win = ev.get("window") or {}
+    flags.append(
+        _flag(
+            "rate_ceiling",
+            "change",
+            f"`rate_ceiling` TRIPPED: losing {ev.get('observed_lb_wk')} lb/wk ({ev.get('method')}, {win.get('start')}..{win.get('end')}, "
+            f"n={ev.get('n_weigh_ins')} {ev.get('source')} weigh-ins) is ABOVE the {ev.get('threshold_lb_wk')} lb/wk cap — the rate is "
+            f"NOT within bounds; {row.get('action_if_tripped')}",
+            provenance=ev.get("threshold_provenance") or row.get("provenance", "owner"),
+            governed=True,
+        )
+    )
 
 
 CONSISTENT_BLOCK_WEEKS = 2  # trailing weeks at >=2 lifts/wk before a lift counts as having a CURRENT baseline
@@ -776,7 +815,7 @@ def deterministic_verdict(packet: dict[str, Any]) -> dict[str, Any]:
         if extra:
             out["additional_changes"] = extra
         return out
-    return {
+    out = {
         "verdict": "approve",
         "metric": None,
         "value": None,
@@ -784,6 +823,11 @@ def deterministic_verdict(packet: dict[str, Any]) -> dict[str, Any]:
         "to": None,
         "reason": "nothing in this packet crosses a stated threshold",
     }
+    # #5070: approve the draft as written; a recommendation travels beside the verdict and applies nothing
+    if recs := [f for f in packet.get("flags", []) if f["severity"] == "recommend"]:
+        out["reason"] += "; a deload is RECOMMENDED, not applied (owner-gated)"
+        out["recommendation"] = {"metric": recs[0]["metric"], "reason": recs[0]["reason"], **recs[0]["proposed"]}
+    return out
 
 
 def _prompt(packet: dict[str, Any], draft: dict[str, Any]) -> dict[str, Any]:
@@ -804,6 +848,7 @@ def _prompt(packet: dict[str, Any], draft: dict[str, Any]) -> dict[str, Any]:
                 "flags": packet["flags"],
                 "unknown": packet["unknown"],
                 "violations": packet.get("violations", []),
+                **({"charter": packet["charter"]} if packet.get("charter") else {}),  # #5071: the charter + May frame, context only
             },
         },
         default=str,
@@ -863,11 +908,16 @@ def reconcile(det: dict[str, Any], model: dict[str, Any] | None, packet: dict[st
         out["model"] = {"error": model["error"]}
         return out
     out["model"] = {k: model.get(k) for k in ("verdict", "metric", "value", "field", "to", "sentence")}
+    rank = {"approve": 0, "change": 1, "veto": 2}
+    if rank[model["verdict"]] < rank[det["verdict"]]:
+        # #5001: a MILDER model's sentence never rides as the verdict's — on 2026-10-18 an approve saying the rate was
+        # "within bounds" would have sat on a rate_ceiling change. It stays on `model`, where it is the model's word.
+        out["model_overruled"] = f"model said {model['verdict']}, milder than the deterministic {det['verdict']} — the floor holds"
+        return out
     if model.get("sentence"):
         out["sentence"] = model["sentence"]
-    rank = {"approve": 0, "change": 1, "veto": 2}
-    if rank[model["verdict"]] <= rank[det["verdict"]]:
-        return out  # the model agrees or is milder — the floor holds
+    if rank[model["verdict"]] == rank[det["verdict"]]:
+        return out  # the model agrees — the floor holds
     flags = {f["metric"]: f for f in packet.get("flags", [])}
     violated = {v["metric"] for v in packet.get("violations", [])}
     metric = model.get("metric")
@@ -1018,8 +1068,23 @@ def commit_status(ir: Any) -> str:
         return NOT_RED_TEAMED
     paused = " (model paused — deterministic layer only)" if rec.get("model_ran") is False else ""
     return f"{rec.get('engine', CRITICS_VERSION)}{paused}: " + ", ".join(
-        f"{_SHORT.get(v['critic'], v['critic'])} {v['verdict']}" + (" (owner-overridden)" if is_overridden(v) else "") for v in verdicts
+        f"{_SHORT.get(v['critic'], v['critic'])} {display_verdict(v, rec.get('changes'))}"
+        + (" (owner-overridden)" if is_overridden(v) else "")
+        for v in verdicts
     )
+
+
+def display_verdict(v: dict[str, Any], changes: list[dict[str, Any]] | None) -> str:
+    """The verdict word the Hevy note prints (#5008 C1). A `change` whose every recorded change landed
+    `applied: false` (e.g. "hold: nothing to trim") changed NOTHING in the routine — it is a FLAG for
+    the coach, not a CHANGE. No change records at all (apply never ran) keeps the stored verdict."""
+    verdict = str(v.get("verdict") or "")
+    if verdict != "change":
+        return verdict
+    mine = [c for c in changes or [] if c.get("critic") == v.get("critic")]
+    if mine and not any(c.get("applied") for c in mine):
+        return "flag"
+    return verdict
 
 
 def notes_block(ir: Any) -> str:
@@ -1035,7 +1100,8 @@ def notes_block(ir: Any) -> str:
         paused = " (model paused)" if isinstance(v.get("model"), dict) and v["model"].get("paused") else ""
         reason = (v.get("reason") or "").replace("\n", " ")
         over = " OVERRIDDEN BY OWNER" if is_overridden(v) else ""
-        lines.append(f"- {_SHORT.get(v['critic'], v['critic'])} {v['verdict'].upper()}{over}{paused}:{num}{prov} {reason}"[:300])
+        word = display_verdict(v, rec.get("changes")).upper()
+        lines.append(f"- {_SHORT.get(v['critic'], v['critic'])} {word}{over}{paused}:{num}{prov} {reason}"[:300])
     applied = [c for c in rec.get("changes", []) if c.get("applied")]
     if applied:
         lines.append("applied: " + "; ".join(f"{c['field']} -> {c['to']}" for c in applied))

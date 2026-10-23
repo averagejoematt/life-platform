@@ -173,8 +173,9 @@ def test_a_late_recompute_anchors_every_window_on_the_target_day(table, monkeypa
     anchor = ANCHOR.isoformat()
     expected = sorted(
         [
-            ("whoop", _d(-6), TARGET),  # 7-day HRV
-            ("whoop", _d(-29), TARGET),  # 30-day HRV
+            ("whoop", _d(-29), TARGET),  # 30-day HRV (#4999: the 7-day HRV is sliced from it)
+            ("eightsleep", _d(-59), TARGET),  # #4999: AF-day exclusion — 30 baseline days x a 30-day trailing max
+            ("withings", _d(-29), TARGET),  # #4999: AF-day exclusion — the device rhythm classification
             ("strava", _d(-59), TARGET),  # fitness / fatigue / balance
             ("hevy", _d(-59), TARGET),
             ("whoop", _d(-6), TARGET),  # sleep debt

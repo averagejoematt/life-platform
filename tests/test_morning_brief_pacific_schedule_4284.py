@@ -10,6 +10,8 @@ import re
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -19,19 +21,19 @@ def _read(rel):
 
 
 def test_only_the_daily_brief_uses_a_zoned_schedule():
-    users = []
+    # #4284: the zone is a column of config/schedules.json, never a stack kwarg.
+    users = sorted((k, r["stack"], r["timezone"]) for k, r in schedule_rows.rows().items() if r.get("timezone"))
+    assert users == [("daily-brief", "LifePlatformEmail", "America/Los_Angeles")], users
     for fname in sorted(os.listdir(os.path.join(_ROOT, "cdk", "stacks"))):
-        if fname.endswith(".py") and fname != "lambda_helpers.py":
-            for m in re.finditer(r"schedule_timezone=\"([^\"]+)\"", _read(f"cdk/stacks/{fname}")):
-                users.append((fname, m.group(1)))
-    assert users == [("email_stack.py", "America/Los_Angeles")], users
+        if fname.endswith("_stack.py"):
+            assert "schedule_timezone=" not in _read(f"cdk/stacks/{fname}"), fname
 
 
 def test_brief_block_is_pacific_ten_am():
-    src = _read("cdk/stacks/email_stack.py")
-    block = src[src.index('function_name="daily-brief"') :].split("create_platform_lambda(")[0]
-    assert 'schedule="cron(0 10 * * ? *)"' in block
-    assert 'schedule_timezone="America/Los_Angeles"' in block
+    row = schedule_rows.rows()["daily-brief"]
+    assert row["expression"] == "cron(0 10 * * ? *)"
+    assert row["timezone"] == "America/Los_Angeles"
+    assert row["facing"] == "reader"
 
 
 def test_scheduler_role_is_invoke_only_and_account_scoped():
@@ -59,7 +61,6 @@ def test_brief_instant_is_unchanged_before_and_one_hour_later_after_the_change()
 def test_every_producer_runs_before_the_brief_on_both_sides_of_the_change():
     """The brief reads results written by the compute chain (16:30-16:55 UTC). After
     2026-11-01 the brief moves LATER (18:00 UTC), so no producer can be overtaken."""
-    stacks = _read("cdk/stacks/compute_stack.py")
     producers = {
         "character-sheet-compute": "cron(30 16 * * ? *)",
         "adaptive-mode-compute": "cron(35 16 * * ? *)",
@@ -67,6 +68,6 @@ def test_every_producer_runs_before_the_brief_on_both_sides_of_the_change():
         "daily-insight-compute": "cron(45 16 * * ? *)",
     }
     for name, cron in producers.items():
-        assert f'schedule="{cron}"' in stacks, name
+        assert schedule_rows.expr(name) == cron, name
         hh, mm = re.search(r"cron\((\d+) (\d+)", cron).groups()
         assert (int(mm), int(hh)) < (17, 0)  # before the earliest brief instant

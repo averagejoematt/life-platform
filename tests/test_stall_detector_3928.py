@@ -246,7 +246,7 @@ def _pull_ir() -> RoutineSpec:
     )
 
 
-def _pull_performed(lat_kg=LB120_KG, lat_reps=12) -> dict:
+def _pull_performed(lat_kg=LB120_KG, lat_reps=12, lat_rpe=8.0) -> dict:
     return {
         "routine_id": "7da4dd70-546b-4522-bb48-11a9e4a8f1df",
         "start_time": "2026-09-08T17:30:00+00:00",
@@ -255,8 +255,8 @@ def _pull_performed(lat_kg=LB120_KG, lat_reps=12) -> dict:
                 "exercise_template_id": LAT_PULLDOWN_TID,
                 "sets": [
                     {"type": "warmup", "weight_kg": 30.0, "reps": 10, "rpe": None},
-                    {"type": "normal", "weight_kg": lat_kg, "reps": lat_reps, "rpe": 8.0},
-                    {"type": "normal", "weight_kg": lat_kg, "reps": lat_reps, "rpe": 8.0},
+                    {"type": "normal", "weight_kg": lat_kg, "reps": lat_reps, "rpe": lat_rpe},
+                    {"type": "normal", "weight_kg": lat_kg, "reps": lat_reps, "rpe": lat_rpe},
                 ],
             },
             {"exercise_template_id": DB_CURL_TID, "sets": [{"type": "normal", "weight_kg": 15.0, "reps": 10, "rpe": 8.5}]},
@@ -339,7 +339,9 @@ def test_stall_check_pairs_each_session_with_the_plan_that_was_pushed(monkeypatc
             return {"workouts": []}
         return {
             "workouts": [
-                {**_pull_performed(), "start_time": f"2026-09-0{d}T17:30:00+00:00"} for d in (8, 6, 4, 2)  # newest first, as Hevy pages
+                # RPE 8.5: above #5057's stall-rule cap (8), so the window stays #3928's refusal, not a step_due
+                {**_pull_performed(lat_rpe=8.5), "start_time": f"2026-09-0{d}T17:30:00+00:00"}
+                for d in (8, 6, 4, 2)  # newest first, as Hevy pages
             ]
         }
 
@@ -363,7 +365,8 @@ def test_stall_check_says_no_prescription_rather_than_reading_performed_alone(mo
     def _fake_get_workouts(page=1, page_size=10):
         if page > 1:
             return {"workouts": []}
-        return {"workouts": [{**_pull_performed(), "start_time": f"2026-09-0{d}T17:30:00+00:00"} for d in (8, 6, 4)]}
+        # RPE 8.5: above #5057's stall-rule cap, so this pins #3928's no-plan refusal, not a step_due
+        return {"workouts": [{**_pull_performed(lat_rpe=8.5), "start_time": f"2026-09-0{d}T17:30:00+00:00"} for d in (8, 6, 4)]}
 
     out = hevy_readback_report.stall_check({"template_id": LAT_PULLDOWN_TID}, get_workouts=_fake_get_workouts)
     assert out["stall"]["verdict"] == VERDICT_UNKNOWN

@@ -1,0 +1,207 @@
+{
+  "_README": "#5072 (epic #5067): the panel rubric — a FIXED standard the training plan is graded against, one seat per school of the training charter's concession_ledger (the seat keys must equal the ledger's keys; tests/test_panel_rubric_5072.py holds it). Each criterion is graded by CODE (a named check in lambdas/training/panel_rubric.py CHECKS, ADR-105: deterministic computation before any model verdict) or by the JUDGE (lambdas/training/panel_judge.py, route charter.judge / charter.judge_gate) when code cannot check it. The concession each seat makes is READ from the charter at grade time, never copied here. The target (overall letter, every-seat floor) is the charter's panel_target. Hand-owned; a change is a new version with a change_log line.",
+  "version": "1.1.0",
+  "change_log": [
+    {"version": "1.0.0", "date": "2026-10-19", "issue": "#5072", "what": "the eight seats, 40 criteria (32 by code, 8 by the judge), the letter scale"},
+    {"version": "1.1.0", "date": "2026-10-19", "issue": "#5110", "what": "food_panel: nine nutrition seats (six schools, three roles) from the charter's nutrition.concession_ledger, 45 criteria (36 by code against the resolved food plan, 9 by the judge), graded on the same letter scale and the same panel_target; built on the panel defaults, pending R1 and R2 (#5091)"}
+  ],
+  "scale": {"min": 0, "max": 10},
+  "letters": [
+    {"letter": "A", "min": 9.0},
+    {"letter": "A-", "min": 8.5},
+    {"letter": "B+", "min": 8.0},
+    {"letter": "B", "min": 7.0},
+    {"letter": "C", "min": 6.0},
+    {"letter": "D", "min": 5.0},
+    {"letter": "F", "min": 0.0}
+  ],
+  "overall_rule": "the overall score is the mean of the eight seat scores, mapped through `letters`; a seat score is the mean of its criteria; the target is met only when the overall letter reaches the charter's panel_target.overall AND every seat reaches panel_target.every_seat_at_least",
+  "calibration": {
+    "owner_graded_plans_required": 5,
+    "owner_grades": [],
+    "rule": "the judge is uncalibrated until the owner has graded this many plans by hand and the judge's seat scores sit within 1 point of his on each; every grade carries its calibration state"
+  },
+  "food_panel": {
+    "_README": "#5110 (epic #5094): the FOOD panel — the same harness grading the week's food plan, one seat per school or role of the charter's nutrition.concession_ledger (the seat keys must equal the ledger's keys; tests/test_food_panel_5110.py holds it). A CODE criterion names a check in lambdas/training/food_panel.py CHECKS, read from the food plan the platform resolves (health.calorie_target.resolve per day, the protein engine's range and feedings, the macro floors, the week's titration record); a JUDGE criterion is graded by the same blinded judge (training/panel_judge.py) on the same routes. Seats name schools and roles, never people: issue #5110 names six schools by their leading figure and each gets its own seat (the person-to-seat map is on PR #5206), plus the three roles. The bar is the charter's panel_target, the letters above. Built on the panel defaults R1 (eat up to the band, weekly refit) and R2 (the range in four feedings), pending the owner (#5091).",
+    "plan_shape": "lambdas/training/food_panel.py build_food_plan: {case_id, panel: food, week_start, charter_version, days: [7 x the resolver's day (date, day_type, kcal, base_kcal, uplift_kcal, band, floors, source, provenance, balance_held, split, pre_post_session) + the day's intended feedings], protein: the engine's range and feeding rule, floors: the macro floors, titration: the week's record or null}",
+    "calibration": {
+      "owner_graded_plans_required": 5,
+      "owner_grades": [],
+      "rule": "the food judge is uncalibrated until the owner has graded this many real food plans by hand and the judge's seat scores sit within 1 point of his on each"
+    },
+    "seats": {
+      "evidence_based_hypertrophy_nutrition": {
+        "school": "evidence-based hypertrophy nutrition",
+        "criteria": [
+          {"id": "protein_range", "by": "code", "check": "protein_range_every_day", "text": "every day's planned protein reaches the charter's protein range"},
+          {"id": "macro_floors", "by": "code", "check": "macro_floors_held", "text": "every day's split holds the fat and carbohydrate floors, and the fibre floor is carried"},
+          {"id": "training_day_fuel", "by": "code", "check": "training_day_fuel", "text": "lifting days carry the uplift and the pre and post session fuel"},
+          {"id": "in_band", "by": "code", "check": "week_in_band", "text": "each day's base target sits inside its stated calorie band"},
+          {"id": "food_quality", "by": "judge", "text": "the plan protects lean mass in a deficit the way the evidence does: protein, fat and carbohydrate each sized for training, nothing cut to zero, no day built to starve a lift"}
+        ]
+      },
+      "flexible_dieting": {
+        "school": "flexible dieting (daily totals first)",
+        "criteria": [
+          {"id": "target_resolved", "by": "code", "check": "calorie_target_resolved", "text": "every day's total comes from the one resolver, so the day's number is the plan, not a meal rule"},
+          {"id": "split_accounts", "by": "code", "check": "split_accounts_for_kcal", "text": "each day's protein, fat and carbohydrate add up to the day's calories"},
+          {"id": "protein_range", "by": "code", "check": "protein_range_every_day", "text": "the protein range is the one fixed priority every day"},
+          {"id": "steady_week", "by": "code", "check": "week_balanced", "text": "the week averages its base target, so one day over is paid back inside the week"},
+          {"id": "flexibility", "by": "judge", "text": "the plan sets totals and a protein priority and leaves the food inside them flexible, so the week holds on an imperfect day without a rule broken"}
+        ]
+      },
+      "protein_lean_mass": {
+        "school": "protein and lean-mass retention",
+        "criteria": [
+          {"id": "protein_range", "by": "code", "check": "protein_range_every_day", "text": "the protein range is planned every day"},
+          {"id": "four_feedings", "by": "code", "check": "four_feedings_planned", "text": "every day plans the charter's number of feedings, each at or above the per-feeding threshold"},
+          {"id": "feedings_cover_range", "by": "code", "check": "feedings_cover_the_range", "text": "the day's planned feedings add up to the range's low end"},
+          {"id": "post_session", "by": "code", "check": "post_session_feeding", "text": "every lifting day counts its post-session protein as one of the feedings, at the threshold"},
+          {"id": "distribution", "by": "judge", "text": "the feedings are spread across the waking day, each a realistic serving of a complete protein, with the first one early"}
+        ]
+      },
+      "appetite_food_environment": {
+        "school": "appetite and the food environment",
+        "criteria": [
+          {"id": "fibre_and_floors", "by": "code", "check": "macro_floors_held", "text": "the fibre floor is carried and the carbohydrate and fat floors hold, so the plan is not built on low-volume food"},
+          {"id": "rhythm", "by": "code", "check": "four_feedings_planned", "text": "a fixed feeding rhythm every day"},
+          {"id": "no_crash_day", "by": "code", "check": "day_floors_held", "text": "no day sits under its calorie floor"},
+          {"id": "steady_week", "by": "code", "check": "week_balanced", "text": "the week averages its base target with no day left unpaid"},
+          {"id": "environment", "by": "judge", "text": "the plan makes the default choice the easy one: satiating, high-volume, minimally processed food at the planned feedings, and nothing in it depends on willpower at the hungriest hour"}
+        ]
+      },
+      "energy_balance_metabolism": {
+        "school": "energy balance and metabolism",
+        "criteria": [
+          {"id": "target_resolved", "by": "code", "check": "calorie_target_resolved", "text": "every day's target comes from the one resolver (titration or charter), never a constant"},
+          {"id": "in_band", "by": "code", "check": "week_in_band", "text": "each day's base target sits inside its stated band"},
+          {"id": "split_accounts", "by": "code", "check": "split_accounts_for_kcal", "text": "each day's protein, fat and carbohydrate add up to the day's calories"},
+          {"id": "weekly_refit", "by": "code", "check": "titration_decided", "text": "the week carries the titration engine's decision with its reason"},
+          {"id": "honest_model", "by": "judge", "text": "the plan treats the intake target as a model refit against the measured trend, not a fixed truth, and states no number with more certainty than its basis"}
+        ]
+      },
+      "obesity_medicine": {
+        "school": "obesity medicine",
+        "criteria": [
+          {"id": "day_floors", "by": "code", "check": "day_floors_held", "text": "every day holds its floor (the lifting-day floor on a lifting day)"},
+          {"id": "week_floor", "by": "code", "check": "week_mean_floor", "text": "the week's mean holds the seven-day floor"},
+          {"id": "bounded_steps", "by": "code", "check": "titration_step_bounded", "text": "a titration step stays inside the step cap and never under the planned minimum"},
+          {"id": "steps_before_food", "by": "code", "check": "steps_before_food", "text": "food comes down only with the step floor met (steps before food)"},
+          {"id": "sustainable_pace", "by": "judge", "text": "the pace and the floors read as something a person can hold for months, with every cut earned by the trend and none taken on a hunch"}
+        ]
+      },
+      "sports_dietitian": {
+        "school": "sports dietitian",
+        "criteria": [
+          {"id": "training_day_fuel", "by": "code", "check": "training_day_fuel", "text": "lifting days carry the uplift and the pre and post session targets"},
+          {"id": "post_session", "by": "code", "check": "post_session_feeding", "text": "the post-session feeding is planned at the threshold on every lifting day"},
+          {"id": "floors", "by": "code", "check": "macro_floors_held", "text": "the carbohydrate floor holds every day"},
+          {"id": "split_accounts", "by": "code", "check": "split_accounts_for_kcal", "text": "the split is real grams that add up to the day's calories"},
+          {"id": "timing", "by": "judge", "text": "the fuel around the session is practical for a working day: the pre-session food fits its window, the post-session feeding is real food or a shake, and rest days are not starved"}
+        ]
+      },
+      "behaviour_change_psychologist": {
+        "school": "behaviour-change psychology",
+        "criteria": [
+          {"id": "rhythm", "by": "code", "check": "four_feedings_planned", "text": "the same feeding rhythm every day"},
+          {"id": "small_changes", "by": "code", "check": "titration_step_bounded", "text": "a change to the target is small and bounded"},
+          {"id": "reasons", "by": "code", "check": "numbers_carry_their_reason", "text": "every day's number carries its source and the charter version, and a titration decision carries its reason"},
+          {"id": "steady_week", "by": "code", "check": "week_balanced", "text": "the week balances, so a lifting day is not a debt"},
+          {"id": "repeatable", "by": "judge", "text": "the plan is a few repeatable rules rather than perfection: a missed feeding or a hard day has an obvious way back, and nothing in it is framed as failure"}
+        ]
+      },
+      "studio_nutritionist": {
+        "school": "studio transformation nutritionist",
+        "criteria": [
+          {"id": "in_band", "by": "code", "check": "week_in_band", "text": "the target sits in the band that delivers the deadline pace"},
+          {"id": "protein_range", "by": "code", "check": "protein_range_every_day", "text": "protein is planned every day"},
+          {"id": "training_day_fuel", "by": "code", "check": "training_day_fuel", "text": "the lifting days are fuelled"},
+          {"id": "weekly_refit", "by": "code", "check": "titration_decided", "text": "the target is refit every week"},
+          {"id": "the_frame", "by": "judge", "text": "the plan reads like a time-bound transformation diet: simple to shop and cook, sized to the deadline, and nothing in the week wastes it"}
+        ]
+      }
+    }
+  },
+  "seats": {
+    "nippard": {
+      "school": "evidence-based hypertrophy (the Nippard school)",
+      "criteria": [
+        {"id": "double_progression", "by": "code", "check": "double_progression_with_reason", "text": "every lifting movement carries the double progression's verdict (step, hold, floor raise or re-entry) with its reason"},
+        {"id": "rep_ranges", "by": "code", "check": "rep_ranges_stated", "text": "working sets carry a rep range wide enough for double progression to run"},
+        {"id": "accessory_rotation", "by": "code", "check": "accessory_rotation_ok", "text": "the accessory layer rotates on the charter cadence instead of freezing"},
+        {"id": "priority_volume", "by": "code", "check": "priority_sets_in_landmarks", "text": "weekly hard sets for the priority muscles sit between MEV and MAV"},
+        {"id": "stretch_position", "by": "judge", "text": "each priority muscle gets at least one movement loaded in its lengthened (stretch) position, and the exercise choices are the high-stimulus, low-fatigue options for this trainee"}
+      ]
+    },
+    "athlean_x": {
+      "school": "Athlean-X (athletic, corrective)",
+      "criteria": [
+        {"id": "single_leg", "by": "code", "check": "single_leg_work", "text": "single-leg lower-body work appears at least twice a week"},
+        {"id": "carries", "by": "code", "check": "carries_weekly", "text": "loaded carries appear at least once a week"},
+        {"id": "corrective", "by": "code", "check": "corrective_work", "text": "corrective / posture work (face pulls, Pallof press, rear delts, rotator cuff) appears at least twice a week"},
+        {"id": "pull_push_balance", "by": "code", "check": "pull_push_balance", "text": "pulling volume at least matches pressing volume"},
+        {"id": "athletic_carryover", "by": "judge", "text": "the plan keeps some athletic carryover (multi-planar, unilateral, trunk stability) and does not read as machines-only bodybuilding"}
+      ]
+    },
+    "rp_israetel": {
+      "school": "Renaissance Periodization (Israetel)",
+      "criteria": [
+        {"id": "priority_volume", "by": "code", "check": "priority_sets_in_landmarks", "text": "weekly sets per priority muscle sit inside MEV-MAV"},
+        {"id": "mev_floors", "by": "code", "check": "mev_floors_every_template", "text": "the charter's MEV-floor muscles appear in every lifting session"},
+        {"id": "legs_maintenance", "by": "code", "check": "legs_at_maintenance_floor", "text": "legs are held at or above their maintenance floor (MEV)"},
+        {"id": "no_unrecorded_deload", "by": "code", "check": "no_unrecorded_deload", "text": "no deload is scheduled or applied without the owner's recorded word"},
+        {"id": "fatigue_management", "by": "judge", "text": "volume is distributed so per-session junk volume is avoided and fatigue is managed without a scheduled deload"}
+      ]
+    },
+    "sbs_nuckols": {
+      "school": "Stronger By Science (Nuckols)",
+      "criteria": [
+        {"id": "coded_progression", "by": "code", "check": "progression_rule_coded", "text": "the progression and stall rules are coded, not improvised"},
+        {"id": "anchors", "by": "code", "check": "anchors_every_lifting_day", "text": "every lifting day carries a tracked anchor lift"},
+        {"id": "strength_tripwire", "by": "code", "check": "strength_tripwire_live", "text": "the anchor-strength tripwire is evaluated, so muscle loss is caught early"},
+        {"id": "effort_by_rpe", "by": "code", "check": "effort_by_rpe", "text": "effort is prescribed by RPE on the lifting movements"},
+        {"id": "honest_claims", "by": "judge", "text": "numbers in the plan's reasons are stated with their basis (his own data vs population defaults); nothing claims more certainty than the evidence carries"}
+      ]
+    },
+    "galpin": {
+      "school": "Galpin (concurrent training)",
+      "criteria": [
+        {"id": "hard_easy_split", "by": "code", "check": "hard_easy_cardio_split", "text": "conditioning is split hard/easy with the charter's number of hard sessions"},
+        {"id": "cardio_dosed", "by": "code", "check": "cardio_dosed", "text": "every cardio block carries a dose: minutes, a level/speed/incline and an RPE or talk test"},
+        {"id": "fatigue_flags", "by": "code", "check": "fatigue_flags_present", "text": "weekly fatigue signals are wired into a deload recommendation"},
+        {"id": "steps_floor", "by": "code", "check": "steps_floor_carried", "text": "the daily step floor is carried by the plan"},
+        {"id": "interference", "by": "judge", "text": "hard conditioning is placed to limit interference with the heavy lower day and recovery"}
+      ]
+    },
+    "dan_john": {
+      "school": "Dan John (simple, fundamental)",
+      "criteria": [
+        {"id": "carries_or_kb", "by": "code", "check": "carries_or_kettlebell_weekly", "text": "carries or kettlebell work every week"},
+        {"id": "fundamental_patterns", "by": "code", "check": "fundamental_patterns", "text": "the week covers hinge, squat, push, pull and carry"},
+        {"id": "sustainable_length", "by": "code", "check": "sessions_within_cap", "text": "no session runs past the charter's lifting-minute cap"},
+        {"id": "anchors", "by": "code", "check": "anchors_every_lifting_day", "text": "the same few big lifts repeat across the week"},
+        {"id": "keep_the_goal", "by": "judge", "text": "the plan is simple enough to execute for months — the goal stays the goal, no novelty for its own sake"}
+      ]
+    },
+    "hollywood_transformation_trainer": {
+      "school": "Hollywood transformation trainer",
+      "criteria": [
+        {"id": "five_days", "by": "code", "check": "lifting_days_match", "text": "the charter's number of lifting days"},
+        {"id": "session_length", "by": "code", "check": "session_minutes_in_band", "text": "every lifting session sits inside the charter's lifting-minute band"},
+        {"id": "delts_frequency", "by": "code", "check": "delts_frequency", "text": "delts are trained the charter's number of times a week"},
+        {"id": "steps", "by": "code", "check": "steps_floor_carried", "text": "the step floor and target are carried every day"},
+        {"id": "the_frame", "by": "judge", "text": "the plan reads like a time-bound transformation: aesthetic priorities (delts, lats, upper chest, arms) get the emphasis and nothing in the week wastes the deadline"}
+      ]
+    },
+    "clinical_exercise_physiologist": {
+      "school": "clinical exercise physiologist",
+      "criteria": [
+        {"id": "effort_by_rpe", "by": "code", "check": "effort_by_rpe", "text": "effort is prescribed by RPE"},
+        {"id": "no_auto_deload", "by": "code", "check": "no_unrecorded_deload", "text": "no automatic deload; a deload only on the owner's word"},
+        {"id": "conditioning_by_rpe", "by": "code", "check": "conditioning_by_rpe", "text": "conditioning is prescribed by RPE or the talk test"},
+        {"id": "monitoring", "by": "code", "check": "recovery_tripwires_wired", "text": "the recovery, protein, strength and weight-stall tripwires are evaluated every week"},
+        {"id": "safe_dosing", "by": "judge", "text": "the week's total dose (lifting days, conditioning, steps) is sensible for fast loss, with warm-ups on the heavy lifts and the hardest work spread out"}
+      ]
+    }
+  }
+}

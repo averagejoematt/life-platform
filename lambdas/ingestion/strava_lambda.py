@@ -35,6 +35,8 @@ except ImportError:
     logger = logging.getLogger("strava")
     logger.setLevel(logging.INFO)
 
+from common.numeric import decimals_to_float
+
 from ingestion import strava_population
 from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
@@ -144,6 +146,38 @@ def _fetch_activity_streams(strava_id: str, secret: dict) -> tuple:
         "hr_30s_recovery": peak - hr[peak_idx + 29],
         "hr_60s_recovery": peak - hr[peak_idx + 59] if len(after) >= 60 else None,
     }, secret
+
+
+def _stored_enrichment(date_str: str) -> dict:
+    """Per-activity vendor enrichment already stored for ``date_str``: {strava_id: {...}}.
+
+    #4626: zones and the HR-recovery stream never change once the vendor has computed them,
+    but the trailing-3-days refresh re-fetched both for every heart-rate activity on every run.
+    Each entry carries the stored zone fields, any ``hr_recovery`` and the ``elapsed_time_seconds``
+    they were computed against (an edit that changes the duration invalidates the reuse).
+    Fail-soft: any read problem returns {} and the caller simply re-fetches, as before.
+    """
+    try:
+        table = boto3.resource("dynamodb", region_name=REGION).Table(os.environ.get("TABLE_NAME", "life-platform"))
+        item = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#strava", "sk": f"DATE#{date_str}"}).get("Item") or {}
+    except Exception as e:  # noqa: BLE001 — enrichment reuse is an optimisation, never a dependency
+        logger.warning("strava stored-enrichment read failed for %s (re-fetching): %s", date_str, e)
+        return {}
+    # #5255: boto3 hands every stored number back as Decimal, and a reused zone summed beside a
+    # re-fetched (float) one in transform() raised `Decimal + float`, erroring the whole day on
+    # every re-ingest. Normalise once, here at the read boundary, so nothing stored leaves as Decimal.
+    item = decimals_to_float(item)
+    out = {}
+    for act in item.get("activities") or []:
+        if not isinstance(act, dict) or not act.get("strava_id"):
+            continue
+        zones = {k: v for k, v in act.items() if k.startswith("zone") and k.endswith("_seconds") and k[4:-8].isdigit()}
+        out[str(act["strava_id"])] = {
+            "zones": zones,
+            "hr_recovery": act.get("hr_recovery") or {},
+            "elapsed": act.get("elapsed_time_seconds"),
+        }
+    return out
 
 
 def _normalize(activity: dict, zone_data: dict = None, hr_recovery: dict = None) -> dict:
@@ -286,14 +320,26 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
         return None
     activities = _dedup(activities)
     enriched = []
+    stored = None  # read lazily: only a heart-rate activity needs it
     for a in activities:
         if a.get("start_date_local", "")[:10] != date_str:
             continue  # ±1-day window over-fetches by design; keep only this local date
         zone_data, hr_recovery = {}, {}
         if a.get("has_heartrate") and a.get("id"):
-            zone_data, secret = _fetch_activity_zones(str(a["id"]), secret)
+            if stored is None:
+                stored = _stored_enrichment(date_str)
+            prior = stored.get(str(a["id"])) or {}
+            # Reuse only what is stored AND was computed against the same duration.
+            reusable = bool(prior) and prior.get("elapsed") == a.get("elapsed_time")
+            if reusable and prior["zones"]:
+                zone_data = prior["zones"]
+            else:
+                zone_data, secret = _fetch_activity_zones(str(a["id"]), secret)
             if (a.get("elapsed_time") or 0) >= 600:
-                hr_recovery, secret = _fetch_activity_streams(str(a["id"]), secret)
+                if reusable and prior["hr_recovery"]:
+                    hr_recovery = prior["hr_recovery"]
+                else:
+                    hr_recovery, secret = _fetch_activity_streams(str(a["id"]), secret)
         enriched.append(_normalize(a, zone_data, hr_recovery if a.get("has_heartrate") else None))
     _secret_cache["secret"] = secret
     return {"activities": enriched} if enriched else None

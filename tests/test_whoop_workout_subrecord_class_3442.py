@@ -286,7 +286,9 @@ _WHOOP_CONSUMER_REGISTRY = {
     ),
     "lambdas/compute/circadian_compliance_lambda.py": (1, "non-member", "calc-proof verified non-member (explicit handling)"),
     "lambdas/compute/daily_insight_compute_lambda.py": (3, "non-member", "daily_* verified field-absent-safe (calc-proof non-member)"),
-    "lambdas/compute/daily_metrics_compute_lambda.py": (5, "non-member", "daily_* verified field-absent-safe (calc-proof non-member)"),
+    # #4999: 5 -> 4 — the 7-day HRV read is now sliced from the 30-day one (re-verified: hrv/resting_heart_rate are
+    # absent on WORKOUT# sub-records, so `hr_regime.baseline_values` skips them exactly as the old comprehension did).
+    "lambdas/compute/daily_metrics_compute_lambda.py": (4, "non-member", "daily_* verified field-absent-safe (calc-proof non-member)"),
     "lambdas/compute/dashboard_refresh_lambda.py": (1, "non-member", "fetch_date = exact-key day read"),
     "lambdas/compute/personal_baselines_lambda.py": (1, "non-member", "field-absent-safe per-field series extraction"),
     "lambdas/content/output_writers.py": (4, "non-member", "field-absent-safe extraction (calc-proof sweep)"),
@@ -325,7 +327,12 @@ _WHOOP_CONSUMER_REGISTRY = {
         "shared-guard",
         "filter_day_rows for avg_strain + #WORKOUT# rows by distinct id (#4629 — was a missed member, not a non-member) + #4627: the Zone 2 read hands rows to training.zone2_minutes.whoop_recordings, which keeps ONLY #WORKOUT# sub-rows, one per workout_id",
     ),
-    "mcp/tools_health.py": (2, "non-member", "field-absent-safe tool extraction"),
+    "mcp/tools_health.py": (
+        3,
+        "non-member",
+        "field-absent-safe tool extraction + #4978: the overnight-physiology baseline read keeps only rows carrying "
+        "respiratory_rate / skin_temp_celsius, which #WORKOUT# sub-rows never carry",
+    ),
     "mcp/tools_plan.py": (1, "shared-guard", "filter_day_rows on the readiness_floor whoop read (#4072)"),
     "mcp/tools_training.py": (
         2,

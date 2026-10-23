@@ -122,14 +122,22 @@ export function playerHTML(podcast, { held = false, caption = "" } = {}) {
 // take, with the caption that says whose week it is. null when the list has none (site-to-A
 // round 1, #4580 ST1: the only player was gated on the held episode, so no audio rendered
 // anywhere and every row linked a bare .mp3).
-export function newestEpisode(episodes) {
+// `chapterWeek` (the chapter the player sits under) and `held` (that chapter's own episode is
+// recorded and held): the weeks between the newest episode and the chapter that have no episode
+// are said, not left for the reader to notice (red team round 3, A-17: "The newest episode, for
+// week 4" under the Week 6 chapter never said weeks 5 and 6 had none).
+export function newestEpisode(episodes, { chapterWeek = null, held = false } = {}) {
   const eps = ((episodes && episodes.episodes) || []).filter((e) => e && e.url && e.title).sort((a, b) => String(b.date).localeCompare(String(a.date)));
   const e = eps[0];
   if (!e) return null;
   const mins = num(e.duration_sec) !== null ? Math.round(e.duration_sec / 60) : null;
   const week = num(e.week) !== null ? `, for week ${e.week}` : "";
   const guest = e.guest_name ? `: ${e.guest_name}` : "";
-  const caption = `The newest episode${week}${guest}${mins !== null ? ` · ${mins} min` : ""}.`;
+  const tail = `${week}${guest}${mins !== null ? ` · ${mins} min` : ""}.`;
+  const last = num(chapterWeek) !== null ? chapterWeek - (held ? 1 : 0) : null;
+  const gap = num(e.week) !== null && last !== null && last > e.week ? Array.from({ length: last - e.week }, (_, i) => e.week + 1 + i) : [];
+  const weeks = gap.length === 1 ? `week ${gap[0]}` : `weeks ${gap.slice(0, -1).join(", ")} and ${gap[gap.length - 1]}`;
+  const caption = gap.length ? `No episode yet for ${weeks}; the newest${tail}` : `The newest episode${tail}`;
   return { block: { state: "ok", data: { mp3_url: e.url, title: e.title, guest: e.guest_name || "", duration_minutes: mins } }, caption, episode: e };
 }
 
@@ -221,13 +229,25 @@ export function chapterHTML(block, nextBlock, { heading = "h1", player = true, l
   const nextLine = held ? (/draft (?:is|was) due/.test(held) ? "" : nextChapterLine(nextBlock).replace(/; it publishes once Matthew approves it\.$/, ".")) : nextChapterLine(nextBlock);
   // The front page runs one sentence of the chapter's own summary; Story runs it whole.
   const dek = player ? teaserText(c.dek) : summarySentence(c.dek) || c.dek;
+  // Red team round 3: B-03 — the chapter's date is its dateline, not the day it was written (the
+  // Week 6 chapter dated October 13 was written on the 14th and published on the 18th), so it is
+  // said as "Dated"; A-10 — "the record" is said plainly, what the devices and logs recorded.
+  const provenance = small(
+    fresh
+      ? `Dated ${shortDay(c.date)}. Written by AI from what the devices and logs recorded. Matthew reads each chapter before it publishes.`
+      : "Written by AI from what the devices and logs recorded. Matthew reads each chapter before it publishes.",
+  );
+  const dekHTML = dek ? `<p class="ck-premise ck-soft">${esc(dek)}</p>` : "";
+  // Story opens with his one sentence saying what the site is, then the chapter: its label, its
+  // title, how it was made, its dek (red team round 3, A-16: the first-person frame sat between the
+  // chapter's title and its byline, four registers in five lines). The byline stays above the dek:
+  // the AI label sits above the AI's words.
   return [
+    frame ? `<p class="ck-soft">${esc(frame)}</p>` : "",
     badge,
     `<${heading}>${esc(c.title)}</${heading}>`,
-    // Story opens on a chapter title, so one sentence says what the site is before the chapter does.
-    frame ? `<p class="ck-soft">${esc(frame)}</p>` : "",
-    small(fresh ? `Written by AI from the record on ${shortDay(c.date)}. Matthew reads each chapter before it publishes.` : "Written by AI from the record. Matthew reads each chapter before it publishes."),
-    dek ? `<p class="ck-premise ck-soft">${esc(dek)}</p>` : "",
+    provenance,
+    dekHTML,
     read || listen ? `<div class="ck-actions">${read}${listen}</div>` : "",
     // With this chapter's own episode held or not yet made, the newest published one plays here,
     // its caption naming its week; the held sentence then joins the line below instead of standing alone.
@@ -485,7 +505,7 @@ export const postsInOrder = (journal) => ((journal && journal.posts) || []).filt
 // second computation: the change is the chapter's, as written on its date.
 // Site-to-A round 1 (start:S6): each prologue says what it is, not one shared line.
 const PROLOGUE_LINES = [
-  [/Part I\b(?! ?I)/, "Who he was before the record."],
+  [/Part I\b(?! ?I)/, "Who he was before any of it was measured."],
   [/Part II\b/, "The plan, written before day one."],
 ];
 export const prologueLine = (p) => (PROLOGUE_LINES.find(([rx]) => rx.test(String(p.label || ""))) || [null, "Before day one."])[1];
@@ -500,8 +520,16 @@ export const servedChange = (statsLine) => {
 };
 export function chapterStatLine(p) {
   if (isPrologue(p)) return prologueLine(p);
-  const raw = lbText(String((p && p.stats_line) || "").split("|")[0].trim());
+  let raw = lbText(String((p && p.stats_line) || "").split("|")[0].trim());
   if (!raw) return "";
+  // Red team round 3 (A-11): an old-format stats line ("Weight: 305.4 lbs | Week Grade: …") is never
+  // printed as a form-field "Label:" fragment. A weight is said as the chapter's weight; any other
+  // labelled fragment is not printed (the producer's format is the Lambda lane's fix).
+  const labelled = /^([A-Za-z][A-Za-z ]*):\s*(.+)$/.exec(raw);
+  if (labelled) {
+    if (!/^weight$/i.test(labelled[1].trim()) || !/^\d+(?:\.\d+)? lb$/.test(labelled[2].trim())) return "";
+    raw = `${labelled[2].trim()} at the chapter`;
+  }
   const change = servedChange(raw);
   const line = raw.replace(SERVED_CHANGE, change ? `, ${change}` : "");
   return /[.!?]$/.test(line) ? line : `${line}.`;
@@ -549,9 +577,9 @@ export function episodeRowsHTML(episodes, { playing = "" } = {}) {
 // With no start or goal served, the frame is the series' own range, as a line alone. The ends of
 // the line are labelled under it, and the frame's two rules in one text line under those (round 2:
 // labels inside the drawing scaled with the viewBox and rendered at about 6 px on a phone).
-// "The top rule is 327.3 lb, the start; the dashed rule is 185 lb, the goal." — one line, so the
+// "The top line is 327.3 lb, the start; the dashed line is 185 lb, the goal." — one line, so the
 // near-flat trace reads against the whole distance, not as a chart that failed to move.
-export const chartFrameLine = (start, goal) => `The top rule is ${trim1(start)} lb, the start; the dashed rule is ${trim1(goal)} lb, the goal.`;
+export const chartFrameLine = (start, goal) => `The top line is ${trim1(start)} lb, the start; the dashed line is ${trim1(goal)} lb, the goal.`;
 export function chartHTML(weights, { sentence: withSentence = true, start = null, goal = null } = {}) {
   const pts = (weights || []).filter((w) => w && w.date && num(w.lbs) !== null).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   if (pts.length < 2) return "";
@@ -595,6 +623,7 @@ export function teamHTML(coachesBody, base = "", from = "", { startDate = "", as
   const n = (c) => (c.record && num(c.record.n)) || 0;
   const ordered = [...coaches].sort((a, b) => (b.tier === "lead") - (a.tier === "lead") || n(b) - n(a));
   const sittingOut = [];
+  const lagging = {};
   const rows = ordered
     .map((c) => {
       const job = COACH_JOBS[c.persona_id] || "";
@@ -604,7 +633,11 @@ export function teamHTML(coachesBody, base = "", from = "", { startDate = "", as
       // The sitting-out sentence goes under the list as one small line (#4580 C5): a four-line
       // job cell beside "1 of 7" broke the row and read as a contradiction.
       if (c.absent) {
-        sittingOut.push(`${c.name} is sitting out${c.reason ? `: ${String(c.reason).replace(ISO_RE, (iso) => shortDay(iso))}` : ""}${preStart ? ", before day one, so the calls counted here were checked on other readings" : ""}.`);
+        // Red team round 3 (A-26): the served "no sensor" names the coach's own device when the
+        // kit knows it, so a reader is not left to guess which sensor (the claim's scope is kept).
+        const device = SITTING_OUT_DEVICE[c.persona_id];
+        const reason = c.reason ? String(c.reason).replace(ISO_RE, (iso) => shortDay(iso)).replace(/^no sensor\b/, device ? `no ${device} reading` : "no sensor") : "";
+        sittingOut.push(`${c.name} is sitting out${reason ? `: ${reason}` : ""}${preStart ? ", before day one, so the calls counted here were checked on other readings" : ""}.`);
       }
       // One rule for every row (round 2: a bar on some rows and not others read as a ranking):
       // the count alone, never a bar — a coach's n is often under MIN_PERCENT_N. A coach with
@@ -614,8 +647,9 @@ export function teamHTML(coachesBody, base = "", from = "", { startDate = "", as
       let why = "";
       if (r && num(r.n) !== null && r.n > 0) {
         record = `${r.confirmed} of ${r.n}`;
-        const through = r.through && asOf && r.through < asOf ? shortDay(r.through) : "";
-        if (through) record += `<br><span class="ck-small">through ${esc(through)}</span>`;
+        // Red team round 3 (A-25): a lagging record's day is said once in a note under the list,
+        // grouped by day, not as an orphan "through October 14" line in each record cell.
+        if (r.through && asOf && r.through < asOf && shortDay(r.through)) (lagging[r.through] = lagging[r.through] || []).push(c.name);
       } else {
         why = c.headline_stat && !/\d/.test(String(c.headline_stat)) ? `; ${String(c.headline_stat).trim()}, so no checked calls` : "; no checked calls";
       }
@@ -624,8 +658,18 @@ export function teamHTML(coachesBody, base = "", from = "", { startDate = "", as
       return `<li><span class="ck-coach__name">${name}</span><span class="ck-coach__job">${esc(jobLine)}</span><span class="ck-coach__record">${record}</span></li>`;
     })
     .join("");
-  return `<ul class="ck-coach ck-coach--record">${rows}</ul>${sittingOut.map(small).join("")}`;
+  const and = (names) => (names.length < 2 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
+  const days = Object.keys(lagging).sort().reverse();
+  const counted = (n) => ordered.filter((c) => c.record && num(c.record.n) !== null && c.record.n > 0).length === n;
+  const lagLine = !days.length
+    ? ""
+    : days.length === 1 && counted(lagging[days[0]].length)
+      ? `Every record above is counted through ${shortDay(days[0])}.`
+      : `${days.map((d, i) => `${i ? "through" : "Counted through"} ${shortDay(d)}: ${and(lagging[d])}`).join("; ")}.`;
+  return `<ul class="ck-coach ck-coach--record">${rows}</ul>${lagLine ? small(lagLine) : ""}${sittingOut.map(small).join("")}`;
 }
+// The device a sitting-out coach reads, named in the served "no sensor since ..." (A-26).
+const SITTING_OUT_DEVICE = { glucose_coach: "glucose monitor" };
 // "Next to settle: Nathan Reeves’s call on protein, Thursday, October 29." — the earliest pending
 // call due on or after the page's day, from GET /api/predictions (#4580 C6: the page ended with
 // no date to come back for). "" when nothing is pending or the route is not served.
@@ -745,8 +789,9 @@ export function frontSlots(edition, b, base = "/") {
     // Round 8b: every number on the first screen is a door — the record to the coaches, the
     // weight to its trend. A failed block prints its own sentence, with no door.
     "ck-record": recordHTML(b.record, { href: `${base}coaches/` }),
-    // No weigh-in in the window draws no picture; the slot then says so (#4586 box 2).
-    "ck-mark": F.markHTML(usable(b.week) ? b.week.data.weight_series : null, e.as_of, t.start_weight_lbs, t.goal_weight_lbs) || soft(usable(b.week) ? "No weigh-in in the last 28 days." : (b.week && b.week.absent_text) || "The weigh-ins are not served right now."),
+    // No weigh-in in the year frame draws no picture; the slot then says so (#4586 box 2).
+    // The frame starts on the experiment's first day, as the today block serves it (#4646 C).
+    "ck-mark": F.markHTML(usable(b.week) ? b.week.data.weight_series : null, e.as_of, t.start_weight_lbs, t.goal_weight_lbs, { startIso: t.start_date }) || soft(usable(b.week) ? "No weigh-in since the start." : (b.week && b.week.absent_text) || "The weigh-ins are not served right now."),
     "ck-mark-caption": F.markCaption(b.today, e) ? `<a href="${esc(base)}trend/?m=weight">${F.markCaption(b.today, e)}</a>` : esc((b.today && b.today.absent_text) || ""),
     ...words,
     // The argument: the open bet is the edition's; the lines come in mountFront from the
@@ -791,9 +836,22 @@ export function weekNextLine(nextBlock, asOf = "", chapterBlock = null) {
   const day = dayInWords(iso);
   return day ? `Next: the chapter draft ${day}; the numbers every Sunday.` : "";
 }
+// Which record "his own words" is counted from (red team round 3, B-07): a coach on the day page can
+// count days since the JOURNAL, while this block reads his replies and his notes on the plan
+// (`/api/owner_words`, `/api/decisions` — site_api_edition._his_words). Two records, two silences:
+// the absence line names its own so the two dates do not read as one record contradicting itself.
+const WORDS_SOURCES = new Set(["/api/owner_words", "/api/decisions"]);
+export function wordsSourceNote(block) {
+  const src = block && block.source;
+  const list = Array.isArray(src) ? src : [src];
+  return list.length && list.every((x) => WORDS_SOURCES.has(x)) ? "Counted from his replies and his notes on the plan, not the journal." : "";
+}
 export function weekSlots(edition, b, base = "/") {
   const span = F.weekSpan(b.week);
-  const words = hisWordsFresh(b.his_words) ? { "ck-words": hisWordsHTML(b.his_words), "ck-words-absent": null } : { "ck-words": null, "ck-words-absent": esc((b.his_words && b.his_words.absent_text) || "") };
+  const absentText = String((b.his_words && b.his_words.absent_text) || "");
+  const quiet = absentText && b.his_words && (b.his_words.state === "stale" || b.his_words.state === "absent");
+  const absentWords = quiet ? [absentText, wordsSourceNote(b.his_words)].filter(Boolean).join(" ") : absentText;
+  const words = hisWordsFresh(b.his_words) ? { "ck-words": hisWordsHTML(b.his_words), "ck-words-absent": null } : { "ck-words": null, "ck-words-absent": esc(absentWords) };
   return {
     "ck-week-label": esc(span ? `This week · ${span}` : "This week"),
     // #4595: the served scorecard (one written rule per area, decided in code) when the edition
@@ -951,10 +1009,27 @@ async function mountWeek(edition, b) {
   if (transcript) fill("ck-quotes", F.quotesHTML(b.chapter, transcript, base));
 }
 
+// Start's numbers under the approved opening (red team round 3, A-12: the page's first goal
+// number was the chart caption's): "From 327.3 lb toward 185, since September 6. Day 43: 302.2 lb."
+// Every number is served (the edition's today block and day count); "" unless start, goal and
+// the current weight are all served.
+export function startNumbersLine(t, edition) {
+  const [start, goal, now] = [num(t && t.start_weight_lbs), num(t && t.goal_weight_lbs), num(t && t.weight_lbs)];
+  if (start === null || goal === null || now === null) return "";
+  const since = shortDay(t.start_date);
+  // The day count is the edition's, so it labels the weigh-in only when the weigh-in is that day's.
+  const sameDay = edition && t.date && t.date === edition.as_of;
+  const dayN = sameDay && num(edition.day_n) !== null && edition.day_n >= 1 ? `Day ${edition.day_n}` : "";
+  const when = dayN || (shortDay(t.date) ? `On ${shortDay(t.date)}` : "Latest");
+  return `From ${fmt1(start)} lb toward ${trim1(goal)}${since ? `, since ${since}` : ""}. ${when}: ${fmt1(now)} lb.`;
+}
 async function mountStart(edition, b) {
   const [journal, timeline] = await Promise.all([tryJSON("/journal/posts.json"), tryJSON("/api/timeline")]);
   const allWeights = timeline && timeline.timeline && timeline.timeline.weights;
   const t = usable(b.today) ? b.today.data : {};
+  const numbers = startNumbersLine(t, edition);
+  if (numbers) fill("ck-start-line", esc(numbers));
+  else document.getElementById("ck-start-line")?.remove();
   fill("ck-recap", recapHTML(postsInOrder(journal)) || soft("The chapters are not served right now."));
   // The same series the front page's mark draws (the edition's weigh-ins) in the same frame (start
   // to goal); the timeline's weights stand in when the edition's week block is not served.
@@ -982,18 +1057,22 @@ const chapterNextLine = (nextBlock, chapterBlock = null) => {
 const startLbOf = (b) => (usable(b.today) ? num(b.today.data.start_weight_lbs) : null);
 // The one-line frame the front page opens with, said once under Story's chapter title (#4580 ST10:
 // the page opened on a chapter title with no sentence saying what the site is).
-export const STORY_FRAME = "I’m trying to get from 327 pounds to 185, in public. A team of AI coaches I built predicts how it will go, and code checks every call.";
+// Red team round 3 (A-15/A-27): the frame is the owner-approved premise (#4590) word for word, the
+// front page's own sentence (site/next/v8/index.html .ck-premise), not a shortened variant of it.
+export const STORY_FRAME = "I’m Matthew. I’m trying to get from 327 pounds to 185 and to get my life back with it, in public, because I do better when someone is watching. A team of AI coaches I built predicts how it will go, and code checks every call.";
 // Story's lead: the latest chapter, its served held state, the podcast's hold (the newest published
 // episode plays when this chapter's own is held) and the frame sentence; the teaser is the
 // chapter's dek as served. Pure, for tests/js/ck_red_team_4586.test.mjs.
 export function storyChapterHTML(edition, b, journal, episodes) {
   const c = usable(b.chapter) ? b.chapter.data : null;
+  const chapterWeek = c ? weekNumberOf(c.week_label) : null;
+  const podHeld = c ? podcastHeld(episodes, chapterWeek) : false;
   return chapterHTML(b.chapter, b.next, {
     held: heldChapterLine(b.chapter, edition, journal, b.next),
-    podcastHeld: c ? podcastHeld(episodes, weekNumberOf(c.week_label)) : false,
+    podcastHeld: podHeld,
     asOf: (edition && edition.as_of) || "",
     frame: STORY_FRAME,
-    fallbackPlayer: newestEpisode(episodes),
+    fallbackPlayer: newestEpisode(episodes, { chapterWeek, held: podHeld }),
   });
 }
 async function mountStory(edition, b) {

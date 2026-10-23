@@ -10,23 +10,19 @@ Exports:
   _section_error_html()  — graceful section error placeholder
 """
 
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G
-from common.digest_utils import compute_confidence
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_PROTEIN_MIN_G
+from common.digest_utils import compute_confidence, safe_float  # safe_float: shared bundled helper (#970; the local d2f copy was unused)
+from common.habit_registry import habit_tier  # #5232
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.pacific_time import day_in_words, shift_day_key  # #4182: dates in words, one PT spelling
+from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 from health.scoring_engine import habitify_reading  # #4362
 
-_HAS_CONFIDENCE = True
+from content.brief_format import esc, supplement_timing_label, supplement_timing_order, v2_coach_header_titles, weather_context_cells
 
 # ==============================================================================
 # INLINE UTILITIES (tiny — avoids import dependency on daily_brief_lambda)
 # ==============================================================================
-
-
-from common.digest_utils import safe_float  # shared bundled helpers (#970; the local d2f copy was unused)
-
-from content.brief_format import esc, supplement_timing_label, supplement_timing_order, v2_coach_header_titles, weather_context_cells
-
 # S2-T1-10 Weekly Habit Review — compute + render live in their own module (#1654 shape).
 # Re-exported here because `daily_brief_lambda` and the behavior suite both reach for
 # `html_builder._compute_weekly_habit_review`.
@@ -626,7 +622,7 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
         tier0_status = tier_status.get(0, tier_status.get("0", {}))
         registry = profile.get("habit_registry", {})
 
-        tier0_names = [n for n, m in registry.items() if m.get("tier") == 0 and m.get("status") == "active"]
+        tier0_names = [n for n, m in registry.items() if habit_tier(m) == 0 and m.get("status") == "active"]
         if not tier0_names:
             tier0_names = list(profile.get("mvp_habits", []))
 
@@ -765,12 +761,12 @@ def _habits_deep_dive(data, profile):
             ("TIER 1 — HIGH PRIORITY", 1, "#f59e0b"),
             ("TIER 2 — GOOD TO DO", 2, "#64748b"),
         ]:
-            tier_habits = [(n, m) for n, m in registry.items() if m.get("tier", 2) == tier_num and m.get("status") == "active"]
+            tier_habits = [(n, m) for n, m in registry.items() if habit_tier(m) == tier_num and m.get("status") == "active"]
             if not tier_habits:
                 continue
             out += '<p style="color:' + tier_color + ';font-size:9px;margin:8px 0 4px;font-weight:700;">' + tier_label + "</p>"
             for h_name, meta in sorted(tier_habits, key=lambda x: x[0]):
-                done = habitify_reading(h_map, h_name, meta, h_statuses)  # #4362/#4632: by vendor id, names as aliases
+                done = habitify_reading(h_map, h_name, meta, h_statuses, habitify.get("date"))  # #4362/#4632/#5007
                 completed = done is not None and done >= 1
                 icon = "✅" if completed else ("·" if done is None else "❌")
                 why = meta.get("why_matthew", "")
@@ -791,7 +787,7 @@ def _habits_deep_dive(data, profile):
             sg = meta.get("synergy_group")
             if not sg:
                 continue
-            if (done := habitify_reading(h_map, h_name, meta, h_statuses)) is not None and done < 1:  # #4362/#4632
+            if (done := habitify_reading(h_map, h_name, meta, h_statuses, habitify.get("date"))) is not None and done < 1:  # #4362/#4632
                 synergy_misses.setdefault(sg, []).append(h_name)
         for sg, misses in synergy_misses.items():
             total = sum(1 for _, m in registry.items() if m.get("synergy_group") == sg and m.get("status") == "active")
@@ -984,7 +980,7 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
         carbs = safe_float(mf, "total_carbs_g")
         fiber = safe_float(mf, "total_fiber_g")
 
-        cal_target = PLAN_DAILY_CALORIES_TARGET
+        cal_target = target_kcal(data.get("date"))
         protein_target = PLAN_DAILY_PROTEIN_MIN_G
 
         if cals is not None:
@@ -995,7 +991,7 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
 
             out += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">'
             macro_items = [
-                ("Calories", fmt_num(cals), "/" + str(cal_target), cal_color),
+                ("Calories", fmt_num(cals), "/" + str(cal_target or "—"), cal_color),
                 ("Protein", str(round(protein)) + "g" if protein else "—", "/" + str(protein_target) + "g", prot_color),
                 ("Fat", str(round(fat)) + "g" if fat else "—", "", "#94a3b8"),
                 ("Carbs", str(round(carbs)) + "g" if carbs else "—", "", "#94a3b8"),
@@ -1914,27 +1910,22 @@ def build_html(
     budget_headroom_line=None,
     intake_line=None,
     journal_coach_absent=False,
+    steps_line=None,
 ):
     """Build the full daily brief HTML email.
 
     triggered_rewards and protocol_recs are pre-computed by lambda_handler
     (extracted from _evaluate_rewards_brief / _get_protocol_recs_brief in output_writers.py).
 
-    intake_line (#1405): the pre-formatted private intake-ledger line from
-    intake_response.brief_line() — n + CI per ADR-105, or arming progress. The
-    brief is Matthew-private; this line must never reach a public surface.
+    intake_line (#1405: intake_response.brief_line, n + CI per ADR-105) and steps_line (#5056) are pre-formatted
+    Matthew-private one-liners; they must never reach a public surface.
     """
-
     date_str = data["date"]
-    # #4182: the H1 names the morning the brief is read (the data day + 1, the subject
-    # line's day); the freshness line under it names the data day. Both in words.
+    # #4182: the H1 names the morning the brief is read (data day + 1); the freshness line names the data day.
     day_label = day_in_words(shift_day_key(date_str, 1))
 
     # Defaults
-    if triggered_rewards is None:
-        triggered_rewards = []
-    if protocol_recs is None:
-        protocol_recs = []
+    triggered_rewards, protocol_recs = triggered_rewards or [], protocol_recs or []
 
     # Adaptive mode banner colour
     banner_color = "#1a1a2e"
@@ -1967,6 +1958,8 @@ def build_html(
         journal_coach_absent=journal_coach_absent,
     )
     # #1405: private intake-ledger line — quiet, above the footer, never scolding.
+    if steps_line:  # #5056: the day's steps floor/target, owner-only
+        html += '<div style="padding:4px 24px 4px;"><p style="font-size:12px;color:#475569;margin:0;">👣 ' + steps_line + "</p></div>"
     if intake_line:
         html += '<div style="padding:4px 24px 12px;"><p style="font-size:12px;color:#475569;margin:0;">🌙 ' + intake_line + "</p></div>"
     html += _brief_footer(compute_age_msg, compute_stale, data, date_str, budget_headroom_line=budget_headroom_line)

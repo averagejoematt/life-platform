@@ -1,0 +1,1688 @@
+{
+ "case_id": "neg_scheduled_deload",
+ "constraint_block": {
+  "accessory_rotation_ok": true,
+  "deload_recommendation": {
+   "active": false,
+   "applied": false,
+   "applied_on": null,
+   "reasons": [],
+   "triggers_wired": [
+    "rpe_drift",
+    "recovery"
+   ]
+  },
+  "progression": {
+   "gain_rule": {
+    "kind": "double_progression"
+   },
+   "stall_rule": {
+    "verdict": "step_due"
+   }
+  },
+  "steps_ramp": {
+   "floor": 12000,
+   "state": "ramping"
+  },
+  "tripwires": [
+   {
+    "id": "anchor_lift_strength_drop",
+    "state": "clear"
+   },
+   {
+    "id": "readiness_floor",
+    "state": "clear"
+   },
+   {
+    "id": "protein_floor_missed",
+    "state": "clear"
+   },
+   {
+    "id": "weight_stall_with_adherence",
+    "state": "clear"
+   }
+  ]
+ },
+ "expect_fail": [
+  "rp_israetel.no_unrecorded_deload",
+  "clinical_exercise_physiologist.no_auto_deload"
+ ],
+ "kind": "negative_control",
+ "routines": [
+  {
+   "archetype": "upper-heavy",
+   "exercises": [
+    {
+     "movement_key": "barbell_bench_press",
+     "notes": "RPE 8 on the top set; 2 back-off sets at RPE 8.",
+     "rationale_tag": "",
+     "rest_seconds": 180,
+     "sets": [
+      {
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 41.96
+      },
+      {
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 41.96
+      },
+      {
+       "rep_range_end": 8,
+       "rep_range_start": 6,
+       "type": "normal",
+       "weight_kg": 83.91
+      },
+      {
+       "rep_range_end": 8,
+       "rep_range_start": 6,
+       "type": "normal",
+       "weight_kg": 83.91
+      },
+      {
+       "rep_range_end": 8,
+       "rep_range_start": 6,
+       "type": "normal",
+       "weight_kg": 83.91
+      }
+     ]
+    },
+    {
+     "movement_key": "t_bar_row",
+     "notes": "RPE 8; chest on the pad, full stretch at the bottom.",
+     "rationale_tag": "",
+     "rest_seconds": 150,
+     "sets": [
+      {
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 30.62
+      },
+      {
+       "rep_range_end": 10,
+       "rep_range_start": 6,
+       "type": "normal",
+       "weight_kg": 61.23
+      },
+      {
+       "rep_range_end": 10,
+       "rep_range_start": 6,
+       "type": "normal",
+       "weight_kg": 61.23
+      },
+      {
+       "rep_range_end": 10,
+       "rep_range_start": 6,
+       "type": "normal",
+       "weight_kg": 61.23
+      }
+     ]
+    },
+    {
+     "movement_key": "pull_up_assisted",
+     "notes": "RPE 8; 50 lb assistance.",
+     "rationale_tag": "",
+     "rest_seconds": 120,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": null
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": null
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ]
+    },
+    {
+     "movement_key": "cable_tricep_pushdown",
+     "notes": "RPE 9 on the last set.",
+     "rationale_tag": "",
+     "rest_seconds": 90,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 27.22
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 27.22
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 27.22
+      }
+     ]
+    },
+    {
+     "movement_key": "lateral_raise_machine",
+     "notes": "RPE 9 on the last set.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 18.14
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 18.14
+      }
+     ]
+    },
+    {
+     "movement_key": "face_pull",
+     "notes": "RPE 8; pull to the forehead, thumbs back.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 22.68
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 22.68
+      }
+     ]
+    },
+    {
+     "movement_key": "shrug_dumbbell",
+     "notes": "RPE 8; 1 s hold at the top.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 31.75
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 31.75
+      }
+     ]
+    },
+    {
+     "movement_key": "standing_calf_raise_machine",
+     "notes": "RPE 9; 2 s pause in the stretch.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 63.5
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 63.5
+      }
+     ]
+    },
+    {
+     "movement_key": "cable_pallof_press",
+     "notes": "RPE 7; anti-rotation, each side.",
+     "rationale_tag": "",
+     "rest_seconds": 60,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 13.61
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 13.61
+      }
+     ]
+    },
+    {
+     "movement_key": "treadmill",
+     "notes": "Easy incline walk: 10% incline, 3.0 mph, RPE 4-5, full sentences.",
+     "rationale_tag": "",
+     "rest_seconds": null,
+     "sets": [
+      {
+       "duration_seconds": 1200,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "inputs_snapshot": {
+    "calendar": {
+     "session_role": "Upper-heavy"
+    },
+    "load_floors": {
+     "movements": {
+      "barbell_bench_press": {
+       "progression": {
+        "basis": "step",
+        "reason": "+5 lb: two top sets at 8 reps (top of 6-8), RPE <= 8"
+       },
+       "status": "applied"
+      },
+      "cable_pallof_press": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 30 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "cable_tricep_pushdown": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 60 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "face_pull": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 50 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "lateral_raise_machine": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 40 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "pull_up_assisted": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 0 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "shrug_dumbbell": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 70 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "standing_calf_raise_machine": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 140 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "t_bar_row": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 135 lb: top set short of 10 reps on the last exposure"
+       },
+       "status": "applied"
+      }
+     },
+     "status": "applied"
+    }
+   },
+   "notes": "",
+   "routine_id": "golden-5072-0",
+   "status": "active",
+   "target_date": "2026-10-19",
+   "title": "Upper-heavy",
+   "variant": "ideal"
+  },
+  {
+   "archetype": "lower-heavy",
+   "exercises": [
+    {
+     "movement_key": "hack_squat_machine",
+     "notes": "RPE 8 on the top set.",
+     "rationale_tag": "",
+     "rest_seconds": 180,
+     "sets": [
+      {
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 40.82
+      },
+      {
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 40.82
+      },
+      {
+       "rep_range_end": 8,
+       "rep_range_start": 6,
+       "type": "normal",
+       "weight_kg": 81.65
+      },
+      {
+       "rep_range_end": 8,
+       "rep_range_start": 6,
+       "type": "normal",
+       "weight_kg": 81.65
+      },
+      {
+       "rep_range_end": 8,
+       "rep_range_start": 6,
+       "type": "normal",
+       "weight_kg": 81.65
+      }
+     ]
+    },
+    {
+     "movement_key": "romanian_deadlift_dumbbell",
+     "notes": "RPE 8; slow eccentric into the hamstring stretch.",
+     "rationale_tag": "",
+     "rest_seconds": 150,
+     "sets": [
+      {
+       "rep_range_end": 10,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": 27.22
+      },
+      {
+       "rep_range_end": 10,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": 27.22
+      },
+      {
+       "rep_range_end": 10,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": 27.22
+      }
+     ]
+    },
+    {
+     "movement_key": "bulgarian_split_squat_dumbbell",
+     "notes": "RPE 8 each leg.",
+     "rationale_tag": "",
+     "rest_seconds": 120,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": 13.61
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": 13.61
+      }
+     ]
+    },
+    {
+     "movement_key": "machine_hip_thrust",
+     "notes": "RPE 8; 1 s squeeze at the top.",
+     "rationale_tag": "",
+     "rest_seconds": 120,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": 81.65
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": 81.65
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": 81.65
+      }
+     ]
+    },
+    {
+     "movement_key": "lying_leg_curl_machine",
+     "notes": "RPE 9 on the last set.",
+     "rationale_tag": "",
+     "rest_seconds": 90,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 40.82
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 40.82
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 40.82
+      }
+     ]
+    },
+    {
+     "movement_key": "db_rear_delt_rows",
+     "notes": "RPE 8.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 11.34
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 11.34
+      }
+     ]
+    },
+    {
+     "movement_key": "shrug_machine",
+     "notes": "RPE 8.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 63.5
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 63.5
+      }
+     ]
+    },
+    {
+     "movement_key": "seated_calf_raise",
+     "notes": "RPE 9.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 40.82
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 40.82
+      }
+     ]
+    },
+    {
+     "movement_key": "dead_bug",
+     "notes": "RPE 7; slow, low back flat.",
+     "rationale_tag": "",
+     "rest_seconds": 60,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": null
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ]
+    },
+    {
+     "movement_key": "farmers_walk",
+     "notes": "Farmer carry 40 m per round, RPE 7, tall posture.",
+     "rationale_tag": "",
+     "rest_seconds": 60,
+     "sets": [
+      {
+       "duration_seconds": 40,
+       "reps": 1,
+       "type": "normal",
+       "weight_kg": 31.75
+      },
+      {
+       "duration_seconds": 40,
+       "reps": 1,
+       "type": "normal",
+       "weight_kg": 31.75
+      }
+     ]
+    },
+    {
+     "movement_key": "cycling",
+     "notes": "Easy recumbent bike after the lower day: level 6, 80 rpm, RPE 4, full sentences.",
+     "rationale_tag": "",
+     "rest_seconds": null,
+     "sets": [
+      {
+       "duration_seconds": 900,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "inputs_snapshot": {
+    "calendar": {
+     "session_role": "Lower-heavy"
+    },
+    "load_floors": {
+     "movements": {
+      "bulgarian_split_squat_dumbbell": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 30 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "db_rear_delt_rows": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 25 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "dead_bug": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 0 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "farmers_walk": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 70 lb per hand: 40 m clean on every carry last week"
+       },
+       "status": "applied"
+      },
+      "hack_squat_machine": {
+       "progression": {
+        "basis": "step",
+        "reason": "+5 lb: two top sets at 8 reps (top of 6-8), RPE <= 8"
+       },
+       "status": "applied"
+      },
+      "lying_leg_curl_machine": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 90 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "machine_hip_thrust": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 180 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "romanian_deadlift_dumbbell": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 60 lb: top set short of 10 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "seated_calf_raise": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 90 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "shrug_machine": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 140 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      }
+     },
+     "status": "applied"
+    }
+   },
+   "notes": "",
+   "routine_id": "golden-5072-1",
+   "status": "active",
+   "target_date": "2026-10-20",
+   "title": "Lower-heavy",
+   "variant": "ideal"
+  },
+  {
+   "archetype": "shoulders_arms",
+   "exercises": [
+    {
+     "movement_key": "machine_shoulder_press",
+     "notes": "RPE 8 on the top set.",
+     "rationale_tag": "",
+     "rest_seconds": 180,
+     "sets": [
+      {
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 24.95
+      },
+      {
+       "rep_range_end": 10,
+       "rep_range_start": 6,
+       "type": "normal",
+       "weight_kg": 49.9
+      }
+     ]
+    },
+    {
+     "movement_key": "chin_up_assisted",
+     "notes": "RPE 8; 40 lb assistance, full hang at the bottom.",
+     "rationale_tag": "",
+     "rest_seconds": 120,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": null
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ]
+    },
+    {
+     "movement_key": "lateral_raise_machine",
+     "notes": "RPE 9 on the last set.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 18.14
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 18.14
+      }
+     ]
+    },
+    {
+     "movement_key": "seated_incline_curl_dumbbell",
+     "notes": "RPE 9 on the last set; full stretch at the bottom.",
+     "rationale_tag": "",
+     "rest_seconds": 90,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": 11.34
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": 11.34
+      }
+     ]
+    },
+    {
+     "movement_key": "triceps_extension_machine",
+     "notes": "RPE 9 on the last set; deep stretch overhead.",
+     "rationale_tag": "",
+     "rest_seconds": 90,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 31.75
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 31.75
+      }
+     ]
+    },
+    {
+     "movement_key": "bicep_curl_machine",
+     "notes": "RPE 9 on the last set.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 27.22
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 27.22
+      }
+     ]
+    },
+    {
+     "movement_key": "cable_tricep_pushdown",
+     "notes": "RPE 9 on the last set.",
+     "rationale_tag": "",
+     "rest_seconds": 90,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 27.22
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 27.22
+      }
+     ]
+    },
+    {
+     "movement_key": "shrug_dumbbell",
+     "notes": "RPE 8.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 31.75
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 31.75
+      }
+     ]
+    },
+    {
+     "movement_key": "calf_raise_machine",
+     "notes": "RPE 9.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 81.65
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 81.65
+      }
+     ]
+    },
+    {
+     "movement_key": "dead_bug",
+     "notes": "RPE 7; slow, low back flat.",
+     "rationale_tag": "",
+     "rest_seconds": 60,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": null
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ]
+    },
+    {
+     "movement_key": "treadmill",
+     "notes": "Hills: incline 4% to 10% and back down in 2-min steps at 3.2 mph, RPE 6-7, short phrases on the climbs.",
+     "rationale_tag": "",
+     "rest_seconds": null,
+     "sets": [
+      {
+       "duration_seconds": 1500,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "inputs_snapshot": {
+    "calendar": {
+     "session_role": "Shoulders+arms"
+    },
+    "deload": {
+     "applied": true,
+     "source": "week_6_schedule"
+    },
+    "load_floors": {
+     "movements": {
+      "bicep_curl_machine": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 60 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "cable_tricep_pushdown": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 60 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "calf_raise_machine": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 180 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "chin_up_assisted": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 0 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "dead_bug": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 0 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "lateral_raise_machine": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 40 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "machine_shoulder_press": {
+       "progression": {
+        "basis": "step",
+        "reason": "+5 lb: two top sets at 10 reps (top of 6-10), RPE <= 8"
+       },
+       "status": "applied"
+      },
+      "seated_incline_curl_dumbbell": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 25 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "shrug_dumbbell": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 70 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "triceps_extension_machine": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 70 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      }
+     },
+     "status": "applied"
+    }
+   },
+   "notes": "Week 6: scheduled deload, sets -40%.",
+   "routine_id": "golden-5072-2",
+   "status": "active",
+   "target_date": "2026-10-21",
+   "title": "Shoulders+arms",
+   "variant": "deload"
+  },
+  {
+   "archetype": "upper-volume",
+   "exercises": [
+    {
+     "movement_key": "incline_db_press",
+     "notes": "RPE 8; upper chest, deep stretch at the bottom.",
+     "rationale_tag": "",
+     "rest_seconds": 150,
+     "sets": [
+      {
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 13.61
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": 27.22
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": 27.22
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": 27.22
+      }
+     ]
+    },
+    {
+     "movement_key": "lat_pulldown_machine",
+     "notes": "RPE 8; full stretch overhead.",
+     "rationale_tag": "",
+     "rest_seconds": 120,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 63.5
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 63.5
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 63.5
+      }
+     ]
+    },
+    {
+     "movement_key": "db_chest_supported_rows",
+     "notes": "RPE 8.",
+     "rationale_tag": "",
+     "rest_seconds": 120,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 22.68
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 22.68
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 22.68
+      }
+     ]
+    },
+    {
+     "movement_key": "chest_fly_machine",
+     "notes": "RPE 9 on the last set.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 40.82
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 40.82
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 40.82
+      }
+     ]
+    },
+    {
+     "movement_key": "db_curl",
+     "notes": "RPE 9 on the last set.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 13.61
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 13.61
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 13.61
+      }
+     ]
+    },
+    {
+     "movement_key": "lateral_raise_machine",
+     "notes": "RPE 9 on the last set.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 18.14
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 18.14
+      }
+     ]
+    },
+    {
+     "movement_key": "machine_row",
+     "notes": "RPE 8; full stretch forward.",
+     "rationale_tag": "",
+     "rest_seconds": 90,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 54.43
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 54.43
+      }
+     ]
+    },
+    {
+     "movement_key": "shrug_dumbbell",
+     "notes": "RPE 8.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 31.75
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 31.75
+      }
+     ]
+    },
+    {
+     "movement_key": "standing_calf_raise_machine",
+     "notes": "RPE 9.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 63.5
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 63.5
+      }
+     ]
+    },
+    {
+     "movement_key": "machine_crunch",
+     "notes": "RPE 8.",
+     "rationale_tag": "",
+     "rest_seconds": 60,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 31.75
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 31.75
+      }
+     ]
+    },
+    {
+     "movement_key": "rowing_machine",
+     "notes": "Intervals: 5 x 2 min hard at damper 6, 26 spm, RPE 8 / 2 min easy, a few words on the hard minutes.",
+     "rationale_tag": "",
+     "rest_seconds": null,
+     "sets": [
+      {
+       "duration_seconds": 1200,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "inputs_snapshot": {
+    "calendar": {
+     "session_role": "Upper-volume"
+    },
+    "load_floors": {
+     "movements": {
+      "chest_fly_machine": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 90 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "db_chest_supported_rows": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 50 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "db_curl": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 30 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "incline_db_press": {
+       "progression": {
+        "basis": "step",
+        "reason": "+5 lb: two top sets at 12 reps (top of 8-12), RPE <= 8"
+       },
+       "status": "applied"
+      },
+      "lat_pulldown_machine": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 140 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "lateral_raise_machine": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 40 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "machine_crunch": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 70 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "machine_row": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 120 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "shrug_dumbbell": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 70 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "standing_calf_raise_machine": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 140 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      }
+     },
+     "status": "applied"
+    }
+   },
+   "notes": "",
+   "routine_id": "golden-5072-3",
+   "status": "active",
+   "target_date": "2026-10-22",
+   "title": "Upper-volume",
+   "variant": "ideal"
+  },
+  {
+   "archetype": "lower-volume",
+   "exercises": [
+    {
+     "movement_key": "leg_press_horizontal_machine",
+     "notes": "RPE 8 on the top set.",
+     "rationale_tag": "",
+     "rest_seconds": 150,
+     "sets": [
+      {
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 61.23
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 122.47
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 122.47
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 122.47
+      }
+     ]
+    },
+    {
+     "movement_key": "hip_thrust_barbell",
+     "notes": "RPE 8; 1 s squeeze at the top.",
+     "rationale_tag": "",
+     "rest_seconds": 150,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": 83.91
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": 83.91
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 8,
+       "type": "normal",
+       "weight_kg": 83.91
+      }
+     ]
+    },
+    {
+     "movement_key": "reverse_lunge_dumbbell",
+     "notes": "RPE 8 each leg.",
+     "rationale_tag": "",
+     "rest_seconds": 90,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 13.61
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 13.61
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 13.61
+      }
+     ]
+    },
+    {
+     "movement_key": "leg_extension_machine",
+     "notes": "RPE 9 on the last set.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 40.82
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 40.82
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 40.82
+      }
+     ]
+    },
+    {
+     "movement_key": "lying_leg_curl_machine",
+     "notes": "RPE 9 on the last set.",
+     "rationale_tag": "",
+     "rest_seconds": 90,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 40.82
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 40.82
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 40.82
+      }
+     ]
+    },
+    {
+     "movement_key": "lateral_raise_machine",
+     "notes": "RPE 9.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 18.14
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 18.14
+      }
+     ]
+    },
+    {
+     "movement_key": "shrug_dumbbell",
+     "notes": "RPE 8.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 31.75
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 31.75
+      }
+     ]
+    },
+    {
+     "movement_key": "seated_calf_raise",
+     "notes": "RPE 9.",
+     "rationale_tag": "",
+     "rest_seconds": 75,
+     "sets": [
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 40.82
+      },
+      {
+       "rep_range_end": 15,
+       "rep_range_start": 12,
+       "type": "normal",
+       "weight_kg": 40.82
+      }
+     ]
+    },
+    {
+     "movement_key": "cable_pallof_press",
+     "notes": "RPE 7; anti-rotation, each side.",
+     "rationale_tag": "",
+     "rest_seconds": 60,
+     "sets": [
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 13.61
+      },
+      {
+       "rep_range_end": 12,
+       "rep_range_start": 10,
+       "type": "normal",
+       "weight_kg": 13.61
+      }
+     ]
+    },
+    {
+     "movement_key": "suitcase_carry",
+     "notes": "Suitcase carry 40 m each side, RPE 7, no lean.",
+     "rationale_tag": "",
+     "rest_seconds": 60,
+     "sets": [
+      {
+       "duration_seconds": 40,
+       "reps": 1,
+       "type": "normal",
+       "weight_kg": 22.68
+      },
+      {
+       "duration_seconds": 40,
+       "reps": 1,
+       "type": "normal",
+       "weight_kg": 22.68
+      }
+     ]
+    },
+    {
+     "movement_key": "elliptical",
+     "notes": "Easy elliptical: level 8, RPE 4-5, full sentences.",
+     "rationale_tag": "",
+     "rest_seconds": null,
+     "sets": [
+      {
+       "duration_seconds": 1200,
+       "type": "normal"
+      }
+     ]
+    }
+   ],
+   "inputs_snapshot": {
+    "calendar": {
+     "session_role": "Lower-volume"
+    },
+    "load_floors": {
+     "movements": {
+      "cable_pallof_press": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 30 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "hip_thrust_barbell": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 185 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "lateral_raise_machine": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 40 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "leg_extension_machine": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 90 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "leg_press_horizontal_machine": {
+       "progression": {
+        "basis": "step",
+        "reason": "+10 lb: two top sets at 12 reps (top of 10-12), RPE <= 8"
+       },
+       "status": "applied"
+      },
+      "lying_leg_curl_machine": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 90 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "reverse_lunge_dumbbell": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 30 lb: top set short of 12 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "seated_calf_raise": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 90 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "shrug_dumbbell": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 70 lb: top set short of 15 reps on the last exposure"
+       },
+       "status": "applied"
+      },
+      "suitcase_carry": {
+       "progression": {
+        "basis": "hold",
+        "reason": "hold at 50 lb per hand: 40 m clean on every carry last week"
+       },
+       "status": "applied"
+      }
+     },
+     "status": "applied"
+    }
+   },
+   "notes": "",
+   "routine_id": "golden-5072-4",
+   "status": "active",
+   "target_date": "2026-10-23",
+   "title": "Lower-volume",
+   "variant": "ideal"
+  }
+ ],
+ "week_start": "2026-10-19"
+}

@@ -121,6 +121,49 @@ def stub_readers(monkeypatch):
     monkeypatch.setattr(coach_packet_today, "read_hevy_day", _today_hevy)
     monkeypatch.setattr(coach_packet_today, "read_strava_day", _today_strava)
     monkeypatch.setattr(coach_packet_today, "pacific_today", lambda: "2026-09-26")
+    # #5081: steps_7d reads its rows through the packet's one fetch seam; stub it to a live-shaped day.
+    monkeypatch.setattr(pkt, "_steps_fetch", _steps_rows)
+    # #5082: steps_ramp reads the plan's own pain / deload stores and performed-lift flags; stub the three seams.
+    monkeypatch.setattr(tools_plan, "_pain_dismissals", lambda: [])
+    monkeypatch.setattr(tools_plan, "_deload_records", lambda: [])
+    monkeypatch.setattr(tools_plan, "_gather_performed_evidence", lambda d, layer: {"exercises": [], "scope": {"status": "none"}})
+    # #5059: the guidance freshness flag reads the clinical partition through the plan's own seam; stub it.
+    from health import guidance_freshness as gf
+
+    monkeypatch.setattr(tools_plan, "_guidance_freshness", lambda: gf.freshness({"effective": "2026-09-01"}, [], "2026-09-26"))
+    # #5061: the calibration cadence reads three partitions through `calibration_cadence.read`; stub it to dates held in the test.
+    from training import calibration_cadence as cc
+
+    monkeypatch.setattr(
+        cc,
+        "read",
+        lambda table, today: cc.compute(today, {"tape": lambda: ["2026-09-20"], "photos": lambda: ["2026-09-20"], "dexa": lambda: []}),
+    )
+    # #5078: the fitness battery reads its BATTERY# record through its own seam; stub one stored battery.
+    from mcp import tools_fitness_tests
+
+    monkeypatch.setattr(tools_fitness_tests, "_records", lambda: [FITNESS_BATTERY_ROW])
+
+
+# #5078: one battery as the store's reader returns it (decimals_to_float of the BATTERY# item).
+FITNESS_BATTERY_ROW = {
+    "pk": "USER#matthew#SOURCE#fitness_tests",
+    "sk": "BATTERY#2026-09-20",
+    "date": "2026-09-20",
+    "tests": {"dead_hang": {"value": 40.0, "unit": "s", "protocol_version": "1", "source": "explicit"}},
+    "protocol_version": "1",
+}
+
+
+# #5081: field-projected live rows (DATE#2026-10-14, read 2026-10-18) placed on a packet-window day.
+def _steps_rows(source: str, start: str, end: str) -> list[dict]:
+    from decimal import Decimal
+
+    rows = {
+        "whoop": [{"sk": "DATE#2026-09-20", "date": "2026-09-20", "step_count": Decimal("17739")}],
+        "apple_health": [{"sk": "DATE#2026-09-20", "date": "2026-09-20", "steps": Decimal("13157.82")}],
+    }
+    return [r for r in rows.get(source, []) if start <= r["date"] <= end]
 
 
 # ── the contract: one tool, every field, three states ─────────────────────────────────
@@ -251,6 +294,24 @@ def test_packet_carries_the_planners_own_numbers(stub_readers):
     assert out["nutrition_7d"]["value"]["protein_days_measured"] == 2
     assert out["readiness"]["value"]["recovery_tier"] == "green"
     assert out["muscle_volume"]["value"]["window_7d"]["muscles"]["Chest"]["sets_per_week"] == 6.0
+    steps = out["steps_7d"]["value"]
+    assert steps["window"] == {"start": "2026-09-16", "end": "2026-09-22"}
+    day = {d["date"]: d for d in steps["days"]}["2026-09-20"]
+    assert (day["steps"], day["winner"]) == (17739, "whoop") and steps["summary"]["days_measured"] == 1
+
+
+def test_steps_7d_with_no_source_is_absent_and_a_read_error_is_read_failed(stub_readers, monkeypatch):
+    """Mutation (#5081): report a week with no steps source as measured zeros, or swallow a read error."""
+    monkeypatch.setattr(pkt, "_steps_fetch", lambda s, a, b: [])
+    f = pkt.tool_get_coach_session_packet({"target_date": "2026-09-23"})["fields"]["steps_7d"]
+    assert f["state"] == "absent" and all(d["steps"] is None for d in f["value"]["days"])
+
+    def boom(s, a, b):
+        raise TimeoutError("ddb")
+
+    monkeypatch.setattr(pkt, "_steps_fetch", boom)
+    f = pkt.tool_get_coach_session_packet({"target_date": "2026-09-23"})["fields"]["steps_7d"]
+    assert f["state"] == "read_failed" and "TimeoutError" in str(f)
 
 
 def test_muscle_volume_is_read_over_plan_next_sessions_window(stub_readers, monkeypatch):
@@ -388,7 +449,8 @@ def test_block_position_before_the_block_start_is_week_0():
 
 
 # ── the instructions point at it ───────────────────────────────────────────────────────
-@pytest.mark.parametrize("path", ["docs/coaching/COACH_SESSION.md", ".claude/skills/daily-debrief/SKILL.md"])
+# #5086: the coach-session skill is the protocol's one source (docs/coaching/COACH_SESSION.md is a pointer to it).
+@pytest.mark.parametrize("path", [".claude/skills/coach-session/SKILL.md", ".claude/skills/daily-debrief/SKILL.md"])
 def test_chat_instructions_call_the_packet_first(path):
     """Mutation: remove the packet from the doc that tells a chat session what to call."""
     assert "get_coach_session_packet" in (ROOT / path).read_text()
@@ -466,7 +528,7 @@ def test_morning_note_is_measured_with_the_four_words_the_day_and_the_pt_instant
     assert v["written_at_pt"].endswith("PT") and "written_at" not in v
     expected = {k: val for k, val in mn.coach_fact(dict(MORNING_NOTE_ROW)).items() if k != "state"}
     assert v == expected, "the packet must carry coach_fact's shape verbatim"
-    assert out["packet_version"] == "coach-session-packet@1.3.0"
+    assert out["packet_version"] == "coach-session-packet@1.8.0"
 
 
 def test_morning_note_no_row_is_absent_and_a_failed_read_is_read_failed(stub_readers, monkeypatch):
@@ -674,3 +736,29 @@ def test_today_walking_hours_are_the_shared_definitions_and_the_ceiling_is_carri
     tree = ast.parse((ROOT / "mcp" / "coach_packet_today.py").read_text())
     calls = {n.func.attr for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)}
     assert "walking_layer_for_day" in calls and "build" not in calls and "walking_layer" not in calls
+
+
+def test_steps_ramp_field_is_the_modules_compute_over_the_resolver_window(stub_readers):
+    """Mutation (#5082): the packet re-derives the ramp, or reads a different window than the plan's constraint block."""
+    from training import steps_ramp
+
+    f = pkt.tool_get_coach_session_packet({"target_date": "2026-09-23"})["fields"]["steps_ramp"]
+    window = steps_ramp.window_days("2026-09-23")
+    assert f["state"] == "measured" and f["value"]["window_days"] == 14 and window == ("2026-09-09", "2026-09-22")
+    assert f["value"]["days_counted"] == 1 and f["value"]["state"] == "holding" and "no_baseline" in f["value"]["held_by"]
+    assert f["source"] == pkt.SOURCES["steps_ramp"] and f["value"]["charter_version"]
+
+
+@pytest.mark.parametrize("seam", ["_deload_records", "_pain_dismissals", "_gather_performed_evidence"])
+def test_steps_ramp_unreadable_input_is_read_failed_not_a_climb(stub_readers, monkeypatch, seam):
+    """#5082/#4072: an unreadable deload / dismissal / performed-lift store must not let the ramp climb — same as the plan."""
+
+    from mcp import tools_plan
+
+    def boom(*a, **k):
+        raise RuntimeError("store down")
+
+    monkeypatch.setattr(tools_plan, seam, boom)
+    f = pkt.tool_get_coach_session_packet({"target_date": "2026-09-23"})["fields"]["steps_ramp"]
+    assert f["state"] == "read_failed"
+    assert f["value"]["state"] == "unknown" and "today_target" not in f["value"]

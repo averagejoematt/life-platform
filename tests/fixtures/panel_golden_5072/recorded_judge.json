@@ -1,0 +1,490 @@
+{
+ "_README": "#5072: RECORDED judge replies for the golden cases \u2014 hand-authored to the response schema (panel_judge.response_schema), NOT a live model output. The unit tests and `scripts/panel_rubric_gate.py --recorded` replay them so no test reaches Bedrock. The gate's --live mode re-asks the model; a live run's replies may be pasted over these after review. #5110 added the three food-panel cases (food_*), same rules.",
+ "responses": {
+  "food_good_week": {
+   "appetite_food_environment": {
+    "concession_held": true,
+    "scores": {
+     "environment": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   },
+   "behaviour_change_psychologist": {
+    "concession_held": true,
+    "scores": {
+     "repeatable": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   },
+   "energy_balance_metabolism": {
+    "concession_held": true,
+    "scores": {
+     "honest_model": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   },
+   "evidence_based_hypertrophy_nutrition": {
+    "concession_held": true,
+    "scores": {
+     "food_quality": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   },
+   "flexible_dieting": {
+    "concession_held": true,
+    "scores": {
+     "flexibility": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   },
+   "obesity_medicine": {
+    "concession_held": true,
+    "scores": {
+     "sustainable_pace": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   },
+   "protein_lean_mass": {
+    "concession_held": true,
+    "scores": {
+     "distribution": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   },
+   "sports_dietitian": {
+    "concession_held": true,
+    "scores": {
+     "timing": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   },
+   "studio_nutritionist": {
+    "concession_held": true,
+    "scores": {
+     "the_frame": 9
+    },
+    "why": "graded from the day lines, the feedings and the session fuel"
+   }
+  },
+  "food_neg_no_refit_no_fuel": {
+   "appetite_food_environment": {
+    "concession_held": false,
+    "scores": {
+     "environment": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   },
+   "behaviour_change_psychologist": {
+    "concession_held": false,
+    "scores": {
+     "repeatable": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   },
+   "energy_balance_metabolism": {
+    "concession_held": false,
+    "scores": {
+     "honest_model": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   },
+   "evidence_based_hypertrophy_nutrition": {
+    "concession_held": false,
+    "scores": {
+     "food_quality": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   },
+   "flexible_dieting": {
+    "concession_held": false,
+    "scores": {
+     "flexibility": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   },
+   "obesity_medicine": {
+    "concession_held": false,
+    "scores": {
+     "sustainable_pace": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   },
+   "protein_lean_mass": {
+    "concession_held": false,
+    "scores": {
+     "distribution": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   },
+   "sports_dietitian": {
+    "concession_held": false,
+    "scores": {
+     "timing": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   },
+   "studio_nutritionist": {
+    "concession_held": false,
+    "scores": {
+     "the_frame": 6
+    },
+    "why": "no weekly refit and no fuel around the sessions"
+   }
+  },
+  "food_neg_old_constant": {
+   "appetite_food_environment": {
+    "concession_held": false,
+    "scores": {
+     "environment": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   },
+   "behaviour_change_psychologist": {
+    "concession_held": false,
+    "scores": {
+     "repeatable": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   },
+   "energy_balance_metabolism": {
+    "concession_held": false,
+    "scores": {
+     "honest_model": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   },
+   "evidence_based_hypertrophy_nutrition": {
+    "concession_held": false,
+    "scores": {
+     "food_quality": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   },
+   "flexible_dieting": {
+    "concession_held": false,
+    "scores": {
+     "flexibility": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   },
+   "obesity_medicine": {
+    "concession_held": false,
+    "scores": {
+     "sustainable_pace": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   },
+   "protein_lean_mass": {
+    "concession_held": false,
+    "scores": {
+     "distribution": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   },
+   "sports_dietitian": {
+    "concession_held": false,
+    "scores": {
+     "timing": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   },
+   "studio_nutritionist": {
+    "concession_held": false,
+    "scores": {
+     "the_frame": 2
+    },
+    "why": "one flat number every day with no protein structure, no band and no refit"
+   }
+  },
+  "good_charter_plan": {
+   "athlean_x": {
+    "concession_held": true,
+    "scores": {
+     "athletic_carryover": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "clinical_exercise_physiologist": {
+    "concession_held": true,
+    "scores": {
+     "safe_dosing": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "dan_john": {
+    "concession_held": true,
+    "scores": {
+     "keep_the_goal": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "galpin": {
+    "concession_held": true,
+    "scores": {
+     "interference": 9
+    },
+    "why": "the intervals sit on the upper-volume day, the bike follows the heavy lower day"
+   },
+   "hollywood_transformation_trainer": {
+    "concession_held": true,
+    "scores": {
+     "the_frame": 10
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "nippard": {
+    "concession_held": true,
+    "scores": {
+     "stretch_position": 10
+    },
+    "why": "incline curls, overhead triceps work, RDLs and incline press all load the lengthened position"
+   },
+   "rp_israetel": {
+    "concession_held": true,
+    "scores": {
+     "fatigue_management": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "sbs_nuckols": {
+    "concession_held": true,
+    "scores": {
+     "honest_claims": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   }
+  },
+  "neg_cardio_no_dose": {
+   "athlean_x": {
+    "concession_held": true,
+    "scores": {
+     "athletic_carryover": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "clinical_exercise_physiologist": {
+    "concession_held": false,
+    "scores": {
+     "safe_dosing": 6
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "dan_john": {
+    "concession_held": true,
+    "scores": {
+     "keep_the_goal": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "galpin": {
+    "concession_held": false,
+    "scores": {
+     "interference": 5
+    },
+    "why": "every cardio block reads 'Cardio.' \u2014 no level, speed or effort"
+   },
+   "hollywood_transformation_trainer": {
+    "concession_held": true,
+    "scores": {
+     "the_frame": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "nippard": {
+    "concession_held": true,
+    "scores": {
+     "stretch_position": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "rp_israetel": {
+    "concession_held": true,
+    "scores": {
+     "fatigue_management": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "sbs_nuckols": {
+    "concession_held": true,
+    "scores": {
+     "honest_claims": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   }
+  },
+  "neg_frozen_no_progression": {
+   "athlean_x": {
+    "concession_held": true,
+    "scores": {
+     "athletic_carryover": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "clinical_exercise_physiologist": {
+    "concession_held": true,
+    "scores": {
+     "safe_dosing": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "dan_john": {
+    "concession_held": true,
+    "scores": {
+     "keep_the_goal": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "galpin": {
+    "concession_held": true,
+    "scores": {
+     "interference": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "hollywood_transformation_trainer": {
+    "concession_held": true,
+    "scores": {
+     "the_frame": 8
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "nippard": {
+    "concession_held": false,
+    "scores": {
+     "stretch_position": 7
+    },
+    "why": "no movement carries a progression verdict; accessories are not rotating"
+   },
+   "rp_israetel": {
+    "concession_held": true,
+    "scores": {
+     "fatigue_management": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "sbs_nuckols": {
+    "concession_held": false,
+    "scores": {
+     "honest_claims": 7
+    },
+    "why": "graded from the listed movements and their cues"
+   }
+  },
+  "neg_long_session": {
+   "athlean_x": {
+    "concession_held": true,
+    "scores": {
+     "athletic_carryover": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "clinical_exercise_physiologist": {
+    "concession_held": true,
+    "scores": {
+     "safe_dosing": 5
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "dan_john": {
+    "concession_held": true,
+    "scores": {
+     "keep_the_goal": 5
+    },
+    "why": "session 2 runs past three hours of lifting"
+   },
+   "galpin": {
+    "concession_held": true,
+    "scores": {
+     "interference": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "hollywood_transformation_trainer": {
+    "concession_held": false,
+    "scores": {
+     "the_frame": 6
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "nippard": {
+    "concession_held": true,
+    "scores": {
+     "stretch_position": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "rp_israetel": {
+    "concession_held": true,
+    "scores": {
+     "fatigue_management": 6
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "sbs_nuckols": {
+    "concession_held": true,
+    "scores": {
+     "honest_claims": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   }
+  },
+  "neg_scheduled_deload": {
+   "athlean_x": {
+    "concession_held": true,
+    "scores": {
+     "athletic_carryover": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "clinical_exercise_physiologist": {
+    "concession_held": true,
+    "scores": {
+     "safe_dosing": 6
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "dan_john": {
+    "concession_held": true,
+    "scores": {
+     "keep_the_goal": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "galpin": {
+    "concession_held": false,
+    "scores": {
+     "interference": 7
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "hollywood_transformation_trainer": {
+    "concession_held": true,
+    "scores": {
+     "the_frame": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "nippard": {
+    "concession_held": true,
+    "scores": {
+     "stretch_position": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   },
+   "rp_israetel": {
+    "concession_held": false,
+    "scores": {
+     "fatigue_management": 6
+    },
+    "why": "session 3 is cut 40% on a schedule with no recorded word from the owner"
+   },
+   "sbs_nuckols": {
+    "concession_held": true,
+    "scores": {
+     "honest_claims": 9
+    },
+    "why": "graded from the listed movements and their cues"
+   }
+  }
+ }
+}

@@ -50,7 +50,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Full system design (the 10 stacks, ingest→store→serve; counts auto-synced) |
 | [INFRASTRUCTURE.md](INFRASTRUCTURE.md) | The AWS account by the numbers |
 | [DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md) | What calls what; single points of failure |
-| [MCP_TOOL_CATALOG.md](MCP_TOOL_CATALOG.md) | All 88 MCP tools by domain (generated — never hand-edit) |
+| [MCP_TOOL_CATALOG.md](MCP_TOOL_CATALOG.md) | All 89 MCP tools by domain (generated — never hand-edit) |
 | [MCP_TOOL_AUDIT.md](MCP_TOOL_AUDIT.md) | The tool-removal ledger (#395 prune ratchet) |
 | [API.md](API.md) | Site-API endpoints |
 | [engines/](engines/) | The algorithm pages: [SCORING](engines/SCORING.md) · [CHARACTER](engines/CHARACTER.md) · [READINESS](engines/READINESS.md) · [HYPOTHESIS](engines/HYPOTHESIS.md) · [COACH_STANCE](engines/COACH_STANCE.md) |
@@ -83,7 +83,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | Doc | |
 |---|---|
 | [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md) | The durable why — purpose, thesis, audiences, success bar |
-| [DECISIONS.md](DECISIONS.md) | **ADRs (001–163)** — every significant decision with rationale; index auto-generated |
+| [DECISIONS.md](DECISIONS.md) | **ADRs (001–164)** — every significant decision with rationale; index auto-generated |
 | [CONVENTIONS.md](CONVENTIONS.md) | **The load-bearing reflexes** (one-bundle rule #781, deploy-from-main, squash-drift, CI gate ordering, asset-staging trap) + drift-discovery commands |
 | [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) | **The "definition of an A" for craft** — the 10-dimension rubric + naming/size/gate standards `/review craft` grades against |
 | [OPERATING_DISCIPLINE.md](OPERATING_DISCIPLINE.md) | **The work-adjudication + session reflexes** — verifying a finding, closing an issue, judging an epic, concurrent lanes, watchers; plus the dated memory-corpus audit and the residual gap list (#2848) |
@@ -131,6 +131,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | `reviews/` | Dated board/consultancy reviews. **The external acquisition-diligence line (epic [#3042](https://github.com/averagejoematt/life-platform/issues/3042)) is the current one:** [DILIGENCE_2026-08-23_RESPONSE](reviews/DILIGENCE_2026-08-23_RESPONSE.md) is the per-finding register (52 findings → CONFIRMED / STALE / WRONG / PRICED, with live evidence per row); [REGRADE_BRIEF_2026-08-25](reviews/REGRADE_BRIEF_2026-08-25.md) is what an external assessor is handed to re-score it; `scripts/diligence_verify.py` is the acceptance instrument (the report's §15 playbooks, scripted against live state — three verdicts, `UNVERIFIED` never folded into `PASS`) and `reviews/evidence/` holds its dated bundles. Also: [R21](reviews/R21_BACKLOG.md), the 2026-07-06 definitive review; [FRONTIER_REVIEW_2026-07-18](reviews/FRONTIER_REVIEW_2026-07-18.md), the quantified-life strategy review → label `review:frontier-2026-07-18`. [PLATFORM_PRODUCT_REVIEW_2026-07](reviews/PLATFORM_PRODUCT_REVIEW_2026-07.md) also holds the **parked register** — the gated/won't-do/owner-capture items the ADR-099 backlog deliberately does not file as issues (ADR-101); pointer issue [#423](https://github.com/averagejoematt/life-platform/issues/423), never duplicated here |
 | `design/` | Current design assets + the portrait runbook; `design/v7/` and `design/v8/` hold the prototypes and the v8 kit |
 | `engines/` | The algorithm pages (SCORING · CHARACTER · READINESS · HYPOTHESIS · COACH_STANCE), indexed in the Reference table |
+| `integrations/` | Vendor-change reviews: what a third-party API or app changed and what it means for the platform. Currently [hevy-changes-2026-10.md](integrations/hevy-changes-2026-10.md): Hevy since July 2026, and why pinned exercise notes can't be read or written through the API (#5010) |
 | `methods/` | Method notes behind public claims (currently [TIME_AFFLUENCE_PROXY.md](methods/TIME_AFFLUENCE_PROXY.md)) |
 | `_lint/` | CI lint data — `tombstones.txt`, the retired-concept list `scripts/check_doc_tombstones.py` scans for |
 | `design-review/` | The paste-ready design-review prompt kit (current tooling) |

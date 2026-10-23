@@ -1,0 +1,679 @@
+{
+ "verified_at": "2026-10-18T21:10:00Z",
+ "counts": {
+  "confirmed": 46,
+  "refuted": 6,
+  "partial": 9
+ },
+ "note": "60 grader findings (A 29, B 31) + 1 extra (A-X1, Grader A's unnumbered lead_read cycle note). Live renders: Playwright 390x844 PT, 16 page variants, 2026-10-18 ~20:55Z; 15 /api endpoints + 7 coach_moves days fetched fresh; DDB read-only (withings/whoop/eightsleep/strava/macrofactor/apple_health/notion/chronicle/character_sheet/ai_analysis); SSM budget-tier + budget-breakdown read.",
+ "findings": [
+  {
+   "id": "B-22",
+   "verdict": "confirmed",
+   "severity": "high",
+   "class": "api",
+   "evidence": "Stored character_sheet DATE#2026-10-17 (computed_at 2026-10-18T16:30Z, AFTER macrofactor 10-17 row ingested 06:54Z, total_protein_g 133, 13 entries) still scores calorie_adherence/protein_total/protein_distribution/consistency absent=0; same on 10-15 and 10-16 rows. Root cause re-derived: character_engine.py nutrition reads mf 'protein'/'total_protein' and 'calories'/'total_calories', but the macrofactor row's keys are total_protein_g / total_calories_kcal (no calorie_target key at all) -> every behavioral food component is None -> scored ABSENT at full weight. Food pillar 2.8/100 is an engine field-mapping defect, not a logging gap. Page prints only the 'dragging' driver. No open issue found.",
+   "files": [
+    "lambdas/health/character_engine.py",
+    "config/character_sheet.json",
+    "site/assets/js/ck_sheet.js"
+   ],
+   "fix": "Engine: map total_protein_g / total_calories_kcal (and the real target source) in character_engine.py's nutrition scorer, add a fixture-is-the-wire test from a real macrofactor row, recompute the affected days. Page: when drivers.absent is non-empty, say so. The engine fix comes first; the page change alone would only disclose a wrong 0."
+  },
+  {
+   "id": "B-06",
+   "verdict": "confirmed",
+   "severity": "high",
+   "class": "renderer",
+   "evidence": "Live /next/v8/day/ (Oct 18) prints 'No training was recorded on this day.' while /api/training_overview daily_modality_minutes_30d[2026-10-18] = strength_min 41, total_min 41, and front/week/trend print 41 min. DDB strava DATE#2026-10-18 holds two WeightTraining activities (2459 s + 1019 s, device WHOOP); hevy has no 10-18 row. Mechanism CORRECTION: ck_depth.js dayLiftsHTML builds `other` from daily_modality_minutes_30d (not cardio_sessions as the finder says), but its key list is walking/cycling/hiking/soccer/stretching and omits strength_min, so a device-recorded strength session is dropped. (Note: the 17-min second session is not in the served 41 either.)",
+   "files": [
+    "site/assets/js/ck_depth.js"
+   ],
+   "fix": "Add [\"strength_min\",\"strength\"] (and other_min) to the dayLiftsHTML key list so the no-Hevy branch prints 'No lifting logged that day. Also that day: 41 minutes of strength.' The finder's fix target is right; the cause it names is wrong."
+  },
+  {
+   "id": "B-14",
+   "verdict": "confirmed",
+   "severity": "high",
+   "class": "api",
+   "evidence": "/api/calls bet-20261016-b76d3b26d3 actual.value 16.357 ('16.4%'), 'Graded on the reading for October 16', with no device or window named. Re-measured from DDB: Whoop slow_wave/sleep_duration 10-10..10-16 = 25.3,17.0,19.3,22.2,21.0,25.7,30.1 -> 22.9% mean (Oct 16 alone 30.1%). Eight Sleep deep_pct 7-day windows: 10-09..15 = 16.40, 10-10..16 = 16.23. So 16.4 is an Eight Sleep 7-day mean, not reproducible to the served 16.357 on any current window, and not the wrist strap. The verdict (<26%) holds on both devices; the printed number and its 'reading for October 16' framing do not reproduce as stated.",
+   "files": [
+    "lambdas/web/site_api_calls.py",
+    "lambdas/coach/coach_prediction_evaluator.py",
+    "site/assets/js/ck_call.js"
+   ],
+   "fix": "Serve actual.source + actual.window on bets and print them ('16.4%, the bed sensor's 7-day average to October 15'). Which device the deep-sleep share should grade on is a one-device-per-quantity ruling (ADR-105); serving and printing the source needs no ruling."
+  },
+  {
+   "id": "A-X1",
+   "verdict": "confirmed",
+   "severity": "high",
+   "class": "ai-text",
+   "evidence": "(Grader A cross_page note, not numbered.) The served lead read says 'For a twelve-month recomposition after a previous cycle that stalled in the final phase, that visibility is the early warning system.' It is verbatim in DDB EXPERT#integrator.public_summary and served on /api/edition blocks.lead_read, /api/weekly_priority and /api/coaching-dashboard (curl-grepped). The v8 week page truncates before it (the page prints 2 sentences), so it is not printed there, but it is in public reader-register JSON and breaks the owner's 2026-09-26 no-cycle/attempt ruling. No guard covers it: grep finds no cycle/attempt/reset rule in lambdas/coach/audience_guard.py or integrator_prompts.py.",
+   "files": [
+    "lambdas/intelligence/integrator_prompts.py",
+    "lambdas/coach/audience_guard.py"
+   ],
+   "fix": "Add 'never refer to earlier cycles, attempts, resets or starts' to the public_summary instruction, and a deterministic reader_safe rule that rejects previous/prior/earlier cycle|attempt|start|reset in public_summary. Check whether legacy /coaching/ renders the full text, since that is where it would be printed."
+  },
+  {
+   "id": "A-01",
+   "verdict": "confirmed",
+   "severity": "high",
+   "class": "ruling",
+   "evidence": "The live front reads: first-person premise, then 'Lisa Park called Matthew’s morning recovery score (his wrist strap’s ...)', 'what he lifted, slept and ate' (index.html:82), 'In his own words' (index.html:85), 'each once Matthew approves it' (ck_front.js:432). The forced third person IS ck_verdict.js:175 matthewsCall (/\\bcalled his\\b/ -> 'called Matthew’s'), used by callCardHTML on every page. The gloss 'his wrist strap’s' is served text.",
+   "files": [
+    "site/assets/js/ck_verdict.js",
+    "site/next/v8/index.html",
+    "site/assets/js/ck_front.js"
+   ],
+   "fix": "The mechanism the finder names is correct (a data-ck-voice argument to matthewsCall). But rewriting static lines into first person writes new words in his voice. The 10-18 review classed exactly this (D4) as owner, and #4590 approved only the two premise sentences. Needs his ruling: first person everywhere, or a neutral site voice outside the premise."
+  },
+  {
+   "id": "A-09",
+   "verdict": "confirmed",
+   "severity": "high",
+   "class": "ruling",
+   "evidence": "Start reads: 'Who he was before the record.' (ck_pages.js:488), 'His weight at every weigh-in' (ck_pages.js:572), 'I read each one before it publishes' then 'it publishes once Matthew approves it' (ck_pages.js:196). The same fact in two persons, eight lines apart.",
+   "files": [
+    "site/assets/js/ck_pages.js",
+    "site/next/v8/start/index.html"
+   ],
+   "fix": "The minimum fix needs no new owner words: make the two approval sentences agree (pick the one already on the page). Converting the rest to first person is the A-01 ruling."
+  },
+  {
+   "id": "A-22",
+   "verdict": "confirmed",
+   "severity": "high",
+   "class": "ruling",
+   "evidence": "Coaches: 'software I built with Claude', 'My scale ... write to me', then 'Henning Brandt called Matthew’s weight' (matthewsCall) and 'one standard deviation of his readings'.",
+   "files": [
+    "site/assets/js/ck_verdict.js",
+    "site/next/v8/coaches/index.html"
+   ],
+   "fix": "Same ruling as A-01; one helper with a voice argument once he rules."
+  },
+  {
+   "id": "B-02",
+   "verdict": "confirmed",
+   "severity": "medium",
+   "class": "renderer",
+   "evidence": "/api/edition week.measures.training.values end ...,168,41 (Oct 18), so the week says 'Trained on 7 of 7'; the day page for the same Sunday says 'No training was recorded'. Same root cause as B-06.",
+   "files": [
+    "site/assets/js/ck_depth.js"
+   ],
+   "fix": "Fixed by B-06. The week row is right; the day page is wrong."
+  },
+  {
+   "id": "B-11",
+   "verdict": "confirmed",
+   "severity": "medium",
+   "class": "renderer",
+   "evidence": "/next/v8/trend/ prints 'Training time · 41 minutes October 18 ->' linking to the day page that denies it. Duplicate of B-06.",
+   "files": [
+    "site/assets/js/ck_depth.js"
+   ],
+   "fix": "Fixed by B-06."
+  },
+  {
+   "id": "B-07",
+   "verdict": "confirmed",
+   "severity": "medium",
+   "class": "renderer",
+   "evidence": "Day page Nathan Reeves: '39 days of journal silence' (Notion journal, last DDB row 2026-09-09 = 39 days); the week page says 'Nothing new in his own words since Wednesday, September 23' (/api/decisions, a chat message). Two records, two silences, one word.",
+   "files": [
+    "site/assets/js/ck_pages.js",
+    "lambdas/web/site_api_edition.py"
+   ],
+   "fix": "Name the his_words source on the page ('his notes on the plan'), or point his_words at the journal. Do not rewrite served coach text."
+  },
+  {
+   "id": "B-10",
+   "verdict": "confirmed",
+   "severity": "medium",
+   "class": "renderer",
+   "evidence": "/api/pulse_history 2026-10-17 steps 17866 = DDB whoop step_count 17866; DDB apple_health DATE#2026-10-17 steps 13856. The trend index prints 'Steps · 17,866' with no device named. (METRIC_TRUTH[steps] picks Whoop by design, #4947, held on #4644, so the choice is sanctioned; the missing label is the defect.)",
+   "files": [
+    "site/assets/js/ck_depth.js",
+    "lambdas/web/site_api_lambda.py"
+   ],
+   "fix": "Print the source ('wrist strap') on the steps row, ideally served from the steps truth facet."
+  },
+  {
+   "id": "B-24",
+   "verdict": "confirmed",
+   "severity": "medium",
+   "class": "ruling",
+   "evidence": "/api/character metabolic data_coverage 0.15, coverage_hold true, composite 'mean of 6 of 7 pillars'; the page says so honestly ('measured thinly and still counts').",
+   "files": [
+    "lambdas/health/character_engine.py"
+   ],
+   "fix": "Owner ruling: drop held pillars from the composite, or keep it as is. The copy is already true."
+  },
+  {
+   "id": "A-16",
+   "verdict": "confirmed",
+   "severity": "medium",
+   "class": "renderer",
+   "evidence": "Story lead order live: 'New this week · Week 6' / title / STORY_FRAME (first person) / 'Written by AI ... Matthew reads each chapter' / served dek ('the platform flagged'). Four registers in five lines.",
+   "files": [
+    "site/assets/js/ck_pages.js"
+   ],
+   "fix": "Reordering (frame, then chapter, then provenance) is a renderer change. Changing the provenance into first person is the A-01 ruling."
+  },
+  {
+   "id": "A-17",
+   "verdict": "confirmed",
+   "severity": "medium",
+   "class": "renderer",
+   "evidence": "Live: 'The newest episode, for week 4: Marcus Webb · 7 min.' under the Week 6 chapter; episodes.json newest is EP4 (Oct 1); edition chapter.podcast.state 'absent' for week 6. The week is named, but the gap is never said.",
+   "files": [
+    "site/assets/js/ck_pages.js"
+   ],
+   "fix": "Bind to the served absent/held state: 'No episode yet for weeks 5 and 6; the newest, for week 4 ...'. The finder's high severity is overstated, since the line does name week 4."
+  },
+  {
+   "id": "A-18",
+   "verdict": "confirmed",
+   "severity": "medium",
+   "class": "static-copy",
+   "evidence": "story/index.html:54 says 'Each week the AI that writes the chapter interviews one of the AI coaches' above a list whose newest episode is October 1.",
+   "files": [
+    "site/next/v8/story/index.html"
+   ],
+   "fix": "'When a chapter publishes, the AI that wrote it interviews one of the coaches about it.'"
+  },
+  {
+   "id": "A-19",
+   "verdict": "confirmed",
+   "severity": "medium",
+   "class": "ai-text",
+   "evidence": "The dek is posts.json week-6 excerpt (edition dek_of(post.excerpt)) and contains 'that the platform flagged as genuine cardiovascular work rather than a stroll'.",
+   "files": [
+    "lambdas/emails/chronicle_prompt.py"
+   ],
+   "fix": "Add a chronicle style rule (never name 'the platform/system'; no 'X rather than Y' flourish). The published week-6 text stays as published unless the owner re-approves it."
+  },
+  {
+   "id": "A-11",
+   "verdict": "confirmed",
+   "severity": "medium",
+   "class": "api",
+   "evidence": "Start's Week 6 row prints 'Weight: 305.4 lb.' because posts.json week 6 stats_line is the old format 'Weight: 305.4 lbs | Week Grade: avg 70 | T0 Streak: 1 days'; weeks 1-5 use 'Day N to Day M · X lbs (-Y this week) · N training sessions'.",
+   "files": [
+    "lambdas/emails/chronicle_prompt.py",
+    "site/assets/js/ck_pages.js"
+   ],
+   "fix": "Fix the stats_line producer for week 6 (regenerate posts.json), with a renderer fallback that never prints a 'Label:' fragment."
+  },
+  {
+   "id": "A-12",
+   "verdict": "confirmed",
+   "severity": "medium",
+   "class": "static-copy",
+   "evidence": "Start's opening has no goal number; the first '185' is the chart caption 'the dashed rule is 185 lb, the goal.'",
+   "files": [
+    "site/next/v8/start/index.html",
+    "site/assets/js/ck_pages.js"
+   ],
+   "fix": "Add one served-number line under the approved opening ('From 327.3 lb toward 185, since September 6. Day 43: 302.2.'). It is not first-person, so no ruling is needed."
+  },
+  {
+   "id": "A-06",
+   "verdict": "confirmed",
+   "severity": "medium",
+   "class": "static-copy",
+   "evidence": "front.txt has zero occurrences of 'Claude'; Start has 'the AI coaches I built with Claude'.",
+   "files": [
+    "site/next/v8/index.html"
+   ],
+   "fix": "Add Claude in a neutral-voice line in the AI section or the 'How it’s built' row ('software built with Claude'). The finder's first-person wording would need the A-01 ruling."
+  },
+  {
+   "id": "A-04",
+   "verdict": "confirmed",
+   "severity": "medium",
+   "class": "static-copy",
+   "evidence": "Live: two captions under the mark, 'Each column runs from 327.3 lb ... at the floor.' (ck_front.js:88) and 'One column a day for four weeks: green is gone, grey is left...' (index.html:46). The mark itself is unapproved (#4646 OPEN).",
+   "files": [
+    "site/assets/js/ck_front.js",
+    "site/next/v8/index.html"
+   ],
+   "fix": "Merge into one caption. Hold the change behind #4646, since the mark may go."
+  },
+  {
+   "id": "A-24",
+   "verdict": "confirmed",
+   "severity": "medium",
+   "class": "api",
+   "evidence": "Coaches disclosures verbatim: 'Counting how sure each call was...' and '11 sealed before day one, 10 sides of bets..., 111 read out of the coaches' running commentary and 59 conditional or hedged sentences'. The breakdown is served text (ck_pages.js countedHTML prints it 'as served').",
+   "files": [
+    "lambdas/web/site_api_edition.py",
+    "site/assets/js/ck_pages.js"
+   ],
+   "fix": "Re-word at the source sentence. Also: this 59 'conditional or hedged' differs from /api/calls excluded reasons (7 conditional/hedged, 110 commentary), a partition worth reconciling."
+  },
+  {
+   "id": "B-16",
+   "verdict": "confirmed",
+   "severity": "low",
+   "class": "api",
+   "evidence": "tolerance n 29, value 3.9712. From pulse_history: 09-15..10-14 gives n 28, SD 3.777; 09-15..10-15 gives n 29, SD 3.960 (matches within unrounded withings). So the SD window includes the call day, while the simple guess excludes it (B-15). The page says '30 days before the call' with no n.",
+   "files": [
+    "lambdas/web/site_api_calls.py",
+    "site/assets/js/ck_verdict.js"
+   ],
+   "fix": "Print the window dates and n, and make the tolerance and the guess use the same anchor."
+  },
+  {
+   "id": "B-03",
+   "verdict": "confirmed",
+   "severity": "low",
+   "class": "renderer",
+   "evidence": "'Written by AI from the record on October 13' (ck_front.js:408, ck_pages.js:229 print c.date). DDB chronicle DATE#2026-10-13: generated_at 2026-10-14T15:04Z, approved_at 2026-10-18T04:29Z. It was written Oct 14 (not Oct 18, as the finder implied) and published Oct 18; Oct 13 is the dateline.",
+   "files": [
+    "site/assets/js/ck_front.js",
+    "site/assets/js/ck_pages.js",
+    "lambdas/web/site_api_edition.py"
+   ],
+   "fix": "Say 'dated October 13', or serve generated_at/approved_at and print 'written October 14, published October 18'."
+  },
+  {
+   "id": "B-04",
+   "verdict": "confirmed",
+   "severity": "low",
+   "class": "renderer",
+   "evidence": "pulse_history 10-05..10-11 = 311.1,308.9,308.3,307.2,306.1,306.5,null (6 weigh-ins, mean 308.02); 10-12..18 mean 304.60; down 3.4 reproduces. n not stated.",
+   "files": [
+    "site/assets/js/ck_front.js"
+   ],
+   "fix": "Append '(7 weigh-ins against 6)'."
+  },
+  {
+   "id": "B-08",
+   "verdict": "confirmed",
+   "severity": "low",
+   "class": "ai-text",
+   "evidence": "Served coach_lines[0].text contains '25.1 lbs down'; the site unit elsewhere is ' lb'.",
+   "files": [
+    "site/assets/js/ck_front.js",
+    "lambdas/web/site_api_edition.py"
+   ],
+   "fix": "Normalise lbs->lb at serve time (the coach-line post-pass), not in each renderer."
+  },
+  {
+   "id": "B-12",
+   "verdict": "confirmed",
+   "severity": "low",
+   "class": "renderer",
+   "evidence": "daily_modality_minutes_30d: n 30, min 41 (2026-10-18, today, partial), max 269, mean 156.4, last-7 124.9, prior-7 112.9. All reproduce; the 'lowest' is today's partial day.",
+   "files": [
+    "site/assets/js/ck_depth.js"
+   ],
+   "fix": "Leave today out of min/max, or label it 'today so far'."
+  },
+  {
+   "id": "B-19",
+   "verdict": "confirmed",
+   "severity": "low",
+   "class": "renderer",
+   "evidence": "Coach page prints 'within 14.8' / 'not within 19.3 out of 100' with 'one standard deviation ... over the 30 days before the call'. tolerance.n is served per call and never printed. Same class as B-16.",
+   "files": [
+    "site/assets/js/ck_verdict.js"
+   ],
+   "fix": "Print n with the shared tolerance note."
+  },
+  {
+   "id": "B-28",
+   "verdict": "confirmed",
+   "severity": "low",
+   "class": "static-copy",
+   "evidence": "Page: '31 days like it come to $156.86, under the ceiling.' The served typical_day.basis says 'not a forecast'; the page drops that.",
+   "files": [
+    "site/assets/js/ck_built.js"
+   ],
+   "fix": "Add 'not a forecast' to the sentence at ck_built.js:191."
+  },
+  {
+   "id": "A-10",
+   "verdict": "confirmed",
+   "severity": "low",
+   "class": "static-copy",
+   "evidence": "'Who he was before the record.' (ck_pages.js:488) and 'The chapters are written by AI from the record.' The third use is the published chapter title, which stays.",
+   "files": [
+    "site/assets/js/ck_pages.js",
+    "site/next/v8/start/index.html"
+   ],
+   "fix": "Say it plainly the first time ('from what the devices and logs recorded')."
+  },
+  {
+   "id": "A-25",
+   "verdict": "confirmed",
+   "severity": "low",
+   "class": "renderer",
+   "evidence": "Live: 'through October 14 / 17 / 16' as orphan lines under three records (served record.through).",
+   "files": [
+    "site/assets/js/ck_pages.js"
+   ],
+   "fix": "One line with the record ('8 of 20, counted through October 14'), or one note under the list."
+  },
+  {
+   "id": "A-26",
+   "verdict": "confirmed",
+   "severity": "low",
+   "class": "renderer",
+   "evidence": "Live: 'Amara Patel is sitting out: no sensor since August 27, before day one, so the calls counted here were checked on other readings.' (ck_pages.js:607 plus served reason).",
+   "files": [
+    "site/assets/js/ck_pages.js"
+   ],
+   "fix": "Name the device ('glucose monitor'). The finder's 'her 7 calls were about other numbers' was NOT verified; keep the existing claim's scope."
+  },
+  {
+   "id": "A-07",
+   "verdict": "confirmed",
+   "severity": "low",
+   "class": "renderer",
+   "evidence": "Front miss card: 'Wrong · not within 17.9 out of 100 either way' + 'one standard deviation of his readings over the 30 days before the call' (ck_verdict toleranceNote/sharedToleranceNote; the house card rule #4808 applies to all pages).",
+   "files": [
+    "site/assets/js/ck_verdict.js"
+   ],
+   "fix": "Plain-words variant on the front only. Keep the one-card rule."
+  },
+  {
+   "id": "A-28",
+   "verdict": "confirmed",
+   "severity": "low",
+   "class": "renderer",
+   "evidence": "Coaches: 'Each allowed distance is one standard deviation of his readings...' Duplicate of A-07.",
+   "files": [
+    "site/assets/js/ck_verdict.js"
+   ],
+   "fix": "As A-07."
+  },
+  {
+   "id": "A-08",
+   "verdict": "confirmed",
+   "severity": "low",
+   "class": "api",
+   "evidence": "Live: 'Planned · Bench Press (Barbell), Dumbbell Row and 7 more.' The text is built server-side (edition_life_rows.py:57 'Planned for today: ...') from Hevy routine names.",
+   "files": [
+    "lambdas/web/edition_life_rows.py"
+   ],
+   "fix": "Normalise 'X (Barbell)' to 'barbell X' where the served sentence is built."
+  },
+  {
+   "id": "A-13",
+   "verdict": "confirmed",
+   "severity": "low",
+   "class": "renderer",
+   "evidence": "ck_pages.js:554 chartFrameLine: 'The top rule is 327.3 lb, the start; the dashed rule is 185 lb, the goal.'",
+   "files": [
+    "site/assets/js/ck_pages.js"
+   ],
+   "fix": "'line' for 'rule'."
+  },
+  {
+   "id": "A-29",
+   "verdict": "confirmed",
+   "severity": "low",
+   "class": "static-copy",
+   "evidence": "coaches/index.html:68 links 'Every prediction, right and wrong' to /coaching/scorecard/ (v5); /next/v8/call/ renders the kit's settled-call index.",
+   "files": [
+    "site/next/v8/coaches/index.html"
+   ],
+   "fix": "Point it at /next/v8/call/."
+  },
+  {
+   "id": "A-21",
+   "verdict": "confirmed",
+   "severity": "low",
+   "class": "ruling",
+   "evidence": "Story provenance 'Matthew reads each chapter before it publishes' (ck_pages.js:229) under a first-person standfirst.",
+   "files": [
+    "site/assets/js/ck_pages.js"
+   ],
+   "fix": "Part of the A-01 narrator ruling."
+  },
+  {
+   "id": "B-05",
+   "verdict": "confirmed",
+   "severity": "info",
+   "class": "renderer",
+   "evidence": "Reproduced: week values weight [308.3..302.2], sleep [9.6,8.5,9.1,8.1,8.3,8.8,9.3] (7/7 >=7h), food [155,166,152,98,166,133,null] (0/6 >=170), record 78/191, baseline rate 0.408.",
+   "files": [],
+   "fix": "none"
+  },
+  {
+   "id": "B-09",
+   "verdict": "confirmed",
+   "severity": "info",
+   "class": "renderer",
+   "evidence": "pulse_history 10-18: weight 302.2, sleep 9.3, recovery 80; the day page prints the same.",
+   "files": [],
+   "fix": "none"
+  },
+  {
+   "id": "B-13",
+   "verdict": "confirmed",
+   "severity": "info",
+   "class": "renderer",
+   "evidence": "pulse_history: 34 weigh-ins, min 302.2, max 327.3.",
+   "files": [],
+   "fix": "none"
+  },
+  {
+   "id": "B-17",
+   "verdict": "confirmed",
+   "severity": "info",
+   "class": "api",
+   "evidence": "/api/calls count 63 (5 bets), excluded.count 123; 63+123+5 = 191 = edition record.decided.",
+   "files": [],
+   "fix": "none"
+  },
+  {
+   "id": "B-18",
+   "verdict": "confirmed",
+   "severity": "info",
+   "class": "api",
+   "evidence": "/api/coaches explorer_coach 18 of 36 through 2026-10-18; the coach page prints '18 of 36'.",
+   "files": [],
+   "fix": "none"
+  },
+  {
+   "id": "B-21",
+   "verdict": "confirmed",
+   "severity": "info",
+   "class": "renderer",
+   "evidence": "The Eli page says 'The lead makes no checked calls'; /api/coaches eli_marsh record null. The unchecked numeric surface is B-01.",
+   "files": [],
+   "fix": "see B-01"
+  },
+  {
+   "id": "B-25",
+   "verdict": "confirmed",
+   "severity": "info",
+   "class": "api",
+   "evidence": "Pillar levels 22,25,2,1,3,17 (relationships not_instrumented): mean 11.67 -> 12; achievements earned 7 of 40, days_tracked 41 (not printed).",
+   "files": [],
+   "fix": "none"
+  },
+  {
+   "id": "B-29",
+   "verdict": "confirmed",
+   "severity": "info",
+   "class": "api",
+   "evidence": "Sum of per-coach records: right 19+10+8+13+1+9+18 = 78, n = 191; platform_stats data_sources 20.",
+   "files": [],
+   "fix": "none"
+  },
+  {
+   "id": "B-30",
+   "verdict": "confirmed",
+   "severity": "info",
+   "class": "static-copy",
+   "evidence": "75 unique internal appendix hrefs fetched with curl -L: 0 non-200.",
+   "files": [],
+   "fix": "none"
+  },
+  {
+   "id": "B-01",
+   "verdict": "partial",
+   "severity": "high",
+   "class": "ai-text",
+   "evidence": "Served text confirmed verbatim in DDB ai_analysis EXPERT#integrator.public_summary (generated_at 2026-10-18T04:38Z, data_through 10-17), on /api/edition lead_read, /api/weekly_priority and /api/coaching-dashboard. The week page prints only the first two sentences. Of the four 'wrong facts': (1) 'starting weight of 302.2 pounds' is CONFIRMED wrong (start is 327.3, 302.2 is the current weight). (2) The food-log gap is NOT a fabrication: the macrofactor rows for 10-11..10-17 were ingested 2026-10-18T06:54Z, 2h16m after the read was written, so the gap was real when written and is stale now. (3) The journal claim ('forty days') matches the Notion journal (last DDB entry 2026-09-09, 38 days at write time); the finder compared it with the /api/decisions record, which is a different source. (4) '54 sessions in thirty days' matches no served count (workouts_30d 39, whoop_workout_count 63, strength 21), so it is unreproduced either way. The 3.3 lb/wk rate went through weight_findings' served-rate CI check; the finder's 4.2 uses a different definition. Gate question answered: the labelled-fact check EXISTS (grounded_generation stale_baseline), but ai_expert_analyzer_lambda._gate_prose never passes baseline_lbs, so it is never switched on. Reproduced: grounding_findings(sentence, generation_date_iso='2026-10-17', start_date_iso='2026-09-06', baseline_lbs=327.3) -> [stale_baseline claimed 302.2 expected 327.3]; without baseline_lbs -> [].",
+   "files": [
+    "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+    "lambdas/intelligence/integrator_prompts.py"
+   ],
+   "fix": "In ai_expert_analyzer_lambda._gate_prose, pass baseline_lbs=EXPERIMENT_BASELINE_WEIGHT_LBS to _gg.grounding_findings (ai_calls.py and ai_review_pack already do). That turns on the existing labelled-start check, so no new gate is needed. The served-at-write-time staleness (the food gap) is a separate vintage issue: a lead read written before an ingest should carry its data_through, which it already serves."
+  },
+  {
+   "id": "B-26",
+   "verdict": "partial",
+   "severity": "medium",
+   "class": "renderer",
+   "evidence": "Tier 1 is CORRECT: SSM /life-platform/budget-tier = 1 (modified 2026-10-12), and budget-breakdown (computed 16:00Z) shows projected 188.05, mtd 136.96, tier 1, tier_crossings {2: 2026-10-22}. cost_governor._decide_tier lets the projection raise the tier at most ONE step above what actual mtd justifies: mtd 136.96 < 157.67 (55/75*215) gives tier 0, +1 = tier 1, although _tier_for(188.05) = 2 (threshold 186.33 = 86.7%). The $225.31 all-classes scope IS already printed in the disclosure. The real defect: the page says 'sets a tier from the forecast's share of the ceiling' and lists 'Tier 2 from about 87%', so the forecast (87.5%) reads as contradicting the printed tier, because the actual-spend cap is never stated.",
+   "files": [
+    "site/assets/js/ck_built.js"
+   ],
+   "fix": "Do not print the tier the projection implies; tier 1 is right. Add the cap to the tier rule sentence: 'A forecast can raise the tier only one step above what has actually been spent; tier 2 needs about $158 actually spent.' GOVERNOR in ck_built.js already restates the shares; add the cap rule and pin it in tests/test_built_page_facts_4586.py."
+  },
+  {
+   "id": "A-15",
+   "verdict": "partial",
+   "severity": "medium",
+   "class": "ruling",
+   "evidence": "The footer 'Preview. A first-person line with no date on it is draft wording Matthew has not rewritten yet.' is CONFIRMED live on story, coaches, week, day and trend (5 of 5) and gone from front and start (PR #5012). But the claim that it 'labels the approved sentence' is WRONG: the story's line is STORY_FRAME (ck_pages.js:985), a shortened variant ('I’m trying to get from 327 pounds to 185, in public...'). The owner approved the front's longer sentence ('...and to get my life back with it... because I do better when someone is watching'), and the day/trend pages carry unapproved first-person headings ('What I lifted.', 'What I log most.'). Removing the footer would unmark draft first-person copy.",
+   "files": [
+    "site/assets/js/ck_pages.js",
+    "site/next/v8/story/index.html",
+    "site/next/v8/coaches/index.html",
+    "site/next/v8/week/index.html",
+    "site/next/v8/day/index.html",
+    "site/next/v8/trend/index.html"
+   ],
+   "fix": "Without a ruling, set STORY_FRAME to the approved front sentence verbatim. Remove the footer only once every first-person line on the page is approved (owner), or mark the individual lines as the finder suggests."
+  },
+  {
+   "id": "A-27",
+   "verdict": "partial",
+   "severity": "medium",
+   "class": "ruling",
+   "evidence": "Footer live on coaches (confirmed). Its first-person lines ('software I built with Claude', 'My scale... write to me') are not among the two sentences #4590 approved, so the footer is accurate there, not contradictory.",
+   "files": [
+    "site/next/v8/coaches/index.html"
+   ],
+   "fix": "As A-15: owner approves the coaches lines, then the footer goes."
+  },
+  {
+   "id": "A-02",
+   "verdict": "partial",
+   "severity": "medium",
+   "class": "ruling",
+   "evidence": "Live: 'The AI / The coaches. / No open bet between them this week.', and the served coach_lines holds only Nathan Reeves' reply. But the front DELIBERATELY never quotes the mind coach (ck_front.js FRONT_UNQUOTED {mind_coach, mind}, documented: 'a first-time reader should meet the record, not an AI's diagnosis of the person'), and the line also fails plainLanguage (>28 words, 'For now' hedge). The finder misread the line-440 comment: the 'newest line that coach said' fallback is for an open bet's two sides only. The null section is real; the proposed fix breaks a documented rule.",
+   "files": [
+    "site/assets/js/ck_pages.js",
+    "site/assets/js/ck_front.js"
+   ],
+   "fix": "Owner/design call: drop the section when there is no quotable bet or exchange, or keep it. Do not quote Nathan's line on the front."
+  },
+  {
+   "id": "B-15",
+   "verdict": "partial",
+   "severity": "low",
+   "class": "api",
+   "evidence": "Reproduces: the simple guess is 305.6 (Oct 14) while the Oct 15 weigh-in 304.5 exists and equals the coach's number. But it is INTENTIONAL: coach_baseline.filed_reading anchors on 'the day BEFORE filed' (docstring). The defect is only the words 'the last reading before the call' in site_api_calls.py:426, which hide the day-before rule.",
+   "files": [
+    "lambdas/web/site_api_calls.py"
+   ],
+   "fix": "Print the filed_on date that the baseline already stamps: 'stay at 305.6 lb, the October 14 reading, the day before the call'. Keep the engine rule."
+  },
+  {
+   "id": "A-05",
+   "verdict": "partial",
+   "severity": "low",
+   "class": "ruling",
+   "evidence": "Live: 'In his own words / Nothing new since Wednesday, September 23.' with no door. It is deliberate: ck_pages.js:730 (site-to-A round 1, front:F16) removed the door because the target page ended on the same absence. It is still a non-door in a 'one tap away' list.",
+   "files": [
+    "site/assets/js/ck_pages.js"
+   ],
+   "fix": "Design call: drop the row while stale, or relabel the list. Reverting F16 to a door is not the fix."
+  },
+  {
+   "id": "A-14",
+   "verdict": "partial",
+   "severity": "low",
+   "class": "api",
+   "evidence": "'A guess that every call has a 41% chance of coming true does about as well.' is served record.baseline.text, the 'one sayable guess sentence' that round 2 adopted. It is a style judgement against a prior accepted fix, not a defect.",
+   "files": [
+    "lambdas/web/site_api_edition.py"
+   ],
+   "fix": "Optional re-wording at the served source, once, for all pages."
+  },
+  {
+   "id": "A-20",
+   "verdict": "partial",
+   "severity": "low",
+   "class": "renderer",
+   "evidence": "True that the story list has no summary sentence, but every row carries its weight and today's 302.2 is on front/start. This is an addition, not a defect.",
+   "files": [
+    "site/assets/js/ck_pages.js"
+   ],
+   "fix": "Optional one computed line under the h2."
+  },
+  {
+   "id": "B-23",
+   "verdict": "refuted",
+   "severity": "medium",
+   "class": "api",
+   "evidence": "DDB character_sheet DATE#2026-10-17 exists (computed_at 2026-10-18T16:30Z). The finder looked under the wrong pk (SOURCE#character, not SOURCE#character_sheet). as_of_date is the scored day; input_manifest.as_of_day is the compute day. 'Level 12 on Saturday, October 17' is correct, and the page already says sources were late.",
+   "files": [],
+   "fix": "none needed. Printing the compute date is optional polish."
+  },
+  {
+   "id": "B-27",
+   "verdict": "refuted",
+   "severity": "medium",
+   "class": "static-copy",
+   "evidence": "True that 81 is a constant (ck_built.js SCHEDULED {count:81, asOf 2026-10-17}), but this is deliberate and documented in the file header, pinned to its source by tests/test_built_page_facts_4586.py, and the page states the provenance honestly: 'Counted October 17, from the code.' Not a truth defect.",
+   "files": [],
+   "fix": "none (optional: serve it on /api/platform_stats)"
+  },
+  {
+   "id": "A-03",
+   "verdict": "refuted",
+   "severity": "medium",
+   "class": "static-copy",
+   "evidence": "The 'three times' count includes 'No open bet between them this week', which is not a statement of failure; the failure is said twice (the record line and the miss card). The 'purpose never once' claim is false: the premise on the same page says 'A team of AI coaches I built predicts how it will go, and code checks every call.'",
+   "files": [],
+   "fix": "none (A-02 covers the section shape)"
+  },
+  {
+   "id": "A-23",
+   "verdict": "refuted",
+   "severity": "medium",
+   "class": "static-copy",
+   "evidence": "'Every call checked.' is true: all 191 decided calls are checked by code, and Eli makes no calls ('runs the program, so no checked calls'), so his row does not contradict the h1. Re-labelling commentary-derived calls is the A-24 wording, not an overclaim in the h1.",
+   "files": [],
+   "fix": "none"
+  },
+  {
+   "id": "B-20",
+   "verdict": "refuted",
+   "severity": "low",
+   "class": "renderer",
+   "evidence": "/coach/?c=henning_brandt renders the designed not-found state, listing all eight coach doors, with one console 404. The kit never links the name form. The finder itself says it is not a truth defect.",
+   "files": [],
+   "fix": "none"
+  },
+  {
+   "id": "B-31",
+   "verdict": "refuted",
+   "severity": "low",
+   "class": "static-copy",
+   "evidence": "Only ONE 'Planned' entry exists (Kitchen). The other 'Nothing is here yet' line is the slot for the home page's earlier layout, which the owner's 10-18 ruling keeps as a reference page. A planned row without a date is not a truth defect.",
+   "files": [],
+   "fix": "none"
+  }
+ ]
+}

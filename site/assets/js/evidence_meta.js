@@ -339,25 +339,25 @@ function verifyDeviceLinks() {
   // linked" wording) once Matthew confirms it; Whoop has no public-profile
   // feature at all, so its row explains the cross-check instead of a dead link.
   const rows = [
-    ["Whoop", "No public profile pages exist on Whoop's platform — its HRV/RHR readings are instead cross-checked against Garmin's independent sensor above."],
+    ["Whoop", "No public profile pages exist on Whoop's platform — its resting heart rate is instead cross-checked against the Apple Watch's independent sensor above."],
+    ["Apple Watch", "No public profile pages exist for Apple Health — the watch is the second sensor in the comparison above."],
     ["Strava", "Not yet linked publicly. <!-- TODO(#735): Matthew's public Strava athlete profile URL, if training is shared publicly -->"],
     ["Hevy", "Not yet linked publicly. <!-- TODO(#735): Matthew's public Hevy profile URL, if lifting sessions are shared publicly -->"],
-    ["Garmin Connect", "Not yet linked publicly (ingestion has also been paused since 2026-06, ADR-074 — vendor anti-automation). <!-- TODO(#735): public Garmin Connect profile URL, if enabled -->"],
+    ["Garmin Connect", "Not linked — the direct Garmin feed is retired (#4640); the Garmin watch's activities arrive through Strava."],
   ];
   return sec("Public device profiles", `<p class="rd-prose">The devices behind this data, and whether their own platforms let a stranger check them directly. No links are invented — a row says "not yet linked" until a real, confirmed public URL exists.</p>` +
     `<ul class="rd-tierlist">${rows.map(([name, text]) => `<li><strong>${esc(name)}</strong> — ${text}</li>`).join("")}</ul>`);
 }
 
 function verifyRawSample() {
-  // One real day (2026-06-15), both sensors, straight from DynamoDB — partition/sort
-  // keys (pk/sk, which carry the internal user-id shape) stripped; every remaining
-  // field is exactly what the ingestion pipeline wrote, unedited.
+  // One real day (2026-06-15), straight from DynamoDB — partition/sort keys (pk/sk,
+  // which carry the internal user-id shape) stripped; every remaining field is exactly
+  // what the ingestion pipeline wrote, unedited. #4976: the Garmin half of this sample
+  // is gone with the Garmin comparison (its stored rows are untouched).
   const whoop = { source: "whoop", date: "2026-06-15", phase: "experiment", ingested_at: "2026-06-15T23:00:41.814388+00:00", resting_heart_rate: 61, hrv: 42.34, recovery_score: 76, sleep_duration_hours: 10.4, sleep_efficiency_percentage: 96.74, respiratory_rate: 13.3, strain: 3.56 };
-  const garmin = { source: "garmin", date: "2026-06-15", phase: "experiment", ingested_at: "2026-06-16T00:00:17.374875+00:00", resting_heart_rate: 56, training_readiness: 79, training_readiness_level: "HIGH", body_battery_end: 84, avg_stress: 17, steps: 298 };
-  return sec("A raw payload, identifiers stripped", `<p class="rd-prose">One real night (June 15), as both devices actually reported it — the same night the table above compares. Partition/sort keys (the internal row-id shape) are removed; every other field is untouched.</p>` +
+  return sec("A raw payload, identifiers stripped", `<p class="rd-prose">One real night (June 15), as Whoop actually reported it. Partition/sort keys (the internal row-id shape) are removed; every other field is untouched.</p>` +
     `<pre class="rd-code">// Whoop — DATE#2026-06-15\n${esc(JSON.stringify(whoop, null, 2))}</pre>` +
-    `<pre class="rd-code">// Garmin — DATE#2026-06-15\n${esc(JSON.stringify(garmin, null, 2))}</pre>` +
-    `<p class="rd-meta label">The 61 vs 56 bpm resting-heart-rate reading above is row one of the comparison table — a real 5bpm sensor disagreement, not a rounding artifact.</p>`);
+    "");
 }
 
 export function renderVerify(d) {
@@ -367,15 +367,14 @@ export function renderVerify(d) {
   if (!d || d.status === "unavailable") {
     return sec("Cross-device agreement — the credibility signal", empty(d && d.reason ? d.reason : "No overlapping device data recorded yet.")) + links + sample + methodLink + note("Nothing here is fabricated to fill a gap — an empty section says so.");
   }
-  const rhr = d.rhr_agreement;
-  const headFigs = figs([
-    d.period && fig(d.period.overlapping_days, "nights both devices recorded"),
-    d.combined_agreement_rate_pct != null && fig(d.combined_agreement_rate_pct + "%", "agreement rate"),
-    rhr && fig(rhr.flagged_days, "nights flagged (RHR diff >6bpm)"),
-  ]);
+  // #5042: the comparison is the Apple WATCH era only (the producer floors it at the
+  // registry's first watch day) — every heading names that start, and below the agreement
+  // study's floor (#4974, 30 nights) the page shows the nights but no verdict.
+  const watchFrom = d.watch_era && d.watch_era.start ? d.watch_era.start : null;
+  const watchLabel = watchFrom ? `Apple Watch (from ${esc(watchFrom)})` : "Apple Watch";
   const rows = (d.daily || []).slice(0, 30).map((r) => {
     const flagged = r.rhr_agreement === "flag" || r.hrv_agreement === "flag";
-    return `<tr class="${flagged ? "rd-flag" : ""}"><td class="rd-name">${esc(r.date)}</td><td class="num">${r.whoop_rhr_bpm != null ? fmt(r.whoop_rhr_bpm) : "—"}</td><td class="num">${r.garmin_rhr_bpm != null ? fmt(r.garmin_rhr_bpm) : "—"}</td><td class="num">${r.rhr_abs_diff_bpm != null ? fmt(r.rhr_abs_diff_bpm) : "—"}</td><td>${esc(r.rhr_agreement || "—")}</td></tr>`;
+    return `<tr class="${flagged ? "rd-flag" : ""}"><td class="rd-name">${esc(r.date)}</td><td class="num">${r.whoop_rhr_bpm != null ? fmt(r.whoop_rhr_bpm) : "—"}</td><td class="num">${r.apple_rhr_bpm != null ? fmt(r.apple_rhr_bpm) : "—"}</td><td class="num">${r.rhr_abs_diff_bpm != null ? fmt(r.rhr_abs_diff_bpm) : "—"}</td><td>${esc(r.rhr_agreement || "—")}</td></tr>`;
   }).join("");
   // #2957: the table's own caption now bounds the window it's actually showing —
   // whatever the pause note says, a bare "night by night" table with no dates in
@@ -383,17 +382,33 @@ export function renderVerify(d) {
   // site_api_phase_frame.archival_frame call, off the window's newest night) adds
   // the same "previous cycle" framing every other cross-phase surface uses.
   const period = d.period ? ` — ${esc(d.period.start)} to ${esc(d.period.end)}` : "";
-  const table = rows ? sec(`Whoop vs Garmin, night by night (resting heart rate, bpm)${period}`, `<table class="rd-tbl"><thead><tr><th>date</th><th>Whoop</th><th>Garmin</th><th>diff</th><th>agreement</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
-  const pausedNote = d.garmin_paused ? `<p class="rd-meta label">Garmin ingestion has been paused since ${esc(d.garmin_last_date)} (vendor anti-automation, ADR-074) — the window above is real history through that date, not a live feed.</p>` : "";
+  const table = rows ? sec(`Whoop vs ${watchLabel}, night by night (resting heart rate, bpm)${period}`, `<table class="rd-tbl"><thead><tr><th>date</th><th>Whoop</th><th>Apple Watch</th><th>diff</th><th>agreement</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
+  // #4976: HRV is not compared (Whoop RMSSD vs Apple SDNN) — the producer says so, the page repeats it.
+  const hrvNote = d.hrv_note ? `<p class="rd-meta label">${esc(d.hrv_note)}</p>` : "";
+  const nNights = d.n_nights != null ? d.n_nights : (d.period ? d.period.overlapping_days : 0);
+  if (d.status === "too_few_nights") {
+    const minN = d.min_nights || 30;
+    return sec("Cross-device agreement — the credibility signal", figs([fig(nNights, `nights Whoop and the ${watchLabel} both recorded`)]) +
+        empty(`Too few nights to compare yet — ${nNights} of the ${minN} the agreement study needs. The comparison starts when the Apple Watch did${watchFrom ? ` (${esc(watchFrom)})` : ""}; earlier Apple Health heart-rate readings came from other devices, so they are left out rather than padded in.`) +
+        hrvNote) +
+      table + links + sample + methodLink +
+      note("Nothing is graded until the study's minimum is reached — the nights above are raw readings, not a finding.");
+  }
+  const rhr = d.rhr_agreement;
+  const headFigs = figs([
+    d.period && fig(nNights, `nights Whoop and the ${watchLabel} both recorded`),
+    d.combined_agreement_rate_pct != null && fig(d.combined_agreement_rate_pct + "%", "agreement rate"),
+    rhr && fig(rhr.flagged_days, "nights flagged (RHR diff >6bpm)"),
+  ]);
   const archivalNote = d.archival && d.archival.pre_cycle
-    ? `<p class="rd-meta label">${esc(_dayFrame(d.archival.label))} — the comparison window itself, not only the Garmin pause.</p>`
+    ? `<p class="rd-meta label">${esc(_dayFrame(d.archival.label))} — the comparison window itself.</p>`
     : "";
   const agreeDays = rhr ? rhr.agree_days : 0, minorDays = rhr ? rhr.minor_days : 0, flagDays = rhr ? rhr.flagged_days : 0;
   return sec("Cross-device agreement — the credibility signal", headFigs +
-      `<p class="rd-prose">Whoop and Garmin are two independently-made sensors, worn the same nights, that were never designed to talk to each other. Across every overlapping night on record: ${esc(agreeDays)} agreed within 3bpm, ${esc(minorDays)} were within 6bpm, and ${esc(flagDays)} disagreed enough to flag. That specific, correlated-but-imperfect pattern is what two real pieces of hardware produce — synthetic or copy-pasted numbers don't misbehave this particular way.</p>` +
-      pausedNote + archivalNote) +
+      `<p class="rd-prose">Whoop and the Apple Watch are two independently-made sensors, worn the same nights, that were never designed to talk to each other. Across every overlapping night since the watch arrived${watchFrom ? ` (${esc(watchFrom)})` : ""}: ${esc(agreeDays)} agreed within 3bpm, ${esc(minorDays)} were within 6bpm, and ${esc(flagDays)} disagreed enough to flag. That specific, correlated-but-imperfect pattern is what two real pieces of hardware produce — synthetic or copy-pasted numbers don't misbehave this particular way.</p>` +
+      hrvNote + archivalNote) +
     table + links + sample + methodLink +
-    note(d.interpretation || "Cross-device HRV/RHR comparison, thresholded from real inter-device variance — not a claim either sensor is 'right.'");
+    note(d.interpretation || "Cross-device resting-heart-rate comparison, thresholded from real inter-device variance — not a claim either sensor is 'right.'");
 }
 
 export function renderPipeline(d) {

@@ -95,7 +95,7 @@ v1.2.0 — Structured logging + auth resilience (RCA corrective actions)
 v1.1.0 — Three-tier source filtering + expanded metrics
   - Tier 1 (Apple-exclusive): activity, gait, energy, audio — all readings ingested
   - Tier 2 (cross-device): HR, HRV, RHR, respiratory, SpO2 — filtered to Apple Watch only
-  - Tier 3 (skip): nutrition (MacroFactor SOT), sleep (Eight Sleep SOT), body (Withings SOT)
+  - Tier 3 (skip): nutrition (MacroFactor SOT), sleep (Eight Sleep SOT; Apple's own night since #4971 → sleep_*_apple), body (Withings SOT)
   - Derived: total_calories_burned = active + basal
   - New fields: gait metrics, headphone_audio_exposure_db, *_apple suffixed cross-ref fields
   - Source detection via device name substring matching
@@ -121,6 +121,7 @@ try:
     from health import glycemic
 except ImportError:
     glycemic = None
+from health import rhythm_channel as _rhythm  # #4972: the owner-only ECG / HR-notification / medication-log channel
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -147,6 +148,11 @@ except ImportError:
 from ingestion import (
     health_auto_export_additive as _additive,  # #4628: the archived day sum
     health_auto_export_archive as _archive,
+    health_auto_export_protein as _protein,  # #5187: the same-day protein feed for the breakfast nudge
+    health_auto_export_sleep as _sleep,  # #4971: Apple's own night, sleep_*_apple fields
+    health_auto_export_units as _units,  # #4970: day-field units + derived totals
+    health_auto_export_watch as _watch,  # #4970: the Apple Watch's daily-metric map
+    watch_presence as _watch_presence,  # #4970: the watch dead-man's presence stamp
 )
 
 
@@ -587,6 +593,9 @@ _METRIC_DEFS = [
     ({"Respiratory Rate", "respiratory_rate"}, {"field": "respiratory_rate_apple", "agg": "avg", "tier": 2}),
     ({"Oxygen Saturation", "blood_oxygen_saturation"}, {"field": "spo2_pct_apple", "agg": "avg", "tier": 2}),
 ]
+# #4970: the Apple Watch's own daily metrics — names, tiers, summarize contract and lane
+# exclusions live in the cohesive sibling (health_auto_export_watch.py).
+_METRIC_DEFS += _watch.WATCH_METRIC_DEFS
 
 # Build lookup from all name variants
 for names, config in _METRIC_DEFS:
@@ -595,14 +604,15 @@ for names, config in _METRIC_DEFS:
 
 
 # ── Tier 3: Skip entirely (SOT covered by dedicated pipelines) ───────────
-# sleep_analysis   → Eight Sleep is SOT for sleep
+# sleep_analysis   → skipped HERE only: health_auto_export_sleep.py stores Apple's own
+#                    night as sleep_*_apple fields (#4971); Whoop/Eight Sleep rows dropped
 # All nutrition    → MacroFactor is SOT for nutrition
 # body_mass/fat   → Withings is SOT for body composition
 SKIP_METRICS = {
     # Glucose handled separately
     "Blood Glucose",
     "blood_glucose",
-    # Sleep — Eight Sleep is SOT
+    # Sleep — not generic-aggregated; Apple's night goes to health_auto_export_sleep (#4971)
     "sleep_analysis",
     "Sleep Analysis",
     # Body comp — Withings is primary, but accept body_mass from HAE as fallback
@@ -612,7 +622,7 @@ SKIP_METRICS = {
     # Nutrition — MacroFactor is SOT (these flow into HealthKit from MF app)
     "dietary_energy",
     "Dietary Energy",
-    "protein",
+    "protein",  # the DAILY figure is MacroFactor's; timed entries are captured by health_auto_export_protein (#5187)
     "Protein",
     "carbohydrates",
     "Carbohydrates",
@@ -689,22 +699,25 @@ _DEDUP_FIELDS = {"water_intake_raw", "caffeine_mg"}
 # so a payload-local average overwrote the day with the last sync's mean (equal
 # to the last payload on 40 of 40 field-days measured). The map is keyed on the
 # reading's own timestamp, so a re-delivered reading cannot shift the mean.
-_AVG_DEDUP_FIELDS = {"walking_speed_mph", "walking_step_length_in", "walking_double_support_pct", "walking_asymmetry_pct"}
+_GAIT_AVG_DEDUP_FIELDS = {"walking_speed_mph", "walking_step_length_in", "walking_double_support_pct", "walking_asymmetry_pct"}
+
+# #4970: the watch's averaged daily metrics take the SAME timestamp-keyed mean as gait, its
+# additive ones the unique-timestamp sum, and a 0 on a physiological reading is absent —
+# the sets and their reasons live in health_auto_export_watch.py.
+_WATCH_AVG_DEDUP_FIELDS = _watch.WATCH_AVG_DEDUP_FIELDS
+_AVG_DEDUP_FIELDS = _GAIT_AVG_DEDUP_FIELDS | _WATCH_AVG_DEDUP_FIELDS
+_DEDUP_FIELDS = _DEDUP_FIELDS | _watch.WATCH_SUM_DEDUP_FIELDS
+_ZERO_IS_ABSENT_FIELDS = _watch.ZERO_IS_ABSENT_FIELDS
+
+# #4970: the dead-man's presence stamp (newest watch-sourced reading, epoch seconds) —
+# GREATEST-on-merge so a late re-export of older readings never pulls it backwards.
+_PRESENCE_GUARD_FIELDS = {_watch_presence.WATCH_PRESENCE_FIELD}
 
 
-def _water_ml_factor(units):
-    """mL per reported water unit (#483/D-9). Historical payloads report fl-oz, which the
-    old code hard-assumed; honor mL/L when tagged so a mL-reporting app isn't ×29.5735'd."""
-    u = (units or "").lower().replace(" ", "").replace("_", "")
-    if u in ("ml", "milliliter", "milliliters", "millilitre", "millilitres"):
-        return 1.0
-    if u in ("l", "liter", "liters", "litre", "litres"):
-        return 1000.0
-    if u in ("floz", "flozus", "fluidounce", "fluidounces", "oz", "ounce", "ounces"):
-        return 29.5735
-    if u:
-        logger.warning(f"[HAE] unexpected water units {units!r}; assuming fl-oz")
-    return 29.5735  # historical default
+# #4970: the day-field unit normalisation + derived totals moved to the cohesive sibling
+# health_auto_export_units.py (the #1665 size guard); the names stay bound here.
+_water_ml_factor = _units.water_ml_factor
+_derive_day_fields = _units.derive_day_fields
 
 
 def process_generic_metrics(metrics):
@@ -792,6 +805,8 @@ def process_generic_metrics(metrics):
                 qty_f = float(qty)
             except (ValueError, TypeError):
                 continue
+            if qty_f == 0 and field in _ZERO_IS_ABSENT_FIELDS:
+                continue  # #4970 ADR-104: a failed measurement is absent, never a 0
 
             src_key = source if source else "_unknown"
             acc = day_per_source[date][src_key]
@@ -868,37 +883,7 @@ def process_generic_metrics(metrics):
                 if merged_ts:
                     daily_timestamps[date][field] = merged_ts
 
-    # ── Compute derived fields ──
-    for date, fields in daily_data.items():
-        ac = fields.get("active_calories")
-        bc = fields.get("basal_calories")
-        if ac is not None and bc is not None:
-            fields["total_calories_burned"] = round(ac + bc, 2)
-
-        # Water → mL, honoring the reported unit rather than assuming fl-oz (#483/D-9).
-        # oz is derived from ml after dedup, not tracked independently.
-        water_raw = fields.pop("water_intake_raw", None)
-        if water_raw is not None:
-            factor = _water_ml_factor(field_units.get("water_intake_raw"))
-            fields["water_intake_ml"] = round(water_raw * factor)
-            # Carry dedup timestamps from water_intake_raw → water_intake_ml
-            if date in daily_timestamps and "water_intake_raw" in daily_timestamps[date]:
-                raw_ts = daily_timestamps[date].pop("water_intake_raw")
-                daily_timestamps[date]["water_intake_ml"] = {ts: round(qty * factor) for ts, qty in raw_ts.items()}
-
-        # Weight is stored as lbs (HAE is a Withings fallback). Convert kg if so tagged (#483/D-9).
-        w = fields.get("weight_lbs")
-        if w is not None:
-            wu = (field_units.get("weight_lbs") or "").lower().strip()
-            if wu in ("kg", "kilogram", "kilograms"):
-                fields["weight_lbs"] = round(w * 2.20462, 2)
-            elif wu and wu not in ("lb", "lbs", "pound", "pounds"):
-                logger.warning(f"[HAE] unexpected weight units {wu!r} for {date}; assuming lbs")
-
-        # Distances are stored as miles. Convert km/m if so tagged; warn on anything else (#483/D-9).
-        for dfield in [f for f in fields if f.endswith("_miles")]:
-            if fields.get(dfield) is not None:
-                fields[dfield] = _additive.to_miles(fields[dfield], field_units.get(dfield))
+    _derive_day_fields(daily_data, daily_timestamps, field_units)
 
     # ── Logging ──
     if matched:
@@ -916,6 +901,14 @@ def process_generic_metrics(metrics):
                 logger.info(f"Source dedup [{date} {fname}]: chose {choice['chosen']!r}, rejected {choice['rejected']}")
 
     return daily_data, dict(daily_timestamps), dict(source_audit)
+
+
+# #4970: process_generic_metrics + the watch dead-man's presence stamp — the newest
+# watch-sourced reading per day, over EVERY metric (mapped or not), GREATEST-guarded on merge.
+def process_metrics_with_watch_presence(metrics):
+    daily, timestamps, audit = process_generic_metrics(metrics)
+    _watch_presence.stamp_presence(daily, metrics, parse_date_str)
+    return daily, timestamps, audit
 
 
 # ── DynamoDB Write ─────────────────────────────────────────────────────────────
@@ -955,7 +948,7 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
 
     # ── GREATEST-on-write for monotonic activity totals + reading counts ──
     if monotonic_guard:
-        _guarded_fields = _ACTIVITY_MAX_FIELDS | _READING_COUNT_GUARD_FIELDS
+        _guarded_fields = _ACTIVITY_MAX_FIELDS | _READING_COUNT_GUARD_FIELDS | _PRESENCE_GUARD_FIELDS
         _guard = [f for f in _guarded_fields if f in fields and fields[f] is not None and f not in archived]
         if _guard:
             try:
@@ -1534,8 +1527,7 @@ def lambda_handler(event, context):
             glucose_metric = m
             break
 
-    glucose_days = 0
-    glucose_readings_new = 0
+    glucose_days = glucose_readings_new = 0
 
     if glucose_metric:
         glucose_data = glucose_metric.get("data", [])
@@ -1557,18 +1549,18 @@ def lambda_handler(event, context):
         logger.info("No blood glucose data in payload")
 
     # ── Process other metrics ──
-    other_daily, other_timestamps, source_audit = process_generic_metrics(metrics)
+    other_daily, other_timestamps, source_audit = process_metrics_with_watch_presence(metrics)
     archived = _additive.apply_archived_sums(other_daily, metrics, METRIC_MAP, parse_date_str, s3_client, S3_BUCKET)
-    other_days = 0
     for date_str, fields in other_daily.items():
         merge_day_to_dynamo(date_str, fields, reading_timestamps=other_timestamps.get(date_str), archived=archived.get(date_str, ()))
-        other_days += 1
-
+    other_days = len(other_daily)
     if other_days:
-        fields_written = set()
-        for fields in other_daily.values():
-            fields_written.update(fields.keys())
-        logger.info(f"Other metrics: {other_days} days updated, fields: {sorted(fields_written)}")
+        logger.info(f"Other metrics: {other_days} days updated, fields: {sorted(set().union(*other_daily.values()))}")
+    # #4971: sleep_analysis skips the generic path (SKIP_METRICS) and lands here, Apple devices only.
+    sleep_nights = _sleep.write_apple_sleep(metrics, table, is_apple_device, parse_date_str, lambda d: {"pk": PK, "sk": f"DATE#{d}"})
+
+    # #5187: `protein` skips the generic path (SKIP_METRICS: the DAILY figure is MacroFactor's) and lands here as timed entries.
+    _protein.write_hae_protein(metrics, table, parse_date_str, lambda d: {"pk": PK, "sk": f"DATE#{d}"})
 
     # ── Process blood pressure individual readings (v1.4.0 + v1.4.1 combined format) ──
     bp_readings_new = 0
@@ -1651,9 +1643,7 @@ def lambda_handler(event, context):
                 # (was one level out → broke on the first metric regardless of name)
 
     # ── Process workouts (v1.6.0) ──
-    workout_days = 0
-    workout_new = 0
-    recovery_days = 0
+    workout_days = workout_new = recovery_days = 0
 
     if workouts:
         daily_workouts, workout_daily_agg = process_workouts(workouts)
@@ -1691,11 +1681,13 @@ def lambda_handler(event, context):
         "glucose_days_updated": glucose_days,
         "glucose_new_readings": glucose_readings_new,
         "other_metric_days": other_days,
+        "apple_sleep_nights": sleep_nights,
         "som_entries_new": som_entries_new,
         "som_days_updated": som_days,
         "workout_days": workout_days,
         "workout_new": workout_new,
         "recovery_days": recovery_days,
+        "rhythm_channel": _rhythm.webhook_ingest(table, data, user_id=USER_ID),  # #4972: counts only, fail-soft
         "metrics_received": [m.get("name") for m in metrics],
         "workouts_received": len(workouts),
         "raw_archive": s3_key,

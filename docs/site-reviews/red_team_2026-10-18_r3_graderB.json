@@ -1,0 +1,352 @@
+{
+ "grader": "B-truth",
+ "graded_at": "2026-10-18T20:52:53Z",
+ "method": "Live pages rendered headless (Playwright 390×844, PT clock) 2026-10-18 ~20:45Z; every /api/* the ck_*.js modules load fetched and re-added; stored rows read read-only from DynamoDB life-platform (withings, whoop, strava, macrofactor, apple_health, eightsleep); live JS confirmed identical to repo main 0fa46efc5 modulo fingerprinted import paths.",
+ "round2_truth_letters": {
+  "week": "A",
+  "day": "C",
+  "trend": "A",
+  "call": "B",
+  "coach": "A",
+  "sheet": "C",
+  "built": "C",
+  "appendix": "A"
+ },
+ "pages": [
+  {
+   "path": "/next/v8/week/",
+   "grade": "B",
+   "round2_truth": "A",
+   "findings": [
+    {
+     "id": "B-01",
+     "severity": "high",
+     "claim": "The lead coach's weekly read states the starting weight, a session count, a food-log gap and a journal gap, all four wrong against the data served on the same page",
+     "served": "“54 logged training sessions in thirty days, consistent daily movement, and a weight loss rate holding at 3.3 pounds per week from his starting weight of 302.2 pounds on day 42.” (full served text continues: “his food logs stopped four days ago, and his journal entries have been silent for forty days”)",
+     "source": "/api/edition blocks.lead_read (as_of 2026-10-17, /api/weekly_priority). Same response: blocks.today start_weight_lbs 327.3, weight_lbs 302.2 (302.2 is the CURRENT weight); /api/training_overview training.workouts_30d 39 (Hevy /api/workouts count 22); blocks.week.measures.food values logged 10-12..10-17 (6 of 7 days, /api/nutrition_overview nutrition_trend last date 2026-10-17 = the day before as_of); blocks.his_words as_of 2026-09-23 = 25 days, not forty; 25.1 lb / 6 weeks = 4.2 lb/wk, the scorecard's own 7-day drop is 3.4",
+     "fix": "Run weekly_priority through the grounded-generation number gate with the canonical facts block (ADR-104 arm 2) and fail-closed on a number that labels a served fact wrongly (302.2 is in the input, so the allow-list passes it — add a labelled-fact check: 'starting weight' must equal start_weight_lbs); until then do not quote the lead on the week page, or quote only the sentence with no numbers.",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-02",
+     "severity": "medium",
+     "claim": "The training row counts Sunday as trained while the day page for the same Sunday says no training was recorded",
+     "served": "“No rest day. Trained on 7 of 7 days recorded.” and detail 2026-10-18 “41 minutes of strength” (settled: false)",
+     "source": "/api/edition blocks.week.measures.training.values [109,99,168,131,158,168,41]; DynamoDB strava DATE#2026-10-18 activities[0] sport_type WeightTraining moving_time_seconds 2459 (41 min, device WHOOP, ingested 20:10Z); /next/v8/day/ (d=2026-10-18) prints “No training was recorded on this day.”",
+     "fix": "One training reader for both pages (the day page's training section must read daily_modality / the Strava row, not only Hevy + cardio_sessions), or print the week row's 'settled: false' day as 'so far' with the partial-day flag.",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-03",
+     "severity": "low",
+     "claim": "The chapter line dates the chapter's writing to October 13 while the chronicle published it on October 18",
+     "served": "“Week 6 · “The Quiet Accumulation”, the chapter. Written by AI from the record on October 13; Matthew reads each chapter before it publishes.”",
+     "source": "/api/edition blocks.chapter date 2026-10-13, latest.status published; SITE_REVIEW_2026-10-18 records week 6 published 2026-10-18T04:29Z — the served `date` is the chapter's dateline, not the write date",
+     "fix": "Say “dated October 13” (the dateline) or serve and print a `published_at`; do not assert when it was written from the dateline field.",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-04",
+     "severity": "low",
+     "claim": "The Body verdict's 'seven days before' average is over six weigh-ins (October 11 has none) and the page does not say so",
+     "served": "“Seven-day average 304.6 lb, down 3.4 lb from the seven days before.”",
+     "source": "/api/pulse_history weight_lbs 10-05..10-11 = [311.1,308.9,308.3,307.2,306.1,306.5,null] mean 308.02; 10-12..10-18 mean 304.60; the arithmetic reproduces (304.6 − 308.0 = 3.4 ✓)",
+     "fix": "Append the counts the way the other rows do: “(7 weigh-ins against 6)”. Reproduces; the fix is the stated n (ADR-105 rule 1).",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-05",
+     "severity": "info",
+     "claim": "Every scorecard number reproduces: 304.6 / −3.4 (pulse_history), 7 of 7 trained, 7 of 7 nights ≥7 h ([9.6,8.5,9.1,8.1,8.3,8.8,9.3]), 0 of 6 days ≥170 g ([155,166,152,98,166,133]), 78 of 191 and the 41% base rate (record.baseline.rate 0.408, brier_skill −0.0147), Day 43 from genesis 2026-09-06, next chapter 2026-10-21, his words since 2026-09-23 (decisions latest 2026-09-23)",
+     "served": "as listed",
+     "source": "/api/edition blocks.week, blocks.scorecard, blocks.record, blocks.next, blocks.his_words; /api/decisions",
+     "fix": "none",
+     "fixture_bound": false
+    }
+   ]
+  },
+  {
+   "path": "/next/v8/day/",
+   "grade": "C",
+   "round2_truth": "C",
+   "findings": [
+    {
+     "id": "B-06",
+     "severity": "high",
+     "claim": "Today's page says no training was recorded while a 41-minute weight-training session is stored and printed on the trend and week pages for the same day",
+     "served": "“Training — What I lifted. No training was recorded on this day.” (Sunday, October 18, Day 43)",
+     "source": "DynamoDB strava DATE#2026-10-18: Lunch Weight Training, sport_type WeightTraining, moving_time_seconds 2459, average_heartrate 114.1, ingested 2026-10-18T20:10Z; /api/training_overview daily_modality_minutes_30d 2026-10-18 strength_min 41; /next/v8/trend/ “Training time · 41 minutes October 18”; ck_depth.js line 287 prints the sentence when there is no Hevy session and `other` (cardio_sessions) is empty — cardio_sessions carries Walk/Cycling/Stretching, never WeightTraining",
+     "fix": "In ck_depth.js build `other` from daily_modality_minutes_30d (or the Strava row) so a device-recorded strength session prints as “Also that day: 41 minutes of weight training (recorded by the wrist strap; no lift log)”.",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-07",
+     "severity": "medium",
+     "claim": "Two journals, two silences, one word — unresolved from round 2",
+     "served": "“25.1 lbs down, protein climbing, yet 39 days of journal silence.” (Nathan Reeves, Oct 18) beside the week page's “Nothing new in his own words since Wednesday, September 23.” (25 days)",
+     "source": "/api/edition blocks.coach_lines (coaching-dashboard, Notion journal gap) vs blocks.his_words as_of 2026-09-23 (/api/decisions); day 2026-10-17 prints “38 days”, so the Notion gap counts from 2026-09-09/10",
+     "fix": "Name the record in the coach line's gloss (“39 days without a Notion journal entry”) or make the his_words block read the same journal; one sentence on the page saying which is which.",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-08",
+     "severity": "low",
+     "claim": "A coach quote prints 'lbs' on a site whose unit is 'lb'",
+     "served": "“25.1 lbs down”",
+     "source": "served coach text /api/edition blocks.coach_lines[0].text; site unit is ' lb' everywhere else (blocks.today unit)",
+     "fix": "Normalise units in the coach-line renderer (lbs→lb) or in the grounded-generation post-pass.",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-09",
+     "severity": "info",
+     "claim": "The measured row reproduces to the stored rows: 302.2 lb (withings DATE#2026-10-18 weight_lbs 302.2), 9.3 hours (whoop sleep_duration_hours 9.26), recovery 80 out of 100 (whoop recovery_score 80.0); Oct 17 reproduces too (withings 302.22, Strava walk moving_time 10097 s = 168 min, macrofactor 1561 kcal / 133 g / 162 g / 37 g, macro shares 35/43/22 re-added); Oct 16 304.0 = withings 304.03",
+     "served": "as listed",
+     "source": "DynamoDB life-platform, pk USER#matthew#SOURCE#{withings,whoop,strava,macrofactor}",
+     "fix": "none — the round-1 168-vs-90 defect is closed on the stored row",
+     "fixture_bound": false
+    }
+   ]
+  },
+  {
+   "path": "/next/v8/trend/",
+   "grade": "B",
+   "round2_truth": "A",
+   "findings": [
+    {
+     "id": "B-10",
+     "severity": "medium",
+     "claim": "The Steps figure is one device's count with no device named, while the other stored device disagrees by 4,000 steps on the same day",
+     "served": "“Steps · 17,866 October 17”",
+     "source": "/api/pulse_history 2026-10-17 steps 17866 (Whoop step_count); DynamoDB apple_health DATE#2026-10-17 steps 13856",
+     "fix": "Gloss the row “(wrist strap)” the way Recovery is glossed on the coach page, or serve the device in pulse_history and print it; where two devices disagree the method must be stated (ADR-105 rule 1).",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-11",
+     "severity": "medium",
+     "claim": "The training index row prints a day the day page denies",
+     "served": "“Training time · 41 minutes October 18 →” links to a day page saying “No training was recorded on this day.”",
+     "source": "/api/training_overview daily_modality_minutes_30d 2026-10-18 total_min 41 (Strava WeightTraining, see B-06)",
+     "fix": "Same fix as B-06.",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-12",
+     "severity": "low",
+     "claim": "The 30-day stats line gives no window rule for a series whose latest day is partial",
+     "served": "“30 readings from September 19 to October 18. Lowest 41 minutes, highest 269 minutes, average 156 minutes.” and “The last seven readings average 125 minutes; the seven before, 113 minutes.”",
+     "source": "Re-added from daily_modality_minutes_30d: min 41 (10-18, a day still in progress at 13:42 PT), max 269 (09-19), mean 156.4, last 7 124.9, prior 7 112.9 — all reproduce; the 'lowest' is today's partial day",
+     "fix": "Exclude the current PT day from min/max or label it “today so far”.",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-13",
+     "severity": "info",
+     "claim": "Weight: 34 readings 09-06→10-18, lowest 302.2, highest 327.3, the last seven rows 302.2/302.2/304.0/304.5/305.6/305.4/308.3 — all reproduce from /api/pulse_history and the withings rows; Recovery “80 out of 100” carries the unit; Calories/Protein/Carbs/Fat Oct 17 match macrofactor",
+     "served": "as listed",
+     "source": "/api/pulse_history; DynamoDB withings, macrofactor",
+     "fix": "none",
+     "fixture_bound": false
+    }
+   ]
+  },
+  {
+   "path": "/next/v8/call/",
+   "grade": "B",
+   "round2_truth": "B",
+   "findings": [
+    {
+     "id": "B-14",
+     "severity": "high",
+     "claim": "The bet's outcome number is a different device and (apparently) a different window from what the sentence states, and neither is named",
+     "served": "“whether the 7-day average of his deep-sleep share … would be at or above 26% on October 16 … It came in at 16.4%. Graded on the reading for October 16.”",
+     "source": "DynamoDB whoop DATE#2026-10-10..16 slow_wave_sleep_hours/sleep_duration_hours → 25.3,17.0,19.3,22.2,21.0,25.7,30.1; 7-day mean 22.9% (Oct 16 alone 30.1%). DynamoDB eightsleep deep_pct 10-09..10-15 = 15.8,14.8,8.9,16.6,21.8,17.5,19.4 → mean 16.4% (10-10..10-16 → 16.2%). So 16.4 reproduces only as Eight Sleep's share over Oct 9–15. The verdict (no, <26%) holds on both devices; the number does not reproduce as stated.",
+     "fix": "Serve `actual.source` and `actual.window` for bets and print them: “16.4%, the bed sensor's 7-day average to October 15” — or grade on the wrist strap (22.9%) if that is the series the coaches' 27.6% claim was about; one device per quantity across the bet's claim, its yardstick and its grade.",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-15",
+     "severity": "medium",
+     "claim": "The simple guess for the weight call skipped the reading on the day the call was made",
+     "served": "“The simple guess was that it would stay at 305.6 lb, the last reading before the call.” (call logged October 15: “Weight will be around 304.5 pounds tomorrow morning”)",
+     "source": "/api/pulse_history 2026-10-15 weight_lbs 304.5, 2026-10-14 305.6; /api/calls[0] logged_date 2026-10-15, observed_on 2026-10-16. The coach's number equals the Oct 15 weigh-in; the guess used Oct 14. Both still 'right' within 4 lb.",
+     "fix": "Define 'last reading before the call' by timestamp (call logged_at vs withings measurement_time_utc) and print the date: “stay at 304.5 lb, the October 15 reading”. If the engine deliberately uses strictly-before-date, say so in simple_guess_words.",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-16",
+     "severity": "low",
+     "claim": "The tolerance's n does not match the stated window",
+     "served": "“The allowed distance is one standard deviation of his readings over the 30 days before the call.” (tolerance.text “4 lb”, value 3.9712, n 29)",
+     "source": "/api/pulse_history has 28 weigh-ins in 2026-09-15..2026-10-14 (sample SD 3.78); n=29 implies the window includes Oct 15 or Sep 14",
+     "fix": "Print the window's dates and n (“29 readings, September 15 to October 15”) so the SD reproduces.",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-17",
+     "severity": "info",
+     "claim": "Records reproduce everywhere: Max Reyes 13 of 28, Lisa Park 19 of 47, Henning Brandt 18 of 36 (both /api/calls records and /api/coaches headline_stat); 8 listed + 55 earlier = 63 = calls.count; 63 + 123 excluded + 5 bets counted twice = 191 = Σ per-coach n; 78 right = Σ per-coach right; the 178-vs-183 clarity defect from round 2 is closed by the printed reconciliation sentence",
+     "served": "“191 checked calls in all: 63 with a page here, 5 of them bets the record counts once for each coach, and 123 without.”",
+     "source": "/api/calls, /api/coaches, /api/edition blocks.record",
+     "fix": "none",
+     "fixture_bound": false
+    }
+   ]
+  },
+  {
+   "path": "/next/v8/coach/",
+   "grade": "A",
+   "round2_truth": "A",
+   "findings": [
+    {
+     "id": "B-18",
+     "severity": "info",
+     "claim": "Henning Brandt's record partitions exactly: number 6 (5 right) + direction 27 (12) + sealed 2 (1) + 1 not checkable against the guess = 36; 5+12+1 = 18 right; 'through October 18' matches /api/coaches record.through",
+     "served": "“Right so far — 18 of 36 checked calls” and the comparison sentence",
+     "source": "/api/coaches explorer_coach record {confirmed 18, refuted 18, n 36, through 2026-10-18}; /api/calls records",
+     "fix": "none",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-19",
+     "severity": "low",
+     "claim": "Two call cards print without their stated units' source — fine — but the Sep 16 card's tolerance (19.3) and the Oct 16 card's (14.8) are 'one standard deviation over the 30 days before the call' with no n; same class as B-16",
+     "served": "“Wrong · not within 19.3 out of 100 either way”",
+     "source": "/api/calls tolerance.n is served per call and not printed",
+     "fix": "Print n with the shared tolerance note.",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-20",
+     "severity": "low",
+     "claim": "The not-found branch renders for a persona id spelled as a name (`?c=henning_brandt`) and fetches a 404 (console error) — the ids are role ids (`explorer_coach`)",
+     "served": "“No coach by that name” for /next/v8/coach/?c=henning_brandt, 1 console 404",
+     "source": "/api/coaches persona_id values; ck_coach.js isCoachId",
+     "fix": "Accept the slugified name as an alias or keep as is (the kit never links the name form). Not a truth defect.",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-21",
+     "severity": "info",
+     "claim": "Eli Marsh page: “The lead makes no checked calls” is consistent with /api/coaches record null and headline_stat 'runs the program'; but the week page quotes Eli with four numbers (B-01) — the lead's prose is the one unchecked numeric surface",
+     "served": "“Eli Marsh is the lead. The lead makes no checked calls, so there is no record here.”",
+     "source": "/api/coaches eli_marsh",
+     "fix": "Covered by B-01's fix.",
+     "fixture_bound": false
+    }
+   ]
+  },
+  {
+   "path": "/next/v8/sheet/",
+   "grade": "C",
+   "round2_truth": "C",
+   "findings": [
+    {
+     "id": "B-22",
+     "severity": "high",
+     "claim": "The Food row's served 'why' hides that the engine saw no food log at all, on a week with six logged days",
+     "served": "“Food — Score 2.8 of 100, up 0.2 on the day. Held back most by body composition. Level 2”",
+     "source": "/api/character pillars.nutrition drivers.absent = [calorie_adherence, protein_total, protein_distribution, consistency], dragging = [body_composition_progress]; /api/nutrition_overview nutrition.days_logged 29 of 30, avg_protein_g 146.8; DynamoDB macrofactor DATE#2026-10-17 total_protein_g 133, entries_count 13. ADR-104 scores a behavioral component ABSENT as 0 — four components are scored as 'he did not log' while the log exists (the ADR-104 field-mapping class). The page's sentence names only the 'dragging' driver.",
+     "fix": "Engine: the nutrition pillar must read the macrofactor rows (check the component's source key in config/character_sheet.json against the registry). Page: when drivers.absent is non-empty, print it (“four parts of this score count as not logged”) so a reader can see the hold; never collapse absent into the dragging sentence.",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-23",
+     "severity": "medium",
+     "claim": "The sheet's date and its input date disagree",
+     "served": "“Level 12 on Saturday, October 17” and “Some sources were late when this was worked out, so today's numbers may move.”",
+     "source": "/api/character character.as_of_date 2026-10-17 but input_manifest.as_of_day 2026-10-18, status partial, degraded [food_delivery, notion]; _meta generated 2026-10-18T20:42Z; no DATE#2026-10-17/18 row under pk …SOURCE#character (the sheet's store is elsewhere) — the stored day could not be re-read in the time box",
+     "fix": "Serve one date: the day the scores describe, and the day they were computed; print both (“scores for October 17, worked out October 18 on partial input”).",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-24",
+     "severity": "medium",
+     "claim": "Metabolic health is on coverage hold (15% coverage) yet counts in the composite — the owner item from round 2, still open",
+     "served": "“Worked out from 6 of 7 areas: Relationships has nothing measuring it and is left out; Metabolic health is measured thinly and still counts.” / “Metabolic health Score 59.4 of 100, level on the day. Level 1”",
+     "source": "/api/character pillars.metabolic data_coverage 0.15 coverage_hold true; composite_pillar_count 6 of 7; composite_note 'mean of 6 of 7 pillars'",
+     "fix": "Owner ruling pending (exclude held areas or keep saying it counts). The page now says the truth; grade held at C for the engine, not the copy.",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-25",
+     "severity": "info",
+     "claim": "Level 12 = mean(22,25,2,1,3,17) = 11.67 → 12 reproduces; every level matches pillars.*.level; 7 of 40 badges with the served dates (Lost 20 lb 2026-10-08: pulse_history 10-08 307.2 = 20.1 lb down ✓; Month of Data 10-05 = day 30 ✓); summary.days_tracked 41 vs Day 43 on the header — the badge engine counts tracked days, unstated",
+     "served": "“7 of 40 earned so far.”",
+     "source": "/api/achievements summary {earned 7, total 40, days_tracked 41}",
+     "fix": "Low: gloss days_tracked if it is ever printed; it is not printed today.",
+     "fixture_bound": false
+    }
+   ]
+  },
+  {
+   "path": "/next/v8/built/",
+   "grade": "B",
+   "round2_truth": "C",
+   "findings": [
+    {
+     "id": "B-26",
+     "severity": "high",
+     "claim": "The forecast is printed as under the ceiling at tier 1 while the page's own tier table puts that forecast in tier 2, and the served projection says the all-classes forecast is over the ceiling",
+     "served": "“As of October 18, $136.96 is spent this month, and the forecast for October 31 is $188.05, under the ceiling. The system is at tier 1 … Tier 2 From about 87%.”",
+     "source": "/api/receipts projected_month_end_usd 188.05, ceiling_usd 215, projected_pct_of_ceiling 87.5 (≥ the 87% band), tier 1 (computed_at 16:00Z, 4.7 h before the projection served), projected_all_classes_usd 225.31 = 104.8% of ceiling (projection_note: recurring classes only; dev-session counted in full but not extrapolated)",
+     "fix": "Print the projection's scope (“forecast for the scheduled spend; counting the laptop sessions at today's rate it would be $225.31, over the ceiling”) and the tier's computed_at; or print the tier the served projection implies and say the governor re-reads it every 8 hours.",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-27",
+     "severity": "medium",
+     "claim": "The scheduled-program count is a repo constant stamped 'counted from the code', not a served number — round-1 finding still open",
+     "served": "“81 programs run on a timer. Another 27 run when called … Counted October 17, from the code.”",
+     "source": "/api/platform_stats serves lambdas 108 (81+27 = 108 ✓) and no scheduled split; ck_built.js line 26: 'Source: model/platform_model.json meta.counts.scheduled_lambdas' (a build-time constant)",
+     "fix": "Serve scheduled_lambdas on /api/platform_stats and bind it, with the model's generated date as the 'counted' stamp.",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-28",
+     "severity": "low",
+     "claim": "One cost line is a median presented as 'an ordinary day' with the window right; the 31-day figure is correctly labelled not a forecast in the API but reads as one on the page",
+     "served": "“An ordinary day costs $5.06, AI included: the middle day of the 30 days to October 17. 31 days like it come to $156.86, under the ceiling.”",
+     "source": "/api/receipts typical_day {usd 5.06, days_counted 30, window 09-18..10-17, month_usd 156.86, basis 'A median … not a forecast'}; 5.06 × 31 = 156.86 ✓",
+     "fix": "Add “not a forecast” to the sentence, as the served basis does.",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-29",
+     "severity": "info",
+     "claim": "78 right, 113 wrong = 191 reproduces (/api/edition blocks.record right 78 decided 191); 20 sources, 8 coaches (/api/platform_stats data_sources 20, /api/coaches count 8); the approval sentence is now one sentence on the page and on In-his-words (round-2 built C defect closed)",
+     "served": "“78 right, 113 wrong”",
+     "source": "/api/edition, /api/platform_stats, /api/coaches",
+     "fix": "none",
+     "fixture_bound": false
+    }
+   ]
+  },
+  {
+   "path": "/next/v8/appendix/",
+   "grade": "A",
+   "round2_truth": "A",
+   "findings": [
+    {
+     "id": "B-30",
+     "severity": "info",
+     "claim": "All 75 internal links return 200; the page carries no numerals beyond its list; the 'Earlier version … superseded' notes match the ruling (2026-10-04) that retired pages are listed",
+     "served": "75 hrefs",
+     "source": "curl HEAD on every appendix href 2026-10-18T20:5xZ",
+     "fix": "none",
+     "fixture_bound": false
+    },
+    {
+     "id": "B-31",
+     "severity": "low",
+     "claim": "Two entries describe pages as 'Planned … Nothing is here yet' with no date for when they were planned or by whom",
+     "served": "“Kitchen — Planned: what meals do to blood sugar. Nothing is here yet.”",
+     "source": "static copy in the appendix HTML",
+     "fix": "Add the planned date or drop the row until it exists.",
+     "fixture_bound": false
+    }
+   ]
+  }
+ ]
+}

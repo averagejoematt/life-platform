@@ -116,6 +116,13 @@ CONSUMERS: dict[tuple[str, str], dict] = {
         "Same map, device measure 130 (ECG screening; 0 = ran, not detected). Stored as "
         "an event-class result, never rolled into a trend stat.",
     ),
+    ("lambdas/health/hr_regime.py", "afib_result"): _d(
+        SAW,
+        "#4999 AF-day exclusion: `af_days` reads the field off the Withings rows the caller already "
+        "fetched and reduces it to 'this date is excluded from the HRV/RHR baselines' — a set of dates "
+        "that never leaves the baseline math. The value is never returned, stored, logged or counted by "
+        "reason (the stored basis carries only `excluded_days_n`, which merges it with the Eight Sleep spike rule).",
+    ),
     ("lambdas/ingestion/withings_lambda.py", "measurement_attrib"): _d(
         SAW,
         "The ingester (#4642): stores the Withings attribution code of the day's latest "
@@ -125,6 +132,62 @@ CONSUMERS: dict[tuple[str, str], dict] = {
         SAW,
         "The ingester (#4642): stores a {timestamp, attrib} list for the day's groups, "
         "capture only. Writer-only footprint; owner-only in FIELD_TIERS, no reader.",
+    ),
+    ("lambdas/ingestion/health_auto_export_lambda.py", "spo2_pct_apple"): _d(
+        SAW,
+        "The HAE webhook (#4970 tiering of a pre-existing map entry): maps HealthKit "
+        "blood_oxygen_saturation from Apple devices only, and lists the field in its "
+        "zero-is-absent and timestamp-mean sets. Writer-only footprint; no reader yet.",
+    ),
+    ("lambdas/ingestion/health_auto_export_units.py", "wrist_temp_sleep_c_apple"): _d(
+        SAW,
+        "The webhook's day-field units sibling (#4970): passes the reported wrist-temperature "
+        "unit to the Celsius conversion during the per-day derivation pass. Writer-only.",
+    ),
+    ("lambdas/ingestion/health_auto_export_watch.py", "wrist_temp_sleep_c_apple"): _d(
+        SAW,
+        "The webhook's watch-map sibling (#4970): maps Apple Sleeping Wrist Temperature, "
+        "lists it in the mean/zero-absent sets and converts degF to Celsius on write.",
+    ),
+    ("lambdas/ingestion/health_auto_export_watch.py", "breathing_disturbances_apple"): _d(
+        SAW,
+        "The webhook's watch-map sibling (#4970): maps the nightly Breathing Disturbances "
+        "rate (sleep-apnea screen, diagnostic-class) into the timestamp-mean set.",
+    ),
+    ("lambdas/ingestion/health_auto_export_watch.py", "spo2_pct_apple"): _d(
+        SAW,
+        "The webhook's watch-map sibling (#4970): names the pre-existing SpO2 field in the "
+        "timestamp-mean and zero-is-absent sets; the mapping itself stays in the webhook.",
+    ),
+    ("lambdas/ingestion/ingestion_validator.py", "spo2_pct_apple"): _d(
+        SAW,
+        "The merge validator (#4970): a WARNING-only plausibility band (70-100%) checked "
+        "on the HAE fragment before it merges. Reads the value, logs, never publishes.",
+    ),
+    ("lambdas/ingestion/ingestion_validator.py", "wrist_temp_sleep_c_apple"): _d(
+        SAW,
+        "The merge validator (#4970): a WARNING-only 30-42 C band on the converted wrist "
+        "temperature, so a degF value that escaped conversion is logged, not dropped.",
+    ),
+    ("lambdas/ingestion/ingestion_validator.py", "breathing_disturbances_apple"): _d(
+        SAW,
+        "The merge validator (#4970): a WARNING-only 0-60 events/hr band; the value is "
+        "compared and logged inside ingestion, never surfaced.",
+    ),
+    ("lambdas/ingestion/source_registry.py", "spo2_pct_apple"): _d(
+        EXCLUDED,
+        "Not a value read: the #4970 hae_datatypes 'watch_overnight_vitals' entry names "
+        "the field as a liveness presence signal (any-of), never its value.",
+    ),
+    ("lambdas/ingestion/source_registry.py", "wrist_temp_sleep_c_apple"): _d(
+        EXCLUDED,
+        "Not a value read: a presence-signal name in the #4970 overnight-vitals "
+        "hae_datatypes entry; the freshness checker tests `is not None` only.",
+    ),
+    ("lambdas/ingestion/source_registry.py", "breathing_disturbances_apple"): _d(
+        EXCLUDED,
+        "Not a value read: a presence-signal name in the #4970 overnight-vitals "
+        "hae_datatypes entry, the same any-of liveness set as the two above.",
     ),
     # NOTE — `mcp/tools_data.py` is deliberately ABSENT. It was the #2809 leak site and
     # it carried a hand-written `TIER2_STRIP_FIELDS` literal naming all three fields.
@@ -177,6 +240,11 @@ CONSUMERS: dict[tuple[str, str], dict] = {
         "bmr_kcal. Cross-name collision with the withings device field, not a read "
         "of it — this module never touches withings rows.",
     ),
+    ("mcp/tools_health.py", "skin_temp_celsius"): _d(
+        SAW,
+        "#4978: the owner MCP readiness tool scores the night's Whoop skin temperature against his own "
+        "30-night baseline (overnight_physiology) and returns the deviation on the owner's own surface only.",
+    ),
     ("mcp/tools_health.py", "bmr_kcal"): _d(
         SAW,
         "Owner MCP energy-budget tool: reads tdee.py's computed bmr_kcal output "
@@ -192,9 +260,9 @@ CONSUMERS: dict[tuple[str, str], dict] = {
     # fat_mass_lbs: cross-source collision — both mentions read the DEXA report's
     # body_composition dict (source `dexa`, TIER_OWNER_PUBLISHED source-level per
     # ADR-155), never a withings row. The withings stamp governs withings rows.
-    ("lambdas/content/output_writers.py", "fat_mass_lbs"): _d(
+    ("lambdas/content/dexa_fields.py", "fat_mass_lbs"): _d(
         EXCLUDED,
-        "AI/content family, but the read is bc.get('fat_mass_lbs') on the dexa "
+        "AI/content family, but the key is built off bc.get('fat_mass_lb') on the dexa "
         "partition's body_composition dict — a TIER_OWNER_PUBLISHED source "
         "(ADR-155), not a withings row. Cross-source name collision; this module "
         "does not read the governed withings field.",
@@ -270,6 +338,45 @@ _WRITER_ONLY = {
         "spo2_percentage",
     ),
 }
+# #4972: the heart-rhythm event channel's producer. `lambdas/health/rhythm_channel.py` parses
+# the HAE ECG / heart-rate-notification / medication payloads and builds the `RHYTHM#` rows, so
+# it necessarily names every channel field; it is the writer (via clinical_facts.put_channel_rows),
+# where the tier is assigned, not where it leaks. No other module names these fields.
+_RHYTHM_FIELDS = (
+    "cross_device_same_day",
+    "rhythm_ecg_avg_hr_bpm",
+    "rhythm_ecg_classification",
+    "rhythm_ecg_device",
+    "rhythm_ecg_sample_start",
+    "rhythm_med_at",
+    "rhythm_med_dose_text",
+    "rhythm_med_name",
+    "rhythm_med_status",
+    "rhythm_notification_at",
+    "rhythm_notification_bpm",
+    "rhythm_notification_device",
+    "rhythm_notification_kind",
+    "rhythm_notification_kind_inferred",
+    "rhythm_notification_threshold_bpm",
+)
+for _field in _RHYTHM_FIELDS:
+    CONSUMERS[("lambdas/health/rhythm_channel.py", _field)] = _d(
+        SAW,
+        f"The #4972 channel producer builds `{_field}` on a `RHYTHM#` clinical row from the HAE "
+        "event payload (writer-only footprint, verified tree-wide 2026-10-18). Owner-only by "
+        "owner ruling (c), 2026-10-17; tests/test_rhythm_channel_privacy_4972.py holds every reader out.",
+    )
+CONSUMERS[("lambdas/health/rhythm_channel.py", "afib_result")] = _d(
+    SAW,
+    "ECG de-duplication (#4972): reads only the PRESENCE of the Withings day row's ECG result to "
+    "set `cross_device_same_day` on a watch ECG row — the value itself is never copied, logged or returned.",
+)
+CONSUMERS[("lambdas/health/rhythm_channel.py", "measurement_group_attribs")] = _d(
+    SAW,
+    "ECG de-duplication (#4972): reads the Withings group TIMESTAMPS only, to recognise a "
+    "Withings ECG mirrored through Apple Health as the recording Withings already stores; "
+    "the attribution codes are never read, copied or returned.",
+)
 for _path, _fields in _WRITER_ONLY.items():
     for _field in _fields:
         CONSUMERS[(_path, _field)] = _d(
@@ -278,6 +385,36 @@ for _path, _fields in _WRITER_ONLY.items():
             "(writer-only footprint, verified tree-wide 2026-08-23 for the #3045 "
             "port). The writer is where the tier is assigned, not where it leaks.",
         )
+
+# #4971: the Apple Watch's own night. The sleep sibling of the HAE webhook is the one
+# module that names these fields (verified tree-wide 2026-10-18: no reader exists yet —
+# the agreement study #4974 is the first planned one and must get its own entry here).
+for _field in (
+    "sleep_total_hours_apple",
+    "sleep_in_bed_hours_apple",
+    "sleep_core_min_apple",
+    "sleep_deep_min_apple",
+    "sleep_rem_min_apple",
+    "sleep_awake_min_apple",
+    "sleep_unspecified_min_apple",
+    "sleep_start_apple",
+    "sleep_end_apple",
+    "sleep_in_bed_start_apple",
+    "sleep_in_bed_end_apple",
+    "sleep_source_apple",
+    "sleep_record_kind_apple",
+    "_rd_sleep_apple",
+):
+    CONSUMERS[("lambdas/ingestion/health_auto_export_sleep.py", _field)] = _d(
+        SAW,
+        f"The Apple sleep writer (#4971) derives and stores `{_field}` from HAE's "
+        "sleep_analysis, Apple devices only; writer-only footprint, no reader yet.",
+    )
+
+CONSUMERS[("lambdas/ingestion/health_auto_export_protein.py", "_rd_protein_hae")] = _d(
+    SAW,
+    "The HAE intraday protein writer (#5187) stores `_rd_protein_hae`; protein_nudge_runner reads it for the owner-only breakfast nudge.",
+)
 
 
 # ── The derivation ────────────────────────────────────────────────────────────

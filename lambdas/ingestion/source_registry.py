@@ -346,6 +346,10 @@ DEFAULT_STALE_HOURS = 48
 #                  BP/State of Mind) vs the passive device streams (steps/workouts)
 #                  — only the manual ones are nudge-eligible. Read by
 #                  hae_datatype_thresholds().
+#                  `dead_man` (#4970) {field, stale_hours} is the one ALARMING bar on a
+#                  sub-datatype: `field` holds an instant (epoch seconds), and older
+#                  than `stale_hours` counts toward StaleSourceCount. Read by
+#                  ingestion.watch_presence.check_dead_men(); today only `watch`.
 #                  `evidence_for` (#3294) is the SUB-datatype's answer to the same
 #                  question the source-level facet asks, and apple_health is the one
 #                  source that needs both: every HAE stream shares ONE partition, so a
@@ -354,6 +358,15 @@ DEFAULT_STALE_HOURS = 48
 #                  Read by evidence_field_predicates(); a behavioral source needs no
 #                  entry because its row IS the evidence (that is what `behavioral`
 #                  means), which is why this facet lives on apple_health alone.
+#   field_feeds    (#5097) the non-HAE form of the same idea: a FEED that arrives as
+#                  fields on another channel's DATE# row, so the source-level
+#                  `stale_hours` cannot see it go dark. Same row shape as
+#                  `hae_datatypes` — {key, label, fields (any-of presence), stale_days,
+#                  manual, note}. MacroFactor is the specimen: the diary export keeps
+#                  the partition fresh daily while the adaptive expenditure (only the
+#                  daily-summary export carries it) was last written 2026-04-04. Read
+#                  by field_feed_thresholds(); the consumer that reports it is
+#                  health/expenditure_reconciler.py. Narrates, never pages.
 #   instrument_for (#4217) the coach(es) whose DOMAIN INSTRUMENT this source is — the
 #                  sensor without which that coach's reads are ungrounded. Carried on the
 #                  SOURCE (whoop -> sleep_coach) or, where a source is one partition fed by
@@ -681,6 +694,21 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "expected_days": 7,
         "qa_tier": "required",
         "method": "Health Auto Export webhook, near-real-time",
+        # #5042 (Refs #4976): the first day the Apple WATCH is the sensor behind this partition's
+        # resting heart rate. The stored DATE# rows carry no per-reading device, and before the
+        # watch the Apple Health RHR stream was other writers (the HAE drops of 10-15/10-16 carry
+        # source "WHOOP" — Whoop's own app writing into Apple Health), so an all-history read
+        # compares Whoop with Whoop. Determined from the raw HAE drops (read-only s3 cp of
+        # raw/matthew/health_auto_export/2026/10/, 2026-10-18): the earliest resting-heart-rate
+        # reading whose source is "Matthew's Apple Watch" is dated 2026-10-17. Readers that
+        # mean "the watch" (the /api/device_agreement comparison) floor their window here.
+        "watch_first_day": {
+            "date": "2026-10-17",
+            "determined_by": (
+                "the earliest resting-heart-rate reading sourced \u201cMatthew\u2019s Apple Watch\u201d in the raw "
+                "Health Auto Export drops (the stored daily rows carry no device)"
+            ),
+        },
         # #3257: the ONE source whose DATE# key names a UTC calendar day, not a Pacific
         # one — health_auto_export_lambda.parse_date_str converts to UTC before taking the
         # day (TD-19 Phase 2). Every consumer that ages this key must anchor it at UTC
@@ -922,6 +950,85 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
                 "manual": False,
                 "evidence_for": ("steps",),
             },
+            # ── #4970: the Apple Watch (Ultra 4, worn day and night from 2026-10-16) ──
+            # The watch writes into this SAME partition, so the phone's steps/water keep
+            # the partition "fresh" whether or not the watch is alive. Four day-level
+            # liveness groups (behavioural bars: they narrate, never alarm) plus ONE
+            # dead-man that DOES alarm (digest route). Field semantics, tiers and absence rules:
+            # docs/SCHEMA.md "Apple Watch daily metrics (#4970)".
+            #
+            # The dead-man. `dead_man` = {field, stale_hours}: the newest watch-sourced
+            # reading instant (any metric, `watch_last_reading_epoch_apple`, written
+            # GREATEST-on-merge by the webhook) older than `stale_hours` is a silent watch
+            # — dead battery, revoked Health access, a stuck background sync. 36 h is the
+            # owner's bar (#4970): a full night plus a full day with no watch sample at all
+            # is never "he took it off for a shower". Read by
+            # ingestion.watch_presence.check_dead_men(); the freshness checker folds a
+            # not-ok row into StaleSourceCount, the metric slo-source-freshness (to_digest=True)
+            # alarms on — the daily digest route; no hand-built alarm, no new schedule. Resolution is the checker's
+            # daily cadence: it fires on the first run after the 36 h mark (<= 60 h worst case).
+            {
+                "key": "watch",
+                "label": "Apple Watch (any watch-sourced reading)",
+                "fields": ["watch_last_reading_epoch_apple"],
+                "stale_days": 2,
+                "manual": False,
+                "dead_man": {
+                    "field": "watch_last_reading_epoch_apple",
+                    "stale_hours": 36,
+                    # Bootstrap grace (#4970 regression): the presence stamp only exists from the
+                    # webhook deploy (2026-10-18 ~21:25Z), so until the first watch payload lands
+                    # "no stamp" means "not armed yet", not "dead watch" — it paged the slo alarm
+                    # at 21:34Z on a healthy watch. After this instant, no stamp in the lookback
+                    # is a stale dead-man again.
+                    "armed_after": "2026-10-20T00:00:00+00:00",
+                },
+            },
+            # Overnight vitals: written once per sleep by the watch (wrist temperature needs
+            # a Sleep Focus; breathing disturbances need sleep tracking). The watch is worn
+            # nightly (owner ruling 2026-10-17), so two dark days means a missed capture.
+            {
+                "key": "watch_overnight_vitals",
+                "label": "Apple Watch overnight vitals",
+                "fields": ["wrist_temp_sleep_c_apple", "respiratory_rate_apple", "spo2_pct_apple", "breathing_disturbances_apple"],
+                "stale_days": 2,
+                "manual": False,
+            },
+            # Heart: HRV (SDNN) and resting HR arrive daily from a worn watch; walking HR
+            # and cardio recovery ride walks/workouts, so the any-of set stays live on a
+            # rest day through the first two.
+            {
+                "key": "watch_heart",
+                "label": "Apple Watch heart (HRV / resting / walking HR / cardio recovery)",
+                "fields": ["hrv_sdnn_apple", "resting_heart_rate_apple", "walking_heart_rate_avg", "cardio_recovery_bpm_apple"],
+                "stale_days": 2,
+                "manual": False,
+            },
+            # Activity rings + exposure: every worn waking day carries stand hours at least.
+            {
+                "key": "watch_activity",
+                "label": "Apple Watch activity (exercise / stand / effort / daylight / audio)",
+                "fields": [
+                    "exercise_minutes_apple",
+                    "stand_minutes_apple",
+                    "stand_hours_apple",
+                    "physical_effort",
+                    "daylight_minutes_apple",
+                    "environmental_audio_db_apple",
+                ],
+                "stale_days": 2,
+                "manual": False,
+            },
+            # Fitness estimates: VO2 max needs an outdoor walk/run/hike with GPS and
+            # walking steadiness is a weekly estimate — a fortnight dark means the
+            # estimate stopped, not a missed day.
+            {
+                "key": "watch_fitness",
+                "label": "Apple Watch fitness estimates (VO2 max / walking steadiness)",
+                "fields": ["vo2max", "walking_steadiness_pct"],
+                "stale_days": 14,
+                "manual": False,
+            },
         ],
         # #4638: stated default (owner ruling pending). The webhook path is append-only by design:
         # merge_day_to_dynamo(monotonic_guard=True) never lowers a total, the per-reading maps never
@@ -1088,6 +1195,20 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "engagement_channel": {"label": "food", "stale_days": 2, "primary": True},
         # #3252: the only source that records what he ate.
         "evidence_for": ("nutrition",),
+        # #5097: the adaptive expenditure is a field feed — only the daily-summary export
+        # carries it, the routine diary export does not, so `stale_hours` above (kept fresh
+        # by the diary) cannot see it go dark. 7 days: the reconciliation reads it over the
+        # 14-day loss-rate window and needs at least half of that window.
+        "field_feeds": [
+            {
+                "key": "adaptive_expenditure",
+                "label": "MacroFactor adaptive expenditure",
+                "fields": ["expenditure_kcal"],
+                "stale_days": 7,
+                "manual": True,
+                "note": "arrives only with the daily-summary export (the XLSX quick export, converted by dropbox-poll); the diary export carries no expenditure column",
+            },
+        ],
         # #4638: stated default (owner ruling pending). The diary export is a rolling 7-day window and
         # its date range is authoritative (macrofactor_lambda.absent_day_items).
         "upstream_changes": {
@@ -1210,9 +1331,17 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "active_api": False,
         "expected_days": None,
         "qa_tier": None,
-        "method": "Manual log",
+        "method": "Manual log (paused: no orders logged since March)",
         "metrics": "Delivery-order behavioral signal (incl. longest-ever streak)",
-        "posture": "portfolio",
+        # PAUSED 2026-10-19 (#5108/#5006; built on the evidence, pending the owner's confirmation):
+        # no delivery orders logged since 2026-03-28 (>200 days; the only S3 imports are the
+        # 03-28 backfill CSVs). ADR-074 posture: off by design, shown as paused, never counted
+        # stale, never a coach check-in context, no nudge, no "dark N days" stamp, and
+        # get_food_delivery_streak_state returns None so the Nutrition-pillar modifier is neutral.
+        # Data, raw prefix and the ingestion Lambda are untouched. Un-pause = delete `paused` and `paused_since` and restore `posture` to "portfolio".
+        "paused": True,
+        "paused_since": "2026-10-19",
+        "posture": "paused",
         "raw_layout": None,
         "capture_channel": "mcp",  # #746: logged by hand in an MCP conversation
     },
@@ -2611,7 +2740,7 @@ def engagement_primary_channel() -> str:
 # ── #746: manual-source reliability — staleness surfaced kindly ────────────────
 
 
-def manual_capture_sources(channel: str = None) -> dict:
+def manual_capture_sources(channel: str = None, include_paused: bool = False) -> dict:
     """{key: {label, channel, stale_hours}} for the manual-capture sources — the
     HAE / Notion / MCP-conversation channels Matthew fills by hand (#746,
     Matthew's decision).
@@ -2621,11 +2750,19 @@ def manual_capture_sources(channel: str = None) -> dict:
     automatic pipe (worn device, scheduled pull) has no capture_channel, so a
     device outage — a dead Whoop token the nudge can't fix — is structurally
     excluded from both surfaces. Pass `channel` to filter to one lane
-    ('hae' | 'notion' | 'mcp'). `stale_hours` falls back to the registry default."""
+    ('hae' | 'notion' | 'mcp'). `stale_hours` falls back to the registry default.
+
+    #5006: a source with `paused: True` (ADR-074 posture) is OFF BY DESIGN, so it is
+    excluded unless `include_paused=True` — a paused channel must never be named the
+    "longest-dark manual channel" in a coach check-in question, get a "gone quiet"
+    nudge, or wear the public "dark N days" stamp. Un-pausing returns it with no
+    other change."""
     out = {}
     for k, v in SOURCE_REGISTRY.items():
         ch = v.get("capture_channel")
         if not ch or (channel and ch != channel):
+            continue
+        if v.get("paused") and not include_paused:
             continue
         sh = v.get("stale_hours")
         out[k] = {"label": v["label"], "channel": ch, "stale_hours": sh if sh is not None else DEFAULT_STALE_HOURS}
@@ -2640,6 +2777,13 @@ def hae_datatype_thresholds() -> list:
     registry. Each: {key, label, fields, stale_days, manual}. The checker's
     HAE_DATATYPES aliases this; compute_datatype_liveness reads it."""
     return [dict(d) for d in cast("list[dict[str, Any]]", SOURCE_REGISTRY["apple_health"].get("hae_datatypes", []))]
+
+
+def field_feed_thresholds(source: str) -> list:
+    """The `field_feeds` rows of `source` (#5097) — feeds carried as fields on another
+    channel's DATE# rows, each {key, label, fields, stale_days, manual, note}. [] for a
+    source with none."""
+    return [dict(d) for d in cast("list[dict[str, Any]]", SOURCE_REGISTRY.get(source, {}).get("field_feeds", []))]
 
 
 def hae_reader_surfaces() -> dict:
@@ -2759,6 +2903,16 @@ def catalog_entries() -> list:
 #                      with a POSITIVE value wins; only when none has one does the
 #                      highest-precedence zero report stand (a genuine 0-step day, #1658)
 #   ruling           — where the precedence was decided (or is pending)
+#   mode             — OPTIONAL (#4975), how the sources combine; absent means "primary":
+#                      primary        = today's behaviour: `overlap_rule` over fallback_order
+#                      primary_backup = truth_source when it has a usable value, else the ONE
+#                                       source named in `backup`; the answer names source_used
+#                      mean           = the mean of the sources with a usable value (positives
+#                                       only while any source has one), with n_sources and the
+#                                       per-source values returned
+#                      Which mode a metric uses is the OWNER's ruling (#4975 gate:owner, after
+#                      the #4974 dual-wear agreement study) — never set one without his words.
+#   backup           — primary_backup only: the fallback source (must be in fallback_order)
 #
 # steps: HELD on #4644 Q4. Built on the recommended answer "4: yes — Whoop when both devices
 # have a count": the phone delivers roughly 0.27-0.62 of the wrist's count on days it is not
@@ -2773,11 +2927,63 @@ METRIC_TRUTH: dict[str, dict[str, Any]] = {
         "field_by_source": {"whoop": "step_count", "apple_health": "steps", "garmin": "steps"},
         "min_by_source": {"whoop": 1, "apple_health": 1, "garmin": 1000},
         "overlap_rule": "first_positive_else_first_zero",
-        "ruling": "#4644 Q4 (recommended: 'yes — Whoop when both devices have a count') — pending the owner",
+        "ruling": "#4644 Q4 'yes — Whoop when both devices have a count' (owner 'all recommended', recorded 2026-10-17)",
+    },
+    # vo2_max (#4976): the Apple Watch's estimate from now on, Garmin's stored estimates for the
+    # history before it (the direct Garmin feed is retired, #4640 — its rows stay and stay
+    # readable). The two are different vendors' estimators, so a reader that draws an arc across
+    # both carries each point's `source` and says when the arc spans more than one device.
+    "vo2_max": {
+        "truth_source": "apple_health",
+        "unit": "ml/kg/min",
+        "fallback_order": ("apple_health", "garmin"),
+        "field_by_source": {"apple_health": "vo2max", "garmin": "vo2_max"},
+        "min_by_source": {"apple_health": 10, "garmin": 10},
+        "overlap_rule": "first_positive_else_first_zero",
+        "ruling": "#4976 + owner ruling 2026-10-17 (a): keep Whoop and the Apple Watch; Garmin's feed is retired (#4640)",
+    },
+    # #4975: the three Whoop-only vitals the scattered tables (mcp/config.py domain owners,
+    # web/vitals_resolver.py) used to state by hand. Each is ONE source on mode "primary" —
+    # exactly today's answer. Whether Apple Watch joins as a backup or into a mean is the
+    # owner's ruling after the #4974 agreement study; Apple's HRV is SDNN and Whoop's is RMSSD,
+    # so a `mean` over them is not arithmetic until that ruling names a conversion.
+    # Keys are the vitals output names, deliberately NOT a stored field name: a facet keyed
+    # "hrv" would silently re-route anomaly_detector's per-field baseline through the resolver.
+    "hrv_ms": {
+        "truth_source": "whoop",
+        "unit": "ms (RMSSD)",
+        "fallback_order": ("whoop",),
+        "field_by_source": {"whoop": "hrv"},
+        "min_by_source": {"whoop": 0},
+        "overlap_rule": "first_positive_else_first_zero",
+        "mode": "primary",
+        "ruling": "#4975 gate:owner (mean vs primary/backup, after #4974) — pending; encodes today's Whoop-only answer",
+    },
+    "rhr_bpm": {
+        "truth_source": "whoop",
+        "unit": "bpm",
+        "fallback_order": ("whoop",),
+        "field_by_source": {"whoop": "resting_heart_rate"},
+        "min_by_source": {"whoop": 0},
+        "overlap_rule": "first_positive_else_first_zero",
+        "mode": "primary",
+        "ruling": "#4975 gate:owner (mean vs primary/backup, after #4974) — pending; encodes today's Whoop-only answer",
+    },
+    "sleep_hours": {
+        "truth_source": "whoop",
+        "unit": "hours",
+        "fallback_order": ("whoop",),
+        "field_by_source": {"whoop": "sleep_duration_hours"},
+        "min_by_source": {"whoop": 0},
+        "overlap_rule": "first_positive_else_first_zero",
+        "mode": "primary",
+        "ruling": "#4975 gate:owner (mean vs primary/backup, after #4974) — pending; encodes today's Whoop-only answer",
     },
 }
 
 METRIC_TRUTH_OVERLAP_KINDS = ("first_positive_else_first_zero",)
+# #4975: how a metric's sources combine. "primary" is the default and today's behaviour.
+METRIC_TRUTH_MODES = ("primary", "primary_backup", "mean")
 
 
 def _validate_metric_truth() -> None:
@@ -2796,6 +3002,15 @@ def _validate_metric_truth() -> None:
                 raise ValueError(f"METRIC_TRUTH[{metric!r}]: {src!r} is not a registered source")
             if src not in facet["field_by_source"]:
                 raise ValueError(f"METRIC_TRUTH[{metric!r}]: no field_by_source entry for {src!r}")
+        mode = facet.get("mode", "primary")
+        if mode not in METRIC_TRUTH_MODES:
+            raise ValueError(f"METRIC_TRUTH[{metric!r}]: unknown mode {mode!r}")
+        if mode == "primary_backup":
+            backup = facet.get("backup")
+            if backup not in order[1:]:
+                raise ValueError(f"METRIC_TRUTH[{metric!r}]: primary_backup needs a `backup` from fallback_order other than truth_source")
+        elif "backup" in facet:
+            raise ValueError(f"METRIC_TRUTH[{metric!r}]: `backup` is only meaningful in mode primary_backup")
 
 
 _validate_metric_truth()
@@ -2812,4 +3027,5 @@ def metric_truth(metric: str) -> dict:
         "fallback_order": tuple(facet["fallback_order"]),
         "field_by_source": dict(facet["field_by_source"]),
         "min_by_source": dict(facet["min_by_source"]),
+        "mode": facet.get("mode", "primary"),  # #4975: absent = primary (today's behaviour)
     }

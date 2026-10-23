@@ -1,8 +1,8 @@
 """full_body_session.py — the program's session for one role, as IR (#4064; v0.4 #4147).
 
 The module name is v0.3's (full body, superseded 2026-09-24); it now builds whatever the ACTIVE
-program's role is — under v0.4, upper_heavy / lower_heavy / upper_volume / lower_volume, with
-archetype `upper` / `lower` and the Upper / Lower Hevy folders.
+program's role is — since #5069 the five roles of the charter's split (upper_heavy / lower_heavy /
+shoulders_arms / upper_volume / lower_volume), archetype `upper` / `lower`, the Upper / Lower Hevy folders.
 
 `routine_generator.generate_routines` hands a day here when the schedule entry carries a
 program role (`program_structure.SESSION_TEMPLATES`). Split out of `routine_generator` so
@@ -24,7 +24,7 @@ from __future__ import annotations
 import functools
 from typing import Any
 
-from training import in_block_variant, load_ramp, program_structure, routine_generator as _rg
+from training import in_block_variant, load_ramp, program_structure, routine_generator as _rg, warmup_sets
 from training.routine_generator import (
     LAYOFF_DAYS_DEFAULT,
     GeneratorInputs,
@@ -137,6 +137,77 @@ def _apply_back_offs(
     return lines
 
 
+def _back_offs_then_warmups(
+    blocks: list[ExerciseBlock], used: list[dict[str, Any]], rationale: list[str], load_floors: dict[str, Any], movements: dict[str, Any]
+) -> dict[str, Any]:
+    """The last two passes over a block's sets, in this order: §3's back-offs, then #5049's warm-up
+    climb — prepended after every load pass, so it climbs to the load the block finally carries."""
+    load_floors["back_offs"] = _apply_back_offs(blocks, used, rationale, load_floors)
+    return warmup_sets.attach_and_note(blocks, movements, rationale)
+
+
+def _sequence_line(day_entry: dict[str, Any]) -> str:
+    """The rationale line naming where the session came from: the sequence position (and what advanced it), or the weekday grid."""
+    if day_entry.get("source") != "session_sequence":
+        return f"weekday grid: {day_entry.get('label')}"
+    adv = day_entry.get("advanced_by")
+    return f"session sequence: {day_entry['position_label']}, block {day_entry['block']}" + (
+        f"; advanced by {adv['date']} {adv.get('title') or ''} ({adv['was']})".rstrip() if adv else "; the first session of the program"
+    )
+
+
+def _fit_session_shape(
+    blocks: list[ExerciseBlock], rx: dict[str, Any], caps: dict[str, Any], load_catalog: dict[str, Any], rationale: list[str]
+) -> dict[str, Any]:
+    """#5069 (owner ruling 5): ONE lifting-minute estimate (sets as written, warm-ups included, x set time + rest) and the
+    charter's session shape — one cardio block and the stretching cut to their caps (`program_structure.enforce_session_shape`).
+    The lifting minutes were fitted upstream (`session_prescription_for_role` trims accessories first); an overrun that
+    survives is flagged, never cut from the anchors."""
+    shape = program_structure.enforce_session_shape(blocks, load_catalog.get("movements") or {})
+    rationale += [f"session shape: {a}" for a in shape["actions"]]
+    t = rx.get("time_trim") or {}
+    if t.get("dropped_accessories"):
+        rationale.append(
+            f"time: ~{t['estimate_before_min']} min > the {t['cap_minutes']}-min lifting cap — dropped "
+            f"{', '.join(map(str, t['dropped_accessories']))} (accessories first) -> ~{t['estimate_after_min']} min"
+        )
+    if shape["lifting_minutes"] > caps["session_minutes"]:
+        rationale.append(
+            f"OVER the {caps['session_minutes']}-min lifting cap at ~{shape['lifting_minutes']} min — anchors are never cut for time; flagged"
+        )
+    return shape
+
+
+def _session_loads(
+    blocks: list[ExerciseBlock],
+    load_catalog: dict[str, Any],
+    history_index: dict[str, list],
+    weight_index: dict[str, float],
+    inputs: GeneratorInputs,
+    week_cfg: dict[str, Any],
+    rationale: list[str],
+    ramp_week: int,
+    ramp_p: dict[str, Any],
+    deload: bool,
+) -> dict[str, Any]:
+    """The floor (#4107: the ONE v0.3 load path, `load_ramp.v03_floor`) and then the double
+    progression (#5052) — held on a deload the owner applied, whose loads are held as written."""
+    load_floors = _enforce_load_floors(
+        blocks,
+        load_catalog,
+        history_index,
+        weight_index,
+        target_date=inputs.target_date,
+        days_since_last_workout=inputs.days_since_last_workout,
+        layoff_days=int(week_cfg.get("re_entry_days_threshold", LAYOFF_DAYS_DEFAULT)),
+        rationale=rationale,
+        floor_fn=functools.partial(load_ramp.v03_floor, week=ramp_week),
+        hold_reason="a deload the owner applied holds every load" if deload else None,
+    )
+    load_floors["load_rule"] = {"rule": "v0.3 §3 entry ramp", "week": ramp_week, "params": ramp_p}
+    return load_floors
+
+
 def full_body_routines(
     inputs: GeneratorInputs,
     day_entry: dict[str, Any],
@@ -166,18 +237,7 @@ def full_body_routines(
         f"week grid source={resolved_week.source} ({resolved_week.detail})",
         f"archetype={archetype}; program=v{program_structure.PROGRAM_VERSION}; session_role={role}; autoreg={autoreg:.2f} (recovery={inputs.recovery_tier}, acwr={inputs.acwr_flag})",
     ]
-    if day_entry.get("source") == "session_sequence":
-        adv = day_entry.get("advanced_by")
-        rationale.append(
-            f"session sequence: {day_entry['position_label']}, block {day_entry['block']}"
-            + (
-                f"; advanced by {adv['date']} {adv.get('title') or ''} ({adv['was']})".rstrip()
-                if adv
-                else "; the first session of the program"
-            )
-        )
-    else:
-        rationale.append(f"weekday grid: {day_entry.get('label')}")
+    rationale.append(_sequence_line(day_entry))
     if deload and rx.get("deload_trim"):
         t = rx["deload_trim"]
         rationale.append(f"deload: sets {t['sets_before']} -> {t['sets_after']} ({t['pct']}%), loads held")
@@ -217,35 +277,24 @@ def full_body_routines(
         "a load already moved at the set's rep floor at this band this cycle, no layoff, is held — never ramped under (#4408); "
         "back-offs −10 % of the top set"
     )
-    load_floors = _enforce_load_floors(
-        blocks,
-        load_catalog,
-        history_index,
-        weight_index,
-        target_date=inputs.target_date,
-        days_since_last_workout=inputs.days_since_last_workout,
-        layoff_days=int(week_cfg.get("re_entry_days_threshold", LAYOFF_DAYS_DEFAULT)),
-        rationale=rationale,
-        floor_fn=functools.partial(load_ramp.v03_floor, week=ramp_week),  # #4107: the ONE v0.3 load path
-    )
-    load_floors["load_rule"] = {"rule": "v0.3 §3 entry ramp", "week": ramp_week, "params": ramp_p}
-    load_floors["back_offs"] = _apply_back_offs(blocks, used, rationale, load_floors)
+    load_floors = _session_loads(blocks, load_catalog, history_index, weight_index, inputs, week_cfg, rationale, ramp_week, ramp_p, deload)
+    warmups = _back_offs_then_warmups(blocks, used, rationale, load_floors, load_catalog.get("movements") or {})
 
     caps = {
         "total_sets": week_cfg["session_set_ceiling"],
         "session_minutes": week_cfg["session_minutes_ceiling"],
         "weekly_volume_per_muscle": week_cfg["weekly_volume_cap_per_muscle"],
     }
-    total_sets = sum(len(b.sets) for b in blocks)
+    total_sets = sum(warmup_sets.working_set_count(b.sets) for b in blocks)
     assert total_sets <= caps["total_sets"], f"BUG: total_sets {total_sets} > cap {caps['total_sets']}"
-    est_minutes = total_sets * 3 + len(blocks) * 2
-    assert est_minutes <= caps["session_minutes"], f"BUG: est_minutes {est_minutes} > cap {caps['session_minutes']}"
+    shape = _fit_session_shape(blocks, rx, caps, load_catalog, rationale)  # #5069: the charter's session shape
+    est_minutes = shape["lifting_minutes"]
 
     budget_used: dict[str, int] = {}
     for b in blocks:
         muscle = catalog.get("movements", {}).get(b.movement_key, {}).get("primary_muscle") or "unknown"
-        budget_used[muscle] = budget_used.get(muscle, 0) + len(b.sets)
-    rationale.append(f"{total_sets} sets over {len(blocks)} movements (~{est_minutes} min)")
+        budget_used[muscle] = budget_used.get(muscle, 0) + warmup_sets.working_set_count(b.sets)
+    rationale.append(f"{total_sets} sets over {len(blocks)} movements (~{est_minutes} min) + {warmups['warmup_sets']} warm-up set(s)")
 
     label = rx["role_label"]
     week_tag = f" — W{day_entry['week']}" if day_entry.get("week") else ""
@@ -272,7 +321,13 @@ def full_body_routines(
         exercises=blocks,
         budget_used=budget_used,
         inputs_snapshot=_build_inputs_snapshot(inputs, landmarks, catalog)
-        | {"load_floors": load_floors, "session_prescription": rx, "calendar": calendar_snapshot},
+        | {
+            "load_floors": load_floors,
+            "session_prescription": rx,
+            "calendar": calendar_snapshot,
+            "warmups": warmups,
+            "session_shape": shape,
+        },
         rationale=rationale,
         caps=caps,
     )

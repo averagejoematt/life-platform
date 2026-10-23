@@ -26,6 +26,7 @@ from decimal import Decimal
 import pytest
 from common.constants import EXPERIMENT_START_DATE  # #3728: the cycle genesis the scope fields name
 from content import output_writers as ow
+from content.dexa_fields import dexa_body_comp
 
 # ==============================================================================
 # FIXED CLOCK
@@ -591,12 +592,12 @@ def test_sanitize_for_demo_masks_weight_values_in_both_rendered_precisions():
 
 
 def test_sanitize_for_demo_masks_calories_and_protein():
-    # #4540: the calorie target a brief renders is the plan's, so that is the figure masked.
-    html = f"<p>2100 kcal / 190g protein (target {ow.PLAN_DAILY_CALORIES_TARGET})</p>"
-    data = {"macrofactor": {"total_calories_kcal": 2100, "total_protein_g": 190}}
+    # #4540/#5095: the calorie target a brief renders is the ONE resolver's, so that is the figure masked.
+    html = f"<p>2050 kcal / 190g protein (target {ow.target_kcal()})</p>"
+    data = {"macrofactor": {"total_calories_kcal": 2050, "total_protein_g": 190}}
     profile = {"demo_mode_rules": {"replace_values": {"calories": "[cal]", "protein": "[pro]"}}, "calorie_target": 2200}
     out = ow.sanitize_for_demo(html, data, profile)
-    assert "2100" not in out and str(ow.PLAN_DAILY_CALORIES_TARGET) not in out and "190" not in out
+    assert "2050" not in out and str(ow.target_kcal()) not in out and "190" not in out
     assert "[cal]" in out and "[pro]" in out
 
 
@@ -986,9 +987,10 @@ def _clinical_table():
             "USER#matthew#SOURCE#dexa": [
                 {
                     "scan_date": "2026-02-01",
-                    "body_composition": {"body_fat_pct": 34.2, "lean_mass_lbs": 190.1, "fat_mass_lbs": 110.0, "visceral_fat_g": 900},
-                    "bone_density": {"t_score": 1.2},
-                    "interpretations": {"ffmi": 22.4},
+                    # The LIVE row shape (docs/SCHEMA.md dexa; epic #4625): `_lb` leaves, `bone`, `indices`.
+                    "body_composition": {"body_fat_pct": 34.2, "lean_mass_lb": 190.1, "fat_mass_lb": 110.0, "visceral_fat_g": 900},
+                    "bone": {"t_score": 1.2},
+                    "indices": {"ffmi_kg_m2": 22.4},
                 }
             ],
             "USER#matthew#SOURCE#labs": [
@@ -1054,9 +1056,35 @@ def test_write_clinical_json_body_comp_from_the_latest_dexa_scan():
         "ffmi": 22.4,
         "lean_mass_lbs": 190.1,
         "fat_mass_lbs": 110.0,
-        "visceral_fat_area": 900,
-        "bmd": 1.2,
+        "visceral_fat_g": 900,
+        "bmd_t_score": 1.2,
     }
+
+
+def test_dexa_body_comp_older_scan_has_no_indices_and_ffmi_is_null_not_invented():
+    # The 2025-05-10 live row: `bone.{t_score,z_score}` and `interpretations.{strengths,goals_6mo}` — no `indices`.
+    bc = dexa_body_comp(
+        {
+            "scan_date": "2025-05-10",
+            "body_composition": {"body_fat_pct": 30.0, "lean_mass_lb": 180.0, "fat_mass_lb": 90.0},
+            "bone": {"t_score": 1.0, "z_score": 1.1},
+            "interpretations": {"strengths": ["x"]},
+        }
+    )
+    assert bc["ffmi"] is None and bc["visceral_fat_g"] is None
+    assert (bc["lean_mass_lbs"], bc["fat_mass_lbs"], bc["bmd_t_score"]) == (180.0, 90.0, 1.0)
+
+
+def test_dexa_body_comp_does_not_read_the_retired_names_no_live_row_holds():
+    bc = dexa_body_comp(
+        {
+            "scan_date": "2026-01-01",
+            "body_composition": {"lean_mass_lbs": 1.0, "fat_mass_lbs": 2.0},
+            "bone_density": {"t_score": 3.0},
+            "interpretations": {"ffmi": 4.0},
+        }
+    )
+    assert bc["ffmi"] is None and bc["bmd_t_score"] is None and bc["lean_mass_lbs"] is None and bc["fat_mass_lbs"] is None
 
 
 def test_write_clinical_json_labs_are_ordered_by_category_then_name():

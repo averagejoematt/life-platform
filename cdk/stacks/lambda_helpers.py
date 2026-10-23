@@ -33,9 +33,12 @@ Usage in a stack:
         bucket=core.bucket,
         dlq=core.dlq,
         custom_policies=ingestion_policies("whoop"),
-        schedule="cron(0 14 * * ? *)",
         timeout_seconds=120,
     )
+
+Schedules (#4284): the factory takes NO schedule argument. It reads the function's row from
+config/schedules.json (cdk/stacks/schedule_table.py) by `function_name`; a rule built beside
+the factory takes its expression from `table_schedule("<function>#<ConstructId>")`.
 """
 
 import json
@@ -68,6 +71,8 @@ if _DEPLOY_DIR not in sys.path:
     sys.path.insert(0, _DEPLOY_DIR)
 import build_bundle  # noqa: E402
 
+from stacks import schedule_table  # noqa: E402  — #4284, the ONE schedule table
+
 # ── Enrollment by construction (#2846) ────────────────────────────────────────
 # Importing by module path rather than package-relative: cdk/app.py puts
 # cdk/ on sys.path and imports `stacks.<name>`, and this module is also read
@@ -97,6 +102,17 @@ def staged_tree_asset():
         build_bundle.stage_tree(_TREE_STAGE)
         _staged["tree"] = True
     return _lambda.Code.from_asset(_TREE_STAGE)
+
+
+def table_schedule(key: str) -> events.Schedule:
+    """The `events.Schedule` for a rule built beside the factory, from config/schedules.json (#4284).
+    The key is `<function-name>#<ConstructId>`; a missing row fails the synth naming the file."""
+    return events.Schedule.expression(schedule_table.entry(key)["expression"])
+
+
+def table_enabled(key: str) -> bool:
+    """The `enabled` state the table records for a rule built beside the factory (default True)."""
+    return bool(schedule_table.entry(key).get("enabled", True))
 
 
 def _add_zoned_schedule(scope, id, fn, schedule, timezone, schedule_input=None):
@@ -149,13 +165,11 @@ def create_platform_lambda(
     digest: bool = False,
     alarm_name: str = None,
     secrets: list[str] = None,
-    schedule: str = None,
+    # #4284: NO `schedule=` / `schedule_timezone=` here — the schedule is this function's row in
+    # config/schedules.json, read below by function_name. A row with a `timezone` moves it off the
+    # fixed-UTC `events.Rule` carrier onto an EventBridge Scheduler schedule (wall-clock time in
+    # that zone, follows the DST change); every other row is the fixed-UTC rule.
     schedule_input: dict = None,  # constant event for the scheduled target; None = EventBridge's own event
-    # #4284: an IANA zone (e.g. "America/Los_Angeles") moves THIS schedule off the fixed-UTC
-    # `events.Rule` carrier onto an EventBridge Scheduler schedule, so `schedule=` is read as
-    # wall-clock time in that zone and follows the DST change. None (every other Lambda) = the
-    # fixed-UTC rule, unchanged.
-    schedule_timezone: str = None,
     timeout_seconds: int = 120,
     memory_mb: int = 256,
     environment: dict = None,
@@ -199,6 +213,17 @@ def create_platform_lambda(
 
     Returns the Lambda Function construct.
     """
+
+    # ── The schedule, from the ONE table (#4284) ──
+    _sched_row = schedule_table.factory_entry(function_name) if isinstance(function_name, str) else None
+    schedule = _sched_row["expression"] if _sched_row else None
+    schedule_timezone = _sched_row.get("timezone") if _sched_row else None
+    if _sched_row:
+        _stack_name = Stack.of(scope).stack_name
+        if _sched_row["stack"] != _stack_name:
+            raise schedule_table.ScheduleTableError(
+                f"config/schedules.json[{function_name!r}] says stack {_sched_row['stack']!r} but the function is built in {_stack_name!r}"
+            )
 
     # ── Enrollment gate (#2846) ──
     # Runs BEFORE anything is constructed: a stack that violates E1–E3 does not

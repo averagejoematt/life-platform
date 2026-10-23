@@ -94,6 +94,7 @@ from common.constants import EXPERIMENT_START_DATE  # the void rule's genesis (#
 from common.numeric import decimals_to_float, floats_to_decimal  # the ONE canonical walker pair (#1207)
 
 from coach import coach_baseline  # #4585 — the "nothing changes" rule beside each docket grade
+from coach.metric_reading import metric_reading_provenance  # #4580 B-14: the device + days a graded bet read
 
 logger = logging.getLogger("dispute-docket")
 logger.setLevel(logging.INFO)
@@ -823,6 +824,8 @@ def _resolve_one(docket, due_date, today_str, data_cache, resolved, voided, wait
         return
     criterion = docket.get("criterion") or {}
     actual = _resolve_metric_value(criterion.get("metric", ""), data_cache, today_str)
+    # #4580 B-14: the device and the days the graded reading came from, read off the same points as `actual`
+    reading = metric_reading_provenance(_ev, criterion.get("metric", ""), data_cache, today_str) if actual is not None else None
     holds = _evaluate_condition(actual, criterion.get("condition"), criterion.get("threshold"))
     if holds is None:
         # No data yet — grace window, then an honest void (never silent limbo).
@@ -876,6 +879,7 @@ def _resolve_one(docket, due_date, today_str, data_cache, resolved, voided, wait
                 "loser": loser,
                 "actual_value": actual,
                 "holds": bool(holds),
+                **({"actual_reading": reading} if reading else {}),
             },
             "winner": winner,
             "loser": loser,

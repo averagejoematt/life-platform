@@ -24,11 +24,14 @@ from boto3.dynamodb.conditions import Attr, Key
 from coach.reading_date_fidelity import guard_derived_summary  # #2343: derived-summary day correspondence
 from coach.voice_register_guard import sanitize_summary  # #1987: deterministic voice-register check
 from common.digest_utils import is_day_row  # #3442: whoop inventory counts day rows, not #WORKOUT# fragments
+from common.habit_registry import coerce_profile  # #5232
 from common.metric_truth import steps_series, steps_sources  # #4630: the ONE steps resolver
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 from experiment import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
+from health import macro_floors  # #5204: the ONE fibre floor (the charter's)
+from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 
 from intelligence.inventory_window import inventory_row, inventory_window_start, out_of_window_line  # #3728
 
@@ -79,7 +82,7 @@ def fetch_profile(table, user_id: str = "matthew") -> dict:
     """
     try:
         r = table.get_item(Key={"pk": f"USER#{user_id}", "sk": "PROFILE#v1"})
-        return _decimal_to_float(r.get("Item", {}))
+        return coerce_profile(_decimal_to_float(r.get("Item", {})))  # #5232: numeric registry fields as numbers
     except Exception as e:
         logging.getLogger("intelligence-common").error(f"fetch_profile: {e}")
         return {}
@@ -356,6 +359,20 @@ def load_goals_config() -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+# #4976: replaces the stale Garmin steps-truth rule (Garmin's feed is retired, #4640) — steps arrive resolved.
+_STEPS_TRUTH_RULE = (
+    "- Step counts arrive already resolved by the platform's one steps resolver (Whoop, else Apple Health) — "
+    "quote the number given and never choose between devices yourself."
+)
+
+
+def _resolved_target(path: str, val: Any) -> Any:
+    """A DEFINED TARGETS line's value: the calorie target and the fibre floor come from their one resolver, the rest from the goals doc."""
+    if path == "nutrition.daily_calories_target":
+        return target_kcal()
+    return macro_floors.floor_g("fibre") if path == "nutrition.daily_fiber_min_g" else val
+
+
 def build_coach_preamble(coach_name: str, domain: str, goals: dict, inventory: dict, maturity: dict, action_history: list = None) -> str:
     """
     Build the standard context preamble injected into every coach prompt.
@@ -411,12 +428,12 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict, inventory: d
         "behavioral.journal_entries_per_week": "Journal entries/week",
     }
     for path, label in _target_map.items():
-        keys = path.split(".")
         val = targets
-        for k in keys:
+        for k in path.split("."):
             val = val.get(k) if isinstance(val, dict) else None
             if val is None:
                 break
+        val = _resolved_target(path, val)  # #5095 the ONE calorie target; #5204 the ONE fibre floor
         target_lines.append(f"  - {label}: {val if val is not None else 'not yet set'}")
     parts.append("DEFINED TARGETS:\n" + "\n".join(target_lines) + "\n")
 
@@ -546,7 +563,7 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict, inventory: d
         'say "no training logged" NOT "provide your training data"\n'
         "- If a data source exists but values are null for today, use the most recent available data\n"
         '- NEVER tell Matthew to "obtain" or "get" a scan/test if the data already exists above\n'
-        "- Garmin is the step count source of truth (wearable). Ignore Apple Health step counts if Garmin data is available.\n"
+        f"{_STEPS_TRUTH_RULE}\n"
         '- If a target is "not yet set", do NOT invent one. You may suggest one with reasoning.\n'
     )
 
@@ -636,17 +653,10 @@ _CLAIM_DOMAIN_MAP = {
     "biomarker": ["labs"],
 }
 
-# SOT definitions — which source is authoritative for each metric
-_SOURCE_OF_TRUTH = {
-    # "steps" retired (#4630): resolved per day by common.metric_truth from the registry facet.
-    "weight": "withings",
-    "sleep_duration": "whoop",
-    "recovery": "whoop",
-    "hrv": "whoop",
-    "glucose": "cgm",
-    "calories": "macrofactor",
-    "protein": "macrofactor",
-}
+# #4975: the module's `_SOURCE_OF_TRUTH` table is retired — nothing read it (a second,
+# unread statement of which source answers each metric). The truth for a metric carried by
+# more than one source is the registry's METRIC_TRUTH facet, applied by common.metric_truth;
+# tests/test_metric_truth_modes_4975.py fails if a hand-written SOT table names one again.
 
 
 # The checks validate_coach_output can actually emit. write_quality_results derives
@@ -975,7 +985,7 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
       - Workouts logged (Strava)
       - Journal entries written (Notion)
       - Habit completion rate (Habitify)
-      - Steps (Garmin — SOT)
+      - Steps (the steps resolver, common.metric_truth — Whoop, else Apple Health)
 
     Score 0-100:
       0-30: healthy (health activity >= platform activity)

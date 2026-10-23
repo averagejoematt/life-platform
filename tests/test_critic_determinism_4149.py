@@ -180,8 +180,10 @@ def test_the_replayed_answer_commits_against_the_gate_floor_the_minus_25_run_fai
 # ── 2. every numeric change is code's ────────────────────────────────────────────────
 def test_a_grounded_escalation_applies_the_flags_number_never_the_models():
     """The flag's number, never the model's. Since #4161 the advocate's flag is governed (it adds
-    nothing), so this is held on the joints fatigue flag — a governed `change` the model cannot move.
-    Mutation control: in `reconcile`, take `to` from the model again -> 8/40/2 not 14 and this reds."""
+    nothing), so this is held on the joints fatigue flag — a governed flag the model cannot move. Since #5070 that
+    flag RECOMMENDS the cut and applies nothing: the verdict stays approve, carries the code's number (14) and the
+    model's veto/number is discarded. Mutation control: in `reconcile`, take `to` from the model again -> a veto
+    or an 8/40/2 appears and this reds."""
     from coach import critics_fatigue as cf
 
     d = {"total_sets": 20, "exercises": []}
@@ -190,7 +192,9 @@ def test_a_grounded_escalation_applies_the_flags_number_never_the_models():
     for asked in (8, 40, 2):
         m = {"verdict": "veto", "metric": "fatigue_trigger", "value": True, "field": "session.total_sets", "to": asked, "sentence": "x"}
         v = c.reconcile(c.deterministic_verdict(p), m, p)
-        assert (v["verdict"], v["field"], v["to"]) == ("change", "session.total_sets", 14)
+        assert (v["verdict"], v["field"], v["to"]) == ("approve", None, None)
+        assert v["recommendation"]["to"] == 14 and v["recommendation"]["applied"] is False
+        assert "code rule governs" in v["discarded"]
 
 
 def test_the_advocate_adds_nothing_whatever_the_model_asks():

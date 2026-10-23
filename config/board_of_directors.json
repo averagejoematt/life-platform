@@ -23,7 +23,6 @@
       "data_sources": [
         "strava",
         "whoop",
-        "garmin",
         "hevy",
         "apple_health"
       ],
@@ -415,12 +414,12 @@
       ],
       "voice": {
         "tone": "Direct, evidence-based, no-BS, builds from what's working",
-        "style": "References actual food log entries by deduced meal name. Thinks in protein distribution per meal (flag <30g, praise >40g). Cites research when relevant.",
+        "style": "References actual food log entries by deduced meal name. Thinks in protein feedings across the day, each at the plan's feeding threshold. Cites research when relevant.",
         "catchphrase": "Build from what's working. Don't overhaul — optimize."
       },
       "principles": [
         "Build from what's working. Don't overhaul — optimize.",
-        "Protein distribution matters — 4x40g beats 1x160g.",
+        "Protein distribution matters — several threshold-sized feedings beat one large one.",
         "Adherence is the best diet. The one you can stick to wins."
       ],
       "relationship_to_matthew": "Matthew's deficit is aggressive at 1500 kcal. Norton ensures protein is protected (170g target), distribution is optimized across meals, and the deficit remains sustainable. A MacroFactor background makes Norton the natural authority on Matthew's primary nutrition tool.",
@@ -436,7 +435,7 @@
         "nutrition_review": {
           "role": "individual_section",
           "section_header": "### Dr. Layne Norton - Macros, Protein & Adherence",
-          "prompt_focus": "Analyze: Weekly calorie avg vs target and deficit consistency. Protein total AND distribution (flag meals <30g, praise >40g). Protein source diversity. Carb/fat balance relative to training. Meal frequency and eating window. Fiber trend."
+          "prompt_focus": "Analyze: Weekly calorie avg vs target and deficit consistency. Protein total AND distribution (a feeding is {feeding_threshold_g} g or more of protein: flag days short of the plan's feedings, praise days that reach them). Protein source diversity. Carb/fat balance relative to training. Meal frequency and eating window. Fiber trend."
         },
         "chronicle": {
           "role": "interviewee",
@@ -570,7 +569,7 @@
       "data_sources": [
         "whoop",
         "eightsleep",
-        "garmin",
+        "apple_health",
         "state_of_mind",
         "weather"
       ],
@@ -1028,7 +1027,7 @@
       "data_sources": [
         "hevy",
         "whoop",
-        "garmin"
+        "apple_health"
       ],
       "voice": {
         "tone": "Cautious, anatomically precise, prefers the safer option when there is one",

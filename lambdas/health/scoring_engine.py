@@ -20,10 +20,12 @@ import logging
 from datetime import datetime
 from typing import Any, Iterable, Optional, Union
 
-from common.constants import PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
+from common.habit_pause import is_paused_on  # #5007: a paused habit is not scheduled
 from training.owner_redlines import REDLINES  # ADR-163: the walking floor the movement target defaults from
 from training.walking_volume import WALKING_VOLUME_VERSION, walking_minutes_for_day  # ADR-163: the ONE walking definition
 
+from health import macro_floors, protein_engine  # #5098: THE protein hit and the charter's range low
+from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 from health.habit_identity import day_name_for  # #4632: id first, then names, then ingest-derived aliases
 
 logger = logging.getLogger(__name__)
@@ -129,10 +131,11 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
     protein = safe_float(mf, "total_protein_g")
     fat = safe_float(mf, "total_fat_g")
     carbs = safe_float(mf, "total_carbs_g")
-    cal_target = PLAN_DAILY_CALORIES_TARGET
+    cal_target = target_kcal(data.get("date"))
     # #4540: the plan states ONE protein line, a floor. The profile row's separate 190 g
     # "target" was never the plan; a day at or over the floor has met it.
-    protein_target = protein_floor = PLAN_DAILY_PROTEIN_MIN_G
+    # #5098: the floor is the charter's protein range low and the hit is the protein engine's — one definition.
+    protein_target = protein_floor = protein_engine.range_low()
     cal_tolerance = profile.get("calorie_tolerance_pct", 10) / 100
     cal_penalty = profile.get("calorie_penalty_threshold_pct", 25) / 100
     details = {
@@ -160,7 +163,7 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
         weights.append(0.40)
         details["cal_score"] = cal_score
     if protein is not None:
-        if protein >= protein_floor:
+        if protein_engine.hit(protein, protein_floor):
             prot_score = 100
         else:
             prot_score = max(0, 80 * protein / protein_floor)
@@ -168,13 +171,13 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
         parts.append(prot_score * 0.40)
         weights.append(0.40)
         details["protein_score"] = prot_score
-    fat_target = profile.get("fat_target_g", 60)
-    carb_target = profile.get("carb_target_g", 125)
-    if fat is not None and carbs is not None:
-        fat_diff = abs(fat - fat_target) / fat_target if fat_target else 0
-        carb_diff = abs(carbs - carb_target) / carb_target if carb_target else 0
-        # 50x multiplier: 100% off target on both macros = score 0
-        macro_score = clamp(round(100 - (fat_diff + carb_diff) * 50))
+    # #5102: the 0.20 macro slot grades the charter's fat, carbohydrate and fibre FLOORS (health.macro_floors), one-sided:
+    # met = 100, below = 80 * value / floor; a missing field is unknown and drops out of the slot's mean, never a miss.
+    floors = macro_floors.evaluate_day(mf)
+    macro_score = macro_floors.score(floors)
+    details["macro_floors"] = floors
+    if macro_score is not None:
+        macro_score = clamp(macro_score)
         parts.append(macro_score * 0.20)
         weights.append(0.20)
         details["macro_score"] = macro_score
@@ -229,7 +232,11 @@ def score_movement(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
 
 
 def habitify_reading(
-    habits_map: dict[str, Any], name: str, meta: Optional[dict[str, Any]] = None, statuses: Optional[dict[str, Any]] = None
+    habits_map: dict[str, Any],
+    name: str,
+    meta: Optional[dict[str, Any]] = None,
+    statuses: Optional[dict[str, Any]] = None,
+    date_str: Optional[str] = None,
 ) -> Optional[float]:
     """The day's Habitify value for registry habit `name`, or None when the day never names it.
 
@@ -249,7 +256,13 @@ def habitify_reading(
     habit id first (the registry entry's `habitify_id`), then names, then the ingest-derived
     `aliases` on each entry — so a habit renamed after ids were stored still resolves with
     no registry edit (`health.habit_identity`). Without `statuses` it is the #4362 lookup.
+
+    #5007: pass `date_str` and a habit whose registry entry carries `paused_since` on or
+    before that day is NOT SCHEDULED — None (unobserved), never a miss. Without `date_str`
+    the lookup is date-blind, as before.
     """
+    if date_str and is_paused_on(meta, date_str):
+        return None
     hit = day_name_for(habits_map, statuses, name, meta)
     if hit is None:
         return None
@@ -313,6 +326,7 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
 
     habitify_7d = data.get("habitify_7d") or []
     unobserved: list[str] = []
+    paused: list[str] = []
     type_drift: list[str] = []
 
     for habit_name, meta in registry.items():
@@ -331,7 +345,10 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
             strava = data.get("strava") or {}
             if not strava.get("activities"):
                 continue
-        reading = habitify_reading(habits_map, habit_name, meta, statuses)
+        reading = habitify_reading(habits_map, habit_name, meta, statuses, date_str)
+        if reading is None and is_paused_on(meta, date_str):
+            paused.append(habit_name)  # #5007: not scheduled — reported as paused, never missed
+            continue
         if reading is None:
             # #4362: unobserved (renamed/archived upstream, or not on today's journal) —
             # named in the details so the drift is visible, never scored as a miss.
@@ -350,7 +367,7 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
             for day_rec in habitify_7d[-6:]:
                 day_habits = day_rec.get("habits", {}) if isinstance(day_rec, dict) else {}
                 day_statuses = day_rec.get("habit_statuses") if isinstance(day_rec, dict) else None
-                d = habitify_reading(day_habits, habit_name, meta, day_statuses)
+                d = habitify_reading(day_habits, habit_name, meta, day_statuses, (day_rec.get("sk") or "").replace("DATE#", ""))
                 if d is not None and d >= 1:
                     week_count += 1
             freq_score = min(100.0, round(week_count / max(target_freq, 1) * 100))
@@ -393,6 +410,8 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
     }
     if unobserved:
         details["unobserved"] = unobserved
+    if paused:
+        details["paused"] = paused
     if type_drift:
         details["registry_type_drift"] = sorted(set(type_drift))
     return composite, details

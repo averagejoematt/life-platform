@@ -254,8 +254,8 @@ test("the miss leads with the week's clearest wrong call when there is one, else
 test("the deeper rows: the chapter is one door with its week and its own first sentence; a failed block is its sentence", () => {
   const row = F.chapterRowHTML(B.chapter);
   // Site-to-A round 1 (front:F6): the note is the chapter's own date and length, never the dek's claims.
-  const note = `The latest chapter · October 6 · ${B.chapter.data.read_minutes} min`;
-  assert.equal(row, `<a class="ck-rows__key" href="/journal/posts/week-08/">Week 5 · “Park's Blind Spot”</a><span>${note.replace(/'/g, "&#39;")}</span>`);
+  const note = `The latest chapter · October 13 · ${B.chapter.data.read_minutes} min`;
+  assert.equal(row, `<a class="ck-rows__key" href="/journal/posts/week-09/">Week 6 · “The Quiet Accumulation”</a><span>${note.replace(/'/g, "&#39;")}</span>`);
   assert.equal(F.chapterRowHTML({ state: "unavailable", absent_text: "The latest chapter is not served right now.", data: null }), '<p class="ck-soft">The latest chapter is not served right now.</p>');
   const slots = P.frontSlots(edition, B, BASE);
   assert.equal(slots["ck-chapter-row"], row);
@@ -275,7 +275,7 @@ test("the week page carries the band whole: the sorted week without a second kic
   assert.equal(slots["ck-week-label"], `This week · ${WEEK_SPAN}`);
   assert.doesNotMatch(slots["ck-week"], /ck-label">How the whole thing is going/, "the page's own heading says it");
   assert.match(slots["ck-week"], /Going well|Not yet/);
-  assert.match(slots["ck-quotes"], /“Park's Blind Spot”, the chapter/);
+  assert.match(slots["ck-quotes"], /“The Quiet Accumulation”, the chapter/);
   assert.equal(slots["ck-words"], null);
   assert.match(slots["ck-words-absent"], /Nothing new in his own words since/);
   const gone = { state: "unavailable", absent_text: "Not served right now.", data: null };

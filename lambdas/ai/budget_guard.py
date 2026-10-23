@@ -137,6 +137,28 @@ _FEATURE_CUTOFF = {
     # human to read later, not a reader-facing surface and not the operator's deploy-safety
     # verdict, so it has no claim to outlive coach narratives or the two CI truth gates.
     "comprehension_qa": 1,
+    # charter_judge (#5072, epic #5067; classed by #5084): the panel-rubric judge — one Haiku
+    # call per panel seat (the training charter's concession-ledger schools) over a golden plan
+    # case or the week's real plan, run back-to-back so the cached charter block
+    # (training_charter.prompt_prefix) is written once and read by every later seat. Its golden
+    # cases are a REGRESSION GATE on charter/engine/skill/prompt changes — an internal eval, so it
+    # pauses FIRST with the rest of band 1. A paused run is reported as paused/degraded on the
+    # grade (#5072's "first non-degraded weekly grade" is its live proof), never a fabricated
+    # score, and the plan itself ships unaffected (nothing deterministic depends on the judge).
+    # Bound: lambdas/training/charter_ai.py names the route, feature and block in one place.
+    "charter_judge": 1,
+    # charter_retro (#5079; classed by #5084): the block retro — the same panel rubric re-grading
+    # the fixed scorecard once per block (charter `calibration.block_retro`), one call per seat,
+    # run from the /training-review skill on a workstation (so the dev AI cap applies too). A
+    # periodic internal review, not a surface: band 1, pauses first. A paused retro is postponed
+    # and says so; the previous retro stays the comparison baseline.
+    "charter_retro": 1,
+    # nutrition_critics (#5114, epic #5094): the model layer over the three nutrition critics
+    # (health/nutrition_critics_ai.py) — up to three short Haiku calls per get_deficit_sustainability
+    # call, one narrative per critic. It NARRATES verdicts the deterministic layer already decided and
+    # may never move one, so nothing ships differently when it is paused: band 1, it pauses FIRST. A
+    # paused layer writes `paused` with the tier on every verdict, never a fabricated narrative.
+    "nutrition_critics": 1,
     # ── Band 2: reader NARRATIVE content — pauses only under real pressure, a full
     #    tier AFTER all internal AI. The biggest recurring daily bucket, so it's
     #    the real cost lever, but the reader product is never the first sacrifice.
@@ -216,6 +238,15 @@ _FEATURE_CUTOFF = {
     # (never a fabricated band) and the owner's MCP tool reports the week as absent.
     # Pennies a month; the band placement is audience-order, not dollars.
     "coach_vision": 2,
+    # charter_narrative (#5071 "every plan explains itself"; classed by #5084): the short lines
+    # that explain a drafted plan in the training charter's frame on the owner's own surfaces —
+    # the plan, its Hevy note and the Telegram coach — written back-to-back in the nightly
+    # pre-draft pass against the cached charter block (one line per surface,
+    # charter_ai.NARRATIVE_SURFACES). Owner-facing coach voice, the same audience as
+    # plan_critics (whose verdicts ride in the same Hevy notes), so band 2: it outlives every
+    # internal/dev AI feature and pauses with the reader narrative. A paused night writes the
+    # plan with NO explanation line (never a templated one that reads as the coach's).
+    "charter_narrative": 2,
     # ── INGEST-PATH processing (#4643) — hard-stop only, BY DECLARATION ───────
     #
     # The four AI callers on the ingest path (every lambdas/ingestion/ module and
@@ -328,6 +359,14 @@ _FEATURE_CUTOFF = {
     # pinned by tests/test_budget_guard_ladder.py's _OPERATOR_TRUTH band.
     "reader_truth_qa": 3,
     "visual_ai_qa": 3,
+    # charter_judge_gate (#5072): the panel-rubric judge run as the CI REGRESSION GATE over the golden
+    # plan cases (scripts/panel_rubric_gate.py), on changes to the training charter, the engine
+    # templates, the planning skills or the coach prompts. The same operator-truth question as the two
+    # above ("is the change that just landed safe?"), the same bounded per-run shape (one call per golden
+    # case, ~5, back-to-back inside one cache TTL) — so the same band. The weekly grade of the real plan
+    # is a different feature (charter_judge, band 1). A paused gate reports SKIPPED-BY-BUDGET and its
+    # deterministic half still gates.
+    "charter_judge_gate": 3,
     #
     # website_ai: the PUBLIC /api/ask + /api/board_ask hook — the platform's most
     # differentiating surface. Rate limits (5/hr/IP) + Haiku pricing bound the
@@ -344,7 +383,7 @@ _HARD_STOP_TIER = 3
 # the qa_smoke hook and the tests all read one list instead of re-typing the names
 # (the "guard the SET, not the instance" rule). Membership is asserted against
 # _FEATURE_CUTOFF in tests/test_budget_guard_ladder.py.
-CI_GATE_FEATURES = ("reader_truth_qa", "visual_ai_qa")
+CI_GATE_FEATURES = ("reader_truth_qa", "visual_ai_qa", "charter_judge_gate")  # #5072 added the panel-rubric gate
 
 # #2824 / DIL-036: the features that must fail CLOSED when the budget tier is
 # UNREADABLE (see the module docstring's split contract). Guard the SET, not the

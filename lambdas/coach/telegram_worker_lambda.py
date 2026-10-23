@@ -1132,6 +1132,12 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
         return _event_outbound()
     if (event or {}).get("kind") == "progress_photo":
         return _progress_photo(event or {})
+    if (event or {}).get("kind") == "evening_checkin":  # #5106: one fixed prompt, deterministic (coach.evening_checkin)
+        from coach import evening_checkin
+
+        return evening_checkin.run_prompt(
+            _table(), _pacific_now(), _bot_seat, lambda tok, chat, t: _tg(tok, "sendMessage", {"chat_id": chat, "text": t})
+        )
 
     order = event or {}
     coach_id = order.get("coach_id")
@@ -1169,6 +1175,14 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
 
     if progress_access.is_view_command(text):
         return _progress_view(order)
+
+    # #5106: the evening check-in reply ("2 3 1 tired" / "/checkin ...") is captured, never sent to a coach turn.
+    from coach.evening_checkin import capture_reply
+
+    checkin_reply = capture_reply(_table(), text, _pacific_now(), is_group=bool(order.get("is_group")))
+    if checkin_reply:
+        _tg(token, "sendMessage", {"chat_id": chat_id, "text": checkin_reply})
+        return {"ok": True, "reason": "evening_checkin"}
 
     # The board room (epic #2363): a group order takes the room's whole path —
     # who-speaks decision, shared thread, speaker-stamped storage — and a silent

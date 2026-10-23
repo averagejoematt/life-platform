@@ -58,6 +58,7 @@ from __future__ import annotations
 import argparse
 import ast
 import importlib.util
+import json
 import os
 import re
 import subprocess
@@ -76,6 +77,7 @@ JS_SCAN_DIR = "site/assets/js"
 IMPORT_GATE = "scripts/import_site_js_graph.mjs"
 CDK_STACKS_DIR = "cdk/stacks"
 MONITORING_STACK = "cdk/stacks/monitoring_stack.py"
+SCHEDULE_TABLE = "config/schedules.json"  # #4284: every schedule's row — the CRON leg reads it as a stack
 
 _SCHEDULE_METHODS = {"cron", "rate", "expression"}  # events.Schedule.<method>(...)
 
@@ -311,11 +313,22 @@ def schedule_signatures(source: str) -> Counter:
     people would learn to route around. Measured totals, by running this function over
     `cdk/stacks/*.py` on 2026-09-14: 16 before, 84 after.
     """
+    sigs: Counter = Counter()
+    # Form 3 (#4284) — config/schedules.json, THE schedule table: one signature per row. Since
+    # #4284 a new schedule is written HERE (the factory reads it by function name), so this is
+    # the form nearly every new cron now takes; the stacks only carry `table_schedule("<key>")`.
+    if source.lstrip().startswith("{"):
+        try:
+            rows = json.loads(source).get("schedules", {})
+        except ValueError:
+            return Counter()
+        for key, row in rows.items():
+            sigs[f'table:{key}="{row.get("expression")}"'] += 1
+        return sigs
     try:
         tree = ast.parse(source)
     except SyntaxError:
         return Counter()
-    sigs: Counter = Counter()
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
@@ -482,7 +495,9 @@ def monitoring_change_present(repo: str, mb: str, changed: list) -> bool:
 
 
 def collect_cron_findings(repo: str, mb: str, changed: list, exemptions: list) -> list:
-    stack_changes = [(s, p) for s, p in changed if p.startswith(CDK_STACKS_DIR + "/") and p.endswith(".py") and s != "D"]
+    stack_changes = [
+        (s, p) for s, p in changed if s != "D" and ((p.startswith(CDK_STACKS_DIR + "/") and p.endswith(".py")) or p == SCHEDULE_TABLE)
+    ]
     if not stack_changes:
         return []
     new_by_file = {}

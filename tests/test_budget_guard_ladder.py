@@ -40,6 +40,9 @@ _INTERNAL = (
     "conversation_enrichment",  # #1577: conversational-corpus Haiku sweep — analysis layer, pauses first
     "comprehension_qa",  # #4182 M4: advisory newcomer-comprehension judge — a triage signal, not a reader
     # surface and not the operator-truth CI gates below, so it pauses with the rest of band 1
+    "charter_judge",  # #5084: the charter's panel-rubric judge (#5072) — golden cases are an internal regression eval
+    "charter_retro",  # #5084: the block retro (#5079) — a periodic internal review run from a workstation
+    "nutrition_critics",  # #5114: the nutrition critics' narrator — narrates decided verdicts, never moves one
 )
 _READER_NARRATIVE = (
     "coach_narrative",
@@ -52,6 +55,7 @@ _READER_NARRATIVE = (
     "coach_social_reaction",  # #1675: the same reaction mechanism on the social channel — same audience, same band
     "coach_nudge",  # #1382: proactive decision-moment nudge — band 2, tier ≥2 silences (AC2)
     "plan_critics",  # #3752: the four debrief critics — Matthew-facing coach voice, pauses with the narrative band
+    "charter_narrative",  # #5084: the plan's charter-frame lines on the owner's plan/Hevy note/Telegram — owner coach voice
     "coach_vision",  # #3759: the Monday progress-photo read — owner-facing coach voice, pauses with the narrative band
 )
 _IRREDUCIBLE_READER = ("website_ai", "daily_brief_ai")
@@ -60,7 +64,7 @@ _IRREDUCIBLE_READER = ("website_ai", "daily_brief_ai")
 # upstream of every reader surface, and they are per-deploy + bounded rather than
 # per-day + open-ended. They pause at the hard stop, i.e. exactly when Bedrock
 # stops for everything.
-_OPERATOR_TRUTH = ("reader_truth_qa", "visual_ai_qa")
+_OPERATOR_TRUTH = ("reader_truth_qa", "visual_ai_qa", "charter_judge_gate")  # #5072: the panel-rubric regression gate
 # #4643: the ingest-path AI callers, listed at the hard stop BY DECLARATION — the cutoff each
 # already inherited by being unlisted, so naming them changed no live behaviour. Moving one into
 # band 1 would pause it on most days of a month (tier >= 1 is the default at current burn), which

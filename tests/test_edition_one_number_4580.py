@@ -101,19 +101,32 @@ def test_the_front_days_training_is_the_training_routes_row_for_that_date():
     # Today's count is served as not settled: the day is still being recorded (round 1's "168 minutes of
     # walking" against a day page reading 90 was the same day read 38 minutes apart, not another day's row).
     today_fact = _fact(week["detail"][0], "Training")
-    assert week["detail"][0]["date"] == CAPTURE_DAY and today_fact is not None and today_fact["settled"] is False
+    assert week["detail"][0]["date"] == CAPTURE_DAY
+    today_row = next((r for r in rows if r["date"] == CAPTURE_DAY), None)
+    if today_row and float(today_row.get("total_min") or 0):
+        assert today_fact is not None and today_fact["settled"] is False
+    else:
+        # The 2026-10-18 capture is from 00:15 Pacific: the route's row for the day has no minutes yet, so the
+        # day carries no Training fact at all (an empty day makes no claim). The not-settled rule is proven on
+        # the planted row below.
+        assert today_fact is None, "an empty day row makes no Training fact"
     assert all("settled" not in (_fact(d, "Training") or {}) for d in week["detail"][1:])
-    # MUTATION CONTROL: the route's row for the day changes -> the detail follows it, per date, and the
-    # offender check names exactly that date when held against the old rows.
+    # MUTATION CONTROL: the route's row for the day changes -> the detail follows it, per date, today's fact is
+    # served as not settled, and the offender check names exactly that date when the detail and the rows disagree.
     mutated = copy.deepcopy(wire)
-    row = next(r for r in mutated["training"]["daily_modality_minutes_30d"] if r["date"] == CAPTURE_DAY)
-    assert row["total_min"] != 77  # the plant must differ from the capture
+    mutated_rows = mutated["training"]["daily_modality_minutes_30d"]
+    row = next((r for r in mutated_rows if r["date"] == CAPTURE_DAY), None)
+    if row is None:
+        row = {"date": CAPTURE_DAY}
+        mutated_rows.append(row)
+    assert float(row.get("total_min") or 0) != 77  # the plant must differ from the capture
     row.update({"walking_min": 64, "strength_min": 13, "total_min": 77})
     week2 = _compose(mutated)["week"]["data"]
     assert _fact(week2["detail"][0], "Training")["text"] == "13 minutes of strength; 64 minutes of walking"
     assert _fact(week2["detail"][0], "Training")["value"] == 77.0
-    assert _training_offenders(week2, rows) == [CAPTURE_DAY]
-    assert _training_offenders(week2, mutated["training"]["daily_modality_minutes_30d"]) == []
+    assert _fact(week2["detail"][0], "Training")["settled"] is False
+    assert _training_offenders(week, mutated_rows) == [CAPTURE_DAY], "the served detail against the planted rows names the day"
+    assert _training_offenders(week2, mutated_rows) == []
 
 
 # ── 2. one sentence, one module ────────────────────────────────────────────────────────

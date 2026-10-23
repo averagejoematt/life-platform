@@ -36,7 +36,7 @@ from constructs import Construct
 
 from stacks import role_policies as rp
 from stacks.constants import ACCT, CF_DIST_ID, LAMEENC_LAYER_ARN, REGION, TABLE_NAME
-from stacks.lambda_helpers import create_platform_lambda
+from stacks.lambda_helpers import create_platform_lambda, table_schedule
 
 # ── #3568: the reader-facing From addresses, read at synth time from the ONE
 # registry (lambdas/common/email_identity.py) rather than hand-typed here.
@@ -114,8 +114,6 @@ class EmailStack(Stack):
             # #4284 (owner ruling, docket #4644 Q42): the brief keeps its PACIFIC wall-clock time
             # across the DST change — 10:00 PDT (17:00 UTC) until 2026-11-01, 10:00 PST (18:00 UTC)
             # after. Every producer it reads runs 16:30-16:55 UTC, i.e. before 10:00 on both sides.
-            schedule="cron(0 10 * * ? *)",
-            schedule_timezone="America/Los_Angeles",
             timeout_seconds=900,
             memory_mb=768,
             environment=_email_env,
@@ -129,7 +127,6 @@ class EmailStack(Stack):
             function_name="weekly-digest",
             handler="emails.weekly_digest_lambda.lambda_handler",
             source_file="lambdas/emails/weekly_digest_lambda.py",
-            schedule="cron(0 16 ? * SUN *)",
             timeout_seconds=120,
             memory_mb=256,
             environment=_email_env,
@@ -143,7 +140,6 @@ class EmailStack(Stack):
             function_name="monthly-digest",
             handler="emails.monthly_digest_lambda.lambda_handler",
             source_file="lambdas/emails/monthly_digest_lambda.py",
-            schedule="cron(0 16 ? * 1#1 *)",
             timeout_seconds=120,
             memory_mb=256,
             environment=_email_env,
@@ -157,7 +153,6 @@ class EmailStack(Stack):
             function_name="nutrition-review",
             handler="emails.nutrition_review_lambda.lambda_handler",
             source_file="lambdas/emails/nutrition_review_lambda.py",
-            schedule="cron(0 17 ? * SAT *)",
             # Verified at 63% of ceiling (max 75.5s / 120s over 30d) — the AI review's
             # only at-risk scheduled generator; 300s gives a slow-Bedrock-day cushion so
             # it can't follow coach-history-summarizer into the DLQ. (Audit 2026-06-28.)
@@ -204,7 +199,6 @@ class EmailStack(Stack):
             function_name="daily-debrief",
             handler="emails.daily_debrief_lambda.lambda_handler",
             source_file="lambdas/emails/daily_debrief_lambda.py",
-            schedule="cron(0 19 * * ? *)",
             timeout_seconds=300,
             memory_mb=512,
             environment=_email_env,
@@ -248,7 +242,7 @@ class EmailStack(Stack):
         panel_hold_sweep = events.Rule(
             self,
             "PanelHoldSweep",
-            schedule=events.Schedule.cron(minute="0", hour="18", week_day="MON,WED"),
+            schedule=table_schedule("coach-panel-podcast#PanelHoldSweep"),
             description="SS-02: retry a soft (quality) Panel HOLD on the current week after the review window",
         )
         panel_hold_sweep.add_target(
@@ -264,7 +258,6 @@ class EmailStack(Stack):
             function_name="wednesday-chronicle",
             handler="emails.wednesday_chronicle_lambda.lambda_handler",
             source_file="lambdas/emails/wednesday_chronicle_lambda.py",
-            schedule="cron(0 15 ? * WED *)",
             # #2669: 120 → 300. A representative full generation measured ~102s
             # (Elena + ADR-104 corrective + Margaret + presence gates), and three
             # runs in 21 days hit the 120s wall AFTER the paid model work
@@ -286,7 +279,7 @@ class EmailStack(Stack):
         story_questions_rule = events.Rule(
             self,
             "StoryQuestionsMonday",
-            schedule=events.Schedule.cron(minute="0", hour="16", week_day="MON"),
+            schedule=table_schedule("wednesday-chronicle#StoryQuestionsMonday"),
             description="#4546: the Story Desk's weekly reply-by-email questions (optional; no reply is a normal week)",
         )
         story_questions_rule.add_target(
@@ -296,13 +289,13 @@ class EmailStack(Stack):
         # #4584 the Tuesday question: ONE fixed question on the same channel and routing token, so his reply lands
         # verbatim in the owner-words store and leads Wednesday's edition. Same target function, same role: no new
         # IAM (it already sends SES and writes the STORYQ# marker for Monday).
-        # Clock: cron(0 1 ? * WED *) = Wednesday 01:00 UTC = Tuesday 18:00 PDT (UTC-7, mid-March → early November) and
+        # Clock: its config/schedules.json row = Wednesday 01:00 UTC = Tuesday 18:00 PDT (UTC-7, mid-March → early November) and
         # Tuesday 17:00 PST (UTC-8) in winter. EventBridge crons here are fixed UTC, so the send drifts one hour
         # earlier across the November DST change; both are Tuesday evening Pacific, and the sender reads the PT day.
         tuesday_question_rule = events.Rule(
             self,
             "OwnerWordsQuestionTuesday",
-            schedule=events.Schedule.cron(minute="0", hour="1", week_day="WED"),
+            schedule=table_schedule("wednesday-chronicle#OwnerWordsQuestionTuesday"),
             description="#4584: the Tuesday-evening-PT question whose verbatim reply leads Wednesday's edition (optional)",
         )
         tuesday_question_rule.add_target(
@@ -315,7 +308,6 @@ class EmailStack(Stack):
             function_name="weekly-plate",
             handler="emails.weekly_plate_lambda.lambda_handler",
             source_file="lambdas/emails/weekly_plate_lambda.py",
-            schedule="cron(0 2 ? * SAT *)",
             timeout_seconds=120,
             memory_mb=512,
             environment=_email_env,
@@ -329,7 +321,6 @@ class EmailStack(Stack):
             function_name="monday-compass",
             handler="emails.monday_compass_lambda.lambda_handler",
             source_file="lambdas/emails/monday_compass_lambda.py",
-            schedule="cron(0 15 ? * MON *)",
             timeout_seconds=120,
             memory_mb=512,
             environment=_email_env,
@@ -348,7 +339,6 @@ class EmailStack(Stack):
             function_name="habit-skip-review",
             handler="emails.habit_skip_review_lambda.lambda_handler",
             source_file="lambdas/emails/habit_skip_review_lambda.py",
-            schedule="cron(0 16 ? * SAT *)",
             timeout_seconds=60,
             memory_mb=256,
             custom_policies=rp.email_habit_skip_review(),
@@ -366,7 +356,6 @@ class EmailStack(Stack):
             function_name="ai-review-pack",
             handler="emails.ai_review_pack_lambda.lambda_handler",
             source_file="lambdas/emails/ai_review_pack_lambda.py",
-            schedule="cron(0 18 ? * SUN *)",
             timeout_seconds=120,
             memory_mb=256,
             environment=_email_env,
@@ -403,7 +392,6 @@ class EmailStack(Stack):
             function_name="partner-weekly-email",
             handler="emails.partner_email_lambda.lambda_handler",
             source_file="lambdas/emails/partner_email_lambda.py",
-            schedule="cron(30 17 ? * 1 *)",
             timeout_seconds=90,
             memory_mb=256,
             environment=_partner_env,
@@ -412,14 +400,13 @@ class EmailStack(Stack):
         )
 
         # R54: Evening nudge — checks supplements/journal/How We Feel completeness at 8 PM PT
-        # cron(0 3 * * ? *) = 3:00 AM UTC = 8:00 PM PDT (UTC-7). Adjust after DST ends.
+        # its config/schedules.json row = 3:00 AM UTC = 8:00 PM PDT (UTC-7). Adjust after DST ends.
         create_platform_lambda(
             self,
             "EveningNudge",
             function_name="evening-nudge",
             handler="emails.evening_nudge_lambda.lambda_handler",
             source_file="lambdas/emails/evening_nudge_lambda.py",
-            schedule="cron(0 3 * * ? *)",
             timeout_seconds=60,
             memory_mb=256,
             environment=_email_env,
@@ -431,14 +418,13 @@ class EmailStack(Stack):
         # Matthew chose, only on a durable MILESTONE# announcement, spiral-breaker
         # gated, ledger-spaced (>=10-14 days). Runs daily AFTER the 16:40 UTC
         # milestone sweep; a run with nothing new (or no recipients configured
-        # yet) is a logged no-op. cron(15 17 * * ? *) = 10:15 AM PDT.
+        # yet) is a logged no-op. its config/schedules.json row = 10:15 AM PDT.
         create_platform_lambda(
             self,
             "MilestoneDigest",
             function_name="milestone-digest",
             handler="emails.milestone_digest_lambda.lambda_handler",
             source_file="lambdas/emails/milestone_digest_lambda.py",
-            schedule="cron(15 17 * * ? *)",
             timeout_seconds=60,
             memory_mb=256,
             environment={**_email_env, "DIGEST_SECRET": "life-platform/digest"},
@@ -460,7 +446,6 @@ class EmailStack(Stack):
             function_name="coach-nudge",
             handler="emails.coach_nudge_lambda.lambda_handler",
             source_file="lambdas/emails/coach_nudge_lambda.py",
-            schedule="cron(10 0-5,15-23 * * ? *)",
             timeout_seconds=120,
             memory_mb=256,
             environment=_email_env,
@@ -477,7 +462,7 @@ class EmailStack(Stack):
             function_name="weekly-signal",
             handler="compute.weekly_signal_lambda.lambda_handler",
             source_file="lambdas/compute/weekly_signal_lambda.py",
-            schedule="cron(30 16 ? * SUN *)",  # Sunday 9:30 AM PT
+            # schedule: config/schedules.json (#4284) — Sunday 9:30 AM PT
             timeout_seconds=300,
             memory_mb=256,
             environment={
@@ -491,7 +476,7 @@ class EmailStack(Stack):
         )
 
         # BS-03: Chronicle Email Sender — delivers Chronicle installment to confirmed subscribers.
-        # Fires 10 min after wednesday-chronicle (cron(0 15 ? * WED *) = 8:00 AM PT).
+        # Fires 10 min after wednesday-chronicle (its config/schedules.json row = 8:00 AM PT).
         # Viktor guard: clean no-op if no installment found this week.
         # Independent DLQ + alarm from wednesday-chronicle.
         # timeout_seconds=300: headroom for ~300 subs at 1/sec rate limit.
@@ -502,7 +487,6 @@ class EmailStack(Stack):
             function_name="chronicle-email-sender",
             handler="emails.chronicle_email_sender_lambda.lambda_handler",
             source_file="lambdas/emails/chronicle_email_sender_lambda.py",
-            schedule="cron(10 15 ? * WED *)",
             timeout_seconds=300,
             memory_mb=256,
             environment={
@@ -617,7 +601,6 @@ class EmailStack(Stack):
             function_name="between-chronicle",
             handler="emails.between_chronicle_lambda.lambda_handler",
             source_file="lambdas/emails/between_chronicle_lambda.py",
-            schedule="cron(0 17 ? * SUN *)",
             timeout_seconds=300,
             memory_mb=256,
             environment={
@@ -663,7 +646,7 @@ class EmailStack(Stack):
             # SS-01: a daily sweep auto-publishes any draft older than the review window
             # (CHRONICLE_AUTOPUBLISH_HOURS) so the weekly story never goes dark unattended.
             # The scheduled invoke arrives as source=aws.events → handled as a sweep.
-            schedule="cron(0 18 * * ? *)",  # daily 10:00 AM PT
+            # schedule: config/schedules.json (#4284) — daily 10:00 AM PT
             environment={
                 "CF_DIST_ID": CF_DIST_ID,
                 "CHRONICLE_EMAIL_SENDER_ARN": chronicle_sender.function_arn,
@@ -696,7 +679,7 @@ class EmailStack(Stack):
             function_name="subscriber-onboarding",
             source_file="lambdas/web/subscriber_onboarding_lambda.py",
             handler="web.subscriber_onboarding_lambda.lambda_handler",
-            schedule="cron(5 17 * * ? *)",  # 10:05 AM PT daily (staggered from daily-brief)
+            # schedule: config/schedules.json (#4284) — 10:05 AM PT daily (staggered from daily-brief)
             timeout_seconds=120,
             memory_mb=256,
             # #3568: onboarding is reader mail — From the site domain.

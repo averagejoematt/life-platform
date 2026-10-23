@@ -363,6 +363,59 @@ _WHOOP_HISTORY_READ_REASON = (
 
 
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
+    "measurements::lambdas/training/calibration_cadence.py::read": (
+        "2026-10-19",
+        "#5061: the cadence reads ONLY the `date` (falling back to the `sk` DATE# suffix) of each tape row, to find when a tape was "
+        "last logged; the writer (measurements_ingestion_lambda) writes `sk` = DATE#<session_date> and `date` = session_date in one "
+        "put. A drift cannot fabricate a row: an unparseable value is skipped and the kind reads as never logged. Pinned on the real "
+        "writer's key shape by tests/test_calibration_cadence_5061.py::test_the_readers_parse_what_the_real_writers_store.",
+    ),
+    "progress_photos::lambdas/training/calibration_cadence.py::read": (
+        "2026-10-19",
+        "#5061: the cadence projects only `sk` and `date` of the photo index rows (never `s3_key`), the two fields "
+        "progress_capture.store writes with `index_sk(date, pose)` = DATE#<date>#<pose>. Pinned against the REAL writer "
+        "(progress_capture.store with a fake S3 and table) by tests/test_calibration_cadence_5061.py::"
+        "test_the_readers_parse_what_the_real_writers_store; an unparseable date is skipped, never a photo path read.",
+    ),
+    "progress_photos::lambdas/coach/progress_capture.py::write": (
+        "2026-10-19",
+        "#5061: the same seam as the cadence's read, seen from the writer: the index row's `sk` and `date` are what "
+        "`calibration_cadence` reads; no other field of the row is read by it. Pinned by "
+        "tests/test_calibration_cadence_5061.py::test_the_readers_parse_what_the_real_writers_store.",
+    ),
+    "hevy::mcp/authoring_input_age.py::read": (
+        "2026-10-19",
+        "#5085: the authoring gate's input-age check reads ONLY the newest hevy `sk` (ProjectionExpression='sk', "
+        "begins_with 'DATE#', Limit=1, descending) and takes the YYYY-MM-DD after 'DATE#'; it reads no attribute. The "
+        "writer's sk is hevy_common.normalize_workout's DATE#{date}#WORKOUT#{id}. Pinned two-sided on the writer's real "
+        "output by tests/test_authoring_freshness_and_charter_stamp_5085.py::"
+        "test_the_hevy_date_read_parses_exactly_the_sk_the_writer_writes.",
+    ),
+    "strava::lambdas/ingestion/strava_lambda.py::read": (
+        "2026-10-18",
+        "#4626: strava_lambda reads back its OWN day row (strava_id, zoneN_seconds, hr_recovery, elapsed_time_seconds) to skip "
+        "re-fetching unchanged enrichment; the writer of those fields is the same module's _normalize, and enrichment_lambda only "
+        "writes enriched_name/enriched_at. Pinned on the real row shape by tests/test_strava_enrichment_reuse_4626.py::"
+        "test_reader_parses_exactly_what_normalize_writes; a stale or missing field degrades to the vendor call.",
+    ),
+    "strava::lambdas/intelligence/labelled_facts.py::read": (
+        "2026-10-18",
+        "#4580 B-01: the analyzer's served 30-day workout count reads the strava day rows ONLY through "
+        "`web.site_api_training._flatten_day_activities` + `_dedup_whoop` — imported, not re-derived — the same two "
+        "functions /api/training_overview's `workouts_30d` is computed with, so this reader cannot disagree with that "
+        "consumer about the row shape; it counts activities and reads no field of its own. A drift in the strava writer "
+        "moves both counts together. tests/test_analyzer_labelled_facts_4580.py pins the gate on the count.",
+    ),
+    "whoop::lambdas/ingestion/whoop_cycle_day.py::read": (
+        "2026-10-18",
+        "#5002: the cycle-id guard reads back ONLY `sk` and `cycle_id` of the neighbouring whoop day rows. Both sides of "
+        "`cycle_id` live in the one module: `whoop_cycle_day.cycle_identity` builds the field `whoop_lambda._extract_cycle` "
+        "writes, and `cycle_id_filed_elsewhere` beside it reads it back. A drift cannot fabricate a row: an unmatched "
+        "name reads as no neighbour holding the id, and the "
+        "start-day rule (`cycle_for_day`) still keeps the prior day's cycle off the row. Pinned two-sided on the "
+        "archived 2026-10-17/18 payloads by tests/test_whoop_cycle_day_dedup_5002.py (guard removed -> 2 red; "
+        "start-day rule removed too -> the 10-18 duplicate is written again).",
+    ),
     "whoop::lambdas/web/site_api_physical.py::read": (
         "2026-10-16",
         "#4630: the weekly physical summary reads whoop rows ONLY to hand them to common.metric_truth's steps resolver, "
@@ -464,6 +517,16 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
     "hevy::mcp/tools_health.py::read": (
         "2026-09-20",
         _HEVY_WORKED_SET_REASON,
+    ),
+    # #4976 (2026-10-18): /api/device_agreement re-pointed from garmin to the Apple Watch. It reads
+    # `date` + `resting_heart_rate_apple` only — the one name health_auto_export_lambda's tier-2
+    # _METRIC_DEFS writes for Apple RHR (freshness_checker writes no such field). A writer-side
+    # rename leaves the reader with NO matching rows, which the endpoint serves as an explicit
+    # 'unavailable' with a reason (tests/test_device_agreement.py::test_no_overlap_returns_shaped_unavailable_200)
+    # — the two sides can disagree only into an honest absence, never into a wrong number.
+    "apple_health::lambdas/web/site_api_freshness.py::read": (
+        "2026-10-18",
+        "reads resting_heart_rate_apple + date only; a writer rename degrades to an explicit 'unavailable', never a wrong value",
     ),
     "hevy::mcp/tools_nutrition.py::read": (
         "2026-09-20",
@@ -656,6 +719,15 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "`state: unknown` with avg/max None (never 0), a visible flip on the stored `cardio_hr` record. Pinned by "
         "tests/test_walking_volume_3930.py::test_no_overlap_or_thin_coverage_is_unknown_never_zero and "
         "::test_the_0925_treadmill_replays_joined_on_the_live_fixture (the live-row fixture).",
+    ),
+    # #5187 (2026-10-22): the breakfast nudge reads the apple_health day row's `_rd_protein_hae` map.
+    "apple_health::lambdas/emails/protein_nudge_runner.py::read": (
+        "2026-10-22",
+        "#5187: the runner projects ONE attribute, `_rd_protein_hae`, whose name is imported from the writer "
+        "(`ingestion.health_auto_export_protein.RD_FIELD`, the same constant both sides use), and hands the map unparsed to "
+        "`health.protein_engine.hae_feeding_rows`, which reads only the entry keys `t` and `g` that the writer stores. A drift cannot "
+        "fabricate a number: an entry missing either key is skipped, and no entries means the nudge withholds (`no_same_day_log`). "
+        "VERIFIED: tests/test_hae_protein_intraday_5187.py drives the writer's real output through the runner end to end.",
     ),
 }
 

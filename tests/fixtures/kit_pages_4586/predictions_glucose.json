@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-17T23:29:14.369996+00:00",
-  "served_at": "2026-10-17T23:29:14.369996+00:00",
+  "generated_at": "2026-10-18T07:15:15.874460+00:00",
+  "served_at": "2026-10-18T07:15:15.874460+00:00",
   "cache_seconds": 300,
-  "request_id": "4be3bf1958ff4e3b"
+  "request_id": "87d91e66b13d41c9"
  },
  "overall": {
   "total": 50,
@@ -16,7 +16,7 @@
   "decided": 7,
   "accuracy_pct": 14.3,
   "due": {
-   "as_of": "2026-10-17",
+   "as_of": "2026-10-18",
    "due_now": 0,
    "earliest_due": "2026-11-03"
   },
@@ -39,6 +39,12 @@
    }
   },
   "counted_text": "Counted: 1 side of a bet between two coaches and 6 read out of the coaches' running commentary.",
+  "baseline": {
+   "rule": "base_rate",
+   "rate": 0.143,
+   "rate_pct": 14,
+   "text": "A guess that every call has a 14% chance of coming true is the comparison; too few calls are checked to make it yet."
+  },
   "lifetime": {
    "total": 401,
    "confirmed": 1,

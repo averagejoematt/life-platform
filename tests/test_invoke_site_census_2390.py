@@ -152,12 +152,28 @@ EXEMPTIONS: dict[str, dict[str, str]] = {
         OWNER_CHAT_MCP,
         "MCP-only exercise-note classification against a fixed taxonomy allow-list — a label from a closed set, not prose, and not published.",
     ),
+    "lambdas/training/panel_judge.py": _ex(
+        OWNER_CHAT_MCP,
+        "#5072: the panel rubric's blinded judge — one JSON reply per plan of 0-10 criterion scores, a concession_held flag "
+        "and a one-line `why` per seat, parsed by panel_judge.parse_response (an unparseable reply leaves the code scores "
+        "standing and marks the grade degraded). It lands in the owner-only training_constraints/PANEL#<week_end> row that "
+        "mcp/panel_weekly_grade.py writes and MCP reads, and in the panel-rubric-gate CI verdict; no /api/ route, site page "
+        "or email reads PANEL#.",
+    ),
     "mcp/tools_plan.py": _ex(
         OWNER_CHAT_MCP,
         "#3752 stage 2: the four debrief critics — each model reply is ONE JSON object {verdict, metric, value, field, to, sentence} parsed by "
         "coach.critics.parse_model_verdict; the verdict is floored by the deterministic layer and a `metric` outside the packet is discarded, "
         "so the model cannot introduce a number. The only free text is a single <=200-char sentence that lands in Matthew's own Hevy routine "
         "notes and the training coach thread (owner-only surfaces, never rendered publicly).",
+    ),
+    "mcp/nutrition_critics_inputs.py": _ex(
+        OWNER_CHAT_MCP,
+        "#5114: the nutrition critics' narrator (health.nutrition_critics_ai) — one JSON reply per critic {narrative, agrees, "
+        "dissent}; the verdict is the deterministic layer's and the model writes only the verdict's `model` record. A "
+        "narrative citing any number outside the verdict + packet is WITHHELD (grounded_generation.fabricated_numbers, exact "
+        "tolerance), so the model cannot introduce a number. It lands in get_deficit_sustainability's `critics` block, an "
+        "MCP-only owner surface; no /api/ route, site page or email reads it (#3754's owner-only import sweep holds the block).",
     ),
     "lambdas/intelligence/intelligence_common.py": _ex(
         OWNER_CHAT_MCP,

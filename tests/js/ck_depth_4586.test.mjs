@@ -104,7 +104,7 @@ test("the sentence gives count and range, an average only when asked, and days a
 
 test("the newest week of readings is on the page and the rest is one tap away", () => {
   const rows = D.recentRowsHTML(D.seriesOf("steps", SRC), D.MEASURES.steps.write, BASE, 3);
-  assert.match(rows, /href="\/next\/v8\/day\/\?d=2026-10-03">Oct 3 · Saturday · 9,913 </);
+  assert.match(rows, /href="\/next\/v8\/day\/\?d=2026-10-03">Oct 3 · Saturday · 24,816 </);
   assert.match(rows, /<details><summary>The \d+ earlier readings<\/summary>/);
   assert.equal((rows.split("<details>")[0].match(/<li>/g) || []).length, 3);
   const lift = D.recentRowsHTML(D.liftSeries(SRC.workouts.workouts, "Bench Press (Barbell)"), (v) => `${v} lb`, BASE);
@@ -160,7 +160,9 @@ test("macro share is worked from the logged grams and needs all three", () => {
 });
 
 test("the steps trend says how steps are counted and that some days read low", () => {
-  assert.match(D.MEASURES.steps.about, /A day they were not carried reads low/);
+  assert.match(D.MEASURES.steps.about, /A day nothing was worn or carried reads low/);
+  // Red team round 3 (B-10): whose count it is — the strap's first (METRIC_TRUTH steps), the phone's after.
+  assert.match(D.MEASURES.steps.about, /^The wrist strap’s step count, or the phone and watch’s/);
 });
 
 test("a measure name from the address bar finds only real measures", () => {

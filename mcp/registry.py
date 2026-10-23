@@ -115,6 +115,7 @@ from mcp.tools_descriptions import (
     LOG_COACH_CORRECTION_INPUT,
     LOG_DECISION_DESCRIPTION,
     LOG_EVENING_INTAKE_DESCRIPTION,
+    LOG_EVENING_INTAKE_INPUT,
     LOG_FIELD_NOTE_RESPONSE_DESCRIPTION,
     LOG_HABIT_REFLECTION_DESCRIPTION,
     MANAGE_DIARY_CLAIMS_DESCRIPTION,
@@ -154,12 +155,8 @@ from mcp.tools_lifestyle import (
     tool_save_insight,
     tool_update_insight_outcome,
 )
-from mcp.tools_memory import (
-    tool_delete_platform_memory,
-    tool_list_memory_categories,
-    tool_read_platform_memory,
-    tool_write_platform_memory,
-)
+from mcp.tools_may_tracker import GET_MAY_TRACKER_DESCRIPTION, GET_MAY_TRACKER_INPUT, tool_get_may_tracker  # #5073
+from mcp.tools_memory import tool_delete_platform_memory, tool_list_memory_categories, tool_read_platform_memory, tool_write_platform_memory
 from mcp.tools_meta import list_registered_tools  # #3668: the meta-tool body, lifted out of this table
 from mcp.tools_nutrition import tool_get_deficit_sustainability, tool_get_nutrition
 from mcp.tools_owner_words import LOG_OWNER_NOTE_DESCRIPTION, LOG_OWNER_NOTE_INPUT, tool_log_owner_note  # #4584
@@ -345,6 +342,11 @@ TOOLS = {
         "fn": tool_get_coach_vision,
         "schema": {"name": "get_coach_vision", "description": GET_COACH_VISION_DESCRIPTION, "inputSchema": GET_COACH_VISION_INPUT},
     },
+    # #5073: owner-only, the May tracker; the description + input table live in the tool's own module.
+    "get_may_tracker": {
+        "fn": tool_get_may_tracker,
+        "schema": {"name": "get_may_tracker", "description": GET_MAY_TRACKER_DESCRIPTION, "inputSchema": GET_MAY_TRACKER_INPUT},
+    },
     "get_predictions": {
         "fn": tool_get_predictions,
         "schema": {
@@ -492,7 +494,10 @@ TOOLS = {
                     },
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 30d ago)."},
                     "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "step_target": {"type": "integer", "description": "[movement] Daily step target (default: 8000)."},
+                    "step_target": {
+                        "type": "integer",
+                        "description": "[movement] Daily step target (default: the training charter's steps floor).",
+                    },
                 },
                 "required": [],
             },
@@ -691,9 +696,10 @@ TOOLS = {
             "description": (
                 "Unified readiness score (0-100) synthesising Whoop recovery (40%), Whoop sleep quality (25%), "
                 "HRV 7-day trend vs 30-day baseline (20%), TSB training form (10%), and "
-                "Garmin Body Battery (5%) into a single GREEN / YELLOW / RED signal with a 1-line "
-                "actionable recommendation. Also includes a device_agreement section showing Whoop vs "
-                "Garmin HRV/RHR delta as a confidence signal — flag status means lower score reliability; "
+                "Overnight physiology (5%) — respiratory rate + skin temperature vs his own 30-night baseline — into "
+                "a single GREEN / YELLOW / RED signal with a 1-line actionable recommendation; the formula ships in "
+                "the output. No Body Battery. Also includes a device_agreement section showing Whoop vs "
+                "Apple Watch same-night resting-HR delta as a confidence signal — flag status means lower score reliability; "
                 "when the cross-check can't run it returns status=unavailable with a reason instead of null. "
                 "Reduces cognitive load: one number instead of 5 separate metrics tells you "
                 "'train hard today' vs 'go easy' vs 'rest day'. Missing components are excluded and "
@@ -745,20 +751,10 @@ TOOLS = {
             },
         },
     },
+    # #5106: the input table (count + the evening check-in fields) is LOG_EVENING_INTAKE_INPUT in mcp/tools_descriptions.py.
     "log_evening_intake": {
         "fn": tool_log_evening_intake,
-        "schema": {
-            "name": "log_evening_intake",
-            "description": LOG_EVENING_INTAKE_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "count": {"type": "integer", "description": "Evening count, 0-4 (4 = four or more)."},
-                    "date": {"type": "string", "description": "YYYY-MM-DD (default: tonight, the Pacific calendar day)."},
-                },
-                "required": ["count"],
-            },
-        },
+        "schema": {"name": "log_evening_intake", "description": LOG_EVENING_INTAKE_DESCRIPTION, "inputSchema": LOG_EVENING_INTAKE_INPUT},
     },
     "get_intake_response": {
         "fn": tool_get_intake_response,
@@ -1489,7 +1485,6 @@ TOOLS = {
         },
     },
     # ── BS-01: Essential Seven Protocol ─────────────────────────────────────────────
-    # ── Garmin biometrics + device agreement ─────────────────────────────────────────
     # ── BS-09: ACWR Training Load ────────────────────────────────────────────────────
     "get_acwr_status": {
         "fn": tool_get_acwr_status,
@@ -1680,10 +1675,8 @@ TOOLS = {
                         ),
                     },
                     "notes": {"type": "string", "description": "draft_custom only: one-line session WHY-note shown in Hevy."},
-                    "routine_id": {
-                        "type": "string",
-                        "description": "Platform routine_id. Required for dry_run, commit, get, archive, adherence.",
-                    },
+                    "departure_reason": {"type": "string", "description": "draft_custom, REQUIRED (#5055): why it departs from `draft`."},
+                    "routine_id": {"type": "string", "description": "Routine id. Required for dry_run, commit, get, archive, adherence."},
                     "owner_override_redteam": {"type": "boolean", "description": "commit (#4066): owner-only override."},
                     "override_reason": {"type": "string", "description": "commit (#4066): the owner's own words for that override."},
                     "movement_key": {"type": "string", "description": "stall_check: the movement to assess (e.g. 'lat_pulldown')."},
@@ -1693,10 +1686,7 @@ TOOLS = {
                     "start_date": {"type": "string", "description": "List action: range start (YYYY-MM-DD)."},
                     "end_date": {"type": "string", "description": "List action: range end (YYYY-MM-DD)."},
                     "limit": {"type": "integer", "default": 50, "description": "Max items returned by list."},
-                    "recovery_tier": {
-                        "type": "string",
-                        "description": "green | yellow | red — overrides default yellow for draft/floor/re_entry.",
-                    },
+                    "recovery_tier": {"type": "string", "description": "green | yellow | red; overrides the yellow default."},
                     "acwr_flag": {"type": "string", "description": "safe | caution | high | very_high."},
                     "volume_7d": {"type": "object", "description": "Optional map of muscle->sets completed in last 7d."},
                     "days_since_last_workout": {"type": "integer"},

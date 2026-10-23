@@ -317,7 +317,7 @@ REPLAY_SEMANTICS: dict[str, tuple[str, str]] = {
     # ── #4401: read-verb tools reclassified as writes (mcp/audit.py WRITE_TOOLS_BEHIND_READ_VERB) ──
     "get_exercise_notes": (
         DETERMINISTIC_KEY,
-        "action=dismiss puts training_constraints sk=dismissal_sk(site, dismissed_on) — a replay rewrites the same dismissal",
+        "action=dismiss puts training_constraints sk=dismissal_sk(site, dismissed_on); action=deload puts sk=deload_sk(start_date) — a replay rewrites the same record",
     ),
     "get_coach_checkin_queue": (
         READ_BEFORE_WRITE,

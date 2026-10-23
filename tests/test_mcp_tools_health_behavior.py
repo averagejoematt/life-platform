@@ -339,140 +339,153 @@ def _declared_views(tool: str) -> list[str]:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _readiness_rows(date=TODAY):
-    """Every component present and fresh: Whoop recovery+sleep, pre-computed HRV
-    trend and TSB, same-day Garmin Body Battery."""
+def _baseline_nights(date=TODAY, n=10, rr=14.0, temp=33.8):
+    """#4978: the Whoop nights BEFORE `date` carrying the two overnight-physiology
+    signals (respiratory rate, skin temperature) and nothing else."""
+    return [whoop(d(date, -i), respiratory_rate=rr, skin_temp_celsius=temp) for i in range(1, n + 1)]
+
+
+def _readiness_rows(date=TODAY, rr=15.0, temp=34.0):
+    """Every component present and fresh: Whoop recovery+sleep (with the night's
+    respiratory rate and skin temperature), pre-computed HRV trend and TSB, ten
+    baseline nights, and the same night's Apple Watch resting HR."""
     return [
-        whoop_full(date, recovery=60, hrv=45, rhr=55, sleep_score=80),
+        dict(whoop_full(date, recovery=60, hrv=45, rhr=55, sleep_score=80), respiratory_rate=rr, skin_temp_celsius=temp),
         cmetrics(date, hrv_7d=44, hrv_30d=40, tsb=4),
-        garmin(date, body_battery_end=70, hrv_last_night=48, resting_heart_rate=57),
+        apple(date, resting_heart_rate_apple=57, hrv_sdnn_apple=70),
+        *_baseline_nights(date),
     ]
 
 
 def test_readiness_weights_every_component_and_reports_the_hand_derived_score(monkeypatch):
-    """The published weights are 40/25/20/10/5. With all five present:
+    """The published weights are 40/25/20/10/5 (#4978: the 5% leg is overnight
+    physiology, not Body Battery). With all five present:
 
-    whoop_recovery   60 * 0.40 = 24.0
-    sleep_quality    80 * 0.25 = 20.0   (sleep_quality_score 80 -> sleep_score 80)
-    hrv_trend        80 * 0.20 = 16.0   (44/40 = 1.10 -> 60 + 0.10*200 = 80)
-    training_form    80 * 0.10 =  8.0   (tsb 4 -> 70 + 4*2.5 = 80)
-    body_battery     70 * 0.05 =  3.5
-                                -----
-                                 71.5   / total weight 1.00 = 71.5  -> GREEN (>=70)
+    whoop_recovery        60 * 0.40 = 24.0
+    sleep_quality         80 * 0.25 = 20.0   (sleep_quality_score 80 -> sleep_score 80)
+    hrv_trend             80 * 0.20 = 16.0   (44/40 = 1.10 -> 60 + 0.10*200 = 80)
+    training_form         80 * 0.10 =  8.0   (tsb 4 -> 70 + 4*2.5 = 80)
+    overnight_physiology  80 * 0.05 =  4.0   (RR 15.0 vs 14.0 -> +1.0: 100*(3.0-1.0)/2.5 = 80;
+                                              temp 34.0 vs 33.8 -> +0.2 <= 0.3 -> 100; min = 80)
+                                     -----
+                                      72.0   / total weight 1.00 = 72.0  -> GREEN (>=70)
     """
     install(monkeypatch, _readiness_rows())
     out = th.tool_get_readiness_score({})
-    assert out["readiness_score"] == 71.5
+    assert out["readiness_score"] == 72.0
     assert out["label"] == "GREEN"
     assert out["data_completeness"] == "full"
     assert out["missing_components"] is None
     assert out["components"]["hrv_trend"]["raw"]["trend_pct"] == 10.0
     assert out["components"]["training_form"]["score"] == 80.0
-    assert out["components"]["garmin_body_battery"]["score"] == 70.0
+    phys = out["components"]["overnight_physiology"]
+    assert phys["score"] == 80.0
+    assert phys["raw"]["respiratory_rate_brpm_deviation"] == 1.0 and phys["raw"]["skin_temp_c_subscore"] == 100.0
+    assert phys["raw"]["respiratory_rate_brpm_n_baseline"] == 10
 
 
-def test_readiness_carries_the_medical_disclaimer(monkeypatch):
-    """R13-F09 — a health assessment never ships bare."""
+def test_readiness_states_its_formula_in_the_output(monkeypatch):
+    """#4978 box 2: the formula travels with the score — every component's weight
+    and map — and names what it does NOT use."""
     install(monkeypatch, _readiness_rows())
-    assert "Not medical advice" in th.tool_get_readiness_score({})["_disclaimer"]
-
-
-def test_readiness_has_an_explicit_no_data_branch(monkeypatch):
-    """The `if not components` guard exists and returns an error rather than a
-    score — the intent is right. The next test is about whether it is reachable."""
-    monkeypatch.setattr(th, "_get_training_load", lambda a: {})
-    install(monkeypatch, [])
     out = th.tool_get_readiness_score({})
-    assert "error" in out
-    assert "readiness_score" not in out and "label" not in out
+    f = out["formula"]
+    assert {k: v["weight"] for k, v in f["components"].items()} == th.READINESS_WEIGHTS
+    assert set(out["components"]) == set(f["components"])
+    assert "Body Battery" in f["not_used"] and "Apple" in f["not_used"]
+    assert "Body Battery 5%" not in out["scoring_note"] and "overnight physiology" in out["scoring_note"]
 
 
-def test_readiness_on_a_platform_with_no_data_errors_rather_than_scoring_seventy(monkeypatch):
-    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
-
-    The defect this test was written to report:
-
-    DEFECT (ADR-104, P1, mcp/tools_health.py:192-213 + 307 tool_get_readiness_score): on a platform with NO data the
-    `if not components: return {'error': ...}` guard is unreachable, because the TSB fallback calls
-    `_get_training_load`, whose Banister model over an all-zeros load series yields ctl=atl=0 -> tsb_form 0.0 ->
-    `clamp(70 + 0*2.5)` = a training_form component scoring 70.0. Total weight 0.10, so raw_score = 70.0 exactly,
-    which clears the `>= 70` GREEN threshold. The tool answers a completely silent platform with 'readiness 70.0 /
-    GREEN / You're primed - go ahead with your planned hard session.' A zero training load is an ABSENCE of training
-    data, not measured freshness. Who it hurts: the worst possible day to be told to train hard is the day nothing is
-    measuring him.
-    """
-    install(monkeypatch, [])
+def test_readiness_never_reads_garmin_even_when_a_body_battery_row_exists(monkeypatch):
+    """#4976/#4978: Garmin's feed is retired; its stored rows stay, but readiness never
+    reads them. A same-day Body Battery of 95 is present and changes nothing, and the
+    garmin partition is never queried. (Mutation control: restore the old garmin read
+    and both the score and the sources_read assertion move.)"""
+    rows = _readiness_rows()
+    rows.append(garmin(TODAY, body_battery_end=95, hrv_last_night=48, resting_heart_rate=57))
+    t = install(monkeypatch, rows)
     out = th.tool_get_readiness_score({})
-    assert "error" in out, f"got readiness_score={out.get('readiness_score')} label={out.get('label')}"
+    assert out["readiness_score"] == 72.0
+    assert "garmin" not in t.sources_read
+    assert not any("garmin" in k or "battery" in k for k in out["components"])
 
 
-def test_readiness_renormalises_the_remaining_weights_when_garmin_is_absent(monkeypatch):
+def test_readiness_renormalises_the_remaining_weights_when_physiology_is_absent(monkeypatch):
     """(24.0 + 20.0 + 16.0 + 8.0) / 0.95 = 68 / 0.95 = 71.578... -> 71.6, and the
     shortfall is DISCLOSED rather than silently absorbed."""
-    install(monkeypatch, [r for r in _readiness_rows() if "garmin" not in r["pk"]])
+    rows = [r for r in _readiness_rows() if not (r["pk"].endswith("whoop") and r["date"] != TODAY)]
+    rows[0] = {k: v for k, v in rows[0].items() if k not in ("respiratory_rate", "skin_temp_celsius")}
+    install(monkeypatch, rows)
     out = th.tool_get_readiness_score({})
     assert out["readiness_score"] == 71.6
     assert out["data_completeness"] == "partial (95% weight covered)"
-    assert out["missing_components"] == ["garmin body battery"]
+    assert out["missing_components"] == ["overnight physiology"]
 
 
-def test_readiness_excludes_a_garmin_record_more_than_a_day_staler_than_whoop(monkeypatch):
-    """Garmin ingestion is paused (ADR-074); a Body Battery from two days ago must
-    not enter today's score at full weight, and the exclusion must say so."""
-    rows = [r for r in _readiness_rows() if "garmin" not in r["pk"]]
-    rows.append(garmin(d(TODAY, -2), body_battery_end=95, hrv_last_night=48))
-    install(monkeypatch, rows)
-    out = th.tool_get_readiness_score({})
-    assert "garmin_body_battery" not in out["components"]
-    assert out["data_completeness"] == "partial (95% weight covered)"
-
-
-def test_readiness_does_not_cross_check_against_a_record_it_declared_too_stale(monkeypatch):
-    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
-
-    The defect this test was written to report:
-
-    DEFECT (P2, mcp/tools_health.py:253-302 tool_get_readiness_score): the staleness branch builds `device_agreement =
-    {'status': 'unavailable', 'reason': '<garmin date> is >1 day older than whoop - stale data excluded'} ` and then
-    the very next block, guarded only by `if 'whoop_recovery' in components and garmin_today is not None`, OVERWRITES
-    it with a cross-check computed from that same excluded record. So a Garmin reading the tool just refused to score
-    at 5% weight is still used to publish 'device_agreement: available, confidence: high' — the reliability signal for
-    the whole score. The overwrite must also be gated on `not garmin_stale`.
-    """
-    rows = [r for r in _readiness_rows() if "garmin" not in r["pk"]]
-    rows.append(garmin(d(TODAY, -2), body_battery_end=95, hrv_last_night=48))
+def test_readiness_does_not_cross_check_against_a_different_night(monkeypatch):
+    """The Apple Watch row must be the SAME night as the Whoop recovery — a reading from
+    two days ago is not a cross-check, and the verdict says so."""
+    rows = [r for r in _readiness_rows() if "apple_health" not in r["pk"]]
+    rows.append(apple(d(TODAY, -2), resting_heart_rate_apple=57))
     install(monkeypatch, rows)
     da = th.tool_get_readiness_score({})["device_agreement"]
     assert da["status"] == "unavailable"
-    assert "stale" in da["reason"]
+    assert TODAY in da["reason"]
 
 
 def test_readiness_never_returns_a_silent_null_for_the_device_cross_check(monkeypatch):
-    """#492/M-7 — when the Whoop/Garmin cross-check cannot run, it says WHY."""
-    install(monkeypatch, [r for r in _readiness_rows() if "garmin" not in r["pk"]])
+    """#492/M-7 — when the Whoop/Apple Watch cross-check cannot run, it says WHY."""
+    install(monkeypatch, [r for r in _readiness_rows() if "apple_health" not in r["pk"]])
     da = th.tool_get_readiness_score({})["device_agreement"]
     assert da["status"] == "unavailable" and da["reason"]
-    assert "garmin" in da["reason"].lower()
+    assert "apple watch" in da["reason"].lower()
+    assert "garmin" not in da["reason"].lower()
 
 
-def test_readiness_cross_checks_whoop_against_garmin_with_hand_derived_deltas(monkeypatch):
-    """HRV 45 vs 48 -> delta -3.0 ms, |3| <= 10 -> agree.
-    RHR 55 vs 57 -> delta -2.0 bpm, |2| <= 3  -> agree.  Both agree -> high."""
+def test_readiness_cross_checks_whoop_against_the_apple_watch_with_hand_derived_deltas(monkeypatch):
+    """RHR 55 vs 57 -> delta -2.0 bpm, |2| <= 3 -> agree -> high. HRV is NOT compared:
+    Whoop RMSSD and Apple SDNN are different statistics (the row carries an SDNN of 70
+    that would read as a 25 ms 'flag' if it were compared)."""
     install(monkeypatch, _readiness_rows())
     da = th.tool_get_readiness_score({})["device_agreement"]
     assert da["status"] == "available" and da["confidence"] == "high"
-    assert da["checks"]["hrv"]["delta_ms"] == -3.0
     assert da["checks"]["rhr"]["delta_bpm"] == -2.0
+    assert "hrv" not in da["checks"] and "SDNN" in da["hrv_note"]
 
 
 def test_readiness_flags_a_large_inter_device_disagreement_as_low_confidence(monkeypatch):
-    """HRV 45 vs 20 -> delta 25 ms, > 20 -> flag -> confidence low. A flagged day
-    is the tool telling him the number itself is shaky."""
-    rows = [r for r in _readiness_rows() if "garmin" not in r["pk"]]
-    rows.append(garmin(TODAY, body_battery_end=70, hrv_last_night=20, resting_heart_rate=57))
+    """RHR 55 vs 65 -> delta 10 bpm, > 6 -> flag -> confidence low."""
+    rows = [r for r in _readiness_rows() if "apple_health" not in r["pk"]]
+    rows.append(apple(TODAY, resting_heart_rate_apple=65))
     install(monkeypatch, rows)
     da = th.tool_get_readiness_score({})["device_agreement"]
-    assert da["checks"]["hrv"]["status"] == "flag" and da["confidence"] == "low"
+    assert da["checks"]["rhr"]["status"] == "flag" and da["confidence"] == "low"
+
+
+# ── #4978: the overnight-physiology component, pure ─────────────────────────────
+
+
+def test_physiology_baseline_never_includes_the_scored_night():
+    """The night itself sits outside its own baseline: a baseline row dated the
+    same night (or later) is ignored."""
+    night = whoop(TODAY, respiratory_rate=17.0)
+    base = _baseline_nights(n=7, rr=14.0) + [whoop(TODAY, respiratory_rate=17.0), whoop(d(TODAY, 1), respiratory_rate=17.0)]
+    c = th.overnight_physiology_component(night, base)
+    assert c["raw"]["respiratory_rate_brpm_baseline"] == 14.0 and c["raw"]["respiratory_rate_brpm_n_baseline"] == 7
+    assert c["score"] == 0.0  # +3.0 brpm = the zero point
+
+
+def test_physiology_below_baseline_scores_100_and_a_thin_baseline_is_not_scored():
+    night = whoop(TODAY, respiratory_rate=12.0, skin_temp_celsius=34.0)
+    c = th.overnight_physiology_component(night, _baseline_nights(n=10, rr=14.0, temp=33.0)[:6] + _baseline_nights(n=10, rr=14.0)[6:])
+    # respiratory rate: 10 baseline nights, 2 below -> 100; skin temp: all 10 present
+    assert c["raw"]["respiratory_rate_brpm_subscore"] == 100.0
+    thin = th.overnight_physiology_component(night, _baseline_nights(n=6))
+    assert thin is None  # 6 < 7 readings for both signals -> no component, never a guess
+
+
+def test_physiology_is_absent_without_either_signal():
+    assert th.overnight_physiology_component(whoop(TODAY, recovery_score=60), _baseline_nights()) is None
 
 
 def test_readiness_hides_a_pilot_phase_computed_metrics_row(monkeypatch):
@@ -620,25 +633,22 @@ def test_readiness_seven_day_window_really_spans_seven_days(monkeypatch):
     assert span_days(lo, hi) == 7
 
 
-def test_readiness_treats_a_body_battery_of_zero_as_a_real_depleted_reading(monkeypatch):
-    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
-
-    The defect this test was written to report:
-
-    DEFECT (ADR-104, P2, mcp/tools_health.py:231 tool_get_readiness_score): `bb = garmin_today.get('body_battery_end')
-    or garmin_today.get('body_battery_high')`. A fully-depleted Body Battery of 0 is a REAL reading — and the
-    strongest 'rest today' signal Garmin produces — but it is falsy, so the `or` silently substitutes the day's HIGH.
-    Here end=0 becomes 95. The record-selection guard 13 lines above correctly uses `is not None`; only the value read
-    uses `or`. Who it hurts: Matthew is told GREEN/95 on the day his own device measured total depletion.
-    """
+def test_readiness_on_a_garmin_only_platform_errors_rather_than_scoring(monkeypatch):
+    """#4978 (supersedes the Body-Battery-of-zero regression, #1658): Body Battery is no
+    longer an input, so a platform whose only rows are Garmin's has NO readiness data
+    and says so rather than scoring a retired device's reading."""
     install(monkeypatch, [garmin(TODAY, body_battery_end=0, body_battery_high=95)])
     out = th.tool_get_readiness_score({})
-    assert out["components"]["garmin_body_battery"]["score"] == 0.0
+    assert "error" in out and "readiness_score" not in out
+
+
+def _physiology_only_rows():
+    return [whoop(TODAY, respiratory_rate=15.0, skin_temp_celsius=34.0), *_baseline_nights()]
 
 
 def test_readiness_discloses_a_thin_component_set(monkeypatch):
-    """A score built from Body Battery ALONE discloses 5% coverage and names all
-    four missing components.
+    """A score built from the overnight-physiology leg ALONE (#4978; was Body Battery)
+    discloses 5% coverage and names all four missing components.
 
     This test previously asserted 15%, on the strength of "the always-present
     zero-load training_form" — which was the very defect
@@ -647,7 +657,7 @@ def test_readiness_discloses_a_thin_component_set(monkeypatch):
     training_form is now ABSENT rather than a neutral 70 (ADR-104), and it
     correctly appears in missing_components.
     """
-    install(monkeypatch, [garmin(TODAY, body_battery_end=95)])
+    install(monkeypatch, _physiology_only_rows())
     out = th.tool_get_readiness_score({})
     assert out["data_completeness"] == "partial (5% weight covered)"
     assert sorted(out["missing_components"]) == ["hrv trend", "sleep quality", "training form", "whoop recovery"]
@@ -664,7 +674,7 @@ def test_readiness_label_carries_its_own_confidence_marker(monkeypatch):
     five-component score. The label should carry its own confidence (e.g. `label_confidence`) derived from
     total_weight. Who it hurts: 'readiness GREEN' quoted from a lone stale Body Battery.
     """
-    install(monkeypatch, [garmin(TODAY, body_battery_end=95)])
+    install(monkeypatch, _physiology_only_rows())
     out = th.tool_get_readiness_score({})
     assert out.get("label_confidence") is not None
 
@@ -876,12 +886,73 @@ def test_weight_loss_reports_hand_derived_rate_bmi_and_projection(monkeypatch):
     assert out["projection"]["pct_complete"] == 7.5
 
 
-def test_weight_loss_flags_a_rate_above_the_acsm_safe_ceiling(monkeypatch):
-    """3.0 lbs/wk > 2.5 -> the lean-mass warning fires on every affected point."""
+def _series(start_lbs, per_week, n=4):
+    return [withings(d("2026-04-01", 7 * i), weight_lbs=start_lbs - per_week * i) for i in range(n)]
+
+
+def test_weight_loss_rate_flag_is_his_schedule_cap_at_that_weight(monkeypatch):
+    """#5074: the line is the schedule's cap at the weigh-in's own weight — the charter ceiling itself (3.5 lb/wk, one
+    ceiling, no margin) above the 240 lb landing, his own taper cap from the landing down. 3.4 lb/wk never flags at 400
+    or 280; 3.9 flags at both; 3.0 lb/wk flags once he is on the landing schedule (cap 2.25 at 210)."""
+    for start in (400.0, 280.0):
+        install(monkeypatch, _series(start, 3.4))
+        out = th.tool_get_weight_loss_progress({})
+        assert not [p for p in out["weight_series"] if "Losing too fast" in p.get("rate_flag", "")], start
+        install(monkeypatch, _series(start, 3.9))
+        flagged = [p for p in th.tool_get_weight_loss_progress({})["weight_series"] if "Losing too fast" in p.get("rate_flag", "")]
+        assert len(flagged) == 3, start
+        assert "% of bodyweight" in flagged[0]["rate_flag"] and "lb/wk" in flagged[0]["rate_flag"]
+    install(monkeypatch, _series(215.0, 3.0))
+    landing = [p for p in th.tool_get_weight_loss_progress({})["weight_series"] if "Losing too fast" in p.get("rate_flag", "")]
+    assert len(landing) == 3
+
+
+def test_weight_loss_reports_both_units_for_every_rate(monkeypatch):
+    """3.0 lb/wk at the last weigh-in of 311 lb -> 3.0/311*100 = 0.96 %BW/wk."""
     install(monkeypatch, WEIGH_INS)
     out = th.tool_get_weight_loss_progress({})
-    flagged = [p for p in out["weight_series"] if "Losing too fast" in p.get("rate_flag", "")]
-    assert len(flagged) == 3
+    assert out["rate_lb_per_wk"] == 3.0
+    assert out["rate_pct_bodyweight_per_wk"] == 0.96
+    assert out["avg_weekly_loss_pct_bodyweight"] == 0.96
+    assert out["projection"]["avg_weekly_loss_pct_bodyweight"] == 0.96
+    assert out["next_milestone"]["recent_pace_pct_bodyweight_per_week"] == 0.96
+    for p in out["weight_series"]:
+        if "weekly_loss_rate_lbs" in p:
+            assert p["rate_lb_per_wk"] == p["weekly_loss_rate_lbs"]
+            assert p["rate_pct_bodyweight_per_wk"] is not None
+
+
+def test_weight_loss_shows_the_owners_band_beside_both_units_at_the_current_weight(monkeypatch):
+    """#5074: 3.0 lb/wk at 311 lb -> band 3.0-3.5 lb/wk = 0.96-1.13 %BW/wk, in band (at its floor)."""
+    install(monkeypatch, WEIGH_INS)
+    rb = th.tool_get_weight_loss_progress({})["rate_band"]
+    assert (rb["floor_lb_wk"], rb["ceiling_lb_wk"], rb["floor_pct_bodyweight_per_wk"], rb["ceiling_pct_bodyweight_per_wk"]) == (
+        3.0,
+        3.5,
+        0.96,
+        1.13,
+    )
+    assert (rb["in_band"], rb["position"], rb["guidance_capped"]) == (True, "in", False)
+
+
+@pytest.mark.parametrize("per_week,position", [(2.0, "below"), (3.2, "in"), (4.5, "above")])
+def test_weight_loss_places_the_average_rate_in_the_band(monkeypatch, per_week, position):
+    install(monkeypatch, _series(340.0, per_week))
+    rb = th.tool_get_weight_loss_progress({})["rate_band"]
+    assert rb["position"] == position
+
+
+def test_weight_loss_band_yields_to_the_clinical_guidance_cap(monkeypatch):
+    install(monkeypatch, _series(340.0, 3.2))
+    monkeypatch.setattr(th.rate_band, "guidance_cap_for", lambda table, user_id="matthew": 2.0)
+    rb = th.tool_get_weight_loss_progress({})["rate_band"]
+    assert (rb["ceiling_lb_wk"], rb["guidance_capped"], rb["position"]) == (2.0, True, "above")
+
+
+def test_weight_loss_clinical_note_carries_no_fixed_lb_ceiling(monkeypatch):
+    install(monkeypatch, WEIGH_INS)
+    note = th.tool_get_weight_loss_progress({})["clinical_note"]
+    assert "2.5" not in note and "% of bodyweight" in note
 
 
 def test_weight_loss_names_the_next_bmi_milestone_with_the_lbs_to_cross(monkeypatch):
@@ -1235,7 +1306,8 @@ def test_energy_derives_the_calorie_target_and_implied_loss_rate(monkeypatch):
     out = th.tool_get_daily_metrics({"view": "energy"})
     assert out["exercise_kcal_7d_daily_avg"] == 86.0
     assert out["tdee_7d_avg"] == 2057.0
-    assert out["calorie_target_based_on_7d"] == 1557.0
+    assert out["maintenance_context_7d"]["estimated_maintenance_kcal"] == 2057.0
+    assert out["maintenance_context_7d"]["deficit_kcal"] == 500.0
     assert out["implied_weekly_loss_lbs"] == 1.0
 
 
@@ -1273,7 +1345,7 @@ def test_energy_honours_a_custom_deficit_target(monkeypatch):
     install(monkeypatch, ENERGY_ROWS)
     out = th.tool_get_daily_metrics({"view": "energy", "target_deficit_kcal": 750})
     assert out["implied_weekly_loss_lbs"] == 1.5
-    assert out["calorie_target_based_on_7d"] == 1307.0
+    assert out["maintenance_context_7d"]["deficit_kcal"] == 750.0
 
 
 def test_energy_uses_day_level_kilojoules_when_the_field_is_present(monkeypatch):
@@ -1586,7 +1658,7 @@ def test_readiness_reads_only_the_four_partitions_it_documents(monkeypatch):
     a widened blast radius on an owner-facing tool."""
     t = install(monkeypatch, _readiness_rows())
     th.tool_get_readiness_score({})
-    assert t.sources_read <= {"computed_metrics", "whoop", "garmin"}
+    assert t.sources_read <= {"computed_metrics", "whoop", "apple_health"}  # #4976: garmin out, the Apple Watch in
 
 
 def test_weight_loss_reads_only_withings(monkeypatch):
@@ -1615,3 +1687,14 @@ def _output_schema_conformance_4286(monkeypatch):
     from test_mcp_registry import check_output_schema
 
     check_output_schema(monkeypatch, th, "get_weight_loss_progress")
+
+
+def test_weight_loss_band_reports_a_broken_guidance_read_not_no_cap(monkeypatch):
+    install(monkeypatch, _series(340.0, 3.2))
+
+    def boom(table, user_id="matthew"):
+        raise th.rate_band.GuidanceReadError("x")
+
+    monkeypatch.setattr(th.rate_band, "guidance_cap_for", boom)
+    rb = th.tool_get_weight_loss_progress({})["rate_band"]
+    assert rb["guidance_read"] == "read_failed" and rb["guidance_capped"] is False

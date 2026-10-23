@@ -19,9 +19,12 @@ INPUT SHAPE -> SORT KEYS  (pk `USER#matthew#SOURCE#clinical`)
     labs_<anything>{}      -> LABS#<collection_date>
     patient_history_<YYYY_MM_DD>{} -> HISTORY#<YYYY-MM-DD>
     coach_guidance{}       -> GUIDANCE#current
+    lab_priorities{}       -> PRIORITIES#current    (`text`: plain lines for the owner-only coach context, #5111)
+    appointments[]         -> APPT#<date>#<slug>    (a logged appointment: `date`, optional `kind`/`title`;
+                              `health/guidance_freshness.py` reads only the date, #5059)
     documents[]            -> s3://matthew-life-platform/raw/matthew/clinical/<YYYY-MM-DD>/<file>
   Every item gets `source="clinical"`, `schema_version=1`, `updated_at`; floats become
-  Decimal. A document whose filename matches an ECG/EVENT item's `source_file` sets that
+  Decimal. A document whose filename matches an ECG/EVENT/APPT item's `source_file` sets that
   item's `s3_key` and dates its upload folder; otherwise the folder is the document's own
   `date`, else the file's `prepared` date (or today). Every document also gets an index
   row `DOC#<date>#<slug>` (kind, s3_key, content_type, sha256, bytes); the bytes stay in S3.
@@ -104,6 +107,13 @@ def _ecg_sk(r: dict) -> str:
     return f"ECG#{ts}#{slugify(r.get('device'))}"
 
 
+def _appt_sk(a: dict) -> str:
+    date = str(a.get("date") or "")[:10]
+    if not _DATE.match(date):
+        raise ValueError("an appointment has no YYYY-MM-DD `date`")
+    return f"APPT#{date}#{slugify(a.get('kind') or a.get('title') or 'appointment')}"
+
+
 def build_items(record: dict, now: Optional[str] = None) -> list:
     """The DynamoDB items for one record file, in a stable order. Pure."""
     now = now or datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -114,6 +124,8 @@ def build_items(record: dict, now: Optional[str] = None) -> list:
         items.append(_stamp(_med_sk(m), m, now))
     for r in record.get("ecg_recordings") or []:
         items.append(_stamp(_ecg_sk(r), r, now))
+    for a in record.get("appointments") or []:
+        items.append(_stamp(_appt_sk(a), a, now))
     for key, body in record.items():
         if key.startswith("labs_") and isinstance(body, dict):
             date = str(body.get("collection_date") or "")[:10]
@@ -128,6 +140,9 @@ def build_items(record: dict, now: Optional[str] = None) -> list:
     guidance = record.get("coach_guidance")
     if isinstance(guidance, dict):
         items.append(_stamp("GUIDANCE#current", guidance, now))
+    priorities = record.get("lab_priorities")
+    if isinstance(priorities, dict):
+        items.append(_stamp("PRIORITIES#current", priorities, now))
     seen: set = set()
     for it in items:
         if it["sk"] in seen:
@@ -140,7 +155,7 @@ def _item_date(item: dict) -> str:
     sk = item["sk"]
     if sk.startswith("ECG#"):
         return sk.split("#")[1][:10]
-    if sk.startswith("EVENT#"):
+    if sk.startswith(("EVENT#", "APPT#")):
         return sk.split("#")[1]
     return ""
 

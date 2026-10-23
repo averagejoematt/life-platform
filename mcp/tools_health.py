@@ -3,43 +3,192 @@ Health & body composition tools.
 """
 
 from datetime import datetime, timedelta, timezone
+from typing import Any, Optional
 
 from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
-from health import tdee as tdee_core  # ADR-152 / #2310: THE one TDEE definition
-from training import training_load  # #4075: the ONE load-provenance predicate for the TSB label
+from health import (
+    calorie_target as calorie_resolver,  # #5095: the ONE calorie target
+    hr_regime,  # #4999: THE dated HR regime markers (re-baselining window, post-marker baselines, AF days)
+    tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
+)
+from training import rate_band, training_load  # #4075: the ONE load-provenance predicate for the TSB label
 
+from mcp import core as _mcp_core
 from mcp.config import logger
-from mcp.core import date_diff_days, decimal_to_float, get_profile, phase_scope_block, query_source, query_source_cross_phase
+from mcp.core import decimal_to_float, get_profile, phase_scope_block, query_source, query_source_cross_phase
 from mcp.helpers import normalize_whoop_sleep
+from mcp.tools_nutrition import expenditure_reconciliation  # #5097: the three burn estimates vs the scale
 from mcp.tools_training import _get_training_load
+from mcp.weight_rate import (
+    annotate_weekly_rates,
+    bmi_category,
+    calc_bmi,
+    rate_pct_bw,
+)  # noqa: F401 — #5060, split by the size guard
+
+# ── #4978: the readiness formula, stated once and returned with every score ─────────
+READINESS_WEIGHTS = {
+    "whoop_recovery": 0.40,
+    "sleep_quality": 0.25,
+    "hrv_trend": 0.20,
+    "training_form": 0.10,
+    "overnight_physiology": 0.05,
+}
+PHYSIOLOGY_BASELINE_DAYS = 30  # the nights BEFORE the scored night, never including it
+PHYSIOLOGY_MIN_BASELINE_N = 7  # fewer readings than this and that signal is not scored
+# Elevation above baseline at which the sub-score starts to fall, and at which it reaches 0.
+# Platform choices, stated as such — not validated clinical cut-offs. Direction from the
+# literature: a raised overnight respiratory rate and skin temperature precede symptoms of
+# infection (Miller et al. 2020, PLoS ONE 15(12):e0243693; Mishra et al. 2020, Nat Biomed Eng 4:1208).
+RESP_RATE_TOLERANCE_BRPM, RESP_RATE_ZERO_BRPM = 0.5, 3.0
+SKIN_TEMP_TOLERANCE_C, SKIN_TEMP_ZERO_C = 0.3, 1.0
+APPLE_RHR_FIELD = "resting_heart_rate_apple"  # health_auto_export_lambda tier-2 field (Apple Watch only)
+
+READINESS_FORMULA: dict[str, Any] = {
+    "score": "round(Σ score_i · w_i / Σ w_i, 1) over the components present (missing ones re-normalise)",
+    "labels": "GREEN ≥ 70 · YELLOW ≥ 40 · RED < 40",
+    "components": {
+        "whoop_recovery": {"weight": 0.40, "map": "Whoop recovery_score used directly (0–100)"},
+        "sleep_quality": {"weight": 0.25, "map": "Whoop sleep_score; fallback clamp(sleep_efficiency_pct − 25)"},
+        "hrv_trend": {"weight": 0.20, "map": "clamp(60 + (hrv_7d / hrv_30d − 1) × 200), Whoop HRV"},
+        "training_form": {"weight": 0.10, "map": "clamp(70 + TSB × 2.5)"},
+        "overnight_physiology": {
+            "weight": 0.05,
+            "map": (
+                f"min over the scored signals of clamp(100 × (zero − dev) / (zero − tol)), dev = the night's value − the mean of "
+                f"the {PHYSIOLOGY_BASELINE_DAYS} nights before it (≥ {PHYSIOLOGY_MIN_BASELINE_N} readings); respiratory rate "
+                f"tol {RESP_RATE_TOLERANCE_BRPM} / zero {RESP_RATE_ZERO_BRPM} breaths/min, skin temperature tol "
+                f"{SKIN_TEMP_TOLERANCE_C} / zero {SKIN_TEMP_ZERO_C} °C; only elevation lowers the score"
+            ),
+        },
+    },
+    "not_used": "No Body Battery (Garmin's feed is retired, #4640) and no imitation of Apple's Readiness or Sleep Score (not exported).",
+}
+READINESS_SCORING_NOTE = (
+    "Weights: Whoop recovery 40%, Whoop sleep quality 25%, HRV 7d trend 20%, TSB form 10%, "
+    "overnight physiology (respiratory rate + skin temperature vs his 30-night baseline) 5%. "
+    "Missing components are excluded and remaining weights re-normalised. No Body Battery."
+)
+assert abs(sum(READINESS_WEIGHTS.values()) - 1.0) < 1e-9
+assert {k: v["weight"] for k, v in READINESS_FORMULA["components"].items()} == READINESS_WEIGHTS
+
+
+def _num_or_none(v):
+    try:
+        return None if v is None or isinstance(v, bool) else float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _elevation_subscore(dev, tol, zero):
+    """100 at or below `tol` above baseline, 0 at or above `zero`, linear between."""
+    if dev <= tol:
+        return 100.0
+    if dev >= zero:
+        return 0.0
+    return 100.0 * (zero - dev) / (zero - tol)
+
+
+def overnight_physiology_component(night, baseline_rows):
+    """#4978: the overnight-physiology component from one Whoop night and the Whoop
+    nights before it, or None when no signal has both a reading and a baseline.
+
+    Pure — no AWS. A baseline row dated on/after the night is ignored (the night never
+    sits in its own baseline)."""
+    night_date = (night or {}).get("date")
+    if not night_date:
+        return None
+    signals = (
+        ("respiratory_rate", "respiratory_rate_brpm", RESP_RATE_TOLERANCE_BRPM, RESP_RATE_ZERO_BRPM),
+        ("skin_temp_celsius", "skin_temp_c", SKIN_TEMP_TOLERANCE_C, SKIN_TEMP_ZERO_C),
+    )
+    raw = {"date": night_date, "baseline_days": PHYSIOLOGY_BASELINE_DAYS, "source": "whoop"}
+    subscores = {}
+    for field, key, tol, zero in signals:
+        value = _num_or_none(night.get(field))
+        base = [
+            v
+            for r in baseline_rows or ()
+            if (r.get("date") or "") < night_date and r.get("date") and (v := _num_or_none(r.get(field))) is not None
+        ]
+        raw[f"{key}_n_baseline"] = len(base)
+        if value is None or len(base) < PHYSIOLOGY_MIN_BASELINE_N:
+            raw[f"{key}_status"] = "no reading" if value is None else f"baseline too thin (n={len(base)} < {PHYSIOLOGY_MIN_BASELINE_N})"
+            continue
+        mean = sum(base) / len(base)
+        dev = value - mean
+        sub = _elevation_subscore(dev, tol, zero)
+        raw.update(
+            {key: round(value, 2), f"{key}_baseline": round(mean, 2), f"{key}_deviation": round(dev, 2), f"{key}_subscore": round(sub, 1)}
+        )
+        subscores[key] = sub
+    if not subscores:
+        return None
+    return {"score": round(min(subscores.values()), 1), "weight": READINESS_WEIGHTS["overnight_physiology"], "raw": raw}
+
+
+def _whoop_vs_apple_agreement(whoop_component, end_date, start_date):
+    """#4976: Whoop vs Apple Watch resting HR on the SAME night. HRV is never compared
+    (Whoop RMSSD vs Apple SDNN). Always a shaped dict with a reason (#492/M-7)."""
+    hrv_note = "HRV not compared: Whoop reports RMSSD and Apple reports SDNN — two different statistics."
+    if not whoop_component:
+        return {"status": "unavailable", "reason": "no whoop recovery record to cross-check against", "hrv_note": hrv_note}
+    whoop_raw = whoop_component["raw"]
+    night = whoop_raw.get("date")
+    apple_rows = query_source("apple_health", start_date, end_date)
+    apple_night = next((a for a in apple_rows if a.get("date") == night and a.get(APPLE_RHR_FIELD) is not None), None)
+    whoop_rhr = _num_or_none(whoop_raw.get("resting_hr"))
+    if apple_night is None or whoop_rhr is None:
+        return {
+            "status": "unavailable",
+            "reason": f"no Apple Watch resting heart rate for the Whoop night ({night}) — nothing to cross-check",
+            "hrv_note": hrv_note,
+        }
+    apple_rhr = float(apple_night[APPLE_RHR_FIELD])
+    delta = whoop_rhr - apple_rhr
+    status = "agree" if abs(delta) <= 3 else ("minor_variance" if abs(delta) <= 6 else "flag")
+    return {
+        "status": "available",
+        "devices": ["whoop", "apple_watch"],
+        "confidence": {"agree": "high", "minor_variance": "moderate", "flag": "low"}[status],
+        "checks": {
+            "rhr": {
+                "date": night,
+                "whoop_bpm": round(whoop_rhr, 1),
+                "apple_bpm": round(apple_rhr, 1),
+                "delta_bpm": round(delta, 1),
+                "status": status,
+            }
+        },
+        "hrv_note": hrv_note,
+        "note": "RHR Δ ≤ 3 bpm agree · ≤ 6 minor · else flag; a flagged night means the score may be less reliable",
+    }
 
 
 def tool_get_readiness_score(args):
     """
     Unified readiness score (0–100) synthesising Whoop recovery, Whoop sleep quality,
-    HRV 7-day trend, TSB training form, and Garmin Body Battery into a single
+    HRV 7-day trend, TSB training form and an overnight-physiology deviation
+    (respiratory rate + skin temperature vs his own 30-night baseline) into a single
     GREEN / YELLOW / RED signal with a 1-line actionable recommendation.
 
-    Weights:
-      Whoop recovery score  : 40%
-      Whoop sleep quality    : 25%
-      HRV 7-day trend       : 20%
-      TSB training form     : 10%
-      Garmin Body Battery   : 5%
+    Weights and every component's map are READINESS_WEIGHTS / READINESS_FORMULA
+    (module level, returned in the output as `formula`; docs/engines/READINESS.md).
+    No component reads Body Battery or any other retired-device field (#4976/#4978),
+    and no vendor-proprietary score that is not exported (Apple's Readiness / Sleep
+    Score) is imitated.
 
     If a component is unavailable, remaining weights are re-normalised so the
-    score is still meaningful with partial data. Garmin Body Battery is
-    additionally skipped when it is more than 1 day staler than the newest
-    Whoop record (Garmin ingestion is unreliable), to keep stale Garmin data
-    from entering the score.
+    score is still meaningful with partial data.
 
     The top-level "date" reflects the actual newest data date across components,
     not the requested date. When the requested date has no data yet (its
     overnight hasn't happened), "is_forward_dated" is true and a
     "staleness_warning" explains the score reflects the latest available data.
 
-    Device agreement: Whoop vs Garmin HRV and RHR delta is computed and returned
-    as a confidence signal — large disagreement flags lower score reliability.
+    Device agreement: Whoop vs Apple Watch resting HR on the same night is
+    returned as a confidence signal. HRV is NOT compared — Whoop reports RMSSD,
+    Apple reports SDNN, two different statistics.
     """
     # Bad input returns an error DICT, never a stack trace out of the tool: an
     # unparseable string used to raise ValueError and an explicit {"date": None}
@@ -82,7 +231,7 @@ def tool_get_readiness_score(args):
         rec_score = float(whoop_today["recovery_score"])
         components["whoop_recovery"] = {
             "score": round(rec_score, 1),
-            "weight": 0.40,
+            "weight": READINESS_WEIGHTS["whoop_recovery"],
             "raw": {
                 "date": whoop_today.get("date"),
                 "recovery_score": whoop_today.get("recovery_score"),
@@ -149,6 +298,7 @@ def tool_get_readiness_score(args):
             "n_days_7d": int(_n7) if _n7 is not None else None,
             "n_days_30d": int(_n30) if _n30 is not None else None,
             "source": "pre_computed_metrics",
+            "baseline_basis": decimal_to_float(_cm.get("hrv_30d_basis")),  # #4999: cut at an HR regime marker, AF days out
         }
         if _n7 is None or _n30 is None:
             _hrv_raw["n_note"] = (
@@ -161,10 +311,8 @@ def tool_get_readiness_score(args):
             "raw": _hrv_raw,
         }
     else:
-        # Fallback: live 30-day Whoop query (pre-compute record missing)
-        whoop_30d = query_source("whoop", d30_start, end_date)
-        hrv_30d_vals = [float(w["hrv"]) for w in whoop_30d if w.get("hrv") is not None]
-        hrv_7d_vals = [float(w["hrv"]) for w in whoop_recent if w.get("hrv") is not None]
+        # Fallback: live 30-day Whoop query (pre-compute record missing) — #4999: post-marker, AF days out.
+        hrv_30d_vals, hrv_7d_vals, _hrv_30d_basis = _live_hrv_baselines(d7_start, d30_start, end_date, _end_dt)
         if len(hrv_30d_vals) >= 7 and hrv_7d_vals:
             baseline = sum(hrv_30d_vals) / len(hrv_30d_vals)
             recent7 = sum(hrv_7d_vals) / len(hrv_7d_vals)
@@ -182,6 +330,7 @@ def tool_get_readiness_score(args):
                     "trend_direction": "above_baseline" if trend_pct > 3 else ("below_baseline" if trend_pct < -3 else "at_baseline"),
                     "n_days_30d": len(hrv_30d_vals),
                     "n_days_7d": len(hrv_7d_vals),
+                    "baseline_basis": _hrv_30d_basis,
                     "source": "live_whoop_query",
                 },
             }
@@ -257,103 +406,31 @@ def tool_get_readiness_score(args):
         except Exception as e:
             logger.warning(f"get_readiness_score: TSB fallback failed — {e}")
 
-    # ── 5. Garmin Body Battery (10%) ──────────────────────────────────────────
-    garmin_recent = query_source("garmin", d7_start, end_date)
-    garmin_sorted = sorted(garmin_recent, key=lambda x: x.get("date", ""), reverse=True)
-    garmin_today = next((g for g in garmin_sorted if g.get("body_battery_end") is not None or g.get("body_battery_high") is not None), None)
+    # ── 5. Overnight physiology deviation (5%) — #4978 ───────────────────────
+    # Replaces the retired Garmin Body Battery leg (#4640/#4976): the same 5% slot,
+    # scored from two signals Whoop MEASURES every night — respiratory rate and skin
+    # temperature — as a deviation from his own 30-night baseline. Elevation only:
+    # a night below baseline scores 100, never "better than baseline".
+    _night = whoop_today or next(
+        (w for w in whoop_sorted if w.get("respiratory_rate") is not None or w.get("skin_temp_celsius") is not None), None
+    )
+    if _night and _night.get("date"):
+        _base_end = (datetime.strptime(_night["date"], "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+        _base_start = (datetime.strptime(_night["date"], "%Y-%m-%d") - timedelta(days=PHYSIOLOGY_BASELINE_DAYS)).strftime("%Y-%m-%d")
+        _baseline_rows = query_source("whoop", _base_start, _base_end)
+        _phys = overnight_physiology_component(_night, _baseline_rows)
+        if _phys is not None:
+            components["overnight_physiology"] = _phys
 
-    # Freshness gate: Garmin ingestion is unreliable and Body Battery can be days
-    # stale. Skip it entirely when it's more than 1 day older than the newest Whoop
-    # record so stale Garmin data can't enter the score at full weight. The weight
-    # re-normalisation below redistributes the freed weight onto Whoop automatically.
-    garmin_stale = False
-    if garmin_today and whoop_today and garmin_today.get("date") and whoop_today.get("date"):
-        if date_diff_days(garmin_today["date"], whoop_today["date"]) > 1:
-            garmin_stale = True
+    # ── Device agreement: Whoop vs Apple Watch (#4976) ───────────────────────
+    # #492/M-7: never a silent null — when the cross-check can't run, say why.
+    # Garmin's feed is retired (#4640); the second wrist is the Apple Watch, worn
+    # nightly (owner ruling 2026-10-17 b). Same night only — a different night is
+    # not a cross-check.
+    device_agreement = _whoop_vs_apple_agreement(components.get("whoop_recovery"), end_date, d7_start)
 
-    if garmin_today and not garmin_stale:
-        # Use end-of-day Body Battery as primary; fall back to high if end is missing.
-        # ADR-104: `end or high` treated a fully-depleted 0 — a REAL reading, and the
-        # strongest "rest today" signal Garmin produces — as missing and substituted
-        # the day's HIGH. Presence is `is not None`, matching the selection guard above.
-        bb = garmin_today.get("body_battery_end")
-        if bb is None:
-            bb = garmin_today.get("body_battery_high")
-        if bb is not None:
-            bb_score = _clamp(float(bb))  # Body Battery is already 0-100
-            components["garmin_body_battery"] = {
-                "score": round(bb_score, 1),
-                "weight": 0.05,
-                "raw": {
-                    "date": garmin_today.get("date"),
-                    "body_battery_end": garmin_today.get("body_battery_end"),
-                    "body_battery_high": garmin_today.get("body_battery_high"),
-                    "body_battery_low": garmin_today.get("body_battery_low"),
-                    "avg_stress": garmin_today.get("avg_stress"),
-                    "hrv_last_night": garmin_today.get("hrv_last_night"),
-                    "hrv_status": garmin_today.get("hrv_status"),
-                },
-            }
-
-    # ── Device agreement: Whoop vs Garmin cross-validation ───────────────────
-    # #492/M-7: never a silent null — when the cross-check can't run, say why
-    # (structurally None since ~06-16 because Garmin is paused, ADR-074).
-    if garmin_today is None:
-        device_agreement = {"status": "unavailable", "reason": "garmin paused (ADR-074) — no recent Garmin record to cross-check"}
-    elif garmin_stale:
-        device_agreement = {
-            "status": "unavailable",
-            "reason": f"garmin record ({garmin_today.get('date')}) is >1 day older than whoop — stale data excluded",
-        }
-    elif "whoop_recovery" not in components:
-        device_agreement = {"status": "unavailable", "reason": "no whoop recovery record to cross-check against"}
-    else:
-        device_agreement = {"status": "unavailable", "reason": "overlapping garmin+whoop records lack comparable HRV/RHR fields"}
-    # `not garmin_stale` is load-bearing: without it this block OVERWROTE the
-    # "stale data excluded" verdict above with a cross-check computed from that
-    # very record, publishing "device_agreement: available, confidence: high" off
-    # a reading the tool had just refused to score at 5% weight.
-    if "whoop_recovery" in components and garmin_today is not None and not garmin_stale:
-        whoop_hrv_val = components["whoop_recovery"]["raw"].get("hrv_ms")
-        garmin_hrv_val = garmin_today.get("hrv_last_night")
-        whoop_rhr_val = components["whoop_recovery"]["raw"].get("resting_hr")
-        garmin_rhr_val = garmin_today.get("resting_heart_rate")
-
-        checks = {}
-        agreement_signals = []
-
-        if whoop_hrv_val is not None and garmin_hrv_val is not None:
-            hrv_diff = abs(float(whoop_hrv_val) - float(garmin_hrv_val))
-            hrv_status = "agree" if hrv_diff <= 10 else ("minor_variance" if hrv_diff <= 20 else "flag")
-            checks["hrv"] = {
-                "whoop_ms": round(float(whoop_hrv_val), 1),
-                "garmin_ms": round(float(garmin_hrv_val), 1),
-                "delta_ms": round(float(whoop_hrv_val) - float(garmin_hrv_val), 1),
-                "status": hrv_status,
-            }
-            agreement_signals.append(hrv_status)
-
-        if whoop_rhr_val is not None and garmin_rhr_val is not None:
-            rhr_diff = abs(float(whoop_rhr_val) - float(garmin_rhr_val))
-            rhr_status = "agree" if rhr_diff <= 3 else ("minor_variance" if rhr_diff <= 6 else "flag")
-            checks["rhr"] = {
-                "whoop_bpm": round(float(whoop_rhr_val), 1),
-                "garmin_bpm": round(float(garmin_rhr_val), 1),
-                "delta_bpm": round(float(whoop_rhr_val) - float(garmin_rhr_val), 1),
-                "status": rhr_status,
-            }
-            agreement_signals.append(rhr_status)
-
-        if agreement_signals:
-            has_flag = any(s == "flag" for s in agreement_signals)
-            all_agree = all(s == "agree" for s in agreement_signals)
-            confidence = "high" if all_agree else ("low" if has_flag else "moderate")
-            device_agreement = {
-                "status": "available",
-                "confidence": confidence,
-                "checks": checks,
-                "note": "flag = significant inter-device disagreement; readiness score may be less reliable on flagged days",
-            }
+    if (_regime := hr_regime.regime_status(end_date)) is not None:  # #4999: HR regime marker — re-baselining, not a tier
+        return _rebaselining_result(end_date, components, device_agreement, _regime)
 
     # ── Weighted aggregate ────────────────────────────────────────────────────
     total_weight = sum(c["weight"] for c in components.values())
@@ -364,17 +441,11 @@ def tool_get_readiness_score(args):
     raw_score = sum(c["score"] * c["weight"] for c in components.values()) / total_weight
     readiness_score = round(raw_score, 1)
 
-    # Label
-    if readiness_score >= 70:
-        label = "GREEN"
-    elif readiness_score >= 40:
-        label = "YELLOW"
-    else:
-        label = "RED"
+    label = _readiness_label(readiness_score)
 
     # ── Recommendation ────────────────────────────────────────────────────────
     missing = []
-    all_keys = {"whoop_recovery", "sleep_quality", "hrv_trend", "training_form", "garmin_body_battery"}
+    all_keys = set(READINESS_WEIGHTS)
     for k in sorted(all_keys - set(components.keys())):
         missing.append(k.replace("_", " "))
 
@@ -403,10 +474,10 @@ def tool_get_readiness_score(args):
     # so the components may pre-date the requested end_date (e.g. asking for a
     # date whose overnight hasn't happened yet). Surface the ACTUAL data date
     # rather than stamping the request. Only whoop_recovery / sleep_quality /
-    # garmin_body_battery carry a raw.date.
+    # overnight_physiology carry a raw.date.
     _data_dates = [
         components[k]["raw"].get("date")
-        for k in ("whoop_recovery", "sleep_quality", "garmin_body_battery")
+        for k in ("whoop_recovery", "sleep_quality", "overnight_physiology")
         if k in components and components[k]["raw"].get("date")
     ]
     # hrv_trend / training_form carry no raw.date of their own, so a score built
@@ -444,11 +515,9 @@ def tool_get_readiness_score(args):
         "device_agreement": device_agreement,
         "data_completeness": "full" if total_weight >= 0.99 else f"partial ({round(total_weight*100)}% weight covered)",
         "missing_components": missing if missing else None,
-        "scoring_note": (
-            "Weights: Whoop recovery 40%, Whoop sleep quality 25%, HRV 7d trend 20%, TSB form 10%, "
-            "Garmin Body Battery 5%. Missing components are excluded and remaining weights re-normalised. "
-            "Garmin Body Battery is skipped when >1 day staler than the newest Whoop record."
-        ),
+        "scoring_note": READINESS_SCORING_NOTE,
+        # #4978: the formula travels with the number — every component's weight and map.
+        "formula": READINESS_FORMULA,
         # R13-F09: Medical disclaimer on all health-assessment tool responses
         "_disclaimer": "For personal health tracking only. Not medical advice. Consult a qualified healthcare provider before making health decisions based on this data.",
     }
@@ -474,7 +543,7 @@ def tool_get_readiness_score(args):
             "source": "daily-metrics-compute (9:40 AM)",
             "note": (
                 "Pre-computed with Whoop recovery 40% + sleep 25% + HRV trend 20% + TSB 10% "
-                "(sums to 95%, not 100% — no Body Battery component, and the shortfall isn't "
+                "(sums to 95%, not 100% — no overnight-physiology component, and the shortfall isn't "
                 "backfilled; present components are re-normalised the same way the live tool "
                 "does it). Minor weight difference from live tool."
             ),
@@ -485,6 +554,67 @@ def tool_get_readiness_score(args):
                 "score above may be elapsed time rather than model drift."
             )
     return result
+
+
+def _readiness_label(readiness_score):
+    """The live tool's traffic light: GREEN >= 70, YELLOW >= 40, else RED."""
+    if readiness_score >= 70:
+        return "GREEN"
+    if readiness_score >= 40:
+        return "YELLOW"
+    return "RED"
+
+
+def _live_hrv_baselines(d7_start, d30_start, end_date, end_dt):
+    """(30d values, 7d values, 30d basis) from a live Whoop read, through the same post-marker,
+    AF-day-excluded baseline the pre-compute stores (health.hr_regime, #4999)."""
+    whoop_30d = query_source("whoop", d30_start, end_date)
+    d60_start = (end_dt - timedelta(days=59)).strftime("%Y-%m-%d")
+    excluded = hr_regime.af_days(query_source("eightsleep", d60_start, end_date), query_source("withings", d30_start, end_date))
+    hrv_30d_vals, basis = hr_regime.baseline_values(whoop_30d, "hrv", d30_start, end_date, excluded)
+    hrv_7d_vals, _ = hr_regime.baseline_values(whoop_30d, "hrv", d7_start, end_date, excluded)
+    return hrv_30d_vals, hrv_7d_vals, basis
+
+
+# The readiness components computed from heart rate (#4999) — named by this tool's keys.
+_HR_DERIVED_READINESS_KEYS = ("whoop_recovery", "hrv_trend")
+
+
+def _rebaselining_result(end_date, components, device_agreement, regime):
+    """`get_readiness_score` inside an HR regime marker's re-baselining window (#4999).
+
+    No score, no tier. The HR-derived components are reported as re-baselining beside the raw
+    values they would have scored (the owner can still read them); the non-HR components keep
+    their own scores but are not combined into a label.
+    """
+    held = {}
+    for k in _HR_DERIVED_READINESS_KEYS:
+        c = components.pop(k, None)
+        if c is not None:
+            held[k] = {"state": hr_regime.REBASELINING, "weight": c["weight"], "raw": c.get("raw")}
+        else:
+            held[k] = {"state": hr_regime.REBASELINING}
+    return {
+        "date": end_date,
+        "requested_date": end_date,
+        "readiness_score": None,
+        "label": "RE-BASELINING",
+        "recommendation": regime["note"],
+        "hr_regime": regime,
+        "rebaselining_components": held,
+        "components": components,
+        "components_note": "Non-HR components are shown for reference only; they are not combined into a tier while HR is re-baselining.",
+        "device_agreement": device_agreement,
+        "_disclaimer": "For personal health tracking only. Not medical advice. Consult a qualified healthcare provider before making health decisions based on this data.",
+    }
+
+
+def _guidance_cap_state() -> tuple[Optional[float], str]:
+    """(cap, "read" | "read_failed") — ADR-105: a broken clinical read is surfaced on rate_band, never read as 'no cap'."""
+    try:
+        return rate_band.guidance_cap_for(_mcp_core.table), "read"
+    except rate_band.GuidanceReadError:
+        return None, "read_failed"
 
 
 def tool_get_weight_loss_progress(args):
@@ -534,59 +664,13 @@ def tool_get_weight_loss_progress(args):
     if not weight_series:
         return {"error": "No weight_lbs field found in Withings data."}
 
-    def calc_bmi(weight_lbs, height_in):
-        if not height_in:
-            return None
-        # 703 converts imperial (lbs/in^2) to metric BMI (kg/m^2)
-        return round(703 * weight_lbs / (height_in**2), 1)
-
-    bmi_categories = [
-        (18.5, "Underweight"),
-        (25.0, "Normal weight"),
-        (30.0, "Overweight"),
-        (35.0, "Obese Class I"),
-        (40.0, "Obese Class II"),
-        (float("inf"), "Obese Class III"),
-    ]
-
-    def bmi_category(bmi):
-        if bmi is None:
-            return None
-        for threshold, label in bmi_categories:
-            if bmi < threshold:
-                return label
-        return "Obese Class III"
-
     for pt in weight_series:
         bmi = calc_bmi(pt["weight_lbs"], height_in)
         pt["bmi"] = bmi
         pt["bmi_category"] = bmi_category(bmi)
 
-    weekly_rates = []
-    for i in range(len(weight_series)):
-        pt = weight_series[i]
-        target_dt = datetime.strptime(pt["date"], "%Y-%m-%d") - timedelta(days=7)
-        prior = None
-        best_gap = 999
-        for j in range(i):
-            d = datetime.strptime(weight_series[j]["date"], "%Y-%m-%d")
-            gap = abs((target_dt - d).days)
-            if gap < best_gap:
-                best_gap = gap
-                prior = weight_series[j]
-        if prior and best_gap <= 4:
-            days_diff = (datetime.strptime(pt["date"], "%Y-%m-%d") - datetime.strptime(prior["date"], "%Y-%m-%d")).days
-            if days_diff > 0:
-                weekly_rate = round((prior["weight_lbs"] - pt["weight_lbs"]) / days_diff * 7, 2)
-                pt["weekly_loss_rate_lbs"] = weekly_rate
-                weekly_rates.append(weekly_rate)
-                # >2.5 lbs/week exceeds ACSM safe rate; risk of lean mass catabolism (Helms 2014)
-                if weekly_rate > 2.5:
-                    pt["rate_flag"] = "⚠️ Losing too fast (>2.5 lbs/wk) — risk of muscle loss. Check nutrition."
-                elif weekly_rate < 0:
-                    pt["rate_flag"] = "↑ Weight gain this week"
-                elif weekly_rate < 0.25 and len(weight_series) > 14:
-                    pt["rate_flag"] = "⏸ Very slow — review deficit"
+    guidance_cap, guidance_read = _guidance_cap_state()
+    weekly_rates = annotate_weekly_rates(weight_series, guidance_cap)
 
     milestones = {}
     milestone_thresholds = [
@@ -624,6 +708,7 @@ def tool_get_weight_loss_progress(args):
                     "milestone": label,
                     "lbs_to_cross": round(lbs_to_threshold, 1),
                     "recent_pace_lbs_per_week": _recent_mean,
+                    "recent_pace_pct_bodyweight_per_week": rate_pct_bw(_recent_mean, weight_series[-1]["weight_lbs"]),
                     "n_recent_rates": len(_recent),
                 }
                 if _recent_mean is not None and _recent_mean > 0:
@@ -704,6 +789,7 @@ def tool_get_weight_loss_progress(args):
             "goal_weight_lbs": goal_weight,
             "lbs_remaining": round(current_weight - goal_weight, 1),
             "avg_weekly_loss_lbs": avg_weekly,
+            "avg_weekly_loss_pct_bodyweight": rate_pct_bw(avg_weekly, current_weight),
             # ADR-105: the n behind the average travels with it — three paired
             # weigh-ins and thirty no longer produce identically-confident output.
             "n_weekly_rates": len(weekly_rates),
@@ -723,6 +809,10 @@ def tool_get_weight_loss_progress(args):
         "current_bmi_category": weight_series[-1].get("bmi_category"),
         "total_lost_lbs": total_lost,
         "avg_weekly_loss_lbs": avg_weekly,
+        "avg_weekly_loss_pct_bodyweight": rate_pct_bw(avg_weekly, current_weight),
+        "rate_lb_per_wk": avg_weekly,
+        "rate_pct_bodyweight_per_wk": rate_pct_bw(avg_weekly, current_weight),
+        "rate_band": {**(rate_band.band_view(current_weight, avg_weekly, guidance_cap) or {}), "guidance_read": guidance_read},
         "projection": projection,
         "plateau_detected": plateau,
         "milestones_achieved": milestones,
@@ -737,13 +827,45 @@ def tool_get_weight_loss_progress(args):
             "Real weigh-ins only, from USER#matthew#SOURCE#withings, trailing 14 days off end_date. "
             "A gap in logging shows as missing dates here — never an interpolated or smoothed entry."
         ),
-        "clinical_note": "Safe loss rate: 0.5–2.0 lbs/week. >2.5 lbs/week consistently risks lean mass catabolism.",
+        "clinical_note": (
+            "Rate is judged against the owner's band (`rate_band`, from the training charter) and relative to bodyweight, "
+            "shown in lb/wk and % of bodyweight; a weekly point is flagged only above his schedule's cap at that weight "
+            "(sustained losses past it risk lean mass catabolism, Helms 2014)."
+        ),
     }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HYDRATION TRACKING ENHANCEMENT  (#30)
 # ══════════════════════════════════════════════════════════════════════════════
+
+
+def _model_check_state(budget):
+    """#5198 (ADR-104): tri-state, so a window no check ran on never reads as passed. `refused` when the
+    impossibility check refused, `passed` only when the measured weight trend agreed, else `not_run`
+    (no trend check, or a `published_unverified_*` basis)."""
+    tc = budget.get("trend_check")
+    if not tc:
+        return "not_run"
+    if not tc.get("publish", True):
+        return "refused"
+    return "passed" if str(tc.get("basis") or "").startswith("agrees_with_measured_weight_trend") else "not_run"
+
+
+def _maintenance_context(budget, check=None):
+    """#5198: one deficit-model window as maintenance context. Deliberately carries no key or flag
+    named target (the view's single calorie target is `calorie_target_platform`)."""
+    out = {
+        "estimated_maintenance_kcal": budget["tdee"],
+        "deficit_kcal": budget["deficit"],
+        "model_check": _model_check_state(budget),
+        "method": budget["method"],
+        "basis": budget.get("target_basis"),
+        "inputs": budget["inputs"],
+    }
+    if check is not None:
+        out["check"] = check
+    return out
 
 
 def _get_energy_expenditure(args):
@@ -878,8 +1000,6 @@ def _get_energy_expenditure(args):
     ex_daily_30d_avg = budget_30d["inputs"]["exercise_kcal_daily_avg"]
     tdee_7d_avg = budget_7d["tdee"]
     tdee_30d_avg = budget_30d["tdee"]
-    calorie_target_7d = budget_7d["target"]
-    calorie_target_30d = budget_30d["target"]
     implied_weekly_loss_lbs = tdee_core.implied_weekly_loss_lbs(target_deficit_kcal)
 
     journey_start_wt = profile.get("journey_start_weight_lbs")
@@ -943,28 +1063,27 @@ def _get_energy_expenditure(args):
         "exercise_kcal_by_basis_30d": ex_30d["kcal_by_basis"],
         "tdee_7d_avg": tdee_7d_avg,
         "tdee_30d_avg": tdee_30d_avg,
+        "expenditure_reconciliation": expenditure_reconciliation(end_date, tdee_7d_avg, read=query_source_cross_phase),
         "target_deficit_kcal": target_deficit_kcal,
-        "calorie_target_based_on_7d": calorie_target_7d,
-        "calorie_target_based_on_30d": calorie_target_30d,
+        # #5198: `calorie_target_platform` is the ONE calorie target on this view (#5095). The deficit
+        # model's windows are MAINTENANCE CONTEXT (estimated maintenance + the modelled deficit): no key
+        # or flag in them is called a target, and the TDEE-minus-deficit figure is not published.
+        "calorie_target_platform": calorie_resolver.resolve(end_date),
+        # ADR-152/ADR-105: maintenance context carries its method and inputs, so a reader can check
+        # the number without reading this source.
+        "maintenance_context_7d": _maintenance_context(budget_7d, check_7d),
+        "maintenance_context_30d": _maintenance_context(budget_30d),
         # #3931 box 4: the method name (DERIVED from health.tdee, never re-typed) and the
         # impossibility verdict, on the surface that publishes the number. When `basis`
-        # begins with "refused: ", `calorie_target_based_on_7d` is None — the surface says
-        # refused rather than publishing a figure the weight trend contradicts.
-        "calorie_target_method": tdee_core.METHOD,
+        # begins with "refused: ", `maintenance_context_7d.model_check` is "refused" — the impossibility check
+        # refused; the TDEE-minus-deficit figure is not emitted, only the maintenance estimate.
+        "maintenance_method": tdee_core.METHOD,
         # #3931 box 3: the SECOND method, offered alongside rather than folded in. It
         # never touches a MET table or a Mifflin coefficient, so it fails in different
-        # directions than `calorie_target_method` does — and when the two disagree,
-        # `calorie_target_check` below is what refuses. `None` when no intake average or
+        # directions than `maintenance_method` does — and when the two disagree,
+        # `maintenance_context_7d.check` below is what refuses. `None` when no intake average or
         # no measured trend exists to back-solve from (ADR-104: absent, not zero).
         "tdee_second_method": tdee_core.tdee_from_trend(intake_avg, trend_lb_wk, days=trend_days),
-        "calorie_target_basis": budget_7d.get("target_basis"),
-        "calorie_target_published": budget_7d.get("target_published", True),
-        "calorie_target_check": check_7d,
-        # ADR-152/ADR-105: the same target, with its method and its inputs attached, so a
-        # reader can check the number without reading this source — and so this tool and
-        # `get_nutrition view=macros` are visibly answering from ONE definition.
-        "calorie_target": budget_7d,
-        "calorie_target_30d_basis": budget_30d,
         "implied_weekly_loss_lbs": implied_weekly_loss_lbs,
         "bmr_change_since_start": bmr_change,
         "coaching_note": "Recalculate targets every 10 lbs lost as BMR decreases. Eating below 1200 kcal (women) or 1500 kcal (men) risks lean mass loss even with adequate protein.",

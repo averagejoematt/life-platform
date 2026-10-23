@@ -25,6 +25,8 @@ import os
 import sys
 from datetime import datetime, timedelta
 
+import pytest
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 for _k, _v in {
@@ -203,10 +205,12 @@ def test_history_report_counts_the_duplicate_keys_in_the_writers_frame():
     assert plan["rows_relabel_from_archive"] == 4 and plan["rows_unresolved"] == 0
 
 
-def test_history_report_refuses_to_run_without_dry_run_and_has_no_write_path(capsys):
+def test_history_report_refuses_to_run_without_a_mode_and_writes_only_behind_apply():
     mod = _report_module()
-    assert mod.main([]) == 2
-    assert "no write mode" in capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        mod.main([])  # neither --dry-run nor --apply: the argparse group is required
     body = open(os.path.join(ROOT, "scripts", "whoop_workout_history_4629.py")).read()
-    for verb in ("put_item", "update_item", "delete_item", "batch_writer", "--apply"):
-        assert verb not in body, f"the history report grew a write path ({verb}) — the removal and relabel are the owner's"
+    for verb in ("put_item", "batch_writer"):
+        assert verb not in body, f"the history script grew an unplanned write path ({verb})"
+    # the write mode (#4629, owner ruling 2026-10-18) lives in apply_plan only; see test_whoop_workout_history_write_mode_4629.py
+    assert body.count("table.delete_item(") == 1 and body.count("table.update_item(") == 1

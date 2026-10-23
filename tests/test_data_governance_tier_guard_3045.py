@@ -27,6 +27,11 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(_HERE)
 sys.path.insert(0, os.path.join(REPO, "lambdas"))
 
+from health.rhythm_channel import CHANNEL_FIELDS as RHYTHM_CHANNEL_FIELDS  # noqa: E402
+from ingestion import (
+    health_auto_export_protein as _hae_protein,  # noqa: E402
+    health_auto_export_sleep as _apple_sleep,  # noqa: E402
+)
 from privacy.field_tiers import (  # noqa: E402
     FIELD_TIERS,
     OWNER_CONSENT_ADR,
@@ -77,6 +82,15 @@ ROW_MAP: list[dict] = [
             ("field", "withings", "temperature_c"),
             ("field", "withings", "body_temperature_c"),
             ("field", "withings", "skin_temperature_c"),
+            # #4970: the Apple Watch's overnight vitals, under the same raw-biometrics row
+            ("field", "apple_health", "spo2_pct_apple"),
+            ("field", "apple_health", "wrist_temp_sleep_c_apple"),
+            ("field", "apple_health", "breathing_disturbances_apple"),
+            # #4971: the Apple Watch's own night — derived from the writer's field tuple.
+            *(
+                ("field", "apple_health", f)
+                for f in (*_apple_sleep.APPLE_SLEEP_FIELDS, _apple_sleep.RD_FIELD, *_hae_protein.HAE_PROTEIN_FIELDS)
+            ),
         ],
     },
     {
@@ -146,6 +160,24 @@ ROW_MAP: list[dict] = [
     # #3759: the weekly observation DERIVED from the photos takes the tier of its input.
     # Declared before the first row exists; no public projection at all, so no `claims`.
     {"key": "coach_vision", "pattern": r"^Coach vision observations", "requirements": [("source", "coach_vision", OO)], "claims": []},
+    # #5073: the May tracker — the target date and band are owner-only by ruling; no public projection, so no `claims`.
+    {"key": "may_tracker", "pattern": r"^May tracker", "requirements": [("source", "may_tracker", OO)], "claims": []},
+    # #5078: the fitness test battery — feeds the owner-only May tracker; no public projection, so no `claims`.
+    {"key": "fitness_tests", "pattern": r"^Fitness test battery", "requirements": [("source", "fitness_tests", OO)], "claims": []},
+    # #5096: the weekly calorie titration decision — its inputs carry the owner-only band; no public projection, so no `claims`.
+    {
+        "key": "nutrition_titration",
+        "pattern": r"^Nutrition titration",
+        "requirements": [("source", "nutrition_titration", OO)],
+        "claims": [],
+    },
+    # #5106: the evening check-in and its weekly read against intake — behavioural self-report; no public projection.
+    {
+        "key": "evening_checkin",
+        "pattern": r"^Evening check-in",
+        "requirements": [("source", "evening_checkin", OO), ("source", "checkin_intake_pairs", OO)],
+        "claims": [],
+    },
     # #4036: declared before the first dismissal exists, for the progress_photos reason —
     # an owner statement about an injury must never be stored under no tier. No `claims`:
     # this source has no public projection at all.
@@ -174,6 +206,14 @@ ROW_MAP: list[dict] = [
     # sense (never on a public surface) but registry tier TIER_INTERNAL, because the owner
     # ruled it may enter AI coach context. No `claims`: no public projection at all.
     {"key": "clinical", "pattern": r"^Owner clinical record", "requirements": [("source", "clinical", TIER_INTERNAL)], "claims": []},
+    # #4972: the heart-rhythm event channel inside the clinical partition — field-level
+    # owner-only, stricter than the partition's TIER_INTERNAL (owner ruling (c), 2026-10-17).
+    {
+        "key": "rhythm_channel",
+        "pattern": r"^Heart-rhythm event channel",
+        "requirements": [("field", "clinical", f, OO) for f in sorted(RHYTHM_CHANNEL_FIELDS)],
+        "claims": [],
+    },
 ]
 
 # The #2782/#2809 trio is ruled Tier-2 by docs/SCHEMA.md (its prose home predates this

@@ -22,7 +22,7 @@
 // and dated), no count of earlier starts, no "Dr.", no percentage on fewer than 20 items.
 import { esc } from "/assets/js/evidence_shared.js";
 import { dayInWords } from "/assets/js/entry_age.js";
-import { TERMS } from "/assets/js/ck_terms.js";
+import { TERMS, RECOVERY_UNIT } from "/assets/js/ck_terms.js";
 
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const fmt1 = (v) => (num(v) === null ? "" : v.toFixed(1));
@@ -37,12 +37,18 @@ const dayBefore = (iso) => {
 };
 
 // ── the daily mark ─────────────────────────────────────────────────────────────
-// One column a day for the last four weeks, in a frame that never changes. The frame's
-// height is the whole distance from the start weight to the goal: the green cap hanging
-// from the top is what is gone as of that day, the grey beneath it is what is left. A day
-// with no weigh-in leaves a gap. One encoding, no axis; the caption carries the number.
-// The same drawing is meant to be the link-preview image.
+// C, the year frame (the owner's ruling on #4646, 2026-10-23). One frame one year wide,
+// from the first day of the experiment: the frame's top is the start weight and its floor
+// is the goal. Each weigh-in is one thin column at its day, as tall as the weight still
+// above the goal, so the columns step down as the pounds go, and the empty right of the
+// frame is the part of the year not yet lived. A day with no weigh-in draws nothing. The
+// columns are neutral ink, not the accent: a column is the weight still to lose, and the
+// accent on this kit only ever means progress. The same drawing is the link-preview image.
+//
+// markDays (the four-week cells) stays: the Start chart's tests hold the chart to the same
+// start-to-goal share it computes.
 export const MARK_DAYS = 28;
+export const YEAR_DAYS = 365;
 export function markDays(series, todayIso, start, goal, days = MARK_DAYS) {
   const byDay = new Map((series || []).filter((w) => w && w.date && num(w.lbs) !== null).map((w) => [w.date, w.lbs]));
   const span = num(start) !== null && num(goal) !== null && start > goal ? start - goal : null;
@@ -56,36 +62,54 @@ export function markDays(series, todayIso, start, goal, days = MARK_DAYS) {
   }
   return out;
 }
-export function markSentence(cells, start, goal) {
-  const weighed = cells.filter((c) => c.gone !== null);
-  if (!weighed.length) return "";
-  const last = weighed[weighed.length - 1];
-  const missed = cells.length - weighed.length;
-  return `The last ${cells.length} days: ${fmt1(start - last.lbs)} of the ${fmt1(start - goal)} pounds to the goal are gone as of the latest weigh-in${missed ? `; ${missed} ${missed === 1 ? "day has" : "days have"} no weigh-in` : ""}.`;
+const isoDay = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(String(iso || "")) ? Date.parse(`${iso}T12:00:00Z`) : NaN);
+const daysFrom = (from, iso) => Math.round((isoDay(iso) - isoDay(from)) / 86400000);
+const shiftDay = (iso, n) => new Date(isoDay(iso) + n * 86400000).toISOString().slice(0, 10);
+// The year frame: { from, cols: [{ date, lbs, day, height }] } — `day` is 0..364 from the
+// frame's first day, `height` the weight still above the goal as a share of the whole
+// distance (0 at the goal, 1 at the start or above). The frame starts on `startIso` (the
+// experiment's first day); past a year it is the 365 days ending today. null without a
+// start above the goal, a today, or a weigh-in inside the frame.
+export function yearFrame(series, todayIso, start, goal, startIso) {
+  if (!Number.isFinite(isoDay(todayIso)) || num(start) === null || num(goal) === null || start <= goal) return null;
+  const weighed = (series || []).filter((w) => w && Number.isFinite(isoDay(w.date)) && num(w.lbs) !== null && w.date <= todayIso);
+  let from = Number.isFinite(isoDay(startIso)) && startIso <= todayIso ? startIso : weighed.map((w) => w.date).sort()[0];
+  if (!from) return null;
+  if (daysFrom(from, todayIso) >= YEAR_DAYS) from = shiftDay(todayIso, -(YEAR_DAYS - 1));
+  const byDay = new Map(weighed.filter((w) => w.date >= from).map((w) => [w.date, w.lbs]));
+  const cols = [...byDay.keys()].sort().map((date) => {
+    const lbs = byDay.get(date);
+    return { date, lbs, day: daysFrom(from, date), height: Math.max(0, Math.min(1, (lbs - goal) / (start - goal))) };
+  });
+  return cols.length ? { from, cols } : null;
 }
-export function markHTML(series, todayIso, start, goal, { width = 640, height = 120 } = {}) {
-  if (!todayIso) return "";
-  const cells = markDays(series, todayIso, start, goal);
-  if (!cells.some((c) => c.gone !== null)) return "";
-  const gap = 4;
-  const w = (width - gap * (cells.length - 1)) / cells.length;
-  const rects = cells
-    .map((c, i) => {
-      if (c.gone === null) return "";
-      const x = (i * (w + gap)).toFixed(1);
-      const cap = Math.max(c.gone > 0 ? 2 : 0, c.gone * height);
-      return `<rect class="ck-mark__left" x="${x}" y="0" width="${w.toFixed(1)}" height="${height}" rx="2"/><rect class="ck-mark__gone" x="${x}" y="0" width="${w.toFixed(1)}" height="${cap.toFixed(1)}" rx="2"/>`;
+export function markSentence(frame, start, goal) {
+  if (!frame || !frame.cols.length) return "";
+  const last = frame.cols[frame.cols.length - 1];
+  const n = frame.cols.length;
+  return `One year from ${shortDay(frame.from)}, one column per weigh-in: ${n} ${n === 1 ? "weigh-in" : "weigh-ins"} so far, the latest ${fmt1(last.lbs)} lb, with ${fmt1(Math.max(0, start - last.lbs))} of the ${fmt1(start - goal)} pounds to the goal gone.`;
+}
+export function markHTML(series, todayIso, start, goal, { startIso = null, width = 640, height = 120 } = {}) {
+  const frame = yearFrame(series, todayIso, start, goal, startIso);
+  if (!frame) return "";
+  const step = width / YEAR_DAYS;
+  const w = Math.max(1, step * 0.8);
+  const cols = frame.cols
+    .map((c) => {
+      const h = Math.max(1, c.height * height);
+      return `<rect class="ck-mark__day" x="${(c.day * step).toFixed(2)}" y="${(height - h).toFixed(1)}" width="${w.toFixed(2)}" height="${h.toFixed(1)}"/>`;
     })
     .join("");
-  return `<svg class="ck-mark" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(markSentence(cells, start, goal))}">${rects}</svg>${markEndsHTML(start, goal)}`;
+  const box = `<rect class="ck-mark__frame" x="0.5" y="0.5" width="${width - 1}" height="${height - 1}" rx="2"/>`;
+  return `<svg class="ck-mark" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(markSentence(frame, start, goal))}">${box}${cols}</svg>${markEndsHTML(start, goal, frame.from)}`;
 }
-// The mark's two ends, named under it in ONE line (site-to-A round 1, front:F15; round 2, G10:
-// a left-hand "at the start" and a right-hand "the goal" read as a time axis on a drawing whose
-// scale is vertical). The top of every column is the start weight, the floor is the goal — the
-// grey the legend names. "" without both numbers.
-export function markEndsHTML(start, goal) {
+// The frame named under it in ONE line (site-to-A round 1, front:F15; round 2, G10: no
+// left/right pair of labels): its width is the year from the first day, its top the start
+// weight, its floor the goal. "" without both numbers.
+export function markEndsHTML(start, goal, fromIso = null) {
   if (num(start) === null || num(goal) === null || start <= goal) return "";
-  return `<div class="ck-ends"><span>${esc(`Each column runs from ${fmt1(start)} lb, the start, at the top to ${String(Number(goal.toFixed(1)))} lb, the goal, at the floor.`)}</span></div>`;
+  const year = Number.isFinite(isoDay(fromIso)) ? `The frame is one year from ${shortDay(fromIso)}; its` : "The frame’s";
+  return `<div class="ck-ends"><span>${esc(`${year} top is ${fmt1(start)} lb, the start, and its floor ${String(Number(goal.toFixed(1)))} lb, the goal.`)}</span></div>`;
 }
 // "312.1 lb · Day 29 · 15.2 down, 127.1 to go to 185" — the mark's one line of numbers,
 // the weight in bold. Returns HTML.
@@ -125,10 +149,16 @@ export function morningLine(week, todayIso) {
   }
   return `${fmt1(now)} lb.`;
 }
-const RECOVERY_GLOSS = "Recovery is the wrist strap’s morning score, as a percentage.";
-// THE recovery display (round 3): the score is served on a 0-100 scale and the chapters write it
-// "98%", so every kit page prints it that way — one helper over the served day text.
-export const recoveryShown = (text) => String(text || "").replace(/\brecovery (\d+(?:\.\d+)?) out of 100\b/gi, (m, n) => `recovery ${n}%`);
+const RECOVERY_GLOSS = "Recovery is the wrist strap’s morning score out of 100.";
+// THE recovery display (round 3, re-graded 2026-10-18): the score is printed with the unit the route
+// serves beside it (`facts[].recovery.unit`, lane E of #4580) — " out of 100" — and with RECOVERY_UNIT
+// when none is served, so the band, the day page, the trend and the call card say "62 out of 100".
+// One helper over the served day text: whatever unit the text carries is replaced by the served one.
+const RE_RECOVERY = /\brecovery (\d+(?:\.\d+)?)(?:%| out of 100| points)?(?=[\s.,;:]|$)/gi;
+export const recoveryShown = (text, unit = "") => {
+  const u = String(unit || "").trim() || RECOVERY_UNIT;
+  return String(text || "").replace(RE_RECOVERY, (m, n) => (u === "%" ? `recovery ${n}%` : `recovery ${n} ${u}`));
+};
 // One day's facts as one line: "241 minutes of walking · 8.8 hours of sleep; recovery 98
 // out of 100 · 153 g protein, 1,732 kcal, under the protein floor". Step counts are left
 // out: the served counts are unreliable (a caveat sits on their trend page).
@@ -136,9 +166,10 @@ export function factLine(facts, { skip = [], floorMet = null } = {}) {
   return (facts || [])
     .filter((f) => f && f.label && f.text && f.label !== "Steps" && !skip.includes(f.label))
     .map((f) => {
-      if (f.label === "Sleep") return `slept ${recoveryShown(f.text.replace(/^(\d[\d.]*) hours/, "$1 hours"))}`;
+      const unit = f.recovery && typeof f.recovery.unit === "string" ? f.recovery.unit : "";
+      if (f.label === "Sleep") return `slept ${recoveryShown(f.text.replace(/^(\d[\d.]*) hours/, "$1 hours"), unit)}`;
       if (f.label === "Food" && floorMet !== null) return `${f.text}, ${floorMet ? "at or above" : "under"} the protein target`;
-      return recoveryShown(f.text);
+      return recoveryShown(f.text, unit);
     })
     .join(" · ");
 }
@@ -398,7 +429,7 @@ export function quotesHTML(chapter, transcript, base = "/") {
   const out = [];
   const line = firstSentences(c.dek, 200);
   const week = c.week_label ? `${c.week_label} · ` : "";
-  out.push(`<p class="ck-small">${esc(`${week}“${c.title}”, the chapter. Written by AI from the record on ${shortDay(c.date)}; Matthew reads each chapter before it publishes.`)}</p>`);
+  out.push(`<p class="ck-small">${esc(`${week}“${c.title}”, the chapter, dated ${shortDay(c.date)}. Written by AI from what the devices and logs recorded; Matthew reads each chapter before it publishes.`)}</p>`);
   if (line) out.push(`<p class="ck-quote ck-quote--chapter">${esc(line)}</p>`);
   const read = c.url ? `<a class="ck-btn" href="${esc(c.url)}">Read${num(c.read_minutes) !== null ? ` · ${c.read_minutes} min` : ""}</a>` : "";
   const listen = hasPod ? `<a class="ck-btn ck-btn--ghost" href="${esc(base)}story/">Listen${num(pod.data.duration_minutes) !== null ? ` · ${pod.data.duration_minutes} min` : ""}</a>` : "";

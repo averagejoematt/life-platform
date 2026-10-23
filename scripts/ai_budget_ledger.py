@@ -191,6 +191,36 @@ LEDGER: dict[str, dict] = {
         "founding window, so $0 stamped; dedicated allowlisted CI label (#2888), same pattern as "
         "visual_ai_qa/reader_truth_qa above but band 1 (advisory triage signal, not a deploy gate)",
     ),
+    "charter_judge": _row(
+        owner="lambdas/training/charter_ai.py",
+        attribution=NONE,
+        note="#5084/#5072: the charter's panel-rubric judge, the WEEKLY real-plan grade — one Sonnet call per plan with "
+        "every seat in it, the real plan + 4 negative controls, then the food plan + 2 (#5110), back-to-back, the cached "
+        "charter block written once and read by the rest. Hosted by the MCP Lambda's weekly job once scheduled (no "
+        "dimension value of its own: it lands under the host's). Estimate (#5110): ~$0.30 a weekly run, ~$1.30/month",
+    ),
+    "charter_judge_gate": _row(
+        owner="lambdas/training/panel_judge.py",
+        attribution=NONE,
+        note="#5072: the same judge as the CI regression gate over the golden plan cases (band 3, an operator-truth CI "
+        "gate). Path-filtered to charter / engine-template / skill / coach-prompt changes, so it bills only on those "
+        "merges; lands under the ci (or dev-session) caller class. Estimate: ~$0.30 a run (8 cases: 5 training, 3 food)",
+    ),
+    "nutrition_critics": _row(
+        owner="lambdas/health/nutrition_critics_ai.py",
+        attribution=SHARED,
+        attribution_keys=("life-platform-mcp",),
+        note="#5114: the nutrition critics' model layer — three short Haiku narratives per get_deficit_sustainability "
+        "call (the plan, Hevy and benchmark readers of that tool pass critics_model=False), inside the MCP Lambda "
+        "beside plan_critics, so the dimension is shared. Band 1: $0 while the tier is >= 1. Estimate: ~$0.006 per "
+        "call (3 x ~1,250 tok in / ~150 out on Haiku 4.5), ~1-3 calls a day = $0.2-0.55/mo at tier 0",
+    ),
+    "charter_retro": _row(
+        owner="lambdas/training/charter_ai.py",
+        attribution=NONE,
+        note="#5084: the block retro (#5079) — the judge's rubric, one call per seat, once per block from the "
+        "/training-review skill on a workstation, so its spend lands under dev-session. Estimate: $0.0746 per retro",
+    ),
     # ── band 2: reader narrative ─────────────────────────────────────────────
     "coach_narrative": _row(
         owner="lambdas/coach/coach_narrative_orchestrator.py",
@@ -247,15 +277,21 @@ LEDGER: dict[str, dict] = {
     ),
     "plan_critics": _row(
         owner="mcp/tools_plan.py",
-        attribution=EXCLUSIVE,
+        attribution=SHARED,
         attribution_keys=("life-platform-mcp",),
-        founding_usd=0.00,
-        monthly_budget_usd=1.00,
         note="#3752: the four debrief critics — four short Haiku calls per drafted routine, at most once a night, "
-        "inside the MCP Lambda, which makes no other Bedrock call (grep mcp/ for bedrock_client: this is the only "
-        "caller; EstimatedCostUSD{LambdaFunction=life-platform-mcp} had ZERO datapoints over the trailing 30d on "
-        "2026-09-19). Did not exist in the founding window, so $0 stamped; the floor budget means growth past $1/mo "
-        "gets a look at close. Re-measure from LifePlatform/AI::EstimatedCostUSD{LambdaFunction=life-platform-mcp}",
+        "inside the MCP Lambda. EXCLUSIVE with a $1 floor budget until #5114 (2026-10-19) wired the nutrition "
+        "critics' narrative into the same Lambda: life-platform-mcp now carries two features' spend, so per-feature "
+        "dollars no longer exist for either and the row is SHARED (gated by the ADR-063 ceiling). "
+        "Re-measure from LifePlatform/AI::EstimatedCostUSD{LambdaFunction=life-platform-mcp}",
+    ),
+    "charter_narrative": _row(
+        owner="lambdas/training/charter_ai.py",
+        attribution=NONE,
+        note="#5084: the plan's charter-frame explanation lines, three back-to-back Haiku calls a night in the nightly "
+        "pre-draft. Its expected host is life-platform-mcp-warmer (mcp_stack: the NightlyPredraft rule targets the warmer), "
+        "where the pre-draft's plan_critics stage also runs — the lane that wires the first call reconciles the two rows' "
+        "attribution in the same PR. Estimate: $0.0154/night cached (~$0.46/mo)",
     ),
     "coach_vision": _row(
         owner="lambdas/coach/coach_vision.py",

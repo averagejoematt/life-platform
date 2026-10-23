@@ -40,6 +40,7 @@ v1.0.0 — 2026-03-14 (post doc-audit that found 19 stale facts)
 """
 
 import ast
+import json
 import re
 import sys
 from datetime import datetime, timezone
@@ -384,33 +385,24 @@ _WEEKLY_CRON_RE = re.compile(r"cron\((\d{1,2}) (\d{1,2}) \? \* (SUN|MON|TUE|WED|
 def _auto_discover_hypothesis_cadence() -> str | None:
     """The doc phrase for hypothesis-engine's weekly cadence, e.g. "Sun 19:00 UTC" (#973).
 
-    Resolves the `schedule=` kwarg on the create_platform_lambda(...) call whose
-    function_name is "hypothesis-engine" in cdk/stacks/compute_stack.py and renders
+    Resolves hypothesis-engine's row in config/schedules.json (#4284) and renders
     the weekly EventBridge cron as the phrase CLAUDE.md's Compute-Lambdas line
     quotes (crons are fixed UTC by convention, so the render is exact). A missing,
     non-literal, or non-weekly expression returns None (manual fallback) rather
     than guessing — if the schedule ever stops being weekly, the doc sentence
     shape itself needs a human edit, not a literal sync.
     """
-    path = ROOT / "cdk" / "stacks" / "compute_stack.py"
-    if not path.exists():
-        return None
+    # #4284: the schedule is hypothesis-engine's row of config/schedules.json, THE schedule table.
+    path = ROOT / "config" / "schedules.json"
     try:
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        expr = json.loads(path.read_text(encoding="utf-8"))["schedules"]["hypothesis-engine"]["expression"]
     except Exception:
         return None
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "create_platform_lambda":
-            fn = _kwarg_value(node, "function_name")
-            if isinstance(fn, ast.Constant) and fn.value == "hypothesis-engine":
-                sched = _kwarg_value(node, "schedule")
-                if isinstance(sched, ast.Constant) and isinstance(sched.value, str):
-                    m = _WEEKLY_CRON_RE.fullmatch(sched.value)
-                    if m:
-                        minute, hour, day = int(m.group(1)), int(m.group(2)), m.group(3)
-                        return f"{day.title()} {hour:02d}:{minute:02d} UTC"
-                return None
-    return None
+    m = _WEEKLY_CRON_RE.fullmatch(expr)
+    if not m:
+        return None
+    minute, hour, day = int(m.group(1)), int(m.group(2)), m.group(3)
+    return f"{day.title()} {hour:02d}:{minute:02d} UTC"
 
 
 def _auto_discover_module_count() -> int | None:

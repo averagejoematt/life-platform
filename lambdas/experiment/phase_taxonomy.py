@@ -248,6 +248,7 @@ SOURCE_CLASS: dict[str, str] = {
     "habitify": RAW_TIMESERIES,  # raw completion; habit_scores is the derived one
     "habit_causality": RAW_TIMESERIES,  # #422: user-authored why/trigger/reward per habit-day — a logged fact, kept forever
     "private_intake": RAW_TIMESERIES,  # #1405: Matthew-private evening intake count — logged fact, cross-cycle physiology, NEVER public-served
+    "evening_checkin": RAW_TIMESERIES,  # #5106: the evening check-in (hunger/stress/cravings 0-4 + one word) — a self-report fact like felt_probe
     "felt_probe": RAW_TIMESERIES,  # #1409: weekly felt-reality probe (Sunday one-tap, 0-4×3) — self-report fact; calibration reads it cycle-stamped
     "time_affluence": RAW_TIMESERIES,  # #1408: Time-Affluence Meter — weekly 1-item probe (DATE# rows, a
     # logged self-report fact, the durable spine) PLUS idempotently-recomputable derived rows (PROXY#/EDGE#
@@ -314,6 +315,15 @@ SOURCE_CLASS: dict[str, str] = {
     # row per photo set, keyed on the SET's date, anchored to the nearest DEXA and the tape trend. It
     # follows its input: a before/after read that spans attempts is the comparison the photos exist
     # for, and the model id on each row is what makes an old read re-checkable rather than re-run.
+    "fitness_tests": CROSS_PHASE,  # #5078: the fitness test battery (BATTERY#<date>) — a measurement taken by hand
+    # on a fixed cadence and unrecomputable (no API re-runs a 6-minute walk); the trend across blocks is the point.
+    "checkin_intake_pairs": CROSS_PHASE,  # #5106: the weekly check-in -> intake read (WEEK#<iso-week>) — a dated re-fit over a
+    # rolling window of RAW_TIMESERIES inputs; each row is self-contained, and a reset hiding earlier weeks would cut the trend.
+    "nutrition_titration": CROSS_PHASE,  # #5096: the weekly calorie titration decision (WEEK#<monday>) — a decision
+    # trail the next week's step reads (spacing, consecutive reads); like may_tracker it spans the campaign.
+    "may_tracker": CROSS_PHASE,  # #5073: the weekly May tracker row (WEEK#<monday>) — a trajectory toward a
+    # dated target that spans the whole campaign; every row is recomputable from its RAW inputs, but a
+    # reset that hid the earlier weeks would cut the trend the two-weeks-running triggers read.
     "supplements": CROSS_PHASE,  # ADR-077 dec A: medication-safety — never hide
     "chronicling": CROSS_PHASE,  # ADR-077 dec D: frozen pre-platform "before" archive
     "subscribers": CROSS_PHASE,  # audience identity
@@ -607,7 +617,11 @@ _PK_RULES: list = [
     # sent today". Carrying a reset into them would either destroy a live send counter or
     # re-open a spend window mid-day. "I already sent N today" is not an artifact of the
     # cycle that produced it — the same sentence that settles outbound_events.
-    (lambda pk, sk: pk in ("COACH#nudge_ledger", "COACH#outbound_ledger"), SYSTEM_STATE),
+    (
+        lambda pk, sk: pk
+        in ("COACH#nudge_ledger", "COACH#outbound_ledger", "COACH#steps_nudge", "COACH#protein_nudge", "COACH#evening_checkin"),
+        SYSTEM_STATE,
+    ),
     # Coach intelligence tier — all experiment-scoped.
     #   #3900 ruling (2026-09-20): COACH#commitments/TALLY#current is EXPERIMENT_SCOPED, not
     #   SYSTEM_STATE. It is a rolling tally, but of THIS cycle's graded commitments (the payload

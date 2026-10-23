@@ -6,8 +6,8 @@ WHY THIS EXISTS (ADR-155 amendment, 2026-10-12)
   standing guidance his clinicians gave — may enter the AI coaches' context, so no coach
   prescribes training, nutrition or recovery advice that a medical instruction already
   overrides. The record lives in its own owner-written partition,
-  `USER#matthew#SOURCE#clinical`, written only by `scripts/load_clinical_record.py`
-  from a file kept outside this (public) repo.
+  `USER#matthew#SOURCE#clinical`, written by `scripts/load_clinical_record.py` from a
+  file kept outside this (public) repo (plus the `RHYTHM#` channel — THE TWO WRITERS).
 
   Its tier is `TIER_INTERNAL` (`privacy.field_tiers.SOURCE_TIERS["clinical"]`): never
   on a public surface, safe inside owner-facing tooling and AI context. Two of the three
@@ -27,6 +27,14 @@ THE SORT-KEY FAMILIES (docs/SCHEMA.md)
   HISTORY#<date>                   an intake history questionnaire (not rendered here)
   GUIDANCE#current                 the standing rules for coaches (`rules`, `public_rules`, `effective`, `review_after`)
   DOC#<date>#<slug>                an index row for one source document held in S3 (not rendered here)
+  RHYTHM#{ECG,HRNOTIF,MEDLOG}#...  the owner-only heart-rhythm event channel (#4972,
+                                   `health/rhythm_channel.py`; NOT rendered here — every
+                                   field is TIER_OWNER_ONLY, the coach fact pack is #4977)
+
+THE TWO WRITERS
+  `scripts/load_clinical_record.py` (owner-run, the off-repo record) writes every family
+  but `RHYTHM#`; `put_channel_rows` below is the only lambda-side writer, and it refuses
+  any row outside the `RHYTHM#` prefix — the webhook can never touch the owner's record.
 
 FAIL-SOFT
   `clinical_context_block` never raises into a coach run: no rows, a failed read or a
@@ -274,3 +282,35 @@ def clinical_context_block(table, *, published: bool = True, user_id: str = "mat
     except Exception as e:  # noqa: BLE001 — a coach run is never load-bearing on this read
         logger.warning("[clinical_facts] clinical context unavailable (block omitted): %s", e)
         return ""
+
+
+# ── The channel writer (#4972) ────────────────────────────────────────────────
+CHANNEL_PREFIX = "RHYTHM#"
+
+
+def put_channel_rows(table, rows: list, *, user_id: str = "matthew") -> tuple:
+    """Write heart-rhythm channel rows into the clinical partition: (written, duplicates).
+
+    The pk is set here, never taken from the row, and a row whose sort key is outside
+    `CHANNEL_PREFIX` raises — this writer cannot reach the owner-loaded families. Each put
+    is conditional on the key being new, so a re-delivered event is counted as a duplicate
+    and the first write is never clobbered (one event per instant + device/kind).
+    """
+    pk = f"USER#{user_id}#SOURCE#{CLINICAL_SOURCE}"
+    written = dupes = 0
+    for row in rows:
+        sk = str(row.get("sk") or "")
+        if not sk.startswith(CHANNEL_PREFIX):
+            raise ValueError(f"[clinical_facts] channel writer refuses a non-{CHANNEL_PREFIX} sort key")
+        item = {k: v for k, v in row.items() if v is not None and v != ""}
+        item["pk"] = pk
+        item["sk"] = sk
+        try:
+            table.put_item(Item=item, ConditionExpression="attribute_not_exists(sk)")
+            written += 1
+        except Exception as e:  # noqa: BLE001 — only the conditional-check failure is a duplicate
+            code = str(getattr(e, "response", {}).get("Error", {}).get("Code", "")) or type(e).__name__
+            if code != "ConditionalCheckFailedException":
+                raise
+            dupes += 1
+    return written, dupes

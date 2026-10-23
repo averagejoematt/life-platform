@@ -1,0 +1,603 @@
+{
+  "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
+  "version": "1.19.1",
+  "change_log": [
+    {
+      "version": "1.0.0",
+      "date": "2026-10-18",
+      "by": "owner rulings 2026-10-18 (the elite-panel training review, #5067)",
+      "what": "First charter: the frame, the rate band, the 5-day split, the step floor and target, the cardio menu, no scheduled deload, effort ceilings, rotation cadence, gated movements, the concession ledger.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.1.0",
+      "date": "2026-10-18",
+      "by": "the owner's double-progression ruling (#4503 OD5, 2026-09-30), moved here from owner_redlines.REDLINES['lifting_sessions_per_wk']['gain_rule'] (#5052)",
+      "what": "Added `progression`: the gain rule (two top-of-range exposures at or under the effort ceiling earn one 5-lb step, reps back to the bottom) and the self-raised-load rule (a load the owner raised himself at or under the ceiling becomes the next floor and is graded progressed, not a breach). The redline copy is retired; the engine reads it here.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.2.0",
+      "date": "2026-10-19",
+      "by": "owner ruling 2026-10-18 on #5088 (a late-December trip: travel templates, steps held, 2-3 short sessions a week, step back up on return)",
+      "what": "Adds split.minimum_session (the 20-minute minimum per role: anchors only, top set + one back-off) and the disruption block (an owner-switched mode that holds habits instead of targets, its travel/busy templates, the step-back-up week and when the coach OFFERS the mode).",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.3.0",
+      "date": "2026-10-19",
+      "by": "owner rulings 2026-10-18, ruling 4 (gym cardio is deliberate, from a menu, with level, speed and RPE) and ruling 7 (intervals and conditioning open, by RPE / talk test); #5076",
+      "what": "The cardio menu gains its dose: each block's talk test and machines, the incline treadmill walk's starting dose (8-12 % at 2.5-3.0 mph; his treadmill history tops out at 6 % at 2.8 mph, so the walk starts at the floor of the band) and step, the interval set, and the weekly placement rule.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.4.0",
+      "date": "2026-10-19",
+      "by": "the owner-requested elite-panel training review 2026-10-18 (#5057): calf press, leg press and DB curl held the same load x reps for weeks at an easy self-reported RPE",
+      "what": "Adds progression.stall_rule: the same top-set load x reps on 3 consecutive same-type exposures, each at self-reported RPE 8 or lower, is `step_due` (the prescription's failure to progress, not his) and the next draft carries one step: up to 2 more reps below the top of the range, else the gain rule's load step.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.5.0",
+      "date": "2026-10-19",
+      "by": "owner rulings 2026-10-18 on #5058 (the elite-panel training review): compounds RPE 8-9; the last isolation set RPE 9-10; an overage within +1 RPE is not a breach; a ceiling beaten on more than 50% of sets two weeks running PROPOSES a change, which the owner applies",
+      "what": "Renames effort_ceilings.by_experience_tier to by_movement_class (it always held the two movement-class bands, not tiers) holding exactly the ruled bands, and states that a set is graded against the HIGH end of its class band (effort_ceilings.ceiling_is; progression.ceiling_tier read the low end until #5058). The tolerance and the proposal rule are the ruled ones, unchanged in value.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.6.0",
+      "date": "2026-10-19",
+      "by": "owner ruling 2026-10-18 (second round, #5090): running is in the May plan; cleared with no exercise restrictions; effort by RPE / talk test",
+      "what": "Builds the run gate's missing Stage 4. gated_movements.running gains the walking condition as numbers (4 consecutive weeks of >= 8.5 h weight-bearing walking, each without a lower-leg pain flag — the owner_redlines run_gate_lb tissue clause, now read here), the reading (the gate opens the run/walk on-ramp; continuous running is unlocked when the on-ramp is completed) and the on-ramp itself: treadmill first, eight levels from 1 min run / 2 min walk to 30 min continuous, two sessions at a level at or under the easy block's RPE with no pain flag to advance, max 2 runs a week, none on a heavy lower day or the session either side of it; a lower-leg strain flag pauses the run/walk (as it pauses the pogo hops) and holds the on-ramp at its level; the Stage 4 record is read back to history_from (the ruling day). lower_leg_prep gains its prescription (calf work, tibialis work, low-amplitude pogo hops on lower days from the prep weight; brisk incline walking is the menu's default block) and the catalog keys of the carve-out — the ONLY plyometric keys the generator may place; every other plyometric entry stays excluded. cardio_menu.blocks gains run_walk (placed by training.run_onramp once the gate is open, never by the weekly menu rule). The level table, the prep doses and the spacing rule's sequence reading are platform-chosen within the ruling.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.7.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on #5078 (the elite-panel training review: a fitness test battery every 6 weeks)",
+      "what": "calibration.fitness_tests gains its protocol: each test's machine, unit, better direction and how it is logged (the explicit record or Hevy), the protocol version, the block alignment and grace for the due week (overdue, then missed: the dead-man state), and the test day (the lightest role carries the tests on its minimum session, never a lower day).",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.8.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition panel review (#5095, epic #5091: one calorie target everywhere); the level is the panel default R1 (eat up to the prescribed band now, refit weekly), pending the owner's R1 answer",
+      "what": "nutrition.calories: the ONE calorie target every surface reads through health.calorie_target.resolve. The energy floors, the prescribed band, the opening target and the titration rule MOVE here from training.owner_redlines energy_floor_kcal (same values; the redlines now read them from this block). The 1,500 kcal generated constant is retired. A weekly titration record (USER#matthew#SOURCE#nutrition_titration / WEEK#<iso-monday>, written by the #5096 titration engine, not yet built) outranks target_kcal for its week; the any-day floor clamps any resolved target.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.10.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition panel review (epic #5091: 'all items worked now'); the 300 kcal bar is #5097's own acceptance line",
+      "what": "nutrition.expenditure (#5097): the reconciliation that sets MacroFactor's adaptive expenditure and both platform burn models against the scale-trend-implied expenditure (mean intake + 3500 kcal per lb of the shared 14-day loss rate). disagreement_threshold_kcal is the spread between the models above which the read says which one matches the scale; min_logged_days is the fewest logged intake days in the loss-rate window before a scale-implied figure is computed at all.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.11.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5098, epic #5091); the four-feeding structure and the relaxed fasting window are built on the panel default, pending R2",
+      "what": "nutrition.protein: the daily range (low = the plan's floor, held equal to config/user_goals.json and common.constants by tests/test_protein_engine_5098.py; high = the redlines' target), the days-of-7 bar, four feedings with a per-feeding threshold and a target band, the merge window that groups food-log rows into one feeding, THE hit definition (strictly total >= range low), and the breakfast nudge (a cut-off and a send window in Pacific time, at most one a day, owner-only; a day with no food-log row yet withholds, because the food log is an end-of-day upload). owner_redlines.protein_floor_g reads target_g, days_of_7, feedings and feeding_g from here; lambdas/health/protein_engine.py is the one reader.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.14.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5102, epic #5091): 'all items worked now'",
+      "what": "nutrition.floors: the fat, carbohydrate and fibre floors the redlines defined in prose (65 g / 120 g / 35 g, the values the redlines already carried), moved here as data. owner_redlines.fat_floor_g / carb_floor_g read them; lambdas/health/macro_floors.py is the one reader and the one hit definition (strictly at or above the floor; a missing field is unknown, never a miss). The critics and the daily grade call it.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.15.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5101, epic #5091); built on the panel default, pending R1",
+      "what": "nutrition.training_day (#5101): a lifting-day calorie uplift balanced by the rest days so the week averages the base target, the carbohydrate split (protein and fat held, carbohydrate moves), pre and post session carbohydrate and protein targets, and the travel-day rule. Read by health.calorie_target.resolve (day_type seam) and printed in the plan's training_day_fuel block.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.16.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5096, epic #5091: the redlines' titration rule gets a reader); weekly refit built on the panel default, pending R1",
+      "what": "nutrition.titration: the weekly titration engine's rule (lambdas/health/titration.py), MOVED here from nutrition.calories.titration (same rule values: 150 kcal step, 14-day spacing, never on a week with fewer than 6 complete logs, not before day 21, two consecutive out-of-band reads, steps before food) and nutrition.calories.titration_record. The band it reads is the charter rate band (governing_goal.rate_band_lb_per_wk through training.rate_band, the clinical guidance cap applied) above the landing, and the redlines' own landing schedule step (target to cap) from the landing down: the redlines' old 'target +/- 0.5 lb/wk' band is retired, so one band governs both the rate target and the titration. The step is sized from the miss (500 kcal/day per lb/wk, 3500 kcal per lb over 7 days), rounded to 50 and held inside min_step_kcal..max_step_kcal. owner_redlines energy_floor_kcal.titration reads this block (max_step_kcal is the one step-size key; the old step_kcal duplicate is dropped). Every rule value is required: a missing one holds the week as insufficient_data, never a fallback. trend_days must equal the shared loss-rate window. A complete log is a day at or above the redlines' dark-day line, and the first step waits for the redlines' complete_days_before_first_titration (both read from owner_redlines, not copied). The redlines' owner rule 'walking FIRST, then food, never both inside 14 days' is kept as a walking-first hold; the steps-floor precondition on top of it is the panel interpretation, pending an owner ruling on epic #5091. The modelled `expected_path` moves with the block; `insufficient_loss_with_logging_intact` is carried by the walking_first rule and the redlines tripwire loss_insufficient_adherent.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.17.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5111, epic #5094)",
+      "what": "nutrition.labs (#5111): the follow-up draw cadence only — follow_up_weeks and reminder_lead_days. Read by training.calibration_cadence (kind lab_draw): next draw due = the last draw date + the cadence, a reminder on the owner channel once per cycle (CALIB_PROMPT#lab_draw#<cycle_start>), state ok|due|overdue. The owner-only fallback due date (no draw readable) lives in the private twin, never here. Links the labs ingest #4639. follow_up_weeks 16 puts the next draw about late January from the October draw (the issue's date); the draw date is read from the labs partition and the clinical LABS# keys, latest wins.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.18.0",
+      "date": "2026-10-19",
+      "by": "owner direction 2026-10-18 on the nutrition elite-panel review (#5110, epic #5094): the food plan is graded by a fixed panel like the training plan; built on the panel defaults, pending R1 and R2 (#5091)",
+      "what": "nutrition.concession_ledger: the food panel's nine seats (six schools and three roles: the six schools #5110 names, one seat each, plus a sports dietitian, a behaviour-change psychologist and a studio nutritionist) and what each concedes to the deadline and gets in return. config/panel_rubric.json food_panel holds one fixed rubric per seat (criteria by code against the resolved food plan, one by the judge each); the seat keys must equal this ledger's keys, the concession is READ from here at grade time (lambdas/training/food_panel.py), and the bar is panel_target (overall A, every seat 9 of 10 or better with its concession named).",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.19.0",
+      "date": "2026-10-20",
+      "by": "owner ruling 5 (2026-10-18: five lifting days a week) and the #5101 known limit (#5191, epic #5091); built on the panel default, pending R1",
+      "what": "nutrition.training_day prose only (no number changes): day_type now names the per-date training calendar (training.training_calendar, #5191) that types each date of the week lifting or rest from split.lifting_days_per_wk and the week's credited sessions, so the plan's training_day_fuel block is typed and its weekly mean is the base target; balance adds that a typed week with no rest day to pay the uplift reports balance_held false.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.19.1",
+      "date": "2026-10-22",
+      "by": "#5187 (epic #5094), filling in the same-day source the 1.18.x text named ('armed but silent until a same-day food source exists (#5187)'); no new owner ruling, the nudge rule itself is unchanged and still pending R2 (#5091)",
+      "what": "nutrition breakfast_nudge.rule prose only (no number, window or threshold changes): names the timed protein entries Health Auto Export delivers intraday as the same-day read, beside the end-of-day MacroFactor row; an absent record of both still withholds (no_same_day_log).",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    }
+  ],
+  "governing_goal": {
+    "frame": "a Hollywood, time-bound, must-hit target",
+    "mentality": "time-bound, must-hit: every expert school is synthesized and each concedes something to the deadline (see concession_ledger)",
+    "target_date": "2027-05-15",
+    "rate_band_lb_per_wk": {
+      "floor": 3.0,
+      "ceiling": 3.5,
+      "shown_as": ["lb_per_wk", "pct_bodyweight_per_wk"],
+      "note": "always shown in lb AND as a percent of bodyweight"
+    },
+    "precedence": "the owner clinical guidance record (USER#matthew#SOURCE#clinical, GUIDANCE#current) outranks the rate band wherever the two conflict; it is reference context, never a gate on intensity",
+    "published": false
+  },
+  "phase_after_may": {
+    "frame": "toward the long-term goal and maintenance — the frame does not end at the target date",
+    "rule": "the charter is re-versioned on an owner ruling before the target date, not after it"
+  },
+  "split": {
+    "lifting_days_per_wk": 5,
+    "sequence": ["Upper-heavy", "Lower-heavy", "Shoulders+arms", "Upper-volume", "Lower-volume"],
+    "frequency": {"each_major_muscle_per_wk": 2, "delts_per_wk": 3},
+    "session_minutes": {"lifting": [60, 75], "cardio_block_max": 30, "stretching_max": 10},
+    "minimum_session": {
+      "minutes": 20,
+      "shape": "anchors only, top set + one back-off",
+      "sets_per_movement": 2,
+      "max_movements": 4,
+      "est_minutes_per_set": 2.5,
+      "back_off_pct": -10,
+      "from": "owner_redlines lifting_sessions_per_wk.minimum_viable_session, tightened to 20 minutes for disruption weeks (#5088)"
+    },
+    "rule": "the next session is the one after the last performed lift, whatever the date"
+  },
+  "volume_priorities": {
+    "sets_per_wk": {
+      "side_rear_delts": [14, 18],
+      "lats": [14, 18],
+      "upper_chest": [14, 18],
+      "legs": [8, 10],
+      "arms": [10, 14]
+    },
+    "legs_posture": "strong maintenance",
+    "mev_floors_in_every_template": ["side_rear_delts", "traps", "calves", "core"]
+  },
+  "steps": {
+    "floor": 12000,
+    "target": 15000,
+    "every_day": true,
+    "lifting_days_included": true,
+    "ramp": {
+      "from": "the trailing average over `ramp_window_days`",
+      "ramp_window_days": 14,
+      "owner_adjustable": ["ramp_window_days"],
+      "held_by": "a lower-leg strain flag holds the ramp at its current level"
+    },
+    "gym_cardio_minutes_count_toward_movement": true,
+    "note": "walking carries the volume; gym cardio is deliberate, from the menu"
+  },
+  "cardio_menu": {
+    "default": "incline_treadmill_walk",
+    "conditioning_sessions_per_wk": 2,
+    "every_block_carries": ["level", "speed", "rpe_or_talk_test"],
+    "progression": "same RPE at a higher level",
+    "blocks": {
+      "easy": {"rpe": [4, 5], "talk_test": "full sentences", "machines": ["cycling", "elliptical", "rowing_machine"]},
+      "tempo": {"label": "hard flat 40", "rpe": [6, 7], "minutes": 40, "talk_test": "short phrases", "machines": ["cycling", "elliptical", "rowing_machine"]},
+      "hills": {"rpe": [5, 7], "talk_test": "short phrases on the climbs", "shape": "incline then decline", "machines": ["treadmill", "cycling", "elliptical"]},
+      "intervals": {"rpe_hard_minutes": 8, "note": "RPE 8 on the hard minutes; open by RPE / talk test", "talk_test": "a few words on the hard minutes", "work_easy_minutes": [2, 2], "efforts": 5, "machines": ["cycling", "air_bike", "rowing_machine", "elliptical"]},
+      "incline_treadmill_walk": {
+        "rpe": [4, 6],
+        "default": true,
+        "talk_test": "full sentences",
+        "machines": ["treadmill"],
+        "starting_dose": {"incline_pct": [8, 12], "mph": [2.5, 3.0]},
+        "step": {"incline_pct": 1, "mph": 0.1}
+      },
+      "kettlebell_swings_and_circuits": {"available": "now", "prescribed_by": "RPE / talk test"},
+      "run_walk": {
+        "on": "treadmill",
+        "rpe_from": "easy",
+        "talk_test": "full sentences on the walk, short phrases on the run",
+        "gated_by": "gated_movements.running",
+        "placed_by": "training.run_onramp once the run gate is open: an easy slot only, never a conditioning slot",
+        "dose": "gated_movements.running.onramp.levels"
+      }
+    },
+    "placement": {
+      "conditioning_order": ["tempo_or_hills", "intervals"],
+      "the_rest": "easy",
+      "recumbent_after": ["a lower day", "a heavy walking weekend"],
+      "never_consecutive": "the same hard shape",
+      "rule": "conditioning 2x/wk (one tempo-or-hills, one intervals), every other block easy; the recumbent after a lower day or a heavy walking weekend; never the same hard shape on consecutive days"
+    },
+    "movement_minutes": "gym cardio minutes count toward the daily steps/movement goal (steps.gym_cardio_minutes_count_toward_movement)"
+  },
+  "deload": {
+    "scheduled": false,
+    "automatic": false,
+    "owner_gated": true,
+    "recommendation_triggers": ["rpe_drift", "recovery", "event_signals"],
+    "applied_only_on": "the owner's recorded word",
+    "note": "fatigue signals become a recommendation; a deload happens only on his recorded word (owner ruling 2026-10-18)"
+  },
+  "effort_ceilings": {
+    "by_movement_class": {
+      "compounds_rpe": [8, 9],
+      "last_isolation_set_rpe": [9, 10]
+    },
+    "ceiling_is": "the high end of the set's class band: the band is the prescription, its top is the ceiling a set is graded against",
+    "overage_tolerance_rpe": 1,
+    "overage_rule": "within +1 RPE of the ceiling is not a breach",
+    "ceiling_change_proposal": {
+      "when": "a ceiling is beaten on more than 50% of sets two weeks running",
+      "share_of_sets": 0.5,
+      "weeks_running": 2,
+      "effect": "proposes a ceiling change (an owner ruling applies it)"
+    }
+  },
+  "progression": {
+    "gain_rule": {
+      "kind": "double_progression",
+      "trigger": "the top of the slot's rep range on the top set of 2 consecutive same-type exposures (heavy -> heavy, volume -> volume), each logged at or under the movement's effort ceiling",
+      "consecutive_same_type_exposures": 2,
+      "step_lb": 5,
+      "step_pct": 2.5,
+      "size": "+2.5 % of the load in whole 5-lb steps, never less than one 5-lb step; reps back to the bottom of the range",
+      "reps_after_step": "bottom_of_range",
+      "rpe_role": "veto only — a top-of-range set logged above the movement's effort ceiling (or with no RPE logged) does not count toward the trigger",
+      "nutrition_clause": null,
+      "refused_when": [
+        "recovery < 50",
+        "sleep < 6.5 h",
+        "the week after a rate-over-cap flag",
+        "the first three exposures of a novel-again pattern",
+        "a deload the owner applied"
+      ],
+      "provenance": "owner",
+      "stated": "2026-09-30",
+      "ruling": "#4503 OD5"
+    },
+    "self_raised_load": {
+      "rule": "a load the owner raised himself, logged at or under the movement's effort ceiling (an overage within `effort_ceilings.overage_tolerance_rpe` is not a breach), becomes the next floor and is graded `progressed` — a named state, never folded into an adherence percentage",
+      "above_the_ceiling": "a raised load logged above the ceiling plus the tolerance is a breach and never becomes a floor"
+    },
+    "ceiling_tier": {
+      "compounds": "the high end of `effort_ceilings.by_movement_class.compounds_rpe` (`effort_ceilings.ceiling_is`, #5058)",
+      "last_isolation_set": "the high end of `effort_ceilings.by_movement_class.last_isolation_set_rpe`; an isolation movement's earlier sets read the compounds band",
+      "refs": "#5058"
+    },
+    "stall_rule": {
+      "verdict": "step_due",
+      "consecutive_exposures": 3,
+      "max_rpe": 8,
+      "rpe_basis": "self-reported: the RPE he logged on the top set (the first working set at the session's heaviest load); an unlogged RPE is not evidence",
+      "trigger": "the top set's load and reps are identical on the last 3 consecutive same-type exposures, each logged at RPE 8 or lower",
+      "rep_step_max": 2,
+      "step": "below the top of the slot's rep range: up to `rep_step_max` more reps at the same load, never past the top; at the top of the range (or with no range on file): the gain rule's load step (`gain_rule.step_pct` in whole `gain_rule.step_lb` steps), reps back to the bottom",
+      "not_a_stall": "step_due is the prescription's failure to progress, not his: it never fires when he fell short of a prescription on file, and it never fires under a refusal (re-entry, a deload the owner applied)",
+      "precedence": "after the gain rule's step; before a floor raise (repeating the same load is what it ends)",
+      "provenance": "owner",
+      "stated": "2026-10-18",
+      "ruling": "owner-requested elite-panel training review 2026-10-18 (#5057)"
+    }
+  },
+  "rotation": {
+    "anchors_fixed_weeks": 6,
+    "accessory_slots_rotate_every_weeks": 3,
+    "pool_seeded_from": "the owner's Hevy history",
+    "pool": {
+      "traps": ["barbell shrug"],
+      "second_press": ["incline barbell press", "dumbbell flat press", "decline machine press"],
+      "rows": ["chest-supported T-bar row", "seated cable row"],
+      "vertical_pull": ["assisted pull-up", "assisted chin-up"],
+      "hinge": ["stiff-leg deadlift", "Romanian deadlift"],
+      "single_leg_progression": ["supported split squat", "reverse lunge", "Bulgarian split squat"],
+      "carries": ["farmer carry", "suitcase carry"],
+      "delts": ["lateral raise", "face pull"],
+      "core": ["Pallof press"]
+    }
+  },
+  "gated_movements": {
+    "conventional_deadlift": {"gate_lb": 275, "until_then": "trap bar"},
+    "power_clean": {"revisit_at_lb": 250},
+    "running": {
+      "gate_lb": 240,
+      "prerequisites": ["four weeks pain-free walking", "Stage 4 of the run/walk on-ramp completed"],
+      "walking_weeks": 4,
+      "walking_hours_per_wk": 8.5,
+      "walking_basis": "weight-bearing walking hours (training.walking_volume, the walking modality: Strava walks/hikes plus Hevy treadmill/walking blocks, de-duplicated), consecutive completed weeks, each without a lower-leg pain flag",
+      "reading": "at or under the gate weight with the walking weeks met, the gate OPENS the run/walk on-ramp (Stage 4); continuous running is unlocked when Stage 4 is completed (onramp.complete_when)",
+      "onramp": {
+        "stage": 4,
+        "where": "treadmill first",
+        "levels": [
+          {"level": 1, "run_min": 1, "walk_min": 2, "rounds": 7},
+          {"level": 2, "run_min": 2, "walk_min": 2, "rounds": 6},
+          {"level": 3, "run_min": 3, "walk_min": 2, "rounds": 5},
+          {"level": 4, "run_min": 5, "walk_min": 2, "rounds": 4},
+          {"level": 5, "run_min": 8, "walk_min": 2, "rounds": 3},
+          {"level": 6, "run_min": 12, "walk_min": 2, "rounds": 2},
+          {"level": 7, "run_min": 20, "walk_min": 0, "rounds": 1},
+          {"level": 8, "run_min": 30, "walk_min": 0, "rounds": 1}
+        ],
+        "advance_rule": {
+          "sessions_at_level": 2,
+          "rpe_max_from": "cardio_menu.blocks.easy.rpe (its top)",
+          "pain_free": true,
+          "rule": "two sessions at a level, each logged at or under the easy block's top RPE and with no lower-leg pain flag, advance one level; an unlogged RPE is not evidence"
+        },
+        "complete_when": "the last level completed twice under the advance rule",
+        "max_runs_per_wk": 2,
+        "not_within_h_of_heavy_lower": 24,
+        "spacing_rule": "no run on a heavy lower day, nor on the session before or after it in split.sequence (day-level reading of 24 h)",
+        "held_by": "a lower-leg strain flag (training.steps_ramp: a strain flag or an active standing constraint) pauses the run/walk — no run is placed, the same impact rule that pauses the pogo hops — and holds the on-ramp at its level: no session dated on or after the flag counts, and the level earned before it is kept",
+        "history_from": "2026-10-18",
+        "history_from_why": "the owner's ruling that put running in the plan: no on-ramp session exists before it, so a Stage 4 reader reads back to this day and an early level never ages out of a rolling window",
+        "counts_toward_movement": "run/walk minutes count toward the daily movement goal (steps.gym_cardio_minutes_count_toward_movement)",
+        "provenance": "owner ruling 2026-10-18 (running in the May plan, by RPE / talk test); the level table and the spacing reading are platform-chosen"
+      },
+      "refs": "#5090"
+    },
+    "lower_leg_prep": {
+      "from_lb": 260,
+      "carve_out_from_plyometrics_exclusion": ["low-amplitude pogo hops", "calf work", "tibialis work", "brisk incline walking"],
+      "carve_out_catalog_keys": ["low_pogos"],
+      "prescription": [
+        {"item": "calf work", "catalog_keys": ["standing_calf_raise_machine", "calf_raise_machine", "seated_calf_raise"], "sets": 2, "reps": [12, 20], "rpe": [6, 7]},
+        {"item": "tibialis work", "catalog_keys": [], "sets": 2, "reps": [15, 20], "rpe": [5, 6], "cue": "toes-up raises, back to a wall"},
+        {"item": "low-amplitude pogo hops", "catalog_keys": ["low_pogos"], "sets": 2, "reps": [15, 20], "rpe": [3, 4], "cue": "ankle-only bounce, heels barely leave the floor; stop on any shin or heel pain"}
+      ],
+      "incline_walking": "the menu's default block (cardio_menu.blocks.incline_treadmill_walk) is the brisk incline walking",
+      "placement": "lower days (the split.sequence names opening 'lower'), after the lifting",
+      "held_by": "a lower-leg strain flag holds the pogo hops (the calf and tibialis work stay)",
+      "note": "the carve-out is limited to the list; everything else plyometric stays excluded"
+    },
+    "kettlebell_swings_and_circuits": {"available": "now", "prescribed_by": "RPE / talk test"}
+  },
+  "equipment": {
+    "assumed": "full commercial club — machines, cables, plate-loaded, T-bar, dumbbells to heavy, kettlebells, sled, full cardio deck",
+    "not_available": [],
+    "owner_editable": ["not_available"],
+    "rule": "the club is never named in this repo"
+  },
+  "travel": {
+    "windows": [
+      {"label": "late December 2026", "start": null, "end": null, "templates": "#5088"}
+    ],
+    "rule": "travel templates by mid-December; no calendar blocking"
+  },
+  "disruption": {
+    "owner_switched": true,
+    "imposed": false,
+    "rule": "the owner switches the mode on and off; the coach OFFERS it and never applies it (owner ruling 2026-10-18, #5088)",
+    "holds": ["steps.floor", "protein_floor", "sleep_floor", "one short session"],
+    "templates": {
+      "travel": {"sessions_per_wk": [2, 3], "pools": ["hotel", "bodyweight"], "note": "a resort/hotel gym first, bodyweight when there is none"},
+      "busy": {"sessions_per_wk": [1, 5], "pools": ["gym_minimum", "bodyweight"], "note": "the 20-minute minimum at the usual club"}
+    },
+    "step_back_up": {"days": 7, "serves": "the minimum session at the club", "then": "the full split"},
+    "offer": {"travel_lead_days": 3, "missed_session_days": 4},
+    "max_days": 28
+  },
+  "calibration": {
+    "tape_and_photos": {"every_weeks": 2, "dead_man_missed_cycles": 2},
+    "dexa": {"every_weeks_approx": 12},
+    "fitness_tests": {
+      "every_weeks": 6,
+      "battery": ["6-minute walk", "20-minute bike at RPE 6", "dead hang", "assisted pull-up assistance"],
+      "protocol_version": "1",
+      "aligned_to": "the block: a battery is due in the program week that closes each block (program week a whole multiple of every_weeks)",
+      "early_days_credited": 7,
+      "grace_weeks": 1,
+      "dead_man": "a due week passed with no battery is overdue for grace_weeks, then missed; missed is the dead-man state",
+      "test_day": {
+        "role": "Shoulders+arms",
+        "never_on": ["Lower-heavy", "Lower-volume"],
+        "session": "the role's minimum session (split.minimum_session) plus the tests in `order`",
+        "why": "the lightest day of the split carries the tests, so no heavy leg work blunts the walk or the bike"
+      },
+      "order": ["six_minute_walk", "dead_hang", "assisted_pull_up", "minimum_session", "bike_20min_rpe6"],
+      "tests": {
+        "six_minute_walk": {
+          "label": "6-minute walk",
+          "catalog_key": "treadmill",
+          "unit": "m",
+          "better": "higher",
+          "duration_s": 360,
+          "hevy_field": "distance_m",
+          "protocol": "Treadmill at 0 % incline, no handrails, no running: the fastest steady walk you can hold for 6 minutes. Log the distance.",
+          "hevy": "a Treadmill set of about 6 minutes with a distance"
+        },
+        "bike_20min_rpe6": {
+          "label": "20-minute bike at RPE 6",
+          "catalog_key": "cycling",
+          "unit": "m",
+          "better": "higher",
+          "duration_s": 1200,
+          "hevy_field": "distance_m",
+          "protocol": "The same bike every time (note which). 20 minutes held at RPE 6, short sentences only. Log the distance.",
+          "hevy": "a Cycling set of about 20 minutes with a distance"
+        },
+        "dead_hang": {
+          "label": "dead hang",
+          "catalog_key": "dead_hang",
+          "unit": "s",
+          "better": "higher",
+          "hevy_field": "duration_sec",
+          "protocol": "Overhand grip, shoulder width, feet off the floor, one attempt until the grip goes. Log the seconds.",
+          "hevy": "the longest Dead Hang set"
+        },
+        "assisted_pull_up": {
+          "label": "assisted pull-up assistance",
+          "catalog_key": "pull_up_assisted",
+          "unit": "lb",
+          "better": "lower",
+          "reps": 5,
+          "hevy_field": "weight_lb",
+          "protocol": "Assisted pull-up machine: the least assistance at which 5 clean reps (full hang, chin over the bar) complete. Start at the last test's assistance. Log the assistance.",
+          "hevy": "the least assistance on a Pull Up (Assisted) set of at least 5 reps"
+        }
+      },
+      "provenance": "the battery and its cadence: owner direction 2026-10-18 (#5078); the protocol detail (units, machines, order, test day): platform-proposed for the owner's review"
+    },
+    "block_retro": {"every_weeks": 6, "scorecard_rows": 13}
+  },
+  "concession_ledger": {
+    "nippard": {"concedes": "a faster deficit than it would pick", "in_return": "double progression, stretch-position work, rotation"},
+    "athlean_x": {"concedes": "looks-first over athletic carryover", "in_return": "corrective work, carries, single-leg work"},
+    "rp_israetel": {"concedes": "no scheduled deload and legs at maintenance", "in_return": "rising volume on shoulders, lats and upper chest plus MEV floors"},
+    "sbs_nuckols": {"concedes": "a deadline-set loss rate", "in_return": "coded progression and strength tracking that catches muscle loss early"},
+    "galpin": {"concedes": "no deload rhythm", "in_return": "weekly fatigue flags and a real hard/easy cardio split"},
+    "dan_john": {"concedes": "machines and isolation in the mix", "in_return": "carries and kettlebell work weekly"},
+    "hollywood_transformation_trainer": {"concedes": "nothing", "in_return": "gets the frame, the deadline, the steps and the session length"},
+    "clinical_exercise_physiologist": {"concedes": "fast loss alongside 5 lifting days", "in_return": "weekly strength, sleep and fat-free-mass tracking, effort by RPE"}
+  },
+  "panel_target": {
+    "overall": "A",
+    "every_seat_at_least": 9,
+    "out_of": 10,
+    "rule": "every seat scores at least 9/10 with its concession named"
+  },
+  "nutrition": {
+    "calories": {
+      "target_kcal": 2100,
+      "prescribed_band_kcal": [2000, 2100],
+      "floor_any_day_kcal": 1600,
+      "floor_lifting_day_kcal": 1900,
+      "floor_7d_mean_kcal": 1800,
+      "planned_minimum_any_weight_kcal": 1700,
+      "resolver": "health.calorie_target.resolve",
+      "reading": "target_kcal is the day's calorie target (panel default R1: eat up to the prescribed band now). A titration record for the week outranks it; the any-day floor clamps any resolved value. The lifting-day and any-day floors grade single days; the 7-day-mean floor is reported, not enforced.",
+      "provenance": "population-derived",
+      "derived_by": "red-team consensus 2026-09-22 (physician + nutritionist floors; the calibrated model's 'highest intake that reproduces the trajectory')",
+      "stated": "2026-09-22"
+    },
+    "expenditure": {
+      "disagreement_threshold_kcal": 300,
+      "min_logged_days": 7,
+      "compared": ["macrofactor_adaptive", "platform_measured", "platform_flat"],
+      "against": "scale-trend-implied expenditure: mean logged intake over the shared 14-day loss-rate window + 3500 kcal per lb of that rate, per day",
+      "owner": "health/expenditure_reconciler.py (#5097)"
+    },
+    "protein": {
+      "range_g": {"low": 170, "high": 200},
+      "range_note": "low is the plan's floor (config/user_goals.json targets.nutrition.daily_protein_min_g, generated into common.constants.PLAN_DAILY_PROTEIN_MIN_G; a contract test holds the three equal); high is the target the redlines name",
+      "days_of_7": 6,
+      "feedings_per_day": 4,
+      "feeding_threshold_g": 40,
+      "feeding_target_g": [45, 55],
+      "feeding_merge_minutes": 30,
+      "hit": "a day is a hit when its logged total is at or above range_g.low, strictly: no tolerance below the floor until the owner rules one (#5003). An unlogged day is unknown, never a miss",
+      "feeding_rule": "food-log rows within feeding_merge_minutes of a feeding's first row are one feeding; a feeding counts when its protein is at or above feeding_threshold_g. A day with no timed rows has an unknown feeding count, never 0",
+      "fasting_window": "relaxed (panel default, pending R2): an early first feeding is wanted, not a breach; the eating-window field itself is the calorie-band lane's",
+      "breakfast_nudge": {
+        "cutoff_pt": "10:00",
+        "window_end_pt": "12:00",
+        "max_per_day": 1,
+        "channel": "owner email on the coach-nudge hourly tick",
+        "rule": "behind when no feeding at or above feeding_threshold_g is logged at or before the later of the cut-off and the tick; the day's MacroFactor row is an end-of-day upload, so the same-day read is the timed protein entries Health Auto Export delivers intraday (#5187); when neither exists the note withholds (no_same_day_log): an absent record at breakfast is lag, not a missed feeding; untimed rows withhold the note (unknown)"
+      },
+      "basis": "built on the panel default, pending R2 (#5091)"
+    },
+    "titration": {
+      "read": "the shared 14-day least-squares loss rate (mcp.shared_quantities.loss_rate_lb_wk, water weeks excluded), read weekly",
+      "trend_days": 14,
+      "trend_days_rule": "must equal mcp.shared_quantities.LOSS_RATE_WINDOW_DAYS (the window the trend is read over); on a mismatch the run withholds the trend and the week holds (trend_window_mismatch), and tests/test_titration_engine_5096.py asserts they agree",
+      "not_before_day": 21,
+      "never_on_a_week_with_fewer_complete_logs_than": 6,
+      "consecutive_out_of_band_reads": 2,
+      "act_on": "consecutive_out_of_band_reads weekly reads on the same side of the band",
+      "min_step_kcal": 100,
+      "max_step_kcal": 150,
+      "step_rounding_kcal": 50,
+      "kcal_per_lb_wk": 500,
+      "step_sizing": "the miss (lb/wk outside the band edge) x kcal_per_lb_wk, rounded to step_rounding_kcal, held inside min_step_kcal..max_step_kcal",
+      "min_days_between_steps": 14,
+      "steps_before_food": {
+        "rule": "below the band floor, food comes down only when the trailing steps mean is at or above steps.floor; otherwise the week holds and the cue is the steps floor. This precondition is added ON TOP of walking_first, built on the panel interpretation, pending an owner ruling (#5091)",
+        "steps_window_days": 7,
+        "steps_floor_path": "steps.floor"
+      },
+      "walking_first": {
+        "rule": "the redlines' owner rule (feet before fork): below the floor with steps at the floor, the first confirmed read is a walking-first hold (the cue is the rule's walking action); food comes down only on a later read at least min_days_between_steps after it, with the run unbroken (never both inside the spacing)",
+        "action_path": "tripwire:loss_insufficient_adherent.action"
+      },
+      "complete_logs": {
+        "rule": "a complete day is one whose logged calories are at or above the redlines' dark-day line (a day under it is dark, not complete); the first step also waits for the redlines' run of complete days before the first titration",
+        "complete_day_min_kcal_path": "logging_completeness.dark_day_kcal",
+        "complete_days_before_first_step_path": "logging_completeness.complete_days_before_first_titration"
+      },
+      "band_source": {
+        "above_landing": "governing_goal.rate_band_lb_per_wk (training.rate_band.band, the clinical guidance cap applied)",
+        "from_landing_down": "owner_redlines rate_schedule_lb_wk step at the bodyweight (training.redline_rate.rate_schedule_step): target to cap"
+      },
+      "expected_path": "2,100 to 275 → 2,000 to 240 → 1,950 to 220 → rising to 2,000–2,150 through the landing → ~2,700–2,800 at maintenance (model; measure RMR)",
+      "never_below": "nutrition.calories.planned_minimum_any_weight_kcal",
+      "insufficient_data": "no measured trend, a provisional trend window, no weigh-in, an unreadable band or guidance record, an unreadable rule value, or too few complete logs: the week holds with reason insufficient_data, never a guess",
+      "record": {"pk": "USER#matthew#SOURCE#nutrition_titration", "sk": "WEEK#<iso-monday>", "writer": "lambdas/health/titration.py via mcp/titration_leg.py on the nightly pre-draft run (Friday to Sunday nights, the first write for the coming week stands)"},
+      "dead_man": {"armed_from": "2026-11-03", "rule": "no record for the current week once armed: an owner-only alert (the calibration sweep's dead-man, token NUTRITION_TITRATION_MISSED)"},
+      "basis": "the redlines' titration rule, owner-approved v0.3 (#3753); the weekly refit built on the panel default, pending R1 (#5091)"
+    },
+    "training_day": {
+      "lifting_uplift_kcal": 150,
+      "balance": "the week averages the base target: a rest day takes -(uplift x lifting days / rest days) so the uplift is paid for inside the week (5 lifting / 2 rest: -375); travel and unknown days stay at the base. A day clamped by its floor is reported balance_held false. A typed week with lifting days but no rest day (travel fills the rest) cannot pay the uplift and is reported balance_held false too",
+      "fat_pct_of_base_kcal": 30,
+      "split_rule": "protein = nutrition.protein.range_g.low and fat = fat_pct of the base target, both held every day; the uplift and the offset are carbohydrate",
+      "pre_session": {
+        "carb_g": 40,
+        "protein_g": 20,
+        "minutes_before": [
+          60,
+          90
+        ]
+      },
+      "post_session": {
+        "carb_g": 60,
+        "protein_g": 40,
+        "minutes_after": 60,
+        "note": "the post-session protein is one of the four feedings (nutrition.protein.feeding_threshold_g)"
+      },
+      "travel_day": "no uplift and no rest-day offset: the base target holds; pre and post targets still apply when a session is done",
+      "day_type": "lifting | rest | travel | unknown: travel from a travel disruption or charter travel window; else lifting/rest from the per-date training calendar (training.training_calendar, #5191: the week's credited program sessions are lifting days, the sessions still owed to split.lifting_days_per_wk are laid on the remaining dates, nominal lifting weekdays first, every other date rest; a rest-day postponement moves a session inside the week and does not change the week's count while days remain); else unknown (base target, never a guessed rest day) when the Hevy record or the count cannot be read, with the lifting uplift and the rest offset stated as conditional",
+      "surface": "owner-only: the plan_next_session constraint block (training_day_fuel) and the coach packet; no public surface",
+      "basis": "built on the panel default, pending R1 (#5091)"
+    },
+    "labs": {
+      "_note": "The follow-up draw cadence only (#5111). Dates and weeks; no result, name or priority lives here. The owner-only due date, when no draw is readable, is the private twin's lab_followup.next_draw_on.",
+      "follow_up_weeks": 16,
+      "reminder_lead_days": 14
+    },
+    "floors": {
+      "fat": {"floor_g": 65, "unit": "g", "per_meal_g": 10, "meals_with_fat": 3, "epa_dha_g": 2},
+      "carb": {"floor_g": 120, "unit": "g", "typical_g": [150, 180]},
+      "fibre": {"floor_g": 35, "unit": "g", "target_range_g": [35, 40]},
+      "hit": "a day meets a floor when its logged total is at or above it, strictly. A missing field is unknown, never a miss (health.macro_floors)",
+      "grade_weight": "the three floors share the nutrition component's macro-split slot (0.20); calories 0.40 and protein 0.40 are untouched (docs/engines/SCORING.md)",
+      "provenance": "population-derived",
+      "derived_by": "red-team consensus 2026-09-22 (nutritionist, physician and S&C coach); moved from owner_redlines.py by #5102"
+    },
+    "concession_ledger": {
+      "evidence_based_hypertrophy_nutrition": {"concedes": "a deeper deficit than a muscle-first cut would pick", "in_return": "the protein range every day, the fat and carbohydrate floors held, training-day fuel"},
+      "flexible_dieting": {"concedes": "a fixed feeding count on top of the daily totals", "in_return": "daily totals that come from the one resolver, a split that adds up to them and a week that balances"},
+      "protein_lean_mass": {"concedes": "protein counted from a log, not a weighed meal plan", "in_return": "four feedings at the per-feeding threshold, the post-session protein counted as one"},
+      "appetite_food_environment": {"concedes": "a calorie target instead of a food-quality-only approach", "in_return": "the fibre floor, a fixed feeding rhythm and no day under its floor"},
+      "energy_balance_metabolism": {"concedes": "a population-derived starting target", "in_return": "a weekly refit against the measured trend in small, bounded steps"},
+      "obesity_medicine": {"concedes": "a faster rate than it would start with", "in_return": "floors on every day and on the week, and steps before food"},
+      "sports_dietitian": {"concedes": "no per-session periodised carbohydrate plan", "in_return": "a lifting-day uplift with pre and post session fuel, paid back inside the week"},
+      "behaviour_change_psychologist": {"concedes": "numeric targets over intuitive eating", "in_return": "a few repeatable rules, calorie changes no bigger than the step cap, every number with its reason"},
+      "studio_nutritionist": {"concedes": "nothing", "in_return": "gets the deadline pace, the weekly refit and the training-day fuel"}
+    }
+  }
+}

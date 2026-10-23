@@ -28,6 +28,14 @@ THE VERDICTS
                  inside its own noise band. Names both numbers in ``reason``.
 ``progressing``  net e1RM rose beyond that lift's own session-to-session noise.
 ``regressing``   net e1RM fell beyond it.
+``step_due``     (#5057) the top set's load × reps is identical on the last 3
+                 consecutive exposures, each at self-reported RPE <= 8 (both numbers are
+                 the charter's ``progression.stall_rule``), and none fell short of a
+                 prescription on file. It is NOT a stall: it is the PRESCRIPTION's failure
+                 to progress, not his — so it is callable at a fixed prescription, the one
+                 window ``stall`` refuses. The verdict carries ``step``, the proposed step
+                 from ``training.load_progression.stall_step`` (the one progression), with
+                 the reason naming the dates; ``basis`` is ``self-reported RPE``.
 ``unknown``      every other state — and deliberately the state a matched, fixed
                  prescription lands in. ``unknown`` is a real answer here, not a
                  failure: "we cannot tell from this window" has never been the
@@ -49,7 +57,9 @@ never consulted it carries ``basis: "measured load × reps"``. The field is on t
 verdict, not in prose, so a downstream renderer cannot drop the label while
 keeping the number.
 
-NO I/O. The module is pure: dataclasses in, dict out, no clock, no AWS, no model.
+NO I/O. The module is pure: dataclasses in, dict out, no clock, no AWS, no model. The one
+read is the bundled charter (``step_due``'s thresholds and step size, via
+``training.load_progression``; cached, fail-soft — an unreadable charter is no ``step_due``).
 The fetch half lives at the call site (``mcp/tools_hevy_routine.py`` action
 ``stall_check``), which is what makes every branch below directly fixture-testable.
 """
@@ -64,6 +74,7 @@ VERDICT_STALL = "stall"
 VERDICT_PROGRESSING = "progressing"
 VERDICT_REGRESSING = "regressing"
 VERDICT_UNKNOWN = "unknown"
+VERDICT_STEP_DUE = "step_due"  # #5057: the prescription's failure to progress — never a stall
 
 # ── Bases (the label on the input a verdict actually leaned on) ───────────────
 BASIS_MEASURED = "measured load × reps"
@@ -73,6 +84,9 @@ BASIS_SELF_REPORTED_RPE = "self-reported RPE"
 MATCH_AS_PRESCRIBED = "as_prescribed"
 MATCH_DEVIATED = "deviated"
 MATCH_UNREADABLE = "unreadable"
+# #5052: he carried MORE than the prescribed load, logged at or under the charter effort limit for the movement
+# (`training.load_progression`) — progress, not a deviation. Only when the caller supplies the limit.
+MATCH_PROGRESSED = "progressed"
 
 # ── Thresholds (every one is a window or an n, never a verdict) ───────────────
 MIN_SESSIONS = 3  # two deltas is the floor for any personal noise scale
@@ -101,13 +115,21 @@ class SessionPoint:
     rpe: float | None = None
     prescribed_load_kg: float | None = None
     prescribed_reps: int | None = None
+    progression_limit_rpe: float | None = None  # #5052: the charter effort limit; None = the pre-#5052 three states
 
     def match(self) -> str:
-        """as_prescribed | deviated | unreadable — the per-session diff verdict."""
+        """as_prescribed | progressed | deviated | unreadable — the per-session diff verdict."""
         if self.prescribed_load_kg is None or self.prescribed_reps is None:
             return MATCH_UNREADABLE
         if self.load_kg is None or self.reps is None:
             return MATCH_UNREADABLE
+        if (
+            self.progression_limit_rpe is not None
+            and self.rpe is not None
+            and float(self.load_kg) > float(self.prescribed_load_kg) + LOAD_TOLERANCE_KG
+            and float(self.rpe) <= float(self.progression_limit_rpe)
+        ):
+            return MATCH_PROGRESSED
         load_same = abs(float(self.load_kg) - float(self.prescribed_load_kg)) <= LOAD_TOLERANCE_KG
         reps_same = int(self.reps) == int(self.prescribed_reps)
         return MATCH_AS_PRESCRIBED if (load_same and reps_same) else MATCH_DEVIATED
@@ -179,6 +201,7 @@ def diff_prescribed_vs_performed(
     ir: Any,
     performed_sets_by_template: dict[str, list[dict[str, Any]]],
     template_for: dict[str, str] | None = None,
+    limit_for: dict[str, float | None] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Per-movement prescribed-vs-performed diff for ONE session.
 
@@ -195,6 +218,10 @@ def diff_prescribed_vs_performed(
     performed_load_kg, performed_reps, performed_rpe, match}}``. A movement the
     routine prescribed and he never performed is reported with performed values None
     and ``match: "unreadable"`` — absence is absence, never compliance (ADR-104).
+
+    ``limit_for`` (#5052) maps ``movement_key`` → the charter effort limit for its class
+    (``load_progression.grading_limits``); with it, a heavier-than-prescribed top set at or
+    under the limit reads ``progressed`` instead of ``deviated``.
     """
     tmap = dict(template_for or {})
     performed_by_tid = {str(k): (v or []) for k, v in (performed_sets_by_template or {}).items()}
@@ -217,15 +244,9 @@ def diff_prescribed_vs_performed(
             "performed_load_kg": did["weight_kg"],
             "performed_reps": did["reps"],
             "performed_rpe": did["rpe"],
+            "progression_limit_rpe": (limit_for or {}).get(key),
         }
-        row["match"] = SessionPoint(
-            date=str(getattr(ir, "target_date", "") or ""),
-            load_kg=did["weight_kg"],
-            reps=did["reps"],
-            rpe=did["rpe"],
-            prescribed_load_kg=prescribed["weight_kg"],
-            prescribed_reps=prescribed["reps"],
-        ).match()
+        row["match"] = session_point_from_diff(str(getattr(ir, "target_date", "") or ""), row).match()
         out[key] = row
     return out
 
@@ -239,6 +260,7 @@ def session_point_from_diff(date: str, row: dict[str, Any]) -> SessionPoint:
         rpe=row.get("performed_rpe"),
         prescribed_load_kg=row.get("prescribed_load_kg"),
         prescribed_reps=row.get("prescribed_reps"),
+        progression_limit_rpe=row.get("progression_limit_rpe"),
     )
 
 
@@ -284,6 +306,7 @@ def _prescription_summary(points: list[SessionPoint]) -> dict[str, Any]:
     return {
         "sessions_compared": len(points),
         "as_prescribed": matches.count(MATCH_AS_PRESCRIBED),
+        "progressed": matches.count(MATCH_PROGRESSED),
         "deviated": matches.count(MATCH_DEVIATED),
         "unreadable": matches.count(MATCH_UNREADABLE),
         "prescription_varied": len(prescriptions) > 1,
@@ -299,12 +322,34 @@ def _fixed_prescription_label(points: list[SessionPoint]) -> str:
     return f"{round(float(p.prescribed_load_kg or 0), 2)} kg × {int(p.prescribed_reps or 0)}"
 
 
+def _as_session(p: SessionPoint) -> dict[str, Any]:
+    """One detector point in the `exercise_history` session shape `load_progression` reads."""
+    return {
+        "date": p.date,
+        "sets": [{"weight_kg": p.load_kg, "reps": p.reps, "rpe": p.rpe}],
+        "prescribed_kg": p.prescribed_load_kg,
+        "prescribed_reps": p.prescribed_reps,
+    }
+
+
+def step_due(points: list[SessionPoint], rep_range: tuple[int, int] | None = None) -> dict[str, Any] | None:
+    """The stall rule's proposed step for this window (oldest first), or None (#5057).
+
+    Delegates to ``load_progression.stall_step`` — the ONE progression; this module never
+    sizes a step. ``rep_range`` (the slot's bottom/top) picks a rep step below the top; without
+    it the step is the load step at the same reps."""
+    from training import load_progression as lp
+
+    return lp.stall_step([_as_session(p) for p in reversed(points)], rep_range=rep_range)
+
+
 def assess_stall(
     points: Iterable[SessionPoint],
     *,
     movement_key: str = "",
     min_sessions: int = MIN_SESSIONS,
     noise_k: float = NOISE_K,
+    rep_range: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     """Call — or refuse to call — a stall on ONE movement.
 
@@ -337,7 +382,22 @@ def assess_stall(
         result.update(extra or {})
         return result
 
-    # 1. Not enough sessions for any trend claim, in either direction.
+    # 1. #5057: the same top-set load × reps at an easy self-reported RPE, exposure after
+    #    exposure, is the PRESCRIPTION failing to progress — a claim about the plan, so it is
+    #    callable where `stall` (a claim about him) is refused, including with no plan on file.
+    #    It runs BEFORE the trend floor: `stall_step` enforces the charter's own
+    #    `progression.stall_rule.consecutive_exposures`, so lowering that never hides behind MIN_SESSIONS.
+    step = step_due(pts, rep_range)
+    if step is not None:
+        return _out(
+            VERDICT_STEP_DUE,
+            f"Step due, not a stall: {step['reason']}. The prescription held still while he had room "
+            "(RPE is his own rating, not a measurement); the next draft carries the step.",
+            used_rpe=True,
+            extra={"step": step},
+        )
+
+    # 1b. Not enough sessions for any trend claim, in either direction.
     if len(pts) < min_sessions:
         return _out(VERDICT_UNKNOWN, f"{len(pts)} session(s) — below the {min_sessions}-session floor for a trend claim.")
 
@@ -352,7 +412,7 @@ def assess_stall(
 
     # 3. He did exactly what the platform prescribed, and the prescription never moved.
     #    e1RM is constant BY CONSTRUCTION here; the series is the prescription read back.
-    if presc["deviated"] == 0 and presc["unreadable"] == 0 and not presc["prescription_varied"]:
+    if presc["deviated"] == 0 and presc["progressed"] == 0 and presc["unreadable"] == 0 and not presc["prescription_varied"]:
         label = _fixed_prescription_label(pts)
         reason = (
             f"Every one of these {len(pts)} sessions was performed exactly as prescribed, at a fixed "

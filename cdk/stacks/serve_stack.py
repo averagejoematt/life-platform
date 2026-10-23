@@ -40,7 +40,7 @@ from aws_cdk import (
 
 from stacks import role_policies as rp
 from stacks.constants import TABLE_NAME  # CONF-01 / #936: one source for the table name (DR cutover)
-from stacks.lambda_helpers import create_platform_lambda
+from stacks.lambda_helpers import create_platform_lambda, table_schedule
 from stacks.reader_audience import URGENT_TOPIC_NAME, route_reader_audience  # #3499
 from stacks.secrets_helpers import site_api_origin_secret_value
 
@@ -575,7 +575,7 @@ class ServeStack(Stack):
         telegram_worker_fn.node.default_child.add_property_override("ReservedConcurrentExecutions", 2)
 
         # Eli's weekday morning check-in (Act 1b) — the ONE scheduled outbound the
-        # coaching team has. cron(15 17 ? * MON-FRI *) UTC = 10:15 AM PDT / 09:15 PST,
+        # coaching team has. its config/schedules.json row UTC = 10:15 AM PDT / 09:15 PST,
         # UTC-fixed per the no-DST-drift convention; the handler re-checks the
         # Pacific weekday itself, because the cron's weekday is a UTC weekday.
         #
@@ -593,7 +593,7 @@ class ServeStack(Stack):
             "TelegramMorningCheckin",
             rule_name="telegram-coach-morning-checkin",
             description="Weekday morning check-in from the program lead (dark until his Telegram bot is registered)",
-            schedule=events.Schedule.expression("cron(15 17 ? * MON-FRI *)"),
+            schedule=table_schedule("telegram-coach-worker#TelegramMorningCheckin"),
         )
         morning_checkin_rule.add_target(
             targets.LambdaFunction(
@@ -603,7 +603,7 @@ class ServeStack(Stack):
         )
 
         # The event-triggered outbound sweep (#2490) — the data's chance to start a
-        # conversation. cron(0 16 * * ? *) UTC = 09:00 PDT / 08:00 PST, UTC-fixed.
+        # conversation. its config/schedules.json row UTC = 09:00 PDT / 08:00 PST, UTC-fixed.
         #
         # Two things pin that hour. It runs EARLY, before the check-in rule above, so
         # that on a day with real news (a lift PR, a milestone, a slide) the news takes
@@ -621,7 +621,7 @@ class ServeStack(Stack):
             "TelegramEventOutbound",
             rule_name="telegram-coach-event-outbound",
             description="Daily event-triggered coach outbound sweep (celebration + soft concern; dark until the coaches' bots are registered)",
-            schedule=events.Schedule.expression("cron(0 16 * * ? *)"),
+            schedule=table_schedule("telegram-coach-worker#TelegramEventOutbound"),
         )
         event_outbound_rule.add_target(
             targets.LambdaFunction(

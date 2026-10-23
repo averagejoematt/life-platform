@@ -228,7 +228,7 @@ def goals_digest(goals):
         f"Goal: {t['weight']['goal_lbs']} lbs. Milestone schedule: {milestones}. "
         f"Nutrition: {t['nutrition']['daily_calories_target']} kcal/day target, "
         f"{t['nutrition']['daily_protein_min_g']} g protein floor, "
-        f"{t['nutrition']['daily_fiber_min_g']} g fiber minimum, eating window "
+        f"{genesis_prereg_stamp.GENESIS_FIBER_MIN_G} g fiber minimum, eating window "
         f"{t['nutrition']['eating_window']['window']}. "
         f"Training phase: {t['training']['phases'][0]['phase']} — "
         f"{t['training']['phases'][0]['gym_days_per_week']} gym days/week, "

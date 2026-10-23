@@ -1445,7 +1445,9 @@ class TestGenerateSynthesis:
         az.generate_synthesis({"sleep": "s", "training": "t"})
         p = m.prompts[0]
         assert f"experiment day_n = {DAY_N}" in p
-        assert "logged training sessions (last 30d, Hevy + Strava) = 2" in p
+        # #4580 B-01: the served /api/training_overview count (Strava activities, WHOOP dupes dropped) — the page's
+        # number, not the old Hevy + Strava ROW sum (2 here; 54 vs the page's 39 live on 2026-10-18).
+        assert "workouts in the last 30 days (the count the site prints) = 1" in p
         # #4185: the food-log count is the SERVED logging record (health.nutrition_logging, the
         # /api/nutrition_overview derivation) — its window and its last log, never a second counter.
         assert f"food-log days since {GENESIS} = 1; last food log = {TODAY}" in p

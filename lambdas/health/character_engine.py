@@ -32,9 +32,13 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.macrofactor_fields import app_target_kcal, macro_value  # #4580 B-22: the row's declared field names
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_today  # #2811: the character sheet's DAY is the Pacific day
+
+from health import protein_engine  # #5214: THE per-feeding definition
+from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 
 logger = logging.getLogger(__name__)
 
@@ -532,14 +536,21 @@ def compute_nutrition_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
     """Compute Nutrition pillar raw_score (0-100)."""
     pillar_cfg = config.get("pillars", {}).get("nutrition", {})
     components = pillar_cfg.get("components", {})
-    config.get("baseline", {})
     scores = {}
 
     mf = data.get("macrofactor") or {}
 
     # Calorie adherence
-    cals = _safe_float(mf, "calories") or _safe_float(mf, "total_calories")
-    cal_target = _safe_float(mf, "calorie_target") or _safe_float(mf, "target_calories")
+    # #4580 B-22: the row's macro names come from common.macrofactor_fields (SCHEMA.md § macrofactor) —
+    # this read spelled `calories`/`protein`, names a v1 row never carries, so every logged day scored
+    # ABSENT. #5095: the reference is the ONE calorie target (health.calorie_target). The row's MacroFactor-app
+    # target is read by its STORED name (`target_calories_kcal` — this read spelled `target_calories`, a name the
+    # row never carries) and only as a drift signal: scoring against it would be a second target.
+    cals = macro_value(mf, "calories")
+    cal_target = target_kcal(data.get("date"))
+    app_target = app_target_kcal(mf)
+    if app_target and cal_target and abs(app_target - cal_target) > 50:
+        logger.warning("[character_engine] MacroFactor app target %.0f kcal != platform target %d kcal (#5095)", app_target, cal_target)
     if cals is not None and cal_target and cal_target > 0:
         deviation = abs(cals - cal_target) / cal_target
         scores["calorie_adherence"] = _clamp(round(100 - (deviation / 0.20) * 100, 1))
@@ -547,7 +558,7 @@ def compute_nutrition_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
         scores["calorie_adherence"] = None
 
     # Protein total
-    protein = _safe_float(mf, "protein") or _safe_float(mf, "total_protein")
+    protein = macro_value(mf, "protein")
     # #1898: the fallback is a PLAN LITERAL and must track the sealed pre-registration
     # (170 g floor for cycle 11), not the wiped pilot cycle's 190. A stale default here
     # is the same drift class as the config copies — worse, it only bites when the config
@@ -556,19 +567,11 @@ def compute_nutrition_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
     protein_target = components.get("protein_total", {}).get("target_grams", 170)
     scores["protein_total"] = _pct_of_target(protein, protein_target, 1.2)
 
-    # Protein distribution
-    meals = mf.get("meals") or []
-    high_protein_meals = 0
-    dist_threshold = components.get("protein_distribution", {}).get("threshold_grams", 30)
+    # Protein distribution — #4580 B-22: a v1 row has no `meals` list; the ingest's own meal grouping stores the count
+    # #5214: ONE feeding definition — the protein engine's (charter nutrition.protein.feeding_threshold_g, merged by
+    # feeding_merge_minutes), read via protein_engine. No per-meal gram default here; an untimed day is unknown.
     dist_target = components.get("protein_distribution", {}).get("target_meals", 4)
-    for meal in meals:
-        mp = _safe_float(meal, "protein")
-        if mp and mp >= dist_threshold:
-            high_protein_meals += 1
-    if meals:
-        scores["protein_distribution"] = _pct_of_target(high_protein_meals, dist_target, 1.25)
-    else:
-        scores["protein_distribution"] = None
+    scores["protein_distribution"] = _pct_of_target(protein_engine.feedings_at_threshold(mf), dist_target, 1.25)
 
     # Consistency (14d)
     mf_14d = data.get("macrofactor_14d", [])
@@ -576,8 +579,8 @@ def compute_nutrition_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
         in_range_count = 0
         tracked_count = 0
         for day in mf_14d:
-            dc = _safe_float(day, "calories") or _safe_float(day, "total_calories")
-            dt_target = _safe_float(day, "calorie_target") or _safe_float(day, "target_calories") or cal_target
+            dc = macro_value(day, "calories")
+            dt_target = target_kcal(day.get("date") or data.get("date"))  # #5095: that day's week's target
             if dc is not None and dt_target and dt_target > 0:
                 tracked_count += 1
                 if abs(dc - dt_target) / dt_target <= 0.10:

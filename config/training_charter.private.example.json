@@ -1,0 +1,12 @@
+{
+  "_README": "TEMPLATE for the owner-only half of the training charter (#5087). Copy to config/training_charter.private.local.json (gitignored) and fill it, or put the same object in env TRAINING_CHARTER_PRIVATE_JSON, or at the owner-private S3 key config/coaching/training_charter.private.json. The repo is PUBLIC: no real value ever goes in a tracked file. lambdas/training/training_charter.py merges this over the public config/training_charter.json and reports private_loaded + private_keys; nothing under these keys is ever on the PUBLISHED_WHITELIST.",
+  "target_picture": {
+    "weight_band_lb": [null, null],
+    "waist_in": null,
+    "photo_pose": null
+  },
+  "appearance_brief": null,
+  "lab_followup": {
+    "next_draw_on": null
+  }
+}

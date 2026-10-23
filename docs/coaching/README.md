@@ -50,7 +50,7 @@ tracked file ever declares itself PRIVATE again.
 
 ## The files that remain here are deliberately public
 
-`COACH_SESSION.md`, `CHAT_MODES.md`, `READING_CALIBRATION.md`,
+`COACH_SESSION.md` (a pointer since #5086: the session protocol is `.claude/skills/coach-session/SKILL.md`), `CHAT_MODES.md`, `READING_CALIBRATION.md`,
 `WORKORDER_HEVY_COMMIT_HARDENING.md`, and `routines/` were reviewed 2026-08-23
 (#3043) and stay public on purpose: they document *how the coaching system works*
 (session protocol, chat-mode registry, calibration philosophy, engineering work
@@ -65,3 +65,27 @@ owner-only per `docs/DATA_GOVERNANCE.md`'s `progress_photos` entry. A working
 copy also lives at `s3://matthew-life-platform/config/coaching/PROGRESS_PHOTO_PROTOCOL.md`
 beside the rest of the owner-private corpus, for convenience — this repo copy is
 the source of truth.
+
+## Owner notes on the coach-nudge tick
+
+Two deterministic, owner-only notes ride the hourly `coach-nudge` tick beside the coach's own
+nudge, each on its own ledger row and each at most once a Pacific day: the lifting-day steps
+note (#5056, `training.steps_nudge`) and the protein breakfast note (#5098,
+`health.protein_engine.nudge_decide`). The protein note reads the charter's
+`nutrition.protein` block — the range, four feedings at or above the feeding threshold, the
+breakfast cut-off — and the same engine owns the one definition of a protein hit that the
+scoring engine, the macros view, the critics and the `protein_floor_missed` tripwire share.
+
+## The weekly calorie titration
+
+The calorie target moves weekly by a rule the owner can read (#5096, `health.titration`): the
+charter's `nutrition.titration` block — the shared 14-day trend against the charter rate band,
+two consecutive weekly reads on the same side before a step, 14 days between steps, a step of
+at most 150 kcal sized from the miss, feet before fork (below the band: the steps mean must be
+at the floor, then a walking-first week, and food comes down only 14 days after it with the
+trend still under the floor), complete logs counted against the redlines' dark-day line, and a
+hold whenever the data or any rule value is unreadable. The steps-floor precondition on top of
+the owner's walking-first rule is the panel interpretation, pending an owner ruling (#5091). The decision
+is made Friday night for the coming week, carried by every calorie surface through
+`health.calorie_target`, and shown with its reason in the Saturday nutrition-review email. The
+weekly refit itself is built on the panel default, pending R1 (#5091).

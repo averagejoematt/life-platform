@@ -34,6 +34,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from common.constants import EXPERIMENT_START_DATE as GENESIS  # noqa: E402 — one genesis (ADR-058)
 from common.metric_truth import resolve_steps, steps_sources  # #4630: the ONE steps resolver
+from health.protein_floor import met_floor  # #5098: THE protein hit predicate (strict, #5003)
 
 USER = "matthew"
 
@@ -62,9 +63,6 @@ def _operational() -> tuple:
     from coach.persona_registry import OPERATIONAL_COACH_IDS  # the registry owns the roster (charter rule 1)
 
     return tuple(OPERATIONAL_COACH_IDS)
-
-
-RATE_FLAG_LB_WK = 2.5  # the platform's own "losing too fast" flag (get_weight_loss_progress)
 
 
 # ── the season calendar ──────────────────────────────────────────────────────
@@ -165,6 +163,9 @@ def _weight(table, wk: Dict[str, Any], plan: Dict[str, Any]) -> Dict[str, Any]:
     marks = [m for m in range(325, 180, -5) if end_w <= m < start_ref[1]]
     waypoints = plan.get("weight_waypoints") or []
     nxt = next((w for w in waypoints if w["lbs"] < end_w), None)
+    from training import rate_band
+
+    _flag_lb = rate_band.flag_threshold_lb_wk(end_w)
     return {
         "available": True,
         "first_weigh_in": {"date": first_d, "lbs": _r(first_w)},
@@ -175,8 +176,10 @@ def _weight(table, wk: Dict[str, Any], plan: Dict[str, Any]) -> Dict[str, Any]:
         "total_change_lbs": _r(end_w - first_w),
         "avg_rate_lb_per_wk_since_start": _r(rate, 2),
         "rate_this_window_lb_per_wk": _r(week_rate, 2),
-        "platform_rate_flag": rate > RATE_FLAG_LB_WK,
-        "platform_rate_flag_rule": f"the platform flags losses above {RATE_FLAG_LB_WK} lb/wk as a lean-mass risk",
+        # #5074: the line is his schedule's cap at this weight (training/rate_band.py); the rule text carries no number —
+        # the band is never published, and the writers must not restate it
+        "platform_rate_flag": (_flag_lb is not None and rate > _flag_lb),
+        "platform_rate_flag_rule": "the platform flags a loss past the schedule's cap at this bodyweight as a lean-mass risk",
         "round_numbers_crossed_this_week": marks,
         "weigh_ins_in_window": [{"date": d, "lbs": _r(w)} for d, w in in_win],
         "next_plan_waypoint": nxt,
@@ -403,6 +406,7 @@ def export_watermarks(table, wk: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
 
 def _nutrition(table, wk: Dict[str, Any], plan: Dict[str, Any], wm: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     days = _days(table, "macrofactor", wk["start"], wk["end"])
+    # kcal_t is the live target (load_plan maps it from health.calorie_target, #5095); the genesis figure rides along labelled
     kcal_t, prot_t, fib_t = plan.get("daily_calories_target"), plan.get("daily_protein_min_g"), plan.get("daily_fiber_min_g")
     per: List[Dict[str, Any]] = []
     for d in _dates(wk["start"], wk["end"]):
@@ -425,13 +429,15 @@ def _nutrition(table, wk: Dict[str, Any], plan: Dict[str, Any], wm: Optional[Dic
     return {
         "targets_from_plan": {
             "calories_kcal": kcal_t,
+            "genesis_calories_kcal": plan.get("genesis_daily_calories_target"),
             "protein_floor_g": prot_t,
             "fiber_min_g": fib_t,
-            "source": "config/user_goals.json (the sealed plan)",
+            "source": "calories: health.calorie_target (the one target, #5095; genesis_calories_kcal is the sealed "
+            "genesis baseline, history only); protein and fiber: config/user_goals.json (the sealed plan)",
         },
         "per_day": per,
         "days_logged": len(per),
-        "days_protein_at_or_over_floor": sum(1 for p in per if prot_t and (p["protein_g"] or 0) >= prot_t),
+        "days_protein_at_or_over_floor": sum(1 for p in per if prot_t and met_floor(p["protein_g"], prot_t)),
         "days_calories_at_or_under_target": sum(1 for p in per if kcal_t and (p["kcal"] or 1e9) <= kcal_t),
         "protein_mean_g": _mean([p["protein_g"] for p in per]),
         "calories_mean_kcal": _mean([p["kcal"] for p in per]),
@@ -787,11 +793,17 @@ def _plan_facts() -> Optional[Dict[str, Any]]:
 
 
 def load_plan(facts: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    from experiment.plan_facts import LIVE_CALORIE_TARGET_KEY
+
     facts = (facts if facts is not None else _plan_facts()) or {}
     goals = _goals()
     t = goals.get("targets") or {}
     return {
         **facts,
+        # #5095: the calorie target is the ONE resolver's (health.calorie_target, via plan_facts); the sealed
+        # plan root's figure is the genesis baseline — history, kept under its own label, never the target.
+        "daily_calories_target": facts.get(LIVE_CALORIE_TARGET_KEY),
+        "genesis_daily_calories_target": facts.get("daily_calories_target"),
         "goal_lbs": (t.get("weight") or {}).get("goal_lbs"),
         "weight_waypoints": [{"lbs": m["lbs"], "label": m["label"]} for m in (t.get("weight") or {}).get("interim_milestones", [])],
         "plan_start_lbs": (goals.get("timeline") or {}).get("start_weight_lbs"),
@@ -841,10 +853,13 @@ def roster() -> List[Dict[str, Any]]:
 # carries them twice — the merged plan block and nutrition's targets_from_plan — and both
 # are held, because a writer may quote either.
 PLAN_TARGET_PATHS: Tuple[Tuple[Tuple[str, ...], str], ...] = (
-    (("plan", "daily_calories_target"), "daily_calories_target"),
+    # #5095: the stated calorie target is the live one (plan_facts.LIVE_CALORIE_TARGET_KEY); the genesis figure is held to the root
+    (("plan", "daily_calories_target"), "calorie_target_kcal"),
+    (("plan", "genesis_daily_calories_target"), "daily_calories_target"),
     (("plan", "daily_protein_min_g"), "daily_protein_min_g"),
     (("plan", "daily_fiber_min_g"), "daily_fiber_min_g"),
-    (("nutrition", "targets_from_plan", "calories_kcal"), "daily_calories_target"),
+    (("nutrition", "targets_from_plan", "calories_kcal"), "calorie_target_kcal"),
+    (("nutrition", "targets_from_plan", "genesis_calories_kcal"), "daily_calories_target"),
     (("nutrition", "targets_from_plan", "protein_floor_g"), "daily_protein_min_g"),
     (("nutrition", "targets_from_plan", "fiber_min_g"), "daily_fiber_min_g"),
 )

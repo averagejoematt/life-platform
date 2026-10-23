@@ -47,6 +47,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 import pytest
+import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
 from pacific_clock import freeze_pacific  # noqa: E402 — #2811: the PT clock the module actually calls
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -795,13 +796,30 @@ def test_a_day_identified_only_by_its_sort_key_is_still_enriched(table, frozen_c
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def test_the_nightly_default_enriches_yesterday(table, frozen_clock):
+def test_the_nightly_default_covers_the_three_days_ending_yesterday(table, frozen_clock):
     import json
 
     _seed(table, [strava_day(FROZEN_YESTERDAY, [activity("X", distance_miles=1.0)])])
     body = json.loads(en.lambda_handler({}, None)["body"])
     assert body["mode"] == "nightly"
-    assert body["start_date"] == body["end_date"] == FROZEN_YESTERDAY
+    # frozen today 2026-08-07: yesterday is the 6th, the window opens on the 4th (3 days back from today)
+    assert (body["start_date"], body["end_date"]) == ("2026-08-04", FROZEN_YESTERDAY)
+
+
+def test_a_late_synced_activity_two_days_back_gets_its_label(table, frozen_clock):
+    _seed(table, [strava_day("2026-08-05", [activity("Late", distance_miles=2.0)])])
+    result = en.lambda_handler({}, None)
+    assert result["statusCode"] == 200
+    assert len(table.updates) == 1 and table.updates[0]["Key"]["sk"] == "DATE#2026-08-05"
+    assert table.updates[0]["ExpressionAttributeValues"][":acts"][0].get("enriched_name"), "the late activity was labelled"
+
+
+def test_an_older_nightly_day_is_fill_only_a_stored_label_is_not_re_ranked(table, frozen_clock):
+    kept = activity("Done", distance_miles=2.0, enriched_name="STORED LABEL", enriched_at="x")
+    _seed(table, [strava_day("2026-08-05", [kept])])
+    result = en.enrich_date_range("2026-08-04", FROZEN_YESTERDAY, fill_only_before=FROZEN_YESTERDAY)
+    assert result["enriched"] == 0 and kept["enriched_name"] == "STORED LABEL"
+    assert not table.updates, "a labelled older day is not rewritten"
 
 
 def test_an_explicit_range_is_honoured(table, frozen_clock):
@@ -1037,9 +1055,7 @@ def test_the_weekly_digest_renders_the_label_that_survived_the_re_ingest():
 
 
 def test_the_docstring_states_the_schedule_the_stack_actually_deploys():
-    stack = open(os.path.join(ROOT, "cdk", "stacks", "ingestion_stack.py"), encoding="utf-8").read()
-    marker = stack.split('function_name="activity-enrichment"', 1)[1]
-    schedule = marker.split("schedule=", 1)[1].split("\n", 1)[0]
+    schedule = schedule_rows.expr("activity-enrichment")  # #4284: the table row is the deployed schedule
     hour = schedule.split("(", 1)[1].split(" ")[1]
     assert f"{int(hour):02d}:" in en.__doc__
 

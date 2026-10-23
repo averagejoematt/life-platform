@@ -23,7 +23,8 @@ sys.path.insert(0, str(REPO))
 
 from training import training_context_registry as reg  # noqa: E402
 
-COACH_SESSION = (REPO / "docs" / "coaching" / "COACH_SESSION.md").read_text(encoding="utf-8")
+# #5086: the coach-session protocol's ONE source is the skill (docs/coaching/COACH_SESSION.md is a pointer to it).
+COACH_SESSION = (REPO / ".claude" / "skills" / "coach-session" / "SKILL.md").read_text(encoding="utf-8")
 COACHING_README = (REPO / "docs" / "coaching" / "README.md").read_text(encoding="utf-8")
 
 
@@ -100,7 +101,7 @@ def test_summary_states_confirmation_with_its_date_and_the_active_count(monkeypa
 
 # ── derivation guard: the coach protocol names the SAME home, not a hand-typed copy ──
 def test_coach_session_protocol_names_the_registrys_s3_key():
-    assert reg.S3_KEY.rsplit("/", 1)[-1] in COACH_SESSION, "COACH_SESSION.md does not name TRAINING_CONTEXT.md"
+    assert reg.S3_KEY.rsplit("/", 1)[-1] in COACH_SESSION, "the coach-session skill does not name TRAINING_CONTEXT.md"
     assert "aws s3 cp" in COACH_SESSION
 
 

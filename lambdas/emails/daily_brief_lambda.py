@@ -188,6 +188,7 @@ from ingestion import source_registry  # #2003: the canonical freshness set + th
 from intelligence import brief_domain_inputs, weight_recency  # #1894/#1924: a weigh-in carries its own date; #4358/#4359 coach blocks
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
+from emails import brief_lines  # #5056: fail-soft one-line readouts, extracted for the module-size ratchet
 from emails.brief_data_status import (  # #2326 quiet notice / #3049 partial-input notice
     build_data_status_banner_html,
     qualified_compute_outputs,
@@ -690,14 +691,10 @@ def gather_daily_data(profile, yesterday):
 
     hrv_7d_recs = fetch_range("whoop", (today - timedelta(days=7)).isoformat(), yesterday)
     hrv_30d_recs = fetch_range("whoop", (today - timedelta(days=30)).isoformat(), yesterday)
-    # #2221 (P1): key-presence let an explicit NULL hrv cell reach float(None) →
-    # TypeError out of the unwrapped gather_daily_data call, costing the whole brief.
-    hrv_7d_vals = [v for v in (safe_float(r, "hrv") for r in hrv_7d_recs) if v is not None]
-    hrv_30d_vals = [v for v in (safe_float(r, "hrv") for r in hrv_30d_recs) if v is not None]
-    # #2221: the same windows carry RHR, so `rhr_trend` can be a measurement.
-    rhr_7d_vals = [v for v in (safe_float(r, "resting_heart_rate") for r in hrv_7d_recs) if v is not None]
-    rhr_30d_vals = [v for v in (safe_float(r, "resting_heart_rate") for r in hrv_30d_recs) if v is not None]
-
+    # #4999: the post-marker, AF-day-excluded HRV + RHR baselines daily-metrics-compute stores (a NULL cell is skipped, #2221).
+    _bl = hr_regime.trailing_baselines(hrv_30d_recs, ("hrv", "resting_heart_rate"), today, yesterday, fetch_range=fetch_range)
+    hrv_7d_vals, hrv_30d_vals = _bl[("hrv", 7)][0], _bl[("hrv", 30)][0]
+    rhr_7d_vals, rhr_30d_vals = _bl[("resting_heart_rate", 7)][0], _bl[("resting_heart_rate", 30)][0]
     strava_60d = fetch_range("strava", (today - timedelta(days=60)).isoformat(), yesterday)
     tsb = compute_tsb(strava_60d, today)
     strava_7d_cutoff = (today - timedelta(days=7)).isoformat()
@@ -969,7 +966,7 @@ def fetch_anomaly_record(date_str):
 # AST-level check confirmed zero logic divergence. One implementation, one
 # place for the next scoring change.
 # ==============================================================================
-from health import habit_streaks  # noqa: E402 — #2221: the ADR-104 streak scan, lifted out
+from health import habit_streaks, hr_regime  # noqa: E402 — #2221: the ADR-104 streak scan; #4999: the HR regime markers
 from health.scoring_engine import (  # noqa: E402,F401
     COMPONENT_SCORERS,
     compute_day_grade,
@@ -2069,8 +2066,7 @@ def lambda_handler(event, context):
     except Exception as _whr_err:
         logger.warning("S2-T1-10: Weekly habit review failed (non-fatal): " + str(_whr_err))
 
-    # Vacation fund: workout miles since experiment start → USD ($1/mile).
-    # Non-fatal — a failure here must never block the brief.
+    # Vacation fund: workout miles since experiment start → USD ($1/mile). Non-fatal.
     _vacation_fund = None
     try:
         from content.vacation_fund import compute_vacation_fund
@@ -2079,21 +2075,11 @@ def lambda_handler(event, context):
     except Exception as _vf_err:
         logger.warning("vacation fund compute failed (non-fatal): " + str(_vf_err))
 
-    # Budget-headroom readout (#822): one code-derived line from the cost
-    # governor's persisted projection breakdown (SSM /life-platform/budget-
-    # breakdown), so a dev-sprint burn that threatens the $75 ceiling is
-    # visible in the brief — not just as a tier flip after the fact.
-    # Fail-soft: missing/stale/malformed breakdown → the line is simply absent.
-    _budget_headroom_line = None
-    try:
-        from ai import budget_guard
+    # Budget-headroom readout (#822): one code-derived line from the cost governor's persisted projection
+    # breakdown (SSM /life-platform/budget-breakdown). Fail-soft: missing/stale/malformed → the line is absent.
+    _budget_headroom_line = brief_lines.budget_headroom(logger)
 
-        _budget_headroom_line = budget_guard.format_headroom_line(budget_guard.read_breakdown()) or None
-    except Exception as _bh_err:
-        logger.warning("budget headroom line failed (non-fatal): " + str(_bh_err))
-
-    # #1405: the private intake-ledger line (n + CI per ADR-105, or arming
-    # progress). Fail-soft — the brief must send even if the read breaks.
+    # #1405: the private intake-ledger line (n + CI per ADR-105, or arming progress). Fail-soft.
     _intake_line = None
     try:
         from coach import intake_response
@@ -2101,6 +2087,8 @@ def lambda_handler(event, context):
         _intake_line = intake_response.brief_line(intake_response.compute_intake_response(table))
     except Exception as _ir_err:
         logger.warning("intake-response line failed (non-fatal): " + str(_ir_err))
+
+    _steps_line = brief_lines.steps_line(table, pacific_today(), logger)  # #5056: the day's steps floor/target, owner-only
 
     try:
         html = html_builder.build_html(
@@ -2138,6 +2126,7 @@ def lambda_handler(event, context):
             vacation_fund=_vacation_fund,
             budget_headroom_line=_budget_headroom_line,
             intake_line=_intake_line,
+            steps_line=_steps_line,
             journal_coach_absent=_journal_coach_absent,  # #2944: explicit declared-absent label
         )
     except Exception as e:

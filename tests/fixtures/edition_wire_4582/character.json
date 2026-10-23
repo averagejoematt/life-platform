@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-17T23:19:41.431988+00:00",
-  "served_at": "2026-10-17T23:19:41.431988+00:00",
+  "generated_at": "2026-10-18T07:13:49.126456+00:00",
+  "served_at": "2026-10-18T07:13:49.126456+00:00",
   "cache_seconds": 900,
-  "request_id": "d8746e3b80bc494a"
+  "request_id": "98e8703348424dd5"
  },
  "character": {
   "level": 12.0,
@@ -95,8 +95,8 @@
     "last_log_date": "2026-10-17",
     "days_dark": null,
     "stale_hours": null,
-    "transition": "logged",
-    "days_since_last_log": 0,
+    "transition": "paused",
+    "days_since_last_log": 1,
     "absent_behaviors": []
    }
   },
@@ -135,18 +135,16 @@
     "no_data": []
    },
    "absence": {
-    "state": "dark",
+    "state": "logged",
     "sources": [
      "macrofactor"
     ],
-    "dark_sources": [
-     "macrofactor"
-    ],
-    "last_log_date": "2026-10-12",
-    "days_dark": 5,
-    "stale_hours": 96,
+    "dark_sources": [],
+    "last_log_date": "2026-10-17",
+    "days_dark": null,
+    "stale_hours": null,
     "transition": "paused",
-    "days_since_last_log": 5,
+    "days_since_last_log": 1,
     "absent_behaviors": [
      "calorie_adherence",
      "protein_total",
@@ -230,10 +228,10 @@
      "notion"
     ],
     "last_log_date": "2026-09-09",
-    "days_dark": 38,
+    "days_dark": 39,
     "stale_hours": 336,
     "transition": "paused",
-    "days_since_last_log": 38,
+    "days_since_last_log": 39,
     "absent_behaviors": [
      "t0_habit_compliance",
      "t1_habit_compliance"
@@ -302,7 +300,7 @@
      "habitify"
     ],
     "dark_sources": [],
-    "last_log_date": "2026-10-17",
+    "last_log_date": "2026-10-18",
     "days_dark": null,
     "stale_hours": null,
     "transition": null,

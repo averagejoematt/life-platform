@@ -39,7 +39,7 @@ WHAT STAYED INLINE, AND WHY
       REGISTRY; as a constant here it would be an un-literal-evaluable node and the
       catalog would render the placeholder instead of 90.
     * `get_readiness_score` — `tests/test_data_truth_batch.py::test_device_agreement_never_silent_null`
-      asserts the blend weights ("Whoop recovery (40%)", "Garmin Body Battery (5%)") appear
+      asserts the blend weights ("Whoop recovery (40%)", "Overnight physiology (5%)") appear
       in the TEXT of mcp/registry.py, so that the table can never advertise weights the code
       stopped using. That guard reads the file, not the resolved schema, and it is right to:
       the claim it protects is a reader-facing one. Moving the string out would have turned a
@@ -62,7 +62,15 @@ GET_EXERCISE_NOTES_DESCRIPTION = (
     "makes the flag read 'clear': plan_next_session reports the tripwire as dismissed_by_owner with the "
     "date and his words, and the joints/tendons critic stops vetoing that instance. It RE-ARMS on its "
     "own — a note dated after the dismissal trips the flag again and marks the dismissal superseded. "
-    "action='dismissals' lists them."
+    "action='dismissals' lists them. "
+    "action='deload' (#5070, OWNER-ONLY): record his word that a deload starts (words VERBATIM, optional "
+    "start_date/days/sets_pct) — the ONLY way a deload ever applies; action='deloads' lists them. "
+    "action='disruption' (#5088, OWNER-ONLY): record his word that disruption mode is ON (words VERBATIM, "
+    "template travel|busy, until, optional start_date) — habits held instead of targets, the short session "
+    "served; action='disruption_end' switches it OFF (step back up); action='disruptions' lists them. "
+    "action='fitness_test' (#5078, OWNER-ONLY): record fitness-battery results — results {test: value} "
+    "(six_minute_walk m, bike_20min_rpe6 m, dead_hang s, assisted_pull_up lb of assistance), optional notes and "
+    "date; action='fitness_tests' lists the batteries, each test's trend and whether the battery is due."
 )
 
 # ── the inputSchema that lives beside its description (the #3692 ceiling) ────────────
@@ -78,10 +86,26 @@ GET_EXERCISE_NOTES_INPUT = {
     "properties": {
         "action": {
             "type": "string",
-            "enum": ["read", "dismiss", "dismissals"],
+            "enum": [
+                "read",
+                "dismiss",
+                "dismissals",
+                "deload",
+                "deloads",
+                "disruption",
+                "disruption_end",
+                "disruptions",
+                "fitness_test",
+                "fitness_tests",
+            ],
             "description": (
                 "read (default) = the note timeline. dismiss = record HIS dismissal of a pain flag on this "
-                "movement (#4036, OWNER-ONLY WRITE). dismissals = list every dismissal on the record."
+                "movement (#4036, OWNER-ONLY WRITE). dismissals = list every dismissal on the record. "
+                "deload = record HIS word that a deload starts (#5070, OWNER-ONLY WRITE; `words` verbatim, optional "
+                "`start_date`, `days`, `sets_pct`). deloads = list them. disruption / disruption_end = HIS switch for "
+                "disruption mode (#5088, OWNER-ONLY WRITE; `words` verbatim, `template`, `until` / `ended_on`). disruptions = list. "
+                "fitness_test = record fitness-battery results (#5078, OWNER-ONLY WRITE; `results`, optional `notes`, `date`). "
+                "fitness_tests = the batteries, trend and due state."
             ),
         },
         "exercise": {
@@ -110,6 +134,21 @@ GET_EXERCISE_NOTES_INPUT = {
             ),
         },
         "dismissed_on": {"type": "string", "description": "action='dismiss': YYYY-MM-DD he said it. Defaults to today (Pacific)."},
+        "start_date": {"type": "string", "description": "action='deload': YYYY-MM-DD the deload starts. Defaults to today (Pacific)."},
+        "days": {"type": "integer", "description": "action='deload': days the deload covers (default 7)."},
+        "sets_pct": {"type": "integer", "description": "action='deload': the set cut, negative (default -40)."},
+        "template": {"type": "string", "enum": ["travel", "busy"], "description": "action='disruption': travel or busy."},
+        "until": {"type": "string", "description": "action='disruption': YYYY-MM-DD, the last day the mode covers. Required."},
+        "ended_on": {"type": "string", "description": "action='disruption_end': YYYY-MM-DD, the first day back. Defaults to today."},
+        "results": {
+            "type": "object",
+            "description": (
+                "action='fitness_test': {test: value} — six_minute_walk (m), bike_20min_rpe6 (m), dead_hang (s), "
+                "assisted_pull_up (lb of assistance; lower is better). Any subset; a second call on the same date merges."
+            ),
+        },
+        "notes": {"type": "object", "description": "action='fitness_test': {test: note} — e.g. which bike, the grip."},
+        "date": {"type": "string", "description": "action='fitness_test': YYYY-MM-DD of the battery. Defaults to today (Pacific)."},
     },
     "required": [],
 }
@@ -190,7 +229,7 @@ PLAN_NEXT_SESSION_DESCRIPTION = (
     "clear; blueprint historian: the band reference + the labelled #3717 attestation). Each returns approve / "
     "change <field> to <value> / veto with the metric and number it argued from. Changes are APPLIED to the "
     "draft and re-checked; a veto BLOCKS commit; the verdicts ride in the Hevy notes and the training coach "
-    "thread. Order: plan_next_session → manage_hevy_routine draft_custom → plan_next_session(routine_id) → "
+    "thread. Order: plan_next_session → manage_hevy_routine draft (draft_custom only for a deliberate departure, with departure_reason) → plan_next_session(routine_id) → "
     "dry_run → commit. A draft not passed through stage 2 commits with a 'not red-teamed' warning. "
     "OWNER OVERRIDE (#4076): if Matthew overrules one critic's veto, re-run stage 2 with "
     "veto_override={critic, owner_words} — his words verbatim; only that veto is lifted, every other "
@@ -228,7 +267,10 @@ GET_MUSCLE_VOLUME_DESCRIPTION = (
     "Counting (#4071): warm-up sets are excluded by the Hevy set type; each working set credits ONE primary muscle (1.0) and "
     "only the secondaries the taxonomy names, at 0.5 each (`direct_sets` + `secondary_sets` = `total_sets`); cardio/mobility "
     "entries carry no muscle volume and unknown movements are listed in `unattributed`, never folded into a muscle. Windows are "
-    "inclusive whole days (7 days = 1.0 week); every answer also carries `trailing_windows` for the 7 and 28 days ending on end_date. "
+    "inclusive whole days (7 days = 1.0 week); every answer also carries `trailing_windows` for the 7, 14 and 28 days ending on "
+    "end_date, and a top-level `below_mev_14d` block: each muscle's trailing-14-day sets/wk against its landmark MEV "
+    "(config/training_landmarks.json), with the `flagged` list (status `unavailable` when the 14-day window or the landmarks "
+    "cannot be read). "
     "Counts every set in the window across EVERY experiment cycle (#4031 — no phase filter; the superseded legacy "
     "daily-aggregate generation is excluded so nothing is double-counted), so a trailing window no longer truncates to the "
     "current cycle's age. Default window is the trailing 28 days (4 whole weeks) for period='week' and 90 days for "
@@ -281,15 +323,41 @@ LOG_EVENING_INTAKE_DESCRIPTION = (
     "PRIVATE (#1405): log this evening's drinks count (0-4; 4 = four or more) "
     "to the Matthew-private intake ledger. One tap, no free text. Idempotent: "
     "re-logging the same evening updates it (returns previous_count), never double-counts. "
-    "Use for: 'log 2 drinks tonight', 'zero drinks yesterday' (pass date)."
+    "Use for: 'log 2 drinks tonight', 'zero drinks yesterday' (pass date). "
+    "Also the 20-second evening check-in (#5106): hunger, stress, cravings (0-4 each) and one word, "
+    "to the private evening_checkin ledger (count is then optional; same idempotent overwrite). "
+    "Use for: 'check-in: hunger 2 stress 3 cravings 1, tired'."
 )
+
+# #5106: the input table rides beside its description (the #3759 extraction shape) so mcp/registry.py, at its size
+# ceiling, pays for the evening check-in fields instead of growing; the writer is coach.evening_checkin.
+LOG_EVENING_INTAKE_INPUT = {
+    "type": "object",
+    "properties": {
+        "count": {
+            "type": "integer",
+            "description": "Evening drinks count, 0-4 (4 = four or more). Optional when a check-in field is given.",
+        },
+        "hunger": {"type": "integer", "description": "#5106 evening check-in: hunger 0-4."},
+        "stress": {"type": "integer", "description": "#5106 evening check-in: stress 0-4."},
+        "cravings": {"type": "integer", "description": "#5106 evening check-in: cravings 0-4."},
+        "word": {"type": "string", "description": "#5106 evening check-in: one word for the day."},
+        "date": {
+            "type": "string",
+            "description": "YYYY-MM-DD (default: tonight, the Pacific calendar day; check-in fields given before 04:00 PT file to the previous evening).",
+        },
+    },
+    "required": [],
+}
 
 GET_INTAKE_RESPONSE_DESCRIPTION = (
     "PRIVATE (#1405): the intake→next-morning dose-response read. Lagged pairs "
     "vs HRV / recovery / REM with effective-n correction (Pyper-Peterman), p on "
     "n_eff, zero-vs-nonzero block-bootstrap CI, and dose bins (0/1/2+) once 15 "
     "nonzero evenings exist. Reports arming progress below the floors (ADR-105). "
-    "Use for: 'what do drinks do to my HRV?', 'intake dose-response so far'."
+    "Use for: 'what do drinks do to my HRV?', 'intake dose-response so far'. "
+    "Also carries `checkin_intake`: the newest weekly read of the evening check-in against intake "
+    "(stress/hunger/cravings/mood vs calories over target, protein, late eating; ADR-105 verdicts) (#5106)."
 )
 
 GET_INSIGHTS_DESCRIPTION = (
@@ -554,12 +622,12 @@ GET_WORKOUT_DETAIL_DESCRIPTION = (
 MANAGE_HEVY_ROUTINE_DESCRIPTION = (
     "Author, preview, push, list, fetch, archive, or score adherence on Hevy training routines. One tool, "
     "action-dispatched. Actions: 'draft' (the deterministic programmer builds its OWN routine from your state "
-    "— does NOT take an exercise list), 'draft_custom' (author a routine from an explicit exercise/set/weight "
-    "list you supply — use this to push a hand-designed session), 'dry_run' (compile a draft into the Hevy "
+    "— does NOT take an exercise list), 'draft_custom' (a deliberate DEPARTURE from the engine's draft: an explicit exercise/set/weight "
+    "list you supply; REQUIRES departure_reason, refused without it — 'draft' is the default), 'dry_run' (compile a draft into the Hevy "
     "POST body for preview), 'commit' (push to Hevy — requires explicit routine_id), 'list' (date range), "
     "'get' (one IR by routine_id), 'archive' (RENAME only — Hevy has no DELETE, and folder_id is create-only "
     "so the routine is NOT moved out of its folder), 'floor' (≈20-min variant), 're_entry' (deliberately "
-    "easy after a break), 'adherence' (programmed-vs-performed), 'stall_check' (prescribed-vs-performed stall verdict for ONE movement — pass movement_key; it returns 'unknown', NEVER 'stall', when he performed exactly what was prescribed at a fixed load x reps, because e1RM is constant by construction there, and it labels any verdict that leaned on RPE as self-reported). Typical custom flow: draft_custom → dry_run "
+    "easy after a break), 'adherence' (programmed-vs-performed), 'stall_check' (prescribed-vs-performed stall verdict for ONE movement — pass movement_key; it returns 'unknown', NEVER 'stall', when he performed exactly what was prescribed at a fixed load x reps, because e1RM is constant by construction there, and it labels any verdict that leaned on RPE as self-reported; 'step_due' (#5057) is the prescription's failure to progress — the same top-set load x reps 3 exposures running at self-reported RPE <= 8 — with the proposed step and its dates, which the next 'draft' carries). Typical custom flow: draft_custom → dry_run "
     "→ plan_next_session(routine_id) (stage 2) → commit. Commit REFUSES (REDTEAM_BINDING, #4066) any routine that is not the "
     "one stage 2 verdicted, unchanged since — only the owner may override (owner_override_redteam + override_reason). "
     "Subtract-only autoregulation on the 'draft' path. TITLES ARE AUTO-RENDERED: the compiler names "

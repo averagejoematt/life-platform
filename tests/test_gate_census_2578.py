@@ -1119,11 +1119,60 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 265 -> 266 (2026-10-18, #4580 round 1 lane E): structural::test_edition_one_number_4580.py — the one-number /
         # one-unit / one-sentence contracts over the edition wire — arrives PROVEN via STRUCTURAL_HAND_PROOFS (three plants, each
         # 1 failed / 6 passed; restored 7 passed). Enters exactly that id, leaves {}.
-        # Upper bound 266 -> 267 (2026-10-18, #4588 cut-over rehearsal rebuilt on the post-#4988 main, HELD): structural::test_v4_redirects_function.py —
+        # Upper bound 266 -> 267 (2026-10-18, #4972): structural::test_rhythm_channel_privacy_4972.py — the owner-only rhythm
+        # channel's sweep + /api/* route walk — arrives PROVEN via STRUCTURAL_HAND_PROOFS (two plants in site_api_vitals:
+        # 3 failed / 4 and 1 failed / 6; restored 7 passed). Enters exactly that id, leaves {}.
+        # Upper bound 267 -> 269 (2026-10-18, #5068 + #5087 the training charter, on charter-w0): TWO entrants,
+        # structural::test_training_charter_derivation_5068.py (the charter derivation sweep + shrink-only ledger) and
+        # structural::test_training_charter_privacy_5087.py (the public/private content filter over lambdas/web + lambdas/emails),
+        # both PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS in scripts/gate_census_mutations.py, ARMED 2/2:
+        # baseline 4 passed | mutated 1 failed | reverted 4 passed; baseline 8 passed | mutated 1 failed | reverted 8 passed).
+        # Enter exactly those two ids, leave {}, unproven does NOT move.
+        # Upper bound 269 -> 270 (2026-10-19, #5073 the owner-only May tracker, on charter-w2): structural::test_may_tracker_5073.py
+        # (the os.walk sweep of lambdas/web + lambdas/emails for an import of the tracker) arrives PROVEN via the re-runnable harness
+        # (MutationSpec + STRUCTURAL_PROOFS, ARMED 1/1: baseline 35 passed | mutated 1 failed | reverted 35 passed). Enters exactly
+        # that id, leaves {}, unproven does NOT move. Concurrent lanes stack: the driver adds entrants.
+        # Upper bound 270 -> 272 (2026-10-19, #5072 the panel rubric eval harness, on charter-w2, stacked on #5073 above):
+        # TWO proven entrants,
+        # guard::scripts/panel_rubric_gate.py (GUARD_PROOFS: three plants, exit 1 / 1 failed of 11 / exit 1; restored exit 0)
+        # and ci::panel-rubric-gate.yml::gate::3 (CI_PROOFS: the step's real run: text, M1 + M3 exit 1; restored exit 0). The
+        # third entrant, the Live judge step, is ATTEMPTED_UNPROVEN. Enter exactly those ids, leave {}, unproven does NOT move.
+        # Upper bound 272 -> 273 (2026-10-19, #5059 on charter-w2, stacked on #5073 + #5072 above):
+        # structural::test_guidance_freshness_5059.py — the guidance freshness flag's closed reader set — arrives
+        # PROVEN via STRUCTURAL_HAND_PROOFS (four plants, each 1 failed; restored 15 passed). Enters exactly that id, leaves {}.
+        # Upper bound 273 -> 274 (2026-10-19, #5086 the synced chat skills, on charter-w2, stacked on #5059 above):
+        # guard::scripts/check_synced_skill_drift.py arrives PROVEN via GUARD_PROOFS (M1 `_same` always True: 3 failed / 9 passed;
+        # M2 drift exits 0: 2 failed / 10 passed; restored 12 passed). Enters exactly that id, leaves {}, unproven does NOT move.
+        # Upper bound 275 -> 276 (2026-10-19, #5061 stacked on #5079 below; both entrants counted, never max'd): was 274 -> 275 (#5061 the calibration cadence, on charter-w3): structural::test_calibration_cadence_5061.py
+        # (the os.walk sweep of lambdas/web + lambdas/emails) arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS,
+        # ARMED 1/1: baseline 21 passed | mutated 1 failed | reverted 21 passed). Enters exactly that id, leaves {}, unproven does NOT move.
+        # Upper bound 274 -> 275 (2026-10-19, #5079 the block retro, on charter-w3): structural::test_block_retro_5079.py — the
+        # os.walk sweep of lambdas/web + lambdas/emails for a module naming the owner-only retro — arrives PROVEN via
+        # STRUCTURAL_HAND_PROOFS (two plants, each 1 failed / 12 passed; restored 13 passed). Enters exactly that id, leaves {}.
+        # Upper bound 276 -> 277 (2026-10-19, #5095 one calorie target, on nutrition-w0): structural::test_calorie_target_one_resolver_5095.py
+        # (the rglob sweep of lambdas/ mcp/ deploy/ scripts/ for the retired constant or a 1,500 calorie literal) arrives PROVEN via the
+        # re-runnable harness (MutationSpec + STRUCTURAL_PROOFS, ARMED 1/1: baseline 12 passed | mutated 1 failed | reverted 12 passed).
+        # Enters exactly that id, leaves {}, unproven does NOT move. A concurrent lane bumping this bound stacks, never max'd.
+        # Upper bound 277 -> 278 (2026-10-19, #5106 the evening check-in, on nutrition-w2): structural::test_evening_checkin_5106.py
+        # (the os.walk sweep of lambdas/web + lambdas/emails for a module naming the owner-only check-in partitions) arrives PROVEN via
+        # the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS, ARMED 1/1: baseline 27 passed | mutated 1 failed | reverted 27
+        # passed). Enters exactly that id, leaves {}, unproven does NOT move. A concurrent lane bumping this bound stacks, never max'd.
+        # Upper bound 278 -> 279 (2026-10-20, #5200 the May tracker on every coach-context caller path, on followups-a):
+        # structural::test_may_tracker_coach_context_5200.py (the rglob sweep of lambdas/ + mcp/ for an assemble call with no
+        # tracker) arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS, ARMED 1/1: baseline 8 passed |
+        # mutated 1 failed | reverted 8 passed). Enters exactly that id, leaves {}. A concurrent lane bumping this bound stacks.
+        # Upper bound 279 -> 281 (2026-10-20, #5221 the additive-IAM gate at PR time, on followups-a, stacked on #5200 above): TWO proven entrants,
+        # guard::deploy/check_iam_additive_pr.py (GUARD_PROOFS: three plants, each 3 failed / 9 passed; restored 12 passed) and
+        # ci::iam-gate-pr.yml::gate::3 (CI_PROOFS: the step's real run: text with the incident rule planted back, exit 1; restored
+        # exit 0). Enter exactly those ids, leave {}, unproven does NOT move. A concurrent lane bumping this bound stacks, never max'd.
+        # 281 -> 282 (2026-10-20, #5213, restacked onto #5200 + #5221): ONE entrant, `structural::test_nutrition_critics_ai_5114.py`, PROVEN via MutationSpec +
+        # STRUCTURAL_PROOFS (ARMED 1/1: baseline 11 passed | mutated 1 failed | reverted 11 passed). Stacked, never max'd.
+        # 282 -> 283 (2026-10-20, #5232): structural::test_habit_tier_set_guard_5232.py (STRUCTURAL_HAND_PROOFS). Stacked, never max'd.
+        # Upper bound 283 -> 284 (2026-10-23, #4588 cut-over rehearsal refreshed onto ea6f23cb4, owner's go 'asap'): structural::test_v4_redirects_function.py —
         # the every-existing-URL-still-resolves sweep — arrives PROVEN via GUARD_PROOFS in scripts/gate_census_proofs.py (M1 the /start/
         # 301 left at the edge, M2 a cut-over page missing, M3 /story/about/ dropped: each 1 failed; reverted 1 passed). Enters exactly
         # that id, leaves {}, unproven does NOT move.
-        <= 267
+        <= 284
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

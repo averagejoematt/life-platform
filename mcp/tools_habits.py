@@ -33,7 +33,7 @@ from boto3.dynamodb.conditions import Key
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.config import USER_ID as _user_id_ref, table as _table_ref
-from mcp.core import decimal_to_float as _d2f
+from mcp.core import decimal_to_float as _d2f, get_profile
 
 try:
     # Shared, bundled module (#781) — the deterministic conventions live here.
@@ -41,6 +41,8 @@ try:
 except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
     if not TYPE_CHECKING:
         from lambdas.experiment.habit_causality import clip_note, parse_note, slugify_habit
+
+from common.habit_pause import is_name_paused_on  # noqa: E402  #5007
 
 CAUSALITY_SOURCE = "habit_causality"
 HABITIFY_SOURCE = "habitify"
@@ -100,7 +102,12 @@ def tool_get_habit_reflection_queue(args):
     except Exception as e:  # pragma: no cover — live DDB only
         return {"error": f"could not read habit history: {e}"}
     reflections = _captured_reflections(days)
+    try:
+        registry = (get_profile() or {}).get("habit_registry") or {}
+    except Exception:  # pragma: no cover — fail open: no registry means nothing is paused
+        registry = {}
 
+    paused_days = 0  # #5007: habit-days not scheduled (paused_since) — neither missed nor done
     missed_needs_why = []
     done_needs_driver = []
     for rec in habitify:
@@ -111,6 +118,10 @@ def tool_get_habit_reflection_queue(args):
             status = st.get("status")
             group = st.get("group") or "Other"
             slug = slugify_habit(name)
+            if is_name_paused_on(registry, name, date):
+                if status in _MISSED_STATES or status == "completed":
+                    paused_days += 1
+                continue
             refl = reflections.get((date, slug)) or {}
             habitify_notes = st.get("notes") or []
 
@@ -135,6 +146,7 @@ def tool_get_habit_reflection_queue(args):
             "completed_needs_driver": done_needs_driver[:15],
             "missed_needs_why_total": len(missed_needs_why),
             "completed_needs_driver_total": len(done_needs_driver),
+            "paused_habit_days": paused_days,
             "already_captured": len(reflections),
             "how_to_ask": (
                 "Ask Matthew about a couple of these — e.g. 'You missed {habit} on {date} — what got in the way?' "
