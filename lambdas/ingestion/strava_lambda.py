@@ -35,6 +35,8 @@ except ImportError:
     logger = logging.getLogger("strava")
     logger.setLevel(logging.INFO)
 
+from common.numeric import decimals_to_float
+
 from ingestion import strava_population
 from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
@@ -161,6 +163,10 @@ def _stored_enrichment(date_str: str) -> dict:
     except Exception as e:  # noqa: BLE001 — enrichment reuse is an optimisation, never a dependency
         logger.warning("strava stored-enrichment read failed for %s (re-fetching): %s", date_str, e)
         return {}
+    # #5255: boto3 hands every stored number back as Decimal, and a reused zone summed beside a
+    # re-fetched (float) one in transform() raised `Decimal + float`, erroring the whole day on
+    # every re-ingest. Normalise once, here at the read boundary, so nothing stored leaves as Decimal.
+    item = decimals_to_float(item)
     out = {}
     for act in item.get("activities") or []:
         if not isinstance(act, dict) or not act.get("strava_id"):
