@@ -101,14 +101,18 @@ def _deliveries():
 
 def _delivered_unique_sum():
     """The independent expectation: per field, the sum over unique reading timestamps of every
-    reading delivered for DAY, computed straight from the fixture (not through the writer)."""
+    reading delivered for DAY, computed straight from the fixture (not through the writer). A
+    timestamp re-delivered with a new quantity counts at its newest distinct version (#4628 revisions;
+    the fixture carries two, steps 15:57:09 and active energy 15:56:09 -0700, in the same-second pair)."""
     by_field = {}
     for d in _deliveries():
         for m in d["payload"]["data"]["metrics"]:
             field = hae.METRIC_MAP[m["name"]]["field"]
             for r in m["data"]:
-                by_field.setdefault(field, {}).setdefault(r["date"], r["qty"])
-    return {f: round(sum(tsq.values()), 2) for f, tsq in by_field.items()}
+                versions = by_field.setdefault(field, {}).setdefault(r["date"], [])
+                if r["qty"] not in versions:
+                    versions.append(r["qty"])
+    return {f: round(sum(v[-1] for v in tsv.values()), 2) for f, tsv in by_field.items()}
 
 
 @pytest.fixture

@@ -154,9 +154,11 @@ def test_replay_equals_the_write_path_and_the_independent_unique_timestamp_sum()
     for d in fx["deliveries"]:
         for m in d["payload"]["data"]["metrics"]:
             independent.setdefault(hae.METRIC_MAP[m["name"]]["field"], {})
-            for r in m["data"]:
-                independent[hae.METRIC_MAP[m["name"]]["field"]].setdefault(r["date"], r["qty"])
-    independent = {f: round(sum(v.values()), 2) for f, v in independent.items()}
+            for r in m["data"]:  # a re-delivered timestamp counts at its newest distinct quantity (#4628 revisions)
+                versions = independent[hae.METRIC_MAP[m["name"]]["field"]].setdefault(r["date"], [])
+                if r["qty"] not in versions:
+                    versions.append(r["qty"])
+    independent = {f: round(sum(v[-1] for v in tsv.values()), 2) for f, tsv in independent.items()}
     naive_steps = sum(
         r["qty"] for d in fx["deliveries"] for m in d["payload"]["data"]["metrics"] if m["name"] == "step_count" for r in m["data"]
     )
@@ -183,11 +185,11 @@ def test_dry_run_reports_the_diff_and_writes_nothing():
     assert (
         steps["days_differing"] == 1
         and steps["days_stored_under"] == 1
-        and steps["sum_delta"] == pytest.approx(13229.98 - 11525.99, abs=0.011)
+        and steps["sum_delta"] == pytest.approx(13157.82 - 11525.99, abs=0.011)  # 13157.82: the live 10-14 archive object
     )
     assert report["per_field"]["basal_calories"]["sum_delta"] > 600
     assert "apply" not in report
-    assert re.search(rf"^{DAY}\s+\d+d\s+differs\s+steps: 11525.99->1322\d(\.\d+)? \(\+17\d\d", text, re.M), text
+    assert re.search(rf"^{DAY}\s+\d+d\s+differs\s+steps: 11525.99->1315\d(\.\d+)? \(\+16\d\d", text, re.M), text
     assert not s3.puts and not table.updates
 
 
@@ -218,7 +220,10 @@ def test_apply_writes_exactly_the_rebuilt_fields_and_is_idempotent():
 
     for f in mod.FIELDS:
         obj = json.loads(s3.objects[raw_date_key("apple_health", DAY, sub=f"additive_{f}")])
-        assert set(obj) == {"field", "date", "units", "readings"} and obj["field"] == f and obj["date"] == DAY
+        assert set(obj) - {"revisions"} == {"field", "date", "units", "readings"} and obj["field"] == f and obj["date"] == DAY
+    # the fixture's same-second pair re-delivered two readings with a new quantity: both versions are kept
+    steps_obj = json.loads(s3.objects[raw_date_key("apple_health", DAY, sub="additive_steps")])
+    assert [q for _, q in steps_obj["revisions"]["Matt 17"]["2026-10-14 15:57:09 -0700"]] == [103.9283, 31.7674]
     assert sum(len(t) for t in json.loads(s3.objects[raw_date_key("apple_health", DAY, sub="additive_steps")])["readings"].values()) == 185
 
     _, again = _run(["--since", DAY, "--until", DAY, "--apply"], s3, table)
