@@ -142,15 +142,21 @@ def test_a_workstation_call_is_named_dev_session_and_quiet(monkeypatch, capsys):
     assert "UNATTRIBUTED" not in capsys.readouterr().err
 
 
-def test_the_tripwire_itself_never_raises_into_an_ai_call(monkeypatch):
-    """Fail-open: a broken print path must not break the call (the emit's own except catches it)."""
+def test_the_tripwire_never_costs_the_datapoint_or_the_call(monkeypatch):
+    """Fail-open: a broken stderr must neither raise into the AI call nor drop the metered spend."""
 
-    def _boom(*a, **k):
-        raise OSError("stderr closed")
+    class _BrokenStderr:
+        def write(self, *a, **k):
+            raise OSError("stderr closed")
 
-    monkeypatch.setattr(bedrock_client, "_CW", _FakeCW())
-    monkeypatch.setattr(bedrock_client, "_note_unattributed", _boom)
+        def flush(self):
+            raise OSError("stderr closed")
+
+    cw = _FakeCW()
+    monkeypatch.setattr(bedrock_client, "_CW", cw)
+    monkeypatch.setattr(bedrock_client.sys, "stderr", _BrokenStderr())
     bedrock_client._emit_usage_metrics({"input_tokens": 1, "output_tokens": 1}, _HAIKU)  # must not raise
+    assert any(m["MetricName"] == "EstimatedCostUSD" for m in cw.metric_data), "the tripwire cost the datapoint"
 
 
 # ── 3. the receipt dates the residual ──────────────────────────────────────────
@@ -215,7 +221,7 @@ class _SSM:
     def get_parameter(self, Name):
         if Name == "/life-platform/budget-tier":
             return {"Parameter": {"Value": "0"}}
-        return {"Parameter": {"Value": json.dumps({"ceiling": 300.0, "surge_active": False})}}
+        return {"Parameter": {"Value": json.dumps({"ceiling": 85.0, "surge_active": False})}}
 
 
 def test_the_served_receipt_and_the_mcp_tool_carry_the_dated_residual(monkeypatch):

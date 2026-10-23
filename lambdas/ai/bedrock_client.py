@@ -298,7 +298,10 @@ def _note_unattributed(feature: str, cost_usd: float, env=None) -> str | None:
         f"caller_class={caller_class(env)} workflow={workflow!r} entrypoint={entry!r}. Wrap the caller in "
         "bedrock_client.attributed_to(<label>) and add the label to ATTRIBUTABLE_FEATURES (#5136)."
     )
-    print(line, file=sys.stderr)
+    try:
+        print(line, file=sys.stderr)
+    except Exception:  # noqa: BLE001 — a broken stderr must never cost the datapoint itself
+        pass
     return line
 
 
