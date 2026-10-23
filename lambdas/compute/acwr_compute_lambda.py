@@ -37,8 +37,8 @@ Writes to DynamoDB SOURCE#computed_metrics | DATE#<yesterday> via UpdateItem
   acwr                  float   (acute / chronic ratio)
   acute_load_7d         float   (EWMA-7 strain — field name kept for schema stability)
   chronic_load_28d      float   (EWMA-28 strain — field name kept for schema stability)
-  acwr_zone             str     ("safe" | "caution" | "danger" | "detraining")
-  acwr_alert            bool    (True if >1.3 or <0.8)
+  acwr_zone             str     ("safe" | "caution" | "danger" | "detraining" | "re-baselining")
+  acwr_alert            bool    (True if >1.3 or <0.8; inside an HR regime window only >1.3)
   acwr_alert_reason     str     (human-readable)
   acwr_days_acute       int     (days with actual Whoop data in trailing 7-day window)
   acwr_days_chronic     int     (days with actual Whoop data in trailing 28-day window)
@@ -64,6 +64,7 @@ from typing import Any
 import boto3
 from common import stats_core  # #543: the sanctioned EWMA (stats_core.ewma_series), ADR-105
 from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
+from health import hr_regime  # #5029: THE dated HR regime markers — Whoop strain is HR-weighted
 
 try:
     from common.platform_logger import get_logger
@@ -262,6 +263,30 @@ def _classify_acwr(acwr):
     )
 
 
+def _regime_classify(acwr, target_date):
+    """#5029: `_classify_acwr` read through the HR regime markers (`health.hr_regime`).
+
+    Whoop strain is heart-rate-weighted, so inside a marker's re-baselining window the ratio is
+    not compared against the pre-marker load on equal terms: the "safe" (green) and
+    "detraining" (train-more) labels are withheld and the zone reads "re-baselining". The
+    protective high side is never withheld — "caution" (>1.3) and "danger" (>1.5) keep their
+    zone and their alert, so every consumer that gates on them (the brief's load alert, the
+    coach prompts, get_acwr_status) still fires. Nothing is loosened; no threshold changes.
+    """
+    zone, alert, reason = _classify_acwr(acwr)
+    status = hr_regime.regime_status(target_date)
+    if status is None or zone in ("caution", "danger", "unknown"):
+        if status is not None and zone in ("caution", "danger"):
+            reason = f"{reason} (Heart-rate-derived load is re-baselining after the {status['marker_date']} HR regime marker.)"
+        return zone, alert, reason
+    return (
+        hr_regime.REBASELINING,
+        False,
+        f"ACWR {acwr:.2f}: no safe/detraining label is drawn while heart-rate-derived load re-baselines after the "
+        f"{status['marker_date']} HR regime marker (through {status['window_end']}). An ACWR above 1.3 still alerts.",
+    )
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # WRITE TO COMPUTED_METRICS
 # ─────────────────────────────────────────────────────────────────────────────
@@ -382,7 +407,7 @@ def _lambda_handler_impl(event, context):
     _, n_acute = _rolling_avg(whoop_items, "strain", 7, target_date)
     _, n_chronic = _rolling_avg(whoop_items, "strain", 28, target_date)
 
-    zone, alert, reason = _classify_acwr(acwr)
+    zone, alert, reason = _regime_classify(acwr, target_date)  # #5029: re-baselining inside an HR regime window
 
     logger.info(
         "ACWR=%s zone=%s alert=%s | acute_7d=%s chronic_28d=%s " "(data coverage: %d/7d, %d/28d)",

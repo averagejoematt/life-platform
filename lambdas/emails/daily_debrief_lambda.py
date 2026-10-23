@@ -46,6 +46,7 @@ from common import media_tombstone  # #4365: a restart tombstone is not a publis
 from common.numeric import decimals_to_float
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.er03_gate import BANNED_CAUSAL  # the platform's one banned-causal-connective list
+from health import hr_regime  # #5029: THE dated HR regime markers
 
 try:
     from common.platform_logger import get_logger
@@ -141,7 +142,10 @@ def gather_facts(date_str: str) -> dict:
         # stores this prefixed as acwr_zone — the bare "zone" name never
         # existed on the record, so this read was dead and training_load_zone
         # never reached the debrief.
-        put("training_load_zone", cm.get("acwr_zone"))
+        # #5029: a public episode never voices the HR-regime "re-baselining" zone — the
+        # zone is simply absent that day (the ratio itself still airs).
+        if cm.get("acwr_zone") != hr_regime.REBASELINING:
+            put("training_load_zone", cm.get("acwr_zone"))
     # Habit completion — the effort surface.
     if hs.get("tier0_total"):
         put("core_habits_done", _int(hs.get("tier0_done")))

@@ -2545,7 +2545,9 @@ def lambda_handler(event, context):
                     # "neutral" and injury_risk permanently "low", even on a genuine alert
                     # day. ADR-104: when the compute genuinely hasn't run (no acwr_alert
                     # key at all), publish honest absence rather than fabricating "low".
-                    "form_status": _cm.get("acwr_zone", "neutral"),
+                    # #5029: public payload (OG card FORM) — an HR-regime "re-baselining" zone reads
+                    # "neutral" here, so no reader surface carries the regime window.
+                    "form_status": ("neutral" if _cm.get("acwr_zone") == hr_regime.REBASELINING else _cm.get("acwr_zone", "neutral")),
                     "injury_risk": ("high" if _cm.get("acwr_alert") else "low") if "acwr_alert" in _cm else None,
                     # ADR-104 (#2221): hard-coded zeros — a reader (and the OG card) could
                     # not tell "we do not compute this" from "you did nothing for 30 days".

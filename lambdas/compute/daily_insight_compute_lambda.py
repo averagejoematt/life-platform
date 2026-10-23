@@ -1507,6 +1507,12 @@ def _build_acwr_signal(computed_7d):
             "if recovery metrics support it. Don't alarm — this is an opportunity."
         )
         priority = 4
+    elif zone == "re-baselining":  # #5029: HR regime window — no safe/optimal claim, informational only
+        instruction = (
+            "INSTRUCTION: Heart-rate-weighted load is re-baselining — do not call the training load optimal or "
+            "under-stimulated. Coach to the standing constraint."
+        )
+        priority = 8
     else:  # safe
         instruction = "Training load is in the optimal zone."
         priority = 8

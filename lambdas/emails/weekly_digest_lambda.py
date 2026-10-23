@@ -1219,7 +1219,9 @@ def build_html(data, commentary, profile):
             _av = float(_acwr_val)
             _zone = str(_acwr_data.get("zone", "")).upper()
             _acwr_alert = bool(_acwr_data.get("alert", False))
-            _acol = "#e74c3c" if _acwr_alert else "#e67e22" if _av > 1.3 or _av < 0.8 else "#27ae60"
+            _acol = (
+                "#e74c3c" if _acwr_alert else "#94a3b8" if _zone == "RE-BASELINING" else "#e67e22" if _av > 1.3 or _av < 0.8 else "#27ae60"
+            )
             bl_rows += row(
                 "ACWR — Training Load",
                 f'<span style="color:{_acol};font-weight:700;">{round(_av, 2)}{" — " + _zone if _zone else ""}</span>',
