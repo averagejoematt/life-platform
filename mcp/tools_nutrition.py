@@ -704,7 +704,7 @@ def _get_macro_targets(args):
             "calorie_target_check": _labelled_trend_check(budget.get("trend_check")) if budget else None,
             "note": (
                 "Calorie target = the platform's ONE calorie target (health.calorie_target: the week's titration record "
-                "when one exists, else the charter's nutrition.calories target, clamped at the any-day floor) — the same "
+                "when one exists, else the charter's nutrition.calories target; the energy floors are warnings, never a clamp) — the same "
                 "number scoring, the emails, the coach and the critics use. Adherence below is graded against it. "
                 "energy_budget is maintenance context (TDEE), not a target."
                 if calorie_target

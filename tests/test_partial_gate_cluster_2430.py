@@ -5,7 +5,9 @@ resolved to a registered grounding decision. That is a distinct failure from "un
 the check that existed looked like a gate, so nobody asked what it did not cover.
 
   * the daily reflection ran ER-03 per reflection — correlative, hedged, no number
-    outside the facts — and nothing about dates or the cycle anchor;
+    outside the facts — and nothing about dates or the cycle anchor (the reflection was
+    RETIRED 2026-10-23 on the #4583 owner ruling, so its registration and its proofs left
+    this file with it — the other three below are unchanged);
   * the quarterly memoir ran fabricated_numbers + the cites_a_miss bar, over a QUARTER,
     with no date class and no span/Day-N class;
   * the meal-photo probe had the #1390 partition isolation as its whole contract, which
@@ -20,13 +22,11 @@ module's own tests.
 
 import os
 
-REFLECTION = "lambdas/compute/coach_daily_reflection_lambda.py"
 MEMOIR = "lambdas/compute/coach_memoir_lambda.py"
 EYEBALL = "lambdas/experiment/eyeball_calibration.py"
 PODCAST = "lambdas/emails/coach_panel_podcast_lambda.py"
 
 ARMED = {
-    f"{REFLECTION}::_grounding_findings": REFLECTION,
     f"{MEMOIR}::gate_check": MEMOIR,
     f"{EYEBALL}::_grounded_note": EYEBALL,
 }
@@ -83,23 +83,6 @@ class TestTheNewClassIsLoadBEARING:
     so the ONE finding is `fabricated_date` and nothing is riding on a number gate that
     was already there."""
 
-    def test_reflection_er03_passes_the_date_the_registered_gate_refuses(self):
-        from compute import coach_daily_reflection_lambda as reflection
-        from experiment import er03_gate
-
-        facts = {
-            "summary": "recovery averaged 62",
-            "themes": [],
-            "numbers": {"62", "2026", "3", "4"},
-            "allowed": {62.0, 2026.0, 3.0, 4.0},
-            "allowed_dates": {"2026-04-03"},
-            "n": 12,
-        }
-        text = "So far recovery around 62 appears to hold. It looked the same on 2026-03-04."
-        assert er03_gate.er03_check(text, allowed_numbers=facts["numbers"], n=facts["n"])[0], "precondition: the OLD gate passes it"
-        ok, reasons = reflection._accepts(text, facts, "2026-08-10")
-        assert not ok and reasons == ["fabricated_date"], reasons
-
     def test_memoir_refuses_a_date_it_never_graded(self):
         from compute import coach_memoir_lambda as memoir
 
@@ -135,7 +118,7 @@ class TestCensusLedger:
     def test_the_three_left_the_tracked_defect_table_as_surfaces(self):
         import test_invoke_site_census_2390 as census
 
-        for module in (REFLECTION, MEMOIR, EYEBALL):
+        for module in (MEMOIR, EYEBALL):
             assert module in census.SITES, f"precondition: {module} still references a model seam"
             assert module not in census.UNGATED_READER_KNOWN, f"{module} must exit the tracked-defect table via SURFACES"
             assert census.classify(module, census.SURFACE_MODULES) == ["surfaces"]

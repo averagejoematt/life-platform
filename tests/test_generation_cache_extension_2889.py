@@ -136,29 +136,10 @@ def test_an_entry_with_an_empty_output_is_a_miss():
 
 # ── the named part sets: dropping a part NARROWS the fingerprint ──────────────
 #
-# `reflection_parts` / `ensemble_parts` exist so the names live in this module and a
-# call site cannot quietly drop one. These assert the property that matters — every
+# `ensemble_parts` exists so the names live in this module and a call site cannot
+# quietly drop one (`reflection_parts` left with the retired daily reflection, #4583). These assert the property that matters — every
 # named part actually reaches the digest — rather than the literal key list, so they
 # stay honest if a part is renamed but break if one stops counting.
-
-
-def _reflection_kwargs():
-    return {
-        "persona": {"name": "Sol", "domain": "sleep"},
-        "voice_rules": '{"tone": "dry"}',
-        "example": "A sample in voice.",
-        "facts": {"summary": "efficiency 88%", "themes": ["consistency"], "n": 12},
-    }
-
-
-def test_every_named_reflection_part_moves_the_fingerprint():
-    base = gc.reflection_parts(**_reflection_kwargs())
-    for name in base:
-        mutated = dict(_reflection_kwargs())
-        mutated[name] = {"MUTATED": True}
-        assert gc.brief_fingerprint(gc.reflection_parts(**mutated)) != gc.brief_fingerprint(
-            base
-        ), f"part '{name}' does not reach the fingerprint — reuse could serve output generated from a different {name}"
 
 
 def _ensemble_kwargs():

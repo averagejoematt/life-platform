@@ -20,6 +20,11 @@ What this file holds `health.nutrition_critics` to:
 Mutation control (watched 2026-09-21, recorded in the PR): removing the energy-floor breach
 rule from `build_muscle_defense_packet` reds `test_energy_floor_two_days_below_is_a_breach`
 and `test_specimen_from_the_red_team_record_names_the_intake_floor`.
+
+Owner rulings 2026-10-23 (#5091 R1, #5205): the target is ~1,500, the energy floors and the rate-ceiling flags stay
+as WARNINGS (an `info` flag that says WARNING, never a veto or an automatic change), and the one calorie step is
+`nutrition.titration.max_step_kcal`. The pre-ruling breach arms are still covered under `pre_ruling` (the charter's
+`floor_role` / `above_ceiling_action` patched back).
 """
 
 from __future__ import annotations
@@ -45,6 +50,18 @@ PROTEIN = rl.REDLINES["protein_floor_g"]
 LIFTS = rl.REDLINES["lifting_sessions_per_wk"]
 TW = {t["id"]: t for t in rl.TRIPWIRES}
 LO, HI = ENERGY["prescribed"]
+MID = (LO + HI) // 2  # the band's centre: the target (#5099, owner ruling 2026-10-23 R1)
+STEP = int(nc.charter_value("nutrition.titration.max_step_kcal"))  # the ONE calorie step (#5205)
+
+
+@pytest.fixture
+def pre_ruling(monkeypatch):
+    """The pre-2026-10-23 posture: the energy floors are a breach and the ceiling flag is a change (not warnings)."""
+    real = nc.charter_value
+    patched = {"nutrition.calories.floor_role": "breach", "nutrition.titration.above_ceiling_action": "up"}
+    monkeypatch.setattr(nc, "charter_value", lambda path, default=None: patched[path] if path in patched else real(path, default))
+
+
 TARGET_317 = rl.rate_target_lb_per_wk(317.0)["target_lb_wk"]  # the scheduled target at the fixture's weight, never a literal
 
 
@@ -55,7 +72,7 @@ def _inputs(**over):
     fixture follows a v3 → v4 rate edit instead of silently going stale (#3753 v3: 3.0 → 3.5)."""
     base = {
         "window_end": "2026-09-20",
-        "intake_kcal_by_day": [2100] * 14,
+        "intake_kcal_by_day": [MID] * 14,
         "protein_g_by_day": [205] * 14,
         "lifting_day_flags": [True, True, False, True, True, True, False] * 2,
         "weight_lb": 317.0,
@@ -150,16 +167,27 @@ def test_provisional_trend_argues_no_change_and_names_its_n():
     assert f["severity"] == "info" and "PROVISIONAL" in f["reason"] and "n=3" in f["reason"]
 
 
-def test_overshoot_two_weeks_over_cap_after_week_4_quotes_the_schedule_rule():
+def _overshoot_flag():
     cap = rl.rate_target_lb_per_wk(317.0)["cap_lb_wk"]
     need = TW["rate_overshoot"]["threshold_weeks"]
     p = nc.build_deficit_advocate_packet(
         _inputs(weekly_loss_rates_lb_wk=[cap + 0.5] * need, weight_trend_lb_wk=-(cap + 0.5), weeks_since_genesis=5)
     )
     (f,) = _flags(p, "rate_over_cap_consecutive_weeks")
-    assert f["severity"] == "change" and f["to"] == 2100 + 250
     assert rl.REDLINES["rate_schedule_lb_wk"]["overshoot_rule"] in f["reason"]
     assert f["provenance"] == TW["rate_overshoot"]["provenance"]
+    return f
+
+
+def test_overshoot_two_weeks_over_cap_after_week_4_is_a_warning_quoting_the_schedule_rule():
+    f = _overshoot_flag()  # the live charter: owner ruling 2026-10-23 R1, the ceiling flag is a warning
+    assert f["severity"] == "info" and f["reason"].startswith("WARNING") and f["to"] is None and f["field"] is None
+    assert f"+{STEP} kcal/day" in f["reason"]
+
+
+def test_overshoot_under_the_pre_ruling_posture_is_a_change_of_the_one_step(pre_ruling):
+    f = _overshoot_flag()
+    assert f["severity"] == "change" and f["to"] == MID + STEP
 
 
 @pytest.mark.parametrize("over", [{"weeks_since_genesis": 3}, {"weekly_loss_rates_lb_wk": [2.0, 4.0]}])
@@ -179,9 +207,17 @@ def test_ic29_moderate_adaptation_is_a_diet_break_decision_with_its_provenance()
 
 
 # ── 4. muscle defense ─────────────────────────────────────────────────────────
-def test_energy_floor_two_days_below_is_a_breach(monkeypatch):
+def test_energy_floor_two_days_below_is_a_warning_at_the_ruled_charter():
+    days = [ENERGY["floor_any_day"]] * 12 + [ENERGY["floor_any_day"] - 100, ENERGY["floor_any_day"] - 50]
+    p = nc.build_muscle_defense_packet(_inputs(intake_kcal_by_day=days, lifting_day_flags=[False] * 14))
+    (f,) = _flags(p, "energy_floor_days_below_7d")
+    assert f["severity"] == "info" and f["reason"].startswith("WARNING") and not p["violations"]
+    assert TW["intake_floor_breached"]["action"] in f["reason"] and str(ENERGY["floor_any_day"]) in f["reason"]
+
+
+def test_energy_floor_two_days_below_is_a_breach(monkeypatch, pre_ruling):
     monkeypatch.setattr(rl, "ACTIVE", False)
-    days = [2100] * 12 + [ENERGY["floor_any_day"] - 100, ENERGY["floor_any_day"] - 50]
+    days = [ENERGY["floor_any_day"]] * 12 + [ENERGY["floor_any_day"] - 100, ENERGY["floor_any_day"] - 50]
     p = nc.build_muscle_defense_packet(_inputs(intake_kcal_by_day=days, lifting_day_flags=[False] * 14))
     assert p["numbers"]["energy_floor_days_below_7d"] == TW["intake_floor_breached"]["threshold_days"]
     (f,) = _flags(p, "energy_floor_days_below_7d")
@@ -191,7 +227,7 @@ def test_energy_floor_two_days_below_is_a_breach(monkeypatch):
 
 
 def test_energy_floor_one_day_below_is_info_not_a_breach():
-    days = [2100] * 13 + [ENERGY["floor_any_day"] - 100]
+    days = [ENERGY["floor_any_day"]] * 13 + [ENERGY["floor_any_day"] - 100]
     p = nc.build_muscle_defense_packet(_inputs(intake_kcal_by_day=days, lifting_day_flags=[False] * 14))
     (f,) = _flags(p, "energy_floor_days_below_7d")
     assert f["severity"] == "info"
@@ -335,7 +371,7 @@ def test_self_added_volume_report_only_never_reaches_a_change_verdict():
 _BREACH = dict(intake_kcal_by_day=[2100] * 12 + [1000, 1000], lifting_day_flags=[False] * 14)
 
 
-def test_redline_breach_is_a_change_saying_proposed_while_active_is_false(monkeypatch):
+def test_redline_breach_is_a_change_saying_proposed_while_active_is_false(monkeypatch, pre_ruling):
     monkeypatch.setattr(rl, "ACTIVE", False)
     res = nc.run(_inputs(**_BREACH))
     v = _verdict(res, "muscle_defense")
@@ -345,7 +381,7 @@ def test_redline_breach_is_a_change_saying_proposed_while_active_is_false(monkey
     assert not res["veto"]
 
 
-def test_redline_breach_is_a_veto_carrying_its_provenance_when_active_is_true(monkeypatch):
+def test_redline_breach_is_a_veto_carrying_its_provenance_when_active_is_true(monkeypatch, pre_ruling):
     monkeypatch.setattr(rl, "ACTIVE", True)
     res = nc.run(_inputs(**_BREACH))
     v = _verdict(res, "muscle_defense")
@@ -398,12 +434,22 @@ SPECIMEN = dict(
 )
 
 
-def test_specimen_from_the_red_team_record_names_the_intake_floor():
+def test_specimen_from_the_red_team_record_names_the_intake_floor(pre_ruling):
     res = nc.run(_inputs(**SPECIMEN))
     v = _verdict(res, "muscle_defense")
     assert v["verdict"] in ("change", "veto"), "1,533 kcal / 146 g must never be approved"
     assert v["metric"] == "energy_floor_days_below_7d"
     assert str(ENERGY["floor_any_day"]) in v["reason"] and "energy floor" in v["reason"]
+
+
+def test_specimen_at_the_ruled_charter_is_still_never_approved_and_names_the_floor_as_a_warning():
+    """Owner ruling 2026-10-23 R1: ~1,533 kcal is now ON the target, so the energy floor is a WARNING; 146 g protein is
+    still under the protein floor, so the specimen is never approved — on the protein metric."""
+    p = nc.build_muscle_defense_packet(_inputs(**SPECIMEN))
+    (f,) = _flags(p, "energy_floor_days_below_7d")
+    assert f["severity"] == "info" and f["reason"].startswith("WARNING") and str(ENERGY["floor_any_day"]) in f["reason"]
+    v = _verdict(nc.run(_inputs(**SPECIMEN)), "muscle_defense")
+    assert v["verdict"] in ("change", "veto") and v["metric"] == "protein_days_missed_7d"
     assert sum(p >= PROTEIN["value"] for p in SPECIMEN["protein_g_by_day"]) == 3
     assert round(sum(SPECIMEN["protein_g_by_day"]) / 14) == 146
 
@@ -452,12 +498,13 @@ def test_stall_conditions_are_read_from_the_redlines_not_literals():
     assert not [d for d in offered if d["trigger"]["id"] == "weight_stall_with_adherence"]
 
 
-def test_rate_overshoot_offers_the_plus_250_decision():
+def test_rate_overshoot_offers_the_one_step_decision_5205():
     cap = rl.rate_target_lb_per_wk(317.0)["cap_lb_wk"]
     inputs = _inputs(weekly_loss_rates_lb_wk=[cap + 0.5, cap + 0.5], weight_trend_lb_wk=-(cap + 0.5), weeks_since_genesis=5)
     offered = nc.decisions_offered(nc.run(inputs)["verdicts"], inputs, already_logged=[])
     (d,) = [d for d in offered if d["trigger"]["id"] == "rate_overshoot"]
-    assert d["state"] == "pending" and any("+250 kcal/day" in o for o in d["options"])
+    assert d["state"] == "pending" and any(f"+{STEP} kcal/day" in o for o in d["options"])
+    assert not any("+250" in o for o in d["options"]), "one calorie step everywhere (owner ruling 2026-10-23, #5205)"
     assert d["log_decision_payload"]["decision"].startswith("[rate_overshoot]")
 
 
@@ -673,7 +720,8 @@ def test_the_resolver_block_carries_the_verdicts_and_names_what_it_could_not_rea
     monkeypatch.setattr(nci.shared_quantities, "dxa_scans", lambda end: [])  # #4166: no scan on file -> tier unknown
     out = nci.block("2026-09-20", deficit_severity="SUSTAINABLE", degraded_count=0)
     md = next(v for v in out["verdicts"] if v["critic"] == "muscle_defense")
-    assert md["verdict"] in ("change", "veto") and md["metric"] == "energy_floor_days_below_7d"
+    # owner ruling 2026-10-23 R1: 1,533 kcal sits on the ~1,500 target (the energy floor is a warning); 146 g protein is not
+    assert md["verdict"] in ("change", "veto") and md["metric"] == "protein_days_missed_7d"
     assert set(out["inputs_unresolved"]) == {"metabolic_adaptation"}, "only the reader that failed is named"
     assert "metabolic_adaptation_severity" in next(v for v in out["verdicts"] if v["critic"] == "deficit_advocate")["unknown"]
     assert out["window_end"] == "2026-09-20" and out["model_ran"] is False

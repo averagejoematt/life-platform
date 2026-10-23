@@ -58,7 +58,8 @@ HELPER_READERS = frozenset(
         # (coach/audience_guard.public_timeline_summary). served_summary's
         # key_recommendation → content chain is the owner register (#2972's class).
         "lambdas/emails/coach_panel_podcast_lambda.py",
-        "lambdas/compute/coach_daily_reflection_lambda.py",
+        # coach_daily_reflection_lambda LEFT this set 2026-10-23 (#4583): its one read fed
+        # the retired daily reflection; the module no longer reads a coach OUTPUT# row.
     }
 )
 
@@ -133,11 +134,12 @@ class TestTheSixServingPaths:
             assert "coach_derived_prose.served_summary(" in source, f"{rel} no longer uses the shared derived-prose read seam"
             assert 'observatory_summary") or ""' not in source, f"{rel} still ends its chain at the empty string"
 
-    def test_the_census_is_four_paths(self):
+    def test_the_census_is_three_paths(self):
         # Six until #2972 moved site_api_lambda's dashboard blurb slot off
         # observatory_summary entirely (see the DIRECT_READERS note above); five until
-        # #4213 moved site_api_coach_profile's timeline slot to the public register.
-        assert len(DIRECT_READERS | HELPER_READERS) == 4
+        # #4213 moved site_api_coach_profile's timeline slot to the public register;
+        # four until #4583 retired the daily reflection (2026-10-23).
+        assert len(DIRECT_READERS | HELPER_READERS) == 3
 
     def test_a_held_record_still_serves_the_gated_narrative(self):
         """The whole point of the fallback: HOLD degrades, it does not blank."""
