@@ -43,7 +43,6 @@ from coach import (  # noqa: E402
     coach_history_summarizer as chs,  # noqa: E402
 )
 from coach.coach_extraction_prompt import EXTRACTION_SYSTEM_PROMPT, build_extraction_message  # noqa: E402
-from compute import coach_daily_reflection_lambda as daily  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 from web import site_api_coach as C  # noqa: E402
 
@@ -87,13 +86,29 @@ _PK = f"COACH#{_COACH}"
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _table(stance=None, outputs=(), commitments=()):
+_TODAY = "2026-09-26"  # the clock is frozen here in `_coach_body` (#4848: no literal through a live clock)
+
+
+def _moves_row(text, coach_id=_COACH, day=_TODAY):
+    """One stored board MOVES# row whose single line is `coach_id`'s (#4583: the move is
+    each coach's one daily voice, served as `daily`)."""
+    return {
+        "pk": "COACH#eli_marsh",
+        "sk": f"MOVES#{day}",
+        "date": day,
+        "lines": [{"coach_id": coach_id, "name": "Nathan Reeves", "move": "question", "text": text, "date": day}],
+    }
+
+
+def _table(stance=None, outputs=(), commitments=(), moves=None):
     def _query_hook(table, **kw):
         expr = kw["KeyConditionExpression"].get_expression()
         if expr.get("operator") != "AND":
             return {"Items": []}
         pk = expr["values"][0].get_expression()["values"][1]
         sk = expr["values"][1].get_expression()["values"][1]
+        if pk == "COACH#eli_marsh" and sk == "MOVES#":
+            return {"Items": [dict(moves)] if moves else []}
         if pk != _PK:
             return {"Items": []}
         if sk == "OUTPUT#":
@@ -112,13 +127,16 @@ def _table(stance=None, outputs=(), commitments=()):
     return FakeDdbTable(query_hook=_query_hook, get_item_hook=_get_item_hook)
 
 
-def _coach_body(monkeypatch, *, stance=None, outputs=(), commitments=(), daily_text=None):
-    monkeypatch.setattr(C, "table", _table(stance, outputs, commitments))
+def _coach_body(monkeypatch, *, stance=None, outputs=(), commitments=(), daily_text=None, moves=None, coach_daily_artifact=None):
+    from common import pacific_time
+
+    monkeypatch.setattr(pacific_time, "pacific_today", lambda *a, **k: _TODAY)
+    monkeypatch.setattr(C, "table", _table(stance, outputs, commitments, moves or (_moves_row(daily_text) if daily_text else None)))
     real_load = C._load_s3_json
 
     def _load(key, cache_name):
         if key == "generated/coach_daily.json":
-            return {"reflections": {_COACH: {"text": daily_text, "date": "2026-09-26"}}} if daily_text else {}
+            return coach_daily_artifact or {}
         if key.startswith("generated/"):
             return {}
         return real_load(key, cache_name)
@@ -206,16 +224,24 @@ def test_a_third_person_daily_read_is_served(monkeypatch):
     assert body["daily"] == _PUBLIC_DAILY
 
 
-def test_the_daily_producer_gate_rejects_an_owner_directed_reflection():
-    """The write side: the reflection's fail-closed gate treats a second-person text as
-    a violation (retried stricter, then dropped) — and the #2889 reuse path re-gates
-    through the same function, so a cached second-person reflection never republishes."""
-    facts = {"allowed": set(), "allowed_dates": set(), "numbers": [], "n": 21}
-    ok, reasons = daily._accepts(_REEVES_DAILY, facts, "2026-09-26")
-    assert not ok and "audience_violation" in reasons
-    _ok, reasons = daily._accepts(_PUBLIC_DAILY, facts, "2026-09-26")
-    assert "audience_violation" not in reasons
-    assert "THIRD person" in daily._SYSTEM_RULES
+def test_daily_is_the_coachs_move_from_the_current_run(monkeypatch):
+    """#4583 (owner ruling 2026-10-23): the move is the coach's one daily voice. Yesterday's
+    row still counts before today's 19:00Z run lands; anything older is stale."""
+    yesterday = "2026-09-25"
+    assert _coach_body(monkeypatch, moves=_moves_row(_PUBLIC_DAILY, day=yesterday))["daily"] == _PUBLIC_DAILY
+    assert _coach_body(monkeypatch, moves=_moves_row(_PUBLIC_DAILY, day="2026-09-24"))["daily"] is None
+
+
+def test_a_coach_who_did_not_speak_serves_nothing_never_another_coachs_line(monkeypatch):
+    body = _coach_body(monkeypatch, moves=_moves_row(_PUBLIC_DAILY, coach_id="sleep_coach"))
+    assert "daily" in body and body["daily"] is None
+
+
+def test_the_retired_reflection_artifact_is_not_read(monkeypatch):
+    """Mutation control for the retirement: a reflection left in generated/coach_daily.json
+    (the reference copy kept in S3) never reaches the page."""
+    artifact = {"reflections": {_COACH: {"text": _PUBLIC_DAILY, "date": _TODAY}}}
+    assert _coach_body(monkeypatch, coach_daily_artifact=artifact)["daily"] is None
 
 
 # ══════════════════════════════════════════════════════════════════════════════

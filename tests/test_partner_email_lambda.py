@@ -164,7 +164,7 @@ def test_normalize_whoop_sleep_unparseable_stage_value_fails_soft():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# DDB readers (query_range / query_journal_range / fetch_profile)
+# DDB readers (query_range / fetch_profile)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
@@ -192,56 +192,6 @@ def test_query_range_delegates_to_the_shared_digest_util(monkeypatch):
     monkeypatch.setattr(partner.digest_utils, "query_range", _fake)
     assert partner.query_range("whoop", WEEK_START, WEEK_END) == {"2026-07-30": {"sleep_score": 70}}
     assert seen == {"table": partner.table, "source": "whoop", "start": WEEK_START, "end": WEEK_END, "user_id": partner.USER_ID}
-
-
-def test_query_journal_range_groups_by_date_paginates_and_converts_decimals(monkeypatch):
-    from decimal import Decimal
-
-    pk = "USER#%s#SOURCE#notion" % partner.USER_ID
-    page1 = {
-        "Items": [
-            {"pk": pk, "sk": "DATE#2026-07-30#journal#001", "enriched_mood": Decimal("4")},
-            {"pk": pk, "sk": "DATE#2026-07-30#journal#002", "enriched_mood": Decimal("3.5")},
-        ],
-        "LastEvaluatedKey": {"pk": pk, "sk": "DATE#2026-07-30#journal#002"},
-    }
-    page2 = {"Items": [{"pk": pk, "sk": "DATE#2026-08-01#journal#001", "enriched_stress": Decimal("2")}]}
-    fake = _FakeTable([page1, page2])
-    monkeypatch.setattr(partner, "table", fake)
-
-    out = partner.query_journal_range(WEEK_START, WEEK_END)
-    assert sorted(out) == ["2026-07-30", "2026-08-01"]
-    assert len(out["2026-07-30"]) == 2
-    assert out["2026-07-30"][1]["enriched_mood"] == 3.5
-    assert isinstance(out["2026-07-30"][1]["enriched_mood"], float)  # d2f applied
-    assert out["2026-08-01"][0]["enriched_stress"] == 2.0
-    assert isinstance(out, dict) and not hasattr(out, "default_factory")  # plain dict, not defaultdict
-
-
-def test_query_journal_range_scopes_the_key_range_and_applies_the_phase_filter(monkeypatch):
-    fake = _FakeTable([{"Items": []}])
-    monkeypatch.setattr(partner, "table", fake)
-    partner.query_journal_range(WEEK_START, WEEK_END)
-
-    kwargs = fake.queries[0]
-    vals = kwargs["ExpressionAttributeValues"]
-    assert vals[":pk"] == "USER#%s#SOURCE#notion" % partner.USER_ID
-    assert vals[":s"] == "DATE#" + WEEK_START + "#journal#"
-    assert vals[":e"] == "DATE#" + WEEK_END + "#journal#zzz"
-    # ADR-058 default-deny: pilot-phase rows must be filtered out
-    assert "#phase" in kwargs["ExpressionAttributeNames"]
-    assert "attribute_not_exists(#phase)" in kwargs["FilterExpression"]
-
-
-def test_query_journal_range_passes_the_cursor_forward_on_the_second_page(monkeypatch):
-    cursor = {"pk": "p", "sk": "s"}
-    fake = _FakeTable([{"Items": [], "LastEvaluatedKey": cursor}, {"Items": []}])
-    monkeypatch.setattr(partner, "table", fake)
-    partner.query_journal_range(WEEK_START, WEEK_END)
-
-    assert len(fake.queries) == 2
-    assert "ExclusiveStartKey" not in fake.queries[0]
-    assert fake.queries[1]["ExclusiveStartKey"] == cursor
 
 
 def test_fetch_profile_delegates_to_intelligence_common(monkeypatch):
@@ -300,38 +250,30 @@ RAW = {
     "day_grade": {"2026-07-30": {"total_score": 72}, "2026-07-31": {"total_score": 60}},
 }
 
-JOURNAL = {
-    "2026-07-30": [
-        {
-            "enriched_mood": 4,
-            "enriched_energy": 3,
-            "enriched_stress": 2,
-            "enriched_themes": ["work", "sleep"],
-            "enriched_emotions": ["tired"],
-            "enriched_avoidance_flags": ["scrolling"],
-            "enriched_defense_patterns": ["intellectualising"],
-            "enriched_notable_quote": "I keep pushing.",
-        }
-    ],
-    "2026-07-31": [
-        {
-            "morning_mood": 3,
-            "morning_energy": 4,
-            "stress_level": 3,
-            "enriched_themes": ["work"],
-            "enriched_emotions": ["tired", "flat"],
-            "enriched_notable_quote": "Quieter today.",
-        }
-    ],
+# #5125 R5: the evening check-in reaches the letter only as checkin_partner_view's words + one count.
+CHECKINS = {
+    "evenings": 5,
+    "days": 7,
+    "ratings": {
+        "stress": {"band": "moderate", "direction": "lower than last week"},
+        "hunger": {"band": "low", "direction": None},
+        "cravings": {"band": "low", "direction": None},
+    },
+    "sentence": "He answered 5 of 7 evening check-ins. Stress mostly moderate (lower than last week); hunger mostly low; cravings mostly low.",
 }
+NO_CHECKINS = {"evenings": 0, "days": 7, "ratings": {}, "sentence": "He did not answer the evening check-in this week."}
 
 
-def _wire_gather(monkeypatch, raw=None, journal=None, profile=None):
+def _wire_gather(monkeypatch, raw=None, checkins=None, profile=None):
     """Point gather_all at in-memory fixtures and a pinned clock."""
     raw = RAW if raw is None else raw
-    journal = JOURNAL if journal is None else journal
+    checkins = CHECKINS if checkins is None else checkins
     profile = PROFILE if profile is None else profile
-    seen = {"ranges": []}
+    seen = {"ranges": [], "checkin_windows": []}
+
+    def _week_view(table, start, end, prior_start, prior_end):
+        seen["checkin_windows"].append((start, end, prior_start, prior_end))
+        return checkins
 
     def _query_range(source, start_date, end_date):
         seen["ranges"].append((source, start_date, end_date))
@@ -340,7 +282,7 @@ def _wire_gather(monkeypatch, raw=None, journal=None, profile=None):
     monkeypatch.setattr(partner, "datetime", _FixedDatetime)
     freeze_pacific(monkeypatch, partner, _FixedDatetime)  # #2817: pin the PACIFIC helpers this module now calls
     monkeypatch.setattr(partner, "query_range", _query_range)
-    monkeypatch.setattr(partner, "query_journal_range", lambda s, e: journal)
+    monkeypatch.setattr(partner.checkin_partner_view, "week_view", _week_view)
     monkeypatch.setattr(partner, "fetch_profile", lambda: profile)
     return seen
 
@@ -369,24 +311,13 @@ def test_gather_all_sleep_and_recovery_aggregates(monkeypatch):
     assert data["recovery"] == {"avg": 60.0, "hrv_avg": 50.0}
 
 
-def test_gather_all_mood_aggregates_fall_back_through_the_field_ladder(monkeypatch):
-    _wire_gather(monkeypatch)
-    mood = partner.gather_all()["mood"]
-    # day 1 uses enriched_*, day 2 has none so morning_mood / stress_level are used
-    assert mood["mood_avg"] == 3.5
-    assert mood["energy_avg"] == 3.5
-    assert mood["stress_avg"] == 2.5
-    assert mood["mood_label"] == "neutral"
-    assert mood["entries"] == 2
-    assert mood["days_journaled"] == 2
-    assert mood["top_themes"] == [("work", 2), ("sleep", 1)]
-    assert mood["top_emotions"] == [("tired", 2), ("flat", 1)]
-    assert mood["avoidance_flags"] == ["scrolling"]
-    assert mood["defense_patterns"] == ["intellectualising"]
-    assert mood["notable_quotes"] == [
-        {"date": "2026-07-30", "quote": "I keep pushing."},
-        {"date": "2026-07-31", "quote": "Quieter today."},
-    ]
+def test_gather_all_reads_the_checkin_projection_over_this_week_and_last(monkeypatch):
+    """#5125 R5: the emotional read is the evening check-in's partner projection, not the dark journal."""
+    seen = _wire_gather(monkeypatch)
+    data = partner.gather_all()
+    assert data["checkins"] == CHECKINS
+    assert seen["checkin_windows"] == [(WEEK_START, WEEK_END, "2026-07-23", "2026-07-29")]
+    assert "mood" not in data and not hasattr(partner, "query_journal_range")
 
 
 def test_gather_all_nutrition_hit_rates_use_the_ten_percent_calorie_grace(monkeypatch):
@@ -444,13 +375,11 @@ def test_gather_all_journey_week_floors_at_one_for_a_future_genesis(monkeypatch)
 
 
 def test_gather_all_with_no_data_emits_honest_no_data_labels(monkeypatch):
-    _wire_gather(monkeypatch, raw={}, journal={}, profile={"journey_start_date": "2026-08-01"})
+    _wire_gather(monkeypatch, raw={}, checkins=NO_CHECKINS, profile={"journey_start_date": "2026-08-01"})
     data = partner.gather_all()
     assert data["sleep"] == {"score_avg": None, "duration_avg": None, "nights": 0, "quality_label": "no data"}
     assert data["recovery"] == {"avg": None, "hrv_avg": None}
-    assert data["mood"]["mood_label"] == "no data"
-    assert data["mood"]["mood_avg"] is None
-    assert data["mood"]["top_themes"] == []
+    assert data["checkins"]["evenings"] == 0
     assert data["day_grade"] == {"avg": None, "days": 0, "week_summary": "no data"}
     assert data["nutrition"]["cal_hit_rate"] is None
     assert data["nutrition"]["prot_hit_rate"] is None
@@ -465,14 +394,8 @@ def test_gather_all_with_no_data_emits_honest_no_data_labels(monkeypatch):
     [(90, "good"), (80, "good"), (79.9, "mixed"), (60, "mixed"), (59.9, "poor"), (10, "poor")],
 )
 def test_gather_all_sleep_quality_label_thresholds(monkeypatch, score, label):
-    _wire_gather(monkeypatch, raw={"whoop": {"2026-07-30": {"sleep_score": score, "sleep_duration_hours": 7}}}, journal={})
+    _wire_gather(monkeypatch, raw={"whoop": {"2026-07-30": {"sleep_score": score, "sleep_duration_hours": 7}}})
     assert partner.gather_all()["sleep"]["quality_label"] == label
-
-
-@pytest.mark.parametrize("mood,label", [(5, "positive"), (4, "positive"), (3.9, "neutral"), (3, "neutral"), (2.9, "struggling")])
-def test_gather_all_mood_label_thresholds(monkeypatch, mood, label):
-    _wire_gather(monkeypatch, raw={}, journal={"2026-07-30": [{"enriched_mood": mood}]})
-    assert partner.gather_all()["mood"]["mood_label"] == label
 
 
 @pytest.mark.parametrize(
@@ -488,7 +411,7 @@ def test_gather_all_mood_label_thresholds(monkeypatch, mood, label):
     ],
 )
 def test_gather_all_week_summary_thresholds(monkeypatch, grade, label):
-    _wire_gather(monkeypatch, raw={"day_grade": {"2026-07-30": {"total_score": grade}}}, journal={})
+    _wire_gather(monkeypatch, raw={"day_grade": {"2026-07-30": {"total_score": grade}}})
     assert partner.gather_all()["day_grade"]["week_summary"] == label
 
 
@@ -650,19 +573,7 @@ def _data(**over):
     base = {
         "sleep": {"score_avg": 70.0, "duration_avg": 6.5, "nights": 2, "quality_label": "mixed"},
         "recovery": {"avg": 60.0, "hrv_avg": 50.0},
-        "mood": {
-            "mood_avg": 3.5,
-            "energy_avg": 3.5,
-            "stress_avg": 2.5,
-            "mood_label": "neutral",
-            "entries": 2,
-            "days_journaled": 2,
-            "top_themes": [("work", 2), ("sleep", 1)],
-            "top_emotions": [("tired", 2)],
-            "avoidance_flags": ["scrolling"],
-            "defense_patterns": ["intellectualising"],
-            "notable_quotes": [{"date": "2026-07-30", "quote": "I keep pushing."}, {"date": "2026-07-31", "quote": "Quieter today."}],
-        },
+        "checkins": dict(CHECKINS),
         "nutrition": {
             "calories_avg": 2050.0,
             "protein_avg": 175.0,
@@ -719,25 +630,26 @@ def test_build_html_renders_every_board_section_with_its_own_accent():
     html = partner.build_html(_data(), COMMENTARY)
     for accent, line in [
         ("#22c55e", "He is tired in a way sleep alone will not fix."),
-        ("#a855f7", "He is measuring instead of feeling."),
         ("#3b82f6", "Sit with him without a plan."),
         ("#6b7280", "The body is keeping up, barely."),
     ]:
         assert "border-left:4px solid " + accent in html
         assert line in html
+    # #5125 R5: the journal-fed "underneath" section is retired — a stray one from the model is not rendered.
+    assert "He is measuring instead of feeling." not in html and "border-left:4px solid #a855f7" not in html
 
 
 def test_build_html_at_a_glance_dots_reflect_the_metric_bands():
     html = partner.build_html(
         _data(
-            mood={**_data()["mood"], "mood_avg": 4.0, "mood_label": "positive"},
+            checkins={**CHECKINS, "ratings": {**CHECKINS["ratings"], "stress": {"band": "low", "direction": None}}},
             sleep={"score_avg": 60.0, "duration_avg": 6.0, "nights": 3, "quality_label": "mixed"},
             day_grade={"avg": 40.0, "days": 3, "week_summary": "tough week"},
         ),
         COMMENTARY,
     )
     assert "At a glance" in html
-    assert partner.signal_dot("Mood: positive", True, True) in html  # 4.0 >= 3.5 → green
+    assert partner.signal_dot("Evenings: stress mostly low", True, False) in html  # low stress → green
     assert partner.signal_dot("Sleep: mixed", False, True) in html  # 55 <= 60 < 70 → amber
     assert partner.signal_dot("Week: tough week", False, False) in html  # 40 < 55 → red
 
@@ -745,7 +657,7 @@ def test_build_html_at_a_glance_dots_reflect_the_metric_bands():
 def test_build_html_glance_dots_are_hollow_when_there_is_no_data():
     html = partner.build_html(
         _data(
-            mood={**_data()["mood"], "mood_avg": None, "mood_label": "no data", "notable_quotes": []},
+            checkins=NO_CHECKINS,
             sleep={"score_avg": None, "duration_avg": None, "nights": 0, "quality_label": "no data"},
             day_grade={"avg": None, "days": 0, "week_summary": "no data"},
         ),
@@ -754,16 +666,22 @@ def test_build_html_glance_dots_are_hollow_when_there_is_no_data():
     assert html.count('color:#9ca3af;font-size:10px;">○</span>') == 3
 
 
-def test_build_html_renders_at_most_one_journal_quote_with_its_date():
+def test_build_html_renders_the_checkin_read_deterministically_and_never_a_journal_quote():
     html = partner.build_html(_data(), COMMENTARY)
-    assert '"I keep pushing."' in html
-    assert "From his journal · 2026-07-30" in html
-    assert "Quieter today." not in html  # only the first quote is surfaced
-
-
-def test_build_html_omits_the_quote_card_when_there_are_no_quotes():
-    html = partner.build_html(_data(mood={**_data()["mood"], "notable_quotes": []}), COMMENTARY)
+    assert "His evenings, from his own check-ins" in html
+    assert CHECKINS["sentence"] in html
     assert "From his journal" not in html
+
+
+def test_build_html_moderate_stress_is_an_amber_dot():
+    html = partner.build_html(_data(), COMMENTARY)
+    assert partner.signal_dot("Evenings: stress mostly moderate", False, True) in html
+
+
+def test_build_html_says_so_when_he_did_not_check_in():
+    html = partner.build_html(_data(checkins=NO_CHECKINS), COMMENTARY)
+    assert "He did not answer the evening check-in this week." in html
+    assert partner.signal_dot("Evenings: no read", None, None) in html
 
 
 def test_build_html_never_leaks_raw_numbers_or_the_weight_block():
@@ -885,13 +803,13 @@ def test_build_commentary_prompt_is_fully_substituted_with_this_weeks_context(mo
     assert "{" not in prompt and "}" not in prompt  # no unsubstituted placeholders
     assert "week 4 of his transformation" in prompt
     assert "Overall week: solid week" in prompt
-    assert "Mood: neutral (avg 3.5/5" in prompt
     assert "Sleep quality: mixed (70.0% avg Whoop score, 2 nights tracked)" in prompt
     assert "Training: 2 workouts this week" in prompt
-    assert "Journal themes: work, sleep" in prompt
-    assert "Emotional patterns: tired" in prompt
-    assert "Avoidance flags: scrolling" in prompt
-    assert 'Notable journal quotes: "I keep pushing." | "Quieter today."' in prompt
+    # #5125 R5: the check-in is owner-only — never in the model's context, and the dark journal lines are gone.
+    assert "His mood, stress and cravings: NOT given to you." in prompt
+    assert CHECKINS["sentence"] not in prompt and "moderate" not in prompt
+    for gone in ("Journal themes", "Emotional patterns", "Avoidance flags", "Defence patterns", "journal quotes", "REEVES", "🧠"):
+        assert gone not in prompt, gone
 
 
 def test_build_commentary_renders_unknown_and_none_for_absent_signals(monkeypatch):
@@ -907,28 +825,13 @@ def test_build_commentary_renders_unknown_and_none_for_absent_signals(monkeypatc
     empty = _data(
         sleep={"score_avg": None, "duration_avg": None, "nights": 0, "quality_label": "no data"},
         recovery={"avg": None, "hrv_avg": None},
-        mood={
-            "mood_avg": None,
-            "energy_avg": None,
-            "stress_avg": None,
-            "mood_label": "no data",
-            "top_themes": [],
-            "top_emotions": [],
-            "avoidance_flags": [],
-            "defense_patterns": [],
-            "notable_quotes": [],
-        },
+        checkins=NO_CHECKINS,
         day_grade={"avg": None, "days": 0, "week_summary": "no data"},
     )
     partner.build_commentary(empty)
     prompt = captured["p"]
-    assert "Mood: no data (avg unknown/5" in prompt
     assert "Recovery: unknown% average" in prompt
-    assert "Journal themes: none" in prompt
-    assert "Emotional patterns: none" in prompt
-    assert "Avoidance flags: none" in prompt
-    assert "Defence patterns: none" in prompt
-    assert "Notable journal quotes: none" in prompt
+    assert "evening check-in this week" not in prompt
 
 
 def test_build_commentary_holds_when_retry_utils_is_absent(monkeypatch):
@@ -1097,7 +1000,7 @@ def test_handler_still_sends_a_fallback_when_the_ai_call_fails(monkeypatch):
     assert "The written update is unavailable this week" in html
     assert "The full written update returns next week." in html
     # the data-only body carries the deterministic labels, never model prose
-    assert "Overall: solid week. Mood: neutral. Sleep: mixed." in html
+    assert "Overall: solid week. Evenings: " + CHECKINS["sentence"] + " Sleep: mixed." in html
 
 
 def test_handler_grounding_hold_sends_the_data_only_email(monkeypatch):
@@ -1111,7 +1014,7 @@ def test_handler_grounding_hold_sends_the_data_only_email(monkeypatch):
     assert len(fake_ses.sends) == 1  # held narrative ≠ silenced week
     html = fake_ses.sends[0]["Content"]["Simple"]["Body"]["Html"]["Data"]
     assert "The written update is unavailable this week" in html
-    assert "Overall: solid week. Mood: neutral. Sleep: mixed." in html
+    assert "Overall: solid week. Evenings: " + CHECKINS["sentence"] + " Sleep: mixed." in html
 
 
 def test_handler_ships_clean_commentary_through_the_real_ai3_validator(monkeypatch):

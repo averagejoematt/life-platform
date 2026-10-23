@@ -236,7 +236,8 @@ LEDGER: dict[str, dict] = {
         monthly_budget_usd=11.56,
         note="the coach pipeline as a group — orchestrator/history-summarizer/elena-state-updater "
         "gate on coach_narrative directly; state-updater and daily-reflection are stages of the "
-        "same pipeline with no other feature's spend",
+        "same pipeline with no other feature's spend (#4583, 2026-10-23: coach-daily-reflection "
+        "now runs only the board's daily moves — its per-coach reflection calls are retired)",
     ),
     "state_of_matthew": _row(
         owner="lambdas/compute/state_of_matthew_lambda.py",

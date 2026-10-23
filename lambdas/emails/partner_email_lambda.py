@@ -1,26 +1,29 @@
 """
-Partner Weekly Email — v1.1.0
+Partner Weekly Email — v2.0.0
 Fires Sunday 9:30 AM PT (17:30 UTC) via EventBridge.
 
 Design philosophy: narrative-first, not a data dashboard.
 The recipient is Matthew's partner, not his doctor. She doesn't need Whoop
-scores. She needs to understand how he's doing emotionally and how to show up
-for him.
+scores. She needs to understand how he's doing and how to show up for him.
+
+v2.0.0 (#5125 R5, owner ruling 2026-10-23: "rebuild the weekly partner email on check-in data"):
+the emotional read is his EVENING CHECK-IN (#5106 — hunger, stress, cravings), not the Notion
+journal, whose enriched mood / themes / avoidance / quotes are dark. The check-in reaches this
+letter ONLY through `health.checkin_partner_view` — the one owner-consented projection (an answered-
+evenings count and a low/moderate/high band per rating, never a score, a day, the intake or his
+word) — and it is rendered DETERMINISTICALLY in its own block; it is never put in the model's prompt
+(the owner-only tier's "never quoted into an AI narrative" rule). The model no longer writes the
+journal-fed "what's happening underneath" section: with no data under it, it could only invent.
 
 Structure:
-  - Hero: Elena's one-line narrative lede
-  - At a glance: 3 plain-English signals (mood/energy, sleep quality, week grade — no jargon)
-  - Weight: one honest sentence of context
-  - The Board sections — the centrepiece:
-      💚 Rodriguez: How He's Feeling (emotional/behavioural state)
-      🧠 Conti: What's Happening Underneath (psychological patterns)
+  - Hero: the one-line narrative lede
+  - At a glance: 3 plain-English signals (evenings, sleep quality, week grade — no jargon)
+  - His evenings: the check-in read, in plain words (deterministic)
+  - The Board sections:
+      💚 Rodriguez: How His Week Went (what he did, in plain English)
       🤝 Murthy: How to Show Up for Him (specific, actionable)
       💪 The Chair: His Body This Week (physical synthesis, plain English)
   - Footer: warm one-liner about the platform
-
-Board: Full consultation. Rodriguez/Conti/Murthy are primary authors.
-Physical board (Chen/Webb/Park/Okafor/Attia/Huberman/Patrick/Norton) synthesised
-by The Chair into plain English for a partner audience.
 """
 
 import json
@@ -28,8 +31,8 @@ import logging
 import os
 import urllib.error
 import urllib.request
-from collections import defaultdict
 from datetime import datetime, timedelta
+from html import escape as html_escape
 
 import boto3
 from ai.grounded_generation import allowed_dates, allowed_numbers, correction_prompt, grounding_findings  # ADR-104 gate (#2423)
@@ -47,7 +50,7 @@ from common.constants import (
 from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
-from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from health import checkin_partner_view  # #5125 R5: the ONE owner-consented projection of the evening check-in
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 from health.protein_floor import met_floor  # #5098: THE protein hit predicate (strict, #5003)
 
@@ -92,7 +95,7 @@ secrets = boto3.client("secretsmanager", region_name=_REGION)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.digest_utils import safe_float  # shared bundled helpers (#970)
 
 
 def avg(vals):
@@ -106,27 +109,6 @@ def query_range(source, start_date, end_date):
     Shared paginated, phase-scoped implementation (digest_utils, #970).
     """
     return digest_utils.query_range(table, source, start_date, end_date, user_id=USER_ID)
-
-
-def query_journal_range(start_date, end_date):
-    entries_by_date = defaultdict(list)
-    kwargs = {
-        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-        "ExpressionAttributeValues": {
-            ":pk": f"USER#{USER_ID}#SOURCE#notion",
-            ":s": "DATE#" + start_date + "#journal#",
-            ":e": "DATE#" + end_date + "#journal#zzz",
-        },
-    }
-    while True:
-        resp = table.query(**with_phase_filter(kwargs))
-        for item in resp.get("Items", []):
-            date_str = item["sk"].split("#")[1]
-            entries_by_date[date_str].append(d2f(item))
-        if "LastEvaluatedKey" not in resp:
-            break
-        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
-    return dict(entries_by_date)
 
 
 def fetch_profile():
@@ -163,6 +145,8 @@ def gather_all():
     today = pacific_now().date()
     w_end = (today - timedelta(days=1)).isoformat()
     w_start = (today - timedelta(days=7)).isoformat()
+    p_end = (today - timedelta(days=8)).isoformat()  # the previous week, for the check-in's direction only
+    p_start = (today - timedelta(days=14)).isoformat()
     print("[INFO] Gathering " + w_start + " → " + w_end)
 
     profile = fetch_profile()
@@ -172,8 +156,9 @@ def gather_all():
         raw[src] = query_range(src, w_start, w_end)
         print("  " + src + ": " + str(len(raw[src])) + " records")
 
-    journal = query_journal_range(w_start, w_end)
-    print("  journal: " + str(len(journal)) + " days")
+    # #5125 R5: the evening check-in, through its one partner projection (words + one count, never a score).
+    checkins = checkin_partner_view.week_view(table, w_start, w_end, p_start, p_end)
+    print("  evening check-ins answered: " + str(checkins.get("evenings")))
 
     # ── Sleep (Whoop SOT) ──
     sleep_scores, sleep_durations = [], []
@@ -204,54 +189,6 @@ def gather_all():
     recoveries = [safe_float(r, "recovery_score") for r in raw["whoop"].values() if safe_float(r, "recovery_score") is not None]
     hrvs = [safe_float(r, "hrv") for r in raw["whoop"].values() if safe_float(r, "hrv") is not None]
     recovery_avg = avg(recoveries)
-
-    # ── Mood / Journal ──
-    mood_scores, energy_scores, stress_scores = [], [], []
-    all_themes, all_emotions, all_avoidance, all_defense = [], [], [], []
-    notable_quotes = []
-    for date_str, entries in journal.items():
-        for entry in entries:
-            m = entry.get("enriched_mood") or entry.get("morning_mood") or entry.get("day_rating")
-            e = entry.get("enriched_energy") or entry.get("morning_energy") or entry.get("energy_eod")
-            s = entry.get("enriched_stress") or entry.get("stress_level")
-            if m is not None:
-                mood_scores.append(float(m))
-            if e is not None:
-                energy_scores.append(float(e))
-            if s is not None:
-                stress_scores.append(float(s))
-            for t in entry.get("enriched_themes") or []:
-                all_themes.append(str(t))
-            for em in entry.get("enriched_emotions") or []:
-                all_emotions.append(str(em))
-            for av in entry.get("enriched_avoidance_flags") or []:
-                all_avoidance.append(str(av))
-            for df in entry.get("enriched_defense_patterns") or []:
-                all_defense.append(str(df))
-            q = entry.get("enriched_notable_quote")
-            if q:
-                notable_quotes.append({"date": date_str, "quote": str(q)})
-
-    theme_freq = defaultdict(int)
-    for t in all_themes:
-        theme_freq[t] += 1
-    emotion_freq = defaultdict(int)
-    for em in all_emotions:
-        emotion_freq[em] += 1
-
-    mood_avg = avg(mood_scores)
-    energy_avg = avg(energy_scores)
-    stress_avg = avg(stress_scores)
-
-    # Plain-English mood label
-    if mood_avg is None:
-        mood_label = "no data"
-    elif mood_avg >= 4:
-        mood_label = "positive"
-    elif mood_avg >= 3:
-        mood_label = "neutral"
-    else:
-        mood_label = "struggling"
 
     # ── Nutrition ──
     cals = [safe_float(r, "total_calories_kcal") for r in raw["macrofactor"].values() if safe_float(r, "total_calories_kcal")]
@@ -318,19 +255,7 @@ def gather_all():
             "avg": recovery_avg,
             "hrv_avg": avg(hrvs),
         },
-        "mood": {
-            "mood_avg": mood_avg,
-            "energy_avg": energy_avg,
-            "stress_avg": stress_avg,
-            "mood_label": mood_label,
-            "entries": sum(len(e) for e in journal.values()),
-            "days_journaled": len(journal),
-            "top_themes": sorted(theme_freq.items(), key=lambda x: -x[1])[:5],
-            "top_emotions": sorted(emotion_freq.items(), key=lambda x: -x[1])[:5],
-            "avoidance_flags": list(dict.fromkeys(all_avoidance))[:4],
-            "defense_patterns": list(dict.fromkeys(all_defense))[:4],
-            "notable_quotes": notable_quotes[:2],
-        },
+        "checkins": checkins,
         "nutrition": {
             "calories_avg": avg(cals),
             "protein_avg": avg(prots),
@@ -389,19 +314,14 @@ IMPORTANT CONTEXT ABOUT MATTHEW:
 
 THIS WEEK'S DATA (plain language context only — do NOT repeat these numbers in your writing):
 - Overall week: {week_summary}
-- Mood: {mood_label} (avg {mood_avg}/5 across journal entries)
-- Energy: {energy_avg}/5 average
-- Stress: {stress_avg}/5 average (higher = more stressed)
+- His mood, stress and cravings: NOT given to you. His own evening check-ins are shown to her
+  separately, in plain words. Do NOT guess, infer or describe his mood, stress, cravings or
+  emotional state — you have no data on it, and anything you wrote would be invented.
 - Sleep quality: {sleep_quality_label} ({sleep_score_avg}% avg Whoop score, {nights} nights tracked)
 - Sleep duration: {sleep_dur_avg} hrs/night average
 - Recovery: {recovery_avg}% average (Whoop)
 - Training: {activity_count} workouts this week
 - Nutrition: logged food {days_logged}/7 days, hit calorie target {cal_hit_rate}% of days, protein target {prot_hit_rate}% of days
-- Journal themes: {top_themes}
-- Emotional patterns: {top_emotions}
-- Avoidance flags: {avoidance_flags}
-- Defence patterns: {defense_patterns}
-- Notable journal quotes: {notable_quotes}
 
 WRITING RULES (strictly follow these):
 - Write TO Partner. Warm, personal, direct.
@@ -416,22 +336,17 @@ WRITING RULES (strictly follow these):
 - Do NOT use markdown formatting. No ##, no **, no ---, no bullet points. Plain text only.
 - Do NOT mention percentage of goal completion, gamification levels, or frame him as being at the start/early in his journey. Focus on this week's effort and what it means.
 
-Write EXACTLY these five sections with EXACTLY these headers (include the emoji):
+Write EXACTLY these four sections with EXACTLY these headers (include the emoji):
 
 🪞 THIS WEEK IN ONE LINE
 One sentence only. A journalist's opening line — specific, honest, narrative. Not a summary.
-Capture the emotional texture of the week. Reference something real.
+Reference something real he did this week (sleep, training, logging) — never a feeling.
 
-💚 HOW HE'S FEELING — COACH RODRIGUEZ
-Coach Maya Rodriguez specialises in the psychology of behaviour change. She reads the whole picture.
-3 short paragraphs. Cover: What is Matthew's emotional state this week? What's driving it?
-What should Partner know about where he is right now — not just the data, but the person?
-
-🧠 WHAT'S HAPPENING UNDERNEATH — REEVES
-Nathan Reeves is a psychiatrist who pays attention to what's not being said.
-3 short paragraphs. Cover: What psychological patterns are showing up this week?
-What might Matthew be protecting himself from? What does Partner need to understand
-about how to reach him — not what to do, but how to be with him?
+💚 HOW HIS WEEK WENT — COACH RODRIGUEZ
+Coach Maya Rodriguez specialises in the psychology of behaviour change.
+2 short paragraphs. Cover: What did Matthew actually do this week — how consistent was he
+with sleep, training and logging? What does that consistency (or the lack of it) mean for
+someone in the middle of a long change? Describe behaviour only, never his emotional state.
 
 🤝 HOW TO SHOW UP FOR HIM — MURTHY
 Vivek Murthy is the world's leading expert on connection and loneliness.
@@ -443,14 +358,12 @@ Specific to where he is right now. End with one concrete, small thing she can do
 The Chair synthesises the full medical panel's view (sports science, nutrition, sleep medicine,
 longevity, psychiatry) into plain English for Partner.
 2 short paragraphs. How is he doing physically — honestly? Is the body supporting the mind
-or fighting it this week? What does Partner need to know about his physical state to understand
-his energy and mood levels?
+or fighting it this week? What does Partner need to know about his physical state?
 
 Be warm. Be honest. Be human."""
 
 
 def build_commentary(data):
-    mood = data["mood"]
     sl = data["sleep"]
     tr = data["training"]
     nu = data["nutrition"]
@@ -463,10 +376,6 @@ def build_commentary(data):
 
     prompt = BOARD_PROMPT.format(
         week_summary=dg.get("week_summary", "unknown"),
-        mood_label=mood.get("mood_label", "unknown"),
-        mood_avg=fmt(mood.get("mood_avg")),
-        energy_avg=fmt(mood.get("energy_avg")),
-        stress_avg=fmt(mood.get("stress_avg")),
         sleep_quality_label=sl.get("quality_label", "unknown"),
         sleep_score_avg=fmt(sl.get("score_avg")),
         nights=sl.get("nights", 0),
@@ -476,11 +385,6 @@ def build_commentary(data):
         days_logged=nu.get("days_logged", 0),
         cal_hit_rate=fmt(nu.get("cal_hit_rate"), "unknown"),
         prot_hit_rate=fmt(nu.get("prot_hit_rate"), "unknown"),
-        top_themes=", ".join(t for t, _ in mood.get("top_themes", [])[:4]) or "none",
-        top_emotions=", ".join(e for e, _ in mood.get("top_emotions", [])[:4]) or "none",
-        avoidance_flags=", ".join(mood.get("avoidance_flags", [])) or "none",
-        defense_patterns=", ".join(mood.get("defense_patterns", [])) or "none",
-        notable_quotes=" | ".join('"' + q["quote"] + '"' for q in mood.get("notable_quotes", [])) or "none",
         pct_to_goal=w.get("pct_to_goal", 0),
         lbs_lost=fmt(w.get("lbs_lost")),
         lbs_to_go=fmt(w.get("lbs_to_go")),
@@ -555,14 +459,14 @@ def deterministic_commentary(data):
     the AI-3 validator broke. Uses the section-header contract parse_sections /
     build_html already render."""
     dg = data.get("day_grade", {})
-    mood = data.get("mood", {})
+    ci = data.get("checkins") or {}
     sl = data.get("sleep", {})
     return (
         "🪞 THIS WEEK IN ONE LINE\n"
         "The written update is unavailable this week — here is the plain summary from his tracked data.\n\n"
         "💪 HIS BODY THIS WEEK — THE CHAIR\n"
         "Overall: " + str(dg.get("week_summary", "no data")) + ". "
-        "Mood: " + str(mood.get("mood_label", "no data")) + ". "
+        "Evenings: " + str(ci.get("sentence") or "no check-in read this week.") + " "
         "Sleep: " + str(sl.get("quality_label", "no data")) + ".\n"
         "The full written update returns next week."
     )
@@ -681,12 +585,28 @@ def signal_dot(label, good, neutral=None):
     )
 
 
+def checkin_block_html(view):
+    """#5125 R5: the evening check-in read, rendered deterministically — never model prose, never a score.
+
+    `view` is `checkin_partner_view.summarize`'s / `week_view`'s output: one sentence of words and one count."""
+    text = (view or {}).get("sentence")
+    if not text:
+        return ""
+    return (
+        '<div style="background:#f5f3ff;border-radius:12px;padding:18px 24px;margin-bottom:20px;border:1px solid #ddd6fe;">'
+        '<p style="font-size:11px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px;">'
+        "His evenings, from his own check-ins</p>"
+        '<p style="font-size:15px;color:#2d3748;line-height:1.7;margin:0;">' + html_escape(text) + "</p>"
+        "</div>"
+    )
+
+
 def build_html(data, commentary_text):
     sections = parse_sections(commentary_text)
     data["weight"]
     sl = data["sleep"]
     dg = data["day_grade"]
-    mood = data["mood"]
+    ci = data.get("checkins") or {}
     dates = data["dates"]
 
     logger.debug("partner_parsed_sections=%s lede_excerpt=%s", list(sections.keys()), sections.get("lede", "(empty)")[:80])
@@ -720,19 +640,20 @@ def build_html(data, commentary_text):
         )
 
     # ── At a glance: 3 plain signals ──
-    mood_avg = mood.get("mood_avg")
+    stress_band = ((ci.get("ratings") or {}).get("stress") or {}).get("band")
     sl_score = sl.get("score_avg")
     dg_avg = dg.get("avg")
     dg_label = dg.get("week_summary", "")
 
-    mood_good = mood_avg >= 3.5 if mood_avg is not None else None
-    mood_neutral = mood_avg >= 2.5 if mood_avg is not None else None
+    # Evenings dot: the stress band (low = green, moderate = amber, high = red; none read = grey).
+    evening_good = None if stress_band is None else stress_band == "low"
+    evening_neutral = None if stress_band is None else stress_band == "moderate"
     sleep_good = sl_score >= 70 if sl_score is not None else None
     sleep_neutral = sl_score >= 55 if sl_score is not None else None
     grade_good = dg_avg >= 70 if dg_avg is not None else None
     grade_neutral = dg_avg >= 55 if dg_avg is not None else None
 
-    mood_dot_label = "Mood: " + mood.get("mood_label", "unknown")
+    evening_dot_label = "Evenings: " + (f"stress mostly {stress_band}" if stress_band else "no read")
     sleep_dot_label = "Sleep: " + sl.get("quality_label", "unknown")
     grade_dot_label = "Week: " + dg_label
 
@@ -742,7 +663,7 @@ def build_html(data, commentary_text):
         '<p style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;'
         'letter-spacing:1px;margin:0 0 10px;">At a glance</p>'
         '<div style="display:flex;flex-wrap:wrap;gap:4px;">'
-        + signal_dot(mood_dot_label, mood_good, mood_neutral)
+        + signal_dot(evening_dot_label, evening_good, evening_neutral)
         + signal_dot(sleep_dot_label, sleep_good, sleep_neutral)
         + signal_dot(grade_dot_label, grade_good, grade_neutral)
         + "</div></div>"
@@ -756,21 +677,10 @@ def build_html(data, commentary_text):
 
     # ── Board sections ──
     rodriguez_block = section_html(sections.get("rodriguez", ""), "#22c55e", "#f0fdf4", "#15803d")
-    conti_block = section_html(sections.get("conti", ""), "#a855f7", "#faf5ff", "#7e22ce")
     murthy_block = section_html(sections.get("murthy", ""), "#3b82f6", "#eff6ff", "#1e40af")
     chair_block = section_html(sections.get("chair", ""), "#6b7280", "#f9fafb", "#374151")
 
-    # ── Notable quote ──
-    quote_block = ""
-    for q in mood.get("notable_quotes", [])[:1]:
-        quote_block = (
-            '<div style="border-left:3px solid #818cf8;padding:14px 20px;'
-            'margin:28px 0;background:#eef2ff;border-radius:0 10px 10px 0;">'
-            '<p style="font-size:14px;font-style:italic;color:#4338ca;margin:0 0 6px;">'
-            '"' + q["quote"] + '"</p>'
-            '<p style="font-size:11px;color:#818cf8;margin:0;">From his journal · ' + q["date"] + "</p>"
-            "</div>"
-        )
+    evenings_block = checkin_block_html(ci)
 
     return (
         """<!DOCTYPE html>
@@ -801,6 +711,9 @@ def build_html(data, commentary_text):
         + glance_block
         + """
     """
+        + evenings_block
+        + """
+    """
         + weight_block
         + """
     """
@@ -810,16 +723,10 @@ def build_html(data, commentary_text):
         + rodriguez_block
         + """
     """
-        + conti_block
-        + """
-    """
         + murthy_block
         + """
     """
         + chair_block
-        + """
-    """
-        + quote_block
         + """
   </div>
 
@@ -875,7 +782,7 @@ def lambda_handler(event, context):
         logger.warning("[DIL-025] partner letter for %s already sent — refusing to send it twice (pass force_send to override)", period_key)
         return {"statusCode": 200, "body": f"Partner email for {period_key} already sent — skipped (replay guard)"}
 
-    logger.info("Partner Weekly Email v1.1.0 starting...")
+    logger.info("Partner Weekly Email v2.0.0 starting...")
     data = gather_all()
 
     logger.info("Calling Sonnet 4.6 for Board commentary...")
@@ -932,4 +839,4 @@ def lambda_handler(event, context):
     if not dry_run:
         send_ledger.record_sent(table, LEDGER_NAME, period_key, logger=logger)
     print("[INFO] Sent to the partner address: " + subject)
-    return {"statusCode": 200, "body": "Partner email v1.1.0 sent: " + subject}
+    return {"statusCode": 200, "body": "Partner email v2.0.0 sent: " + subject}

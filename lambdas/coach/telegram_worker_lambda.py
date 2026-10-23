@@ -1045,8 +1045,12 @@ def _event_outbound() -> dict:
     Errors remain the ``telegram-worker-errors`` alarm's job — the two together
     are "it broke" and "it stopped", which are different questions.
     """
-    from coach import coach_event_triggers
+    from coach import calibration_deadman_alert, coach_event_triggers
 
+    # #5203: the calibration dead-man goes first, as plain text, at ANY budget tier (no model call). Never raises.
+    deadman = calibration_deadman_alert.run(
+        _table(), _pacific_now(), _bot_seat, lambda tok, chat, t: _tg(tok, "sendMessage", {"chat_id": chat, "text": t})
+    )
     out = coach_event_triggers.run_sweep(
         now_pt=_pacific_now(),
         table=_table(),
@@ -1057,7 +1061,7 @@ def _event_outbound() -> dict:
     )
     _emit_metric(EVENT_SWEEP_METRIC, EVENT_SWEEP_DIMENSION, float(out.get("candidates") or 0))
     logger.info("[telegram] event sweep done (reason=%s candidates=%s)", out.get("reason"), out.get("candidates"))
-    return out
+    return {**out, "calibration_deadman": deadman}
 
 
 def _resolve_persona(coach_id: str) -> tuple:
