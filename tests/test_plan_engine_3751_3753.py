@@ -306,11 +306,13 @@ def test_v3_landing_block_is_data_the_coach_reads():
 def test_v3_floors_and_new_redlines_carry_the_plans_numbers():
     R = owner_redlines.REDLINES
     e = R["energy_floor_kcal"]
-    assert (e["floor_7d_mean"], e["floor_lifting_day"], e["floor_any_day"], e["opening_kcal"]) == (1800, 1900, 1600, 2100)
+    # owner ruling 2026-10-23 R1 (#5091): the opening target is ~1,500 and the three floors are kept, as warnings
+    assert (e["floor_7d_mean"], e["floor_lifting_day"], e["floor_any_day"], e["opening_kcal"]) == (1800, 1900, 1600, 1500)
+    assert e["floor_role"] == "warning"
     assert e["titration"]["max_step_kcal"] == 150 and e["titration"]["never_on_a_week_with_fewer_complete_logs_than"] == 6
     assert R["protein_floor_g"]["value"] == 170 and R["protein_floor_g"]["target_g"] == 200 and R["protein_floor_g"]["days_of_7"] == 6
     assert R["protein_floor_g"]["g_per_kg_dxa_lean"]["floor"] == 2.3
-    assert R["fat_floor_g"]["value"] == 65 and R["carb_floor_g"]["value"] == 120
+    assert R["fat_floor_g"]["value"] == 65 and R["carb_floor_g"]["value"] == 58  # #5212: lowered to ~60 g (owner 2026-10-23)
     w = R["walking_floor_hr_wk"]
     # #4503 OD2 (owner 2026-09-30): 11–12 h by block-2 week 6 (was 13), 16 h retired, HR avg <= 120 with 105 the target
     assert (w["value"], w["target_hr_wk"], w["target_range_hr_wk"], w["target_by_week"], w["maintenance_floor_hr_wk"]) == (
