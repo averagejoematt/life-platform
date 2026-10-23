@@ -50,7 +50,16 @@ def _page_card_names() -> list[str]:
 # Cards deliberately generated but NOT expected on any non-legacy public page. Keep this
 # EMPTY unless a card genuinely has no honest public home — an entry here is a documented
 # admission that the sweep draws a card nothing serves. Add a `# reason:` note per entry.
-ORPHAN_ALLOWLIST: frozenset[str] = frozenset()
+ORPHAN_ALLOWLIST: frozenset[str] = frozenset(
+    {
+        # reason: #4646 — og-front is drawn first and pointed at second. The front page keeps
+        # the static wordmark card until og-front.png has been deployed and has rendered
+        # live; the flip of site/index.html + site/next/v8/index.html og:image is the
+        # follow-up one-liner, which must also remove this entry (the stale-entry test
+        # below cannot catch a card that is both allowlisted AND served).
+        "og-front",
+    }
+)
 
 _SITE = os.path.join(_REPO, "site")
 
@@ -91,6 +100,13 @@ def test_orphan_allowlist_entries_are_real_cards():
     card_names = set(_page_card_names())
     stale = ORPHAN_ALLOWLIST - card_names
     assert not stale, f"ORPHAN_ALLOWLIST names not in og_image_lambda.PAGES: {sorted(stale)}"
+
+
+def test_no_allowlisted_card_is_already_served():
+    """An allowlist entry is an admission that NOTHING serves the card. Once a page points
+    at it (e.g. the #4646 og-front flip), the entry is stale and must go."""
+    served_and_allowlisted = ORPHAN_ALLOWLIST & _served_card_files()
+    assert not served_and_allowlisted, f"served by a page yet still on ORPHAN_ALLOWLIST — remove: {sorted(served_and_allowlisted)}"
 
 
 # premerge-gate: structural gate that sweeps the repo tree (#2372)
