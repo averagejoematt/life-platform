@@ -35,6 +35,7 @@ import contextvars
 import json
 import os
 import random
+import sys
 import threading
 import time
 
@@ -221,11 +222,21 @@ ATTRIBUTABLE_FEATURES: frozenset = frozenset(
         # (never gates the deploy), so its spend is metered separately from the two
         # deploy-gating judges above rather than falling into the "unknown" residual.
         "comprehension_qa",
+        # scripts/fresh_eyes_discovery.py (#823) — the weekly Sunday 15:00Z
+        # `Fresh-Eyes Discovery` workflow: one Haiku vision read per door screenshot
+        # plus one Sonnet board synthesis. #5136: the ONLY caller still landing in
+        # `unknown` after #4589 — 9 calls / ~$0.08 a run, at 10-04 16:25Z, 10-11 15:15Z
+        # and 10-18 15:10Z, the minutes of its three October runs.
+        "fresh-eyes-discovery",
     }
 )
 
 # #4589: the per-feature label every unlabelled WORKSTATION call carries (see the bullet above).
 DEV_SESSION_FEATURE = "dev-session"
+# The residual: a call outside Lambda, carrying no allowlisted label, from a non-workstation
+# context (CI or the remediation agent). Kept under its historic name (series continuity), but
+# since #5136 it is never SILENT — `_note_unattributed()` prints who reached the meter unnamed.
+UNATTRIBUTED_FEATURE = "unknown"
 
 _FEATURE = contextvars.ContextVar("bedrock_feature", default="")
 
@@ -261,7 +272,34 @@ def feature_name() -> str:
     label = _FEATURE.get()
     if label in ATTRIBUTABLE_FEATURES:
         return label
-    return DEV_SESSION_FEATURE if caller_class() == CALLER_CLASS_DEV_SESSION else "unknown"
+    return DEV_SESSION_FEATURE if caller_class() == CALLER_CLASS_DEV_SESSION else UNATTRIBUTED_FEATURE
+
+
+def _note_unattributed(feature: str, cost_usd: float, env=None) -> str | None:
+    """Make an unnamed call LOUD at the moment it is metered (#5136). Returns the line printed.
+
+    The residual bucket exists on purpose (series continuity), but nothing told anyone a
+    caller had landed in it: #5136 found $35.52 of October's receipt in `unknown` two weeks
+    after the fact, by reading a monthly total. The spend is still metered under the residual
+    — dropping or guessing it would break ADR-104 — but the run that incurred it now prints
+    the caller class, the GitHub workflow and the entrypoint, so a CI log names the caller
+    the same day and the fix is one `attributed_to()` + one `ATTRIBUTABLE_FEATURES` entry.
+
+    No new metric: a dimension value per offender is the unbounded cardinality the allowlist
+    exists to prevent. Pure apart from the print; `env` is injectable for tests.
+    """
+    if feature != UNATTRIBUTED_FEATURE:
+        return None
+    env = os.environ if env is None else env
+    workflow = (env.get("GITHUB_WORKFLOW") or "").strip() or "-"
+    entry = os.path.basename(sys.argv[0]) if sys.argv and sys.argv[0] else "-"
+    line = (
+        f"[WARN] UNATTRIBUTED Bedrock spend ${cost_usd:.4f} booked to LambdaFunction={UNATTRIBUTED_FEATURE}: "
+        f"caller_class={caller_class(env)} workflow={workflow!r} entrypoint={entry!r}. Wrap the caller in "
+        "bedrock_client.attributed_to(<label>) and add the label to ATTRIBUTABLE_FEATURES (#5136)."
+    )
+    print(line, file=sys.stderr)
+    return line
 
 
 # ── Caller-class attribution (#2892) ────────────────────────────────────────
@@ -612,7 +650,9 @@ def _emit_usage_metrics(usage: dict, model_id: str, cost_scale: float = 1.0) -> 
         if not (in_tok or out_tok or cache_read or cache_write):
             return
         cost = estimate_cost_usd(usage, model_id) * float(cost_scale)
-        fn_dim = [{"Name": "LambdaFunction", "Value": feature_name()}]
+        feature = feature_name()
+        _note_unattributed(feature, cost)
+        fn_dim = [{"Name": "LambdaFunction", "Value": feature}]
         class_dim = [{"Name": CALLER_CLASS_DIMENSION, "Value": caller_class()}]
         md = [
             {"MetricName": "AnthropicInputTokens", "Dimensions": fn_dim, "Value": in_tok, "Unit": "Count"},

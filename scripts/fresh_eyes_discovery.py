@@ -120,6 +120,28 @@ def should_skip_for_budget(tier: int) -> bool:
     return tier >= 2
 
 
+# #5136: the spend label every Bedrock call in this run carries. Must be a member of
+# `bedrock_client.ATTRIBUTABLE_FEATURES` — an unlisted label is ignored and the spend
+# falls back to the `unknown` residual, which is exactly where all three October runs
+# landed before this label existed.
+FRESH_EYES_FEATURE = "fresh-eyes-discovery"
+
+
+def _attributed_invoke(bedrock, body, model_name):
+    """`bedrock.invoke` metered under FRESH_EYES_FEATURE (#5136, the #2888 pattern).
+
+    `bedrock` is the real client or a test double; a double without `attributed_to`
+    gets a plain call. The real client's label is pinned end-to-end by
+    tests/test_bedrock_attribution_residual_5136.py, which drives this helper with
+    the real `bedrock_client.attributed_to` and reads `feature_name()` at call time.
+    """
+    ctx = getattr(bedrock, "attributed_to", None)
+    if ctx is None:
+        return bedrock.invoke(body, model_name=model_name)
+    with ctx(FRESH_EYES_FEATURE):
+        return bedrock.invoke(body, model_name=model_name)
+
+
 def _import_bedrock():
     try:
         from ai import bedrock_client
@@ -271,7 +293,7 @@ def vision_read(bedrock, page_name, path, screenshot_path, viewport, model_name=
         return []
     body = {"messages": [{"role": "user", "content": [*blocks, {"type": "text", "text": prompt}]}], "max_tokens": 800}
     try:
-        resp = bedrock.invoke(body, model_name=model_name)
+        resp = _attributed_invoke(bedrock, body, model_name)
     except Exception as e:
         # #4035 box 4: tracked, not just printed — see VISION_CALL_FAILURES above.
         VISION_CALL_FAILURES.append(f"{page_name} ({viewport}) — {e}")
@@ -439,7 +461,7 @@ def synthesize_board(bedrock, ranked, open_titles, model_name="claude-sonnet-4-6
     )
     body = {"messages": [{"role": "user", "content": prompt}], "max_tokens": 1200}
     try:
-        resp = bedrock.invoke(body, model_name=model_name)
+        resp = _attributed_invoke(bedrock, body, model_name)
     except Exception as e:
         print(f"[warn] synthesis call failed, using the unpolished ranked board: {e}")
         return fallback_board(ranked)

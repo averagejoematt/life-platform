@@ -179,4 +179,17 @@ def tool_get_platform_cost(args=None):
         "receipt), not an AWS Cost Explorer query. The month-end projection they carry is the cost governor's "
         "projection; treat it as a forecast, and read the tier alongside it."
     )
+    # #5136: an 'unknown' total read on its own was mistaken for a live attribution hole two
+    # weeks after the fact. Say what the residual is made of, from the receipt's own dated split.
+    attribution = (out.get("inference_receipt") or {}).get("attribution") or {}
+    if attribution.get("unattributed_usd"):
+        since = attribution.get("residual_labels_since") or "?"
+        out["unattributed_reading"] = (
+            f"${attribution.get('unattributed_usd')} of AI spend this month carries no function name ('unknown'). "
+            f"${attribution.get('unattributed_before_labels_usd')} of it is dated before {since}: workstation "
+            "calls metered before the 'dev-session' label existed, kept where the meter put them. "
+            f"${attribution.get('unattributed_since_labels_usd')} is dated on or after {since} — that is a "
+            "caller still missing a name; see attribution.unattributed_by_day for the day, and that run's log "
+            "for the 'UNATTRIBUTED Bedrock spend' warning naming the workflow and entrypoint."
+        )
     return out

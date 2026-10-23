@@ -403,8 +403,9 @@ LEDGER: dict[str, dict] = {
         # #4589: `dev-session` is the SAME residual, now named — feature_name() books an unlabelled
         # WORKSTATION call there instead of `unknown`. Claimed here so the ratchet keeps grading the
         # dollars it always graded (continuous with the founding month) and the dimension is never
-        # an unclaimed one at close.
-        attribution_keys=("unknown", "dev-session"),
+        # an unclaimed one at close. #5136: `fresh-eyes-discovery` likewise — the weekly CI survey
+        # was the last caller still in `unknown` after #4589, now named under its own label.
+        attribution_keys=("unknown", "dev-session", "fresh-eyes-discovery"),
         founding_usd=UNKNOWN_FOUNDING_USD,
         monthly_budget_usd=33.19,
         note="every call that reaches the chokepoint with no lambda name and no allowlisted CI label "
