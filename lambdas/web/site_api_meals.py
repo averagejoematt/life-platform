@@ -12,6 +12,8 @@ site_api_common (identical binding semantics to the pre-split facade).
 from datetime import datetime
 from typing import Any, cast
 
+from privacy import food_names  # #5112: owner-approved food names only (fail closed)
+
 from web.site_api_common import (
     PT,
     _error,
@@ -26,6 +28,14 @@ from web.site_api_common import (
 # reader can never drift out of sync with the sibling. With the flag off, the delivery
 # source is never queried and nothing private (spend/binge figures) enters the response.
 _DELIVERY_PUBLIC = nutrition_delivery_public()
+
+# #5112 (owner ruling R5, 2026-10-23): these endpoints stay public, but a food NAME is published
+# only when it is on the owner-approved list in `privacy.food_names` (empty by default, so every
+# name is withheld until he approves one). Unapproved names are omitted before ranking: never a
+# row, never a pooled "other" label. `names_withheld` counts the distinct qualifying names held
+# back, so an empty table reads as "withheld", not "nothing logged". Totals and averages that are
+# not keyed by name (protein per day, days analysed) still count every logged entry: hiding a
+# name never changes a number.
 
 
 def protein_sources(*, _g) -> dict:
@@ -46,7 +56,7 @@ def protein_sources(*, _g) -> dict:
     # days (the #1917 rule).
     _w30 = _window_span(d30, today, 30)
 
-    def _envelope(sources: list, avg_g: float | None, days_count: int, *, as_of: str | None = None) -> dict:
+    def _envelope(sources: list, avg_g: float | None, days_count: int, *, withheld: int = 0, as_of: str | None = None) -> dict:
         """The ONE published shape for this endpoint.
 
         Empty and populated payloads are built here so they cannot diverge again:
@@ -62,6 +72,7 @@ def protein_sources(*, _g) -> dict:
             "total_protein_avg_g": avg_g,
             "total_protein_avg_g_window_days": _w30["actual_days"],
             "days_analyzed": days_count,
+            "names_withheld": withheld,  # #5112: qualifying food names not on the owner-approved list
         }
         if as_of is not None:
             data["as_of_date"] = as_of
@@ -93,6 +104,7 @@ def protein_sources(*, _g) -> dict:
     days_count = len(logged_days)
 
     sources: list[dict[str, Any]] = []
+    withheld = 0
     try:
         for day in logged_days:
             food_log = day.get("food_log") or []
@@ -109,7 +121,10 @@ def protein_sources(*, _g) -> dict:
                 f["total_cal"] += float(entry.get("calories_kcal") or 0)
 
         total_protein_all = sum(f["total_protein"] for f in food_protein.values())
+        withheld = sum(1 for name in food_protein if not food_names.approved(name))
         for name, f in sorted(food_protein.items(), key=lambda x: -x[1]["total_protein"]):
+            if not food_names.approved(name):
+                continue  # #5112: an unapproved name is never published; its protein stays in the total
             sources.append(
                 {
                     "food": name,
@@ -133,7 +148,7 @@ def protein_sources(*, _g) -> dict:
         logger.warning(f"[protein_sources] Failed: {e}")
         return _error(503, "Protein source data temporarily unavailable.")
 
-    return _ok(_envelope(sources, _total_protein_avg_g, days_count), cache_seconds=3600)
+    return _ok(_envelope(sources, _total_protein_avg_g, days_count, withheld=withheld), cache_seconds=3600)
 
 
 def frequent_meals(*, _g) -> dict:
@@ -174,7 +189,9 @@ def frequent_meals(*, _g) -> dict:
                 m["count"] += 1
 
         top_meals = []
-        for name, freq in meal_counts.most_common(8):
+        withheld = sum(1 for name in meal_counts if not food_names.approved(name))
+        approved_counts = Counter({n: c for n, c in meal_counts.items() if food_names.approved(n)})
+        for name, freq in approved_counts.most_common(8):
             m = meal_macros[name]
             cnt = m["count"] or 1
             avg_cal = round(m["cal"] / cnt)
@@ -200,7 +217,7 @@ def frequent_meals(*, _g) -> dict:
         # #1917 reader-truth: `period_days` carries its window in the VALUE, so the
         # AST guard in test_window_name_honesty_1917.py never saw it. Shipping the
         # literal 30 told the reader the table covered 30 days on Day 5 of a cycle.
-        return _ok({"meals": top_meals, "period_days": period_days}, cache_seconds=3600)
+        return _ok({"meals": top_meals, "period_days": period_days, "names_withheld": withheld}, cache_seconds=3600)
     except Exception as e:
         logger.warning(f"[frequent_meals] Failed: {e}")
         return _error(503, "Meal data temporarily unavailable.")
@@ -286,7 +303,9 @@ def meal_glucose(*, _g) -> dict:
 
         # Build response — top 10 meals by frequency, with glucose grades
         results: list[dict[str, Any]] = []
-        for name, m in sorted(meal_data.items(), key=lambda x: x[1]["count"], reverse=True)[:10]:
+        withheld = sum(1 for name in meal_data if not food_names.approved(name))
+        approved_meals = {n: m for n, m in meal_data.items() if food_names.approved(n)}
+        for name, m in sorted(approved_meals.items(), key=lambda x: x[1]["count"], reverse=True)[:10]:
             cnt = m["count"] or 1
             avg_cal = round(m["cal"] / cnt)
             avg_pro = round(m["protein"] / cnt)
@@ -327,7 +346,9 @@ def meal_glucose(*, _g) -> dict:
                 }
             )
 
-        return _ok({"meals": results, "period_days": period_days, "has_cgm": bool(daily_glucose)}, cache_seconds=3600)
+        return _ok(
+            {"meals": results, "period_days": period_days, "has_cgm": bool(daily_glucose), "names_withheld": withheld}, cache_seconds=3600
+        )
     except Exception as e:
         logger.warning(f"[meal_glucose] Failed: {e}")
         return _error(503, "Meal glucose data temporarily unavailable.")

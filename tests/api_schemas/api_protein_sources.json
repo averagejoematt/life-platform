@@ -28,6 +28,9 @@
       "days_analyzed": {
         "type": "integer"
       },
+      "names_withheld": {
+        "type": "integer"
+      },
       "protein_sources": {
         "items": null,
         "length_sample": 0,

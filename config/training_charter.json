@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.19.1",
+  "version": "1.20.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -126,6 +126,13 @@
       "date": "2026-10-22",
       "by": "#5187 (epic #5094), filling in the same-day source the 1.18.x text named ('armed but silent until a same-day food source exists (#5187)'); no new owner ruling, the nudge rule itself is unchanged and still pending R2 (#5091)",
       "what": "nutrition breakfast_nudge.rule prose only (no number, window or threshold changes): names the timed protein entries Health Auto Export delivers intraday as the same-day read, beside the end-of-day MacroFactor row; an absent record of both still withholds (no_same_day_log).",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.20.0",
+      "date": "2026-10-23",
+      "by": "owner ruling 2026-10-23 (Session CD, on #5006 and #5108): food delivery is not a live feed; it becomes a 6-monthly manual upload ritual",
+      "what": "nutrition.food_delivery added: upload_every_months 6, the cadence of the owner's food-delivery upload reminder (training.calibration_cadence's food_delivery_upload row). The source stays paused in the source registry between uploads, so no freshness verdict, coach question, nudge or daily-brief modifier reads it.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -578,6 +585,10 @@
       "_note": "The follow-up draw cadence only (#5111). Dates and weeks; no result, name or priority lives here. The owner-only due date, when no draw is readable, is the private twin's lab_followup.next_draw_on.",
       "follow_up_weeks": 16,
       "reminder_lead_days": 14
+    },
+    "food_delivery": {
+      "_note": "The food-delivery upload cadence only (#5006/#5108, owner ruling 2026-10-23). A 6-monthly manual upload ritual: the source stays paused between uploads and this number is when the owner-only reminder fires. No order, merchant or amount lives here.",
+      "upload_every_months": 6
     },
     "floors": {
       "fat": {"floor_g": 65, "unit": "g", "per_meal_g": 10, "meals_with_fat": 3, "epa_dha_g": 2},
