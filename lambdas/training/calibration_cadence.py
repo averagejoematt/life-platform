@@ -22,6 +22,14 @@ DEXA is a cadence, not a behavioural dead-man (a scan is booked, not forgotten):
 (never `missed_2`), and when no scan row is readable it is `unknown` and names the ingest that would supply it
 (#4639, not built) rather than guessing a date.
 
+FOOD-DELIVERY UPLOAD (#5006/#5108, owner ruling 2026-10-23). Food delivery is not a live feed: it is a
+6-monthly manual upload ritual, and tracking stays PAUSED between uploads (the registry's `paused` facet,
+so freshness, coach questions, the nudge and the daily-brief modifier never read it). This row is the
+reminder: a cadence like DEXA (no dead-man), its cycle the charter's
+`nutrition.food_delivery.upload_every_months` (never a second number here), its last-logged date the newest `import_date` the
+ingestion Lambda stamps on the partition's `DATE#` rows. It fires while the source is paused: that is
+the point of it.
+
 PRIVACY (PUBLIC repo; owner ruling 2026-10-03, stored is not published). The output is dates, counts and
 prose — never a photo key, a pose path or a reading. Owner-only: `tests/test_calibration_cadence_5061.py`
 holds that no `lambdas/web/` or `lambdas/emails/` module imports this one and that the only published-tree
@@ -33,8 +41,8 @@ from __future__ import annotations
 import datetime as _dt
 from typing import Any, Callable, Mapping, Optional
 
-VERSION = "calibration-cadence@1.1.0"  # 1.1.0 #5111: lab_draw
-KINDS = ("tape", "photos", "dexa", "lab_draw")
+VERSION = "calibration-cadence@1.2.0"  # 1.2.0 #5006/#5108: food_delivery_upload; 1.1.0 #5111: lab_draw
+KINDS = ("tape", "photos", "dexa", "lab_draw", "food_delivery_upload")
 OK, DUE, OVERDUE, MISSED_2, UNKNOWN, READ_FAILED = "ok", "due", "overdue", "missed_2", "unknown", "read_failed"
 PROMPT_PREFIX = "CALIB_PROMPT"
 DEADMAN_PREFIX = "CALIB_DEADMAN"
@@ -45,12 +53,17 @@ SRC = {
     "photos": "USER#matthew#SOURCE#progress_photos (DATE#<day>#<pose> index rows; dates only, never a key)",
     "dexa": "USER#matthew#SOURCE#dexa (scan_date)",
     "lab_draw": "USER#matthew#SOURCE#labs (draw_date) + USER#matthew#SOURCE#clinical (LABS#<date> sort keys); dates only, never a result",
+    "food_delivery_upload": "USER#matthew#SOURCE#food_delivery (DATE# rows, import_date); the upload date only, never an order or an amount",
 }
 PROMPTS = {
     "tape": "Tape day: measure waist (navel, narrowest, iliac crest) and the other sites, then log it with your coach. Last tape {last}.",
     "photos": "Photo day: front, side and back, same light and spot as last time; send each to the bot as /progress front (side, back). Last set {last}.",
     "dexa": "DEXA is due about now ({due}). Book the scan; the labs/DEXA ingest (#4639) is not built, so tell your coach the date once it is done.",
     "lab_draw": "The follow-up draw is due about {due}. Book it; tell your coach the date once it is done. Last draw {last}.",
+    "food_delivery_upload": (
+        "The food-delivery upload is due ({due}): export the delivery transactions since the last upload as CSV "
+        "and drop it in imports/food_delivery/. Tracking stays paused between uploads. Last upload {last}."
+    ),
 }
 
 
@@ -176,6 +189,26 @@ def _lab_draw(readers: Mapping[str, Callable], today: str) -> dict[str, Any]:
     return out
 
 
+def _food_delivery_upload(readers: Mapping[str, Callable], today: str) -> dict[str, Any]:
+    """#5006/#5108: the 6-monthly food-delivery upload reminder. The cycle is the charter's
+    `nutrition.food_delivery.upload_every_months` x the registry's `DAYS_PER_CADENCE_MONTH` (the month the
+    /api/status due panel counts in); no readable upload date is `unknown` (no anchor is guessed)."""
+    from ingestion.source_registry import DAYS_PER_CADENCE_MONTH
+
+    months = _cv("nutrition.food_delivery.upload_every_months")
+    base = {"kind": "food_delivery_upload", "source": SRC["food_delivery_upload"], "cycle_months": months, "cadence": "approximate"}
+    dates, err = _read(readers.get("food_delivery_upload"))
+    if err:
+        return {**base, "state": READ_FAILED, "error": err}
+    if not months:
+        return {**base, "state": UNKNOWN, "detail": "the charter names no food-delivery upload cadence"}
+    cycle_days = int(months) * DAYS_PER_CADENCE_MONTH
+    out = {**base, **cycle_state("food_delivery_upload", dates, today, cycle_days, anchor=None, dead_cycles=None)}
+    if out["state"] == UNKNOWN:
+        out["detail"] = "no food-delivery upload date is readable"
+    return out
+
+
 def _prompt(row: dict[str, Any]) -> Optional[str]:
     if row.get("state") not in (DUE, OVERDUE, MISSED_2):
         return None
@@ -189,6 +222,7 @@ def compute(today: str, readers: Mapping[str, Callable[[], Any]], *, anchor: Opt
     rows = {"tape": _behavioural("tape", readers, today, anchor), "photos": _behavioural("photos", readers, today, anchor)}
     rows["dexa"] = _dexa(readers, today)
     rows["lab_draw"] = _lab_draw(readers, today)
+    rows["food_delivery_upload"] = _food_delivery_upload(readers, today)
     for r in rows.values():
         r["prompt"] = _prompt(r)
         if r.get("cycle_start"):
@@ -260,6 +294,28 @@ def _clinical_draw_dates(table: Any) -> list[str]:
         kw["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
 
+def upload_dates(table: Any) -> list[str]:
+    """The distinct `import_date`s on the food_delivery partition's `DATE#` rows (#5006/#5108): the day each
+    upload ran. Only that attribute is projected, so no order, merchant or amount leaves the read. A row without
+    an `import_date` is skipped, never read as its order date (an order day is not an upload day)."""
+    from boto3.dynamodb.conditions import Key
+
+    out: set[str] = set()
+    kw: dict[str, Any] = {
+        "KeyConditionExpression": Key("pk").eq("USER#matthew#SOURCE#food_delivery") & Key("sk").begins_with("DATE#"),
+        "ProjectionExpression": "import_date",
+    }
+    while True:
+        resp = table.query(**kw)
+        for it in resp.get("Items") or []:
+            v = str(it.get("import_date") or "").strip()
+            if _day(v):
+                out.add(v[:10])
+        if not resp.get("LastEvaluatedKey"):
+            return sorted(out)
+        kw["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+
+
 def draw_dates(table: Any) -> list[str]:
     """Every known draw date: the labs partition's plus the clinical record's — the latest draw may live in either."""
     return sorted(set(_dates(table, "labs", "draw_date")) | set(_clinical_draw_dates(table)))
@@ -273,6 +329,7 @@ def table_readers(table: Any) -> dict[str, Callable[[], list[str]]]:
         "photos": lambda: _dates(table, "progress_photos", "date"),
         "dexa": lambda: _dates(table, "dexa", "scan_date"),
         "lab_draw": lambda: draw_dates(table),
+        "food_delivery_upload": lambda: upload_dates(table),
     }
 
 

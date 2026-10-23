@@ -131,6 +131,23 @@ Role.AssumeRolePolicyDocument` lists exactly the two `environment:` subjects;
 (d) CloudTrail `AssumeRoleWithWebIdentity` for `github-actions-deploy-role` shows only
 `environment:` subjects after step 5.
 
+### PENDING APPLY — the readonly role's Scheduler read for I6 (#5252, 2026-10-23)
+
+`github-actions-readonly-role.permissions.json` gains two read-only statements:
+`SchedulerScheduleRead` (`scheduler:GetSchedule` on
+`arn:aws:scheduler:us-west-2:205930651321:schedule/default/LifePlatform*`) and `SchedulerList`
+(`scheduler:ListSchedules` on `*` — the call takes no resource; a narrower ARN implicitDenies it,
+probed with `aws iam simulate-custom-policy`). The consumer is I6
+(`tests/test_integration_aws.py::test_i6_eventbridge_rules_exist_and_enabled`) in `ci-cd.yml`
+`post-deploy-checks`: it lists schedules by the `LifePlatform<Stack>-` prefix, then reads each
+match with `GetSchedule`. Until applied, that leg skips with `I6 PARTIAL`. Simulated against the
+proposed document: `GetSchedule` on the live brief schedule is allowed; `Update`/`Delete`/`CreateSchedule`
+anywhere, and `GetSchedule` outside `default/LifePlatform*` or outside us-west-2, implicitDeny.
+Owner apply, after merge:
+`aws iam put-role-policy --role-name github-actions-readonly-role --policy-name readonly-permissions --policy-document file://infra/iam/github-actions-readonly-role.permissions.json`,
+then `python3 deploy/verify_oidc_iam.py --strict`, then delete the role's entry from
+`_PENDING_PERMISSIONS_APPLY` (`tests/test_grant_enumeration_drift.py`).
+
 ### APPLIED 2026-10-11 — the deploy role's bucket-notification read (#4643)
 
 > Applied by the owner ~03:30Z with

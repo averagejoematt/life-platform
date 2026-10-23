@@ -51,7 +51,10 @@ from web.site_api_common import (
 # `tests/test_source_registry_coverage_3669.py` asserts the two are the same number, in
 # both directions: the panel's months AND the registry's derived `stale_hours`.
 # "dexa" left this literal in #4639 — it is a registry source with `cadence_months: 12` now, so due_months() carries it.
-_DUE_MONTHS_UNREGISTERED = {"food_delivery": 3, "bp_readings": 3, "measurements": 2}
+# "food_delivery" is 6 since #5006/#5108 (owner ruling 2026-10-23: a 6-monthly upload ritual). Its home is the charter's
+# `nutrition.food_delivery.upload_every_months` (the reminder reads it there); tests/test_food_delivery_upload_ritual_5006.py
+# holds this copy equal to it. Not a registry `cadence_months`: that would derive a 6-month stale_hours (see the registry row).
+_DUE_MONTHS_UNREGISTERED = {"food_delivery": 6, "bp_readings": 3, "measurements": 2}
 DUE_MONTHS = {**_DUE_MONTHS_UNREGISTERED, **due_months()}
 DUE_MONTHS_DEFAULT = 6
 
@@ -438,7 +441,7 @@ def status(*, _g) -> dict:
         (
             "food_delivery",
             "Food Delivery Index",
-            "Quarterly CSV import \u00b7 delivery index 0-10",
+            "6-monthly CSV upload \u00b7 delivery index 0-10",
             2160,
             2880,
             "manual",
