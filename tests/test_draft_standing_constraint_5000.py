@@ -305,8 +305,8 @@ def test_5167_a_draft_before_the_retirement_day_is_byte_identical_to_the_pre_516
         ir, structured, pick, _ = _redraft(monkeypatch, day=day)
         return [(e.movement_key, e.notes) for e in ir.exercises], copy.deepcopy(structured), pick
 
-    now = {d: _snap(d) for d in (DAY, "2026-10-12")}
+    with_split = {d: _snap(d) for d in (DAY, "2026-10-12")}
     pre = {**sc.STANDING_CONSTRAINTS[0]}
     pre.pop("lifting_caps_retired_from")
     monkeypatch.setattr(sc, "STANDING_CONSTRAINTS", [pre])
-    assert {d: _snap(d) for d in (DAY, "2026-10-12")} == now
+    assert {d: _snap(d) for d in (DAY, "2026-10-12")} == with_split

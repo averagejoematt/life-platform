@@ -684,18 +684,13 @@ def _performed(day="2026-09-29"):
 
 # #5162 (owner ruling 2026-10-23) moved the overhead press off upper-heavy. The 09-29 replays below are of the session that
 # was served WITH it, and what they hold is the in-block variant resolver (#4409) and the one template resolver (#4431), not
-# the week's design — so they run against upper-heavy's template as it stood then. The current template is held above.
-_PRE_5162_UPPER_HEAVY = {
-    **program_structure.SESSION_TEMPLATES[UH],
-    "anchors": [["bench", "heavy"], ["row", "heavy"], ["overhead_press", "moderate"], ["vertical_pull", "moderate"]],
-    "accessories": ["cable_tricep_pushdown", "db_curl", "reverse_pec_deck"],
-    "accessory_sets": {},
-}
-
-
+# the week's design — so they run against upper-heavy's template as it stood then (`served_templates_5162`). The current
+# template is held above.
 @pytest.fixture
 def pre_5162_upper_heavy():
-    with patch.dict(program_structure.SESSION_TEMPLATES, {UH: _PRE_5162_UPPER_HEAVY}):
+    from served_templates_5162 import pre_5162_upper_days
+
+    with pre_5162_upper_days():
         yield
 
 
