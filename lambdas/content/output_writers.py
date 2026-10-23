@@ -21,6 +21,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.journal_silence import public_body  # #5131: the one public-surface guard
 from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.metric_truth import steps_series  # #4630: the ONE steps resolver
 from common.pacific_time import PACIFIC
@@ -418,7 +419,7 @@ def write_public_stats_json(data, profile, streak_data=None):
         _s3.put_object(
             Bucket=_S3_BUCKET,
             Key="generated/public_stats.json",
-            Body=json.dumps(stats, default=str),
+            Body=public_body(json.dumps(stats, default=str), "application/json"),
             ContentType="application/json",
             CacheControl="max-age=300",
         )
@@ -627,7 +628,7 @@ def write_dashboard_json(
         _s3.put_object(
             Bucket=_S3_BUCKET,
             Key=_DASHBOARD_KEY,
-            Body=json.dumps(dashboard, default=str),
+            Body=public_body(json.dumps(dashboard, default=str), "application/json"),
             ContentType="application/json",
             CacheControl="max-age=300",
         )
@@ -852,7 +853,7 @@ def write_clinical_json(data, profile, yesterday):
         _s3.put_object(
             Bucket=_S3_BUCKET,
             Key=f"dashboard/{_USER_ID}/clinical.json",
-            Body=json.dumps(clinical, default=str),
+            Body=public_body(json.dumps(clinical, default=str), "application/json"),
             ContentType="application/json",
             CacheControl="max-age=300",
         )
@@ -1182,7 +1183,7 @@ def write_buddy_json(data, profile, yesterday, character_sheet=None):
         _s3.put_object(
             Bucket=_S3_BUCKET,
             Key=f"buddy/{_USER_ID}/data.json",
-            Body=json.dumps(buddy_data, default=str),
+            Body=public_body(json.dumps(buddy_data, default=str), "application/json"),
             ContentType="application/json",
             CacheControl="max-age=300",
         )

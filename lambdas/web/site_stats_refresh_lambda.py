@@ -20,6 +20,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import boto3
 from common.constants import EXPERIMENT_START_DATE  # ADR-058
+from common.journal_silence import public_body  # #5131: the one public-surface guard
 from common.pacific_time import PACIFIC as PT  # #2414: reader-facing days anchor in the Pacific frame
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from health.sensor_absence import carry_forward_ok  # #3204: may a value be republished as current?
@@ -319,7 +320,7 @@ def lambda_handler(event, context):
     _s3.put_object(
         Bucket=S3_BUCKET,
         Key=STATS_KEY,
-        Body=json.dumps(payload, indent=2, default=str),
+        Body=public_body(json.dumps(payload, indent=2, default=str), "application/json"),
         ContentType="application/json",
         CacheControl="max-age=3600",
     )

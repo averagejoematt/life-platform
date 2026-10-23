@@ -46,6 +46,7 @@ from typing import Any
 import boto3
 from coach.persona_registry import plain_name  # #4564 — bylines carry no honorific; match on the plain name either way
 from common.email_identity import CHRONICLE_SENDER  # #3568 — ONE sending vocabulary, gated against the SES-verified set
+from common.journal_silence import reader_mail  # #5131: the one public-surface guard
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
@@ -715,8 +716,8 @@ def lambda_handler(event, context):
                     Destination={"ToAddresses": [email]},
                     Content={
                         "Simple": {
-                            "Subject": {"Data": subject, "Charset": "UTF-8"},
-                            "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+                            "Subject": {"Data": reader_mail(subject), "Charset": "UTF-8"},
+                            "Body": {"Html": {"Data": reader_mail(html), "Charset": "UTF-8"}},
                         }
                     },
                 )

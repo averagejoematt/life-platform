@@ -35,6 +35,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import boto3
+from common.journal_silence import public_body  # #5131: the one public-surface guard
 from experiment.phase_filter import EXPERIMENT_PHASE_CURRENT, singleton_visible  # #3485: writers honour the wipe's tombstone too
 
 try:
@@ -166,7 +167,7 @@ def _publish_to_s3(item: dict, failures: list | None = None) -> list[str]:
         s3.put_object(
             Bucket=S3_BUCKET,
             Key=journal_post_key,
-            Body=journal_post_html.encode("utf-8"),
+            Body=public_body(journal_post_html.encode("utf-8"), "text/html; charset=utf-8"),
             ContentType="text/html; charset=utf-8",
             CacheControl="max-age=300",
         )
@@ -179,7 +180,7 @@ def _publish_to_s3(item: dict, failures: list | None = None) -> list[str]:
         s3.put_object(
             Bucket=S3_BUCKET,
             Key="generated/journal/posts.json",
-            Body=journal_posts_json.encode("utf-8"),
+            Body=public_body(journal_posts_json.encode("utf-8"), "application/json"),
             ContentType="application/json",
             CacheControl="max-age=300",
         )
@@ -198,7 +199,9 @@ def _publish_to_s3(item: dict, failures: list | None = None) -> list[str]:
             s3.put_object(
                 Bucket=S3_BUCKET,
                 Key=kit_key,
-                Body=(share_kit_json if isinstance(share_kit_json, str) else json.dumps(kit)).encode("utf-8"),
+                Body=public_body(
+                    (share_kit_json if isinstance(share_kit_json, str) else json.dumps(kit)).encode("utf-8"), "application/json"
+                ),
                 ContentType="application/json",
                 CacheControl="max-age=300",
             )

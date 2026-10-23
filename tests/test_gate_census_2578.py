@@ -1174,7 +1174,8 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # the every-existing-URL-still-resolves sweep — arrives PROVEN via GUARD_PROOFS in scripts/gate_census_proofs.py (M1 the /start/
         # 301 left at the edge, M2 a cut-over page missing, M3 /story/about/ dropped: each 1 failed; reverted 1 passed). Enters exactly
         # that id, leaves {}, unproven does NOT move.
-        <= 285
+        # 285 -> 286 (2026-10-23, #5131, stacked onto #4588): structural::test_journal_silence_public_surfaces_5131.py (STRUCTURAL_HAND_PROOFS). Stacked, never max'd.
+        <= 286
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

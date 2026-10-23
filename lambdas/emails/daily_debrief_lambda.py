@@ -43,6 +43,7 @@ from ai.grounded_generation import allowed_dates, allowed_numbers, grounding_fin
 from ai.grounding_gate_params import cycle_gate_params  # #1967 — cycle anchors (#1691/#1897)
 from boto3.dynamodb.conditions import Key
 from common import media_tombstone  # #4365: a restart tombstone is not a published episode
+from common.journal_silence import public_body, scrub_document  # #5131: the one public-surface guard
 from common.numeric import decimals_to_float
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.er03_gate import BANNED_CAUSAL  # the platform's one banned-causal-connective list
@@ -379,7 +380,7 @@ def _write_indexes(episodes: list) -> None:
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=f"{PREFIX}/episodes.json",
-        Body=json.dumps({"episodes": episodes}, indent=1),
+        Body=public_body(json.dumps({"episodes": episodes}, indent=1), "application/json"),
         ContentType="application/json",
         CacheControl="max-age=3600, public",
     )
@@ -406,7 +407,7 @@ def _write_indexes(episodes: list) -> None:
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=f"{PREFIX}/feed.xml",
-        Body=feed,
+        Body=public_body(feed, "application/rss+xml; charset=utf-8"),
         ContentType="application/rss+xml; charset=utf-8",
         CacheControl="max-age=3600, public",
     )
@@ -428,7 +429,7 @@ def _emit_published_metric() -> None:
 
 def _publish(date_str: str, narrative: str, excerpt: str) -> dict:
     script = _spoken_script(date_str, narrative)
-    audio = google_tts.synthesize(script, DEBRIEF_VOICE)
+    audio = google_tts.synthesize(scrub_document(script), DEBRIEF_VOICE)
     key = _episode_key(date_str)
     s3.put_object(Bucket=S3_BUCKET, Key=key, Body=audio, ContentType="audio/mpeg", CacheControl="max-age=86400, public")
 

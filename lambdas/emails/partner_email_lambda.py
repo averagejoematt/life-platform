@@ -47,6 +47,7 @@ from common.constants import (
     EXPERIMENT_START_DATE,
     PLAN_DAILY_PROTEIN_MIN_G,
 )  # ADR-058
+from common.journal_silence import reader_mail  # #5131: the one public-surface guard
 from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
@@ -827,8 +828,8 @@ def lambda_handler(event, context):
         Destination={"ToAddresses": [_recipient()]},
         Content={
             "Simple": {
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+                "Subject": {"Data": reader_mail(subject), "Charset": "UTF-8"},
+                "Body": {"Html": {"Data": reader_mail(html), "Charset": "UTF-8"}},
             }
         },
         ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking

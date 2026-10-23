@@ -54,6 +54,7 @@ second-person address from the PUBLIC-facing slot.
 import os
 import re
 
+from common.journal_silence import mentions_journal_silence  # #5131: the one public-surface guard
 from common.text_utils import truncate_at_word
 from content.story_checks import cycle_reference_findings  # #4580 A-X1: THE one cycle/attempt/reset pattern
 
@@ -154,6 +155,11 @@ def reader_safe(text, coach_id=None, logger=None):
                 "public slot rejected for %s (refers to an earlier cycle/attempt/reset) — held empty (#4580)", coach_id or "unknown-coach"
             )
         return None
+    # #5131: the journal's silence is never reader copy — the same pattern the desk and the daily gate read.
+    if mentions_journal_silence(text):
+        if logger is not None:
+            logger.warning("public slot rejected for %s (journal silence) — held empty (#5131)", coach_id or "unknown-coach")
+        return None
     return text
 
 
@@ -181,7 +187,9 @@ def public_read(output_item):
     if not isinstance(value, str) or not value.strip():
         return None
     value = value.strip()
-    if is_owner_directed(value) or is_bare_token(value):  # belt for rows written before the write-side seam
+    if (
+        is_owner_directed(value) or is_bare_token(value) or mentions_journal_silence(value)
+    ):  # belt for rows written before the write-side seam
         return None
     return value
 
@@ -261,7 +269,11 @@ def public_items(values) -> list:
     """The list form of `public_or_empty`: owner-directed entries are dropped."""
     if not isinstance(values, list):
         return []
-    return [v for v in values if isinstance(v, str) and v.strip() and not is_owner_directed(v) and not is_machine_token(v)]
+    return [
+        v
+        for v in values
+        if isinstance(v, str) and v.strip() and not is_owner_directed(v) and not is_machine_token(v) and not mentions_journal_silence(v)
+    ]
 
 
 # #4392: a theme TAG is a label, not prose — the coach extraction stores them as slugs

@@ -70,11 +70,12 @@ _REEVES_COMMITMENT = (
 )
 
 # The public register — first person for the coach, third person for Matthew, the ask reported.
+# #5131: the journal's silence is never reader copy, so these fixtures no longer narrate it (reader_safe refuses it).
 _PUBLIC_HEADLINE = (
-    "Matthew's body is recovering well, while his journal has been quiet. I've asked him one thing: before he picks "
+    "Matthew's body is recovering well, while his evenings have run late. I've asked him one thing: before he picks "
     "up the phone in the morning, notice whether he already felt rested."
 )
-_PUBLIC_DAILY = "Matthew noticed the shift before the data confirmed it. I'm curious whether his quiet journal is tiredness or avoidance."
+_PUBLIC_DAILY = "Matthew noticed the shift before the data confirmed it. I'm curious whether his late evenings are tiredness or avoidance."
 _PUBLIC_ASK = "I've asked him to notice, before he checks the device each morning, whether he already felt rested."
 
 _COACH = "mind_coach"
@@ -152,7 +153,7 @@ def _coach_body(monkeypatch, *, stance=None, outputs=(), commitments=(), daily_t
 def _stance(headline, **extra):
     base = {
         "headline_read": headline,
-        "focused_on_now": ["Whether you felt the recovery spike before checking the device", "His journal's silence"],
+        "focused_on_now": ["Whether you felt the recovery spike before checking the device", "His late evenings"],
         "set_aside_for_now": [],
         "stage": {"label": "noticing", "rationale": "He is learning to read his own signals."},
         "how_my_read_changed": "",
@@ -204,7 +205,7 @@ def test_a_third_person_headline_is_served_verbatim(monkeypatch):
 
 def test_owner_directed_stance_items_are_dropped_and_public_ones_kept(monkeypatch):
     body = _coach_body(monkeypatch, stance=_stance(_PUBLIC_HEADLINE))
-    assert body["stance"]["focused_on_now"] == ["His journal's silence"]
+    assert body["stance"]["focused_on_now"] == ["His late evenings"]
     assert body["stance"]["stage"]["rationale"] == "He is learning to read his own signals."
 
 

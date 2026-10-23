@@ -6,6 +6,7 @@ import json
 from datetime import datetime, timezone
 from decimal import Decimal
 
+from common.journal_silence import public_body  # #5131: the one public-surface guard
 from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 # #2254: the statuses a stored installment can be in that a regenerating run must
@@ -201,7 +202,7 @@ def _set_chronicle_pending(week_num, reason, display, *, _g):
         s3.put_object(
             Bucket=S3_BUCKET,
             Key="generated/journal/posts.json",
-            Body=json.dumps(doc, indent=2).encode("utf-8"),
+            Body=public_body(json.dumps(doc, indent=2).encode("utf-8"), "application/json"),
             ContentType="application/json",
             CacheControl="max-age=300",
         )
