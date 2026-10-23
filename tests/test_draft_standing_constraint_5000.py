@@ -249,3 +249,64 @@ def test_action_draft_wires_the_gate_the_tripwire_and_the_cardio_block(monkeypat
     assert "Take an ECG before you leave." in ideal.exercises[0].notes
     assert not [m for m in BAND_MARKERS if m in "\n".join(e.notes for e in ideal.exercises)]
     assert ideal.inputs_snapshot["standing_constraint"]["id"] == "hr_regime_change_2026_10_10"
+
+
+# ── #5167 (owner ruling 2026-10-23, the date split): the lifting RPE caps retire from their day ────────────
+RETIRED = sc.STANDING_CONSTRAINTS[0]["lifting_caps_retired_from"]
+
+
+def _caps_below(text: str, ceiling: float) -> list[str]:
+    import re
+
+    return [m for m in re.findall(r"≤\s*RPE\s*(\d+(?:\.\d+)?)", text) if float(m) < ceiling]
+
+
+def test_5167_the_retirement_day_is_after_the_pinned_fixture_and_carries_its_provenance():
+    c = sc.STANDING_CONSTRAINTS[0]
+    assert RETIRED == "2026-10-19" and DAY < RETIRED  # the owner's hand-built 10-18 routine keeps its caps
+    assert c["provenance"]["lifting_caps_retired_from"].startswith("owner")
+    assert sc.lifting_caps_active(c, DAY) and not sc.lifting_caps_active(c, RETIRED) and not sc.lifting_caps_active(c, "2026-11-02")
+    assert sc.lifting_caps_active(c, None)  # an undated caller keeps the caps — never a silently dropped cap
+
+
+def test_5167_from_the_retirement_day_no_lifting_cap_below_the_charter_ceiling_is_written(monkeypatch):
+    """The red test the issue asks for: on a date on/after the retirement day, no note carries an RPE cap below the
+    charter compound ceiling and every stashed branch cap (what adherence grades against) IS that ceiling."""
+    from training import effort_ceilings
+
+    ceiling = effort_ceilings.ceiling(effort_ceilings.COMPOUNDS)
+    ir, structured, pick, _ = _redraft(monkeypatch, day=RETIRED)
+    notes = "\n".join(e.notes for e in ir.exercises)
+    assert not _caps_below(notes, ceiling), _caps_below(notes, ceiling)
+    caps = {b[k]["rpe_cap"] for b in structured["exercises"].values() for k in ("green", "yellow", "red")}
+    assert structured["exercises"] and caps == {ceiling}
+    assert structured["lifting_caps"] == {"retired_from": RETIRED, "ceiling_rpe": ceiling}
+    first = ir.exercises[0].notes
+    bands = effort_ceilings.class_bands()
+    assert f"compounds RPE {bands['compounds_rpe'][0]:g}–{bands['compounds_rpe'][1]:g}" in first
+    assert "• ECG not sinus, or feel off → accessories and cardio optional." in first
+    # the HR half is unchanged: the ECG gate, the stop list, no Whoop-band cue, the talk test and no HR field
+    assert "Take an ECG before you leave." in first and PLACEHOLDER_STOP in first
+    assert not [m for m in BAND_MARKERS if m in notes]
+    assert not set(sc.HR_PICK_FIELDS) & set(pick) and pick["hr_fields_dropped_by"] == "hr_regime_change_2026_10_10"
+    # mutation control: the same day with the caps still in force writes the ≤ RPE 8 / ≤ RPE 7 caps this test reds on
+    capped = {**sc.STANDING_CONSTRAINTS[0], "lifting_caps_retired_from": None}
+    monkeypatch.setattr(sc, "STANDING_CONSTRAINTS", [capped])
+    ir2, structured2, _, _ = _redraft(monkeypatch, day=RETIRED)
+    assert _caps_below("\n".join(e.notes for e in ir2.exercises), ceiling) and "lifting_caps" not in structured2
+
+
+def test_5167_a_draft_before_the_retirement_day_is_byte_identical_to_the_pre_5167_output(monkeypatch):
+    """The date split's other half: the pinned 2026-10-18 re-draft (and every day before the split) writes exactly what
+    it wrote with no retirement day on the entry at all."""
+    import copy
+
+    def _snap(day):
+        ir, structured, pick, _ = _redraft(monkeypatch, day=day)
+        return [(e.movement_key, e.notes) for e in ir.exercises], copy.deepcopy(structured), pick
+
+    now = {d: _snap(d) for d in (DAY, "2026-10-12")}
+    pre = {**sc.STANDING_CONSTRAINTS[0]}
+    pre.pop("lifting_caps_retired_from")
+    monkeypatch.setattr(sc, "STANDING_CONSTRAINTS", [pre])
+    assert {d: _snap(d) for d in (DAY, "2026-10-12")} == now

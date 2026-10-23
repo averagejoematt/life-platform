@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.19.1",
+  "version": "1.20.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -127,6 +127,13 @@
       "by": "#5187 (epic #5094), filling in the same-day source the 1.18.x text named ('armed but silent until a same-day food source exists (#5187)'); no new owner ruling, the nudge rule itself is unchanged and still pending R2 (#5091)",
       "what": "nutrition breakfast_nudge.rule prose only (no number, window or threshold changes): names the timed protein entries Health Auto Export delivers intraday as the same-day read, beside the end-of-day MacroFactor row; an absent record of both still withholds (no_same_day_log).",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.20.0",
+      "date": "2026-10-23",
+      "by": "owner ruling 2026-10-23 on #5162 (attended, Session CD): 'Trade inside 75. Shoulder-press sets become lateral raises and face pulls (closing the side/rear-delt gap). The chest, lat and arm targets are lowered to what fits, keeping 60-75 min sessions. The 2 -> 4 calf sets and the dropped second leg curl stay.'",
+      "what": "volume_priorities.sets_per_wk: lats 14-18 -> 4-4, upper_chest 14-18 -> 0-0, arms 10-14 -> 6-6 (each the five-role week's own count inside the 75-set redline; side_rear_delts 14-18 and legs 8-10 unchanged). split.frequency gains overhead_press_per_wk 1: 8 of the week's 9 shoulder-press sets became lateral-raise and face-pull sets (side/rear delts 6 -> 14), the press keeps one set on Shoulders+arms; delts_per_wk 3 is now met by that direct delt work. The total stays 75 sets.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
   "governing_goal": {
@@ -149,7 +156,7 @@
   "split": {
     "lifting_days_per_wk": 5,
     "sequence": ["Upper-heavy", "Lower-heavy", "Shoulders+arms", "Upper-volume", "Lower-volume"],
-    "frequency": {"each_major_muscle_per_wk": 2, "delts_per_wk": 3},
+    "frequency": {"each_major_muscle_per_wk": 2, "delts_per_wk": 3, "overhead_press_per_wk": 1},
     "session_minutes": {"lifting": [60, 75], "cardio_block_max": 30, "stretching_max": 10},
     "minimum_session": {
       "minutes": 20,
@@ -165,10 +172,10 @@
   "volume_priorities": {
     "sets_per_wk": {
       "side_rear_delts": [14, 18],
-      "lats": [14, 18],
-      "upper_chest": [14, 18],
+      "lats": [4, 4],
+      "upper_chest": [0, 0],
       "legs": [8, 10],
-      "arms": [10, 14]
+      "arms": [6, 6]
     },
     "legs_posture": "strong maintenance",
     "mev_floors_in_every_template": ["side_rear_delts", "traps", "calves", "core"]

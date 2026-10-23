@@ -448,6 +448,14 @@ def next_prescription(
         )
         return out
 
+    if cur and load < cur - LOAD_TOLERANCE_KG:
+        # #5052 (the 2026-10-23 calf read): the gain rule needs the performed load at or above the prescribed one, so a
+        # run at a LOWER load never counts — say so, rather than "2 of 2 at the top" beside a hold
+        out["reason"] = (
+            f"hold {_lb(cur)}: the top sets on {_day(last.get('date'))} were at {_lb(load)}, below the prescribed load — "
+            f"the gain rule counts top sets at or above it"
+        )
+        return out
     hits = 0
     for _s, t in exposures[: max(need, 1)]:
         if abs(float(t["load_kg"]) - load) <= LOAD_TOLERANCE_KG and _at_top(t, rep_hi) and not _breach(t):

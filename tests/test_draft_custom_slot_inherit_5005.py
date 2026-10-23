@@ -68,6 +68,23 @@ PROGRAM_KEYS = (
 )
 
 
+@pytest.fixture(autouse=True)
+def _upper_volume_as_served_2026_10_18():
+    """The wire is the 2026-10-18 upper-volume session, served WITH the overhead press; #5162 (owner ruling 2026-10-23)
+    moved the press's sets to a face pull. What this file holds is the custom-draft slot stamp (#5005), not the week's
+    design, so the replay runs against upper-volume's template as it was served that day."""
+    from training import program_structure
+
+    as_served = {
+        **program_structure.SESSION_TEMPLATES["upper_volume"],
+        "anchors": [["bench", "volume"], ["row", "volume"], ["overhead_press", "volume"], ["vertical_pull", "volume"]],
+        "accessories": ["cable_chest_fly", "cable_tricep_pushdown", "db_curl"],
+        "accessory_sets": {},
+    }
+    with patch.dict(program_structure.SESSION_TEMPLATES, {"upper_volume": as_served}):
+        yield
+
+
 def _history():
     """The real `load_history_indexes` over the captured rows (the generator's and the gate's index)."""
     import datetime

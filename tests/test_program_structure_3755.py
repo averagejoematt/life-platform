@@ -203,13 +203,16 @@ def test_the_nominal_week_carries_the_five_roles_in_the_charters_order():
 
 
 def test_every_anchor_pattern_is_reachable_twice_a_week_on_the_required_days():
-    """Six patterns at the charter's `split.frequency` (owner ruling 5: each major muscle 2x/wk, delts 3x/wk — the
-    press). 'Reachable' = a required lifting day whose targets include one of the pattern's primary muscles; the
+    """Six patterns at the charter's `split.frequency` (owner ruling 5: each major muscle 2x/wk; the press once a week
+    since #5162, delts' 3x/wk now carried by the lateral raise / face pull work). 'Reachable' = a required lifting day whose targets include one of the pattern's primary muscles; the
     generator selects by muscle."""
     reach = program_structure.anchor_reachability()
     assert set(reach) == {"squat", "hinge", "bench", "row", "overhead_press", "vertical_pull"}
     for name, r in reach.items():
-        want = charter_value("split.frequency.delts_per_wk" if name == "overhead_press" else "split.frequency.each_major_muscle_per_wk")
+        # #5162: the press runs once a week (its delt sets were traded for lateral raises and face pulls)
+        want = charter_value(
+            "split.frequency.overhead_press_per_wk" if name == "overhead_press" else "split.frequency.each_major_muscle_per_wk"
+        )
         assert r["frequency_target"] == want, name
         assert r["reachable_at_target"] is True, name
         assert len(r["reachable_days_excluding_optional"]) >= want, name

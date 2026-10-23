@@ -4,17 +4,18 @@ THE INCIDENT: 2026-10-04 the Flex day was dropped; side/rear delts and core went
 alert (`muscle_volume` counted it; nothing compared the count with the landmark). Two halves, held here:
 
   * TEMPLATES — every charter MEV floor (`volume_priorities.mev_floors_in_every_template`: side/rear delts, traps, calves,
-    core) has a slot in a role, and every floor but side/rear delts meets its landmark MEV (side/rear delts are pinned SHORT:
-    6 direct sets vs MEV 8, below); the week stays inside the owner's 60–75 hard-set redline and every session inside the
-    charter's lifting-minute cap.
+    core) has a slot in a role and meets its landmark MEV (side/rear delts were 6 direct sets vs MEV 8 until #5162 traded the
+    press for lateral raises and face pulls: 14); the week stays inside the owner's 60–75 hard-set redline and every session
+    inside the charter's lifting-minute cap.
   * THE FLAG — `below_mev_14d` rides the coach packet and the plan packet, derived from `get_muscle_volume`'s trailing-14d
     counts (`working_sets_by_muscle`, the one computation) — and a fixture of the 2026-10-04 drop trips it on day 14, not 13.
 
-RESIDUAL (named, shrink-only): the charter bands for side/rear delts / lats / upper chest / arms are not reachable inside
-the 75-set week, and side/rear delts (6 direct sets) sit below their MEV of 8; `KNOWN_BAND_GAPS` pins today's shortfall so
-it can only shrink. Side/rear delts, upper chest and lats are counted BY MOVEMENT (`volume_floors.FLOOR_MOVEMENTS` /
+RESIDUAL — CLOSED by #5162 (owner ruling 2026-10-23, "trade inside 75"): 8 of the 9 weekly shoulder-press sets became
+lateral raises and face pulls (side/rear delts 6 -> 14, the band's floor), and the lats / upper-chest / arms bands were
+lowered to what fits inside the 75-set week (charter 1.20.0: 4, 0, 6). `KNOWN_BAND_GAPS` is all zeros and stays
+shrink-only. Side/rear delts, upper chest and lats are still counted BY MOVEMENT (`volume_floors.FLOOR_MOVEMENTS` /
 `BAND_MOVEMENTS`): upper chest has 0 incline sets (the 8 catalog-'chest' sets are flat bench + cable fly), lats has 4
-(the lat pulldown; rows and the shrug are not lat work), so the gaps are 14 and 10, not the catalog-muscle 6 and 2. Carrier: #5162 (gate:owner, the 75-set redline vs the charter bands). The LOGGED Shoulders flag cannot
+(the lat pulldown; rows and the shrug are not lat work). The LOGGED Shoulders flag cannot
 see a side/rear-delt drop that continued pressing masks (live 2026-10-05..18: 16 Shoulders sets, 8.0/wk); that follow-on is
 #5164 — so the day-14 trip below is asserted for Calves and Core, and Shoulders is asserted NOT flagged, as it really was.
 """
@@ -42,8 +43,8 @@ from training.training_charter import charter_value  # noqa: E402
 CATALOG = json.loads((REPO / "config" / "movement_catalog.json").read_text())["movements"]
 ROLES = list(program_structure.SESSION_TEMPLATES)
 
-# gap (sets/wk) below each charter band's floor today — may only shrink (#5053 residual; see the module docstring)
-KNOWN_BAND_GAPS = {"side_rear_delts": 8, "lats": 10, "upper_chest": 14, "legs": 0, "arms": 4}
+# gap (sets/wk) below each charter band's floor today — may only shrink (#5053 residual, closed by #5162; see the docstring)
+KNOWN_BAND_GAPS = {"side_rear_delts": 0, "lats": 0, "upper_chest": 0, "legs": 0, "arms": 0}
 
 
 @pytest.fixture(scope="module")
@@ -56,10 +57,11 @@ def test_every_charter_floor_muscle_has_a_slot_and_meets_its_mev(coverage):
     assert set(floors) == set(charter_value("volume_priorities.mev_floors_in_every_template"))
     for name, row in floors.items():
         assert row["slot_roles"], (name, row)
-        if name != "side_rear_delts":  # #5162: 6 direct sets vs MEV 8 — pinned honestly below, not papered over
-            assert row["meets_mev"], (name, row)
+        assert row["meets_mev"], (name, row)
     delts = floors["side_rear_delts"]
-    assert (delts["sets"], delts["mev"], delts["meets_mev"]) == (6, 8, False)  # presses are NOT side/rear-delt work
+    # #5162: the press sets traded for lateral raises + face pulls (presses are NOT side/rear-delt work: 6 before)
+    assert (delts["sets"], delts["mev"], delts["meets_mev"]) == (14, 8, True)
+    assert delts["slot_roles"] == ["upper_heavy", "shoulders_arms", "upper_volume"]
     assert floors["traps"]["sets"] == 2  # the shrug slot, not all Back
     assert floors["traps"]["slot_roles"] == ["shoulders_arms"]
     assert floors["calves"]["sets"] >= 8 and floors["core"]["sets"] >= 4
@@ -78,9 +80,10 @@ def test_every_floor_movement_is_in_a_role_and_in_the_pool():
 def test_weekly_sets_by_muscle_delts_frequency_and_the_real_side_rear_count(coverage):
     delts = program_structure.weekly_sets_by_muscle(CATALOG)["delts"]
     assert delts["frequency_per_wk"] >= charter_value("split.frequency.delts_per_wk")
-    # 15 catalog-'shoulders' sets = 9 press + 6 direct; only the 6 count toward the charter's side/rear-delt band (#5162)
-    assert delts["sets"] == 15 and coverage["sets_by_muscle"]["side_rear_delts_direct"] == 6
-    assert coverage["bands"]["side_rear_delts"]["member_sets"] == [6]
+    # 15 catalog-'shoulders' sets = 1 press + 14 direct (#5162; were 9 press + 6 direct); only the 14 count toward the band
+    assert delts["sets"] == 15 and coverage["sets_by_muscle"]["side_rear_delts_direct"] == 14
+    assert coverage["bands"]["side_rear_delts"]["member_sets"] == [14]
+    assert coverage["bands"]["side_rear_delts"]["band"][0] == 14  # the floor is closed, not lowered
 
 
 def test_upper_chest_and_lats_are_counted_by_movement_not_catalog_muscle(coverage):
@@ -106,6 +109,23 @@ def test_band_gaps_only_shrink(coverage):
         assert gap <= KNOWN_BAND_GAPS[g], f"{g}: gap {gap} grew past the pinned {KNOWN_BAND_GAPS[g]}"
     assert coverage["bands"]["legs"]["gap_to_floor"] == 0  # strong maintenance, 8-10
     assert all(row["band"][0] <= max(row["member_sets"]) or row["gap_to_floor"] for row in coverage["bands"].values())
+
+
+def test_5162_the_ruled_trade_inside_75():
+    """Owner ruling 2026-10-23 (#5162): "Trade inside 75. Shoulder-press sets become lateral raises and face pulls ... The
+    2 -> 4 calf sets and the dropped second leg curl stay." Held as numbers: the week is still 75; the press keeps 1 of its
+    9 sets; the 8 traded sets are lateral raises + face pulls; the calf and leg-curl trades are unchanged."""
+    by_mv = program_structure._week_movement_sets(CATALOG)
+    total = sum(program_structure.session_prescription_for_role(r, catalog_movements=CATALOG)["total_sets"] for r in ROLES)
+    assert total == owner_redlines.REDLINES["lifting_sessions_per_wk"]["total_hard_sets_wk"][1] == 75
+    assert by_mv.get("machine_shoulder_press", 0) == 1
+    assert (by_mv["db_lateral_raise"], by_mv["face_pull"], by_mv["reverse_pec_deck"]) == (6, 6, 2)  # were 2 / 2 / 2
+    tmpl = program_structure.SESSION_TEMPLATES
+    assert tmpl["lower_heavy"]["accessory_sets"]["calf_raise_machine"] == 4 and by_mv["calf_raise_machine"] == 8
+    assert "leg_curl" not in tmpl["lower_volume"]["accessories"] and by_mv["leg_curl"] == 2
+    # the lowered bands are the week's own counts — a band above what the week carries would re-open a gap
+    bands = charter_value("volume_priorities.sets_per_wk")
+    assert (bands["lats"], bands["upper_chest"], bands["arms"]) == ([4, 4], [0, 0], [6, 6])
 
 
 def test_the_week_and_every_session_stay_inside_the_caps():
