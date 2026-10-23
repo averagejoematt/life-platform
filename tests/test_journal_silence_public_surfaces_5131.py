@@ -77,7 +77,6 @@ API_SURFACES = {
 }
 
 GENERATED_WRITERS = {
-    "compute/coach_daily_reflection_lambda.py": GUARDED,
     "compute/coach_memoir_lambda.py": GUARDED,
     "content/output_writers.py": GUARDED,
     "content/site_writer.py": GUARDED,

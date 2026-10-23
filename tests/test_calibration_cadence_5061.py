@@ -147,15 +147,17 @@ def test_nothing_is_prompted_before_the_due_day():
     assert cet.detect_calibration(block(plus(LAST, CYCLE - 1), tape=[LAST], photos=[LAST]), plus(LAST, CYCLE - 1)) == []
 
 
-def test_the_deadman_is_a_concern_candidate_once_per_cycle_and_replaces_the_prompt():
+def test_the_deadman_replaces_the_prompt_once_per_cycle_outside_the_ai_sweep():
+    # #5203: the dead-man left the AI sweep (it stood down at budget tier >= 2) for coach.calibration_deadman_alert.
+    from coach import calibration_deadman_alert as cda
+
     today = plus(LAST, CYCLE * 3)
-    evs = cet.detect_calibration(block(today, tape=[LAST], photos=[today]), today)
-    assert [e["kind"] for e in evs] == ["calibration_deadman"]
-    d = evs[0]
-    assert d["event_id"] == f"CALIB_DEADMAN#tape#{LAST}" and d["provenance"] == coach_outbound.PROVENANCE_CONCERN
+    assert cet.detect_calibration(block(today, tape=[LAST], photos=[today]), today) == []
+    d = cda.due(block(today, tape=[LAST], photos=[today]))
+    assert [x["kind"] for x in d] == ["tape"] and d[0]["event_id"] == f"CALIB_DEADMAN#tape#{LAST}"
     assert cc.deadman_kinds(block(today, tape=[LAST], photos=[today])) == ["tape"]
     ledger = Ledger()
-    assert coach_outbound.claim_event(ledger, d["event_id"]) and not coach_outbound.claim_event(ledger, d["event_id"])
+    assert coach_outbound.claim_event(ledger, d[0]["event_id"]) and not coach_outbound.claim_event(ledger, d[0]["event_id"])
 
 
 def test_calibration_ranks_last_and_has_a_frame():

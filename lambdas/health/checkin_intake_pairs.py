@@ -36,7 +36,9 @@ completed day with no row means the writer stopped, which a missing check-in mus
 keeps joining the window itself (it must, to cover days older than the writer and to re-settle a late food upload).
 
 PRIVACY. Owner-only, stored apart from the public ``weekly_correlations`` record (which the site serves):
-``USER#matthew#SOURCE#checkin_intake_pairs`` / ``WEEK#<iso-week>``. No web or email module imports this.
+``USER#matthew#SOURCE#checkin_intake_pairs`` / ``WEEK#<iso-week>``. No web or email module imports this. The ONE
+owner-ruled projection of the ``DATE#`` rows a third party may see is ``health.checkin_partner_view`` (#5125 R5: the
+partner letter — check-in keys only, never the intake columns).
 """
 
 from __future__ import annotations

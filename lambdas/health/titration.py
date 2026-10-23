@@ -18,8 +18,10 @@ THE DECISION (``decide``, pure — every input is a value the caller already rea
   spacing            a step inside ``min_days_between_steps`` of the last one -> ``hold`` / ``spacing``
   first step         no step yet and fewer than the redlines' ``complete_days_before_first_titration``
                      complete days in the trailing window -> ``hold`` / ``logs_before_first_step``
-  above the ceiling  (losing faster than the band) -> ``up`` by the step (panel default R1: eat up to
-                     the band now, refit weekly — built on the panel default, pending R1)
+  above the ceiling  (losing faster than the band) -> the charter's ``above_ceiling_action``: ``warn`` (owner
+                     ruling 2026-10-23 R1, #5091: stay ~1,500 — the engine never pushes food up on its own) holds
+                     with ``above_ceiling_warning``, naming the +``max_step_kcal`` step the owner may choose; ``up``
+                     (the pre-ruling behaviour) steps up by it; any other value holds as ``insufficient_data``
   below the floor    (losing slower) -> FEET BEFORE FORK, in order: steps unknown -> ``steps_unknown``;
                      the trailing steps mean under ``steps.floor`` -> ``steps_first``; then the redlines'
                      owner rule (walking FIRST, then food, never both inside the spacing): the first
@@ -56,7 +58,7 @@ from datetime import timedelta
 from decimal import Decimal
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
-from health.calorie_target import TITRATION_PK, TITRATION_SK_PREFIX, _day, week_monday
+from health.calorie_target import TITRATION_PK, TITRATION_SK_PREFIX, _day, record_predates_retarget, week_monday
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +68,8 @@ CALIBRATION_KIND = "nutrition_titration"
 DEADMAN_LOG_MARK = "NUTRITION_TITRATION_MISSED"
 DECISION_LOG_MARK = "NUTRITION_TITRATION_DECISION"
 HOLD, UP, DOWN = "hold", "up", "down"
+WARN = "warn"  # nutrition.titration.above_ceiling_action: hold and warn above the band ceiling (owner ruling 2026-10-23 R1)
+ABOVE_CEILING_ACTIONS = (WARN, UP)
 HISTORY_WEEKS = 8
 
 CharterReader = Callable[[str], Any]
@@ -142,6 +146,8 @@ def settings(charter_reader: Optional[CharterReader] = None) -> Dict[str, Any]:
         "steps_window_days": int(window) if window is not None else None,
         "steps_floor": _num(via(sbf, "steps_floor_path", read)),
         "walking_first_action": via(walk, "action_path", _redline),
+        "above_ceiling_action": t.get("above_ceiling_action") if t.get("above_ceiling_action") in ABOVE_CEILING_ACTIONS else None,
+        "records_from_version": cal.get("records_from_version"),
         "target_kcal": _num(cal.get("target_kcal")),
         "band_kcal": [_num(band[0]), _num(band[1])] if isinstance(band, (list, tuple)) and len(band) == 2 else None,
         "minimum_kcal": _num(cal.get("planned_minimum_any_weight_kcal")),
@@ -166,6 +172,7 @@ NEED = (
     "steps_window_days",
     "steps_floor",
     "minimum_kcal",
+    "above_ceiling_action",
 )
 
 
@@ -212,9 +219,14 @@ def step_size(miss_lb_wk: float, cfg: Mapping[str, Any]) -> int:
     return int(max(lo, min(hi, math.floor(raw / rnd + 0.5) * rnd)))  # half-up: a 125 kcal miss is a 150 step
 
 
-def _prior(history: Optional[List[Mapping[str, Any]]], week: str) -> List[Mapping[str, Any]]:
-    """Records strictly before ``week``, newest first, tombstones dropped."""
-    rows = [r for r in history or () if not r.get("tombstone") and str(r.get("week") or "") < week]
+def _prior(history: Optional[List[Mapping[str, Any]]], week: str, from_version: Any = None) -> List[Mapping[str, Any]]:
+    """Records strictly before ``week``, newest first, tombstones dropped, and records written under a charter version
+    before ``nutrition.calories.records_from_version`` dropped (they carried the pre-re-target kcal, R1 2026-10-23)."""
+    rows = [
+        r
+        for r in history or ()
+        if not r.get("tombstone") and str(r.get("week") or "") < week and not record_predates_retarget(dict(r), from_version)
+    ]
     return sorted(rows, key=lambda r: str(r.get("week")), reverse=True)
 
 
@@ -236,7 +248,7 @@ def decide(
 ) -> Dict[str, Any]:
     """THE weekly decision for ``week`` (an ISO Monday). Pure. See the module docstring for the rules."""
     c = dict(cfg if cfg is not None else settings())
-    prior = _prior(history, week)
+    prior = _prior(history, week, c.get("records_from_version"))
     last = next((r for r in prior if _num(r.get("kcal")) is not None), None)
     base = _num(last.get("kcal")) if last else c.get("target_kcal")
     last_step = next((r for r in prior if r.get("action") in (UP, DOWN)), None)
@@ -311,6 +323,14 @@ def decide(
     side = "under the band floor" if position == "below" else "over the band ceiling"
     if reads < c["reads_required"]:
         return hold("awaiting_confirmation", f"{side} on read {reads} of {c['reads_required']}: hold until it repeats", detail)
+    if position == "above" and c["above_ceiling_action"] == WARN:
+        out["warning"] = f"losing faster than the {ceiling:g} lb/wk band ceiling on {reads} weekly reads"
+        return hold(
+            "above_ceiling_warning",
+            f"WARNING: {side} on {reads} weekly reads — the target holds (owner ruling 2026-10-23: stay ~1,500, food is not pushed up); "
+            f"the step the owner may choose is +{int(c['max_step_kcal'])} kcal/day",
+            detail,
+        )
     if last_step_date and (_day(week) - _day(last_step_date)).days < c["spacing_days"]:
         return hold("spacing", f"{side}, but the last step ({last_step_date}) is inside the {int(c['spacing_days'])}-day spacing", detail)
 
@@ -354,7 +374,9 @@ def decide(
         )
     new = max(base - step, c["minimum_kcal"])
     if new >= base:
-        return hold("at_minimum", f"{side}, but the target is already at the planned minimum", detail)
+        return hold(
+            "at_minimum", f"{side}, but the target is already at or below the planned minimum ({int(c['minimum_kcal'])} kcal)", detail
+        )
     taken = int(base - new)
     out.update(action=DOWN, step_kcal=-taken, new_target_kcal=int(new))
     return _stepped(out, c, f"-{taken} kcal: {side} on {reads} weekly reads, steps at the floor, walking first from {walked}", detail)

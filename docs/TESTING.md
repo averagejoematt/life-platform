@@ -136,8 +136,10 @@ batch and The Panel enforce at publish time. Two parts:
   **causal connective** on a correlation, an **unhedged small-N** claim (`N<30`
   needs confidence framing), and a **"Matthew"-prefixed** opening.
 - **Wiring-coverage guard** — the reader-facing paths that are supposed to be
-  gated (`coach_daily_reflection_lambda`, `coach_panel_podcast_lambda`) must still
-  route through `er03_gate`, so a refactor can't silently drop the truthfulness gate.
+  gated (`coach_panel_podcast_lambda`) must still route through `er03_gate`, so a
+  refactor can't silently drop the truthfulness gate. (`coach_daily_reflection_lambda`
+  left the list when its reflection was retired, #4583 — its move lines are gated by
+  the registered `coach_moves_sheet.check_line` surface instead.)
 
 The rubric lives in the gate module + the corpus README, not in a buried prompt
 string. **Layer 2** (a budget-gated Haiku judge vs an in-repo rubric, self-skipping

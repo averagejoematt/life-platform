@@ -20,7 +20,7 @@ def _row(fat, carb, fibre):
 
 
 def test_the_charter_owns_the_floors_and_the_redlines_read_them():
-    assert (FAT, CARB, FIBRE) == (65, 120, 35)
+    assert (FAT, CARB, FIBRE) == (65, 58, 35)  # #5212 (owner ruling 2026-10-23): the carb floor lowered from 120 to ~60 g
     R = owner_redlines.REDLINES
     assert R["fat_floor_g"]["value"] == FAT and R["carb_floor_g"]["value"] == CARB
     assert R["carb_floor_g"]["fibre_g"] == training_charter.charter_value("nutrition.floors.fibre.target_range_g")
