@@ -16,7 +16,8 @@ appendix, which lists every off-path page. The appendix is a footnote, not navig
 walk treats the appendix and the pages it lists as sinks (`site_text.appendix_sinks`): not
 counted, not walked. What is still counted through them is honest reach — `/subscribe/` keeps
 its v5 chrome, so its menu walks the v5 doors (`/cockpit/`, `/data/`, `/coaching/`,
-`/protocols/`, `/method/`, `/story/build/`) and those count: 17 on the rebuilt rehearsal, the
+`/protocols/`, `/method/`, `/story/build/`) and those count: 17 on the rebuilt rehearsal, 18 on
+the 2026-10-23 refresh (main pointed the v8 coaches page at the kit call list), the
 new ceiling. Re-pouring `/subscribe/` on the kit would take that to ~10, but it is a new screen
 and the epic's rule 4 builds nothing beneath a screen the owner has not seen.
 """

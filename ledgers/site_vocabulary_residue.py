@@ -50,4 +50,8 @@ BASELINE = {
 # counted (tests/site_text.appendix_sinks). Measured 17 on the rebuilt rehearsal: the kit's own
 # nine (/ and the eight /next/v8/ pages it links), /subscribe/, the live /story/, and the six v5
 # doors /subscribe/'s v5 menu still walks.
-NAV_REACH_CEILING = 17
+# 18 on the 2026-10-23 refresh onto main (00c91014c; owner's go "asap" on #4588): main had since
+# re-pointed /next/v8/coaches/'s "Every prediction, right and wrong" door from the v5
+# /coaching/scorecard/ to the kit's own /next/v8/call/, so the call list is a tenth kit page two
+# taps from /. Still a lowering from main's 24, set to what this tree measures, never raised past it.
+NAV_REACH_CEILING = 18
