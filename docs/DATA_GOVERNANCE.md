@@ -51,7 +51,7 @@ Visible at `averagejoematt.com` to anyone:
 - Raw biometrics: HRV, heart rate, sleep stages, CGM glucose readings, overnight vitals (SpO2, skin/wrist temperature, and the Apple Watch's breathing-disturbances screen — `apple_health` `spo2_pct_apple` / `wrist_temp_sleep_c_apple` / `breathing_disturbances_apple`, #4970)
 - Lab results (cholesterol, biomarkers, genome variants)
 - Body composition (DEXA scan details, weight, body fat %)
-- Nutrition logs (every meal, every calorie)
+- Nutrition logs (every meal, every calorie). The public meal views (`/api/frequent_meals`, `/api/protein_sources`, `/api/meal_glucose`) publish aggregates over the log, and a food NAME only when it is on the owner-approved list `lambdas/privacy/food_names.py` (owner ruling R5, 2026-10-23, #5112). The list ships empty (fail closed); an unapproved name is omitted and counted in `names_withheld`, never shown or pooled under a label. Held by `tests/test_food_name_allowlist_5112.py`.
 - Journal entries (full text)
 - State of mind / mood entries
 - Activity GPS traces, workout details
