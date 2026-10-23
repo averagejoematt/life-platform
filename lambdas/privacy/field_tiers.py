@@ -322,6 +322,9 @@ SOURCE_TIERS: dict[str, int] = {
     # #5106: the evening check-in (hunger, stress, cravings, one word) and its weekly read against intake. Behavioural
     # self-report about him, so owner-only with no public projection; the weekly read is stored APART from the public
     # weekly_correlations record for exactly that reason. Declared before the first row exists (ADR-154's ordering).
+    # Carve-out (owner ruling 2026-10-23, #5125 R5): the weekly partner letter — ONE SSM-resolved recipient, never a
+    # public surface, never the model's prompt — reads a coarse projection (answered-evenings count + a
+    # low/moderate/high band per rating) through `health.checkin_partner_view`; the rows themselves stay owner-only.
     "evening_checkin": TIER_OWNER_ONLY,
     "checkin_intake_pairs": TIER_OWNER_ONLY,
     # #4078: chat writes queued for approval. A queued row carries the target write tool's exact

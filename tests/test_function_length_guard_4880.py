@@ -128,7 +128,6 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/emails/daily_brief_lambda.py::lambda_handler": 893,
     "lambdas/emails/freshness_checker_lambda.py::lambda_handler": 459,
     "lambdas/emails/monthly_digest_render.py::build_html": 323,
-    "lambdas/emails/partner_email_lambda.py::gather_all": 182,
     "lambdas/emails/wednesday_chronicle_lambda.py::_handler_core": 576,
     "lambdas/emails/weekly_digest_lambda.py::build_html": 679,
     "lambdas/health/character_engine.py::compute_character_sheet": 267,
