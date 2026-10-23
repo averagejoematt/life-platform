@@ -1223,6 +1223,8 @@ def tool_get_acwr_status(args):
         coaching = "Galpin: ACWR in the caution zone (1.3-1.5). Reduce volume by 30-40%. Maintain intensity on 1-2 key sessions; cut accessory work."
     elif zone == "safe":
         coaching = "Galpin: ACWR in the optimal window (0.8-1.3). Current load progression is appropriate for continued adaptation."
+    elif zone == "re-baselining":  # #5029: acwr-compute withholds safe/detraining inside an HR regime window
+        coaching = "Heart-rate-weighted load is re-baselining after an HR regime marker: no optimal/detraining verdict is drawn. An ACWR above 1.3 still alerts."
     elif zone == "detraining":
         coaching = "Attia: Chronic load exceeds acute — you are doing less than your body is adapted to. Increase training frequency or duration this week."
 

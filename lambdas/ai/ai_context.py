@@ -1089,6 +1089,11 @@ def _build_acwr_coaching_context(data):
             "Gently flag under-stimulation. If recovery metrics support it, suggest a "
             "training session today to bring acute load up. This is an opportunity, not an alarm."
         )
+    elif zone == "re-baselining":  # #5029: inside an HR regime window — no safe/optimal claim from HR-weighted load
+        lines.append(
+            "  COACHING NOTE: Heart-rate-weighted load is re-baselining (no safe or optimal label). "
+            "Do not call the training load optimal; coach to the standing constraint. An ACWR above 1.3 would still alert."
+        )
     else:  # safe
         lines.append("  COACHING NOTE: Training load is in the optimal zone (0.8-1.3). Validate current approach.")
 
