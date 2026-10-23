@@ -199,6 +199,61 @@ def _ceiling_window_clause(window) -> str:
     return clause
 
 
+# #5136: the first UTC day on which every residual caller had a name available. The
+# workstation label (`dev-session`, #4589/PR #4598) merged 2026-10-04 08:01Z; before it, an
+# unlabelled workstation call could only be metered as `unknown`. Measured for October 2026
+# (LifePlatform/AI EstimatedCostUSD{LambdaFunction=unknown}, hourly): $30.65 of the row's
+# $30.88 (x1.15 = $35.52, the figure #5136 quotes) is dated 10-01 19-20Z, 10-02 01-02Z and
+# 10-03 03Z — the Story Desk season rebuilds #4589 itself traced — and the other $0.23 is the
+# three weekly fresh-eyes runs (10-04, 10-11, 10-18 ~15-16Z), labelled by #5136. The receipt splits the row on this date rather than
+# re-booking the old dollars: the meter recorded `unknown`, and that is what the receipt says.
+_RESIDUAL_LABELS_SINCE = "2026-10-04"
+
+
+def _unattributed_by_day(points) -> list:
+    """`[{"date": "YYYY-MM-DD", "usd": x}, ...]` for every UTC day the residual row spent on.
+
+    `points` are the per-day (timestamp, unbuffered USD) buckets of the `unknown` row's
+    EstimatedCostUSD series. Dollars carry the same x1.15 buffer as every other figure on
+    the receipt so the list sums to `unattributed_usd`. Zero days are omitted.
+    """
+    days: dict = {}
+    for ts, v in points:
+        if ts is None:
+            continue
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        key = ts.astimezone(timezone.utc).date().isoformat()
+        days[key] = days.get(key, 0.0) + float(v)
+    return [{"date": d, "usd": round(usd * _AI_SAFETY_BUFFER, 4)} for d, usd in sorted(days.items()) if usd > 0]
+
+
+def _residual_split(points) -> dict:
+    """The `unknown` row, dated and split at `_RESIDUAL_LABELS_SINCE` (#5136).
+
+    A month total alone could not say whether the residual was a live hole or old spend:
+    #5136 read $35.52 as "no function name" two weeks after every dollar of it but $0.27 had
+    been explained. `before_labels` is the slice dated before the workstation label existed
+    (workstation spend metered as `unknown` because nothing else was available, #4589);
+    `since_labels` is a caller that still needs a name — and since #5136 the run that spent
+    it printed bedrock_client's UNATTRIBUTED warning naming the workflow and entrypoint.
+    """
+    by_day = _unattributed_by_day(points)
+    return {
+        "unattributed_label": "unknown",
+        "unattributed_by_day": by_day,
+        "unattributed_before_labels_usd": round(sum(d["usd"] for d in by_day if d["date"] < _RESIDUAL_LABELS_SINCE), 4),
+        "unattributed_since_labels_usd": round(sum(d["usd"] for d in by_day if d["date"] >= _RESIDUAL_LABELS_SINCE), 4),
+        "residual_labels_since": _RESIDUAL_LABELS_SINCE,
+        "residual_note": (
+            f"The 'unknown' row is listed by UTC day. Dollars dated before {_RESIDUAL_LABELS_SINCE} are calls "
+            "made from a workstation before the 'dev-session' label existed; they stay where the meter put "
+            "them rather than being moved after the fact. A dollar dated on or after it is a caller that "
+            "still needs a name."
+        ),
+    }
+
+
 def inference_receipt() -> dict:
     """GET /api/inference_receipt — today's AI calls + month-to-date, priced."""
     try:
@@ -476,8 +531,9 @@ def inference_receipt() -> dict:
             # bedrock_client.feature_name() falls back to "unknown" when no Lambda name
             # resolves, the context label is not allowlisted and the caller is not a
             # workstation. Since #4589 a workstation call is booked to "dev-session" instead.
-            "unattributed_label": "unknown",
             "unattributed_usd": unattributed,
+            # `unattributed_label` + #5136's dated split of that residual (see _residual_split).
+            **_residual_split(series.get(qid_map.get(("feature", "unknown", "cost")), [])),
             "note": (
                 "Per-feature dollars are self-metered at the inference chokepoint: every call is "
                 "priced from its own token usage and the model it actually resolved, then emitted "
