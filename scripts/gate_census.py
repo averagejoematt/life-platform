@@ -308,7 +308,7 @@ PROVEN_CAN_FAIL: dict[str, Proof] = {
     ),
     "ci::ci-lint.yml::lint::5": Proof(
         gate_name="lint / Format gate (black — ENFORCED, config in pyproject.toml)",
-        command="black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/   # black==26.3.1, the CI pin",
+        command="black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/   # black==26.10.1, the CI pin",
         mutation="a new lambdas/common/ file written with non-black spacing (`def probe( a,b ):`, 2-space indent).",
         observed=(
             "exit 1, 'would reformat …/_census_probe.py — 1 file would be reformatted, 1458 "
