@@ -24,7 +24,10 @@ the verdict (``sent``, ``dark``, ``already_logged`` ...). ``nudge_ledger_qa.chec
 (the nightly qa-smoke) reds when a completed day has no ``EVAL#`` row: the rule stopped firing.
 
 PRIVACY. Owner-only (``field_tiers.SOURCE_TIERS``). No ``lambdas/web`` or ``lambdas/emails`` module reads
-the partition; ``tests/test_evening_checkin_5106.py`` holds that set.
+the partition; ``tests/test_evening_checkin_5106.py`` holds that set. Two owner-ruled readers sit outside it
+(#5125, 2026-10-23): ``health.checkin_partner_view`` (R5 — the partner letter's coarse weekly read, words and one
+count, over the settled ``checkin_intake_pairs`` day rows) and ``coach.named_human_contact`` (R3 — row PRESENCE
+only, so an answered evening is platform use for the silence alert).
 """
 
 from __future__ import annotations

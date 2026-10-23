@@ -485,16 +485,16 @@ def test_the_deadman_row_states():
 
 
 def test_the_deadman_rides_the_calibration_block_and_the_telegram_sweep(monkeypatch):
-    from coach import coach_event_triggers as cet
+    from coach import calibration_deadman_alert as cda  # #5203: the dead-man is plain text, not an AI sweep candidate
     from training import calibration_cadence as cc, fitness_tests as ft
 
     monkeypatch.setattr(cc, "table_readers", lambda table: {k: (lambda: []) for k in cc.KINDS})
     monkeypatch.setattr(ft, "calibration_row_from_table", lambda table, today: {"kind": ft.CALIBRATION_KIND, "state": "ok"})
     block = cc.read(FakeTable(), "2026-11-04")
     assert block["kinds"][ti.CALIBRATION_KIND]["state"] == cc.MISSED_2 and ti.CALIBRATION_KIND in cc.deadman_kinds(block)
-    evs = [e for e in cet.detect_calibration(block, "2026-11-04") if ti.CALIBRATION_KIND in e["event_id"]]
+    evs = [e for e in cda.due(block) if ti.CALIBRATION_KIND in e["event_id"]]
     assert len(evs) == 1 and evs[0]["event_id"] == "CALIB_DEADMAN#nutrition_titration#2026-11-02"
-    assert "No calorie titration decision" in evs[0]["evidence"]
+    assert "No calorie titration decision" in evs[0]["text"]
     t = FakeTable()
     ti.write_decision(t, decide(week="2026-11-02"), "2026-10-30")
     assert cc.read(t, "2026-11-04")["kinds"][ti.CALIBRATION_KIND]["state"] == cc.OK

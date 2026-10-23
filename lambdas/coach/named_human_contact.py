@@ -29,6 +29,14 @@ yesterday reads 0), because nutrition in particular lands end-of-day.
     three), because this one reaches a person outside the system.
   * N = 28 for the second — the owner's own stated "four weeks of no use".
 
+THE EVENING CHECK-IN IS A CHANNEL TOO (#5125 R3). The owner armed this path on 2026-10-23 ("arm the 7-day
+silence alert with them"), and "quiet" is ALL-channel silence. The registry's engagement channels predate the
+evening check-in (#5106), now his most frequent touch — so a night he answers it (any of hunger / stress /
+cravings present on its ``DATE#`` row) is platform use here, and a week of answered check-ins with nothing else
+logged is NOT a silence a third party should hear about. Only the row's existence and those three keys' presence
+are read (projection), never a value or his word. ``CHECKIN_CHANNEL`` below; the registry is not changed (the
+presence instrument's channel set is its own).
+
 Both are the DEFAULTS; the private config's optional ``thresholds`` block may move them
 inside fixed bounds (below). Nothing moves them silently.
 
@@ -82,7 +90,11 @@ mood signal is read here. A ``"mood_tripwire": true`` in the config is NOT honou
 the leg logs that it is ignored under ruling A and carries on with disengagement only.
 Building one is a new owner ruling (and a clinical-resources-first route), not a flag.
 
-ARMING = ``"armed": true`` in the private config — an owner act with no deploy. Until
+ARMING = ``"armed": true`` in the private config — an owner act with no deploy (ruled on #5125 R3, 2026-10-23:
+armed, to the support person he names; the identity-free read of the live object on that day was
+``designated`` / ``armed: true``, via ``designation_status``). THE SLOT (#5125 R1) is that object and only that
+object — the name and address are never in this repo, never in DynamoDB, never in a log line; the owner writes
+or changes the person there, privately, with no deploy. Until
 then (the default, and on any non-``true`` value) the path is a DRY RUN: the exact body
 the contact would receive is rendered to the OWNER's inbox instead (the same
 ``EMAIL_RECIPIENT`` the evening nudge already mails), with a preview banner — the
@@ -126,6 +138,10 @@ COOLDOWN_DAYS_BOUNDS = (7, 60)
 # How far back a channel is searched for its last logged day. Past the largest allowed
 # four-week line with margin; nothing in the window reads as "quiet >= LOOKBACK".
 LOOKBACK_DAYS = 63
+
+# #5125 R3: the evening check-in counts as platform use (all-channel silence). Presence only — never a value.
+CHECKIN_CHANNEL = "evening_checkin"
+CHECKIN_PRESENCE_FIELDS = ("hunger", "stress", "cravings")
 
 RUNG_QUIET = "quiet"
 RUNG_FOUR_WEEK = "four_week"
@@ -511,7 +527,26 @@ def channel_last_logged(table: Any, user_id: str, today: str) -> dict[str, Optio
                 continue
             latest = day if latest is None or day > latest else latest
         out[source] = latest
+    out[CHECKIN_CHANNEL] = _checkin_last_logged(table, user_id, floor, today)
     return out
+
+
+def _checkin_last_logged(table: Any, user_id: str, floor: str, today: str) -> Optional[str]:
+    """The newest evening a check-in was answered inside the lookback (#5125 R3), or None. Raises on read failure.
+
+    Projects the sort key and the three rating keys only to test PRESENCE — no value is used or returned."""
+    resp = table.query(
+        KeyConditionExpression="pk = :pk AND sk BETWEEN :lo AND :hi",
+        ExpressionAttributeValues={":pk": _pk(user_id, CHECKIN_CHANNEL), ":lo": f"DATE#{floor}", ":hi": f"DATE#{today}~"},
+        ScanIndexForward=False,
+        ProjectionExpression=", ".join(("sk",) + CHECKIN_PRESENCE_FIELDS),
+    )
+    days = [
+        str(i.get("sk", ""))[5:15]
+        for i in resp.get("Items", [])
+        if _to_date(str(i.get("sk", ""))[5:15]) is not None and any(i.get(f) is not None for f in CHECKIN_PRESENCE_FIELDS)
+    ]
+    return max(days) if days else None
 
 
 def travel_days(table: Any, user_id: str, today: str) -> frozenset[str]:
@@ -583,7 +618,7 @@ def newest_row_day(table: Any, user_id: str) -> Optional[str]:
     rows at all is a broken read, not a four-week silence. Raises on read failure.
     """
     newest: Optional[str] = None
-    for source in engagement_channels():
+    for source in (*engagement_channels(), CHECKIN_CHANNEL):
         resp = table.query(
             KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
             ExpressionAttributeValues={":pk": _pk(user_id, source), ":pfx": "DATE#"},

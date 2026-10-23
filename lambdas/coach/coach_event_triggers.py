@@ -410,11 +410,12 @@ def detect_open_loops(loops: list, today: str) -> list:
 
 
 def detect_calibration(block: dict, today: str) -> list:
-    """The tape / photo / DEXA prompt on its due day, and the dead-man after two missed cycles.
+    """The tape / photo / DEXA prompt on its due day (the dead-man after two missed cycles is sent elsewhere, #5203).
 
     The cadence, the state and the prompt text are `training.calibration_cadence`'s — this only turns a due row
     into a candidate. Idempotency is the event id: `CALIB_PROMPT#<kind>#<cycle_start>` (one prompt per cycle; a new
-    log opens a new key) and `CALIB_DEADMAN#<kind>#<cycle_start>`. Owner-only by construction (the Telegram seat)."""
+    log opens a new key). The dead-man (`CALIB_DEADMAN#<kind>#<cycle_start>`) is `coach.calibration_deadman_alert`'s:
+    a fixed-text message at any budget tier (#5203). Owner-only by construction (the Telegram seat)."""
     from training import calibration_cadence as cc
 
     events = []
@@ -428,17 +429,8 @@ def detect_calibration(block: dict, today: str) -> list:
         )
         if ev:
             events.append(ev)
-    for kind in cc.deadman_kinds(block or {}):
-        row = block["kinds"][kind]
-        ev = _event(
-            kind="calibration_deadman",
-            event_id=cc.deadman_key(kind, row["cycle_start"]),
-            provenance=coach_outbound.PROVENANCE_CONCERN,
-            persona_id=LEAD_OWNER,
-            evidence=[cc.deadman_alert(row)],
-        )
-        if ev:
-            events.append(ev)
+    # #5203: the dead-man is NOT a candidate here. This sweep is an AI turn and stands down at budget tier >= 2,
+    # and a dead-man must not be silenced by AI spend — `coach.calibration_deadman_alert` sends it as plain text.
     return events
 
 
