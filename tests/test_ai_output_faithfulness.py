@@ -80,8 +80,10 @@ def test_corpus_covers_all_failure_classes():
 # Reader-facing AI paths that publish to a human surface and MUST stay gated.
 # A path here that stops referencing er03_gate has silently lost its truthfulness
 # gate — the exact regression this guard exists to catch.
+# coach_daily_reflection_lambda.py left this list 2026-10-23 (#4583): its reflection was
+# retired; the move lines it still writes are gated by coach_moves_sheet.check_line,
+# a registered grounding surface (tests/grounding_wiring.py).
 _GATED_PATHS = [
-    os.path.join("compute", "coach_daily_reflection_lambda.py"),
     os.path.join("emails", "coach_panel_podcast_lambda.py"),
 ]
 

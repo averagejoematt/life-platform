@@ -42,6 +42,12 @@ USAGE
   python3 scripts/backlog_next.py --issues-json FIXTURE.json
       Offline mode for tests/CI — same JSON shape, no network.
 
+  python3 scripts/backlog_next.py --in-flight-limit 0
+      #5140: the default `Now` view shows at most the in-flight limit (25, owner
+      ruling 2026-10-23) in charter wave order and lists the overflow as QUEUED;
+      `0` turns the cut off. The limit and the wave order are data in
+      `scripts/backlog_waves.json` — see `split_in_flight`.
+
   python3 scripts/backlog_next.py --refill-now
       THE REMEDY for check_backlog_hygiene.py's blocking `now_liveness` finding
       (#3254). Prints the derived promotion plan — which issues, in what order,
@@ -261,6 +267,95 @@ def select(
     empty["fell_through_from"] = tried
     empty["exhausted"] = True
     return empty
+
+
+# ── the in-flight limit and the charter wave order (#5140) ─────────────────────
+#
+# THE PROBLEM
+#   Measured 2026-10-18: 129 open issues, 93 on `Now`. A board that holds everything does
+#   not discriminate — a session reading it has to read 93 rows to pick one. The owner
+#   ruled an in-flight limit (2026-10-23: 25, not the panel's 15) with the overflow LISTED
+#   as queued, in the charter waves' order. Code only: nothing here relabels or moves an
+#   issue — a queued row stays on `Now` and is printed under QUEUED, by name.
+#
+# THE SHAPE
+#   `scripts/backlog_waves.json` holds the limit and an ordered list of waves; each wave
+#   names issues and (for the residue of a charter) epics. A row's wave is the first wave
+#   naming its number, else the first naming its `**Epic:**` parent; unwaved rows rank
+#   after every wave. Within one wave the stored ADR-099 score orders (`sort_key`). The
+#   cut is taken over the WHOLE startable `Now` board (blocked rows are never in flight —
+#   they are counted separately, as before), so `--model` shows that lane's share of the
+#   in-flight set rather than a different 25.
+WAVES_PATH = Path(__file__).resolve().parent / "backlog_waves.json"
+_NO_WAVES: Dict[str, Any] = {"in_flight_limit": 0, "waves": []}
+
+
+def load_waves(path: Optional[Path] = None) -> Dict[str, Any]:
+    """The wave file, or an empty no-limit spec when it is missing or unreadable (advisory)."""
+    try:
+        data = json.loads(Path(path or WAVES_PATH).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        print(f"backlog_next: wave order unreadable ({e}); showing Now without the in-flight cut (advisory).")
+        return dict(_NO_WAVES)
+    return data if isinstance(data, dict) else dict(_NO_WAVES)
+
+
+def wave_of(row: Dict[str, Any], waves: List[Dict[str, Any]]) -> Optional[int]:
+    """Index of the row's wave — its number first, then its epic parent — or None. Pure."""
+    number, parent = row.get("number"), row.get("epic_parent")
+    for i, w in enumerate(waves):
+        if number in (w.get("issues") or []):
+            return i
+    if parent:
+        for i, w in enumerate(waves):
+            if parent in (w.get("epics") or []):
+                return i
+    return None
+
+
+def wave_key(row: Dict[str, Any], waves: List[Dict[str, Any]]):
+    """Sort: wave order first (unwaved last), then the stored score (`sort_key`)."""
+    idx = wave_of(row, waves)
+    return (len(waves) if idx is None else idx,) + tuple(sort_key(row))
+
+
+def split_in_flight(rows: List[Dict[str, Any]], waves: List[Dict[str, Any]], limit: int):
+    """(in_flight, queued) over the startable `Now` board, both in wave order. Pure.
+
+    `limit <= 0` means no cut: everything is in flight and nothing is queued."""
+    board = sorted((r for r in rows if r.get("milestone") == "Now" and not r.get("blocking")), key=lambda r: wave_key(r, waves))
+    if limit <= 0:
+        return board, []
+    return board[:limit], board[limit:]
+
+
+def apply_in_flight(
+    result: Dict[str, Any], rows: List[Dict[str, Any]], spec: Dict[str, Any], limit: int, by_closeability: bool = False
+) -> Dict[str, Any]:
+    """Cut a `Now` result to the in-flight set; the overflow goes to `result["queued"]`. Pure.
+
+    Only a `Now` result is cut (a fall-through to `Next` or an `all` view is returned as it
+    was), and `--include-blocked`'s inline blocked rows stay — they are never in flight and
+    never queued. In-flight rows print in wave order, or by closeability under `--closeable`.
+    """
+    if result.get("milestone") != "Now" or limit <= 0:
+        return result
+    waves = list(spec.get("waves") or [])
+    in_flight, queued = split_in_flight(rows, waves, limit)
+    keep = {r["number"] for r in in_flight}
+    visible = {r["number"] for r in result["rows"]}
+    shown = [r for r in result["rows"] if r.get("blocking") or r["number"] in keep]
+    shown = sorted(shown, key=closeability_key if by_closeability else (lambda r: wave_key(r, waves)))
+    names = [w.get("id") or f"wave {i}" for i, w in enumerate(waves)]
+    for r in shown + queued:
+        idx = wave_of(r, waves)
+        r["wave"] = names[idx] if idx is not None else None
+    out = dict(result, rows=shown)
+    out["queued"] = [r for r in queued if r["number"] in visible]
+    out["in_flight_limit"] = limit
+    out["in_flight_board"] = len(in_flight)
+    out["queued_board"] = len(queued)
+    return out
 
 
 # ── the `Now` refill plan (#3254) ───────────────────────────────────────────────
@@ -595,11 +690,28 @@ def render(result: Dict[str, Any], rows: List[Dict[str, Any]], args: argparse.Na
         else:
             out.append(f"{milestone}: no rows match this filter.")
     else:
-        out.append(f"RANKED — {milestone} ({len(shown)} of {len(result['rows'])} shown, by stored ADR-099 score):")
+        if "in_flight_limit" in result:
+            out.append(
+                f"IN FLIGHT — {milestone} ({len(shown)} of {len(result['rows'])} shown; the board holds "
+                f"{result['in_flight_board']} of a limit of {result['in_flight_limit']}, in charter wave order, "
+                "then stored ADR-099 score):"
+            )
+        else:
+            out.append(f"RANKED — {milestone} ({len(shown)} of {len(result['rows'])} shown, by stored ADR-099 score):")
         out.append("")
         for row in shown:
             out.extend(format_row(row))
             out.append("")
+
+    queued = result.get("queued") or []
+    if "in_flight_limit" in result and result.get("queued_board"):
+        out.append(
+            f"QUEUED — {result['queued_board']} startable Now row(s) over the in-flight limit of "
+            f"{result['in_flight_limit']}, in wave order ({len(queued)} match this filter). Still on Now; nothing is moved:"
+        )
+        for row in queued:
+            out.append(f"  #{row['number']:<5} · {row.get('wave') or 'unwaved'} · {row['title']}")
+        out.append("")
 
     if result["blocked_count"]:
         verb = "shown inline" if args.include_blocked else "hidden"
@@ -676,6 +788,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             "acceptance boxes. Use it when the goal is closures; use the default when the goal is impact."
         ),
     )
+    parser.add_argument(
+        "--in-flight-limit",
+        type=int,
+        default=None,
+        help="#5140: cut the Now view to N rows in charter wave order and list the rest as QUEUED "
+        "(default: `in_flight_limit` in scripts/backlog_waves.json, 25; 0 = no cut).",
+    )
     parser.add_argument("--issues-json", help="Offline fixture path (gh issue list --json number,title,labels,milestone,body output).")
     parser.add_argument(
         "--refill-now",
@@ -708,6 +827,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         print("\n".join(render_refill(plan_now_refill(rows, lane=args.lane))))
         return 0
     result = select(rows, milestone=args.milestone, model=args.model, include_blocked=args.include_blocked, by_closeability=args.closeable)
+    spec = load_waves()
+    limit = args.in_flight_limit if args.in_flight_limit is not None else int(spec.get("in_flight_limit") or 0)
+    result = apply_in_flight(result, rows, spec, limit, by_closeability=args.closeable)
     print("\n".join(render(result, rows, args)))
     return 0
 

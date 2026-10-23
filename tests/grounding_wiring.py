@@ -305,26 +305,9 @@ SURFACES = {
         ("numbers", "dates", "freshness"),
         {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NO_NIGHT_MAP},
     ),
-    # #2430: the once-a-day coach reflection published to generated/coach_daily.json and
-    # rendered on the coach pages. It was never ungated — every line crossed ER-03 —
-    # but ER-03 answers "correlative, hedged, no number outside the facts" and nothing
-    # else, so a fabricated calendar date or a stale Day-N framing walked straight
-    # through a check that looked like a gate. Both checks are fail-closed and both must
-    # pass; a held reflection is dropped, and the coach is listed in `skipped`.
-    "lambdas/compute/coach_daily_reflection_lambda.py::_grounding_findings": _entry(
-        ("numbers", "dates", "freshness"),
-        {
-            "behavioral": (
-                "the reflection re-voices ONE stored COACH#{id} OUTPUT# row — that row is the module's "
-                "entire read, and it opens no log partition at all (the same measured fact #2056 recorded "
-                "for the stance pipeline and #2419 for the digest). Its subject is the coach's own recent "
-                "read of its own domain, not an account of what Matthew did today, which is the only shape "
-                "#1699 checks. Arming it would buy a same-day availability probe purely to grade a claim "
-                "class this re-voicing does not emit. Revisit if the prompt ever asks for direct address."
-            ),
-            "night": _NO_NIGHT_MAP,
-        },
-    ),
+    # The #2430 daily-reflection surface (coach_daily_reflection_lambda::_grounding_findings)
+    # left this registry with the surface itself: the reflection was retired 2026-10-23
+    # (#4583 owner ruling) and the board's moves below are each coach's one daily voice.
     # #4583: the board's daily moves (COACH#eli_marsh / MOVES#), served as
     # /api/coaching-dashboard.moves and the edition's coach lines. `check_line` judges every
     # line against the day's ONE fact sheet: exact number allow-list with the unit-voids-benign
@@ -853,14 +836,6 @@ SURFACE_FACETS = {
         "the turn, branching only on an empty reply, never on the findings. So a residual finding is airing on a reader "
         "surface with a number beside it — the second of the three public keep-best surfaces, and the one whose residual is "
         "visible in the stored record.",
-    ),
-    "lambdas/compute/coach_daily_reflection_lambda.py::_grounding_findings": _facet(
-        PUBLIC,
-        FAIL_CLOSED,
-        "lambda_handler@ok",
-        "The reflection is published to generated/coach_daily.json and rendered on the coach pages with no second gate "
-        "downstream. Fail-closed through `_accepts`, which ANDs the ER-03 verdict with an empty finding list: the handler "
-        "regenerates once stricter, and a coach that still fails is added to `skipped` — dropped, never shipped.",
     ),
     "lambdas/coach/lead_daily_read.py::_grounding_findings": _facet(
         PUBLIC,
