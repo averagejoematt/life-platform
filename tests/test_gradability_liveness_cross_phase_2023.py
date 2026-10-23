@@ -363,9 +363,6 @@ _SANCTIONED_CURRENT_CYCLE_VIEWS: dict[str, str] = {
         "Unbounded partition scan, but its callers pass genome/labs/dexa — all CROSS_PHASE, so "
         "those rows are never tagged and the filter is a literal no-op."
     ),
-    "lambdas/emails/partner_email_lambda.py::query_journal_range": (
-        "Notion journal entries for the reported week only — a this-week digest by definition."
-    ),
     "lambdas/emails/weekly_digest_lambda.py::query_journal_range": (
         "Same shape: this week plus the prior week. Only the opening fortnight of a cycle straddles "
         "genesis, and a weekly digest is meant to be a current-cycle view."
