@@ -136,7 +136,7 @@ MAIL_SENDERS = {
 }
 
 # The family's guard: a GUARDED member's source must call one of these.
-FAMILY_GUARDS = {
+GUARD_FOR_FAMILY = {
     "api": frozenset({"guard_api_response"}),
     "generated": frozenset({"public_body", "scrub_document", "scrub_payload", "spoken_turns"}),
     "mail": frozenset({"reader_mail"}),
@@ -246,14 +246,14 @@ def test_every_derived_surface_is_classified():
         ), f"{family}: derivation found only {len(derived)} — broken walk"
         for rel in sorted(derived - set(registry)):
             offenders.append(
-                f"{family}: NEW public writer {rel} is unclassified — guard it ({sorted(FAMILY_GUARDS[family])}) or exempt it with a reason"
+                f"{family}: NEW public writer {rel} is unclassified — guard it ({sorted(GUARD_FOR_FAMILY[family])}) or exempt it with a reason"
             )
         for rel in sorted(set(registry) - derived):
             offenders.append(f"{family}: {rel} is classified but no longer derived — remove the stale entry")
         for rel, verdict in sorted(registry.items()):
             if verdict == GUARDED:
-                if (LAMBDAS / rel).exists() and not _calls_any(rel, FAMILY_GUARDS[family]):
-                    offenders.append(f"{family}: {rel} is GUARDED but never calls {sorted(FAMILY_GUARDS[family])}")
+                if (LAMBDAS / rel).exists() and not _calls_any(rel, GUARD_FOR_FAMILY[family]):
+                    offenders.append(f"{family}: {rel} is GUARDED but never calls {sorted(GUARD_FOR_FAMILY[family])}")
             elif not (isinstance(verdict, str) and verdict.strip()):
                 offenders.append(f"{family}: {rel} is exempt without a reason")
     assert not offenders, "\n".join(offenders)
