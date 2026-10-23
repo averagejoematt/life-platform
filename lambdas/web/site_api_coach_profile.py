@@ -25,6 +25,7 @@ from coach import (
     coach_baseline,  # #4585: the record and what a simple guess scored, from one read
     coach_corrections,  # #1689 ledger — reused by the dossier retract/correct path (#1387)
     coach_dossier,  # #1387: the verbatim, privacy-filtered dossier projection (bundled module)
+    coach_moves,  # #4583: the board's daily moves — each coach's one daily voice (MOVES# rows)
     coach_record,  # #4220: the ONE record producer — K of N through <day>, from the PREDICTION# ledger
     coach_traits,  # #1113: authored trait scores for the immersive bios (bundled module)
     latest_checked,  # E1 / #4182: the ledger line — the coach's most recent GRADED call, audience-guarded
@@ -330,15 +331,32 @@ def _character(p, *, _g):
     }
 
 
+# #4583 (owner ruling 2026-10-23): the move is each coach's single daily voice. The moves
+# job runs once a day (19:00Z), so the newest MOVES# row is "the current run" from the
+# moment it lands until the next one does — today's row, or yesterday's before today's
+# run. Anything older is stale and is not served as "today's read".
+MOVE_FRESH_DAYS = 1
+
+
 def _coach_daily(coach_id, *, _g):
-    """CC-08: today's cached daily reflection for a coach (generated/coach_daily.json),
-    or None. Read-only over the batch-written artifact — never inferenced here."""
-    _load_s3_json = _g["_load_s3_json"]
-    doc = _load_s3_json("generated/coach_daily.json", "coach_daily")
-    r = (doc.get("reflections") or {}).get(coach_id)
-    # #4213: served to visitors — an owner-directed reflection (an artifact written
-    # before the producer's third-person rule, or a drift) is withheld, never served.
-    return audience_guard.reader_safe(r.get("text")) if isinstance(r, dict) else None
+    """Today's read for a staff coach: the coach's line in the newest board MOVES# row
+    (`coach_moves.latest_served`), or None. A coach who did not speak on the current run
+    serves None — nothing stale. The retired CC-08 reflection artifact
+    (generated/coach_daily.json) is no longer read. Read-only — never inferenced here."""
+    from common import pacific_time
+
+    moves = coach_moves.latest_served(_g["table"])
+    if not isinstance(moves, dict):
+        return None
+    today = pacific_time.pacific_today()
+    current = {pacific_time.shift_day_key(today, -n) for n in range(MOVE_FRESH_DAYS + 1)}
+    if str(moves.get("date") or "") not in current:
+        return None
+    for ln in moves.get("lines") or []:
+        if isinstance(ln, dict) and ln.get("coach_id") == coach_id:
+            # #4213: served to visitors — an owner-directed line is withheld, never served.
+            return audience_guard.reader_safe(ln.get("text"))
+    return None
 
 
 def _coach_memoir(coach_id, *, _g):
@@ -758,9 +776,11 @@ def handle_coach(event, *, _g):
                 # #1387: the dossier — what this coach knows, verbatim from COACH#
                 # memory (privacy-filtered, correction-aware, no LLM in the path).
                 "dossier": _held_positions(_dossier_block(pid), dark),
-                # #4188: the lead's daily read lives in its own LEAD_DAILY# row (the CC-08
-                # reflection batch covers staff only). `daily` keeps its string type for
-                # every consumer; `lead_daily` carries the text WITH its cited block.
+                # #4188: the lead's daily read lives in its own LEAD_DAILY# row. A staff
+                # coach's `daily` is that coach's line in the current run of the board's
+                # moves (#4583 — the CC-08 reflection is retired). `daily` keeps its
+                # string-or-null type for every consumer; `lead_daily` carries the lead's
+                # text WITH its cited block.
                 "daily": "" if absent_state else ((lead_daily or {}).get("text") if is_lead else _coach_daily(pid)),
                 "lead_daily": lead_daily,
                 "memoir": _coach_memoir(pid),

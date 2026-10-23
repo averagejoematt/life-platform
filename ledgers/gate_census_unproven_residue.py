@@ -268,7 +268,6 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "registry::lambdas/coach/correction_promotion.py::NON_PROMOTABLE_CLASSES::defense-held": "2026-09-05 seal (#3536)",
     "registry::lambdas/coach/correction_promotion.py::NON_PROMOTABLE_CLASSES::hedged-safe": "2026-09-05 seal (#3536)",
     "registry::lambdas/coach/spiral_breaker.py::INSUFFICIENT_BASELINE": "2026-09-05 seal (#3536)",
-    "registry::lambdas/compute/coach_daily_reflection_lambda.py::_SYSTEM_RULES": "2026-09-05 seal (#3536)",
     "registry::lambdas/compute/coach_memoir_lambda.py::_SYSTEM_RULES": "2026-09-05 seal (#3536)",
     "registry::lambdas/content/chronicle_schema.py::_TYPE_CHECKS::integer": "2026-09-05 seal (#3536)",
     "registry::lambdas/content/chronicle_schema.py::_TYPE_CHECKS::number": "2026-09-05 seal (#3536)",
