@@ -82,13 +82,14 @@ THE THREE INTERNAL FEATURES OF THE OPEN-WEIGHT TRIAL (#4776)
 Run (one feature per run):
     python3 tests/model_swap_eval.py --feature field_notes --candidate claude-haiku-5-5 --dry-run
     python3 tests/model_swap_eval.py --feature field_notes --candidate claude-haiku-5-5 --n 4
-    python3 tests/model_swap_eval.py --feature coach_quality_gate --incumbent claude-haiku-5-5 --candidate gpt-oss-120b --dry-run
+    python3 tests/model_swap_eval.py --feature coach_quality_gate --incumbent claude-haiku-4-5-20251001 --candidate gpt-oss-120b --dry-run
     python3 tests/model_swap_eval.py --list
 
 `claude-haiku-5-5` is a mapped NAME since #4770 and the four #4776 candidates (gpt-oss-120b,
-gpt-oss-20b, qwen3-32b, nova-micro) since #4776; each prices on its own row. The Haiku 5.5
-baseline the #4776 trial runs against needs model access first (#4772) — until then a real run
-against it fails at the candidate/incumbent call and is reported as such, never as a verdict.
+gpt-oss-20b, qwen3-32b, nova-micro) since #4776; each prices on its own row. The #4776 trial's
+baseline is the current Haiku 4.5 (owner ruling 2026-10-23), the three features' default incumbent.
+Haiku 5.5 still needs model access (#4772) — a real run against it fails at the call and is
+reported as such, never as a verdict.
 """
 
 from __future__ import annotations
