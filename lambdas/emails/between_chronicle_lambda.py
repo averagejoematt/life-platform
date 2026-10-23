@@ -36,6 +36,7 @@ from typing import Any
 
 import boto3
 from common.email_identity import CHRONICLE_SENDER  # #3568 — ONE sending vocabulary, gated against the SES-verified set
+from common.journal_silence import reader_mail  # #5131: the one public-surface guard
 
 try:
     from common.platform_logger import get_logger
@@ -343,7 +344,10 @@ def lambda_handler(event: dict, context) -> dict:
                 FromEmailAddress=SENDER,
                 Destination={"ToAddresses": [email]},
                 Content={
-                    "Simple": {"Subject": {"Data": subject, "Charset": "UTF-8"}, "Body": {"Html": {"Data": html, "Charset": "UTF-8"}}}
+                    "Simple": {
+                        "Subject": {"Data": reader_mail(subject), "Charset": "UTF-8"},
+                        "Body": {"Html": {"Data": reader_mail(html), "Charset": "UTF-8"}},
+                    }
                 },
             )
             sent += 1

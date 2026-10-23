@@ -39,6 +39,7 @@ from ai.ai_context import (
 from boto3.dynamodb.conditions import Key
 from common.client_ip import client_ip_is_trusted, extract_client_ip, salted_ip_hash  # #1221 / #3620
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from common.journal_silence import guard_api_response  # #5131: the one public-surface guard
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1085 / #2109
 from ingestion.source_registry import public_board_sources, public_paused_sources  # #387: derived source count
 from privacy import privacy_guard  # deterministic real-name + vice scrub (layer module)
@@ -845,19 +846,19 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     if path == "/api/board_ask":
         if method != "POST":
             return _error(405, "Use POST method")
-        return _handle_board_ask(event)
+        return guard_api_response(_handle_board_ask(event), logger)
 
     # ── POST /api/ask ──────────────────────────────────────
     if path == "/api/ask":
         if method != "POST":
             return _error(405, "Use POST method")
-        return _handle_ask(event)
+        return guard_api_response(_handle_ask(event), logger)
 
     # ── POST /api/explain (#403) ───────────────────────────
     if path == "/api/explain":
         if method != "POST":
             return _error(405, "Use POST method")
-        return _handle_explain(event)
+        return guard_api_response(_handle_explain(event), logger)
 
     return _error(404, "Not found")
 

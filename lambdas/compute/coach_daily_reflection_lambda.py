@@ -38,6 +38,7 @@ from ai import grounded_generation
 from boto3.dynamodb.conditions import Key
 from coach import audience_guard, coach_derived_prose, coach_moves, persona_registry  # #2418: served_summary falls back to gated `content`
 from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor (#1691 freshness class)
+from common.journal_silence import public_body  # #5131: the one public-surface guard
 from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import er03_gate
 from experiment.phase_filter import with_phase_filter
@@ -313,7 +314,7 @@ def lambda_handler(event, context):
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=OUTPUT_KEY,
-        Body=json.dumps(payload).encode("utf-8"),
+        Body=public_body(json.dumps(payload).encode("utf-8"), "application/json"),
         ContentType="application/json",
         CacheControl="max-age=3600",
     )

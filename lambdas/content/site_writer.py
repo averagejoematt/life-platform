@@ -34,6 +34,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+from common.journal_silence import public_body  # #5131: the one public-surface guard
 from common.pacific_time import pacific_day_n, pacific_today
 
 logger = logging.getLogger(__name__)
@@ -416,7 +417,7 @@ def write_public_stats(
         s3_client.put_object(
             Bucket=S3_BUCKET,
             Key=PUBLIC_STATS_KEY,
-            Body=json.dumps(payload, indent=2),
+            Body=public_body(json.dumps(payload, indent=2), "application/json"),
             ContentType="application/json",
             CacheControl="max-age=3600",
         )
@@ -507,7 +508,7 @@ def write_character_stats(
         s3_client.put_object(
             Bucket=S3_BUCKET,
             Key=CHARACTER_STATS_KEY,
-            Body=json.dumps(payload, indent=2),
+            Body=public_body(json.dumps(payload, indent=2), "application/json"),
             ContentType="application/json",
             CacheControl="max-age=86400",
         )
@@ -753,7 +754,7 @@ def write_pulse_json(
         s3_client.put_object(
             Bucket=S3_BUCKET,
             Key=PULSE_KEY,
-            Body=json.dumps(pulse, indent=2, default=str),
+            Body=public_body(json.dumps(pulse, indent=2, default=str), "application/json"),
             ContentType="application/json",
             CacheControl="max-age=300",
         )

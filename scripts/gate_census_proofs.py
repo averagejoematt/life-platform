@@ -3751,3 +3751,26 @@ STRUCTURAL_HAND_PROOFS["structural::test_habit_tier_set_guard_5232.py"] = {
     ),
     "proved_on": "2026-10-20",
 }
+
+STRUCTURAL_HAND_PROOFS["structural::test_journal_silence_public_surfaces_5131.py"] = {
+    "gate_name": "test_journal_silence_public_surfaces_5131.py",
+    "command": "python3 -m pytest tests/test_journal_silence_public_surfaces_5131.py -q   # baseline 9 passed",
+    "mutation": (
+        "Three, each applied by a scratch script and restored before the next: (a) lambdas/web/site_api_lambda.py's "
+        "`return guard_api_response(result, logger)` reverted to `return result`; (b) the public_body() wrap removed from "
+        "lambdas/compute/coach_memoir_lambda.py's put_object Body; (c) a new lambdas/web/planted_5131_probe.py writing "
+        "`generated/planted.json` with put_object, then deleted."
+    ),
+    "observed": (
+        "MUTATED: (a) test_every_site_api_route_serves_no_journal_silence failed naming 140 routes; (b) "
+        "test_every_derived_surface_is_classified failed 'compute/coach_memoir_lambda.py is GUARDED but never calls'; (c) the "
+        "same test failed 'NEW public writer web/planted_5131_probe.py is unclassified'. Restored: 9 passed. Watched 2026-10-23."
+    ),
+    "scope": (
+        "Derives the reader-facing writer set by AST: Function-URL Lambdas in cdk/stacks, lambdas/ modules with an S3 write "
+        "call plus a `generated/...` constant, and lambdas/ modules calling an SES send. Does NOT see a generated/ writer "
+        "whose key is built only from a constant imported from another module, an S3 write through a non-boto helper, or a "
+        "guarded module that calls the guard on one write and not another (the check is per module)."
+    ),
+    "proved_on": "2026-10-23",
+}
