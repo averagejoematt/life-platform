@@ -88,7 +88,9 @@ V4_DOORS = {
 def test_v4_doors_have_skip_link_and_main():
     for name, rel in V4_DOORS.items():
         html = _read(rel)
-        assert 'class="skip"' in html, f"{name} door missing skip link"
+        # #4588: a kit page (Home and Story since the cut-over) carries the kit's skip link, class ck-skip.
+        skip = 'class="ck-skip"' if 'data-ck-page="' in html else 'class="skip"'
+        assert skip in html, f"{name} door missing skip link ({skip})"
         assert "<main" in html and "</main>" in html, f"{name} door missing <main> landmark"
 
 

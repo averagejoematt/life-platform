@@ -9,7 +9,8 @@ import os
 import re
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-HOME = open(os.path.join(_REPO, "site/index.html")).read()
+# #4588: the v5 home is the reference copy since the 2026-10-22 cut-over; this guards the stored layout, not the kit front page.
+HOME = open(os.path.join(_REPO, "site/reference/2026-10-22-home-v5/index.html")).read()
 STORY_JS = open(os.path.join(_REPO, "site/assets/js/story.js")).read()
 
 _MIRROR = STORY_JS[STORY_JS.find("async function wireMirror") :]

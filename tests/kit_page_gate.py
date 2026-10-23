@@ -69,6 +69,13 @@ _RUN_AXE_JS = """async () => {
 
 #: path -> phone-screen budget. Adding a kit page means adding it here.
 KIT_PAGES = {
+    # #4588: after the cut-over the four doors are served at their live paths too, as copies of the
+    # /next/v8/ originals (canonical, noindex and og:url edited; data-ck-base still /next/v8/). The
+    # same budgets hold the copies: a copy that drifts from its original is caught here.
+    "/": 6,
+    "/start/": 4,
+    "/story/": 4,
+    "/coaches/": 4.25,
     "/next/v8/": 6,
     "/next/v8/week/": 4,  # round 8: the week band moved here whole from the front page
     "/next/v8/start/": 4,

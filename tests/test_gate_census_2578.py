@@ -1170,8 +1170,12 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # 282 -> 283 (2026-10-20, #5232): structural::test_habit_tier_set_guard_5232.py (STRUCTURAL_HAND_PROOFS). Stacked, never max'd.
         # 283 -> 284 (2026-10-23, #5125 R5): structural::test_partner_email_checkins_5125.py, PROVEN via MutationSpec + STRUCTURAL_PROOFS
         # (ARMED 1/1: baseline 10 passed | mutated 1 failed | reverted 10 passed). Stacked, never max'd.
-        # 284 -> 285 (2026-10-23, #5131): structural::test_journal_silence_public_surfaces_5131.py (STRUCTURAL_HAND_PROOFS). Stacked, never max'd.
-        <= 285
+        # 284 -> 285 (2026-10-23, #4588 cut-over rehearsal refreshed onto main, owner's go 'asap'): structural::test_v4_redirects_function.py —
+        # the every-existing-URL-still-resolves sweep — arrives PROVEN via GUARD_PROOFS in scripts/gate_census_proofs.py (M1 the /start/
+        # 301 left at the edge, M2 a cut-over page missing, M3 /story/about/ dropped: each 1 failed; reverted 1 passed). Enters exactly
+        # that id, leaves {}, unproven does NOT move.
+        # 285 -> 286 (2026-10-23, #5131, stacked onto #4588): structural::test_journal_silence_public_surfaces_5131.py (STRUCTURAL_HAND_PROOFS). Stacked, never max'd.
+        <= 286
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

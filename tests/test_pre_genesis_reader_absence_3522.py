@@ -226,7 +226,8 @@ def test_weekly_summary_pre_genesis_drops_a_stray_in_window_record(monkeypatch):
 
 # ── #3524 · the home shell's own placeholders ─────────────────────────────────
 
-HOME = os.path.join(REPO, "site", "index.html")
+# #4588: the v5 home is the reference copy since the 2026-10-22 cut-over; this guards the stored layout, not the kit front page.
+HOME = os.path.join(REPO, "site", "reference", "2026-10-22-home-v5", "index.html")
 
 
 def test_home_dial_eyebrow_is_bound():

@@ -103,7 +103,8 @@ def _read_constellation(story_js_override=None):
             page = context.new_page()
             errors = []
             page.on("pageerror", lambda e, _errs=errors: _errs.append(str(e)))
-            page.goto(base_url + "/", wait_until="networkidle", timeout=30000)
+            # #4588: the v5 home is the reference copy since the 2026-10-22 cut-over; this guards the stored layout, not the kit front page.
+            page.goto(base_url + "/reference/2026-10-22-home-v5/", wait_until="networkidle", timeout=30000)
             page.wait_for_selector(".constellation svg [data-edges] line", timeout=8000)
             page.wait_for_timeout(800)  # let the re-attach + motion.js observer settle
             info = page.evaluate("""() => {
