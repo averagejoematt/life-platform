@@ -27,6 +27,9 @@
         "length_sample": 0,
         "type": "array"
       },
+      "names_withheld": {
+        "type": "integer"
+      },
       "period_days": {
         "type": "integer"
       }

@@ -539,6 +539,15 @@ _CHECKIN_PUBLISHED_READER_PY = (
     "    return table.get_item(Key={'pk': 'USER#matthew#SOURCE#evening_checkin', 'sk': 'DATE#2026-10-28'})\n"
 )
 
+# #5125 R5: a second published module (lambdas/emails) importing the partner letter's check-in projection — the
+# owner's consent covers ONE recipient (the partner letter), so any other email would widen the carve-out silently.
+_CHECKIN_PROJECTION_SECOND_IMPORTER_PY = (
+    '"""census probe — a second importer of the partner check-in projection that must never exist."""\n\n'
+    "from health import checkin_partner_view\n\n\n"
+    "def handle(table):\n"
+    "    return checkin_partner_view.week_view(table, '2026-10-12', '2026-10-18', '2026-10-05', '2026-10-11')\n"
+)
+
 # #5200: a planning caller that assembles the coach context without reading the May tracker — the section would
 # be `not_supplied` on that path although the weekly row exists (the specimen: plan_next_session, 2026-10-20).
 _ASSEMBLE_WITHOUT_TRACKER_PY = (
@@ -1350,6 +1359,18 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         plants=(("lambdas/web/_census_probe_5106.py", _CHECKIN_PUBLISHED_READER_PY),),
         track=False,  # the guard os.walks lambdas/web + lambdas/emails on disk, so an untracked module is in scope
+    ),
+    # #5125 R5: the partner letter is the ONLY published importer of the evening check-in's partner projection.
+    "structural::test_partner_email_checkins_5125.py": MutationSpec(
+        gate_id="structural::test_partner_email_checkins_5125.py",
+        target="tests/test_partner_email_checkins_5125.py",
+        detects=(
+            "a second published module (lambdas/emails or lambdas/web) importing health.checkin_partner_view — the owner's "
+            "2026-10-23 consent (#5125 R5) lets ONE recipient, the partner letter, see a coarse read of the owner-only "
+            "evening check-in; another importer would widen that carve-out with no ruling"
+        ),
+        plants=(("lambdas/emails/_census_probe_5125.py", _CHECKIN_PROJECTION_SECOND_IMPORTER_PY),),
+        track=False,  # the guard rglobs lambdas/web + lambdas/emails on disk, so an untracked module is in scope
     ),
     # #5200: every coach-context assembly caller outside the module passes the May tracker.
     "structural::test_may_tracker_coach_context_5200.py": MutationSpec(
@@ -2346,6 +2367,18 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "dead-man's registration. STILL INVISIBLE, stated: a published module handed a check-in row as an argument by "
         "an unswept caller (mcp/, lambdas/coach), a pk assembled from fragments, and the live table.",
         proved_on="2026-10-19",
+    ),
+    "structural::test_partner_email_checkins_5125.py": _proof(
+        "structural::test_partner_email_checkins_5125.py",
+        "ARMED 1/1 — baseline: 10 passed in 2.99s | mutated: 1 failed, 9 passed in 1.59s :: "
+        "test_the_projection_is_the_only_door_from_emails_and_web_and_never_reaches_the_prompt | reverted: 10 passed in 3.66s",
+        "lambdas/web/ and lambdas/emails/ on disk (rglob, every .py): any module other than partner_email_lambda.py "
+        "naming `checkin_partner_view` fails and names the set; any import of `checkin_intake_pairs` or "
+        "`coach.evening_checkin` there fails and names the file; the partner prompt carries no check-in/mood "
+        "placeholder. Also pinned: the projection's column list (check-in keys only) and the silence alert counting an "
+        "answered check-in. STILL INVISIBLE, stated: a published module handed a projection dict by an unswept caller, a "
+        "dynamic import by string, and the live table.",
+        proved_on="2026-10-23",
     ),
     "structural::test_may_tracker_5073.py": _proof(
         "structural::test_may_tracker_5073.py",

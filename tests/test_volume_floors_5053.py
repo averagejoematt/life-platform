@@ -12,7 +12,7 @@ alert (`muscle_volume` counted it; nothing compared the count with the landmark)
 
 RESIDUAL — CLOSED by #5162 (owner ruling 2026-10-23, "trade inside 75"): 8 of the 9 weekly shoulder-press sets became
 lateral raises and face pulls (side/rear delts 6 -> 14, the band's floor), and the lats / upper-chest / arms bands were
-lowered to what fits inside the 75-set week (charter 1.20.0: 4, 0, 6). `KNOWN_BAND_GAPS` is all zeros and stays
+lowered to what fits inside the 75-set week (charter 1.22.0: 4, 0, 6). `KNOWN_BAND_GAPS` is all zeros and stays
 shrink-only. Side/rear delts, upper chest and lats are still counted BY MOVEMENT (`volume_floors.FLOOR_MOVEMENTS` /
 `BAND_MOVEMENTS`): upper chest has 0 incline sets (the 8 catalog-'chest' sets are flat bench + cable fly), lats has 4
 (the lat pulldown; rows and the shrug are not lat work). The LOGGED Shoulders flag cannot
