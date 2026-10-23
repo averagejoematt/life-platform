@@ -14,10 +14,11 @@ WHAT IT DOES (default, read-only). For every UTC day in [--since, --until]:
      delivery days from since-1 to until+8, because a reading of UTC day D is delivered on D or
      D+1 (the key's day is the DELIVERY day) and a late re-send can land up to 7 days after
      (the live maximum measured on 2026-10-18 — the totals block prints it);
-  2. reads every one (threaded GETs; ``AWS_MAX_ATTEMPTS=1``, 60 s read timeout) in LastModified
-     order and runs each through the writer's own two steps — ``payload_readings`` (the
-     reading's own UTC day, the reading's own timestamp as the dedup key) and ``merge_readings``
-     (a re-sent reading counts once) — then ``day_value`` for the sum. All three are imported
+  2. reads every one (threaded GETs; ``AWS_MAX_ATTEMPTS=1``, 60 s read timeout) in RECEIPT
+     order (the ``received-at`` metadata the writer stamps, else LastModified) and runs each
+     through the writer's own two steps — ``payload_readings`` (the reading's own UTC day, the
+     reading's own timestamp as the dedup key) and ``merge_readings`` (a re-sent reading counts
+     once; a re-sent timestamp with a new quantity is a revision, every version kept) — then ``day_value`` for the sum. All three are imported
      from ``lambdas/ingestion/health_auto_export_additive.py``: there is no second
      implementation here;
   3. reads the stored ``apple_health`` day rows over the same range (one DynamoDB QUERY);
@@ -29,7 +30,7 @@ WRITE MODE — THE OWNER'S / DRIVER'S LINE ONLY. ``--apply``, per day that has a
 AND an existing day row (a row is never created) and whose stored values differ or lack the stamp:
   * merges the replayed readings into the per-field S3 objects the live writer sums from
     (``raw_date_key("apple_health", day, sub="additive_<field>")``, same body shape, a stored
-    timestamp never overwritten) — so the writer's next delivery for that day extends the
+    reading moved only by a revision the replay saw, every version kept in ``revisions``) — so the writer's next delivery for that day extends the
     rebuilt total instead of restarting it from one delivery;
   * ``UpdateItem`` SETs the five fields (Decimal), their one derived companion the writer also
     sets (``total_calories_burned`` = active + basal) and ``delivered_readings_only = true``
@@ -138,15 +139,22 @@ def archive_keys(s3, bucket: str, since: str, until: str, today: date) -> list[t
     return out
 
 
-def read_payloads(s3, bucket: str, keys: list, workers: int = 8) -> list[tuple[str, str, dict]]:
-    """[(key, delivery_day, payload)] in the listed (LastModified) order."""
+def read_payloads(s3, bucket: str, keys: list, workers: int = 8) -> list[tuple[str, str, dict, str]]:
+    """[(key, delivery_day, payload, received_at)] in RECEIPT order: the ``received-at`` metadata the
+    writer stamps on each delivery (microseconds, #4628), else the listed LastModified (whole seconds:
+    a same-second tie keeps the listing's (LastModified, key) order, which no older archive can resolve)."""
 
     def _get(item):
-        key, delivered, _ = item
-        return key, delivered, json.loads(s3.get_object(Bucket=bucket, Key=key)["Body"].read())
+        key, delivered, modified = item
+        resp = s3.get_object(Bucket=bucket, Key=key)
+        received = (resp.get("Metadata") or {}).get("received-at") or additive.received_stamp(
+            modified if isinstance(modified, datetime) else None
+        )
+        return key, delivered, json.loads(resp["Body"].read()), received
 
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
-        return list(pool.map(_get, keys))
+        got = list(pool.map(_get, keys))
+    return sorted(got, key=lambda t: t[3])  # stable: equal stamps keep the listed order
 
 
 def _metrics(payload: dict) -> list:
@@ -156,18 +164,22 @@ def _metrics(payload: dict) -> list:
 
 
 def replay(payloads: list) -> tuple[dict, Counter]:
-    """{reading_day: {field: {"units", "readings": {source: {ts: qty}}, "deliveries": n}}} plus
-    replay stats — each delivery through the writer's ``payload_readings`` + ``merge_readings``."""
+    """{reading_day: {field: {"units", "readings": {source: {ts: qty}}, "revisions", "deliveries": n}}} plus
+    replay stats — each delivery, in receipt order, through the writer's ``payload_readings`` + ``merge_readings``."""
     acc: dict = {}
     stats: Counter = Counter()
-    for key, delivered, payload in payloads:
+    for key, delivered, payload, received_at in payloads:
         stats["payloads_read"] += 1
         for day, per_field in additive.payload_readings(_metrics(payload), METRIC_MAP, parse_date_str).items():
             lag = (date.fromisoformat(delivered) - date.fromisoformat(day)).days
             stats["max_delivery_lag_days"] = max(stats["max_delivery_lag_days"], lag)
             for field, entry in per_field.items():
-                slot = acc.setdefault(day, {}).setdefault(field, {"units": entry["units"], "readings": {}, "deliveries": 0})
-                slot["readings"], _ = additive.merge_readings(slot["readings"], entry["readings"])
+                slot = acc.setdefault(day, {}).setdefault(
+                    field, {"units": entry["units"], "readings": {}, "revisions": {}, "deliveries": 0}
+                )
+                slot["readings"], _, slot["revisions"] = additive.merge_readings(
+                    slot["readings"], entry["readings"], slot["revisions"], received_at
+                )
                 slot["deliveries"] += 1
     return acc, stats
 
@@ -300,6 +312,23 @@ def _read_object(s3, bucket: str, key: str) -> dict:
         return {}
 
 
+def _merge_replayed(stored: dict, slot: dict) -> tuple[dict, dict, int]:
+    """The stored object + the replay, through the writer's own ``merge_readings``: each reading's
+    first replayed version, then every later version in receipt order, so a revision the replay saw
+    moves the value exactly as it would have live. Returns (readings, revisions, changes)."""
+    replayed_revs = slot.get("revisions") or {}
+    first = {
+        src: {ts: (replayed_revs.get(src, {}).get(ts) or [["", q]])[0][1] for ts, q in tsq.items()} for src, tsq in slot["readings"].items()
+    }
+    merged, changes, revisions = additive.merge_readings(stored.get("readings"), first, stored.get("revisions"))
+    for src, tsv in replayed_revs.items():
+        for ts, versions in tsv.items():
+            for received_at, qty in versions[1:]:
+                merged, n, revisions = additive.merge_readings(merged, {src: {ts: qty}}, revisions, received_at)
+                changes += n
+    return merged, revisions, changes
+
+
 def rebuild_archive(s3, bucket: str, day: str, per_field: dict) -> tuple[dict, int]:
     """Merge the replayed readings into the writer's per-field objects; returns (values, objects_written).
     The value is summed from the MERGED object — what the writer will sum on its next delivery."""
@@ -307,10 +336,12 @@ def rebuild_archive(s3, bucket: str, day: str, per_field: dict) -> tuple[dict, i
     for field, slot in per_field.items():
         key = raw_date_key(SOURCE, day, sub=f"additive_{field}")
         stored = _read_object(s3, bucket, key)
-        merged, added = additive.merge_readings(stored.get("readings"), slot["readings"])
+        merged, revisions, changes = _merge_replayed(stored, slot)
         units = stored.get("units") or slot["units"]
-        if added or not stored:
+        if changes or not stored:
             body = {"field": field, "date": day, "units": units, "readings": merged}
+            if revisions:
+                body["revisions"] = revisions
             s3.put_object(Bucket=bucket, Key=key, Body=json.dumps(body, sort_keys=True), ContentType="application/json")
             written += 1
         values[field] = additive.day_value(field, merged, units)

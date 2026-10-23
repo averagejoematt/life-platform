@@ -3,8 +3,8 @@ sit below what the phone actually delivered for that day.
 
 THE FAILURE THIS WATCHES FOR
   Since the Health Auto Export app went incremental (2026-06-21) each webhook payload
-  carries only that sync's readings. The ingest still sums one payload at a time and
-  writes GREATEST(stored, new), so the stored day equals the LARGEST single sync, not the
+  carries only that sync's readings. Until #4962 the ingest summed one payload at a time and
+  wrote GREATEST(stored, new), so the stored day equalled the LARGEST single sync, not the
   day — 55 of 55 field-days in the 2026-10-04 sweep, steps 0.50-1.00 and basal energy
   0.26-0.76 of what was delivered. Nothing alarmed: the step guard in the freshness
   checker only fires on a low floor across 4 of 7 days.
@@ -29,11 +29,13 @@ OUTPUT
   read. Never a value, never a key: the qa-smoke report is emailed.
 
 VERDICT
-  A shortfall is a chronic WARN pinned to the filed #4628 (class (b) of Check.warn):
-  the writer fix waits on the storage-shape ruling (#4644 Q2/Q3), and until it lands the
-  shortfall recurs every night with no marginal information. Un-chronic it — make it a
-  FAIL — in the PR that lands the writer fix. An archive that cannot be read (the
-  s3:GetObject grant on the HAE raw prefix is not deployed yet, or anything else) is an
+  A shortfall is a FAIL. It was a chronic WARN pinned to #4628 while the writer kept the
+  largest sync; the writer fix (#4962, owner Q2 b) is live since 2026-10-18, and a read-only
+  replay of 2026-10-14/15/19/20/21 (2026-10-23) found every stored field-day equal to its
+  archived readings — so a shortfall now means a delivery fell back to the guarded legacy
+  write (its additive archive read or write failed) or a concurrent merge was lost. An
+  archive that cannot be read (the s3:GetObject grant on the HAE raw prefix is not deployed
+  yet, or anything else) is an
   ALARMED warn naming the cause: a check that cannot reach a verdict is never green.
 
 Dependency-injected like raw_archive_qa: qa_smoke_lambda owns the clients and the nightly
@@ -89,7 +91,11 @@ def _factor(field, units):
 
 
 def delivered_day_values(payloads, days):
-    """Pure: {(day, field): largest per-source sum over unique reading timestamps}."""
+    """Pure: {(day, field): largest per-source sum over unique reading timestamps}.
+
+    A timestamp re-delivered with a changed quantity counts at its SMALLEST version: the writer
+    keeps the newest (health_auto_export_additive.merge_readings), and the smallest is at or below
+    any version it can hold, so the comparison stays one-sided whatever order deliveries came in."""
     wanted = set(days)
     seen = defaultdict(dict)  # (day, field, source) -> {timestamp: qty}
     for payload in payloads:
@@ -107,7 +113,8 @@ def delivered_day_values(payloads, days):
                     qty = float(r.get("qty"))
                 except (TypeError, ValueError):
                     continue
-                seen[(day, field, r.get("source") or "_unknown")].setdefault(r.get("date"), qty * factor)
+                bucket, ts = seen[(day, field, r.get("source") or "_unknown")], r.get("date")
+                bucket[ts] = min(bucket.get(ts, qty * factor), qty * factor)
     out = {}
     for (day, field, _src), readings in seen.items():
         total = sum(readings.values())
@@ -192,12 +199,12 @@ def check_hae_additive_integrity(table, s3, bucket, check_cls, partition, now_ut
         return [c.warn(f"no delivered additive readings to check ({span}) — not evaluable (#4628).")]
     if counts["short"]:
         per = ", ".join(f"{f} {n}" for f, n in counts["by_field"].items() if n)
-        # Chronic, class (b): pinned to the filed #4628 — un-chronic (FAIL) in the writer-fix PR.
+        # A FAIL since the writer fix is live (#4962): a shortfall now means a delivery fell back to the
+        # guarded legacy write (its additive archive read or write failed) or a concurrent merge was lost.
         return [
-            c.warn(
+            c.fail(
                 f"{counts['short']} of {counts['checked']} Apple Health field-days stored BELOW the delivered readings "
-                f"({per}; {span}) — the writer keeps the largest sync, not the day ({_SHORT_ISSUE}).",
-                chronic=True,
+                f"({per}; {span}) — a delivery skipped the additive archive or a merge was lost ({_SHORT_ISSUE})."
             )
         ]
     return [c.ok(f"0 of {counts['checked']} Apple Health field-days below the delivered readings ({span}) ({_SHORT_ISSUE}).")]
