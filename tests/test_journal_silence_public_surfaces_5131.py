@@ -138,7 +138,7 @@ MAIL_SENDERS = {
 # The family's guard: a GUARDED member's source must call one of these.
 FAMILY_GUARDS = {
     "api": frozenset({"guard_api_response"}),
-    "generated": frozenset({"public_body", "scrub_document", "scrub_payload"}),
+    "generated": frozenset({"public_body", "scrub_document", "scrub_payload", "spoken_turns"}),
     "mail": frozenset({"reader_mail"}),
 }
 
@@ -164,23 +164,27 @@ def _modules(root: Path) -> tuple:
             tree = ast.parse(path.read_text(encoding="utf-8"))
         except SyntaxError:  # pragma: no cover — a broken file is another gate's problem
             continue
-        calls, gen = set(), False
+        calls, refs, gen = set(), set(), False
         for n in ast.walk(tree):
             if isinstance(n, ast.Call):
                 calls.add(_call_name(n))
+            elif isinstance(n, ast.Attribute):  # `map(journal_silence.reader_mail, ...)` applies the guard without calling it here
+                refs.add(n.attr)
+            elif isinstance(n, ast.Name):
+                refs.add(n.id)
             elif isinstance(n, ast.Constant) and isinstance(n.value, str) and n.value.startswith("generated/"):
                 gen = True
-        out.append((path.relative_to(root).as_posix(), frozenset(calls), gen))
+        out.append((path.relative_to(root).as_posix(), frozenset(calls), frozenset(refs | calls), gen))
     return tuple(out)
 
 
 def derive_generated_writers(root: Path = LAMBDAS) -> set:
-    return {rel for rel, calls, gen in _modules(root) if gen and calls & S3_WRITE_METHODS}
+    return {rel for rel, calls, _refs, gen in _modules(root) if gen and calls & S3_WRITE_METHODS}
 
 
 def derive_mail_senders(root: Path = LAMBDAS) -> set:
     # common/send_guard.py is the shared helper itself, not a sender
-    return {rel for rel, calls, _gen in _modules(root) if calls & SES_SEND_CALLS and rel != "common/send_guard.py"}
+    return {rel for rel, calls, _refs, _gen in _modules(root) if calls & SES_SEND_CALLS and rel != "common/send_guard.py"}
 
 
 def _handler_module(kws: dict, lambdas_root: Path) -> str | None:
@@ -218,7 +222,7 @@ def derive_api_lambdas(cdk_root: Path = CDK_STACKS, lambdas_root: Path = LAMBDAS
 
 
 def _calls_any(rel: str, names: frozenset) -> bool:
-    return any(r == rel and calls & names for r, calls, _gen in _modules(LAMBDAS))
+    return any(r == rel and refs & names for r, _calls, refs, _gen in _modules(LAMBDAS))
 
 
 FAMILIES = {
@@ -313,6 +317,8 @@ def test_reader_mail_and_the_coach_public_slots_refuse_it():
     from coach import audience_guard
 
     assert not J.mentions_journal_silence(J.reader_mail(f"<p>{LEAK}</p>"))
+    turns = [{"speaker": "a", "line": LEAK}, {"speaker": "b", "line": "The diary has been blank."}]
+    assert J.spoken_turns(turns) == [{"speaker": "a", "line": CLEAN}], "a podcast turn is scrubbed BEFORE TTS; an emptied turn is dropped"
     assert audience_guard.reader_safe(LEAK) is None
     assert audience_guard.public_items([LEAK, CLEAN]) == [CLEAN]
     assert audience_guard.public_read({"public_summary": LEAK}) is None

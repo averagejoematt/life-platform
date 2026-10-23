@@ -116,7 +116,7 @@ def _scrub_text_body(text: str, content_type: str = "") -> tuple[str, int]:
         except ValueError:
             parsed = None
         if isinstance(parsed, (dict, list)):
-            scrubbed, hits = _scrub(parsed)
+            scrubbed, hits = scrub_payload(parsed)
             return json.dumps(scrubbed, ensure_ascii=False, default=str), hits
     return scrub_document(text), 1
 
@@ -154,6 +154,17 @@ def guard_api_response(response: Any, logger: Any = None) -> Any:
     if logger is not None:
         logger.warning("journal-silence copy withheld from a public response: %d span(s) (#5131)", hits)
     return {**response, "headers": headers, "body": new_body}
+
+
+def spoken_turns(turns: Any, key: str = "line") -> list:
+    """Dialogue turns bound for a PUBLIC podcast's TTS or transcript: each turn's line scrubbed by sentence, a turn
+    left with nothing to say dropped. Audio cannot be scrubbed after synthesis, so this runs before it."""
+    out = []
+    for t in turns or []:
+        line = scrub_document(t.get(key, "")) if isinstance(t, dict) else ""
+        if line.strip():
+            out.append({**t, key: line})
+    return out
 
 
 def reader_mail(text: Any) -> str:
