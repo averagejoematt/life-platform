@@ -270,7 +270,7 @@ SOURCE_TIERS: dict[str, int] = {
     "genome": TIER_OWNER_ONLY,  # variants/identifiers (#1943); served risk projection is the gated non-variant surface
     "notion": TIER_OWNER_ONLY,  # journal entries, full text; publication only via the diary consent/publish gates
     "state_of_mind": TIER_OWNER_ONLY,  # mood / state-of-mind entries
-    "macrofactor": TIER_OWNER_ONLY,  # nutrition logs (every meal, every calorie); public meal views pass the privacy flags
+    "macrofactor": TIER_OWNER_ONLY,  # nutrition logs (every meal, every calorie); public meal views pass the privacy flags + #5112's approved-name list (privacy.food_names)
     "strava": TIER_OWNER_ONLY,  # activity GPS traces (location is never public — DATA_GOVERNANCE PII definition)
     "hevy": TIER_OWNER_ONLY,  # workout details; public training surfaces serve aggregates (muscle volume, PRs)
     "sick_days": TIER_OWNER_ONLY,  # sick-day records
