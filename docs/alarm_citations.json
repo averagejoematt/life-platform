@@ -71,8 +71,8 @@
   },
   "life-platform-budget-tier-escalation": {
     "added": "2026-10-21",
-    "cause": "budget tier 2 on the October spend projection",
-    "cause_observed": "2026-10-20T00:00Z cost_governor wrote tier 2 (ADR-125 band 2: internal AI + reader narratives paused); the alarm re-fired 2026-10-21T00:01Z (datapoint 2.0 at threshold 2.0). Read 2026-10-21 by Session CB; the tier was never forced.",
+    "cause": "budget tier 2 on the October spend projection — re-read 2026-10-23 by Session CC: SSM /life-platform/budget-tier = 2, LastModified 2026-10-19T17:00-07:00 (unchanged since CB's read); the alarm alternates ALARM/OK about every 5 h on 10-22 (01:01, 09:01, 17:01 PT into ALARM) as the governor's datapoints arrive, with the SAME cause, tier 2 on the October projection. The tier was never forced.",
+    "cause_observed": "2026-10-23",
     "citation": "#5135 — the dev-session AI envelope (epic #5134): laptop/agent spend counts against the one production ceiling and lifts the projection into band 2. Expiry: self-clears at the 2026-11-01 month rollover or when the projection falls below the band; still lit after 2026-11-02 → re-cite.",
     "history": "Prior citation #2801 (closed) covered the 2026-08-26 flap of the same class."
   },
@@ -216,5 +216,15 @@
     "cause": "vendor transient: Bedrock ServiceUnavailableException (503)",
     "cause_observed": "6 AnthropicAPIFailure 2026-10-19 14:00-14:02Z, all ai-expert-analyzer request 65a7dbba (Monday cron): six experts each exhausted 3 attempts, retry_utils.py:280. Re-ALARM 2026-10-20 16:19Z is a CloudWatch look-back to the window starting 10-18T16:19Z, no new failures. Budget tier 2 does not count (budget-stop branches never emit). Predates the 10-20 nutrition merges.",
     "citation": "self-clearing vendor transient (a Bedrock 503 burst the alarm correctly counts; the class closed issue 3830 recorded). Window: the six 2026-10-19 14:00-14:02Z failures leave the 24h evaluation by 2026-10-21 ~16:20Z. Expiry: if still ALARM after 2026-10-21 17:00Z, or any AnthropicAPIFailure appears after 2026-10-19 14:02Z, file a story 'slo-ai-coaching-success: one run's 503 burst crosses the daily threshold'. Prune 72 h after OK."
+  },
+  "ingest-consecutive-failures-strava": {
+    "added": "2026-10-23",
+    "cause": "Strava re-ingest of the already-stored DATE#2026-10-18 raised Decimal + float every hourly run 2026-10-21T04:10Z until the day left the window on 10-22",
+    "citation": "#5255 — the re-ingest Decimal/float defect. Episode ALARM 2026-10-21 05:11 PT → OK 2026-10-22 05:11 PT. Expiry: re-cite if it fires again before #5255 is fixed."
+  },
+  "ingest-liveness-unhealthy": {
+    "added": "2026-10-23",
+    "cause": "the composite liveness view of the same Strava episode (RunSuccess 0 on each errored run)",
+    "citation": "#5255 — same episode as ingest-consecutive-failures-strava: ALARM 2026-10-21 10:11 PT → OK 2026-10-22 10:11 PT. Expiry: re-cite if it fires again before #5255 is fixed."
   }
 }
