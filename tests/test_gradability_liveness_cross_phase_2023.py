@@ -583,6 +583,16 @@ _PER_SOURCE_READS: dict[str, str] = {
         "flourishing/withings/hevy callers all read cross-phase; the computed_metrics caller "
         "(EXPERIMENT_SCOPED) stays filtered. Pinned by tests/test_phase_filter_third_wave_3444.py."
     ),
+    "lambdas/compute/scenario_explorer_lambda.py::_write_checkin_pair": (
+        "#5211: the next-morning check-in / intake day row. Its nested fetch passes "
+        "include_pilot=source_reads_cross_phase(source), the #2109 idiom, into "
+        "checkin_intake_pairs.write_day, the same reads as weekly_correlation_compute_lambda.fetch_range: "
+        "evening_checkin/macrofactor/apple_health read cross-phase per the registry."
+    ),
+    "lambdas/compute/scenario_explorer_lambda.py::fetch": (
+        "#5211: the nested reader inside _write_checkin_pair — include_pilot=source_reads_cross_phase(source), "
+        "the #2109 idiom; see the _write_checkin_pair entry."
+    ),
     "lambdas/compute/hypothesis_engine_lambda.py::query_range": (
         "include_pilot=source_reads_cross_phase(source) — the #2109 idiom, closing #3444: every "
         "COMPUTE_INPUTS['hypothesis-engine'] source plus todoist/evening_ritual/time_affluence/"

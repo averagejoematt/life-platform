@@ -18,6 +18,7 @@ from typing import Callable
 from common.numeric import floats_to_decimal
 from common.pacific_time import PACIFIC
 from health import protein_engine
+from ingestion import health_auto_export_protein as hae_protein
 
 logger = logging.getLogger()
 
@@ -29,6 +30,23 @@ CHANNEL = "email"
 def _today_row(table, date: str, user: str) -> dict | None:
     item = table.get_item(Key={"pk": f"USER#{user}#SOURCE#macrofactor", "sk": f"DATE#{date}"}).get("Item")
     return None if not item or item.get("tombstone") else item
+
+
+def _hae_row(table, date: str, user: str) -> dict | None:
+    """The same-day path (#5187): the timed protein entries Health Auto Export delivers intraday, as a food-log row.
+    The apple_health row is the UTC day; a Pacific morning is the same date, and the engine filters on each entry's own
+    Pacific date."""
+    item = table.get_item(
+        Key={"pk": f"USER#{user}#SOURCE#apple_health", "sk": f"DATE#{date}"},
+        ProjectionExpression="#rd",
+        ExpressionAttributeNames={"#rd": hae_protein.RD_FIELD},
+    ).get("Item")
+    return protein_engine.hae_feeding_rows((item or {}).get(hae_protein.RD_FIELD), date)
+
+
+def _read_row(table, date: str, user: str) -> dict | None:
+    """The end-of-day MacroFactor row when it exists (the fuller record), else the intraday HAE entries."""
+    return _today_row(table, date, user) or _hae_row(table, date, user)
 
 
 def _claim(table, date: str, verdict: dict, now_utc: datetime) -> bool:
@@ -75,6 +93,7 @@ def _stamp_eval(table, date: str, verdict: dict, now_utc: datetime) -> None:
                 "send": bool(verdict.get("send")),
                 "evaluated_at": now_utc.isoformat(),
                 "version": protein_engine.NUDGE_VERSION,
+                "source": str(verdict.get("source") or "none"),
             }
         )
     except Exception as e:  # noqa: BLE001 — the stamp is the dead-man's food; never block the pass
@@ -90,7 +109,7 @@ def run(table, send: Callable[[str], None], now_utc: datetime, budget_tier: int,
     try:
         sent = bool(table.get_item(Key={"pk": LEDGER_PK, "sk": protein_engine.idempotency_key(date)}).get("Item"))
         verdict = protein_engine.nudge_decide(
-            date=date, now_pt=now_pt, row=None if sent else _today_row(table, date, user), already_sent=sent, budget_tier=budget_tier
+            date=date, now_pt=now_pt, row=None if sent else _read_row(table, date, user), already_sent=sent, budget_tier=budget_tier
         )
     except Exception as e:  # noqa: BLE001
         logger.error("[protein-nudge] evaluation failed: %s", e)

@@ -19,6 +19,8 @@ ABSENT: dict[str, Any] = {"state": "absent"}
 def _scalar(v: Any) -> Any:
     if isinstance(v, (int, float, bool)) or v is None:
         return v
+    if isinstance(v, (list, tuple)):  # #5247: a list stays a JSON list (its members clipped), never its Python repr
+        return [_scalar(i) for i in v]
     s = str(v)
     return s if len(s) <= _VALUE else s[: _VALUE - 1] + "…"
 
@@ -27,6 +29,14 @@ def _pick(src: Any, keys: tuple[str, ...]) -> dict[str, Any]:
     if not isinstance(src, dict) or not src:
         return dict(ABSENT)
     return {k: _scalar(src.get(k)) for k in keys}
+
+
+def _tracker(src: Any) -> dict[str, Any]:
+    """#5247: ``write_latest`` returns the week's tracker status as ``status``; ``state`` stays as the fallback."""
+    out = _pick(src, ("outcome", "sk"))
+    if out != ABSENT:
+        out["state"] = _scalar(src.get("status") if src.get("status") is not None else src.get("state"))
+    return out
 
 
 def _critics(c: Any) -> dict[str, Any]:
@@ -46,7 +56,7 @@ def _coach_context(c: Any) -> dict[str, Any]:
     if c.get("state") == "read_failed":
         return {"state": "read_failed"}
     return {
-        "stamp": f"coach-context@{c.get('context_version')}",
+        "stamp": c.get("context_version"),  # #5247: CONTEXT_VERSION already reads "coach-context@x.y.z"; never re-prefix it
         "charter_version": c.get("charter_version"),
         "not_supplied": _scalar(c.get("not_supplied")),
     }
@@ -69,7 +79,7 @@ def summarise(result: dict[str, Any], charter_version: Any = None) -> dict[str, 
         "critics": _critics(r.get("critics")),
         "coach_context": _coach_context(r.get("coach_context")),
         "shadow": _shadow(r.get("shadow")),
-        "may_tracker": _pick(r.get("may_tracker"), ("outcome", "sk", "state")),
+        "may_tracker": _tracker(r.get("may_tracker")),
         "calibration": _pick(r.get("calibration"), ("outcome", "deadman")),
         "titration": _pick(r.get("titration"), ("outcome", "week", "action", "step_kcal", "reason_code")),
         "fitness_battery": _pick(r.get("fitness_battery"), ("outcome", "state")),

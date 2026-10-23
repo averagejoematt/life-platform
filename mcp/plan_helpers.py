@@ -248,7 +248,14 @@ PACKET_NOT_REREAD = (
     "plan_next_session does not re-read the plan packet: get_coach_session_packet is the pre-flight call that carries it, "
     "and stage 1 reads its own inputs into constraint_block"
 )
-PACKET_NOT_READ_PREDRAFT = "the nightly pre-draft reads no plan packet: its inputs are stage 1's constraint block (no chat pre-flight runs)"
+PACKET_NOT_READ_PREDRAFT = "the nightly pre-draft reads no plan packet (no chat pre-flight runs)"
+# #5247: the pre-draft's draft is built inside `manage_hevy_routine draft`, which does not hand stage 1's constraint block
+# back to the caller, so the pre-draft's coach context cannot carry it. Stated, not implied (the generic reason says
+# "plan_next_session builds it after pre-flight", which is not why it is missing here).
+BLOCK_NOT_READ_PREDRAFT = (
+    "the nightly pre-draft's coach context carries no constraint block: the draft is built inside manage_hevy_routine draft, "
+    "which does not return stage 1's block to the pre-draft; plan_next_session's own context carries it"
+)
 
 
 def coach_context_brief(target_date: str) -> dict[str, Any]:
@@ -257,7 +264,13 @@ def coach_context_brief(target_date: str) -> dict[str, Any]:
     from training import coach_context
 
     ctx = coach_context_for(target_date, packet_reason=PACKET_NOT_READ_PREDRAFT)
-    return ctx if ctx.get("state") == "read_failed" else {k: v for k, v in coach_context.summary(ctx).items() if k != "text"}
+    if ctx.get("state") == "read_failed":
+        return ctx
+    brief = {k: v for k, v in coach_context.summary(ctx).items() if k != "text"}
+    reasons = brief.get("not_supplied_reason")
+    if isinstance(reasons, dict) and "constraint_block" in reasons:  # #5247
+        brief["not_supplied_reason"] = {**reasons, "constraint_block": BLOCK_NOT_READ_PREDRAFT}
+    return brief
 
 
 def critics_with_charter(

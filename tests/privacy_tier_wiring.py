@@ -411,6 +411,11 @@ for _field in (
         "sleep_analysis, Apple devices only; writer-only footprint, no reader yet.",
     )
 
+CONSUMERS[("lambdas/ingestion/health_auto_export_protein.py", "_rd_protein_hae")] = _d(
+    SAW,
+    "The HAE intraday protein writer (#5187) stores `_rd_protein_hae`; protein_nudge_runner reads it for the owner-only breakfast nudge.",
+)
+
 
 # ── The derivation ────────────────────────────────────────────────────────────
 def _scan_dirs() -> tuple[str, ...]:

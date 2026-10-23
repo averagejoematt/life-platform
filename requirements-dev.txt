@@ -55,7 +55,8 @@ pillow==13.0.0
 # via scripts/ci_pins.py like every other gate tool.
 flake8==7.4.1
 ruff==0.14.14
-black==26.3.1
+# 26.10.1 fixes CVE-2026-114134 (pip-audit, 2026-10-22); the whole tree is unchanged under it
+black==26.10.1
 
 # Type checking (ENFORCED/blocking on the clean-module set, advisory elsewhere —
 # see tests/test_mypy_clean_modules.py + mypy.ini). Version MUST equal ci-lint.yml's

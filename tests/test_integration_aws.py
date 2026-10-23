@@ -367,18 +367,74 @@ def test_i5_required_secrets_exist():
 # ══════════════════════════════════════════════════════════════════════════════
 
 REQUIRED_EB_RULES = [
-    "daily-brief-schedule",
+    # #5252: no `daily-brief-schedule` here — that Events rule was retired when the brief moved
+    # to a zoned EventBridge Scheduler schedule (#4284, CONVENTIONS §1b). A Scheduler schedule
+    # is not an Events rule (`DescribeRule` never sees it); it is checked below through
+    # `scheduler:GetSchedule`, derived from the schedule table rather than a hashed name.
     "LifePlatformIngestion-WhoopIngestionScheduleC6CE3A0-DjUDUDY4XrFs",
     "LifePlatformIngestion-TodoistIngestionSchedule03D61-XqriAparCo0n",
     "LifePlatformOperational-FreshnessCheckerScheduleD9E-xZki3XA2x0bb",
 ]
 
+#: The role the CI post-deploy job assumes for I6 (.github/workflows/ci-cd.yml post-deploy-checks).
+I6_CI_ROLE = "github-actions-readonly-role"
+
+
+def _zoned_schedule_rows():
+    """The config/schedules.json rows the CDK factory puts on an EventBridge Scheduler schedule
+    (a `timezone` row -> lambda_helpers._add_zoned_schedule), as key -> row (#5252)."""
+    tests_dir = os.path.dirname(os.path.abspath(__file__))
+    if tests_dir not in sys.path:
+        sys.path.insert(0, tests_dir)
+    from schedule_rows import rows
+
+    return {k: r for k, r in rows().items() if r.get("timezone")}
+
+
+def _check_zoned_schedules(scheduler, zoned_rows):
+    """Resolve each zoned row to its live Scheduler schedule and read it with GetSchedule.
+
+    The physical name is CloudFormation-generated (`<Stack>-<LogicalId>-<hash>`), so the
+    identity comes from the declaration instead: the row's `stack` is the name prefix and its
+    `function` is the target. Returns the list of issues found."""
+    issues = []
+    for key, row in sorted(zoned_rows.items()):
+        prefix = f"{row['stack']}-"
+        fn_suffix = f":function:{row['function']}"
+        matches = []
+        for page in scheduler.get_paginator("list_schedules").paginate(NamePrefix=prefix):
+            for summary in page.get("Schedules", []):
+                if summary.get("Target", {}).get("Arn", "").endswith(fn_suffix):
+                    matches.append(summary)
+        if not matches:
+            issues.append(f"{key}: no Scheduler schedule named {prefix}* targets {row['function']} — SCHEDULE DOES NOT EXIST")
+            continue
+        if len(matches) > 1:
+            issues.append(f"{key}: {len(matches)} Scheduler schedules target {row['function']}: {[m['Name'] for m in matches]}")
+        for summary in matches:
+            sched = scheduler.get_schedule(Name=summary["Name"], GroupName=summary.get("GroupName", "default"))
+            state = sched.get("State", "UNKNOWN")
+            if state != "ENABLED":
+                issues.append(f"{key} ({summary['Name']}): state is '{state}'")
+            live = (sched.get("ScheduleExpression"), sched.get("ScheduleExpressionTimezone"))
+            if live != (row["expression"], row["timezone"]):
+                issues.append(
+                    f"{key} ({summary['Name']}): live {live} != declared {(row['expression'], row['timezone'])} (config/schedules.json)"
+                )
+    return issues
+
 
 def test_i6_eventbridge_rules_exist_and_enabled():
-    """I6: Critical EventBridge rules must exist and be ENABLED.
+    """I6: Critical EventBridge rules — and the zoned Scheduler schedules — must exist and be ENABLED.
 
     Missing/disabled rules cause scheduled Lambdas to silently stop running.
     Caught the March 10 P3 retroactively — this test would have caught it immediately.
+
+    #5252: the daily brief runs on an EventBridge Scheduler schedule, not an Events rule, so
+    every `timezone` row in config/schedules.json is resolved and read with `GetSchedule`.
+    If the caller may not read Scheduler (AccessDenied — the CI role lacks the grant today),
+    a clean rule leg SKIPS with the reason rather than passing silently: the grant is an
+    owner-attended IAM change, never a test edit.
     """
     boto3 = _get_boto3()
     eb = boto3.client("events", region_name=REGION)
@@ -396,12 +452,29 @@ def test_i6_eventbridge_rules_exist_and_enabled():
             if "ResourceNotFoundException" in str(e):
                 missing.append(f"{rule_name}: RULE DOES NOT EXIST")
 
-    issues = missing + disabled
+    zoned_rows = _zoned_schedule_rows()
+    assert zoned_rows, "I6: config/schedules.json carries no `timezone` row — the brief's zoned schedule has left the table"
+    scheduler_denied = None
+    sched_issues = []
+    try:
+        sched_issues = _check_zoned_schedules(boto3.client("scheduler", region_name=REGION), zoned_rows)
+    except Exception as e:
+        if "AccessDenied" not in str(e):
+            raise
+        scheduler_denied = e
+
+    issues = missing + disabled + sched_issues
     assert not issues, (
-        f"I6 FAIL: {len(issues)} EventBridge rule issue(s):\n"
+        f"I6 FAIL: {len(issues)} EventBridge rule/schedule issue(s):\n"
         + "\n".join(f"  ❌ {i}" for i in issues)
         + "\n\nMissing rules mean Lambdas won't run on schedule!"
     )
+    if scheduler_denied is not None:
+        pytest.skip(
+            f"I6 PARTIAL: {len(REQUIRED_EB_RULES)} Events rules OK; the Scheduler leg ({sorted(zoned_rows)}) is UNCHECKED — "
+            f"the caller lacks scheduler:ListSchedules/GetSchedule ({scheduler_denied}). "
+            f"On {I6_CI_ROLE} that grant is owner-required (infra/iam, IAM gate, #5252)."
+        )
 
 
 # ══════════════════════════════════════════════════════════════════════════════

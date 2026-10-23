@@ -29,6 +29,8 @@ import json
 import re
 from typing import Any, Dict, Optional, Set
 
+from health import macro_floors
+
 PLAN_SOURCE = "config/user_goals.json"
 # #5095: the live calorie target + band, added by `load_plan_facts` (never sealed into a freeze).
 LIVE_CALORIE_KEY = "calorie_target_live_kcal"
@@ -84,7 +86,7 @@ def plan_facts_from_goals(goals: Dict[str, Any]) -> Dict[str, Any]:
         # ── additive since #3518 (future freezes only) ──
         "daily_steps_floor": step_lo,
         "daily_steps_range": [step_lo, step_hi] if step_lo is not None and step_hi is not None else None,
-        "daily_fiber_min_g": _int(nutrition.get("daily_fiber_min_g")),
+        "daily_fiber_min_g": _int(macro_floors.floor_g("fibre")),  # #5204: the charter floor, not a second figure in user_goals
         "protein_figures_named_g": protein_prose,
     }
     return facts

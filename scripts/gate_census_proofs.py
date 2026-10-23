@@ -3730,3 +3730,24 @@ CI_PROOFS["ci::iam-gate-pr.yml::gate::3"] = {
     ),
     "proved_on": "2026-10-20",
 }
+
+STRUCTURAL_HAND_PROOFS["structural::test_habit_tier_set_guard_5232.py"] = {
+    "gate_name": "test_habit_tier_set_guard_5232.py",
+    "command": "python3 -m pytest tests/test_habit_tier_set_guard_5232.py -q   # baseline 2 passed",
+    "mutation": (
+        'lambdas/ai/ai_context.py `habit_tier(meta) > 1` reverted to the shipped raw `meta.get("tier", 2) > 1` '
+        "(the literal pre-#5232 compare on a registry meta); sed -i '' with the file diffed before the verdict was read."
+    ),
+    "observed": (
+        "MUTATED: test_no_raw_registry_tier_compare_in_lambdas failed (names the reverted ai_context.py line) alongside "
+        "test_outcome_context_and_streaks_read_string_tiers; the mutation was removed with git checkout and the guard "
+        "returned to 2 passed. Watched 2026-10-20."
+    ),
+    "scope": (
+        'An AST sweep of lambdas/ and mcp/ for a `.get("tier")` / `["tier"]` read compared with a numeric literal or an '
+        "ordering operator. Does NOT see a registry tier copied into a local variable first and compared later, nor a "
+        "compare spelled through a helper other than habit_tier; character/budget/evidence tiers are string- or int()-wrapped "
+        "and never match."
+    ),
+    "proved_on": "2026-10-20",
+}

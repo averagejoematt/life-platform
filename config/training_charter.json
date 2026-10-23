@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.19.0",
+  "version": "1.19.1",
   "change_log": [
     {
       "version": "1.0.0",
@@ -119,6 +119,13 @@
       "date": "2026-10-20",
       "by": "owner ruling 5 (2026-10-18: five lifting days a week) and the #5101 known limit (#5191, epic #5091); built on the panel default, pending R1",
       "what": "nutrition.training_day prose only (no number changes): day_type now names the per-date training calendar (training.training_calendar, #5191) that types each date of the week lifting or rest from split.lifting_days_per_wk and the week's credited sessions, so the plan's training_day_fuel block is typed and its weekly mean is the base target; balance adds that a typed week with no rest day to pay the uplift reports balance_held false.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.19.1",
+      "date": "2026-10-22",
+      "by": "#5187 (epic #5094), filling in the same-day source the 1.18.x text named ('armed but silent until a same-day food source exists (#5187)'); no new owner ruling, the nudge rule itself is unchanged and still pending R2 (#5091)",
+      "what": "nutrition breakfast_nudge.rule prose only (no number, window or threshold changes): names the timed protein entries Health Auto Export delivers intraday as the same-day read, beside the end-of-day MacroFactor row; an absent record of both still withholds (no_same_day_log).",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -500,7 +507,7 @@
         "window_end_pt": "12:00",
         "max_per_day": 1,
         "channel": "owner email on the coach-nudge hourly tick",
-        "rule": "behind when no feeding at or above feeding_threshold_g is logged at or before the later of the cut-off and the tick; no food-log row for the day withholds the note (no_same_day_log): the food log is an end-of-day upload, so an absent row at breakfast is upload lag, not a missed feeding; untimed rows withhold the note (unknown). Armed but silent until a same-day food source exists (#5187)"
+        "rule": "behind when no feeding at or above feeding_threshold_g is logged at or before the later of the cut-off and the tick; the day's MacroFactor row is an end-of-day upload, so the same-day read is the timed protein entries Health Auto Export delivers intraday (#5187); when neither exists the note withholds (no_same_day_log): an absent record at breakfast is lag, not a missed feeding; untimed rows withhold the note (unknown)"
       },
       "basis": "built on the panel default, pending R2 (#5091)"
     },
