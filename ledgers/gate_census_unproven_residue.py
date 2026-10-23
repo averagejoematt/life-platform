@@ -414,6 +414,7 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "registry::tests/test_no_tool_attribution_3005.py::ALLOWLIST::CLAUDE.md": "2026-09-05 seal (#3536)",
     "registry::tests/test_no_tool_attribution_3005.py::ALLOWLIST::tests/test_no_tool_attribution_3005.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_og_card_coverage.py::ORPHAN_ALLOWLIST": "2026-09-05 seal (#3536)",
+    "registry::tests/test_og_card_coverage.py::ORPHAN_ALLOWLIST::og-front": "2026-10-23 (#4646): a dated exemption, not a check — og-front.png is drawn before any page points at it; the og:image flip removes this entry and test_no_allowlisted_card_is_already_served fails until it does.",
     "registry::tests/test_pacific_today_guard_2414.py::_EXEMPT_MARKER": "2026-09-05 seal (#3536)",
     "registry::tests/test_partial_gate_cluster_2430.py::REQUIRED_CLASSES::dates": "2026-09-05 seal (#3536)",
     "registry::tests/test_partial_gate_cluster_2430.py::REQUIRED_CLASSES::freshness": "2026-09-05 seal (#3536)",
