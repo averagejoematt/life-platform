@@ -93,7 +93,6 @@ _BEFORE_4770 = {
     "challenge_generator": _H45,
     "coach_chat_summary": _H45_PROFILE,
     "coach_checkin": _H45,
-    "coach_daily_reflection": _H45,
     "coach_telegram": _S46,
     "coach_thread_extract": _H45,
     "daily_insight": _H45,
