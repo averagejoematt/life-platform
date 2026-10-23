@@ -56,8 +56,11 @@ def test_thirteen_weeks_ramp_within_each_block_model_the_next_and_never_deload()
     plan = block_model.muscle_plan(LANDMARKS)
     priority = [m for m, r in plan.items() if r["priority"]]
     held = [m for m, r in plan.items() if not r["priority"]]
-    assert {"shoulders", "back", "chest", "biceps", "triceps"} <= set(priority)
+    assert {"shoulders"} <= set(priority)
     assert {"quadriceps", "hamstrings", "glutes"} <= set(held), "legs are the charter's maintenance posture"
+    # #5162 (owner ruling 2026-10-23): the lats / upper-chest / arms bands were lowered to what fits inside the 75-set week
+    # (a one-number band), so those muscles hold at their band start and never ramp — no room to climb into
+    assert {"back", "chest", "biceps", "triceps"} <= set(held)
     for m in priority:
         series = [_sets(w)[m] for w in weeks]
         for b in range(2):
