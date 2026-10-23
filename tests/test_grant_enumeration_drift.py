@@ -111,6 +111,15 @@ _OPEN_GAPS: dict[tuple, str] = {
     "siblings on 2026-08-23): the repair lands in cdk/stacks/role_policies_email.py, which "
     "#3037 is concurrently reworking — a second editor there buys a merge-union conflict on "
     "the file this class is least able to afford one in. Close it on top of #3037.",
+    (
+        "mcp_server.py",
+        "ssm",
+        "/life-platform/training-plan-source",
+    ): "#5080 2026-10-19: mcp/predraft_shadow.plan_source reads the nightly pre-draft's plan-source switch. The "
+    "ssm:GetParameter statement in cdk/stacks/role_policies_serve.py::mcp_server was held out of the charter wave-2 "
+    "merge (eff889938) for the owner's attended LifePlatformMcp apply — an additive IAM statement puts the production "
+    "IAM gate in the deploy path. Until it lands the read is AccessDenied and the switch fails safe to `charter` "
+    "(tests/test_predraft_shadow_switch_5080.py's no_permission case). Delete this row in the PR that re-adds the grant.",
 }
 
 #: OPEN LIVE GAPS on the CI OIDC identities. Same rule: defects with an owner,

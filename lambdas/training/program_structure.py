@@ -30,19 +30,26 @@ Both readers reach the week grid through ONE seam (`training.program_seam.
 resolve_week_grid`), so there is exactly one place that decides module-vs-JSON and exactly
 one answer. The seam names its source in its result; it never silently substitutes.
 
-STATUS: v0.4 ACTIVE since 2026-09-24 (#4147). The owner switched programs on 2026-09-23
-(~20:10 PT; decision `DECISION#2026-09-24T03:10:59`, corrections-ledger override signal
-`program_split_full_body_v0.3`): v0.3 full-body -> v0.4 UPPER/LOWER, served in ORDER —
-Upper-heavy -> Lower-heavy -> Upper-volume -> Lower-volume, repeating, the next session being
-the one after the last PERFORMED lift whatever the date (#4110, `training.session_sequence`).
-The prose home is the owner-private `TRAINING_PROGRAM_v0.4.md` (`PROSE_HOME`, written by the
-driver, never in this repo); THIS module is its machine-readable half.
+STATUS: v1.0 ACTIVE since 2026-10-18 (#5069) — THE FIVE-DAY SPLIT. Owner rulings 2026-10-18 (epic
+#5067): ruling 5, "5 lifting days, 60-75 min of lifting. Sequence Upper-heavy, Lower-heavy,
+Shoulders+arms, Upper-volume, Lower-volume. Delts 3x/week."; ruling 6, "the v0.4 lock to 2026-11-04 is
+lifted now". The split, its order, the lifting-minute budget, the cardio and stretching caps and the
+block length are READ from the training charter (`config/training_charter.json` `split.*`,
+`rotation.anchors_fixed_weeks`; `training.training_charter.charter_value`) — this module holds no
+private copy of them. The sessions are still served in ORDER (#4110, `training.session_sequence`):
+the next undone session on whatever day he lifts.
 
-v0.3 (full body, approved 2026-09-21 on #3753) is SUPERSEDED, not deleted: its definitions
-live verbatim in `training.program_v03` (`SUPERSEDED_PROGRAMS`), so anything written under
-it stays readable against the program it was written for. v0.2 (PPL) was never approved.
-While `ACTIVE` is False the seam serves the live JSON grid unchanged and the block says
-PROPOSED — an unratified program must not steer a prescription.
+v0.4 (four-session upper/lower, #4147, served 2026-09-24 .. 2026-10-18) is SUPERSEDED, not deleted:
+its order, nominal week and block lock live in `training.program_v04` (`SUPERSEDED_PROGRAMS`). The
+live block is NOT re-anchored: `SESSION_SEQUENCE['block_start']` is unchanged, every session
+credited before the cut-over day keeps its v0.4 role, and the five-day order continues from the
+role after the last credited v0.4 session (`SESSION_SEQUENCE['cutover']`). v0.4's four role
+templates are unchanged and still defined here; the fifth (`shoulders_arms`) is new.
+
+v0.3 (full body, approved 2026-09-21 on #3753) is SUPERSEDED likewise: its definitions live
+verbatim in `training.program_v03`. v0.2 (PPL) was never approved. While `ACTIVE` is False the
+seam serves the live JSON grid unchanged and the block says PROPOSED — an unratified program must
+not steer a prescription.
 
 PROVENANCE VOCABULARY (ADR-105 — every number says where it came from)
 
@@ -71,59 +78,89 @@ family-by-family state rather than asserting it.
 
 from __future__ import annotations
 
-import datetime as _dt
 from typing import Any
 
-from training import in_block_variant, program_conflicts, program_v03
+from training import effort_ceilings, in_block_variant, program_conflicts, program_v03, program_v04
+from training.accessory_check import CARDIO_NAME_HINTS, accessory_rotation, classify_movement  # noqa: F401 — re-exported (#5069 split)
 from training.program_v03 import BLOCK_CALENDAR  # noqa: F401 — v0.3 history; `load_ramp.block_1_start()` reads it (#4107)
+from training.session_shape import (  # noqa: F401 — #5069: a session's length and shape (ruling 5), re-exported from here
+    SESSION_TIME_MODEL,
+    enforce_session_shape,
+    lifting_minutes_cap,
+    lifting_minutes_range,
+    routine_minutes,
+    session_minutes_estimate,
+    session_shape_problems,
+    trim_to_time,
+)
+from training.training_charter import charter_value, charter_version
 
 ACTIVE = True
-"""True since 2026-09-21 (v0.3, #3753); v0.4 replaced v0.3 on 2026-09-24 without a gap (#4147)."""
+"""True since 2026-09-21 (v0.3, #3753); v0.4 replaced v0.3 on 2026-09-24 (#4147) and v1.0 replaced v0.4 on 2026-10-18 (#5069)."""
 
-LAST_REVIEWED_BY_OWNER: str | None = "2026-09-23"
-"""ISO date the owner last read this program. None means never. v0.4 is his own switch (2026-09-23)."""
+LAST_REVIEWED_BY_OWNER: str | None = "2026-10-18"
+"""ISO date the owner last read this program. None means never. v1.0 is his rulings 5 and 6 of 2026-10-18 (#5067)."""
 
-PROGRAM_VERSION = "0.4"
-ISSUE = "#4147"
-PROSE_HOME = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.4.md"
-"""Owner-private; the driver writes it beside v0.3's. Cited, never read by the engine."""
+PROGRAM_VERSION = "1.0"
+ISSUE = "#5069"
+PROSE_HOME = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM.md"
+"""Owner-private (the v0.4 prose is `program_v04.SUPERSEDED['prose_home']`). Cited, never read by the engine; bringing it
+to the five-day split is an owner act (#5069 PR)."""
 
 DECISION_SK = "DECISION#2026-09-24T03:10:59"
-"""The owner's program-switch decision (2026-09-23 ~20:10 PT)."""
+"""The owner's v0.4 program-switch decision (2026-09-23 ~20:10 PT). The five-day split's ruling is `SPLIT_DECISION['ruling']`."""
 
-SUPERSEDED_PROGRAMS: dict[str, dict[str, Any]] = {"0.3": program_v03.SUPERSEDED}
-"""Every program this one replaced, with the date and the decision. The definitions are in `training.program_v03`."""
+CHARTER_VERSION = charter_version()
+"""The training charter version this module's split was read from — stamped on the sequence and every prescription."""
 
-SPLIT = "upper_lower"
-"""Four sessions in ORDER — Upper-heavy, Lower-heavy, Upper-volume, Lower-volume — each muscle
-2x/wk, walking every day. ORDER, not weekdays (#4110): a walk audible postpones, never skips.
+SUPERSEDED_PROGRAMS: dict[str, dict[str, Any]] = {"0.3": program_v03.SUPERSEDED, "0.4": program_v04.SUPERSEDED}
+"""Every program this one replaced, with the date and the decision. The definitions are in `training.program_v03` / `program_v04`."""
 
-The STRUCTURE decision is the owner's (2026-09-23, #4147); the frequency NUMBER under each
-anchor below is population-derived and says so.
+
+def role_id(sequence_name: str) -> str:
+    """The engine's role id for one charter `split.sequence` name ('Upper-heavy' -> 'upper_heavy',
+    'Shoulders+arms' -> 'shoulders_arms'). The charter names the sessions; this is the only spelling rule."""
+    return "".join(c if c.isalnum() else "_" for c in str(sequence_name).strip().lower())
+
+
+SPLIT_SEQUENCE_NAMES: list[str] = list(charter_value("split.sequence") or [])
+"""The charter's session names, in its order (owner ruling 5, 2026-10-18). Read, never restated."""
+
+SPLIT_ROLES: list[str] = [role_id(n) for n in SPLIT_SEQUENCE_NAMES]
+"""The role ids of `SPLIT_SEQUENCE_NAMES`, same order — the keys of `SESSION_TEMPLATES` the sequence serves."""
+
+SPLIT = "five_day"
+"""Five sessions in the charter's ORDER (`split.sequence`) — each major muscle 2x/wk, delts 3x/wk, walking every
+day. ORDER, not weekdays (#4110): a walk audible postpones, never skips.
+
+The STRUCTURE decision is the owner's (2026-10-18, rulings 5 + 6, #5067); the per-pattern frequency NUMBER under
+each anchor below is population-derived and says so.
 """
 
 SPLIT_DECISION: dict[str, Any] = {
-    "chosen": "upper_lower",
+    "chosen": "five_day",
     "rejected": [
+        "upper_lower (TRAINING_PROGRAM v0.4, four sessions in order, served 2026-09-24 .. 2026-10-18 — superseded by ruling 5)",
         "full_body (TRAINING_PROGRAM v0.3, approved 2026-09-21 — superseded 2026-09-24 before its first session)",
         "ppl (TRAINING_PROGRAM.md v0.2, six lifting days — never approved)",
     ],
     "provenance": "owner",
-    "stated": "2026-09-23",
+    "stated": "2026-10-18",
+    "ruling": "owner rulings 2026-10-18 (epic #5067): 5 — five lifting days in the charter's order, delts 3x/week; 6 — the v0.4 lock is lifted now",
+    "charter_paths": ["split.sequence", "split.lifting_days_per_wk", "split.frequency", "split.session_minutes"],
     "decision_sk": DECISION_SK,
     "override_signal": "program_split_full_body_v0.3",
     "supersedes": {
-        "ruling": "v0.3 full body (heavy / moderate / heavy-moderate)",
-        "stated": "2026-09-21",
-        "where": "#3753 / #3755",
-        "superseded_by": "the owner's 2026-09-23 switch to v0.4 Upper/Lower (#4147, " + DECISION_SK + ")",
+        "ruling": "v0.4 upper/lower, four sessions in order (#4147)",
+        "stated": "2026-09-23",
+        "where": "#4147 / #4161",
+        "superseded_by": "the owner's 2026-10-18 rulings 5 + 6 (#5067; #5069)",
     },
     "note": (
-        "v0.4 is the WS4SB3 upper/lower structure MINUS its max-effort and dynamic-effort work (`EXCLUDED_METHODS`): heavy days "
-        "are a top set of 4–6 at RPE 7–8 plus two back-offs at −10 %, volume days are 8–12. Every v0.3/v3.1 redline is kept — "
-        "protein, energy floor, walking floor, rate schedule, tripwires, subtract-only authoring, band-matched anchoring, the "
-        "novel-again rule and the 10 % detraining discount; they live in `owner_redlines`, not here. v0.3's split decision is "
-        "kept verbatim in `program_v03.SPLIT_DECISION`."
+        "v1.0 keeps v0.4's four role templates unchanged and adds the fifth, the aesthetic day (`shoulders_arms`: overhead press, "
+        "side and rear delts, biceps, triceps, traps), so delts are trained on both upper days AND that day. It keeps v0.4's "
+        "exclusions (`EXCLUDED_METHODS`) and every redline; those live in `owner_redlines`, not here. v0.4's structure is kept in "
+        "`program_v04`, v0.3's split decision verbatim in `program_v03.SPLIT_DECISION`."
     ),
 }
 
@@ -141,15 +178,23 @@ SPLIT_DECISION: dict[str, Any] = {
 # discover at the rack (since #4108/#4124 every anchor key exists — the gap map is empty). The generator selects by `primary_muscle`, so `primary_muscles`
 # here is how a pattern becomes REACHABLE on a given day (see `anchor_reachability()`).
 _FREQ_NOTE = (
-    "2x/wk per pattern is the red team's minimum-effective-dose frequency (S&C coach, 2026-09-22; Bickel 2011) at 6–10 hard "
-    "sets/muscle/wk; it is NOT derived from Matthew's own session-to-session variance and must say so wherever it fires "
-    "(ADR-105). Re-derive it from his own data once cycle 17 has enough anchor-lift sessions to estimate one."
+    "Owner ruling 5 (2026-10-18, #5067): each major muscle 2x/wk, delts 3x/wk — read from the charter (`split.frequency`). "
+    "2x/wk per pattern was first the red team's minimum-effective-dose frequency (S&C coach, 2026-09-22; Bickel 2011) at 6–10 "
+    "hard sets/muscle/wk; it is still NOT derived from Matthew's own session-to-session variance and must say so wherever it "
+    "fires (ADR-105)."
 )
+
+
+def _frequency(charter_path: str) -> dict[str, Any]:
+    """An anchor's weekly frequency band, read from the charter's `split.frequency` (one value -> low == high)."""
+    n = int(charter_value(f"split.frequency.{charter_path}"))
+    return {"low": n, "high": n, "provenance": "owner", "charter_path": f"split.frequency.{charter_path}", "note": _FREQ_NOTE}
+
 
 ANCHORS: dict[str, dict[str, Any]] = {
     "squat": {
         "pattern": "knee-dominant squat (SSB / high-bar; leg press as the listed fallback at 316 lb)",
-        "frequency_per_week": {"low": 2, "high": 2, "provenance": "population-derived", "note": _FREQ_NOTE},
+        "frequency_per_week": _frequency("each_major_muscle_per_wk"),
         # #4108 catalog keys (2026-09-23): Squat (Barbell) ×85 and Front Squat ×7 are what he has trained; §3's SSB /
         # high-bar are not in his Hevy history. Barbell first per the owner's #4080 option B; machine/DB stay as fallbacks.
         "catalog_keys": ["squat_barbell", "front_squat", "leg_press", "goblet_squat"],
@@ -166,7 +211,7 @@ ANCHORS: dict[str, dict[str, Any]] = {
     },
     "hinge": {
         "pattern": "hip hinge — TRAP BAR until ≤ 275 lb; the conventional pull is gated by bodyweight",
-        "frequency_per_week": {"low": 2, "high": 2, "provenance": "population-derived", "note": _FREQ_NOTE},
+        "frequency_per_week": _frequency("each_major_muscle_per_wk"),
         # #4108: the catalog key is `deadlift_trap_bar` (Deadlift (Trap bar) ×14); §3 keeps the trap bar until <= 275 lb.
         "catalog_keys": ["deadlift_trap_bar", "machine_hip_thrust", "leg_curl"],
         # #4147 v0.4 (owner 2026-09-23): the RDL is allowed as the MODERATE hinge — it is what the committed first v0.4
@@ -186,7 +231,7 @@ ANCHORS: dict[str, dict[str, Any]] = {
     },
     "bench": {
         "pattern": "horizontal press",
-        "frequency_per_week": {"low": 2, "high": 2, "provenance": "population-derived", "note": _FREQ_NOTE},
+        "frequency_per_week": _frequency("each_major_muscle_per_wk"),
         "catalog_keys": ["barbell_bench_press", "db_bench_press_flat", "machine_chest_press", "incline_db_press"],
         "hevy_title_hints": ["bench press", "chest press"],
         "primary_muscles": ["chest"],
@@ -199,7 +244,7 @@ ANCHORS: dict[str, dict[str, Any]] = {
     },
     "row": {
         "pattern": "horizontal pull",
-        "frequency_per_week": {"low": 2, "high": 2, "provenance": "population-derived", "note": _FREQ_NOTE},
+        "frequency_per_week": _frequency("each_major_muscle_per_wk"),
         "catalog_keys": ["machine_row", "one_arm_db_row"],
         "hevy_title_hints": ["row"],
         "primary_muscles": ["back"],
@@ -209,7 +254,8 @@ ANCHORS: dict[str, dict[str, Any]] = {
     },
     "overhead_press": {
         "pattern": "vertical press",
-        "frequency_per_week": {"low": 2, "high": 2, "provenance": "population-derived", "note": _FREQ_NOTE},
+        # ruling 5: delts 3x/wk — the press anchors the delts on both upper days and the shoulders+arms day
+        "frequency_per_week": _frequency("delts_per_wk"),
         "catalog_keys": ["machine_shoulder_press", "db_shoulder_press"],
         "hevy_title_hints": ["overhead press", "shoulder press", "military press", "push press"],
         "primary_muscles": ["shoulders"],
@@ -219,7 +265,7 @@ ANCHORS: dict[str, dict[str, Any]] = {
     },
     "vertical_pull": {
         "pattern": "vertical pull",
-        "frequency_per_week": {"low": 2, "high": 2, "provenance": "population-derived", "note": _FREQ_NOTE},
+        "frequency_per_week": _frequency("each_major_muscle_per_wk"),
         "catalog_keys": ["lat_pulldown"],
         "hevy_title_hints": ["pulldown", "pull-up", "pull up", "pullup", "chin-up", "chin up"],
         "primary_muscles": ["back"],
@@ -242,17 +288,18 @@ CORE_ANCHORS: tuple[str, ...] = ("bench", "row", "squat", "hinge")
 # movements new to the trailing week that the prior week did not carry — rather than
 # repeats. Repeats are still reported, as a measurement, not a verdict.
 ACCESSORY_POOL: dict[str, list[str]] = {
-    "upper": ["cable_chest_fly", "cable_tricep_pushdown", "db_curl", "reverse_pec_deck", "db_lateral_raise"],
+    # #5069: face_pull (rear delts, 93 logged sessions) and shrug_dumbbell (traps) join for the shoulders+arms day
+    "upper": ["cable_chest_fly", "cable_tricep_pushdown", "db_curl", "reverse_pec_deck", "db_lateral_raise", "face_pull", "shrug_dumbbell"],
     "lower": ["leg_press", "leg_curl", "calf_raise_machine", "machine_crunch", "machine_hip_thrust"],
 }
-"""v0.4's pools, one per archetype, the block's 2–3 accessories per session are chosen FROM at block start (machines/cables
-only); not a rotation menu. `leg_press` is a squat-family member used here as a lower ACCESSORY — the committed first v0.4
+"""The pools, one per archetype, the block's accessories are chosen FROM at block start (v0.4's machines/cables, plus the
+shoulders+arms day's face pull and dumbbell shrug, #5069); not a rotation menu (the rotation is #5075's). `leg_press` is a squat-family member used here as a lower ACCESSORY — the committed first v0.4
 session carries it at 2 x 8–10 beside the barbell squat. v0.3's single `full` pool is `program_v03.ACCESSORY_POOL`."""
 
 ROTATION_RULE: dict[str, Any] = {
-    "rule": "accessories are FIXED for the 6-week block: 2–3 per session, 2 sets, machines/cables, none added after week 1; the set changes only at a block boundary",
+    "rule": "accessories are FIXED for the block: 2–3 per session, 2 sets, machines/cables, none added after week 1; the set changes only at a block boundary",
     "window_days": 14,
-    "block_weeks": 6,
+    # #5077: the block's length is the charter's `rotation.anchors_fixed_weeks` (`block_model.block_weeks()`), not a copy here
     "per_session": [2, 3],
     "sets_each": 2,
     "anchors_exempt": True,
@@ -272,12 +319,18 @@ ROTATION_RULE: dict[str, Any] = {
 
 # ── the day shape ────────────────────────────────────────────────────────────
 DAY_SHAPE: dict[str, Any] = {
-    "am": "lift the next session in ORDER (upper-heavy, lower-heavy, upper-volume, lower-volume) on a lifting day — the hard, loaded work; ~55–70 min",
+    "am": (
+        f"lift the next session in ORDER ({', '.join(n.lower() for n in SPLIT_SEQUENCE_NAMES)}) on a lifting day — the hard, loaded "
+        f"work; {charter_value('split.session_minutes.lifting')[0]}–{charter_value('split.session_minutes.lifting')[1]} min of lifting "
+        f"(charter `split.session_minutes`), one cardio block <= {charter_value('split.session_minutes.cardio_block_max')} min and "
+        f"stretching <= {charter_value('split.session_minutes.stretching_max')} min on top"
+    ),
     "pm": "easy walking EVERY day (HR avg ≤ 120 with the talk test, 105 the target; 2–3 walks, weekday none over 75 min, one long-walk slot a week; never intervals)",
-    "order": "the sessions are a SEQUENCE, not weekdays (#4110): a walk or rest day postpones the next session, never skips it (v0.4, #4147)",
+    "order": "the sessions are a SEQUENCE, not weekdays (#4110): a walk or rest day postpones the next session, never skips it (#4147, #5069)",
     "cardio_placement": "no walking in the 2 h before lifting; the lightest walking day follows the heavy session; cycling is the knee-sparing substitute (OD2 deleted the ≤ 2 h cap)",
     "provenance": "owner-history",
     "stated": "2026-06-19",
+    "minutes_provenance": "owner ruling 5, 2026-10-18 (#5067) — read from the charter",
     "note": (
         "The owner-private blueprint records AM lift + PM easy cardio as the pattern during the campaign that held, and the v0.3 "
         "historian shows the RATE was made by the walking (16–19 h/wk in the first nine weeks). The WALKING FLOOR and targets are not "
@@ -304,38 +357,44 @@ _ARCHETYPE_TARGETS: dict[str, list[str]] = {
     "rest": [],
 }
 
-_SCHEDULE: dict[str, dict[str, Any]] = {
-    "0": {"archetype": "upper", "session_role": "upper_heavy", "label": "Monday UPPER-HEAVY (nominal — the sequence decides) + walk (PM)"},
-    "1": {"archetype": "lower", "session_role": "lower_heavy", "label": "Tuesday LOWER-HEAVY (nominal — the sequence decides) + walk (PM)"},
-    "2": {"archetype": "aerobic", "label": "Wednesday walk"},
-    "3": {
-        "archetype": "upper",
-        "session_role": "upper_volume",
-        "label": "Thursday UPPER-VOLUME (nominal — the sequence decides) + walk (PM)",
-    },
-    "4": {
-        "archetype": "lower",
-        "session_role": "lower_volume",
-        "label": "Friday LOWER-VOLUME (nominal — the sequence decides) + walk (PM)",
-    },
-    "5": {"archetype": "aerobic", "label": "Saturday walk"},
-    "6": {"archetype": "aerobic", "label": "Sunday walk"},
-}
-"""v0.4's NOMINAL week — the shape `training_week.json` requires, and the answer only when the Hevy
-record cannot be read (the result then says the sequence was UNREADABLE). What is served is the
-SEQUENCE (`SESSION_SEQUENCE`, `session_sequence.next_session`), never this weekday."""
+_WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+NOMINAL_LIFTING_DAYS: tuple[str, ...] = ("0", "1", "2", "4", "5")
+"""Where the five sessions sit on a NOMINAL week (Mon, Tue, Wed, Fri, Sat; Thu and Sun walk), in the charter's order.
+Platform-placed (#5069): the only constraint it serves is a walk day between the shoulders+arms day and the next upper day.
+The sequence, not this placement, decides what is served (#4110)."""
+
+
+def _nominal_schedule() -> dict[str, dict[str, Any]]:
+    """The nominal week from the charter's order: each lifting day carries its role, every other day is a walk."""
+    if len(NOMINAL_LIFTING_DAYS) != len(SPLIT_ROLES):
+        raise ValueError(f"{len(SPLIT_ROLES)} sessions in the charter's split but {len(NOMINAL_LIFTING_DAYS)} nominal lifting days")
+    by_day = dict(zip(NOMINAL_LIFTING_DAYS, SPLIT_ROLES))
+    out: dict[str, dict[str, Any]] = {}
+    for i, name in enumerate(_WEEKDAYS):
+        role = by_day.get(str(i))
+        if role is None:
+            out[str(i)] = {"archetype": "aerobic", "label": f"{name} walk"}
+        else:
+            out[str(i)] = {
+                "archetype": SESSION_TEMPLATES[role]["archetype"],
+                "session_role": role,
+                "label": f"{name} {_ROLE_LABEL[role]} (nominal — the sequence decides) + walk (PM)",
+            }
+    return out
 
 
 # Every value below that DIFFERS from the live JSON grid, and why. A changed ceiling with
 # no recorded reason is a number nobody owns.
 WEEK_GRID_PROVENANCE: dict[str, dict[str, Any]] = {
     "schedule": {
-        "changed_from": "v0.3: full-body Mon / Wed / Fri + optional Sat (program_v03.SCHEDULE)",
+        "changed_from": "v0.4: four upper/lower sessions Mon / Tue / Thu / Fri (program_v04.NOMINAL_WEEK)",
         "provenance": "owner",
-        "stated": "2026-09-23",
+        "stated": "2026-10-18",
         "note": (
-            "v0.4 (#4147): four upper/lower sessions in ORDER. The weekday placement here is NOMINAL — the served session is the "
-            "sequence's (#4110); the grid answers only when the Hevy record cannot be read, and says so."
+            "v1.0 (#5069, owner ruling 5): five sessions in the charter's ORDER. The weekday placement here is NOMINAL and the "
+            "platform's (`NOMINAL_LIFTING_DAYS`) — the served session is the sequence's (#4110); the grid answers only when the "
+            "Hevy record cannot be read, and says so."
         ),
     },
     "session_set_ceiling": {
@@ -344,16 +403,20 @@ WEEK_GRID_PROVENANCE: dict[str, dict[str, Any]] = {
         "provenance": "owner",
         "stated": "2026-09-30",
         "note": (
-            "v0.5 OD4 (#4503): 20 base / 24 with 🟢 (`green_block`); was 18 (v0.3 §3). The locked v0.4 sessions run 12–17 and carry no 🟢 "
-            "tail (OD8a), so no locked session gains a set. The muscle-budget path trims budgets to this ceiling and records the trim."
+            "v0.5 OD4 (#4503): 20 base / 24 with 🟢 (`green_block`); was 18 (v0.3 §3). The five sessions run 12–17 and no template "
+            "carries a 🟢 tail, so no session gains a set. The muscle-budget path trims budgets to this ceiling and records the trim."
         ),
     },
     "session_minutes_ceiling": {
-        "changed_from": 75,
-        "value": 70,
-        "provenance": "population-derived",
-        "stated": "2026-09-22",
-        "note": "v0.3 §3: 55–70 min. The Minimum Viable Session (anchors only, ~25 min) is `floor_session_minutes`.",
+        "changed_from": "70 (v0.3 §3's band top)",
+        "value": "the charter's `split.session_minutes.lifting` top",
+        "provenance": "owner",
+        "stated": "2026-10-18",
+        "note": (
+            "Owner ruling 5 (#5067): the LIFTING minutes, read from the charter; cardio and stretching are capped separately "
+            "(`split.session_minutes.cardio_block_max` / `stretching_max`). `session_minutes_estimate` is the one estimate and "
+            "`session_prescription_for_role` trims accessories first to fit it. The Minimum Viable Session is `floor_session_minutes`."
+        ),
     },
     "weekly_volume_cap_per_muscle": {
         "value": 22,
@@ -361,7 +424,7 @@ WEEK_GRID_PROVENANCE: dict[str, dict[str, Any]] = {
         "note": (
             "The absolute fail-safe, unchanged. The v0.4 TARGET is ~10 hard sets/muscle/wk (8–12) and it has one home — "
             "owner_redlines.REDLINES['lifting_sessions_per_wk']['sets_per_muscle_wk'] — with `volume_ceiling` as its tripwire. "
-            "`weekly_sets_by_muscle` sums the four sessions (a test holds every group inside its band); the cap never binds."
+            "`weekly_sets_by_muscle` sums the five sessions (a test holds every big group inside its band); the cap never binds."
         ),
     },
     "skill_ceiling": {
@@ -393,7 +456,7 @@ WEEK_GRID_PROVENANCE: dict[str, dict[str, Any]] = {
 
 
 def week_grid() -> dict[str, Any]:
-    """The v0.4 week, in the exact shape `config/training_week.json` provides (placement NOMINAL — the sequence serves).
+    """The program's week, in the exact shape `config/training_week.json` provides (placement NOMINAL — the sequence serves).
 
     Served by `program_seam.resolve_week_grid` ONLY when `ACTIVE` is True. The schedule
     entries carry two keys the JSON never had — `session_role` and `optional` — which the
@@ -402,7 +465,9 @@ def week_grid() -> dict[str, Any]:
     """
     return {
         "_comment": (
-            f"TRAINING_PROGRAM v{PROGRAM_VERSION} ({SPLIT}: four upper/lower sessions in ORDER, each muscle 2x/wk, loads hold) "
+            f"TRAINING_PROGRAM v{PROGRAM_VERSION} ({SPLIT}: {len(SPLIT_ROLES)} sessions in ORDER, each major muscle "
+            f"{charter_value('split.frequency.each_major_muscle_per_wk')}x/wk, delts {charter_value('split.frequency.delts_per_wk')}x/wk, "
+            f"loads hold; charter v{CHARTER_VERSION}) "
             f"as the engine reads it. Generated by lambdas/training/program_structure.py ({ISSUE}); the prose lives at {PROSE_HOME}. "
             "day_of_week is 0=Monday .. 6=Sunday; archetype names are handled generically by routine_generator."
         ),
@@ -410,7 +475,7 @@ def week_grid() -> dict[str, Any]:
         "schedule": {k: dict(v) for k, v in _SCHEDULE.items()},
         "archetype_targets": {k: list(v) for k, v in _ARCHETYPE_TARGETS.items()},
         "session_set_ceiling": 20,
-        "session_minutes_ceiling": 70,  # drift-ok: MINUTES per lifting session, not the ADR-133 AI budget ceiling in dollars
+        "session_minutes_ceiling": lifting_minutes_cap(),  # drift-ok: MINUTES per lifting session, not the ADR-133 AI budget ceiling in dollars
         "weekly_volume_cap_per_muscle": 22,
         "skill_ceiling": 2,
         "re_entry_days_threshold": 7,
@@ -424,13 +489,17 @@ def week_grid() -> dict[str, Any]:
         ),
         "exercise_notes_lookback_days": 3650,
         "_notes": [
-            f"v{PROGRAM_VERSION}: split={SPLIT} (owner, 2026-09-23, {DECISION_SK}; supersedes v0.3 full body — program_v03); six anchor patterns 2x/wk (population-derived, not his variance).",
+            f"v{PROGRAM_VERSION}: split={SPLIT} (owner rulings 5 + 6, 2026-10-18, #5067; supersedes v0.4 upper/lower — program_v04 — "
+            f"and v0.3 full body — program_v03); each anchor pattern at the charter's split.frequency (owner, not his variance).",
             "Loads HOLD: start 60–65 % of band-anchored e1RM after the detraining discount, ramp ~5 %/wk to week 6, ≤ 85 % until week 8, then hold; gains rep-triggered (double progression, v0.5 OD5). One home: owner_redlines.REDLINES['lifting_sessions_per_wk'].",
             "The PM walking is NOT in this grid — `schedule` holds one archetype per day; walking days are `aerobic`. Read program_structure.DAY_SHAPE.",
-            "The weekday placement is NOMINAL: the sessions are served in ORDER (upper-heavy, lower-heavy, upper-volume, lower-volume) — the next one after the last PERFORMED lift, whatever the date (#4110). This grid answers only when the Hevy record cannot be read.",
-            "session_set_ceiling 18 -> 20 base / 24 with 🟢 is v0.5 OD4 (#4503, training.green_block); session_minutes_ceiling 75 -> 70 is §3 (55–70 min); the weekly cap of 22 is the unchanged fail-safe and never binds here.",
+            f"The weekday placement is NOMINAL: the sessions are served in ORDER ({', '.join(n.lower() for n in SPLIT_SEQUENCE_NAMES)}) — "
+            "the next one after the last PERFORMED lift, whatever the date (#4110). This grid answers only when the Hevy record cannot be read.",
+            "session_set_ceiling 18 -> 20 base / 24 with 🟢 is v0.5 OD4 (#4503, training.green_block); session_minutes_ceiling is the "
+            "charter's lifting-minute top (owner ruling 5, #5069); the weekly cap of 22 is the unchanged fail-safe and never binds here.",
             "The generator selects by muscle, not by pattern: a `back` budget reaches row OR vertical pull. See program_structure.anchor_reachability() for what the grid can and cannot guarantee.",
-            "RESOLVED against redlines v3 (approved 2026-09-21): 3–4 lifting days sits inside owner_redlines.REDLINES['lifting_sessions_per_wk'] (3–4); `program_conflicts.conflicts()` computes it rather than asserting it.",
+            "Lifting days vs owner_redlines.REDLINES['lifting_sessions_per_wk']: the redline reads the charter's split.lifting_days_per_wk "
+            "(owner ruling 5); `program_conflicts.conflicts()` computes the agreement rather than asserting it.",
         ],
     }
 
@@ -457,50 +526,90 @@ def anchor_reachability() -> dict[str, dict[str, Any]]:
     return out
 
 
-# ── the v0.4 SESSIONS: what each role prescribes (#4064 shape, #4147 content) ─
+# ── the SESSIONS: what each role prescribes (#4064 shape, #4147 content, #5069 the fifth role) ─
 # The machine-readable half of the session: which anchor patterns each role trains, at which
 # intensity, and which accessories ride with it. Since #4064 the generator builds THIS (top
 # set, back-offs, rep ranges, fixed accessories), not a muscle-budget session with a role label.
 #
 # Lower-heavy is the committed first v0.4 session, owner-authored in chat on 2026-09-23
 # (platform routine b1b9960468f374e30dcdeca8630dd18f, Hevy 4b743f67, target 2026-09-25): barbell
-# squat heavy, RDL moderate, leg press / leg curl / calf 2 sets each. The other three roles are
-# the PLATFORM's placement under the owner's constraints (each muscle 2x/wk, heavy 4–6 + back-offs,
-# volume 8–12, ~10 sets/muscle/wk) and `SESSION_DISTRIBUTION_PROVENANCE` says so.
+# squat heavy, RDL moderate, leg press / leg curl / calf 2 sets each. The other three v0.4 roles
+# were the PLATFORM's placement, ratified by the owner on 2026-09-25. The fifth role (#5069, owner
+# ruling 5: the aesthetic day) is the platform's placement under his named contents.
 HEVY_FOLDERS: dict[str, str] = {"upper": "Upper", "lower": "Lower"}
 """The Hevy routine folder per v0.4 archetype. `mcp.hevy_routine_commit_report.FOLDER_BY_ARCHETYPE`
 must name the same strings (held by a test); a folder is found-or-created at the first commit
 (`ensure_folder`), never created ahead of time. v0.3's "Full Body" is `program_v03.HEVY_FOLDER`."""
 
+# #5058: every RPE here is the charter's — `effort_ceilings.by_movement_class` (the ruled bands, read through
+# `training.effort_ceilings`); the pre-charter `top_rpe` [7, 8] and the accessories' RIR are retired. A compound set
+# (top set, moderate, volume) reads the compounds band, an accessory's earlier sets the compounds band and its LAST set
+# the last-isolation-set band. Back-offs are prescribed by % of the top set only — the charter rules no back-off RPE.
+_EFFORT = effort_ceilings.class_bands()
+_C, _L = (f"{_EFFORT[k][0]:g}–{_EFFORT[k][1]:g}" for k in (effort_ceilings.COMPOUNDS, effort_ceilings.LAST_ISOLATION_SET))
+
 EXPOSURES: dict[str, dict[str, Any]] = {
     "heavy": {
         "top_sets": 1,
         "reps": [4, 6],
-        "top_rpe": [7, 8],
+        "effort": effort_ceilings.COMPOUNDS,
         "back_off_sets": 2,
         "back_off_pct": -10,
         "rest_seconds": 180,
-        "cue": "HEAVY: 1 top set of 4–6 @ RPE 7–8, then 2 back-offs at −10 % of the top set.",
+        "cue": f"HEAVY: 1 top set of 4–6 @ RPE {_C}, then 2 back-offs at −10 % of the top set (charter ceilings).",
     },
-    "moderate": {"sets": 3, "reps": [6, 10], "rest_seconds": 120, "cue": "MODERATE: 3 sets of 6–10, leave 2–3 in the tank."},
+    "moderate": {
+        "sets": 3,
+        "reps": [6, 10],
+        "effort": effort_ceilings.COMPOUNDS,
+        "rest_seconds": 120,
+        "cue": f"MODERATE: 3 sets of 6–10 @ RPE {_C} (charter compound ceiling).",
+    },
     # #4147 v0.4: the volume days' anchor exposure (owner: "Volume days: 8–12 reps").
-    "volume": {"sets": 3, "reps": [8, 12], "rest_seconds": 120, "cue": "VOLUME: 3 sets of 8–12, leave 1–3 in the tank."},
-    "accessory": {"sets": 2, "reps": [8, 15], "rir": [1, 2], "rest_seconds": 90, "cue": "ACCESSORY: 2 sets of 8–15 at RIR 1–2."},
+    "volume": {
+        "sets": 3,
+        "reps": [8, 12],
+        "effort": effort_ceilings.COMPOUNDS,
+        "rest_seconds": 120,
+        "cue": f"VOLUME: 3 sets of 8–12 @ RPE {_C} (charter compound ceiling).",
+    },
+    "accessory": {
+        "sets": 2,
+        "reps": [8, 15],
+        "effort": effort_ceilings.COMPOUNDS,
+        "last_set_effort": effort_ceilings.LAST_ISOLATION_SET,
+        "rest_seconds": 90,
+        "cue": f"ACCESSORY: 2 sets of 8–15 @ RPE {_C}; last set RPE {_L} (charter ceilings).",
+    },
 }
 """The rep scheme as numbers (v0.3 §3's heavy / moderate / accessory, plus v0.4's volume). The one PROSE home is `owner_redlines.REDLINES
-['lifting_sessions_per_wk']['rep_scheme']`; a test holds every number here to that string."""
+['lifting_sessions_per_wk']['rep_scheme']`; a test holds every number here to that string. The effort keys name a charter class band
+(`training.effort_ceilings`, #5058) — the RPE numbers themselves live only in the charter."""
 
 SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
     "upper_heavy": {
         "archetype": "upper",
         "anchors": [["bench", "heavy"], ["row", "heavy"], ["overhead_press", "moderate"], ["vertical_pull", "moderate"]],
         "anchor_sets": {"vertical_pull": 2},
-        "accessories": ["cable_tricep_pushdown", "db_curl"],
+        # #5053: the rear-delt slot (delts 14–18/wk, charter `volume_priorities`) — the upper heavy day carries the pec deck
+        "accessories": ["cable_tricep_pushdown", "db_curl", "reverse_pec_deck"],
     },
     "lower_heavy": {
         "archetype": "lower",
         "anchors": [["squat", "heavy"], ["hinge", "moderate"]],
         "accessories": ["leg_press", "leg_curl", "calf_raise_machine"],
+        "accessory_sets": {"calf_raise_machine": 4},  # #5053: calves at their MEV floor (8/wk) across the two lower days
+    },
+    # #5069 (owner ruling 5, 2026-10-18): the aesthetic day — overhead press, side + rear delts, biceps, triceps, traps.
+    # Archetype `upper` (the Upper folder; the sequence credits it like any upper session whose sets reach the delts).
+    "shoulders_arms": {
+        "archetype": "upper",
+        "anchors": [["overhead_press", "moderate"]],
+        "accessories": ["db_lateral_raise", "face_pull", "db_curl", "cable_tricep_pushdown", "shrug_dumbbell"],
+        "accessory_rule": (
+            "the aesthetic day's accessories ARE the session (owner ruling 5): five of them, not 2–3 — `ROTATION_RULE`'s per-session "
+            "count binds the other roles; every one is still fixed for the block"
+        ),
     },
     "upper_volume": {
         "archetype": "upper",
@@ -511,16 +620,20 @@ SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
     "lower_volume": {
         "archetype": "lower",
         "anchors": [["hinge", "volume"], ["squat", "volume"]],
-        "accessories": ["leg_curl", "calf_raise_machine", "machine_crunch"],
+        # #5053: core and calves reach their MEV floors (4 and 8 sets/wk) here; the second leg curl is the week's trade — the
+        # redline's 75-set week is full (`owner_redlines` total_hard_sets_wk) and hamstrings still sit at the 8-set floor
+        "accessories": ["calf_raise_machine", "machine_crunch"],
+        "accessory_sets": {"calf_raise_machine": 4, "machine_crunch": 4},
     },
 }
-"""Per v0.4 role: its archetype, the anchor exposures (pattern, intensity) and the block-fixed accessories.
+"""Per role: its archetype, the anchor exposures (pattern, intensity) and the block-fixed accessories, in the charter's order.
 
-Every anchor pattern is trained exactly twice across the four roles and every redline muscle
-group sits inside its weekly band (`weekly_sets_by_muscle`, held by a test). Accessories come
-from `ACCESSORY_POOL[archetype]`, fixed per role for the block (`ROTATION_RULE`).
-`anchor_sets` overrides an exposure's set count for one pattern: vertical pull runs 2 sets so
-back (row + pulldown, twice) sits at 10. v0.3's four roles are `program_v03.SESSION_TEMPLATES`."""
+Every anchor pattern is trained at least twice across the five roles, the overhead press three times (delts 3x/wk, owner
+ruling 5); every big redline muscle group sits inside its weekly band and each group's weekly FREQUENCY meets the charter's
+`split.frequency` (`weekly_sets_by_muscle`, held by tests). Accessories come from `ACCESSORY_POOL[archetype]`, fixed per
+role for the block (`ROTATION_RULE`). `anchor_sets` overrides an exposure's set count for one pattern: vertical pull runs
+2 sets so back (row + pulldown, twice) sits at 10. The four v0.4 roles are unchanged (#4147); v0.3's are
+`program_v03.SESSION_TEMPLATES`."""
 
 SESSION_DISTRIBUTION_PROVENANCE: dict[str, Any] = {
     # Owner ratification 2026-09-25 (session AU, answering "ratify the three platform-proposed sessions":
@@ -528,15 +641,21 @@ SESSION_DISTRIBUTION_PROVENANCE: dict[str, Any] = {
     "provenance": "owner",
     "owner_committed_roles": ["lower_heavy"],
     "owner_ratified_roles": ["upper_heavy", "upper_volume", "lower_volume"],
-    "placed_by": "platform (2026-09-24, #4147); ratified by the owner 2026-09-25 (#4161, PR #4162 ruling)",
-    "stated": "2026-09-25",
-    "issue": "#4147",
+    # #5069: the fifth role's CONTENTS are the owner's (ruling 5 names them); the movement choice is the platform's
+    "platform_placed_roles": ["shoulders_arms"],
+    "placed_by": (
+        "platform (2026-09-24, #4147); ratified by the owner 2026-09-25 (#4161, PR #4162 ruling); the fifth role placed by the "
+        "platform 2026-10-18 under owner ruling 5 (#5069)"
+    ),
+    "stated": "2026-10-18",
+    "issue": "#5069 (v0.4: #4147)",
     "note": (
-        "The owner fixed the SPLIT and its ORDER (Upper-heavy -> Lower-heavy -> Upper-volume -> Lower-volume), the heavy scheme "
-        "(top 4–6 @ RPE 7–8 + 2 back-offs at −10 %), the volume reps (8–12), each muscle 2x/wk, ~10 sets/muscle/wk, the trap "
-        "bar until ≤ 275 lb and the RDL as the moderate hinge. Lower-heavy is the session he committed on 2026-09-23 (routine "
-        "b1b9960468f374e30dcdeca8630dd18f). The other three placements are the platform's: 15 / 17 / 12 sets, 56 hard sets/wk "
-        "(inside §3's 50–65), every group inside its band. The owner ratified them unchanged on 2026-09-25; the block is owner-locked until 2026-11-04."
+        "The owner fixed the SPLIT and its ORDER (the charter's `split.sequence`, ruling 5), the heavy scheme (top set + 2 back-offs "
+        "at −10 %), the volume reps (8–12), each major muscle 2x/wk and delts 3x/wk, the trap bar until the charter's gate and the "
+        "RDL as the moderate hinge. `lower_heavy` is the session he committed on 2026-09-23 (routine b1b9960468f374e30dcdeca8630dd18f). "
+        "Three v0.4 placements are the platform's, owner-ratified unchanged on 2026-09-25. The `shoulders_arms` day's movements "
+        "(overhead press, lateral raise, face pull, curl, pushdown, dumbbell shrug) are the platform's choice from his logged "
+        "history under the contents ruling 5 names. The v0.4 block lock is lifted (ruling 6; history: `program_v04.BLOCK_LOCK`)."
     ),
 }
 
@@ -549,90 +668,80 @@ EXCLUDED_METHODS: dict[str, Any] = {
 }
 """What v0.4 refuses. A test holds every exposure's rep floor at >= 4 and no catalog key in a template names a jump/plyo."""
 
-BLOCK_LOCK: dict[str, Any] = {
-    "weeks": 6,
-    "block_start": "2026-09-24",
-    "locked_until": "2026-11-04",
-    "rule": "no STRUCTURAL edits to v0.4 (split, order, templates, accessories) before this date; loads and deloads run as written",
-    # #4161: enforced — `session_sequence.block_lock_state` compares the live structure with this, recorded at the lock
-    "structure_fingerprint": "000ffceefa732c6e",
-    # every re-record carries this note — `session_sequence.fingerprint_record_problems` reds a bare edit (#4161 review)
-    "structure_fingerprint_record": {
-        "fingerprint": "000ffceefa732c6e",
-        "provenance": "owner",
-        "stated": "2026-09-24",
-        "ref": "#4161 (owner-approved red team: enforce the lock) over origin/main 7218b187, the block as locked by DECISION#2026-09-24T03:10:59",
-    },
-    "provenance": "owner",
-    "stated": "2026-09-23",
-    "decision_sk": DECISION_SK,
-}
-"""The owner's 6-week lock on the v0.4 block (~2026-11-04). A test holds the date; since #4161 the engine reads it as a guard."""
-
-DELOAD_RULE: dict[str, Any] = {
-    "rule": (
-        "one pre-planned deload at the LATER of program week 6 (hybrid weeks: 4 sessions AND >= 7 days, #4161) or the block lock "
-        "(2026-11-04): −40 % sets for 7 days (rounded to whole sets, accessories and back-offs first), loads held, never a week off"
-    ),
-    "provenance": "owner",
-    "one_home": "owner_redlines.REDLINES['lifting_sessions_per_wk']['deload']",
-}
+BLOCK_LOCK_HISTORY: dict[str, Any] = program_v04.BLOCK_LOCK
+"""The owner's v0.4 block lock (#4161) — HISTORY since owner ruling 6 (2026-10-18): "the v0.4 lock to 2026-11-04 is lifted
+now". Nothing reads it to refuse an edit; `session_sequence.structure_fingerprint()` is a measurement, never a guard."""
 
 
 def _deload_cfg() -> dict[str, Any]:
+    # The deload's RESPONSE (−40 % sets, 7 days, loads held), one home in `owner_redlines`. No schedule (#5070): it applies
+    # only on the owner's recorded word (`deload_word`).
     from training import owner_redlines
 
     return dict(owner_redlines.REDLINES["lifting_sessions_per_wk"]["deload"])
 
 
-# ── the SESSION SEQUENCE (#4110) — v0.4's order (#4147) ────────────────────
+# ── the SESSION SEQUENCE (#4110) — the charter's order (#5069) ─────────────
 # Owner, 2026-09-23 (#4110): "more just focusing on planned sequence and not forgetting next if
-# I audible a change" — the sessions are an ORDER, not dates. Owner, 2026-09-23 (#4147): v0.4
-# is Upper-heavy -> Lower-heavy -> Upper-volume -> Lower-volume, repeating. The position advances
-# only on a completed LOADED Hevy session (a walk or an Engine day postpones, never skips). Four
-# completed sessions AND >= 7 days are one program week (#4161); the deload is `owner_redlines` (later of week 6 / the lock).
+# I audible a change" — the sessions are an ORDER, not dates. Owner ruling 5, 2026-10-18: five
+# sessions in the charter's `split.sequence`, repeating. The position advances only on a completed
+# LOADED Hevy session (a walk or an Engine day postpones, never skips). A program week is the
+# charter's lifting days completed AND >= 7 days (#4161); the deload is the owner's recorded word
+# (`deload_word`, #5070). The arithmetic and its rulings live in `training.session_sequence`.
 #
-# The sequence STARTS at Lower-heavy: that is the first v0.4 session, already committed from chat
-# (`first_session`). Counting starts on `block_start`, the first Pacific day after the decision
-# (2026-09-23 ~20:10 PT), so a lift on 09-24 or later advances it whatever the day; a pre-switch
-# v0.3/v0.2 lift never does. The arithmetic and its rulings live in `training.session_sequence`.
+# THE CUT-OVER (#5069 — the live block is NOT re-anchored). `block_start` stays 2026-09-24. Every
+# session credited on a day BEFORE `cutover.on` keeps the v0.4 role it was served as
+# (`program_v04.SESSION_SEQUENCE`, from lower-heavy, four a week). From `cutover.on` the five-day
+# order runs, continuing from the role AFTER the last credited v0.4 session (so a last v0.4 session
+# of lower-heavy serves shoulders+arms next; upper-volume serves lower-volume). Weeks opened before the
+# cut-over counted v0.4's four sessions; sessions on/after it count five.
 SESSION_SEQUENCE: dict[str, Any] = {
     "program_version": PROGRAM_VERSION,
+    "charter_version": CHARTER_VERSION,
     "block_start": "2026-09-24",
-    "session_roles": ["upper_heavy", "lower_heavy", "upper_volume", "lower_volume"],
-    "first_role": "lower_heavy",
-    "first_session": {
-        "role": "lower_heavy",
-        "routine_id": "b1b9960468f374e30dcdeca8630dd18f",
-        "hevy_routine_id": "4b743f67",
-        "target_date": "2026-09-25",
-        "committed": "from chat, 2026-09-23",
+    "session_roles": list(SPLIT_ROLES),
+    # only when no v0.4 session was credited before the cut-over (otherwise the order continues from the last one)
+    "first_role": SPLIT_ROLES[0] if SPLIT_ROLES else None,
+    "sessions_per_week": int(charter_value("split.lifting_days_per_wk") or 0),
+    "cutover": {
+        "on": "2026-10-19",
+        "from_program": "0.4",
+        "from_sequence": "program_v04.SESSION_SEQUENCE",
+        "rule": (
+            "a session credited on a day before `on` keeps its v0.4 role and counts toward a v0.4 week (four sessions); from `on` "
+            "the five-day order serves the role after the last credited v0.4 session, and a week counts the charter's lifting days"
+        ),
+        "why_this_day": "the first Pacific day after the rulings (2026-10-18); block_start is not re-anchored",
+        "ruling": "owner rulings 5 + 6, 2026-10-18 (#5067)",
+        "issue": "#5069",
     },
-    "sessions_per_week": 4,
-    "weeks_per_block": 6,
+    # #5077: no `weeks_per_block` copy — `session_sequence._seq()` adds it from the charter (`block_model.block_weeks()`)
     "advances_on": "a loaded Hevy session (training_streaks.is_loaded_session), one per Pacific day, dated on/after block_start, whose routine archetype is a program archetype and whose loaded sets reach the role's anchor muscles (session_sequence.classify_sessions, #4312) — an off-program complement (Flex) never advances it",
     "provenance": "owner",
-    "stated": "2026-09-23",
+    "stated": "2026-10-18",
     "decision_sk": DECISION_SK,
-    "issue": "#4147 (order: #4110)",
+    "issue": "#5069 (order: #4110; v0.4: #4147)",
     "note": (
-        "The order and the first session are the owner's (#4147); serving by order rather than weekday is the owner's (#4110). "
-        "The weekday calendar v0.3 shipped (`program_v03.BLOCK_CALENDAR`) is retired, not kept as a display suggestion — two "
-        "answers to 'what is next' was the defect."
+        "The order is the owner's (ruling 5, read from the charter); serving by order rather than weekday is the owner's (#4110). "
+        "The cut-over day is the platform's: the first day after the rulings. The weekday calendar v0.3 shipped "
+        "(`program_v03.BLOCK_CALENDAR`) stays retired — two answers to 'what is next' was the defect."
     ),
 }
 
 _ROLE_LABEL = {
-    "upper_heavy": "UPPER-HEAVY",
-    "lower_heavy": "LOWER-HEAVY",
-    "upper_volume": "UPPER-VOLUME",
-    "lower_volume": "LOWER-VOLUME",
+    # the charter's names, upper-cased (titles: "SHOULDERS+ARMS — W5 — 2026-10-21"); v0.4's four roles are among them
+    **{role: name.upper() for name, role in zip(SPLIT_SEQUENCE_NAMES, SPLIT_ROLES)},
     # v0.3 (program_v03) — kept so a v0.3 routine's role still renders
     "heavy": "HEAVY",
     "moderate": "MODERATE",
     "heavy_moderate": "HEAVY-MODERATE",
     "optional_fourth": "OPTIONAL 4th",
 }
+
+_SCHEDULE: dict[str, dict[str, Any]] = _nominal_schedule()
+"""The NOMINAL week — the shape `training_week.json` requires, and the answer only when the Hevy record cannot be read (the
+result then says the sequence was UNREADABLE). What is served is the SEQUENCE (`SESSION_SEQUENCE`, `session_sequence.
+next_session`), never this weekday. v0.4's nominal week is `program_v04.NOMINAL_WEEK`."""
 
 
 def _day(day: str):
@@ -723,8 +832,13 @@ def session_prescription_for_role(
     skill_ceiling: int = 2,
     anchor_exempt: bool = True,
     in_block: list[dict[str, Any]] | None = None,
+    deload_sets_pct: int | None = None,
 ) -> dict[str, Any]:
-    """The session for one v0.4 role, as data: exposures, sets (top / back_off / working), reps.
+    """The session for one role, as data: exposures, sets (top / back_off / working), reps, and its lifting minutes.
+
+    #5069 (owner ruling 5): the session fits the charter's lifting-minute cap — `trim_to_time` drops accessories, last-listed
+    first, and records what it dropped (`time_trim`); anchors are never cut for time. `session_minutes` is the estimate after
+    every trim (`session_minutes_estimate`).
 
     `in_block` (#4409): `in_block_variant.performed_in_block` — a slot keeps its in-block variant.
 
@@ -760,7 +874,7 @@ def session_prescription_for_role(
         if key:
             taken.add(key)
         if intensity == "heavy":
-            sets = [{"kind": "top", "reps": list(spec["reps"]), "rpe": list(spec["top_rpe"])}] + [
+            sets = [{"kind": "top", "reps": list(spec["reps"]), "rpe": list(_EFFORT[spec["effort"]])}] + [
                 {"kind": "back_off", "reps": list(spec["reps"]), "pct_of_top": 100 + spec["back_off_pct"]}
                 for _ in range(spec["back_off_sets"])
             ]
@@ -782,6 +896,7 @@ def session_prescription_for_role(
         )
     acc = EXPOSURES["accessory"]
     for k in tmpl["accessories"]:
+        n_acc = int((tmpl.get("accessory_sets") or {}).get(k, acc["sets"]))  # #5053: a floor slot may run more than 2 sets
         # an accessory is named by its catalog key already; without the catalog it is still
         # prescribable by that key, it just has not been checked against the skill ceiling
         key, why = _resolve_movement([k], catalog_movements, skill_ceiling, taken) if catalog_movements is not None else (k, None)
@@ -794,15 +909,16 @@ def session_prescription_for_role(
                 "intensity": "accessory",
                 "movement_key": key,
                 "resolution_note": why,
-                "sets": [{"kind": "working", "reps": list(acc["reps"])} for _ in range(acc["sets"])],
+                "sets": [{"kind": "working", "reps": list(acc["reps"])} for _ in range(n_acc)],
                 "rest_seconds": acc["rest_seconds"],
                 "cue": acc["cue"],
             }
         )
+    time_trim = trim_to_time(exposures)  # #5069: the charter's lifting-minute cap, accessories first
     in_block_variant.stamp_template_ids(exposures, catalog_movements, in_block)  # #4431: the one slot-template resolver
     deload_info = None
     if deload:
-        deload_info = _deload_trim(exposures, int(_deload_cfg()["sets_pct"]))
+        deload_info = _deload_trim(exposures, int(deload_sets_pct if deload_sets_pct is not None else _deload_cfg()["sets_pct"]))
     return {
         "archetype": tmpl["archetype"],
         "program_version": PROGRAM_VERSION,
@@ -812,6 +928,9 @@ def session_prescription_for_role(
         "deload_trim": deload_info,
         "exposures": exposures,
         "total_sets": sum(len(e["sets"]) for e in exposures),
+        "session_minutes": session_minutes_estimate(exposures),
+        "time_trim": time_trim,
+        "charter_version": CHARTER_VERSION,
         "hevy_folder": HEVY_FOLDERS[tmpl["archetype"]],
         "distribution": SESSION_DISTRIBUTION_PROVENANCE,
     }
@@ -823,6 +942,7 @@ def planned_session(
     block_workouts: list[dict[str, Any]] | None = None,
     catalog_movements: dict[str, Any] | None = None,
     skill_ceiling: int = 2,
+    deload_records: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """What the program serves on `day`: the next UNDONE session of the sequence (#4110), and
     its §3 prescription. Before the block start the weekday grid answers, and the result says
@@ -833,7 +953,7 @@ def planned_session(
     """
     from training import session_sequence
 
-    entry = session_sequence.next_session(day, block_workouts)
+    entry = session_sequence.next_session(day, block_workouts, deload_records)
     if entry is None:
         grid = dict(_SCHEDULE[str(_day(day).weekday())])
         entry = {
@@ -845,14 +965,20 @@ def planned_session(
     role = entry.get("session_role")
     if role in SESSION_TEMPLATES:
         ib = in_block_variant.performed_in_block(block_workouts, catalog_movements, day)  # #4409
+        applied = ((entry.get("deload_recommendation") or {}).get("applied_on")) or {}  # #5070: his recorded word's own cut
         out["prescription"] = session_prescription_for_role(
-            role, deload=bool(entry.get("deload")), catalog_movements=catalog_movements, skill_ceiling=skill_ceiling, in_block=ib
+            role,
+            deload=bool(entry.get("deload")),
+            catalog_movements=catalog_movements,
+            skill_ceiling=skill_ceiling,
+            in_block=ib,
+            deload_sets_pct=applied.get("sets_pct"),
         )
     return out
 
 
 def weekly_sets_by_pattern() -> dict[str, int]:
-    """Anchor sets per pattern over one program week — the four v0.4 roles."""
+    """Anchor sets per pattern over one program week — the five roles of the charter's split."""
     out: dict[str, int] = {}
     for role in SESSION_SEQUENCE["session_roles"]:
         for e in session_prescription_for_role(role)["exposures"]:
@@ -862,247 +988,99 @@ def weekly_sets_by_pattern() -> dict[str, int]:
 
 
 REDLINE_MUSCLE_GROUPS: dict[str, dict[str, Any]] = {
-    "quads": {"primary_muscles": ["quadriceps"], "range_key": "sets_per_muscle_wk"},
-    "hams_glutes": {"primary_muscles": ["hamstrings", "glutes"], "range_key": "sets_per_muscle_wk"},
-    "chest": {"primary_muscles": ["chest"], "range_key": "sets_per_muscle_wk"},
-    "back": {"primary_muscles": ["back"], "range_key": "sets_per_muscle_wk"},
-    "delts": {"primary_muscles": ["shoulders"], "range_key": "sets_per_muscle_wk_small"},
-    "biceps": {"primary_muscles": ["biceps"], "range_key": "sets_per_muscle_wk_small"},
-    "triceps": {"primary_muscles": ["triceps"], "range_key": "sets_per_muscle_wk_small"},
+    "quads": {"primary_muscles": ["quadriceps"], "range_key": "sets_per_muscle_wk", "frequency_key": "each_major_muscle_per_wk"},
+    "hams_glutes": {
+        "primary_muscles": ["hamstrings", "glutes"],
+        "range_key": "sets_per_muscle_wk",
+        "frequency_key": "each_major_muscle_per_wk",
+    },
+    "chest": {"primary_muscles": ["chest"], "range_key": "sets_per_muscle_wk", "frequency_key": "each_major_muscle_per_wk"},
+    "back": {"primary_muscles": ["back"], "range_key": "sets_per_muscle_wk", "frequency_key": "each_major_muscle_per_wk"},
+    # #5069: the shoulders+arms day lifts delts and arms ABOVE v0.4's 4–6 by ruling 5 — that band is their FLOOR now; the
+    # charter's `volume_priorities` bands for them land with the volume-floor lane (#5053), not here
+    "delts": {
+        "primary_muscles": ["shoulders"],
+        "range_key": "sets_per_muscle_wk_small",
+        "frequency_key": "delts_per_wk",
+        "band_top_binds": False,
+    },
+    "biceps": {
+        "primary_muscles": ["biceps"],
+        "range_key": "sets_per_muscle_wk_small",
+        "frequency_key": "each_major_muscle_per_wk",
+        "band_top_binds": False,
+    },
+    "triceps": {
+        "primary_muscles": ["triceps"],
+        "range_key": "sets_per_muscle_wk_small",
+        "frequency_key": "each_major_muscle_per_wk",
+        "band_top_binds": False,
+    },
 }
-"""The per-muscle set ranges, keyed to the catalog's `primary_muscle` (#4090): v0.4's 8–12 (~10, #4147)
-for quads, hams/glutes, chest, back; 4–6 for delts and arms. Counted as DIRECT sets (the movement's
-primary muscle) — §3's 'mostly indirect' is the pressing and pulling on top of these."""
+"""The per-muscle set ranges, keyed to the catalog's `primary_muscle` (#4090): v0.4's 8–12 (~10, #4147) for quads,
+hams/glutes, chest, back; 4–6 for delts and arms, which since the shoulders+arms day (#5069) is a floor, not a ceiling
+(`band_top_binds: False`). Counted as DIRECT sets (the movement's primary muscle) — §3's 'mostly indirect' is the pressing
+and pulling on top of these. `frequency_key` names the charter's `split.frequency` target each group is held to."""
 
 
 def weekly_sets_by_muscle(catalog_movements: dict[str, Any], skill_ceiling: int = 2) -> dict[str, dict[str, Any]]:
-    """Hard sets per redline muscle group over one program week (the four v0.4 roles), with the
-    range each must sit in (`owner_redlines`)."""
+    """Hard sets AND sessions per redline muscle group over one program week (the five roles), with the set range each must
+    sit in (`owner_redlines`) and the weekly frequency the charter asks of it (`split.frequency`, owner ruling 5)."""
     from training import owner_redlines
 
     lift = owner_redlines.REDLINES["lifting_sessions_per_wk"]
+    by_muscle, sessions_by_muscle = _week_tallies(catalog_movements, skill_ceiling)
+    out: dict[str, dict[str, Any]] = {}
+    for g, spec in REDLINE_MUSCLE_GROUPS.items():
+        roles = set().union(*(sessions_by_muscle.get(m, set()) for m in spec["primary_muscles"]))
+        out[g] = {
+            "sets": sum(by_muscle.get(m, 0) for m in spec["primary_muscles"]),
+            "range": list(lift[spec["range_key"]]),
+            "band_top_binds": bool(spec.get("band_top_binds", True)),
+            "frequency_per_wk": len(roles),
+            "frequency_target": int(charter_value(f"split.frequency.{spec['frequency_key']}")),
+            "sessions": [r for r in SESSION_SEQUENCE["session_roles"] if r in roles],
+        }
+    return out
+
+
+def _week_tallies(catalog_movements: dict[str, Any], skill_ceiling: int = 2) -> tuple[dict[str, int], dict[str, set[str]]]:
+    """({primary muscle: hard sets}, {primary muscle: roles}) over the five roles — the one tally under every weekly view."""
     by_muscle: dict[str, int] = {}
+    sessions_by_muscle: dict[str, set[str]] = {}
     for role in SESSION_SEQUENCE["session_roles"]:
         rx = session_prescription_for_role(role, catalog_movements=catalog_movements, skill_ceiling=skill_ceiling)
         for e in rx["exposures"]:
             muscle = (catalog_movements.get(e.get("movement_key") or "") or {}).get("primary_muscle") or "unresolved"
             by_muscle[muscle] = by_muscle.get(muscle, 0) + len(e["sets"])
+            sessions_by_muscle.setdefault(muscle, set()).add(role)
+    return by_muscle, sessions_by_muscle
+
+
+def _week_movement_sets(catalog_movements: dict[str, Any], skill_ceiling: int = 2) -> dict[str, int]:
+    """{movement key: hard sets} over the five roles — the per-movement view the movement-counted floors read (#5053)."""
+    out: dict[str, int] = {}
+    for role in SESSION_SEQUENCE["session_roles"]:
+        rx = session_prescription_for_role(role, catalog_movements=catalog_movements, skill_ceiling=skill_ceiling)
+        for e in rx["exposures"]:
+            k = e.get("movement_key") or ""
+            out[k] = out.get(k, 0) + len(e["sets"])
+    return out
+
+
+def volume_floor_coverage(catalog_movements: dict[str, Any], skill_ceiling: int = 2) -> dict[str, Any]:
+    """#5053: the charter's MEV floors and `sets_per_wk` bands against the five roles' weekly sets (`training.volume_floors`)."""
+    from training import volume_floors
+
+    by_muscle, _ = _week_tallies(catalog_movements, skill_ceiling)
+    by_movement = _week_movement_sets(catalog_movements, skill_ceiling)
+    by_muscle = volume_floors.movement_counts(by_muscle, by_movement)
+    accs = {r: list(t["accessories"]) for r, t in SESSION_TEMPLATES.items()}
     return {
-        g: {"sets": sum(by_muscle.get(m, 0) for m in spec["primary_muscles"]), "range": list(lift[spec["range_key"]])}
-        for g, spec in REDLINE_MUSCLE_GROUPS.items()
-    }
-
-
-# ── the computed check: is the accessory layer holding still? ────────────────
-# Cardio blocks logged inside a Hevy session are not lifting accessories, and counting
-# them would report "diversity" that is really the same treadmill every day. This list is
-# deliberately NOT `walking_volume.HEVY_COUNTED_NAMES`: that one answers "does this count
-# toward the walking floor" (walking/cycling only, rowing and elliptical excluded on
-# purpose), which is a DIFFERENT question from "is this a lifting accessory". Sharing one
-# list would create a must-agree seam between two questions that legitimately disagree.
-CARDIO_NAME_HINTS: tuple[str, ...] = (
-    "treadmill",
-    "walking",
-    "rucking",
-    "running",
-    "cycling",
-    "stationary bike",
-    "air bike",
-    "echo bike",
-    "assault bike",
-    "rowing",
-    "elliptical",
-    "stair",
-    "stretching",
-    "mobility",
-    "foam roll",
-)
-
-
-def _lower(name: Any) -> str:
-    return str(name or "").strip().lower()
-
-
-def classify_movement(name: str) -> str:
-    """`anchor:<family>` | `cardio` | `accessory` for one performed Hevy exercise name.
-
-    Cardio is checked FIRST: the `row` anchor's hint is a substring of 'rowing machine'.
-    """
-    nl = _lower(name)
-    if not nl:
-        return "cardio"  # an unnamed block is not evidence of accessory diversity
-    if any(hint in nl for hint in CARDIO_NAME_HINTS):
-        return "cardio"
-    for family, anchor in ANCHORS.items():
-        if any(hint in nl for hint in anchor["hevy_title_hints"]):
-            return f"anchor:{family}"
-    return "accessory"
-
-
-def _shift_day(day: str, delta_days: int) -> str:
-    """Shift a DATE# day key by whole days — through THE calendar-day parse (#3609: the ISO-parse
-    registry is shrink-only, so a day key is never parsed with `date.fromisoformat` here)."""
-    from common.pacific_time import parse_day_key
-
-    parsed = parse_day_key(day)
-    if parsed is None:
-        raise ValueError(f"not a YYYY-MM-DD day key: {day!r}")
-    return (parsed + _dt.timedelta(days=delta_days)).isoformat()
-
-
-def _boundary_honesty(window_start: str, window_end: str, block_boundaries: list[str] | None) -> str:
-    """The honesty line about block boundaries — the days a block's first session was COMPLETED
-    (`session_sequence.block_boundaries`, #4110). None = the sequence was not read."""
-    lead = f"the {ROTATION_RULE['window_days']}-day window is {ROTATION_RULE['window_provenance']}"
-    if block_boundaries is None:
-        return f"{lead}; the session sequence was not read, so a block boundary inside it is unknown and an addition is reported as drift"
-    inside = [d for d in block_boundaries if window_start < d <= window_end]
-    if inside:
-        return (
-            f"{lead}; the session sequence opened a new block on {inside[0]} inside it, so an accessory added from that day "
-            "is legitimate, not drift"
-        )
-    return f"{lead}; the session sequence opened no new block inside it, so an addition here is drift"
-
-
-def accessory_rotation(
-    *,
-    window_start: str,
-    window_end: str,
-    hevy_workouts: list[dict[str, Any]] | None,
-    block_boundaries: list[str] | None = None,
-) -> dict[str, Any]:
-    """The accessory layer over a trailing window, computed from the Hevy record.
-
-    v0.3/v0.4 fix accessories for the block, so the computed verdict is DRIFT: accessories
-    performed in the window's trailing 7 days that its earlier days did not carry. `ok`
-    is True when nothing was added ("fixed") and False when something was ("drifting").
-    Repeats are still counted and reported — as a measurement, not a defect.
-
-    ADR-105: the answer carries its `n` and its window. It is a measurement of what was
-    PERFORMED, not a claim about what was programmed.
-
-    `hevy_workouts` is the DDB `USER#matthew#SOURCE#hevy` row shape the MCP readers
-    already return: `{"date": "YYYY-MM-DD", "exercises": [{"name": ..., "sets": [...]}]}`.
-    Passed in, never fetched here — this module has no I/O, same contract as `plan_engine`.
-
-    `None` means the read RAISED and the verdict is `unknown`. An empty list means the
-    window genuinely holds no lifting sessions, which is ALSO `unknown` — a rule over zero
-    sessions is vacuously satisfied, and reporting that as `ok` is the #3767 failure
-    wearing gym clothes. A window whose earlier half holds no session is `unknown` too:
-    there is no prior week to have added anything to.
-    """
-    window = {"start": window_start, "end": window_end, "days": ROTATION_RULE["window_days"]}
-    base: dict[str, Any] = {
-        "rule": ROTATION_RULE["rule"],
-        "rule_provenance": ROTATION_RULE["provenance"],
-        "window": window,
-        "program_version": PROGRAM_VERSION,
-        "program_active": ACTIVE,
-    }
-    if hevy_workouts is None:
-        return {
-            **base,
-            "ok": None,
-            "state": "unknown",
-            "n_sessions": None,
-            "detail": "the Hevy record could not be read for this window — the accessory layer is unmeasured, not clear",
-            "honesty": ["the accessory layer is UNKNOWN: the read failed. Never report an unreadable rule as satisfied."],
-        }
-
-    try:
-        split_day = _shift_day(window_end, -6)  # the trailing 7 days start here
-    except ValueError:
-        split_day = window_end
-    days_by_movement: dict[str, set[str]] = {}
-    anchor_days: dict[str, set[str]] = {}
-    cardio_names: set[str] = set()
-    sessions = 0
-    session_days: set[str] = set()
-    early_session_days: set[str] = set()
-    for row in hevy_workouts:
-        exercises = row.get("exercises") or []
-        if not exercises:
-            continue
-        day = str(row.get("date") or "")[:10]
-        if not (window_start <= day <= window_end):
-            continue
-        sessions += 1
-        session_days.add(day)
-        if day < split_day:
-            early_session_days.add(day)
-        for ex in exercises:
-            name = _lower(ex.get("name"))
-            if not name:
-                continue
-            kind = classify_movement(name)
-            if kind.startswith("anchor:"):
-                anchor_days.setdefault(kind.split(":", 1)[1], set()).add(day)
-            elif kind == "cardio":
-                cardio_names.add(name)
-            else:
-                days_by_movement.setdefault(name, set()).add(day)
-
-    if sessions == 0:
-        return {
-            **base,
-            "ok": None,
-            "state": "unknown",
-            "n_sessions": 0,
-            "n_session_days": 0,
-            "detail": "no lifting sessions in the window — the accessory rule is vacuous here, which is not the same as satisfied",
-            "honesty": ["the accessory layer is UNKNOWN: n=0 sessions in the window. A rule with nothing to check is not a pass."],
-        }
-
-    repeats = sorted(
-        ({"movement": name, "n_days": len(days), "days": sorted(days)} for name, days in days_by_movement.items() if len(days) > 1),
-        key=lambda r: (-r["n_days"], r["movement"]),
-    )
-    added = sorted(name for name, days in days_by_movement.items() if all(d >= split_day for d in days))
-    distinct_accessories = len(days_by_movement)
-    measurable = bool(early_session_days)
-    ok: bool | None = (not added) if measurable else None
-    state = "unknown" if not measurable else ("fixed" if ok else "drifting")
-    return {
-        **base,
-        "ok": ok,
-        "state": state,
-        "n_sessions": sessions,
-        "n_session_days": len(session_days),
-        "n_early_session_days": len(early_session_days),
-        "split_day": split_day,
-        "distinct_accessories": distinct_accessories,
-        "distinct_movements_total": distinct_accessories + len(anchor_days) + len(cardio_names),
-        "anchors_trained": {family: {"n_days": len(days), "days": sorted(days)} for family, days in sorted(anchor_days.items())},
-        "anchor_families_missing": sorted(set(ANCHORS) - set(anchor_days)),
-        "added_in_trailing_7d": added,
-        "repeats_within_window": repeats,
-        "cardio_blocks_excluded": sorted(cardio_names),
-        "detail": (
-            f"{distinct_accessories} distinct accessory movement(s) over n={sessions} session(s) ({window_start}..{window_end}); "
-            + (
-                f"{len(added)} added in the trailing 7 days that the prior days did not carry; {len(repeats)} repeated (by design — accessories are fixed for the block)"
-                if measurable
-                else "no session before the trailing 7 days, so 'added' cannot be measured"
-            )
-        ),
-        "honesty": [
-            s
-            for s in [
-                (
-                    None
-                    if ACTIVE
-                    else f"the accessory rule is PROPOSED ({ISSUE}, gate:owner) — this is a measurement of what happened, not a compliance verdict against an approved program"
-                ),
-                _boundary_honesty(window_start, window_end, block_boundaries),
-                (
-                    "anchor repeats are EXEMPT by design (progressive overload) — they are reported separately under anchors_trained"
-                    if anchor_days
-                    else "no anchor pattern was trained in this window at all"
-                ),
-            ]
-            if s
-        ],
+        "floors": volume_floors.floor_coverage(by_muscle, accs),
+        "bands": volume_floors.charter_band_rows(by_muscle),
+        "sets_by_muscle": dict(sorted(by_muscle.items())),
+        "charter_version": CHARTER_VERSION,
     }
 
 
@@ -1131,7 +1109,10 @@ def summary() -> dict[str, Any]:
         # #4110/#4147: the session sequence (order, not weekdays), and the weekly anchor dose it produces
         "session_sequence": SESSION_SEQUENCE,
         "decision_sk": DECISION_SK,
-        "block_lock": BLOCK_LOCK,
+        "block_lock_history": BLOCK_LOCK_HISTORY,  # #5069: lifted by owner ruling 6 — history, never a guard
+        "session_time_model": SESSION_TIME_MODEL,
+        "lifting_minutes_range": lifting_minutes_range(),
+        "charter_version": CHARTER_VERSION,
         "excluded_methods": EXCLUDED_METHODS,
         "superseded_programs": SUPERSEDED_PROGRAMS,
         "hevy_folders": HEVY_FOLDERS,

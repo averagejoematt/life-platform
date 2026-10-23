@@ -17,7 +17,7 @@ What these tests hold, all on the wire (`tests/fixtures/draft_custom_slot_5005`,
      movement (bench 83.91 kg, RPE ceiling 9, ceiling_basis "slot").
   4. OFF-PROGRAM movements (cycling, a stretching template, a lift the slot does not prescribe)
      stay `custom`.
-  5. MUTATION CONTROL — without the stamp the gate reproduces the live 79.38 kg at RPE 8.
+  5. MUTATION CONTROL — without the stamp the gate skips the hold (the live 79.38 kg at RPE 8; 81.65 kg at the #5058 RPE 9).
   6. FAIL-SOFT — an unreadable record or a non-program date leaves every block custom and says so.
   7. WIRING — `manage_hevy_routine draft_custom` runs the stamp and persists it.
 
@@ -44,7 +44,7 @@ os.environ.setdefault("S3_BUCKET", "test-bucket")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
-from training import routine_generator  # noqa: E402
+from training import load_ramp, routine_generator  # noqa: E402
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set  # noqa: E402
 
 from mcp import draft_custom_session  # noqa: E402
@@ -176,9 +176,13 @@ def test_a_custom_draft_of_the_same_movements_inherits_the_slot_and_gets_the_eng
 
 # ── 5. mutation control: without the stamp the gate reproduces the live defect ──
 def test_mutation_control_without_the_stamp_the_gate_reads_the_live_79_38_at_rpe_8():
+    """#5058 moved the lowest program ceiling from RPE 8 to the charter compounds ceiling (RPE 9), so the unstamped
+    gate no longer reproduces the live 79.38 kg exactly: it reads the RPE-9 rep cap (81.65 kg, 180 lb) and still
+    skips the hold — still under the engine's 83.91 kg, so the stamp is still what moves the floor."""
     bench = _gate_floors(_custom_ir())[BENCH]
-    assert bench["floor_kg"] == pytest.approx(BENCH_CUSTOM_LIVE_KG)
-    assert _rep_cap(bench)["rpe_ceiling"] == 8 and _rep_cap(bench)["ceiling_basis"].startswith("unknown intensity")
+    lowest = load_ramp.lowest_program_rpe_ceiling()
+    assert lowest == 9 and _rep_cap(bench)["rpe_ceiling"] == lowest and _rep_cap(bench)["ceiling_basis"].startswith("unknown intensity")
+    assert bench["floor_kg"] == pytest.approx(180 * 0.45359237) and BENCH_CUSTOM_LIVE_KG < bench["floor_kg"] < BENCH_ENGINE_KG
 
 
 # ── 6. fail-soft ─────────────────────────────────────────────────────────────
@@ -214,7 +218,9 @@ def test_the_draft_custom_action_persists_the_inherited_slot():
         patch("mcp.plan_cardio_pick.draft_cardio_warnings", return_value=[]),
         patch("training.routine_generator.attach_cardio_cues", return_value=0),
     ):
-        resp = tools_hevy_routine._action_draft_custom({"exercises": exercises, "target_date": DAY})
+        resp = tools_hevy_routine._action_draft_custom(
+            {"departure_reason": "test: deliberate departure from the engine draft", "exercises": exercises, "target_date": DAY}
+        )
     assert resp["status"] == "drafted_custom" and resp["program_slot"]["status"] == "inherited"
     ir = persisted["ir"]
     assert ir.inputs_snapshot["calendar"]["session_role"] == "upper_volume"

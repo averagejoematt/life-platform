@@ -50,7 +50,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Full system design (the 10 stacks, ingest→store→serve; counts auto-synced) |
 | [INFRASTRUCTURE.md](INFRASTRUCTURE.md) | The AWS account by the numbers |
 | [DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md) | What calls what; single points of failure |
-| [MCP_TOOL_CATALOG.md](MCP_TOOL_CATALOG.md) | All 88 MCP tools by domain (generated — never hand-edit) |
+| [MCP_TOOL_CATALOG.md](MCP_TOOL_CATALOG.md) | All 89 MCP tools by domain (generated — never hand-edit) |
 | [MCP_TOOL_AUDIT.md](MCP_TOOL_AUDIT.md) | The tool-removal ledger (#395 prune ratchet) |
 | [API.md](API.md) | Site-API endpoints |
 | [engines/](engines/) | The algorithm pages: [SCORING](engines/SCORING.md) · [CHARACTER](engines/CHARACTER.md) · [READINESS](engines/READINESS.md) · [HYPOTHESIS](engines/HYPOTHESIS.md) · [COACH_STANCE](engines/COACH_STANCE.md) |
@@ -83,7 +83,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | Doc | |
 |---|---|
 | [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md) | The durable why — purpose, thesis, audiences, success bar |
-| [DECISIONS.md](DECISIONS.md) | **ADRs (001–163)** — every significant decision with rationale; index auto-generated |
+| [DECISIONS.md](DECISIONS.md) | **ADRs (001–164)** — every significant decision with rationale; index auto-generated |
 | [CONVENTIONS.md](CONVENTIONS.md) | **The load-bearing reflexes** (one-bundle rule #781, deploy-from-main, squash-drift, CI gate ordering, asset-staging trap) + drift-discovery commands |
 | [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) | **The "definition of an A" for craft** — the 10-dimension rubric + naming/size/gate standards `/review craft` grades against |
 | [OPERATING_DISCIPLINE.md](OPERATING_DISCIPLINE.md) | **The work-adjudication + session reflexes** — verifying a finding, closing an issue, judging an epic, concurrent lanes, watchers; plus the dated memory-corpus audit and the residual gap list (#2848) |

@@ -3,19 +3,28 @@ Health & body composition tools.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Optional
 
 from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from health import (
+    calorie_target as calorie_resolver,  # #5095: the ONE calorie target
     hr_regime,  # #4999: THE dated HR regime markers (re-baselining window, post-marker baselines, AF days)
     tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
 )
-from training import training_load  # #4075: the ONE load-provenance predicate for the TSB label
+from training import rate_band, training_load  # #4075: the ONE load-provenance predicate for the TSB label
 
+from mcp import core as _mcp_core
 from mcp.config import logger
 from mcp.core import decimal_to_float, get_profile, phase_scope_block, query_source, query_source_cross_phase
 from mcp.helpers import normalize_whoop_sleep
+from mcp.tools_nutrition import expenditure_reconciliation  # #5097: the three burn estimates vs the scale
 from mcp.tools_training import _get_training_load
+from mcp.weight_rate import (
+    annotate_weekly_rates,
+    bmi_category,
+    calc_bmi,
+    rate_pct_bw,
+)  # noqa: F401 — #5060, split by the size guard
 
 # ── #4978: the readiness formula, stated once and returned with every score ─────────
 READINESS_WEIGHTS = {
@@ -600,6 +609,14 @@ def _rebaselining_result(end_date, components, device_agreement, regime):
     }
 
 
+def _guidance_cap_state() -> tuple[Optional[float], str]:
+    """(cap, "read" | "read_failed") — ADR-105: a broken clinical read is surfaced on rate_band, never read as 'no cap'."""
+    try:
+        return rate_band.guidance_cap_for(_mcp_core.table), "read"
+    except rate_band.GuidanceReadError:
+        return None, "read_failed"
+
+
 def tool_get_weight_loss_progress(args):
     end_date = args.get("end_date", pacific_today())
     explicit_start = args.get("start_date")  # None when caller didn't pass one
@@ -647,59 +664,13 @@ def tool_get_weight_loss_progress(args):
     if not weight_series:
         return {"error": "No weight_lbs field found in Withings data."}
 
-    def calc_bmi(weight_lbs, height_in):
-        if not height_in:
-            return None
-        # 703 converts imperial (lbs/in^2) to metric BMI (kg/m^2)
-        return round(703 * weight_lbs / (height_in**2), 1)
-
-    bmi_categories = [
-        (18.5, "Underweight"),
-        (25.0, "Normal weight"),
-        (30.0, "Overweight"),
-        (35.0, "Obese Class I"),
-        (40.0, "Obese Class II"),
-        (float("inf"), "Obese Class III"),
-    ]
-
-    def bmi_category(bmi):
-        if bmi is None:
-            return None
-        for threshold, label in bmi_categories:
-            if bmi < threshold:
-                return label
-        return "Obese Class III"
-
     for pt in weight_series:
         bmi = calc_bmi(pt["weight_lbs"], height_in)
         pt["bmi"] = bmi
         pt["bmi_category"] = bmi_category(bmi)
 
-    weekly_rates = []
-    for i in range(len(weight_series)):
-        pt = weight_series[i]
-        target_dt = datetime.strptime(pt["date"], "%Y-%m-%d") - timedelta(days=7)
-        prior = None
-        best_gap = 999
-        for j in range(i):
-            d = datetime.strptime(weight_series[j]["date"], "%Y-%m-%d")
-            gap = abs((target_dt - d).days)
-            if gap < best_gap:
-                best_gap = gap
-                prior = weight_series[j]
-        if prior and best_gap <= 4:
-            days_diff = (datetime.strptime(pt["date"], "%Y-%m-%d") - datetime.strptime(prior["date"], "%Y-%m-%d")).days
-            if days_diff > 0:
-                weekly_rate = round((prior["weight_lbs"] - pt["weight_lbs"]) / days_diff * 7, 2)
-                pt["weekly_loss_rate_lbs"] = weekly_rate
-                weekly_rates.append(weekly_rate)
-                # >2.5 lbs/week exceeds ACSM safe rate; risk of lean mass catabolism (Helms 2014)
-                if weekly_rate > 2.5:
-                    pt["rate_flag"] = "⚠️ Losing too fast (>2.5 lbs/wk) — risk of muscle loss. Check nutrition."
-                elif weekly_rate < 0:
-                    pt["rate_flag"] = "↑ Weight gain this week"
-                elif weekly_rate < 0.25 and len(weight_series) > 14:
-                    pt["rate_flag"] = "⏸ Very slow — review deficit"
+    guidance_cap, guidance_read = _guidance_cap_state()
+    weekly_rates = annotate_weekly_rates(weight_series, guidance_cap)
 
     milestones = {}
     milestone_thresholds = [
@@ -737,6 +708,7 @@ def tool_get_weight_loss_progress(args):
                     "milestone": label,
                     "lbs_to_cross": round(lbs_to_threshold, 1),
                     "recent_pace_lbs_per_week": _recent_mean,
+                    "recent_pace_pct_bodyweight_per_week": rate_pct_bw(_recent_mean, weight_series[-1]["weight_lbs"]),
                     "n_recent_rates": len(_recent),
                 }
                 if _recent_mean is not None and _recent_mean > 0:
@@ -817,6 +789,7 @@ def tool_get_weight_loss_progress(args):
             "goal_weight_lbs": goal_weight,
             "lbs_remaining": round(current_weight - goal_weight, 1),
             "avg_weekly_loss_lbs": avg_weekly,
+            "avg_weekly_loss_pct_bodyweight": rate_pct_bw(avg_weekly, current_weight),
             # ADR-105: the n behind the average travels with it — three paired
             # weigh-ins and thirty no longer produce identically-confident output.
             "n_weekly_rates": len(weekly_rates),
@@ -836,6 +809,10 @@ def tool_get_weight_loss_progress(args):
         "current_bmi_category": weight_series[-1].get("bmi_category"),
         "total_lost_lbs": total_lost,
         "avg_weekly_loss_lbs": avg_weekly,
+        "avg_weekly_loss_pct_bodyweight": rate_pct_bw(avg_weekly, current_weight),
+        "rate_lb_per_wk": avg_weekly,
+        "rate_pct_bodyweight_per_wk": rate_pct_bw(avg_weekly, current_weight),
+        "rate_band": {**(rate_band.band_view(current_weight, avg_weekly, guidance_cap) or {}), "guidance_read": guidance_read},
         "projection": projection,
         "plateau_detected": plateau,
         "milestones_achieved": milestones,
@@ -850,13 +827,45 @@ def tool_get_weight_loss_progress(args):
             "Real weigh-ins only, from USER#matthew#SOURCE#withings, trailing 14 days off end_date. "
             "A gap in logging shows as missing dates here — never an interpolated or smoothed entry."
         ),
-        "clinical_note": "Safe loss rate: 0.5–2.0 lbs/week. >2.5 lbs/week consistently risks lean mass catabolism.",
+        "clinical_note": (
+            "Rate is judged against the owner's band (`rate_band`, from the training charter) and relative to bodyweight, "
+            "shown in lb/wk and % of bodyweight; a weekly point is flagged only above his schedule's cap at that weight "
+            "(sustained losses past it risk lean mass catabolism, Helms 2014)."
+        ),
     }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HYDRATION TRACKING ENHANCEMENT  (#30)
 # ══════════════════════════════════════════════════════════════════════════════
+
+
+def _model_check_state(budget):
+    """#5198 (ADR-104): tri-state, so a window no check ran on never reads as passed. `refused` when the
+    impossibility check refused, `passed` only when the measured weight trend agreed, else `not_run`
+    (no trend check, or a `published_unverified_*` basis)."""
+    tc = budget.get("trend_check")
+    if not tc:
+        return "not_run"
+    if not tc.get("publish", True):
+        return "refused"
+    return "passed" if str(tc.get("basis") or "").startswith("agrees_with_measured_weight_trend") else "not_run"
+
+
+def _maintenance_context(budget, check=None):
+    """#5198: one deficit-model window as maintenance context. Deliberately carries no key or flag
+    named target (the view's single calorie target is `calorie_target_platform`)."""
+    out = {
+        "estimated_maintenance_kcal": budget["tdee"],
+        "deficit_kcal": budget["deficit"],
+        "model_check": _model_check_state(budget),
+        "method": budget["method"],
+        "basis": budget.get("target_basis"),
+        "inputs": budget["inputs"],
+    }
+    if check is not None:
+        out["check"] = check
+    return out
 
 
 def _get_energy_expenditure(args):
@@ -991,8 +1000,6 @@ def _get_energy_expenditure(args):
     ex_daily_30d_avg = budget_30d["inputs"]["exercise_kcal_daily_avg"]
     tdee_7d_avg = budget_7d["tdee"]
     tdee_30d_avg = budget_30d["tdee"]
-    calorie_target_7d = budget_7d["target"]
-    calorie_target_30d = budget_30d["target"]
     implied_weekly_loss_lbs = tdee_core.implied_weekly_loss_lbs(target_deficit_kcal)
 
     journey_start_wt = profile.get("journey_start_weight_lbs")
@@ -1056,28 +1063,27 @@ def _get_energy_expenditure(args):
         "exercise_kcal_by_basis_30d": ex_30d["kcal_by_basis"],
         "tdee_7d_avg": tdee_7d_avg,
         "tdee_30d_avg": tdee_30d_avg,
+        "expenditure_reconciliation": expenditure_reconciliation(end_date, tdee_7d_avg, read=query_source_cross_phase),
         "target_deficit_kcal": target_deficit_kcal,
-        "calorie_target_based_on_7d": calorie_target_7d,
-        "calorie_target_based_on_30d": calorie_target_30d,
+        # #5198: `calorie_target_platform` is the ONE calorie target on this view (#5095). The deficit
+        # model's windows are MAINTENANCE CONTEXT (estimated maintenance + the modelled deficit): no key
+        # or flag in them is called a target, and the TDEE-minus-deficit figure is not published.
+        "calorie_target_platform": calorie_resolver.resolve(end_date),
+        # ADR-152/ADR-105: maintenance context carries its method and inputs, so a reader can check
+        # the number without reading this source.
+        "maintenance_context_7d": _maintenance_context(budget_7d, check_7d),
+        "maintenance_context_30d": _maintenance_context(budget_30d),
         # #3931 box 4: the method name (DERIVED from health.tdee, never re-typed) and the
         # impossibility verdict, on the surface that publishes the number. When `basis`
-        # begins with "refused: ", `calorie_target_based_on_7d` is None — the surface says
-        # refused rather than publishing a figure the weight trend contradicts.
-        "calorie_target_method": tdee_core.METHOD,
+        # begins with "refused: ", `maintenance_context_7d.model_check` is "refused" — the impossibility check
+        # refused; the TDEE-minus-deficit figure is not emitted, only the maintenance estimate.
+        "maintenance_method": tdee_core.METHOD,
         # #3931 box 3: the SECOND method, offered alongside rather than folded in. It
         # never touches a MET table or a Mifflin coefficient, so it fails in different
-        # directions than `calorie_target_method` does — and when the two disagree,
-        # `calorie_target_check` below is what refuses. `None` when no intake average or
+        # directions than `maintenance_method` does — and when the two disagree,
+        # `maintenance_context_7d.check` below is what refuses. `None` when no intake average or
         # no measured trend exists to back-solve from (ADR-104: absent, not zero).
         "tdee_second_method": tdee_core.tdee_from_trend(intake_avg, trend_lb_wk, days=trend_days),
-        "calorie_target_basis": budget_7d.get("target_basis"),
-        "calorie_target_published": budget_7d.get("target_published", True),
-        "calorie_target_check": check_7d,
-        # ADR-152/ADR-105: the same target, with its method and its inputs attached, so a
-        # reader can check the number without reading this source — and so this tool and
-        # `get_nutrition view=macros` are visibly answering from ONE definition.
-        "calorie_target": budget_7d,
-        "calorie_target_30d_basis": budget_30d,
         "implied_weekly_loss_lbs": implied_weekly_loss_lbs,
         "bmr_change_since_start": bmr_change,
         "coaching_note": "Recalculate targets every 10 lbs lost as BMR decreases. Eating below 1200 kcal (women) or 1500 kcal (men) risks lean mass loss even with adequate protein.",

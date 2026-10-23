@@ -40,8 +40,9 @@ FOLDER_BY_ARCHETYPE = {
     "push": "Push",
     "pull": "Pull",
     "legs": "Legs",
-    # #4147 v0.4: the owner's folders are Upper / Lower. Must equal program_structure.HEVY_FOLDERS
-    # (held by a test). `legs` (the PPL-era archetype) still files into "Legs".
+    # #4147: the owner's folders are Upper / Lower. Must equal program_structure.HEVY_FOLDERS
+    # (held by a test). #5069: the shoulders+arms day is archetype `upper`, so it files into "Upper".
+    # `legs` (the PPL-era archetype) still files into "Legs".
     "lower": "Lower",
     "upper": "Upper",
     "engine": "Engine",
@@ -136,5 +137,5 @@ def discarded_commit_title_warnings(args: dict[str, Any], ir: Any) -> list[str]:
         f"Ignored {'/'.join(supplied)} on commit: both are DRAFT-time arguments, read only from "
         f"the routine's draft snapshot (force_title={forced} there). The title was rendered from "
         f"that snapshot, not from this call. To force a title, re-draft with "
-        f"draft_custom(force_title=true, title=...) then dry_run, then commit."
+        f"draft_custom(force_title=true, title=..., departure_reason=...) then dry_run, then commit."
     ]

@@ -36,7 +36,8 @@ WHAT IT DOES
 
 THE DERIVATION RULES (each stated with its reason)
 
-  * `skill_tier` from Hevy's `equipment` — see `EQUIPMENT_SKILL_TIER`. 382 of 538 titles carry no
+  * `skill_tier` from Hevy's `equipment` — see `EQUIPMENT_SKILL_TIER` — raised for bodyweight-loaded
+    titles (pull-up, chin-up, dip, inverted row; the advanced skills at 3), see `BODYWEIGHT_SKILL_TIER_*`. 382 of 538 titles carry no
     equipment word, so the title cannot carry this; Hevy's own field can.
   * `primary_muscle` / `secondary_muscles` from Hevy's muscle groups through
     `training.muscle_volume.HEVY_MUSCLE_GROUP` — the one table (column 1 is the planner key the
@@ -116,6 +117,28 @@ EQUIPMENT_SKILL_TIER: dict[str, int] = {
 }
 UNKNOWN_EQUIPMENT_TIER = 3
 
+#: Movements whose load IS the lifter's body, so Hevy's equipment word ("none", or "machine"/band
+#: where Hevy files a pull-up bar or ring under the wrong kit) understates the demand (#5054).
+#: Matched on the TITLE, because the equipment field cannot tell a pull-up from a stretch. Two bands:
+#:   tier 2 — pull-up, chin-up, dip, inverted row: the whole bodyweight must be pulled/pressed and
+#:            stabilised, the same "free or semi-free load" rung as a dumbbell (2), not the
+#:            fixed-path rung (1). Tier 3 stays the barbell's: a loaded barbell carries injury cost a
+#:            bodyweight pull does not.
+#:   tier 3 — muscle-up, pistol squat, Nordic curl, handstand push-up, human flag, one-arm
+#:            push/pull-up: gated skills most lifters cannot do for a work set at all, so they must
+#:            never be auto-picked under the skill ceiling of 2.
+#: An assisted/machine/band-assisted variant (title says "assisted", "machine" or "band") is NOT
+#: bodyweight-loaded — the stack takes part of the load — and keeps its equipment tier; so does
+#: every other equipment-none title (mobility, stretching, plank, push-up) at tier 1. Known gap: a
+#: title with no pull/chin/dip/inverted-row word (e.g. "Plyo Inverted Chins") stays at its equipment
+#: tier; the rule is deliberately title-word based, review such a row by hand (`reviewed: true`).
+BODYWEIGHT_SKILL_TIER_3 = re.compile(
+    r"\bmuscle[\s-]?ups?\b|\bpistol\b|\bnordic\b|\bhandstand\s+push|\bflag\b|\b(?:1|one)[\s-]?arm\s+(?:push|pull|chin)[\s-]?ups?\b", re.I
+)
+BODYWEIGHT_SKILL_TIER_2 = re.compile(r"\bpull[\s-]?ups?\b|\bchin[\s-]?ups?\b|\bdips?\b|\binverted\s+rows?\b", re.I)
+BODYWEIGHT_ASSISTED = re.compile(r"\bassist|\bmachine\b|\bband(?:ed)?\b|\bcable\b", re.I)
+BODYWEIGHT_EQUIPMENT = frozenset({"none", "machine", "resistance_band", None})
+
 #: Every generated (unreviewed) entry's joint_friendly_score. 1 = below every curated entry
 #: scored 2 or 3, so the muscle selector (which sorts by joint_friendly_score desc) keeps the
 #: hand-reviewed pool first until a human reviews the new entry and scores it.
@@ -129,7 +152,7 @@ _WORKOUT_SK = re.compile(r"^DATE#(\d{4}-\d{2}-\d{2})#WORKOUT#")
 CATALOG_COMMENT = (
     "Internal movement vocabulary. Maps a stable internal key -> Hevy exercise_template_id. Tags every movement with primary "
     "muscle (the config/training_landmarks.json key the generator matches on), secondary muscles, skill_tier "
-    "(1=machine/band/bodyweight, 2=dumbbell/cable/kettlebell, 3=barbell/smith) and joint_friendly_score (3=highest, 0=lowest). "
+    "(1=machine/band/mobility; 2=dumbbell/cable/kettlebell; 3=barbell/smith; bodyweight-loaded titles 2-3 by title, see _rules.skill_tier) and joint_friendly_score (3=highest, 0=lowest). "
     "Consumed by routine_generator.py for selection + hevy_template_cache.py for resolution. Entries with `reviewed: true` "
     "are hand-curated and are preserved verbatim by the builder; `provenance: hevy_history` entries are GENERATED from the "
     "owner's whole Hevy history by deploy/build_movement_catalog.py (#4108) — review one by setting `reviewed: true` and "
@@ -244,6 +267,11 @@ def _skill_tier(equipment: str | None, title: str) -> tuple[int, str]:
     tl = title.lower()
     if re.search(r"\bsmith\b", tl):
         return 3, "title:smith"
+    if equipment in BODYWEIGHT_EQUIPMENT and not BODYWEIGHT_ASSISTED.search(tl):
+        if BODYWEIGHT_SKILL_TIER_3.search(tl):
+            return 3, "title:bodyweight_loaded"
+        if BODYWEIGHT_SKILL_TIER_2.search(tl):
+            return 2, "title:bodyweight_loaded"
     if equipment == "machine" and re.search(r"\bcable\b", tl):
         return 2, "title:cable"  # Hevy files cable exercises under "machine"; the issue's mapping puts cable at 2
     if equipment in EQUIPMENT_SKILL_TIER:
@@ -362,6 +390,11 @@ def build_catalog(current: dict[str, Any], history: dict[str, Any], metadata: di
     retired: list[str] = []
     unavailable: list[str] = []
     generated: dict[str, dict[str, Any]] = {}
+    prior_notes = {
+        str(v.get("hevy_template_id_hint") or "").upper(): v["notes"]
+        for v in (current.get("movements") or {}).values()
+        if v.get("notes") and _kind(v) == "regenerate"
+    }
     for tid in sorted(hist):
         if tid in claimed:
             continue
@@ -372,6 +405,8 @@ def build_catalog(current: dict[str, Any], history: dict[str, Any], metadata: di
         if meta is None:
             unavailable.append(tid)
         entry = generated_entry(tid, hist[tid], meta)
+        if tid.upper() in prior_notes:  # hand-written provenance (#4169/#4176) survives regeneration
+            entry.setdefault("notes", prior_notes[tid.upper()])
         key = _slug(entry["title"])
         if key in kept or key in generated:
             key = f"{key}_{_slug(tid)[:8]}"
@@ -406,12 +441,15 @@ def build_catalog(current: dict[str, Any], history: dict[str, Any], metadata: di
         "_rules": {
             "skill_tier": "Hevy equipment: machine/resistance_band/none -> 1; dumbbell/kettlebell/plate/suspension/other and "
             "cable (by title) -> 2; barbell and smith (by title) -> 3; metadata unavailable -> 3. See "
-            "deploy/build_movement_catalog.py EQUIPMENT_SKILL_TIER.",
+            "deploy/build_movement_catalog.py EQUIPMENT_SKILL_TIER. Bodyweight-loaded titles (pull/chin-up, dip, inverted row -> 2; "
+            "muscle-up, pistol, Nordic, handstand push-up, flag, one-arm push/pull -> 3; never an assisted/machine/band title) are "
+            "raised above their equipment tier by title (#5054, BODYWEIGHT_SKILL_TIER_*).",
             "joint_friendly_score_unreviewed": UNREVIEWED_JOINT_FRIENDLY_SCORE,
             "primary_muscle": "Hevy primary_muscle_group through training/muscle_volume.HEVY_MUSCLE_GROUP (column 1); "
             "volume_muscle is column 0 (muscle_volume.MUSCLES).",
             "generator_eligibility": "training/movement_catalog.generator_eligible: skill_tier <= ceiling AND (reviewed OR a "
-            "default_rep_range). No frequency gate (owner ruling C, #4108).",
+            "default_rep_range) AND not plyometric, bar the charter's lower-leg prep carve-out while the prep is on (#5090). "
+            "No frequency gate (owner ruling C, #4108).",
             "anchor_family": "training/movement_catalog.anchor_family: program_structure.classify_movement(title) AND primary "
             "muscle in the anchor's primary_muscles AND loaded (Hevy weight_reps; any rep-based type for vertical_pull).",
             "coach_added": "A never-trained exercise may be added as {title, hevy_template_id_hint, provenance: coach_added}; "

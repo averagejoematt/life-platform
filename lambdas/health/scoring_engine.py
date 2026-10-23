@@ -20,11 +20,12 @@ import logging
 from datetime import datetime
 from typing import Any, Iterable, Optional, Union
 
-from common.constants import PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
 from common.habit_pause import is_paused_on  # #5007: a paused habit is not scheduled
 from training.owner_redlines import REDLINES  # ADR-163: the walking floor the movement target defaults from
 from training.walking_volume import WALKING_VOLUME_VERSION, walking_minutes_for_day  # ADR-163: the ONE walking definition
 
+from health import macro_floors, protein_engine  # #5098: THE protein hit and the charter's range low
+from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 from health.habit_identity import day_name_for  # #4632: id first, then names, then ingest-derived aliases
 
 logger = logging.getLogger(__name__)
@@ -130,10 +131,11 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
     protein = safe_float(mf, "total_protein_g")
     fat = safe_float(mf, "total_fat_g")
     carbs = safe_float(mf, "total_carbs_g")
-    cal_target = PLAN_DAILY_CALORIES_TARGET
+    cal_target = target_kcal(data.get("date"))
     # #4540: the plan states ONE protein line, a floor. The profile row's separate 190 g
     # "target" was never the plan; a day at or over the floor has met it.
-    protein_target = protein_floor = PLAN_DAILY_PROTEIN_MIN_G
+    # #5098: the floor is the charter's protein range low and the hit is the protein engine's — one definition.
+    protein_target = protein_floor = protein_engine.range_low()
     cal_tolerance = profile.get("calorie_tolerance_pct", 10) / 100
     cal_penalty = profile.get("calorie_penalty_threshold_pct", 25) / 100
     details = {
@@ -161,7 +163,7 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
         weights.append(0.40)
         details["cal_score"] = cal_score
     if protein is not None:
-        if protein >= protein_floor:
+        if protein_engine.hit(protein, protein_floor):
             prot_score = 100
         else:
             prot_score = max(0, 80 * protein / protein_floor)
@@ -169,13 +171,13 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
         parts.append(prot_score * 0.40)
         weights.append(0.40)
         details["protein_score"] = prot_score
-    fat_target = profile.get("fat_target_g", 60)
-    carb_target = profile.get("carb_target_g", 125)
-    if fat is not None and carbs is not None:
-        fat_diff = abs(fat - fat_target) / fat_target if fat_target else 0
-        carb_diff = abs(carbs - carb_target) / carb_target if carb_target else 0
-        # 50x multiplier: 100% off target on both macros = score 0
-        macro_score = clamp(round(100 - (fat_diff + carb_diff) * 50))
+    # #5102: the 0.20 macro slot grades the charter's fat, carbohydrate and fibre FLOORS (health.macro_floors), one-sided:
+    # met = 100, below = 80 * value / floor; a missing field is unknown and drops out of the slot's mean, never a miss.
+    floors = macro_floors.evaluate_day(mf)
+    macro_score = macro_floors.score(floors)
+    details["macro_floors"] = floors
+    if macro_score is not None:
+        macro_score = clamp(macro_score)
         parts.append(macro_score * 0.20)
         weights.append(0.20)
         details["macro_score"] = macro_score

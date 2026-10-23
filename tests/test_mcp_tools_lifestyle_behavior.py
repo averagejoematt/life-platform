@@ -1445,7 +1445,7 @@ def test_get_intake_response_clamps_the_window_silently(table, monkeypatch):
     the only tell is that the echoed value differs from the request."""
     seen = {}
 
-    def _fake(tbl, window_days=180):
+    def _fake(tbl, window_days=180, **kw):  # #5106: the tool also asks for the check-in read (include_checkin)
         seen["window_days"] = window_days
         return {"window_days": window_days, "logged_evenings": 0, "nonzero_evenings": 0}
 
@@ -1852,13 +1852,13 @@ def test_movement_neat_conversion_uses_the_thermochemical_kilocalorie(monkeypatc
 
 
 def test_movement_step_target_hit_rate_is_hand_derived(monkeypatch):
-    """Four days at 9000/9000/7000/7000 steps against the declared default target
-    of 8000 ⇒ 2 of 4 ⇒ 50.0%, and the average is (9000+9000+7000+7000)/4 = 8000."""
-    ah = [{"date": _d(-i), "steps": s, "active_calories": 400} for i, s in enumerate((9000, 9000, 7000, 7000))]
+    """Four days at 13000/13000/11000/11000 steps against the default target — the charter's 12,000 steps
+    floor (#5056) ⇒ 2 of 4 ⇒ 50.0%, and the average is (13000+13000+11000+11000)/4 = 12000."""
+    ah = [{"date": _d(-i), "steps": s, "active_calories": 400} for i, s in enumerate((13000, 13000, 11000, 11000))]
     _movement_sources(monkeypatch, apple_health=ah)
     out = TOOLS["get_daily_metrics"]["fn"]({"view": "movement", "start_date": _d(-3), "end_date": TODAY})
-    assert out["summary"]["step_target"] == 8000
-    assert out["summary"]["avg_daily_steps"] == 8000
+    assert out["summary"]["step_target"] == 12000
+    assert out["summary"]["avg_daily_steps"] == 12000
     assert out["summary"]["step_target_hit_rate_pct"] == 50.0
 
 

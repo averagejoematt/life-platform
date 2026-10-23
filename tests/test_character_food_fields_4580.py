@@ -19,8 +19,9 @@ LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), "..", "lambdas")
 sys.path.insert(0, os.path.abspath(LAMBDAS_DIR))
 
 from common import macrofactor_fields as mff  # noqa: E402
-from common.constants import PLAN_DAILY_CALORIES_TARGET  # noqa: E402
+from health.calorie_target import target_kcal  # noqa: E402
 from health.character_engine import compute_nutrition_raw  # noqa: E402
+from training.training_charter import charter_value  # noqa: E402
 
 _CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "character_sheet.json")
 
@@ -39,7 +40,7 @@ ROW_2026_10_17 = {
     "protein_distribution_score": Decimal("100"),
     "total_meals": Decimal("1"),
     "total_snacks": Decimal("4"),
-    "food_log": [{"food_name": "Morning Smoothies", "calories_kcal": Decimal("80"), "protein_g": Decimal("0")}],
+    "food_log": [{"food_name": "Morning Smoothies", "time": "07:30", "calories_kcal": Decimal("80"), "protein_g": Decimal("0")}],
 }
 
 # date, total_calories_kcal, total_protein_g, meals_above_30g_protein — stored rows 2026-10-04..10-17.
@@ -83,15 +84,16 @@ def test_logged_day_has_no_absent_food_behaviors():
 
 def test_food_components_score_the_wire_row():
     d = _details()
-    # |1561 - 1500| / 1500 = 4.07 % against a 20 % band -> 79.7
-    assert PLAN_DAILY_CALORIES_TARGET == 1500
-    assert d["calorie_adherence"]["score"] == 79.7
+    # #5095: the reference is the ONE calorie target (charter nutrition.calories, 2,100 at v1.8.0, was the
+    # retired 1,500 constant): |1561 - 2100| / 2100 = 25.7 % against a 20 % band -> clamped to 0.0
+    assert target_kcal("2026-10-17") == 2100
+    assert d["calorie_adherence"]["score"] == 0.0
     # 133 g / 170 g target, perfect at 1.2x -> 65.2
     assert d["protein_total"]["score"] == 65.2
-    # 1 meal at >= 30 g of a 4-meal target, perfect at 1.25x -> 20.0
-    assert d["protein_distribution"]["score"] == 20.0
-    # 8 of 14 days within 10 % of 1,500 kcal
-    assert d["consistency"]["score"] == 57.1
+    # #5214: feedings are the protein engine's (charter threshold) — the one timed row carries 0 g -> 0 feedings -> 0.0
+    assert d["protein_distribution"]["score"] == 0.0
+    # 2 of 14 days (1,911 and 1,935) within 10 % of 2,100 kcal
+    assert d["consistency"]["score"] == 14.3
 
 
 def test_shared_accessor_resolves_by_presence():
@@ -118,4 +120,17 @@ def test_mutation_legacy_names_only_reads_absent(monkeypatch):
     d = _details()
     absent = sorted(k for k, v in d.items() if isinstance(v, dict) and v.get("absent"))
     # calorie_adherence keeps the plan target but loses the intake, so it is absent too
-    assert absent == ["calorie_adherence", "consistency", "protein_distribution", "protein_total"]
+    # #5214: the distribution slot no longer reads the legacy stored count, so it is not among the absences
+    assert absent == ["calorie_adherence", "consistency", "protein_total"]
+
+
+def test_distribution_counts_engine_feedings_not_the_legacy_stored_count():
+    """#5214: 1 feeding at the charter threshold of a 4-feeding target, perfect at 1.25x -> 20.0; the stored legacy
+    count (meals_above_30g_protein = 1) is not what is graded, and an untimed day is unknown, never 0."""
+    thr = float(charter_value("nutrition.protein.feeding_threshold_g"))
+    timed = dict(ROW_2026_10_17, food_log=[{"time": "08:00", "protein_g": thr, "calories_kcal": 400}], meals_above_30g_protein=Decimal("4"))
+    _, d = compute_nutrition_raw({"macrofactor": timed, "macrofactor_14d": ROWS_14D, "latest_weight": None}, _config())
+    assert d["protein_distribution"]["score"] == 20.0
+    untimed = dict(ROW_2026_10_17, food_log=[{"protein_g": thr}], meals_above_30g_protein=Decimal("4"))
+    _, d = compute_nutrition_raw({"macrofactor": untimed, "macrofactor_14d": ROWS_14D, "latest_weight": None}, _config())
+    assert d["protein_distribution"].get("absent")

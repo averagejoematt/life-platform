@@ -9,8 +9,10 @@ sometimes I'll listen to body and do a walk instead, so more just focusing on pl
 and not forgetting next if I audible a change." Under a weekday calendar a walk on a lifting
 day silently SKIPPED that session, and the next date's session was served although the
 previous one never happened. The same evening the owner switched to v0.4 Upper/Lower (#4147),
-ORDER-BASED: Upper-heavy -> Lower-heavy -> Upper-volume -> Lower-volume, repeating, the next
-session being the one after the last PERFORMED lift. This module serves that order.
+ORDER-BASED, four sessions repeating, the next session being the one after the last PERFORMED
+lift. Owner rulings 5 + 6 (2026-10-18, #5069): five sessions in the training charter's
+`split.sequence` order, and the v0.4 block lock lifted. This module serves that order — and the
+cut-over between the two (`program_structure.SESSION_SEQUENCE['cutover']`).
 
 #4161 (the 2026-09-24 evidence red team, owner-approved the same day): a program week used to
 be four completed sessions, so at his pace (5–6 lifts a week) the load ramp, the
@@ -27,19 +29,22 @@ THE RULE, AS ARITHMETIC (pure — every Hevy row is injected; the numbers are
                 A walk, an Engine day (treadmill + bike + stretching) or a rest day carries no
                 load, so it never advances the position.
   index       = len(completed)                       (0-based: the next UNDONE session)
-  role        = session_roles[(offset + index) % 4]  offset = the index of `first_role`
-                                                     (Lower-heavy — the committed first v0.4 session)
+  role        = THE CUT-OVER (#5069, `_role_at`). A session on a day before `cutover.on` takes v0.4's
+                role: v04_roles[(offset + index) % 4], offset = the index of v0.4's first role
+                (Lower-heavy — the committed first v0.4 session). From `cutover.on`, with n_pre the
+                sessions credited before it: roles[(start + index - n_pre) % 5], start = the role
+                AFTER the last credited v0.4 role in the charter's order (the first role if none).
   week        = walk the sessions in order (`ledger`): week 1 opens on the block start; a session
-                opens the NEXT week only when the current week already holds >= 4 sessions AND
+                opens the NEXT week only when the current week already holds >= `per` sessions
+                (v0.4's 4 for a session before the cut-over, the charter's lifting days from it) AND
                 its day is >= 7 days after the day the current week opened. A session that has
                 the four but not the seven days is an EXTRA session of the current week
                 (`advance_blocked_by: "calendar_floor"`). The role still rotates by index — the
                 order never waits on the calendar; only the ramp clock does.
-  deload      = one pre-planned deload window (`owner_redlines` `lifting_sessions_per_wk.deload`):
-                it opens on the first session in program week >= 6 dated on/after
-                `program_structure.BLOCK_LOCK['locked_until']` (2026-11-04) — the LATER of the two —
-                and covers `days` (7) calendar days at −40 % sets, loads held, never a week off.
-                The next one is due `every_nth_week` program weeks after the week it opened.
+  deload      = NONE on its own (owner ruling 2026-10-18, #5070). A day is a deload day only when a record of the
+                owner's word (`deload_word`, passed in as `deload_records`) covers it — then `owner_redlines`
+                `lifting_sessions_per_wk.deload` applies as written: −40 % sets, loads held, `days` (7). A fatigue
+                signal is a RECOMMENDATION on the packet (`deload_recommendation`), never a cut.
   block       = (week - 1) // weeks_per_block + 1
 
 RULINGS (#4110/#4147/#4161 — stated so a reader can dispute them, not discover them)
@@ -49,6 +54,9 @@ RULINGS (#4110/#4147/#4161 — stated so a reader can dispute them, not discover
   * The sequence starts at Lower-heavy, the session the owner committed from chat on 2026-09-23
     (target 2026-09-25). Counting starts 2026-09-24, the first Pacific day after the switch, so
     a lift on Thursday advances it exactly as Friday's would; no pre-switch lift ever does.
+  * #5069: the five-day split does NOT re-anchor the block. A v0.4 session keeps its v0.4 role and
+    its v0.4 week; the five-day order continues from the role after the last one. The v0.4 block
+    lock (#4161) is lifted (ruling 6): `structure_fingerprint` is a measurement, never a guard.
   * A session logged ON the planned day is the one that day's plan served; it advances the
     NEXT day's plan. So the plan for a date is stable all day — a re-run after the workout (the
     stage-2 critics, the commit gate) sees the same session the draft was built for.
@@ -70,7 +78,7 @@ RULINGS (#4110/#4147/#4161 — stated so a reader can dispute them, not discover
     The routine index is read ONCE at the two block-read seams (`plan_hevy_windows._block_workouts`,
     `load_block_workouts`) and carried on the rows; a row without it counts as it always did and
     `credit_rule.routine_index_consulted` says so.
-  * #4161: "the 4-session cycle is complete" is read as ">= 4 sessions in the CURRENT week",
+  * #4161: "the cycle is complete" is read as ">= per sessions in the CURRENT week",
     not "at a multiple of 4 in the sequence": with the latter, one blocked advance would push the
     next boundary four more sessions out and a week would run ~9 days at his pace — slower than
     the calendar the rule exists to follow. The week that opens after a blocked advance opens at
@@ -78,12 +86,13 @@ RULINGS (#4110/#4147/#4161 — stated so a reader can dispute them, not discover
   * The redline's calendar ceiling (3–4 lifting sessions a week) is reported as an ADVISORY
     beside the served session (`spacing`), never by skipping it — the owner audibles, the plan
     remembers. v0.3's "non-consecutive days" advisory is gone: the order alternates upper and
-    lower, so back-to-back days never load the same region twice.
+    lower; the five-day order puts shoulders+arms between lower-heavy and upper-volume, so two upper sessions
+    can fall on consecutive days — the nominal week places a walk between them (`program_structure.NOMINAL_LIFTING_DAYS`).
   * #5004: the spacing window is the 7 days ENDING ON AND INCLUDING the target date, the target
     session counted in it; the advisory states that window. `self_added_volume` is NOT on this window
     and stays on its Mon–Sun Pacific calendar week (changing it would alter the Sunday digest's
     report): that is a weekly performed-vs-prescribed-sets report, this is a rolling session count.
-    The two differ on purpose and each says which it is. The 3–4/wk redline value is unchanged.
+    The two differ on purpose and each says which it is. The per-week redline is the charter's lifting days (#5069).
 """
 
 from __future__ import annotations
@@ -94,7 +103,7 @@ from typing import Any, Iterable
 
 from common.pacific_time import parse_day_key, shift_day_key
 
-from training import program_structure, training_streaks
+from training import block_model, deload_word, program_structure, program_v04, training_streaks
 
 ISSUE = "#4110"
 PROGRAM_ISSUE = "#4147"
@@ -104,7 +113,10 @@ CREDIT_ISSUE = "#4312"
 WEEK_RULE: dict[str, Any] = {
     "sessions_per_week": "program_structure.SESSION_SEQUENCE['sessions_per_week']",
     "floor_days": 7,
-    "rule": "a program week advances only when its 4-session cycle is complete AND >= 7 Pacific days have passed since the previous advance",
+    "rule": (
+        "a program week advances only when its session cycle is complete (v0.4's four sessions before the cut-over, the charter's "
+        "lifting days from it) AND >= 7 Pacific days have passed since the previous advance"
+    ),
     "provenance": "population-derived",
     "evidence": (
         "tendon adapts on calendar time, not session count: Kubo 2010 JSCR 24(2):322 doi:10.1519/JSC.0b013e3181c865e2 "
@@ -119,7 +131,8 @@ WEEK_RULE: dict[str, Any] = {
 
 
 def _seq() -> dict[str, Any]:
-    return program_structure.SESSION_SEQUENCE
+    """`program_structure.SESSION_SEQUENCE` plus the block length, read from the charter (#5077: `rotation.anchors_fixed_weeks`)."""
+    return {**program_structure.SESSION_SEQUENCE, "weeks_per_block": block_model.block_weeks()}
 
 
 def block_start() -> str:
@@ -144,20 +157,52 @@ def _days(a: str, b: str) -> int:
     return (pb - pa).days
 
 
-def _role_at(index: int) -> str:
-    """The role of the session at 0-based `index` in the sequence — THE role formula (`ledger` and
-    the credit guard read this one function, so the role a candidate WOULD take is the role the
-    ledger gives it once credited)."""
+def cutover_day() -> str:
+    """The first day the five-day order serves (#5069); a session before it is a v0.4 session."""
+    return str(_seq()["cutover"]["on"])
+
+
+def _v04_role_at(index: int) -> str:
+    v04 = program_v04.SESSION_SEQUENCE
+    roles = v04["session_roles"]
+    return str(roles[(roles.index(v04["first_role"]) + index) % len(roles)])
+
+
+def _role_at(index: int, day: str, n_before_cutover: int) -> str:
+    """The role of the session at 0-based `index`, logged on `day`, with `n_before_cutover` sessions credited before the
+    cut-over — THE role formula (`ledger` and the credit guard read this one function, so the role a candidate WOULD
+    take is the role the ledger gives it once credited).
+
+    Before the cut-over: v0.4's order from its first role. From it: the charter's order, starting at the role AFTER the
+    last credited v0.4 session (the live block is not re-anchored, #5069), or at `first_role` when none was credited."""
+    if day < cutover_day():
+        return _v04_role_at(index)
     seq = _seq()
-    roles = seq["session_roles"]
-    return str(roles[(roles.index(seq.get("first_role") or roles[0]) + index) % len(roles)])
+    roles = list(seq["session_roles"])
+    if n_before_cutover > 0:
+        last = _v04_role_at(n_before_cutover - 1)
+        start = (roles.index(last) + 1) % len(roles) if last in roles else 0
+    else:
+        start = roles.index(seq.get("first_role") or roles[0])
+    return str(roles[(start + index - n_before_cutover) % len(roles)])
+
+
+def _per_week(day: str) -> int:
+    """Sessions in a program week for a session on `day`: v0.4's four before the cut-over, the charter's lifting days from it."""
+    seq = program_v04.SESSION_SEQUENCE if day < cutover_day() else _seq()
+    return int(seq["sessions_per_week"])
+
+
+def _version_on(day: str) -> Any:
+    return program_v04.SESSION_SEQUENCE["program_version"] if day < cutover_day() else _seq().get("program_version")
 
 
 # ── #4312: what a loaded log must be to be credited as a PROGRAM session ─────────────
 def program_archetypes() -> set[str]:
     """The archetypes of the program's own sessions — `SESSION_TEMPLATES[role]['archetype']` over
-    the sequence's roles (v0.4: upper, lower). One derivation; no list of complement names."""
-    return {str(program_structure.SESSION_TEMPLATES[r]["archetype"]) for r in _seq()["session_roles"]}
+    the sequence's roles, v0.4's and the five-day split's (upper, lower). One derivation; no list of complement names."""
+    roles = set(_seq()["session_roles"]) | set(program_v04.SESSION_SEQUENCE["session_roles"])
+    return {str(program_structure.SESSION_TEMPLATES[r]["archetype"]) for r in roles}
 
 
 def role_anchor_muscles(role: str) -> set[str]:
@@ -277,7 +322,7 @@ def classify_sessions(workouts: Iterable[dict[str, Any]] | None, before_day: str
             )
         if not program:
             continue
-        role = _role_at(len(credited))
+        role = _role_at(len(credited), d, sum(1 for c in credited if c["date"] < cutover_day()))
         check = content_check(program, role)
         if check["matched"] is False:
             logged = "/".join(check["logged_muscles"]) or "none"
@@ -312,20 +357,25 @@ def uncredited_sessions(workouts: Iterable[dict[str, Any]] | None, before_day: s
     return classify_sessions(workouts, before_day)[1]
 
 
-# ── the deload and the block lock (#4161) ─────────────────────────────────────────────
+# ── the deload, and the structure as a measurement (#4161 -> #5069) ─────────────────────
 def deload_cfg() -> dict[str, Any]:
-    """The owner's deload, one home (`owner_redlines`), with the lock date resolved from `BLOCK_LOCK`."""
-    cfg = program_structure._deload_cfg()
-    cfg["not_before_date"] = str(program_structure.BLOCK_LOCK["locked_until"])
-    return cfg
+    """The deload's response (`owner_redlines`, one home) and its gate (the charter's `deload` block, #5070).
+
+    There is no schedule: the sequence never enters a deload on its own. A deload exists only on a record of the
+    owner's word (`deload_word`), passed to `ledger` as `deload_records`."""
+    return {**program_structure._deload_cfg(), "scheduled": False}
 
 
-# program_version is NOT structure (#4161 review): a version bump with no structural change must not read `violated`
+# program_version is NOT structure (#4161 review): a version bump with no structural change must not move the fingerprint
 _STRUCTURAL_KEYS = ("session_roles", "first_role", "sessions_per_week", "weeks_per_block", "block_start")
 
 
 def structure_fingerprint() -> str:
-    """sha256 over what `BLOCK_LOCK` calls STRUCTURE: the split, the order, the templates, the accessories."""
+    """sha256 over the program's STRUCTURE: the split, the order, the templates, the accessories.
+
+    A MEASUREMENT since owner ruling 6 (2026-10-18, #5069 — "the v0.4 lock to 2026-11-04 is lifted now"): the served
+    session carries it so a structural change is visible between two plans; nothing compares it to refuse an edit.
+    The value recorded when v0.4 was locked is history (`program_v04.BLOCK_LOCK`)."""
     body = {
         "split": program_structure.SPLIT,
         "sequence": {k: _seq().get(k) for k in _STRUCTURAL_KEYS},
@@ -335,72 +385,32 @@ def structure_fingerprint() -> str:
     return hashlib.sha256(json.dumps(body, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 
-def fingerprint_record_problems(lock: dict[str, Any] | None = None) -> list[str]:
-    """Why `BLOCK_LOCK`'s recorded fingerprint is not an OWNER-attested record, or [] (#4161 review).
-
-    A re-recorded `structure_fingerprint` must travel with `structure_fingerprint_record`: the same value,
-    `provenance: "owner"`, a `stated` day key, and a `ref` naming the decision or issue that allowed it —
-    so re-recording the lock can never be how a structural edit quietly passes the guard."""
-    lock = lock if lock is not None else program_structure.BLOCK_LOCK
-    rec = lock.get("structure_fingerprint_record") or {}
-    out = []
-    if rec.get("fingerprint") != lock.get("structure_fingerprint"):
-        out.append(f"record names {rec.get('fingerprint')!r}, the lock holds {lock.get('structure_fingerprint')!r}")
-    if rec.get("provenance") != "owner":
-        out.append("record provenance is not 'owner'")
-    if parse_day_key(str(rec.get("stated") or "")) is None:
-        out.append("record carries no dated `stated`")
-    if "#" not in str(rec.get("ref") or ""):
-        out.append("record names no decision/issue `ref`")
-    return out
-
-
-def block_lock_state(day: str) -> dict[str, Any]:
-    """The owner's v0.4 block lock as a guard the engine READS (#4161; it was recorded, not enforced).
-
-    `locked` until `locked_until`. While locked, a structure whose fingerprint differs from the one
-    recorded at the lock is `violated` — the served session says so and names both fingerprints, and
-    `tests/test_hybrid_week_deload_lock_4161.py` refuses the edit at CI. Loads and deloads are not
-    structure: they run as written."""
-    lock = program_structure.BLOCK_LOCK
-    locked = day < str(lock["locked_until"])
-    live, recorded = structure_fingerprint(), str(lock.get("structure_fingerprint"))
-    problems = fingerprint_record_problems(lock)
-    state = ("violated" if live != recorded or problems else "locked") if locked else "open"
+def structure_state() -> dict[str, Any]:
+    """The served session's structure line: the live fingerprint, and that the old lock is lifted (never a guard)."""
+    lock = program_v04.BLOCK_LOCK
     return {
-        "state": state,
-        "locked_until": lock["locked_until"],
-        "structure_fingerprint": live,
-        "recorded_fingerprint": recorded,
-        "rule": lock["rule"],
-        "record_problems": problems,
-        **(
-            {
-                "refusal": f"a STRUCTURAL edit to v{_seq().get('program_version')} before {lock['locked_until']} — the owner's block lock ({WEEK_ISSUE})"
-            }
-            if state == "violated"
-            else {}
-        ),
+        "structure_fingerprint": structure_fingerprint(),
+        "lock": "lifted",
+        "lifted": lock["lifted"],
+        "v0_4_lock_history": {k: lock[k] for k in ("locked_until", "structure_fingerprint", "decision_sk")},
+        "note": "a measurement, never a guard — owner ruling 6 (2026-10-18) lifted the v0.4 lock; structural edits need no fingerprint re-record",
     }
 
 
 # ── the ledger: every session's week, in order ─────────────────────────────────────────
-def ledger(dates: list[str], day: str | None = None) -> list[dict[str, Any]]:
+def ledger(dates: list[str], day: str | None = None, deload_records: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     """The program position of each completed session (`dates`, oldest first, one per day) and —
     when `day` is given — of the NEXT session served on `day`, as the last element. Pure.
 
     THE one place a week, a deload and a block are computed (#4161); every reader goes through it."""
     seq = _seq()
-    per = int(seq["sessions_per_week"])
     floor = _floor_days()
-    dl = deload_cfg()
-    dl_days, dl_every = int(dl["days"]), int(dl["every_nth_week"])
-    due_week, not_before = int(dl["at_program_week"]), dl["not_before_date"]
     week, opened, in_week = 1, block_start(), 0
-    dl_start: str | None = None
-    dl_week = 0
     out: list[dict[str, Any]] = []
-    for i, d in enumerate(list(dates) + ([day] if day is not None else [])):
+    every = list(dates) + ([day] if day is not None else [])
+    n_pre = sum(1 for d in every if d < cutover_day())  # #5069: the sessions that keep their v0.4 role
+    for i, d in enumerate(every):
+        per = _per_week(d)
         prev_opened, since, before = opened, _days(opened, d), in_week
         blocked, advanced = None, False
         if in_week >= per:
@@ -409,12 +419,10 @@ def ledger(dates: list[str], day: str | None = None) -> list[dict[str, Any]]:
             else:
                 blocked = "calendar_floor"
         in_week += 1
-        if dl_start is not None and _days(dl_start, d) >= dl_days:
-            dl_start, due_week, not_before = None, dl_week + dl_every, None
-        if dl_start is None and week >= due_week and (not_before is None or d >= not_before):
-            dl_start, dl_week = d, week
-        deload = dl_start is not None and _days(dl_start, d) < dl_days
-        role = _role_at(i)
+        # #5070: a deload is the owner's recorded word covering this day — never the week counter, never a date
+        dl_rec = deload_word.active_record(deload_records, d)
+        deload = dl_rec is not None
+        role = _role_at(i, d, n_pre)
         label = program_structure._ROLE_LABEL[role].lower()
         if in_week <= per:
             pos_label = f"week {week} · session {in_week} of {per} · {label}"
@@ -424,7 +432,7 @@ def ledger(dates: list[str], day: str | None = None) -> list[dict[str, Any]]:
             {
                 "sequence_index": i,
                 "date": d,
-                "program_version": seq.get("program_version"),
+                "program_version": _version_on(d),
                 "archetype": program_structure.SESSION_TEMPLATES[role]["archetype"],
                 "week": week,
                 "session_in_week": in_week,
@@ -445,18 +453,20 @@ def ledger(dates: list[str], day: str | None = None) -> list[dict[str, Any]]:
                     "advance_blocked_by": blocked,
                     "next_advance_earliest": shift_day_key(opened, floor),
                 },
-                "deload_window": {"started_on": dl_start, "days": dl_days} if deload else None,
+                "deload_window": {"started_on": dl_rec["start_date"], "days": int(dl_rec["days"])} if dl_rec else None,
             }
         )
     return out
 
 
-def preview(n_sessions: int, *, every_days: int = 1, start_day: str | None = None) -> list[dict[str, Any]]:
+def preview(
+    n_sessions: int, *, every_days: int = 1, start_day: str | None = None, deload_records: list[dict[str, Any]] | None = None
+) -> list[dict[str, Any]]:
     """The next `n_sessions` positions assuming one session every `every_days` from `start_day`
     (default: the block start) — the ledger over synthetic dates, so a preview can never use a
     different week rule from the one served."""
     s = start_day or block_start()
-    return ledger([shift_day_key(s, i * max(1, int(every_days))) for i in range(max(0, int(n_sessions)))])
+    return ledger([shift_day_key(s, i * max(1, int(every_days))) for i in range(max(0, int(n_sessions)))], deload_records=deload_records)
 
 
 def completed_positions(workouts: Iterable[dict[str, Any]] | None, before_day: str) -> list[dict[str, Any]]:
@@ -502,7 +512,9 @@ def _spacing(completed: list[dict[str, Any]], day: str) -> dict[str, Any]:
     }
 
 
-def next_session(day: str, workouts: Iterable[dict[str, Any]] | None) -> dict[str, Any] | None:
+def next_session(
+    day: str, workouts: Iterable[dict[str, Any]] | None, deload_records: list[dict[str, Any]] | None = None
+) -> dict[str, Any] | None:
     """The next UNDONE session as of `day`, or None before the block start.
 
     Same shape the generator reads (archetype / session_role / label / week / block / deload)
@@ -527,7 +539,7 @@ def next_session(day: str, workouts: Iterable[dict[str, Any]] | None) -> dict[st
 
     rows = list(workouts)
     done, refused = classify_sessions(rows, day)
-    led = ledger([c["date"] for c in done], day)
+    led = ledger([c["date"] for c in done], day, deload_records)
     pos = {k: v for k, v in led[-1].items() if k != "date"}
     last = done[-1] if done else None
     basis = pos["week_basis"]
@@ -552,18 +564,18 @@ def next_session(day: str, workouts: Iterable[dict[str, Any]] | None) -> dict[st
         # #4161: the week counter's basis, flat, so a reader of the served session sees WHY it is this week
         "days_since_last_advance": basis["days_since_last_advance"],
         "advance_blocked_by": basis["advance_blocked_by"],
+        # #5070: no schedule — signals recommend, the owner's recorded word applies. The plan engine fills `reasons`.
+        "deload_recommendation": deload_word.recommendation(day=day, records=deload_records),
         "deload_plan": {
             "rule": (
-                f"one pre-planned deload at the LATER of program week {dl['at_program_week']} or {dl['not_before_date']} "
-                f"(the block lock): {dl['sets_pct']} % sets for {dl['days']} days, loads {dl['loads']}, never a week off"
+                f"NO scheduled or automatic deload (owner ruling 2026-10-18): a deload applies only on the owner's recorded word — "
+                f"{dl['sets_pct']} % sets for {dl['days']} days, loads {dl['loads']}, never a week off"
             ),
-            "at_program_week": dl["at_program_week"],
-            "not_before": dl["not_before_date"],
             "sets_pct": dl["sets_pct"],
             "days": dl["days"],
             "evidence": dl.get("evidence"),
         },
-        "block_lock": block_lock_state(day),
+        "structure": structure_state(),  # #5069: the v0.4 lock is lifted — a measurement, never a guard
         "advanced_by": (
             {k: last[k] for k in ("date", "title", "workout_id", "sequence_index", "loaded_logs_that_day")}
             | {"was": led[-2]["position_label"]}
@@ -587,7 +599,7 @@ def next_session(day: str, workouts: Iterable[dict[str, Any]] | None) -> dict[st
         "rule": (
             f"the v{_seq().get('program_version')} sessions run as a SEQUENCE ("
             + " -> ".join(program_structure._ROLE_LABEL[r].lower() for r in _seq()["session_roles"])
-            + f", from {program_structure._ROLE_LABEL[_seq()['first_role']].lower()}); the position advances only on a completed "
+            + f", from the role after the last v0.4 session credited before {cutover_day()} — #5069); the position advances only on a completed "
             f"loaded Hevy session, so a walk or rest day postpones a session and never skips it ({ISSUE}, {PROGRAM_ISSUE}); "
             f"an off-program complement (Flex) never advances it and never takes a role ({CREDIT_ISSUE}); "
             f"the WEEK advances only when its {pos['sessions_per_week']}-session cycle is complete AND >= {basis['floor_days']} days "
@@ -596,16 +608,16 @@ def next_session(day: str, workouts: Iterable[dict[str, Any]] | None) -> dict[st
     }
 
 
-def program_week(day: str, workouts: Iterable[dict[str, Any]] | None) -> int | None:
+def program_week(day: str, workouts: Iterable[dict[str, Any]] | None, deload_records: list[dict[str, Any]] | None = None) -> int | None:
     """THE program week for `day` — 0 before the block start, None when the Hevy record was not
     read (or the day key is unreadable). Read by the `not_before_week` gate (#4098) and the load
     ramp (#4090) — one function, so the two can never disagree about which week it is.
 
-    #4161: a program week is HYBRID — it advances only when its 4-session cycle is complete AND >= 7
-    days have passed since the previous advance (`ledger`, `WEEK_RULE`). The deload and the block lock
-    read the same ledger; `BLOCK_LOCK` is enforced as a guard (`block_lock_state`)."""
+    #4161: a program week is HYBRID — it advances only when its session cycle is complete AND >= 7
+    days have passed since the previous advance (`ledger`, `WEEK_RULE`). The v0.4 block lock is lifted
+    (owner ruling 6, #5069) — no guard reads the ledger for it."""
     try:
-        entry = next_session(day, workouts)
+        entry = next_session(day, workouts, deload_records)
     except ValueError:
         return None
     if entry is None:

@@ -25,16 +25,22 @@ from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DA
 
 from mcp.core import decimal_to_float, get_profile, query_source
 
-# Run gate from PROVEN_BLUEPRINT.md (owner-private: s3://matthew-life-platform/config/coaching/,
-# #3043) — zero runs logged above ~240 lb in his own history.
+# The run gate is the training charter's `gated_movements.running.gate_lb` (#5090 retired the hand copy
+# `RUN_GATE_LB`): zero runs logged above it in his own history. This view reads the WEIGHT half only;
+# the whole gate (walking weeks, the strain hold, the on-ramp) is `training.run_onramp.gate_state`.
 #
-# Numeric-anchor disclosure ACCEPTED, dated 2026-08-23 (#3045, DIL-012 residual): this
-# threshold (and the ~0.79x regain-asymmetry ratio below) are functional code constants
-# in a public repo. The quantity they anchor — the owner's weight ballpark — is itself
-# TIER_OWNER_PUBLISHED (ADR-155: weight is deliberately published daily on /api/vitals),
-# so the anchors disclose nothing beyond the consented surface. Revisit trigger: weight
-# ever leaves the published set.
-RUN_GATE_LB = 240.0
+# Numeric-anchor disclosure ACCEPTED, dated 2026-08-23 (#3045, DIL-012 residual): the ~0.79x
+# regain-asymmetry ratio below is a functional code constant in a public repo. The quantity it
+# anchors — the owner's weight ballpark — is itself TIER_OWNER_PUBLISHED (ADR-155: weight is
+# deliberately published daily on /api/vitals). Revisit trigger: weight ever leaves the published set.
+
+
+def _run_gate_lb() -> float | None:
+    from training.training_charter import charter_value
+
+    v = charter_value("gated_movements.running.gate_lb")
+    return float(v) if v is not None else None
+
 
 # The chronic training-load window (#3711). Rates computed over a shorter span
 # are arithmetic, not measurements — see band_reference.VOLUME_FLOOR_DAYS for
@@ -201,17 +207,22 @@ def _benchmark_pace(args: dict) -> dict:
     proven_rate = _proven_rate_at(ref.get("proven_curve") or [], current_weight)
     walks_current, n_walk = _recent_walks_wk(end_date)
     walk_gap = round(walks_proven - walks_current, 2) if (walks_proven is not None and walks_current is not None) else None
-    run_gate_ok = current_weight <= RUN_GATE_LB
+    gate_lb = _run_gate_lb()
+    run_gate_ok = None if gate_lb is None else current_weight <= gate_lb
     n_ref = ref.get("n_episodes_with_covariates")
 
     # Forward-framed signal (Nathan): no failure tally — only what works next.
     bits = []
     if walks_proven is not None:
         bits.append(f"Walking is {walks_current}/wk vs the ~{walks_proven}/wk that worked at this weight last time.")
-    if not run_gate_ok:
-        bits.append(f"Running stays parked until ~240 lb (currently ~{round(current_weight)}); walking is the highest-leverage lever now.")
+    if run_gate_ok is None:
+        bits.append("The run gate could not be read from the training charter.")
+    elif not run_gate_ok:
+        bits.append(
+            f"Running stays parked until ~{gate_lb:g} lb (currently ~{round(current_weight)}); walking is the highest-leverage lever now."
+        )
     else:
-        bits.append("You're under the ~240 lb run gate — easy running can enter as joints allow.")
+        bits.append(f"You're under the ~{gate_lb:g} lb run gate — the run/walk on-ramp opens once the walking weeks are met.")
 
     return {
         "view": "pace",
@@ -283,7 +294,7 @@ def _gate_signals() -> dict:
     try:
         from mcp.tools_nutrition import _get_metabolic_adaptation, tool_get_deficit_sustainability
 
-        ds = tool_get_deficit_sustainability({})
+        ds = tool_get_deficit_sustainability({"critics_model": False})
         out["deficit_sustainability"] = {"available": "error" not in ds, "note": ds.get("error")} if isinstance(ds, dict) else {}
         ma = _get_metabolic_adaptation({})
         out["metabolic_adaptation"] = {"available": "error" not in ma, "note": ma.get("error")} if isinstance(ma, dict) else {}
@@ -922,7 +933,7 @@ GET_BENCHMARK_DESCRIPTION = (
     "correlational, n=1 — never causal). Use 'view' to select: "
     "'pace' (default) = live pace vs the proven trajectory at the current weight — current "
     "weight/rate + recent walking volume vs the by-band proven volumes, walk gap, and the "
-    "~240 lb run gate. "
+    "weight half of the training charter's run gate. "
     "'episodes' = the detected loss/regain ledger + loss-vs-regain rate asymmetry. "
     "'maintenance' = the regain firewall (near goal): rolling walk volume vs the proven floor "
     "and the post-trough decay signature. "

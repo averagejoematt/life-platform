@@ -50,6 +50,7 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
 
 from training import plan_engine, program_conflicts, program_seam, program_structure  # noqa: E402
+from training.training_charter import charter_value  # noqa: E402
 
 CONFIG = REPO / "config"
 HEVY_FIXTURE = REPO / "tests" / "fixtures" / "walking_volume_3930" / "hevy_2026-09-13_19.json"
@@ -62,12 +63,13 @@ def _hevy_rows() -> list[dict]:
 
 # ── 1. gate:owner cannot be simulated ────────────────────────────────────────
 def test_active_is_true_only_with_the_owner_review_date():
-    """The owner approved v0.3 on 2026-09-21 (#3753/#3755) and switched to v0.4 on 2026-09-23
-    (#4147). ACTIVE without that date is the inherited-assumption failure this module exists to
-    prevent — the pair is pinned. Mutation control (recorded in the PR): set ACTIVE = False → this reds."""
+    """The owner approved v0.3 on 2026-09-21 (#3753/#3755), switched to v0.4 on 2026-09-23 (#4147)
+    and ruled the five-day split on 2026-10-18 (#5069, rulings 5 + 6). ACTIVE without that date is the
+    inherited-assumption failure this module exists to prevent — the pair is pinned. Mutation control
+    (recorded in the PR): set ACTIVE = False → this reds."""
     assert program_structure.ACTIVE is True
-    assert program_structure.LAST_REVIEWED_BY_OWNER == "2026-09-23"
-    assert program_structure.PROGRAM_VERSION == "0.4"
+    assert program_structure.LAST_REVIEWED_BY_OWNER == "2026-10-18"
+    assert program_structure.PROGRAM_VERSION == "1.0"
     assert program_structure.DECISION_SK == "DECISION#2026-09-24T03:10:59"
 
 
@@ -81,22 +83,27 @@ def test_active_and_review_date_cannot_disagree():
 def test_summary_reports_active_with_the_review_date():
     s = program_structure.summary()
     assert s["active"] is True
-    assert s["status_note"].startswith("ACTIVE") and "2026-09-23" in s["status_note"]
-    assert s["split"] == "upper_lower"
-    assert s["program_version"] == "0.4"
-    assert s["prose_home"].endswith("TRAINING_PROGRAM_v0.4.md")
+    assert s["status_note"].startswith("ACTIVE") and "2026-10-18" in s["status_note"]
+    assert s["split"] == "five_day"
+    assert s["program_version"] == "1.0"
+    assert s["prose_home"].endswith("TRAINING_PROGRAM.md")
     assert s["superseded_programs"]["0.3"]["superseded_on"] == "2026-09-24"
+    assert s["superseded_programs"]["0.4"]["superseded_on"] == "2026-10-18"
+    assert s["block_lock_history"]["lifted"]["on"] == "2026-10-18" and "block_lock" not in s
 
 
 def test_the_split_decision_records_both_owner_dates():
-    """Each ruling was real and was overtaken, not ignored — every date travels. v0.4 (2026-09-23)
-    supersedes v0.3 (2026-09-21), whose own record of the 2026-09-19 PPL ruling is kept verbatim."""
+    """Each ruling was real and was overtaken, not ignored — every date travels. The five-day split (2026-10-18,
+    rulings 5 + 6) supersedes v0.4 (2026-09-23), which superseded v0.3 (2026-09-21), whose own record of the
+    2026-09-19 PPL ruling is kept verbatim."""
     from training import program_v03
 
     d = program_structure.SPLIT_DECISION
-    assert d["chosen"] == "upper_lower" and d["stated"] == "2026-09-23" and d["provenance"] == "owner"
+    assert d["chosen"] == "five_day" and d["stated"] == "2026-10-18" and d["provenance"] == "owner"
+    assert "ruling 6" in d["ruling"] or "6 —" in d["ruling"]
     assert d["decision_sk"] == "DECISION#2026-09-24T03:10:59"
-    assert d["supersedes"]["stated"] == "2026-09-21" and "v0.3" in d["supersedes"]["ruling"]
+    assert d["supersedes"]["stated"] == "2026-09-23" and "v0.4" in d["supersedes"]["ruling"]
+    assert any("upper_lower" in r for r in d["rejected"])
     assert any("full_body" in r for r in d["rejected"]) and any("ppl" in r for r in d["rejected"])
     old = program_v03.SPLIT_DECISION
     assert old["chosen"] == "full_body" and old["stated"] == "2026-09-21"
@@ -120,8 +127,8 @@ def test_every_anchor_and_knob_carries_provenance():
 
 
 def test_conflicts_with_the_owners_redlines_are_named_not_hidden():
-    """v3 redlines say 3–4 lifting sessions and v0.3 schedules 3 + an optional 4th, so the frequency
-    conflict is gone BY COMPUTATION — it must REAPPEAR under the v1 (2–3) and v2 (5–6) values
+    """The redline reads the charter's five lifting days and the nominal week carries five (#5069, ruling 5), so the
+    frequency conflict is gone BY COMPUTATION — it must REAPPEAR under v0.4's 3–4 and a 6–7 band
     (mutation control: the check is live, not deleted). The barbell-bench-vs-skill-ceiling
     conflict is RESOLVED (not deleted — still NAMED, per the #4080 audit-trail style) by the
     owner's 2026-09-23 exemption: bench is one of the four core anchor families
@@ -138,9 +145,10 @@ def test_conflicts_with_the_owners_redlines_are_named_not_hidden():
     assert bench_conflict["resolved"] is True
     assert bench_conflict["resolved_on"] == "2026-09-23"
     assert bench_conflict["resolution_source"] == "owner ruling recorded on #4080 (option B)"
-    with unittest.mock.patch.dict(owner_redlines.REDLINES["lifting_sessions_per_wk"], {"low": 2, "high": 3}):
+    assert owner_redlines.REDLINES["lifting_sessions_per_wk"]["low"] == owner_redlines.REDLINES["lifting_sessions_per_wk"]["high"] == 5
+    with unittest.mock.patch.dict(owner_redlines.REDLINES["lifting_sessions_per_wk"], {"low": 3, "high": 4}):
         assert "lifting_frequency_vs_redline" in {c["id"] for c in program_conflicts.conflicts()}
-    with unittest.mock.patch.dict(owner_redlines.REDLINES["lifting_sessions_per_wk"], {"low": 5, "high": 6}):
+    with unittest.mock.patch.dict(owner_redlines.REDLINES["lifting_sessions_per_wk"], {"low": 6, "high": 7}):
         assert "lifting_frequency_vs_redline" in {c["id"] for c in program_conflicts.conflicts()}
     # mutation control: without the exemption, the bench conflict is unresolved again
     with unittest.mock.patch.dict(program_conflicts.ANCHOR_SKILL_CEILING_RULING, {"exempt_families": ("squat", "hinge", "row")}):
@@ -155,11 +163,11 @@ def test_week_grid_keys_equal_the_json_keys():
     assert set(program_structure.week_grid()) == set(live), "week_grid() must be a drop-in for config/training_week.json"
 
 
-def test_week_grid_is_an_upper_lower_week_the_generator_can_read():
+def test_week_grid_is_an_upper_lower_archetype_week_the_generator_can_read():
     grid = program_structure.week_grid()
     assert grid["_version"] == 3
     archetypes = {d["archetype"] for d in grid["schedule"].values()}
-    assert archetypes == {"upper", "lower", "aerobic"}, "v0.4: upper/lower lifting days and walking days, nothing else"
+    assert archetypes == {"upper", "lower", "aerobic"}, "upper/lower-archetype lifting days (the five roles) and walking days, nothing else"
     # every scheduled archetype must have a targets entry, or the generator silently
     # produces an empty session for that day
     for day in grid["schedule"].values():
@@ -167,35 +175,46 @@ def test_week_grid_is_an_upper_lower_week_the_generator_can_read():
     assert set(grid["archetype_targets"]["upper"]) == {"chest", "back", "shoulders", "biceps", "triceps"}
     assert set(grid["archetype_targets"]["lower"]) == {"quadriceps", "hamstrings", "glutes", "calves"}
     assert grid["session_set_ceiling"] == 20, "v0.5 OD4 (#4503): 20 base / 24 with 🟢 (training.green_block)"
-    assert grid["session_minutes_ceiling"] == 70, "§3: 55–70 min"
+    # #5069, ruling 5: "60-75 min of lifting" — the charter's lifting top, read, never restated
+    assert grid["session_minutes_ceiling"] == program_structure.lifting_minutes_cap() == charter_value("split.session_minutes.lifting")[1]
     assert grid["weekly_volume_cap_per_muscle"] == 22, "the fail-safe cap does not move; the 8–12 target lives in owner_redlines"
     assert grid["exercise_notes_mode"] == "one_best_line" and grid["exercise_notes_lookback_days"] == 3650
 
 
-def test_the_nominal_week_carries_the_four_v04_roles_in_order():
-    """#4147: the weekday placement is NOMINAL (the sequence serves); it still carries the four
-    roles in the owner's order, inside the 3–4/wk redline, with walking on every other day."""
+def test_the_nominal_week_carries_the_five_roles_in_the_charters_order():
+    """#5069 (ruling 5: "5 lifting days ... Sequence Upper-heavy, Lower-heavy, Shoulders+arms, Upper-volume,
+    Lower-volume"): the weekday placement is NOMINAL (the sequence serves); it carries the five roles in the charter's
+    order, a walk between the shoulders+arms day and the next upper day, and walking on every other day."""
     grid = program_structure.week_grid()
     lifting = [int(k) for k, d in grid["schedule"].items() if d["archetype"] in ("upper", "lower")]
-    assert lifting == [0, 1, 3, 4] and program_structure.lifting_days() == ["0", "1", "3", "4"]
+    assert lifting == [0, 1, 2, 4, 5] and program_structure.lifting_days() == ["0", "1", "2", "4", "5"]
     roles = [grid["schedule"][str(k)]["session_role"] for k in lifting]
-    assert roles == program_structure.SESSION_SEQUENCE["session_roles"] == ["upper_heavy", "lower_heavy", "upper_volume", "lower_volume"]
-    assert not any(d.get("optional") for d in grid["schedule"].values()), "v0.4 has no optional fourth slot"
+    assert (
+        roles
+        == program_structure.SESSION_SEQUENCE["session_roles"]
+        == [program_structure.role_id(n) for n in charter_value("split.sequence")]
+    )
+    assert len(lifting) == charter_value("split.lifting_days_per_wk")
+    assert grid["schedule"]["3"]["archetype"] == "aerobic", "a walk between shoulders+arms (Wed) and upper-volume (Fri)"
+    assert not any(d.get("optional") for d in grid["schedule"].values()), "no optional slot"
     assert all("nominal" in grid["schedule"][str(k)]["label"] for k in lifting)
     # walking is every day: the non-lifting days are aerobic, never rest
     assert all(d["archetype"] == "aerobic" for k, d in grid["schedule"].items() if int(k) not in lifting)
 
 
 def test_every_anchor_pattern_is_reachable_twice_a_week_on_the_required_days():
-    """Six patterns, each 2x/wk (population-derived). 'Reachable' = a required lifting day whose
-    targets include one of the pattern's primary muscles; the generator selects by muscle."""
+    """Six patterns at the charter's `split.frequency` (owner ruling 5: each major muscle 2x/wk, delts 3x/wk — the
+    press). 'Reachable' = a required lifting day whose targets include one of the pattern's primary muscles; the
+    generator selects by muscle."""
     reach = program_structure.anchor_reachability()
     assert set(reach) == {"squat", "hinge", "bench", "row", "overhead_press", "vertical_pull"}
     for name, r in reach.items():
-        assert r["frequency_target"] == 2, name
+        want = charter_value("split.frequency.delts_per_wk" if name == "overhead_press" else "split.frequency.each_major_muscle_per_wk")
+        assert r["frequency_target"] == want, name
         assert r["reachable_at_target"] is True, name
-        assert len(r["reachable_days_excluding_optional"]) >= 2, name
-        assert program_structure.ANCHORS[name]["frequency_per_week"]["provenance"] == "population-derived"
+        assert len(r["reachable_days_excluding_optional"]) >= want, name
+        freq = program_structure.ANCHORS[name]["frequency_per_week"]
+        assert freq["provenance"] == "owner" and freq["charter_path"].startswith("split.frequency."), name
     assert set(program_structure.CORE_ANCHORS) == {"bench", "row", "squat", "hinge"}
 
 
@@ -213,16 +232,10 @@ def test_the_trap_bar_gate_and_the_load_hold_rule_have_one_home_each():
     lifting = owner_redlines.REDLINES["lifting_sessions_per_wk"]
     assert lifting["load_rule"].startswith("hold")
     assert lifting["load_entry"]["then"] == "hold" and lifting["load_entry"]["max_pct_of_band_e1rm_until_week_8"] == 85
-    # #4161 (v3.3): one pre-planned deload at the later of week 6 or the block lock, −40 % sets for 7 days, loads held
+    # #5070 (v3.4): no scheduled deload — the response a recorded owner word applies: −40 % sets for 7 days, loads held
     dl = lifting["deload"]
-    assert (dl["at_program_week"], dl["every_nth_week"], dl["sets_pct"], dl["days"], dl["loads"], dl["week_off"]) == (
-        6,
-        6,
-        -40,
-        7,
-        "held",
-        False,
-    )
+    assert (dl["sets_pct"], dl["days"], dl["loads"], dl["week_off"]) == (-40, 7, "held", False)
+    assert not {"at_program_week", "every_nth_week", "not_before"} & set(dl)
     assert any("HOLD" in n for n in program_structure.week_grid()["_notes"])
 
 
@@ -344,7 +357,7 @@ def test_seam_serves_the_module_when_active__mutation_control(monkeypatch):
     assert resolved.source == "module"
     assert calls == [], "the JSON must not be read at all once the program is active"
     assert set(resolved.week) == set(program_structure.week_grid())
-    assert "v0.4" in resolved.detail and "upper_lower" in resolved.detail and "2026-09-21" in resolved.detail
+    assert "v1.0" in resolved.detail and "five_day" in resolved.detail and "2026-09-21" in resolved.detail
 
 
 def test_seam_result_always_names_its_source():
@@ -526,8 +539,8 @@ def test_constraint_block_carries_the_program_summary():
     2026-09-23 exemption (#4080) — it must still be NAMED in honesty (audit trail), but as
     resolved, never as UNRESOLVED."""
     block = _block()
-    assert block["program"]["program_version"] == "0.4"
-    assert block["program"]["split"] == "upper_lower"
+    assert block["program"]["program_version"] == "1.0"
+    assert block["program"]["split"] == "five_day"
     assert block["program"]["active"] is True
     assert not any("is PROPOSED, not approved" in line for line in block["honesty"])
     assert not any("UNRESOLVED conflicts" in line for line in block["honesty"])

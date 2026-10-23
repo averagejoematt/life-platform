@@ -32,6 +32,15 @@ import the counting / estimating primitives themselves):
                            and `tools_plan._protein_days_7d` for the days-below-floor count.
   walking_hours_7d         `tools_plan._walking_volume_last_7d` -> `shared_quantities.walking_layer`
                            (#4068/#4105 — THE definition).
+  steps_7d                 `training.steps_resolver.steps_range` (#5081) over the 7 completed days before the
+                           target — each day's ONE steps figure through `common.metric_truth.resolve_steps`
+                           (the registry's METRIC_TRUTH winner rule), losers kept, a no-source day null, the
+                           Strava-walk figure a separate DERIVED estimate. Rows via `core.query_source_range`
+                           (Hevy via the one sanctioned Hevy read).
+  steps_ramp               `plan_engine._steps_ramp_block` -> `training.steps_ramp.compute` (#5082) over the SAME resolver window the plan's
+                           constraint block reads (`tools_plan._steps_window`, the packet's `_steps_fetch`) —
+                           the ramp to the charter floor, held by a lower-leg strain flag; no second computation. An unreadable
+                           window / dismissal / deload / performed-lift read is `read_failed` (value state `unknown`), as in the plan.
   loss_rate                `tools_benchmark._loss_rate_block` -> `shared_quantities.loss_rate_from_rows`.
   streaks                  `tools_plan._training_streaks` -> `training_streaks.streaks` (#4067).
   readiness                `get_readiness_score`, tiered by `tools_plan._recovery_tier`.
@@ -47,6 +56,10 @@ import the counting / estimating primitives themselves):
                            the HR ceiling from `owner_redlines`. Labelled PARTIAL while the day is in
                            progress. The one window that is NOT completed days: it is the day a
                            night-before debrief reviews.
+  guidance_freshness       `health.guidance_freshness.read_freshness` (#5059) — the owner guidance record's
+                           `effective` date against his latest logged appointment (`APPT#`): fresh / stale /
+                           no_appointment / unreadable, with the load prompt when stale. REFERENCE ONLY — never a
+                           gate on intensity (owner ruling 7); the same read `plan_next_session` puts on its block.
 
 READ STATES (#4072's vocabulary, `plan_engine.input_status`)
 
@@ -61,7 +74,7 @@ from typing import Any
 from common.pacific_time import pacific_today, shift_day_key
 from training.routine_title import ROUTINE_INDEX_LOOKBACK_DAYS as _ROUTINE_INDEX_LOOKBACK_DAYS
 
-PACKET_VERSION = "coach-session-packet@1.3.0"  # 1.3.0 #4189: morning_note field; 1.2.0 #4313: today; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
+PACKET_VERSION = "coach-session-packet@1.8.0"  # 1.8.0 #5078: fitness_tests; 1.7.0 #5061: calibration_cadence (tape / photos / DEXA due dates); 1.6.0 #5059: guidance_freshness (reference only); 1.5.0 #5082: steps_ramp; 1.4.0 #5081: steps_7d; 1.3.0 #4189: morning_note field; 1.2.0 #4313: today; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
 # Long enough that each performed type is found once a block is running (a v0.4 role recurs
 # weekly; an Engine day twice a week), bounded so the read stays one Hevy query.
 LAST_SESSION_LOOKBACK_DAYS = 28
@@ -69,7 +82,8 @@ LAST_SESSION_LOOKBACK_DAYS = 28
 ROUTINE_INDEX_LOOKBACK_DAYS = _ROUTINE_INDEX_LOOKBACK_DAYS  # one value (#4312): the block-read seams read the same lookback
 
 SOURCES: dict[str, str] = {
-    "muscle_volume": "get_muscle_volume (training.muscle_volume.working_sets_by_muscle, #4071) — plan_next_session's window",
+    "muscle_volume": "get_muscle_volume (training.muscle_volume.working_sets_by_muscle, #4071) — plan_next_session's window; "
+    "below_mev_14d = training.volume_floors over that tool's 14d trailing window vs config/training_landmarks.json (#5053)",
     "last_session_by_type": (
         "tools_strength._read_hevy_all_phases + training.muscle_volume.normalize_hevy_items; type = "
         "training.routine_title.resolve_archetype, role = session_sequence.completed_positions (#4110/#4161), loaded = training_streaks.is_loaded_session; "
@@ -77,6 +91,11 @@ SOURCES: dict[str, str] = {
     ),
     "nutrition_7d": "get_nutrition view=summary + tools_plan._protein_days_7d (plan_next_session's protein window)",
     "walking_hours_7d": "tools_plan._walking_volume_last_7d -> mcp.shared_quantities.walking_layer (#4068/#4105)",
+    "steps_7d": "training.steps_resolver.steps_range (#5081) -> common.metric_truth.resolve_steps (the METRIC_TRUTH steps facet) — "
+    "the 7 completed days before target_date, one winner per day, losers kept, no-source days null, Strava walks a DERIVED estimate",
+    "steps_ramp": "training.plan_engine._steps_ramp_block -> training.steps_ramp.compute (#5082) over tools_plan._steps_window (training.steps_resolver.steps_range, the same read as "
+    "steps_7d) — the ramp to the charter steps floor from the trailing average, held by a lower-leg strain flag; the plan's constraint_block "
+    "carries the same object",
     "loss_rate": "tools_benchmark._loss_rate_block -> mcp.shared_quantities.loss_rate_from_rows (#4068)",
     "streaks": "tools_plan._training_streaks -> training.training_streaks.streaks (#4067)",
     "readiness": "get_readiness_score, tier by tools_plan._recovery_tier",
@@ -90,6 +109,13 @@ SOURCES: dict[str, str] = {
         "de-dup = training.walking_volume.dedup_strava (#4068), walking = mcp.shared_quantities.walking_layer_for_day, "
         "HR ceiling = owner_redlines.REDLINES['walking_floor_hr_wk']['hr_ceiling_bpm']"
     ),
+    "fitness_tests": "mcp.tools_fitness_tests.read_view -> training.fitness_tests (#5078): the BATTERY# record + Hevy over "
+    "plan_hevy_windows._block_workouts, each test's trend in its better direction and the cadence state (upcoming/due/overdue/missed, counted in program weeks) with its prompt",
+    "guidance_freshness": "health.guidance_freshness.read_freshness (#5059) — the guidance record's effective date vs the latest "
+    "logged appointment; reference only, never a gate on intensity (plan_next_session's constraint_block carries the same read)",
+    "calibration_cadence": "training.calibration_cadence.read (#5061) — the charter's tape / progress-photo / DEXA cadences against the "
+    "dates last logged (measurements, progress_photos index dates only, dexa scan_date); due_on, state ok|due|overdue|missed_2, the prompt; "
+    "owner-only, no photo key or reading in it",
 }
 
 # Model-facing prose + schema live beside the tool (the #4078 manage_pending_writes precedent), so
@@ -98,7 +124,8 @@ COACH_PACKET_DESCRIPTION = (
     "CALL FIRST in any training-coaching conversation (#4082). ONE read of the coaching input packet a chat "
     "otherwise spends 10+ calls re-verifying: working sets per muscle over the 7 and 28 completed days, the "
     "last session of each type (and each v0.4 session role — the order-based sequence) with every set and every note, MacroFactor kcal + "
-    "protein over 7 days with the protein-floor count, weekly walking hours (THE one definition), the loss "
+    "protein over 7 days with the protein-floor count, weekly walking hours (THE one definition), daily steps over the 7 "
+    "completed days (one named winning source per day, the losers kept, a no-source day null — never 0), the loss "
     "rate, the active-day and loaded-lifting streaks, readiness + the readiness-floor streak, the v0.4 "
     "sequence position (the next undone session, #4110), `today` (#4311) — every activity on the day BEFORE target_date (what a "
     "night-before debrief reviews) from Hevy AND Strava on every device (WHOOP, Garmin, Apple), de-duplicated in time, each with device, "
@@ -149,6 +176,7 @@ def _muscle_volume(target_date: str) -> tuple[Any, dict[str, Any]]:
     value = {
         "window_7d": trailing.get("7d"),
         "window_28d": trailing.get("28d"),
+        "below_mev_14d": vol.get("below_mev_14d"),  # #5053: training.volume_floors over the 14d trailing window — no second count
         "landmark_status_28d": {m: r.get("volume_landmark_status") for m, r in (vol.get("muscle_volume") or {}).items()},
         "unattributed": vol.get("unattributed"),
         "completeness": vol.get("completeness"),
@@ -332,6 +360,55 @@ def _walking(target_date: str) -> tuple[Any, dict[str, Any]]:
     return value, status
 
 
+def _steps_fetch(source: str, start: str, end: str) -> list[dict[str, Any]]:
+    """Rows for the steps resolver: Hevy through the ONE sanctioned Hevy read, every other source
+    through the MCP range read (Strava's multi-device duplicates removed there, #4419)."""
+    if source == "hevy":
+        from mcp.tools_strength import _read_hevy_all_phases
+
+        items, _phases = _read_hevy_all_phases(start, end)
+        return list(items or [])
+    from mcp import core
+
+    return list(core.query_source_range(source, start, end) or [])
+
+
+def _steps(target_date: str) -> tuple[Any, dict[str, Any]]:
+    """The 7 completed days of steps, resolved by `training.steps_resolver` (#5081) — carried, not counted."""
+    from training.plan_engine import ABSENT, MEASURED
+    from training.steps_resolver import steps_range
+
+    out = steps_range(shift_day_key(target_date, -7), shift_day_key(target_date, -1), fetch=_steps_fetch)
+    if not out["summary"]["days_measured"]:
+        return out, _st(ABSENT, f"no steps source has a count in {out['window']['start']}..{out['window']['end']}")
+    return out, _st(MEASURED)
+
+
+def _steps_ramp(target_date: str) -> tuple[Any, dict[str, Any]]:
+    """The steps ramp (#5082) — `training.steps_ramp.compute` over the resolver window and the plan's own pain/deload reads."""
+    from training import plan_engine as _plan_engine
+    from training.plan_engine import READ_FAILED
+
+    from mcp.core import LAYER_UNKNOWN
+    from mcp.tools_plan import _deload_records, _gather_performed_evidence, _pain_dismissals, _pain_instances, _read, _steps_window
+
+    window, status = _read("steps_window", _steps_window, target_date)
+    if window is None:
+        return None, status
+    dismissals, dis_st = _read("pain_dismissals", _pain_dismissals)
+    deload, del_st = _read("deload_records", _deload_records)
+    performed, perf_st = _read("pain_evidence_scope", _gather_performed_evidence, target_date, LAYER_UNKNOWN)
+    flagged = [r for r in (performed or {}).get("exercises") or [] if r.get("pain_flag_any")]
+    states = {"pain_dismissals": dis_st, "deload_records": del_st, "pain_evidence_scope": perf_st, "steps_window": status}
+    out = _plan_engine._steps_ramp_block(target_date, window, _pain_instances(flagged), dismissals, deload, states)
+    out["input_states"] = {k: v["state"] for k, v in states.items() if k != "steps_window"}
+    if out.get("state") == "unknown":
+        return out, _st(READ_FAILED, error=out.get("reason"))
+    if not out["days_counted"]:
+        return out, _st("absent", "no measured steps day in the ramp window")
+    return out, _st("measured")
+
+
 def _loss_rate(target_date: str) -> tuple[Any, dict[str, Any]]:
     from training.plan_engine import ABSENT, MEASURED, READ_FAILED
 
@@ -463,11 +540,55 @@ def _morning_note(target_date: str) -> tuple[Any, dict[str, Any]]:
     return {k: v for k, v in fact.items() if k != "state"}, _st(MEASURED)
 
 
+def _guidance_freshness(target_date: str) -> tuple[Any, dict[str, Any]]:
+    """#5059: the guidance-record freshness flag, the plan's own read (`tools_plan._guidance_freshness`). A failed
+    partition read is `read_failed`; every other answer (incl. no record on file) is the measured state word."""
+    from training.plan_engine import MEASURED, READ_FAILED
+
+    from mcp.tools_plan import _guidance_freshness as reader
+
+    flag = reader()
+    if flag.get("read_failed"):
+        return flag, _st(READ_FAILED, error="ReadError: the clinical partition read failed")
+    return flag, _st(MEASURED)
+
+
+def _fitness_tests(target_date: str) -> tuple[Any, dict[str, Any]]:
+    """#5078: the battery's trend and cadence (owner-only). A failed record read is `read_failed`, never 'no battery'."""
+    from training.plan_engine import ABSENT, MEASURED, READ_FAILED
+
+    from mcp.tools_fitness_tests import packet_value
+
+    value = packet_value(target_date)
+    rec = (value.get("reads") or {}).get("record")
+    if isinstance(rec, dict):
+        return value, _st(READ_FAILED, error=rec.get("error"))
+    if not value["batteries_on_file"]:
+        return value, _st(ABSENT, "no fitness-test battery on file yet")
+    return value, _st(MEASURED)
+
+
+def _calibration_cadence(target_date: str) -> tuple[Any, dict[str, Any]]:
+    """#5061: the calibration cadence block (`training.calibration_cadence.read`). All three kinds unreadable is `read_failed`;
+    a single kind's failure rides its own row (`state: read_failed`)."""
+    from training import calibration_cadence as cc
+    from training.plan_engine import MEASURED, READ_FAILED
+
+    from mcp import core
+
+    block = cc.read(core.table, target_date)
+    if all(r.get("state") == cc.READ_FAILED for r in block["kinds"].values()):
+        return block, _st(READ_FAILED, error="ReadError: the tape, photo and DEXA reads all failed")
+    return block, _st(MEASURED)
+
+
 READERS = {
     "muscle_volume": _muscle_volume,
     "last_session_by_type": _last_sessions_field,
     "nutrition_7d": _nutrition,
     "walking_hours_7d": _walking,
+    "steps_7d": _steps,
+    "steps_ramp": _steps_ramp,
     "loss_rate": _loss_rate,
     "streaks": _streaks,
     "readiness": _readiness,
@@ -475,6 +596,9 @@ READERS = {
     "block_position": _block_position,
     "morning_note": _morning_note,
     "today": _today,
+    "guidance_freshness": _guidance_freshness,
+    "fitness_tests": _fitness_tests,
+    "calibration_cadence": _calibration_cadence,
 }
 
 
@@ -493,7 +617,7 @@ def tool_get_coach_session_packet(args):
         value, status = _wrap(reader)(target_date)
         fields[name] = _field(name, value, status)
     states = {name: f["state"] for name, f in fields.items()}
-    return {
+    out = {
         "target_date": target_date,
         "packet_version": PACKET_VERSION,
         "states": states,
@@ -513,3 +637,6 @@ def tool_get_coach_session_packet(args):
             "Consult a qualified healthcare provider before making health decisions based on this data."
         ),
     }
+    from mcp.plan_helpers import attach_coach_context  # #5071: the pre-flight call carries the guidance, the charter and the May tracker
+
+    return attach_coach_context(out, target_date, packet=out)

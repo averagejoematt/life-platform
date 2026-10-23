@@ -886,12 +886,73 @@ def test_weight_loss_reports_hand_derived_rate_bmi_and_projection(monkeypatch):
     assert out["projection"]["pct_complete"] == 7.5
 
 
-def test_weight_loss_flags_a_rate_above_the_acsm_safe_ceiling(monkeypatch):
-    """3.0 lbs/wk > 2.5 -> the lean-mass warning fires on every affected point."""
+def _series(start_lbs, per_week, n=4):
+    return [withings(d("2026-04-01", 7 * i), weight_lbs=start_lbs - per_week * i) for i in range(n)]
+
+
+def test_weight_loss_rate_flag_is_his_schedule_cap_at_that_weight(monkeypatch):
+    """#5074: the line is the schedule's cap at the weigh-in's own weight — the charter ceiling itself (3.5 lb/wk, one
+    ceiling, no margin) above the 240 lb landing, his own taper cap from the landing down. 3.4 lb/wk never flags at 400
+    or 280; 3.9 flags at both; 3.0 lb/wk flags once he is on the landing schedule (cap 2.25 at 210)."""
+    for start in (400.0, 280.0):
+        install(monkeypatch, _series(start, 3.4))
+        out = th.tool_get_weight_loss_progress({})
+        assert not [p for p in out["weight_series"] if "Losing too fast" in p.get("rate_flag", "")], start
+        install(monkeypatch, _series(start, 3.9))
+        flagged = [p for p in th.tool_get_weight_loss_progress({})["weight_series"] if "Losing too fast" in p.get("rate_flag", "")]
+        assert len(flagged) == 3, start
+        assert "% of bodyweight" in flagged[0]["rate_flag"] and "lb/wk" in flagged[0]["rate_flag"]
+    install(monkeypatch, _series(215.0, 3.0))
+    landing = [p for p in th.tool_get_weight_loss_progress({})["weight_series"] if "Losing too fast" in p.get("rate_flag", "")]
+    assert len(landing) == 3
+
+
+def test_weight_loss_reports_both_units_for_every_rate(monkeypatch):
+    """3.0 lb/wk at the last weigh-in of 311 lb -> 3.0/311*100 = 0.96 %BW/wk."""
     install(monkeypatch, WEIGH_INS)
     out = th.tool_get_weight_loss_progress({})
-    flagged = [p for p in out["weight_series"] if "Losing too fast" in p.get("rate_flag", "")]
-    assert len(flagged) == 3
+    assert out["rate_lb_per_wk"] == 3.0
+    assert out["rate_pct_bodyweight_per_wk"] == 0.96
+    assert out["avg_weekly_loss_pct_bodyweight"] == 0.96
+    assert out["projection"]["avg_weekly_loss_pct_bodyweight"] == 0.96
+    assert out["next_milestone"]["recent_pace_pct_bodyweight_per_week"] == 0.96
+    for p in out["weight_series"]:
+        if "weekly_loss_rate_lbs" in p:
+            assert p["rate_lb_per_wk"] == p["weekly_loss_rate_lbs"]
+            assert p["rate_pct_bodyweight_per_wk"] is not None
+
+
+def test_weight_loss_shows_the_owners_band_beside_both_units_at_the_current_weight(monkeypatch):
+    """#5074: 3.0 lb/wk at 311 lb -> band 3.0-3.5 lb/wk = 0.96-1.13 %BW/wk, in band (at its floor)."""
+    install(monkeypatch, WEIGH_INS)
+    rb = th.tool_get_weight_loss_progress({})["rate_band"]
+    assert (rb["floor_lb_wk"], rb["ceiling_lb_wk"], rb["floor_pct_bodyweight_per_wk"], rb["ceiling_pct_bodyweight_per_wk"]) == (
+        3.0,
+        3.5,
+        0.96,
+        1.13,
+    )
+    assert (rb["in_band"], rb["position"], rb["guidance_capped"]) == (True, "in", False)
+
+
+@pytest.mark.parametrize("per_week,position", [(2.0, "below"), (3.2, "in"), (4.5, "above")])
+def test_weight_loss_places_the_average_rate_in_the_band(monkeypatch, per_week, position):
+    install(monkeypatch, _series(340.0, per_week))
+    rb = th.tool_get_weight_loss_progress({})["rate_band"]
+    assert rb["position"] == position
+
+
+def test_weight_loss_band_yields_to_the_clinical_guidance_cap(monkeypatch):
+    install(monkeypatch, _series(340.0, 3.2))
+    monkeypatch.setattr(th.rate_band, "guidance_cap_for", lambda table, user_id="matthew": 2.0)
+    rb = th.tool_get_weight_loss_progress({})["rate_band"]
+    assert (rb["ceiling_lb_wk"], rb["guidance_capped"], rb["position"]) == (2.0, True, "above")
+
+
+def test_weight_loss_clinical_note_carries_no_fixed_lb_ceiling(monkeypatch):
+    install(monkeypatch, WEIGH_INS)
+    note = th.tool_get_weight_loss_progress({})["clinical_note"]
+    assert "2.5" not in note and "% of bodyweight" in note
 
 
 def test_weight_loss_names_the_next_bmi_milestone_with_the_lbs_to_cross(monkeypatch):
@@ -1245,7 +1306,8 @@ def test_energy_derives_the_calorie_target_and_implied_loss_rate(monkeypatch):
     out = th.tool_get_daily_metrics({"view": "energy"})
     assert out["exercise_kcal_7d_daily_avg"] == 86.0
     assert out["tdee_7d_avg"] == 2057.0
-    assert out["calorie_target_based_on_7d"] == 1557.0
+    assert out["maintenance_context_7d"]["estimated_maintenance_kcal"] == 2057.0
+    assert out["maintenance_context_7d"]["deficit_kcal"] == 500.0
     assert out["implied_weekly_loss_lbs"] == 1.0
 
 
@@ -1283,7 +1345,7 @@ def test_energy_honours_a_custom_deficit_target(monkeypatch):
     install(monkeypatch, ENERGY_ROWS)
     out = th.tool_get_daily_metrics({"view": "energy", "target_deficit_kcal": 750})
     assert out["implied_weekly_loss_lbs"] == 1.5
-    assert out["calorie_target_based_on_7d"] == 1307.0
+    assert out["maintenance_context_7d"]["deficit_kcal"] == 750.0
 
 
 def test_energy_uses_day_level_kilojoules_when_the_field_is_present(monkeypatch):
@@ -1625,3 +1687,14 @@ def _output_schema_conformance_4286(monkeypatch):
     from test_mcp_registry import check_output_schema
 
     check_output_schema(monkeypatch, th, "get_weight_loss_progress")
+
+
+def test_weight_loss_band_reports_a_broken_guidance_read_not_no_cap(monkeypatch):
+    install(monkeypatch, _series(340.0, 3.2))
+
+    def boom(table, user_id="matthew"):
+        raise th.rate_band.GuidanceReadError("x")
+
+    monkeypatch.setattr(th.rate_band, "guidance_cap_for", boom)
+    rb = th.tool_get_weight_loss_progress({})["rate_band"]
+    assert rb["guidance_read"] == "read_failed" and rb["guidance_capped"] is False

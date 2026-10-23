@@ -22,11 +22,12 @@ EXPERIMENT_BASELINE_WEIGHT_KG = 148.478
 
 EXPERIMENT_GOAL_WEIGHT_LBS = 185
 
-# The plan's nutrition targets (targets.nutrition in the plan root; the same two figures
-# experiment.plan_facts derives). The plan states ONE protein line — a floor. Every surface
-# that names a calorie target or a protein target/floor reads these, never PROFILE#v1 and
-# never a literal (#4540; guard: tests/test_protein_contract.py).
-PLAN_DAILY_CALORIES_TARGET = 1500
+# The plan's protein floor (targets.nutrition in the plan root; the figure experiment.plan_facts
+# derives). The plan states ONE protein line — a floor. Every surface that names a protein
+# target/floor reads this, never PROFILE#v1 and never a literal (#4540; guard:
+# tests/test_protein_contract.py). The calorie target is NOT generated here: it is resolved by
+# health.calorie_target from the charter's nutrition.calories block (#5095; guard:
+# tests/test_calorie_target_one_resolver_5095.py).
 PLAN_DAILY_PROTEIN_MIN_G = 170
 
 

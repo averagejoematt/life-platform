@@ -358,6 +358,15 @@ DEFAULT_STALE_HOURS = 48
 #                  Read by evidence_field_predicates(); a behavioral source needs no
 #                  entry because its row IS the evidence (that is what `behavioral`
 #                  means), which is why this facet lives on apple_health alone.
+#   field_feeds    (#5097) the non-HAE form of the same idea: a FEED that arrives as
+#                  fields on another channel's DATE# row, so the source-level
+#                  `stale_hours` cannot see it go dark. Same row shape as
+#                  `hae_datatypes` — {key, label, fields (any-of presence), stale_days,
+#                  manual, note}. MacroFactor is the specimen: the diary export keeps
+#                  the partition fresh daily while the adaptive expenditure (only the
+#                  daily-summary export carries it) was last written 2026-04-04. Read
+#                  by field_feed_thresholds(); the consumer that reports it is
+#                  health/expenditure_reconciler.py. Narrates, never pages.
 #   instrument_for (#4217) the coach(es) whose DOMAIN INSTRUMENT this source is — the
 #                  sensor without which that coach's reads are ungrounded. Carried on the
 #                  SOURCE (whoop -> sleep_coach) or, where a source is one partition fed by
@@ -1186,6 +1195,20 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "engagement_channel": {"label": "food", "stale_days": 2, "primary": True},
         # #3252: the only source that records what he ate.
         "evidence_for": ("nutrition",),
+        # #5097: the adaptive expenditure is a field feed — only the daily-summary export
+        # carries it, the routine diary export does not, so `stale_hours` above (kept fresh
+        # by the diary) cannot see it go dark. 7 days: the reconciliation reads it over the
+        # 14-day loss-rate window and needs at least half of that window.
+        "field_feeds": [
+            {
+                "key": "adaptive_expenditure",
+                "label": "MacroFactor adaptive expenditure",
+                "fields": ["expenditure_kcal"],
+                "stale_days": 7,
+                "manual": True,
+                "note": "arrives only with the daily-summary export (the XLSX quick export, converted by dropbox-poll); the diary export carries no expenditure column",
+            },
+        ],
         # #4638: stated default (owner ruling pending). The diary export is a rolling 7-day window and
         # its date range is authoritative (macrofactor_lambda.absent_day_items).
         "upstream_changes": {
@@ -1308,9 +1331,17 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "active_api": False,
         "expected_days": None,
         "qa_tier": None,
-        "method": "Manual log",
+        "method": "Manual log (paused: no orders logged since March)",
         "metrics": "Delivery-order behavioral signal (incl. longest-ever streak)",
-        "posture": "portfolio",
+        # PAUSED 2026-10-19 (#5108/#5006; built on the evidence, pending the owner's confirmation):
+        # no delivery orders logged since 2026-03-28 (>200 days; the only S3 imports are the
+        # 03-28 backfill CSVs). ADR-074 posture: off by design, shown as paused, never counted
+        # stale, never a coach check-in context, no nudge, no "dark N days" stamp, and
+        # get_food_delivery_streak_state returns None so the Nutrition-pillar modifier is neutral.
+        # Data, raw prefix and the ingestion Lambda are untouched. Un-pause = delete `paused` and `paused_since` and restore `posture` to "portfolio".
+        "paused": True,
+        "paused_since": "2026-10-19",
+        "posture": "paused",
         "raw_layout": None,
         "capture_channel": "mcp",  # #746: logged by hand in an MCP conversation
     },
@@ -2748,6 +2779,13 @@ def hae_datatype_thresholds() -> list:
     return [dict(d) for d in cast("list[dict[str, Any]]", SOURCE_REGISTRY["apple_health"].get("hae_datatypes", []))]
 
 
+def field_feed_thresholds(source: str) -> list:
+    """The `field_feeds` rows of `source` (#5097) — feeds carried as fields on another
+    channel's DATE# rows, each {key, label, fields, stale_days, manual, note}. [] for a
+    source with none."""
+    return [dict(d) for d in cast("list[dict[str, Any]]", SOURCE_REGISTRY.get(source, {}).get("field_feeds", []))]
+
+
 def hae_reader_surfaces() -> dict:
     """The HAE sub-datatypes that are ALSO published as current-looking statistics on
     a reader endpoint, keyed by datatype key (#3204).
@@ -2889,7 +2927,7 @@ METRIC_TRUTH: dict[str, dict[str, Any]] = {
         "field_by_source": {"whoop": "step_count", "apple_health": "steps", "garmin": "steps"},
         "min_by_source": {"whoop": 1, "apple_health": 1, "garmin": 1000},
         "overlap_rule": "first_positive_else_first_zero",
-        "ruling": "#4644 Q4 (recommended: 'yes — Whoop when both devices have a count') — pending the owner",
+        "ruling": "#4644 Q4 'yes — Whoop when both devices have a count' (owner 'all recommended', recorded 2026-10-17)",
     },
     # vo2_max (#4976): the Apple Watch's estimate from now on, Garmin's stored estimates for the
     # history before it (the direct Garmin feed is retired, #4640 — its rows stay and stay

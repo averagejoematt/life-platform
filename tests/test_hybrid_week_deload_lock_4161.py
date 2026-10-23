@@ -10,9 +10,13 @@ fixture AND a mutation control that shows the fixture can fail:
   1. HYBRID WEEK — a program week advances only when its 4-session cycle is complete AND >= 7
      Pacific days have passed since the previous advance (Kubo 2010; Bohm 2015). The served
      position names its basis. The ramp, the `not_before_week` gate and the block read it.
-  2. DELOAD + LOCK — one pre-planned deload at the LATER of week 6 or the block lock (2026-11-04),
-     −40 % sets for 7 days, loads held, never a week off (Coleman 2024); the lock is a guard the
-     engine reads, and a structural edit before the date reds here.
+  2. DELOAD + LOCK — REWRITTEN to the owner's ruling of 2026-10-18 (#5070), which outranks the red team's
+     scheduled week-6 / 2026-11-04 deload: "No scheduled or automatic deload. Fatigue signals become a
+     recommendation; a deload happens only on the owner's recorded word." The response (−40 % sets for 7
+     days, loads held, never a week off — Coleman 2024) is unchanged and applies as written, only on a
+     record. The LOCK half is REWRITTEN to owner ruling 6 of 2026-10-18 (#5069), quoted: "Structure lock:
+     the v0.4 lock to 2026-11-04 is lifted now." The lock is history (`program_v04.BLOCK_LOCK`); the
+     structure fingerprint is a measurement on the served session, and a structural edit refuses nothing.
   3. CRITICS — (i) the stale-lift cap scales with the gap (Nosaka 2001; Chen 2012); (ii) the
      fatigue trigger is performance or readiness, not a loaded-day count (Bell 2023; Rogerson
      2024; Kataoka 2022; Yang 2018), −30 % sets for one session, plus the 48 h same-region guard;
@@ -48,7 +52,7 @@ START = "2026-09-24"
 
 
 def lift(day: str, name: str = "Linear Leg Press", wid: str | None = None) -> dict:
-    # #4312: `name` plus a bench set, so the generic lift reaches an anchor muscle of whichever role it takes
+    # #4312: `name` plus a bench set (and, #5069, a delt set), so the generic lift reaches an anchor muscle of whichever role it takes
     return {
         "date": day,
         "sk": f"DATE#{day}#WORKOUT#{wid or day}",
@@ -56,6 +60,7 @@ def lift(day: str, name: str = "Linear Leg Press", wid: str | None = None) -> di
         "exercises": [
             {"name": name, "sets": [{"type": "normal", "weight_kg": 90, "reps": 5}]},
             {"name": "Bench Press (Barbell)", "sets": [{"type": "normal", "weight_kg": 60, "reps": 5}]},
+            {"name": "Lateral Raise (Dumbbell)", "sets": [{"type": "normal", "weight_kg": 10, "reps": 12}]},
         ],
     }
 
@@ -124,39 +129,54 @@ def test_the_block_counter_reads_the_hybrid_week():
     assert session_sequence.next_session(shift_day_key(START, 45), rows)["block"] == 2
 
 
-# ── 2. the deload and the lock ───────────────────────────────────────────────────────
-def test_a_week_6_before_the_lock_date_does_not_deload():
+# ── 2. the deload is the owner's call (#5070) ────────────────────────────────────────
+WORD = {"sk": "DELOAD#2026-11-04", "start_date": "2026-11-04", "days": 7, "sets_pct": -40, "loads": "held", "words": "deload this week"}
+
+
+def test_nothing_deloads_at_week_6_or_on_the_old_lock_date_without_a_record():
     rows = daily(35)  # daily: week 6 opens 10-29 (day 35)
     e = session_sequence.next_session("2026-10-29", rows)
     assert (e["week"], e["deload"]) == (6, False)
-    assert session_sequence.next_session("2026-11-03", daily(40))["deload"] is False
+    assert session_sequence.next_session("2026-11-04", daily(41))["deload"] is False
+    assert not any(p["deload"] for p in session_sequence.preview(120)), "no program week ever deloads on its own"
+    assert not any(p["deload"] for p in session_sequence.preview(60, every_days=3))
+    dl = session_sequence.deload_cfg()
+    assert dl["scheduled"] is False and not {"at_program_week", "not_before_date", "every_nth_week"} & set(dl)
 
 
-def test_the_deload_opens_on_the_lock_date_and_runs_seven_days():
-    on = [p for p in session_sequence.preview(60) if p["deload"]]
-    assert [p["date"] for p in on][:7] == [shift_day_key("2026-11-04", i) for i in range(7)]
-    assert on[0]["week"] == 6 and on[0]["deload_window"] == {"started_on": "2026-11-04", "days": 7}
-    e = session_sequence.next_session("2026-11-04", daily(41))
+def test_a_recorded_word_applies_the_deload_for_its_days_only():
+    on = [p for p in session_sequence.preview(60, deload_records=[WORD]) if p["deload"]]
+    assert [p["date"] for p in on] == [shift_day_key("2026-11-04", i) for i in range(7)]
+    assert on[0]["deload_window"] == {"started_on": "2026-11-04", "days": 7}
+    e = session_sequence.next_session("2026-11-04", daily(41), [WORD])
     assert e["deload"] is True and "DELOAD" in e["label"]
-    assert e["deload_plan"]["sets_pct"] == -40 and e["deload_plan"]["not_before"] == "2026-11-04"
-    assert session_sequence.next_session("2026-11-11", daily(48))["deload"] is False
+    assert e["deload_plan"]["sets_pct"] == -40
+    assert e["deload_recommendation"]["applied"] is True and e["deload_recommendation"]["applied_on"]["start_date"] == "2026-11-04"
+    assert session_sequence.next_session("2026-11-11", daily(48), [WORD])["deload"] is False
+    assert session_sequence.next_session("2026-11-03", daily(40), [WORD])["deload"] is False
 
 
-def test_at_a_slower_pace_the_deload_waits_for_week_6():
-    pv = session_sequence.preview(40, every_days=3)  # 4 sessions / 9 days: week 6 opens well after 11-04
-    first = next(p for p in pv if p["deload"])
-    assert first["week"] == 6 and first["session_in_week"] == 1 and first["date"] > "2026-11-04"
+def test_planned_session_cuts_sets_only_on_the_word():
+    plain = program_structure.planned_session("2026-11-04", block_workouts=daily(41))
+    cut = program_structure.planned_session("2026-11-04", block_workouts=daily(41), deload_records=[WORD])
+    assert plain["deload"] is False and plain["prescription"]["deload_trim"] is None
+    assert cut["deload"] is True and cut["prescription"]["deload_trim"]["pct"] == -40
+    assert cut["prescription"]["total_sets"] < plain["prescription"]["total_sets"]
+    # the record's own cut is the one applied
+    other = program_structure.planned_session("2026-11-04", block_workouts=daily(41), deload_records=[{**WORD, "sets_pct": -20}])
+    assert other["prescription"]["deload_trim"]["pct"] == -20
 
 
-def test_mutation_control_an_unenforced_lock_deloads_in_week_6_before_it():
-    with patch.dict(program_structure.BLOCK_LOCK, {"locked_until": "2026-10-01"}):
-        first = next(p for p in session_sequence.preview(60) if p["deload"])
-    assert first["date"] == "2026-10-29" and first["week"] == 6
+def test_mutation_control_a_scheduled_deload_would_fire_without_a_record():
+    """Control: the retired schedule key is inert; only a recorded word moves a deload."""
+    with patch.dict(owner_redlines.REDLINES["lifting_sessions_per_wk"]["deload"], {"at_program_week": 6}):
+        assert not any(p["deload"] for p in session_sequence.preview(60)), "the engine reads no schedule at all"
+    assert any(p["deload"] for p in session_sequence.preview(60, deload_records=[WORD])), "the record path is the only path"
 
 
 def test_the_deload_is_minus_40_loads_held_never_a_week_off():
     dl = owner_redlines.REDLINES["lifting_sessions_per_wk"]["deload"]
-    assert (dl["sets_pct"], dl["days"], dl["loads"], dl["week_off"], dl["stated"]) == (-40, 7, "held", False, "2026-09-24")
+    assert (dl["sets_pct"], dl["days"], dl["loads"], dl["week_off"], dl["stated"]) == (-40, 7, "held", False, "2026-10-18")
     assert "Coleman 2024" in dl["evidence"] and "e16777" in dl["evidence"]
     for role in program_structure.SESSION_TEMPLATES:
         rx = program_structure.session_prescription_for_role(role, deload=True)
@@ -164,23 +184,29 @@ def test_the_deload_is_minus_40_loads_held_never_a_week_off():
         assert rx["total_sets"] >= 1 and all(len(e["sets"]) >= 1 for e in rx["exposures"]), "a deload is lighter, never a week off"
 
 
-def test_no_structural_edit_before_the_lock_date():
-    """THE refusal: before 2026-11-04 the v0.4 structure (split, order, templates, accessories) must
-    fingerprint to what was recorded at the lock. Loads, deloads, catalog keys are not structure."""
-    state = session_sequence.block_lock_state(pacific_today())
-    if pacific_today() < program_structure.BLOCK_LOCK["locked_until"]:
-        assert state["state"] == "locked", state.get("refusal")
-    assert session_sequence.block_lock_state("2026-11-03")["recorded_fingerprint"] == program_structure.BLOCK_LOCK["structure_fingerprint"]
+def test_the_lock_is_lifted_and_the_fingerprint_is_only_a_measurement():
+    """Ruling 6 (2026-10-18, #5069): "the v0.4 lock to 2026-11-04 is lifted now". No guard is left to read: the lock is a
+    dated record, and the served session carries the live fingerprint marked as a measurement."""
+    from training import program_v04
+
+    for gone in ("block_lock_state", "fingerprint_record_problems"):
+        assert not hasattr(session_sequence, gone), gone
+    assert not hasattr(program_structure, "BLOCK_LOCK")
+    assert program_v04.BLOCK_LOCK["locked_until"] == "2026-11-04" and program_v04.BLOCK_LOCK["lifted"]["on"] == "2026-10-18"
+    for day in ("2026-10-10", pacific_today(), "2026-11-04"):
+        st = session_sequence.next_session(max(day, START), [])["structure"]
+        assert st["lock"] == "lifted" and st["structure_fingerprint"] == session_sequence.structure_fingerprint()
+        assert "never a guard" in st["note"]
 
 
-def test_mutation_control_a_structural_edit_is_flagged_on_the_served_session():
+def test_mutation_control_a_structural_edit_moves_the_measurement_and_refuses_nothing():
+    """Before the ruling this edit read `violated` on the served session until 2026-11-04. Now the fingerprint moves (the
+    measurement can see it) and the session is served exactly as before."""
+    before = session_sequence.next_session("2026-10-10", [])
     with patch.dict(program_structure.SESSION_TEMPLATES["lower_heavy"], {"accessories": ["leg_press"]}):
-        state = session_sequence.block_lock_state("2026-10-10")
         e = session_sequence.next_session("2026-10-10", [])
-        after = session_sequence.block_lock_state("2026-11-04")
-    assert state["state"] == "violated" and "block lock" in state["refusal"]
-    assert e["block_lock"]["state"] == "violated"
-    assert after["state"] == "open"
+    assert e["structure"]["structure_fingerprint"] != before["structure"]["structure_fingerprint"]
+    assert e["session_role"] == before["session_role"] and "refusal" not in e and "block_lock" not in e
 
 
 # ── 3(i). the stale-lift cap scales with the gap ───────────────────────────────────────
@@ -243,10 +269,9 @@ def test_the_joints_packet_applies_the_scaled_cap():
 def test_the_stale_constants_carry_their_provenance():
     assert cf.STALE_CAPS == {"short": {1: 2}, "long": {1: 2, 2: 2, 3: 3}}
     assert "Nosaka 2001" in cf.STALE_PROVENANCE["evidence"] and "Chen 2012" in cf.STALE_PROVENANCE["evidence"]
-    assert (
-        "the first three exposures of a novel-again pattern"
-        in owner_redlines.REDLINES["lifting_sessions_per_wk"]["gain_rule"]["refused_when"]
-    )
+    from training import load_progression  # #5052: the gain rule moved to the charter
+
+    assert "the first three exposures of a novel-again pattern" in load_progression.gain_rule()["refused_when"]
 
 
 # ── 3(ii). the fatigue trigger ─────────────────────────────────────────────────────────
@@ -314,8 +339,17 @@ def test_each_trigger_cuts_one_session_by_30_percent_loads_held(kw):
     base = {"readiness_low_streak_days": 0, "perf_by_idx": {}, "soreness_by_idx": {}, "same_region": {"state": "clear"}}
     fat = cf.assess(**{**base, **kw})
     v = c.deterministic_verdict(_joints(fat))
-    assert (v["verdict"], v["metric"], v["field"], v["to"]) == ("change", "fatigue_trigger", "session.total_sets", 14)
-    assert "THIS session only" in v["reason"] and cf.FATIGUE_RESPONSE == {
+    # #5070: the cut is RECOMMENDED (carried, applies nothing) — the verdict is approve, with no field/to to apply
+    assert (v["verdict"], v["metric"], v["field"], v["to"]) == ("approve", None, None, None)
+    assert v["recommendation"] == {
+        "metric": "fatigue_trigger",
+        "reason": v["recommendation"]["reason"],
+        "field": "session.total_sets",
+        "to": 14,
+        "applied": False,
+    }
+    assert "THIS session only" in v["recommendation"]["reason"] and "owner's recorded word" in v["recommendation"]["reason"]
+    assert cf.FATIGUE_RESPONSE == {
         "sets_pct": -30,
         "loads": "held",
         "sessions": 1,
@@ -341,7 +375,7 @@ def test_the_48h_same_region_guard():
     assert cf.same_region_recent(squat_yesterday, "2026-10-10", "upper")["state"] == "clear"
     fat = cf.assess(readiness_low_streak_days=0, perf_by_idx={}, soreness_by_idx={}, same_region=got)
     v = c.deterministic_verdict(_joints(fat))
-    assert (v["metric"], v["to"]) == ("same_region_48h", 14)
+    assert (v["verdict"], v["recommendation"]["metric"], v["recommendation"]["to"]) == ("approve", "same_region_48h", 14)  # #5070
 
 
 def test_the_fatigue_constants_carry_their_provenance():
@@ -599,30 +633,22 @@ def test_inside_the_deload_the_fatigue_cut_does_not_stack():
     assert any("larger cut is taken, not both" in f["reason"] for f in in_deload["flags"])
     # mutation control: outside the deload the same trigger cuts
     out = c.deterministic_verdict(_joints(cf.assess(**base), total=12))
-    assert (out["verdict"], out["to"]) == ("change", 8)
+    assert (out["verdict"], out["to"], out["recommendation"]["to"]) == ("approve", None, 8)  # recommended, not applied (#5070)
 
 
 def test_the_stage_2_evidence_marks_a_deload_session_superseded():
     from mcp import plan_draft_evidence as pde
 
     ev = {"exercises": []}
-    pde.attach_fatigue_inputs(ev, readiness_low_streak_days=3, block_workouts=daily(41), target_date="2026-11-04")
+    pde.attach_fatigue_inputs(ev, readiness_low_streak_days=3, block_workouts=daily(41), target_date="2026-11-04", deload_records=[WORD])
     assert ev["fatigue"]["response"]["superseded_by_deload"] is True and ev["fatigue"]["response"]["deload_sets_pct"] == -40
 
 
-def test_a_version_bump_is_not_a_structural_edit():
-    with patch.dict(program_structure.SESSION_SEQUENCE, {"program_version": "0.4.1"}):
-        assert session_sequence.block_lock_state("2026-10-10")["state"] == "locked"
-
-
-def test_a_fingerprint_re_record_without_the_owner_note_reds():
-    assert session_sequence.fingerprint_record_problems() == []
-    with patch.dict(program_structure.BLOCK_LOCK, {"structure_fingerprint": "deadbeefdeadbeef"}):
-        assert session_sequence.fingerprint_record_problems(), "a bare re-record must not pass"
-        assert session_sequence.block_lock_state("2026-10-10")["state"] == "violated"
-    bad = {**program_structure.BLOCK_LOCK["structure_fingerprint_record"], "provenance": "platform"}
-    with patch.dict(program_structure.BLOCK_LOCK, {"structure_fingerprint_record": bad}):
-        assert "record provenance is not 'owner'" in session_sequence.fingerprint_record_problems()
+def test_a_version_bump_is_not_a_structural_change():
+    """program_version is not structure (#4161 review): a bump leaves the measured fingerprint where it was."""
+    fp = session_sequence.structure_fingerprint()
+    with patch.dict(program_structure.SESSION_SEQUENCE, {"program_version": "1.0.1"}):
+        assert session_sequence.structure_fingerprint() == fp
 
 
 def test_the_gated_target_is_one_data_field():

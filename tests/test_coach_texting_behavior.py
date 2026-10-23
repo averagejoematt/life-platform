@@ -515,7 +515,10 @@ def test_nutrition_pack_prefers_macrofactor_adaptive_like_the_site():
     site_tdee, site_label = _resolve_mf_tdee(mf_rows)
     assert str(round(site_tdee)) in block  # phone cites the site's own number
     assert "MacroFactor adaptive" in block
-    assert str(round(site_tdee) - 500) in block  # ADR-152 target = TDEE - 500
+    # #5095: the calorie target is the ONE resolver's, not TDEE - 500 (a second target)
+    from health.calorie_target import target_kcal
+
+    assert f"Calorie target: {target_kcal()} kcal/day" in block and str(round(site_tdee) - 500) not in block
 
 
 def test_nutrition_pack_falls_back_to_the_shared_energy_budget():
@@ -546,7 +549,9 @@ def test_nutrition_pack_falls_back_to_the_shared_energy_budget():
     )
     assert budget is not None
     assert f"TDEE (maintenance): {budget['tdee']} kcal" in block
-    assert f"calorie target: {budget['tdee'] - 500} kcal" in block
+    from health.calorie_target import target_kcal  # #5095: the ONE calorie target, not TDEE - 500
+
+    assert f"Calorie target: {target_kcal()} kcal/day" in block and f"{budget['tdee'] - 500} kcal" not in block
 
 
 def test_nutrition_pack_states_absence_instead_of_guessing():

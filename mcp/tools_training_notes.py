@@ -198,8 +198,21 @@ def tool_get_exercise_notes(args):
         return _dismiss_pain_flag(args)
     if action in ("dismissals", "list_dismissals"):
         return _list_dismissals()
+    if action == "deload":
+        return _record_deload_word(args)
+    if action in ("deloads", "list_deloads"):
+        return _list_deload_words()
+    if action in ("disruption", "disruption_end", "disruptions"):
+        return {"disruption": _record_disruption, "disruption_end": _end_disruption, "disruptions": _list_disruptions}[action](args)
+    if action in ("fitness_test", "fitness_tests"):  # #5078: the battery's owner write + its read (mcp/tools_fitness_tests.py)
+        from mcp import tools_fitness_tests as ftt
+
+        return (ftt.action_log if action == "fitness_test" else ftt.action_list)(args)
     if action != "read":
-        return {"error": f"Unknown action '{action}'.", "valid_actions": ["read", "dismiss", "dismissals"]}
+        return {
+            "error": f"Unknown action '{action}'.",
+            "valid_actions": ["read", "dismiss", "dismissals", "deload", "deloads", *_DISRUPTION_ACTIONS, "fitness_test", "fitness_tests"],
+        }
     exercise = args.get("exercise") or args.get("template_id") or ""
     lookback_days = int(args.get("lookback_days") or PREFLIGHT_LOOKBACK_DAYS)
     if not exercise:
@@ -454,3 +467,177 @@ def _dismiss_pain_flag(args):
             "Consult a qualified healthcare provider before making health decisions based on this data."
         ),
     }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #5070 — the deload is the owner's call (ruling 2026-10-18)
+# ══════════════════════════════════════════════════════════════════════════════
+# No schedule, no automatic deload: fatigue signals RECOMMEND (plan_next_session's `deload_recommendation`), and a
+# deload applies only on a record of his word — `USER#matthew#SOURCE#training_constraints / DELOAD#<start_date>`,
+# the same partition and the same chat path as the pain-flag dismissal, so this is one more ACTION on this existing
+# owner tool (no new tool, so no generated count moves). The rule and the record shape live in `training.deload_word`.
+
+
+def _deload_records() -> list:
+    """Every recorded deload word, newest first. Paginated (#3729) — read by `mcp.tools_plan._deload_records`."""
+    from training import deload_word
+
+    items: list = []
+    kwargs = {
+        "KeyConditionExpression": Key("pk").eq(deload_word.DELOAD_PK) & Key("sk").begins_with(deload_word.DELOAD_SK_PREFIX),
+        "ScanIndexForward": False,
+    }
+    while True:
+        resp = table.query(**kwargs)
+        items.extend(resp.get("Items", []))
+        if "LastEvaluatedKey" not in resp:
+            break
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    return [decimal_to_float(i) for i in items]
+
+
+def _list_deload_words():
+    """action='deloads' — every recorded deload word (OWNER-ONLY: verbatim words)."""
+    from training import deload_word
+
+    return {
+        "count": len(_deload_records()),
+        "store": deload_word.DELOAD_STORE,
+        "policy": deload_word.policy(),
+        "deloads": [
+            {k: r.get(k) for k in ("sk", "start_date", "days", "sets_pct", "loads", "words", "recorded_at")} for r in _deload_records()
+        ],
+    }
+
+
+def _record_deload_word(args):
+    """action='deload' — record the owner's word that a deload starts on `start_date` (default today, Pacific)."""
+    from datetime import datetime, timezone
+
+    from training import deload_word
+
+    try:
+        record = deload_word.build_deload_record(
+            start_date=args.get("start_date") or pacific_now().date().isoformat(),
+            words=args.get("words") or "",
+            days=args.get("days"),
+            sets_pct=args.get("sets_pct"),
+            recorded_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        )
+    except ValueError as e:
+        return {"error": f"refused: {e}", "policy": deload_word.policy(), "wrote": False}
+    table.put_item(
+        Item={
+            # literal (orphan-gate greppable); == training.deload_word.DELOAD_PK
+            "pk": "USER#matthew#SOURCE#training_constraints",
+            **record,
+        }
+    )
+    return {
+        "status": "recorded",
+        "wrote": True,
+        "sk": record["sk"],
+        "record": record,
+        "next": (
+            "Call plan_next_session — for the days in this window the served session is a deload "
+            f"({record['sets_pct']} % sets, loads held, {record['days']} days) and `deload_recommendation.applied` reads true."
+        ),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #5088 — disruption mode is the owner's switch (ruling 2026-10-18: a late-December trip)
+# ══════════════════════════════════════════════════════════════════════════════
+# The same partition and the same chat path as the deload word: `USER#matthew#SOURCE#training_constraints /
+# MODE#disruption#<start_date>` with `until`, `template` (travel|busy) and `words` VERBATIM. ON holds habits instead of
+# targets; OFF (`disruption_end`) starts the step-back-up week. The coach OFFERS it (plan_next_session's
+# `disruption.offer`) and never writes it. The rule and the record shape live in `training.disruption`.
+_DISRUPTION_ACTIONS = ("disruption", "disruption_end", "disruptions")
+
+
+def _disruption_records() -> list:
+    """Every disruption record, newest first. Paginated — read by `mcp.tools_plan._disruption_records`."""
+    from training import disruption
+
+    items: list = []
+    kwargs = {
+        "KeyConditionExpression": Key("pk").eq(disruption.DISRUPTION_PK) & Key("sk").begins_with(disruption.DISRUPTION_SK_PREFIX),
+        "ScanIndexForward": False,
+    }
+    while True:
+        resp = table.query(**kwargs)
+        items.extend(resp.get("Items", []))
+        if "LastEvaluatedKey" not in resp:
+            break
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    return [decimal_to_float(i) for i in items]
+
+
+def _list_disruptions(args=None):
+    """action='disruptions' — every record and today's state (OWNER-ONLY: verbatim words)."""
+    from training import disruption
+    from training.routine_generator import _load_json
+
+    records = _disruption_records()
+    movements = (_load_json("movement_catalog.json") or {}).get("movements") or {}
+    return {
+        "templates": disruption.templates_preview(movements),
+        "count": len(records),
+        "store": disruption.DISRUPTION_STORE,
+        "today": disruption.state(records, pacific_now().date().isoformat()),
+        "policy": disruption.policy(),
+        "records": records,
+    }
+
+
+def _now_z() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _put_disruption(record: dict) -> None:
+    # literal (orphan-gate greppable); == training.disruption.DISRUPTION_PK
+    table.put_item(Item={"pk": "USER#matthew#SOURCE#training_constraints", **record})
+
+
+def _record_disruption(args):
+    """action='disruption' — his word that the mode is ON from `start_date` (default today, Pacific) through `until`."""
+    from training import disruption
+
+    try:
+        record = disruption.build_disruption_record(
+            start_date=args.get("start_date") or pacific_now().date().isoformat(),
+            until=args.get("until") or "",
+            words=args.get("words") or "",
+            template=str(args.get("template") or "").strip().lower(),
+            recorded_at=_now_z(),
+        )
+    except ValueError as e:
+        return {"error": f"refused: {e}", "policy": disruption.policy(), "wrote": False}
+    _put_disruption(record)
+    return {
+        "status": "recorded",
+        "wrote": True,
+        "sk": record["sk"],
+        "record": record,
+        "holds": disruption.holds(record["template"]),
+        "next": "plan_next_session reads `disruption.active: true` for these days; the drafted session is the short one.",
+    }
+
+
+def _end_disruption(args):
+    """action='disruption_end' — his word that the mode is OFF from `ended_on` (default today): the step-back-up starts."""
+    from training import disruption
+
+    ended_on = args.get("ended_on") or pacific_now().date().isoformat()
+    rec = disruption.active_record(_disruption_records(), ended_on)
+    if rec is None:
+        return {"error": f"refused: no disruption mode covers {ended_on}", "wrote": False}
+    try:
+        record = disruption.end_record(rec, ended_on=ended_on, words=args.get("words") or "", recorded_at=_now_z())
+    except ValueError as e:
+        return {"error": f"refused: {e}", "wrote": False}
+    record.pop("pk", None)
+    _put_disruption(record)
+    return {"status": "ended", "wrote": True, "sk": record["sk"], "record": record, "step_back_up": disruption.policy().get("step_back_up")}

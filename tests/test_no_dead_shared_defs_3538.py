@@ -89,6 +89,18 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
+    "lambdas/training/cardio_menu.py:performed_movement_minutes": (
+        "#5076's performed side of `movement_minutes` (the gym cardio minutes a performed day adds to the "
+        "steps/movement goal, charter `steps.gym_cardio_minutes_count_toward_movement`), landed fixture-tested "
+        "in tests/test_cardio_menu_dose_5076.py for the #5056 steps-floor lane to read. The first live caller "
+        "is #5056; delete this entry when it lands."
+    ),
+    "lambdas/training/cardio_menu.py:place_week": (
+        "#5076's week-whole reading of the cardio placement rule (`choose_kind` iterated over a week), the "
+        "7-day placement proof in tests/test_cardio_menu_dose_5076.py. The draft path places one day at a "
+        "time through `choose_kind`; the first live caller is a weekly plan surface (the #5073 tracker or the "
+        "#5079 block retro); delete this entry when one lands."
+    ),
     "lambdas/training/workout_identity.py:identity_totals": (
         "#4973's one-workout-identity resolver, landed fixture-tested and deliberately wired into no live "
         "reader: no Apple Watch workout exists in the store yet (#4968 configures the watch), and the one "
@@ -175,12 +187,6 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
         "IS live (email_subscriber_lambda, subscriber_onboarding_lambda, "
         "qa_check_subscriber_promise); deleting the set the promise is checked AGAINST "
         "would leave the promise asserted only against itself."
-    ),
-    "lambdas/ai/prompt_cache.py:cached_prefix_blocks": (
-        "same class as clears_floor: the byte-stable prefix assembler the #2888 tests "
-        "drive directly. Its production callers are the ones #2888/#3085 are still "
-        "converting; the record of which callers have and have not engaged caching lives "
-        "in CACHING_DECISIONS in this same module."
     ),
     # ── #3609 box 2: the widened-scan batch (101 entries, dated 2026-09-19). ────────
     #
@@ -390,6 +396,16 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
     ),
     "lambdas/privacy/content_filter_channel.py:last_channel_errors": (
         "#3609 box 2 widen: exercised only by tests/test_content_filter_channel_errors_2655.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/training/program_structure.py:volume_floor_coverage": (
+        "#5053: the five roles' weekly sets against the charter's MEV floors and sets_per_wk bands — the measurement "
+        "tests/test_volume_floors_5053.py pins (KNOWN_BAND_GAPS, shrink-only) and the numbers the owner ruling #5162 is "
+        "decided on. No live caller yet by design: the coach-facing reader is the volume block #5162's ruling unblocks."
+    ),
+    "lambdas/training/training_charter.py:reset_cache": (
+        "The charter loader's cache reset (#5068, ADR-164) — the same shape as content_filter_channel.reset_cache "
+        "above: called by tests/test_training_charter_loader_5068.py between channel fixtures (env -> local -> S3) and "
+        "by nothing live on purpose; the 15-min TTL is the production reset. Mirrors the content-filter precedent."
     ),
     "lambdas/privacy/content_filter_channel.py:reset_cache": (
         "#3609 box 2 widen: exercised by tests/test_between_chronicle_scrub_2654.py; named only in a COMMENT in lambdas/privacy/privacy_guard.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."

@@ -312,12 +312,22 @@ def format_title(ir: RoutineSpec, ctx: dict[str, Any]) -> str:
     return title[:MAX_TITLE_CHARS]
 
 
+def _compound_band() -> str:
+    """'8-9' — the charter's ruled compounds band (#5058), or 'the charter ceiling'."""
+    from training import effort_ceilings
+
+    band = effort_ceilings.class_bands().get(effort_ceilings.COMPOUNDS)
+    return f"{band[0]:g}-{band[1]:g}" if band else "the charter ceiling"
+
+
+_CB = _compound_band()
 _ROLE_WHY = {
-    # v0.4 (#4147) — upper/lower, in order
-    "upper_heavy": "Upper heavy: one top set at RPE 7-8 on bench and row, back-offs 10% lighter. Loads hold.",
-    "lower_heavy": "Lower heavy: one top set at RPE 7-8 on the squat, back-offs 10% lighter. Loads hold.",
-    "upper_volume": "Upper volume: steady sets of 8-12, a few left in the tank. Loads hold.",
-    "lower_volume": "Lower volume: steady sets of 8-12, a few left in the tank. Loads hold.",
+    # the five-day split (#5069; v0.4's four roles #4147 unchanged), in the charter's order; #5058: the RPE is the charter's
+    "upper_heavy": f"Upper heavy: one top set at RPE {_CB} on bench and row, back-offs 10% lighter. Loads hold.",
+    "lower_heavy": f"Lower heavy: one top set at RPE {_CB} on the squat, back-offs 10% lighter. Loads hold.",
+    "shoulders_arms": "Shoulders and arms: press, side and rear delts, biceps, triceps, traps. Loads hold.",
+    "upper_volume": f"Upper volume: steady sets of 8-12 at RPE {_CB}. Loads hold.",
+    "lower_volume": f"Lower volume: steady sets of 8-12 at RPE {_CB}. Loads hold.",
     # v0.3 (superseded 2026-09-24) — kept so a v0.3 routine still reads right
     "heavy": "Full-body heavy: one top set at RPE 7-8, back-offs 10% lighter. Loads hold.",
     "moderate": "Full-body moderate: steady working sets, 2-3 left in the tank. Loads hold.",
@@ -333,6 +343,9 @@ def format_why_note(ir: RoutineSpec) -> str:
         # line rather than a generator-flavored rationale that doesn't apply.
         lines = [ln for ln in (ir.notes or "").splitlines() if ln.strip()]
         return lines[0].strip()[:140] if lines else "Custom session — manually programmed."
+    if getattr(ir, "source_action", "") == "disruption" and (ir.notes or "").strip():
+        # #5083: the title is the convention's at commit, so the minimum/travel label rides the session note
+        return (ir.notes or "").strip().splitlines()[0][:140]
     if ir.variant == "re_entry":
         return "Easing back in after a gap. Take it gently today."
     if ir.variant == "floor":

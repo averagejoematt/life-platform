@@ -25,8 +25,10 @@ ONE VERDICT RULE IN THE CODEBASE
 `coach.critics.deterministic_verdict` and `coach.critics.reconcile` are imported and
 reused, never copied. `coach.critics.run_critics` is NOT reused: it iterates the training
 `CRITIC_IDS` by name, so this module runs the same two functions over its own ids. v1 is
-deterministic only (ADR-105: computation before any LLM verdict) — every verdict records
-`model = {"paused": MODEL_PAUSED_REASON}`; a critic that did not run a model says so.
+deterministic (ADR-105: computation before any LLM verdict) — every verdict records
+`model = {"paused": MODEL_PAUSED_REASON}`; a critic that did not run a model says so. The
+model layer is a SEPARATE step, `health.nutrition_critics_ai` (#5114): it narrates these
+verdicts under the `nutrition_critics` budget feature and may never move one.
 
 WHERE EVERY THRESHOLD COMES FROM
 
@@ -55,11 +57,16 @@ from typing import Any
 from coach.critics import deterministic_verdict, reconcile
 from training import owner_redlines
 
-from health import deficit_disclosures
+from health import (
+    calorie_target,
+    deficit_disclosures,
+    macro_floors,
+    protein_engine,
+)  # #5098: THE protein hit; #5095: the ONE calorie target
 
 CRITICS_VERSION = "nutrition-critics@1.0.0"
 CRITIC_IDS = ("deficit_advocate", "muscle_defense", "adherence")
-MODEL_PAUSED_REASON = "not wired for nutrition (v1)"
+MODEL_PAUSED_REASON = "model layer not requested on this surface (#5114: it narrates on get_deficit_sustainability)"
 DECISION_SOURCE = "nutrition_critics"
 DECISION_PILLARS = ["nutrition"]
 
@@ -78,6 +85,9 @@ INPUT_KEYS = (
     "window_end",  # YYYY-MM-DD, the last day of the 14-day series (informational)
     "intake_kcal_by_day",  # 14 entries oldest->newest, None for an unlogged day
     "protein_g_by_day",  # 14 entries oldest->newest, None for an unlogged day
+    "fat_g_by_day",  # 14 entries oldest->newest, None for an unlogged day (#5102)
+    "carb_g_by_day",  # same shape (#5102)
+    "fiber_g_by_day",  # same shape (#5102): graded against the charter's fibre floor
     "lifting_day_flags",  # 14 entries oldest->newest, True/False/None
     "weight_lb",  # latest weigh-in
     "weight_trend_lb_wk",  # SIGNED 14-day trend, negative = losing (health.tdee.weight_trend_lb_per_wk)
@@ -101,6 +111,19 @@ INPUT_KEYS = (
 # ── helpers ────────────────────────────────────────────────────────────────────────────
 def _redline(rid: str) -> dict[str, Any]:
     return owner_redlines.REDLINES[rid]
+
+
+def _energy(inputs: dict[str, Any] | None = None) -> dict[str, Any]:
+    """The `energy_floor_kcal` redline with its band, floors and target from the ONE calorie resolver
+    (health.calorie_target, #5095) for the window's week — a titration week moves the critics too."""
+    e = dict(_redline("energy_floor_kcal"))
+    r = calorie_target.resolve((inputs or {}).get("window_end") or None)
+    if r["band_low"] is not None and r["band_high"] is not None:
+        e["prescribed"] = [r["band_low"], r["band_high"]]
+    e["floor_any_day"] = r["floor_any_day_kcal"] or e["floor_any_day"]
+    e["floor_lifting_day"] = r["floor_lifting_day_kcal"] or e["floor_lifting_day"]
+    e["target_kcal"], e["target_source"] = r["kcal"], r["source"]
+    return e
 
 
 def _tripwire(tid: str) -> dict[str, Any]:
@@ -191,6 +214,18 @@ def _loss_rate(inputs: dict[str, Any]) -> float | None:
 
 
 # ── critic 1: the deficit advocate ─────────────────────────────────────────────────────
+def _served_target(weight, p_missed, p_measured, inputs):
+    """The rate target the critics argue against: protein-gated (#4161), body-fat tiered (#4166), guidance-capped (#5074)."""
+    return owner_redlines.rate_target_lb_per_wk(
+        weight,
+        protein_missed_7d=p_missed,
+        protein_measured_7d=p_measured,
+        protein_window_days=_protein7_window(inputs),
+        dxa_scans=inputs.get("dxa_scans"),
+        guidance_cap_lb_wk=inputs.get("guidance_cap_lb_wk"),
+    )
+
+
 def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
     """Argues FOR the owner's scheduled rate. Below target is an ADHERENCE AUDIT, never
     "eat less" — unless mean intake sits above the prescribed band's top. Above the cap
@@ -198,18 +233,12 @@ def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
     p = _new_packet("deficit_advocate")
     n, flags, unknown = p["numbers"], p["flags"], p["unknown"]
     sched = _redline("rate_schedule_lb_wk")
-    energy = _redline("energy_floor_kcal")
+    energy = _energy(inputs)
     overshoot_t = _tripwire("rate_overshoot")
     weight = _num(inputs.get("weight_lb"))
     # v3.3 ruling "B" (#4161): the target this critic argues against is the SERVED one — gated by protein adherence
     p_missed, p_measured = _protein7_counts(inputs)
-    target = owner_redlines.rate_target_lb_per_wk(
-        weight,
-        protein_missed_7d=p_missed,
-        protein_measured_7d=p_measured,
-        protein_window_days=_protein7_window(inputs),
-        dxa_scans=inputs.get("dxa_scans"),  # #4166: the same body-fat tier the plan reads
-    )
+    target = _served_target(weight, p_missed, p_measured, inputs)
     loss = _loss_rate(inputs)
     intake14 = _logged(_series(inputs, "intake_kcal_by_day"))
     mean14 = _mean(intake14)
@@ -229,6 +258,9 @@ def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
             "rate_protein_gate_tier": ((target or {}).get("protein_gate") or {}).get("tier"),
             "rate_cap_lb_wk": (target or {}).get("cap_lb_wk"),
             "rate_band_low_lb_wk": (target or {}).get("low_lb_wk"),
+            # ruling 3: both units; % of bodyweight per week = rate (lb/wk) / current weight (lb) x 100 (#3725: name the base)
+            "rate_band_floor_pct_bodyweight_per_wk": ((target or {}).get("band") or {}).get("floor_pct_bodyweight_per_wk"),
+            "rate_band_ceiling_pct_bodyweight_per_wk": ((target or {}).get("band") or {}).get("ceiling_pct_bodyweight_per_wk"),
             "rate_band_high_lb_wk": (target or {}).get("high_lb_wk"),
             "mean_intake_kcal_14d": mean14,
             "prescribed_band_kcal": [lo, hi],
@@ -369,15 +401,49 @@ def _energy_floor_days(intake7: list[Any], lifting7: list[Any] | None, energy: d
     return (below if measured else None), measured, breaches
 
 
+def _macro_floor_flags(p: dict[str, Any], inputs: dict[str, Any]) -> None:
+    """#5102: the fat, carbohydrate and fibre floors over the trailing 7 days (health.macro_floors, the charter's
+    `nutrition.floors`). A miss is reported WITH the floor and the value; an unlogged day is unknown, never a miss."""
+    n, flags, unknown = p["numbers"], p["flags"], p["unknown"]
+    prov = "population-derived (the charter's nutrition.floors; red-team consensus 2026-09-22)"
+    for macro, key in (("fat", "fat_g_by_day"), ("carb", "carb_g_by_day"), ("fibre", "fiber_g_by_day")):
+        s = _series(inputs, key)
+        n[f"{macro}_floor_g"] = macro_floors.floor_g(macro)
+        if s is None:
+            n[f"{macro}_days_missed_7d"] = None
+            unknown.append(f"{macro}_days_missed_7d")
+            continue
+        graded = [macro_floors.grade(macro, v) for v in s[-7:]]
+        measured = [g for g in graded if g["met"] is not None]
+        if not measured:
+            n[f"{macro}_days_missed_7d"] = None
+            unknown.append(f"{macro}_days_missed_7d")
+            continue
+        missed = [g for g in measured if g["met"] is False]
+        n[f"{macro}_days_measured_7d"] = len(measured)
+        n[f"{macro}_days_missed_7d"] = len(missed)
+        if missed:
+            worst = min(missed, key=lambda g: g["value_g"])
+            flags.append(
+                _flag(
+                    f"{macro}_days_missed_7d",
+                    "info",
+                    f"{len(missed)} of {len(measured)} measured days below the {macro} floor — lowest: {macro_floors.miss_text(macro, worst)}",
+                    provenance=prov,
+                    field=f"{macro}_g_per_day",
+                    to=worst["floor_g"],
+                )
+            )
+
+
 def build_muscle_defense_packet(inputs: dict[str, Any]) -> dict[str, Any]:
     """The energy floor and the protein floor — the two redlines whose breach is where lean
     mass goes. Trailing 7 days, measured days only."""
     p = _new_packet("muscle_defense")
     n, flags, unknown = p["numbers"], p["flags"], p["unknown"]
-    energy = _redline("energy_floor_kcal")
+    energy = _energy(inputs)
     protein = _redline("protein_floor_g")
-    floor_t = _tripwire("intake_floor_breached")
-    prot_t = _tripwire("protein_floor_missed")
+    floor_t, prot_t = _tripwire("intake_floor_breached"), _tripwire("protein_floor_missed")
     intake14 = _series(inputs, "intake_kcal_by_day")
     protein14 = _series(inputs, "protein_g_by_day")
     lifting14 = _series(inputs, "lifting_day_flags")
@@ -410,8 +476,7 @@ def build_muscle_defense_packet(inputs: dict[str, Any]) -> dict[str, Any]:
             )
         )
 
-    # energy floor
-    if intake7 is None:
+    if intake7 is None:  # energy floor
         n["energy_floor_days_below_7d"] = None
         n["mean_intake_kcal_7d"] = None
         unknown += ["energy_floor_days_below_7d", "mean_intake_kcal_7d"]
@@ -473,7 +538,7 @@ def build_muscle_defense_packet(inputs: dict[str, Any]) -> dict[str, Any]:
             unknown += ["protein_days_missed_7d", "protein_target_days_7d"]
         else:
             missed = owner_redlines.protein_days_missed(grams)[0] or 0  # #4161: THE count, shared with the rate gate
-            at_target = sum(1 for g in grams if g >= protein["target_g"])
+            at_target = sum(1 for g in grams if protein_engine.hit(g, protein["target_g"]))  # #5098: the one predicate, at the range high
             n["protein_days_missed_7d"] = missed
             n["protein_target_days_7d"] = at_target
             n["mean_protein_g_7d"] = _mean(grams)
@@ -512,7 +577,7 @@ def build_muscle_defense_packet(inputs: dict[str, Any]) -> dict[str, Any]:
                     )
                 )
 
-    # the deficit tool's composite — its OWN recommendation, labelled with its provenance
+    _macro_floor_flags(p, inputs)  # #5102; below, the deficit tool's composite — its OWN recommendation, labelled with its provenance
     sev = inputs.get("deficit_severity")
     bands = deficit_disclosures.CONCURRENT_DEGRADATION_BANDS
     if sev is None:
@@ -678,10 +743,17 @@ def build_packets(inputs: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 # ── verdicts ───────────────────────────────────────────────────────────────────────────
+def _floor_miss_lines(packet: dict[str, Any]) -> list[str]:
+    """#5102: the fat / carbohydrate / fibre floor-miss lines of one packet — each states the floor and the measured value.
+    Approve-side information like `recommendation`: the flags are `info`, so they never touch the verdict."""
+    metrics = {f"{m}_days_missed_7d" for m in macro_floors.MACROS}
+    return [f["reason"] for f in packet.get("flags", []) if f["severity"] == "info" and f["metric"] in metrics]
+
+
 def run(inputs: dict[str, Any], *, model_allowed: bool = False) -> dict[str, Any]:
     """Three verdicts over three packets, through `coach.critics`' deterministic layer and
-    `reconcile` (the ONE verdict rule). v1 never runs a model: `model_allowed` is accepted
-    for shape parity and refused — a critic that did not run a model says so."""
+    `reconcile` (the ONE verdict rule). This never runs a model: `model_allowed` is accepted
+    for shape parity and refused — the narrative is `health.nutrition_critics_ai.apply` (#5114)."""
     inputs = inputs or {}
     packets = build_packets(inputs)
     verdicts: list[dict[str, Any]] = []
@@ -691,6 +763,8 @@ def run(inputs: dict[str, Any], *, model_allowed: bool = False) -> dict[str, Any
         v = reconcile(det, None, packet)
         v["model"] = {"paused": MODEL_PAUSED_REASON}
         v["unknown"] = list(packet.get("unknown", []))
+        if lines := _floor_miss_lines(packet):
+            v["floor_misses"] = lines
         if v.get("verdict") == "veto":
             # ADR-105: a population-derived redline keeps its label even once it is a veto —
             # coach.critics stamps violations "owner" (his calibration doc); ours carry their own.
@@ -707,6 +781,7 @@ def run(inputs: dict[str, Any], *, model_allowed: bool = False) -> dict[str, Any
         "redlines_version": owner_redlines.REDLINES_VERSION,
         "verdicts": verdicts,
         "veto": any(v.get("verdict") == "veto" for v in verdicts),
+        "floor_misses": [line for v in verdicts for line in v.get("floor_misses", [])],  # #5102: also on the deterministic path
         "packet_numbers": {cid: p["numbers"] for cid, p in packets.items()},
         "unknown": {cid: p["unknown"] for cid, p in packets.items() if p["unknown"]},
     }
@@ -758,7 +833,7 @@ def _break_options(inputs: dict[str, Any]) -> list[str]:
         if maint is not None
         else "estimated maintenance (TDEE unpublished — derive it from the 14-day trend first, #3931)"
     )
-    energy = _redline("energy_floor_kcal")
+    energy = _energy(inputs)
     return [
         f"diet break: 7-14 days at {at} (IC-29's own MODERATE recommendation)",
         f"refeed: 2 days at {at}, then resume the prescribed {energy['prescribed'][0]}-{energy['prescribed'][1]} band",
@@ -774,7 +849,7 @@ def decisions_offered(
     whose inputs cannot be read is returned `unevaluable` with the missing names."""
     inputs = inputs or {}
     out: list[dict[str, Any]] = []
-    energy = _redline("energy_floor_kcal")
+    energy = _energy(inputs)
     protein = _redline("protein_floor_g")
     lifts = _redline("lifting_sessions_per_wk")
     stall_t = _tripwire("weight_stall_with_adherence")
@@ -806,7 +881,7 @@ def decisions_offered(
         logged14 = _logged(intake14)
         mean14 = _mean(logged14)
         grams7 = _logged(protein14[-7:])
-        prot_ok_days = sum(1 for g in grams7 if g >= protein["value"])
+        prot_ok_days = sum(1 for g in grams7 if protein_engine.hit(g))  # #5098: THE hit (the charter range low)
         lift_days = sum(1 for f in lifting14[-7:] if f)
         flat = loss < STALL_FLAT_LB_WK
         in_band = mean14 is not None and lo <= mean14 <= hi
@@ -835,7 +910,7 @@ def decisions_offered(
 
     # 2. rate overshoot — the schedule's own +250 rule
     weight = _num(inputs.get("weight_lb"))
-    target = owner_redlines.rate_target_lb_per_wk(weight)
+    target = owner_redlines.rate_target_lb_per_wk(weight, guidance_cap_lb_wk=inputs.get("guidance_cap_lb_wk"))
     rates = [r for r in (_num(x) for x in (inputs.get("weekly_loss_rates_lb_wk") or [])) if r is not None]
     weeks = inputs.get("weeks_since_genesis")
     need = int(over_t["threshold_weeks"])

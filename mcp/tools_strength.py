@@ -124,7 +124,7 @@ _DEFAULT_LOOKBACK_DAYS = {"week": 28, "month": 90}
 
 # #4071: every answer also carries these two trailing windows, ending on `end_date`, read
 # from the same partition read — the planner's 28-day rate and the 7-day "this week" read.
-_TRAILING_WINDOWS = (7, 28)
+_TRAILING_WINDOWS = (7, 14, 28)  # 14d (#5053): the below-MEV flag's window
 
 
 def _item_day(item: dict) -> str:
@@ -150,6 +150,7 @@ def tool_get_muscle_volume(args):
     The answer echoes what it did in `searched` (window, whose window, phases read) and `method`.
     """
     from training.muscle_volume import METHOD, MUSCLES, window_days, window_start, window_weeks, working_sets_by_muscle
+    from training.volume_floors import below_mev_14d
 
     end_date = args.get("end_date") or pacific_now().date().isoformat()
     period = args.get("period", "week")  # "week" or "month"
@@ -259,6 +260,7 @@ def tool_get_muscle_volume(args):
         "completeness": completeness,
         "muscle_volume": volume_report,
         "trailing_windows": trailing,
+        "below_mev_14d": below_mev_14d(trailing.get("14d")),  # #5053: the trailing window's own counts against the landmarks
         "warmup_sets_excluded": counted["warmup_sets_excluded"],
         "working_sets_counted": counted["working_sets_counted"],
         "non_resistance_excluded": counted["non_resistance"],

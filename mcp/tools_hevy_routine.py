@@ -13,7 +13,7 @@ One tool, eleven actions:
   floor         — generate floor variant explicitly
   re_entry      — force re-entry mode regardless of last-workout date
   adherence     — programmed-vs-performed report for a routine_id
-  stall_check   — prescribed-vs-performed stall verdict for ONE movement (#3928)
+  stall_check   — prescribed-vs-performed stall verdict for ONE movement (#3928; `step_due`, #5057)
 
 `draft` is the opinionated, deterministic volume-landmark programmer — it
 builds its own routine from your state and never takes an exercise list.
@@ -44,7 +44,7 @@ from common.pacific_time import pacific_today  # #2798: target_date is a Pacific
 from training import commit_binding  # #4066: the commit is bound to the red-teamed routine
 from training.warmup_sets import working_set_count  # #5049: the set ceilings count working sets
 
-from mcp.draft_custom_session import attach_draft_warmups, stamp_program_slot  # #5005 slot tags; #5049 warm-ups
+from mcp.draft_custom_session import custom_args_refusal, finish_custom_draft  # #5005 slots; #5049 warm-ups; #5057 step; #5055 reason
 from mcp.hevy_prescription_gate import prescription_gate, refusal as _gate_refusal, summary as _gate_summary
 
 # #3670: everything the commit result must report honestly lives in its own module
@@ -129,6 +129,8 @@ def _generator_inputs(args: dict[str, Any]):
         z2_minutes_7d=z2_minutes_7d(target_date),
         days_since_last_workout=int(args.get("days_since_last_workout") or 2),
         add_load_enabled=False,  # never permitted from chat; SSM-gated only
+        deload_records=args.get("deload_records"),  # #5070: injected when the caller read the store; None = read once, fail-soft
+        disruption_records=args.get("disruption_records"),  # #5088: the same contract for his disruption-mode records
     )
 
 
@@ -142,6 +144,7 @@ def _authoring_freshness_gate(target_date: str) -> dict[str, Any]:
     to author when an input lags the latest ingested session. Reuses the Stage-1
     get_muscle_volume `completeness` signal and the Whoop recovery high-water mark.
     """
+    from mcp.authoring_input_age import add_input_age
     from mcp.recovery_authoring import assess_authoring_freshness
 
     vol_completeness = None
@@ -176,8 +179,8 @@ def _authoring_freshness_gate(target_date: str) -> dict[str, Any]:
         logger.warning("freshness gate: recovery read failed: %s", e)
 
     gate = assess_authoring_freshness(vol_completeness, latest_recovery, target_date)
+    gate = add_input_age(gate, latest_recovery, target_date)  # #5085: a stale Whoop/Hevy refuses by name (registry stale_hours)
     gate["data_current_through"] = data_current_through
-    gate["latest_recovery"] = latest_recovery
     return gate
 
 
@@ -199,7 +202,7 @@ def _gather_training_context(target_date: str) -> dict[str, Any]:
     try:
         from mcp.tools_nutrition import tool_get_deficit_sustainability
 
-        ds = tool_get_deficit_sustainability({})
+        ds = tool_get_deficit_sustainability({"critics_model": False})
         label = ((ds or {}).get("deficit") or {}).get("deficit_label")
         deficit_state = {"aggressive": "deep", "moderate": "moderate", "mild": "maintenance", "maintenance": "maintenance"}.get(
             label, "moderate"
@@ -217,8 +220,8 @@ def _apply_recovery_adaptation(
 
     Tier-agnostic (brief §2.1): the routine carries GREEN/YELLOW/RED in its notes; the
     morning selects one. Renders into EXERCISE notes (#3938: Hevy has no routine-level notes
-    field — the compiler now places the WHY line ahead of this block on exercises[0]). Stashes structured branches in the
-    existing inputs_snapshot so no layer-resident IR schema bump is needed for v1.
+    field — the WHY line leads, then exercise 0's prescription line, then this block, #5083).
+    Stashes structured branches in the existing inputs_snapshot (no IR schema bump for v1).
     """
     # #5000: an active standing constraint (`constraint`) replaces the band block with the ECG + feel
     # gate (`mcp.draft_standing_constraint.apply_gate`); `green_withheld` (a tripped `protein_floor_missed`)
@@ -233,9 +236,10 @@ def _apply_recovery_adaptation(
 
         structured = apply_gate(ir, ctx, inputs_current_through, constraint, green_withheld)
     else:
-        session_block = render_session_block(ctx, inputs_current_through, green_withheld)
+        from training.hevy_render import place_after_prescription  # #5083: the block goes after exercise 0's reason line
+
         first = ir.exercises[0]
-        first.notes = (session_block + ("\n\n" + first.notes if first.notes else "")).strip()
+        first.notes = place_after_prescription(first.notes, render_session_block(ctx, inputs_current_through, green_withheld))
         structured = {"session": ctx, "exercises": {}}
         for ex in [ex for ex in ir.exercises if getattr(ex, "skill_tier", 1) >= 2][:2]:
             branches = build_top_set_branches(RPE_BASE_YELLOW, ctx, green_withheld)
@@ -274,6 +278,9 @@ def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
     routines = generate_routines(inputs)
     ideal = next((r for r in routines if r.variant == "ideal"), None)
     floor = next((r for r in routines if r.variant == "floor"), None)
+    # #5088: under his disruption mode the served session is the short one; it carries its own notes, so the
+    # recovery branches and the appended cardio block (a full-session adaptation) are not run over it
+    short = next((r for r in routines if r.variant == "disruption"), None)
 
     # Tier-agnostic adaptation: the ideal routine becomes the self-adapting carrier.
     ctx = _gather_training_context(target_date)
@@ -288,10 +295,11 @@ def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
     return {
         "status": "drafted",
         "target_date": inputs.target_date,
-        "ideal_routine_id": getattr(ideal, "routine_id", None),
+        "ideal_routine_id": getattr(ideal or short, "routine_id", None),
+        "disruption": (short.inputs_snapshot or {}).get("disruption") if short else None,
         "floor_routine_id": getattr(floor, "routine_id", None),
         "variants_persisted": [r.variant for r in routines],
-        "rationale": (ideal.rationale if ideal else []),
+        "rationale": getattr(ideal or short, "rationale", None) or [],
         "freshness_gate": {"ok": gate.get("ok"), "gaps": gate.get("gaps", []), "inputs_current_through": inputs_current_through},
         "recovery_adaptation": {
             "applied": bool(adaptation),
@@ -656,14 +664,10 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     from training.routine_ir import ExerciseBlock, RoutineSpec
     from training.routine_repo import draft_versioned  # #3115
 
-    raw_exercises = args.get("exercises")
-    if not isinstance(raw_exercises, list) or not raw_exercises:
-        return mcp_error(
-            "draft_custom requires a non-empty 'exercises' list "
-            "[{movement_key|title, sets:[{weight_lbs|weight_kg, reps|rep_range_start/end, "
-            "count?}], rest_seconds?, superset_id?, notes?}]",
-            error_code="MISSING_ARG",
-        )
+    refusal = custom_args_refusal(args)  # the exercises list + #5055's departure_reason
+    if refusal:
+        return mcp_error(refusal[0], error_code=refusal[1])
+    raw_exercises = args["exercises"]
 
     # #3718 — DEFAULT FLIPPED TO FALSE. On 2026-09-08 create_missing invented
     # "Calf Press on Leg Press Machine" and guessed `shoulders` as its muscle
@@ -811,8 +815,8 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     # AFTER `_new_routine_id` and BEFORE `draft_versioned`, so the persisted draft carries it.
     cardio_cues = attach_custom_cardio_notes(ir, target_date)
     ir.inputs_snapshot["cardio_cues"] = cardio_cues
-    # #5005: a program-session date re-tags the blocks with the slot's intensity, so the commit gate checks the engine's floors
-    program_slot, warmups = stamp_program_slot(ir), attach_draft_warmups(ir, catalog, args)  # #5049: the generator's climb too
+    # #5005 slot tags (the commit gate checks the engine's floors), #5049 the warm-up climb, #5057 the stall rule's step
+    finished = finish_custom_draft(ir, catalog, args)
     draft_versioned(ir)
     resp = {
         "status": "drafted_custom",
@@ -821,9 +825,8 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         "archetype": archetype,
         "exercise_count": len(blocks),
         "total_sets": total_sets,
-        "warmup_sets": (warmups or {}).get("warmup_sets", 0),
         "cardio_cues": cardio_cues,
-        "program_slot": program_slot,
+        **finished,  # warmup_sets, program_slot, step_due
         "warnings": warnings,
         "note": "Run action=dry_run with this routine_id to preview the exact Hevy "
         "body, then action=commit to push. Commit requires explicit routine_id.",
@@ -903,10 +906,9 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
     routine_id = args.get("routine_id")
     if not routine_id:
         return mcp_error("dry_run requires routine_id", error_code="MISSING_ARG")
-    from training.hevy_compiler import to_create_body
-    from training.routine_repo import get_current
+    from training import hevy_compiler, hevy_render, routine_repo
 
-    ir = get_current(routine_id)
+    ir = routine_repo.get_current(routine_id)
     if not ir:
         return mcp_error(f"routine_id={routine_id} not found", error_code="NOT_FOUND")
     # Preview the title the way commit will actually render it (the compiler
@@ -916,7 +918,7 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
     # #3938: the critics' block already rides on ir.exercises[0].notes (placed at plan time); the
     # compiler puts the WHY line ahead of it there. Composing the block into `why` again would
     # stack it twice on the one channel that lands.
-    body = to_create_body(ir, _make_resolver(), title_context=title_ctx, why_note=why)
+    body = hevy_compiler.to_create_body(ir, _make_resolver(), title_context=title_ctx, why_note=why)
     out = {
         "status": "preview",
         "routine_id": routine_id,
@@ -926,6 +928,7 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
         # #3971 box 1 — dry_run REPORTS what commit will refuse on: the derived load
         # floors and every find_conditional_up hit, before anything reaches Hevy.
         "prescription_audit": prescription_gate(ir),
+        "render_check": hevy_render.render_check(body, session_note=why, ir=ir),  # #5083: each charter field and where it shows
     }
     # Recovery-adaptive preflight (brief §6.5): show the inputs_current_through line +
     # the per-lift branch blocks Matthew eyeballs in 30s, so he sleeps trusting it.

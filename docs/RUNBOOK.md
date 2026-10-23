@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-10-18 (v8.6.0 — 88 MCP tools, 72-module package, 108 Lambdas, 20 data sources)
+Last updated: 2026-10-23 (v8.6.0 — 89 MCP tools, 81-module package, 108 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 108 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -1974,6 +1974,34 @@ The cron emits a `RoutineConflict` CloudWatch metric and returns `pushed=false` 
 2. Inspect failed payloads in the DLQ (CloudWatch logs for `hevy-routine-cron` log the throw).
 3. If transient: redrive via the existing DLQ consumer (`life-platform-dlq-consumer`, every 6h).
 4. If persistent: disable the cron (`aws events disable-rule --name hevy-routine-cron-weekly`) until Hevy recovers.
+
+### Nightly pre-draft plan source — the v0.4 revert (#5080)
+
+The nightly pre-draft (`mcp/nightly_predraft.py`, 02:00Z on `life-platform-mcp-warmer`) persists ONE plan per night. Which one is SSM `/life-platform/training-plan-source` (`v04 | charter`), read with a 60-s cache. **The parameter's absence means `charter`** (`mcp/predraft_shadow.py` `DEFAULT_SOURCE`), and so does a missing `ssm:GetParameter` grant or any read error — the run names the reason under `plan_source`.
+
+```bash
+# Revert to the frozen v0.4 plan (training/program_v04.build_session) from the next nightly run:
+aws ssm put-parameter --name /life-platform/training-plan-source --value v04 --type String --overwrite
+# Back to the charter engine:
+aws ssm put-parameter --name /life-platform/training-plan-source --value charter --type String --overwrite
+# What it reads now:
+aws ssm get-parameter --name /life-platform/training-plan-source --query Parameter.Value --output text --cli-read-timeout 60
+```
+
+The parameter is deliberately NOT CDK-owned — a stack deploy would re-assert a synth value and undo a revert. The flip takes effect on the next run (a warm container may hold the previous answer for up to 60 s). It changes only the nightly pre-draft; a draft built in chat is unaffected, and nothing is committed to Hevy either way. For the first five nights the run also builds the other plan and writes an owner-only side-by-side at `USER#matthew#SOURCE#training_constraints / SHADOW#<date>` (`docs/SCHEMA.md`); the run's log line carries the one-line `shadow.summary`.
+
+What a revert does and does not change (read before flipping to `v04`):
+
+- **The days are still the charter's.** The run asks the charter's schedule (`scheduled_session`) whether tomorrow is a lifting day and returns `no_session` when it is not, so under `v04` the v0.4 sessions are drafted on the charter's five lifting days, not v0.4's four-day `program_v04.NOMINAL_WEEK`. The v0.4 ROLE is v0.4's own order (`v04_role` over the loaded sessions since the block start), and the draft's marker carries that role (`seam: program_v04.build_session`). The owner-routine skip and the partition check still compare against the charter's served session; a v0.4 draft that would version over a routine he authored is refused by `_mark_draft`'s backstop, by name.
+- **No scheduled deload, under a revert too.** v0.4's calendar deload (from 2026-11-04, −40 % sets) is never applied — owner ruling 2 of 2026-10-18 (#5070) outranks v0.4. The plan reports it as `deload.would_have_deloaded` (and the shadow summary says "v0.4 would have deloaded — not applied"); sets are cut only when his recorded DELOAD# word (`get_exercise_notes action='deload'`) covers the day, exactly as on the charter path.
+
+### Weekly calorie titration (#5096)
+
+The coming week's calorie target is decided on the nightly pre-draft run (`mcp/titration_leg.py`, a fail-soft leg on `life-platform-mcp-warmer` at 02:00Z): it decides on a Pacific Friday night for the next ISO week and writes `USER#matthew#SOURCE#nutrition_titration / WEEK#<monday>` once (a conditional put; the Saturday and Sunday runs retry only if Friday's did not write). The rule is the charter's `nutrition.titration` block; the decision logic is `health.titration.decide`. The run's log line carries `NUTRITION_TITRATION_DECISION week=… action=… step=… code=…`; the pre-draft's `NIGHTLY_PREDRAFT` result line carries it under `titration`.
+
+- **Dry run (no write, any weekday):** `python3 -c "import sys; sys.path[:0]=['lambdas','.']; import json; from mcp import titration_leg as t; print(json.dumps(t.run(dry_run=True), indent=1, default=str))"` with read-only AWS credentials prints the decision the coming week would get.
+- **Dead-man:** from the charter's `nutrition.titration.dead_man.armed_from`, a week with no record is a `nutrition_titration` row at `missed_2` in `training.calibration_cadence`'s block: the calibration leg logs `CALIB_DEADMAN kind=nutrition_titration`, the row logs `NUTRITION_TITRATION_MISSED week=…`, and the Telegram event sweep sends the owner one alert per week (`CALIB_DEADMAN#nutrition_titration#<monday>`). The resolver falls back to the charter's `target_kcal` meanwhile.
+- **A wrong decision:** never edit the row in place silently. Delete the week's row with an owner-attended AWS write (`aws dynamodb delete-item --key '{"pk":{"S":"USER#matthew#SOURCE#nutrition_titration"},"sk":{"S":"WEEK#<monday>"}}'`) before its Monday and the next weekend run re-decides it. A row deleted inside its own week is not re-decided: the charter's `target_kcal` serves for the rest of that week and the dead-man alerts.
 
 ### Public-site copy reminder
 

@@ -375,8 +375,8 @@ def test_daily_nutrition_carries_the_logged_totals_verbatim():
     assert (d["total_calories"], d["total_protein_g"], d["total_carbs_g"]) == (1743.0, 187.0, 61.0 * 0 + 142.0)
     assert (d["total_fat_g"], d["total_fiber_g"]) == (61.0, 33.5)
     # #4244: the micro figure is DERIVED from the day's totals (+ the supplement record), not the
-    # stored food-only avg — here fiber alone is logged, 33.5 / 38 = 88.2%, and no supplement row.
-    assert d["micronutrient_avg_pct"] == 88.2
+    # stored food-only avg — here fiber alone is logged, 33.5 / 35 = 95.7% (the charter fibre floor, #5204), and no supplement row.
+    assert d["micronutrient_avg_pct"] == 95.7
     assert d["micronutrient_intake_channels"] == ["food", "supplements"]
     assert d["supplements_state"] == "absent"
 
@@ -821,9 +821,9 @@ def test_a_field_no_day_logged_is_reported_absent_not_zero():
 
 
 def test_weekly_summary_averages_micronutrient_sufficiency():
-    # #4244: derived from the totals — fiber 22.8 g = 60%, 30.4 g = 80% of the 38 g target.
+    # #4244: derived from the totals — fiber 22.8 g = 65.1%, 30.4 g = 86.9% of the 35 g charter floor (#5204).
     days = m.extract_daily_nutrition({"2026-06-06": _mf_day(fiber=22.8), "2026-06-07": _mf_day(fiber=30.4)})
-    assert m.compute_weekly_summary(days)["avg_micronutrient_pct"] == 70.0
+    assert m.compute_weekly_summary(days)["avg_micronutrient_pct"] == 76.0
 
 
 def test_a_single_logged_day_averages_to_itself():
@@ -868,8 +868,8 @@ def test_a_day_whose_date_cannot_be_parsed_still_appears_labelled_by_its_key():
 def test_the_snapshot_shows_each_days_actual_numbers():
     html = _table({"2026-06-06": _mf_day(cal=1743, protein=187, carbs=142, fat=61, fiber=33, micro=71)})
     row = _day_row(html, "Sat 06/06")
-    # #4244: MICRO is the derived food + supplements figure (fiber 33 / 38 = 87%), not the stored 71.
-    assert row[1:] == ["1743", "187g", "142g", "61g", "33g", "87%"]
+    # #4244: MICRO is the derived food + supplements figure (fiber 33 / 35 = 94%), not the stored 71.
+    assert row[1:] == ["1743", "187g", "142g", "61g", "33g", "94%"]
 
 
 def test_the_average_row_is_the_mean_of_the_shown_days():
@@ -879,23 +879,26 @@ def test_the_average_row_is_the_mean_of_the_shown_days():
             "2026-06-07": _mf_day(cal=1900, protein=200, carbs=160, fat=70, fiber=34, micro=80),
         }
     )
-    # #4244: MICRO derived per day from fiber (30 -> 78.9%, 34 -> 89.5%), mean 84%.
-    assert _avg_row(html)[1:] == ["1800", "190g", "150g", "65g", "32g", "84%"]
+    # #4244: MICRO derived per day from fiber (30 -> 85.7%, 34 -> 97.1%), mean 91%.
+    assert _avg_row(html)[1:] == ["1800", "190g", "150g", "65g", "32g", "91%"]
 
 
 def test_the_snapshot_states_the_targets_it_is_grading_against():
     # #4540: the plan's targets — the profile row's copies are not read, whatever they say.
     html = _table({"2026-06-06": _mf_day(cal=1800)}, {"calorie_target": 2000, "protein_target_g": 175})
     footer = [r for r in _rows(html) if r and "Targets" in r[0]][0][0]
-    assert f"{m.PLAN_DAILY_CALORIES_TARGET} kcal" in footer
+    assert f"{m.calorie_target.target_kcal()} kcal" in footer
     assert f"{m.PLAN_DAILY_PROTEIN_MIN_G}g protein" in footer
     assert "2000 kcal" not in footer and "175g" not in footer
+    # #5204: the footer's fibre figure is the one the MICRO column grades against (the charter floor), never a literal
+    fiber = m.nutrient_intake.MICRONUTRIENT_TARGETS["fiber_g"]["target"]
+    assert f"{fiber:g}g fiber" in footer and "38g fiber" not in footer
 
 
 def test_a_profile_with_no_targets_still_states_the_plans():
     html = _table({"2026-06-06": _mf_day(cal=1800)}, {})
     footer = [r for r in _rows(html) if r and "Targets" in r[0]][0][0]
-    assert f"{m.PLAN_DAILY_CALORIES_TARGET} kcal" in footer and f"{m.PLAN_DAILY_PROTEIN_MIN_G}g protein" in footer
+    assert f"{m.calorie_target.target_kcal()} kcal" in footer and f"{m.PLAN_DAILY_PROTEIN_MIN_G}g protein" in footer
 
 
 def test_calories_over_target_are_flagged_differently_from_calories_on_target():
@@ -1044,7 +1047,7 @@ def test_a_week_without_a_dexa_scan_reports_dexa_as_absent(frozen_clock):
 def test_the_prompt_carries_the_plan_targets_the_panel_grades_against():
     p = _payload(profile={"calorie_target": 2000, "protein_target_g": 175, "goal_weight_lbs": 250})
     assert p["profile_targets"] == {
-        "calorie_target": m.PLAN_DAILY_CALORIES_TARGET,
+        "calorie_target": m.calorie_target.target_kcal(),
         "protein_target_g": m.PLAN_DAILY_PROTEIN_MIN_G,
         "goal_weight_lbs": 250,
     }
@@ -1053,7 +1056,7 @@ def test_the_prompt_carries_the_plan_targets_the_panel_grades_against():
 def test_missing_profile_targets_change_nothing_about_the_plan_targets():
     p = _payload(profile={})
     assert p["profile_targets"] == {
-        "calorie_target": m.PLAN_DAILY_CALORIES_TARGET,
+        "calorie_target": m.calorie_target.target_kcal(),
         "protein_target_g": m.PLAN_DAILY_PROTEIN_MIN_G,
         "goal_weight_lbs": 185,
     }
@@ -1180,7 +1183,7 @@ def test_both_panel_prompt_paths_state_which_channel_each_micronutrient_number_c
     board config AND the hardcoded fallback) now carry the scope note."""
     _with_board(monkeypatch, BOARD)
     board = m._build_nutrition_prompt_from_config(1800, 190)
-    fallback = m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1800, protein_target_g=190)
+    fallback = m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1800, protein_target_g=190, feeding_threshold_g=m._feeding_threshold_text())
     for prompt in (board, fallback):
         assert m.MICRONUTRIENT_SCOPE_NOTE in prompt
         assert "from_supplements" in prompt
@@ -1202,7 +1205,9 @@ def test_the_served_board_config_prompt_carries_no_food_only_micro_rule(monkeypa
     assert m.MICRO_GAP_RULE in prompt
     assert any("food-only micro rule" in w for w in warned), warned
     # The hardcoded fallback states the same re-scoped rule, word for word.
-    assert m.MICRO_GAP_RULE in m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1800, protein_target_g=190)
+    assert m.MICRO_GAP_RULE in m._FALLBACK_SYSTEM_PROMPT.format(
+        calorie_target=1800, protein_target_g=190, feeding_threshold_g=m._feeding_threshold_text()
+    )
 
 
 def test_a_supplement_covered_nutrient_is_not_a_gap_in_the_weekly_table():
@@ -1258,14 +1263,14 @@ def test_a_scheduled_supplement_miss_reaches_the_weekly_rows_as_a_zero_not_an_ab
 
 
 def test_the_panel_is_told_omega3_is_two_targets_and_what_a_scheduled_miss_means():
-    fallback = m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1800, protein_target_g=190)
+    fallback = m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1800, protein_target_g=190, feeding_threshold_g=m._feeding_threshold_text())
     for needle in ("omega3_epa_dha_g", "omega3_ala_g", "scheduled_miss", "supplements_not_taken"):
         assert needle in m.MICRONUTRIENT_SCOPE_NOTE and needle in fallback, needle
     assert "`species`" not in m.MICRONUTRIENT_SCOPE_NOTE  # the retired field is not described to the panel
 
 
 def test_the_hardcoded_fallback_prompt_renders_the_live_targets():
-    rendered = m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1650, protein_target_g=205)
+    rendered = m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1650, protein_target_g=205, feeding_threshold_g=m._feeding_threshold_text())
     assert "1650 kcal" in rendered
     assert "205g" in rendered
     assert "{" not in rendered.replace("{calorie_target}", "").replace("{protein_target_g}", "")
@@ -1584,7 +1589,7 @@ def test_the_panel_prompt_receives_the_weeks_real_numbers(handler_env):
 def test_the_panel_prompt_states_the_targets_being_graded(handler_env):
     m.lambda_handler({}, None)
     system, _ = handler_env["calls"]["anthropic"][0]
-    assert f"{m.PLAN_DAILY_CALORIES_TARGET} kcal" in system
+    assert f"{m.calorie_target.target_kcal()} kcal" in system
     assert f"{m.PLAN_DAILY_PROTEIN_MIN_G}g" in system
 
 
@@ -1679,7 +1684,7 @@ def test_a_config_driven_panel_prompt_is_used_when_the_board_config_loads(handle
     handler_env["monkeypatch"].setattr(m, "_build_nutrition_prompt_from_config", lambda cal, pro: f"BOARD PROMPT {cal}/{pro}")
     m.lambda_handler({}, None)
     system, _ = handler_env["calls"]["anthropic"][0]
-    assert system == f"BOARD PROMPT {m.PLAN_DAILY_CALORIES_TARGET}/{m.PLAN_DAILY_PROTEIN_MIN_G}"
+    assert system == f"BOARD PROMPT {m.calorie_target.target_kcal()}/{m.PLAN_DAILY_PROTEIN_MIN_G}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════

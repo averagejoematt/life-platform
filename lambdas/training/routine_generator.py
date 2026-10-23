@@ -93,6 +93,9 @@ class GeneratorInputs:
         history_last_dates: dict[str, str] | None = None,  # movement_key -> last YYYY-MM-DD
         add_load_enabled: bool = False,  # SSM gate — default false until N>=30
         block_workouts: list[dict[str, Any]] | None = None,  # #4110: Hevy rows since the program's block start; None = read it here
+        deload_records: list[dict[str, Any]] | None = None,  # #5070: the owner's recorded deload words; None = read it here (fail-soft)
+        disruption_records: list[dict[str, Any]] | None = None,  # #5088: his disruption-mode records; None = read it here (fail-soft)
+        fitness_batteries: list[dict[str, Any]] | None = None,  # #5078: the battery records; None = read it here on a test day only
     ) -> None:
         self.target_date = target_date
         self.recovery_tier = recovery_tier
@@ -103,6 +106,9 @@ class GeneratorInputs:
         self.history_last_dates = history_last_dates or {}
         self.add_load_enabled = add_load_enabled
         self.block_workouts = block_workouts
+        self.deload_records = deload_records
+        self.disruption_records = disruption_records
+        self.fitness_batteries = fitness_batteries
 
 
 def _archetype_for_date(target_date: str, week_cfg: dict[str, Any]) -> str:
@@ -111,11 +117,15 @@ def _archetype_for_date(target_date: str, week_cfg: dict[str, Any]) -> str:
 
 
 def _schedule_entry_for_date(
-    target_date: str, week_cfg: dict[str, Any], source: str | None = None, block_workouts: list[dict[str, Any]] | None = None
+    target_date: str,
+    week_cfg: dict[str, Any],
+    source: str | None = None,
+    block_workouts: list[dict[str, Any]] | None = None,
+    deload_records: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The whole schedule entry for the day. #3755: the module grid carries a key the JSON grid
-    never had — `session_role` (v0.4: upper_heavy / lower_heavy / upper_volume / lower_volume,
-    #4147) — which routes the day to the program's session and rides on the rationale and title.
+    never had — `session_role` (the five roles of the charter's split, #5069; v0.4's four, #4147) —
+    which routes the day to the program's session and rides on the rationale and title.
 
     #4110 (replacing #4064's weekday calendar): when the seam served the MODULE grid
     (`source == "module"`, i.e. the program is ACTIVE), the session SEQUENCE answers first —
@@ -128,9 +138,10 @@ def _schedule_entry_for_date(
     grid (v0.2 / any inactive program) never consults the sequence."""
     dow = date.fromisoformat(target_date).weekday()
     if source == "module":
-        from training import session_sequence
+        from training import deload_word, session_sequence
 
-        seq = session_sequence.next_session(target_date, block_workouts)
+        records = deload_records if deload_records is not None else deload_word.load_records_failsoft()  # #5070: his word
+        seq = session_sequence.next_session(target_date, block_workouts, records)
         if seq is not None and seq.get("source") == "session_sequence":
             return seq
         if seq is not None:
@@ -501,7 +512,7 @@ def _select_movements_for_muscle(
         for k, v in catalog["movements"].items()
         # #4108: the skill ceiling AND the prescribable-shape rule (reviewed, or carries a rep
         # range) — one predicate in training.movement_catalog, no frequency gate (owner ruling C).
-        if v.get("primary_muscle") == muscle and generator_eligible(v, skill_ceiling) and k not in chosen_so_far
+        if v.get("primary_muscle") == muscle and generator_eligible(v, skill_ceiling, key=k) and k not in chosen_so_far
     ]
     if not candidates:
         return []
@@ -586,8 +597,10 @@ def _enforce_load_floors(
     layoff_days: int,
     rationale: list[str],
     floor_fn: Callable[..., dict[str, Any]] | None = None,
+    hold_reason: str | None = None,
 ) -> dict[str, Any]:
-    """Derive and APPLY the prescription floor for every block. Returns the audit dict.
+    """Derive and APPLY the prescription floor for every block, then the double progression
+    (#5052, `_progress_block`) on top of it. Returns the audit dict.
 
     `floor_fn` (#4090/#4107) replaces `prescription_floor` with a function of the same
     signature — the v0.3 path passes `load_ramp.v03_floor` (band anchor -> nearest-band
@@ -654,10 +667,51 @@ def _enforce_load_floors(
             "fallback": floor.get("fallback"),
             "fallback_detail": floor.get("fallback_detail"),
             "corrections": corrections,
+            "progression": _progress_block(block, catalog, history_index, floor, hold_reason, rationale),
         }
+        if cue and audit["movements"][block.movement_key]["progression"].get("changes"):
+            # #5202: the progression moved the load, so the floor/ramp line (an older rule's rationale) is superseded
+            block.notes = " ".join(block.notes.replace(cue, "").split())
         if corrections:
             rationale.append(f"{block.movement_key}: floor applied — " + "; ".join(corrections))
     return audit
+
+
+def _progress_block(
+    block: ExerciseBlock,
+    catalog: dict[str, Any],
+    history_index: dict[str, list],
+    floor: dict[str, Any],
+    hold_reason: str | None,
+    rationale: list[str],
+) -> dict[str, Any]:
+    """#5052: the charter's double progression, AFTER the floor and BEFORE the back-offs and warm-ups.
+
+    Reads the movement's performed sessions from the same history index the floor read, raises
+    (never lowers) the working sets on a `step` / `floor_raise`, and writes the reason into the
+    exercise note — the cue pass's channel, so the note says why the load moved or held. The reason
+    leads the note (#5083): a cut of the visible note lands on the history cue behind it, never on it."""
+    from training import load_progression as lp
+    from training.load_ramp import _rep_range_of
+
+    entry = (catalog.get("movements") or {}).get(block.movement_key) or {}
+    tid = entry.get("hevy_template_id_hint")
+    current = max((float(s.weight_kg) for s in block.sets if s.weight_kg and str(s.type or "normal") != "warmup"), default=None)
+    prog = lp.next_prescription(
+        list((history_index or {}).get(tid) or []) if tid else [],
+        current_kg=current,
+        rep_range=_rep_range_of(block.sets),
+        cls=lp.movement_class(entry),
+        exposure=str(block.rationale_tag).split(":")[-1] if ":" in str(block.rationale_tag or "") else None,
+        re_entry_reason=floor.get("layoff_reason"),
+        hold_reason=hold_reason,
+    )
+    prog["changes"] = lp.apply_to_sets(block.sets, prog)
+    if prog["reason"] and (prog["changes"] or prog["basis"] != lp.BASIS_HOLD or current):
+        block.notes = f"{prog['reason']}. {block.notes}".strip()  # #5083: the reason LEADS the note (hevy-render-table.md)
+    if prog["changes"]:
+        rationale.append(f"{block.movement_key}: {prog['basis']} — {prog['reason']}")
+    return prog
 
 
 def _portfolio_guard(z2_minutes_7d: float | None, z2_floor: float) -> bool:
@@ -774,6 +828,26 @@ def _load_note_indexes(
     return history_index, weight_index, cardio_index, whoop_index
 
 
+def _disruption_mode(inputs: GeneratorInputs) -> dict[str, Any]:
+    """#5088: the owner's disruption mode on the target day — injected records, else one fail-soft read (no record = off)."""
+    from training import disruption
+
+    records = inputs.disruption_records if inputs.disruption_records is not None else disruption.load_records_failsoft()
+    return disruption.state(records, inputs.target_date)
+
+
+def _with_fitness_battery(
+    inputs: GeneratorInputs, day_entry: dict[str, Any], routines: list[RoutineSpec], catalog: dict[str, Any], block_workouts: Any
+) -> list[RoutineSpec]:
+    """#5078: on the block's due week the test-day role's ideal carries the fitness battery. The record is read only on a test day."""
+    from training import fitness_tests
+
+    if not fitness_tests.is_test_day(day_entry):
+        return routines
+    records = inputs.fitness_batteries if inputs.fitness_batteries is not None else fitness_tests.load_records_failsoft()
+    return fitness_tests.place_battery(routines, day_entry, records, block_workouts, catalog.get("movements") or {})
+
+
 def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     """Returns 1-3 RoutineSpec IR records (ideal, floor, optional re-entry).
 
@@ -790,20 +864,25 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     week_cfg = resolved_week.week
 
     block_workouts = _block_workouts_for(inputs) if resolved_week.source == "module" else None
-    day_entry = _schedule_entry_for_date(inputs.target_date, week_cfg, resolved_week.source, block_workouts)
+    day_entry = _schedule_entry_for_date(inputs.target_date, week_cfg, resolved_week.source, block_workouts, inputs.deload_records)
     archetype = day_entry.get("archetype") or _archetype_for_date(inputs.target_date, week_cfg)
     targets = week_cfg["archetype_targets"].get(archetype, [])
     if archetype in ("rest", "aerobic", "mobility"):
         # Non-lifting day — return a minimal placeholder ideal + floor.
         return _non_lifting_pair(inputs, archetype, week_cfg, landmarks, catalog, day_entry=day_entry)
+    if day_entry.get("session_role") and (mode := _disruption_mode(inputs)).get("phase") != "off":
+        from training import disruption  # #5088: his switched-on mode (or its step-back-up week) serves the short session
+
+        return disruption.routines(inputs.target_date, day_entry["session_role"], mode, catalog, int(week_cfg.get("skill_ceiling", 2)))
     if day_entry.get("session_role") in program_structure.SESSION_TEMPLATES:
-        # #4064/#4147 — a program role (v0.4: upper/lower heavy/volume) is the program's session
-        # (anchors at heavy/moderate/volume, fixed accessories, the #4161 deload at the later of week 6 or the block lock),
+        # #4064/#4147/#5069 — a program role (the five-day split's) is the program's session
+        # (anchors at heavy/moderate/volume, fixed accessories, the deload only on the owner's recorded word — #5070),
         # not a muscle-budget session with a role label on it. Only the module grid carries a
         # `session_role`; the JSON grid's upper/lower days still take the muscle-budget path.
         from training.full_body_session import full_body_routines
 
-        return full_body_routines(inputs, day_entry, week_cfg, landmarks, catalog, resolved_week, targets, block_workouts=block_workouts)
+        out = full_body_routines(inputs, day_entry, week_cfg, landmarks, catalog, resolved_week, targets, block_workouts=block_workouts)
+        return _with_fitness_battery(inputs, day_entry, out, catalog, block_workouts)
 
     autoreg = _autoreg_multiplier(inputs.recovery_tier, inputs.acwr_flag)
     z2_ok = _portfolio_guard(inputs.z2_minutes_7d, week_cfg.get("z2_floor_minutes", 90))

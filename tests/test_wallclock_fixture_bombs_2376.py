@@ -78,6 +78,11 @@ _LAMBDAS = _REPO / "lambdas"
 # files also use the constant for date arithmetic / row-building / assertion
 # text, which is what keeps them in the scan.
 EXEMPT_DATED_FIXTURE_FILES: dict[str, str] = {
+    "test_food_delivery_paused_5108.py": (
+        "the reader get_food_delivery_streak_state is called with now=_NOW passed EXPLICITLY and every "
+        "expected value is derived from _NOW or from the pause itself (the reader returns None before it "
+        "touches the table); source_registry is read only for its facets, so no handler wall clock is reached"
+    ),
     "test_watch_metrics_registry_4970.py": (
         "NOW is passed EXPLICITLY to every dead-man call (evaluate/check_dead_men(table, NOW)) and the "
         "expected ages are derived from it (NOW.timestamp() - h*3600); source_registry is read only for "
@@ -166,6 +171,14 @@ EXEMPT_DATED_FIXTURE_FILES: dict[str, str] = {
     "test_subscriber_retention_sweep.py": (
         "retention_cutoff_iso(now) is a pure function of its argument; the local "
         "`now` exists only to compute the expected value of that same call."
+    ),
+    "test_steps_nudge_5056.py": (
+        "every driven entrypoint takes its clock as an argument: steps_nudge.decide(now_pt=NOW, steps_as_of_pt=NOW), "
+        "steps_nudge.pace(target, NOW), steps_nudge_runner.run(table, send, NOW_UTC, tier) and "
+        "nudge_ledger_qa.check_steps_nudge_liveness(..., _pt_now) with an injected now-callable; NOW_UTC is NOW's own "
+        "instant in UTC (19:10 PDT on DATE), and DATE builds every fixture sk. common.pacific_time is imported only "
+        "for the PACIFIC tzinfo constant; none of the driven modules (steps_nudge, steps_nudge_runner, steps_ramp, "
+        "steps_resolver, deload_word, nudge_ledger_qa) reads a wall clock."
     ),
     "test_som_checkin_frame_3914.py": (
         "_check_how_we_feel(date_str)/_som_count(item) take the Pacific day as an "

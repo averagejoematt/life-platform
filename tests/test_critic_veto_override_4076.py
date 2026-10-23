@@ -161,8 +161,10 @@ def test_veto_plus_override_keeps_the_joints_cap_and_records_the_override_on_the
     assert "OVERRIDDEN by the owner" in crit["next"]
 
     # every OTHER critic's change still applied — the joints set cap
-    assert {"critic": "joints_tendons", "field": "session.total_sets", "to": 14, "applied": True, "why": None} in crit["changes"]
-    assert _total_sets(ir) == 14 and crit["recheck"]["total_sets"] == 14
+    # #5070: the fatigue cut is a RECOMMENDATION now (owner ruling 2026-10-18) — nothing cuts a set without his recorded
+    # word, so the readiness streak leaves the session whole and the override record is the only thing that applied
+    assert not any(ch.get("field") == "session.total_sets" for ch in crit["changes"]), crit["changes"]
+    assert _total_sets(ir) == 20 and crit["recheck"]["total_sets"] == 20
     # and ONLY the historian's objection is lifted: its own field (the squat load) is not applied
     assert all(s.weight_kg == pytest.approx(200.0 * KG, abs=0.01) for s in ir.exercises[0].sets)
 
@@ -181,9 +183,8 @@ def test_veto_plus_override_keeps_the_joints_cap_and_records_the_override_on_the
     res, created = _commit(ir)
     assert res.get("status") == "committed", res
     assert "historian veto (owner-overridden)" in res["critics"]
-    assert "joints/tendons change" in res["critics"]
     body = created[0]["routine"]
-    assert sum(len(e["sets"]) for e in body["exercises"]) == 14, "the cap reached Hevy"
+    assert sum(len(e["sets"]) for e in body["exercises"]) == 20, "no fatigue cut reached Hevy (#5070)"
     notes = body["exercises"][0]["notes"]
     assert "- historian VETO OVERRIDDEN BY OWNER" in notes
     assert "owner override of historian (" in notes and "I benched and squatted this load on Friday" in notes
@@ -201,7 +202,7 @@ def test_no_override_the_veto_holds_and_the_commit_refuses():
     crit = out["critics"]
     assert crit["veto"] is True and crit["owner_overrides"] == [] and ledger == []
     assert crit["next"].startswith("VETO") and "veto_override" in crit["next"]
-    assert _total_sets(ir) == 14
+    assert _total_sets(ir) == 20
     res, created = _commit(ir)
     assert "CRITIC_VETO" in json.dumps(res) and created == []
 

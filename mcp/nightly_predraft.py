@@ -29,6 +29,12 @@ WHAT A RUN DOES — nothing a chat turn could not already do, in the same order
      `primary`, its floor / re-entry siblings as `sibling` (one version bump each) — BEFORE stage 2,
      because stage 2's commit binding (#4066) binds the version it writes — a stamp after it
      would un-bind the verdict.
+  3b. #5080 THE SWITCH + SHADOW (`mcp/predraft_shadow.py`): SSM `/life-platform/training-plan-source` (`v04 | charter`,
+     60-s cache, FAIL-SAFE to `charter` when absent or unreadable) picks which plan step 3 persists — the charter draft,
+     or the FROZEN v0.4 plan (`program_v04.build_session`) through `draft_custom`'s action function. Only one is ever
+     persisted; a v04 draft lands on the CHARTER's lifting days and never applies v0.4's calendar deload (#5070). For the
+     first `SHADOW_NIGHTS` nights the other is built too and an owner-only diff row is written
+     (`SHADOW#<date>`); fail-soft, never the outcome. Revert: `predraft_shadow.REVERT_COMMAND`.
   5. `plan_next_session(routine_id=…)` — stage 2, the four critics. Their model calls are
      gated by `budget_guard` feature `plan_critics` INSIDE stage 2 (`tools_plan._model_allowed`):
      at a paused tier the deterministic layer still runs and the record says the model did
@@ -79,6 +85,9 @@ from typing import Any
 
 from training.routine_repo import ORPHAN_DRAFT_DAYS
 
+from mcp.plan_helpers import coach_context_brief  # #5071
+from mcp.predraft_summary import summary_line  # #5199
+
 logger = logging.getLogger("nightly_predraft")
 
 MARKER = "nightly_predraft"
@@ -128,7 +137,7 @@ STALE_REASON = "stale_untouched"
 AUTO_ARCHIVE_KEY = "auto_archived"
 """Where a non-pre-draft archive is stamped — NEVER `MARKER`, which would make the row read as ours."""
 """#4732: the index Query page the sweep reads — the same bound `routine_repo.stale_draft_census` uses."""
-GENERATOR_VARIANTS = ("ideal", "floor", "re_entry")
+GENERATOR_VARIANTS = ("ideal", "floor", "re_entry", "disruption")  # #5088: the owner-switched short session
 """The variants `routine_generator` persists for a lifting session — with the date and the archetype,
 each is one routine PARTITION (`_new_routine_id`, #3115)."""
 
@@ -146,16 +155,18 @@ def _block_record(target_date: str) -> list[dict[str, Any]] | None:
         return None
 
 
-def _session_from(target_date: str, block_workouts: list[dict[str, Any]] | None) -> dict[str, Any] | None:
+def _session_from(
+    target_date: str, block_workouts: list[dict[str, Any]] | None, deload_records: list[dict[str, Any]] | None = None
+) -> dict[str, Any] | None:
     from training import plan_engine
 
     from mcp.plan_helpers import _catalog_and_ceiling
 
     catalog, ceiling = _catalog_and_ceiling()
-    return plan_engine._scheduled_session(target_date, catalog, ceiling, block_workouts)
+    return plan_engine._scheduled_session(target_date, catalog, ceiling, block_workouts, deload_records)
 
 
-def scheduled_session(target_date: str) -> dict[str, Any] | None:
+def scheduled_session(target_date: str, deload_records: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
     """The session the program serves on `target_date` — the SAME function stage 1 uses (#4064).
 
     #4110 / #4147 (PR #4120 — v0.4 Upper/Lower, ORDER-BASED: the next undone session in the
@@ -167,7 +178,11 @@ def scheduled_session(target_date: str) -> dict[str, Any] | None:
     session is draftable iff it carries a `prescription` (`is_lifting_session`), whatever its
     archetype (`upper`, `lower`; `full` for v0.3 history).
     """
-    return _session_from(target_date, _block_record(target_date))
+    from training import deload_word
+
+    # #5070: the owner's recorded deload word rides the served session; the recommendation (signals) is stage 1's
+    records = deload_records if deload_records is not None else deload_word.load_records_failsoft()
+    return _session_from(target_date, _block_record(target_date), records)
 
 
 def is_lifting_session(session: dict[str, Any] | None) -> bool:
@@ -262,6 +277,7 @@ def _mark_draft(
     run_at: str,
     before: dict[str, int] | None = None,
     owner_ids: frozenset[str] = frozenset(),
+    plan_source: str = "charter",
 ) -> None:
     """Stamp the marker on EVERY routine the draft just persisted (ideal + its floor / re-entry
     siblings — `_action_draft` writes all of them), each as its next version, before stage 2 (see
@@ -303,7 +319,9 @@ def _mark_draft(
                 "session_label": session.get("label"),
                 "session_role": session.get("session_role"),
                 "optional": bool(session.get("optional")),
-                "seam": "plan_engine._scheduled_session",
+                "seam": "program_v04.build_session" if plan_source == "v04" else "plan_engine._scheduled_session",
+                "charter_version": (ir.inputs_snapshot or {}).get("charter_version"),  # #5085: the version that drafted it
+                "plan_source": plan_source,  # #5080: which engine this draft is (`charter`, or the frozen `v04` revert)
             },
         }
         ir.parent_version = ir.version
@@ -311,11 +329,63 @@ def _mark_draft(
         put_versioned(ir)
 
 
+def _disruption(target_date: str) -> dict[str, Any]:
+    """#5088: his disruption mode on the date (a fail-soft read — no record is the full plan). The draft path serves
+    the short session itself; this only decides whether an ACTIVE mode's weekly band is already met (travel: two or
+    three a week), in which case nothing is drafted. The Hevy record is read only when the mode is on."""
+    from training import disruption
+
+    st = disruption.state(disruption.load_records_failsoft(), target_date)
+    out = {k: st.get(k) for k in ("phase", "template", "until")}
+    if st["phase"] == disruption.PHASE_ACTIVE:
+        out.update(disruption.sessions_due(st, target_date, _block_record(target_date)))
+    return out
+
+
 def _draft(target_date: str) -> dict[str, Any]:
     """`manage_hevy_routine draft` for the date — the action function itself, never the dispatcher."""
     from mcp.tools_hevy_routine import _action_draft
 
     return _action_draft({"target_date": target_date})
+
+
+def _switch(target_date: str) -> dict[str, Any]:
+    """#5080: the plan-source switch (fail-safe to the default) and whether tonight is a shadow night. Never raises."""
+    from mcp import predraft_shadow as ps
+
+    src = ps.plan_source()
+    return {**src, "shadow": ps.shadow_due(target_date)}
+
+
+def _draft_by_source(target_date: str, switch: dict[str, Any]) -> dict[str, Any]:
+    """#5080: persist ONE plan — the charter draft (`_draft`), or the frozen v0.4 plan when the switch says `v04`."""
+    if switch.get("source") != "v04":
+        return _draft(target_date)
+    from mcp import predraft_shadow as ps
+
+    plan = ps.v04_plan(target_date, _block_record(target_date))
+    return {**ps.draft_v04(target_date, plan), "v04_plan": plan}
+
+
+def _v04_marked(plan: dict[str, Any]) -> dict[str, Any]:
+    """#5080: the marker's session for a v0.4 draft — the frozen plan's own role, so `_routine_role` reads what was drafted."""
+    return {
+        "label": f"v0.4 {plan['session_role']}",
+        "session_role": plan["session_role"],
+        "archetype": plan["archetype"],
+        "optional": False,
+    }
+
+
+def _shadow(target: str, switch: dict[str, Any], session: dict[str, Any], routine_id: str, run_at: str, v04: Any) -> dict[str, Any]:
+    """#5080: the side NOT persisted, diffed against the one that was — owner-only, fail-soft, never the outcome."""
+    if not (switch.get("shadow") or {}).get("due"):
+        return {"outcome": "not_due", "reason": (switch.get("shadow") or {}).get("reason")}
+    from mcp import predraft_shadow as ps
+
+    ir = next((r for r in _routines_for(target) if r.routine_id == routine_id), None)
+    blocks = None if v04 else _block_record(target)
+    return ps.shadow_leg(target, switch.get("source") or ps.DEFAULT_SOURCE, session, ir, blocks, run_at, v04_built=v04)
 
 
 def _stage_2(target_date: str, routine_id: str) -> dict[str, Any]:
@@ -473,13 +543,35 @@ def run(target_date: str | None = None) -> dict[str, Any]:
         out["sweep"] = {"error": f"{type(e).__name__}: {e}"[:300]}
 
     session = scheduled_session(target) or {}
-    # #4161: the week counter's basis (sessions AND days) and the deload ride with the pre-draft too
-    keys = ("label", "archetype", "session_role", "optional", "source", "week", "deload", "week_basis", "advance_blocked_by", "note")
+    # #4161: the week counter's basis (sessions AND days) and the deload ride with the pre-draft too; #5077: the block model
+    keys = (
+        "label",
+        "archetype",
+        "session_role",
+        "optional",
+        "source",
+        "week",
+        "deload",
+        "deload_recommendation",
+        "block_model",  # #5077: the block mesocycle week the draft is built in (set targets, ramp stage, next block)
+        "week_basis",
+        "advance_blocked_by",
+        "note",
+    )
     out["session"] = {k: session.get(k) for k in keys}
     if not is_lifting_session(session):
         out.update(
             outcome=NO_SESSION,
             reason=f"the program serves no lifting session on {target} ({session.get('label') or session.get('note') or 'no session returned'})",
+        )
+        return out
+
+    out["plan_source"] = switch = _switch(target)  # #5080: which ONE plan persists, and whether tonight shadows the other
+    out["disruption"] = mode = _disruption(target)
+    if mode.get("due") is False:
+        out.update(
+            outcome=NO_SESSION,
+            reason=f"disruption mode ({mode['template']}): {mode['done_7d']} session(s) in the last 7 days meets the week's {mode['band']}",
         )
         return out
 
@@ -510,6 +602,7 @@ def run(target_date: str | None = None) -> dict[str, Any]:
         out.update(outcome=EXISTS, routine_id=r.routine_id, routine_version=int(r.version), critics=_critics_summary(_critics(r)))
         return out
 
+    v04_built = None
     if mine:  # a run that died between the draft and stage 2 — resume, never redraft
         routine_id = mine[0].routine_id
         out["resumed"] = True
@@ -530,7 +623,8 @@ def run(target_date: str | None = None) -> dict[str, Any]:
                 routines=[{"routine_id": r.routine_id, "status": r.status, "hevy_linked": bool(r.hevy_routine_id)} for r in in_the_way],
             )
             return out
-        drafted = _draft(target)
+        drafted = _draft_by_source(target, switch)
+        v04_built = drafted.pop("v04_plan", None)
         if drafted.get("status") != "drafted" or not drafted.get("ideal_routine_id"):
             out.update(
                 outcome=BLOCKED_STALE_INPUTS if drafted.get("status") == "blocked_stale_inputs" else FAILED,
@@ -542,12 +636,14 @@ def run(target_date: str | None = None) -> dict[str, Any]:
         _mark_draft(
             target,
             routine_id,
-            session,
+            _v04_marked(v04_built) if v04_built else session,  # #5080: a v0.4 draft carries ITS role, never the charter's
             run_at,
             {r.routine_id: int(r.version) for r in existing},
             frozenset(r.routine_id for r in others),
+            "v04" if v04_built else "charter",
         )
 
+    out["shadow"] = _shadow(target, switch, session, routine_id, run_at, v04_built)
     res = _stage_2(target, routine_id)
     rec = (res or {}).get("critics") or {}
     if not rec:
@@ -561,6 +657,7 @@ def run(target_date: str | None = None) -> dict[str, Any]:
         routine_version=rec.get("routine_version"),
         critics=_critics_summary(rec),
         committed=False,
+        coach_context=coach_context_brief(target),  # #5071: the charter version + May frame the evening chat explains it in
     )
     return out
 
@@ -593,15 +690,61 @@ def emf_line(outcome: str) -> str:
     )
 
 
+def _may_tracker_leg() -> dict[str, Any]:
+    """#5073: a second, fail-soft leg on the same run — it never changes the pre-draft's outcome or its dead-man."""
+    try:
+        from mcp.tools_may_tracker import nightly_leg
+    except Exception as e:  # noqa: BLE001 — an import failure is named on the result, never raised into the pre-draft
+        return {"outcome": "failed", "error": type(e).__name__}
+    return nightly_leg()
+
+
+def _fitness_battery_leg() -> dict[str, Any]:
+    """#5078: the battery's dead-man — a named, fail-soft check on the same run; never the pre-draft's outcome."""
+    try:
+        from mcp.tools_fitness_tests import nightly_leg
+    except Exception as e:  # noqa: BLE001 — an import failure is named on the result, never raised into the pre-draft
+        return {"outcome": "failed", "error": type(e).__name__}
+    return nightly_leg()
+
+
+def _calibration_leg() -> dict[str, Any]:
+    from mcp.calibration_leg import calibration_leg
+
+    return calibration_leg()
+
+
+def _titration_leg() -> dict[str, Any]:
+    from mcp.titration_leg import nightly_leg  # #5096: the weekly calorie titration (Fri-Sun nights); fail-soft
+
+    return nightly_leg()
+
+
+def _charter_version() -> Any:
+    try:
+        from training.training_charter import charter_version
+
+        return charter_version()
+    except Exception:  # noqa: BLE001 — the summary names a missing version as null, never raises
+        return None
+
+
 def lambda_entry(event: dict[str, Any]) -> dict[str, Any]:
     """The scheduled entry. Never raises: a failure is logged with its class and emits the
-    datapoint at 0 (#4568), so the dead-man — not a misattributed warmer Errors alarm — reports it."""
+    datapoint at 0 (#4568), so the dead-man — not a misattributed warmer Errors alarm — reports it.
+    #5200: the tracker leg runs FIRST so the draft's coach context reads the week this run just wrote."""
+    tracker = _may_tracker_leg()  # #5073: the newest completed week's tracker row; fail-soft, never the outcome
     try:
         result = run((event or {}).get("target_date"))
     except Exception as e:  # noqa: BLE001 — reported by name; the dead-man reads the 0
         logger.exception("nightly pre-draft failed")
         result = {"job": JOB["name"], "outcome": FAILED, "error": f"{type(e).__name__}: {e}"[:300]}
+    result["may_tracker"] = tracker
+    result["fitness_battery"] = _fitness_battery_leg()  # #5078: upcoming|due|overdue|missed + FitnessBatteryMissed; never the outcome
+    result["calibration"] = _calibration_leg()  # #5061: the tape/photo dead-man witness; fail-soft, never the outcome
+    result["titration"] = _titration_leg()  # #5096: the coming week's calorie titration record; never the outcome
     print(emf_line(result.get("outcome") or FAILED))
+    logger.info("%s", summary_line(result, _charter_version()))  # #5199: FIRST and compact — the detail line below is clipped
     logger.info("NIGHTLY_PREDRAFT %s", json.dumps(result, default=str)[:4000])
     return {"statusCode": 200, "body": json.dumps(result, default=str), "headers": {"Content-Type": "application/json"}}
 
@@ -624,6 +767,7 @@ def predraft_for(target_date: str) -> dict[str, Any]:
     rec = _critics(r)
     base = {"target_date": target_date, "routine_id": r.routine_id, "routine_version": int(r.version), "status_in_repo": r.status}
     base["drafted_at"] = ((r.inputs_snapshot or {}).get(MARKER) or {}).get("drafted_at")
+    base["plan_source"] = ((r.inputs_snapshot or {}).get(MARKER) or {}).get("plan_source") or "charter"  # #5080: which engine drafted it
     if not _red_teamed(r):
         return {**base, "status": "drafted_not_red_teamed", "how_to_use": "Run stage 2 on this routine_id before anything else."}
     summary = _critics_summary(rec)

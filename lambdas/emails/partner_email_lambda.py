@@ -42,13 +42,14 @@ from common import (
 from common.constants import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
     EXPERIMENT_START_DATE,
-    PLAN_DAILY_CALORIES_TARGET,
     PLAN_DAILY_PROTEIN_MIN_G,
 )  # ADR-058
 from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from health.calorie_target import target_kcal  # #5095: the ONE calorie target
+from health.protein_floor import met_floor  # #5098: THE protein hit predicate (strict, #5003)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -255,10 +256,10 @@ def gather_all():
     # ── Nutrition ──
     cals = [safe_float(r, "total_calories_kcal") for r in raw["macrofactor"].values() if safe_float(r, "total_calories_kcal")]
     prots = [safe_float(r, "total_protein_g") for r in raw["macrofactor"].values() if safe_float(r, "total_protein_g")]
-    cal_target = PLAN_DAILY_CALORIES_TARGET
+    cal_target = target_kcal()  # #5095: the ONE calorie target
     prot_target = PLAN_DAILY_PROTEIN_MIN_G
-    cal_hit_rate = round(sum(1 for c in cals if c <= cal_target * 1.1) / len(cals) * 100) if cals else None
-    prot_hit_rate = round(sum(1 for p in prots if p >= prot_target) / len(prots) * 100) if prots else None
+    cal_hit_rate = round(sum(1 for c in cals if c <= cal_target * 1.1) / len(cals) * 100) if (cals and cal_target) else None
+    prot_hit_rate = round(sum(1 for p in prots if met_floor(p, prot_target)) / len(prots) * 100) if prots else None
     days_logged = len(raw["macrofactor"])
 
     # ── Training ──

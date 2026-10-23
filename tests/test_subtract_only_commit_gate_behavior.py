@@ -143,7 +143,14 @@ def _only(ir, movement_key: str):
 def _drafted_custom(exercises, **kw):
     """Author an IR the way chat does — through `draft_custom`, not by hand."""
     captured: dict = {}
-    args = {"action": "draft_custom", "target_date": "2026-09-19", "archetype": "push", "exercises": exercises, **kw}
+    args = {
+        "action": "draft_custom",
+        "departure_reason": "test: deliberate departure from the engine draft",
+        "target_date": "2026-09-19",
+        "archetype": "push",
+        "exercises": exercises,
+        **kw,
+    }
     with patch("training.routine_repo.draft_versioned", side_effect=lambda ir: captured.setdefault("ir", ir)):
         out = t.tool_manage_hevy_routine(args)
     assert out.get("status") == "drafted_custom", out

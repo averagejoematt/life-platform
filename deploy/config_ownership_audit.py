@@ -220,6 +220,43 @@ RULINGS: tuple[Ruling, ...] = (
         "of an S3 object. Uploading it is a publish (it also has a per-user alias key, see config_twin_registry).",
     ),
     Ruling(
+        "config/training_charter.json",
+        HAND_OWNED,
+        "#5068 (ADR-164): the training charter — the one source of every training target (the split, the step floor and "
+        "target, the cardio menu, the rotation cadence, the concession ledger). Hand-authored on an owner ruling, "
+        "versioned with its own change_log; read by lambdas/training/training_charter.py (local/bundle copy first, the "
+        "S3 twin as the fallback), staged into every Lambda bundle by deploy/build_bundle.py. No writer anywhere. "
+        "Uploading it is a publish. The owner-only half (body/appearance targets) is NOT in this file — see the "
+        "example below.",
+    ),
+    Ruling(
+        "config/panel_rubric.json",
+        HAND_OWNED,
+        "#5072 (epic #5067): the panel rubric — the fixed standard the training plan is graded against, one seat per "
+        "school of the charter's concession_ledger, each criterion graded by code (lambdas/training/panel_rubric.py "
+        "CHECKS) or by the judge (lambdas/training/panel_judge.py). Hand-authored, versioned with its own change_log; "
+        "staged into every Lambda bundle by deploy/build_bundle.py and read from the bundle only. No writer anywhere. "
+        "Uploading it is a publish.",
+    ),
+    Ruling(
+        "config/training_scorecard.json",
+        HAND_OWNED,
+        "#5079 (epic #5051): the fixed thirteen-row training scorecard the /training-review block retro re-grades "
+        "once per block — each row's measurable inputs, its code rules and the grade scale. NO grade letters: the "
+        "2026-10-18 baseline letters are the owner-only training_constraints RETRO#2026-10-18 row. Hand-authored, "
+        "versioned with its own change_log; read by lambdas/training/block_retro.py from the checkout on the owner's "
+        "workstation (scripts/training_block_retro.py). No writer anywhere and not bundled; "
+        "the config twin sync's S3 copy is a publish nothing reads.",
+    ),
+    Ruling(
+        "config/training_charter.private.example.json",
+        HAND_OWNED,
+        "#5087: a committed TEMPLATE (null placeholders only) for the owner-only half of the training charter. The real "
+        "object is off-repo — env TRAINING_CHARTER_PRIVATE_JSON, the gitignored training_charter.private.local.json, or "
+        "the owner-private S3 key config/coaching/training_charter.private.json — and this file is documentation, "
+        "excluded from the twin set by *.example.json.",
+    ),
+    Ruling(
         "config/content_filter.example.json",
         HAND_OWNED,
         "A committed TEMPLATE (`_README`: ER-06 vocabulary TEMPLATE). The real vocabulary is off-repo since #2503 "

@@ -376,7 +376,6 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "registry::tests/test_integration_aws.py::REQUIRED_EB_RULES::LifePlatformIngestion-TodoistIngestionSchedule03D61-XqriAparCo0n": "2026-09-05 seal (#3536)",
     "registry::tests/test_integration_aws.py::REQUIRED_EB_RULES::LifePlatformIngestion-WhoopIngestionScheduleC6CE3A0-DjUDUDY4XrFs": "2026-09-05 seal (#3536)",
     "registry::tests/test_integration_aws.py::REQUIRED_EB_RULES::LifePlatformOperational-FreshnessCheckerScheduleD9E-xZki3XA2x0bb": "2026-09-05 seal (#3536)",
-    "registry::tests/test_integration_aws.py::REQUIRED_EB_RULES::daily-brief-schedule": "2026-09-05 seal (#3536)",
     "registry::tests/test_journal_archive_notice_3512.py::BASELINE": "2026-09-05 seal (#3536)",
     "registry::tests/test_journey_day1_synthetic_baseline_3478.py::BASELINE": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::deploy/archive/onetime/daily_brief_lambda.py": "2026-09-05 seal (#3536)",

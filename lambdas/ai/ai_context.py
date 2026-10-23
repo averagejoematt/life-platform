@@ -10,10 +10,12 @@ no module state). ai_calls.py re-exports them for backward compatibility.
 import re
 from datetime import date as _date_cls
 
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, EXPERIMENT_TZ, PLAN_DAILY_CALORIES_TARGET  # noqa: F401
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, EXPERIMENT_TZ  # noqa: F401
 from common.habit_pause import count_scheduled  # #5007: a paused habit is not scheduled
+from common.habit_registry import habit_tier  # #5232
 from common.metric_truth import resolve_steps, steps_series  # #4630: the ONE steps resolver
 from common.pacific_time import pacific_now  # #2811: THE Pacific frame — journey days are PT days
+from health.calorie_target import target_kcal, target_phrase  # #5095: the ONE calorie target
 from health.scoring_engine import habitify_reading  # #4362: rename-aware habit lookup
 from intelligence import (
     brief_domain_inputs,  # #4358/#4359: the physical training block + the explorer block, one seam with the brief
@@ -319,30 +321,17 @@ def format_experiment_phase_context(pctx, coaching_principles=False):
 def _build_tdee_context(data, profile):
     """
     Build TDEE + deficit context for nutrition AI calls.
-    MacroFactor computes estimated TDEE; if not available, derive from phase targets.
+    TDEE is MacroFactor's measured estimate only; the target is the ONE resolver's (#5095). The old
+    fallback derived a TDEE as target + a phase deficit — a number built from two plan figures,
+    stated as an estimate (ADR-104) — and is retired: an unmeasured TDEE is said to be unmeasured.
     """
     mf = data.get("macrofactor") or {}
     # MacroFactor may store estimated TDEE as tdee_kcal or estimated_tdee_kcal
     tdee = _safe_float(mf, "tdee_kcal") or _safe_float(mf, "estimated_tdee_kcal")
-
-    cal_target = PLAN_DAILY_CALORIES_TARGET
-
-    # Derive from current phase if MacroFactor doesn't expose TDEE
-    if tdee is None:
-        # Check weight phases for deficit target
-        phases = profile.get("weight_loss_phases", [])
-        latest_weight = data.get("latest_weight")
-        deficit_target = 1500  # Phase 1 default
-        for p in phases:
-            if latest_weight and latest_weight >= p.get("end_lbs", 0):
-                deficit_target = p.get("calorie_deficit_target", 1500)
-                break
-        tdee = cal_target + deficit_target
-
-    # Actual intake
+    cal_target = target_kcal(data.get("date"))
     actual_cal = _safe_float(mf, "total_calories_kcal")
-    if actual_cal is None:
-        return f"Estimated TDEE: ~{int(tdee)} kcal | Target: {cal_target} kcal/day"
+    if tdee is None or actual_cal is None or not cal_target:
+        return f"Estimated TDEE: {f'~{int(tdee)} kcal' if tdee else 'not measured'} | Target: {target_phrase(data.get('date'))}/day"
 
     actual_deficit = tdee - actual_cal
     deficit_pct = round(actual_deficit / tdee * 100, 1)
@@ -399,8 +388,8 @@ def _build_habit_outcome_context(data, profile):
         "exercise": "movement",
     }
 
-    tier0_names = [n for n, m in registry.items() if m.get("tier") == 0 and m.get("status") == "active"]
-    tier1_names = [n for n, m in registry.items() if m.get("tier") == 1 and m.get("status") == "active"]
+    tier0_names = [n for n, m in registry.items() if habit_tier(m) == 0 and m.get("status") == "active"]
+    tier1_names = [n for n, m in registry.items() if habit_tier(m) == 1 and m.get("status") == "active"]
 
     # 7-day completion trend
     trend_lines = []
@@ -415,7 +404,7 @@ def _build_habit_outcome_context(data, profile):
     # Known habit-outcome relationships to surface to the AI
     causal_pairs = []
     for h_name, meta in registry.items():
-        if meta.get("status") != "active" or meta.get("tier", 2) > 1:
+        if meta.get("status") != "active" or habit_tier(meta) > 1:
             continue
         outcome = HABIT_OUTCOME_MAP.get(h_name.lower().replace(" ", "_"))
         why = meta.get("why_matthew", "")
@@ -459,7 +448,7 @@ def _compute_data_quality(data, profile):
     cal = _safe_float(mf, "total_calories_kcal")
     _safe_float(mf, "total_protein_g")
     food_log = mf.get("food_log", [])
-    cal_target = PLAN_DAILY_CALORIES_TARGET
+    cal_target = target_kcal(data.get("date")) or 0  # #5095; 0 = no target resolved, so no %-of-target heuristic fires
 
     if cal is None or cal == 0:
         signals.append("\u274c Nutrition (MacroFactor): NO DATA logged")
@@ -619,8 +608,8 @@ def _compute_surprise_scores(data):
     # --- Nutrition (calories) ---
     mf = data.get("macrofactor") or {}
     cal = _safe_float(mf, "total_calories_kcal")
-    cal_target = PLAN_DAILY_CALORIES_TARGET
-    if cal is not None and cal > 0:
+    cal_target = target_kcal(data.get("date"))  # #5095: the ONE calorie target
+    if cal is not None and cal > 0 and cal_target:
         dev_from_target = abs(cal - cal_target) / cal_target
         direction = "up" if cal > cal_target else "down"
         surprises["nutrition"] = {
@@ -838,7 +827,7 @@ def _build_cross_pillar_tradeoffs(component_scores, data, profile):
     sleep_debt = data.get("sleep_debt_7d_hrs")
     stress = _safe_float(journal, "stress_avg")
     recovery = _safe_float(whoop, "recovery_score")
-    cal_target = PLAN_DAILY_CALORIES_TARGET
+    cal_target = target_kcal(data.get("date")) or 0  # #5095; 0 = none resolved, so the under-fuel trade-off cannot fire
 
     tradeoffs = []
 

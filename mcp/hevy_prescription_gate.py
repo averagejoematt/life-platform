@@ -15,7 +15,7 @@ WHY THIS EXISTS
 #3927 made the subtract-only rule real on the CRON path: `routine_generator.
 _enforce_load_floors()` raises every working set to the movement's band-matched
 prescription floor and records the pass in `inputs_snapshot["load_floors"]`. The
-chat path — `manage_hevy_routine draft_custom -> dry_run -> commit`, which is the
+chat path — `manage_hevy_routine draft -> dry_run -> commit`, which is the
 surface that authored BOTH #3927 specimens — was left governed only by SKILL.md
 prose plus `recovery_authoring.audit_prescription()`, which the authoring session
 has to REMEMBER to call. A rule that depends on remembering is a discipline, not a
@@ -74,7 +74,7 @@ SUBTRACT_ONLY_ERROR_CODE = "SUBTRACT_ONLY_VIOLATION"
 
 # Variants that prescribe no load by design (#3927: "a floor stamped on a
 # deliberately-easy variant would be the opposite rule").
-NO_LOAD_VARIANTS = frozenset({"floor", "re_entry"})
+NO_LOAD_VARIANTS = frozenset({"floor", "re_entry", "disruption"})  # #5088: the owner-switched short session is reduced by design
 
 SKIP_NOTE = (
     "subtract-only gate SKIPPED — variant={variant} prescribes a deliberately reduced session and asserts no load "
@@ -283,7 +283,7 @@ def v03_load_rule(target_date: str, block_workouts: list[dict[str, Any]] | None 
     best-load floor it was always judged against.
 
     #4110/#4161: the week is the session SEQUENCE's (`session_sequence.next_session` over `ledger()`) — HYBRID:
-    a week advances only when its 4-session cycle is complete AND >= 7 days have passed since the previous
+    a week advances only when its session cycle is complete AND >= 7 days have passed since the previous
     advance (`session_sequence.WEEK_RULE`) — the same week `full_body_session` ramps and the
     `not_before_week` gate reads. `block_workouts` is the Hevy record since the block start;
     None reads it (`plan_hevy_windows._block_workouts`, the sanctioned MCP Hevy read). A read
@@ -314,7 +314,7 @@ def v03_load_rule(target_date: str, block_workouts: list[dict[str, Any]] | None 
     pct = 100 + int(program_structure.EXPOSURES["heavy"]["back_off_pct"])  # §3: back-offs at −10 % of the top set
     return {
         "rule": "§3 entry ramp (load_ramp.v03_floor)",
-        "program_version": program_structure.PROGRAM_VERSION,
+        "program_version": entry.get("program_version") or program_structure.PROGRAM_VERSION,  # #5069: a v0.4 day says v0.4
         "week": int(entry.get("week") or 1),
         "week_state": "measured" if known else "unreadable",
         "week_source": (
@@ -448,7 +448,7 @@ def refusal_message(gate: dict[str, Any] | None) -> str | None:
     return (
         f"Refusing to commit — subtract-only violation (#3927/#3971), {len(lines)} finding(s): "
         + " | ".join(lines)
-        + f" || Rule: {gate.get('rule')} || Fix the draft (re-run draft_custom) and commit again — "
+        + f" || Rule: {gate.get('rule')} || Fix the draft (re-run draft) and commit again — "
         "the gate is not overridable from chat."
     )
 
@@ -466,13 +466,14 @@ def refusal_suggestions(gate: dict[str, Any] | None) -> list[str]:
     for v in (gate.get("audit") or {}).get("violations") or []:
         if v.get("kind") == "conditional_up":
             out.append(
-                f"Remove the conditional up-branch from {v.get('where')}'s notes (\"{v.get('clause')}\") in a new draft "
-                "(draft_custom) — progression is the platform's job, never his to trigger mid-set."
+                f"Remove the conditional up-branch from {v.get('where')}'s notes (\"{v.get('clause')}\") in a new routine "
+                "(manage_hevy_routine draft by default; draft_custom + departure_reason to keep a deliberate departure) — "
+                "progression is the platform's job, never his to trigger mid-set."
             )
         else:
             out.append(
                 f"Prescribe {v.get('where')} set {v.get('set')} at or above its floor of {_fmt(v.get('floor_kg'))} "
-                f"(now {_fmt(v.get('prescribed_kg'))}; {_provenance(gate, v)}) in a new draft (draft_custom)"
+                f"(now {_fmt(v.get('prescribed_kg'))}; {_provenance(gate, v)}) in a new routine (draft by default; draft_custom + departure_reason to keep a departure at or above the floor)"
                 + (" — or mark it a prescribed back-off in the set notes if it is one." if not v.get("back_off_note") else ".")
             )
     out.append(

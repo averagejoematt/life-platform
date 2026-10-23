@@ -1148,6 +1148,11 @@ def lambda_handler(event, context):
         from mcp.nightly_predraft import lambda_entry
 
         return lambda_entry(event)
+    # 0b. #5072: the weekly panel-rubric grade of the committed plan (constant input; its rule is an owner CDK apply)
+    if isinstance(event, dict) and event.get("job") == "panel_weekly_grade":
+        from mcp.panel_weekly_grade import lambda_entry as panel_entry
+
+        return panel_entry(event)
     # 1. EventBridge scheduled rule — nightly cache warmer, no auth
     if event.get("source") == "aws.events" or event.get("detail-type") == "Scheduled Event":
         logger.info("[lambda_handler] EventBridge trigger — running nightly cache warmer")

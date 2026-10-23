@@ -662,14 +662,15 @@ class TestFetchExecutionMetrics:
         assert "calories_logged" not in m and "protein_g" not in m
 
     def test_a_log_below_sixty_five_percent_of_target_is_flagged_incomplete(self, table):
-        """0.65 × the plan's calorie target (#4540: 1,500 → 975); 900 is below it."""
-        assert 900 < 0.65 * di.PLAN_DAILY_CALORIES_TARGET
+        """0.65 × the ONE calorie target (#5095: health.calorie_target); 900 is below it."""
+        assert 900 < 0.65 * di.target_kcal(YESTERDAY)
         seed(table, _date_row("macrofactor", YESTERDAY, total_calories_kcal=900, food_log=[{"a": 1}]))
         m = di._fetch_execution_metrics(YESTERDAY, self.PROFILE)
         assert "nutrition_note" in m and "900" in m["nutrition_note"]
 
     def test_a_log_at_or_above_the_incompleteness_floor_is_not_flagged(self, table):
-        seed(table, _date_row("macrofactor", YESTERDAY, total_calories_kcal=1170, food_log=[]))
+        floor = -(-65 * di.target_kcal(YESTERDAY) // 100)  # ceil(0.65 × the ONE target, #5095)
+        seed(table, _date_row("macrofactor", YESTERDAY, total_calories_kcal=floor, food_log=[]))
         assert "nutrition_note" not in di._fetch_execution_metrics(YESTERDAY, self.PROFILE)
 
     def test_an_absent_strava_day_is_reported_as_zero_sessions(self, table):
@@ -1248,8 +1249,8 @@ class TestWeightPlateau:
         assert [d for d in di._compute_slow_drift(YESTERDAY, {}) if d["metric"] == "Weight Plateau"] == []
 
     def test_a_log_day_below_sixty_five_percent_of_target_is_not_a_complete_day(self, monkeypatch):
-        """0.65 × the plan's calorie target (#4540: 1,500 → 975); days logged at 900 do not count."""
-        assert 900 < 0.65 * di.PLAN_DAILY_CALORIES_TARGET
+        """0.65 × the ONE calorie target (#5095: health.calorie_target); days logged at 900 do not count."""
+        assert 900 < 0.65 * di.target_kcal(YESTERDAY)
         self._fetcher(monkeypatch, weights=[300.0] * 10, mf_records=self._mf(14, kcal=900))
         assert [d for d in di._compute_slow_drift(YESTERDAY, {}) if d["metric"] == "Weight Plateau"] == []
 
@@ -1654,7 +1655,7 @@ class TestDeficitCeiling:
         """The plan's target + 200 kcal for 5 days — the profile row's own figures are not read (#4540)."""
         self._fetcher(monkeypatch, weights=[300.0 - 0.5 * i for i in range(8)])
         block = di._compute_deficit_ceiling_alert(YESTERDAY, [], [], {"calorie_target": 1700, "protein_target_g": 200})[1]
-        kcal, prot = di.PLAN_DAILY_CALORIES_TARGET, di.PLAN_DAILY_PROTEIN_MIN_G
+        kcal, prot = di.target_kcal(YESTERDAY), di.PLAN_DAILY_PROTEIN_MIN_G
         assert f"{kcal} → {kcal + 200} kcal/day" in block and f"Maintain protein at {prot}g" in block
         assert "1700 → 1900" not in block and "200g" not in block  # the row's own figures never surface
         assert "Reassess trend at day 5" in block

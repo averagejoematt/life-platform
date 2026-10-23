@@ -31,10 +31,13 @@ from typing import Any, Optional
 import boto3
 import coach.coach_presence_gate as _presence  # #4217 — the absent coach is not asked
 from coach import coach_brief_input_gate as _in_gate  # #3107 — the upstream change-gate + the shared data-inventory block
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_PROTEIN_MIN_G
+from common.habit_registry import habit_tier  # #5232
 from common.metric_truth import STEPS  # #4630: the resolved steps key build_data_summary fills
 from common.pacific_time import pacific_today
+from health.calorie_target import target_kcal, target_phrase  # #5095: the ONE calorie target
 from health.scoring_engine import habitify_reading  # #4362
+from training.coach_context import charter_goal_lines  # #5109: the standing targets are the charter's, never typed here
 
 from ai import structured_json as _structured_json  # #4276: the one door for model JSON
 
@@ -254,7 +257,7 @@ def daily_brief_shared_system(
         phase_block,
         "",
         "## Profile snapshot (stable across this brief)",
-        f"- Calorie target: {PLAN_DAILY_CALORIES_TARGET} kcal",
+        f"- Calorie target: {target_phrase((data or {}).get('date'))}",
         f"- Protein floor: {PLAN_DAILY_PROTEIN_MIN_G} g",
         f"- Goals: {', '.join(profile.get('active_goals', [])) or 'unspecified'}",
     ]
@@ -411,7 +414,7 @@ def call_training_nutrition_coach(
     # IC-24: Data quality (critical for nutrition coaching)
     data_quality_block, _quality_scores = _compute_data_quality(data, profile)
 
-    cal_target = PLAN_DAILY_CALORIES_TARGET
+    cal_target = target_phrase(data.get("date"))  # #5095: "<n> kcal", or the absence stated
     protein_target = PLAN_DAILY_PROTEIN_MIN_G
     fat_target = profile.get("fat_target_g", 60)
     carb_target = profile.get("carb_target_g", 125)
@@ -439,7 +442,7 @@ FOOD LOG YESTERDAY (with timestamps):
 {food_summary}
 
 MACRO TOTALS: {json.dumps({k: data_summary[k] for k in ["calories", "protein_g", "fat_g", "carbs_g", "fiber_g"] if k in data_summary}, default=str)}
-TARGETS: {cal_target} cal, P{protein_target}g, F{fat_target}g, C{carb_target}g
+TARGETS: {cal_target}, P{protein_target}g, F{fat_target}g, C{carb_target}g
 
 TRAINING COACHING RULES (READ CAREFULLY):
 - You are coaching someone at Week {pctx['week_num']} of transformation, starting weight {pctx['start_weight']} lbs.
@@ -602,9 +605,9 @@ def _bod_phase_targets(data, profile):
         deficit = phase.get("deficit_target_kcal") or phase.get("calorie_deficit_target")
         if deficit:
             targets.append(f"{int(float(deficit))} kcal deficit")
-        # #4540: the plan's calorie target (generated into common/constants.py from the plan root),
-        # not the profile row's `calorie_target` — the row said 1,800 against a plan of 1,500.
-        targets.append(f"{PLAN_DAILY_CALORIES_TARGET} cal daily")
+        # #4540/#5095: the ONE calorie target (health.calorie_target), never the profile row's `calorie_target`.
+        if target_kcal(data.get("date")):
+            targets.append(f"{target_kcal(data.get('date'))} cal daily")
 
         return f"{label}: {', '.join(targets)}." if targets else f"{label}."
     except Exception as e:
@@ -714,7 +717,7 @@ def call_board_of_directors(
     missed_t1 = []
     for h_name, meta in missed:
         why = meta.get("why_matthew", "")
-        tier = meta.get("tier", 2)
+        tier = habit_tier(meta)
         if tier == 0:
             missed_t0.append(h_name + (" — " + why[:80] if why else ""))
         elif tier == 1:
@@ -915,12 +918,12 @@ def call_tldr_and_guidance(
     missed_context = []
     if registry:
         for h_name, meta in _missed_registry_habits(registry, habitify):
-            if meta.get("tier", 2) > 1:
+            if habit_tier(meta) > 1:
                 continue
             missed_mvp.append(h_name)
             why = meta.get("why_matthew", "")
             if why:
-                missed_context.append(h_name + " (T" + str(meta.get("tier", "?")) + "): " + why[:60])
+                missed_context.append(h_name + " (T" + str(habit_tier(meta)) + "): " + why[:60])
     else:
         # mvp_habits is the pre-registry legacy list of bare names (no meta, no vendor id) — out of
         # #4632's id-keyed scope, carried on the issue; it never reads when a registry exists.
@@ -1834,9 +1837,8 @@ VOICE: Write in FIRST PERSON. You ARE {voice_spec['display_name']}. Say "I", nev
 MATTHEW'S GOALS (standing targets — the fixed backdrop, not your read):
 - Target weight: 185 lbs (starting {int(round(EXPERIMENT_BASELINE_WEIGHT_LBS))})
 - Body composition: reduce body fat, preserve lean mass
-- Training philosophy: building from walking + Zone 2 base; structured strength training planned but not yet started
 - Timeline: 12-month experiment, genesis {EXPERIMENT_START_DATE}
-- Key priorities: sleep quality, protein adherence (190g/day target), consistent movement (8,000+ steps/day)
+{charter_goal_lines()}
 
 {_facts_block}
 

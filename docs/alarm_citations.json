@@ -70,8 +70,11 @@
     "note": "Same shape as the 2026-08-30 episode — the mechanism that closes it already exists on this source and had not reached its boundary day yet. `added` is the day this episode was first cited; `cause_observed` the re-derivation date (#3501)."
   },
   "life-platform-budget-tier-escalation": {
-    "citation": "#2801",
-    "note": "FLAP, not a standing red (#2912 detector). Entered and cleared ALARM twice in the 72h to 2026-08-27: first at 2026-08-26T17:00 PT when cost_governor moved the SSM budget-tier 1 -> 2 (ADR-125 band 2 pauses reader narratives incl. coach_narrative), then cleared and re-fired as the projection oscillated across the ~87% band boundary. The guard computed CORRECTLY both times - Session E measured MTD $146.07/26d projecting ~$174 against August's temporary $200 ceiling = 87.1%, driven by the 08-23 diligence spike. Not overridden: Session F's 04:00-13:00Z window fell entirely outside the only effective override window (16:00-17:00Z, after cost_governor's last cron(0 0/8 * * ? *) run and before the 17:00Z brief). Consequence carried in the handover: #3202's last acceptance box - both coaches publishing - stays unproven while tier >= 2. Epic #2801 owns the September base derivation; the temporary $200/$235 window auto-reverts to $150/$176 on 2026-09-01 with no deploy."
+    "added": "2026-10-21",
+    "cause": "budget tier 2 on the October spend projection — re-read 2026-10-23 by Session CC: SSM /life-platform/budget-tier = 2, LastModified 2026-10-19T17:00-07:00 (unchanged since CB's read); the alarm alternates ALARM/OK about every 5 h on 10-22 (01:01, 09:01, 17:01 PT into ALARM) as the governor's datapoints arrive, with the SAME cause, tier 2 on the October projection. The tier was never forced.",
+    "cause_observed": "2026-10-23",
+    "citation": "#5135 — the dev-session AI envelope (epic #5134): laptop/agent spend counts against the one production ceiling and lifts the projection into band 2. Expiry: self-clears at the 2026-11-01 month rollover or when the projection falls below the band; still lit after 2026-11-02 → re-cite.",
+    "history": "Prior citation #2801 (closed) covered the 2026-08-26 flap of the same class."
   },
   "life-platform-s3-bucket-size-high": {
     "citation": "self-clearing on a dated window — the deploys/ noncurrent-version lifecycle was tightened 7d to 1d and applied to the LIVE bucket 2026-08-31 (fin-diligence remediation, verified via get-bucket-lifecycle-configuration); S3 lifecycle expiry runs daily, so the ~72GB noncurrent tail drains over the next runs. Expiry of this citation: 2026-09-03 — if still ALARM then, file a follow-up issue instead of extending this line",
@@ -84,10 +87,11 @@
   },
   "qa-smoke-failures": {
     "added": "2026-10-12",
-    "cause_observed": "2026-10-18",
-    "citation": "self-clearing: both causes were cured 2026-10-18 — story_season:episode_or_hold (weeks 5 and 6 of the Panel retired by name on the owner's pasted ruling, 20:04Z, #4536) and story_season:ledger_advanced (the week-6 LEDGER#2026-10-13 row backfilled 18:0xZ, #4533); the forced qa-smoke run at ~20:1xZ read failed: 0 and an EMPTY cause list, so this entry declares no cause; the alarm goes OK on the next evaluation of its FailCount; prune 72 h after OK · Prior entry (2026-10-18T07:55Z): #4536 (episode_or_hold: weeks 5 AND 6 Panel episodes HELD on the body-number safety class) and #4533 (ledger_advanced: week 6 approved and sent 04:29Z but no LEDGER#2026-10-13 row). Clear timing: the alarm evaluates a daily Maximum (Period 86400, 1 period, ≥ 1), so today's earlier non-zero datapoint keeps it ALARM for the rest of the 2026-10-18 UTC bucket however many later runs read 0; it goes OK on the 2026-10-19 bucket's first evaluation after a clean datapoint.",
-    "updated": "2026-10-18",
-    "note": "Prior episode (added 2026-10-12, cause dashboard:date, observed 2026-10-11T18:31Z): the only FAIL in the 2026-10-11 run was Score Sanity / dashboard:date 'Stale date — expected 2026-10-10, got 2026-10-09' (issue 4847, closed 2026-10-14 after PR 4858); ALARM→OK 2026-10-12T18:32Z. History only — a different cause on the same count-aggregated alarm."
+    "cause_observed": "2026-10-19",
+    "citation": "#5183 — the 2026-10-19 episode: the one FAIL is Reader Truth / cross_surface:coach_vs_engine (qa-smoke run ae333c6b, after the 2026-10-19 coach-text refresh): the nutrition coach's text cites 71.9 g protein against the engine's served 133.5 g 7-day average; no stored MacroFactor day 2026-10-12..18 reads 71.9 g. Not caused by the training-charter deploys (no coach/nutrition/site-api commit since 2026-10-18). Clears on the first nightly run whose coach text agrees with the engine (daily Maximum, 1 period). · Prior entry (2026-10-18): self-clearing: both causes were cured 2026-10-18 — story_season:episode_or_hold (weeks 5 and 6 of the Panel retired by name on the owner's pasted ruling, 20:04Z, #4536) and story_season:ledger_advanced (the week-6 LEDGER#2026-10-13 row backfilled 18:0xZ, #4533); the forced qa-smoke run at ~20:1xZ read failed: 0 and an EMPTY cause list, so this entry declares no cause; the alarm goes OK on the next evaluation of its FailCount; prune 72 h after OK · Prior entry (2026-10-18T07:55Z): #4536 (episode_or_hold: weeks 5 AND 6 Panel episodes HELD on the body-number safety class) and #4533 (ledger_advanced: week 6 approved and sent 04:29Z but no LEDGER#2026-10-13 row). Clear timing: the alarm evaluates a daily Maximum (Period 86400, 1 period, ≥ 1), so today's earlier non-zero datapoint keeps it ALARM for the rest of the 2026-10-18 UTC bucket however many later runs read 0; it goes OK on the 2026-10-19 bucket's first evaluation after a clean datapoint.",
+    "updated": "2026-10-19",
+    "note": "Prior episode (added 2026-10-12, cause dashboard:date, observed 2026-10-11T18:31Z): the only FAIL in the 2026-10-11 run was Score Sanity / dashboard:date 'Stale date — expected 2026-10-10, got 2026-10-09' (issue 4847, closed 2026-10-14 after PR 4858); ALARM→OK 2026-10-12T18:32Z. History only — a different cause on the same count-aggregated alarm.",
+    "cause": "cross_surface:coach_vs_engine"
   },
   "qa-smoke-warnings": {
     "added": "2026-10-04",
@@ -150,10 +154,10 @@
     "note": "Prior entry (2026-10-04, issue 4593, closed): week 4 published by the season promote, which bypasses chronicle-approve, the only path that invokes the email sender; cleared when week 5 delivered through the approve path 2026-10-09 18:00Z. The current episode is a different cause on the same heartbeat."
   },
   "swallowed-permission-denial": {
-    "added": "2026-10-04",
-    "cause": "qa-smoke-share-kit-accessdenied",
-    "cause_observed": "2026-10-03T18:32Z",
-    "citation": "#4593 — one episode, ALARM 2026-10-03T18:32Z, OK 18:47Z (describe-alarm-history). It coincides with the 18:31Z qa-smoke run's AccessDenied GetObject on the missing week-07 share kit; that link is inferred from the timestamps, not read from the metric's source line."
+    "added": "2026-10-20",
+    "cause": "charter-private-twin-absent-403",
+    "cause_observed": "2026-10-20T05:10:19Z",
+    "citation": "#5220 — the loader's 'training_charter.private.json not read (AccessDenied)' line, once per cold container: the owner-only twin does not exist and the roles lack s3:ListBucket on config/, so S3 answers absence with 403. The nutrition charter waves made more filtered functions read the charter (coach-nudge at 05:10:19Z), so cold starts after the 2026-10-20 deploys lit it. The prior episode (2026-10-03, a qa-smoke share-kit read) was a different cause."
   },
   "nightly-predraft-missing": {
     "added": "2026-10-04",
@@ -206,5 +210,21 @@
     "updated": "2026-10-18",
     "citation": "#4970 — a first-deploy effect of the Apple Watch dead-man (the watch-metrics PR merged 2026-10-18 21:08Z, deployed ~21:25Z): the presence stamp `watch_last_reading_epoch_apple` only exists from that deploy, so the checker's 21:33Z run found no stamp in its lookback and counted the dead-man stale on a healthy watch — StaleSourceCount 1 from 21:33Z to 21:40Z, 0 again from 21:45Z once the first post-deploy payload stamped it (checker log '2 stale' → '1 stale'; the one left is behavioural and never counts). The alarm clears on its next evaluation; the fix (an `armed_after` grace on the dead-man facet — an absent stamp is `pending`, never counted, until 2026-10-20T00:00Z; a stamp older than 36 h counts at any time) is the lane PR awaiting CI. Expiry: if still ALARM after 2026-10-19 03:00Z, re-read the metric. Clear timing: the alarm evaluates a daily Maximum (Period 86400, 1 period, ≥ 1), so today's earlier non-zero datapoint keeps it ALARM for the rest of the 2026-10-18 UTC bucket however many later runs read 0; it goes OK on the 2026-10-19 bucket's first evaluation after a clean datapoint.",
     "note": "Reader-facing alarm class (freshness), cited on first red per #3423."
+  },
+  "slo-ai-coaching-success": {
+    "added": "2026-10-20",
+    "cause": "vendor transient: Bedrock ServiceUnavailableException (503)",
+    "cause_observed": "6 AnthropicAPIFailure 2026-10-19 14:00-14:02Z, all ai-expert-analyzer request 65a7dbba (Monday cron): six experts each exhausted 3 attempts, retry_utils.py:280. Re-ALARM 2026-10-20 16:19Z is a CloudWatch look-back to the window starting 10-18T16:19Z, no new failures. Budget tier 2 does not count (budget-stop branches never emit). Predates the 10-20 nutrition merges.",
+    "citation": "self-clearing vendor transient (a Bedrock 503 burst the alarm correctly counts; the class closed issue 3830 recorded). Window: the six 2026-10-19 14:00-14:02Z failures leave the 24h evaluation by 2026-10-21 ~16:20Z. Expiry: if still ALARM after 2026-10-21 17:00Z, or any AnthropicAPIFailure appears after 2026-10-19 14:02Z, file a story 'slo-ai-coaching-success: one run's 503 burst crosses the daily threshold'. Prune 72 h after OK."
+  },
+  "ingest-consecutive-failures-strava": {
+    "added": "2026-10-23",
+    "cause": "Strava re-ingest of the already-stored DATE#2026-10-18 raised Decimal + float every hourly run 2026-10-21T04:10Z until the day left the window on 10-22",
+    "citation": "#5255 — the re-ingest Decimal/float defect. Episode ALARM 2026-10-21 05:11 PT → OK 2026-10-22 05:11 PT. Expiry: re-cite if it fires again before #5255 is fixed."
+  },
+  "ingest-liveness-unhealthy": {
+    "added": "2026-10-23",
+    "cause": "the composite liveness view of the same Strava episode (RunSuccess 0 on each errored run)",
+    "citation": "#5255 — same episode as ingest-consecutive-failures-strava: ALARM 2026-10-21 10:11 PT → OK 2026-10-22 10:11 PT. Expiry: re-cite if it fires again before #5255 is fixed."
   }
 }
