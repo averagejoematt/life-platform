@@ -343,18 +343,14 @@ def _coach_daily(coach_id, *, _g):
     (`coach_moves.latest_served`), or None. A coach who did not speak on the current run
     serves None — nothing stale. The retired CC-08 reflection artifact
     (generated/coach_daily.json) is no longer read. Read-only — never inferenced here."""
-    from datetime import date
-
-    from common.pacific_time import pacific_today
+    from common import pacific_time
 
     moves = coach_moves.latest_served(_g["table"])
     if not isinstance(moves, dict):
         return None
-    try:
-        age = (date.fromisoformat(pacific_today()) - date.fromisoformat(str(moves.get("date") or ""))).days
-    except ValueError:
-        return None
-    if age < 0 or age > MOVE_FRESH_DAYS:
+    today = pacific_time.pacific_today()
+    current = {pacific_time.shift_day_key(today, -n) for n in range(MOVE_FRESH_DAYS + 1)}
+    if str(moves.get("date") or "") not in current:
         return None
     for ln in moves.get("lines") or []:
         if isinstance(ln, dict) and ln.get("coach_id") == coach_id:
