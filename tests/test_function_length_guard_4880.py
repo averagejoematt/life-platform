@@ -133,7 +133,7 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/emails/weekly_digest_lambda.py::build_html": 679,
     "lambdas/health/character_engine.py::compute_character_sheet": 267,
     "lambdas/health/character_engine.py::evaluate_level_changes": 189,
-    "lambdas/health/nutrition_critics.py::build_muscle_defense_packet": 163,
+    "lambdas/health/nutrition_critics.py::build_muscle_defense_packet": 152,
     "lambdas/ingestion/food_delivery_lambda.py::ingest_food_delivery_rows": 177,
     "lambdas/ingestion/health_auto_export_lambda.py::lambda_handler": 223,
     "lambdas/ingestion/health_auto_export_lambda.py::process_state_of_mind": 152,

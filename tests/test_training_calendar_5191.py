@@ -22,6 +22,23 @@ MON, TUE, WED, THU, FRI, SAT, SUN = WEEK
 COUNT = training_charter.charter_value("split.lifting_days_per_wk")
 
 
+def roomy(monkeypatch, target=2100, band=(2000, 2100)):
+    """The live charter with a roomier base (the pre-ruling 2,100), so the uplift MECHANICS stay covered: at the ruled
+    ~1,500 base the payback cap leaves no room and every day is the base (owner ruling 2026-10-23, #5212 / #5207)."""
+    real = training_charter.charter_value
+    cal = dict(real("nutrition.calories"))
+    cal.update(target_kcal=target, prescribed_band_kcal=list(band))
+
+    def read(path, default=None):
+        if path == "nutrition.calories":
+            return dict(cal)
+        if path.startswith("nutrition.calories."):
+            return cal.get(path.split(".", 2)[2], default)
+        return real(path, default)
+
+    monkeypatch.setattr(training_charter, "charter_value", read)
+
+
 def _types(cal):
     return [d["day_type"] for d in cal["days"]]
 
@@ -79,7 +96,8 @@ def _base(day):
     return ct.resolve(day)["kcal"]
 
 
-def test_the_typed_weeks_mean_is_the_base_target():
+def test_the_typed_weeks_mean_is_the_base_target(monkeypatch):
+    roomy(monkeypatch)  # the uplift mechanics; at the ruled ~1,500 the payback cap leaves no uplift (test_training_day_fuel_5101)
     # one test over every scenario (a parametrize would be one census gate per case)
     offenders = []
     for name, credited, today in [("fresh", [], MON), ("postponed", [MON], WED), ("on_plan", [MON, TUE], WED), ("late_week", [], FRI)]:
@@ -100,18 +118,19 @@ def test_the_typed_weeks_mean_is_the_base_target():
     assert not offenders, offenders
 
 
-def test_a_week_whose_rest_offset_hits_the_floor_is_named_unbalanced():
-    # six lifts and one rest day: the one rest day would carry the whole offset; the resolver clamps it at its floor
+def test_a_week_whose_rest_payback_would_cross_the_carb_floor_caps_the_uplift_and_still_balances(monkeypatch):
+    # six lifts and one rest day: the one rest day would carry the whole offset; the payback is capped at the carbohydrate
+    # floor and the lifting uplift shrinks to what that rest day can pay (#5207, owner ruling 2026-10-23 on #5212)
+    roomy(monkeypatch)
     cal = tc.week_calendar(SUN, [MON, TUE, WED, THU, FRI, SAT], today=SUN)
     blk = ct.plan_block(SUN, None, calendar=cal)
-    rest = blk["week_days"][6]
-    floor = blk["floor_any_day_kcal"]
-    assert floor is not None and _base(SUN) - 6 * ct.resolve(SUN, day_type="lifting")["uplift_kcal"] < floor  # the precondition
-    assert (
-        not blk["week_balance_held"]
-        and rest["kcal"] == floor
-        and "NOT held" in ct.resolve(SUN, day_type="rest", week_day_types=[d["day_type"] for d in blk["week_days"]])["provenance"]
-    )
+    types = [d["day_type"] for d in blk["week_days"]]
+    rest = ct.resolve(SUN, day_type="rest", week_day_types=types)
+    lift = ct.resolve(MON, day_type="lifting", week_day_types=types)
+    planned = training_charter.charter_value("nutrition.training_day.lifting_uplift_kcal")
+    assert 0 < lift["uplift_kcal"] < planned and "uplift capped" in rest["provenance"]
+    assert rest["split"]["carb_g"] >= training_charter.charter_value("nutrition.floors.carb.floor_g")
+    assert blk["week_balance_held"] and abs(blk["week_mean_kcal"] - _base(SUN)) < 1
 
 
 def test_an_unread_calendar_keeps_the_conditional_reading():
@@ -119,9 +138,10 @@ def test_an_unread_calendar_keeps_the_conditional_reading():
     assert blk["day_type"] == "unknown" and "if_lifting_day" in blk and "not read" in blk["day_type_basis"]
 
 
-def test_the_plan_engine_types_the_date_from_the_hevy_record():
+def test_the_plan_engine_types_the_date_from_the_hevy_record(monkeypatch):
     from training import plan_engine
 
+    roomy(monkeypatch)
     blk = plan_engine._effort_blocks(MON, [], [], {}, None, [])["training_day_fuel"]
     assert blk["day_type"] == "lifting" and blk["uplift_kcal"] > 0 and blk["calendar"]["lifting_days_per_wk"] == COUNT
     assert abs(blk["week_mean_kcal"] - blk["base_kcal"]) < 0.5

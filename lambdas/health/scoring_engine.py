@@ -25,7 +25,7 @@ from training.owner_redlines import REDLINES  # ADR-163: the walking floor the m
 from training.walking_volume import WALKING_VOLUME_VERSION, walking_minutes_for_day  # ADR-163: the ONE walking definition
 
 from health import macro_floors, protein_engine  # #5098: THE protein hit and the charter's range low
-from health.calorie_target import target_kcal  # #5095: the ONE calorie target
+from health.calorie_target import calorie_band, target_kcal  # #5095: the ONE calorie target; #5099: its band
 from health.habit_identity import day_name_for  # #4632: id first, then names, then ingest-derived aliases
 
 logger = logging.getLogger(__name__)
@@ -132,6 +132,9 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
     fat = safe_float(mf, "total_fat_g")
     carbs = safe_float(mf, "total_carbs_g")
     cal_target = target_kcal(data.get("date"))
+    band = calorie_band(data.get("date")) if cal_target else None
+    if band and not (band[0] <= cal_target <= band[1]):
+        band = None  # a band that does not hold the target in use is not this target's band: the tolerance curve answers
     # #4540: the plan states ONE protein line, a floor. The profile row's separate 190 g
     # "target" was never the plan; a day at or over the floor has met it.
     # #5098: the floor is the charter's protein range low and the hit is the protein engine's — one definition.
@@ -148,14 +151,22 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
     }
     parts, weights = [], []
     if cal is not None and cal_target:
-        pct_off = abs(cal - cal_target) / cal_target
+        if band:
+            # #5099: the habit is a FLOOR and a CEILING (the charter band, centred on the target): inside it is a hit; an
+            # under-floor day is a MISS, never a success, and the score falls from the band edge, not from the target
+            details["cal_band"] = list(band)
+            details["cal_band_hit"] = band[0] <= cal <= band[1]
+            pct_off = max(band[0] - cal, cal - band[1], 0) / cal_target
+            cal_tolerance = 0.0
+        else:
+            pct_off = abs(cal - cal_target) / cal_target
         if pct_off <= cal_tolerance:
             cal_score = 100
         elif pct_off >= cal_penalty:
             cal_score = 0
         else:
             cal_score = 100 * (1 - (pct_off - cal_tolerance) / (cal_penalty - cal_tolerance))
-        if cal > cal_target * (1 + cal_tolerance):
+        if cal > (band[1] if band else cal_target * (1 + cal_tolerance)):
             # Asymmetric: surplus directly stalls weight loss — penalized more than under-eating
             cal_score = max(0, cal_score - 15)
         cal_score = clamp(round(cal_score))

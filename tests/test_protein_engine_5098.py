@@ -62,8 +62,11 @@ def test_the_charter_owns_the_protein_block():
     p = training_charter.charter_value("nutrition.protein")
     assert p and {"range_g", "days_of_7", "feedings_per_day", "feeding_threshold_g", "feeding_merge_minutes", "breakfast_nudge"} <= set(p)
     assert p["range_g"]["low"] < p["range_g"]["high"]
-    assert p["feedings_per_day"] == 4 and p["feeding_threshold_g"] == 40  # R2's panel default (four feedings of 40 g+)
-    assert "pending R2" in p["basis"]
+    assert p["feedings_per_day"] == 4 and p["feeding_threshold_g"] == 40  # R2 (four feedings of 40 g+)
+    # owner ruling 2026-10-23 R2: more protein, but keep 16:8 — the four feedings fit inside the charter's eating window
+    assert "R2" in p["basis"] and "16:8" in p["basis"] and "pending" not in p["basis"]
+    w = training_charter.charter_value("nutrition.eating_window")
+    assert (w["type"], w["fasting_hours"] + w["eating_hours"]) == ("16:8", 24)
     entry = next(e for e in training_charter.charter_value("change_log") if "#5098" in e.get("by", "") + e.get("what", ""))
     assert entry["version"] == "1.11.0"  # restacked above #5095 (1.8.0) and #5097 (1.10.0)
 

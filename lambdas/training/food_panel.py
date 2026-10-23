@@ -316,11 +316,15 @@ def check_protein_range(f: dict[str, Any]) -> tuple[float, str]:
 
 def minimum_day_held(d: dict[str, Any], r: dict[str, Any]) -> bool:
     """The reduced day a disruption mode grades (#5215): the mode HOLDS the protein floor (charter `disruption.holds`),
-    so a disrupted day is met when it plans the any-day calorie floor and the protein range's low end — no four feedings,
-    no fat or carbohydrate floor. Absent evidence is not met."""
+    so a disrupted day is met when it plans a resolved target at the any-day calorie floor and the protein range's low
+    end — no four feedings, no fat or carbohydrate floor. While the charter's floors are WARNINGS (`floor_role`, owner
+    ruling 2026-10-23 R1: the ~1,500 target sits under the 1,600 floor by choice) the calorie half is a resolved target;
+    the floor gap stays visible in `day_floors_held`. Absent evidence is not met."""
     kcal, floor, low = _n(d.get("kcal")), r["floor_any"], r["protein_low"]
     protein = _n((d.get("split") or {}).get("protein_g"))
-    return floor is not None and low is not None and kcal is not None and kcal >= floor and protein is not None and protein >= low
+    warning = charter_value("nutrition.calories.floor_role") == "warning"
+    kcal_ok = kcal is not None and (warning or (floor is not None and kcal >= floor))
+    return low is not None and kcal_ok and protein is not None and protein >= low
 
 
 def _reduced(d: dict[str, Any]) -> bool:
