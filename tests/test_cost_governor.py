@@ -35,7 +35,7 @@ def _pin_normal_thresholds(gov, monkeypatch):
 @pytest.fixture(autouse=True)
 def _pin_base_ceilings(gov, monkeypatch):
     """Same treatment for the calendar-scoped CEILING override
-    (_TEMP_CEILING_WINDOW, August 2026). The assertions in this module are written
+    (_TEMP_CEILING_WINDOW, October 2026). The assertions in this module are written
     against the $215/$252 base pair; without this pin every ceiling test in here
     false-fails for the duration of any raise window and silently passes again
     once it lapses. The window's own behaviour is tested explicitly below, with
@@ -386,9 +386,9 @@ def test_tier_for_scales_proportionally_with_surge_ceiling(gov):
 
 
 # ── temporary raise window (_TEMP_CEILING_WINDOW) ────────────────────────────
-# August 2026 is raised to $200/$235 for one month (#2381 then #2734) and reverts on its own date.
-# These tests inject the date instead of reading the clock, so they assert the
-# same thing in September 2026 as they did the day they were written.
+# October 2026 is raised to $300/$352 for one month (#5135) and reverts on its own date (August 2026
+# used the same window at $200/$235, #2381/#2734). These tests inject the date instead of reading the
+# clock, so they assert the same thing in November 2026 as they did the day they were written.
 
 
 def _clock_at(day):
@@ -410,18 +410,17 @@ def _clock_at(day):
 @pytest.mark.parametrize(
     "today,expected",
     [
-        (date(2026, 7, 31), (215.0, 252.0)),  # day before the window opens (base pair is
-        # resolved from today's constants — the code keeps no memory of July's $85)
-        (date(2026, 8, 1), (200.0, 235.0)),  # inclusive start
-        (date(2026, 8, 9), (200.0, 235.0)),  # the day the first August raise was decided
-        (date(2026, 8, 31), (200.0, 235.0)),  # last day inside
-        (date(2026, 9, 1), (215.0, 252.0)),  # EXCLUSIVE end — reverts unattended, now to the $215 base
-        (date(2027, 8, 15), (215.0, 252.0)),  # does not recur next August
+        (date(2026, 9, 30), (215.0, 252.0)),  # day before the window opens — the permanent base pair
+        (date(2026, 10, 1), (300.0, 352.0)),  # inclusive start
+        (date(2026, 10, 18), (300.0, 352.0)),  # the day the October raise was decided (#5135)
+        (date(2026, 10, 31), (300.0, 352.0)),  # last day inside
+        (date(2026, 11, 1), (215.0, 252.0)),  # EXCLUSIVE end — reverts unattended to the $215 base
+        (date(2027, 10, 15), (215.0, 252.0)),  # does not recur next October
     ],
 )
 def test_temp_ceiling_window_opens_and_self_reverts(gov, monkeypatch, today, expected):
     """The whole point of a dated window is that nobody has to remember it.
-    September must revert with no deploy, no SSM flip, and no human in the loop."""
+    November must revert with no deploy, no SSM flip, and no human in the loop."""
     monkeypatch.setattr(gov, "datetime", _clock_at(today))
     assert gov._REAL_ACTIVE_CEILINGS() == expected
 
@@ -430,7 +429,7 @@ def test_env_override_defeats_the_window(gov, monkeypatch):
     """An operator who explicitly sets MONTHLY_CEILING_USD takes full control.
     Without this, setting the env var mid-window would silently do nothing."""
     monkeypatch.setattr(gov, "_CEILING_ENV_OVERRIDE", True)
-    monkeypatch.setattr(gov, "datetime", _clock_at(date(2026, 8, 9)))
+    monkeypatch.setattr(gov, "datetime", _clock_at(date(2026, 10, 18)))
     assert gov._REAL_ACTIVE_CEILINGS() == (gov.MONTHLY_CEILING, gov.SURGE_CEILING_USD)
 
 
@@ -585,7 +584,7 @@ def test_alert_surge_engage_uses_active_ceilings_in_temp_window(gov, monkeypatch
     # pair for every OTHER test in this module; undo that here so _alert_surge
     # sees the real, date-scoped resolution this test is about.
     monkeypatch.setattr(gov, "_active_ceilings", gov._REAL_ACTIVE_CEILINGS)
-    monkeypatch.setattr(gov, "datetime", _clock_at(date(2026, 8, 9)))  # inside the $200/$235 window
+    monkeypatch.setattr(gov, "datetime", _clock_at(date(2026, 10, 18)))  # inside the $300/$352 window
     fake_sns = _FakeSNS()
     monkeypatch.setattr(gov, "_sns", fake_sns)
 
@@ -594,14 +593,14 @@ def test_alert_surge_engage_uses_active_ceilings_in_temp_window(gov, monkeypatch
     assert len(fake_sns.calls) == 1
     subj = fake_sns.calls[0]["Subject"]
     body = fake_sns.calls[0]["Message"]
-    assert "$200" in subj and "$235" in subj, f"subject must carry the ACTIVE pair, not the base constants: {subj!r}"
-    assert "$200" in body and "$235" in body, f"body must carry the ACTIVE pair, not the base constants: {body!r}"
+    assert "$300" in subj and "$352" in subj, f"subject must carry the ACTIVE pair, not the base constants: {subj!r}"
+    assert "$300" in body and "$352" in body, f"body must carry the ACTIVE pair, not the base constants: {body!r}"
     assert "$215" not in subj and "$252" not in subj, f"subject must not fall back to the out-of-window base pair: {subj!r}"
 
 
 def test_alert_surge_disengage_uses_active_ceilings_in_temp_window(gov, monkeypatch):
     monkeypatch.setattr(gov, "_active_ceilings", gov._REAL_ACTIVE_CEILINGS)
-    monkeypatch.setattr(gov, "datetime", _clock_at(date(2026, 8, 9)))
+    monkeypatch.setattr(gov, "datetime", _clock_at(date(2026, 10, 18)))
     fake_sns = _FakeSNS()
     monkeypatch.setattr(gov, "_sns", fake_sns)
 
@@ -610,8 +609,8 @@ def test_alert_surge_disengage_uses_active_ceilings_in_temp_window(gov, monkeypa
     assert len(fake_sns.calls) == 1
     subj = fake_sns.calls[0]["Subject"]
     body = fake_sns.calls[0]["Message"]
-    assert "$200" in subj, f"subject must revert to the ACTIVE base ($200 in this window), not $215: {subj!r}"
-    assert "$235" in body and "$200" in body, f"body must name the ACTIVE pair reverted from/to: {body!r}"
+    assert "$300" in subj, f"subject must revert to the ACTIVE base ($300 in this window), not $215: {subj!r}"
+    assert "$352" in body and "$300" in body, f"body must name the ACTIVE pair reverted from/to: {body!r}"
 
 
 def test_alert_surge_out_of_window_still_uses_the_default_base(gov, monkeypatch):
