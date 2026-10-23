@@ -842,7 +842,7 @@ class TestExMacrofactor:
         # calories (1500 + 2200)/2 = 1850.0 ; protein (200 + 100)/2 = 150.0
         assert out["calories_avg"] == 1850.0
         assert out["protein_avg_g"] == 150.0
-        # calorie hit = c <= the ONE target (#5095; ~1,500 since charter 1.20.0, owner ruling 2026-10-23 R1) × 1.10 = 1650
+        # calorie hit = c <= the ONE target (#5095; ~1,500 since charter 1.21.0, owner ruling 2026-10-23 R1) × 1.10 = 1650
         # → 1500 yes, 2200 no → 1/2 = 50%
         assert out["calorie_target"] == 1500
         assert out["calorie_hit_rate"] == 50

@@ -84,7 +84,7 @@ def test_logged_day_has_no_absent_food_behaviors():
 
 def test_food_components_score_the_wire_row():
     d = _details()
-    # #5095: the reference is the ONE calorie target (charter nutrition.calories; ~1,500 since charter 1.20.0, owner
+    # #5095: the reference is the ONE calorie target (charter nutrition.calories; ~1,500 since charter 1.21.0, owner
     # ruling 2026-10-23 R1): |1561 - 1500| / 1500 = 4.07 % against a 20 % band -> 100 - 20.3 = 79.7
     assert target_kcal("2026-10-17") == 1500
     assert d["calorie_adherence"]["score"] == 79.7

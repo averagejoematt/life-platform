@@ -806,7 +806,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "derived_by": "lived experience (red team 2026-09-22); firing today on his own record — 15 of 20 logged days",
         "action": f"{_FLOOR_WARNING}: the step he may choose is +{CALORIE_STEP_TEXT} kcal for 7 days, protein to 200 g",
         "evaluated_by_engine": False,
-        "note": "The planned-minimum arm (1,700 at any weight) as distinct from the hard floor above; the current block trips it.",
+        "note": "The pre-ruling planned-minimum arm (1,700 at any weight) as distinct from the hard floor above, kept at its owner-history threshold as a warning; the charter's planned minimum is 1,400 since 1.21.0 (owner ruling 2026-10-23), so the ~1,500 target trips this arm by choice.",
     },
     {
         "id": "logging_dark",

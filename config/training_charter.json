@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.20.0",
+  "version": "1.21.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -131,8 +131,15 @@
     {
       "version": "1.20.0",
       "date": "2026-10-23",
-      "by": "owner rulings 2026-10-23 (attended, Session CD) on #5091 R1/R2, the walk-first rule and the step size, #5099, #5205, #5212 and #5207",
-      "what": "R1 'stay ~1,500 kcal, re-target the charter': nutrition.calories.target_kcal 2100 -> 1500 and prescribed_band_kcal [2000, 2100] -> [1400, 1600] (centred on the target, #5099); the 1,600 any-day, 1,900 lifting-day and 1,800 seven-day-mean floors are KEPT and become warnings (floor_role: the resolver no longer clamps a target up to a floor; a target or a day under one is reported, never hidden). Records written under an earlier charter version are not the base (records_from_version). nutrition.titration.above_ceiling_action 'warn': the weekly engine no longer pushes food up when the loss is faster than the band ceiling; it holds and warns, and the step it names is max_step_kcal. 'Step size: 150 kcal everywhere' (#5205): max_step_kcal 150 is the one step every redline tripwire and critic line states. 'Walk-first rule: keep the steps check': steps_before_food is owner-ruled, no longer pending. R2 'more protein, but keep 16:8': nutrition.eating_window 16:8 and the four feedings fit inside it (protein.fasting_window). 'Lower the carb floor to ~60 g; protein and fat floors stay' (#5212): nutrition.floors.carb.floor_g 120 -> 58, the whole gram the 1,500 kcal base day holds after the protein (170 g) and fat (65 g) floors (1500 - 680 - 585 = 235 kcal = 58.75 g; a 60 g floor would put the base day itself under its own floor). nutrition.training_day: fat is held at the larger of fat_pct_of_base_kcal and the fat floor, and the rest-day payback is capped at the carbohydrate floor with the lifting uplift shrunk to what the rest days can pay (payback_rule, #5207), so every planned day holds the macro floors and the week still averages the base.",
+      "by": "owner ruling 2026-10-23 (Session CD, on #5006 and #5108): food delivery is not a live feed; it becomes a 6-monthly manual upload ritual",
+      "what": "nutrition.food_delivery added: upload_every_months 6, the cadence of the owner's food-delivery upload reminder (training.calibration_cadence's food_delivery_upload row). The source stays paused in the source registry between uploads, so no freshness verdict, coach question, nudge or daily-brief modifier reads it.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.21.0",
+      "date": "2026-10-23",
+      "by": "owner rulings 2026-10-23 (attended, Session CD) on #5091 R1/R2, the walk-first rule and the step size, #5099, #5205, #5212 and #5207; and the three follow-ups the owner ruled the same day on #5091 (PR #5265)",
+      "what": "R1 'stay ~1,500 kcal, re-target the charter': nutrition.calories.target_kcal 2100 -> 1500 and prescribed_band_kcal [2000, 2100] -> [1400, 1600] (centred on the target, #5099); the 1,600 any-day, 1,900 lifting-day and 1,800 seven-day-mean floors are KEPT and become warnings (floor_role: the resolver no longer clamps a target up to a floor; a target or a day under one is reported, never hidden). Records written under an earlier charter version are not the base (records_from_version). nutrition.titration.above_ceiling_action 'warn': the weekly engine no longer pushes food up when the loss is faster than the band ceiling; it holds and warns, and the step it names is max_step_kcal. 'Step size: 150 kcal everywhere' (#5205): max_step_kcal 150 is the one step every redline tripwire and critic line states. 'Walk-first rule: keep the steps check': steps_before_food is owner-ruled, no longer pending. R2 'more protein, but keep 16:8': nutrition.eating_window 16:8 and the four feedings fit inside it (protein.fasting_window). 'Lower the carb floor to ~60 g; protein and fat floors stay' (#5212): nutrition.floors.carb.floor_g 120 -> 58, the whole gram the 1,500 kcal base day holds after the protein (170 g) and fat (65 g) floors (1500 - 680 - 585 = 235 kcal = 58.75 g; a 60 g floor would put the base day itself under its own floor). nutrition.training_day: fat is held at the larger of fat_pct_of_base_kcal and the fat floor. Follow-ups (owner ruling 2026-10-23, #5091): (1) '`planned_minimum_any_weight_kcal` 1,700 -> 1,400. It matches the band floor, so the engine can step food down within [1,400-1,600]. The steps-first rule still applies before any food cut': planned_minimum_any_weight_kcal 1700 -> 1400, steps_before_food unchanged. (2) '+150 kcal on lifting days, so lifting days are about 1,650 and rest days about 1,500. The week averages above 1,500 by design. Rest days are not paid back below the target': the rest-day payback is removed (training_day.balance and rest_day_rule; no payback cap, no uplift_grain_kcal); a lifting day is 1,650 kcal = protein 170 g, fat 65 g, carbohydrate 96 g, a rest day 1,500 kcal = 170 / 65 / 59 g; the session carbohydrate is scaled to fit the lifting day: pre_session.carb_g 40 -> 24 and post_session.carb_g 60 -> 36 (60 g of the day's 96 g, leaving 36 g for the food that carries the 35 g fibre floor; 40 + 60 = 100 g exceeded the whole day). (3) 'Food-plan grader: energy rows grade against the 1,500 target. The 1,600/1,800 lines show as warnings, not failures': read by training.food_panel while floor_role is warning (config/panel_rubric.json). records_from_version is 1.21.0 (main's 1.20.0, #5261, predates the re-target).",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -485,8 +492,8 @@
       "floor_lifting_day_kcal": 1900,
       "floor_7d_mean_kcal": 1800,
       "floor_role": "warning",
-      "planned_minimum_any_weight_kcal": 1700,
-      "records_from_version": "1.20.0",
+      "planned_minimum_any_weight_kcal": 1400,
+      "records_from_version": "1.21.0",
       "resolver": "health.calorie_target.resolve",
       "reading": "target_kcal is the day's calorie target (owner ruling R1 2026-10-23: stay ~1,500). A titration record for the week outranks it, unless it was written under a charter version before records_from_version (a record from before the re-target is not the base). The floors are WARNINGS (floor_role): nothing clamps a target up to a floor; a resolved target or a planned day under its floor carries a floor warning, and the critics grade logged days against them, visibly. The lifting-day and any-day floors grade single days; the 7-day-mean floor is reported, not enforced. prescribed_band_kcal is the calorie habit's floor and ceiling, centred on the target (#5099).",
       "provenance": "owner",
@@ -564,7 +571,7 @@
         "above_landing": "governing_goal.rate_band_lb_per_wk (training.rate_band.band, the clinical guidance cap applied)",
         "from_landing_down": "owner_redlines rate_schedule_lb_wk step at the bodyweight (training.redline_rate.rate_schedule_step): target to cap"
       },
-      "expected_path": "~1,500 held (owner ruling 2026-10-23 R1: the engine never pushes food up; below the planned minimum it cannot step food down either, so it holds and warns) → the landing's own refeed steps (owner_redlines landing.calories) → ~2,700–2,800 at maintenance (model; measure RMR). The pre-ruling model path (2,100 to 275 → 2,000 to 240 → 1,950 to 220) is retired",
+      "expected_path": "~1,500 (owner ruling 2026-10-23 R1: the engine never pushes food up, it holds and warns; follow-up 1: below the band floor, with the steps check met, it may step food down to the planned minimum 1,400, the band floor) → the landing's own refeed steps (owner_redlines landing.calories) → ~2,700–2,800 at maintenance (model; measure RMR). The pre-ruling model path (2,100 to 275 → 2,000 to 240 → 1,950 to 220) is retired",
       "never_below": "nutrition.calories.planned_minimum_any_weight_kcal",
       "insufficient_data": "no measured trend, a provisional trend window, no weigh-in, an unreadable band or guidance record, an unreadable rule value, or too few complete logs: the week holds with reason insufficient_data, never a guess",
       "record": {"pk": "USER#matthew#SOURCE#nutrition_titration", "sk": "WEEK#<iso-monday>", "writer": "lambdas/health/titration.py via mcp/titration_leg.py on the nightly pre-draft run (Friday to Sunday nights, the first write for the coming week stands)"},
@@ -573,13 +580,12 @@
     },
     "training_day": {
       "lifting_uplift_kcal": 150,
-      "balance": "the week averages the base target: a rest day takes -(uplift x lifting days / rest days) so the uplift is paid for inside the week (5 lifting / 2 rest: -375); travel and unknown days stay at the base. A day clamped by its floor is reported balance_held false. A typed week with lifting days but no rest day (travel fills the rest) cannot pay the uplift and is reported balance_held false too",
+      "balance": "no rest-day payback (owner ruling 2026-10-23, #5091 follow-up 2: '+150 kcal on lifting days; rest days are not paid back below the target; the week averages above 1,500 by design'): a lifting day is the base + lifting_uplift_kcal, every rest, travel and unknown day is the base. The week mean is the base + uplift x lifting days / 7 (5 lifting days at 1,500: 1,607). balance_held reports that no planned day sits under its base target",
       "fat_pct_of_base_kcal": 30,
       "split_rule": "protein = nutrition.protein.range_g.low and fat = the larger of fat_pct of the base target and nutrition.floors.fat.floor_g, both held every day; the uplift and the offset are carbohydrate",
-      "uplift_grain_kcal": 10,
-      "payback_rule": "the rest-day offset is capped so a rest day's carbohydrate stays at or above nutrition.floors.carb.floor_g (protein and fat at their split grams); the lifting uplift shrinks to what the rest days can pay (rounded down to uplift_grain_kcal), so the week still averages the base and no planned day sits under a macro floor (#5207; owner ruling 2026-10-23 on #5212: carb floor lowered, protein and fat floors stay). With the floors unreadable no uplift is planned. At the 1,500 kcal base the rest days have ~3 kcal of room, so the uplift is 0 and every day is the base",
+      "rest_day_rule": "no payback: a rest day stays at the base target (never below it) whatever the week's lifting count; the lifting uplift is carbohydrate on top of the base day's split (1,650 kcal at the 1,500 base: protein 170 g, fat 65 g, carbohydrate 96 g against the base day's 59 g)",
       "pre_session": {
-        "carb_g": 40,
+        "carb_g": 24,
         "protein_g": 20,
         "minutes_before": [
           60,
@@ -587,20 +593,25 @@
         ]
       },
       "post_session": {
-        "carb_g": 60,
+        "carb_g": 36,
         "protein_g": 40,
         "minutes_after": 60,
         "note": "the post-session protein is one of the four feedings (nutrition.protein.feeding_threshold_g)"
       },
+      "session_carb_note": "pre 24 g + post 36 g = 60 g, the pre-ruling 40 g : 60 g scaled 0.6 to fit the 1,650 kcal lifting day (owner ruling 2026-10-23, #5091 follow-up 2): its 96 g of carbohydrate (the base day's 59 g + the uplift's 37.5 g) holds the 60 g of session fuel and leaves 36 g for the day's other food, which carries the 35 g fibre floor. The pre-ruling 40 g + 60 g = 100 g exceeded the whole lifting day",
       "travel_day": "no uplift and no rest-day offset: the base target holds; pre and post targets still apply when a session is done",
       "day_type": "lifting | rest | travel | unknown: travel from a travel disruption or charter travel window; else lifting/rest from the per-date training calendar (training.training_calendar, #5191: the week's credited program sessions are lifting days, the sessions still owed to split.lifting_days_per_wk are laid on the remaining dates, nominal lifting weekdays first, every other date rest; a rest-day postponement moves a session inside the week and does not change the week's count while days remain); else unknown (base target, never a guessed rest day) when the Hevy record or the count cannot be read, with the lifting uplift and the rest offset stated as conditional",
       "surface": "owner-only: the plan_next_session constraint block (training_day_fuel) and the coach packet; no public surface",
-      "basis": "owner rulings 2026-10-23 (#5091 R1, #5212): the base is ~1,500 and the payback is capped at the carbohydrate floor"
+      "basis": "owner rulings 2026-10-23 (#5091 R1, #5212, and the #5091 follow-up 2): the base is ~1,500, lifting days +150 with no rest-day payback, and the session carbohydrate scaled to the lifting day"
     },
     "labs": {
       "_note": "The follow-up draw cadence only (#5111). Dates and weeks; no result, name or priority lives here. The owner-only due date, when no draw is readable, is the private twin's lab_followup.next_draw_on.",
       "follow_up_weeks": 16,
       "reminder_lead_days": 14
+    },
+    "food_delivery": {
+      "_note": "The food-delivery upload cadence only (#5006/#5108, owner ruling 2026-10-23). A 6-monthly manual upload ritual: the source stays paused between uploads and this number is when the owner-only reminder fires. No order, merchant or amount lives here.",
+      "upload_every_months": 6
     },
     "floors": {
       "fat": {"floor_g": 65, "unit": "g", "per_meal_g": 10, "meals_with_fat": 3, "epa_dha_g": 2},
@@ -618,7 +629,7 @@
       "appetite_food_environment": {"concedes": "a calorie target instead of a food-quality-only approach", "in_return": "the fibre floor, a fixed feeding rhythm and no day under its floor"},
       "energy_balance_metabolism": {"concedes": "a population-derived starting target", "in_return": "a weekly refit against the measured trend in small, bounded steps"},
       "obesity_medicine": {"concedes": "a faster rate than it would start with", "in_return": "floors on every day and on the week, and steps before food"},
-      "sports_dietitian": {"concedes": "no per-session periodised carbohydrate plan", "in_return": "a lifting-day uplift with pre and post session fuel, paid back inside the week"},
+      "sports_dietitian": {"concedes": "no per-session periodised carbohydrate plan", "in_return": "a lifting-day uplift with pre and post session fuel; rest days are not paid back below the target (owner ruling 2026-10-23)"},
       "behaviour_change_psychologist": {"concedes": "numeric targets over intuitive eating", "in_return": "a few repeatable rules, calorie changes no bigger than the step cap, every number with its reason"},
       "studio_nutritionist": {"concedes": "nothing", "in_return": "gets the deadline pace, the weekly refit and the training-day fuel"}
     }

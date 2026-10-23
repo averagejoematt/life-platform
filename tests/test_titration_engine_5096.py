@@ -346,7 +346,9 @@ def test_the_charter_is_re_targeted_to_1500_and_a_pre_re_target_record_is_not_th
     d = decide(trend_lb_wk=3.2, history=[old], cfg=cfg)
     assert (d["base_kcal"], d["inputs"]["base_source"]) == (1500, "charter nutrition.calories.target_kcal")
     assert ct.resolve(WEEK, titration_reader=lambda week: old)["kcal"] == 1500, "the resolver skips the pre-re-target record too"
-    assert ct.resolve(WEEK, titration_reader=lambda week: {**old, "charter_version": "1.20.0"})["kcal"] == 2100
+    # main's 1.20.0 (#5261, food_delivery) predates the re-target, which landed as 1.21.0: its records are not the base either
+    assert ct.resolve(WEEK, titration_reader=lambda week: {**old, "charter_version": "1.20.0"})["kcal"] == 1500
+    assert ct.resolve(WEEK, titration_reader=lambda week: {**old, "charter_version": "1.21.0"})["kcal"] == 2100
 
 
 def test_one_calorie_step_everywhere_the_tripwire_text_is_the_cap_5205():

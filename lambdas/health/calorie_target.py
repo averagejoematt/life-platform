@@ -29,7 +29,6 @@ cached 15 min — so a per-request caller does no S3 read per call.
 
 from __future__ import annotations
 
-import math
 from datetime import date, datetime, timedelta
 from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Union
 
@@ -90,8 +89,8 @@ def _charter_version(charter_reader: Optional[CharterReader]) -> Optional[str]:
 
 
 # ── training-day fuel (#5101, epic #5091) ───────────────────────────────────────────────────
-# The uplift on a lifting day is balanced by the rest days, so the WEEK averages the base target, and the rest-day payback
-# is capped at the carbohydrate floor (#5207; owner rulings 2026-10-23 on R1 and #5212); charter ``nutrition.training_day``.
+# A lifting day is the base plus the lifting uplift; a rest day stays at the base and is NOT paid back below it, so the
+# week averages above the base by design (owner ruling 2026-10-23, #5091 follow-up 2); charter ``nutrition.training_day``.
 
 
 def classify_day_type(
@@ -140,28 +139,18 @@ def _apply_day_type(
     cfg = cfg if isinstance(cfg, dict) else {}
     if base is None:
         return
-    uplift = _num(cfg.get("lifting_uplift_kcal")) or 0.0
-    n_lift = list(week_types).count("lifting") if week_types is not None else (_num(read("split.lifting_days_per_wk")) or 0)
-    n_rest = list(week_types).count("rest") if week_types is not None else 7 - n_lift
     p_low = _num(read("nutrition.protein.range_g.low"))
     fat_pct = _num(cfg.get("fat_pct_of_base_kcal"))
     fat_floor = _num(read("nutrition.floors.fat.floor_g"))
-    carb_floor = _num(read("nutrition.floors.carb.floor_g"))
     # split_rule: fat is the larger of fat_pct of the base and the fat floor (owner ruling 2026-10-23 on #5212: it stays)
     fat_g = max(base * fat_pct / 100 / 9, fat_floor or 0.0) if fat_pct is not None else None
-    uplift = _payback_capped_uplift(out, base, uplift, n_lift, n_rest, p_low, fat_g, carb_floor, cfg)
-    delta = 0.0
-    if dt == "lifting":
-        delta = uplift
-    elif dt == "rest" and n_rest > 0:
-        delta = -uplift * n_lift / n_rest
+    # rest_day_rule (owner ruling 2026-10-23, #5091 follow-up 2): +uplift on a lifting day, every other day at the base —
+    # no rest-day payback below the target, so the week averages above the base by design
+    delta = (_num(cfg.get("lifting_uplift_kcal")) or 0.0) if dt == "lifting" else 0.0
     final = base + delta
     floor_any, floor_lift = _num(out.get("floor_any_day_kcal")), _num(out.get("floor_lifting_day_kcal"))
     floor = floor_lift if (dt == "lifting" and floor_lift is not None) else floor_any
-    out["balance_held"] = True
-    if dt == "lifting" and delta and n_rest == 0:  # #5191: a typed week with no rest day (travel fills it) cannot pay the uplift
-        out["provenance"] += "; no rest day in the typed week pays the lifting uplift — the weekly balance is NOT held"
-        out["balance_held"] = False
+    out["balance_held"] = final >= base  # the training-day rule held: no planned day under its base target
     if floor is not None and final < floor:
         # owner ruling 2026-10-23 R1 (#5091): the floors stay as WARNINGS — reported, never a clamp that raises the target
         warning = f"{dt} day {int(round(final))} kcal is {int(round(floor - final))} kcal under its {int(floor)} kcal floor (a warning, not a clamp)"
@@ -169,59 +158,25 @@ def _apply_day_type(
         out["provenance"] += f"; {warning}"
     out["kcal"] = int(round(final))
     out["uplift_kcal"] = int(round(final - base))
-    if dt != "unknown" and delta:
-        out["provenance"] += f"; {dt} day {out['uplift_kcal']:+d} kcal (training_day rule)"
+    if delta:
+        out["provenance"] += f"; {dt} day {out['uplift_kcal']:+d} kcal (training_day rule, no rest-day payback)"
     if p_low is not None and fat_g is not None:
         out["split"] = {
             "protein_g": int(round(p_low)),
             "fat_g": int(round(fat_g)),
             "carb_g": int(round(_grams(final, p_low, fat_g))),
-            "rule": "protein and fat held at the base day's grams (fat never under its floor); the uplift and the rest-day offset are carbohydrate",
+            "rule": "protein and fat held at the base day's grams (fat never under its floor); the lifting uplift is carbohydrate",
         }
     if dt in ("lifting", "travel"):
         pre, post = cfg.get("pre_session"), cfg.get("post_session")
         out["pre_post_session"] = {"pre": pre, "post": post} if isinstance(pre, dict) and isinstance(post, dict) else None
 
 
-def _payback_capped_uplift(
-    out: Dict[str, Any],
-    base: float,
-    uplift: float,
-    n_lift: float,
-    n_rest: float,
-    p_low: Optional[float],
-    fat_g: Optional[float],
-    carb_floor: Optional[float],
-    cfg: Dict[str, Any],
-) -> float:
-    """The lifting uplift the rest days can pay without a rest day's carbohydrate falling under its floor
-    (charter ``nutrition.training_day.payback_rule``, #5207 / #5212). The cap is a property of the WEEK, so every day of it
-    reads the same value and the week still averages the base. Floors unreadable: no uplift (it could not be checked)."""
-    out["uplift_planned_kcal"] = int(round(uplift))
-    if not uplift or n_lift <= 0 or n_rest <= 0:
-        return uplift  # nothing to pay back, or no rest day to pay it (the #5191 balance_held path reports that)
-    if p_low is None or fat_g is None or carb_floor is None:
-        out[
-            "provenance"
-        ] += "; the macro floors are unreadable, so no lifting uplift is planned (its rest-day payback could not be checked)"
-        return 0.0
-    room = max(0.0, base - 4 * p_low - 9 * fat_g - 4 * carb_floor)  # kcal a rest day can give before carbohydrate hits its floor
-    payable = room * n_rest / n_lift
-    if payable >= uplift:
-        return uplift
-    grain = _num(cfg.get("uplift_grain_kcal")) or 1.0
-    capped = math.floor(payable / grain) * grain
-    out["provenance"] += (
-        f"; lifting uplift capped {int(round(uplift))} -> {int(capped)} kcal: each rest day can pay {room:.0f} kcal before "
-        f"carbohydrate falls under its {carb_floor:g} g floor (training_day.payback_rule)"
-    )
-    return capped
-
-
 def plan_block(date: str, disruption: Optional[Dict[str, Any]] = None, calendar: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """The plan's `training_day_fuel` (#5101, owner-only). With a typed `calendar` (`training.training_calendar`,
     #5191) the date is lifting/rest/travel and the block carries the typed week (`week_days`, `week_mean_kcal`), whose
-    mean is the base target while `week_balance_held`. Without one (the Hevy record or the count unread) a non-travel
+    mean is the base plus the lifting uplift spread over the week (no rest-day payback, owner ruling 2026-10-23); `week_balance_held`
+    says no day of it sits under its base. Without one (the Hevy record or the count unread) a non-travel
     date is `unknown` at the base target plus `if_lifting_day` / `if_rest_day`, stated as conditional."""
     planned = (calendar or {}).get("planned_dates")
     if planned is not None:
