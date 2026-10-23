@@ -100,9 +100,10 @@ HEAD_CLOSE = "</head>"
 
 def iter_html_files(root: str):
     for dirpath, dirnames, filenames in os.walk(root):
-        # prune the frozen legacy tree
-        dirnames[:] = [d for d in dirnames if not (dirpath == root and d == "legacy")]
-        if os.sep + "legacy" + os.sep in dirpath + os.sep:
+        # prune the frozen legacy tree and the reference copies of replaced layouts
+        # (site/reference/<date>-<slug>/, #4588: kept as they were last served, never rebuilt)
+        dirnames[:] = [d for d in dirnames if not (dirpath == root and d in ("legacy", "reference"))]
+        if os.sep + "legacy" + os.sep in dirpath + os.sep or os.sep + "reference" + os.sep in dirpath + os.sep:
             continue
         for name in sorted(filenames):
             if name.endswith(".html"):
@@ -241,6 +242,21 @@ def rewrite(html: str, self_path: str | None = None):
     html = new_html
 
     return html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted, lf_changed, head_changed, gloss_changed
+
+
+# #4588: a page built from the living-front-page kit (`<body data-ck-page="...">`, the
+# /next/v8/ pages and, after the cut-over, `/`, `/start/`, `/story/`, `/coaches/`) is
+# hand-authored and carries none of the v4 chrome or proof blocks. A v4 generator that
+# would overwrite or inject into one of those files asks this first and leaves it alone.
+KIT_PAGE_MARK = 'data-ck-page="'
+
+
+def is_kit_page(path) -> bool:
+    """True when the file at `path` exists and is a kit page (#4588)."""
+    if not os.path.isfile(path):
+        return False
+    with open(path, encoding="utf-8") as fh:
+        return KIT_PAGE_MARK in fh.read()
 
 
 def write_page(path, html: str) -> str:

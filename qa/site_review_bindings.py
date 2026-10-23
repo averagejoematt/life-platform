@@ -98,25 +98,50 @@ _EVIDENCE_INTENT = {
 # Order = the narrative walk order the skill uses. door ∈ {home,cockpit,story,evidence}.
 PAGE_BINDINGS = [
     {
+        # #4588 cut-over: the kit front page (site/assets/js/ck_pages.js, data-ck-page="front") reads
+        # /api/edition; the v5 home's /api/journey + /api/character reads moved with it to the
+        # reference copy, which is out of the review. The front page's weight and level come from
+        # the edition wire (today's weigh-in and the sheet block), so the cross-page check still
+        # sees the front page beside the cockpit's /api/snapshot.
         "path": "/",
-        "name": "Home (constellation)",
+        "name": "Home (the dated edition)",
         "door": "home",
         "narrative_order": 1,
-        "story_intent": "the hook: an ordinary life, rebuilt with AI, measured in public",
-        "endpoints": [  # site/assets/js/story.js header
+        "story_intent": "the hook: a dated edition of one man's public weight-loss experiment, with AI coaches whose every call is graded",
+        "endpoints": [
             {
-                "url": "/api/journey",
+                "url": "/api/edition",
                 "role": "primary",
                 "metrics": [
-                    {"name": "current_weight_lbs", "path": "journey.current_weight_lbs"},
-                    {"name": "lost_lbs", "path": "journey.lost_lbs"},
-                    {"name": "progress_pct", "path": "journey.progress_pct"},
+                    {"name": "current_weight_lbs", "path": "blocks.today.data.weight_lbs"},
+                    {"name": "level", "path": "blocks.sheet.data.character.level"},
                 ],
             },
-            {"url": "/api/character", "role": "primary", "metrics": [{"name": "level", "path": "character.level"}]},
-            {"url": "/api/journey_waveform", "role": "secondary", "metrics": []},
-            {"url": "/api/field_notes", "role": "secondary", "metrics": []},
-            {"url": "/public_stats.json", "role": "secondary", "metrics": []},
+        ],
+    },
+    {
+        "path": "/start/",
+        "name": "Start here",
+        "door": "home",
+        "narrative_order": 101,  # #4588: one tap from the front page; after the v5 order, which is unchanged
+        "story_intent": "the story in two minutes: who he is, what has happened so far, what is open now",
+        "endpoints": [
+            {"url": "/api/edition", "role": "primary", "metrics": []},
+            {"url": "/journal/posts.json", "role": "secondary", "metrics": []},
+            {"url": "/api/timeline", "role": "secondary", "metrics": []},
+        ],
+    },
+    {
+        "path": "/coaches/",
+        "name": "The AI coaches",
+        "door": "home",
+        "narrative_order": 102,  # #4588: one tap from the front page
+        "story_intent": "the coaches' graded record beside a simple guess, the team, one hit and one miss, this week's bet",
+        "endpoints": [
+            {"url": "/api/edition", "role": "primary", "metrics": []},
+            {"url": "/api/coaches", "role": "secondary", "metrics": []},
+            {"url": "/api/coach_docket", "role": "secondary", "metrics": []},
+            {"url": "/api/calls", "role": "secondary", "metrics": []},
         ],
     },
     {
@@ -148,15 +173,16 @@ PAGE_BINDINGS = [
         ],
     },
     {
+        # #4588 cut-over: /story/ is the kit story page (ck_pages.js, data-ck-page="story"): the latest
+        # chapter and its podcast, then every chapter. The v4 hub's reads live on the reference copy.
         "path": "/story/",
-        "name": "Story hub",
+        "name": "Story (the chapters)",
         "door": "story",
         "narrative_order": 3,
-        "story_intent": "the honest arc — chronicle, lab notes, coaches, panel, journal",
-        "endpoints": [  # site/assets/js/dispatches.js SECTIONS
-            {"url": "/chronicle/posts.json", "role": "primary", "metrics": []},
-            {"url": "/api/field_notes", "role": "primary", "metrics": []},
-            {"url": "/api/coaches", "role": "primary", "metrics": []},
+        "story_intent": "the narration: the latest weekly chapter and its podcast, then every chapter in order",
+        "endpoints": [
+            {"url": "/api/edition", "role": "primary", "metrics": []},
+            {"url": "/journal/posts.json", "role": "primary", "metrics": []},
             {"url": "/panelcast/episodes.json", "role": "secondary", "metrics": []},
             {"url": "/podcast/episodes.json", "role": "secondary", "metrics": []},  # #1121 per-article read-aloud join
             {"url": "/journal/posts.json", "role": "secondary", "metrics": []},

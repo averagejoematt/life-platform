@@ -205,46 +205,44 @@ def _essay_rows():
 _CURATED = [
     {
         "path": "/",
-        # #1469 (variant A "the loop, drawn live"): the fold is now the loop dial —
-        # a code-drawn SVG with the four door stations + the live day counter at the
-        # hub; the constellation moved below the fold but keeps its section (and these
-        # constellation checks stay true of the page).
-        "name": "Home (loop dial)",
-        # #4182 M4: the newcomer-comprehension judge's ground truth for this door —
-        # from docs/SITE_MAP_AND_INTENT.md's "front door" role + SITE_TRANSFORMATION_V6.md
-        # §5's reader-model amendment. ≤30 words, asserted by tests/test_qa_manifest.py.
+        # #4588 cut-over: the kit page from /next/v8/ placed at its live path (epic #4580).
+        # Hand-authored, rendered by ck_pages.js from /api/edition; no v4 static core (the v4
+        # generators leave a kit page alone, scripts/v4_apply_chrome.py::is_kit_page). Its height
+        # and axe budget is tests/kit_page_gate.py on the /next/v8/ original.
+        "name": "Home (the dated edition)",
         "intent": (
-            "The front door: introduces Matthew's public weight-loss experiment and its AI "
-            "coaches, then routes a newcomer into one of three doors — the numbers, the "
-            "coaches, or the story."
+            "The front door: a dated daily edition of one man's public weight-loss experiment — this week's "
+            "chapter, today's weight and the AI coaches' lines — with depth one tap away."
         ),
-        "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
-        # /api/journal_quotes (#1568): the weekly featured line — the beat is dormant
-        # (hidden) without a featured quote, but the endpoint must stay healthy.
-        "api_deps": ["/api/journey", "/api/character", "/api/journal_quotes"],
-        "js_modules": ["home.js"],
+        "api_deps": ["/api/edition"],
+        "js_modules": ["ck_pages.js"],
         "visual": {
-            "wait_for": ".constellation svg",
+            "wait_for": "main.ck-main",
             "checks": [
-                {
-                    "selector": ".loop-dial .st",
-                    "min_count": 4,
-                    "desc": "the 4 loop-dial stations drawn in the fold (#1469)",
-                },
-                {
-                    "selector": ".constellation svg a, .constellation svg .node",
-                    "min_count": 7,
-                    "desc": "7 pillar nodes drawn in the constellation",
-                },
-                {
-                    "selector": "a[href='/cockpit/'], a[href='/story/'], a[href='/data/']",
-                    "min_count": 2,
-                    "desc": "the three door links present",
-                },
+                {"selector": "a.ck-newhere", "min_count": 1, "desc": "the pinned New here? door"},
+                {"selector": "main.ck-main .ck-section", "min_count": 6, "desc": "the edition's sections"},
             ],
-            "charts": [".constellation svg"],
+        },
+    },
+    {
+        "path": "/start/",
+        # #4588 cut-over: the kit page from /next/v8/start/ placed at its live path (epic #4580).
+        # Hand-authored, rendered by ck_pages.js from /api/edition; no v4 static core (the v4
+        # generators leave a kit page alone, scripts/v4_apply_chrome.py::is_kit_page). Its height
+        # and axe budget is tests/kit_page_gate.py on the /next/v8/ original.
+        "name": "Start here",
+        "intent": ("The story in two minutes: who Matthew is, what has happened so far in the experiment, " "and what is open now."),
+        "tier": 2,  # a page one tap from the front door, not a door (tier 1 is the six doors)
+        "content_class": "live-data",
+        "api_deps": ["/api/edition", "/journal/posts.json", "/api/timeline"],
+        "js_modules": ["ck_pages.js"],
+        "visual": {
+            "wait_for": "main.ck-main",
+            "checks": [
+                {"selector": "main.ck-main .ck-section", "min_count": 5, "desc": "the start-here sections"},
+            ],
         },
     },
     {
@@ -285,28 +283,42 @@ _CURATED = [
     },
     {
         "path": "/story/",
-        "name": "Story hub",
-        # #4182 M4: comprehension-judge ground truth (docs/SITE_MAP_AND_INTENT.md "the human
-        # journey narrating the whole loop, week by week").
-        "intent": (
-            "The narration: a weekly AI-written chronicle of the whole experiment, plus "
-            "Matthew's own journal. A reader clicks into the latest write-up to read what "
-            "happened this week."
-        ),
-        "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
+        # #4588 cut-over: the kit page from /next/v8/story/ placed at its live path (epic #4580).
+        # Hand-authored, rendered by ck_pages.js from /api/edition; no v4 static core (the v4
+        # generators leave a kit page alone, scripts/v4_apply_chrome.py::is_kit_page). Its height
+        # and axe budget is tests/kit_page_gate.py on the /next/v8/ original.
+        "name": "Story (the chapters)",
+        "intent": ("The narration: the latest weekly chapter and its podcast, then every chapter in order."),
         "tier": 1,
-        "content_class": "narrative",
-        "api_deps": ["/journal/posts.json"],
-        "js_modules": ["story.js"],
+        "content_class": "live-data",
+        "api_deps": ["/api/edition", "/journal/posts.json", "/panelcast/episodes.json"],
+        "js_modules": ["ck_pages.js"],
         "visual": {
-            "wait_for": "[data-dx-tabs], [data-dx-read]",
+            "wait_for": "main.ck-main",
             "checks": [
-                {
-                    "selector": "[data-dx-tabs], [data-dx-list]",
-                    "min_count": 1,
-                    "desc": "dispatches reader (chronicle/journal/lab-notes tabs) rendered",
-                },
-                {"selector": "a[href='/data/'], a[href='/cockpit/']", "min_count": 1, "desc": "door links present"},
+                {"selector": "#ck-chapter, #ck-chapters", "min_count": 2, "desc": "the latest chapter and the chapter list"},
+            ],
+        },
+    },
+    {
+        "path": "/coaches/",
+        # #4588 cut-over: the kit page from /next/v8/coaches/ placed at its live path (epic #4580).
+        # Hand-authored, rendered by ck_pages.js from /api/edition; no v4 static core (the v4
+        # generators leave a kit page alone, scripts/v4_apply_chrome.py::is_kit_page). Its height
+        # and axe budget is tests/kit_page_gate.py on the /next/v8/ original.
+        "name": "The AI coaches",
+        "intent": (
+            "The AI coaches: their graded record beside what a simple guess would have scored, the team, "
+            "one hit and one miss, and this week's bet."
+        ),
+        "tier": 2,  # a page one tap from the front door, not a door (tier 1 is the six doors)
+        "content_class": "live-data",
+        "api_deps": ["/api/edition", "/api/coaches", "/api/coach_docket", "/api/calls"],
+        "js_modules": ["ck_pages.js"],
+        "visual": {
+            "wait_for": "main.ck-main",
+            "checks": [
+                {"selector": "#ck-record-big, #ck-team, #ck-verdicts", "min_count": 3, "desc": "the record, the team and the verdicts"},
             ],
         },
     },
@@ -980,6 +992,11 @@ EXEMPT = {
     "/next/": "v7 preview subtree (#4182, plan §1b), noindex + unlinked from the live pages; struck at cut-over when the nine get real rows",
     "/kit/": "v8 kit specimen (#4581): the twelve components on one unlisted, noindex page — a build reference, not a reader page; scripts/check_css_tokens.py holds it to the kit rules",
     "/index.html": "the '/' entry covers it (directory index)",
+    "/reference/": (
+        "reference copies of layouts a cut-over replaced (#4588, owner ruling 2026-10-18): served, noindex, out of navigation, "
+        "listed under the appendix's Replaced layouts, kept byte-for-byte as last served (the last live sha is in each head comment); "
+        "never rebuilt by a generator (scripts/v4_apply_chrome.py prunes the tree) and never QA-swept"
+    ),
 }
 
 
