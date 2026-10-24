@@ -329,6 +329,16 @@ def _owner_word_records(status: dict[str, Any]) -> tuple[Any, Any]:
     return out[0], out[1]
 
 
+_DEFICIT_NOT_READ = object()
+
+
+def _event_inputs(target_date: str) -> tuple[dict[str, Any], Any]:
+    """#5146 — `mcp.plan_event_reads.read`, through this module's `_read` (one read-state rule, #4072)."""
+    from mcp.plan_event_reads import read
+
+    return read(target_date, _read)
+
+
 def _training_memory_constraints() -> list[dict[str, Any]]:
     """Standing training constraints written from chat (the RDL gate, a toe flag, a back
     flag — #4077) via `write_platform_memory(category='training')`. Read through the SAME
@@ -715,6 +725,7 @@ def tool_plan_next_session(args):
         status["pain_dismissals"] = st(ABSENT, "no owner dismissal on file")
 
     deload_records, disruption_records = _owner_word_records(status)
+    event_inputs, deficit_raw = _event_inputs(target_date)  # #5146: sick days + the deficit band, for the deload recommendation
 
     # #5082: the steps ramp's base — the resolver's trailing window; the ramp itself is computed in the engine
     steps_window, status["steps_window"] = _read("steps_window", _steps_window, target_date)
@@ -851,6 +862,7 @@ def tool_plan_next_session(args):
         recent_aerobic=recent_aerobic,
         loss_rate=loss_rate,
         steps_window=steps_window,
+        event_inputs=event_inputs,
         input_status=status,
     )
     _merge_walking_volume(block, walk_layer)
@@ -887,7 +899,10 @@ def tool_plan_next_session(args):
     # surface the owner reads — the same block get_deficit_sustainability carries, built by
     # the same resolver, so the two surfaces cannot disagree. Owner-only (MCP), never a site
     # or email surface.
-    out["nutrition_critics"] = _safe(_nutrition_critics_block) or {"error": "nutrition critics could not be built", "verdicts": []}
+    out["nutrition_critics"] = _safe(_nutrition_critics_block, deficit_raw) or {
+        "error": "nutrition critics could not be built",
+        "verdicts": [],
+    }
     # #4503 OD6: between DXA scans, Body Scan 2 is the lean/regional trend — labelled bioimpedance, never the DXA anchor
     out["between_dxa_lean"] = _safe(_between_dxa_lean, target_date, dxa, status["dxa_scans"]["state"]) or {"state": "read_failed"}
     attach_coach_context(out, target_date, constraint_block=block, packet_reason=PACKET_NOT_REREAD)  # #5071/#5200
@@ -917,14 +932,17 @@ def tool_plan_next_session(args):
     return out
 
 
-def _nutrition_critics_block() -> dict[str, Any]:
+def _nutrition_critics_block(pre_read: Any = _DEFICIT_NOT_READ) -> dict[str, Any]:
     """The #3754 block from `get_deficit_sustainability` (one call, its own window ending on the
     latest COMPLETE nutrition day). When that tool refuses (fewer than 7 logged days) the
-    resolver still runs, with the deficit tool's own severity named unknown."""
+    resolver still runs, with the deficit tool's own severity named unknown. `pre_read` is stage 1's
+    own call of the tool (`_event_inputs`, #5146) — reused, so the plan calls the tool once."""
     from mcp import nutrition_critics_inputs
     from mcp.tools_nutrition import _nutrition_through_date, tool_get_deficit_sustainability
 
-    res = _safe(tool_get_deficit_sustainability, {"critics_model": False})  # #5114: no narrative on the plan surface
+    res = pre_read
+    if res is _DEFICIT_NOT_READ:
+        res = _safe(tool_get_deficit_sustainability, {"critics_model": False})  # #5114: no narrative on the plan surface
     if isinstance(res, dict) and isinstance(res.get("critics"), dict):
         block = dict(res["critics"])
         block["via"] = "get_deficit_sustainability"

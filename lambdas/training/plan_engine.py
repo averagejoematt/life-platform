@@ -727,31 +727,6 @@ def _scheduled_session(
     return out
 
 
-def _deload_recommendation(
-    session: dict[str, Any],
-    date: str,
-    deload_records: list[dict[str, Any]] | None,
-    fatigue: dict[str, Any] | None,
-    readiness_low_streak_days: int | None,
-    tripwires: list[dict[str, Any]],
-    states: dict[str, Any] | None,
-) -> dict[str, Any]:
-    """`constraint_block.deload_recommendation` (#5070): the signals that argue for a deload and whether the owner's
-    recorded word applies one today. NEVER an applied set cut by itself. Pain notes count only while the flag is
-    tripped (a dismissed site is the owner's word that it is resolved). An unreadable record store is stated."""
-    pain = next((t for t in tripwires if t["id"] == "pain_flag_named_site" and t["state"] == "tripped"), None)
-    rec = deload_word.recommendation(
-        day=date,
-        records=deload_records,
-        fatigue=fatigue,
-        readiness_low_streak_days=readiness_low_streak_days,
-        pain_note_sites=[str(x) for x in ((pain or {}).get("observed") or [])],
-    )
-    rec["records_state"] = ((states or {}).get("deload_records") or {}).get("state")
-    session["deload_recommendation"] = rec  # also stamped on the served session
-    return rec
-
-
 def _effort_blocks(
     date: str, rows: Any, catalog_movements: Any, states: dict[str, dict[str, Any]], dis_records: Any, block_workouts: Any = None
 ) -> dict[str, Any]:
@@ -891,6 +866,14 @@ def _rate_target(
     )
 
 
+def _accessory_rotation(date: str, window_start: str | None, rows: Any, block_workouts: Any) -> dict[str, Any]:
+    """`constraint_block.accessory_rotation` (#3755), extracted for the #4880 function-length ratchet (#5146)."""
+    boundaries = _block_boundaries(block_workouts, date)
+    return program_structure.accessory_rotation(
+        window_start=window_start or date, window_end=date, hevy_workouts=rows, block_boundaries=boundaries
+    )
+
+
 def constraint_block(
     *,
     date: str,
@@ -930,6 +913,7 @@ def constraint_block(
     loss_rate: dict[str, Any] | None = None,
     guidance_cap_lb_wk: float | None = None,  # #5074: the owner clinical record's rate cap — outranks the charter band
     steps_window: dict[str, Any] | None = None,
+    event_inputs: dict[str, Any] | None = None,  # #5146: {sick_days, deficit, status} — deload_word.event_signals' reads
 ) -> dict[str, Any]:
     """The deterministic inputs to tomorrow's session. No model, no I/O, no hidden state.
 
@@ -1017,16 +1001,12 @@ def constraint_block(
     # record knows what was actually done. The rows are injected (`mcp.tools_plan` reads them) so this function stays
     # pure, and an unreadable window reports `unknown`, never `ok`.
     program = program_structure.summary()
-    rotation = program_structure.accessory_rotation(
-        window_start=rotation_window_start or date,
-        window_end=date,
-        hevy_workouts=hevy_workouts_rotation_window,
-        block_boundaries=_block_boundaries(block_workouts, date),
-    )
+    rotation = _accessory_rotation(date, rotation_window_start, hevy_workouts_rotation_window, block_workouts)
 
     session = _scheduled_session(date, catalog_movements, skill_ceiling, block_workouts, deload_records, weight_lb, pain_flag_instances)
-    # #5070: signals recommend, the owner's recorded word applies — one block, also stamped on the served session
-    deload_rec = _deload_recommendation(session, date, deload_records, fatigue, readiness_low_streak_days, tripwires, states)
+    # #5070: signals recommend, the owner's recorded word applies — one block, also stamped on the served session;
+    # #5146: the event signals (sick days, the deficit band, the charter travel windows) are reasons on it too
+    deload_rec = deload_word.for_plan(session, date, deload_records, fatigue, readiness_low_streak_days, tripwires, states, event_inputs)
 
     return {
         "engine_version": ENGINE_VERSION,
