@@ -474,7 +474,9 @@ This list should be SCREENSHOT-ABLE. Someone should be able to walk into Met Mar
 - Greatest Hits cards: same but with a subtle left border in #4cc9f0
 - Grocery list: clean, readable, with section emoji headers. NO checkboxes — just clean text with bullet points
 - The Wildcard: a standout card with left border #f59e0b and slightly different background
-- Keep total length ~1200-1800 words. Readable in 5 minutes.
+- Keep total length ~900-1300 words. Readable in 4 minutes. Finish all 5 sections and the footer — a short complete edition beats a long one cut off mid-list.
+- Put inline styles on the section and card containers only; never repeat a style attribute on every <p>, <span> or <li> inside them.
+- Every calorie figure you print labels ONE serving, meal or snack: write it on the same line as that label (e.g. "Snack — 150 cal · 25g P / 8g C / 0g F", "Per serving: 465 cal · 48P / 22C / 18F"). Never pair a per-item figure with "a day", "daily" or "today".
 - No <html>/<head>/<body> tags — just the content divs.
 - Mobile-friendly: max-width 600px, centered.
 - Footer: "The Weekly Plate · Life Platform · Friday Edition"
@@ -527,6 +529,15 @@ def build_system_prompt(profile, withings_data):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+# #5297: 4096 truncated 5 of 5 editions (2026-09-26 -> 10-24, every one output_tokens=4096). The
+# prompt's own former 1,200-1,800 words of inline-styled HTML measures ~15.8 chars a visible word
+# (tests/fixtures/weekly_plate_5297), i.e. ~5,400-9,500 output tokens; 4096 held ~800 words, three
+# sections. The prompt is now bounded to ~900-1,300 words with styles on containers only, and the cap
+# leaves headroom over that. Timing: the five truncated calls ran 34-47 s for 4096 tokens (87-120
+# tok/s), so a full 8192 at the slowest rate is ~94 s, inside the Lambda's 120 s timeout.
+MAX_OUTPUT_TOKENS = 8192
+
+
 def call_anthropic(system_prompt, user_message):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
     from common import retry_utils
@@ -540,7 +551,7 @@ def call_anthropic(system_prompt, user_message):
     # against a measured CacheRead > 0.
     return retry_utils.call_anthropic_api(
         prompt=user_message,
-        max_tokens=4096,
+        max_tokens=MAX_OUTPUT_TOKENS,
         system=system_prompt,
         temperature=0.6,
         timeout=120,

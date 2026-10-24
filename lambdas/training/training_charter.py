@@ -90,6 +90,7 @@ PUBLISHED_WHITELIST: tuple[str, ...] = (
     "nutrition.eating_window.eating_hours",
     "nutrition.eating_window.fasting_hours",
     "nutrition.eating_window.rule",
+    "nutrition.calories.planned_minimum_any_weight_kcal",  # #5297: the minimum the AI-3 low-calorie fallback names in an email (a floor, nothing private)
 )
 
 _CACHE_TTL_SECONDS = 900  # the platform's 15-min config-cache convention
