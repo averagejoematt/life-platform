@@ -145,7 +145,7 @@ GET_EXERCISE_NOTES_INPUT = {
         "template": {"type": "string", "enum": ["travel", "busy"], "description": "action='disruption': travel or busy."},
         "maintenance_kcal": {
             "type": "integer",
-            "description": "action='travel_kit': the maintenance week's calorie target, when known (#5107); sizes the maintenance-week day.",
+            "description": "action='travel_kit': the maintenance week's calorie target; sizes the maintenance-week day. Omitted: #5107's own maintenance estimate (the expenditure reconciliation's actionable best match).",
         },
         "trip_days": {
             "type": "integer",

@@ -298,6 +298,24 @@ def test_the_mcp_action_serves_the_kit_and_refuses_a_bad_argument(monkeypatch):
     assert "error" in ttn.tool_get_exercise_notes({"action": "travel_kit", "trip_days": -1})
 
 
+def test_the_mcp_action_reads_the_5107_maintenance_estimate_when_no_argument_is_given(monkeypatch):
+    """#5107 is on main: with no `maintenance_kcal` the kit sizes the maintenance day from health.maintenance_week's own
+    estimate over the expenditure reconciliation; a non-actionable estimate leaves maintenance_pending with its reason."""
+    from mcp import tools_nutrition, tools_training_notes as ttn
+
+    kcal = _resolved()
+    monkeypatch.setattr(calorie_target, "resolve", lambda day, **kw: {"kcal": kcal, "source": "charter", "day_type": kw.get("day_type")})
+    rec = {"best_match": "model_measured", "best_match_actionable": True, "models": {"model_measured": {"kcal": 2400.4}}}
+    monkeypatch.setattr(tools_nutrition, "expenditure_reconciliation", lambda end_date, **kw: rec)
+    out = ttn.tool_get_exercise_notes({"action": "travel_kit"})
+    assert out["menu_day"] == "maintenance-week day" and out["maintenance_pending"] is None
+    assert out["maintenance_estimate"]["kcal"] == 2400 and "5107" in out["maintenance_estimate"]["source"]
+    rec = {"best_match": "model_measured", "best_match_actionable": False, "models": {"model_measured": {"kcal": 2400}}}
+    monkeypatch.setattr(tools_nutrition, "expenditure_reconciliation", lambda end_date, **kw: rec)
+    out = ttn.tool_get_exercise_notes({"action": "travel_kit"})
+    assert out["days"]["maintenance"] is None and "provisional" in out["maintenance_pending"]
+
+
 # ── 8. owner-only ───────────────────────────────────────────────────────────────────────────────────────────
 def test_no_published_or_email_module_imports_the_kit():
     pat = re.compile(r"\btravel_food\b")

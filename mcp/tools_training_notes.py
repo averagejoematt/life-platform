@@ -622,9 +622,14 @@ def _positive_int(v, name: str):
 
 def _travel_kit(args=None):
     """action='travel_kit' (#5104, OWNER-ONLY READ) — the travel food kit: the day plan at today's resolved travel-day
-    target (and at `maintenance_kcal` when given: the trip is a planned maintenance week), the grocery list, the packing
-    list and the hotel/restaurant playbook, all built by `health.travel_food` from the charter. Nothing is written."""
-    from health import calorie_target, travel_food
+    target (and at the maintenance-week target: the trip is a planned maintenance week), the grocery list, the packing
+    list and the hotel/restaurant playbook, all built by `health.travel_food` from the charter. The maintenance target is
+    `maintenance_kcal` when given, else #5107's own estimate (`health.maintenance_week.estimate` over
+    `tools_nutrition.expenditure_reconciliation`, the seam the titration leg reads); an estimate that is not actionable
+    leaves the kit's `maintenance_pending` with the reason. Nothing is written."""
+    from health import calorie_target, maintenance_week, travel_food
+
+    from mcp import tools_nutrition
 
     args = args or {}
     maint, err = _positive_int(args.get("maintenance_kcal"), "maintenance_kcal")
@@ -633,7 +638,16 @@ def _travel_kit(args=None):
         return {"error": err or err2}
     today = pacific_now().date().isoformat()
     target = calorie_target.resolve(today, day_type="travel")
+    if maint is not None:
+        source = {"source": "argument", "kcal": maint}
+    else:
+        est = maintenance_week.estimate(tools_nutrition.expenditure_reconciliation(today))
+        maint = est.get("kcal")
+        source = {"source": "health.maintenance_week.estimate (#5107)", **est}
     kit = travel_food.build(target.get("kcal"), maintenance_kcal=maint, days=days)
+    if maint is None and source.get("reason"):
+        kit["maintenance_pending"] = f"no actionable maintenance estimate (#5107): {source['reason']}"
+    kit["maintenance_estimate"] = source
     kit["calorie_target"] = {k: target.get(k) for k in ("kcal", "source", "provenance", "day_type")}
     kit["reminder"] = travel_food.calibration_row(today)
     return kit

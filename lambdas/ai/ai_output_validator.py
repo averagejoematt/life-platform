@@ -29,7 +29,7 @@ VALIDATION TIERS:
     BLOCK  — output is replaced with safe_fallback. Used for:
              - Empty/None output (Lambda crash protection)
              - Dangerous exercise recs with red recovery (injury risk)
-             - Severely dangerous caloric guidance (< 800 kcal)
+             - Severely dangerous caloric guidance (a 100-799 daily figure)
              - Output clearly truncated mid-sentence
 
     WARN   — output used as-is, warning logged. Used for:
@@ -52,6 +52,7 @@ v1.1.0 — 2026-03-13 (TB7-19: hallucinated data reference detection)
 v1.0.0 — 2026-03-08 (AI-3)
 """
 
+import html
 import logging
 import re
 from dataclasses import dataclass, field
@@ -159,6 +160,17 @@ _MACRO_BREAKDOWN_TOKENS = {
     "fat": re.compile(r"\b\d{1,3}\s*g?\s*(?:F|fat)\b", re.IGNORECASE),
 }
 
+# #5297 — meal / snack level labelling. A Weekly Plate card reads "Snack — 150 cal"
+# or "Your lunch anchor: 180 cal": the figure names ONE meal, snack or dish, never a
+# day. At the owner's ~1,500 kcal target every meal-sized figure is a 100-799 number,
+# so without this every edition was blocked (5 of 5 editions 2026-09-26 -> 10-24).
+# Trusted only inside the figure's own SEGMENT (one line / sentence of the plain
+# text), so a "Dinner" heading cannot launder a bare figure on the next line, and a
+# per-DAY framing in the window (below) still overrides it.
+_MEAL_LEVEL_CONTEXT = [
+    r"\b(?:breakfast|brunch|lunch|dinner|supper|snacks?|meals?|sides?|dessert|dish|recipe|servings?|portions?|macros?)\b",
+]
+
 # A per-DAY framing always wins over the labelling signals above: "500 cal a day
 # (40P/30C/10F)" is a starvation target no matter how it is annotated.
 _DAILY_INTAKE_CONTEXT = [
@@ -174,11 +186,34 @@ _DAILY_INTAKE_CONTEXT = [
     r"\btotal\s+(?:daily\s+)?(?:intake|calories)\b",
 ]
 
+# #5297: the day framings a meal plan uses — "600 cal on rest days", "all day", "across
+# your meals", "in total". Read in the figure's own SEGMENT (not the window above, so a
+# neighbouring card's words cannot block a labelled figure), and they override the meal
+# signal: a meal noun cannot buy a day's total.
+_DAY_FRAMING_IN_SEGMENT = [
+    r"\b(?:rest|training|lifting|off|workout|cardio|fasting|refeed)\s+days?\b",
+    r"\b(?:all|whole|entire)\s+day\b",
+    r"\bacross\s+(?:the|your|all|every)\b",
+    r"\bin\s+total\b",
+    r"\bcombined\b",
+]
+
 # How far either side of the figure we look for that context.
 _CALORIE_CONTEXT_WINDOW = 80
 
-# Segment boundary for the macro-breakdown signal: an HTML tag or a sentence end.
-_SEGMENT_BOUNDARY_RE = re.compile(r"<[^>]{0,200}>|(?<=[.!?;])\s")
+# Segment boundary for the macro-breakdown and meal signals: a line break (a block
+# element, once the HTML is flattened by _calorie_check_text), an HTML tag, or a
+# sentence end.
+_SEGMENT_BOUNDARY_RE = re.compile(r"\n|<[^>]{0,200}>|(?<=[.!?;])\s")
+
+# #5297 — Check 5 reads the PLAIN TEXT of the output. Segmenting on every HTML tag split
+# "<span>465 cal</span> · <span>48g</span> P · <span>22g</span> C" into one segment per
+# span, so a recipe card that DID print its macros still read as a bare figure. Block
+# elements become line breaks (one card line = one segment); inline tags are dropped.
+_BLOCK_TAG_RE = re.compile(
+    r"</?(?:div|p|br|li|ul|ol|h[1-6]|tr|td|th|table|section|article|header|footer|blockquote|hr)\b[^>]{0,400}>", re.I
+)
+_ANY_TAG_RE = re.compile(r"<[^>]{0,400}>")
 
 _SUPPLEMENT_OVERDOSE_PATTERNS = {
     # Supplement name → (safe_max_per_day, unit_pattern)
@@ -369,26 +404,25 @@ def validate_ai_output(
 
     # ── Check 5: Dangerously low calorie suggestions (BLOCK) ──────────────────
     if output_type in (AIOutputType.NUTRITION_COACH, AIOutputType.GUIDANCE, AIOutputType.BOD_COACHING):
-        low_cal_found = _find_patterns(stripped, _DANGEROUS_CALORIE_PHRASES)
+        cal_text = _calorie_check_text(stripped)  # #5297: plain text, one card line per segment
+        low_cal_found = _find_patterns(cal_text, _DANGEROUS_CALORIE_PHRASES)
         if low_cal_found:
             # Extract any actual calorie numbers to confirm (avoid false positives on "800 cal deficit")
             blocked_cals = []
-            for _cal_match in _LOW_CALORIE_FIGURE_RE.finditer(stripped):
+            for _cal_match in _LOW_CALORIE_FIGURE_RE.finditer(cal_text):
                 cal = _cal_match.group(1)
-                # Only block if the number is < 800 and not clearly about deficit/restriction context
-                if int(cal) >= 800 or re.search(rf"{cal}.*(?:deficit|below)", stripped, re.IGNORECASE):
+                # Only block if the number is under the regex's 100-799 band and not clearly about deficit/restriction context
+                if int(cal) >= 800 or re.search(rf"{cal}.*(?:deficit|below)", cal_text, re.IGNORECASE):
                     continue
                 # #2215: a per-serving recipe macro labels ONE dish, not a day's intake.
-                if _is_per_item_calorie_figure(stripped, _cal_match):
+                # #5297: so does a meal / snack label in the figure's own segment.
+                if _is_per_item_calorie_figure(cal_text, _cal_match):
                     continue
                 blocked_cals.append(cal)
             if blocked_cals:
                 result.blocked = True
                 result.block_reason = f"Dangerously low calorie recommendation: {blocked_cals} kcal"
-                result.safe_fallback = (
-                    "⚠️ Calorie guidance review needed. Target minimum: 1,200 kcal/day. "
-                    "Consult your nutritionist if you're uncertain about your calorie target."
-                )
+                result.safe_fallback = _low_calorie_fallback()
                 logger.error("[ai_validator] BLOCKED low-cal rec: %s", blocked_cals)
                 return result
 
@@ -482,11 +516,47 @@ def _is_per_item_calorie_figure(text: str, match: re.Match) -> bool:
     window = text[max(0, match.start() - _CALORIE_CONTEXT_WINDOW) : match.end() + _CALORIE_CONTEXT_WINDOW]
     if _find_patterns(window, _DAILY_INTAKE_CONTEXT):
         return False
+    segment = _enclosing_segment(text, match)
+    if _find_patterns(segment, _DAY_FRAMING_IN_SEGMENT):  # #5297
+        return False
     if _find_patterns(window, _PER_ITEM_CALORIE_CONTEXT):
         return True
-    segment = _enclosing_segment(text, match)
+    if _find_patterns(segment, _MEAL_LEVEL_CONTEXT):  # #5297: "Snack — 150 cal", "Dinner: 465 cal"
+        return True
     macro_classes = sum(1 for token in _MACRO_BREAKDOWN_TOKENS.values() if token.search(segment))
     return macro_classes >= 2
+
+
+def _calorie_check_text(text: str) -> str:
+    """#5297 — the plain text Check 5 reads: block elements become line breaks, inline
+    tags vanish, entities are decoded. Plain prose passes through unchanged."""
+    if "<" not in text:
+        return text
+    flat = _BLOCK_TAG_RE.sub("\n", text)
+    flat = _ANY_TAG_RE.sub("", flat)
+    return html.unescape(flat)
+
+
+def _planned_minimum_kcal() -> Optional[int]:
+    """#5297 — the charter's planned minimum (``nutrition.calories.planned_minimum_any_weight_kcal``),
+    read from the PUBLIC view (this fallback is shown in emails). None when unreadable."""
+    try:
+        from training import training_charter
+
+        cal = training_charter.public_view().get("nutrition", {}).get("calories", {})
+        value = cal.get("planned_minimum_any_weight_kcal")
+        return int(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+    except Exception as exc:  # fail soft: the block still holds, only the number is dropped
+        logger.warning("[ai_validator] charter planned minimum unreadable: %s", exc)
+        return None
+
+
+def _low_calorie_fallback() -> str:
+    """The Check 5 fallback. Its minimum is the charter's, never a literal here (#5297: the
+    hard-coded figure contradicted the charter's floor for weeks)."""
+    minimum = _planned_minimum_kcal()
+    floor_line = f"Planned minimum: {minimum:,} kcal/day. " if minimum else ""
+    return f"⚠️ Calorie guidance review needed. {floor_line}" "Consult your nutritionist if you're uncertain about your calorie target."
 
 
 def _enclosing_segment(text: str, match: re.Match) -> str:

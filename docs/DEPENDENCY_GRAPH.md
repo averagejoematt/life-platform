@@ -571,7 +571,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1365 total · 984 resolved · 381 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1366 total · 984 resolved · 382 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (108 lambdas total)
 - Alarms: 141 literal-named declarations across three idioms, 4 composite; routing digest 96 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 23 owner-only + 3 owner-published sources; 68 owner-only + 11 owner-published fields — non-default entries only

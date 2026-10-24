@@ -26,6 +26,7 @@ from training.walking_volume import WALKING_VOLUME_VERSION, walking_minutes_for_
 
 from health import (
     core_habits,  # #5124: THE core-12 calculation set
+    eating_window,  # #5099: THE eating window (charter nutrition.eating_window, 16:8)
     macro_floors,  # #5098: THE protein hit and the charter's range low
     protein_engine,
 )
@@ -196,6 +197,15 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
         parts.append(macro_score * 0.20)
         weights.append(0.20)
         details["macro_score"] = macro_score
+    # #5099: the 0.10 window slot grades the charter's eating window (16:8, owner ruling R2): every timed meal inside
+    # one eating_hours span = 100, a span past it = 0. An untimed day is unknown and drops out, never a miss.
+    window = eating_window.evaluate_day(mf.get("food_log"))
+    details["eating_window"] = window
+    if window["inside"] is not None:
+        window_score = 100 if window["inside"] else 0
+        parts.append(window_score * 0.10)
+        weights.append(0.10)
+        details["window_score"] = window_score
     if not weights:
         return None, details
     return clamp(round(sum(parts) / sum(weights))), details

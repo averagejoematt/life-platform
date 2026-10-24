@@ -44,6 +44,7 @@ from common.constants import (
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 from health import (  # #4244: THE food + supplements micronutrient join (shared with the public door)
     calorie_target,
+    maintenance_week,  # #5107: the planned maintenance week's line on the titration card
     nutrient_intake,
     protein_engine,
     titration,  # #5096: the weekly calorie titration decision (owner-only; this email is an owner surface)
@@ -113,6 +114,7 @@ except ImportError:
 from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
+from health import eating_window  # #5099: THE eating window, read through public_view
 from training.training_charter import public_view  # #5214 (a published surface reads the whitelist only, #5087)
 
 
@@ -549,6 +551,7 @@ def _render_board_prompt(calorie_target, protein_target_g):
 
     experts_text = "\n\n".join(expert_blocks)
     colors_text = "\n".join(color_rules)
+    eating_window_text = eating_window.published_text()  # #5099: the charter's window, at build time
 
     prompt = f"""You are the Saturday Nutrition Review panel for Matthew's Life Platform. You write a weekly email arriving Saturday morning before his grocery shopping trip to Metropolitan Market in Seattle.
 
@@ -579,7 +582,7 @@ Current supplementation vs genome gaps. Redundancies? Additions?
 2. Supplement entries in food_log: analyze for micros but exclude from meal analysis.
 3. Deduce meal names from ingredient clusters at same timestamp.
 4. He is actively losing weight. Be encouraging but honest about progress relative to his stage.
-5. Eating window ~11am-7pm (16:8). Don't suggest 7am breakfast.
+5. Eating window {eating_window_text}: every feeding fits inside it. Don't suggest a meal or snack that widens it.
 6. If previous week data provided, weave in light trending comparisons naturally.
 
 ## FORMAT
@@ -678,7 +681,7 @@ Current supplementation vs genome gaps. Redundancies? Additions?
 2. Supplement entries in food_log: analyze for micros but exclude from meal analysis.
 3. Deduce meal names from ingredient clusters at same timestamp.
 4. He is actively losing weight. Be encouraging but honest about progress relative to his stage.
-5. Eating window ~11am-7pm (16:8). Don't suggest 7am breakfast.
+5. Eating window {eating_window}: every feeding fits inside it. Don't suggest a meal or snack that widens it.
 6. If previous week data provided, weave in light trending comparisons naturally.
 
 ## FORMAT
@@ -893,6 +896,8 @@ def build_titration_html(today, read=None):
     step = int(rec.get("step_kcal") or 0)
     head = f"{rec.get('kcal')} kcal ({rec.get('action')}{f' {step:+d}' if step else ''})"
     detail = f'<div style="color:#9ca3af;font-size:11px;margin-top:4px;">{rec.get("detail")}</div>' if rec.get("detail") else ""
+    maint = maintenance_week.email_line(rec)  # #5107: the planned maintenance dates and any window grade, owner-only
+    detail += f'<div style="color:#e0e0e0;font-size:12px;margin-top:6px;">{maint}</div>' if maint else ""
     return (
         f'<div {style}><div style="font-size:12px;letter-spacing:1px;color:#9ca3af;font-weight:600;margin-bottom:6px;">'
         f"CALORIE TARGET · WEEK OF {week}</div>{head} — {rec.get('reason')}{detail}</div>"
@@ -1090,6 +1095,7 @@ def lambda_handler(event, context):
             calorie_target=cal_target,
             protein_target_g=pro_target,
             feeding_threshold_g=_feeding_threshold_text(),
+            eating_window=eating_window.published_text(),  # #5099
         )
 
     # P2: Dynamic journey context — panel must know stage for appropriate coaching

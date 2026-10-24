@@ -18,6 +18,7 @@ from common import (
 )
 from common.constants import PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
 from health import (
+    eating_window as eating_window_rule,  # #5099: THE eating window (charter nutrition.eating_window, via public_view)
     nutrient_intake,  # #4244: THE food + supplements micronutrient join (shared with the weekly review)
     nutrition_logging,  # #4185: THE days-logged / lag / stalled derivation (shared with the coach inputs)
     tdee as health_tdee,  # ADR-152 / #2310: THE one TDEE definition
@@ -399,7 +400,7 @@ def nutrition_overview(*, _g) -> dict:
                     "protein_distribution_score": None,
                     "per_day_window": [],
                     "time_distribution": [],
-                    "reference_window_hrs": 8,
+                    "reference_window_hrs": eating_window_rule.published_eating_hours(),  # #5099
                     "days_with_meal_times": 0,
                 },
                 "electrolytes": {
@@ -743,7 +744,7 @@ def nutrition_overview(*, _g) -> dict:
         "time_distribution": [
             {"hour": h, "protein_g": round(bucket_protein[h], 1), "calories": round(bucket_cal.get(h, 0))} for h in sorted(bucket_protein)
         ],
-        "reference_window_hrs": 8,  # the 16:8 reference (8h eating window)
+        "reference_window_hrs": eating_window_rule.published_eating_hours(),  # #5099: the charter's 16:8 window (None = unreadable)
         "days_with_meal_times": len(per_day_window),
     }
 
