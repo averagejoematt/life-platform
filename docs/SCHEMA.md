@@ -1919,7 +1919,7 @@ a re-run would version (no writes, no model calls).
 | `timezone` | User timezone string |
 | `day_grade_weights` | object | Per-component weights for day grade (sleep_quality, recovery, etc.) |
 | `mvp_habits` | list | Habit names tracked in MVP scorecard (legacy, superseded by habit_registry) |
-| `habit_registry` | map | 65-habit registry with tier/category/mechanism/synergy metadata (v2.47.0). Optional per-entry `habitify_names` (list): every name the habit has carried in Habitify — a renamed habit resolves through it, and a registry habit the day's Habitify row does not name is UNOBSERVED, never a miss (#4362, `scoring_engine.habitify_reading`). Optional per-entry `paused_since` (ISO date, #5007): from that day on the habit is NOT SCHEDULED (the `paused` source shape) — not a miss, not in the habit-reflection queue or the skipped-habits nag, out of scores, streaks and completion denominators, reported as `paused`; earlier days read as before. Set by `scripts/apply_habit_pause.py` (owner-run; Habitify is never edited); read via `common/habit_pause.py` |
+| `habit_registry` | map | 65-habit registry with tier/category/mechanism/synergy metadata (v2.47.0). Optional per-entry `habitify_names` (list): every name the habit has carried in Habitify — a renamed habit resolves through it, and a registry habit the day's Habitify row does not name is UNOBSERVED, never a miss (#4362, `scoring_engine.habitify_reading`). Optional per-entry `paused_since` (ISO date, #5007): from that day on the habit is NOT SCHEDULED (the `paused` source shape) — not a miss, not in the habit-reflection queue or the skipped-habits nag, out of scores, streaks and completion denominators, reported as `paused`; earlier days read as before. Set by `scripts/apply_habit_pause.py` (owner-run; Habitify is never edited); read via `common/habit_pause.py`. Optional per-entry `core` (string, #5124): the charter `habits.core` id this entry belongs to — the core-12 calculation set the habit score, the character sheet and the coaches read once any entry is flagged; every unflagged habit is retained and tracked, not scored. Set by `scripts/apply_habit_core_flags.py` (owner-run); read via `health/core_habits.py`; drift-checked by `scripts/check_habit_registry_drift.py` |
 | `weight_loss_phases` | list | Phase objects with start_lbs, end_lbs, weekly_target_lbs |
 | `demo_mode_rules` | object | Rules for demo/share sanitization (see below) |
 | `source_of_truth` | object | Per-domain SOT overrides (see below) |
@@ -2122,8 +2122,13 @@ One item per day. Written by the Daily Brief Lambda (v2.47.0+) after computing t
 | `vice_streaks` | map | Per-vice streak snapshot: `{"No Alcohol": 14, "<blocked habit>": 7, ...}` |
 | `synergy_groups` | map | Per-group completion %: `{"Sleep Stack": 0.8, "Morning Routine": 1.0, ...}` |
 | `missed_tier0` | list | Names of missed Tier 0 habits (for pattern detection) |
-| `composite_score` | number | Tier-weighted composite score (T0=3x, T1=1x, T2=0.5x) |
-| `scoring_method` | string | `tier_weighted_v1` — marks transition from binary scoring |
+| `composite_score` | number | Tier-weighted composite score (T0=3x, T1=1x, T2=0.5x); once the core-12 set is armed (#5124), the share of the day's KNOWN core habits done (0–100) |
+| `scoring_method` | string | `tier_weighted_v1` — marks transition from binary scoring; `core_set_v1` once the core-12 calculation set is armed (#5124: any registry entry carries a `core` flag) |
+| `core_done` / `core_known` / `core_total` | number | #5124, armed days only: core habits done, known (done + missed) and in the set (charter `habits.core`, `health.core_habits`) |
+| `core_pct` | number | #5124: `core_done / core_known` (0.0–1.0); absent when no core habit was known — the character sheet's mind habit compliance reads it on a `core_set_v1` day |
+| `core_status` | map | #5124: `{core_id: "done" \| "missed" \| "unknown"}` — ids, never habit names |
+| `missed_core` | list | #5124: the missed core habits' charter labels |
+| `core_charter_version` | string | #5124: the charter version the core set was read from |
 
 Queried by MCP tools: `get_habit_tier_report`, `get_vice_streak_history`.
 

@@ -655,7 +655,24 @@ def charter_goal_lines() -> str:
         f"- Training: {split.get('lifting_days_per_wk')} lifting days a week in the sequence {', '.join(split['sequence'])}, plus daily walking\n"
         f"- Key priorities: sleep quality, protein adherence (at or above the {lo:g} g floor on {days} of 7 days; range {lo:g}-{hi:g} g), "
         f"consistent movement ({steps['floor']:,} steps/day floor, {steps.get('target'):,} target)\n"
-        f"{wake_time_line()}"
+        f"{wake_time_line()}\n"
+        f"{core_habits_line()}"
+    )
+
+
+def core_habits_line() -> str:
+    """#5124: the daily coaches' standing habits line — the charter's core-12 calculation set (`habits.core`, read from
+    `public_view()`), the habits the habit score, the character sheet and the coaches' missed-habit lines read. Every
+    other habit is retained and tracked, never scored and never dropped. An unreadable set says so in words."""
+    from training import training_charter as tc  # noqa: PLC0415
+
+    core = (tc.public_view().get("habits") or {}).get("core") or []
+    labels = [str(e.get("label") or e.get("id")) for e in core if isinstance(e, dict) and (e.get("label") or e.get("id"))]
+    if not labels:
+        return "- Habits: the charter's core habit set could not be read; name no core habit from memory"
+    return (
+        f"- Core habits (the calculation set, charter habits.core; every other habit is tracked, not scored): {'; '.join(labels)}. "
+        "A core habit with no reading that day is unknown, never a miss"
     )
 
 

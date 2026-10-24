@@ -131,6 +131,16 @@ SECTION_GUIDE: dict[str, str] = {
         "the date, not the band, not a countdown — may appear in any output that could reach a "
         "published surface."
     ),
+    "habits": (
+        "habits — `core` is the core habit set: the calculation set the habit score, the character sheet and the "
+        "coaches read. Each entry has an id, a label and a `basis` saying how a day is graded (`bases` defines each): a "
+        "Habitify check-in of the registry entries flagged with the id, the day's resolved steps against the charter "
+        "value `rule_ref` names, the evening check-in, or the wake-time grader against the sleep rule. A core habit with "
+        "no reading is unknown, never a miss, and the score is the share of the KNOWN core habits done, each weighted "
+        "equally. Every other habit is `retained`: tracked, streaked and visible, but not scored; never propose "
+        "archiving or deleting one, and never grade a day on a habit outside the core set. The registry entries "
+        "themselves are owner data and are never named here."
+    ),
     "nutrition": (
         "nutrition — the food targets, one subsection per lever. `protein` gives the daily range "
         "(`range_g`: the low end is the floor a day is graded against, the high end the target), how "
