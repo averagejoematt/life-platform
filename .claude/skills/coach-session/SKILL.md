@@ -56,9 +56,13 @@ Every planning conversation runs in this order (`lambdas/training/coach_context.
    - `get_exercise_notes` (action `read`): his notes say why a number happened.
 2. **`plan_next_session`** (stage 1, no routine id): the deterministic constraint block. The
    packet is the INPUTS; the plan is this call. Never plan from the packet alone.
-3. **`manage_hevy_routine` action `draft`**: the engine-authored session from the served plan.
-   `draft_custom` is ONLY for a departure he has stated, and it carries his reason in
-   `departure_reason`. A departure you thought of is not his departure.
+3. **`manage_hevy_routine` action `draft`** is the default: the engine authors the session and
+   its loads from the served plan (progression, stall steps, ceilings, cardio dose, warm-ups).
+   `draft_custom` is ONLY for a departure he has stated, never the default route. It REQUIRES a
+   one-line `departure_reason` (why this session leaves the engine's draft); without one the
+   call is refused (`DEPARTURE_REASON_REQUIRED`). The reason is recorded on the routine and in
+   its spec-ledger row, so tell him you are departing and why. A departure you thought of is
+   not his departure.
 4. Then `plan_next_session(routine_id)` (stage 2, the red team over the draft) → `dry_run`
    (show him, with an "inputs current through X" line) → `commit`.
 
