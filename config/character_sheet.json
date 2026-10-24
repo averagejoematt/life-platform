@@ -151,7 +151,10 @@
           "weight": 0.1
         },
         "stress_management": {
-          "weight": 0.1
+          "weight": 0.1,
+          "owner_only_input": "evening_checkin",
+          "in_pillar_score": false,
+          "description": "Reported stress from the evening check-in (0-4, inverted to 0-100; #5129). The input is owner-only with no public projection, so the score is recorded for the owner but held out of the published Mind score and never named as a driver until the owner rules otherwise."
         },
         "vice_control": {
           "weight": 0.1
@@ -518,7 +521,7 @@
       ],
       "Mastery": [
         "Connect journal themes to objective data \u2014 what does the gap between feeling and metrics reveal?",
-        "Reduce T0 habit list only if current set is 95%+ for 30 days \u2014 earned simplification",
+        "Consider trimming the T0 habit list once the current set has held 95%+ for 30 days \u2014 your call: nothing in the platform checks the rate or changes the list",
         "Explore cognitive-behavioral patterns: intellectualization, displacement, isolation of affect"
       ]
     },

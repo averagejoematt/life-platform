@@ -165,6 +165,10 @@ def test_coach_checkin_surfaces_persisted_open_questions(monkeypatch):
         "status": "open",
     }
     _stub_all(monkeypatch, recent_checkins=lambda table, coach_ids: [item], open_checkins=lambda items: items)
+    # #5127: the section leaves out questions past the rotation window — freeze the clock beside the row (#4848)
+    from datetime import datetime, timezone
+
+    monkeypatch.setattr(tc.cc, "utcnow", lambda: datetime(2026, 7, 18, 0, 0, tzinfo=timezone.utc))
     out = tc.tool_get_capture_queues({})
     assert out["coach_checkin"]["count"] == 1
     q = out["coach_checkin"]["open_questions"][0]

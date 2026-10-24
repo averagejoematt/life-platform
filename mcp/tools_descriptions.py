@@ -751,7 +751,8 @@ GET_COACH_CHECKIN_QUEUE_DESCRIPTION = (
     "verbatim answers pair with (or explain the absence of) the quantitative data. Open questions "
     "persist: re-calls return the SAME queue; fresh questions are generated (Bedrock, in the asking "
     "coach's persona, grounded in live presence/adaptive-mode/manual-source context) only when the "
-    "queue is empty. Ask conversationally, one at a time, then call log_coach_checkin. Skipping is "
+    "queue is empty. #5127: a question whose driving source is paused, or that has stood 72 h, is "
+    "retired (never a skip) and the next coach asks. Ask conversationally, one at a time, then call log_coach_checkin. Skipping is "
     "always valid with zero penalty — never nag. "
     "Use for: 'what do my coaches want to know?', 'coach check-in', periodic qualitative catch-ups."
 )

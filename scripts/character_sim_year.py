@@ -85,7 +85,7 @@ DARK_MEASURED_ALIVE = {
     "movement": {"daily_steps": 30},  # phone still counts some steps
     "nutrition": {},  # no weigh-ins, no logging
     "metabolic": {"cgm_glucose_control": 55, "resting_heart_rate": 60},
-    "mind": {"stress_management": 50},  # whoop recovery still streams
+    "mind": {},  # #5129: stress_management reads the evening check-in, which a dark day does not have
     "relationships": {},
     "consistency": {"data_completeness": 30},
 }
@@ -97,6 +97,8 @@ def dark_day(pillar):
     maxw = 0.0
     for name, cfg in comps.items():
         w = cfg.get("weight", 0)
+        if cfg.get("in_pillar_score") is False:
+            continue  # #5129: held out of the pillar arithmetic (owner-only input)
         maxw += w
         if cfg.get("behavioral"):
             wsum += 0.0 * w

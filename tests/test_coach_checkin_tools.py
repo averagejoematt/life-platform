@@ -12,6 +12,9 @@ import json
 import logging
 import os
 import sys
+from datetime import datetime, timezone
+
+import pytest
 
 os.environ.setdefault("TABLE_NAME", "life-platform-test")
 os.environ.setdefault("USER_ID", "matthew")
@@ -46,6 +49,16 @@ def _open_item(coach_id="mind", date="2026-07-09", uid="aaaa1111", **over):
     }
     item.update(over)
     return item
+
+
+# #5127 / #4848: the queue now retires a question by AGE, so every test runs on a frozen clock —
+# the rows above are dated 2026-07-09 and must stay inside the 72 h rotation window.
+FROZEN_NOW = datetime(2026, 7, 9, 20, 0, tzinfo=timezone.utc)
+
+
+@pytest.fixture(autouse=True)
+def _frozen_clock(monkeypatch):
+    monkeypatch.setattr(cc, "utcnow", lambda: FROZEN_NOW)
 
 
 def _fresh_cycle_cache(monkeypatch, value=None):
@@ -86,7 +99,7 @@ def test_queue_returns_open_questions_without_regenerating(monkeypatch):
 
 
 def test_queue_caps_open_questions_at_three(monkeypatch):
-    rows = [_open_item(uid=f"aaaa000{i}", date=f"2026-07-0{i + 1}") for i in range(5)]
+    rows = [_open_item(uid=f"aaaa000{i}", asked_at=f"2026-07-09T0{i}:00:00Z") for i in range(5)]
     monkeypatch.setattr(tcc, "_table_ref", FakeDdbTable(rows=rows))
     out = tcc.tool_get_coach_checkin_queue({})
     assert len(out["open_questions"]) == cc.MAX_OPEN_QUESTIONS == 3
@@ -95,12 +108,12 @@ def test_queue_caps_open_questions_at_three(monkeypatch):
 def test_queue_returns_open_questions_oldest_first(monkeypatch):
     rows = [
         _open_item(uid="bbbb2222", date="2026-07-08", asked_at="2026-07-08T18:00:00Z"),
-        _open_item(uid="aaaa1111", date="2026-07-05", asked_at="2026-07-05T18:00:00Z"),
+        _open_item(uid="aaaa1111", date="2026-07-07", asked_at="2026-07-07T18:00:00Z"),
     ]
     monkeypatch.setattr(tcc, "_table_ref", FakeDdbTable(rows=rows))
     out = tcc.tool_get_coach_checkin_queue({})
     ids = [q["checkin_id"] for q in out["open_questions"]]
-    assert ids == ["CHECKIN#2026-07-05#aaaa1111", "CHECKIN#2026-07-08#bbbb2222"]
+    assert ids == ["CHECKIN#2026-07-07#aaaa1111", "CHECKIN#2026-07-08#bbbb2222"]
 
 
 def test_answered_and_skipped_items_do_not_block_generation(monkeypatch):

@@ -27,6 +27,10 @@ Behavioral rules (psychology panel, encoded in the generation prompt):
   * the asking coach rotates toward the most informative current signal (the
     longest-dark manual channel), with a deterministic least-recently-asked
     rotation as the fallback;
+  * the coach who asked last never wins the dark-channel preference again straight away,
+    and an open question rotates out after QUEUE_ROTATE_HOURS or when its driving source is
+    paused (status `retired`, never a skip) — the queue sat on three food-delivery questions
+    for two weeks before this (#5127);
   * skip is always a valid answer with zero penalty;
   * when presence is dark, questions are about barriers/context — not guilt.
 
@@ -56,6 +60,19 @@ PROVENANCE = "mcp"
 STATUS_OPEN = "open"
 STATUS_ANSWERED = "answered"
 STATUS_SKIPPED = "skipped"
+# #5127: an open question the queue took down unanswered — its driving source is paused, or it
+# sat past the rotation window. Never a skip and never a penalty: nobody declined anything, the
+# question simply stopped being the right one to ask. `retired_code` + `retired_reason` record why.
+STATUS_RETIRED = "retired"
+RETIRED_SOURCE_PAUSED = "source_paused"
+RETIRED_ROTATED = "rotated"
+
+# #5127: the queue was stuck 2026-10-10 → 10-23 on three questions a dead source drove, because an
+# open question never left. An open question now rotates out once it has stood this long, so the
+# next coach gets the turn; a Horizons prescription follow-up keeps its week. The nightly
+# `coach_checkin:queue_age` check (operational/coach_checkin_queue_qa.py) alarms when one did not.
+QUEUE_ROTATE_HOURS = 72
+PRESCRIPTION_ROTATE_HOURS = 7 * 24
 
 MAX_OPEN_QUESTIONS = 3
 MAX_QUESTION_CHARS = 300
@@ -115,8 +132,22 @@ def checkin_uid(*parts: object) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:8]
 
 
+def utcnow() -> datetime:
+    """The one clock read in this module (tests freeze it here)."""
+    return datetime.now(timezone.utc)
+
+
 def now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def parse_iso(value) -> Optional[datetime]:
+    """An aware UTC datetime from a stored ISO stamp ('...Z' or '+00:00'); None when unreadable."""
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
 # ── The Coach's Prescription follow-up hook (#1706, epic #1686) ───────────────
@@ -237,6 +268,89 @@ def read_cycle(ssm_client=None):
     return value
 
 
+# ── #5127: which open questions still deserve the slot ───────────────────────
+
+_DARK_MARKER = " is the longest-dark manual channel"
+
+
+def _registry() -> dict:
+    from ingestion.source_registry import SOURCE_REGISTRY  # lazy — bundled module
+
+    return SOURCE_REGISTRY
+
+
+def paused_sources(registry: Optional[dict] = None) -> set:
+    """Registry sources off by design (`paused: True`, ADR-074 posture — food_delivery since #5006)."""
+    try:
+        reg = registry if registry is not None else _registry()
+    except Exception as e:  # noqa: BLE001 — fail-soft: nothing paused means nothing retired for it
+        logger.warning("[coach_checkin] registry read failed (%s) — no source treated as paused", type(e).__name__)
+        return set()
+    return {k for k, v in reg.items() if isinstance(v, dict) and v.get("paused")}
+
+
+def question_source(item: dict, registry: Optional[dict] = None) -> Optional[str]:
+    """The manual-capture source that drove this question, or None (rotation, explicit, follow-up).
+
+    New rows carry `source_key` (#5127). Rows written before it say so only in prose —
+    "Food delivery is the longest-dark manual channel (196d dark)" — so the label is matched
+    back to the registry; an unmatched label is None, never a guess."""
+    key = str((item or {}).get("source_key") or "").strip()
+    if key:
+        return key
+    reason = str((item or {}).get("context_reason") or "")
+    if _DARK_MARKER not in reason:
+        return None
+    label = reason.split(_DARK_MARKER, 1)[0].strip()
+    try:
+        reg = registry if registry is not None else _registry()
+    except Exception:  # noqa: BLE001
+        return None
+    for key, meta in reg.items():
+        if label and (label == key or (isinstance(meta, dict) and label == meta.get("label"))):
+            return key
+    return None
+
+
+def rotate_hours_for(item: dict) -> int:
+    if str((item or {}).get("generated_by") or "") == "prescription_followup":
+        return PRESCRIPTION_ROTATE_HOURS
+    return QUEUE_ROTATE_HOURS
+
+
+def retire_verdict(item: dict, *, now: datetime, paused: set, registry: Optional[dict] = None) -> Optional[tuple]:
+    """(code, reason) when an OPEN question should leave the queue, else None. Pure.
+
+    A paused source first (the #5006 class: the question has no live signal behind it), then
+    age past the rotation window (the next coach gets the turn)."""
+    if (item or {}).get("status") != STATUS_OPEN:
+        return None
+    src = question_source(item, registry)
+    if src and src in paused:
+        return (
+            RETIRED_SOURCE_PAUSED,
+            f"its driving source {src} is paused by design (#5006, owner ruling 2026-10-23) — a question about a channel "
+            "that is off on purpose has nothing live behind it",
+        )
+    asked = parse_iso(item.get("asked_at"))
+    limit = rotate_hours_for(item)
+    if asked is not None and now - asked >= timedelta(hours=limit):
+        hours = int((now - asked).total_seconds() // 3600)
+        return (
+            RETIRED_ROTATED,
+            f"open {hours}h unanswered (rotation window {limit}h) — the next coach asks instead; not a skip, zero penalty",
+        )
+    return None
+
+
+def servable_open(items: list, *, now: Optional[datetime] = None, paused: Optional[set] = None, registry: Optional[dict] = None) -> list:
+    """The open questions that still deserve a slot (oldest first) — read-only, for the session
+    opener; the queue tool retires the rest."""
+    now = now or utcnow()
+    paused = paused_sources(registry) if paused is None else paused
+    return [it for it in open_checkins(items) if retire_verdict(it, now=now, paused=paused, registry=registry) is None]
+
+
 # ── reads ────────────────────────────────────────────────────────────────────
 
 
@@ -278,20 +392,32 @@ def open_checkins(items: list) -> list:
 # ── coach selection ──────────────────────────────────────────────────────────
 
 
-def pick_asking_coach(coach_ids, manual_signal, recent_items) -> tuple:
-    """(coach_id, reason). Prefer the coach whose domain currently carries the
+def pick_asking_coach_detail(coach_ids, manual_signal, recent_items) -> dict:
+    """{coach, reason, source}. Prefer the coach whose domain currently carries the
     most informative signal — the manual channel that is the most OVERDUE
     relative to its own staleness threshold (a long-dark channel is exactly
     where a qualitative answer beats absent quantitative data). Deterministic
     fallback: least-recently-asked rotation in canonical coach order.
 
+    #5127: the coach who asked LAST never wins the dark-channel preference again
+    straight away — one permanently dark channel used to hand the same coach every
+    turn (food delivery gave nutrition every ask since July). It rotates instead.
+
     manual_signal: [{source, label, days_since, stale_days, coach}] — days_since
     None means "never seen", treated as maximally informative for its coach.
     """
+    last_asked = {cid: "" for cid in coach_ids}
+    for it in recent_items or []:
+        cid = normalize_coach_id(it.get("coach_id") or "")
+        if cid in last_asked:
+            last_asked[cid] = max(last_asked[cid], it.get("asked_at") or "")
+    newest = max(last_asked.values(), default="")
+    last_coach = next((c for c in coach_ids if newest and last_asked[c] == newest), None) if len(coach_ids) > 1 else None
+
     best = None  # (ratio, source-entry)
     for entry in manual_signal or []:
         coach = normalize_coach_id(entry.get("coach") or "")
-        if coach not in coach_ids:
+        if coach not in coach_ids or coach == last_coach:
             continue
         stale = entry.get("stale_days") or 0
         if stale <= 0:
@@ -304,20 +430,22 @@ def pick_asking_coach(coach_ids, manual_signal, recent_items) -> tuple:
         entry = best[1]
         days = entry.get("days_since")
         dark = "no data yet" if days is None else f"{days}d dark"
-        return (
-            normalize_coach_id(entry["coach"]),
-            f"{entry.get('label') or entry.get('source')} is the longest-dark manual channel ({dark})",
-        )
+        return {
+            "coach": normalize_coach_id(entry["coach"]),
+            "reason": f"{entry.get('label') or entry.get('source')}{_DARK_MARKER} ({dark})",
+            "source": entry.get("source"),
+        }
 
     # Rotation fallback: the coach whose most recent check-in is oldest (never
     # asked sorts first); ties resolve by canonical order.
-    last_asked = {cid: "" for cid in coach_ids}
-    for it in recent_items or []:
-        cid = normalize_coach_id(it.get("coach_id") or "")
-        if cid in last_asked:
-            last_asked[cid] = max(last_asked[cid], it.get("asked_at") or "")
     coach = min(coach_ids, key=lambda c: (last_asked[c], coach_ids.index(c)))
-    return coach, "rotation — least-recently-asked coach"
+    return {"coach": coach, "reason": "rotation — least-recently-asked coach", "source": None}
+
+
+def pick_asking_coach(coach_ids, manual_signal, recent_items) -> tuple:
+    """(coach_id, reason) — the tuple view of `pick_asking_coach_detail`."""
+    d = pick_asking_coach_detail(coach_ids, manual_signal, recent_items)
+    return d["coach"], d["reason"]
 
 
 # ── question generation (Bedrock, ADR-062 chokepoint) ───────────────────────

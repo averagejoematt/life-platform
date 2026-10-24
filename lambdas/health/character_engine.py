@@ -37,7 +37,7 @@ from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_today  # #2811: the character sheet's DAY is the Pacific day
 
-from health import protein_engine  # #5214: THE per-feeding definition
+from health import character_privacy, protein_engine  # #5129: owner-only components · #5214: THE per-feeding definition
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 
 logger = logging.getLogger(__name__)
@@ -735,14 +735,10 @@ def compute_mind_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[floa
         else:
             scores["state_of_mind_valence"] = None
 
-    # Stress management
-    whoop = data.get("whoop") or {}
-    recovery = _safe_float(whoop, "recovery_score")
-    if recovery is not None:
-        scores["stress_management"] = _clamp(recovery)
-    else:
-        stress = _safe_float(whoop, "day_strain") or _safe_float(whoop, "strain")
-        scores["stress_management"] = _in_range_score(stress, 6, 16, buffer=0.4) if stress else None
+    # Stress management (#5129): the stress Matthew REPORTED that evening (the #5106 check-in), not
+    # Whoop recovery — recovery is a physiology proxy and was scoring a good night's sleep as calm.
+    # No check-in that evening is "unavailable" (None), never a stand-in from another source.
+    scores["stress_management"] = character_privacy.stress_management_score(data.get("evening_checkin"))
 
     # Vice control — logarithmic curve [F-12]
     vice_streaks = data.get("vice_streaks") or {}
@@ -1052,12 +1048,19 @@ def _weighted_pillar_score(component_scores, components_config):
         comp_cfg = components_config.get(comp_name, {})
         weight = comp_cfg.get("weight", 0) if isinstance(comp_cfg, dict) else comp_cfg
         behavioral = comp_cfg.get("behavioral", False) if isinstance(comp_cfg, dict) else False
+        # #5129: an owner-only input is never named, and is held out of sum + coverage unless the
+        # config opts in (fail-closed in code) — see health/character_privacy.py.
+        owner_only, held_out = character_privacy.component_visibility(comp_name, comp_cfg)
+        if owner_only or held_out:
+            details[comp_name] = {"score": score, "weight": weight, "owner_only": owner_only, "held_out": held_out}
+            if held_out:
+                continue
         max_possible_weight += weight
         if score is None and behavioral and weight > 0:
             score = 0.0
             absent_behaviors.append(comp_name)
             details[comp_name] = {"score": 0.0, "weight": weight, "absent": True}
-        else:
+        elif comp_name not in details:
             details[comp_name] = {"score": score, "weight": weight}
         # #1412 (ADR-105 rule 4): surface the target's derivation provenance —
         # personal {method, window_days, n} or the explicit "population prior,
@@ -1513,8 +1516,8 @@ def pillar_drivers(details: dict[str, Any], top_n: int = 2) -> dict[str, list[st
     no_data = []
     absent = list(details.get("_absent_behaviors", []))
     for name, d in details.items():
-        if name.startswith("_") or not isinstance(d, dict):
-            continue
+        if name.startswith("_") or not isinstance(d, dict) or character_privacy.is_private_detail(d):
+            continue  # #5129: an owner-only input never names itself on a published driver list
         weight = d.get("weight") or 0
         if weight <= 0:
             continue
@@ -1968,10 +1971,9 @@ def compute_character_sheet(
             # Extract top contributing component (skip private keys).
             # v1.2.0: detail values are {"score", "weight"} dicts — read the score
             # (the old isinstance(v, (int, float)) filter matched nothing).
+            # #5129: an owner-only component is never the event's named driver (character_privacy)
             components = {
-                k: v.get("score")
-                for k, v in pillar_details[pillar_name].items()
-                if not k.startswith("_") and isinstance(v, dict) and isinstance(v.get("score"), (int, float)) and v.get("score") > 0
+                k: s for k, v in pillar_details[pillar_name].items() if (s := character_privacy.event_driver_score(k, v)) is not None
             }
             if components:
                 top = max(components, key=components.get)

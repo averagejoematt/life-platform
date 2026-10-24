@@ -648,10 +648,10 @@ def test_steady_76_with_active_boost_levels_up_end_to_end():
 
 def test_behavioral_absent_scores_zero():
     """An unlogged behavior is a miss (0 at full weight), not dropped-to-neutral."""
-    scores = {"journal_consistency": None, "stress_management": 60}
+    scores = {"journal_consistency": None, "state_of_mind_valence": 60}
     config = {
         "journal_consistency": {"weight": 0.5, "behavioral": True},
-        "stress_management": {"weight": 0.5},
+        "state_of_mind_valence": {"weight": 0.5},
     }
     score, details = _weighted_pillar_score(scores, config)
     # Both components count: (0*0.5 + 60*0.5) / 1.0 = 30, full coverage, no blend
