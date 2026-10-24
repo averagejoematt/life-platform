@@ -270,7 +270,7 @@ SOURCE_TIERS: dict[str, int] = {
     "genome": TIER_OWNER_ONLY,  # variants/identifiers (#1943); served risk projection is the gated non-variant surface
     "notion": TIER_OWNER_ONLY,  # journal entries, full text; publication only via the diary consent/publish gates
     "state_of_mind": TIER_OWNER_ONLY,  # mood / state-of-mind entries
-    "macrofactor": TIER_OWNER_ONLY,  # nutrition logs (every meal, every calorie); public meal views pass the privacy flags
+    "macrofactor": TIER_OWNER_ONLY,  # nutrition logs (every meal, every calorie); public meal views pass the privacy flags + #5112's approved-name list (privacy.food_names)
     "strava": TIER_OWNER_ONLY,  # activity GPS traces (location is never public — DATA_GOVERNANCE PII definition)
     "hevy": TIER_OWNER_ONLY,  # workout details; public training surfaces serve aggregates (muscle volume, PRs)
     "sick_days": TIER_OWNER_ONLY,  # sick-day records
@@ -322,6 +322,9 @@ SOURCE_TIERS: dict[str, int] = {
     # #5106: the evening check-in (hunger, stress, cravings, one word) and its weekly read against intake. Behavioural
     # self-report about him, so owner-only with no public projection; the weekly read is stored APART from the public
     # weekly_correlations record for exactly that reason. Declared before the first row exists (ADR-154's ordering).
+    # Carve-out (owner ruling 2026-10-23, #5125 R5): the weekly partner letter — ONE SSM-resolved recipient, never a
+    # public surface, never the model's prompt — reads a coarse projection (answered-evenings count + a
+    # low/moderate/high band per rating) through `health.checkin_partner_view`; the rows themselves stay owner-only.
     "evening_checkin": TIER_OWNER_ONLY,
     "checkin_intake_pairs": TIER_OWNER_ONLY,
     # #4078: chat writes queued for approval. A queued row carries the target write tool's exact

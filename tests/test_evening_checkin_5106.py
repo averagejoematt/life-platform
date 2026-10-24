@@ -434,6 +434,8 @@ def test_the_weekly_engine_wires_the_family_and_keeps_its_public_pairs():
 
 
 def test_no_published_module_reads_either_partition():
+    # The one owner-ruled door (#5125 R5) is `health.checkin_partner_view`, outside this tree; it never names these
+    # partitions here, and tests/test_partner_email_checkins_5125.py holds that partner_email_lambda is its only importer.
     offenders = []
     for top in ("web", "emails"):
         for root, _dirs, files in os.walk(os.path.join(REPO, "lambdas", top)):

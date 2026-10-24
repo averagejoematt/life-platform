@@ -15,7 +15,7 @@ no alert. Landmarks are keyed by catalog muscle (`shoulders`, `abs`); logged cou
 `Core`) — `HEVY_MUSCLE_GROUP` is the one bridge. Granularity caveat: the logged taxonomy has no side/rear/trap split
 (`Shoulders` is all delts, presses included; `Back` carries traps), so the LOGGED flag for side/rear delts is the coarser
 `Shoulders` one and cannot see a drop that pressing masks (carrier: #5164, the movement-level logged flag; the template
-shortfall's carrier is #5162). The TEMPLATE side counts the movement-specific floors and bands by movement
+shortfall was closed by #5162's trade inside the 75-set week, owner ruling 2026-10-23). The TEMPLATE side counts the movement-specific floors and bands by movement
 (`FLOOR_MOVEMENTS`, `BAND_MOVEMENTS`), never by catalog muscle — a shoulder press is not side/rear-delt work, a flat bench
 press is not upper-chest work, a row or a shrug is not a vertical pull (ADR-104, honest numbers).
 """

@@ -223,17 +223,17 @@ def _ceilings_on(monkeypatch, when):
 
 
 def test_governor_effective_ceiling_moves_across_the_window_boundary(monkeypatch):
-    """The acceptance clause 'including inside the dated window' (now August 2026).
+    """The acceptance clause 'including inside the dated window' (now October 2026, #5135).
 
     /api/status now inherits whatever ceiling the governor computed, so the honesty
     of the published percentage rests on THIS function being right about the date.
     """
-    base_aug, surge_aug = _ceilings_on(monkeypatch, datetime(2026, 8, 15, tzinfo=timezone.utc))
-    base_sep, _surge_sep = _ceilings_on(monkeypatch, datetime(2026, 9, 15, tzinfo=timezone.utc))
+    base_aug, surge_aug = _ceilings_on(monkeypatch, datetime(2026, 10, 15, tzinfo=timezone.utc))  # inside (October)
+    base_sep, _surge_sep = _ceilings_on(monkeypatch, datetime(2026, 11, 15, tzinfo=timezone.utc))  # reverted (November)
 
     assert base_aug == cg._TEMP_CEILING_USD, "inside the window the raised ceiling must apply"
     assert surge_aug == cg._TEMP_SURGE_CEILING_USD
-    assert base_sep == cg.MONTHLY_CEILING, "September must be back on the standing ceiling"
+    assert base_sep == cg.MONTHLY_CEILING, "November must be back on the standing ceiling"
     # The load-bearing property is that the boundary CHANGES the effective ceiling, not
     # that the window is higher. That direction assumption held for three windows and
     # stopped holding at the 2026-08-28 amendment (#2801): the September base moved to
@@ -247,8 +247,8 @@ def test_governor_effective_ceiling_moves_across_the_window_boundary(monkeypatch
 
 
 def test_the_window_reverts_on_its_own_date_with_no_deploy(monkeypatch):
-    """The half-open bound is the whole mechanism: 09-01 is already reverted."""
-    last_aug, _ = _ceilings_on(monkeypatch, datetime(2026, 8, 31, 23, 59, tzinfo=timezone.utc))
-    first_sep, _ = _ceilings_on(monkeypatch, datetime(2026, 9, 1, 0, 0, tzinfo=timezone.utc))
+    """The half-open bound is the whole mechanism: 11-01 is already reverted (the October window, #5135)."""
+    last_aug, _ = _ceilings_on(monkeypatch, datetime(2026, 10, 31, 23, 59, tzinfo=timezone.utc))
+    first_sep, _ = _ceilings_on(monkeypatch, datetime(2026, 11, 1, 0, 0, tzinfo=timezone.utc))
     assert last_aug == cg._TEMP_CEILING_USD
     assert first_sep == cg.MONTHLY_CEILING

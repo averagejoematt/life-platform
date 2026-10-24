@@ -7,7 +7,7 @@
   "expect_fail": [
     "energy_balance_metabolism.in_band",
     "protein_lean_mass.four_feedings",
-    "obesity_medicine.day_floors"
+    "flexible_dieting.split_accounts"
   ],
   "days": [
     {

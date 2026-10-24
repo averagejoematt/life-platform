@@ -308,21 +308,22 @@ test("item 6: Start carries the Follow block, the same markup as the front page,
   for (const page of ["", "start"]) assert.match(shell(page), /<link rel="alternate" type="application\/rss\+xml"[^>]*href="\/panelcast\/feed\.xml">/);
 });
 
-test("item 8 / round 2 (front): the mark names its floor in ONE line under it — top is the start, floor is the goal — never a left/right pair that reads as a time axis", () => {
+test("item 8 / round 2 (front): the mark names its frame in ONE line under it — the year from the start, top the start weight, floor the goal — never a left/right pair that reads as a time axis (C, #4646)", () => {
   const t = B.today.data;
-  const ends = F.markEndsHTML(t.start_weight_lbs, t.goal_weight_lbs);
-  assert.equal(ends, '<div class="ck-ends"><span>Each column runs from 327.3 lb, the start, at the top to 185 lb, the goal, at the floor.</span></div>');
+  const ends = F.markEndsHTML(t.start_weight_lbs, t.goal_weight_lbs, t.start_date);
+  assert.equal(ends, '<div class="ck-ends"><span>The frame is one year from September 6; its top is 327.3 lb, the start, and its floor 185 lb, the goal.</span></div>');
   assert.equal((ends.match(/<span>/g) || []).length, 1, "one span, one line");
-  // The legend's "grey" is the kit's faint ink, not the hairline colour that did not read as grey.
+  // The columns are the kit's soft ink and the frame its hairline: the accent claims progress, a column is weight still to lose.
   const css = readFileSync(join(SITE, "assets", "css", "clean.css"), "utf8");
-  assert.match(css, /\.ck-mark__left \{ fill: var\(--ck-faint\); \}/);
-  assert.match(shell(""), /green is gone, grey is left to 185/);
+  assert.match(css, /\.ck-mark__day \{ fill: var\(--ck-soft\); \}/);
+  assert.match(css, /\.ck-mark__frame \{ fill: none; stroke: var\(--ck-line\); \}/);
+  assert.match(shell(""), /One column per weigh-in, as tall as the weight still above 185\./);
   assert.ok(P.frontSlots(EDITION, B, "/next/v8/")["ck-mark"].endsWith(ends));
   assert.equal(F.markEndsHTML(null, 185), "");
   assert.equal(F.markEndsHTML(180, 185), "", "a start under the goal names no floor");
   // front:F5: the caption sits under the mark, then the record — not the record between them.
   const front = shell("");
-  assert.ok(front.indexOf('id="ck-mark"') < front.indexOf("One column a day") && front.indexOf("One column a day") < front.indexOf('id="ck-record"'));
+  assert.ok(front.indexOf('id="ck-mark"') < front.indexOf("One column per weigh-in") && front.indexOf("One column per weigh-in") < front.indexOf('id="ck-record"'));
 });
 
 // ── site-to-A round 1 (2026-10-18, the verified shared-helper defects of #4580, lane J) ──────
@@ -794,7 +795,7 @@ test("Built: the first-person draft sits under the fold with one draft mark, and
   assert.equal((body.match(/[.!?](\s|$)/g) || []).length, 2, "the draft is two sentences, not three paragraphs");
 });
 
-test("Appendix: a jump list of plain links reaches each kind, Tools first, with the replaced-layouts group's empty sentence", () => {
+test("Appendix: a jump list of plain links reaches each kind, Tools first, and the replaced-layouts group lists the reference copies", () => {
   const html = page("appendix");
   const jump = /<p class="ck-soft">((?:<a class="ck-link" href="#kind-[a-z]+">[^<]+<\/a>(?: · )?)+)<\/p>/.exec(html);
   assert.ok(jump, "the jump list is one paragraph of kit links");
@@ -803,7 +804,15 @@ test("Appendix: a jump list of plain links reaches each kind, Tools first, with 
   for (const id of targets) assert.ok(html.includes(`<section class="ck-section" id="${id}">`), id);
   const sections = [...html.matchAll(/<section class="ck-section" id="(kind-[a-z]+)">/g)].map((m) => m[1]);
   assert.deepEqual(sections, targets, "the links are in the sections' order");
-  assert.match(html, /id="kind-replaced">\s*<p class="ck-label">Replaced layouts<\/p>\s*<p class="ck-soft">The home page’s earlier layout will be listed here once the cut-over copies it\. Nothing is here yet\.<\/p>/);
+  // #4588 (owner ruling 2026-10-18): the cut-over keeps each replaced layout as a served, noindex
+  // reference page under /reference/<date>-<slug>/ and lists it here; the group's empty sentence
+  // is gone with the first copies (tests/test_v8_appendix_4586.py proves the sentence on a render
+  // without them).
+  const replaced = /<section class="ck-section" id="kind-replaced">(.*?)<\/section>/s.exec(html)[1];
+  assert.match(replaced, /<p class="ck-label">Replaced layouts<\/p>/);
+  assert.match(replaced, /href="\/reference\/2026-10-22-home-v5\/">The front page, before 22 October 2026<\/a>/);
+  assert.match(replaced, /href="\/reference\/2026-10-22-story-v5\/">The story hub, before 22 October 2026<\/a>/);
+  assert.doesNotMatch(replaced, /Nothing is here yet/);
   assert.doesNotMatch(html, /<a class="ck-link" href="\/next\/v8\/">Back<\/a>/, "no second back link under the list");
 });
 

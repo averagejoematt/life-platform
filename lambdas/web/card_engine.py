@@ -53,6 +53,17 @@ FONT_MONO_BOLD = "ibm-plex-mono-500.ttf"
 W, H = 1200, 630
 MARGIN = 48  # safe left/right margin
 
+# The v8 kit's light ground (site/assets/css/clean.css :root, #4581) — for the one card
+# that is the kit front page's own share image (og-front, #4646), so the unfurl looks like
+# the page it opens. One typeface (Geist, converted from the site's own woff2, OFL), one
+# accent. These are NOT a re-skin of the daily family above.
+KIT_BG = (255, 255, 255)  # --ck-bg #FFFFFF
+KIT_FG = (14, 17, 19)  # --ck-fg #0E1113
+KIT_SOFT = (91, 100, 107)  # --ck-soft #5B646B
+KIT_LINE = (230, 233, 235)  # --ck-line #E6E9EB
+KIT_ACCENT = (10, 122, 90)  # --ck-accent #0A7A5A
+FONT_KIT = "geist-latin.ttf"  # variable, wght 100-900
+
 # ── The AJM brand mark (#1640) ────────────────────────────────────────────────
 # The full-gauge dial with the single ember graduation at the 1-o'clock tick — the
 # mark #1638 landed as favicon/header/app-icons. It was deferred onto the OG share
@@ -180,6 +191,32 @@ def font(name, size):
                 continue
         _font_cache[key] = loaded or ImageFont.load_default()
     return _font_cache[key]
+
+
+_weighted_cache: dict[tuple[str, int, int], Any] = {}
+
+
+def font_weighted(name, size, weight):
+    """A bundled VARIABLE TTF at a size and a weight (the kit's Geist, #4646). Cached per
+    (name, size, weight) — separate from ``font``'s cache because setting a variation
+    mutates the font object. Falls back to ``font`` (default instance) when the weight
+    axis cannot be set, so rendering never raises."""
+    key = (name, size, weight)
+    if key not in _weighted_cache:
+        loaded = None
+        for d in _FONT_DIRS:
+            try:
+                loaded = ImageFont.truetype(os.path.join(d, name), size)
+                break
+            except Exception:
+                continue
+        if loaded is not None:
+            try:
+                loaded.set_variation_by_axes([weight])
+            except Exception:
+                pass
+        _weighted_cache[key] = loaded or font(name, size)
+    return _weighted_cache[key]
 
 
 # ── Primitives ───────────────────────────────────────────────────────────────

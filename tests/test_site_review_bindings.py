@@ -83,10 +83,13 @@ class TestConsistencyLogic:
     """cross_page_consistency over fake captured JSON — no network."""
 
     def _write(self, tmp_path, journey_w, snapshot_w):
+        # #4588: the front page reads /api/edition since the cut-over (the v5 home's /api/journey read
+        # moved to the reference copy, out of the review), so the fake capture is the edition wire's
+        # today block and sheet block, beside the cockpit's /api/snapshot.
         api = tmp_path / "api"
         api.mkdir()
-        (api / "api-journey.json").write_text(
-            json.dumps({"journey": {"current_weight_lbs": journey_w, "lost_lbs": 9.4, "progress_pct": 7.3}})
+        (api / "api-edition.json").write_text(
+            json.dumps({"blocks": {"today": {"data": {"weight_lbs": journey_w}}, "sheet": {"data": {"character": {"level": 4}}}}})
         )
         (api / "api-snapshot.json").write_text(
             json.dumps(
@@ -98,7 +101,7 @@ class TestConsistencyLogic:
         )
         (api / "api-character.json").write_text(json.dumps({"character": {"level": 4}}))
         return {
-            "/api/journey": {"file": "api/api-journey.json", "ok": True, "status": 200},
+            "/api/edition": {"file": "api/api-edition.json", "ok": True, "status": 200},
             "/api/snapshot": {"file": "api/api-snapshot.json", "ok": True, "status": 200},
             "/api/character": {"file": "api/api-character.json", "ok": True, "status": 200},
         }
@@ -130,6 +133,6 @@ class TestConsistencyLogic:
         idx = self._write(tmp_path, 305.0, 305.0)
         idx["/api/snapshot"]["ok"] = False  # simulate a fetch failure
         res = sr.cross_page_consistency(str(tmp_path), idx)
-        # weight now seen from only /api/journey → not cross-checked, no crash
+        # weight now seen from only /api/edition → not cross-checked, no crash
         weight = [c for c in res["checks"] if c["metric"] == "current_weight_lbs"]
         assert weight == [] or len(weight[0]["sources"]) < 2

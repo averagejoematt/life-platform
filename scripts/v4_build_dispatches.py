@@ -221,19 +221,8 @@ def write(path: Path, html_text: str) -> None:
     _apply_chrome.write_page(path, html_text)  # #3721
 
 
-def main() -> None:
-    # #730: bake the dated chronicle post list into the served HTML (noscript) so the
-    # best writing is crawlable/greppable, not locked behind JS. Shown on the hub
-    # (which defaults to the chronicle view) and the /story/chronicle/ sub-page.
-    # #803: also bakes an honest "why didn't this week land" disclosure — a currently
-    # withheld week and/or a break in the Week-N numbering — instead of a silent skip.
-    posts = load_chronicle()
-    chronicle_proof = chronicle_list_html(posts, pending=load_chronicle_pending(), cadence=load_content_cadence())
-    # #1395: the /story/ HUB carries a data-driven OG (the count of published
-    # dispatches, dated) on the weekly-chronicle card instead of the generic home card.
-    hub_og = story_og(posts)
-
-    # hub (defaults to chronicle)
+def _write_hub(chronicle_proof: str, hub_og: dict) -> None:
+    """The v4 /story/ hub shell (defaults to the chronicle view)."""
     write(
         OUT / "index.html",
         SHELL.format(
@@ -250,6 +239,27 @@ def main() -> None:
             promise=DOOR_PROMISE,
         ),
     )
+
+
+def main() -> None:
+    # #730: bake the dated chronicle post list into the served HTML (noscript) so the
+    # best writing is crawlable/greppable, not locked behind JS. Shown on the hub
+    # (which defaults to the chronicle view) and the /story/chronicle/ sub-page.
+    # #803: also bakes an honest "why didn't this week land" disclosure — a currently
+    # withheld week and/or a break in the Week-N numbering — instead of a silent skip.
+    posts = load_chronicle()
+    chronicle_proof = chronicle_list_html(posts, pending=load_chronicle_pending(), cadence=load_content_cadence())
+    # #1395: the /story/ HUB carries a data-driven OG (the count of published
+    # dispatches, dated) on the weekly-chronicle card instead of the generic home card.
+    hub_og = story_og(posts)
+
+    # hub (defaults to chronicle). #4588: after the cut-over `/story/` is the kit story page;
+    # the section shells below are still this generator's, the hub is not.
+    hub_is_kit = _apply_chrome.is_kit_page(OUT / "index.html")
+    if hub_is_kit:
+        print("site/story/index.html is a kit page (#4588) — the hub is left as it is.")
+    else:
+        _write_hub(chronicle_proof, hub_og)
     # per-section sub-pages
     for key, label, desc in SECTIONS:
         section_title = f"{label} — The Story — averagejoematt"
@@ -269,7 +279,8 @@ def main() -> None:
                 promise=PROMISE_BY_SECTION.get(key, DOOR_PROMISE),
             ),
         )
-    print(f"✅ wrote site/story/index.html + {len(SECTIONS)} section shells: " + ", ".join(k for k, _, _ in SECTIONS))
+    hub = "" if hub_is_kit else "site/story/index.html + "
+    print(f"✅ wrote {hub}{len(SECTIONS)} section shells: " + ", ".join(k for k, _, _ in SECTIONS))
 
 
 if __name__ == "__main__":

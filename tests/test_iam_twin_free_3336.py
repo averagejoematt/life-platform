@@ -355,6 +355,10 @@ _WILDCARD_OK_ACTIONS = {
     "events:ListRules": "no-resource",
     "lambda:ListFunctions": "no-resource",
     "logs:DescribeLogGroups": "no-resource",
+    # #5252 (2026-10-23): probed with simulate-custom-policy — ListSchedules granted on
+    # schedule/default/LifePlatform* implicitDenies; the call takes no resource. The
+    # readonly role's I6 check lists by name prefix, then GetSchedule is ARN-scoped.
+    "scheduler:ListSchedules": "no-resource",
     "secretsmanager:ListSecrets": "no-resource",
     "xray:GetSamplingRules": "no-resource",
     "xray:GetSamplingTargets": "no-resource",
@@ -690,6 +694,15 @@ def test_live_inline_policy_matches_the_tracked_json(role_name):
             raise
         pytest.skip(reason)
     live = _normalise_policy(live_doc)
+    if live != tracked:
+        # A merged-but-not-yet-applied grant is queued, dated and carries its apply command in
+        # ONE place — tests/test_grant_enumeration_drift.py::_PENDING_PERMISSIONS_APPLY, whose
+        # own live check reds the moment the apply lands. Read it there, never retype it (#5252).
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from test_grant_enumeration_drift import _PENDING_PERMISSIONS_APPLY  # noqa: PLC0415
+
+        if role_name in _PENDING_PERMISSIONS_APPLY:
+            pytest.skip(f"{role_name}: queued in _PENDING_PERMISSIONS_APPLY — {_PENDING_PERMISSIONS_APPLY[role_name]}")
     assert live == tracked, (
         f"{role_name}: the LIVE inline policy `{role_spec['inline_policy_name']}` differs from "
         f"infra/iam/{role_spec['permissions_file']}. tracked {len(tracked)} statement(s), live {len(live)}. "

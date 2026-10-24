@@ -17,7 +17,18 @@ Output:
     "sets_adherence":      {...},   # #3714 — the set-count dimension, named
     "intensity_adherence": {...},   # #3714 — the RPE-ceiling dimension
     "as_prescribed":       {...},   # #3714 — the AND of the two, never their average
+    "as_prescribed_by_kind": {"lifting": {...}|None, "cardio": {...}|None},  # #5058
   }
+
+LIFTING AND CARDIO ARE GRADED APART (#5058, owner ruling 2026-10-23). One cycling block with an
+RPE ceiling and no RPE logged used to turn the whole session `unknown` — the 2026-10-21 session's
+24 lifting sets, all inside their ceilings, read no verdict at all. Each movement now carries its
+`kind` (cardio by `program_structure.classify_movement`, everything else lifting) and each kind
+gets its own `_as_prescribed` verdict over its own sets and its own intensity rollup
+(`as_prescribed_by_kind`). The session's `as_prescribed` is the lifting verdict on a day that
+programmed lifting (`scope: "lifting"`, with the cardio verdict named beside it when it is not
+`yes`), the cardio verdict on a cardio-only day. `overall_pct` and `intensity_adherence` keep
+their whole-session meaning — they are stored on every earlier record.
 
 TWO DIMENSIONS, NEVER ONE NUMBER (#3714). Adherence used to be set-count overlap
 alone, so the 2026-09-07 push session read `overall_pct: 100.0` while its incline DB
@@ -456,6 +467,71 @@ def _as_prescribed(sets_pct: float, intensity: dict[str, Any], movements: list[d
     return {"verdict": "yes", "reasons": []}
 
 
+KIND_LIFTING = "lifting"
+KIND_CARDIO = "cardio"
+KINDS = (KIND_LIFTING, KIND_CARDIO)
+
+
+def _kind_of(movement_key: str, catalog: dict[str, Any], alias_titles: dict[str, str]) -> str:
+    """#5058 (owner ruling 2026-10-23): `cardio` when the movement's title classifies as cardio
+    (`program_structure.classify_movement`, the same classifier the program default reads), else
+    `lifting`. A movement with no resolvable title is lifting — the pre-ruling whole-session grade."""
+    title = _movement_title_for_classification(movement_key, catalog, alias_titles)
+    return KIND_CARDIO if title and classify_movement(title) == "cardio" else KIND_LIFTING
+
+
+def _sets_pct(rows: list[tuple[str, int, int]]) -> float:
+    """Set completion over (muscle, programmed, performed) rows — `overall_pct`'s own per-muscle arithmetic."""
+    prog: dict[str, int] = {}
+    perf: dict[str, int] = {}
+    for muscle, p, d in rows:
+        prog[muscle] = prog.get(muscle, 0) + p
+        perf[muscle] = perf.get(muscle, 0) + d
+    total = sum(prog.values())
+    done = sum(min(prog[m], perf.get(m, 0)) for m in prog)
+    return round((done / total) * 100, 1) if total else 0.0
+
+
+def _as_prescribed_by_kind(movements: list[dict[str, Any]], muscle_of: dict[str, str]) -> dict[str, Any]:
+    """#5058 (owner ruling 2026-10-23, "grade lifting and cardio separately"): one `_as_prescribed`
+    verdict per kind, each over its own movements — its own set completion and its own intensity
+    rollup. A kind the routine did not program is None (absent, never `yes`). An un-RPE'd cardio
+    block reads `unknown` on the cardio verdict and no longer touches the lifting one."""
+    out: dict[str, Any] = {}
+    for kind in KINDS:
+        mine = [m for m in movements if m.get("kind") == kind]
+        if not mine:
+            out[kind] = None
+            continue
+        pct = _sets_pct([(muscle_of.get(m["movement_key"], "unknown"), m["programmed_sets"], m["performed_sets"]) for m in mine])
+        rollup = _intensity_rollup(mine)
+        out[kind] = {
+            **_as_prescribed(pct, rollup, mine),
+            "sets_pct": pct,
+            "intensity_status": rollup["status"],
+            "movements": sorted(m["movement_key"] for m in mine),
+        }
+    return out
+
+
+def _session_verdict(by_kind: dict[str, Any], whole: dict[str, Any]) -> dict[str, Any]:
+    """The session's `as_prescribed`: the LIFTING verdict when the routine programmed any lifting, else the
+    cardio verdict (a cardio-only day), else the whole-session one. `scope` names which it is; a cardio
+    verdict other than `yes` on a lifting day is carried as one named line, never as the session's verdict."""
+    lift, cardio = by_kind.get(KIND_LIFTING), by_kind.get(KIND_CARDIO)
+    if lift is None and cardio is None:
+        return {**whole, "scope": "session"}
+    chosen: dict[str, Any] = lift if lift is not None else cardio
+    scope = KIND_LIFTING if lift is not None else KIND_CARDIO
+    out = {"verdict": chosen["verdict"], "reasons": list(chosen["reasons"]), "scope": scope}
+    if scope == KIND_LIFTING and cardio is not None and cardio["verdict"] != "yes":
+        out["cardio_verdict"] = cardio["verdict"]
+        out["cardio_note"] = f"cardio graded on its own: {cardio['verdict']}" + (
+            f" ({'; '.join(cardio['reasons'])})" if cardio["reasons"] else ""
+        )
+    return out
+
+
 def _working(sets: Any) -> int:
     """Count of non-warm-up sets, on IR `Set`s or performed-set dicts (#5008 C4)."""
     n = 0
@@ -520,6 +596,7 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
     movements: list[dict[str, Any]] = []
     per_muscle_programmed: dict[str, int] = {}
     per_muscle_performed: dict[str, int] = {}
+    muscle_of: dict[str, str] = {}
     for p in programmed:
         performed_sets = performed_by_tid.get(p["template_id"], 0)
         pct = round(min(1.0, performed_sets / p["sets"]) * 100, 1) if p["sets"] else 0.0
@@ -543,9 +620,11 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
                 "performed_working_sets": performed_working_by_tid.get(p["template_id"], 0),
                 "pct": pct,
                 "intensity": intensity,
+                "kind": _kind_of(p["movement_key"], catalog, alias_titles),  # #5058: lifting and cardio are graded apart
             }
         )
         muscle = _catalog_entry_for(p["movement_key"], catalog).get("primary_muscle", "unknown")
+        muscle_of[p["movement_key"]] = muscle
         per_muscle_programmed[muscle] = per_muscle_programmed.get(muscle, 0) + p["sets"]
         per_muscle_performed[muscle] = per_muscle_performed.get(muscle, 0) + performed_sets
 
@@ -562,6 +641,7 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
     overall_pct = round((total_performed / total_programmed) * 100, 1) if total_programmed else 0.0
 
     intensity_adherence = _intensity_rollup(movements)
+    by_kind = _as_prescribed_by_kind(movements, muscle_of)
 
     return {
         "overall_pct": overall_pct,
@@ -574,7 +654,9 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
             "performed_sets": total_performed,
         },
         "intensity_adherence": intensity_adherence,
-        "as_prescribed": _as_prescribed(overall_pct, intensity_adherence, movements),
+        # #5058 (owner ruling 2026-10-23): the lifting verdict on a lifting day; cardio is graded on its own
+        "as_prescribed": _session_verdict(by_kind, _as_prescribed(overall_pct, intensity_adherence, movements)),
+        "as_prescribed_by_kind": by_kind,
         "per_muscle": per_muscle,
         "movements": movements,
         "missing": missing,

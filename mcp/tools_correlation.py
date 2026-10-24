@@ -5,6 +5,7 @@ Correlation tools: caffeine, exercise, zone2, alcohol vs sleep.
 from datetime import datetime, timedelta
 
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from health import hr_regime  # #5029: THE dated HR regime markers — Zone 2 is counted in heart-rate zones
 from training import zone2_minutes as z2m  # #4627: THE Zone 2 computation (shared with /api/zone2 + /api/training_overview)
 
 from mcp.core import query_source
@@ -168,6 +169,8 @@ def tool_get_zone2_breakdown(args):
         "sport_type_zone2": z2m.sport_breakdown(sessions),
         "trend": trend,
         "alerts": _zone2_alerts(avg_z2_weekly, weekly_target_min, zones, sessions),
+        # #5029: inside an HR regime marker's window (as of end_date) the block says re-baselining.
+        "hr_regime": hr_regime.regime_status(end_date),
         "methodology": (
             "Minutes actually spent in each recording device's own Zone 2 band, from the stored time-in-zone rows "
             "(Whoop workout zones; Strava activity zones). Each session is counted once across sources — Whoop's own "

@@ -120,6 +120,12 @@
       "stack": "monitoring_budget_alarms",
       "via": "declaration"
     },
+    "calibration-deadman": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "mcp_stack",
+      "via": "declaration"
+    },
     "canary-no-invocations-1h": {
       "kind": "metric",
       "routing": "digest",
@@ -1017,7 +1023,7 @@
   ],
   "cost_surface": {
     "ai_features": 30,
-    "alarms": 140,
+    "alarms": 141,
     "emf_namespaces": 33,
     "schedules": 97,
     "secrets": 30
@@ -2914,13 +2920,6 @@
       "via": "fixed-seam"
     },
     {
-      "direction": "unknown",
-      "lambda": "partner-weekly-email",
-      "module": "lambdas/emails/partner_email_lambda.py",
-      "partition": "notion",
-      "via": "pk"
-    },
-    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/emails/podcast_script_v2.py",
@@ -3155,6 +3154,13 @@
       "direction": "unknown",
       "lambda": null,
       "module": "lambdas/health/checkin_intake_pairs.py",
+      "partition": "checkin_intake_pairs",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/health/checkin_partner_view.py",
       "partition": "checkin_intake_pairs",
       "via": "pk"
     },
@@ -4116,6 +4122,13 @@
       "module": "lambdas/training/calibration_cadence.py",
       "partition": "dexa",
       "via": "local-seam"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/calibration_cadence.py",
+      "partition": "food_delivery",
+      "via": "pk"
     },
     {
       "direction": "read",
@@ -8031,13 +8044,13 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead"
     },
     "counts": {
-      "alarms": 140,
+      "alarms": 141,
       "alarms_by_routing": {
         "digest": 96,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
-        "urgent": 26,
+        "urgent": 27,
         "via-composite": 3
       },
       "alarms_composite": 4,
@@ -8045,7 +8058,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 779,
+      "edges": 780,
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
@@ -8059,9 +8072,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 378,
-        "sites_resolved": 980,
-        "sites_total": 1358
+        "sites_dynamic": 380,
+        "sites_resolved": 981,
+        "sites_total": 1361
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8374,7 +8387,7 @@
       "category": "Manual logs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "Manual log (paused: no orders logged since March)",
+      "method": "Manual CSV upload every ~6 months (an upload ritual, paused between uploads; reminder via the calibration cadence)",
       "privacy_tier": "public",
       "stale_hours": 336
     },

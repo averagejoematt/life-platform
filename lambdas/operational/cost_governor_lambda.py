@@ -240,48 +240,34 @@ MONTHLY_CEILING = float(os.environ.get("MONTHLY_CEILING_USD", "215"))
 # structural guard; keeping the pair coherent here means it never has to fire.
 SURGE_CEILING_USD = float(os.environ.get("SURGE_CEILING_USD", "252"))
 SSM_SURGE_PARAM = os.environ.get("SURGE_ACTIVE_PARAM", "/life-platform/surge-active")
-# AUGUST 2026 ONLY (auto-reverts 2026-09-01, no manual step): Matthew's call on
-# 2026-08-09 (#2381) — decided in week 2 on purpose, not in a cutoff scramble
-# like July's. The 08-09 governor read: mtd $32.51, projected $121.79 against
-# the $85 base, ~$3.9/day run-rate; _decide_tier's actual+1 cap put the tier-2
-# reader-narrative pause on track for mid-month, and this month a tier-2 pause
-# also silences the new Telegram coach chat (ADR-151 budget-ranks it with the
-# daily brief). Raised for ONE month; September reverts
-# automatically to the base pair below — now $215/$252 per the 2026-08-28
-# amendment (#2801), not the $85/$100 in effect when this window was written.
-#
-# $115/$135 deliberately repeats the July-2026 amendment's shape: the tier bands
-# are fixed FRACTIONS of the ceiling (≈73/87/97%), so one raised number moves
-# the whole ladder coherently (the July rationale for $115-not-$110 is in the
-# ADR-133 2026-07-21 amendment; this window is the 2026-08-09 amendment).
-#
-# The surge value moves WITH the base ($135 keeps the same ~1.18 ratio as 85→100).
-# It has to: _effective_ceiling returns the surge ceiling unconditionally, so a
-# surge ceiling BELOW the base would tighten the guard exactly when readers
-# arrive. _effective_ceiling now floors it with max() as a structural guard, but
-# keeping the pair coherent here means that floor never has to fire.
-_TEMP_CEILING_WINDOW = (date(2026, 8, 1), date(2026, 9, 1))  # [start, end)
-# 2026-08-16 (#2734, second August amendment): $115/$135 → $200/$235. Measured
-# mid-month: mtd $93.65, projection $230.58 (171% of the $135 surge ceiling),
-# tier-1 the default state since Aug 5 and the sustained-7d alarm lit. Matthew's
-# explicit call (interactive session): accept the overrun, raise August only.
-# $200 keeps the tier ladder meaningful against the real projection (bands at
-# ≈$146/$174/$194) instead of pinning tier 3 for the back half of the month;
-# surge keeps the ~1.18 ratio. The window's END DATE IS UNCHANGED — September
-# still reverts automatically — to $215/$252 as of the 2026-08-28 amendment.
-# The AWS Budgets backstop moves WITH the base (core_stack.py, resolved at synth
-# time by parsing THIS file); it was deliberately left low through August so the
-# temporary overrun kept signalling, and that reason expires with the window.
-_TEMP_CEILING_USD = 200.0
-_TEMP_SURGE_CEILING_USD = 235.0
+# OCTOBER 2026 ONLY (auto-reverts 2026-11-01, no manual step): Matthew's call on
+# 2026-10-18 (#5135) — "lets up the budget just for october this time", choosing
+# $300. The 10-18 governor read: Cost Explorer MTD $134.69, governor MTD $154.42,
+# recurring-only projection $204.18, all-classes projection $262.73 against the
+# $215 base; tier 1 since 2026-10-12 and tier 2 forecast for 2026-10-20, with two
+# owner-approved charter builds (epics #5067 and #5091-#5094) about to fan out.
+# The window's END DATE is the revert: on 2026-11-01 the pair falls back to the
+# permanent $215/$252 above with no deploy, no SSM flip and no human step.
+# $300 puts the bands (fixed FRACTIONS of the ceiling) at ≈$220/$260/$292: with
+# _decide_tier's actual+1 cap, tier 2 then needs real MTD past $220 instead of
+# pausing reader narratives from 10-20. $352 = 300 x ~1.173, the
+# established surge ratio: _effective_ceiling returns the surge ceiling
+# unconditionally, so it must never sit below the base (the max() floor there is
+# the structural guard; keeping the pair coherent means it never has to fire).
+# The AWS Budgets backstop (core_stack.py) parses MONTHLY_CEILING only, so it
+# stays at the permanent base through this window — notice-only, by design.
+# History: August 2026 used this same mechanism at $200/$235 (ADR-133 amendments
+# 2026-08-09 and 2026-08-16, #2381/#2734).
+_TEMP_CEILING_WINDOW = (date(2026, 10, 1), date(2026, 11, 1))  # [start, end)
+_TEMP_CEILING_USD = 300.0
+_TEMP_SURGE_CEILING_USD = 352.0
 # One sentence of WHY, carried in the breakdown payload so a public receipt can
 # explain its own raised ceiling instead of leaving the delta unattributed
 # (#1999). Reader-facing prose: no dollar figures (the payload carries those),
 # no operator jargon.
 _TEMP_CEILING_REASON = (
-    "A one-month raise Matthew approved (2026-08-09, raised again 2026-08-16 against the measured "
-    "month-end projection — ADR-133 amendments) so the reader-facing AI and the coach chat stay on "
-    "through August instead of pausing mid-month. It reverts on its own date."
+    "A one-month raise Matthew approved on 2026-10-18 so the reader-facing AI stays on through "
+    "October while two large planned builds run. It reverts on its own date."
 )
 # An explicit MONTHLY_CEILING_USD in the environment is an operator override and
 # defeats the window entirely — otherwise setting the env var during July would
@@ -543,13 +529,13 @@ def _active_ceilings() -> tuple[float, float]:
 
     Mirrors _active_thresholds: a calendar-scoped override that reverts on its
     own date rather than needing anyone to remember. See _TEMP_CEILING_WINDOW
-    for why August 2026 is raised and what its pair is.
+    for why October 2026 is raised and what its pair is.
     """
     if _CEILING_ENV_OVERRIDE:
         return MONTHLY_CEILING, SURGE_CEILING_USD
     start, end = _TEMP_CEILING_WINDOW
     # utc-exempt(#2798): the dated ceiling window is scoped to a BILLING month (ADR-133's
-    # August raise reverts as the AWS budget month rolls). Pacific would revert it 7-8h late.
+    # dated raise reverts as the AWS budget month rolls). Pacific would revert it 7-8h late.
     if start <= datetime.now(timezone.utc).date() < end:
         return _TEMP_CEILING_USD, _TEMP_SURGE_CEILING_USD
     return MONTHLY_CEILING, SURGE_CEILING_USD

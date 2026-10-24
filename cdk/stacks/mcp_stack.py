@@ -314,6 +314,36 @@ class McpStack(Stack):
         )
         battery_missed_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
+        # ── #5203: the calibration dead-man's email alarm ─────────────────────────────
+        # Owner ruling 2026-10-23: the missed tape/photo alert reaches him by BOTH a plain fixed-text Telegram
+        # message (coach.calibration_deadman_alert, any budget tier) AND this alarm. mcp/calibration_leg.py rides
+        # the 02:00Z pre-draft and emits CalibrationDeadman{Job=calibration} = the number of kinds at the dead-man
+        # (0 on a clean night). Its liveness is the pre-draft's dead-man above (same run), so missing data is NOT a
+        # breach. ALERTS topic (immediate email), not the digest: this is the owner-ruled delivery channel of a
+        # dead-man, and it emails once per transition into ALARM, not per night.
+        calibration_deadman_alarm = cloudwatch.Alarm(
+            self,
+            "CalibrationDeadman",
+            alarm_name="calibration-deadman",
+            alarm_description=(
+                "#5203: a calibration (tape, progress photos, or the titration run) has gone its dead-man count of "
+                "cycles with nothing logged. Log it this week; the CALIB_DEADMAN log line in "
+                "/aws/lambda/life-platform-mcp-warmer names the kind and the last logged date."
+            ),
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/HevyRoutine",
+                metric_name="CalibrationDeadman",
+                dimensions_map={"Job": "calibration"},
+                period=Duration.seconds(86400),
+                statistic="Maximum",
+            ),
+            evaluation_periods=1,
+            threshold=1,
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        calibration_deadman_alarm.add_alarm_action(cw_actions.SnsAction(local_alerts_topic))
+
         # ── #809: recursive-invocation guard (adopted from the 2026-05-25 orphan batch) ──
         # AWS drops Lambda invocations it detects as recursive; a nonzero
         # RecursiveInvocationsDropped on the MCP server would indicate a serious

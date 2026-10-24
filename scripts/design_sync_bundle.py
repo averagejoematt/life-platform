@@ -774,7 +774,9 @@ def _build_reference_pages(repo_root: Path, out_dir: Path) -> None:
     ]
 
     pages = [
-        ("index.html", "home.html", "story.css", ['src="/assets/js/story.js"']),
+        # #4588: since the cut-over site/index.html is the kit front page (clean.css, no tokens.css); the v5
+        # home this design system documents is its reference copy, kept as it was last served.
+        ("reference/2026-10-22-home-v5/index.html", "home.html", "story.css", ['src="/assets/js/story.js"']),
         ("cockpit/index.html", "cockpit.html", "cockpit.css", ['src="/assets/js/cockpit.js"']),
         ("data/index.html", "data-hub.html", "evidence.css", ['src="/assets/js/evidence.js"']),
     ]

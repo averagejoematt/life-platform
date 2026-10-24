@@ -125,6 +125,9 @@ def _routes(context):
     context.route("**/journal/**", _json({}))
 
 
+REF_HOME = "/reference/2026-10-22-home-v5/"  # the v5 home, kept as a reference copy since the #4588 cut-over
+
+
 @pytest.fixture(scope="module")
 def pre_start_pages():
     """One browser pass over the three pre-start surfaces; yields body texts + errors."""
@@ -144,7 +147,8 @@ def pre_start_pages():
                 pytest.skip(f"playwright chromium unavailable: {e}")
             context = browser.new_context(viewport={"width": 1440, "height": 900}, service_workers="block")
             _routes(context)
-            for path in ("/", "/cockpit/", "/data/character/"):
+            # #4588: the v5 home is the reference copy since the 2026-10-22 cut-over; this guards the stored layout, not the kit front page.
+            for path in (REF_HOME, "/cockpit/", "/data/character/"):
                 page = context.new_page()
                 errors = []
                 page.on("pageerror", lambda e, _errs=errors: _errs.append(str(e)))
@@ -187,7 +191,7 @@ def _assert_no_leaks(res, path):
 
 
 def test_home_counts_down(pre_start_pages):
-    res = pre_start_pages["/"]
+    res = pre_start_pages[REF_HOME]
     text = res["text"].lower()
     dial_copy = pre_start_pages["_dial_copy"]
     assert dial_copy and dial_copy.get("cap"), "dialCopy() returned nothing for the pre-start payload"
@@ -196,7 +200,7 @@ def test_home_counts_down(pre_start_pages):
     assert "awaiting day 1" in text  # the family panel's neutral state
     assert "days into the experiment" not in text  # the running-state caption is gone
     assert "since june 14 2026" not in text  # the running-state genesis stamp is hidden
-    _assert_no_leaks(res, "/")
+    _assert_no_leaks(res, REF_HOME)
 
 
 def test_the_derived_caption_would_have_caught_the_3584_drift(pre_start_pages):

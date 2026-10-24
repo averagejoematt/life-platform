@@ -84,7 +84,8 @@ def indexable(p: Path) -> bool:
         html = p.read_text(encoding="utf-8")
     except OSError:
         return False
-    return 'name="robots" content="noindex"' not in html
+    # #4588: a reference copy of a replaced layout asserts `noindex,nofollow`; the prefix match sees both forms.
+    return 'name="robots" content="noindex' not in html
 
 
 def _fetch_posts() -> list[dict]:

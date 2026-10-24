@@ -91,12 +91,22 @@ def _metric_period(start: datetime, end: datetime) -> int:
 
     CloudWatch requires Period to be a multiple of 60, and arbitrary now-anchored
     windows (month-to-date, --days) almost never land on one — so round the window
-    length UP to the next minute (up, never down: a shorter period would split the
-    window into more than one bucket and break the one-bucket-sum contract).
-    Floor of 60 for degenerate/empty windows. (#1335)
+    length UP (up, never down: a shorter period would split the window into more
+    than one bucket and break the one-bucket-sum contract). (#1335)
+
+    #5136: rounded to a multiple of 3600, not 60. CloudWatch only serves data older than
+    15 days at 5-minute resolution and older than 63 days at 1-hour resolution, and a
+    Period that is not a multiple of that resolution does not error — it silently returns
+    only the RECENT datapoints. Measured 2026-10-23 for `--month 2026-10` (period 1,972,560 s,
+    a multiple of 60 but not of 300): the `unknown` row read $0.16 against its true $30.88,
+    visual-ai-qa $7.89 against $10.63, and the AWS/Bedrock "authoritative" footer $59.36
+    against $110.84 — so the "self-reported covers 98%" line was comparing two equally
+    truncated numbers. Two identical runs of that output diff clean, which is why the
+    run-twice check could not see it. The same window at a 3600-multiple returns every
+    datapoint. Rounding UP keeps the one-bucket contract (period >= window).
     """
     seconds = max(int((end - start).total_seconds()), 60)
-    return -(-seconds // 60) * 60  # ceil-divide by 60, back to seconds
+    return -(-seconds // 3600) * 3600  # ceil-divide by 3600, back to seconds
 
 
 def _window(args) -> tuple[datetime, datetime, str]:

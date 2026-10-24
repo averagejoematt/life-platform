@@ -62,9 +62,13 @@ def test_standardized_pages_embed_canonical_footer():
     for rel in ("404.html", "privacy/index.html", "subscribe/index.html", "subscribe/confirm/index.html"):
         html = _read(rel)
         assert canonical in html, f"{rel} lost the canonical site_footer()"
+    # #4588: since the cut-over `/` is the kit front page with the kit footer; the v5 home with its
+    # canonical footer + live asof stamp is the reference copy, kept as it was last served.
     home = _read("index.html")
-    assert v4_chrome.site_footer(with_asof=True) in home, "home lost the canonical footer (with the asof stamp)"
-    assert 'data-bind="asof"' in home, "home lost the live 'updated' stamp (story.js binds it)"
+    assert '<footer class="ck-footer">' in home, "the kit front page lost the kit footer"
+    ref = _read("reference/2026-10-22-home-v5/index.html")
+    assert v4_chrome.site_footer(with_asof=True) in ref, "the v5 home reference copy lost the canonical footer (with the asof stamp)"
+    assert 'data-bind="asof"' in ref, "the v5 home reference copy lost the live 'updated' stamp (story.js binds it)"
 
 
 def test_no_content_page_keeps_a_variant_footer():

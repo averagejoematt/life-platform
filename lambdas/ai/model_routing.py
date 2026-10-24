@@ -175,7 +175,6 @@ ROUTES: dict[str, Route] = {
     "challenge_generator": Route(tier=_W, env="AI_MODEL"),
     "coach_chat_summary": Route(tier=_W, model=_HAIKU_4_5_PROFILE, env="AI_MODEL_HAIKU"),
     "coach_checkin": Route(tier=_W, env="AI_MODEL_HAIKU"),
-    "coach_daily_reflection": Route(tier=_W, env="AI_MODEL_HAIKU"),
     "coach_telegram": Route(tier=_N, env="AI_MODEL"),
     "coach_thread_extract": Route(tier=_W, env="AI_MODEL_HAIKU"),
     "daily_insight": Route(tier=_W, env="AI_MODEL_HAIKU"),

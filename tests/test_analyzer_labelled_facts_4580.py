@@ -112,10 +112,17 @@ def test_restart_as_a_verb_is_not_a_cycle_reference():
     assert lf.reader_surface_findings("I've asked him to restart one of those two channels this week.") == []
 
 
+# The same read with BOTH reader-surface defects removed: the cycle reference (#4580 A-X1) and the journal's
+# silence (#5131 — the read also narrated it, and reader_safe now refuses that class on its own).
+_CYCLE_PHRASE = " after a previous cycle that stalled in the final phase"
+_SILENCE_PHRASE = ", and his journal entries have been silent for forty days"
+FIXED_READ = LEAD_READ_2026_10_18.replace(_CYCLE_PHRASE, "").replace(_SILENCE_PHRASE, "")
+
+
 def test_audience_guard_holds_the_public_slot_empty():
     assert audience_guard.reader_safe(LEAD_READ_2026_10_18, coach_id="integrator") is None
-    fixed = LEAD_READ_2026_10_18.replace(" after a previous cycle that stalled in the final phase", "")
-    assert audience_guard.reader_safe(fixed, coach_id="integrator") == fixed
+    assert audience_guard.reader_safe(LEAD_READ_2026_10_18.replace(_CYCLE_PHRASE, ""), coach_id="integrator") is None  # #5131
+    assert audience_guard.reader_safe(FIXED_READ, coach_id="integrator") == FIXED_READ
 
 
 # ── wired into the analyzer's ONE chokepoint ─────────────────────────────────
@@ -214,5 +221,4 @@ def test_the_stored_read_is_not_served_to_readers():
 
 
 def test_serve_side_control_a_clean_read_still_serves():
-    fixed = LEAD_READ_2026_10_18.replace(" after a previous cycle that stalled in the final phase", "")
-    assert _served_digest(public_summary=fixed, analysis="You logged well.")["analysis"] == fixed
+    assert _served_digest(public_summary=FIXED_READ, analysis="You logged well.")["analysis"] == FIXED_READ

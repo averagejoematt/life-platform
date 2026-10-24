@@ -3751,3 +3751,53 @@ STRUCTURAL_HAND_PROOFS["structural::test_habit_tier_set_guard_5232.py"] = {
     ),
     "proved_on": "2026-10-20",
 }
+# ── #4588 (2026-10-18): the cut-over's "every existing URL still resolves" gate ─────────────
+# `tests/test_v4_redirects_function.py` became a structural gate when the cut-over rehearsal
+# added `test_every_existing_url_still_resolves_4588` (an os.walk of site/). The mutations are
+# the cut-over's own failure modes, each planted in the real tracked files and reverted.
+GUARD_PROOFS["structural::test_v4_redirects_function.py"] = {
+    "gate_name": "test_v4_redirects_function.py",
+    "command": "python3 -m pytest tests/test_v4_redirects_function.py::test_every_existing_url_still_resolves_4588 -q   # baseline 1 passed",
+    "mutation": (
+        "M1: the `/start/` -> `/` 301 put back into deploy/generated/v4_redirects_function.js (the edge left "
+        "unpublished after the cut-over). M2: site/coaches/index.html moved away (a cut-over page missing). "
+        "M3: site/story/about/index.html deleted (an existing page dropped)."
+    ),
+    "observed": (
+        "M1 1 failed: `pages under site/ that a 301 shadows at the edge: ['/start/']`. M2 1 failed: `URLs that no "
+        "longer resolve to a file under site/: ['/coaches/']`. M3 1 failed: `URLs that no longer resolve to a file "
+        "under site/: ['/about/', '/dispatches/about/', '/mission/', '/story/about/']`. REVERTED: 1 passed. "
+        "Watched 2026-10-18 in the #4588 lane, re-run on the rebuilt rehearsal; re-run 2026-10-23 on the refresh onto ea6f23cb4."
+    ),
+    "scope": (
+        "Offline only: a URL resolves when the edge function's hops end on a file under site/. The URL set is "
+        "the site/ pages, the committed sitemap and every redirect source, so a page that is in none of those "
+        "and is deleted is not seen (it leaves the set with its file). Says nothing about the live edge — the "
+        "published CloudFront function can lag deploy/generated/ until the owner publishes it — nor about the "
+        "generated-content origin (/journal/posts/week-*), which KNOWN_UNRESOLVED_4588 names."
+    ),
+    "proved_on": "2026-10-23",
+}
+
+STRUCTURAL_HAND_PROOFS["structural::test_journal_silence_public_surfaces_5131.py"] = {
+    "gate_name": "test_journal_silence_public_surfaces_5131.py",
+    "command": "python3 -m pytest tests/test_journal_silence_public_surfaces_5131.py -q   # baseline 9 passed",
+    "mutation": (
+        "Three, each applied by a scratch script and restored before the next: (a) lambdas/web/site_api_lambda.py's "
+        "`return guard_api_response(result, logger)` reverted to `return result`; (b) the public_body() wrap removed from "
+        "lambdas/compute/coach_memoir_lambda.py's put_object Body; (c) a new lambdas/web/planted_5131_probe.py writing "
+        "`generated/planted.json` with put_object, then deleted."
+    ),
+    "observed": (
+        "MUTATED: (a) test_every_site_api_route_serves_no_journal_silence failed naming 140 routes; (b) "
+        "test_every_derived_surface_is_classified failed 'compute/coach_memoir_lambda.py is GUARDED but never calls'; (c) the "
+        "same test failed 'NEW public writer web/planted_5131_probe.py is unclassified'. Restored: 9 passed. Watched 2026-10-23."
+    ),
+    "scope": (
+        "Derives the reader-facing writer set by AST: Function-URL Lambdas in cdk/stacks, lambdas/ modules with an S3 write "
+        "call plus a `generated/...` constant, and lambdas/ modules calling an SES send. Does NOT see a generated/ writer "
+        "whose key is built only from a constant imported from another module, an S3 write through a non-boto helper, or a "
+        "guarded module that calls the guard on one write and not another (the check is per module)."
+    ),
+    "proved_on": "2026-10-23",
+}

@@ -29,7 +29,7 @@ from ai.ai_context import build_experiment_phase_context, format_experiment_phas
 from ai.model_routing import model_for  # #4770: the one model registry
 from boto3.dynamodb.conditions import Key
 from coach import coach_derived_prose, persona_registry  # #2418: served_summary falls back to gated `content`
-from common import media_tombstone  # #4365: a restart tombstone is not a published episode
+from common import journal_silence, media_tombstone  # #4365: a tombstone is not an episode; #5131: the public-surface guard
 from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
@@ -302,7 +302,7 @@ def _safety_gate(text: str) -> list:
 
 def _synthesize_dialogue(turns: list) -> bytes:
     audio = b""
-    for t in turns:
+    for t in journal_silence.spoken_turns(turns):  # #5131: scrubbed before TTS
         gain = _INTRO_VOLUME_GAIN.get(t["speaker"], 0.0) if "_INTRO_VOLUME_GAIN" in globals() else 0.0
         audio += google_tts.synthesize(t["line"], _voice(t["speaker"]), volume_gain_db=gain)
     return audio
@@ -388,7 +388,7 @@ def _write_indexes(episodes: list) -> None:
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=f"{PREFIX}/episodes.json",
-        Body=json.dumps(_panel_retire().index_doc(episodes, _g=globals()), indent=1),  # #4536: keeps the retired weeks
+        Body=journal_silence.public_body(json.dumps(_panel_retire().index_doc(episodes, _g=globals()), indent=1)),  # #4536
         ContentType="application/json",
         CacheControl="max-age=3600, public",
     )
@@ -436,7 +436,7 @@ def _write_indexes(episodes: list) -> None:
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=f"{PREFIX}/feed.xml",
-        Body=feed,
+        Body=journal_silence.public_body(feed),
         ContentType="application/rss+xml; charset=utf-8",
         CacheControl="max-age=3600, public",
     )
@@ -464,7 +464,7 @@ def _set_pending(week, reason: str, display: str, expected_date=None) -> None:
         s3.put_object(
             Bucket=S3_BUCKET,
             Key=f"{PREFIX}/episodes.json",
-            Body=json.dumps(doc, indent=1),
+            Body=journal_silence.public_body(json.dumps(doc, indent=1)),
             ContentType="application/json",
             CacheControl="max-age=3600, public",
         )
@@ -639,7 +639,7 @@ def _seed_series_state(bible: dict, ep: dict) -> None:
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=SERIES_STATE_KEY,
-        Body=json.dumps(state, indent=2).encode("utf-8"),
+        Body=journal_silence.public_body(json.dumps(state, indent=2).encode("utf-8")),
         ContentType="application/json",
         CacheControl="max-age=300, public",
     )
@@ -881,7 +881,7 @@ def _run_intro(dry_run: bool = False) -> dict:
         stripped = _SIGNOFF_RE.sub("", turns[-1]["line"]).rstrip()
         if stripped:
             turns[-1]["line"] = stripped
-    turns.append({"speaker": ELENA, "line": INTRO_SIGNOFF})
+    turns = journal_silence.spoken_turns(turns + [{"speaker": ELENA, "line": INTRO_SIGNOFF}])  # #5131: before preview, TTS, transcripts
 
     label_of = {ELENA: "Elena", INTRO_GUEST_ID: "Eli"}
     # Dry run: write only the transcript (Bedrock cost only, no Gemini audio) so the
@@ -892,7 +892,7 @@ def _run_intro(dry_run: bool = False) -> dict:
         s3.put_object(
             Bucket=S3_BUCKET,
             Key=f"{PREFIX}/wk0.draft.transcript.txt",
-            Body=preview.encode("utf-8"),
+            Body=journal_silence.public_body(preview.encode("utf-8")),
             ContentType="text/plain; charset=utf-8",
             CacheControl="max-age=60, public",
         )
@@ -921,7 +921,7 @@ def _run_intro(dry_run: bool = False) -> dict:
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=f"{PREFIX}/wk0.transcript.txt",
-        Body=transcript.encode("utf-8"),
+        Body=journal_silence.public_body(transcript.encode("utf-8")),
         ContentType="text/plain; charset=utf-8",
         CacheControl="max-age=300, public",
     )
@@ -1485,7 +1485,7 @@ def _email_subscribers(ep: dict, test_to: str = None) -> dict:
         if not email:
             continue
         try:
-            subject, html = _subscriber_email(ep, email)
+            subject, html = map(journal_silence.reader_mail, _subscriber_email(ep, email))  # #5131
             ses.send_email(
                 FromEmailAddress=SENDER,
                 Destination={"ToAddresses": [email]},
@@ -1774,11 +1774,11 @@ def _run_weekly(force: bool, dry_run: bool = False, week=None, approved: bool = 
     # PASS → synthesize single-pass, then commit (series_state + RSS LAST).
     label_of = {ELENA: "Elena", guest_id: (beats.get("guest") or {}).get("name", "Coach")}
     voices = {label_of[ELENA]: _gemini_voice(ELENA), label_of[guest_id]: _gemini_voice(guest_id)}
-    label_turns = [{"speaker": label_of.get(t["speaker"], "Elena"), "line": t["line"]} for t in clean]
+    label_turns = [{"speaker": label_of.get(t["speaker"], "Elena"), "line": t["line"]} for t in journal_silence.spoken_turns(clean)]
     style = WEEKLY_STYLE
     audio = gemini_tts.synthesize_dialogue(label_turns, voices, style)
     published = _publish_episode_audio(week, audio)
-    transcript = "\n\n".join(f"{label_of.get(t['speaker'], 'Elena')}: {t['line']}" for t in clean)
+    transcript = "\n\n".join(f"{label_of.get(t['speaker'], 'Elena')}: {t['line']}" for t in journal_silence.spoken_turns(clean))
     s3.put_object(
         Bucket=S3_BUCKET, Key=f"{PREFIX}/wk{week}.transcript.txt", Body=transcript.encode("utf-8"), ContentType="text/plain; charset=utf-8"
     )

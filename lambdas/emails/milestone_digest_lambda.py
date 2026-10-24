@@ -34,6 +34,7 @@ import os
 import boto3
 from coach import spiral_breaker  # noqa: F401 — registered celebratory emitter (#1627); used via check_celebration_allowed
 from common import send_ledger  # #3113 / DIL-025: the durable replay guard
+from common.journal_silence import reader_mail  # #5131: the one public-surface guard
 from common.pacific_time import pacific_today
 from common.secret_cache import get_secret_json
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
@@ -111,7 +112,7 @@ def _send(recipient: dict, reply_to: str | None, subject: str, body: str, dry_ru
     kwargs = {
         "FromEmailAddress": SENDER,
         "Destination": {"ToAddresses": [recipient["email"]]},
-        "Content": {"Simple": {"Subject": {"Data": subject}, "Body": {"Text": {"Data": body}}}},
+        "Content": {"Simple": {"Subject": {"Data": reader_mail(subject)}, "Body": {"Text": {"Data": reader_mail(body)}}}},
     }
     if reply_to:
         kwargs["ReplyToAddresses"] = [reply_to]

@@ -50,6 +50,7 @@ from decimal import Decimal  # noqa: F401 — kept for backward-compat with hand
 # third-party
 import boto3  # noqa: F401 — kept for handlers that create clients
 from boto3.dynamodb.conditions import Key
+from common.journal_silence import guard_api_response  # #5131: the one public-surface guard
 from common.metric_namespaces import SITE_API_METRIC_NAMESPACE  # #3002 — ONE spelling, imported, never retyped
 
 # bundled shared module
@@ -1275,4 +1276,4 @@ def lambda_handler(event, context):
         return _error(404, "Not found")
 
     _emit_route_log(result.get("statusCode", 200))
-    return result
+    return guard_api_response(result, logger)

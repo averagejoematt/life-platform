@@ -24,6 +24,7 @@ import json
 import urllib.request
 from datetime import datetime, timezone
 
+from common.journal_silence import public_body  # #5131: the one public-surface guard
 from common.pacific_time import PACIFIC as PT  # #2414: reader-facing dates anchor in the Pacific day
 
 from web.journey_direction import DOWN, EVEN, UNKNOWN, UP, classify_delta  # #3293: the ONE ruling on the sign of the journey delta
@@ -126,7 +127,7 @@ def _shell_html(kicker, title, desc, meta, body_html, moment_path, image_path, l
 
 
 def _put(s3, key, body, content_type, cache="max-age=3600"):
-    s3.put_object(Bucket=S3_BUCKET, Key=key, Body=body, ContentType=content_type, CacheControl=cache)
+    s3.put_object(Bucket=S3_BUCKET, Key=key, Body=public_body(body, content_type), ContentType=content_type, CacheControl=cache)
 
 
 def _put_moment(s3, mtype, mid, card_img, shell):

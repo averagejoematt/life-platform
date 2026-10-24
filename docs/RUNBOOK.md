@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-10-21 (v8.6.0 — 89 MCP tools, 81-module package, 108 Lambdas, 20 data sources)
+Last updated: 2026-10-23 (v8.6.0 — 89 MCP tools, 81-module package, 108 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 108 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -1465,7 +1465,7 @@ nonzero aborts the run and prints what already ran; `--continue-on-error` is the
 14. With `--sync-site` (opt-in, #1092): `bash deploy/sync_site_to_s3.sh` — the full-site
     content-hashed sync + rss.xml regen (deliberately NOT default: heavy + interactive;
     without the flag it stays a printed next command)
-15. `restart_verify_rendered.py --old-genesis <outgoing>` — hard gate over the 98-URL v4 surface (apply mode only)
+15. `restart_verify_rendered.py --old-genesis <outgoing>` — hard gate over the 100-URL v4 surface (apply mode only)
 16. `restart_verify_semantic.py` — **the #1093 semantic hard gate** (apply mode only): deterministic
     assertions on what the live site SAYS pre-start (`pre_start` flags on snapshot/journey, zeroed
     character, no current-cycle findings on /api/discoveries, coach_team dispute null-or-current-cycle,
@@ -2000,7 +2000,7 @@ What a revert does and does not change (read before flipping to `v04`):
 The coming week's calorie target is decided on the nightly pre-draft run (`mcp/titration_leg.py`, a fail-soft leg on `life-platform-mcp-warmer` at 02:00Z): it decides on a Pacific Friday night for the next ISO week and writes `USER#matthew#SOURCE#nutrition_titration / WEEK#<monday>` once (a conditional put; the Saturday and Sunday runs retry only if Friday's did not write). The rule is the charter's `nutrition.titration` block; the decision logic is `health.titration.decide`. The run's log line carries `NUTRITION_TITRATION_DECISION week=… action=… step=… code=…`; the pre-draft's `NIGHTLY_PREDRAFT` result line carries it under `titration`.
 
 - **Dry run (no write, any weekday):** `python3 -c "import sys; sys.path[:0]=['lambdas','.']; import json; from mcp import titration_leg as t; print(json.dumps(t.run(dry_run=True), indent=1, default=str))"` with read-only AWS credentials prints the decision the coming week would get.
-- **Dead-man:** from the charter's `nutrition.titration.dead_man.armed_from`, a week with no record is a `nutrition_titration` row at `missed_2` in `training.calibration_cadence`'s block: the calibration leg logs `CALIB_DEADMAN kind=nutrition_titration`, the row logs `NUTRITION_TITRATION_MISSED week=…`, and the Telegram event sweep sends the owner one alert per week (`CALIB_DEADMAN#nutrition_titration#<monday>`). The resolver falls back to the charter's `target_kcal` meanwhile.
+- **Dead-man:** from the charter's `nutrition.titration.dead_man.armed_from`, a week with no record is a `nutrition_titration` row at `missed_2` in `training.calibration_cadence`'s block: the calibration leg logs `CALIB_DEADMAN kind=nutrition_titration`, the row logs `NUTRITION_TITRATION_MISSED week=…`, and the owner gets one plain fixed-text Telegram alert per week at any budget tier (`coach.calibration_deadman_alert`, `CALIB_DEADMAN#nutrition_titration#<monday>`, #5203) plus the `calibration-deadman` email alarm on `CalibrationDeadman{Job=calibration}`. The resolver falls back to the charter's `target_kcal` meanwhile.
 - **A wrong decision:** never edit the row in place silently. Delete the week's row with an owner-attended AWS write (`aws dynamodb delete-item --key '{"pk":{"S":"USER#matthew#SOURCE#nutrition_titration"},"sk":{"S":"WEEK#<monday>"}}'`) before its Monday and the next weekend run re-decides it. A row deleted inside its own week is not re-decided: the charter's `target_kcal` serves for the rest of that week and the dead-man alerts.
 
 ### Public-site copy reminder

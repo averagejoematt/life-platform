@@ -265,7 +265,7 @@ def test_the_webhook_routes_the_events_to_the_channel_and_never_to_the_day_row(m
     t = FakeTable()
     monkeypatch.setattr(hae, "table", t)
     monkeypatch.setattr(hae, "get_api_key", lambda: "tok")
-    monkeypatch.setattr(hae, "save_raw_payload", lambda payload: "raw/matthew/health_auto_export/test.json")
+    monkeypatch.setattr(hae, "save_raw_payload", lambda payload, received=None: "raw/matthew/health_auto_export/test.json")
     payload = {"data": {"ecg": [ecg()], "heartRateNotifications": [notification()], "medications": [medication()]}}
     resp = hae.lambda_handler({"headers": {"authorization": "Bearer tok"}, "body": json.dumps(payload)}, _Ctx())
     assert resp["statusCode"] == 200

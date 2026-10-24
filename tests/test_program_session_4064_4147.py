@@ -100,15 +100,20 @@ def test_the_split_is_the_charters_five_sessions_in_the_owners_order():
     assert program_structure.SUPERSEDED_PROGRAMS["0.4"] is program_v04.SUPERSEDED
 
 
-def test_every_anchor_pattern_meets_its_charter_frequency_and_the_press_runs_three_times():
-    """Ruling 5: delts 3x/week — the overhead press anchors upper-heavy, shoulders+arms and upper-volume; every other
+def test_every_anchor_pattern_meets_its_charter_frequency_and_the_press_runs_once():
+    """#5162 (owner ruling 2026-10-23, "trade inside 75"): the overhead press anchors shoulders+arms only, 1 set — its other
+    8 weekly sets are lateral raises and face pulls, so delts are still trained 3x/wk (ruling 5) by direct work. Every other
     pattern stays at the charter's each-major-muscle 2x/wk."""
     counts: dict[str, int] = {}
     for role in program_structure.SESSION_SEQUENCE["session_roles"]:
         for pattern, _ in program_structure.SESSION_TEMPLATES[role]["anchors"]:
             counts[pattern] = counts.get(pattern, 0) + 1
     assert counts == {p: a["frequency_per_week"]["low"] for p, a in program_structure.ANCHORS.items()}
-    assert counts["overhead_press"] == charter_value("split.frequency.delts_per_wk") == 3
+    assert counts["overhead_press"] == charter_value("split.frequency.overhead_press_per_wk") == 1
+    assert [r for r, t in program_structure.SESSION_TEMPLATES.items() if any(p == "overhead_press" for p, _ in t["anchors"])] == [SA]
+    assert _rx(SA)["exposures"][0]["pattern"] == "overhead_press" and len(_rx(SA)["exposures"][0]["sets"]) == 1
+    delts = program_structure.weekly_sets_by_muscle(CATALOG["movements"])["delts"]
+    assert delts["frequency_per_wk"] >= charter_value("split.frequency.delts_per_wk") == 3
     assert {p: n for p, n in counts.items() if p != "overhead_press"} == {
         p: charter_value("split.frequency.each_major_muscle_per_wk") for p in program_structure.ANCHORS if p != "overhead_press"
     }
@@ -212,6 +217,9 @@ def test_sessions_fit_the_ceiling_and_the_week_total_sits_in_the_redline_band():
         if role == SA:
             # ruling 5: the aesthetic day's accessories ARE the session — stated on the template, not silently exempt
             assert len(tmpl["accessories"]) == 5 and "ruling 5" in tmpl["accessory_rule"]
+        elif role in (UH, UV):
+            # #5162: the press left these days for a delt accessory — four, stated on the template, never silently exempt
+            assert len(tmpl["accessories"]) == 4 and "#5162" in tmpl["accessory_rule"], role
         else:
             assert 2 <= len(tmpl["accessories"]) <= 3, role
 
@@ -303,12 +311,14 @@ def test_deload_cuts_about_40_percent_of_sets_and_keeps_every_top_set_and_anchor
 # ── #5069: the session's LENGTH (ruling 5: "60-75 min of lifting") and its shape ──────────────
 def test_every_session_fits_the_charters_lifting_minutes_untrimmed():
     """Each role's estimate (working + assumed warm-up sets x (set time + the exposure's rest)) is inside the charter's
-    cap with nothing trimmed. Upper-heavy by hand: bench 3+3 warm-up and row 3+1 at 180 s rest, the press 3+1 and the
-    pulldown 2 at 120 s, two accessories x 2 at 90 s, set time 45 s -> (6+4)x225 + 4x165 + 2x165 + 4x135 = 3780 s = 63.0 min."""
+    cap with nothing trimmed. Upper-heavy by hand before #5162: bench 3+3 warm-up and row 3+1 at 180 s rest, the press 3+1 and
+    the pulldown 2 at 120 s, two accessories x 2 at 90 s, set time 45 s -> (6+4)x225 + 4x165 + 2x165 + 4x135 = 3780 s = 63.0 min.
+    #5162 traded the press (3 sets + a warm-up at 120 s) for a 3-set lateral raise at 90 s: 67.5 -> 63.2 min."""
     cap = charter_value("split.session_minutes.lifting")[1]
     assert program_structure.lifting_minutes_cap() == cap == 75
     got = {r: _rx(r)["session_minutes"]["lifting_minutes"] for r in program_structure.SESSION_TEMPLATES}
-    assert got == {UH: 67.5, LH: 51.5, SA: 39.0, UV: 57.5, LV: 45.5}  # #5053: were 63 / 47 / 39 / 57.5 / 41
+    # #5162: were 67.5 / 51.5 / 39 / 57.5 / 45.5 (#5053: 63 / 47 / 39 / 57.5 / 41)
+    assert got == {UH: 63.2, LH: 51.5, SA: 38.0, UV: 53.2, LV: 45.5}
     for role in program_structure.SESSION_TEMPLATES:
         rx = _rx(role)
         assert rx["time_trim"] is None and rx["session_minutes"]["within_cap"] and rx["session_minutes"]["cap"] == cap, role
@@ -333,7 +343,7 @@ def test_mutation_control_a_session_over_the_cap_trims_accessories_first_and_rec
     t = rx["time_trim"]
     assert t["estimate_before_min"] > t["cap_minutes"] == 75 >= t["estimate_after_min"] == rx["session_minutes"]["lifting_minutes"]
     assert t["dropped_accessories"] == ["db_curl"] and t["over_cap_after_trim"] is False
-    assert [e["kind"] for e in rx["exposures"]].count("anchor") == 4 and [e["movement_key"] for e in rx["exposures"]][
+    assert [e["kind"] for e in rx["exposures"]].count("anchor") == 3 and [e["movement_key"] for e in rx["exposures"]][
         -1
     ] == "cable_tricep_pushdown"
 
@@ -342,8 +352,13 @@ def test_anchors_are_never_cut_for_time_an_anchors_only_overrun_is_flagged():
     with patch.dict(program_structure.EXPOSURES["heavy"], {"rest_seconds": 900}):
         rx = _rx(UH)
     t = rx["time_trim"]
-    assert t["over_cap_after_trim"] is True and t["dropped_accessories"] == ["reverse_pec_deck", "db_curl", "cable_tricep_pushdown"]
-    assert [e["pattern"] for e in rx["exposures"]] == ["bench", "row", "overhead_press", "vertical_pull"]
+    assert t["over_cap_after_trim"] is True and t["dropped_accessories"] == [
+        "reverse_pec_deck",
+        "db_curl",
+        "cable_tricep_pushdown",
+        "db_lateral_raise",
+    ]
+    assert [e["pattern"] for e in rx["exposures"]] == ["bench", "row", "vertical_pull"]  # #5162: the press is on shoulders+arms
 
 
 def _timed(key: str, minutes: float, rest: int | None = None):
@@ -451,12 +466,12 @@ def test_generator_builds_each_role_in_order():
         ("lower", LV),
         ("upper", UH),
     ]
-    assert [b.movement_key for b in got[3].exercises][:4] == [
+    assert [b.movement_key for b in got[3].exercises][:3] == [  # #5162: no press on upper-heavy
         "barbell_bench_press",
         "machine_row",
-        "machine_shoulder_press",
         "lat_pulldown",
     ]
+    assert "machine_shoulder_press" not in [b.movement_key for b in got[3].exercises]
 
 
 def test_generator_builds_the_five_day_order_after_the_cut_over_and_the_fifth_role():
@@ -667,6 +682,28 @@ def _performed(day="2026-09-29"):
     return in_block_variant.performed_in_block(_wire_rows(), CATALOG["movements"], day)
 
 
+# #5162 (owner ruling 2026-10-23) moved the overhead press off upper-heavy. The 09-29 replays below are of the session that
+# was served WITH it, and what they hold is the in-block variant resolver (#4409) and the one template resolver (#4431), not
+# the week's design — so they run against upper-heavy's template as it stood then (`served_templates_5162`). The current
+# template is held above.
+@pytest.fixture
+def pre_5162_upper_heavy():
+    from served_templates_5162 import pre_5162_upper_days
+
+    with pre_5162_upper_days():
+        yield
+
+
+def test_5162_the_current_upper_heavy_carries_no_press_and_the_press_keeps_its_in_block_variant_on_shoulders_arms():
+    """The live counterpart of the replays below: upper-heavy has no press slot, and the shoulders+arms press keeps the
+    DB press he pressed in-block (09-25), through the performed record's template id."""
+    assert "overhead_press" not in {e["pattern"] for e in _rx(UH, in_block=_performed())["exposures"]}
+    press = next(e for e in _rx(SA, in_block=_performed())["exposures"] if e["pattern"] == "overhead_press")
+    assert press["movement_key"] == "db_shoulder_press" and press["in_block"]["kept"] is True
+    assert press["template_id"] == "878CD1D0" and len(press["sets"]) == 1
+
+
+@pytest.mark.usefixtures("pre_5162_upper_heavy")
 def test_4409_the_0929_upper_heavy_keeps_the_in_block_db_row_and_db_press():
     """The reported swap: the 09-29 pre-draft served `machine_row` (last done May 2025) and
     `machine_shoulder_press` (2023) although the block's own sessions rowed and pressed the DB
@@ -685,6 +722,7 @@ def test_4409_the_0929_upper_heavy_keeps_the_in_block_db_row_and_db_press():
     assert ex["bench"]["movement_key"] == "barbell_bench_press" and ex["vertical_pull"]["movement_key"] == "lat_pulldown"
 
 
+@pytest.mark.usefixtures("pre_5162_upper_heavy")
 def test_4409_mutation_control_without_the_block_record_the_catalog_default_swaps_them_back():
     """What the 09-29 draft did: the resolver without the in-block record picks the first listed
     key — the machines with years-old anchors. So the assertion above reds without the fix."""
@@ -717,6 +755,7 @@ def test_4409_a_variant_change_inside_the_block_is_only_the_listed_swap_and_says
     assert _rx(UH, in_block=[]) == _rx(UH)
 
 
+@pytest.mark.usefixtures("pre_5162_upper_heavy")
 def test_4409_the_generator_draft_keeps_the_db_row_and_press_with_a_current_load():
     """End to end through `generate_routines` on the wire record: the 09-29 upper-heavy draft
     carries the DB row at 90 lb (the 09-25 load, held by #4408 at the 4–6 top set's rep floor) and
@@ -792,6 +831,7 @@ def _three_resolutions_4431(day="2026-09-29"):
     return out
 
 
+@pytest.mark.usefixtures("pre_5162_upper_heavy")
 def test_4431_generator_planner_and_gate_resolve_every_week1_movement_identically():
     res = _three_resolutions_4431()
     disagree = {f"{role}/{k}": v for role, rows in res.items() for k, v in rows.items() if len(set(v)) != 1}
@@ -800,6 +840,7 @@ def test_4431_generator_planner_and_gate_resolve_every_week1_movement_identicall
     assert res[UH]["db_shoulder_press"] == ("878CD1D0",) * 3
 
 
+@pytest.mark.usefixtures("pre_5162_upper_heavy")
 def test_4431_db_shoulder_press_generator_floor_equals_gate_floor_and_the_mutation_reds():
     """The chat gate derives the same floor the generator wrote for the in-block DB press — and the
     pre-#4431 catalog-only resolver (the mutation) leaves the gate with `no_template_id`."""

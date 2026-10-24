@@ -14,6 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const F = await import("../../site/assets/js/ck_front.js");
+const { dayInWords } = await import("../../site/assets/js/entry_age.js");
 const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit_pages_4586");
 const load = (name) => JSON.parse(readFileSync(join(FIX, `${name}.json`), "utf8"));
 const edition = load("edition");
@@ -51,13 +52,31 @@ test("a column's green is the share of the whole distance gone that day; a misse
   assert.equal(F.markDays(SERIES, TODAY, START, null)[27].gone, null, "no goal: no drawing");
 });
 
-test("the mark draws two rects per weighed day and says what it shows to a screen reader", () => {
-  const html = F.markHTML(SERIES, TODAY, START, GOAL);
-  const weighed = F.markDays(SERIES, TODAY, START, GOAL).filter((c) => c.gone !== null).length;
-  assert.equal((html.match(/<rect /g) || []).length, 2 * weighed);
-  assert.ok(html.includes(`role="img" aria-label="The last 28 days: ${fmt1(START - SERIES[SERIES.length - 1].lbs)} of the ${fmt1(START - GOAL)} pounds to the goal are gone as of the latest weigh-in`));
+test("the mark is C, the year frame: one frame one year wide from the first day, one neutral column per weigh-in, as tall as the weight still above the goal (#4646)", () => {
+  const html = F.markHTML(SERIES, TODAY, START, GOAL, { startIso: B.today.data.start_date });
+  const frame = F.yearFrame(SERIES, TODAY, START, GOAL, B.today.data.start_date);
+  const weighed = new Set(SERIES.filter((w) => w.date <= TODAY && w.date >= frame.from).map((w) => w.date)).size;
+  assert.equal(frame.from, B.today.data.start_date, "the frame starts on the experiment's first day");
+  assert.equal(frame.cols.length, weighed);
+  assert.equal((html.match(/<rect class="ck-mark__day" /g) || []).length, weighed, "one column per weigh-in");
+  assert.equal((html.match(/<rect class="ck-mark__frame" /g) || []).length, 1, "one frame");
+  assert.doesNotMatch(html, /ck-mark__gone|ck-accent/, "a column is the weight still to lose: never the accent");
+  const last = frame.cols[frame.cols.length - 1];
+  assert.ok(html.includes(`role="img" aria-label="One year from ${dayInWords(frame.from, { weekday: false })}, one column per weigh-in: ${weighed} weigh-ins so far, the latest ${fmt1(last.lbs)} lb, with ${fmt1(START - last.lbs)} of the ${fmt1(START - GOAL)} pounds to the goal gone.`), html.slice(0, 400));
   assert.equal(F.markHTML([], TODAY, START, GOAL), "", "no weigh-ins: no drawing");
   assert.equal(F.markHTML(SERIES, "", START, GOAL), "");
+  assert.equal(F.markHTML(SERIES, TODAY, START, null), "", "no goal: no drawing");
+});
+
+test("the year frame: a column's height is the weight above the goal on the start-to-goal scale, its x the day from the frame's start; past a year the frame is the 365 days ending today", () => {
+  const f = F.yearFrame([{ date: "2026-01-01", lbs: 350 }, { date: "2026-01-03", lbs: 250 }, { date: "2026-01-04", lbs: 360 }, { date: "2026-01-09", lbs: 100 }], "2026-01-04", 350, 150, "2026-01-01");
+  assert.deepEqual(f.cols.map((c) => [c.day, c.height]), [[0, 1], [2, 0.5], [3, 1]], "above the start is a full column, a future weigh-in is not drawn");
+  const html = F.markHTML([{ date: "2026-01-03", lbs: 250 }], "2026-01-04", 350, 150, { startIso: "2026-01-01", width: 365, height: 100 });
+  assert.match(html, /<rect class="ck-mark__day" x="2\.00" y="50\.0" width="1\.00" height="50\.0"\/>/);
+  const late = F.yearFrame([{ date: "2027-03-01", lbs: 200 }], "2027-03-01", 350, 150, "2026-01-01");
+  assert.equal(late.from, "2026-03-02", "the year ending today");
+  assert.equal(late.cols[0].day, F.YEAR_DAYS - 1);
+  assert.equal(F.yearFrame([{ date: "2026-01-03", lbs: 250 }], "2026-01-04", 350, 150, null).from, "2026-01-03", "no start served: the first weigh-in");
 });
 
 test("the mark's caption carries the day, the weight and the distance, from served numbers", () => {
