@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import pathlib
 import re
+import sys
 
 import pytest
 from health import tdee
@@ -398,6 +399,10 @@ def test_an_unchecked_target_names_the_method_in_its_basis():
 # ══════════════════════════════════════════════════════════════════════════════
 
 _REPO = pathlib.Path(__file__).resolve().parents[1]
+if str(_REPO / "scripts") not in sys.path:
+    sys.path.insert(0, str(_REPO / "scripts"))
+import repo_walk  # noqa: E402 — the one shared exclusion (#5273)
+
 _SWEEP_DIRS = ("lambdas", "mcp", "site", "scripts", "deploy", "cdk", "tests")
 _SWEEP_SUFFIXES = (".py", ".js", ".mjs", ".json", ".html", ".css")
 # The one sanctioned mention: tdee.py's own `RETIRED_METHOD` constant and the docstring
@@ -405,21 +410,21 @@ _SWEEP_SUFFIXES = (".py", ".js", ".mjs", ".json", ".html", ".css")
 _ALLOWED = {"lambdas/health/tdee.py", "tests/test_tdee_worked_set_3931_behavior.py"}
 
 
-def test_no_consumer_still_carries_the_retired_method_string():
-    """#3931: the rename is the point. A surface still emitting
-    `mifflin_bmr_plus_measured_7d_exercise` is emitting the old NUMBER under a label the
-    platform no longer means — the exact failure mode the acceptance criterion names.
+def retired_label_offenders(repo: pathlib.Path = _REPO) -> list[str]:
+    """Every sweep-dir file under `repo` still carrying the retired method label.
+
+    #5273: walked through `scripts/repo_walk.py`, so `cdk/cdk.out/asset.*`, `cdk/_*_staging`
+    (byte copies of `lambdas/`, including `tdee.py` itself) and a lane worktree nested in the
+    checkout are not read as consumers — they were, on every local run after a CDK synth.
+    `repo` is the seam `tests/test_repo_walk_5273.py` plants a copy through.
     """
     pattern = re.compile(re.escape(tdee.RETIRED_METHOD))
     offenders = []
     for d in _SWEEP_DIRS:
-        root = _REPO / d
-        if not root.is_dir():
-            continue
-        for path in root.rglob("*"):
-            if not path.is_file() or path.suffix not in _SWEEP_SUFFIXES:
+        for path in repo_walk.iter_files(repo / d, repo=repo):
+            if path.suffix not in _SWEEP_SUFFIXES:
                 continue
-            rel = path.relative_to(_REPO).as_posix()
+            rel = path.relative_to(repo).as_posix()
             if rel in _ALLOWED:
                 continue
             try:
@@ -428,7 +433,16 @@ def test_no_consumer_still_carries_the_retired_method_string():
                 continue
             if pattern.search(text):
                 offenders.append(rel)
-    assert not offenders, f"the retired TDEE method label still ships from: {sorted(offenders)}"
+    return sorted(offenders)
+
+
+def test_no_consumer_still_carries_the_retired_method_string():
+    """#3931: the rename is the point. A surface still emitting
+    `mifflin_bmr_plus_measured_7d_exercise` is emitting the old NUMBER under a label the
+    platform no longer means — the exact failure mode the acceptance criterion names.
+    """
+    offenders = retired_label_offenders()
+    assert not offenders, f"the retired TDEE method label still ships from: {offenders}"
 
 
 def test_the_live_method_constant_is_the_new_name():

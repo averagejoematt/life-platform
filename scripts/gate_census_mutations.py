@@ -1419,6 +1419,15 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         plants=(("lambdas/health/_census_probe_5095.py", _CALORIE_LITERAL_PY),),
         track=False,  # the guard rglobs lambdas/ mcp/ deploy/ scripts/ on disk, so an untracked module is in scope
     ),
+    "structural::test_repo_walk_5273.py": MutationSpec(
+        gate_id="structural::test_repo_walk_5273.py",
+        target="tests/test_repo_walk_5273.py",
+        detects=(
+            "a TRACKED file inside a path the shared repo walk excludes (`cdk/_*_staging`) — an exclusion "
+            "that swallows real source would hide it from every scanner while every planted-copy test stays green"
+        ),
+        plants=(("cdk/_census_probe_5273_staging/probe.py", '"""probe."""\n'),),
+    ),
 }
 
 
@@ -1477,6 +1486,21 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_repo_walk_5273.py": _proof(
+        "structural::test_repo_walk_5273.py",
+        "ARMED 1/1 — baseline: 11 passed in 0.90s | mutated: 1 failed, 10 passed in 0.90s :: "
+        "test_the_real_tree_population_is_still_whole | reverted: 11 passed in 0.90s",
+        "scripts/repo_walk.py — the ONE exclusion every migrated repo scanner walks through (.claude/worktrees, "
+        ".worktrees, cdk/cdk.out and any cdk.out, cdk/_*_staging, and any nested directory carrying its own .git). "
+        "Planted copies in tmp trees prove each migrated scanner (check_no_verify_sites, the tdee retired-label "
+        "sweep, the composite-alarm, NewInteriorGapCount, dead-def live-surface, deploy-critical local-name and "
+        "conformance sweeps) ignores the copies AND still finds the same file at the real path; the real-tree arm "
+        "(this mutation) proves the walk from the repo root still yields every tracked file. STILL INVISIBLE, "
+        "stated: a scanner that does not route through repo_walk (judge_verdict_retry prunes its own derived "
+        "staging roots; repo_scan_cache's walk is a fingerprint, not a scanner), and a copy of the repo under a "
+        "path that is neither listed nor a nested checkout.",
+        proved_on="2026-10-23",
+    ),
     "structural::test_nutrition_critics_ai_5114.py": _proof(
         "structural::test_nutrition_critics_ai_5114.py",
         "ARMED 1/1 — baseline: 11 passed in 0.75s | mutated: 1 failed, 10 passed in 0.79s :: "

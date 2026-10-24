@@ -69,12 +69,15 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from repo_walk import iter_files  # noqa: E402 — the one shared exclusion (#5273)
+
 SCAN_DIRS = ("deploy", "scripts", ".claude")
 NEEDLE = "--no-verify"
 SETTINGS_PATH = ".claude/settings.json"
@@ -129,26 +132,36 @@ class Hit:
     bucket: str
 
 
-def _grep_hits() -> list[tuple[str, int, str]]:
+def _grep_hits(root: Path | None = None) -> list[tuple[str, int, str]]:
     """Every `--no-verify` line under deploy/ scripts/ .claude/, excluding *.md
     (prose, not code) and .claude/settings.json (read structurally instead, see
     `_settings_json_bypass_hits`, since two of its four bypass entries — the `-n`
     short form and the hook-file-removal pair — contain no `--no-verify`
-    substring at all and a text grep cannot see them)."""
-    cmd = ["grep", "-rnI", "--", NEEDLE, *SCAN_DIRS]
-    proc = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True)
-    # grep exits 1 when it finds nothing — that IS a failure state here (a population
-    # floor of zero means the derivation went blind), so don't swallow it silently.
-    if proc.returncode not in (0, 1):
-        raise RuntimeError(f"grep failed: {proc.stderr}")
+    substring at all and a text grep cannot see them).
+
+    #5273: the walk is `scripts/repo_walk.py`'s, not `grep -r`'s. `.claude/` is one of
+    the scan dirs, and an Agent-tool lane worktree lives at `.claude/worktrees/agent-<id>/`
+    — a full second checkout whose copy of every registered site read as 16 UNREGISTERED
+    hits on any local run with a lane live (CI's clean checkout never has one). The
+    semantics `grep -rnI` gave are kept: binary files (a NUL byte) are skipped, lines are
+    `\n`-split and 1-numbered. `root` is a seam for the planted-copy test."""
+    base = REPO_ROOT if root is None else Path(root)
+    needle = NEEDLE.encode()
     hits: list[tuple[str, int, str]] = []
-    for line in proc.stdout.splitlines():
-        if not line:
-            continue
-        path, lineno_s, text = line.split(":", 2)
-        if path.endswith(".md") or path == _SELF or path == SETTINGS_PATH:
-            continue
-        hits.append((path, int(lineno_s), text))
+    for d in SCAN_DIRS:
+        for path in iter_files(base / d, repo=base):
+            rel = path.relative_to(base).as_posix()
+            if rel.endswith(".md") or rel == _SELF or rel == SETTINGS_PATH:
+                continue
+            try:
+                data = path.read_bytes()
+            except OSError:
+                continue
+            if needle not in data or b"\0" in data:
+                continue
+            for lineno, raw in enumerate(data.split(b"\n"), 1):
+                if needle in raw:
+                    hits.append((rel, lineno, raw.decode("utf-8", errors="replace").rstrip("\r")))
     return hits
 
 

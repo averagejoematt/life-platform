@@ -28,6 +28,7 @@ DERIVED, NOT HARD-CODED
 from __future__ import annotations
 
 import os
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -54,6 +55,37 @@ def true_case(path: Path | str) -> Path:
             match = None
         out = out / (match or part)
     return out
+
+
+def primary_checkout(path: Path | str) -> Path:
+    """The PRIMARY checkout's working tree, for `path` anywhere in ANY worktree of the repo.
+
+    #5273: `lane_worktree.py` used to take its repo root from its own `__file__`, i.e. from
+    whichever worktree the command ran in. Run from an Agent-tool worktree at
+    `.claude/worktrees/agent-<id>/`, the canonical parent derived from THAT root landed back
+    inside the main checkout (`.claude/worktrees/worktrees/agent-<id>/issue-…`) — five lanes
+    in one session (#5091 #5162 #4628 #5029 #5136). Every worktree shares one
+    `--git-common-dir`, and for a non-bare repo that is `<primary>/.git`, so its parent is
+    the one anchor that does not move with the caller.
+
+    Falls back to `path` itself when git cannot answer (not a repo) or the common dir is
+    not a `.git` directory (a bare repo has no primary working tree to anchor on).
+    """
+    p = Path(path)
+    try:
+        r = subprocess.run(
+            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            cwd=str(p),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return p
+    common = Path(r.stdout.strip()) if r.returncode == 0 and r.stdout.strip() else None
+    if common is None or common.name != ".git":
+        return p
+    return common.parent
 
 
 def canonical_parent(repo: Path | str) -> Path:

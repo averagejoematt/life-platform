@@ -35,12 +35,14 @@ from tests.deploy_critical_lane_deps import DEP_IMPORT_NAMES, LANE_THIRD_PARTY_D
 
 TESTS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = TESTS_DIR.parent
-
+if str(REPO_ROOT / "scripts") not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+import repo_walk  # noqa: E402 — stdlib-only; the one shared exclusion (#5273)
 
 _SKIP_DIRS = {".git", ".venv", "node_modules", "cdk.out", "site", "__pycache__", ".pytest_cache"}
 
 
-def _repo_local_names():
+def _repo_local_names(repo: Path = REPO_ROOT):
     """Every module/package name the repo itself can satisfy, from any directory.
 
     tests/ files commonly do their own ``sys.path.insert`` (scripts/, deploy/,
@@ -57,13 +59,16 @@ def _repo_local_names():
         for child in d.iterdir():
             if child.name in _SKIP_DIRS or child.name.startswith("."):
                 continue
+            # #5273: `cdk/_*_staging` byte copies and nested lane checkouts are not the repo.
+            if child.is_dir() and repo_walk.skip_dir(child, repo=repo):
+                continue
             if child.suffix == ".py":
                 names.add(child.stem)
             elif child.is_dir():
                 names.add(child.name)
                 _walk(child)
 
-    _walk(REPO_ROOT)
+    _walk(repo)
     return names
 
 
