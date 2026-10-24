@@ -313,9 +313,17 @@ def constraint(
     windows: list[dict[str, Any]] | None = None,
     records_state: str | None = None,
 ) -> dict[str, Any]:
-    """`constraint_block.disruption` — `{active, phase, template, until, offer, ...}`."""
+    """`constraint_block.disruption` — `{active, phase, template, until, offer, food, ...}`. `food` (#5104) is the travel
+    food playbook (`health.travel_food.mode_view`) on an active travel template or an offered travel window, else None."""
+    from health import travel_food  # noqa: PLC0415 — #5104: the hotel/restaurant playbook rides the travel template
+
     st = state(records, day)
     on = st["phase"] != PHASE_OFF
+    off = None if on else offer(day, block_workouts=block_workouts, windows=windows)
+    if st["phase"] == PHASE_ACTIVE:
+        food = travel_food.mode_view(st.get("template"))
+    else:
+        food = travel_food.mode_view((off or {}).get("template"), offered=True) if off and off.get("offered") else None
     return {
         "active": st["phase"] == PHASE_ACTIVE,
         "phase": st["phase"],
@@ -326,7 +334,8 @@ def constraint(
         "pools": st.get("pools"),
         "sessions": sessions_due(st, day, block_workouts),
         "holds": holds(st.get("template")) if on else None,
-        "offer": None if on else offer(day, block_workouts=block_workouts, windows=windows),
+        "offer": off,
+        "food": food,
         "minimum_session": minimum_shape(),
         "records_read": records is not None,
         "records_state": records_state,
