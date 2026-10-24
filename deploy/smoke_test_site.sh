@@ -618,23 +618,22 @@ if [[ "$QUICK" != "--quick" ]]; then
   SUB_FILE=$(mktemp);    CURRENT_CHECK="body fetch $BASE/subscribe/"; smoke_curl -s --max-time 15 "$BASE/subscribe/" > "$SUB_FILE"
   trap 'rm -f "$HOME_FILE" "$NOW_FILE" "$STORY_FILE" "$EVID_FILE" "$PIPE_FILE" "$SUB_FILE"' EXIT
 
-  # Home: cinematic landing + the three doors + interactive constellation
-  check_body_contains "Home: constellation hero"      "$HOME_FILE"  'class="constellation"' "$BASE/"
-  # #4182: the doors nav speaks the reader's words (TODAY · THE NUMBERS · THE COACHES ·
-  # WHAT HE TRIES · THE STORY). Anchored on the label's own `</svg>…</a>` so page prose that
-  # happens to say "the story" can never pass for the nav; the old builder labels must be gone.
-  check_body_contains "Home: door · today"            "$HOME_FILE"  '</svg>today</a>'         "$BASE/"
-  check_body_contains "Home: door · the numbers"      "$HOME_FILE"  '</svg>the numbers</a>'   "$BASE/"
-  check_body_contains "Home: door · the coaches"      "$HOME_FILE"  '</svg>the coaches</a>'   "$BASE/"
-  check_body_contains "Home: door · what he tries"    "$HOME_FILE"  '</svg>what he tries</a>' "$BASE/"
-  check_body_contains "Home: door · the story"        "$HOME_FILE"  '</svg>the story</a>'     "$BASE/"
-  check_body_not_contains "Home: old door labels gone" "$HOME_FILE" '</svg>the \(cockpit\|data\|coaching\|protocols\)</a>' "$BASE/"
+  # Home: the kit front page since the #4588 cut-over (2026-10-23, owner's "asap"). The v5
+  # constellation + five doors live on as the served, noindex /reference/ copy (owner 10-18
+  # ruling: a replaced layout is kept as a reference page, never deleted), so they are no longer
+  # the front page's contract. Static markers only: the kit renders its blocks client-side.
+  check_body_contains "Home: kit front page"          "$HOME_FILE"  'data-ck-page="front"'  "$BASE/"
+  check_body_contains "Home: loads the kit module"    "$HOME_FILE"  'assets/js/ck_pages'    "$BASE/"
+  check_body_contains "Home: the daily mark (C)"      "$HOME_FILE"  'ck-mark'               "$BASE/"
+  check_body_not_contains "Home: v5 constellation gone" "$HOME_FILE" 'class="constellation"' "$BASE/"
   # Cockpit: live data wiring
   check_body_contains "Cockpit: data-bind targets"    "$NOW_FILE"   'data-bind'             "$BASE/cockpit/"
   check_body_contains "Cockpit: loads cockpit.js module" "$NOW_FILE" 'assets/js/cockpit'    "$BASE/cockpit/"
-  # Story hub: the writing surfaces
-  check_body_contains "Story: chronicle linked"       "$STORY_FILE" 'chronicle'             "$BASE/story/"
-  check_body_contains "Story: journal linked"         "$STORY_FILE" 'journal'               "$BASE/story/"
+  # Story: the kit story page since the #4588 cut-over; its chapter and episode lists render
+  # client-side into these static mounts.
+  check_body_contains "Story: kit story page"         "$STORY_FILE" 'data-ck-page="story"'  "$BASE/story/"
+  check_body_contains "Story: chapters mount"         "$STORY_FILE" 'id="ck-chapters"'      "$BASE/story/"
+  check_body_contains "Story: episodes mount"         "$STORY_FILE" 'id="ck-episodes"'      "$BASE/story/"
   # Evidence: registry + readout shell + the new live Pipeline-status topic
   # #3048: the registry ships as the non-executable #page-data JSON island
   # (the old inline window.__EVIDENCE_REGISTRY__ global is gone with the CSP
@@ -723,7 +722,7 @@ if [[ "$QUICK" != "--quick" ]]; then
   # #1526: same same-deploy-content class as the static cores — cache-aware read.
   _og_ok() { grep -oE '<meta property="og:title" content="[^"]*"' "$1" | head -1 | grep -qE '[0-9]'; }
   check_og_has_number() {
-    local label="$1" path="$2"
+    local label="$1" path="$2" mode="${3:-fail}"
     local og_file title verdict
     og_file=$(mktemp)
     curl -s --max-time 15 "$BASE$path" > "$og_file" || true
@@ -731,12 +730,17 @@ if [[ "$QUICK" != "--quick" ]]; then
     title=$(grep -oE '<meta property="og:title" content="[^"]*"' "$og_file" | head -1 || true)
     if [[ "$verdict" -eq 0 ]]; then
       echo "  ✅ $label — $title"; PASS=$((PASS + 1))
+    elif [[ "$mode" == "warn" ]]; then
+      echo "  ⚠️  $label — og:title carries no number yet: $title — WARN by design until the #5267 og-front card lands and its follow-up points the front page at it"
+      WARN=$((WARN + 1))
     else
       echo "  ❌ $label — og:title carries no number (generic boilerplate?): $title"; smoke_record_fail "$label — og:title carries no number"
     fi
     rm -f "$og_file"
   }
-  check_og_has_number "Home og:title has a number"      "/"
+  # #4588: the kit front page ships the wordmark card on purpose until #5267's daily og-front card
+  # has rendered (pointing og at an unrendered PNG would unfurl blank). Flip back to fail with that follow-up.
+  check_og_has_number "Home og:title has a number"      "/" warn
   check_og_has_number "Data og:title has a number"      "/data/"
   check_og_has_number "Protocols og:title has a number" "/protocols/"
   echo ""
