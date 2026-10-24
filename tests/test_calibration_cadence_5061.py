@@ -14,12 +14,15 @@ No clock is read: every `today` is a fixed date; the cycle length is derived fro
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import re
 import sys
 from datetime import date, timedelta
 from pathlib import Path
+
+import pytest
 
 os.environ.setdefault("S3_BUCKET", "test-bucket")
 os.environ.setdefault("USER_ID", "matthew")
@@ -112,8 +115,29 @@ def test_dexa_due_date_is_last_scan_plus_the_charter_cadence():
 
 def test_dexa_with_no_readable_scan_names_the_ingest():
     d = block("2026-10-19", dexa=[])["kinds"]["dexa"]
-    assert d["state"] == cc.UNKNOWN and d["due_on"] is None and d["ingest"] == {"issue": 4639, "built": False}
-    assert "#4639" in d["detail"] and d["prompt"] is None
+    assert d["state"] == cc.UNKNOWN and d["due_on"] is None
+    assert d["ingest"] == {"issue": 4639, "built": True, "command": cc.DEXA_INGEST_COMMAND}
+    assert "#4639" in d["detail"] and "scripts/ingest_lab_report.py dexa" in d["detail"] and d["prompt"] is None
+
+
+def test_the_dexa_prompt_names_the_built_ingest_never_not_built():
+    """#4639 built the scan ingest (PR #4981): the overdue prompt names it, and never tells him to report the date by hand.
+    Live 2026-10-24 the prompt still read "the labs/DEXA ingest (#4639) is not built"."""
+    p = block(plus("2026-03-30", DEXA_DAYS + 1), dexa=["2026-03-30"])["kinds"]["dexa"]["prompt"]
+    assert p and "scripts/ingest_lab_report.py dexa" in p and "2026-03-30" in p
+    assert "not built" not in p
+    assert "not built" not in json.dumps(block("2026-10-19", dexa=[]))
+
+
+def test_the_registry_dexa_cadence_is_the_charter_cadence():
+    """ONE DEXA due date (#5061): /api/status's due panel reads the registry's `cadence_months`, the owner prompt reads the
+    charter's weeks. They must name the same cadence in the registry's 30-day months, or the site says "next due Mar 2027"
+    while the coach says overdue since June (the state before this lane: 12 months against 12 weeks)."""
+    from ingestion import source_registry as reg
+
+    months = reg.SOURCE_REGISTRY["dexa"]["cadence_months"]
+    assert months == round(DEXA_DAYS / reg.DAYS_PER_CADENCE_MONTH), (months, DEXA_DAYS)
+    assert reg.due_months()["dexa"] == months
 
 
 # ── prompts: once per cycle ──────────────────────────────────────────────────────
@@ -296,3 +320,46 @@ def test_the_block_is_owner_tier_and_carries_no_media_path():
     b = block("2026-10-19", tape=[LAST], photos=[LAST], dexa=["2026-03-30"])
     assert b["tier"] == "owner_only"
     assert not re.search(r"\.jpe?g|raw/matthew", json.dumps(b))
+
+
+# ── photos: no GPS EXIF is ever stored (owner rule; #5061 box 4) ───────────────────
+def _seg(marker: int, payload: bytes) -> bytes:
+    return bytes([0xFF, marker]) + (len(payload) + 2).to_bytes(2, "big") + payload
+
+
+def _camera_jpeg() -> tuple[bytes, bytes]:
+    """(a JPEG carrying EXIF with a GPS IFD, XMP and a comment; the same JPEG as it must be stored)."""
+    app0 = _seg(0xE0, b"JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00")
+    exif = _seg(0xE1, b"Exif\x00\x00MM\x00*\x00\x00\x00\x08GPSLatitude 47.6062 GPSLongitude -122.3321")
+    xmp = _seg(0xE1, b"http://ns.adobe.com/xap/1.0/\x00<exif:GPSLatitude>47,36.37N</exif:GPSLatitude>")
+    com = _seg(0xFE, b"taken at home")
+    icc = _seg(0xE2, b"ICC_PROFILE\x00\x01\x01profile")
+    dqt = _seg(0xDB, b"\x00" + bytes(64))
+    scan = _seg(0xDA, b"\x01\x01\x00\x00\x3f\x00") + b"\x12\x34\xff\x00\x56" * 50 + b"\xff\xd9"
+    soi = b"\xff\xd8"
+    return soi + app0 + exif + xmp + com + icc + dqt + scan, soi + app0 + icc + dqt + scan
+
+
+def test_a_stored_progress_photo_carries_no_gps_exif():
+    from coach import progress_capture as pc
+
+    raw, want = _camera_jpeg()
+    got = pc.strip_metadata(raw)
+    assert got == want
+    assert b"GPS" not in got and b"Exif" not in got and b"taken at home" not in got
+    assert pc.strip_metadata(got) == got  # idempotent: an already-clean photo is stored byte-for-byte
+
+
+def test_the_download_path_strips_before_returning_and_refuses_an_unreadable_header():
+    """The bytes `download` hands to `store` are the stripped ones; a header it cannot walk is refused (he is texted),
+    never stored uninspected."""
+    from coach import progress_capture as pc
+
+    raw, want = _camera_jpeg()
+
+    def opener(body):
+        return lambda req, timeout=None: io.BytesIO(body)  # urlopen-shaped: a context manager with .read()
+
+    assert pc.download("t", "photos/f.jpg", opener=opener(raw)) == want
+    with pytest.raises(pc.Refused):
+        pc.download("t", "photos/f.jpg", opener=opener(b"\xff\xd8\xff\xe1\xff\xff truncated"))

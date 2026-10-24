@@ -1445,7 +1445,7 @@ row has ever held). The authoritative leaf list is `lambdas/health/lab_units.py:
 | `changes_vs_baseline.*` / `targets.*` | number | The provider's deltas against the first scan and its targets |
 | `provenance` | object | Same shape as the labs provenance block (`documents[]` archived under `raw/matthew/dexa/<scan-date>/<file>`, `scanner`, `scanned_date`, `extraction_method`, `reviewer`, `ingested_at`), #4639 |
 
-**Writer:** `scripts/ingest_lab_report.py dexa <scan.csv|json> --scan-date … --provider … --document …` (#4639) — same archive-first / review / `--apply` contract as labs; refuses a leaf path not in `DEXA_FIELDS`, a non-number in a numeric leaf, a unit that contradicts the leaf's suffix, and a scan missing any of `DEXA_REQUIRED`. Registry: `SOURCE_REGISTRY["dexa"]` (`cadence_months: 12`; it left `UNREGISTERED_PARTITIONS` in #4639). The two scans on file (2025-05-10, 2026-03-30) predate the path and carry no `provenance`.
+**Writer:** `scripts/ingest_lab_report.py dexa <scan.csv|json> --scan-date … --provider … --document …` (#4639) — same archive-first / review / `--apply` contract as labs; refuses a leaf path not in `DEXA_FIELDS`, a non-number in a numeric leaf, a unit that contradicts the leaf's suffix, and a scan missing any of `DEXA_REQUIRED`. Registry: `SOURCE_REGISTRY["dexa"]` (`cadence_months: 3` since #5061 — the charter's ~12 weeks; it left `UNREGISTERED_PARTITIONS` in #4639). The two scans on file (2025-05-10, 2026-03-30) predate the path and carry no `provenance`.
 
 ### genome (SNP clinical interpretations)
 

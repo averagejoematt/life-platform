@@ -192,7 +192,56 @@ def download(token: str, file_path: str, *, opener=None, max_bytes: int = MAX_BY
         raise Refused(f"photo is {len(body)} bytes, over the {max_bytes} cap", "That photo is too large for me to store.")
     if not body.startswith(_JPEG_MAGIC):
         raise Refused("payload is not a JPEG", "That did not arrive as a photo I can store. Send it as a photo, not a file.")
-    return body
+    try:
+        return strip_metadata(body)
+    except ValueError as e:
+        raise Refused(
+            f"JPEG header unreadable ({e})", "I could not read that photo cleanly, so I did not store it. Send it again as a photo."
+        )
+
+
+#: APP1 carries EXIF (GPS included) and XMP; COM is free text. Neither is part of the picture.
+_STRIPPED_MARKERS = frozenset({0xE1, 0xFE})
+
+
+def strip_metadata(body: bytes) -> bytes:
+    """The JPEG with every APP1 (EXIF / XMP, where a GPS position lives) and COM segment removed (#5061).
+
+    Owner rule (2026-10-02): a stored progress photo never carries GPS EXIF. Telegram's `photo` array is
+    re-encoded and arrives without EXIF today (the three Day-1 objects read APP0 only, 2026-10-24), but
+    that is the vendor's behaviour, not this platform's guarantee; this is the guarantee. Only header
+    segments before the first scan (SOS) are walked; the entropy-coded image data is copied untouched, so
+    the picture is byte-identical. A header that does not parse raises ValueError and the caller REFUSES
+    the photo (texting him back) rather than storing bytes it could not inspect.
+    """
+    if not body.startswith(b"\xff\xd8"):
+        raise ValueError("no SOI marker")
+    out = bytearray(b"\xff\xd8")
+    i, n = 2, len(body)
+    while True:
+        if i + 2 > n or body[i] != 0xFF:
+            raise ValueError(f"no marker at offset {i}")
+        marker = body[i + 1]
+        if marker == 0xFF:  # a fill byte before the marker
+            i += 1
+            continue
+        if marker == 0xD9 or 0xD0 <= marker <= 0xD7 or marker == 0x01:  # EOI, RSTn, TEM: no length field
+            out += body[i : i + 2]
+            if marker == 0xD9:
+                return bytes(out)
+            i += 2
+            continue
+        if i + 4 > n:
+            raise ValueError(f"truncated segment at offset {i}")
+        length = int.from_bytes(body[i + 2 : i + 4], "big")
+        if length < 2 or i + 2 + length > n:
+            raise ValueError(f"bad segment length at offset {i}")
+        if marker == 0xDA:  # SOS: the image data follows; nothing after it is header metadata
+            out += body[i:]
+            return bytes(out)
+        if marker not in _STRIPPED_MARKERS:
+            out += body[i : i + 2 + length]
+        i += 2 + length
 
 
 # ── storage ───────────────────────────────────────────────────────────────────
