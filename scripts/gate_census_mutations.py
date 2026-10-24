@@ -531,6 +531,11 @@ _CALIBRATION_PUBLISHED_IMPORTER_PY = (
 # #5095: a module that grades against a hand-typed 1,500 kcal calorie target instead of the ONE resolver.
 _CALORIE_LITERAL_PY = '"""census probe — a second calorie target that must never exist."""\n\n\ndef grade(cal):\n    cal_target = 1500\n    return cal <= cal_target\n'
 
+# #5099: a prompt module typing its own eating window instead of reading the charter's (nutrition.eating_window).
+_EATING_WINDOW_LITERAL_PY = (
+    '"""census probe — a second eating window that must never exist."""\n\nPROMPT = "Targets: eating window ~11am-7pm."\n'
+)
+
 # #5106: a published module (lambdas/web) that reads the owner-only evening check-in partition — his stress and
 # hunger ratings would then be one call from a served page.
 _CHECKIN_PUBLISHED_READER_PY = (
@@ -1418,6 +1423,17 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         plants=(("lambdas/health/_census_probe_5095.py", _CALORIE_LITERAL_PY),),
         track=False,  # the guard rglobs lambdas/ mcp/ deploy/ scripts/ on disk, so an untracked module is in scope
+    ),
+    # #5099: the eating window is the charter's — no code string under lambdas/ mcp/ types its own.
+    "structural::test_eating_window_reads_5099.py": MutationSpec(
+        gate_id="structural::test_eating_window_reads_5099.py",
+        target="tests/test_eating_window_reads_5099.py",
+        detects=(
+            "a module typing its own eating window in a code string (`~11am-7pm`) instead of reading the charter's "
+            "nutrition.eating_window through health.eating_window — the four-prompts-four-windows class #5099 retired"
+        ),
+        plants=(("lambdas/emails/_census_probe_5099.py", _EATING_WINDOW_LITERAL_PY),),
+        track=False,  # the guard rglobs lambdas/ mcp/ on disk, so an untracked module is in scope
     ),
     "structural::test_repo_walk_5273.py": MutationSpec(
         gate_id="structural::test_repo_walk_5273.py",
@@ -2442,6 +2458,18 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "comment, prose, `_call_`). STILL INVISIBLE, stated: a target in prose, a target computed from other literals, the "
         "sealed plan root's genesis figure (config/user_goals.json), and a calorie target at a different number.",
         proved_on="2026-10-19",
+    ),
+    "structural::test_eating_window_reads_5099.py": _proof(
+        "structural::test_eating_window_reads_5099.py",
+        "ARMED 1/1 — baseline: 15 passed in 5.64s | mutated: 1 failed, 14 passed in 5.49s :: "
+        "test_no_code_string_types_its_own_eating_window | reverted: 15 passed in 5.90s",
+        "lambdas/ mcp/ on disk (rglob, every .py, AST): any code string — a constant or an f-string part, docstrings "
+        "excluded — carrying a fasting:eating ratio that completes a day (16:8, 14:10, 18:6, 20:4), a clock window "
+        "(`11am-7pm`, `11:30am–7:30pm`) or an `N-hour eating window` fails and names the line; in-test controls prove each "
+        "shape and the clean ones (a docstring, a comment, a time of day, 16:9, an interpolated window). STILL INVISIBLE, "
+        "stated: comments and docstrings, config files (config/user_goals.json's practice note), site/ JS, and a window "
+        "built from other literals.",
+        proved_on="2026-10-24",
     ),
 }
 

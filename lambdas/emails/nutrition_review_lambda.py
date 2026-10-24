@@ -114,6 +114,7 @@ except ImportError:
 from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
+from health import eating_window  # #5099: THE eating window, read through public_view
 from training.training_charter import public_view  # #5214 (a published surface reads the whitelist only, #5087)
 
 
@@ -550,6 +551,7 @@ def _render_board_prompt(calorie_target, protein_target_g):
 
     experts_text = "\n\n".join(expert_blocks)
     colors_text = "\n".join(color_rules)
+    eating_window_text = eating_window.published_text()  # #5099: the charter's window, at build time
 
     prompt = f"""You are the Saturday Nutrition Review panel for Matthew's Life Platform. You write a weekly email arriving Saturday morning before his grocery shopping trip to Metropolitan Market in Seattle.
 
@@ -580,7 +582,7 @@ Current supplementation vs genome gaps. Redundancies? Additions?
 2. Supplement entries in food_log: analyze for micros but exclude from meal analysis.
 3. Deduce meal names from ingredient clusters at same timestamp.
 4. He is actively losing weight. Be encouraging but honest about progress relative to his stage.
-5. Eating window ~11am-7pm (16:8). Don't suggest 7am breakfast.
+5. Eating window {eating_window_text}: every feeding fits inside it. Don't suggest a meal or snack that widens it.
 6. If previous week data provided, weave in light trending comparisons naturally.
 
 ## FORMAT
@@ -679,7 +681,7 @@ Current supplementation vs genome gaps. Redundancies? Additions?
 2. Supplement entries in food_log: analyze for micros but exclude from meal analysis.
 3. Deduce meal names from ingredient clusters at same timestamp.
 4. He is actively losing weight. Be encouraging but honest about progress relative to his stage.
-5. Eating window ~11am-7pm (16:8). Don't suggest 7am breakfast.
+5. Eating window {eating_window}: every feeding fits inside it. Don't suggest a meal or snack that widens it.
 6. If previous week data provided, weave in light trending comparisons naturally.
 
 ## FORMAT
@@ -1093,6 +1095,7 @@ def lambda_handler(event, context):
             calorie_target=cal_target,
             protein_target_g=pro_target,
             feeding_threshold_g=_feeding_threshold_text(),
+            eating_window=eating_window.published_text(),  # #5099
         )
 
     # P2: Dynamic journey context — panel must know stage for appropriate coaching

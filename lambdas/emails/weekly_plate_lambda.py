@@ -35,6 +35,7 @@ from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_PROTEIN_
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from health import eating_window  # #5099: THE eating window (charter nutrition.eating_window, via public_view)
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 
 _logger_std = logging.getLogger()
@@ -421,7 +422,7 @@ SYSTEM_PROMPT = """You are the writer of "The Weekly Plate" — a personalized F
 
 ## ABOUT MATTHEW
 {weight_context}
-Targets: {calorie_target} cal/day, {protein_target_g}g protein, 16:8 IF (eating window ~11am-7pm).
+Targets: {calorie_target} cal/day, {protein_target_g}g protein, eating window {eating_window}.
 Shops at: Metropolitan Market in Seattle (premium grocer — think quality proteins, good produce, specialty items).
 Cooking style: Mexican, Asian, simple protein+sides. Weeknight meals under 30 min.
 
@@ -504,7 +505,7 @@ def build_user_message(data):
             "calorie_target": target_kcal(),
             "protein_target_g": PLAN_DAILY_PROTEIN_MIN_G,
             "goal_weight_lbs": data["profile"].get("goal_weight_lbs", 185),
-            "eating_window": "11am-7pm (16:8 IF)",
+            "eating_window": eating_window.published_text(),  # #5099: the charter's window (published whitelist)
         },
     }
     return json.dumps(payload, indent=2, default=str)
@@ -519,6 +520,7 @@ def build_system_prompt(profile, withings_data):
         weight_context=weight_ctx,
         calorie_target=cal,
         protein_target_g=pro,
+        eating_window=eating_window.published_text(),  # #5099
     )
 
 
