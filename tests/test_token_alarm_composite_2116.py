@@ -446,6 +446,12 @@ def _derivation_namespace() -> dict:
         "AI_SPEND_DAILY_MAX_ROLLING_24H_USD",
         "AI_TOKENS_DAILY_MAX_ROLLING_24H",
         "lognormal_upper_bound",
+        "AI_SPEND_VARIANCE_BAR_USD",
+        "AI_TOKENS_VARIANCE_BAR",
+        "_budget_ceilings",
+        "_BUDGET",
+        "AI_SPEND_BUDGET_BAR_USD",
+        "AI_TOKENS_BUDGET_BAR",
         "AI_DAILY_SPEND_THRESHOLD_USD",
         "AI_TOKENS_PLATFORM_DAILY_THRESHOLD",
     }
@@ -456,7 +462,7 @@ def _derivation_namespace() -> dict:
             body.append(node)
         elif isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id in wanted for t in node.targets):
             body.append(node)
-    ns: dict = {}
+    ns: dict = {"__file__": _FAMILY_PATH}  # _budget_ceilings() resolves scripts/ from the module's own path
     exec(compile(ast.Module(body=body, type_ignores=[]), _FAMILY_PATH, "exec"), ns)  # noqa: S102 — our own module's pure lines
     missing = wanted - set(ns)
     assert not missing, f"the #4517 derivation is incomplete in {os.path.basename(_FAMILY_PATH)}: missing {sorted(missing)}"
@@ -481,12 +487,20 @@ def test_the_daily_sum_thresholds_are_derived_from_personal_variance_4517():
     import statistics
 
     ns = _derivation_namespace()
-    for alarm, const, sample_name, rounding in (
-        ("ai-daily-spend-high", "AI_DAILY_SPEND_THRESHOLD_USD", "AI_SPEND_DAILY_MAX_ROLLING_24H_USD", 2),
-        ("ai-tokens-platform-daily-total", "AI_TOKENS_PLATFORM_DAILY_THRESHOLD", "AI_TOKENS_DAILY_MAX_ROLLING_24H", -3),
+    for alarm, threshold, const, sample_name, rounding in (
+        ("ai-daily-spend-high", "AI_DAILY_SPEND_THRESHOLD_USD", "AI_SPEND_VARIANCE_BAR_USD", "AI_SPEND_DAILY_MAX_ROLLING_24H_USD", 2),
+        (
+            "ai-tokens-platform-daily-total",
+            "AI_TOKENS_PLATFORM_DAILY_THRESHOLD",
+            "AI_TOKENS_VARIANCE_BAR",
+            "AI_TOKENS_DAILY_MAX_ROLLING_24H",
+            -3,
+        ),
     ):
         kw = _threshold_kw(alarm)
-        assert isinstance(kw, ast.Name) and kw.id == const, f"{alarm}: threshold must be the derived {const}, found {ast.unparse(kw)}"
+        assert (
+            isinstance(kw, ast.Name) and kw.id == threshold
+        ), f"{alarm}: threshold must be the derived {threshold}, found {ast.unparse(kw)}"
         sample = ns[sample_name]
         assert len(sample) >= 28, f"{sample_name}: n={len(sample)} — the derivation needs ~30 complete days"
         logs = [math.log(v) for _, v in sample]
@@ -503,10 +517,78 @@ def test_the_derived_thresholds_sit_above_every_day_in_their_own_window_4517():
     ns = _derivation_namespace()
     spend_max = max(v for _, v in ns["AI_SPEND_DAILY_MAX_ROLLING_24H_USD"])
     tok_max = max(v for _, v in ns["AI_TOKENS_DAILY_MAX_ROLLING_24H"])
-    assert ns["AI_DAILY_SPEND_THRESHOLD_USD"] > spend_max, (ns["AI_DAILY_SPEND_THRESHOLD_USD"], spend_max)
-    assert ns["AI_TOKENS_PLATFORM_DAILY_THRESHOLD"] > tok_max, (ns["AI_TOKENS_PLATFORM_DAILY_THRESHOLD"], tok_max)
+    for name in ("AI_SPEND_VARIANCE_BAR_USD", "AI_DAILY_SPEND_THRESHOLD_USD"):
+        assert ns[name] > spend_max, (name, ns[name], spend_max)
+    for name in ("AI_TOKENS_VARIANCE_BAR", "AI_TOKENS_PLATFORM_DAILY_THRESHOLD"):
+        assert ns[name] > tok_max, (name, ns[name], tok_max)
     # Positive control: the retired bars DO sit inside the window, so this check can fail.
     assert 6.0 < spend_max and 250000 < tok_max
+
+
+# ── #4517 (2026-10-24): the budget bar, read from the governor; the threshold is the higher bar ──
+
+
+def _governor_and_prices():
+    """The REAL governor and price table, imported (fixture must be the wire, #2898): the module
+    under test parses them, so the expectation here must come from executing them instead."""
+    import sys
+
+    for sub in ("lambdas", "scripts"):
+        path = os.path.join(_REPO, sub)
+        if path not in sys.path:
+            sys.path.insert(0, path)
+    for key, value in (
+        ("TABLE_NAME", "life-platform"),
+        ("S3_BUCKET", "matthew-life-platform"),
+        ("USER_ID", "matthew"),
+        ("AWS_REGION", "us-west-2"),
+    ):
+        os.environ.setdefault(key, value)
+    from ai.bedrock_client import PRICES
+    from operational import cost_governor_lambda as gov
+
+    return gov, PRICES
+
+
+def test_the_daily_sum_thresholds_take_the_budget_bar_from_the_governor_4517():
+    """Spend bar = the narrowest rung of the governor's tier ladder × the PERMANENT base ceiling;
+    token bar = that dollar bar in output tokens at the dearest output rate the chokepoint bills.
+    Each alarm's threshold is the higher of its budget bar and its variance bar. Recomputed here
+    from the imported governor and price table, never from a hand-typed dollar figure."""
+    gov, prices = _governor_and_prices()
+    ns = _derivation_namespace()
+    bands = [0.0] + sorted(t / gov._THRESHOLD_REFERENCE_CEILING for t, _ in gov._TIER_THRESHOLDS)
+    rung = min(hi - lo for lo, hi in zip(bands, bands[1:]))
+    spend_bar = round(gov.MONTHLY_CEILING * rung, 2)
+    dearest = max(row["out"] for row in prices.values() if "out" in row)
+    token_bar = int(round(spend_bar / dearest * 1_000_000, -3))
+    assert ns["AI_SPEND_BUDGET_BAR_USD"] == spend_bar, (ns["AI_SPEND_BUDGET_BAR_USD"], spend_bar)
+    assert ns["AI_TOKENS_BUDGET_BAR"] == token_bar, (ns["AI_TOKENS_BUDGET_BAR"], token_bar)
+    assert ns["AI_DAILY_SPEND_THRESHOLD_USD"] == max(ns["AI_SPEND_VARIANCE_BAR_USD"], spend_bar)
+    assert ns["AI_TOKENS_PLATFORM_DAILY_THRESHOLD"] == max(ns["AI_TOKENS_VARIANCE_BAR"], token_bar)
+    # Every output token billed at the dearest rate costs exactly the bar: the token page can
+    # never fire before the dollar page would on correctly-priced traffic.
+    assert ns["AI_TOKENS_PLATFORM_DAILY_THRESHOLD"] * dearest / 1_000_000 >= ns["AI_DAILY_SPEND_THRESHOLD_USD"] * 0.99
+
+
+def test_the_spend_page_sits_above_every_ceilings_daily_pace_4517():
+    """The defect this closes: $8.72 sat under the October window's daily pace, so a day spent
+    exactly on plan paged URGENT. The bar must clear the daily pace (ceiling / 28, the shortest
+    month) of EVERY figure the governor owns — base, surge and the dated window's pair — so no
+    ceiling in force, now or after a revert, puts an on-plan day over it."""
+    import sys
+
+    sys.path.insert(0, os.path.join(_REPO, "scripts"))
+    from budget_ceilings import read_family
+
+    family = read_family()
+    figures = [v for v in (family.base, family.surge, family.window_base, family.window_surge) if v is not None]
+    assert len(figures) >= 2, "the ceiling family did not parse — this check would be vacuous"
+    ns = _derivation_namespace()
+    worst_pace = max(figures) / 28
+    assert ns["AI_DAILY_SPEND_THRESHOLD_USD"] > worst_pace, (ns["AI_DAILY_SPEND_THRESHOLD_USD"], worst_pace)
+    # Positive control: the retired variance-only bar fails this, so the check can fail.
+    assert not ns["AI_SPEND_VARIANCE_BAR_USD"] > worst_pace, "the variance bar alone now clears every pace — re-read this test"
 
 
 if __name__ == "__main__":

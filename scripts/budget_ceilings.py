@@ -261,3 +261,63 @@ def budget_amount_usd(src: Path | None = None) -> float | int:
     """
     base = base_ceiling_usd(src)
     return int(base) if float(base).is_integer() else base
+
+
+# ── #4517: the governor's tier ladder and the chokepoint's dearest output rate ────────────
+#
+# The urgent AI-spend alarms (cdk/stacks/monitoring_token_alarms.py) take their budget-anchored
+# bar from these two readers, so a ceiling or ladder edit moves the alarm on the next Monitoring
+# apply instead of leaving a hand-typed dollar figure behind. Same rule as the rest of this
+# module: parse, never import (the governor builds boto3 clients at import, and cdk synth must
+# not acquire that dependency), and RAISE rather than guess.
+
+TIER_LADDER_NAME = "_TIER_THRESHOLDS"
+TIER_REFERENCE_NAME = "_THRESHOLD_REFERENCE_CEILING"
+BEDROCK_SRC = ROOT / "lambdas" / "ai" / "bedrock_client.py"
+PRICES_NAME = "PRICES"
+
+
+def _module_literal(src: Path, name: str):
+    """`ast.literal_eval` of the module-level `name = <literal>` in `src`, or None."""
+    if not src.exists():
+        return None
+    for node in ast.parse(src.read_text(encoding="utf-8")).body:
+        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name for t in node.targets):
+            try:
+                return ast.literal_eval(node.value)
+            except (ValueError, SyntaxError):
+                return None
+    return None
+
+
+def tier_band_fractions(src: Path | None = None) -> tuple[float, ...]:
+    """The governor's tier bands as FRACTIONS of whatever ceiling is in force, ascending.
+
+    `_TIER_THRESHOLDS` is calibrated in dollars against `_THRESHOLD_REFERENCE_CEILING` and the
+    governor scales it by ceiling/reference (`_tier_for`), so the fractions are the ladder's
+    ceiling-independent shape. Raises if either name cannot be read."""
+    src = src or GOVERNOR_SRC
+    ladder = _module_literal(src, TIER_LADDER_NAME)
+    reference = _module_literal(src, TIER_REFERENCE_NAME)
+    if not ladder or not reference:
+        raise RuntimeError(f"tier ladder not derivable from {src} — refusing to guess (#4517)")
+    return tuple(sorted(float(t) / float(reference) for t, _tier in ladder))
+
+
+def narrowest_rung_fraction(src: Path | None = None) -> float:
+    """The smallest step on the ladder, counting tier 0's floor as 0: the least share of the
+    month's ceiling that, spent on top of everything else, carries the projection across a
+    whole tier band."""
+    bands = (0.0,) + tier_band_fractions(src)
+    return min(hi - lo for lo, hi in zip(bands, bands[1:]))
+
+
+def dearest_output_usd_per_mtok(src: Path | None = None) -> float:
+    """The highest output-token rate (USD per 1M) in the chokepoint's price table
+    (`ai.bedrock_client.PRICES`). Raises if the table cannot be read."""
+    src = src or BEDROCK_SRC
+    prices = _module_literal(src, PRICES_NAME)
+    rates = [float(row["out"]) for row in (prices or {}).values() if isinstance(row, dict) and "out" in row]
+    if not rates:
+        raise RuntimeError(f"output price table not derivable from {src} — refusing to guess (#4517)")
+    return max(rates)
