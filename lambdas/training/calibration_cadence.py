@@ -336,13 +336,15 @@ def table_readers(table: Any) -> dict[str, Callable[[], list[str]]]:
 def read(table: Any, today: str) -> dict[str, Any]:
     """The block over one table, plus the fitness battery's row (#5078): its due date and prompt come from
     `training.fitness_tests` (the program's own week), carried here so the owner channel has ONE prompt path —
-    and the weekly calorie titration's dead-man row (#5096, `health.titration`: no decision for the week)."""
+    and the weekly calorie titration's dead-man row (#5096, `health.titration`: no decision for the week), and the
+    dated prompt to write the post-deadline plan with its dead-man (#5130, `training.phase_after_may`)."""
     from common.constants import EXPERIMENT_START_DATE
     from health import titration
 
-    from training import fitness_tests
+    from training import fitness_tests, phase_after_may
 
     block = compute(today, table_readers(table), anchor=EXPERIMENT_START_DATE)
     block["kinds"][fitness_tests.CALIBRATION_KIND] = fitness_tests.calibration_row_from_table(table, today)
     block["kinds"][titration.CALIBRATION_KIND] = titration.calibration_row_from_table(table, today)
+    block["kinds"][phase_after_may.CALIBRATION_KIND] = phase_after_may.calibration_row(today)
     return block

@@ -2310,7 +2310,11 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "ARMED 1/1 — baseline: 4 passed in 0.74s | mutated: 1 failed, 3 passed in 0.72s :: "
         "test_every_hand_copy_of_a_charter_value_is_a_ledgered_site_and_every_row_is_live | reverted: 4 passed in 0.71s "
         "(re-proved on the PR #5118 review with the widened plant; a gate-only plant `RUN_GATE_LB = 240` and a band-only plant "
-        '`TOP_RPE = [8, 9]` / `SETS_PER_WK = {"lats": [14, 18]}` each red the guard alone, the line named)',
+        '`TOP_RPE = [8, 9]` / `SETS_PER_WK = {"lats": [14, 18]}` each red the guard alone, the line named). '
+        "#5175 widening (2026-10-23): every LEAF_PATTERNS probe rendering (digits and words, 129) planted one at a time into "
+        ".claude/skills/coach-session/SKILL.md reds its own `path::leaf` key (129 red, 0 blind); a pytest run with the #5086 "
+        "specimens put back ('five lifting days', 'Two weeks of most sets') plus 'within +1 RPE of the ceiling' and '+5 lb' "
+        "-> 1 failed, 5 passed naming all four leaves | restored: 6 passed",
         "lambdas/training/ on disk (os.walk, every .py), lambdas/coach/critics*.py, mcp/tools_plan.py, mcp/tools_health.py, "
         "mcp/tools_hevy_routine.py, mcp/tools_benchmark.py, lambdas/web/site_api_nutrition.py, config/user_goals.json, "
         "docs/coaching/COACH_SESSION.md and the daily-debrief / speak-to-coaches / coach-session skills — CODE lines only "
@@ -2325,7 +2329,7 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "only fall from the pinned seed (21, re-seeded once inside the creating PR). Positive AND negative controls: every "
         "shape each pattern claims, and the lines it must not match (a 3.75 taper cap, a 295 lb step, a standing-constraint `*_rpe_cap`, a "
         "`rpe_max` layoff cap, a computed weekly-sets read). STILL INVISIBLE, stated: a value computed from a different literal "
-        "(12 * 1000), copies in docs/ (COACH_SESSION.md excepted) or tests/, numbers written in words, a pre-charter literal "
+        "(12 * 1000), copies in docs/ (COACH_SESSION.md excepted) or tests/, a number in words away from its noun (#5175: the leaf patterns see words next to the noun), a pre-charter literal "
         "whose number differs from the charter and carries no owning key (the taper table's 3.25 / 3.75), a read of a swept "
         "constant at its use sites, the ~/.claude/skills/synced copy outside the repo, and a hand copy in a module outside the "
         "swept set.",
