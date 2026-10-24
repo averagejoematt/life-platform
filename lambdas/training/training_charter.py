@@ -86,6 +86,7 @@ PUBLISHED_WHITELIST: tuple[str, ...] = (
     "sleep.wake_time.hit",
     "habits.core",  # #5124: the core-12 calculation set's ids, labels and bases (no reading, no registry name, nothing private)
     "nutrition.floors.fibre.floor_g",  # #5204: the one fibre floor the nutrition door and review email grade against (35 g, nothing private)
+    "nutrition.calories.planned_minimum_any_weight_kcal",  # #5297: the minimum the AI-3 low-calorie fallback names in an email (a floor, nothing private)
 )
 
 _CACHE_TTL_SECONDS = 900  # the platform's 15-min config-cache convention
