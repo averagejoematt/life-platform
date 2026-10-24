@@ -321,6 +321,17 @@ def _hour_from_iso_local(ts_str):
         return None
 
 
+def _charter_window_summary(daily_rows):
+    """#5099: the charter's eating window (nutrition.eating_window) and the period's inside / outside / unknown days."""
+    statuses = [r["charter_window"] for r in daily_rows]
+    return {
+        "window": eating_window.describe(),
+        "days_inside": statuses.count("inside"),
+        "days_outside": statuses.count("outside"),
+        "days_unknown": statuses.count("unknown"),
+    }
+
+
 def _get_meal_timing(args):
     """
     Eating window analysis: first bite, last bite, window duration, caloric distribution
@@ -482,13 +493,7 @@ def _get_meal_timing(args):
             "last_bite_consistency_sd_hrs": lb_sd,
             "consistency_n_days": n,
             "trf_status": "OPTIMAL" if avg_win <= 10 else "BORDERLINE" if avg_win <= 12 else "WIDE",
-            # #5099: the PLAN's window is the charter's, not the TRF literature line above
-            "charter_window": {
-                "window": eating_window.describe(),
-                "days_inside": sum(1 for r in daily_rows if r["charter_window"] == "inside"),
-                "days_outside": sum(1 for r in daily_rows if r["charter_window"] == "outside"),
-                "days_unknown": sum(1 for r in daily_rows if r["charter_window"] == "unknown"),
-            },
+            "charter_window": _charter_window_summary(daily_rows),  # #5099: the PLAN's window, not the TRF line above
         },
         "late_eating": {"days_eating_after_8pm": late_days, "pct_days": round(late_days / n * 100, 1)},
         "sleep_overlap": {
