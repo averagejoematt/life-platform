@@ -20,9 +20,9 @@ Covers:
   tests/test_token_alarm_composite_2116.py::test_the_docstring_states_the_real_count,
   so this line cannot rot again:
     ai-tokens-daily-brief-runaway      AnthropicOutputTokens Sum >= 35000, 3600s (ONE run)
-    ai-tokens-platform-daily-total     AnthropicOutputTokens Sum >= 337000, 86400s (#4517)
+    ai-tokens-platform-daily-total     AnthropicOutputTokens Sum >= 459000, 86400s (#4517, budget bar)
     token-alarm-genesis-window-active  TokenAlarmGenesisWindowActive gauge (no routing)
-    ai-daily-spend-high                EstimatedCostUSD Sum >= $8.72, 86400s (#4517)
+    ai-daily-spend-high                EstimatedCostUSD Sum >= $22.93, 86400s (#4517, budget bar)
     composites: ai-tokens-platform-daily-total-{urgent,genesis-window} (#2116) and
                 ai-daily-spend-high-{urgent,genesis-window} (#3505)
 
