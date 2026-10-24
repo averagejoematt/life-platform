@@ -120,7 +120,8 @@ Every check fails closed. A worktree is a candidate only when it is not the main
 tree or the current tree, is **not locked**, has been **idle longer than the floor**
 (`--min-idle-minutes`, default 120), has **no** uncommitted changes, and every commit is
 either already in `origin/main`, or its content is (merging the branch into `origin/main`
-would change nothing — `git merge-tree`, local), or belongs to a PR GitHub reports as `MERGED`. A `CLOSED`
+would change nothing — `git merge-tree`, local), or belongs to a PR GitHub reports as `MERGED` **whose head contains the local tip** (#5139 —
+a commit made after the merge is unpushed work, and a bare `MERGED` used to reap it). A `CLOSED`
 PR is *not* merged and is kept; an ambiguous or unknowable verdict is kept; a detached HEAD
 is kept.
 
@@ -131,6 +132,15 @@ minutes later that sees three dirty trees concludes the tool is safe. The lock *
 exists from creation — and git itself refuses to remove a locked worktree without force,
 which this tool never passes. The main working tree is identified by inode, not by string,
 so a case-twin spelling cannot smuggle the primary clone into the candidate list.
+
+**Squash-merged lanes whose lock was never released (#5139).** `git branch --merged` cannot see
+a squash merge, and a lane stays locked until `/land` §5 releases it — so on 2026-10-23, 41 of 60
+worktrees were lane-locked on a branch GitHub reports MERGED and the inventory called 0
+reapable. The dry run now counts them (`squash-merged but still lane-locked: N`, and a
+`merged_locked=` field on `REAPER-SUMMARY`); `--release-merged-locks` treats such a lock as the
+release `/land` would have done. Only a `lane_worktree.py` lock is eligible, the PR head must
+contain the local tip, and the row must still clear the idle floor and be clean; a locked lane
+with no merged PR is never even status-probed.
 
 Read the kept list before applying — the reasons are the point, and a row you disagree
 with is a bug in the classifier, not a nuisance to override. There is no flag that skips
@@ -143,7 +153,7 @@ there would be green forever without measuring anything — the vacuous-gate cla
 has already paid for (#2578).
 
 The reaper's one scheduled caller is `/wrap`: `scripts/wrap_gates.py` runs
-`worktree_reaper.py --apply --quiet --release-locks-older-than-days 7 --budget-seconds 240`
+`worktree_reaper.py --apply --quiet --release-locks-older-than-days 7 --release-merged-locks --budget-seconds 240`
 as the `worktree-reap` gate on the machine that actually holds the worktrees. It is fast
 enough to sit there — 140 s over 348 trees became ~19 s (parallel probes, one batched
 ancestry call, a local `git merge-tree` squash check, one batched `gh pr list`) — and the

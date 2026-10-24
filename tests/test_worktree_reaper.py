@@ -656,3 +656,204 @@ def test_release_by_branch_name_is_exact_idempotent_and_missing_ok(sandbox):
         lane.main(["release", "--repo", str(sandbox), "no-such-branch"])  # without --missing-ok: an error
     with pytest.raises(SystemExit):
         lane.main(["release", "--missing-ok", "--repo", str(sandbox), "4259"])  # ambiguous is never 'missing'
+
+
+# ── #5139: squash-merged lanes whose lock was never released ──────────────────
+#
+# 2026-10-23: 60 worktrees, 41 lane-locked on a branch GitHub reports MERGED, and the dry
+# run called 0 reapable — `git branch --merged` cannot see a squash merge and the lock was
+# never released. GitHub is faked here (a dict of PR verdicts); git is real, in `sandbox`.
+
+
+def _tip_of(path: Path) -> str:
+    return _run(["git", "rev-parse", "HEAD"], path).strip()
+
+
+@pytest.fixture
+def fake_github(monkeypatch):
+    """GitHub's PR verdicts from a dict: branch -> (state, headRefOid). Absent = no PR."""
+    prs: dict[str, tuple[str, str]] = {}
+
+    def prime(branches):
+        for b in branches:
+            if b and b not in r._PR_CACHE:
+                state, head = prs.get(b, (None, None))
+                r._PR_CACHE[b] = state
+                r._PR_HEAD_CACHE[b] = head
+
+    r._PR_CACHE.clear()
+    r._PR_HEAD_CACHE.clear()
+    monkeypatch.setattr(r, "_prime_pr_states", prime)
+    yield prs
+    r._PR_CACHE.clear()
+    r._PR_HEAD_CACHE.clear()
+
+
+def _shipped_lane(sandbox: Path, slug: str) -> tuple[Path, str]:
+    """A lane, still locked, whose one commit GitHub squash-merged; main has moved on."""
+    path = lane.new_lane("5139", slug, repo=sandbox)
+    _lane_commit(path, f"{slug}.txt")
+    branch = f"issue-5139-{slug}"
+    _run(["git", "merge", "--quiet", "--squash", branch], sandbox)
+    _run(["git", "commit", "--quiet", "-m", f"squash {branch}"], sandbox)
+    (sandbox / f"later-{slug}.txt").write_text("main moved on\n", encoding="utf-8")
+    _run(["git", "add", "-A"], sandbox)
+    _run(["git", "commit", "--quiet", "-m", f"later {slug}"], sandbox)
+    _run(["git", "push", "--quiet", "origin", "main"], sandbox)
+    return path, _tip_of(path)
+
+
+def test_a_squash_merged_lane_lock_is_reported_and_released_only_when_asked(sandbox, fake_github):
+    path, tip = _shipped_lane(sandbox, "shipped")
+    fake_github["issue-5139-shipped"] = ("MERGED", tip)
+    _backdate(path)
+
+    row = _row(r.classify(sandbox, Path(os.getcwd())), path)
+    assert row["merged_lock"] and not row["reapable"], row["reasons"]
+    assert any("--release-merged-locks" in x for x in row["reasons"]), "the kept row must name the flag"
+    assert row["dirty"] is None, "without the flag a locked lane must not even be status-probed"
+
+    row = _row(r.classify(sandbox, Path(os.getcwd()), release_merged_locks=True), path)
+    assert row["reapable"] and row["release_lock"], f"a clean, idle, squash-merged lane lock must retire: {row['reasons']}"
+    assert row["unmerged"] == 1, "fixture invalid: a squash merge must leave the tip unreachable"
+
+
+def test_an_unmerged_locked_lane_is_kept_and_never_probed(sandbox, fake_github):
+    path = lane.new_lane("5139", "open-pr", repo=sandbox)
+    _lane_commit(path, "open.txt")
+    fake_github["issue-5139-open-pr"] = ("OPEN", _tip_of(path))
+    _backdate(path)
+    row = _row(r.classify(sandbox, Path(os.getcwd()), release_merged_locks=True), path)
+    assert not row["merged_lock"] and not row["reapable"] and not row["release_lock"], row["reasons"]
+    assert row["dirty"] is None, "a live lane with no merged PR must not be status-probed"
+    assert any("in use" in x for x in row["reasons"]), row["reasons"]
+
+
+def test_a_freshly_created_lane_with_no_pr_is_kept(sandbox, fake_github):
+    """The #3289 shape again: clean, zero commits, every commit in main — and live."""
+    path = lane.new_lane("5139", "fresh", repo=sandbox)
+    _backdate(path)
+    row = _row(r.classify(sandbox, Path(os.getcwd()), release_merged_locks=True), path)
+    assert not row["merged_lock"] and not row["reapable"], row["reasons"]
+
+
+def test_a_dirty_squash_merged_lane_is_kept(sandbox, fake_github):
+    path, tip = _shipped_lane(sandbox, "dirty")
+    fake_github["issue-5139-dirty"] = ("MERGED", tip)
+    (path / "wip.txt").write_text("after the merge\n", encoding="utf-8")
+    _backdate(path)
+    row = _row(r.classify(sandbox, Path(os.getcwd()), release_merged_locks=True), path)
+    assert row["merged_lock"] and row["dirty"] is True, row
+    assert not row["reapable"] and not row["release_lock"], row["reasons"]
+
+
+def test_commits_after_the_merge_are_kept_locked_or_not(sandbox, fake_github):
+    """A MERGED verdict covers the head GitHub merged, not what was committed since."""
+    path, merged_head = _shipped_lane(sandbox, "after")
+    _lane_commit(path, "after-the-merge.txt")  # unpushed, unmerged work
+    fake_github["issue-5139-after"] = ("MERGED", merged_head)
+    _backdate(path)
+    row = _row(r.classify(sandbox, Path(os.getcwd()), release_merged_locks=True), path)
+    assert not row["merged_lock"] and not row["reapable"], row["reasons"]
+
+    lane.release_lane(path, repo=sandbox)
+    _backdate(path)
+    row = _row(r.classify(sandbox, Path(os.getcwd())), path)
+    assert row["pr_state"] == "MERGED" and not row["content_merged"], row
+    assert not row["reapable"], f"commits made after the PR merged were marked reapable: {row['reasons']}"
+    assert any("not covering this tip" in x for x in row["reasons"]), row["reasons"]
+
+
+def test_a_pr_head_that_moved_past_the_local_tip_still_covers_it(sandbox, fake_github):
+    """Measured on 9 of 41 real lanes: GitHub's update-branch (or a fix pushed from another
+    tree) moves the PR head past the local tip. The tip is then an ANCESTOR of the merged
+    head — nothing local that GitHub did not merge. An unrelated head covers nothing."""
+    path, tip = _shipped_lane(sandbox, "moved")
+    _lane_commit(path, "pushed-elsewhere.txt")
+    moved_head = _tip_of(path)
+    _run(["git", "reset", "--quiet", "--hard", tip], path)
+    fake_github["issue-5139-moved"] = ("MERGED", moved_head)
+    _backdate(path)
+    row = _row(r.classify(sandbox, Path(os.getcwd()), release_merged_locks=True), path)
+    assert row["tip_in_head"] and row["reapable"], row["reasons"]
+
+    unrelated = _run(["git", "rev-parse", "origin/main~1"], sandbox).strip()
+    r._PR_CACHE.clear()
+    r._PR_HEAD_CACHE.clear()
+    fake_github["issue-5139-moved"] = ("MERGED", unrelated)
+    row = _row(r.classify(sandbox, Path(os.getcwd()), release_merged_locks=True), path)
+    assert not row["tip_in_head"] and not row["reapable"], row["reasons"]
+
+
+def test_a_merged_lane_lock_inside_the_idle_floor_is_kept(sandbox, fake_github):
+    path, tip = _shipped_lane(sandbox, "just-merged")
+    fake_github["issue-5139-just-merged"] = ("MERGED", tip)
+    row = _row(r.classify(sandbox, Path(os.getcwd()), release_merged_locks=True), path)
+    assert row["merged_lock"] and not row["reapable"], row["reasons"]
+    assert any("idle floor" in x for x in row["reasons"]), row["reasons"]
+
+
+def test_a_hand_set_lock_on_a_merged_branch_is_never_released(sandbox, fake_github):
+    path = sandbox.parent / "owner-merged"
+    _run(["git", "worktree", "add", "--quiet", "-b", "owner-merged", str(path), "origin/main"], sandbox)
+    _lane_commit(path, "owner.txt")
+    _squash_into_main(sandbox, "owner-merged")
+    _run(["git", "worktree", "lock", str(path), "--reason", "owner: keep"], sandbox)
+    fake_github["owner-merged"] = ("MERGED", _tip_of(path))
+    _backdate(path)
+    row = _row(r.classify(sandbox, Path(os.getcwd()), release_merged_locks=True), path)
+    assert not row["merged_lock"] and not row["reapable"] and not row["release_lock"], row["reasons"]
+
+
+def test_the_batched_pr_lookup_carries_the_head_and_fails_closed(monkeypatch):
+    """The one `gh pr list` call: state AND headRefOid per head; several PRs = unknowable."""
+    import json as _json
+    import unittest.mock as mock
+
+    payload = [
+        {"headRefName": "one", "state": "MERGED", "headRefOid": "a" * 40},
+        {"headRefName": "two", "state": "MERGED", "headRefOid": "b" * 40},
+        {"headRefName": "two", "state": "CLOSED", "headRefOid": "c" * 40},
+    ]
+    done = subprocess.CompletedProcess(args=[], returncode=0, stdout=_json.dumps(payload), stderr="")
+    r._PR_CACHE.clear()
+    r._PR_HEAD_CACHE.clear()
+    with mock.patch.object(r.subprocess, "run", return_value=done) as run:
+        r._prime_pr_states(["one", "two", "none"])
+    assert "headRefOid" in " ".join(run.call_args.args[0]), "the batch must ask GitHub for each PR's head"
+    assert (r._pr_state("one"), r._pr_head("one")) == ("MERGED", "a" * 40)
+    assert (r._pr_state("two"), r._pr_head("two")) == (None, None), "ambiguous must be unknowable"
+    assert (r._pr_state("none"), r._pr_head("none")) == (None, None)
+    r._PR_CACHE.clear()
+    r._PR_HEAD_CACHE.clear()
+
+
+def test_apply_retires_the_squash_merged_lane_and_names_the_dirty_one(sandbox, fake_github, capsys):
+    """The wrap gate's invocation, end to end over real git, with GitHub faked."""
+    shipped, tip = _shipped_lane(sandbox, "apply-shipped")
+    dirty, dtip = _shipped_lane(sandbox, "apply-dirty")
+    live = lane.new_lane("5139", "apply-live", repo=sandbox)
+    fake_github["issue-5139-apply-shipped"] = ("MERGED", tip)
+    fake_github["issue-5139-apply-dirty"] = ("MERGED", dtip)
+    (dirty / "wip.txt").write_text("keep me\n", encoding="utf-8")
+    for p in (shipped, dirty, live):
+        _backdate(p)
+
+    rc = r.main(["--apply", "--quiet", "--release-locks-older-than-days", "7", "--release-merged-locks", "--budget-seconds", "120"])
+    out = capsys.readouterr().out
+    assert rc == 0, out
+    assert not shipped.exists(), f"the squash-merged lane was not retired:\n{out}"
+    assert dirty.exists() and (dirty / "wip.txt").read_text(encoding="utf-8") == "keep me\n"
+    assert live.exists(), "a live lane with no merged PR was removed"
+    assert "issue-5139-apply-dirty" in out, "a dirty lane must be reported by NAME"
+    assert "merged_locked=2" in out and "removed=1" in out and "released=1" in out, out
+
+
+def test_the_wrap_battery_retires_squash_merged_lanes():
+    wg = _load("wrap_gates", "_wrap_gates_5139")
+    (gate,) = [g for g in wg.GATHER if "scripts/worktree_reaper.py" in g.cmd]
+    assert "--release-merged-locks" in gate.cmd, "the wrap reaper must retire squash-merged lane locks (#5139)"
+    from skill_paths import require_skill
+
+    for skill in ("wrap", "worktree"):
+        assert "--release-merged-locks" in require_skill(skill).read_text(encoding="utf-8"), f"/{skill} must show the flag"

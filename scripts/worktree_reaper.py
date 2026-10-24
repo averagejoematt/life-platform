@@ -88,6 +88,22 @@ WIRED, AND FAST (#4259, measured 2026-09-27)
   detection is first a LOCAL `git merge-tree` content check (merging the branch into
   origin/main would change nothing) and only then ONE batched `gh pr list`, and
   `--budget-seconds` keeps whatever it did not reach.
+
+SQUASH-MERGED LANES WHOSE LOCK WAS NEVER RELEASED (#5139, measured 2026-10-23)
+  60 worktrees, 49 of them lane-locked and almost all on a branch whose PR GitHub reports
+  MERGED; the dry run called 0 of 60 reapable. The release step (`/land` §5) was skipped,
+  and the 7-day stale-lock floor is the only other way out, so a busy week accumulates every
+  lane it ships. `git branch --merged` cannot see any of them — a squash merge leaves the
+  tip unreachable. Two changes:
+    * a GitHub MERGED verdict now has to COVER THIS TIP: the PR's `headRefOid` must equal
+      the branch's local tip or contain it (`git merge-base --is-ancestor`). A commit made
+      after the PR merged is unpushed, unmerged work, and a bare "PR MERGED" used to reap
+      it. A tip outside the head, or a head GitHub did not report, is KEPT;
+    * `--release-merged-locks` — a lock with `lane_worktree.py`'s own reason, on a branch
+      whose PR is MERGED at (or past) this tip, is the release `/land` §5 would have done. The
+      row is still judged on every other check (idle floor, clean); a live-locked row with
+      no merged PR is never status-probed, exactly as before. Without the flag such a row is
+      KEPT and its reason names the flag, so the inventory shows it either way.
 """
 
 from __future__ import annotations
@@ -288,6 +304,9 @@ def _content_merged(branch: str | None, main_tree: str | None) -> bool:
 
 
 _PR_CACHE: dict[str, str | None] = {}
+# The PR's head commit beside its state (#5139): a MERGED verdict only covers the commits
+# GitHub merged, so it counts only when this sha is the branch's local tip.
+_PR_HEAD_CACHE: dict[str, str | None] = {}
 
 # One `gh pr list` returns every PR's head + state; a branch whose PR is older than this
 # window simply has no verdict and is KEPT (fail closed), never guessed.
@@ -308,7 +327,7 @@ def _prime_pr_states(branches) -> None:
     data = None
     try:
         res = subprocess.run(
-            ["gh", "pr", "list", "--state", "all", "--limit", str(_PR_BATCH_LIMIT), "--json", "headRefName,state"],
+            ["gh", "pr", "list", "--state", "all", "--limit", str(_PR_BATCH_LIMIT), "--json", "headRefName,state,headRefOid"],
             cwd=ROOT,
             capture_output=True,
             text=True,
@@ -317,14 +336,16 @@ def _prime_pr_states(branches) -> None:
         data = json.loads(res.stdout) if res.returncode == 0 else None
     except Exception:
         data = None
-    by_head: dict[str, list[str]] = {}
+    by_head: dict[str, list[tuple[str, str]]] = {}
     if isinstance(data, list):
         for pr in data:
             if isinstance(pr, dict) and pr.get("headRefName"):
-                by_head.setdefault(pr["headRefName"], []).append(str(pr.get("state") or ""))
+                by_head.setdefault(pr["headRefName"], []).append((str(pr.get("state") or ""), str(pr.get("headRefOid") or "")))
     for b in need:
-        states = by_head.get(b, [])
-        _PR_CACHE[b] = states[0] if len(states) == 1 and states[0] else None
+        prs = by_head.get(b, [])
+        one = len(prs) == 1 and prs[0][0]
+        _PR_CACHE[b] = prs[0][0] if one else None
+        _PR_HEAD_CACHE[b] = (prs[0][1] or None) if one else None
 
 
 def _pr_state(branch: str | None) -> str | None:
@@ -339,19 +360,68 @@ def _pr_state(branch: str | None) -> str | None:
         return _PR_CACHE[branch]
     try:
         r = subprocess.run(
-            ["gh", "pr", "list", "--head", branch, "--state", "all", "--json", "state", "-q", ".[].state"],
+            ["gh", "pr", "list", "--head", branch, "--state", "all", "--json", "state,headRefOid"],
             cwd=ROOT,
             capture_output=True,
             text=True,
             timeout=30,
         )
-        states = [ln.strip() for ln in r.stdout.splitlines() if ln.strip()] if r.returncode == 0 else []
+        data = json.loads(r.stdout) if r.returncode == 0 else []
+        prs = [pr for pr in data if isinstance(pr, dict) and pr.get("state")] if isinstance(data, list) else []
         # Exactly one verdict, and it must be MERGED. Several PRs on one branch head is
         # ambiguous, so it is unknowable rather than a majority vote.
-        _PR_CACHE[branch] = states[0] if len(states) == 1 else None
+        _PR_CACHE[branch] = str(prs[0]["state"]) if len(prs) == 1 else None
+        _PR_HEAD_CACHE[branch] = (str(prs[0].get("headRefOid") or "") or None) if len(prs) == 1 else None
     except Exception:
         _PR_CACHE[branch] = None
+        _PR_HEAD_CACHE[branch] = None
     return _PR_CACHE[branch]
+
+
+def _pr_head(branch: str | None) -> str | None:
+    """The head sha of the branch's one PR, as GitHub reported it; None if unknowable."""
+    return _PR_HEAD_CACHE.get(branch) if branch else None
+
+
+def _tip(branch: str | None) -> str | None:
+    """The branch's local tip sha, or None if unknowable."""
+    if not branch:
+        return None
+    code, out = _git("rev-parse", "--verify", "--quiet", f"refs/heads/{branch}^{{commit}}")
+    line = out.strip().splitlines()[0].strip() if out.strip() else ""
+    return line if code == 0 and len(line) >= 40 else None
+
+
+def _tip_in_head(tip: str | None, head: str | None) -> bool:
+    """True iff every commit on the local tip is inside the PR head GitHub merged.
+
+    Equal shas are the common case. The other measured shape (9 of 32 lanes, 2026-10-23):
+    the PR head moved past the local tip — an update-branch on GitHub, or a fix pushed from
+    another tree — so the local tip is an ANCESTOR of the merged head and still holds
+    nothing GitHub did not merge. A head object missing locally is an error here, so False.
+    """
+    if not tip or not head:
+        return False
+    if tip == head:
+        return True
+    code, _ = _git("merge-base", "--is-ancestor", tip, head)
+    return code == 0
+
+
+def _merged_at_tip(row: dict) -> bool:
+    """GitHub says MERGED, and the head it merged contains the local tip (#5139).
+
+    A squash merge's verdict is about the head GitHub saw. Anything committed on the branch
+    after that is unpushed, unmerged work, so a MERGED PR whose head does not contain the
+    tip — or whose head is unknown — proves nothing about it. `tip_in_head` is computed
+    once in `classify` (`_tip_in_head`); this reads it, so `decide` stays pure.
+    """
+    return row.get("pr_state") == "MERGED" and bool(row.get("tip_in_head"))
+
+
+def _is_lane_lock(wt: dict) -> bool:
+    """A lock `lane_worktree.py new` set — the only kind any rule here may ever release."""
+    return bool(wt.get("locked")) and str(wt.get("lock_reason") or "").startswith(LOCK_REASON_PREFIX)
 
 
 def _stale_lane_lock(wt: dict, last_activity: float | None, now: float, stale_lock_seconds: float | None) -> bool:
@@ -362,9 +432,7 @@ def _stale_lane_lock(wt: dict, last_activity: float | None, now: float, stale_lo
     guess. Eligibility is not reaping — the row still has to pass every check an unlocked
     row passes (clean, merged, not the main/current tree).
     """
-    if stale_lock_seconds is None or not wt.get("locked") or last_activity is None:
-        return False
-    if not str(wt.get("lock_reason") or "").startswith(LOCK_REASON_PREFIX):
+    if stale_lock_seconds is None or last_activity is None or not _is_lane_lock(wt):
         return False
     return now - last_activity >= stale_lock_seconds
 
@@ -406,7 +474,11 @@ def probe(
         unmerged=None,
         content_merged=False,
         pr_state=None,
+        pr_head=None,
+        tip=None,
+        tip_in_head=False,
         stale_lock=False,
+        merged_lock=False,
         release_lock=False,
         unprobed=False,
     )
@@ -429,17 +501,30 @@ def probe(
     # Activity BEFORE dirtiness: `git status` rewrites the admin index.
     row["last_activity"] = _last_activity(p)
     row["stale_lock"] = _stale_lane_lock(wt, row["last_activity"], now, stale_lock_seconds)
+    if not wt["detached"]:
+        row["tip"] = _tip(wt["branch"])
     if wt.get("locked") and not row["stale_lock"]:
         return row
-    row["dirty"] = _is_dirty(p)
-    if not row["dirty"] and not wt["detached"]:
-        row["unmerged"] = _unmerged_commits(wt["branch"], merged)
-        if row["unmerged"]:
-            row["content_merged"] = _content_merged(wt["branch"], main_tree)
+    _probe_state(row, merged, main_tree)
     return row
 
 
-def decide(row: dict, now: float, min_idle_seconds: float, stale_lock_seconds: float | None = None) -> dict:
+def _probe_state(row: dict, merged: set[str] | None, main_tree: str | None) -> None:
+    """Dirtiness, then (clean + on a branch) the ancestry and content-merge facts."""
+    row["dirty"] = _is_dirty(row["path_obj"])
+    if not row["dirty"] and not row["detached"]:
+        row["unmerged"] = _unmerged_commits(row["branch"], merged)
+        if row["unmerged"]:
+            row["content_merged"] = _content_merged(row["branch"], main_tree)
+
+
+def decide(
+    row: dict,
+    now: float,
+    min_idle_seconds: float,
+    stale_lock_seconds: float | None = None,
+    release_merged_locks: bool = False,
+) -> dict:
     """Turn the probed facts into reapable/KEEP + the reasons. Pure — this is the contract.
 
     Ordered most-protective first, and every branch that is not the final "reapable" one
@@ -463,12 +548,21 @@ def decide(row: dict, now: float, min_idle_seconds: float, stale_lock_seconds: f
         return row
     if row["locked"]:
         why = f" ({row['lock_reason']})" if row["lock_reason"] else ""
-        if not row.get("stale_lock"):
+        if row.get("merged_lock") and not row.get("stale_lock"):
+            if not release_merged_locks:
+                reasons.append(
+                    f"LOCKED{why} but its PR is MERGED covering this tip — a missed release; "
+                    "`--release-merged-locks` retires it if idle + clean — KEEP"
+                )
+                return row
+            reasons.append(f"LOCKED{why} but its PR is MERGED covering this tip — a missed release; judged on the checks below")
+        elif not row.get("stale_lock"):
             reasons.append(f"LOCKED{why} — in use; release with `git worktree unlock {row['path']}` — KEEP")
             return row
-        days = (now - row["last_activity"]) / 86400 if row["last_activity"] else 0
-        floor = f" ≥ the {stale_lock_seconds / 86400:g} d stale-lock floor" if stale_lock_seconds else ""
-        reasons.append(f"LOCKED{why} but idle {days:.0f} d{floor} — a forgotten release; judged on the checks below")
+        else:
+            days = (now - row["last_activity"]) / 86400 if row["last_activity"] else 0
+            floor = f" ≥ the {stale_lock_seconds / 86400:g} d stale-lock floor" if stale_lock_seconds else ""
+            reasons.append(f"LOCKED{why} but idle {days:.0f} d{floor} — a forgotten release; judged on the checks below")
     if row["last_activity"] is None:
         reasons.append("activity time unknowable — KEEP")
         return row
@@ -476,11 +570,21 @@ def decide(row: dict, now: float, min_idle_seconds: float, stale_lock_seconds: f
     if idle < min_idle_seconds:
         reasons.append(f"active {int(idle // 60)} min ago — inside the {int(min_idle_seconds // 60)} min idle floor — KEEP")
         return row
+    if row["dirty"] is None:
+        reasons.append("working-tree state never probed — KEEP")
+        return row
     if row["dirty"]:
         reasons.append("has uncommitted changes — KEEP")
         return row
     n = row["unmerged"]
-    if row["detached"]:
+    if row["locked"] and row.get("merged_lock") and not row.get("stale_lock"):
+        # Released on GitHub's verdict alone, so the verdict must cover the tip (#5139).
+        if not row["detached"] and _merged_at_tip(row):
+            row["reapable"] = True
+            reasons.append("squash-merged (PR MERGED covering this tip); nothing committed after the merge")
+        else:
+            reasons.append("PR no longer MERGED covering this tip — KEEP")
+    elif row["detached"]:
         reasons.append("detached HEAD — cannot prove it is merged, KEEP")
     elif n is None:
         reasons.append("branch state unknowable — KEEP")
@@ -494,9 +598,13 @@ def decide(row: dict, now: float, min_idle_seconds: float, stale_lock_seconds: f
         if row.get("content_merged"):
             row["reapable"] = True
             reasons.append(f"content already in origin/main (merging it would change nothing); {n} unreachable commit(s) is expected")
-        elif state == "MERGED":
+        elif state == "MERGED" and _merged_at_tip(row):
             row["reapable"] = True
-            reasons.append(f"squash-merged (PR MERGED); {n} unreachable commit(s) is expected")
+            reasons.append(f"squash-merged (PR MERGED covering this tip); {n} unreachable commit(s) is expected")
+        elif state == "MERGED":
+            # #5139: the PR merged some EARLIER head. Whatever was committed since is
+            # unpushed or unmerged work, and GitHub's verdict says nothing about it.
+            reasons.append(f"{n} commit(s) not in origin/main; PR MERGED but not covering this tip (commits after the merge) — KEEP")
         elif state is None:
             reasons.append(f"{n} commit(s) not in origin/main, and no merge verdict available — KEEP")
         else:
@@ -518,6 +626,7 @@ def classify(
     stale_lock_seconds: float | None = None,
     budget_seconds: float | None = None,
     workers: int = PROBE_WORKERS,
+    release_merged_locks: bool = False,
 ) -> list[dict]:
     """Probe every worktree and decide its fate. `main_path` is a hint — the main working
     tree is also derived from git itself, so a case-twin spelling cannot smuggle it in.
@@ -550,11 +659,42 @@ def classify(
         probed = list(pool.map(one, worktrees()))
 
     need = [x for x in probed if x.get("unmerged") and not x.get("content_merged")]
-    if need and (deadline is None or time.monotonic() < deadline):
-        _prime_pr_states([x["branch"] for x in need])
-        for x in need:
+    # #5139: a lane-locked row that stopped at its lock gets GitHub's verdict too — a lock on
+    # a branch whose PR merged covering this tip is the release `/land` §5 skipped.
+    held = [
+        x for x in probed if _is_lane_lock(x) and not x.get("stale_lock") and x.get("tip") and x.get("exists") and not x.get("unprobed")
+    ]
+    if (need or held) and (deadline is None or time.monotonic() < deadline):
+        _prime_pr_states([x["branch"] for x in need + held])
+        for x in need + held:
             x["pr_state"] = _pr_state(x["branch"])
-    return [decide(x, now=now, min_idle_seconds=min_idle_seconds, stale_lock_seconds=stale_lock_seconds) for x in probed]
+            x["pr_head"] = _pr_head(x["branch"])
+            if x["pr_state"] == "MERGED":
+                x["tip_in_head"] = _tip_in_head(x.get("tip"), x["pr_head"])
+        merged_held = [x for x in held if _merged_at_tip(x)]
+        for x in merged_held:
+            x["merged_lock"] = True
+
+        def state(x: dict) -> None:
+            if deadline is None or time.monotonic() < deadline:
+                _probe_state(x, merged, main_tree)
+            else:
+                x["unprobed"] = True
+
+        # Status-probed only now, and only these: a live lane with no merged PR is never touched.
+        if release_merged_locks and merged_held:
+            with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+                list(pool.map(state, merged_held))
+    return [
+        decide(
+            x,
+            now=now,
+            min_idle_seconds=min_idle_seconds,
+            stale_lock_seconds=stale_lock_seconds,
+            release_merged_locks=release_merged_locks,
+        )
+        for x in probed
+    ]
 
 
 def case_twins(rows: list[dict]) -> list[tuple[str, str]]:
@@ -600,6 +740,12 @@ def main(argv: list[str] | None = None) -> int:
         "only if it passes every other check (clean, merged). Default: never (a lock is always honoured).",
     )
     ap.add_argument(
+        "--release-merged-locks",
+        action="store_true",
+        help="also unlock + reap a lane whose `lane_worktree.py` lock sits on a branch whose PR is MERGED at (or past) "
+        "its local tip (#5139) — only if it passes every other check (idle, clean). Default: reported, never released.",
+    )
+    ap.add_argument(
         "--budget-seconds",
         type=float,
         default=None,
@@ -621,6 +767,7 @@ def main(argv: list[str] | None = None) -> int:
         min_idle_seconds=args.min_idle_minutes * 60,
         stale_lock_seconds=stale_lock_seconds,
         budget_seconds=None if deadline is None else max(0.0, deadline - time.monotonic()),
+        release_merged_locks=args.release_merged_locks,
     )
 
     # The candidate set. A main-tree row can never reach it, and a locked row only when
@@ -667,6 +814,10 @@ def main(argv: list[str] | None = None) -> int:
         else " (never candidates)"
     )
     print(f"\nliveness: {len(locked)} locked{stale_note}; idle floor {args.min_idle_minutes} min")
+    merged_locked = [r for r in rows if r.get("merged_lock")]
+    if merged_locked:
+        verb = "released when idle + clean" if args.release_merged_locks else "kept — pass --release-merged-locks to retire"
+        print(f"squash-merged but still lane-locked: {len(merged_locked)} (PR MERGED covering the local tip; {verb})")
 
     # #4259: every dirty tree by NAME, in every mode (including --quiet, which is how the
     # wrap gate runs). A dirty tree is never touched; this list is the human's to act on.
@@ -700,7 +851,8 @@ def main(argv: list[str] | None = None) -> int:
 
     def summary(removed: int, released: int, deferred: int) -> str:
         return (
-            f"REAPER-SUMMARY worktrees={len(rows)} reapable={len(reapable)} removed={removed} released={released} "
+            f"REAPER-SUMMARY worktrees={len(rows)} reapable={len(reapable)} merged_locked={len(merged_locked)} "
+            f"removed={removed} released={released} "
             f"deferred={deferred} dirty={len(dirty)} unprobed={len(unprobed)} elapsed={time.monotonic() - started:.1f}s"
         )
 

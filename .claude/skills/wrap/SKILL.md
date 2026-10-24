@@ -162,8 +162,9 @@ Every residual/next-picks bullet cites an issue `#N` (file it, ADR-099 shape) or
 - The handover carries one line either way: `**Stash/hooks:** clean` or
   `**Stash/hooks:** <what was found + what you did about it>`.
 - The Phase 1 batch also runs the `worktree-reap` gate (#4259):
-  `python3 scripts/worktree_reaper.py --apply --quiet --release-locks-older-than-days 7 --budget-seconds 240`.
-  It removes every lane that `/land` released (or whose lane lock has sat idle 7 days) once it
+  `python3 scripts/worktree_reaper.py --apply --quiet --release-locks-older-than-days 7 --release-merged-locks --budget-seconds 240`.
+  It removes every lane that `/land` released (or whose lane lock has sat idle 7 days, or whose
+  lane lock sits on a branch whose PR is MERGED covering the local tip — #5139) once it
   is clean and merged, and lists every **dirty** worktree by name without touching it. Its
   last line is `REAPER-SUMMARY …`; a dirty lane it names is yours to commit, park as a patch,
   or explain — the reaper never decides that for you.

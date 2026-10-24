@@ -149,7 +149,8 @@ GATHER = [
     Gate("stash", "e5", ["git", "stash", "list"], marker="Stash/hooks", ok_when=_stash_ok),
     Gate("hooks", "e5", ["python3", "deploy/session_postflight.py"], marker="Stash/hooks", ok_when=_hooks_ok),
     # #4259: the lane reaper — the one scheduled caller `scripts/worktree_reaper.py` has. It
-    # removes every lane that is released (or lane-locked and idle 7 d), clean, and merged,
+    # removes every lane that is released (or lane-locked and idle 7 d, or lane-locked on a
+    # branch whose PR GitHub MERGED covering the local tip — #5139), clean, and merged,
     # and prints every dirty tree by name without touching it. Every check fails closed and
     # the budget keeps what it did not reach, so a slow or offline run reaps LESS, never
     # more. Red only if the reaper itself errors; a dirty tree is a report, not a failure.
@@ -163,6 +164,7 @@ GATHER = [
             "--quiet",
             "--release-locks-older-than-days",
             "7",
+            "--release-merged-locks",
             "--budget-seconds",
             "240",
         ],
