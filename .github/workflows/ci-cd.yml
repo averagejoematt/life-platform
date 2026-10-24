@@ -1101,11 +1101,11 @@ jobs:
           # R4 (CISO review): one human-facing line on the alert topic. The S3 ledger has no
           # readers; the owner reads life-platform-alerts. The deploy role already holds
           # sns:Publish on this topic (infra/iam/github-actions-deploy-role.permissions.json,
-          # Sid SNS) — this adds NO grant. A failed publish fails the step, same as the ledger.
+          # Sid SNS) — no new grant. A failed publish fails the step; SNS caps Subject at 100 chars.
           ADMITTED=$(python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print('; '.join(f\"{s}#{a['sid'] or '-'} {','.join(a['actions'])} -> {','.join(a['resources'])}\" for s,v in d['stacks'].items() for a in v['admitted']) or 'none')" /tmp/iam_gate_2834_apply.json)
           aws sns publish \
             --topic-arn "arn:aws:sns:${{ env.AWS_REGION }}:${{ env.AWS_ACCOUNT_ID }}:life-platform-alerts" \
-            --subject "IAM additive deploy: $DEPLOY_STACKS" \
+            --subject "$(s="IAM additive deploy: ${DEPLOY_STACKS//LifePlatform/}"; echo "${s:0:100}")" \
             --message "CI applied additive-only IAM (#2834). Stacks: $DEPLOY_STACKS. Run: ${GITHUB_RUN_ID} sha ${GITHUB_SHA:0:12}. Admitted: ${ADMITTED}. Ledger: s3://matthew-life-platform/${AUDIT_BASE}-*.json" \
             --region ${{ env.AWS_REGION }} >/dev/null
           echo "✅ additive IAM deployed: $DEPLOY_STACKS · ledger s3://matthew-life-platform/${AUDIT_BASE}-*.json · notified life-platform-alerts"
