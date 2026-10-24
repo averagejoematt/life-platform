@@ -151,7 +151,7 @@ def evaluate_day(food_log: Optional[list], data: Optional[Mapping[str, Any]] = N
     first, last = min(times), max(times)
     span = last - first
     out.update(first=_hhmm(first), last=_hhmm(last), span_min=span)
-    limit = round(b["eating_hours"] * 60)
+    limit = eating_minutes(b) or 0  # b is validated, so this is its eating_hours in minutes
     if span > limit:
         out.update(status="outside", inside=False)
     elif out["untimed_meals"]:
