@@ -97,7 +97,7 @@ def test_the_daily_coach_prompt_states_the_charters_targets_not_typed_ones():
     assert f"{tc.charter_value('nutrition.protein.range_g.low'):g} g floor" in lines
     assert ", ".join(tc.charter_value("split.sequence")) in lines
     src = open(os.path.join(_REPO, "lambdas", "ai", "ai_calls.py"), encoding="utf-8").read()
-    assert "{charter_goal_lines()}" in src
+    assert "{charter_goal_lines(_disruption_language_line())}" in src  # #5122: + the whole-day language line
     assert "190g/day" not in src and "8,000+ steps/day" not in src  # the pre-charter typed targets
 
 
