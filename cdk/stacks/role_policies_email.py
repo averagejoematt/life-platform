@@ -23,6 +23,7 @@ from stacks.role_policies_base import (
     TABLE_ARN,
     _bedrock_statement,
     _bedrock_telemetry_statement,
+    _charter_twin_list,
     _s3,
     _secret_arn,
     _ses_reader_resources,
@@ -58,6 +59,7 @@ def _email_base(
             actions=["s3:GetObject"],
             resources=_s3("config/*"),
         ),
+        _charter_twin_list(),
         iam.PolicyStatement(
             sid="Secrets",
             actions=["secretsmanager:GetSecretValue"],
