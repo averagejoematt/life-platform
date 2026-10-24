@@ -486,6 +486,52 @@ def _labs_pack(table, today: str) -> list:  # noqa: ARG001 — pack signature
     return lines
 
 
+# ── Mind: the evening check-in and the early-warning protocol it owns (#5126) ──
+# The mind coach's OWN Telegram thread is an owner channel, so it reads the owner-only check-in (#5106) the way the
+# character sheet's Mind pillar does (#5129: an owner-surface read, no carve-out) — ratings and the one word, never
+# on a published surface. The daily brief's mind read (the journal_mood fallback) is #5123's, not this pack's.
+_CHECKIN_FIELDS = ("stress", "hunger", "cravings")
+_CHECKIN_WINDOW_DAYS = 7
+
+
+def _response_protocol() -> Optional[dict]:
+    """#5126: the ONE early-warning owner and its protocol (`coach.response_protocol.current`), or None (fail-soft)."""
+    try:
+        from coach import response_protocol  # noqa: PLC0415
+
+        return response_protocol.current()
+    except Exception as e:  # noqa: BLE001 — the chat runs without the protocol line
+        logger.warning("[domain_facts] response protocol unavailable: %s", type(e).__name__)
+        return None
+
+
+def _checkin_lines(table, today: str) -> list:
+    """The last seven evenings of the check-in (0-4 each): answered count, each rating's mean, the latest evening."""
+    start = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=_CHECKIN_WINDOW_DAYS - 1)).strftime("%Y-%m-%d")
+    rows = [r for r in _query_source(table, "evening_checkin", start, today) if any(_num(r.get(f)) is not None for f in _CHECKIN_FIELDS)]
+    if not rows:
+        return [f"Evening check-in: no answered evening in the last {_CHECKIN_WINDOW_DAYS} days — absent. Say so; never infer a rating."]
+    lines = [f"Evening check-in (owner-only, 0-4 each): {len(rows)} of the last {_CHECKIN_WINDOW_DAYS} evenings answered."]
+    for f in _CHECKIN_FIELDS:
+        vals = [v for v in (_num(r.get(f)) for r in rows) if v is not None]
+        if vals:
+            lines.append(f"{f} mean {round(sum(vals) / len(vals), 1)} over {len(vals)} evening(s).")
+    last = _latest(rows)
+    rated = ", ".join(f"{f} {int(_num(last.get(f)))}" for f in _CHECKIN_FIELDS if _num(last.get(f)) is not None)
+    word = f", word '{last['word']}'" if last.get("word") else ""
+    lines.append(f"Latest evening {str(last.get('sk', ''))[len('DATE#'):]}: {rated}{word}.")
+    return lines
+
+
+def _mind_pack(table, today: str) -> list:
+    """Nathan Reeves (mind_coach): the evening check-in, and the early-warning response he owns (#5126)."""
+    lines = _checkin_lines(table, today)
+    rp = _response_protocol()
+    if rp and rp.get("owner"):
+        lines.append(f"Early-warning response: {rp['line']}")
+    return lines
+
+
 def _lead_pack(table, today: str) -> list:  # noqa: ARG001 — pack signature
     """Eli Marsh (Principal Investigator): the week's one priority, nothing else."""
     return _weekly_priority_lines(table)
@@ -497,6 +543,7 @@ _PACKS = {
     "physical": _physical_pack,
     "training": _physical_pack,  # merged Performance seat serves both routes
     "labs": _labs_pack,  # #3792 — was ABSENT, so the labs coach had no facts at all
+    "mind": _mind_pack,  # #5126 — the check-in + the early-warning protocol the mind coach owns
     "eli_marsh": _lead_pack,  # chat-tier lead — pack key == persona id (no _coach suffix)
 }
 
@@ -524,6 +571,7 @@ def _training_context(today: str, clinical: str, table: Any = None) -> str:
             lab_priorities=labs.get("priorities"),
             lab_followup=labs.get("followup"),
             published=False,
+            response_protocol=_response_protocol(),
         )["text"]
     except Exception as e:  # noqa: BLE001 — the chat runs on the clinical block alone
         logger.warning("[domain_facts] coach context unavailable: %s", e)
