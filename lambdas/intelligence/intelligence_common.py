@@ -476,7 +476,7 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict, inventory: d
             f"Early warning signals:\n"
             + "\n".join(f"  ⚠️ {s}" for s in fm.get("early_warning_signals", []))
             + "\n"
-            + f"Response protocol: {fm.get('coach_response', '')}\n"
+            + f"Response protocol (owner: {fm.get('response_owner') or 'unassigned'}, #5126): {fm.get('coach_response', '')}\n"
         )
 
     # Communication directives (V2.2)

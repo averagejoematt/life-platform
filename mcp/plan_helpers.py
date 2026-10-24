@@ -209,6 +209,13 @@ def _may_tracker(target_date: str) -> dict[str, Any]:
     return may_tracker.latest_completed_row(table, target_date)
 
 
+def _response_protocol() -> dict[str, Any] | None:
+    """#5126: the ONE early-warning owner and its protocol (`coach.response_protocol.current`), or None (fail-soft)."""
+    from coach import response_protocol
+
+    return response_protocol.current()
+
+
 def coach_context_for(
     target_date: str,
     *,
@@ -233,6 +240,7 @@ def coach_context_for(
             lab_priorities=lab_priorities.from_rows(guidance),
             lab_followup=labs.get("followup"),
             published=False,
+            response_protocol=_response_protocol(),
         )
     except Exception as e:  # noqa: BLE001
         logger.warning("[#5071] coach context could not be assembled: %s", type(e).__name__)

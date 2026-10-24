@@ -486,6 +486,43 @@ def _labs_pack(table, today: str) -> list:  # noqa: ARG001 — pack signature
     return lines
 
 
+# ── Mind: the mood read (#5123), the last week of check-ins and the early-warning protocol it owns (#5126) ──
+# The mind coach's OWN Telegram thread is an owner channel, so it reads the owner-only check-in (#5106) the way the
+# character sheet's Mind pillar does (#5129: an owner-surface read, no carve-out) — ratings only, never the one
+# word (#5123's rule for this thread), never on a published surface.
+_CHECKIN_FIELDS = ("stress", "hunger", "cravings")
+_CHECKIN_WINDOW_DAYS = 7
+
+
+def _response_protocol() -> Optional[dict]:
+    """#5126: the ONE early-warning owner and its protocol (`coach.response_protocol.current`), or None (fail-soft)."""
+    try:
+        from coach import response_protocol  # noqa: PLC0415
+
+        return response_protocol.current()
+    except Exception as e:  # noqa: BLE001 — the chat runs without the protocol line
+        logger.warning("[domain_facts] response protocol unavailable: %s", type(e).__name__)
+        return None
+
+
+def _checkin_lines(table, today: str) -> list:
+    """The last seven evenings of the check-in (0-4 each): answered count, each rating's mean, the latest evening's
+    ratings. The 21-day mood read (#5123) carries the trend; this is the recent week the early-warning protocol acts on."""
+    start = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=_CHECKIN_WINDOW_DAYS - 1)).strftime("%Y-%m-%d")
+    rows = [r for r in _query_source(table, "evening_checkin", start, today) if any(_num(r.get(f)) is not None for f in _CHECKIN_FIELDS)]
+    if not rows:
+        return [f"Evening check-in: no answered evening in the last {_CHECKIN_WINDOW_DAYS} days — absent. Say so; never infer a rating."]
+    lines = [f"Evening check-in (owner-only, 0-4 each): {len(rows)} of the last {_CHECKIN_WINDOW_DAYS} evenings answered."]
+    for f in _CHECKIN_FIELDS:
+        vals = [v for v in (_num(r.get(f)) for r in rows) if v is not None]
+        if vals:
+            lines.append(f"{f} mean {round(sum(vals) / len(vals), 1)} over {len(vals)} evening(s).")
+    last = _latest(rows)
+    rated = ", ".join(f"{f} {int(_num(last.get(f)))}" for f in _CHECKIN_FIELDS if _num(last.get(f)) is not None)
+    lines.append(f"Latest evening {str(last.get('sk', ''))[len('DATE#'):]}: {rated}.")  # never the word (#5123)
+    return lines
+
+
 def _lead_pack(table, today: str) -> list:  # noqa: ARG001 — pack signature
     """Eli Marsh (Principal Investigator): the week's one priority, nothing else."""
     return _weekly_priority_lines(table)
@@ -498,14 +535,25 @@ def _mind_pack(table, today: str) -> list:
     source (journal | evening_checkin | unavailable) and never supplies a default number. The check-in is owner-only
     (DATA_GOVERNANCE: no public projection), which is why it renders HERE — his own chat — and never in the
     orchestrator's published brief. Lines carry trends, means and counts; never the check-in's word, never journal text.
+
+    #5126: Nathan Reeves (mind_coach) also owns the early-warning response, so the thread carries the last seven
+    evenings (the recent week the protocol acts on, beside the 21-day read) and the protocol line.
     """
     from health import mood_read
 
-    return mood_read.owner_lines(mood_read.owner_read(table, today))
+    lines = mood_read.owner_lines(mood_read.owner_read(table, today))
+    try:
+        lines.extend(_checkin_lines(table, today))
+    except Exception as e:  # noqa: BLE001 — the thread runs on the mood read alone
+        logger.warning("[domain_facts] recent check-in unavailable: %s", type(e).__name__)
+    rp = _response_protocol()
+    if rp and rp.get("owner"):
+        lines.append(f"Early-warning response: {rp['line']}")
+    return lines
 
 
 _PACKS = {
-    "mind": _mind_pack,  # #5123 — the mood read (journal, else the owner-only evening check-in)
+    "mind": _mind_pack,  # #5123 the mood read + #5126 the recent check-in week and the early-warning protocol
     "nutrition": _nutrition_pack,
     "sleep": _sleep_pack,
     "physical": _physical_pack,
@@ -538,6 +586,7 @@ def _training_context(today: str, clinical: str, table: Any = None) -> str:
             lab_priorities=labs.get("priorities"),
             lab_followup=labs.get("followup"),
             published=False,
+            response_protocol=_response_protocol(),
         )["text"]
     except Exception as e:  # noqa: BLE001 — the chat runs on the clinical block alone
         logger.warning("[domain_facts] coach context unavailable: %s", e)

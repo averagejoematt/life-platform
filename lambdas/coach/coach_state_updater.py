@@ -128,6 +128,7 @@ def _parse_confidence(raw) -> float:
 # spec building, timeframe→window mapping, subdomain inference, and the record
 # builder that decides status/gradeable_by (qualitative → "observation", never
 # "pending"). Re-exported because the suite pins the spec builder off this module.
+from coach import prediction_scope as _prediction_scope  # noqa: E402  (#5126: a coach predicts about its own domain)
 from coach.metric_trailing_series import point_tolerance as _point_tolerance, source_items as _source_items  # noqa: E402  (#3551, #4630)
 from coach.prediction_emission import (  # noqa: E402,F401  (F401: _build_prediction_eval_spec/_prediction_window_days are the #3046 contract's re-exports; the loop routes through _resolve_eval_spec since #3551)
     POINT_TYPE as _POINT_TYPE,  # #3551
@@ -1183,6 +1184,12 @@ def lambda_handler(event, context):
                 raw_metric_hint,
                 coach_id,
             )
+        # #5126: a coach files predictions about its OWN domain (coach.prediction_scope) — a mind-coach call
+        # graded on HRV or weight is another coach's call, so it is not written at all.
+        _scope_miss = _prediction_scope.out_of_scope(coach_id, raw_metric_hint, metric_hint, claim)
+        if _scope_miss:
+            logger.info("Prediction refused for coach=%s: %s", coach_id, _scope_miss)
+            continue
         # #813: reject metrics whose source has no recent data — a gradable spec
         # over a dead source can only ever expire inconclusive and stalls the
         # public scorecard. Qualitative is the honest classification.

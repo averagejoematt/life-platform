@@ -44,7 +44,7 @@ from __future__ import annotations
 import json
 from typing import Any, Iterable, Optional
 
-CONTEXT_VERSION = "coach-context@1.5.0"  # 1.5.0 #5111: lab_followup (the next draw, owner channel); 1.4.0 #5200: the May tracker read on every caller path + not_supplied_reason; 1.3.0 #5111: lab_priorities (owner channel, seam only); 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
+CONTEXT_VERSION = "coach-context@1.6.0"  # 1.6.0 #5126: response_protocol (the ONE early-warning owner, owner channel); 1.5.0 #5111: lab_followup (the next draw, owner channel); 1.4.0 #5200: the May tracker read on every caller path + not_supplied_reason; 1.3.0 #5111: lab_priorities (owner channel, seam only); 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
 
 # ── the order contract, as data ───────────────────────────────────────────────────────────
 ORDER: tuple[str, ...] = ("pre_flight", "plan_next_session", "manage_hevy_routine draft")
@@ -308,6 +308,7 @@ def assemble(
     lab_followup: Optional[dict[str, Any]] = None,
     published: bool = False,
     packet_reason: Optional[str] = None,
+    response_protocol: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """The planning context for `target_date`: a dict for code and ``text`` for a prompt.
 
@@ -335,6 +336,7 @@ def assemble(
         "run_gate": None if published else run_gate(tracker),
         "lab_priorities": None if published else lab_priorities,  # #5111: owner-only; absent -> nothing is said
         "lab_followup": None if published else lab_followup,  # #5111: the next draw's date + state (training.lab_priorities.read)
+        "response_protocol": None if published else response_protocol,  # #5126: coach.response_protocol.view (owner channel)
         "not_supplied": sorted(k for k, s in sections.items() if s.get("state") == NOT_SUPPLIED),
     }
     out["not_supplied_reason"] = {k: sections[k].get("detail") for k in out["not_supplied"]}  # #5200: each absence says why
@@ -354,6 +356,7 @@ def summary(ctx: dict[str, Any]) -> dict[str, Any]:
         "may_frame": (ctx.get("may_frame") or {}).get("line"),
         "run_gate": (ctx.get("run_gate") or {}).get("line"),
         "lab_followup": (ctx.get("lab_followup") or {}).get("line"),
+        "response_owner": (ctx.get("response_protocol") or {}).get("owner"),  # #5126
         "order": ctx.get("order"),
         "text": ctx.get("text"),
     }
@@ -479,6 +482,9 @@ def render(ctx: dict[str, Any]) -> str:
         rg = ctx["run_gate"]
         parts.append([f"RUN GATE (owner-only) [{rg['source']}; {rg['state']}]", rg["line"]])
     parts.extend(_render_labs(ctx))
+    rp = None if ctx["published"] else ctx.get("response_protocol")
+    if rp and rp.get("line"):  # #5126: the ONE coach who answers an early-warning signal, and its protocol
+        parts.append([f"EARLY-WARNING RESPONSE (owner-only) [{rp.get('source')}]", f"- {rp['line']}"])
     if not ctx["published"]:  # the order contract is the owner's planning conversation's, never a reader prompt's
         parts.append(["ORDER: " + " -> ".join(ctx["order"]) + " (pre-flight = " + ", ".join(PRE_FLIGHT) + ")"])
     return "\n\n".join("\n".join(p) for p in parts)

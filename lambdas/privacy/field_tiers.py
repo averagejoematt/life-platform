@@ -329,6 +329,7 @@ SOURCE_TIERS: dict[str, int] = {
     # which `health.character_privacy` holds OUT of the published pillar score and never names as a driver.
     # #5123 (no carve-out, an owner-surface read): `health.mood_read.owner_read` reads stress/hunger/cravings (never the
     # word) as the mood read's fallback for the owner's Telegram mind thread only; the published coach brief is journal-only.
+    # #5126 (no carve-out, the same owner thread): `_mind_pack` adds the last seven evenings' ratings (never the word).
     "evening_checkin": TIER_OWNER_ONLY,
     "checkin_intake_pairs": TIER_OWNER_ONLY,
     # #4078: chat writes queued for approval. A queued row carries the target write tool's exact
