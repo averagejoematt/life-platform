@@ -374,10 +374,10 @@ def protocol_targets():
     try:
         from training import training_charter  # noqa: PLC0415 — lazy: keeps this module import-light
 
-        steps = training_charter.public_view().get("steps") or {}
+        rule = training_charter.public_view().get("steps") or {}  # steps-truth: the charter steps RULE (floor/target), not a reading
     except Exception:  # noqa: BLE001 — fail-soft: the personal/prior path stands
         return {}
-    floor, target = steps.get("floor"), steps.get("target")
+    floor, target = rule.get("floor"), rule.get("target")
     ok = all(isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 for v in (floor, target))
     if not ok or target < floor:
         return {}
