@@ -41,7 +41,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Iterable, Mapping, Optional
 
-from common.pacific_time import parse_day_key, shift_day_key
+from common.pacific_time import pacific_weekday, parse_day_key, shift_day_key
 
 logger = logging.getLogger(__name__)
 
@@ -284,14 +284,22 @@ def trend(batts: list[Mapping[str, Any]], proto: Optional[Mapping[str, Any]] = N
             out[tid] = {"state": ABSENT, **base, "detail": "never logged"}
             continue
         (ld, lr), prev = hist[-1], (hist[-2] if len(hist) > 1 else None)
-        cell: dict[str, Any] = {"state": MEASURED, **base, "latest": {"date": ld, "value": lr.get("value"), "source": lr.get("source")}}
+        cell: dict[str, Any] = {
+            "state": MEASURED,
+            **base,
+            "latest": {"date": ld, "weekday": pacific_weekday(ld), "value": lr.get("value"), "source": lr.get("source")},
+        }
         if prev is None:
             cell.update(previous=None, delta=None, direction="first")
         else:
             pv, lv = float(prev[1]["value"]), float(lr["value"])
             delta = round(lv - pv, 1)
             direction = "same" if delta == 0 else ("better" if _better(row, lv, pv) else "worse")
-            cell.update(previous={"date": prev[0], "value": pv, "source": prev[1].get("source")}, delta=delta, direction=direction)
+            cell.update(
+                previous={"date": prev[0], "weekday": pacific_weekday(prev[0]), "value": pv, "source": prev[1].get("source")},
+                delta=delta,
+                direction=direction,
+            )
         out[tid] = cell
     return out
 

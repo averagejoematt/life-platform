@@ -60,6 +60,7 @@ from experiment import phase_taxonomy  # ADR-077/#1233: write-time provenance st
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 from health import (
     achievement_rules,  # #1624: the ONE place badge thresholds live (shared with site_api_vitals)
+    core_habits,  # #5124: THE core-12 calculation set — its habit_scores fields and its derived-basis inputs
     flourishing,  # #1843: entry_channel() — single source of truth for video_diary/solo_recording provenance
     habit_streaks,  # #4362: THE streak scan, shared with the daily brief
     hr_regime,  # #4999: THE dated HR regime markers — re-baselining window, post-marker baselines, AF-day exclusion
@@ -770,7 +771,7 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
     """
     try:
         hd = component_details.get("habits_mvp", {})
-        if not hd or hd.get("composite_method") != "tier_weighted":
+        if not hd or hd.get("composite_method") not in ("tier_weighted", "core_set"):  # #5124: core_set = the armed core-12
             return
         t0 = hd.get("tier0", {})
         t1 = hd.get("tier1", {})
@@ -800,7 +801,7 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
             "pk": USER_PREFIX + "habit_scores",
             "sk": "DATE#" + date_str,
             "date": date_str,
-            "scoring_method": "tier_weighted_v1",
+            "scoring_method": "core_set_v1" if hd.get("composite_method") == "core_set" else "tier_weighted_v1",
             "tier0_done": t0.get("done", 0),
             "tier0_total": t0.get("total", 0),
             "tier1_done": t1.get("done", 0),
@@ -825,6 +826,8 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
             item["vice_streaks"] = _deep_dec(vice_streaks)
         if sg_pcts:
             item["synergy_groups"] = _deep_dec(sg_pcts)
+        # #5124: the core-12 calculation set's day (core_done/known/total/pct, core_status, missed_core) — empty unarmed
+        item.update(_deep_dec(core_habits.habit_scores_fields(hd.get("core"))))
         item = {k: v for k, v in item.items() if v is not None}
         # ADR-058 (#1814): phase-stamp — see store_day_grade above.
         item = tag_record(item, source_id="habit_scores")
@@ -1049,6 +1052,9 @@ def assemble_data(yesterday_str, profile):
     protein_g_target = float(PLAN_DAILY_PROTEIN_MIN_G)
     protein_g_floor = float(PLAN_DAILY_PROTEIN_MIN_G)
 
+    # #5124: the core-12's derived bases (steps, wake times, check-in state), each fail-soft to unknown
+    core_inputs = core_habits.read_inputs(yesterday_str, whoop, apple, hrv_30d_recs, fetch_date=fetch_date, get_item=table.get_item)
+
     elapsed = time.time() - t0_timer
     logger.info(
         "Data assembled for %s in %.1fs — sources: %s",
@@ -1106,6 +1112,7 @@ def assemble_data(yesterday_str, profile):
         "protein_g_avg_since": _protein["window_start"],
         "protein_g_target": protein_g_target,
         "protein_g_floor": protein_g_floor,
+        "core_inputs": core_inputs,  # #5124: steps, wake times, check-in state for health.core_habits
     }
     return data, hrv_7d_avg, hrv_30d_avg
 

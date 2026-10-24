@@ -19,7 +19,10 @@ Inputs (all DynamoDB + S3):
   - Target coach active predictions (COACH#sleep_coach / PREDICTION# where status in pending/confirming)
   - Journal mood/connection signal (#549 — USER#matthew#SOURCE#notion journal entries,
     aggregated from #505's extraction; surfaced only to coaches whose domain covers
-    Matthew's inner state, e.g. mind_coach)
+    Matthew's inner state, e.g. mind_coach). #5123: journal ONLY — this brief feeds generation
+    served on the site, so the owner-only evening check-in fallback never enters it
+    (health.mood_read.published_signal / for_published); that fallback renders in the owner's
+    Telegram mind thread instead (coach.coach_domain_facts._mind_pack)
 
 Output:
   - Generation brief JSON (returned + cached to COACH#sleep_coach / BRIEF#{date})
@@ -39,6 +42,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from common.constants import EXPERIMENT_START_DATE, day_n  # ADR-058
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
+from health import mood_read as _mood_read  # #5123: the one mood read (journal first; the check-in is owner-only)
 
 from coach import coach_brief_input_gate as _input_gate  # #3107 — system prompt + the upstream change-gate
 
@@ -109,8 +113,9 @@ _JOURNAL_MOOD_DOMAINS = {"mental", "mind"}
 
 # Below this many scored entries in the window, a trajectory read is too thin to be
 # honest — the signal is omitted entirely rather than asserting a trend off 2 days.
-JOURNAL_MOOD_MIN_ENTRIES = 5
-JOURNAL_MOOD_WINDOW_DAYS = 21
+# #5123: both numbers are health.mood_read's, shared with the owner-channel check-in fallback.
+JOURNAL_MOOD_MIN_ENTRIES = _mood_read.MIN_ENTRIES
+JOURNAL_MOOD_WINDOW_DAYS = _mood_read.WINDOW_DAYS
 
 
 def _coach_wants_journal_mood(coach_id: str) -> bool:
@@ -661,76 +666,10 @@ def _gather_journal_mood_signal():
         logger.warning("journal mood gather failed: %s", e)
         return None
 
-    if not entries:
-        return None
-
-    def _entry_date(e):
-        d = e.get("date")
-        if d:
-            return d
-        sk = e.get("sk", "")
-        return sk.split("DATE#")[1][:10] if "DATE#" in sk else ""
-
-    entries.sort(key=_entry_date)
-
-    moods, stresses = [], []
-    emotions_all, themes_all = [], []
-    social_qualities = []
-    quote, quote_date = None, None
-    for entry in entries:
-        mood = entry.get("enriched_mood")
-        if mood is not None:
-            moods.append(float(mood))
-        stress = entry.get("enriched_stress")
-        if stress is not None:
-            stresses.append(float(stress))
-        emotions_all.extend(entry.get("enriched_emotions") or [])
-        themes_all.extend(entry.get("enriched_themes") or [])
-        social_quality = entry.get("enriched_social_quality")
-        if social_quality:
-            social_qualities.append(social_quality)
-        # Latest notable quote wins — most recent texture, not a historical one.
-        notable = entry.get("enriched_notable_quote")
-        if notable:
-            quote, quote_date = notable, _entry_date(entry)
-
-    if len(moods) < JOURNAL_MOOD_MIN_ENTRIES and len(stresses) < JOURNAL_MOOD_MIN_ENTRIES:
-        return None
-
-    def _trend(vals):
-        """First-half vs second-half average — same lightweight technique
-        mcp.tools_journal.tool_get_mood_trend uses for its half_delta."""
-        if len(vals) < 4:
-            return {"direction": "insufficient_data", "avg": round(sum(vals) / len(vals), 2) if vals else None, "n": len(vals)}
-        mid = len(vals) // 2
-        first_avg = sum(vals[:mid]) / mid
-        second_avg = sum(vals[mid:]) / (len(vals) - mid)
-        delta = round(second_avg - first_avg, 2)
-        direction = "rising" if delta > 0.3 else "falling" if delta < -0.3 else "stable"
-        return {"direction": direction, "avg": round(sum(vals) / len(vals), 2), "delta": delta, "n": len(vals)}
-
-    def _top(values, n=4):
-        counts: dict = {}
-        for v in values:
-            counts[v] = counts.get(v, 0) + 1
-        return [k for k, _ in sorted(counts.items(), key=lambda x: -x[1])[:n]]
-
-    social_dist: dict = {}
-    for sq in social_qualities:
-        social_dist[sq] = social_dist.get(sq, 0) + 1
-
-    return {
-        "window_days": JOURNAL_MOOD_WINDOW_DAYS,
-        "entries_analyzed": len(entries),
-        "mood_trend": _trend(moods),
-        "stress_trend": _trend(stresses),
-        "dominant_emotions": _top(emotions_all),
-        "dominant_themes": _top(themes_all),
-        "social_quality_distribution": social_dist,
-        "alone_ratio": round(social_dist.get("alone", 0) / len(social_qualities), 2) if social_qualities else None,
-        "notable_quote": quote,
-        "notable_quote_date": quote_date,
-    }
+    # #5123: THE journal aggregate lives in health.mood_read, beside the evening check-in fallback. This brief
+    # feeds coach generation that is served on the site, so it takes the PUBLISHED read: journal only, no
+    # check-in parameter exists on that path (the check-in is owner-only, DATA_GOVERNANCE "no public projection").
+    return _mood_read.published_signal(entries, JOURNAL_MOOD_WINDOW_DAYS)
 
 
 def _journal_mood_for_brief(signal):
@@ -742,9 +681,11 @@ def _journal_mood_for_brief(signal):
     (`privacy_guard.find_violations`) — a hit drops the quote rather than redacting
     it, since there is no upside to keeping a vice-adjacent fragment in an AI's
     planning input at all."""
-    if not isinstance(signal, dict):
+    signal = _mood_read.for_published(signal)  # #5123: fail-closed — an owner-only source never reaches the brief
+    if signal is None:
         return None
     out = {
+        "source": signal.get("source", _mood_read.SOURCE_JOURNAL),
         "window_days": signal.get("window_days"),
         "entries_analyzed": signal.get("entries_analyzed"),
         "mood_trend": signal.get("mood_trend"),

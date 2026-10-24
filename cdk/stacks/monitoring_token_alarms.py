@@ -90,8 +90,60 @@ def lognormal_upper_bound(sample, k_sd=AI_ALARM_DERIVATION_K_SD) -> float:
     return math.exp(statistics.mean(logs) + k_sd * statistics.stdev(logs))
 
 
-AI_DAILY_SPEND_THRESHOLD_USD = round(lognormal_upper_bound(AI_SPEND_DAILY_MAX_ROLLING_24H_USD), 2)  # 8.72 (n=30)
-AI_TOKENS_PLATFORM_DAILY_THRESHOLD = int(round(lognormal_upper_bound(AI_TOKENS_DAILY_MAX_ROLLING_24H), -3))  # 337,000 (n=30)
+AI_SPEND_VARIANCE_BAR_USD = round(lognormal_upper_bound(AI_SPEND_DAILY_MAX_ROLLING_24H_USD), 2)  # 8.72 (n=30)
+AI_TOKENS_VARIANCE_BAR = int(round(lognormal_upper_bound(AI_TOKENS_DAILY_MAX_ROLLING_24H), -3))  # 337,000 (n=30)
+
+
+# ── #4517 (2026-10-24): the BUDGET bar, read from the governor, and the threshold is the higher ──
+#
+# The variance bar above answers "is today unusual for HIM", and on a quiet September that put the
+# dollar bar at $8.72 — 23 % above the base ceiling's own daily allowance (base / 30.44 days) and
+# BELOW the October window's (the dated raise in cost_governor_lambda.py). A day spent exactly at
+# the ceiling's pace is the plan, not an anomaly, and a bar under it pages on the plan.
+#
+# So the urgent page also has to clear a bar the BUDGET defines. It is the narrowest rung of the
+# governor's own tier ladder (the bands are fixed fractions of the ceiling: tier 2 → tier 3 is
+# 8/75 of it) times the permanent base ceiling: one rolling day that, on top of everything else,
+# carries the month's spend across a whole tier band on its own. That is a runaway the governor's
+# 8-hourly tiering would only answer after the fact, which is what an urgent page is for.
+#
+# Why the BASE ceiling and not the dated window's. This is resolved at cdk-synth time, and the window
+# reverts on its own date with no deploy. A bar minted from the window would sit at the window's
+# height after the revert until someone re-applied Monitoring — stale in the loose direction. The base
+# is the number the AWS Budgets backstop (core_stack.py) already reads for the same reason. A base
+# change moves this bar on the next `cdk_deploy.sh LifePlatformMonitoring` (the drift guard shows it).
+#
+# The token bar is the SAME dollar bar in output tokens, priced at the dearest output rate the
+# chokepoint bills (ai.bedrock_client.PRICES). Output tokens alone at that rate reach the bar, so it
+# never pages before the dollar bar would on correctly-priced traffic. It stays as an independent meter:
+# tokens are counted even where EstimatedCostUSD under-prices a call (#2883's drift class).
+#
+# Replay (5-minute LifePlatform/AI Sums, 2026-09-02..10-24, read-only get-metric-statistics, validated
+# against describe-alarm-history to within 5 minutes): both bars page on the same two episodes as the
+# variance bars did — the 10-01 day ($36.59 rolling peak, 940,414 tokens) and the 10-18 dev-session day
+# ($31.39, 602,639) — and on nothing else; the spend page on 10-18 lasts 11.0 h instead of 37.1 h.
+
+
+def _budget_ceilings():
+    """`scripts/budget_ceilings.py`, loaded BY PATH — core_stack.py's idiom and reasons (#2898)."""
+    import importlib.util
+    from pathlib import Path
+
+    src = Path(__file__).resolve().parents[2] / "scripts" / "budget_ceilings.py"
+    spec = importlib.util.spec_from_file_location("_cdk_budget_ceilings_4517", src)
+    if spec is None or spec.loader is None:  # pragma: no cover - a missing file is a broken checkout
+        raise RuntimeError(f"cannot load the budget-ceiling derivation from {src} (#4517)")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_BUDGET = _budget_ceilings()
+AI_SPEND_BUDGET_BAR_USD = round(_BUDGET.base_ceiling_usd() * _BUDGET.narrowest_rung_fraction(), 2)  # 22.93
+AI_TOKENS_BUDGET_BAR = int(round(AI_SPEND_BUDGET_BAR_USD / _BUDGET.dearest_output_usd_per_mtok() * 1_000_000, -3))  # 459,000
+
+AI_DAILY_SPEND_THRESHOLD_USD = max(AI_SPEND_VARIANCE_BAR_USD, AI_SPEND_BUDGET_BAR_USD)
+AI_TOKENS_PLATFORM_DAILY_THRESHOLD = max(AI_TOKENS_VARIANCE_BAR, AI_TOKENS_BUDGET_BAR)
 
 
 def add_token_alarms(scope, topic, digest) -> None:
@@ -171,9 +223,10 @@ def add_token_alarms(scope, topic, digest) -> None:
         to_digest=True,
     )
 
-    # Platform-level total (no dims). 2026-10-01 (#4517): 250000 → AI_TOKENS_PLATFORM_DAILY_THRESHOLD
-    # (337,000), derived at the top of this module on the ROLLING-24h statistic. It fired twice on
-    # 09-30, and the calendar-day estimators below never saw the rolling peak.
+    # Platform-level total (no dims). 2026-10-24 (#4517): 337,000 → 459,000, the budget bar in output
+    # tokens (top of this module); the variance bar stays as its floor. 2026-10-01 (#4517): 250000 →
+    # 337,000, derived on the ROLLING-24h statistic. It fired twice on 09-30, and the calendar-day
+    # estimators below never saw the rolling peak.
     # 2026-09-04 (#3474): 150000 → 250000, re-derived (ADR-105). Set in 2026-06
     # against a ~59k/day baseline peaking ~121k, 150000 had become the platform's
     # 75th PERCENTILE and fired on the ordinary working day. n=31 daily Sums to
@@ -267,7 +320,9 @@ def add_token_alarms(scope, topic, digest) -> None:
     # (not digest): a cost runaway should page promptly, not batch overnight.
     # Future: swap to a CloudWatch anomaly-detection band once this metric
     # has ~2 weeks of history to train on.
-    # 2026-10-01 (#4517): $6.0 → AI_DAILY_SPEND_THRESHOLD_USD ($8.72), derived at the top of this
+    # 2026-10-24 (#4517): $8.72 → $22.93, the budget bar (narrowest governor rung × base ceiling, top
+    # of this module), because $8.72 sat under the ceiling's own daily pace.
+    # 2026-10-01 (#4517): $6.0 → $8.72, the variance bar derived at the top of this
     # module. The "~$1.3/day normal" above is history. The measured 09-01..09-30 rolling-24h daily
     # max has a geometric mean of $2.73, and $6 paged twice on the ordinary 09-30 (brief + AI-vision QA + dry runs).
     #

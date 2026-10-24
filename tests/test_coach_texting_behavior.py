@@ -595,7 +595,7 @@ def test_unpacked_coach_gets_no_domain_facts_section():
     (see tests/test_coach_experiment_awareness.py)."""
     from coach import coach_domain_facts as cdf
 
-    # #5126: mind_coach gained a pack (the evening check-in + the early-warning protocol); explorer has none.
+    # #5123 gave mind_coach a pack (the mood read; #5126 added the protocol), so the unpacked example is explorer_coach.
     block = cdf.domain_facts_block("explorer_coach", _RangeTable([]), today="2026-08-09")
     assert "YOUR DOMAIN FACTS" not in block
     assert "EXPERIMENT FRAME:" in block

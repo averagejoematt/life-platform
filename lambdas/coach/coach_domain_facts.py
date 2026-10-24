@@ -486,10 +486,10 @@ def _labs_pack(table, today: str) -> list:  # noqa: ARG001 — pack signature
     return lines
 
 
-# ── Mind: the evening check-in and the early-warning protocol it owns (#5126) ──
+# ── Mind: the mood read (#5123), the last week of check-ins and the early-warning protocol it owns (#5126) ──
 # The mind coach's OWN Telegram thread is an owner channel, so it reads the owner-only check-in (#5106) the way the
-# character sheet's Mind pillar does (#5129: an owner-surface read, no carve-out) — ratings and the one word, never
-# on a published surface. The daily brief's mind read (the journal_mood fallback) is #5123's, not this pack's.
+# character sheet's Mind pillar does (#5129: an owner-surface read, no carve-out) — ratings only, never the one
+# word (#5123's rule for this thread), never on a published surface.
 _CHECKIN_FIELDS = ("stress", "hunger", "cravings")
 _CHECKIN_WINDOW_DAYS = 7
 
@@ -506,7 +506,8 @@ def _response_protocol() -> Optional[dict]:
 
 
 def _checkin_lines(table, today: str) -> list:
-    """The last seven evenings of the check-in (0-4 each): answered count, each rating's mean, the latest evening."""
+    """The last seven evenings of the check-in (0-4 each): answered count, each rating's mean, the latest evening's
+    ratings. The 21-day mood read (#5123) carries the trend; this is the recent week the early-warning protocol acts on."""
     start = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=_CHECKIN_WINDOW_DAYS - 1)).strftime("%Y-%m-%d")
     rows = [r for r in _query_source(table, "evening_checkin", start, today) if any(_num(r.get(f)) is not None for f in _CHECKIN_FIELDS)]
     if not rows:
@@ -518,17 +519,7 @@ def _checkin_lines(table, today: str) -> list:
             lines.append(f"{f} mean {round(sum(vals) / len(vals), 1)} over {len(vals)} evening(s).")
     last = _latest(rows)
     rated = ", ".join(f"{f} {int(_num(last.get(f)))}" for f in _CHECKIN_FIELDS if _num(last.get(f)) is not None)
-    word = f", word '{last['word']}'" if last.get("word") else ""
-    lines.append(f"Latest evening {str(last.get('sk', ''))[len('DATE#'):]}: {rated}{word}.")
-    return lines
-
-
-def _mind_pack(table, today: str) -> list:
-    """Nathan Reeves (mind_coach): the evening check-in, and the early-warning response he owns (#5126)."""
-    lines = _checkin_lines(table, today)
-    rp = _response_protocol()
-    if rp and rp.get("owner"):
-        lines.append(f"Early-warning response: {rp['line']}")
+    lines.append(f"Latest evening {str(last.get('sk', ''))[len('DATE#'):]}: {rated}.")  # never the word (#5123)
     return lines
 
 
@@ -537,13 +528,37 @@ def _lead_pack(table, today: str) -> list:  # noqa: ARG001 — pack signature
     return _weekly_priority_lines(table)
 
 
+def _mind_pack(table, today: str) -> list:
+    """The mind coach (owner's Telegram thread only): THE mood read, journal first, the evening check-in behind it.
+
+    #5123: the journal is mostly dark, so the mind thread had no read of how he feels. ``health.mood_read`` names its
+    source (journal | evening_checkin | unavailable) and never supplies a default number. The check-in is owner-only
+    (DATA_GOVERNANCE: no public projection), which is why it renders HERE — his own chat — and never in the
+    orchestrator's published brief. Lines carry trends, means and counts; never the check-in's word, never journal text.
+
+    #5126: Nathan Reeves (mind_coach) also owns the early-warning response, so the thread carries the last seven
+    evenings (the recent week the protocol acts on, beside the 21-day read) and the protocol line.
+    """
+    from health import mood_read
+
+    lines = mood_read.owner_lines(mood_read.owner_read(table, today))
+    try:
+        lines.extend(_checkin_lines(table, today))
+    except Exception as e:  # noqa: BLE001 — the thread runs on the mood read alone
+        logger.warning("[domain_facts] recent check-in unavailable: %s", type(e).__name__)
+    rp = _response_protocol()
+    if rp and rp.get("owner"):
+        lines.append(f"Early-warning response: {rp['line']}")
+    return lines
+
+
 _PACKS = {
+    "mind": _mind_pack,  # #5123 the mood read + #5126 the recent check-in week and the early-warning protocol
     "nutrition": _nutrition_pack,
     "sleep": _sleep_pack,
     "physical": _physical_pack,
     "training": _physical_pack,  # merged Performance seat serves both routes
     "labs": _labs_pack,  # #3792 — was ABSENT, so the labs coach had no facts at all
-    "mind": _mind_pack,  # #5126 — the check-in + the early-warning protocol the mind coach owns
     "eli_marsh": _lead_pack,  # chat-tier lead — pack key == persona id (no _coach suffix)
 }
 

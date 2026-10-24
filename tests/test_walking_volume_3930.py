@@ -803,6 +803,7 @@ def test_the_0925_treadmill_replays_joined_on_the_live_fixture():
     last = recent_aerobic.last_cardio_block_hr(block)
     assert last == {
         "date": "2026-09-25",
+        "weekday": "Fri",  # #5274: the Pacific weekday rides the block the critic quotes
         "modality": "treadmill",
         "avg_hr": 116.9,
         "max_hr": 150.0,

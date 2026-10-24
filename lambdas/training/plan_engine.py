@@ -759,7 +759,7 @@ def _steps_ramp_block(
         why = [f"{k} read failed" for k in unreadable] + (
             [] if window is not None else [st.get("detail") or st.get("error") or "the steps window was not read"]
         )
-        return {"date": date, "state": "unknown", "reason": "; ".join(why), "charter_version": training_charter.charter_version()}
+        return steps_ramp.unknown(date, "; ".join(why), training_charter.charter_version())
     out = steps_ramp.compute(date, window, pain_flag_instances=pain_instances, pain_dismissals=dismissals, deload_records=deload_records)
     out["steps_target_line"] = steps_nudge.target_line(out)  # #5056: the day's floor/target line the coach states every day
     return out

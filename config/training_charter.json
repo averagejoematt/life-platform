@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.24.0",
+  "version": "1.25.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -162,6 +162,13 @@
       "by": "the nutrition panel review 2026-10-18 (#5111, epic #5094); no new owner ruling: the new number is a platform default named as one, pending his ruling",
       "what": "nutrition.labs gains dead_man_weeks_after_due 4 (the follow-up draw's dead-man: still no draw 4 weeks after the due day is the owner-only calibration dead-man alert, the lab_draw row's missed_2), plus reader, rule and provenance lines; follow_up_weeks 16 and reminder_lead_days 14 are unchanged and now labelled as platform defaults. The owner-only coach contexts (the planning context and the owner's Telegram training and nutrition threads) now carry the next draw's due date and state beside the owner's lab-driven priorities; dates only, never a result.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.25.0",
+      "date": "2026-10-24",
+      "by": "owner ruling 2026-10-18 on epic #5120 (mind panel review): 'Core-12 is the CALCULATION set (the score, character sheet and coaches read it); ALL other habits are RETAINED - renamed where duplicated or misleading - never archived or deleted for now.' The twelve are the #5124 acceptance list; how each is read is a platform default, pending his ruling",
+      "what": "#5124: habits.core, the core-12 calculation set as data (weigh in; food logged; calories in band; protein at or above the floor; steps at or above the floor; planned session done; evening check-in; no alcohol; no solo takeout; no sweets or fried food; out of bed on time; one connection), each with its basis: the Habitify check-in of the registry entries that carry its id as their `core` flag, the resolved day's steps against steps.floor, the evening check-in row, or health.wake_consistency against sleep.wake_time (the #5133 rule). Resolved in one place, health.core_habits: the habit score, the character sheet's mind habit component and the daily coaches' missed-habit lines read it once any registry entry is flagged; every other habit stays tracked and visible (habits.retained). No new number.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
   "governing_goal": {
@@ -249,6 +256,34 @@
       "hr_regime": "the rule reads sleep TIMING only, so the 2026-10-10 heart-rate regime marker (health.hr_regime, #4999) does not re-baseline it; the heart-rate-derived sleep fields and their surfaces re-baseline under #5029, not here",
       "provenance": "platform default (#5133, mind panel review 2026-10-18): the tolerance is the character sheet's standing 'fixed wake time +/-30 min every day, including weekends' line; the anchor window is the steps ramp's trailing window; pending an owner ruling"
     }
+  },
+  "habits": {
+    "core": [
+      {"id": "weigh_in", "label": "weigh in", "basis": "habitify"},
+      {"id": "food_logged", "label": "food logged", "basis": "habitify"},
+      {"id": "calories_in_band", "label": "calories in band", "basis": "habitify"},
+      {"id": "protein_floor", "label": "protein at or above the floor", "basis": "habitify", "rule_ref": "nutrition.protein.range_g.low"},
+      {"id": "steps_floor", "label": "steps at or above the floor", "basis": "steps", "rule_ref": "steps.floor"},
+      {"id": "planned_session_done", "label": "planned session done", "basis": "habitify"},
+      {"id": "evening_checkin", "label": "evening check-in", "basis": "evening_checkin"},
+      {"id": "no_alcohol", "label": "no alcohol", "basis": "habitify"},
+      {"id": "no_solo_takeout", "label": "no solo takeout", "basis": "habitify"},
+      {"id": "no_sweets_or_fried", "label": "no sweets or fried food", "basis": "habitify"},
+      {"id": "out_of_bed_on_time", "label": "out of bed on time", "basis": "wake_consistency", "rule_ref": "sleep.wake_time"},
+      {"id": "one_connection", "label": "one connection", "basis": "habitify"}
+    ],
+    "bases": {
+      "habitify": "the day's Habitify check-in of every habit_registry entry whose `core` flag is this id (by vendor id, then names, then aliases; a paused entry is not scheduled); done when every member is done, missed when any member is observed not done, unknown otherwise",
+      "steps": "the day's resolved step count (common.metric_truth, the one steps resolver) at or above the charter value rule_ref names; no count is unknown",
+      "evening_checkin": "the day's evening check-in row (coach.evening_checkin) exists; no row on an evening whose prompt went out is a miss; no row and no prompt is unknown",
+      "wake_consistency": "health.wake_consistency.grade_day against sleep.wake_time: on_time is done, off is missed, unknown stays unknown, never a second definition"
+    },
+    "membership": "a habitify-basis core habit's members are the habit_registry entries (the PROFILE#v1 row, owner data) that carry `core: <id>`; several entries may carry one id (all must be held). This file never names a registry entry: habit names are owner data. A `core` flag on a non-habitify id, or an id this list does not carry, is drift (scripts/check_habit_registry_drift.py)",
+    "armed_when": "at least one active registry entry carries a `core` flag; until then the habit score stays the tier-weighted read of every habit and says it is unarmed",
+    "score": "once armed, the habit score is the share of the day's KNOWN core habits that are done, each core habit weighted equally; an unknown core habit is left out, never a miss, and a day with none known has no habit score",
+    "retained": "every non-core habit stays in the registry, tracked, streaked and visible (tier, status and streaks unchanged); it is not scored. Duplicate or misleading names are renamed through the habitify skill, never archived or deleted (owner ruling 2026-10-18)",
+    "reader": "health.core_habits (the ONE resolver): the habit score (health.scoring_engine), the character sheet's mind habit compliance (health.character_engine) and the daily coaches' missed-habit lines (ai.ai_calls) read it",
+    "provenance": "the twelve are the #5124 acceptance list (owner ruling 2026-10-18, epic #5120). Platform defaults pending his ruling: which registry entries carry each flag (owner-run scripts/apply_habit_core_flags.py), the equal weighting, and protein read as the Habitify check-in against nutrition.protein.range_g.low; the #5124 list says 180 g, which no charter field carries"
   },
   "cardio_menu": {
     "default": "incline_treadmill_walk",

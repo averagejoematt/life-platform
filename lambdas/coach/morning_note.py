@@ -36,7 +36,7 @@ from __future__ import annotations
 import re
 from typing import Any, Optional
 
-from common.pacific_time import day_in_words, pacific_clock_label, parse_day_key, shift_day_key
+from common.pacific_time import day_in_words, pacific_clock_label, pacific_weekday, parse_day_key, shift_day_key
 
 MORNING_NOTE_PK = "USER#matthew#SOURCE#morning_note"
 MORNING_NOTE_SK_PREFIX = "MORNING_NOTE#"
@@ -165,6 +165,7 @@ def coach_fact(row: Optional[dict], *, read_ok: bool = True) -> dict:
     fact = {
         "state": "measured",
         "date": view["date"],
+        "weekday": pacific_weekday(view["date"]),  # #5274: the Pacific weekday, quoted — never derived by the model
         "data_through": view["date"],
         "day": day_in_words(view["date"]),
         "written_at_pt": written_pt or view["written_at"],

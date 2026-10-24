@@ -32,14 +32,15 @@ import boto3
 import coach.coach_presence_gate as _presence  # #4217 — the absent coach is not asked
 from coach import coach_brief_input_gate as _in_gate  # #3107 — the upstream change-gate + the shared data-inventory block
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_PROTEIN_MIN_G
-from common.habit_registry import habit_tier  # #5232
 from common.metric_truth import STEPS  # #4630: the resolved steps key build_data_summary fills
 from common.pacific_time import pacific_today
 from health.calorie_target import target_kcal, target_phrase  # #5095: the ONE calorie target
-from health.scoring_engine import habitify_reading  # #4362
 from training.coach_context import charter_goal_lines  # #5109: the standing targets are the charter's, never typed here
 
-from ai import structured_json as _structured_json  # #4276: the one door for model JSON
+from ai import (
+    habit_context as _habit_ctx,  # #5124: the coaches' habit read (core-12 once armed)
+    structured_json as _structured_json,  # #4276: the one door for model JSON
+)
 
 # God-module split slices 2+3: pure context/scoring + domain-data builders moved
 # to ai_context.py. Re-exported so callers + the coach functions keep working.
@@ -666,25 +667,7 @@ Tone: direct, empathetic, no-BS.{protocol_note}"""
     return intro
 
 
-def _missed_registry_habits(registry, habitify):
-    """The active registry habits the day records as NOT done, as (name, meta) in registry order.
-
-    #4362/#4632: each resolved through `scoring_engine.habitify_reading` WITH the day's
-    `habit_statuses` — by vendor id first, names as aliases (`health.habit_identity`) — so a
-    habit renamed in Habitify is the same habit here as in the scoring and the streaks
-    (#4644 Q26). Unobserved (None) is not a miss."""
-    habitify = habitify or {}
-    h_map, statuses = habitify.get("habits", {}), habitify.get("habit_statuses")
-    out = []
-    for h_name, meta in (registry or {}).items():
-        if meta.get("status") != "active":
-            continue
-        done = habitify_reading(
-            h_map, h_name, meta, statuses, (habitify.get("sk") or "").replace("DATE#", "") or habitify.get("date")
-        )  # #5007
-        if done is not None and done < 1:
-            out.append((h_name, meta))
-    return out
+_missed_registry_habits = _habit_ctx.missed_registry_habits  # #5124: moved to ai.habit_context (ai_calls is at its size ceiling)
 
 
 def call_board_of_directors(
@@ -710,23 +693,9 @@ def call_board_of_directors(
         if texts:
             journal_ctx = "JOURNAL ENTRIES:\n" + "\n---\n".join(texts)
 
-    # Habit context from registry
+    # Habit context from registry: the core-12 set once armed (#5124), else the tier lines
     registry = profile.get("habit_registry", {})
-    missed = _missed_registry_habits(registry, data.get("habitify"))
-    missed_t0 = []
-    missed_t1 = []
-    for h_name, meta in missed:
-        why = meta.get("why_matthew", "")
-        tier = habit_tier(meta)
-        if tier == 0:
-            missed_t0.append(h_name + (" — " + why[:80] if why else ""))
-        elif tier == 1:
-            missed_t1.append(h_name)
-    habit_ctx = ""
-    if missed_t0:
-        habit_ctx += "\nMISSED TIER 0 (non-negotiable): " + "; ".join(missed_t0)
-    if missed_t1:
-        habit_ctx += "\nMISSED TIER 1 (high priority): " + ", ".join(missed_t1[:8])
+    habit_ctx, missed = _habit_ctx.board_habit_ctx(data, profile)
 
     # Synergy group analysis
     synergy_misses = {}
@@ -917,13 +886,7 @@ def call_tldr_and_guidance(
     missed_mvp = []
     missed_context = []
     if registry:
-        for h_name, meta in _missed_registry_habits(registry, habitify):
-            if habit_tier(meta) > 1:
-                continue
-            missed_mvp.append(h_name)
-            why = meta.get("why_matthew", "")
-            if why:
-                missed_context.append(h_name + " (T" + str(habit_tier(meta)) + "): " + why[:60])
+        missed_mvp, missed_context = _habit_ctx.tldr_missed(data, profile)  # #5124: the core set once armed
     else:
         # mvp_habits is the pre-registry legacy list of bare names (no meta, no vendor id) — out of
         # #4632's id-keyed scope, carried on the issue; it never reads when a registry exists.

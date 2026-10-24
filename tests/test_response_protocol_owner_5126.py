@@ -129,17 +129,21 @@ def test_the_mind_pack_reads_the_checkin_and_the_protocol(monkeypatch):
     ]
     t = _Table(rows)
     lines = cdf._PACKS["mind"](t, "2026-10-24")
-    assert t.pks == ["USER#matthew#SOURCE#evening_checkin"]
+    # ONE mind pack: #5123's mood read (journal, then the check-in) first, then this lane's recent week + protocol.
+    assert set(t.pks) == {"USER#matthew#SOURCE#notion", "USER#matthew#SOURCE#evening_checkin"}
+    assert lines[0].startswith("Mood read")
     text = "\n".join(lines)
     assert "2 of the last 7 evenings answered" in text and "stress mean 2.0 over 2 evening(s)" in text
-    assert "Latest evening 2026-10-23: stress 1, hunger 1, cravings 2, word 'calm'" in text
-    assert "Early-warning response: Owner: Nathan Reeves (mind_coach)" in text
+    assert "Latest evening 2026-10-23: stress 1, hunger 1, cravings 2." in text
+    assert "calm" not in text and "tired" not in text  # never the check-in word (#5123's rule for this thread)
+    assert lines[-1].startswith("Early-warning response: Owner: Nathan Reeves (mind_coach)")
 
 
 def test_a_dark_checkin_is_stated_absent_never_a_rating(monkeypatch):
     monkeypatch.setattr(cdf, "_response_protocol", lambda: None)
     lines = cdf._mind_pack(_Table([{"sk": "DATE#2026-10-23", "word": None}]), "2026-10-24")
-    assert lines == ["Evening check-in: no answered evening in the last 7 days — absent. Say so; never infer a rating."]
+    assert lines[0].startswith("Mood read: unavailable")
+    assert lines[1:] == ["Evening check-in: no answered evening in the last 7 days — absent. Say so; never infer a rating."]
 
 
 # ── 4. mind-coach predictions are about the mind domain ──────────────────────────────────
