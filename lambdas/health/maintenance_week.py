@@ -103,6 +103,7 @@ def settings(read: Callable[[str], Any]) -> Dict[str, Any]:
     rev = read(REVERSE_PATH)
     rev = rev if isinstance(rev, dict) else {}
     windows = [_window(w, travel) for w in block.get("windows") or [] if isinstance(w, dict)]
+    starts = _d(rev.get("starts_on"))
     return {
         "readable": bool(block),
         "windows": windows,
@@ -110,7 +111,7 @@ def settings(read: Callable[[str], Any]) -> Dict[str, Any]:
         "reach_days": _num(block.get("weigh_in_reach_days")),
         "reverse": {
             "readable": bool(rev),
-            "starts_on": _iso(_d(rev.get("starts_on"))) if _d(rev.get("starts_on")) else None,  # type: ignore[arg-type]
+            "starts_on": _iso(starts) if starts else None,
             "settle_lb_wk": _num(rev.get("settle_trend_lb_wk")),
             "entry_step_kcal": _num(rev.get("entry_step_kcal")),
         },
