@@ -30,7 +30,7 @@ SUPERSEDED: dict[str, Any] = {
     "superseded_on": "2026-10-18",
     "superseded_by": "1.0",
     "issue": "#5069",
-    "ruling": "owner rulings 2026-10-18 (epic #5067): ruling 5 — five lifting days in the charter's order; ruling 6 — the v0.4 lock is lifted now",
+    "ruling": "owner rulings 2026-10-18 (epic #5067): ruling 5 — the charter's lifting days in its order (`split`); ruling 6 — the v0.4 lock is lifted now",
     "approved": "2026-09-23 (#4147, DECISION#2026-09-24T03:10:59); ratified 2026-09-25 (#4161)",
     "prose_home": "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.4.md",
     "note": "v0.4 ran as a sequence from 2026-09-24; its credited sessions keep their v0.4 roles (session_sequence's cut-over).",

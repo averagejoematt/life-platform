@@ -146,7 +146,7 @@ SPLIT_DECISION: dict[str, Any] = {
     ],
     "provenance": "owner",
     "stated": "2026-10-18",
-    "ruling": "owner rulings 2026-10-18 (epic #5067): 5 — five lifting days in the charter's order, delts 3x/week; 6 — the v0.4 lock is lifted now",
+    "ruling": "owner rulings 2026-10-18 (epic #5067): 5 — the charter's lifting days in its order, the delt frequency it states; 6 — the v0.4 lock is lifted now",
     "charter_paths": ["split.sequence", "split.lifting_days_per_wk", "split.frequency", "split.session_minutes"],
     "decision_sk": DECISION_SK,
     "override_signal": "program_split_full_body_v0.3",
@@ -178,7 +178,8 @@ SPLIT_DECISION: dict[str, Any] = {
 # discover at the rack (since #4108/#4124 every anchor key exists — the gap map is empty). The generator selects by `primary_muscle`, so `primary_muscles`
 # here is how a pattern becomes REACHABLE on a given day (see `anchor_reachability()`).
 _FREQ_NOTE = (
-    "Owner ruling 5 (2026-10-18, #5067): each major muscle 2x/wk, delts 3x/wk — read from the charter (`split.frequency`). "
+    f"Owner ruling 5 (2026-10-18, #5067): each major muscle {charter_value('split.frequency.each_major_muscle_per_wk')}x/wk, "
+    f"delts {charter_value('split.frequency.delts_per_wk')}x/wk — read from the charter (`split.frequency`). "
     "2x/wk per pattern was first the red team's minimum-effective-dose frequency (S&C coach, 2026-09-22; Bickel 2011) at 6–10 "
     "hard sets/muscle/wk; it is still NOT derived from Matthew's own session-to-session variance and must say so wherever it "
     "fires (ADR-105)."
@@ -673,7 +674,8 @@ SESSION_DISTRIBUTION_PROVENANCE: dict[str, Any] = {
     "issue": "#5069 (v0.4: #4147)",
     "note": (
         "The owner fixed the SPLIT and its ORDER (the charter's `split.sequence`, ruling 5), the heavy scheme (top set + 2 back-offs "
-        "at −10 %), the volume reps (8–12), each major muscle 2x/wk and delts 3x/wk, the trap bar until the charter's gate and the "
+        f"at −10 %), the volume reps (8–12), each major muscle {charter_value('split.frequency.each_major_muscle_per_wk')}x/wk and "
+        f"delts {charter_value('split.frequency.delts_per_wk')}x/wk, the trap bar until the charter's gate and the "
         "RDL as the moderate hinge. `lower_heavy` is the session he committed on 2026-09-23 (routine b1b9960468f374e30dcdeca8630dd18f). "
         "Three v0.4 placements are the platform's, owner-ratified unchanged on 2026-09-25. The `shoulders_arms` day's movements "
         "(overhead press, lateral raise, face pull, curl, pushdown, dumbbell shrug) are the platform's choice from his logged "

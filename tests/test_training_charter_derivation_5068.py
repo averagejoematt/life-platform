@@ -26,6 +26,16 @@ the movement-gate weights from every `*_lb` leaf under `gated_movements`; the vo
 from `volume_priorities.sets_per_wk`; the RPE ceilings from `effort_ceilings`), so when the
 owner re-versions a value the sweep follows it and a stale literal is a hit the next day.
 
+EVERY NUMERIC LEAF (#5175). Beside the eleven value-class patterns, `LEAF_PATTERNS` carries one pattern per charter
+numeric leaf they do not own — the overage tolerance, the gain step, the lifting-day count, the stall rule, the cardio
+doses, the disruption and calibration cadences, the panel bar, the wake-time rule — each keyed to its owning path, its
+numbers filled from the charter at collection. The leaves are ENUMERATED FROM THE CHARTER
+(`test_every_charter_numeric_leaf_has_a_pattern_or_a_stated_reason`), so a new numeric leaf reds until it gets a pattern
+or a `NOT_APPLICABLE` row; that table is where every not-applicable reason is stated (each names the one reader and the
+test that holds it), and a row covering nothing is red too. WORD FORMS: every pattern fills its numbers from ONE shared
+map, `NUM_WORDS`, so `five lifting days` and `Two weeks of most sets` (the #5086 specimens) are hits like `5 lifting
+days`; the word forms are matched next to the leaf's own noun or unit, in prose files and in code strings alike.
+
 THE RATCHET: a `path::pattern` key with a live count above its ledger row, or with no row
 at all, is a NEW hand copy — red, with the lines named. A row whose live count fell is a
 STALE row — red too, naming the replacement line, so the ledger is always the truth and a
@@ -33,8 +43,10 @@ W1 lane that moves a read onto the charter deletes (or lowers) its row in the sa
 row COUNT may only go down from the seed (`SEEDED_ROW_COUNT`, pinned here a second time).
 
 NOT SEEN, stated: a value computed at runtime from a different literal (a step floor
-written as 12 * 1000); a copy in docs/ or tests/ (COACH_SESSION.md excepted, above); prose
-that names the number in words; a pre-charter literal whose NUMBER differs from the charter
+written as 12 * 1000); a copy in docs/ or tests/ (COACH_SESSION.md excepted, above); a
+number in words that sits away from its noun or unit (the leaf patterns key a number to its noun: `five lifting days`
+is seen, `five of them` is not); a number shared by a different quantity, so a pattern needs context (the
+weeks-running and stall-RPE patterns require the ceiling / stall words on the line); a pre-charter literal whose NUMBER differs from the charter
 and carries no owning key (the redlines' `RPE 7–8` rep-scheme prose, the taper table's 3.25
 / 3.75 steps) — those fall to the W1 rewires, not to this sweep; a READ of a swept constant
 at its use sites (`> RUN_GATE_LB`) — one copy, one row; and the `~/.claude/skills/synced/`
@@ -52,7 +64,7 @@ import pathlib
 import re
 import sys
 import tokenize
-from typing import Any, Dict, Iterable, List, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import pytest
 
@@ -141,6 +153,412 @@ def _ranges(pairs: Iterable[Any]) -> str:
     return "|".join(sorted({rf"{int(lo)}\s*[-–]\s*{int(hi)}" for lo, hi in pairs}))
 
 
+# #5175: ONE number-to-word map for every pattern (the `rotation` map it replaces knew only 3 and 6). A charter
+# integer with an entry here is matched in words as well as digits wherever its pattern names it.
+NUM_WORDS: Dict[int, str] = {
+    0: "zero", 1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight", 9: "nine",
+    10: "ten", 11: "eleven", 12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen", 16: "sixteen", 18: "eighteen",
+    20: "twenty", 24: "twenty-four", 28: "twenty-eight", 30: "thirty", 40: "forty",
+}  # fmt: skip
+_TIMES_WORDS = {1: "once", 2: "twice"}
+
+# #5175: a pattern per charter numeric leaf the eleven value-class patterns above do not own. Each entry is
+# (regex templates, probe templates). A template names the NUMBER only through a slot, filled from the charter at
+# collection time, so a re-versioned value moves the pattern with it:
+#   {n}     the value in digits (and its float/int twin) or in words; a [lo, hi] range as `lo-hi` / `lo to hi` /
+#           `lo or hi` (digits or words); a [k, k] band as k
+#   {list}  the value as a JSON/Python list literal `[lo, hi]` (a copied key's value)
+#   {pct}   a share 0 < v < 1 as a percent (`50 %`), or `half` for 0.5
+#   {times} a count as `2x` / `2 times`, or `once` / `twice`
+# The probes render each probe template with the digits AND (where NUM_WORDS has the number) the words, and every
+# rendering must match — the positive control that this pattern still sees the copy it exists for.
+LEAF_PATTERNS: Dict[str, Tuple[Tuple[str, ...], Tuple[str, ...]]] = {
+    "split.lifting_days_per_wk": (
+        (r"{n}[\s-]+lifting[\s-]+(?:days?|sessions?)\b", r"{n}[\s-]+day[\s-]+split\b", r"\blifting_days_per_wk\"?\s*[:=]\s*{n}"),
+        ("{n} lifting days", "the {n}-day split", '"lifting_days_per_wk": {n}'),
+    ),
+    "split.frequency.each_major_muscle_per_wk": (
+        (r"\b(?:each|every)\s+(?:major\s+)?muscle\s+(?:group\s+)?{times}", r"\beach_major_muscle_per_wk\"?\s*[:=]\s*{n}"),
+        ("each major muscle {times} a week",),
+    ),
+    "split.frequency.delts_per_wk": (
+        (r"\bdelts?\s+{times}", r"\bdelts_per_wk\"?\s*[:=]\s*{n}"),
+        ("delts {times} a week",),
+    ),
+    "split.frequency.overhead_press_per_wk": (
+        (r"\boverhead[\s_-]+press\s+{times}", r"\boverhead_press_per_wk\"?\s*[:=]\s*{n}"),
+        ("overhead press {times} a week",),
+    ),
+    "split.session_minutes.cardio_block_max": (
+        (
+            r"\bcardio_block_max\"?\s*[:=]\s*{n}",
+            r"{n}[\s-]*min(?:ute)?s?\s+(?:of\s+)?cardio\b",
+            r"\bcardio\s+block\s+(?:of\s+|up\s+to\s+)?{n}[\s-]*min",
+        ),
+        ("a {n}-minute cardio block", "{n} min of cardio"),
+    ),
+    "split.session_minutes.stretching_max": (
+        (
+            r"\bstretching_max\"?\s*[:=]\s*{n}",
+            r"{n}[\s-]*min(?:ute)?s?\s+(?:of\s+)?stretch",
+            r"\bstretch\w*\s+(?:of\s+|up\s+to\s+)?{n}[\s-]*min",
+        ),
+        ("{n} minutes of stretching",),
+    ),
+    "split.minimum_session.minutes": (
+        (r"{n}[\s-]*min(?:ute)?s?\s+minimum", r"\bminimum(?:\s+viable)?\s+session\s+(?:of\s+)?{n}[\s-]*min"),
+        ("the {n}-minute minimum", "a minimum session of {n} min"),
+    ),
+    "split.minimum_session.sets_per_movement": (
+        (r"\bsets_per_movement\"?\s*[:=]\s*{n}", r"{n}\s+sets\s+(?:per|a|each)\s+movement"),
+        ("{n} sets per movement",),
+    ),
+    "split.minimum_session.max_movements": (
+        (r"\bmax_movements\"?\s*[:=]\s*{n}", r"\b(?:at\s+most|up\s+to|max(?:imum)?(?:\s+of)?)\s+{n}\s+movements", r"{n}\s+movements\s+max"),
+        ("at most {n} movements",),
+    ),
+    "split.minimum_session.est_minutes_per_set": (
+        (r"\best_minutes_per_set\"?\s*[:=]\s*{n}", r"{n}\s*min(?:ute)?s?\s+(?:per|a|each)\s+set\b"),
+        ("{n} minutes per set",),
+    ),
+    "steps.ramp.ramp_window_days": (
+        (
+            r"\bramp_window_days\"?\s*[:=]\s*{n}",
+            r"{n}[\s-]+day\s+ramp",
+            r"\bramp\w*\s+(?:over|from)\s+(?:the\s+)?(?:trailing\s+)?{n}\s+days",
+        ),
+        ("a {n}-day ramp", "the ramp over the trailing {n} days"),
+    ),
+    "cardio_menu.conditioning_sessions_per_wk": (
+        (r"\bconditioning_sessions_per_wk\"?\s*[:=]\s*{n}", r"{n}\s+(?:hard\s+)?conditioning\s+sessions?", r"\bconditioning\s+{times}"),
+        ("{n} conditioning sessions", "conditioning {times} a week"),
+    ),
+    "cardio_menu.blocks.easy.rpe": (
+        (r"\beasy\b[^\n]{0,40}?\bRPE\s*{n}", r"\"easy\"\s*:\s*\{\s*\"rpe\"\s*:\s*{list}"),
+        ("an easy block at RPE {n}",),
+    ),
+    "cardio_menu.blocks.tempo.rpe": (
+        (r"\btempo\b[^\n]{0,40}?\bRPE\s*{n}", r"\"tempo\"\s*:\s*\{[^}\n]*\"rpe\"\s*:\s*{list}"),
+        ("the tempo block at RPE {n}",),
+    ),
+    "cardio_menu.blocks.tempo.minutes": (
+        (r"\btempo\b[^\n]{0,30}?{n}[\s-]*min", r"{n}[\s-]*min(?:ute)?s?\s+(?:of\s+)?tempo", r"\bhard\s+flat\s+{n}\b"),
+        ("tempo for {n} min", "hard flat {n}"),
+    ),
+    "cardio_menu.blocks.hills.rpe": (
+        (r"\bhills?\b[^\n]{0,40}?\bRPE\s*{n}", r"\"hills\"\s*:\s*\{\s*\"rpe\"\s*:\s*{list}"),
+        ("hills at RPE {n}",),
+    ),
+    "cardio_menu.blocks.intervals.rpe_hard_minutes": (
+        (r"\brpe_hard_minutes\"?\s*[:=]\s*{n}", r"\bRPE\s*{n}\s+on\s+the\s+hard"),
+        ("RPE {n} on the hard minutes",),
+    ),
+    "cardio_menu.blocks.intervals.work_easy_minutes": (
+        (r"\bwork_easy_minutes\"?\s*[:=]\s*{list}", r"{n}\s*(?:min\s*)?(?:on|hard|work)\s*[/,]\s*{n}\s*(?:min\s*)?(?:off|easy)"),
+        ("{n} min hard / {n} min easy",),
+    ),
+    "cardio_menu.blocks.intervals.efforts": (
+        (r"\befforts\"?\s*[:=]\s*{n}", r"{n}\s+(?:hard\s+)?(?:efforts|intervals|rounds\s+of\s+intervals)\b"),
+        ("{n} hard efforts",),
+    ),
+    "cardio_menu.blocks.incline_treadmill_walk.rpe": (
+        (r"\bincline\b[^\n]{0,40}?\bRPE\s*{n}", r"\bwalk\w*\b[^\n]{0,30}?\bRPE\s*{n}"),
+        ("the incline walk at RPE {n}",),
+    ),
+    "cardio_menu.blocks.incline_treadmill_walk.starting_dose.incline_pct": (
+        (r"{n}\s*%\s*(?:incline|grade)", r"\bincline\w*\s+(?:of\s+|at\s+)?{n}\s*%", r"\bincline_pct\"?\s*[:=]\s*{list}"),
+        ("{n} % incline",),
+    ),
+    "cardio_menu.blocks.incline_treadmill_walk.starting_dose.mph": (
+        (r"{n}\s*mph\b", r"\bmph\"?\s*[:=]\s*{list}"),
+        ("at {n} mph",),
+    ),
+    "cardio_menu.blocks.incline_treadmill_walk.step.incline_pct": (
+        (
+            r"\+{n}\s*%\s*(?:incline|grade)",
+            r"\bincline\s+(?:step|steps\s+up)\s+(?:of\s+|by\s+)?\+?{n}\s*%",
+            r"\bincline_pct\"?\s*[:=]\s*{n}(?!\s*[,\]])",
+        ),
+        ("+{n} % incline",),
+    ),
+    "cardio_menu.blocks.incline_treadmill_walk.step.mph": (
+        (r"\+{n}\s*mph\b", r"\bmph\"?\s*[:=]\s*{n}(?!\s*[,\]])"),
+        ("+{n} mph",),
+    ),
+    "effort_ceilings.overage_tolerance_rpe": (
+        (
+            r"\boverage_tolerance_rpe\"?\s*[:=]\s*{n}",
+            r"\bwithin\s+\+?{n}\s*(?:point\s+)?(?:of\s+)?RPE",
+            r"\+{n}\s*RPE\s+(?:of|over|above|past)\s+the\s+ceiling",
+            r"\+{n}\s*RPE\s+overage",
+            r"{n}[\s-]+(?:RPE\s+)?point\s+(?:overage\s+)?tolerance",
+        ),
+        ("within +{n} RPE of the ceiling", "a +{n} RPE overage", '"overage_tolerance_rpe": {n}'),
+    ),
+    "effort_ceilings.ceiling_change_proposal.share_of_sets": (
+        (r"\bshare_of_sets\"?\s*[:=]\s*{n}", r"\bmore\s+than\s+{pct}\s+of\s+(?:the\s+|his\s+)?sets"),
+        ("more than {pct} of sets",),
+    ),
+    "effort_ceilings.ceiling_change_proposal.weeks_running": (
+        (
+            r"\bweeks_running\"?\s*[:=]\s*{n}",
+            r"{n}\s+weeks?\s+of\s+(?:most|more\s+than)\b",
+            r"\b(?:ceiling|sets)\b[^\n]{0,60}?{n}\s+(?:weeks?\s+running|consecutive\s+weeks|straight\s+weeks)\b",
+            r"{n}\s+(?:weeks?\s+running|consecutive\s+weeks|straight\s+weeks)\b[^\n]{0,40}?\b(?:ceiling|sets)\b",
+        ),
+        ("a ceiling beaten on most sets {n} weeks running", "{n} weeks of most sets"),
+    ),
+    "progression.gain_rule.consecutive_same_type_exposures": (
+        (
+            r"\bconsecutive_same_type_exposures\"?\s*[:=]\s*{n}",
+            r"{n}\s+(?:consecutive\s+)?(?:same[\s-]type\s+)?(?:top[\s-]of[\s-](?:the[\s-])?range\s+)?exposures",
+        ),
+        ("{n} consecutive same-type exposures", "{n} top-of-range exposures"),
+    ),
+    "progression.gain_rule.step_lb": (
+        (
+            r"\bstep_lb\"?\s*[:=]\s*{n}",
+            r"\+{n}[\s-]*lbs?\b",
+            r"{n}[\s-]*lbs?\s+(?:load\s+)?(?:step|jump|increment)s?\b",
+            r"\bone\s+{n}[\s-]*lb\b",
+        ),
+        ("+{n} lb", "a {n}-lb step", '"step_lb": {n}'),
+    ),
+    "progression.gain_rule.step_pct": (
+        (r"\bstep_pct\"?\s*[:=]\s*{n}", r"\+?{n}\s*%\s+(?:of\s+the\s+load|load|step|jump)"),
+        ("+{n} % of the load",),
+    ),
+    "progression.stall_rule.consecutive_exposures": (
+        (r"\bconsecutive_exposures\"?\s*[:=]\s*{n}", r"{n}\s+(?:consecutive\s+)?(?:same[\s-]type\s+)?exposures"),
+        ("{n} consecutive exposures", "{n} exposures running"),
+    ),
+    "progression.stall_rule.max_rpe": (
+        (
+            r"\bmax_rpe\"?\s*[:=]\s*{n}",
+            r"\b(?:stall\w*|step_due)\b[^\n]{0,80}?\bRPE\s*(?:{n}\s+or\s+(?:lower|less|under|below)|(?:<=|≤)\s*{n})",
+            r"\bRPE\s*(?:{n}\s+or\s+(?:lower|less|under|below)|(?:<=|≤)\s*{n})[^\n]{0,80}?\b(?:stall\w*|step_due)\b",
+        ),
+        ("a stall: the same load at RPE {n} or lower", "each at RPE {n} or lower (the stall rule)", '"max_rpe": {n}'),
+    ),
+    "progression.stall_rule.rep_step_max": (
+        (r"\brep_step_max\"?\s*[:=]\s*{n}", r"\bup\s+to\s+{n}\s+(?:more\s+|extra\s+)?reps", r"\+{n}\s+reps\b"),
+        ("up to {n} more reps",),
+    ),
+    "disruption.templates.travel.sessions_per_wk": (
+        (r"{n}\s+(?:short\s+)?sessions\s+(?:a|per)\s+(?:week|wk)", r"\"travel\"\s*:\s*\{\s*\"sessions_per_wk\"\s*:\s*{list}"),
+        ("{n} short sessions a week",),
+    ),
+    "disruption.templates.busy.sessions_per_wk": (
+        (r"{n}\s+(?:short\s+)?sessions\s+(?:a|per)\s+(?:week|wk)", r"\"busy\"\s*:\s*\{\s*\"sessions_per_wk\"\s*:\s*{list}"),
+        ("{n} sessions a week",),
+    ),
+    "disruption.step_back_up.days": (
+        (r"{n}[\s-]+day\s+step[\s-]+back", r"\bstep[\s-]+back[\s-]+up\b[^\n]{0,30}?{n}\s+days"),
+        ("a {n}-day step back up",),
+    ),
+    "disruption.offer.travel_lead_days": (
+        (r"\btravel_lead_days\"?\s*[:=]\s*{n}", r"{n}\s+days\s+(?:before|ahead\s+of)\s+(?:a\s+|the\s+)?(?:trip|travel)"),
+        ("{n} days before a trip",),
+    ),
+    "disruption.offer.missed_session_days": (
+        (r"\bmissed_session_days\"?\s*[:=]\s*{n}", r"{n}\s+days\s+(?:without|with\s+no)\s+(?:a\s+)?(?:session|lift)"),
+        ("{n} days without a session",),
+    ),
+    "disruption.max_days": (
+        (
+            r"\bmax_days\"?\s*[:=]\s*{n}",
+            r"{n}\s+days\s+(?:of\s+)?disruption",
+            r"\bdisruption\b[^\n]{0,30}?(?:at\s+most|up\s+to|max(?:imum)?)\s+{n}\s+days",
+        ),
+        ("{n} days of disruption",),
+    ),
+    "calibration.tape_and_photos.every_weeks": (
+        (
+            r"\b(?:tape|photos?|measurements?)\b[^\n]{0,40}?\bevery\s+{n}\s+weeks",
+            r"\bevery\s+{n}\s+weeks\b[^\n]{0,40}?\b(?:tape|photos?)\b",
+        ),
+        ("tape and photos every {n} weeks",),
+    ),
+    "calibration.tape_and_photos.dead_man_missed_cycles": (
+        (r"\bdead_man_missed_cycles\"?\s*[:=]\s*{n}", r"{n}\s+missed\s+(?:cycles|tapes?|photo\s+days)"),
+        ("{n} missed cycles",),
+    ),
+    "calibration.dexa.every_weeks_approx": (
+        (r"\bevery_weeks_approx\"?\s*[:=]\s*{n}", r"\b(?:DEXA|DXA)\b[^\n]{0,40}?{n}\s+weeks", r"{n}\s+weeks\b[^\n]{0,20}?\b(?:DEXA|DXA)\b"),
+        ("a DEXA about every {n} weeks",),
+    ),
+    "calibration.fitness_tests.every_weeks": (
+        (
+            r"\b(?:fitness[\s-]+tests?|battery)\b[^\n]{0,40}?\bevery\s+{n}\s+weeks",
+            r"\bevery\s+{n}\s+weeks\b[^\n]{0,30}?\b(?:battery|fitness)\b",
+        ),
+        ("the fitness test battery every {n} weeks",),
+    ),
+    "calibration.block_retro.every_weeks": (
+        (r"\bretro\b[^\n]{0,40}?\bevery\s+{n}\s+weeks", r"\bevery\s+{n}\s+weeks\b[^\n]{0,30}?\bretro\b"),
+        ("the block retro every {n} weeks",),
+    ),
+    "calibration.block_retro.scorecard_rows": (
+        (r"\bscorecard_rows\"?\s*[:=]\s*{n}", r"{n}[\s-]+row\s+(?:\w+\s+)?scorecard", r"\bscorecard\b[^\n]{0,30}?{n}\s+rows"),
+        ("the {n}-row scorecard",),
+    ),
+    "panel_target.every_seat_at_least": (
+        (r"\bevery_seat_at_least\"?\s*[:=]\s*{n}", r"\b(?:seat|panel)\w*\b[^\n]{0,40}?{n}\s*(?:/|of|out\s+of)\s*\d+"),
+        ("every seat at least {n}/10",),
+    ),
+    "panel_target.out_of": (
+        (r"\bout_of\"?\s*[:=]\s*{n}", r"\b(?:seat|panel)\w*\b[^\n]{0,40}?\d+\s*(?:/|out\s+of)\s*{n}\b"),
+        ("every seat at least 9 out of {n}",),
+    ),
+    "sleep.wake_time.tolerance_minutes": (
+        (r"\bwak\w*\b[^\n]{0,40}?(?:±|\+/-|\+-|within)\s*{n}\s*min", r"\btolerance_minutes\"?\s*[:=]\s*{n}"),
+        ("a fixed wake time ±{n} min", "wake within {n} min of the anchor"),
+    ),
+    "sleep.wake_time.anchor_window_days": (
+        (r"\bwak\w*\b[^\n]{0,60}?(?:trailing|last|past)\s+{n}\s+days", r"\banchor_window_days\"?\s*[:=]\s*{n}"),
+        ("his median wake time over the trailing {n} days",),
+    ),
+    "sleep.wake_time.min_days_for_anchor": (
+        (r"\bmin_days_for_anchor\"?\s*[:=]\s*{n}", r"{n}\s+(?:readable\s+)?days\s+(?:for|before)\s+(?:an\s+|the\s+)?anchor"),
+        ("{n} readable days for an anchor",),
+    ),
+}
+
+# #5175: the charter numeric leaves NO pattern here owns, each with its reason. A dotted PREFIX covers every leaf under
+# it. The coverage test below fails on a leaf that is neither patterned nor listed, and on a row that covers nothing.
+NOT_APPLICABLE: Dict[str, str] = {
+    "gated_movements.running.walking_weeks": "the run gate's walking condition: read only by training.run_onramp; held equal to "
+    "the owner_redlines run_gate_lb tissue clause by tests/test_run_onramp_5090.py",
+    "gated_movements.running.walking_hours_per_wk": "as walking_weeks (training.run_onramp; tests/test_run_onramp_5090.py)",
+    "gated_movements.running.onramp": "the Stage 4 level table and its spacing: read only by training.run_onramp, every expected "
+    "number in tests/test_run_onramp_5090.py read from the charter; a table of small integers no prose pattern can key",
+    "gated_movements.lower_leg_prep.prescription": "the prep doses: read only by training.run_onramp's prep placement "
+    "(tests/test_run_onramp_5090.py); sets/reps/RPE of three accessories, the class effort_ceiling_rpe already sweeps in range form",
+    "split.minimum_session.back_off_pct": "shares its number with the owner-fixed heavy scheme (program_structure.EXPOSURES: top "
+    "set + 2 back-offs at -10 %, a pre-charter ruling with its own home, and its v0.4 freeze in program_v04), so neither a key nor "
+    "a prose pattern can tell a copy from the scheme; read only by training.disruption.minimum_shape (tests/test_disruption_mode_5088.py)",
+    "calibration.fitness_tests.early_days_credited": "the battery's due-week arithmetic: read only by training.fitness_tests "
+    "(tests/test_fitness_tests_5078.py); no prose names it",
+    "calibration.fitness_tests.grace_weeks": "as early_days_credited (training.fitness_tests; tests/test_fitness_tests_5078.py)",
+    "calibration.fitness_tests.tests": "each test's protocol constants (durations, reps): the battery's own definition, read "
+    "only by training.fitness_tests and printed from the charter by the protocol card (tests/test_fitness_tests_5078.py)",
+    "phase_after_may.plan_prompt": "the post-deadline plan prompt's weeks (#5130): owner-only, read only by "
+    "training.phase_after_may (tests/test_phase_after_may_5130.py); no swept file names them",
+    "nutrition": "outside this guard's swept set (the training consumers): every nutrition number has ONE reader with its own "
+    "contract test — calories: health.calorie_target (tests/test_calorie_target_one_resolver_5095.py, which also sweeps "
+    "lambdas/ mcp/ deploy/ scripts/ for a new 1,500 kcal literal); eating_window + protein: health.protein_engine "
+    "(tests/test_protein_engine_5098.py, tests/test_one_protein_feeding_definition_5214.py); expenditure: "
+    "health.expenditure_reconciler (tests/test_expenditure_reconciler_5097.py); titration: health.titration "
+    "(tests/test_titration_engine_5096.py); training_day: tests/test_training_day_fuel_5101.py; labs: "
+    "tests/test_lab_followup_5111.py; food_delivery: tests/test_food_delivery_upload_ritual_5006.py; floors: "
+    "health.macro_floors (tests/test_macro_floors_5102.py) — the fibre floor alone is swept here (fibre_floor, #5204)",
+}
+
+# A pattern's owning path covers the leaves under it — except `gated_movements`, whose pattern is derived from the
+# `*_lb` weights only, so it covers exactly those.
+_COVERS_ONLY = {"gated_movements": lambda leaf: leaf.rsplit(".", 1)[-1].endswith("_lb")}
+
+
+def _numeric_leaves(node: Any, path: str = "") -> List[Tuple[str, Any]]:
+    """Every numeric leaf (int, float, or an all-numeric list) outside `_README` / `version` / `change_log`."""
+    out: List[Tuple[str, Any]] = []
+    if isinstance(node, bool):
+        return out
+    if isinstance(node, (int, float)):
+        return [(path, node)]
+    if isinstance(node, list):
+        if node and all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in node):
+            return [(path, node)]
+        for i, x in enumerate(node):
+            out += _numeric_leaves(x, f"{path}[{i}]")
+        return out
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if not path and k in ("_README", "version", "change_log"):
+                continue
+            out += _numeric_leaves(v, f"{path}.{k}" if path else k)
+    return out
+
+
+def _under(leaf: str, prefix: str) -> bool:
+    return leaf == prefix or leaf.startswith(prefix + ".") or leaf.startswith(prefix + "[")
+
+
+def _num_alt(x: Any) -> str:
+    """One number: its digit forms (`_num_forms`) bounded so `15` never matches inside `150` or `1.5`, or its word."""
+    x = abs(x) if isinstance(x, (int, float)) and not isinstance(x, bool) else x
+    digits = rf"(?<![\w.])(?:{'|'.join(_num_forms(x))})(?!\d|\.\d)"
+    word = NUM_WORDS.get(int(x)) if float(x).is_integer() else None
+    return rf"(?:{digits}|\b{word}\b)" if word else digits
+
+
+def _slots(v: Any) -> Dict[str, str]:
+    if isinstance(v, list):
+        lo, hi = v
+        n = _num_alt(lo) if lo == hi else rf"{_num_alt(lo)}\s*(?:[-–]|to|or)\s*{_num_alt(hi)}"
+        lst = rf"\[\s*(?:{'|'.join(_num_forms(lo))})\s*,\s*(?:{'|'.join(_num_forms(hi))})\s*\]"
+        return {"n": n, "list": lst, "pct": n, "times": n}
+    n = _num_alt(v)
+    pct = n
+    if isinstance(v, float) and 0 < v < 1:
+        p = round(v * 100)
+        pct = rf"(?:{p}\s*%|{p}\s+percent" + (r"|half" if p == 50 else "") + ")"
+    tw = _TIMES_WORDS.get(int(v)) if float(v).is_integer() else None
+    times = rf"(?:{n}\s*(?:x|×|times)\b" + (rf"|\b{tw}\b" if tw else "") + ")"
+    return {"n": n, "list": rf"(?<![\w.])(?:{'|'.join(_num_forms(abs(v)))})(?!\d|\.\d)", "pct": pct, "times": times}
+
+
+def _fill(template: str, slots: Dict[str, str]) -> str:
+    out = template
+    for k, rx in slots.items():
+        out = out.replace("{" + k + "}", rx)
+    return out
+
+
+def _probe_renderings(template: str, v: Any) -> List[str]:
+    """A probe template rendered with the charter value in digits, and again in words where NUM_WORDS has it."""
+
+    def digits(x: Any) -> str:
+        x = abs(x)
+        return str(int(x)) if float(x).is_integer() else str(x)
+
+    def words(x: Any) -> Optional[str]:
+        return NUM_WORDS.get(int(abs(x))) if float(x).is_integer() else None
+
+    if isinstance(v, list):
+        lo, hi = v
+        d_n = digits(lo) if lo == hi else f"{digits(lo)}-{digits(hi)}"
+        w_n = (words(lo) if lo == hi else (f"{words(lo)} to {words(hi)}" if words(lo) and words(hi) else None)) if words(lo) else None
+        forms = [{"n": d_n, "list": f"[{digits(lo)}, {digits(hi)}]", "pct": d_n, "times": f"{d_n}x"}]
+        if w_n:
+            forms.append({"n": w_n, "list": f"[{digits(lo)}, {digits(hi)}]", "pct": w_n, "times": f"{w_n} times"})
+    else:
+        pct = f"{round(v * 100)}%" if isinstance(v, float) and 0 < v < 1 else digits(v)
+        forms = [{"n": digits(v), "list": f"[{digits(v)}]", "pct": pct, "times": f"{digits(v)}x"}]
+        if words(v):
+            forms.append({"n": words(v), "list": f"[{digits(v)}]", "pct": pct, "times": _TIMES_WORDS.get(int(v), f"{words(v)} times")})
+    out = []
+    for f in forms:
+        r = template
+        for k, s in f.items():
+            r = r.replace("{" + k + "}", s)
+        if r not in out:
+            out.append(r)
+    return out
+
+
+def _leaf_patterns(c: Dict[str, Any]) -> Dict[str, Tuple[str, re.Pattern[str]]]:
+    """pattern id (= the owning leaf path) -> (owning path, compiled regex), the numbers filled from the charter."""
+    out: Dict[str, Tuple[str, re.Pattern[str]]] = {}
+    for path, (templates, _probes) in LEAF_PATTERNS.items():
+        v = tc._get(c, path)
+        if v is tc._MISSING:
+            continue  # the coverage test names a dead row; a pattern for an absent leaf would be blind by construction
+        slots = _slots(v)
+        out[path] = (path, re.compile("|".join(f"(?:{_fill(t, slots)})" for t in templates), re.I))
+    return out
+
+
 def _patterns() -> Dict[str, Tuple[str, re.Pattern[str]]]:
     """pattern id -> (owning charter path, compiled regex). Numbers come from the charter."""
     c = tc.load_charter()
@@ -156,7 +574,7 @@ def _patterns() -> Dict[str, Tuple[str, re.Pattern[str]]]:
     gate_lb = "|".join(str(n) for n in sorted(_lb_leaves(c["gated_movements"])))
     volume_bands = _ranges(c["volume_priorities"]["sets_per_wk"].values())
     rpe_bands = _ranges(c["effort_ceilings"]["by_movement_class"].values())  # #5058: renamed from by_experience_tier
-    words = {3: "three", 6: "six"}
+    words = NUM_WORDS
     return {
         "fibre_floor": (
             "nutrition.floors.fibre.floor_g",
@@ -238,6 +656,7 @@ def _patterns() -> Dict[str, Tuple[str, re.Pattern[str]]]:
                 re.I,
             ),
         ),
+        **_leaf_patterns(c),
     }
 
 
@@ -369,13 +788,71 @@ def test_every_pattern_has_a_positive_control():
         "volume_band_sets": ['out["weekly_sets_by_muscle"] = f()', 'row.get("avg_sets_per_week")'],  # computed / read
     }
     pats = _patterns()
-    assert set(probes) == set(pats), "every pattern carries a probe"
-    blind = [f"{pid}: {p!r}" for pid, (_o, rx) in pats.items() for p in probes[pid] if not rx.search(p)]
+    leaf_ids = set(LEAF_PATTERNS)
+    assert set(probes) == set(pats) - leaf_ids, "every value-class pattern carries a probe (the leaf patterns carry their own)"
+    blind = [f"{pid}: {p!r}" for pid, (_o, rx) in pats.items() if pid in probes for p in probes[pid] if not rx.search(p)]
     assert not blind, f"patterns that no longer match their own probe: {blind}"
     loud = [f"{pid}: {p!r}" for pid, ps in negatives.items() for p in ps if pats[pid][1].search(p)]
     assert not loud, f"patterns matching a line they must not: {loud}"
     assert len(_swept_files()) >= 40, "the sweep covers (almost) nothing — a directory moved"
     assert {"mcp/tools_benchmark.py", "lambdas/web/site_api_nutrition.py"} <= {p.relative_to(_REPO).as_posix() for p in _swept_files()}
+
+
+def test_every_charter_numeric_leaf_has_a_pattern_or_a_stated_reason():
+    """#5175: the leaves are enumerated FROM THE CHARTER, not from a hand list, so a new numeric leaf reds here until it
+    gets a pattern (LEAF_PATTERNS or a value-class pattern whose owner covers it) or a NOT_APPLICABLE reason. A leaf
+    both patterned and excused, an excuse that covers nothing and a pattern for a leaf the charter no longer has are
+    all named too, so neither table can rot."""
+    c = tc.load_charter()
+    leaves = [p for p, _v in _numeric_leaves({k: v for k, v in c.items() if k not in ("public_loaded", "private_loaded")})]
+    owners = {o for o, _rx in _patterns().values()}
+
+    def patterned(leaf: str) -> bool:
+        return any(_under(leaf, o) and _COVERS_ONLY.get(o, lambda _l: True)(leaf) for o in owners)
+
+    def excused(leaf: str) -> bool:
+        return any(_under(leaf, na) for na in NOT_APPLICABLE)
+
+    problems = [f"{leaf}: no pattern and no NOT_APPLICABLE reason" for leaf in leaves if not patterned(leaf) and not excused(leaf)]
+    problems += [
+        f"{leaf}: patterned AND excused — drop the NOT_APPLICABLE row" for leaf in leaves if patterned(leaf) and leaf in NOT_APPLICABLE
+    ]
+    problems += [f"NOT_APPLICABLE[{na!r}] covers no numeric leaf" for na in NOT_APPLICABLE if not any(_under(leaf, na) for leaf in leaves)]
+    problems += [f"LEAF_PATTERNS[{p!r}] names a leaf the charter does not carry" for p in LEAF_PATTERNS if p not in leaves]
+    assert not problems, "\n".join(problems)
+    assert len(leaves) >= 65, f"only {len(leaves)} numeric leaves — the walk went blind"
+
+
+def test_every_leaf_pattern_sees_its_copy_in_digits_and_in_words():
+    """#5175 positive control: every probe, rendered with the charter's own number in digits AND in words (where the
+    shared map has the word), is a hit for its leaf's pattern — and the two specimens the #5086 review removed by hand
+    from the coach-session skill are hits for the leaves they copied."""
+    c = tc.load_charter()
+    pats = _patterns()
+    blind = []
+    for path, (_templates, probes) in LEAF_PATTERNS.items():
+        v = tc._get(c, path)
+        for probe in probes:
+            for text in _probe_renderings(probe, v):
+                if not pats[path][1].search(text):
+                    blind.append(f"{path}: {text!r}")
+    assert not blind, "leaf patterns that no longer match their own probe:\n" + "\n".join(blind)
+    specimens = {
+        "split.lifting_days_per_wk": "each session role of the five lifting days",
+        "effort_ceilings.ceiling_change_proposal.weeks_running": "Two weeks of most sets above the ceiling",
+        "effort_ceilings.overage_tolerance_rpe": "an overage within +1 RPE of the ceiling is not a breach",
+        "progression.gain_rule.step_lb": "earn +5 lb next time",
+    }
+    missed = [f"{p}: {t!r}" for p, t in specimens.items() if not pats[p][1].search(t)]
+    assert not missed, f"the named specimens are not hits: {missed}"
+    # A number inside a bigger one is not a copy: `15` never matches in `150`, a `2` never in `2.5`.
+    quiet = {
+        "split.lifting_days_per_wk": ["15 lifting days", "2.5 lifting days"],
+        "progression.gain_rule.step_lb": ["+50 lb", "+0.5 lb"],
+        "steps.ramp.ramp_window_days": ["a 140-day ramp"],
+    }
+    loud = [f"{p}: {t!r}" for p, ts in quiet.items() for t in ts if pats[p][1].search(t)]
+    assert not loud, f"leaf patterns matching a different number: {loud}"
 
 
 def test_the_public_charter_is_a_versioned_registry():

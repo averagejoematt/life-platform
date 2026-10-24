@@ -68,7 +68,7 @@ NO_PRIOR = "nothing: no earlier RETRO# row and no stored baseline row (scripts/t
 
 INSTRUCTIONS = (
     "BLOCK RETRO — ONE PANEL SEAT\n\n"
-    "You are one seat of an expert training panel, re-grading a fixed thirteen-row scorecard at the end of a "
+    "You are one seat of an expert training panel, re-grading a fixed scorecard (its rows are listed below) at the end of a "
     "training block. The charter above names what each school concedes to the deadline and what it gets in return "
     "(concession_ledger). Grade from the evidence only: each row lists the platform reads it is graded from and, "
     "where code could score it, that code score. A row whose inputs are absent is graded on what IS there, and "

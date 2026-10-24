@@ -121,7 +121,9 @@ SECTION_GUIDE: dict[str, str] = {
     ),
     "governing_goal": (
         "governing_goal — the frame every other section serves: a time-bound, must-hit target "
-        "with its date, and the weekly rate band with a floor and a ceiling. The rate is always "
+        "with its date, and the weekly rate band with a floor and a ceiling. The date is a "
+        "milestone that ends phase one, never a finish line (`target_date_role`): speak of what "
+        "the plan reaches by then and what follows it, never of the work being over. The rate is always "
         "shown both ways listed in `shown_as` — pounds per week AND percent of bodyweight per "
         "week — never one without the other. `precedence` is binding: the owner's guidance record "
         "it names outranks the rate band wherever the two conflict, and it is reference context, "
@@ -153,7 +155,10 @@ SECTION_GUIDE: dict[str, str] = {
     "phase_after_may": (
         "phase_after_may — what happens after the target date: the frame continues toward the "
         "long-term goal and maintenance rather than ending, and the charter is re-versioned on an "
-        "owner ruling before the date, not after it. Owner-only, like governing_goal."
+        "owner ruling before the date, not after it. `plan` is the post-deadline plan the owner "
+        "writes, at the place `plan_location` names; while it is empty, say it is not written yet "
+        "and never invent one. `plan_prompt` dates the reminder to write it and its dead-man. "
+        "Owner-only, like governing_goal."
     ),
     "progression": (
         "progression — how a load moves, decided by the engine, not improvised. `gain_rule` is the "
@@ -174,6 +179,14 @@ SECTION_GUIDE: dict[str, str] = {
         "the owner's own logged history: prefer movements in the pool for their slot, and treat "
         "a movement outside it as a proposal that needs a reason. Rotating an anchor early, or "
         "never rotating an accessory, are both findings."
+    ),
+    "sleep": (
+        "sleep — the sleep rules the plan grades against. `wake_time` is the wake-time consistency "
+        "rule: out of bed within the stated tolerance of an anchor every day, weekends included, "
+        "where the anchor is his own median wake time over the trailing window, never a clock time "
+        "you choose. A day with no sleep record is unknown, never a miss, and too few readable "
+        "days means no anchor yet. Judge consistency, not an early or a late hour; never propose a "
+        "fixed wake clock the charter does not state."
     ),
     "split": (
         "split — the lifting week: `lifting_days_per_wk` sessions in the fixed order of "

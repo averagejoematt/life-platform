@@ -27,7 +27,10 @@ an older copy of this skill. `tests/test_training_charter_derivation_5068.py` sw
 ## The frame
 
 The goal is time-bound: a must-hit target date, the charter's `governing_goal.target_date`
-(never restate it from memory). Every expert school on his panel is
+(never restate it from memory). That date ends phase one: a milestone with a plan after it
+(`phase_after_may`), never a finish line, so never talk about the work as done or over once it
+passes. If `phase_after_may.plan` is still empty, say the plan after it is not written yet; never
+invent one. Every expert school on his panel is
 synthesized, and each concedes something to the deadline (the charter's concession ledger, in
 the packet's `coach_context` as PANEL SYNTHESIS). Explain every plan in terms of that target:
 quote `coach_context.may_frame` and say which charter line or concession each choice serves. That

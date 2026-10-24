@@ -273,10 +273,22 @@ def nutrition_charter_context(data: Optional[dict], today: str) -> Optional[dict
         return None
 
 
+def _wake_time_rule() -> Optional[dict]:
+    """#5133: `training.coach_context.wake_time_rule()`, or None on any failure (the coach runs without it)."""
+    try:
+        from training import coach_context  # noqa: PLC0415 — lazy: the charter read stays off the import path
+
+        return coach_context.wake_time_rule()
+    except Exception as e:  # noqa: BLE001 — a coach input is never load-bearing on this read
+        print(f"[COACH-INPUT-FACTS] wake-time rule unavailable (omitted): {type(e).__name__}: {e}")
+        return None
+
+
 def coach_inputs(coach_id: str, domain_data: Any, data: Optional[dict], *, table=None) -> Any:
     """THE coach-input boundary (`ai_calls._run_coach_v2_pipeline`, before the upstream
     change-gate hashes anything): every coach's domain data has its sleep instants
-    rendered in PT, and the nutrition coach gets the served logging record."""
+    rendered in PT, the nutrition coach gets the served logging record, and the sleep coach the charter's
+    wake-time rule (#5133)."""
     facts = served_run_facts(data or {}, table=table)
     out = localize_sleep_instants(domain_data)
     if coach_id == "nutrition_coach" and isinstance(out, dict):
@@ -284,6 +296,10 @@ def coach_inputs(coach_id: str, domain_data: Any, data: Optional[dict], *, table
         ctx = (facts or {}).get("nutrition_context")
         if ctx:  # #5109: the charter, the redlines' rules, the ONE calorie target and the engines' day, as one block
             out = {**out, "charter_context": {k: ctx[k] for k in ("context_version", "charter_version", "sections", "rule")}}
+    if coach_id == "sleep_coach" and isinstance(out, dict):
+        rule = _wake_time_rule()
+        if rule:  # #5133: the charter's wake-time consistency rule, the one the out-of-bed-on-time habit is graded by
+            out = {**out, "wake_time_rule": rule}
     if isinstance(out, dict):
         # #4189: every coach reads the owner's four words — the sleep and mind coaches asked
         # for them by name; the rest see the same fact so no coach narrates a morning he

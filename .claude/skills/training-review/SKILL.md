@@ -1,6 +1,6 @@
 ---
 name: training-review
-description: "Run Matthew's training block retro: at the end of every training block, re-grade the fixed thirteen-row training scorecard from the block's evidence, compare it with the last retro and name what moved, grade the dated charter predictions that have come due, and turn every grade below B into a named fix. Use when he says \"training review\", \"block retro\", \"re-grade the scorecard\", \"how did the block go\", or when a training block has just ended."
+description: "Run Matthew's training block retro: at the end of every training block, re-grade the fixed training scorecard from the block's evidence, compare it with the last retro and name what moved, grade the dated charter predictions that have come due, and turn every grade below B into a named fix. Use when he says \"training review\", \"block retro\", \"re-grade the scorecard\", \"how did the block go\", or when a training block has just ended."
 allowed-tools: Read, Glob, Grep, Bash, mcp__life-platform__*, mcp__claude_ai_Claude_Docs__*
 ---
 

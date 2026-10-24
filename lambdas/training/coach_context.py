@@ -271,7 +271,8 @@ def may_frame(target_date: str, block: Optional[dict[str, Any]] = None) -> Optio
         rate = "unknown (the charter's rate band could not be read)"
     line = (
         f"May frame: {target_date} is {weeks:g} weeks before the {target} target; the loss-rate band is {rate}. "
-        "Every session in this plan is judged by whether it protects muscle and holds the band to that date."
+        "Every session in this plan is judged by whether it protects muscle and holds the band through that date, "
+        f"{_phase_one_clause()}"
     )
     return {
         "source": SRC_MAY,
@@ -281,6 +282,17 @@ def may_frame(target_date: str, block: Optional[dict[str, Any]] = None) -> Optio
         "rate_band": band or raw,
         "line": line,
     }
+
+
+def _phase_one_clause() -> str:
+    """#5130: the date ends phase one, a milestone with a plan after it — read from the charter, and whether the
+    post-deadline plan is written yet (`phase_after_may.plan`), so the frame never reads as a finish line."""
+    from training import training_charter as tc  # noqa: PLC0415
+
+    written = bool(tc.charter_value("phase_after_may.plan"))
+    return "which ends phase one: a milestone, not a finish line (phase_after_may); " + (
+        "the plan after it is in the charter's phase_after_may.plan." if written else "the plan after it is not written yet."
+    )
 
 
 # ── the one assembly ─────────────────────────────────────────────────────────────────────
@@ -622,7 +634,36 @@ def charter_goal_lines() -> str:
     return (
         f"- Training: {split.get('lifting_days_per_wk')} lifting days a week in the sequence {', '.join(split['sequence'])}, plus daily walking\n"
         f"- Key priorities: sleep quality, protein adherence (at or above the {lo:g} g floor on {days} of 7 days; range {lo:g}-{hi:g} g), "
-        f"consistent movement ({steps['floor']:,} steps/day floor, {steps.get('target'):,} target)"
+        f"consistent movement ({steps['floor']:,} steps/day floor, {steps.get('target'):,} target)\n"
+        f"{wake_time_line()}"
+    )
+
+
+WAKE_RULE_KEYS = ("rule", "tolerance_minutes", "anchor_window_days", "min_days_for_anchor", "every_day", "weekends_included", "hit")
+
+
+def wake_time_rule() -> Optional[dict[str, Any]]:
+    """#5133: the charter's wake-time consistency rule (`sleep.wake_time`) as the coaches read it — the rule and its
+    numbers, never a clock time (the anchor is his own trailing median, computed by `health.wake_consistency`, the one
+    grader). Published-safe: the fields are on `PUBLISHED_WHITELIST`. None when the charter does not carry it."""
+    from training import training_charter as tc  # noqa: PLC0415
+
+    sec = (tc.public_view().get("sleep") or {}).get("wake_time") or {}
+    out = {k: sec[k] for k in WAKE_RULE_KEYS if k in sec}
+    if not out.get("tolerance_minutes") or not out.get("anchor_window_days"):
+        return None
+    return {"source": "config/training_charter.json sleep.wake_time (graded by health.wake_consistency)", **out}
+
+
+def wake_time_line() -> str:
+    """The daily coaches' standing sleep line (#5133), from `wake_time_rule()`; an unreadable rule says so in words."""
+    r = wake_time_rule()
+    if r is None:
+        return "- Sleep: the charter's wake-time rule could not be read; state no wake target from memory"
+    return (
+        f"- Sleep: a consistent wake time, out of bed within {r['tolerance_minutes']} min of his own median wake time over the "
+        f"trailing {r['anchor_window_days']} days, every day including weekends (charter sleep.wake_time; a day with no sleep "
+        "record is unknown, never a miss)"
     )
 
 
