@@ -672,6 +672,12 @@
       "stack": "monitoring_stack",
       "via": "declaration"
     },
+    "panel-weekly-grade-missing": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "mcp_stack",
+      "via": "declaration"
+    },
     "panelcast-autopublish-held": {
       "kind": "metric",
       "routing": "digest",
@@ -1023,7 +1029,7 @@
   ],
   "cost_surface": {
     "ai_features": 30,
-    "alarms": 141,
+    "alarms": 142,
     "emf_namespaces": 33,
     "schedules": 97,
     "secrets": 30
@@ -8065,9 +8071,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead"
     },
     "counts": {
-      "alarms": 141,
+      "alarms": 142,
       "alarms_by_routing": {
-        "digest": 96,
+        "digest": 97,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,

@@ -19,12 +19,18 @@ routine repo already live:
   * the write   ONE owner-only row, `USER#<id>#SOURCE#training_constraints / PANEL#<week_end>` (docs/SCHEMA.md):
                 scores, letters, reasons, the controls' verdicts and the trend — never the plan itself.
 
-SCHEDULING IS NOT HERE. `mcp.handler` dispatches `{"job": "panel_weekly_grade"}` to `lambda_entry`, so an
-EventBridge rule with that constant input on `life-platform-mcp-warmer` is the whole schedule — the same
-idiom as the nightly pre-draft. That rule (and its dead-man alarm on `PanelGradeOutcome`) is a CDK change in
-`cdk/stacks/mcp_stack.py`, an owner-attended deploy; until it lands the job runs only on demand.
+THE SCHEDULE. `mcp.handler` dispatches `{"job": "panel_weekly_grade"}` to `lambda_entry`, so an EventBridge
+rule with that constant input on `life-platform-mcp-warmer` is the whole schedule — the same idiom as the nightly
+pre-draft. The rule `PanelWeeklyGrade` and its dead-man `panel-weekly-grade-missing` live in
+`cdk/stacks/mcp_stack.py`; the expression is the `life-platform-mcp-warmer#PanelWeeklyGrade` row of
+`config/schedules.json` — Monday 15:30Z (08:30 PDT / 07:30 PST Monday), so the default week is the Mon-Sun week
+just finished. `JOB` below is the one declaration the stack must match (tests/test_panel_grade_schedule_5072.py).
+The rule carries an implicit `AWS::Lambda::Permission`, so it lands by an owner-attended
+`bash deploy/cdk_deploy.sh LifePlatformMcp`; until that apply the job runs only on demand.
 Every run prints one EMF datapoint (`LifePlatform/HevyRoutine::PanelGradeOutcome{Job=panel_weekly_grade}`):
-1 for a graded or honestly-empty week, 0 for a failure — the series the dead-man will read.
+1 for a graded or honestly-empty week, 0 for a failure — the series the dead-man reads (7 empty daily buckets).
+BUDGET: the judge spends under `charter_judge` (budget_guard band 1) through `bedrock_client.invoke_with_retry`;
+at tier >= 1 the run still lands — code scores only, `degraded` with the pause named — and still emits the 1.
 """
 
 from __future__ import annotations
@@ -44,8 +50,17 @@ logger = logging.getLogger(__name__)
 JOB: dict[str, Any] = {
     "name": "panel_weekly_grade",
     "event": {"job": "panel_weekly_grade"},
+    # fixed UTC (CLAUDE.md): Monday 08:30 PDT / 07:30 PST — Monday Pacific either way, so "yesterday" is Sunday
+    "schedule_key": "life-platform-mcp-warmer#PanelWeeklyGrade",
+    "schedule_utc": "cron(30 15 ? * MON *)",
+    "function": "life-platform-mcp-warmer",
+    "metric_namespace": METRIC_NAMESPACE,
     "metric_name": "PanelGradeOutcome",
     "metric_dimension": {"Job": "panel_weekly_grade"},
+    "deadman_alarm": "panel-weekly-grade-missing",
+    # 7 consecutive empty daily buckets: a whole week with no honest outcome = the Monday run missed or failed
+    "deadman_period_s": 86400,
+    "deadman_periods": 7,
     "week_days": 7,
 }
 HONEST_STATUSES = ("graded", "no_plan")
