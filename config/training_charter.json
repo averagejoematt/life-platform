@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.27.0",
+  "version": "1.29.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -182,6 +182,13 @@
       "date": "2026-10-24",
       "by": "owner rulings 2026-10-23 (attended, Session CD): R3 'yes: the trip is a planned maintenance week, so the travel kit is needed by mid-December' (#5104, #5107); R6 'meal service on weekdays, the code-built menu at weekends'; R7 'no excluded foods'",
       "what": "#5104 N10: nutrition.travel_food, the travel food kit's dates and rulings: ready_by 2026-12-15 (mid-December), the owner-only reminder prompt_days_before_ready 14 days earlier and its dead-man on ready_by while the trip dates are still unset (training.calibration_cadence, kind travel_food_kit), retire_after once the trip is past, default_trip_days (the kit's length until travel.windows carries dates) and spare_days of packed food. The day plan, grocery list, packing list and hotel/restaurant playbook are built by code (health.travel_food) from the existing protein, floor, eating-window and calorie numbers; disruption mode carries the playbook on a travel template. travel.windows' late-December entry names the kit. No new target number.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.29.0",
+      "date": "2026-10-24",
+      "by": "epic #5120 (owner-requested mind/coping/habits panel review 2026-10-18), M2 #5122: the playbook and the protocol are the panel's defaults, named as platform defaults pending his ruling; the switch stays his (the disruption-mode owner ruling of 2026-10-18: the coach offers, never imposes)",
+      "what": "#5122: disruption mode extended from training to the whole day. Two templates beside travel and busy: life (up to 14 days) and lapse (the 72-hour protocol, lapse_protocol.hours; the plan resumes the next morning, no step-back-up week). disruption.whole_day: the held and paused core habits (every habits.core id one or the other), the paused targets, the no-grading rule and the streak-language rule; disruption.lapse_protocol: what runs, what pauses, the trigger (the #5121 early-warning flag, offered by failure_mode.response_owner) and the resume. training.life_disruption is the reader; the coaches read it through training.coach_context and ai.ai_calls. The new numbers are 14 days, 72 hours and the two session bands, all platform defaults.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -497,7 +504,37 @@
     "holds": ["steps.floor", "protein_floor", "sleep_floor", "one short session"],
     "templates": {
       "travel": {"sessions_per_wk": [2, 3], "pools": ["hotel", "bodyweight"], "note": "a resort/hotel gym first, bodyweight when there is none"},
-      "busy": {"sessions_per_wk": [1, 5], "pools": ["gym_minimum", "bodyweight"], "note": "the 20-minute minimum at the usual club"}
+      "busy": {"sessions_per_wk": [1, 5], "pools": ["gym_minimum", "bodyweight"], "note": "the 20-minute minimum at the usual club"},
+      "life": {"sessions_per_wk": [1, 3], "pools": ["gym_minimum", "bodyweight"], "whole_day": true, "max_days": 14, "note": "a life disruption (#5122): the whole day holds habits and the targets and grading pause, not only the training"},
+      "lapse": {"sessions_per_wk": [0, 1], "pools": ["gym_minimum", "bodyweight"], "whole_day": true, "lapse": true, "step_back_up": false, "note": "the 72-hour lapse protocol (#5122): its length is lapse_protocol.hours; the plan resumes the next morning, no step-back-up week"}
+    },
+    "whole_day": {
+      "_note": "The life-disruption playbook (#5122, epic #5120): what the WHOLE day does while a whole_day template (life or lapse) is on. Read by training.life_disruption, carried to every coach through the one context assembly (training.coach_context) and the daily coaches' standing lines. Every list here is a platform default from the mind panel review 2026-10-18, pending an owner ruling.",
+      "held_habits": ["weigh_in", "food_logged", "protein_floor", "steps_floor", "evening_checkin", "out_of_bed_on_time", "one_connection", "no_alcohol"],
+      "paused_habits": ["calories_in_band", "planned_session_done", "no_solo_takeout", "no_sweets_or_fried"],
+      "habits_rule": "every habits.core id is either held or paused, never both and never neither; a held habit is still asked for, a paused one is not asked for and is never a miss; one short session (split.minimum_session) stands in for planned_session_done",
+      "paused_targets": ["steps.target", "nutrition.calories.prescribed_band_kcal", "nutrition.titration", "governing_goal.rate_band_lb_per_wk", "split.lifting_days_per_wk", "volume_priorities.sets_per_wk", "progression.gain_rule"],
+      "targets_rule": "a paused target is not set, chased or cited as owed; the floors (steps.floor, the protein floor, the sleep floor) are held instead; the cut resumes at the pre-mode numbers, never a make-up deficit",
+      "grading": {
+        "paused": ["the day grade", "the habit score", "the character sheet", "the weekly panel grade", "the titration step"],
+        "rule": "no grade is given and no grade is owed for a day the mode covers: a held day is reported as held, never as a miss, a zero or a failure",
+        "enforced_by": "the coaches through training.coach_context and ai.ai_calls' standing lines (#5122); the graders' own pause is a follow-up, so a stored grade may exist and is never cited while the mode is on"
+      },
+      "language": {
+        "rule": "while the mode is on no brief, coach or email counts a broken streak or shames a miss: name what was held, not what lapsed",
+        "never": ["\\bstreak\\s+(?:is\\s+|was\\s+)?(?:broken|over|lost|reset|ended|gone)\\b", "\\b(?:broke|lost|ended|reset|killed|snapped)\\s+(?:your|his|the|a)\\s+(?:\\d+[- ]day\\s+)?streak\\b", "\\bback\\s+to\\s+(?:day\\s+(?:zero|one|0|1)|square\\s+one)\\b", "\\bstart(?:ing)?\\s+(?:over|from\\s+scratch)\\b", "\\bfell\\s+off\\b", "\\bfall(?:ing)?\\s+off\\s+the\\s+wagon\\b", "\\b0[- ]day\\s+streak\\b", "\\bstreak\\s*:\\s*0\\b", "\\bmissed\\s+\\d+\\s+days?\\s+in\\s+a\\s+row\\b", "\\b(?:you|he)\\s+failed\\b", "\\bno\\s+excuses\\b"],
+        "instead": "say what was held (the floors, the weigh-in, the food log, one short session) and that the plan resumes; one ask at most, from the response owner"
+      }
+    },
+    "lapse_protocol": {
+      "_note": "The 72-hour lapse protocol (#5122, epic #5120). Platform defaults from the mind panel review 2026-10-18, pending an owner ruling.",
+      "hours": 72,
+      "trigger": "the relapse early-warning flag (health.early_warning, #5121: USER#matthew#SOURCE#early_warning_flag, owner-only) is active: the response owner OFFERS the protocol in the owner's own channel; it is never applied without his word",
+      "owner_ref": "config/user_goals.json failure_mode.response_owner (coach.response_protocol): the ONE coach who offers it and speaks while it runs; every other coach holds its domain to that and adds no second ask",
+      "entered_by": "his word: get_exercise_notes action='disruption' template='lapse' (words verbatim); left by action='disruption_end' or when the hours run out",
+      "runs": ["the held habits (whole_day.held_habits)", "the weigh-in, even on a bad day", "the food log, whatever was eaten", "one walk", "one short session if he wants it (split.minimum_session), never owed", "the evening check-in", "one message from the response owner"],
+      "pauses": ["every whole_day.paused_targets entry", "every whole_day.grading.paused entry", "streak counts and streak language (whole_day.language)", "every coach's second ask"],
+      "resumes": "the morning after the last covered day: the full plan at the pre-lapse numbers, no step-back-up week, no make-up sessions and no make-up deficit; a longer stretch is the life template, on his word"
     },
     "step_back_up": {"days": 7, "serves": "the minimum session at the club", "then": "the full split"},
     "offer": {"travel_lead_days": 3, "missed_session_days": 4},

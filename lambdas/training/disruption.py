@@ -121,7 +121,8 @@ def holds(template: str | None) -> list[dict[str, Any]]:
     from training import owner_redlines
 
     sleep = next((t for t in owner_redlines.TRIPWIRES if t.get("id") == "sleep"), {})
-    tmpl = (policy().get("templates") or {}).get(template or "") or {}
+    pol = policy()
+    tmpl = (pol.get("templates") or {}).get(template or "") or {}
     return [
         {"habit": "steps", "floor": _charter("steps.floor"), "source": "charter steps.floor", "every_day": _charter("steps.every_day")},
         {"habit": "protein", "floor_g": owner_redlines.REDLINES["protein_floor_g"]["value"], "source": "owner_redlines protein_floor_g"},
@@ -133,7 +134,11 @@ def holds(template: str | None) -> list[dict[str, Any]]:
             "sessions_per_wk": tmpl.get("sessions_per_wk"),
             "source": "charter split.minimum_session + disruption.templates",
         },
-    ]
+    ] + (
+        [{"habit": "core", "held": list((pol.get("whole_day") or {}).get("held_habits") or []), "source": "charter disruption.whole_day"}]
+        if tmpl.get("whole_day")
+        else []
+    )
 
 
 # ── the record (pure; the write is mcp/tools_training_notes.py) ─────────────────────────────
@@ -158,7 +163,7 @@ def build_disruption_record(*, start_date: str, until: str, words: str, template
     s, u = _day(start_date), _day(until)
     if s is None or u is None:
         raise ValueError("start_date and until must be YYYY-MM-DD")
-    max_days = int(policy().get("max_days") or 0)
+    max_days = template_max_days(template)
     if not 0 <= (u - s).days < max_days:
         raise ValueError(f"until must be on/after start_date and within {max_days} days of it")
     return {
@@ -171,6 +176,18 @@ def build_disruption_record(*, start_date: str, until: str, words: str, template
         "recorded_via": "chat",
         "issue": ISSUE,
     }
+
+
+def template_max_days(template: str | None) -> int:
+    """The most days one record of `template` may cover: the template's own `max_days` (life, #5122), the lapse
+    protocol's hours in whole days (lapse), else the block's `max_days` (travel, busy)."""
+    pol = policy()
+    tmpl = (pol.get("templates") or {}).get(template or "") or {}
+    if tmpl.get("max_days"):
+        return int(tmpl["max_days"])
+    if tmpl.get("lapse"):
+        return -(-int((pol.get("lapse_protocol") or {}).get("hours") or 0) // 24)
+    return int(pol.get("max_days") or 0)
 
 
 def end_record(record: dict[str, Any], *, ended_on: str, words: str, recorded_at: str) -> dict[str, Any]:
@@ -209,7 +226,10 @@ def active_record(records: list[dict[str, Any]] | None, day: str) -> dict[str, A
 def _stepping_back_from(records: list[dict[str, Any]] | None, day: str) -> dict[str, Any] | None:
     d = _day(day)
     days = int((policy().get("step_back_up") or {}).get("days") or 0)
+    templates = policy().get("templates") or {}
     for r in sorted(records or [], key=lambda x: str(x.get("start_date")), reverse=True):
+        if (templates.get(r.get("template")) or {}).get("step_back_up") is False:
+            continue  # #5122: the lapse protocol resumes the full plan the next morning
         last = _last_day(r)
         if d is not None and last is not None and 0 < (d - last).days <= days:
             return r
@@ -544,8 +564,8 @@ def routines(target_date: str, role: str, mode: dict[str, Any], catalog: dict[st
 
 
 # ── the generator path's own read (MCP reads through mcp/tools_training_notes.py) ───────────
-def load_records() -> list[dict[str, Any]]:
-    """Every disruption record, newest first. Raises on a failed read."""
+def load_records(table: Any = None) -> list[dict[str, Any]]:
+    """Every disruption record, newest first, from `table` (default: the generator's own). Raises on a failed read."""
     from boto3.dynamodb.conditions import Key
 
     from training import exercise_history
@@ -556,17 +576,17 @@ def load_records() -> list[dict[str, Any]]:
         "ScanIndexForward": False,
     }
     while True:
-        resp = exercise_history._table().query(**kwargs)
+        resp = (table if table is not None else exercise_history._table()).query(**kwargs)
         items.extend(resp.get("Items", []))
         if "LastEvaluatedKey" not in resp:
             return items
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
 
-def load_records_failsoft() -> list[dict[str, Any]]:
+def load_records_failsoft(table: Any = None) -> list[dict[str, Any]]:
     """`load_records`, or [] when the read fails — SAFE: no record means the full plan, never a mode he did not ask for."""
     try:
-        return load_records()
+        return load_records(table)
     except Exception as e:  # noqa: BLE001
         logger.warning(f"disruption: the record read failed ({type(e).__name__}: {e}) — no disruption mode applied")
         return []

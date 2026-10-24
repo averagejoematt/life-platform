@@ -505,6 +505,26 @@ def _response_protocol() -> Optional[dict]:
         return None
 
 
+def _day_mode(table, today: str, response: Optional[dict] = None) -> Optional[dict]:
+    """#5122: the whole-day disruption mode + the lapse offer (`training.life_disruption.current`), or None."""
+    try:
+        from training import life_disruption  # noqa: PLC0415
+
+        return life_disruption.current(table, today, response=response if response is not None else _response_protocol())
+    except Exception as e:  # noqa: BLE001 — the chat runs without the day-mode section
+        logger.warning("[domain_facts] day mode unavailable: %s", type(e).__name__)
+        return None
+
+
+def life_disruption_lines(dm: Optional[dict], persona: Optional[str]) -> list:
+    """`training.life_disruption.owner_lines` for one coach's thread ([] when the day is off or the read failed)."""
+    if not dm:
+        return []
+    from training import life_disruption  # noqa: PLC0415
+
+    return life_disruption.owner_lines(dm, persona)
+
+
 def _checkin_lines(table, today: str) -> list:
     """The last seven evenings of the check-in (0-4 each): answered count, each rating's mean, the latest evening's
     ratings. The 21-day mood read (#5123) carries the trend; this is the recent week the early-warning protocol acts on."""
@@ -577,6 +597,7 @@ def _training_context(today: str, clinical: str, table: Any = None) -> str:
 
         tracker = may_tracker.latest_completed_row(table, today) if table is not None else None
         labs = _owner_labs(table, today)
+        response = _response_protocol()
         return coach_context.assemble(
             today,
             packet=None,
@@ -586,7 +607,8 @@ def _training_context(today: str, clinical: str, table: Any = None) -> str:
             lab_priorities=labs.get("priorities"),
             lab_followup=labs.get("followup"),
             published=False,
-            response_protocol=_response_protocol(),
+            response_protocol=response,
+            day_mode=_day_mode(table, today, response),
         )["text"]
     except Exception as e:  # noqa: BLE001 — the chat runs on the clinical block alone
         logger.warning("[domain_facts] coach context unavailable: %s", e)
@@ -720,6 +742,10 @@ def domain_facts_block(coach_id: str, table, today: Optional[str] = None) -> str
         clinical = _training_context(today, clinical, table)  # #5071: the one planning context, the clinical block inside it
     elif key == "nutrition":
         clinical = "\n\n".join(x for x in (clinical, _nutrition_context(today, table)) if x)  # #5109: the same assembly
+    if key not in _TRAINING_ROUTE_KEYS:  # #5122: the whole-day mode + the lapse offer (routed to the response owner)
+        dm_lines = life_disruption_lines(_day_mode(table, today), persona)  # the training route reads it in its context
+        if dm_lines:
+            sections.append("DAY MODE (owner-only):\n" + "\n".join(f"- {ln}" for ln in dm_lines))
     if clinical:
         sections.append(clinical)
     track_section = coach_team_texture.track_record_section(track_lines)

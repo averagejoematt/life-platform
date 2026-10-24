@@ -64,7 +64,7 @@ def test_the_charter_carries_the_minimum_and_the_disruption_block_with_a_change_
     assert shape["max_movements"] * shape["sets_per_movement"] * shape["est_minutes_per_set"] <= shape["minutes"]
     pol = d.policy()
     assert pol["owner_switched"] is True and pol["imposed"] is False
-    assert set(pol["templates"]) == {"travel", "busy"}
+    assert set(pol["templates"]) == {"travel", "busy", "life", "lapse"}  # #5122 added the two whole-day templates
     assert all(p in d.POOL_NAMES for t in pol["templates"].values() for p in t["pools"])
     # not on a published surface: the mode and the travel windows are engine/owner context
     assert "disruption" not in tc.public_view() and "minimum_session" not in (tc.public_view().get("split") or {})
