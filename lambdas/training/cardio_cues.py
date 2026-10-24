@@ -30,13 +30,14 @@ def with_served_kinds(
     (`routine_repo.list_by_date_range`) and reads its cardio block's kind (`cardio_menu.served_kinds`).
     No ride in the window carries a routine id -> no read at all. Fail-soft: a failed read returns the index unchanged
     (named in the log), so the placement falls back to his notes."""
-    from datetime import date, timedelta
+    from datetime import timedelta
+
+    from common.pacific_time import parse_day_key
 
     from training import cardio_menu
 
-    try:
-        day = date.fromisoformat(str(target_date)[:10])
-    except ValueError:
+    day = parse_day_key(str(target_date or "")[:10])
+    if day is None:
         return cardio_index
     floor = (day - timedelta(days=SERVED_LOOKBACK_DAYS)).isoformat()
     recent = [s for ss in (cardio_index or {}).values() for s in ss or [] if floor <= str(s.get("date") or "")[:10] < day.isoformat()]
@@ -49,7 +50,8 @@ def with_served_kinds(
             from training.routine_generator import _load_json
 
             catalog = _load_json("movement_catalog.json")
-        start = (date.fromisoformat(min(str(s["date"])[:10] for s in recent)) - timedelta(days=SERVED_ROUTINE_LEAD_DAYS)).isoformat()
+        first = parse_day_key(min(str(s["date"])[:10] for s in recent)) or day
+        start = (first - timedelta(days=SERVED_ROUTINE_LEAD_DAYS)).isoformat()
         served = cardio_menu.served_kinds(list_by_date_range(start, day.isoformat()))
     except Exception as e:  # noqa: BLE001 — the placement then reads his notes alone
         logger.warning(f"cardio cue: served-routine read failed ({type(e).__name__}: {e}); kinds read from his notes")
