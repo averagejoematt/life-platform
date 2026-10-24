@@ -60,7 +60,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
-from common.pacific_time import parse_iso_utc
+from common.pacific_time import pacific_weekday, parse_iso_utc
 
 WALKING_VOLUME_VERSION = "walking-volume@1.1.0"  # 1.1.0 (#4068): time de-dup across Strava devices and against Hevy sessions
 
@@ -240,6 +240,7 @@ def dedup_strava(
             removed.append(
                 {
                     "date": c["date"],
+                    "weekday": pacific_weekday(c["date"]),  # #5274: today.dedup / walking.dedup / recent_aerobic.dedup removed[]
                     "label": c["label"],
                     "device": c.get("device"),
                     "hours_removed": _hours(c["seconds"] - keep_s),

@@ -101,7 +101,7 @@ import hashlib
 import json
 from typing import Any, Iterable
 
-from common.pacific_time import parse_day_key, shift_day_key
+from common.pacific_time import pacific_weekday, parse_day_key, shift_day_key
 
 from training import block_model, deload_word, program_structure, program_v04, training_streaks
 
@@ -270,6 +270,7 @@ def content_check(logs: list[dict[str, Any]], role: str) -> dict[str, Any]:
 def _rec(w: dict[str, Any], day: str) -> dict[str, Any]:
     return {
         "date": day,
+        "weekday": pacific_weekday(day),  # #5274: the Pacific weekday, quoted — rides not_credited[] and advanced_by
         "title": w.get("title") or w.get("workout_name") or None,
         "workout_id": w.get("source_workout_id") or w.get("workout_id") or None,
         "start_time": w.get("start_time"),
@@ -578,6 +579,7 @@ def next_session(
         "structure": structure_state(),  # #5069: the v0.4 lock is lifted — a measurement, never a guard
         "advanced_by": (
             {k: last[k] for k in ("date", "title", "workout_id", "sequence_index", "loaded_logs_that_day")}
+            | {"weekday": pacific_weekday(last["date"])}  # #5274
             | {"was": led[-2]["position_label"]}
             if last
             else None
