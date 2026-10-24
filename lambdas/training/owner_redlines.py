@@ -547,6 +547,11 @@ REDLINES: dict[str, dict[str, Any]] = {
         "deceleration_begins_lb": 240,
         "rehearsal_maintenance_weeks_at_lb": [260, 240, 220],
         "rehearsal_week": "seven days at the estimated maintenance, walking floor met, daily weigh-in, logged",
+        "executed_by": (
+            "the charter's nutrition.maintenance_weeks (owner ruling 2026-10-23 R3/R4, #5107: the late-December trip is the one "
+            "rehearsal before the target date, the 240 and 220 weeks are not scheduled) and nutrition.reverse_diet (the calories "
+            "line below, from the date it names), read by health.maintenance_week through the weekly titration decision"
+        ),
         "land_lb": [200, 205],
         "never_lb": 188,
         "goal_after_210": "four consecutive weeks of walking floor met, protein 6 of 7, weekly mean inside a 3-lb band — hitting 200 in week two of that changes nothing",

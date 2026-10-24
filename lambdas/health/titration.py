@@ -29,6 +29,12 @@ THE DECISION (``decide``, pure — every input is a value the caller already rea
                      (``walking_first_wait``), and only then ``down`` by the step, never under
                      ``nutrition.calories.planned_minimum_any_weight_kcal`` (``at_minimum`` when there)
 
+PLANNED MAINTENANCE + THE REVERSE DIET (#5107): ``health.maintenance_week.intercept`` runs first, once the rule is
+readable — a week a dated maintenance window touches holds (``maintenance_week``, the record lists the dates and the
+maintenance kcal the resolver serves on them), a trend window holding a maintenance date holds
+(``maintenance_in_trend``), and from ``nutrition.reverse_diet.starts_on`` the reverse diet decides
+(``reverse_diet_step`` / ``_entry`` / ``_settled`` / ``_gaining``). One decision a week: never both rules.
+
 THE STEP: the miss outside the band edge (lb/wk) x ``kcal_per_lb_wk`` (3500 kcal per lb over 7 days),
 rounded to ``step_rounding_kcal`` and held inside ``min_step_kcal``..``max_step_kcal`` (100..150).
 
@@ -58,6 +64,7 @@ from datetime import timedelta
 from decimal import Decimal
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
+from health import maintenance_week as _maint
 from health.calorie_target import TITRATION_PK, TITRATION_SK_PREFIX, _day, record_predates_retarget, week_monday
 
 logger = logging.getLogger(__name__)
@@ -153,6 +160,7 @@ def settings(charter_reader: Optional[CharterReader] = None) -> Dict[str, Any]:
         "minimum_kcal": _num(cal.get("planned_minimum_any_weight_kcal")),
         "dead_man_armed_from": (t.get("dead_man") or {}).get("armed_from") if isinstance(t.get("dead_man"), dict) else None,
         "charter_version": version if isinstance(version, str) else None,
+        "maintenance": _maint.settings(read),  # #5107: planned maintenance weeks + the reverse diet; absent = inert
     }
 
 
@@ -245,6 +253,7 @@ def decide(
     read_errors: Optional[Mapping[str, str]] = None,
     complete_days_trailing: Optional[int] = None,
     cfg: Optional[Mapping[str, Any]] = None,
+    maintenance: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """THE weekly decision for ``week`` (an ISO Monday). Pure. See the module docstring for the rules."""
     c = dict(cfg if cfg is not None else settings())
@@ -295,6 +304,9 @@ def decide(
             "insufficient data: the charter's titration rule or calorie target is unreadable",
             f"unreadable: {', '.join(missing) or 'the rule block or the base target'}",
         )
+    special = _maintenance(out, c, base, prior, dict(maintenance or {}, trend_lb_wk=trend_lb_wk, trend_provisional=trend_provisional))
+    if special is not None:
+        return special
     if experiment_day is not None and experiment_day < c["not_before_day"]:
         return hold("too_early", f"too early: no titration before experiment day {int(c['not_before_day'])}")
     if trend_lb_wk is None or trend_provisional or trend_provisional is None:
@@ -380,6 +392,22 @@ def decide(
     taken = int(base - new)
     out.update(action=DOWN, step_kcal=-taken, new_target_kcal=int(new))
     return _stepped(out, c, f"-{taken} kcal: {side} on {reads} weekly reads, steps at the floor, walking first from {walked}", detail)
+
+
+def _maintenance(
+    out: Dict[str, Any], c: Mapping[str, Any], base: float, prior: List[Mapping[str, Any]], seam: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    """#5107: the decision when a planned maintenance week, a trend across one, or the reverse diet replaces the rule
+    (``health.maintenance_week.intercept``), else None. ``seam`` is the leg's ``maintenance`` read ({``estimate``,
+    ``trend_window``, ``grades``}) plus the trend; the grades ride every record they are passed to."""
+    if seam.get("grades"):
+        out["maintenance_grades"] = [dict(g) for g in seam["grades"]]
+    inputs = {**seam, "complete_log_days": out["inputs"]["complete_log_days"], "maintenance_estimate": seam.get("estimate")}
+    special = _maint.intercept(week=out["week"], base=base, cfg=c, prior=prior, inputs=inputs, step=lambda miss: step_size(miss, c))
+    if special is None:
+        return None
+    out.update(special)
+    return _with_band(out, c)
 
 
 def _walking_first_since(prior: List[Mapping[str, Any]], week: str) -> Optional[str]:
