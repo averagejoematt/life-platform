@@ -491,7 +491,21 @@ def _lead_pack(table, today: str) -> list:  # noqa: ARG001 — pack signature
     return _weekly_priority_lines(table)
 
 
+def _mind_pack(table, today: str) -> list:
+    """The mind coach (owner's Telegram thread only): THE mood read, journal first, the evening check-in behind it.
+
+    #5123: the journal is mostly dark, so the mind thread had no read of how he feels. ``health.mood_read`` names its
+    source (journal | evening_checkin | unavailable) and never supplies a default number. The check-in is owner-only
+    (DATA_GOVERNANCE: no public projection), which is why it renders HERE — his own chat — and never in the
+    orchestrator's published brief. Lines carry trends, means and counts; never the check-in's word, never journal text.
+    """
+    from health import mood_read
+
+    return mood_read.owner_lines(mood_read.owner_read(table, today))
+
+
 _PACKS = {
+    "mind": _mind_pack,  # #5123 — the mood read (journal, else the owner-only evening check-in)
     "nutrition": _nutrition_pack,
     "sleep": _sleep_pack,
     "physical": _physical_pack,
