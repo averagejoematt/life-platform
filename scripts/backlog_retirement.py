@@ -19,7 +19,7 @@ THE CONTRACT (issue #5141, platform build-and-cost review 2026-10-18)
   * `rule_retirement_ledger_liveness` — the ledger's dead-man. A `planned` row whose story
     is not in the OPEN corpus is stale: the story closed (or was never open) and the ledger
     never recorded whether the removal shipped. Runs on the nightly wrap
-    (`.github/workflows/wrap-nightly.yml`) and every /wrap (e7), so a closure that forgets
+    (the `wrap-nightly` workflow) and every /wrap (e7), so a closure that forgets
     the ledger reds within a day.
 """
 
