@@ -59,6 +59,8 @@ LABELS = {
 _INCLINE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*%?\s*incline|incline\s*(?:of|at)?\s*(\d+(?:\.\d+)?)", re.IGNORECASE)
 _EASY_WORD = re.compile(r"\bflat\b|\beasy\b|\bsteady\b", re.IGNORECASE)
 _TEMPO_WORD = re.compile(r"\btempo\b|\bhard\b", re.IGNORECASE)
+# his own word for an easy ride ("flat" is left out: the tempo block is flat too, so "flat" names no kind)
+_EASY_ONLY_WORD = re.compile(r"\beasy\b|\bsteady\b|\brecovery\b", re.IGNORECASE)
 _M_PER_MI = 1609.344
 
 
@@ -136,6 +138,40 @@ def align_pick(pick: dict[str, Any], kind: str, machine: str) -> dict[str, Any]:
     return out
 
 
+MACHINE_WORD = {RECUMBENT: "bike", TREADMILL: "treadmill", "elliptical": "elliptical", "rowing_machine": "rower", "air_bike": "air bike"}
+
+
+def _or_list(words: list[str]) -> str:
+    return words[0] if len(words) == 1 else ", ".join(words[:-1]) + " or " + words[-1]
+
+
+def off_default(kind: str, movement_key: str, archetype: Any = "", legs_loaded: bool | None = None) -> dict[str, Any] | None:
+    """Why today's block is not the menu's default (the incline treadmill walk), with the charter key that makes it so;
+    None when it is the default. #5076: the live drafts served the bike day after day and said nothing about the walk.
+
+    A conditioning kind the menu never runs on the treadmill (tempo, intervals: `cardio_menu.blocks.<kind>.machines`)
+    is on the bike/elliptical/rower BY CHARTER; an easy or hills block off the treadmill is the recumbent rule
+    (`cardio_menu.placement.recumbent_after`: a lower day, loaded legs); otherwise the block's machine was fixed by
+    its author (a chat draft), which no charter line decides."""
+    if movement_key == TREADMILL and kind in ("incline_treadmill_walk", "run_walk"):
+        return None
+    machines = list(block(kind).get("machines") or [])
+    if kind in HARD and TREADMILL not in machines:
+        words = _or_list([MACHINE_WORD.get(m, m.replace("_", " ")) for m in machines])
+        return {
+            "reason": f"{kind.capitalize()} is conditioning, which the menu runs on the {words}; the incline walk is the easy-day default.",
+            "charter": f"cardio_menu.blocks.{kind}.machines",
+        }
+    if movement_key == TREADMILL:  # hills on the treadmill: the week's conditioning slot
+        return {"reason": f"{kind.capitalize()} is the week's conditioning slot.", "charter": "cardio_menu.placement.conditioning_order"}
+    if is_lower(archetype) or legs_loaded:
+        why = "a lower day" if is_lower(archetype) else "loaded legs"
+        return {"reason": f"The recumbent after {why}, in place of the incline walk.", "charter": "cardio_menu.placement.recumbent_after"}
+    if legs_loaded is None:
+        return {"reason": "The recumbent: the walking load was not read.", "charter": None}
+    return {"reason": f"The block was drafted on the {MACHINE_WORD.get(movement_key, movement_key)}.", "charter": None}
+
+
 def rpe_band(kind: str) -> tuple[int, int] | None:
     b = block(kind)
     if b.get("rpe"):
@@ -190,8 +226,14 @@ def session_before(archetype: Any) -> str | None:
 
 
 # ── placement ─────────────────────────────────────────────────────────────────────────
-def kind_of_performed(machine_key: str, note: str | None) -> str:
-    """The menu kind a performed block was, read from its machine and its own note."""
+def kind_of_performed(machine_key: str, note: str | None, served_kind: str | None = None) -> str:
+    """The menu kind a performed block was, read from its machine, its own note and the routine it was served.
+
+    His own note wins when it names a kind (intervals / hill / tempo / hard, or easy / steady). Otherwise the
+    kind the served routine prescribed for that machine (`served_kind`, `annotate_served`) — #5076: he logs the
+    menu's rides with an EMPTY note, so a performed tempo read from the note alone counted as easy, the week's
+    conditioning never registered, and every draft re-placed "conditioning 1 of 2" tempo on the bike (the live
+    2026-10-21/22/23/24 drafts). With neither, the machine's easy kind."""
     from training import cardio_note
 
     text = note or ""
@@ -200,11 +242,62 @@ def kind_of_performed(machine_key: str, note: str | None) -> str:
         return "intervals"
     if shape == "hill":
         return "hills"
+    if machine_key != TREADMILL and _TEMPO_WORD.search(text):
+        return "tempo"
+    if served_kind in KINDS and not _EASY_ONLY_WORD.search(text) and fits_machine(served_kind, machine_key):
+        return str(served_kind)
     if machine_key == TREADMILL:
         return "incline_treadmill_walk"
-    if _TEMPO_WORD.search(text):
-        return "tempo"
     return "easy"
+
+
+def fits_machine(kind: str, machine_key: str) -> bool:
+    """True when the menu runs `kind` on `machine_key` (a served kind on a machine he swapped to does not carry)."""
+    return machine_key in (block(kind).get("machines") or [])
+
+
+def served_kinds(routines: list[Any] | None) -> dict[str, dict[str, str]]:
+    """Hevy routine id -> {machine key: the cardio kind that routine prescribed}. Pure over the routines it is handed.
+
+    The kind is the menu's placement tag (`cardio:<key>:menu:<kind>`) when the block carries one, else the kind its
+    composed note names (`cardio_note.composed_kind`); a block with neither is left out (read from his note)."""
+    from training import cardio_note
+
+    out: dict[str, dict[str, str]] = {}
+    for ir in routines or []:
+        hid = str(getattr(ir, "hevy_routine_id", None) or "")
+        if not hid:
+            continue
+        for ex in getattr(ir, "exercises", None) or []:
+            key = str(getattr(ex, "movement_key", "") or "")
+            if key not in cardio_note.MACHINES:
+                continue
+            tag = str(getattr(ex, "rationale_tag", "") or "").split(":")
+            kind = (
+                tag[3] if len(tag) >= 4 and tag[0] == "cardio" and tag[2] == "menu" else cardio_note.composed_kind(getattr(ex, "notes", ""))
+            )
+            if kind in KINDS:
+                out.setdefault(hid, {})[key] = kind
+    return out
+
+
+def annotate_served(
+    cardio_index: dict[str, list[dict[str, Any]]] | None, served: dict[str, dict[str, str]], catalog: dict[str, Any] | None
+) -> dict[str, list[dict[str, Any]]] | None:
+    """A copy of `cardio_index` whose sessions carry `served_kind` — the kind the routine he performed prescribed for
+    that machine (`served_kinds`), matched on the session's `hevy_routine_id`. Sessions with no match are unchanged."""
+    if not cardio_index or not served:
+        return cardio_index
+    by_tid = machine_template_ids(catalog)
+    out: dict[str, list[dict[str, Any]]] = {}
+    for tid, sessions in cardio_index.items():
+        key = by_tid.get(tid)
+        rows = []
+        for s in sessions or []:
+            kind = (served.get(str(s.get("hevy_routine_id") or "")) or {}).get(key or "")
+            rows.append({**s, "served_kind": kind} if kind else s)
+        out[tid] = rows
+    return out
 
 
 def authored_kind(machine_key: str, note: str | None) -> str | None:

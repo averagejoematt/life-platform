@@ -13,6 +13,51 @@ from typing import Any
 
 logger = logging.getLogger("routine_generator")
 
+# PLATFORM-CHOSEN: how far back a performed ride is matched to the routine he performed (the week's placement and
+# last week's tempo-or-hills both sit inside it), and how much earlier than the ride that routine may be dated
+# (a routine stamped for one day is often performed a day or two later: 10-20's Upper-heavy was done on 10-21).
+SERVED_LOOKBACK_DAYS = 14
+SERVED_ROUTINE_LEAD_DAYS = 7
+
+
+def with_served_kinds(
+    cardio_index: dict[str, list] | None, target_date: str, catalog: dict[str, Any] | None = None
+) -> dict[str, list] | None:
+    """`cardio_index` with each recent ride's `served_kind`: the kind the routine he performed prescribed (#5076).
+
+    He logs the menu's rides with an empty note, so the note alone read every performed tempo as easy and the week's
+    conditioning never counted. This joins a ride's `hevy_routine_id` to the routine record
+    (`routine_repo.list_by_date_range`) and reads its cardio block's kind (`cardio_menu.served_kinds`).
+    No ride in the window carries a routine id -> no read at all. Fail-soft: a failed read returns the index unchanged
+    (named in the log), so the placement falls back to his notes."""
+    from datetime import timedelta
+
+    from common.pacific_time import parse_day_key
+
+    from training import cardio_menu
+
+    day = parse_day_key(str(target_date or "")[:10])
+    if day is None:
+        return cardio_index
+    floor = (day - timedelta(days=SERVED_LOOKBACK_DAYS)).isoformat()
+    recent = [s for ss in (cardio_index or {}).values() for s in ss or [] if floor <= str(s.get("date") or "")[:10] < day.isoformat()]
+    if not any(s.get("hevy_routine_id") for s in recent):
+        return cardio_index
+    try:
+        from training.routine_repo import list_by_date_range
+
+        if catalog is None:
+            from training.routine_generator import _load_json
+
+            catalog = _load_json("movement_catalog.json")
+        first = parse_day_key(min(str(s["date"])[:10] for s in recent)) or day
+        start = (first - timedelta(days=SERVED_ROUTINE_LEAD_DAYS)).isoformat()
+        served = cardio_menu.served_kinds(list_by_date_range(start, day.isoformat()))
+    except Exception as e:  # noqa: BLE001 — the placement then reads his notes alone
+        logger.warning(f"cardio cue: served-routine read failed ({type(e).__name__}: {e}); kinds read from his notes")
+        return cardio_index
+    return cardio_menu.annotate_served(cardio_index, served, catalog)
+
 
 def attach_cardio_cues(
     spec: Any,
@@ -72,6 +117,7 @@ def attach_cardio_cues(
             # the level cannot be derived, so the note is not rewritten: an authored note beats a level-less guess
             logger.warning(f"cardio cue: history load failed ({e}); notes untouched")
             return 0
+        cardio_index = with_served_kinds(cardio_index, str(getattr(spec, "target_date", "") or "")[:10], catalog)
     if whoop_index is None:
         try:
             from training.exercise_history import load_whoop_workout_index

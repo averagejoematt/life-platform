@@ -201,6 +201,8 @@ def load_history_indexes(
                             # the live wire field is `notes`, plural, on the EXERCISE
                             "note": ride_note,
                             **({"setup_note": setup_note} if setup_note else {}),
+                            # #5076: the routine he performed, so the menu reads the kind it prescribed for an empty-note ride
+                            **({"hevy_routine_id": str(item["hevy_routine_id"])} if item.get("hevy_routine_id") else {}),
                             "duration_sec": block_seconds,
                             "distance_m": block_meters if block_meters > 0 else None,
                             "session_start": item.get("start_time"),
