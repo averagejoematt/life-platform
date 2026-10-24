@@ -388,6 +388,13 @@
       "facing": "internal",
       "purpose": "#4084: draft + red-team tomorrow's session (never commits to Hevy)"
     },
+    "life-platform-mcp-warmer#PanelWeeklyGrade": {
+      "function": "life-platform-mcp-warmer",
+      "stack": "LifePlatformMcp",
+      "expression": "cron(30 15 ? * MON *)",
+      "facing": "internal",
+      "purpose": "#5072: the weekly panel-rubric grade of the committed Mon-Sun week (owner-only PANEL# row)"
+    },
     "life-platform-permanence": {
       "function": "life-platform-permanence",
       "stack": "LifePlatformOperational",

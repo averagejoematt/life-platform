@@ -285,6 +285,54 @@ class McpStack(Stack):
         )
         predraft_missing_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
+        # ── #5072: the weekly panel-rubric grade of the committed plan ──────────────────
+        # The pre-draft idiom again: same function, constant input. mcp.handler dispatches
+        # {"job": "panel_weekly_grade"} to mcp/panel_weekly_grade.py, whose JOB dict is the one
+        # declaration these literals must match (tests/test_panel_grade_schedule_5072.py reads
+        # this file and compares). Fixed UTC: Monday 15:30Z = 08:30 PDT / 07:30 PST Monday, so
+        # the job's default week ("yesterday, Pacific" back 7 days) is always the Mon-Sun week
+        # just finished. The judge spends under `charter_judge` (budget_guard band 1): at
+        # tier >= 1 the run still lands, code scores only, `degraded` with the pause named.
+        panel_grade_rule = events.Rule(
+            self,
+            "PanelWeeklyGrade",
+            schedule=table_schedule("life-platform-mcp-warmer#PanelWeeklyGrade"),
+            description="#5072: weekly panel-rubric grade of the committed week (owner-only PANEL# row)",
+        )
+        panel_grade_rule.add_target(targets.LambdaFunction(warmer, event=events.RuleTargetInput.from_object({"job": "panel_weekly_grade"})))
+
+        # ── #5072: the weekly grade's dead-man ────────────────────────────────────────
+        # Same reasoning as the pre-draft's: the warmer's own Invocations are kept green by its
+        # daily 17:10Z run, so only the job's own EMF series can see this rule die. The job emits
+        # PanelGradeOutcome=1 for every honest outcome (graded, no_plan — a budget-paused judge is
+        # a graded, degraded week) and 0 on a failure. 7 consecutive empty daily buckets with
+        # missing = BREACHING: red when a full week passes with no honest weekly outcome — i.e. the
+        # Monday run was missed or crashed. Digest (ADR-050): a missing grade is a missing
+        # measurement of the plan, never a wrong session.
+        panel_grade_missing_alarm = cloudwatch.Alarm(
+            self,
+            "PanelWeeklyGradeMissing",
+            alarm_name="panel-weekly-grade-missing",
+            alarm_description=(
+                "#5072: no honest weekly panel-grade outcome in 7 daily buckets — the Monday 15:30Z run did not land "
+                "(rule not firing, or the run failed). Check the PANEL_WEEKLY_GRADE log line in "
+                "/aws/lambda/life-platform-mcp-warmer."
+            ),
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/HevyRoutine",
+                metric_name="PanelGradeOutcome",
+                dimensions_map={"Job": "panel_weekly_grade"},
+                period=Duration.seconds(86400),
+                statistic="Sum",
+            ),
+            evaluation_periods=7,
+            datapoints_to_alarm=7,
+            threshold=1,
+            comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        )
+        panel_grade_missing_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
         # ── #5078: the fitness battery's missed alarm ─────────────────────────────────
         # mcp/tools_fitness_tests.nightly_leg rides the 02:00Z pre-draft and emits
         # FitnessBatteryMissed{Job=fitness_battery} = 1 when the battery's due window closed
