@@ -649,6 +649,11 @@ def _enforce_load_floors(
             **extra,
         )
         corrections = apply_prescription_floor(block.sets, floor)
+        # #5008 C3 residual: the floor line lands BEFORE the progression's (the order the two rules ran in) —
+        # it used to be appended after, so a draft read "floor_raise -> 27.5 lb" and then "floor applied -> 25 lb"
+        floor_line_at = len(rationale)
+        if corrections:
+            rationale.append(f"{block.movement_key}: floor applied — " + "; ".join(corrections))
         cue = render_floor_cue(floor)
         if cue:
             block.notes = f"{block.notes} {cue}".strip() if block.notes else cue
@@ -672,8 +677,12 @@ def _enforce_load_floors(
         if cue and audit["movements"][block.movement_key]["progression"].get("changes"):
             # #5202: the progression moved the load, so the floor/ramp line (an older rule's rationale) is superseded
             block.notes = " ".join(block.notes.replace(cue, "").split())
-        if corrections:
-            rationale.append(f"{block.movement_key}: floor applied — " + "; ".join(corrections))
+        prog = audit["movements"][block.movement_key]["progression"]
+        if corrections and prog.get("changes"):
+            # named at the head of the line, not its tail: a 300-char cut of the rationale must not drop it
+            rationale[floor_line_at] = (
+                f"{block.movement_key}: floor applied, then superseded by {prog.get('basis')} (next line) — " + "; ".join(corrections)
+            )
     return audit
 
 
