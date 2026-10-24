@@ -219,6 +219,7 @@ def standalone_walks(strava_raw: list[dict[str, Any]], workouts: list[dict[str, 
         "walks": [
             {
                 "date": r["date"],
+                "weekday": pacific_weekday(r["date"]),  # #5274: standalone_walks.*.walks[]
                 "start_utc": r["start"].isoformat(),
                 "minutes_outside_gym": round(r["seconds"] / 60.0, 1),
                 "device": r.get("device"),
@@ -380,6 +381,7 @@ def last_cardio_block_hr(block: dict[str, Any] | None) -> dict[str, Any] | None:
     r = max(rows, key=lambda x: (x.get("date") or "", x.get("start_utc") or ""))
     return {
         "date": r["date"],
+        "weekday": pacific_weekday(r["date"]),  # #5274: last_cardio_block_hr
         "modality": r["modality"],
         "avg_hr": r["avg_hr"],
         "max_hr": r.get("max_hr"),

@@ -46,7 +46,7 @@ from __future__ import annotations
 import math
 from typing import Any, Mapping, Optional
 
-from common.pacific_time import parse_day_key, shift_day_key
+from common.pacific_time import pacific_weekday, parse_day_key, shift_day_key
 
 from training import deload_word, training_charter, training_context_registry
 
@@ -173,7 +173,13 @@ def compute(
     """The ramp for `date`. `window` is `steps_resolver.steps_range(*window_days(date), fetch=...)`'s return."""
     floor, target = training_charter.charter_value("steps.floor"), training_charter.charter_value("steps.target")
     if not (floor and target):  # the charter did not load (fail-soft loader): state it, never ramp to an invented floor
-        return {"date": date, "state": "unknown", "reason": "the training charter did not load", "charter_version": None}
+        return {
+            "date": date,
+            "weekday": pacific_weekday(date),
+            "state": "unknown",
+            "reason": "the training charter did not load",
+            "charter_version": None,
+        }
     floor, target = int(floor), int(target)
     days = list(window.get("days") or [])
     base = baseline(days)
@@ -195,6 +201,7 @@ def compute(
     held_days = floor_held_days(days, floor)
     out: dict[str, Any] = {
         "date": date,
+        "weekday": pacific_weekday(date),  # #5274: the Pacific weekday, quoted — never derived by the model
         "window_days": len(days),
         "trailing_avg": avg,
         "days_counted": base["days_counted"],

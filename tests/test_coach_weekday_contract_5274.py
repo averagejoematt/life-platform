@@ -11,18 +11,34 @@ instant is SATURDAY — a weekday derived from the UTC timestamp would say "Sat"
 
 The expected weekdays are a hand-written calendar (`CALENDAR`), not the helper under test.
 
+#5274 residual (the 2026-10-24 live walk found 9 coach-read dates with no weekday): `_packet_residual` adds the
+session-sequence `not_credited[]` / `advanced_by`, `steps_ramp`, and the `today` de-dup `removed[]` paths, built
+from the full packet over the #4082 stubs and the real #4312 Flex row; `_plan_aerobic_residual` adds
+plan_next_session's `recent_aerobic.totals.standalone_walks.*.walks[]` and `last_cardio_block_hr`. And
+`test_no_date_in_the_full_packet_lacks_its_weekday` walks EVERY `date`/`day` field of a full fixture packet (and the
+recent_aerobic block), so the next new date path reds without anyone adding it to CONTRACT.
+
 Mutations run while writing this (each reds the named test, restored after):
   * drop `"weekday"` from `recent_aerobic._public_row`  -> the contract test (recent_aerobic.rows[]) and the
                                                           no-own-weekday test (the module no longer calls the helper)
   * `pacific_weekday` taking an instant's UTC date      -> the contract test (today.activities[].start), the late-
                                                           Friday test and the helper test
   * `WEEKDAY_ABBR` rotated by one                       -> the contract, late-Friday and helper tests
+  * drop `"weekday"` from `session_sequence._rec`       -> the contract test (both not_credited[] paths) and the
+                                                          full-packet walk
+  * drop it from `walking_volume.dedup_strava`'s removed -> the contract test (today.dedup / today.walking.dedup) and
+                                                          the full-packet walk
+  * drop it from `steps_ramp.compute`'s output          -> the contract test (steps_ramp) and the full-packet walk
 """
 
 from __future__ import annotations
 
+import datetime as _dt
 import os
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+import pytest
 
 os.environ.setdefault("S3_BUCKET", "test-bucket")
 os.environ.setdefault("USER_ID", "matthew")
@@ -30,10 +46,20 @@ os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
 from common.pacific_time import pacific_weekday  # noqa: E402
 
+from tests.test_coach_session_packet_4082 import stub_readers  # noqa: E402,F401 — the #4082 packet stubs, one home
+
 ROOT = Path(__file__).resolve().parents[1]
 
 # The calendar, written out by hand — the independent truth the helper is checked against.
 CALENDAR = {
+    "2026-09-19": "Sat",
+    "2026-09-20": "Sun",
+    "2026-09-21": "Mon",
+    "2026-09-22": "Tue",
+    "2026-09-23": "Wed",
+    "2026-09-24": "Thu",
+    "2026-09-25": "Fri",
+    "2026-09-26": "Sat",
     "2026-10-13": "Tue",
     "2026-10-14": "Wed",
     "2026-10-15": "Thu",
@@ -201,9 +227,89 @@ def _recent_aerobic(monkeypatch):
     return [("plan_next_session.constraint_block.recent_aerobic.rows[]", block["rows"], "date")]
 
 
-CONTRACT = [_get_workouts, _last_session_by_type, _today, _steps_7d, _nutrition_daily, _recent_aerobic]
+# ── #5274 residual: the paths the 2026-10-24 live walk found bare ─────────────────────────
+PACKET_TARGET = "2026-09-26"
 
 
+def _full_packet(monkeypatch) -> dict:
+    """The whole `get_coach_session_packet` over the #4082 stubs (`stub_readers` must be active), with the real
+    #4312 Hevy rows: the 09-24 Lower session (credited) and the real Flex session re-dated to 09-25 (refused —
+    an off-program complement), so `not_credited[]` and `advanced_by` both carry a date. `today` (09-25) holds the
+    #4311 WHOOP walks recorded inside a Hevy session, so both de-dup `removed[]` lists are non-empty."""
+    import training.routine_title as rt
+
+    from mcp import tools_coach_packet as pkt, tools_strength
+    from tests.test_session_sequence_4110 import FLEX_WID, INDEX_4312, _wire_4312
+
+    wire = _wire_4312()[0]
+    flex = next(r for r in wire if r["source_workout_id"] == FLEX_WID)
+    rows = [r for r in wire if r["date"] == "2026-09-24"] + [dict(flex, sk="DATE#2026-09-25#WORKOUT#" + FLEX_WID, date="2026-09-25")]
+    monkeypatch.setattr(tools_strength, "_read_hevy_all_phases", lambda s, e: ([r for r in rows if s <= r["date"] <= e], ["experiment"]))
+    monkeypatch.setattr(rt, "_load_routine_index", lambda start: INDEX_4312)
+    out = pkt.tool_get_coach_session_packet({"target_date": PACKET_TARGET})
+    assert out["not_measured"] == [], out["states"]
+    return out
+
+
+def _packet_residual(monkeypatch):
+    with monkeypatch.context() as m:
+        f = _full_packet(m)["fields"]
+    seq = f["last_session_by_type"]["value"]["session_sequence"]
+    nxt = f["block_position"]["value"]["next_session"]
+    today = f["today"]["value"]
+    return [
+        ("get_coach_session_packet.last_session_by_type.session_sequence.not_credited[]", seq["not_credited"], "date"),
+        ("get_coach_session_packet.block_position.next_session.not_credited[]", nxt["not_credited"], "date"),
+        ("get_coach_session_packet.block_position.next_session.advanced_by", [nxt["advanced_by"]], "date"),
+        ("get_coach_session_packet.steps_ramp", [f["steps_ramp"]["value"]], "date"),
+        ("get_coach_session_packet.today.dedup.removed[]", today["dedup"]["removed"], "date"),
+        ("get_coach_session_packet.today.walking.dedup.removed[]", today["walking"]["dedup"]["removed"], "date"),
+        ("get_coach_session_packet.morning_note", [f["morning_note"]["value"]], "date"),
+        (
+            "get_coach_session_packet.fitness_tests.trend.*.latest",
+            [c["latest"] for c in f["fitness_tests"]["value"]["trend"].values() if c.get("latest")],
+            "date",
+        ),
+    ]
+
+
+def _plan_aerobic_residual(monkeypatch):
+    from training import recent_aerobic
+
+    from mcp import shared_quantities
+
+    rows = {"strava": STRAVA_ROWS, "hevy": []}
+    block = shared_quantities.recent_aerobic_layer("2026-10-17", today="2026-10-20", read=lambda src, s, e: list(rows.get(src) or []))
+    walks = block["totals"]["standalone_walks"]["trailing_7d"]["walks"]
+    # last_cardio_block_hr is pure over the block's rows: one joined Hevy cardio row, as `_public_row` emits it.
+    hevy_row = {
+        "date": "2026-10-16",
+        "source": "hevy",
+        "modality": "treadmill",
+        "hr_state": "joined",
+        "avg_hr": 120.0,
+        "start_utc": LATE_FRI_START,
+    }
+    last = recent_aerobic.last_cardio_block_hr({"rows": [hevy_row]})
+    return [
+        ("plan_next_session.constraint_block.recent_aerobic.totals.standalone_walks.trailing_7d.walks[]", walks, "date"),
+        ("plan_next_session.recent_aerobic.last_cardio_block_hr", [last], "date"),
+    ]
+
+
+CONTRACT = [
+    _packet_residual,  # first: its stubs sit inside a monkeypatch.context and the later readers re-stub their own seams
+    _get_workouts,
+    _last_session_by_type,
+    _today,
+    _steps_7d,
+    _nutrition_daily,
+    _recent_aerobic,
+    _plan_aerobic_residual,
+]
+
+
+@pytest.mark.usefixtures("stub_readers")
 def test_every_contract_path_carries_the_pacific_weekday(monkeypatch):
     """Walk every enumerated response path; report EVERY offender (one gate, not one per path)."""
     offenders: list[str] = []
@@ -221,7 +327,70 @@ def test_every_contract_path_carries_the_pacific_weekday(monkeypatch):
                 elif r["weekday"] != CALENDAR[day]:
                     offenders.append(f"{path}: {day} says {r['weekday']!r}, the calendar says {CALENDAR[day]!r}")
     assert not offenders, "\n".join(offenders)
-    assert len(covered) == 8, covered
+    assert len(covered) == 18, covered
+
+
+# ── the generic walk: ANY date/day in the packet, named or not ───────────────────────────
+_PT = ZoneInfo("America/Los_Angeles")
+
+
+def _expected_weekday(value: str) -> str | None:
+    """The weekday the walker expects, from the stdlib calendar (never the helper under test): a day key's own
+    weekday; an instant's PACIFIC day. None = not a date."""
+    try:
+        if len(value) == 10:
+            return _dt.date.fromisoformat(value).strftime("%a")
+        inst = _dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return inst.astimezone(_PT).strftime("%a") if inst.tzinfo else inst.strftime("%a")
+
+
+def _date_fields(node, path: str, out: list[tuple[str, str, object]]) -> None:
+    if isinstance(node, dict):
+        for key in ("date", "day"):
+            v = node.get(key)
+            if isinstance(v, str) and _expected_weekday(v):
+                out.append((f"{path}.{key}", v, node.get("weekday")))
+        for k, v in node.items():
+            _date_fields(v, f"{path}.{k}", out)
+    elif isinstance(node, list):
+        for v in node:
+            _date_fields(v, f"{path}[]", out)
+
+
+# The paths the 2026-10-24 live walk found bare: the walk must still SEE each one, or the fixture drifted and the
+# generic gate went vacuous on exactly the class it exists for.
+RESIDUAL_PATHS = {
+    ".fields.last_session_by_type.value.session_sequence.not_credited[].date",
+    ".fields.block_position.value.next_session.not_credited[].date",
+    ".fields.block_position.value.next_session.advanced_by.date",
+    ".fields.steps_ramp.value.date",
+    ".fields.today.value.dedup.removed[].date",
+    ".fields.today.value.walking.dedup.removed[].date",
+}
+
+
+@pytest.mark.usefixtures("stub_readers")
+def test_no_date_in_the_full_packet_lacks_its_weekday(monkeypatch):
+    """Every `date`/`day` field anywhere in a full fixture packet (and plan_next_session's recent_aerobic block)
+    carries a `weekday` sibling equal to the stdlib calendar's. Mutation: drop `"weekday"` from any producer —
+    `session_sequence._rec`, `walking_volume.dedup_strava`'s removed rows, `steps_ramp.compute` — and this reds
+    naming the path, whether or not CONTRACT lists it."""
+    from mcp import shared_quantities
+
+    found: list[tuple[str, str, object]] = []
+    _date_fields(_full_packet(monkeypatch), "", found)
+    rows = {"strava": STRAVA_ROWS, "hevy": []}
+    block = shared_quantities.recent_aerobic_layer("2026-10-17", today="2026-10-20", read=lambda src, s, e: list(rows.get(src) or []))
+    _date_fields(block, "recent_aerobic", found)
+    missing = sorted(RESIDUAL_PATHS - {p for p, _, _ in found})
+    assert not missing, f"the fixture packet no longer exercises {missing} — re-seed it, never drop the path"
+    offenders = sorted(
+        {f"{p}: {v} has weekday {w!r}, the calendar says {_expected_weekday(v)!r}" for p, v, w in found if w != _expected_weekday(v)}
+    )
+    assert not offenders, "\n".join(offenders)
+    assert len(found) >= 20, found
 
 
 def test_the_late_evening_friday_is_friday_not_the_utc_saturday(monkeypatch):
@@ -253,6 +422,11 @@ def test_no_producer_spells_its_own_weekday():
         "mcp/coach_packet_today.py",
         "lambdas/training/steps_resolver.py",
         "lambdas/training/recent_aerobic.py",
+        "lambdas/training/session_sequence.py",
+        "lambdas/training/walking_volume.py",
+        "lambdas/training/steps_ramp.py",
+        "lambdas/training/fitness_tests.py",
+        "lambdas/coach/morning_note.py",
     ]
     offenders = []
     for rel in files:

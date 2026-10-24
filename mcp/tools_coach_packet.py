@@ -81,7 +81,7 @@ from typing import Any
 from common.pacific_time import pacific_today, pacific_weekday, shift_day_key
 from training.routine_title import ROUTINE_INDEX_LOOKBACK_DAYS as _ROUTINE_INDEX_LOOKBACK_DAYS
 
-PACKET_VERSION = "coach-session-packet@1.9.0"  # 1.9.0 #5274: a Pacific `weekday` beside every date; 1.8.0 #5078: fitness_tests; 1.7.0 #5061: calibration_cadence (tape / photos / DEXA due dates); 1.6.0 #5059: guidance_freshness (reference only); 1.5.0 #5082: steps_ramp; 1.4.0 #5081: steps_7d; 1.3.0 #4189: morning_note field; 1.2.0 #4313: today; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
+PACKET_VERSION = "coach-session-packet@1.10.0"  # 1.10.0 #5274: weekday on not_credited[] / advanced_by / steps_ramp / de-dup removed[] / morning_note / fitness latest; 1.9.0 #5274: a Pacific `weekday` beside every date; 1.8.0 #5078: fitness_tests; 1.7.0 #5061: calibration_cadence (tape / photos / DEXA due dates); 1.6.0 #5059: guidance_freshness (reference only); 1.5.0 #5082: steps_ramp; 1.4.0 #5081: steps_7d; 1.3.0 #4189: morning_note field; 1.2.0 #4313: today; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
 # Long enough that each performed type is found once a block is running (a v0.4 role recurs
 # weekly; an Engine day twice a week), bounded so the read stays one Hevy query.
 LAST_SESSION_LOOKBACK_DAYS = 28
