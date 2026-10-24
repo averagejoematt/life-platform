@@ -4257,6 +4257,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/lab_priorities.py",
+      "partition": "clinical",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/training/may_tracker.py",
@@ -8058,7 +8065,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 780,
+      "edges": 781,
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
@@ -8073,8 +8080,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 380,
-        "sites_resolved": 981,
-        "sites_total": 1361
+        "sites_resolved": 982,
+        "sites_total": 1362
       },
       "schedule_resolution": {
         "dynamic": 0,
