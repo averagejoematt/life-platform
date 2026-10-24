@@ -144,7 +144,7 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/intelligence/intelligence_common.py::build_coach_preamble": 182,
     "lambdas/operational/pipeline_health_check_lambda.py::lambda_handler": 154,
     "lambdas/training/plan_engine.py::_tripwire_states": 250,  # 253 -> 250 (#5074: the rate_ceiling row folded)
-    "lambdas/training/plan_engine.py::constraint_block": 217,  # 283 -> 276 (#5068) -> 242 (#5070: the reference block extracted, the deload recommendation added) -> 239 (#5088: the rate target extracted, the disruption block added; 241 once #5052/#5077/#5082 stacked) -> 228 (#5069 merge: the program-conflict honesty lines extracted) -> 217 (#5074 merge: the program-active + accessory-layer honesty lines extracted)
+    "lambdas/training/plan_engine.py::constraint_block": 213,  # 283 -> 276 (#5068) -> 242 (#5070: the reference block extracted, the deload recommendation added) -> 239 (#5088: the rate target extracted, the disruption block added; 241 once #5052/#5077/#5082 stacked) -> 228 (#5069 merge: the program-conflict honesty lines extracted) -> 217 (#5074 merge: the program-active + accessory-layer honesty lines extracted) -> 213 (#5146: the accessory-rotation call extracted, the event-signal input added)
     "lambdas/web/recap_card_lambda.py::render_for_date": 190,
     "lambdas/web/site_api_ai_lambda.py::_handle_board_followup": 181,
     "lambdas/web/site_api_body.py::vitals": 174,
