@@ -13,6 +13,12 @@ from ingestion import source_registry as reg  # noqa: E402
 _COACHES = ["sleep", "nutrition", "training", "mind", "physical", "glucose", "labs", "explorer"]
 
 
+def _pick(coach_ids, manual_signal, recent_items):
+    """(coach, reason) from the one selection function (#5127 retired the tuple wrapper)."""
+    d = cc.pick_asking_coach_detail(coach_ids, manual_signal, recent_items)
+    return d["coach"], d["reason"]
+
+
 def _fixture(monkeypatch, paused):
     dark = {
         "label": "Dark thing",
@@ -41,14 +47,14 @@ def _signal():
 def test_paused_dark_source_is_never_selected(monkeypatch):
     _fixture(monkeypatch, paused=True)
     assert "dark_src" not in reg.manual_capture_sources()
-    _, reason = cc.pick_asking_coach(_COACHES, _signal(), [])
+    _, reason = _pick(_COACHES, _signal(), [])
     assert "Dark thing" not in reason and "rotation" in reason
 
 
 def test_unpaused_dark_source_is_selected_again(monkeypatch):
     """Mutation control: un-pause and the guard lets it through."""
     _fixture(monkeypatch, paused=False)
-    _, reason = cc.pick_asking_coach(_COACHES, _signal(), [])
+    _, reason = _pick(_COACHES, _signal(), [])
     assert "Dark thing" in reason and "longest-dark" in reason
 
 

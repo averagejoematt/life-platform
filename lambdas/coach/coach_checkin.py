@@ -440,12 +440,6 @@ def pick_asking_coach_detail(coach_ids, manual_signal, recent_items) -> dict:
     return {"coach": coach, "reason": "rotation — least-recently-asked coach", "source": None}
 
 
-def pick_asking_coach(coach_ids, manual_signal, recent_items) -> tuple:
-    """(coach_id, reason) — the tuple view of `pick_asking_coach_detail`."""
-    d = pick_asking_coach_detail(coach_ids, manual_signal, recent_items)
-    return d["coach"], d["reason"]
-
-
 # ── question generation (Bedrock, ADR-062 chokepoint) ───────────────────────
 
 

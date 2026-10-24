@@ -167,7 +167,6 @@ def test_a_dark_channel_still_wins_for_a_coach_who_did_not_ask_last_and_names_it
     recent = [{"coach_id": "mind", "asked_at": ASKED}]
     pick = cc.pick_asking_coach_detail(_COACHES, _DARK, recent)
     assert pick == {"coach": "nutrition", "reason": "MacroFactor is the longest-dark manual channel (30d dark)", "source": "macrofactor"}
-    assert cc.pick_asking_coach(_COACHES, _DARK, recent) == (pick["coach"], pick["reason"])
 
 
 def test_a_generated_question_records_its_driving_source(monkeypatch):

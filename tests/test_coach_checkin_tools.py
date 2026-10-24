@@ -215,12 +215,18 @@ def test_count_arg_is_clamped(monkeypatch):
 _COACHES = ["sleep", "nutrition", "training", "mind", "physical", "glucose", "labs", "explorer"]
 
 
+def _pick(coach_ids, manual_signal, recent_items):
+    """(coach, reason) from the one selection function (#5127 retired the tuple wrapper)."""
+    d = cc.pick_asking_coach_detail(coach_ids, manual_signal, recent_items)
+    return d["coach"], d["reason"]
+
+
 def test_pick_coach_prefers_most_overdue_manual_channel():
     signal = [
         {"source": "notion", "label": "Notion", "days_since": 30, "stale_days": 14, "coach": "mind"},
         {"source": "macrofactor", "label": "MacroFactor", "days_since": 3, "stale_days": 2, "coach": "nutrition"},
     ]
-    coach, reason = cc.pick_asking_coach(_COACHES, signal, [])
+    coach, reason = _pick(_COACHES, signal, [])
     assert coach == "mind"  # 30/14 ≈ 2.1 beats 3/2 = 1.5
     assert "longest-dark" in reason and "Notion" in reason
 
@@ -230,7 +236,7 @@ def test_pick_coach_never_seen_channel_is_maximally_informative():
         {"source": "measurements", "label": "Measurements", "days_since": None, "stale_days": 60, "coach": "physical"},
         {"source": "notion", "label": "Notion", "days_since": 20, "stale_days": 14, "coach": "mind"},
     ]
-    coach, _ = cc.pick_asking_coach(_COACHES, signal, [])
+    coach, _ = _pick(_COACHES, signal, [])
     assert coach == "physical"
 
 
@@ -241,13 +247,13 @@ def test_pick_coach_rotation_fallback_is_least_recently_asked():
         {"coach_id": cid, "asked_at": f"2026-07-0{i + 1}T00:00:00Z"}
         for i, cid in enumerate(["sleep", "nutrition", "training", "mind", "physical", "glucose", "labs"])
     ]
-    coach, reason = cc.pick_asking_coach(_COACHES, signal, recent)
+    coach, reason = _pick(_COACHES, signal, recent)
     assert coach == "explorer"  # never asked → sorts first
     assert "rotation" in reason
 
 
 def test_pick_coach_rotation_ties_resolve_by_canonical_order():
-    coach, _ = cc.pick_asking_coach(_COACHES, [], [])
+    coach, _ = _pick(_COACHES, [], [])
     assert coach == "sleep"
 
 
