@@ -1716,28 +1716,31 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
     "dexa": {
         "label": "DEXA",
         "checker_label": "DEXA scan",
-        "desc": "Body-composition scans — a DXA scan roughly every 12 months, uploaded after each visit",
+        "desc": "Body-composition scans — a DXA scan about every 12 weeks, uploaded after each visit",
         "category": "Clinical",
         "behavioral": True,  # a scan happens when he books one; silence is never breakage
-        # no `instrument_for`: physical_coach reads body composition but is not darked by a 12-month scan cadence (#4217 is for sensors)
-        "cadence_months": 12,  # THE cadence — `stale_hours` is DERIVED from it (same rule as labs)
+        # no `instrument_for`: physical_coach reads body composition but is not darked by a quarterly scan cadence (#4217 is for sensors)
+        # #5061: 3 months = the charter's `calibration.dexa.every_weeks_approx` (12 weeks, owner rulings 2026-10-18) in this
+        # registry's 30-day months (84 d -> 3). It was 12 MONTHS, so /api/status said "next due Mar 2027" while the owner-only
+        # calibration prompt said overdue since June: two due dates for one scan. tests/test_calibration_cadence_5061.py holds the pair equal.
+        "cadence_months": 3,  # THE cadence — `stale_hours` is DERIVED from it (same rule as labs)
         "stale_hours": None,  # computed by _derive_cadence_stale_hours(); never typed here
-        # freshness: False for the same reason as labs — a ~8,700-hour healthy state would sit
+        # freshness: False for the same reason as labs — a ~2,200-hour healthy state would sit
         # permanently 🟡 under the checker's global 24h warning tier. The cadence is enforced
         # where an episodic cadence belongs: /api/status's due-date panel via due_months().
         "freshness": False,
         "active_api": False,
         "expected_days": None,  # episodic — a week with no scan is not a gap
         "qa_tier": None,
-        "method": "Manual upload of the scan report after each visit (~12-month cadence) via scripts/ingest_lab_report.py",
+        "method": "Manual upload of the scan report after each visit (~12-week cadence) via scripts/ingest_lab_report.py",
         "metrics": "Body composition (lean/fat mass, body fat %, visceral fat), bone density, segmental and limb detail",
         "posture": "load-bearing",  # the body-composition truth Withings trends against
         # #3571: manual-by-method, so the explicit answer is required rather than optional.
         "capture_channel": None,
         "capture_channel_reason": (
-            "2026-10-17: a scan upload is manual capture on a ~12-month cadence; the #746 channel set "
-            "('hae'|'notion'|'mcp') is an OWNER decision (the same open ruling as labs on issue 3571), and a "
-            "'you have not uploaded a scan' nudge would be noise at this cadence. Stated, not left as a missing key."
+            "2026-10-17: a scan upload is manual capture (about every 12 weeks since the 2026-10-18 charter, #5061); the #746 "
+            "channel set ('hae'|'notion'|'mcp') is an OWNER decision (the same open ruling as labs on issue 3571). The due-date "
+            "nudge is the owner-only calibration prompt (training.calibration_cadence), not a capture channel. Stated, not left as a missing key."
         ),
         "raw_layout": {
             "prefix": "raw/matthew/dexa",
@@ -1858,7 +1861,7 @@ RETIRED_SOURCES: dict[str, dict[str, Any]] = {
 # WHAT WRITES IT, because "I could not find a writer" is not evidence there isn't one.
 UNREGISTERED_PARTITIONS: dict[str, dict[str, str]] = {
     # "dexa" LEFT this dict in #4639 (2026-10-17): it is a SOURCE_REGISTRY source now, with
-    # `cadence_months: 12` and a writer (scripts/ingest_lab_report.py) — the #3669 residual.
+    # `cadence_months` (3 since #5061) and a writer (scripts/ingest_lab_report.py) — the #3669 residual.
     "genome": {
         "dated": "2026-09-17",
         "reason": (

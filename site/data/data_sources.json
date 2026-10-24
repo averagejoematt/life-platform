@@ -1,7 +1,7 @@
 {
   "_meta": {
     "generated_by": "scripts/v4_build_data_sources.py — from lambdas/source_registry.py (#498); never hand-edit",
-    "updated": "2026-10-23",
+    "updated": "2026-10-24",
     "count": 21
   },
   "sources": [
@@ -26,7 +26,7 @@
       "name": "DEXA",
       "category": "Clinical",
       "metrics": "Body composition (lean/fat mass, body fat %, visceral fat), bone density, segmental and limb detail",
-      "method": "Manual upload of the scan report after each visit (~12-month cadence) via scripts/ingest_lab_report.py",
+      "method": "Manual upload of the scan report after each visit (~12-week cadence) via scripts/ingest_lab_report.py",
       "posture": "load-bearing"
     },
     {

@@ -342,7 +342,7 @@ def test_the_write_is_wired_on_the_tool_that_owns_the_pain_flag_surface():
     from mcp.tools_descriptions import GET_EXERCISE_NOTES_INPUT
 
     action = GET_EXERCISE_NOTES_INPUT["properties"]["action"]
-    # #5070 adds the deload word; #5088 the disruption-mode switch; #5078 the fitness battery
+    # #5070 adds the deload word; #5088 the disruption-mode switch; #5104 the travel food kit read; #5078 the fitness battery
     assert set(action["enum"]) == {
         "read",
         "dismiss",
@@ -352,6 +352,7 @@ def test_the_write_is_wired_on_the_tool_that_owns_the_pain_flag_surface():
         "disruption",
         "disruption_end",
         "disruptions",
+        "travel_kit",
         "fitness_test",
         "fitness_tests",
     }
@@ -369,6 +370,7 @@ def test_the_write_is_wired_on_the_tool_that_owns_the_pain_flag_surface():
         "disruption",
         "disruption_end",
         "disruptions",
+        "travel_kit",
         "fitness_test",
         "fitness_tests",
     ]

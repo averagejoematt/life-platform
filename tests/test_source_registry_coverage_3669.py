@@ -401,13 +401,13 @@ class TestEveryLivePartitionIsDispositioned:
         """Named in the issue's own Set so the next pass does not rediscover them.
 
         #4639 (2026-10-17) paid the residual this test used to pin: dexa is a REGISTERED
-        source now (`cadence_months: 12`, writer `scripts/ingest_lab_report.py`), so its
+        source now (`cadence_months`, 3 since #5061, writer `scripts/ingest_lab_report.py`), so its
         disposition is the registry entry, not an exemption — and an exemption for a
         registered source would be the restatement the registry exists to end.
         """
         for key in ("dexa", "genome"):
             assert key in LIVE_SOURCES, f"{key} is not live — the disposition describes nothing"
-        assert "dexa" in reg.SOURCE_REGISTRY and reg.SOURCE_REGISTRY["dexa"]["cadence_months"] == 12
+        assert "dexa" in reg.SOURCE_REGISTRY and reg.SOURCE_REGISTRY["dexa"]["cadence_months"] == 3
         assert "dexa" not in reg.UNREGISTERED_PARTITIONS, "dexa is registered — an exemption beside the entry is a second description"
         assert reg.SOURCE_REGISTRY["dexa"]["raw_layout"]["prefix"] == "raw/matthew/dexa"
         assert "genome" in reg.UNREGISTERED_PARTITIONS, "genome is still undispositioned"

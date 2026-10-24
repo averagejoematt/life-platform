@@ -392,7 +392,7 @@ def test_json_input_is_the_stored_wire_shape(tmp_path, document):
 
 
 def test_both_sources_are_registered_with_the_facets_the_road_requires():
-    for source, months in (("labs", 6), ("dexa", 12)):
+    for source, months in (("labs", 6), ("dexa", 3)):  # dexa 3 since #5061 (the charter's ~12 weeks)
         row = SOURCE_REGISTRY[source]
         assert row["cadence_months"] == months and row["stale_hours"] == months * 30 * 24
         assert row["raw_layout"]["scheme"] == "date-folder" and "ingest_lab_report.py" in row["method"]

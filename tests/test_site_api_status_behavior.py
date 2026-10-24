@@ -1107,11 +1107,19 @@ def test_manual_relative_time_switches_from_days_to_months_at_thirty(monkeypatch
 
 def test_each_manual_source_is_graded_against_its_own_cadence(monkeypatch):
     """One shared age; the source due every N months and the one due every M
-    must not be graded the same."""
-    cadences = sorted({DUE_MONTHS.get(r["id"], 6) for r in DATA_ROWS if r["category"] == "manual"})
+    must not be graded the same.
+
+    Only rows that DECLARE a cadence and are not paused are graded on one (#5061: once dexa's 12 months became the
+    charter's ~12 weeks, the longest cadence tied at 6 and the first 6-month row was a paused or default-cadence one,
+    which renders its own story rather than a due date)."""
+
+    def graded(r):
+        return r["category"] == "manual" and r["id"] in DUE_MONTHS and not _paused(r["id"])
+
+    cadences = sorted({DUE_MONTHS[r["id"]] for r in DATA_ROWS if graded(r)})
     assert len(cadences) >= 2, "the manual sources no longer have distinct cadences"
-    short = pick_data_source(lambda r: r["category"] == "manual" and DUE_MONTHS.get(r["id"], 6) == cadences[0], "the shortest cadence")
-    long = pick_data_source(lambda r: r["category"] == "manual" and DUE_MONTHS.get(r["id"], 6) == cadences[-1], "the longest cadence")
+    short = pick_data_source(lambda r: graded(r) and DUE_MONTHS[r["id"]] == cadences[0], "the shortest cadence")
+    long = pick_data_source(lambda r: graded(r) and DUE_MONTHS[r["id"]] == cadences[-1], "the longest cadence")
     # An age between the two cadences: overdue for one, comfortably fine for the other.
     age = int(((cadences[0] + cadences[-1]) / 2) * 30)
     table = healthy_platform().clear(short["id"]).clear(long["id"]).add(short["id"], days_ago(age)).add(long["id"], days_ago(age)).build()

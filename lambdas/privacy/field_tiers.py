@@ -295,6 +295,11 @@ SOURCE_TIERS: dict[str, int] = {
     # whether/when a third party was told. Identity-free, but a disengagement record is a
     # behavioural fact about him. Declared before the first row exists (ADR-154 ordering).
     "named_human_contact": TIER_OWNER_ONLY,
+    # #5121: the relapse early-warning flag — which lapse signals are active together and since when. A sensitive
+    # mind state, so owner-only with no public projection; readers are the response owner's Telegram ping
+    # (coach.coach_event_triggers) and the mind coach's own thread (coach.coach_domain_facts). Declared before the
+    # first row exists (ADR-154's ordering).
+    "early_warning_flag": TIER_OWNER_ONLY,
     "progress_photos": TIER_OWNER_ONLY,  # body photos (S3 raw/matthew/progress_photos/ + the DDB index); no public projection, ever
     # #3759: the weekly coach-vision observation DERIVED from those photos — a sentence about
     # his body and a body-fat band that is an estimate, not a measurement. Takes the tier of
@@ -330,6 +335,7 @@ SOURCE_TIERS: dict[str, int] = {
     # #5123 (no carve-out, an owner-surface read): `health.mood_read.owner_read` reads stress/hunger/cravings (never the
     # word) as the mood read's fallback for the owner's Telegram mind thread only; the published coach brief is journal-only.
     # #5126 (no carve-out, the same owner thread): `_mind_pack` adds the last seven evenings' ratings (never the word).
+    # #5121 (no carve-out): `health.early_warning` reads row PRESENCE only for the owner-only early-warning flag.
     "evening_checkin": TIER_OWNER_ONLY,
     "checkin_intake_pairs": TIER_OWNER_ONLY,
     # #4078: chat writes queued for approval. A queued row carries the target write tool's exact

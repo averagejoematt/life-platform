@@ -444,6 +444,9 @@ NOT_APPLICABLE: Dict[str, str] = {
     "only by training.fitness_tests and printed from the charter by the protocol card (tests/test_fitness_tests_5078.py)",
     "phase_after_may.plan_prompt": "the post-deadline plan prompt's weeks (#5130): owner-only, read only by "
     "training.phase_after_may (tests/test_phase_after_may_5130.py); no swept file names them",
+    "early_warning": "the relapse early-warning thresholds (#5121): read only by health.early_warning, outside this guard's "
+    "swept set (the training consumers); every expected number in tests/test_relapse_early_warning_5121.py is read from the "
+    "charter, and the owner's own failure_mode prose in config/user_goals.json names no swept pattern's noun",
     "nutrition": "outside this guard's swept set (the training consumers): every nutrition number has ONE reader with its own "
     "contract test — calories: health.calorie_target (tests/test_calorie_target_one_resolver_5095.py, which also sweeps "
     "lambdas/ mcp/ deploy/ scripts/ for a new 1,500 kcal literal); eating_window: health.eating_window "
@@ -452,7 +455,8 @@ NOT_APPLICABLE: Dict[str, str] = {
     "health.expenditure_reconciler (tests/test_expenditure_reconciler_5097.py); titration: health.titration "
     "(tests/test_titration_engine_5096.py); training_day: tests/test_training_day_fuel_5101.py; labs: "
     "tests/test_lab_followup_5111.py; food_delivery: tests/test_food_delivery_upload_ritual_5006.py; maintenance_weeks + reverse_diet: "
-    "health.maintenance_week (tests/test_maintenance_week_5107.py); floors: "
+    "health.maintenance_week (tests/test_maintenance_week_5107.py); travel_food: health.travel_food "
+    "(tests/test_travel_food_kit_5104.py); floors: "
     "health.macro_floors (tests/test_macro_floors_5102.py) — the fibre floor alone is swept here (fibre_floor, #5204)",
 }
 
