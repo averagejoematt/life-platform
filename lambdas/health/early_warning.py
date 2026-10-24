@@ -282,7 +282,7 @@ def cadence_markers(cadence: Mapping[str, Any], as_of: date, s: Mapping[str, Any
     calls = {
         "weigh_in_cadence": lambda: weigh_in_cadence(set(cadence.get("weights") or {}), as_of, sig["weigh_in_cadence"], lb),
         "food_log_gap": lambda: food_log_gap(cadence.get("food_kcal") or {}, as_of, sig["food_log_gap"], lb, s.get("complete_log_kcal")),
-        "step_drop": lambda: step_drop(cadence.get("steps") or {}, as_of, sig["step_drop"]),
+        "step_drop": lambda: step_drop(cadence.get("resolved_steps") or {}, as_of, sig["step_drop"]),
         "checkin_silence": lambda: checkin_silence(set(cadence.get("checkin_days") or ()), as_of, sig["checkin_silence"], lb),
         "weight_reversal": lambda: weight_reversal(cadence.get("weights") or {}, as_of, sig["weight_reversal"]),
         "sessions_below_plan": lambda: sessions_below_plan(
@@ -379,7 +379,9 @@ def gather(fetch_range: Callable[[str, str, str], list], as_of: str, s: Mapping[
         from common import metric_truth  # noqa: PLC0415
 
         rows = {src: fetch_range(src, start, as_of) for src in metric_truth.steps_sources()}
-        out["steps"] = {d: r.value for d, r in metric_truth.resolve_by_date(metric_truth.STEPS, rows).items() if r.value is not None}
+        out["resolved_steps"] = {
+            d: r.value for d, r in metric_truth.resolve_by_date(metric_truth.STEPS, rows).items() if r.value is not None
+        }
 
     def checkins() -> None:
         rows = fetch_range("evening_checkin", start, as_of)

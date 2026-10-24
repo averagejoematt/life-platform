@@ -109,7 +109,7 @@ def _cadence(**over):
     base = {
         "weights": dict(LIVE_WEIGHTS),
         "food_kcal": dict(LIVE_KCAL),
-        "steps": dict(LIVE_STEPS),
+        "resolved_steps": dict(LIVE_STEPS),
         "checkin_days": list(LIVE_CHECKINS),
         "session_days": list(LIVE_SESSIONS),
         "plan_sessions": tc.charter_value("split.lifting_days_per_wk"),
@@ -194,9 +194,9 @@ def test_a_step_drop_against_his_own_baseline_fires_and_thin_data_is_absent():
     low = int(sum(base) / len(base) * (1 - drop)) - 1
     steps = dict(LIVE_STEPS)
     steps.update({_d(i): low for i in range(recent)})
-    assert "step_drop" in _fired(_cadence(steps=steps))
+    assert "step_drop" in _fired(_cadence(resolved_steps=steps))
     thin = {d: v for d, v in steps.items() if d < _d(recent - int(C("signals.step_drop.min_recent_n")) + 1)}
-    assert "step_drop" in ew.cadence_markers(_cadence(steps=thin), D, _s())[2]
+    assert "step_drop" in ew.cadence_markers(_cadence(resolved_steps=thin), D, _s())[2]
 
 
 # ── 4. check-in silence ──────────────────────────────────────────────────────────────────
@@ -285,7 +285,7 @@ def test_gather_reads_the_stored_shapes_and_drops_tombstones_and_workout_subrows
     cad = ew.gather(fetch, AS_OF, _s())
     assert cad["weights"]["2026-10-23"] == 298.42 and cad["food_kcal"]["2026-10-15"] == 873.0
     assert sorted(cad["session_days"]) == sorted(LIVE_SESSIONS), "a tombstoned workout is not a session"
-    assert cad["steps"]["2026-10-23"] == 2679, "a #WORKOUT# sub-row never answers for the day"
+    assert cad["resolved_steps"]["2026-10-23"] == 2679, "a #WORKOUT# sub-row never answers for the day"
     assert cad["checkin_days"] == [] and set(cad["_read"]) == set(ew.CADENCE_SIGNALS)
     assert {c[2] for c in calls} == {AS_OF} and all(c[1] <= _d(int(C("lookback_days")) - 1) for c in calls)
 
