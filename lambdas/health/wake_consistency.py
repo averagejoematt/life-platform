@@ -55,10 +55,9 @@ def _distance(a: float, b: float) -> float:
 
 
 def _day(v: str) -> Optional[_dt.date]:
-    try:
-        return _dt.date.fromisoformat(str(v)[:10])
-    except ValueError:
-        return None
+    from common.pacific_time import parse_day_key  # THE calendar-day parse (#3609); no clock is read
+
+    return parse_day_key(str(v)[:10])
 
 
 def grade_day(day: str, wakes: Mapping[str, Any], *, settings: Optional[Mapping[str, Any]] = None) -> dict[str, Any]:
