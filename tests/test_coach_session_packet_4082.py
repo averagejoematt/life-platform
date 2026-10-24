@@ -528,7 +528,7 @@ def test_morning_note_is_measured_with_the_four_words_the_day_and_the_pt_instant
     assert v["written_at_pt"].endswith("PT") and "written_at" not in v
     expected = {k: val for k, val in mn.coach_fact(dict(MORNING_NOTE_ROW)).items() if k != "state"}
     assert v == expected, "the packet must carry coach_fact's shape verbatim"
-    assert out["packet_version"] == "coach-session-packet@1.8.0"
+    assert out["packet_version"] == "coach-session-packet@1.9.0"
 
 
 def test_morning_note_no_row_is_absent_and_a_failed_read_is_read_failed(stub_readers, monkeypatch):
@@ -593,7 +593,7 @@ def test_today_lists_the_flex_session_and_the_garmin_walk_as_separate_items(stub
     assert flex["type"] == "full" and flex["start"]["pt"] == "Sep 26, 10:59 AM PT" and flex["moving_time_s"] == 3937
     assert flex["distance_mi"] is None and flex["avg_hr"] is None and flex["zones"] is None  # absence, not a default
     assert walk["id"] == "strava:20343117320" and walk["device"] == "Garmin epix (Gen2)" and walk["type"] == "Walk"
-    assert walk["start"] == {"utc": "2026-09-26T20:09:22Z", "pt": "Sep 26, 1:09 PM PT"}
+    assert walk["start"] == {"utc": "2026-09-26T20:09:22Z", "pt": "Sep 26, 1:09 PM PT", "weekday": "Sat"}
     assert (walk["moving_time_s"], walk["distance_mi"], walk["avg_hr"], walk["max_hr"]) == (6108, 5.16, 116.8, 171)
     assert walk["zones"]["zone2_s"] == 850 and "moving_time_s_counted" not in walk
     # the Hevy->Strava mirror and WHOOP's view of the session are named as duplicates, not dropped

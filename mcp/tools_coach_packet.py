@@ -61,6 +61,13 @@ import the counting / estimating primitives themselves):
                            no_appointment / unreadable, with the load prompt when stale. REFERENCE ONLY — never a
                            gate on intensity (owner ruling 7); the same read `plan_next_session` puts on its block.
 
+WEEKDAYS (#5274)
+
+Every date a coach reads here — the session rows (`by_session_role` / `by_archetype`), `today.day`
+and its activity instants, the `steps_7d` and nutrition daily rows — carries a Pacific `weekday`
+beside it from `common.pacific_time.pacific_weekday`, the one helper. The model quotes it; it never
+derives a weekday from an ISO date (a coach labelled Fri/Sun/Mon/Wed as Thu/Sat/Sun/Tue, 2026-10-23).
+
 READ STATES (#4072's vocabulary, `plan_engine.input_status`)
 
 Every field is `measured`, `absent` (read, and nothing there) or `read_failed` (the read broke —
@@ -71,10 +78,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from common.pacific_time import pacific_today, shift_day_key
+from common.pacific_time import pacific_today, pacific_weekday, shift_day_key
 from training.routine_title import ROUTINE_INDEX_LOOKBACK_DAYS as _ROUTINE_INDEX_LOOKBACK_DAYS
 
-PACKET_VERSION = "coach-session-packet@1.8.0"  # 1.8.0 #5078: fitness_tests; 1.7.0 #5061: calibration_cadence (tape / photos / DEXA due dates); 1.6.0 #5059: guidance_freshness (reference only); 1.5.0 #5082: steps_ramp; 1.4.0 #5081: steps_7d; 1.3.0 #4189: morning_note field; 1.2.0 #4313: today; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
+PACKET_VERSION = "coach-session-packet@1.9.0"  # 1.9.0 #5274: a Pacific `weekday` beside every date; 1.8.0 #5078: fitness_tests; 1.7.0 #5061: calibration_cadence (tape / photos / DEXA due dates); 1.6.0 #5059: guidance_freshness (reference only); 1.5.0 #5082: steps_ramp; 1.4.0 #5081: steps_7d; 1.3.0 #4189: morning_note field; 1.2.0 #4313: today; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
 # Long enough that each performed type is found once a block is running (a v0.4 role recurs
 # weekly; an Engine day twice a week), bounded so the read stays one Hevy query.
 LAST_SESSION_LOOKBACK_DAYS = 28
@@ -134,6 +141,7 @@ COACH_PACKET_DESCRIPTION = (
     "before he opened any number (#4189; quote them verbatim or not at all). Every field states `measured`, `absent` (read, nothing there) or `read_failed` (with the "
     "error class) — a failed read is never an empty week — and names the canonical function it came from; "
     "nothing here is a second computation of any number. Quote it rather than re-pulling a measured field. "
+    'Every date carries a Pacific `weekday` ("Fri") — quote it, never compute a weekday yourself (#5274). '
     "It is the planner's INPUTS, not its verdict: plan_next_session still builds the constraint block."
 )
 
@@ -195,6 +203,7 @@ def _session_row(item: dict[str, Any], archetype: str | None, role: str | None) 
     adh = item.get("adherence") if isinstance(item.get("adherence"), dict) else {}
     return {
         "date": str(item.get("date") or "")[:10],
+        "weekday": pacific_weekday(str(item.get("date") or "")[:10]),  # #5274: quote it, never derive it
         "title": item.get("title") or norm.get("workout_name"),
         "workout_uid": item.get("workout_uid"),
         "archetype": archetype,
@@ -320,7 +329,12 @@ def _nutrition(target_date: str) -> tuple[Any, dict[str, Any]]:
         "protein_days_measured": measured,
         "protein_floor_read": pstatus,
         "daily": [
-            {"date": r.get("date"), "calories_kcal": r.get("calories_kcal"), "protein_g": r.get("protein_g")}
+            {
+                "date": r.get("date"),
+                "weekday": pacific_weekday(r.get("date")),  # #5274
+                "calories_kcal": r.get("calories_kcal"),
+                "protein_g": r.get("protein_g"),
+            }
             for r in res["daily_breakdown"]
         ],
     }
@@ -629,7 +643,8 @@ def tool_get_coach_session_packet(args):
             "read broke (name the error, never read it as zero). Windows: volume and walking are COMPLETED days before "
             "target_date; nutrition is plan_next_session's protein window; `today` is the ONE day before target_date across "
             "Hevy AND Strava — review it in a night-before debrief, and read it as PARTIAL (a floor) while the day is in progress. "
-            "Planning a session is still "
+            "Every date here carries a Pacific `weekday` beside it (#5274) — quote it whenever you name a day of the week; "
+            "never derive a weekday from an ISO date or a UTC timestamp yourself. Planning a session is still "
             "plan_next_session (the constraint block + the red team) — this packet is its inputs, not its verdict."
         ),
         "_disclaimer": (

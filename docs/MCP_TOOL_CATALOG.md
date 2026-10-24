@@ -1,8 +1,8 @@
 # Life Platform — MCP Tool Catalog
 
-> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-10-23
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-10-24
 
-**Version:** v8.6.0 | **Last updated:** 2026-10-23 | **Total tools:** 89
+**Version:** v8.6.0 | **Last updated:** 2026-10-24 | **Total tools:** 89
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -132,7 +132,7 @@
 
 | Tool | Key Params | Description |
 |------|-----------|-------------|
-| `get_coach_session_packet` | target_date= | CALL FIRST in any training-coaching conversation (#4082). ONE read of the coaching input packet a chat otherwise spends 10+ calls re-verifying: working sets per muscle over the 7 and 28 completed days, the last session of each type (and each v0.4 session role — the order-based sequence) with every set and every note, MacroFactor kcal + protein over 7 days with the protein-floor count, weekly walking hours (THE one definition), daily steps over the 7 completed days (one named winning source per day, the losers kept, a no-source day null — never 0), the loss rate, the active-day and loaded-lifting streaks, readiness + the readiness-floor streak, the v0.4 sequence position (the next undone session, #4110), `today` (#4311) — every activity on the day BEFORE target_date (what a night-before debrief reviews) from Hevy AND Strava on every device (WHOOP, Garmin, Apple), de-duplicated in time, each with device, type, PT start, moving time, distance, avg/max HR and zones, plus walking hours so far and a flag on any walk over the HR ceiling; it is labelled PARTIAL while the day is in progress — and the owner's MORNING NOTE — his own four words before he opened any number (#4189; quote them verbatim or not at all). Every field states `measured`, `absent` (read, nothing there) or `read_failed` (with the error class) — a failed read is never an empty week — and names the canonical function it came from; nothing here is a second computation of any number. Quote it rather than re-pulling a measured field. It is the planner's INPUTS, not its verdict: plan_next_session still builds the constraint block. |
+| `get_coach_session_packet` | target_date= | CALL FIRST in any training-coaching conversation (#4082). ONE read of the coaching input packet a chat otherwise spends 10+ calls re-verifying: working sets per muscle over the 7 and 28 completed days, the last session of each type (and each v0.4 session role — the order-based sequence) with every set and every note, MacroFactor kcal + protein over 7 days with the protein-floor count, weekly walking hours (THE one definition), daily steps over the 7 completed days (one named winning source per day, the losers kept, a no-source day null — never 0), the loss rate, the active-day and loaded-lifting streaks, readiness + the readiness-floor streak, the v0.4 sequence position (the next undone session, #4110), `today` (#4311) — every activity on the day BEFORE target_date (what a night-before debrief reviews) from Hevy AND Strava on every device (WHOOP, Garmin, Apple), de-duplicated in time, each with device, type, PT start, moving time, distance, avg/max HR and zones, plus walking hours so far and a flag on any walk over the HR ceiling; it is labelled PARTIAL while the day is in progress — and the owner's MORNING NOTE — his own four words before he opened any number (#4189; quote them verbatim or not at all). Every field states `measured`, `absent` (read, nothing there) or `read_failed` (with the error class) — a failed read is never an empty week — and names the canonical function it came from; nothing here is a second computation of any number. Quote it rather than re-pulling a measured field. Every date carries a Pacific `weekday` ("Fri") — quote it, never compute a weekday yourself (#5274). It is the planner's INPUTS, not its verdict: plan_next_session still builds the constraint block. |
 
 ### Strength Training (`mcp/tools_strength.py`)
 
@@ -240,7 +240,7 @@
 
 | Tool | Key Params | Description |
 |------|-----------|-------------|
-| `get_workouts` | start_date=, end_date=, source=, limit= | List normalized workouts across all logging sources (Hevy + MacroFactor) in a date range. Returns per-workout records with title, duration, set count, total volume in kg, and source attribution. Use for: 'what workouts did I do this week?', 'show recent training', 'compare workouts across apps'. |
+| `get_workouts` | start_date=, end_date=, source=, limit= | List normalized workouts across all logging sources (Hevy + MacroFactor) in a date range. Returns per-workout records with title, duration, set count, total volume in kg, and source attribution; each row's `weekday` is its Pacific day of the week — quote it, never compute one (#5274). Use for: 'what workouts did I do this week?', 'show recent training', 'compare workouts across apps'. |
 | `get_workout_detail` | workout_uid | Return full per-set detail for one workout (exercises, weights, reps, RPE, notes). Looked up by workout_uid in the form '<source>:<source_workout_id>' (e.g. 'hevy:abc-123'). Use after get_workouts to drill into a specific session. |
 
 ### Hevy Routine Write-Loop (ADR-066/067/068/088) (`mcp/tools_hevy_routine.py`)

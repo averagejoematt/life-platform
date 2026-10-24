@@ -66,6 +66,12 @@ Every planning conversation runs in this order (`lambdas/training/coach_context.
   through a different tool. That is how two numbers for one quantity reached him.
 - `read_failed` is NOT zero and NOT empty: say which field could not be read and what that
   leaves unknown. `absent` means the window was read and holds nothing; say so.
+- **Weekdays come from the tools, never from you (#5274).** Every coach-facing date carries a
+  Pacific-time `weekday` beside it (`"weekday": "Fri"`): `get_workouts` rows, the packet's
+  session rows, `today`, the steps and nutrition daily rows, and `plan_next_session`'s
+  `recent_aerobic` rows (a `start` instant carries its own). Quote that value whenever you name
+  a day of the week. Never work one out from an ISO date or a UTC timestamp: a coach did, and
+  called Fri/Sun/Mon/Wed Thu/Sat/Sun/Tue.
 - A `coach_context` section marked `not_supplied` is a gap, said in words. Never fill it.
 - A session logged after the packet was read is not in it.
 
