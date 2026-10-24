@@ -142,12 +142,10 @@ def now_iso() -> str:
 
 
 def parse_iso(value) -> Optional[datetime]:
-    """An aware UTC datetime from a stored ISO stamp ('...Z' or '+00:00'); None when unreadable."""
-    try:
-        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    except (TypeError, ValueError):
-        return None
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    """An aware datetime from a stored ISO stamp; None when unreadable — THE parser (#1964/#3609)."""
+    from common.pacific_time import parse_iso_utc
+
+    return parse_iso_utc(value) if value else None
 
 
 # ── The Coach's Prescription follow-up hook (#1706, epic #1686) ───────────────

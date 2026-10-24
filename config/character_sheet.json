@@ -154,7 +154,7 @@
           "weight": 0.1,
           "owner_only_input": "evening_checkin",
           "in_pillar_score": false,
-          "description": "Reported stress from the evening check-in (0-4, inverted to 0-100; #5129). The input is owner-only with no public projection, so the score is recorded for the owner but held out of the published Mind score and never named as a driver until the owner rules otherwise."
+          "description": "Reported stress from the evening check-in, scored 0-100 (calmer is higher; #5129). The answers are private, so this score is kept out of the published Mind score and is never named as a driver."
         },
         "vice_control": {
           "weight": 0.1
