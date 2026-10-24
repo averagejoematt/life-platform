@@ -128,7 +128,8 @@ def shape_of(note: str | None) -> str:
 def week_kinds(sessions_by_machine: dict[str, list[dict[str, Any]]] | None, week_start: str, target_date: str) -> list[str]:
     """The menu kinds of this week's performed cardio blocks in [week_start, target_date), oldest first.
 
-    `sessions_by_machine` is movement_key -> its `cardio_index` entry (each `{date, note, ...}`)."""
+    `sessions_by_machine` is movement_key -> its `cardio_index` entry (each `{date, note, ...}`, plus `served_kind`
+    when `cardio_menu.annotate_served` matched the routine he performed — #5076: his empty-note rides)."""
     from training import cardio_menu
 
     rows: list[tuple[str, str]] = []
@@ -136,7 +137,7 @@ def week_kinds(sessions_by_machine: dict[str, list[dict[str, Any]]] | None, week
         for s in sessions or []:
             d = str(s.get("date") or "")[:10]
             if week_start <= d < target_date:
-                rows.append((d, cardio_menu.kind_of_performed(key, s.get("note"))))
+                rows.append((d, cardio_menu.kind_of_performed(key, s.get("note"), s.get("served_kind"))))
     rows.sort()
     return [k for _, k in rows]
 
@@ -330,10 +331,16 @@ def compose(
     # the owner's walking HR cap rides only an easy block, and never under the constraint's HR half
     cap = None if (constraint or kind in cardio_menu.HARD) else hr_ceiling_bpm
     first = line1(machine, int(minutes), kind, dose, cap)
+    from training import recent_aerobic
+
+    # #5076: a block off the default walk says why. A conditioning kind the menu never runs on the treadmill states
+    # that (its machines are the reason, not the feet); every other case keeps the seated/on-your-feet sentence.
+    off = cardio_menu.off_default(kind, movement_key, archetype, recent_aerobic.legs_loaded(aerobic_block)[0])
+    why = off["reason"] if off and off["charter"] and off["charter"].startswith("cardio_menu.blocks.") else ""
     parts = (
         recovery_answer(kind=kind, hold=hold, constraint=constraint, gate=gate, recovery_band=recovery_band),
         (dose.get("reason") or "").rstrip(".") + "." if dose.get("reason") else "",
-        why_sentence(movement_key, archetype, aerobic_block),
+        why or why_sentence(movement_key, archetype, aerobic_block),
     )
     second = " ".join(p[0].upper() + p[1:] for p in parts if p)
     note = first + ("\n" + second if second else "")
@@ -343,6 +350,8 @@ def compose(
         "kind": kind,
         "requested_kind": requested,
         "placement_why": placement_why,
+        # #5076: why this is not the default incline walk, and the charter key that makes it so (None = the default)
+        "off_default": off,
         "shape": KIND_SHAPE.get(kind, "flat"),
         "level": dose.get("level"),
         "hold_level": dose.get("hold_level"),
