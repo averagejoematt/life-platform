@@ -228,6 +228,38 @@ def day_in_words(date_str: str, weekday: bool = True) -> str:
     return (d.strftime("%A") + ", " if weekday else "") + d.strftime("%B") + " " + str(d.day)
 
 
+# Fixed English abbreviations, indexed by ``date.weekday()`` (Mon = 0). Not ``strftime("%a")``:
+# that is locale-dependent, and a model reads this string verbatim.
+WEEKDAY_ABBR = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+
+def pacific_weekday(value) -> str | None:
+    """The Pacific weekday ("Fri") of a day key or an ISO instant. THE weekday helper (#5274).
+
+    Why this exists: the coach-facing MCP tools returned ISO dates only, so the model worked
+    out the weekday itself — and on 2026-10-23 a coach labelled 16/18/19/21 October as
+    Thu/Sat/Sun/Tue (they were Fri/Sun/Mon/Wed). Every coach-facing date now carries this
+    value beside it (``"weekday": "Fri"``) and the prose says to quote it, never derive it.
+
+    Two inputs, one frame:
+
+    * a ``YYYY-MM-DD`` day key names a Pacific calendar day already (every DATE# key the
+      coach tools serve is Pacific-keyed), so its weekday is that day's — no zone arithmetic;
+    * an ISO INSTANT (has a ``T``) is converted to its Pacific date first
+      (``pacific_date_of``), so a 21:30 PT Friday session stamped ``...T04:30:00Z`` on the
+      Saturday UTC is still "Fri".
+
+    Returns None for anything unparseable (the module's caller-decides-the-fallback contract).
+    """
+    if value is None:
+        return None
+    s = str(value).strip()
+    if "T" in s:
+        s = pacific_date_of(s) or ""
+    d = parse_day_key(s[:10]) if len(s) >= 10 else None
+    return WEEKDAY_ABBR[d.weekday()] if d else None
+
+
 def pacific_day_n(start_date: str, on_date: str | None = None) -> int:
     """1-based day index of a cycle in the Pacific frame — Day 1 IS ``start_date``.
 

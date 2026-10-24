@@ -46,7 +46,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
-from common.pacific_time import pacific_clock_label, pacific_today, parse_iso_utc, shift_day_key
+from common.pacific_time import pacific_clock_label, pacific_today, pacific_weekday, parse_iso_utc, shift_day_key
 from training import walking_volume
 
 TODAY_VIEW_VERSION = "coach-packet-today@1.0.0"
@@ -68,7 +68,11 @@ def _instant(iso: Any) -> dict[str, Any] | None:
     dt = parse_iso_utc(iso)
     if dt is None:
         return None
-    return {"utc": dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "pt": pacific_clock_label(str(iso), with_day=True)}
+    return {
+        "utc": dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "pt": pacific_clock_label(str(iso), with_day=True),
+        "weekday": pacific_weekday(str(iso)),  # #5274: the PACIFIC weekday of the instant — a 21:30 PT Friday is "Fri", not Saturday UTC
+    }
 
 
 # ── the two partition reads ───────────────────────────────────────────────────────────
@@ -330,6 +334,7 @@ def today_view(
 
     value = {
         "day": day,
+        "weekday": pacific_weekday(day),  # #5274: quote it, never derive it
         "partial": partial,
         "label": "PARTIAL — the day in progress, so far" if partial else "the completed day",
         "read_at": _instant(datetime.now(timezone.utc).isoformat()),

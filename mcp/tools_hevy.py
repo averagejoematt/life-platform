@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from common.pacific_time import pacific_now, pacific_weekday  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from training.legacy_workouts import LEGACY_WORKOUTS_PARTITION, day_workouts  # #4636: the ONE retired-shape reader
 
 from mcp.core import query_source_range
@@ -113,6 +113,7 @@ def _expand_legacy_aggregate(item: dict, source_label: str) -> list[dict]:
                 "source": source_label,
                 "source_workout_id": wid.split(":", 1)[-1],  # synthetic but stable
                 "date": date_str,
+                "weekday": pacific_weekday(date_str),  # #5274: the Pacific weekday, quoted — never derived by the model
                 "title": title,
                 "start_time": start_time,
                 "end_time": end_time,
@@ -135,6 +136,7 @@ def _slim_workout(item: dict, include_sets: bool = False) -> dict:
         "source": item.get("source"),
         "source_workout_id": item.get("source_workout_id"),
         "date": item.get("date"),
+        "weekday": pacific_weekday(item.get("date")),  # #5274: the Pacific weekday, quoted — never derived by the model
         "title": item.get("title"),
         "start_time": item.get("start_time"),
         "end_time": item.get("end_time"),
