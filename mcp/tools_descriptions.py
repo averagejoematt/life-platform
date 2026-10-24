@@ -67,7 +67,10 @@ GET_EXERCISE_NOTES_DESCRIPTION = (
     "start_date/days/sets_pct) — the ONLY way a deload ever applies; action='deloads' lists them. "
     "action='disruption' (#5088, OWNER-ONLY): record his word that disruption mode is ON (words VERBATIM, "
     "template travel|busy, until, optional start_date) — habits held instead of targets, the short session "
-    "served; action='disruption_end' switches it OFF (step back up); action='disruptions' lists them."
+    "served; action='disruption_end' switches it OFF (step back up); action='disruptions' lists them. "
+    "action='fitness_test' (#5078, OWNER-ONLY): record fitness-battery results — results {test: value} "
+    "(six_minute_walk m, bike_20min_rpe6 m, dead_hang s, assisted_pull_up lb of assistance), optional notes and "
+    "date; action='fitness_tests' lists the batteries, each test's trend and whether the battery is due."
 )
 
 # ── the inputSchema that lives beside its description (the #3692 ceiling) ────────────
@@ -83,13 +86,26 @@ GET_EXERCISE_NOTES_INPUT = {
     "properties": {
         "action": {
             "type": "string",
-            "enum": ["read", "dismiss", "dismissals", "deload", "deloads", "disruption", "disruption_end", "disruptions"],
+            "enum": [
+                "read",
+                "dismiss",
+                "dismissals",
+                "deload",
+                "deloads",
+                "disruption",
+                "disruption_end",
+                "disruptions",
+                "fitness_test",
+                "fitness_tests",
+            ],
             "description": (
                 "read (default) = the note timeline. dismiss = record HIS dismissal of a pain flag on this "
                 "movement (#4036, OWNER-ONLY WRITE). dismissals = list every dismissal on the record. "
                 "deload = record HIS word that a deload starts (#5070, OWNER-ONLY WRITE; `words` verbatim, optional "
                 "`start_date`, `days`, `sets_pct`). deloads = list them. disruption / disruption_end = HIS switch for "
-                "disruption mode (#5088, OWNER-ONLY WRITE; `words` verbatim, `template`, `until` / `ended_on`). disruptions = list."
+                "disruption mode (#5088, OWNER-ONLY WRITE; `words` verbatim, `template`, `until` / `ended_on`). disruptions = list. "
+                "fitness_test = record fitness-battery results (#5078, OWNER-ONLY WRITE; `results`, optional `notes`, `date`). "
+                "fitness_tests = the batteries, trend and due state."
             ),
         },
         "exercise": {
@@ -124,6 +140,15 @@ GET_EXERCISE_NOTES_INPUT = {
         "template": {"type": "string", "enum": ["travel", "busy"], "description": "action='disruption': travel or busy."},
         "until": {"type": "string", "description": "action='disruption': YYYY-MM-DD, the last day the mode covers. Required."},
         "ended_on": {"type": "string", "description": "action='disruption_end': YYYY-MM-DD, the first day back. Defaults to today."},
+        "results": {
+            "type": "object",
+            "description": (
+                "action='fitness_test': {test: value} — six_minute_walk (m), bike_20min_rpe6 (m), dead_hang (s), "
+                "assisted_pull_up (lb of assistance; lower is better). Any subset; a second call on the same date merges."
+            ),
+        },
+        "notes": {"type": "object", "description": "action='fitness_test': {test: note} — e.g. which bike, the grip."},
+        "date": {"type": "string", "description": "action='fitness_test': YYYY-MM-DD of the battery. Defaults to today (Pacific)."},
     },
     "required": [],
 }
@@ -298,15 +323,41 @@ LOG_EVENING_INTAKE_DESCRIPTION = (
     "PRIVATE (#1405): log this evening's drinks count (0-4; 4 = four or more) "
     "to the Matthew-private intake ledger. One tap, no free text. Idempotent: "
     "re-logging the same evening updates it (returns previous_count), never double-counts. "
-    "Use for: 'log 2 drinks tonight', 'zero drinks yesterday' (pass date)."
+    "Use for: 'log 2 drinks tonight', 'zero drinks yesterday' (pass date). "
+    "Also the 20-second evening check-in (#5106): hunger, stress, cravings (0-4 each) and one word, "
+    "to the private evening_checkin ledger (count is then optional; same idempotent overwrite). "
+    "Use for: 'check-in: hunger 2 stress 3 cravings 1, tired'."
 )
+
+# #5106: the input table rides beside its description (the #3759 extraction shape) so mcp/registry.py, at its size
+# ceiling, pays for the evening check-in fields instead of growing; the writer is coach.evening_checkin.
+LOG_EVENING_INTAKE_INPUT = {
+    "type": "object",
+    "properties": {
+        "count": {
+            "type": "integer",
+            "description": "Evening drinks count, 0-4 (4 = four or more). Optional when a check-in field is given.",
+        },
+        "hunger": {"type": "integer", "description": "#5106 evening check-in: hunger 0-4."},
+        "stress": {"type": "integer", "description": "#5106 evening check-in: stress 0-4."},
+        "cravings": {"type": "integer", "description": "#5106 evening check-in: cravings 0-4."},
+        "word": {"type": "string", "description": "#5106 evening check-in: one word for the day."},
+        "date": {
+            "type": "string",
+            "description": "YYYY-MM-DD (default: tonight, the Pacific calendar day; check-in fields given before 04:00 PT file to the previous evening).",
+        },
+    },
+    "required": [],
+}
 
 GET_INTAKE_RESPONSE_DESCRIPTION = (
     "PRIVATE (#1405): the intake→next-morning dose-response read. Lagged pairs "
     "vs HRV / recovery / REM with effective-n correction (Pyper-Peterman), p on "
     "n_eff, zero-vs-nonzero block-bootstrap CI, and dose bins (0/1/2+) once 15 "
     "nonzero evenings exist. Reports arming progress below the floors (ADR-105). "
-    "Use for: 'what do drinks do to my HRV?', 'intake dose-response so far'."
+    "Use for: 'what do drinks do to my HRV?', 'intake dose-response so far'. "
+    "Also carries `checkin_intake`: the newest weekly read of the evening check-in against intake "
+    "(stress/hunger/cravings/mood vs calories over target, protein, late eating; ADR-105 verdicts) (#5106)."
 )
 
 GET_INSIGHTS_DESCRIPTION = (

@@ -940,6 +940,28 @@ where an operator will be standing when they hit them.
    ```json iam-additive-gate-baseline``` block in the ADR-065 amendment
    (`tests/test_iam_additive_gate_guards_2834.py`) — a widening lands where the owner reads.
 
+   **The PR-time check (#5221):** `.github/workflows/iam-gate-pr.yml`, check `IAM additive
+   gate (PR delta vs base synth)`, runs on any PR into main touching `cdk/**`,
+   `config/schedules.json`, `ci/lambda_map.json`, `scripts/budget_ceilings.py` or the gate
+   itself. `deploy/check_iam_additive_pr.py` synthesizes the PR and the base tip (`git
+   archive`) and runs this same gate with the base synth as `--deployed-dir` — the PR's own
+   delta, no AWS, so no OIDC trust change is needed and a fork/Dependabot PR is covered too.
+   It is RED on OWNER-REQUIRED, every stack + statement named as `::error`; an INTENDED
+   owner change (a held owner PR) carries the label `owner-required-ack`, which prints the
+   same lines as `::warning` and passes. A synth or gate breakage is red whatever the label
+   says. What it cannot see: drift between main and what is deployed (main's Plan still
+   reports that), and a template moved only by a `lambdas/` import (not in the filter).
+
+   **Until that check's first live verdict on a PR, also run the gate BEFORE merging any PR
+   that touches `cdk/` or `config/schedules.json`** (2026-10-20 incident): before #5221, PR
+   checks did not include Plan, so an OWNER-REQUIRED change was invisible until it had
+   already stranded main. From a checkout of the PR head:
+   `cd cdk && npx cdk synth -q && cd .. && python3 deploy/iam_additive_gate.py --synth-dir cdk/cdk.out --live`
+   (read-only). Any stack reading `OWNER-REQUIRED` moves out of the PR into an owner PR
+   applied with `cdk_deploy.sh`. Remember the IMPLICIT resource policies: an EventBridge
+   rule (or SNS subscription, S3 notification) that TARGETS a Lambda creates an
+   `AWS::Lambda::Permission` — a new schedule row is owner-required CDK, not a config edit.
+
 3. **Phantom deploy wedge — the #2052 shape.** The run's `Deploy` job is blocked in the
    `ci-cd-deploy-<ref>` concurrency group by an entry that corresponds to **no real
    run**. Since #2009 moved that group from the workflow onto the `deploy` job, this no

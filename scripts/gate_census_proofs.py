@@ -3661,3 +3661,143 @@ GUARD_PROOFS["guard::scripts/check_synced_skill_drift.py"] = {
     ),
     "proved_on": "2026-10-19",
 }
+
+STRUCTURAL_HAND_PROOFS["structural::test_block_retro_5079.py"] = {
+    "gate_name": "test_block_retro_5079.py",
+    "command": "python3 -m pytest tests/test_block_retro_5079.py -q -p no:cacheprovider   # baseline 13 passed",
+    "mutation": (
+        "two plants, ONE AT A TIME: M1 append `from training import block_retro  # noqa` to lambdas/web/site_api_vitals.py "
+        "(a published module reaches the owner-only retro); M2 create lambdas/emails/_m5079/x.py holding `# block_retro` "
+        "(a NESTED email module names it — the os.walk depth)."
+    ),
+    "observed": (
+        "M1 1 failed / 12 passed (test_no_published_surface_imports_the_retro names site_api_vitals.py). M2 1 failed / 12 passed "
+        "(the same test names lambdas/emails/_m5079/x.py). Restored 13 passed (re-run 2026-10-19 after the review fix round); site_api_vitals.py md5 9ce13aa40d614bc569fd9c3e23046dec "
+        "before and after."
+    ),
+    "scope": (
+        "The sweep is a TEXT match for `block_retro` over every .py under lambdas/web/ and lambdas/emails/ (os.walk, nested "
+        "packages included). The rest of the file is contract tests of lambdas/training/block_retro.py on a fixture block "
+        "(reproducibility, the combine rule, movers, fixes, the prediction graders, the RETRO# row, the skill's wiring) — "
+        "contracts, not mutation-proved gates."
+    ),
+    "proved_on": "2026-10-19",
+}
+
+
+# #5221 (2026-10-20): the additive-IAM gate at PR time — the PR's synth against the base tip's synth, no AWS.
+# Proved on the lane, each plant restored from a byte copy (md5 checked).
+GUARD_PROOFS["guard::deploy/check_iam_additive_pr.py"] = {
+    "gate_name": "deploy/check_iam_additive_pr.py",
+    "command": "python3 -m pytest tests/test_iam_gate_pr_5221.py -q -p no:cacheprovider   # baseline 12 passed",
+    "mutation": (
+        "three plants in deploy/check_iam_additive_pr.py, ONE AT A TIME: M1 decide()'s unacknowledged OWNER-REQUIRED branch "
+        "`return 1, lines` -> `return 0, lines` (the finding prints but the exit says clean); M2 `if ack:` -> `if True:` (every "
+        "finding reads as acknowledged); M3 findings() `!= OWNER` -> `== OWNER` (the owner-required stacks are the ones skipped). "
+        "md5 2d94abbfcf8977d571dad78d861f88be before and after each restore."
+    ),
+    "observed": (
+        "2026-10-20. M1 3 failed / 9 passed (the EventBridge-rule negative control, the new-stack fail-closed case, decide()). "
+        "M2 3 failed / 9 passed (the same three). M3 3 failed / 9 passed (the negative control, the ack warning naming the "
+        "statement, the new-stack case). RESTORED 12 passed."
+    ),
+    "scope": (
+        "Proves the driver carries the gate's OWNER-REQUIRED verdict to its exit code, names stack + statement, and lets the "
+        "`owner-required-ack` label downgrade only an evaluated finding. The `cdk synth` + `git archive` legs are proved by the "
+        "CI step's proof below (a real synth), not by this unit file."
+    ),
+    "proved_on": "2026-10-20",
+}
+CI_PROOFS["ci::iam-gate-pr.yml::gate::3"] = {
+    "gate_name": "gate / IAM additive gate on the PR delta (red on OWNER-REQUIRED unless labelled owner-required-ack)",
+    "command": 'BASE_SHA=$(git rev-parse HEAD) IAM_GATE_ACK=false bash -eo pipefail -c "$(the step\'s run: text read from .github/workflows/iam-gate-pr.yml)"   # baseline exit 0',  # noqa: E501
+    "mutation": (
+        "The step's REAL `run:` text (read from the workflow YAML, unpiped) under `bash -eo pipefail`, with real `cdk synth` of "
+        "both sides. Plant: the incident itself — `git show 4a39ffc57 -- cdk/stacks/serve_stack.py config/schedules.json | git "
+        "apply -R` puts PR #5217's evening check-in rule back in the working tree, so head = rule + its implicit "
+        "Lambda::Permission and base = HEAD without it. Restored with `git checkout --` (md5 serve_stack.py "
+        "e6b57a4f19f5690f331dbfef1950959f, schedules.json f1ce2eff80ca1b9abab0801b7733c192 before and after)."
+    ),
+    "observed": (
+        "2026-10-20. Planted: step exit 1, `::error title=IAM gate OWNER-REQUIRED: LifePlatformServe::new-iam-resource "
+        "TelegramEveningCheckinAllowEventRuleLifePlatformServeTelegramCoachWorker18474C2793320252: AWS::Lambda::Permission` — the "
+        "line main's Plan printed with --live at 04:05Z. Planted with IAM_GATE_ACK=true: exit 0 (warning). RESTORED: exit 0."
+    ),
+    "scope": (
+        "Proves the step reds on the incident shape with no AWS and that the label path is the only soft one. It does not prove "
+        "the GitHub `paths:` filter fires — tests/test_iam_gate_pr_5221.py checks it through deploy/workflow_path_checks.py's "
+        "derivation — and its first live run on a PR is the issue's live proof."
+    ),
+    "proved_on": "2026-10-20",
+}
+
+STRUCTURAL_HAND_PROOFS["structural::test_habit_tier_set_guard_5232.py"] = {
+    "gate_name": "test_habit_tier_set_guard_5232.py",
+    "command": "python3 -m pytest tests/test_habit_tier_set_guard_5232.py -q   # baseline 2 passed",
+    "mutation": (
+        'lambdas/ai/ai_context.py `habit_tier(meta) > 1` reverted to the shipped raw `meta.get("tier", 2) > 1` '
+        "(the literal pre-#5232 compare on a registry meta); sed -i '' with the file diffed before the verdict was read."
+    ),
+    "observed": (
+        "MUTATED: test_no_raw_registry_tier_compare_in_lambdas failed (names the reverted ai_context.py line) alongside "
+        "test_outcome_context_and_streaks_read_string_tiers; the mutation was removed with git checkout and the guard "
+        "returned to 2 passed. Watched 2026-10-20."
+    ),
+    "scope": (
+        'An AST sweep of lambdas/ and mcp/ for a `.get("tier")` / `["tier"]` read compared with a numeric literal or an '
+        "ordering operator. Does NOT see a registry tier copied into a local variable first and compared later, nor a "
+        "compare spelled through a helper other than habit_tier; character/budget/evidence tiers are string- or int()-wrapped "
+        "and never match."
+    ),
+    "proved_on": "2026-10-20",
+}
+# ── #4588 (2026-10-18): the cut-over's "every existing URL still resolves" gate ─────────────
+# `tests/test_v4_redirects_function.py` became a structural gate when the cut-over rehearsal
+# added `test_every_existing_url_still_resolves_4588` (an os.walk of site/). The mutations are
+# the cut-over's own failure modes, each planted in the real tracked files and reverted.
+GUARD_PROOFS["structural::test_v4_redirects_function.py"] = {
+    "gate_name": "test_v4_redirects_function.py",
+    "command": "python3 -m pytest tests/test_v4_redirects_function.py::test_every_existing_url_still_resolves_4588 -q   # baseline 1 passed",
+    "mutation": (
+        "M1: the `/start/` -> `/` 301 put back into deploy/generated/v4_redirects_function.js (the edge left "
+        "unpublished after the cut-over). M2: site/coaches/index.html moved away (a cut-over page missing). "
+        "M3: site/story/about/index.html deleted (an existing page dropped)."
+    ),
+    "observed": (
+        "M1 1 failed: `pages under site/ that a 301 shadows at the edge: ['/start/']`. M2 1 failed: `URLs that no "
+        "longer resolve to a file under site/: ['/coaches/']`. M3 1 failed: `URLs that no longer resolve to a file "
+        "under site/: ['/about/', '/dispatches/about/', '/mission/', '/story/about/']`. REVERTED: 1 passed. "
+        "Watched 2026-10-18 in the #4588 lane, re-run on the rebuilt rehearsal; re-run 2026-10-23 on the refresh onto ea6f23cb4."
+    ),
+    "scope": (
+        "Offline only: a URL resolves when the edge function's hops end on a file under site/. The URL set is "
+        "the site/ pages, the committed sitemap and every redirect source, so a page that is in none of those "
+        "and is deleted is not seen (it leaves the set with its file). Says nothing about the live edge — the "
+        "published CloudFront function can lag deploy/generated/ until the owner publishes it — nor about the "
+        "generated-content origin (/journal/posts/week-*), which KNOWN_UNRESOLVED_4588 names."
+    ),
+    "proved_on": "2026-10-23",
+}
+
+STRUCTURAL_HAND_PROOFS["structural::test_journal_silence_public_surfaces_5131.py"] = {
+    "gate_name": "test_journal_silence_public_surfaces_5131.py",
+    "command": "python3 -m pytest tests/test_journal_silence_public_surfaces_5131.py -q   # baseline 9 passed",
+    "mutation": (
+        "Three, each applied by a scratch script and restored before the next: (a) lambdas/web/site_api_lambda.py's "
+        "`return guard_api_response(result, logger)` reverted to `return result`; (b) the public_body() wrap removed from "
+        "lambdas/compute/coach_memoir_lambda.py's put_object Body; (c) a new lambdas/web/planted_5131_probe.py writing "
+        "`generated/planted.json` with put_object, then deleted."
+    ),
+    "observed": (
+        "MUTATED: (a) test_every_site_api_route_serves_no_journal_silence failed naming 140 routes; (b) "
+        "test_every_derived_surface_is_classified failed 'compute/coach_memoir_lambda.py is GUARDED but never calls'; (c) the "
+        "same test failed 'NEW public writer web/planted_5131_probe.py is unclassified'. Restored: 9 passed. Watched 2026-10-23."
+    ),
+    "scope": (
+        "Derives the reader-facing writer set by AST: Function-URL Lambdas in cdk/stacks, lambdas/ modules with an S3 write "
+        "call plus a `generated/...` constant, and lambdas/ modules calling an SES send. Does NOT see a generated/ writer "
+        "whose key is built only from a constant imported from another module, an S3 write through a non-boto helper, or a "
+        "guarded module that calls the guard on one write and not another (the check is per module)."
+    ),
+    "proved_on": "2026-10-23",
+}

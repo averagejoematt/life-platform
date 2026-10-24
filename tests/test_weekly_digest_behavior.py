@@ -842,7 +842,9 @@ class TestExMacrofactor:
         # calories (1500 + 2200)/2 = 1850.0 ; protein (200 + 100)/2 = 150.0
         assert out["calories_avg"] == 1850.0
         assert out["protein_avg_g"] == 150.0
-        # calorie hit = c <= 1800 × 1.10 = 1980 → 1500 yes, 2200 no → 1/2 = 50%
+        # calorie hit = c <= the ONE target (#5095; ~1,500 since charter 1.21.0, owner ruling 2026-10-23 R1) × 1.10 = 1650
+        # → 1500 yes, 2200 no → 1/2 = 50%
+        assert out["calorie_target"] == 1500
         assert out["calorie_hit_rate"] == 50
         # protein hit = p >= 190 → 200 yes, 100 no → 1/2 = 50%
         assert out["protein_hit_rate"] == 50
@@ -2594,3 +2596,16 @@ class TestRecordEmailSend:
         wd.record_email_send(table, "weekly_digest", "week:2026-W34")
         row = table.puts[0]
         assert row["ttl"] == int(datetime.fromisoformat(row["sent_at"]).timestamp()) + 90 * 86400
+
+
+import pytest as _pytest_5108  # noqa: E402
+
+
+@_pytest_5108.fixture(autouse=True)
+def _food_delivery_unpaused_5108(monkeypatch):
+    """#5108: the real registry now PAUSES food_delivery (reader returns None). These tests
+    exercise the LIVE-source behaviour, so they un-pause it; the paused contract is pinned in
+    tests/test_food_delivery_paused_5108.py."""
+    from ingestion.source_registry import SOURCE_REGISTRY
+
+    monkeypatch.setitem(SOURCE_REGISTRY, "food_delivery", {**SOURCE_REGISTRY["food_delivery"], "paused": False})

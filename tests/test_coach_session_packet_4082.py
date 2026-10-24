@@ -131,6 +131,28 @@ def stub_readers(monkeypatch):
     from health import guidance_freshness as gf
 
     monkeypatch.setattr(tools_plan, "_guidance_freshness", lambda: gf.freshness({"effective": "2026-09-01"}, [], "2026-09-26"))
+    # #5061: the calibration cadence reads three partitions through `calibration_cadence.read`; stub it to dates held in the test.
+    from training import calibration_cadence as cc
+
+    monkeypatch.setattr(
+        cc,
+        "read",
+        lambda table, today: cc.compute(today, {"tape": lambda: ["2026-09-20"], "photos": lambda: ["2026-09-20"], "dexa": lambda: []}),
+    )
+    # #5078: the fitness battery reads its BATTERY# record through its own seam; stub one stored battery.
+    from mcp import tools_fitness_tests
+
+    monkeypatch.setattr(tools_fitness_tests, "_records", lambda: [FITNESS_BATTERY_ROW])
+
+
+# #5078: one battery as the store's reader returns it (decimals_to_float of the BATTERY# item).
+FITNESS_BATTERY_ROW = {
+    "pk": "USER#matthew#SOURCE#fitness_tests",
+    "sk": "BATTERY#2026-09-20",
+    "date": "2026-09-20",
+    "tests": {"dead_hang": {"value": 40.0, "unit": "s", "protocol_version": "1", "source": "explicit"}},
+    "protocol_version": "1",
+}
 
 
 # #5081: field-projected live rows (DATE#2026-10-14, read 2026-10-18) placed on a packet-window day.
@@ -506,7 +528,7 @@ def test_morning_note_is_measured_with_the_four_words_the_day_and_the_pt_instant
     assert v["written_at_pt"].endswith("PT") and "written_at" not in v
     expected = {k: val for k, val in mn.coach_fact(dict(MORNING_NOTE_ROW)).items() if k != "state"}
     assert v == expected, "the packet must carry coach_fact's shape verbatim"
-    assert out["packet_version"] == "coach-session-packet@1.6.0"
+    assert out["packet_version"] == "coach-session-packet@1.8.0"
 
 
 def test_morning_note_no_row_is_absent_and_a_failed_read_is_read_failed(stub_readers, monkeypatch):

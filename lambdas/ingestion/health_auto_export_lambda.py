@@ -148,6 +148,7 @@ except ImportError:
 from ingestion import (
     health_auto_export_additive as _additive,  # #4628: the archived day sum
     health_auto_export_archive as _archive,
+    health_auto_export_protein as _protein,  # #5187: the same-day protein feed for the breakfast nudge
     health_auto_export_sleep as _sleep,  # #4971: Apple's own night, sleep_*_apple fields
     health_auto_export_units as _units,  # #4970: day-field units + derived totals
     health_auto_export_watch as _watch,  # #4970: the Apple Watch's daily-metric map
@@ -621,7 +622,7 @@ SKIP_METRICS = {
     # Nutrition — MacroFactor is SOT (these flow into HealthKit from MF app)
     "dietary_energy",
     "Dietary Energy",
-    "protein",
+    "protein",  # the DAILY figure is MacroFactor's; timed entries are captured by health_auto_export_protein (#5187)
     "Protein",
     "carbohydrates",
     "Carbohydrates",
@@ -1424,10 +1425,10 @@ def save_workouts_to_s3(date_str, workouts_list):
     return _archive.save_workouts_to_s3(s3_client, S3_BUCKET, USER_ID, date_str, workouts_list)
 
 
-def save_raw_payload(payload):
+def save_raw_payload(payload, received=None):
     """Archive the raw webhook payload to S3 (#3119: content-hashed leaf — see
     health_auto_export_archive.py)."""
-    return _archive.save_raw_payload(s3_client, S3_BUCKET, USER_ID, payload)
+    return _archive.save_raw_payload(s3_client, S3_BUCKET, USER_ID, payload, received)
 
 
 # ── Lambda Handler ─────────────────────────────────────────────────────────────
@@ -1515,7 +1516,7 @@ def lambda_handler(event, context):
             logger.info(f"State of Mind: {som_entries_new} new entries saved to S3, {som_days} days updated in DynamoDB")
 
     # ── Archive raw payload ──
-    s3_key = save_raw_payload(payload)
+    s3_key = save_raw_payload(payload, _request_start)
     logger.info(f"Raw payload archived: s3://{S3_BUCKET}/{s3_key}")
 
     # ── Process blood glucose (CGM) ──
@@ -1549,7 +1550,7 @@ def lambda_handler(event, context):
 
     # ── Process other metrics ──
     other_daily, other_timestamps, source_audit = process_metrics_with_watch_presence(metrics)
-    archived = _additive.apply_archived_sums(other_daily, metrics, METRIC_MAP, parse_date_str, s3_client, S3_BUCKET)
+    archived = _additive.apply_archived_sums(other_daily, metrics, METRIC_MAP, parse_date_str, s3_client, S3_BUCKET, _request_start)
     for date_str, fields in other_daily.items():
         merge_day_to_dynamo(date_str, fields, reading_timestamps=other_timestamps.get(date_str), archived=archived.get(date_str, ()))
     other_days = len(other_daily)
@@ -1557,6 +1558,9 @@ def lambda_handler(event, context):
         logger.info(f"Other metrics: {other_days} days updated, fields: {sorted(set().union(*other_daily.values()))}")
     # #4971: sleep_analysis skips the generic path (SKIP_METRICS) and lands here, Apple devices only.
     sleep_nights = _sleep.write_apple_sleep(metrics, table, is_apple_device, parse_date_str, lambda d: {"pk": PK, "sk": f"DATE#{d}"})
+
+    # #5187: `protein` skips the generic path (SKIP_METRICS: the DAILY figure is MacroFactor's) and lands here as timed entries.
+    _protein.write_hae_protein(metrics, table, parse_date_str, lambda d: {"pk": PK, "sk": f"DATE#{d}"})
 
     # ── Process blood pressure individual readings (v1.4.0 + v1.4.1 combined format) ──
     bp_readings_new = 0

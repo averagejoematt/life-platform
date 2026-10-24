@@ -358,6 +358,15 @@ DEFAULT_STALE_HOURS = 48
 #                  Read by evidence_field_predicates(); a behavioral source needs no
 #                  entry because its row IS the evidence (that is what `behavioral`
 #                  means), which is why this facet lives on apple_health alone.
+#   field_feeds    (#5097) the non-HAE form of the same idea: a FEED that arrives as
+#                  fields on another channel's DATE# row, so the source-level
+#                  `stale_hours` cannot see it go dark. Same row shape as
+#                  `hae_datatypes` — {key, label, fields (any-of presence), stale_days,
+#                  manual, note}. MacroFactor is the specimen: the diary export keeps
+#                  the partition fresh daily while the adaptive expenditure (only the
+#                  daily-summary export carries it) was last written 2026-04-04. Read
+#                  by field_feed_thresholds(); the consumer that reports it is
+#                  health/expenditure_reconciler.py. Narrates, never pages.
 #   instrument_for (#4217) the coach(es) whose DOMAIN INSTRUMENT this source is — the
 #                  sensor without which that coach's reads are ungrounded. Carried on the
 #                  SOURCE (whoop -> sleep_coach) or, where a source is one partition fed by
@@ -1186,6 +1195,20 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "engagement_channel": {"label": "food", "stale_days": 2, "primary": True},
         # #3252: the only source that records what he ate.
         "evidence_for": ("nutrition",),
+        # #5097: the adaptive expenditure is a field feed — only the daily-summary export
+        # carries it, the routine diary export does not, so `stale_hours` above (kept fresh
+        # by the diary) cannot see it go dark. 7 days: the reconciliation reads it over the
+        # 14-day loss-rate window and needs at least half of that window.
+        "field_feeds": [
+            {
+                "key": "adaptive_expenditure",
+                "label": "MacroFactor adaptive expenditure",
+                "fields": ["expenditure_kcal"],
+                "stale_days": 7,
+                "manual": True,
+                "note": "arrives only with the daily-summary export (the XLSX quick export, converted by dropbox-poll); the diary export carries no expenditure column",
+            },
+        ],
         # #4638: stated default (owner ruling pending). The diary export is a rolling 7-day window and
         # its date range is authoritative (macrofactor_lambda.absent_day_items).
         "upstream_changes": {
@@ -1303,14 +1326,29 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "desc": "Delivery behavioral signal",
         "category": "Manual logs",
         "behavioral": True,
-        # 14 days (was 90 — masked a 77-day gap, 2026-03-13 triage).
+        # 14 days (was 90 — masked a 77-day gap, 2026-03-13 triage). Deliberately NOT a
+        # `cadence_months` source although the upload is 6-monthly (#5006/#5108, owner ruling
+        # 2026-10-23): this number is also how long the stored STREAK#current stays an honest
+        # live-sounding claim after an upload (#2235), and a derived 6-month threshold would loosen
+        # that. The 6-month UPLOAD cadence is the charter's `nutrition.food_delivery.upload_every_months`,
+        # read by training.calibration_cadence's `food_delivery_upload` reminder row.
         "stale_hours": 14 * 24,
         "active_api": False,
         "expected_days": None,
         "qa_tier": None,
-        "method": "Manual log",
+        "method": "Manual CSV upload every ~6 months (an upload ritual, paused between uploads; reminder via the calibration cadence)",
         "metrics": "Delivery-order behavioral signal (incl. longest-ever streak)",
-        "posture": "portfolio",
+        # PAUSED 2026-10-19 (#5108/#5006). Owner ruling 2026-10-23: it STAYS paused between uploads, so an
+        # upload writes its rows but never un-pauses the source (the reminder, not a live read, is the ritual).
+        # The evidence the pause was built on:
+        # no delivery orders logged since 2026-03-28 (>200 days; the only S3 imports are the
+        # 03-28 backfill CSVs). ADR-074 posture: off by design, shown as paused, never counted
+        # stale, never a coach check-in context, no nudge, no "dark N days" stamp, and
+        # get_food_delivery_streak_state returns None so the Nutrition-pillar modifier is neutral.
+        # Data, raw prefix and the ingestion Lambda are untouched. Un-pause = delete `paused` and `paused_since` and restore `posture` to "portfolio".
+        "paused": True,
+        "paused_since": "2026-10-19",
+        "posture": "paused",
         "raw_layout": None,
         "capture_channel": "mcp",  # #746: logged by hand in an MCP conversation
     },
@@ -2746,6 +2784,13 @@ def hae_datatype_thresholds() -> list:
     registry. Each: {key, label, fields, stale_days, manual}. The checker's
     HAE_DATATYPES aliases this; compute_datatype_liveness reads it."""
     return [dict(d) for d in cast("list[dict[str, Any]]", SOURCE_REGISTRY["apple_health"].get("hae_datatypes", []))]
+
+
+def field_feed_thresholds(source: str) -> list:
+    """The `field_feeds` rows of `source` (#5097) — feeds carried as fields on another
+    channel's DATE# rows, each {key, label, fields, stale_days, manual, note}. [] for a
+    source with none."""
+    return [dict(d) for d in cast("list[dict[str, Any]]", SOURCE_REGISTRY.get(source, {}).get("field_feeds", []))]
 
 
 def hae_reader_surfaces() -> dict:

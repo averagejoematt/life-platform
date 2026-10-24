@@ -520,6 +520,43 @@ _CHARTER_PUBLISHED_READER_PY = (
     '    return load_charter()["governing_goal"]\n'
 )
 
+# #5061: a published module (lambdas/emails) that imports the owner-only calibration cadence (tape / photo / DEXA due dates).
+_CALIBRATION_PUBLISHED_IMPORTER_PY = (
+    '"""census probe — a published importer of the owner-only calibration cadence that must never exist."""\n\n'
+    "from training import calibration_cadence\n\n\n"
+    "def handle(table):\n"
+    "    return calibration_cadence.read(table, '2026-10-19')\n"
+)
+
+# #5095: a module that grades against a hand-typed 1,500 kcal calorie target instead of the ONE resolver.
+_CALORIE_LITERAL_PY = '"""census probe — a second calorie target that must never exist."""\n\n\ndef grade(cal):\n    cal_target = 1500\n    return cal <= cal_target\n'
+
+# #5106: a published module (lambdas/web) that reads the owner-only evening check-in partition — his stress and
+# hunger ratings would then be one call from a served page.
+_CHECKIN_PUBLISHED_READER_PY = (
+    '"""census probe — a published reader that must never exist."""\n\n\n'
+    "def handle(table):\n"
+    "    return table.get_item(Key={'pk': 'USER#matthew#SOURCE#evening_checkin', 'sk': 'DATE#2026-10-28'})\n"
+)
+
+# #5125 R5: a second published module (lambdas/emails) importing the partner letter's check-in projection — the
+# owner's consent covers ONE recipient (the partner letter), so any other email would widen the carve-out silently.
+_CHECKIN_PROJECTION_SECOND_IMPORTER_PY = (
+    '"""census probe — a second importer of the partner check-in projection that must never exist."""\n\n'
+    "from health import checkin_partner_view\n\n\n"
+    "def handle(table):\n"
+    "    return checkin_partner_view.week_view(table, '2026-10-12', '2026-10-18', '2026-10-05', '2026-10-11')\n"
+)
+
+# #5200: a planning caller that assembles the coach context without reading the May tracker — the section would
+# be `not_supplied` on that path although the weekly row exists (the specimen: plan_next_session, 2026-10-20).
+_ASSEMBLE_WITHOUT_TRACKER_PY = (
+    '"""census probe — a planning caller that must never exist."""\n\n'
+    "from training import coach_context\n\n\n"
+    "def handle(day):\n"
+    "    return coach_context.assemble(day, packet=None, constraint_block=None)\n"
+)
+
 # #5073: a published module (lambdas/emails) that imports the owner-only May tracker — the target
 # date, the band and the projected weight would then be one call from an email body.
 _MAY_TRACKER_PUBLISHED_IMPORTER_PY = (
@@ -629,7 +666,25 @@ _UNGLOSSED_ACRONYM_HTML = (
 # weigh-in record read as confidently as a mature one).
 _RATE_WITH_NO_N_JS = "export function probe(j) { return `trend ${j.weekly_rate_lbs} lb/wk`; }\n"
 
+_DEFICIT_CALLER_NO_OPT_OUT_PY = (
+    '"""probe."""\n\n'
+    "from mcp.tools_nutrition import tool_get_deficit_sustainability\n\n\n"
+    "def probe():\n"
+    "    return tool_get_deficit_sustainability({})\n"
+)
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
+    # #5213: every internal caller of the deficit tool opts out of the critics' model layer.
+    "structural::test_nutrition_critics_ai_5114.py": MutationSpec(
+        gate_id="structural::test_nutrition_critics_ai_5114.py",
+        target="tests/test_nutrition_critics_ai_5114.py",
+        detects=(
+            "a fourth internal caller of tool_get_deficit_sustainability passing no critics_model: False — it would "
+            "spend on the critics' model layer (#5114) on every nightly or plan-time read"
+        ),
+        plants=(("mcp/_census_probe_5213.py", _DEFICIT_CALLER_NO_OPT_OUT_PY),),
+        track=False,  # the guard rglobs mcp/ + lambdas/ on disk, so an untracked module is in scope
+    ),
     "structural::test_obligation_carriers_3597.py": MutationSpec(
         gate_id="structural::test_obligation_carriers_3597.py",
         target="tests/test_obligation_carriers_3597.py",
@@ -1292,6 +1347,42 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         plants=(("lambdas/web/_census_probe_5087.py", _CHARTER_PUBLISHED_READER_PY),),
         track=False,  # the guard os.walks lambdas/web + lambdas/emails on disk, so an untracked module is in scope
     ),
+    # #5106: the owner-only evening check-in — no published-surface module (lambdas/web, lambdas/emails) names either partition.
+    "structural::test_evening_checkin_5106.py": MutationSpec(
+        gate_id="structural::test_evening_checkin_5106.py",
+        target="tests/test_evening_checkin_5106.py",
+        detects=(
+            "a published module (lambdas/web or lambdas/emails) reading the owner-only evening check-in partition — his "
+            "hunger, stress and cravings ratings and the word for the day, a behavioural self-report with no public "
+            "projection; the weekly read against intake is stored apart from the served weekly_correlations record for "
+            "the same reason"
+        ),
+        plants=(("lambdas/web/_census_probe_5106.py", _CHECKIN_PUBLISHED_READER_PY),),
+        track=False,  # the guard os.walks lambdas/web + lambdas/emails on disk, so an untracked module is in scope
+    ),
+    # #5125 R5: the partner letter is the ONLY published importer of the evening check-in's partner projection.
+    "structural::test_partner_email_checkins_5125.py": MutationSpec(
+        gate_id="structural::test_partner_email_checkins_5125.py",
+        target="tests/test_partner_email_checkins_5125.py",
+        detects=(
+            "a second published module (lambdas/emails or lambdas/web) importing health.checkin_partner_view — the owner's "
+            "2026-10-23 consent (#5125 R5) lets ONE recipient, the partner letter, see a coarse read of the owner-only "
+            "evening check-in; another importer would widen that carve-out with no ruling"
+        ),
+        plants=(("lambdas/emails/_census_probe_5125.py", _CHECKIN_PROJECTION_SECOND_IMPORTER_PY),),
+        track=False,  # the guard rglobs lambdas/web + lambdas/emails on disk, so an untracked module is in scope
+    ),
+    # #5200: every coach-context assembly caller outside the module passes the May tracker.
+    "structural::test_may_tracker_coach_context_5200.py": MutationSpec(
+        gate_id="structural::test_may_tracker_coach_context_5200.py",
+        target="tests/test_may_tracker_coach_context_5200.py",
+        detects=(
+            "a planning caller (lambdas/ or mcp/) that calls coach_context.assemble without a tracker — its coach context "
+            "lists may_tracker as not supplied although the weekly row exists, the #5200 specimen on plan_next_session"
+        ),
+        plants=(("lambdas/training/_census_probe_5200.py", _ASSEMBLE_WITHOUT_TRACKER_PY),),
+        track=False,  # the sweep rglobs lambdas/ + mcp/ on disk, so an untracked module is in scope
+    ),
     # #5073: the owner-only May tracker — no published-surface module (lambdas/web, lambdas/emails) imports it.
     "structural::test_may_tracker_5073.py": MutationSpec(
         gate_id="structural::test_may_tracker_5073.py",
@@ -1304,6 +1395,29 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         plants=(("lambdas/emails/_census_probe_5073.py", _MAY_TRACKER_PUBLISHED_IMPORTER_PY),),
         track=False,  # the guard os.walks lambdas/web + lambdas/emails on disk, so an untracked module is in scope
+    ),
+    # #5061: the owner-only calibration cadence (tape / progress photos / DEXA) — no published-surface module imports it.
+    "structural::test_calibration_cadence_5061.py": MutationSpec(
+        gate_id="structural::test_calibration_cadence_5061.py",
+        target="tests/test_calibration_cadence_5061.py",
+        detects=(
+            "a published module (lambdas/emails or lambdas/web) importing the owner-only calibration cadence, which reads the "
+            "progress-photo and tape partitions; the owner ruled 2026-10-03 that no progress body photo reaches a reader "
+            "surface (stored is not published), and the cadence sits one call from the photo index"
+        ),
+        plants=(("lambdas/emails/_census_probe_5061.py", _CALIBRATION_PUBLISHED_IMPORTER_PY),),
+        track=False,  # the guard os.walks lambdas/web + lambdas/emails on disk, so an untracked module is in scope
+    ),
+    # #5095: ONE calorie target — no module under lambdas/ mcp/ deploy/ scripts/ names the retired constant or retypes 1,500.
+    "structural::test_calorie_target_one_resolver_5095.py": MutationSpec(
+        gate_id="structural::test_calorie_target_one_resolver_5095.py",
+        target="tests/test_calorie_target_one_resolver_5095.py",
+        detects=(
+            "a module carrying its own 1,500 kcal calorie target (`cal_target = 1500`) instead of reading "
+            "health.calorie_target — the second-target class #5095 retired (scoring, emails, coach and critics disagreed)"
+        ),
+        plants=(("lambdas/health/_census_probe_5095.py", _CALORIE_LITERAL_PY),),
+        track=False,  # the guard rglobs lambdas/ mcp/ deploy/ scripts/ on disk, so an untracked module is in scope
     ),
 }
 
@@ -1363,6 +1477,17 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_nutrition_critics_ai_5114.py": _proof(
+        "structural::test_nutrition_critics_ai_5114.py",
+        "ARMED 1/1 — baseline: 11 passed in 0.75s | mutated: 1 failed, 10 passed in 0.79s :: "
+        "test_only_the_owners_own_deficit_call_runs_the_layer | reverted: 11 passed in 0.76s",
+        "mcp/ and lambdas/ on disk (rglob, every .py, the registry wiring alone excepted): every use of "
+        "tool_get_deficit_sustainability, called directly, via module attribute, via an `as` alias, or handed to a wrapper, must pass a dict literal with "
+        "critics_model False; zero callers found fails loudly; a synthetic source pair proves the detector red on a bare caller. "
+        "STILL INVISIBLE, stated: a caller reaching the tool through getattr/importlib by string, an args dict built in a "
+        "variable (an alias via plain assignment, `f = tool`, also), and the registry-wired owner call, which opts in on purpose.",
+        proved_on="2026-10-20",
+    ),
     "structural::test_obligation_carriers_3597.py": _proof(
         "structural::test_obligation_carriers_3597.py",
         "ARMED 1/1 — baseline: 32 passed in 13.80s | mutated: 1 failed, 31 passed in 13.49s :: "
@@ -2221,6 +2346,40 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "S3 objects, which no repo test reads.",
         proved_on="2026-10-18",
     ),
+    "structural::test_may_tracker_coach_context_5200.py": _proof(
+        "structural::test_may_tracker_coach_context_5200.py",
+        "ARMED 1/1 — baseline: 8 passed in 3.17s | mutated: 1 failed, 7 passed in 3.09s :: "
+        "test_every_assemble_call_outside_the_module_passes_a_tracker | reverted: 8 passed in 3.01s",
+        "lambdas/ and mcp/ on disk (rglob, every .py outside tests/ and coach_context.py): a `coach_context.assemble(...)` "
+        "call with no `tracker=` keyword fails and names the file and line. Also held in the same file: each MCP caller path "
+        "(plan_next_session, the nightly pre-draft, the session packet) and the Telegram training route supply the stored "
+        "week over a fake table and state the honest not_supplied with none. STILL INVISIBLE, stated: a caller that passes "
+        "`tracker=None` explicitly, an assemble imported under another name, and the live table.",
+        proved_on="2026-10-20",
+    ),
+    "structural::test_evening_checkin_5106.py": _proof(
+        "structural::test_evening_checkin_5106.py",
+        "ARMED 1/1 — baseline: 27 passed in 1.06s | mutated: 1 failed, 26 passed in 0.92s :: "
+        "test_no_published_module_reads_either_partition | reverted: 27 passed in 0.92s",
+        "lambdas/web/ and lambdas/emails/ on disk (os.walk, every .py): any mention of `evening_checkin` or "
+        "`checkin_intake_pairs` fails and names the file. Also pinned in the same file: the owner-only tier and the "
+        "phase classes of both partitions, the schedule row before quiet hours, the rule + the scoped grant, the "
+        "dead-man's registration. STILL INVISIBLE, stated: a published module handed a check-in row as an argument by "
+        "an unswept caller (mcp/, lambdas/coach), a pk assembled from fragments, and the live table.",
+        proved_on="2026-10-19",
+    ),
+    "structural::test_partner_email_checkins_5125.py": _proof(
+        "structural::test_partner_email_checkins_5125.py",
+        "ARMED 1/1 — baseline: 10 passed in 2.99s | mutated: 1 failed, 9 passed in 1.59s :: "
+        "test_the_projection_is_the_only_door_from_emails_and_web_and_never_reaches_the_prompt | reverted: 10 passed in 3.66s",
+        "lambdas/web/ and lambdas/emails/ on disk (rglob, every .py): any module other than partner_email_lambda.py "
+        "naming `checkin_partner_view` fails and names the set; any import of `checkin_intake_pairs` or "
+        "`coach.evening_checkin` there fails and names the file; the partner prompt carries no check-in/mood "
+        "placeholder. Also pinned: the projection's column list (check-in keys only) and the silence alert counting an "
+        "answered check-in. STILL INVISIBLE, stated: a published module handed a projection dict by an unswept caller, a "
+        "dynamic import by string, and the live table.",
+        proved_on="2026-10-23",
+    ),
     "structural::test_may_tracker_5073.py": _proof(
         "structural::test_may_tracker_5073.py",
         "ARMED 1/1 — baseline: 35 passed in 0.83s | mutated: 1 failed, 34 passed in 0.73s :: "
@@ -2231,6 +2390,29 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "INVISIBLE, stated: a published module handed a tracker row as an argument by an unswept caller (mcp/, "
         "lambdas/coach — the coach-context assembly #5071 is a sanctioned owner-only reader), a dynamic import by "
         "string, a direct DynamoDB read of the partition by a variable-built pk, and the live table.",
+        proved_on="2026-10-19",
+    ),
+    "structural::test_calibration_cadence_5061.py": _proof(
+        "structural::test_calibration_cadence_5061.py",
+        "ARMED 1/1 — baseline: 21 passed in 0.81s | mutated: 1 failed, 20 passed in 0.77s :: "
+        "test_no_published_module_imports_the_cadence | reverted: 21 passed in 0.73s",
+        "lambdas/web/ and lambdas/emails/ on disk (os.walk, every .py): a line-anchored import of `calibration_cadence` or "
+        "`calibration_leg` fails and names the file, and any published-tree module other than the HMAC-gated viewer that names "
+        "`progress_photos` / `progress_capture` fails; a synthetic two-tree root proves both detectors. Also pinned: the cadence "
+        "projects only date fields (no photo key) and the block carries no media path. STILL INVISIBLE, stated: a published "
+        "module handed a cadence block by an unswept caller (mcp/, lambdas/coach), a dynamic import by string, a variable-built "
+        "photo pk, and the live table.",
+        proved_on="2026-10-19",
+    ),
+    "structural::test_calorie_target_one_resolver_5095.py": _proof(
+        "structural::test_calorie_target_one_resolver_5095.py",
+        "ARMED 1/1 — baseline: 12 passed in 2.65s | mutated: 1 failed, 11 passed in 2.65s :: "
+        "test_no_module_reads_the_retired_constant_or_retypes_the_1500_target | reverted: 12 passed in 2.70s",
+        "lambdas/ mcp/ deploy/ scripts/ on disk (rglob, every .py): any mention of the retired generated calorie constant's name, "
+        "and any code line carrying a 1,500 NUMBER token beside a calorie word (`cal`, `kcal`, `calorie(s)` in a name or string; "
+        "comments dropped) fails and names the line; in-test controls prove each shape and the clean ones (a token cap, a "
+        "comment, prose, `_call_`). STILL INVISIBLE, stated: a target in prose, a target computed from other literals, the "
+        "sealed plan root's genesis figure (config/user_goals.json), and a calorie target at a different number.",
         proved_on="2026-10-19",
     ),
 }

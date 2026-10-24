@@ -878,35 +878,41 @@ def test_the_two_nutrition_views_agree_on_the_fiber_target(monkeypatch):
     """Self-inconsistency: `_get_nutrition_summary` published fiber_g = 30, `_get_macro_targets`
     published 25 under `targets`, and the macros view's `hit_fiber` compared against a THIRD
     literal 25 — so 27 g/day was simultaneously 90% of target and a hit. One tool, one set of
-    arguments, one target: `_FIBER_TARGET_G`. The scoring threshold is asserted too, since a
+    arguments, one target: the charter fibre floor (#5102). The scoring threshold is asserted too, since a
     published target the hit test does not use is the same defect wearing a different hat."""
     install(monkeypatch, SUMMARY_ROWS)
     summary_target = tn.tool_get_nutrition(SUMMARY_ARGS)["target_comparison"]["fiber_g"]["target"]
     macros = tn.tool_get_nutrition(dict(SUMMARY_ARGS, view="macros"))
-    assert summary_target == macros["targets"]["fiber_g"] == tn._FIBER_TARGET_G
+    assert summary_target == macros["targets"]["fiber_g"] == macros["targets"]["macro_floors_g"]["fibre"]
     # a day exactly ON the published target is a hit; one under it is not
-    at_target = tn._FIBER_TARGET_G
+    at_target = macros["targets"]["macro_floors_g"]["fibre"]
     install(monkeypatch, [mf("2026-05-01", total_calories_kcal=2000, total_fiber_g=at_target)])
     assert tn.tool_get_nutrition(dict(SUMMARY_ARGS, view="macros"))["daily_breakdown"][0]["hit_fiber_target"] is True
     install(monkeypatch, [mf("2026-05-01", total_calories_kcal=2000, total_fiber_g=at_target - 1)])
     assert tn.tool_get_nutrition(dict(SUMMARY_ARGS, view="macros"))["daily_breakdown"][0]["hit_fiber_target"] is False
+    # #5102: a day between the old 30 g literal and the charter floor is a miss on BOTH the hit flag and the floors row
+    install(monkeypatch, [mf("2026-05-01", total_calories_kcal=2000, total_fiber_g=at_target - 3)])
+    out = tn.tool_get_nutrition(dict(SUMMARY_ARGS, view="macros"))
+    day = out["daily_breakdown"][0]
+    assert day["hit_fiber_target"] is False and day["floors"]["fibre"]["met"] is False
+    assert out["adherence"]["fiber_target_hit_pct"] == 0.0
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 5. view=macros — adherence against a TDEE-derived target
+# 5. view=macros — adherence against the ONE calorie target (#5095), TDEE as context
 # ──────────────────────────────────────────────────────────────────────────────
 
 MACRO_ROWS = [
-    mf("2026-05-01", total_calories_kcal=2000, total_protein_g=150, total_fiber_g=30, total_fat_g=70, total_carbs_g=200),
+    mf("2026-05-01", total_calories_kcal=2000, total_protein_g=150, total_fiber_g=36, total_fat_g=70, total_carbs_g=200),
     mf("2026-05-02", total_calories_kcal=1500, total_protein_g=100, total_fiber_g=20, total_fat_g=50, total_carbs_g=150),
 ]
 MACRO_ARGS = {"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02", "calorie_target": 2000, "protein_target": 150}
 
 
 def test_macros_scores_daily_adherence_against_the_given_targets(monkeypatch):
-    """target 2000 kcal / 150 g protein / 25 g fiber
-    day 1: 2000/2000 = 100.0% (0.85 <= 1.00 <= 1.10 -> hit); 150 >= 142.5 -> hit; 30 >= 25 -> hit
-    day 2: 1500/2000 =  75.0% (miss);  100/150 = 66.7% (miss);  20 < 25 (miss)
+    """target 2000 kcal / 150 g protein / the charter fibre floor
+    day 1: 2000/2000 = 100.0% (0.85 <= 1.00 <= 1.10 -> hit); 150 >= 142.5 -> hit; 36 >= the charter fibre floor -> hit
+    day 2: 1500/2000 =  75.0% (miss);  100/150 = 66.7% (miss);  20 < the floor (miss)
     -> 1 of 2 on every axis = 50.0%
     """
     install(monkeypatch, MACRO_ROWS)
@@ -937,59 +943,68 @@ def test_macros_rolling_window_spans_exactly_the_days_requested(monkeypatch):
     assert span_days(lo, hi) == 7
 
 
-def test_macros_estimates_the_calorie_target_from_the_latest_weigh_in(monkeypatch):
-    """ADR-152 (#2310): 220 lbs -> 99.79024 kg
-    BMR   = 10*99.79024 + 6.25*182.88 - 5*35 + 5 = 1970.9024 -> 1971
-    TDEE  = BMR + measured 7d exercise energy / 7 = 1971 + 0 (no strava rows) = 1971
-    target = TDEE - 500 deficit                                               = 1471
-    The retired form published round(1970.9024 * 1.55) = 3055 — a MAINTENANCE figure,
-    from a flat multiplier, labelled as the day's calorie target.
-    """
+def _one_target(day="2026-05-02"):
+    """#5095: the ONE calorie target the macros view grades against (health.calorie_target)."""
+    from health.calorie_target import target_kcal
+
+    return target_kcal(day)
+
+
+def test_macros_grades_against_the_one_calorie_target_not_tdee_minus_500(monkeypatch):
+    """#5095: the macros view used to publish TDEE - 500 as the day's calorie target (ADR-152:
+    220 lbs -> BMR 1971, TDEE 1971, target 1471) while scoring, the emails and the critics graded
+    other numbers. The target is now the ONE resolver's; the ADR-152 budget ships beside it as
+    MAINTENANCE context (`energy_budget`), its arithmetic unchanged."""
     install(monkeypatch, MACRO_ROWS + [withings("2026-05-02", weight_lbs=220.0)], profile=PROFILE_WITH_HEIGHT)
     out = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})
-    assert out["targets"]["calories_kcal"] == 1471
+    assert out["targets"]["calories_kcal"] == _one_target() and _one_target()
+    assert (out["targets"]["energy_budget"]["tdee"], out["targets"]["energy_budget"]["target"]) == (1971, 1471)
 
 
-def test_macros_publishes_the_method_and_the_inputs_behind_its_calorie_target(monkeypatch):
-    """ADR-105/ADR-152: the number is checkable without reading the source — TDEE, the
-    deficit, the target, the method name, and the inputs (including the exercise-capture
-    gap tell `exercise_energy_days`) all ship on the payload."""
+def test_macros_publishes_the_source_of_its_calorie_target_and_the_budget_inputs(monkeypatch):
+    """ADR-105: the number is checkable without reading the source — the target's resolver detail
+    (source, provenance, charter version) and the maintenance budget's method and inputs both ship."""
     install(monkeypatch, MACRO_ROWS + [withings("2026-05-02", weight_lbs=220.0)], profile=PROFILE_WITH_HEIGHT)
     t = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})["targets"]
     detail = t["calorie_target_detail"]
+    assert detail["kcal"] == t["calories_kcal"]  # the published target IS the resolver's
+    assert detail["source"] == "charter" and detail["charter_version"] and "nutrition.calories" in detail["provenance"]
+    assert t["calorie_target_method"] == "health.calorie_target.resolve" and t["calorie_target_basis"] == "charter"
+    budget = t["energy_budget"]
     # #3931: the label changed WITH the number it names — the old string named a TDEE
     # that charged rest between sets at the cardio duration proxy.
-    assert detail["method"] == "mifflin_bmr_plus_worked_set_exercise"
-    assert (detail["tdee"], detail["deficit"], detail["target"]) == (1971, 500, 1471)
-    assert detail["target"] == t["calories_kcal"]  # the published target IS the payload's
-    assert detail["inputs"]["bmr_kcal"] == 1971 and detail["inputs"]["weight_lbs"] == 220.0
-    assert detail["inputs"]["age_basis"] == "no_date_of_birth_in_profile"
+    assert budget["method"] == "mifflin_bmr_plus_worked_set_exercise"
+    assert (budget["tdee"], budget["deficit"], budget["target"]) == (1971, 500, 1471)
+    assert budget["inputs"]["bmr_kcal"] == 1971 and budget["inputs"]["weight_lbs"] == 220.0
+    assert budget["inputs"]["age_basis"] == "no_date_of_birth_in_profile"
     # honest absence, never a fabricated multiplier: no strava in the window
-    assert detail["inputs"]["exercise_energy_days"] == 0
-    assert detail["inputs"]["exercise_kcal_7d"] == 0
-    assert t["calorie_target_method"] == "mifflin_bmr_plus_worked_set_exercise"
-    # No MacroFactor intake average is measurable here beyond the two fixture days and no
-    # second weigh-in exists, so the impossibility check has no trend to judge and says so
+    assert budget["inputs"]["exercise_energy_days"] == 0
+    assert budget["inputs"]["exercise_kcal_7d"] == 0
+    # No second weigh-in exists, so the impossibility check has no trend to judge and says so
     # rather than reading "no data" as agreement (#3931 box 2).
-    assert t["calorie_target_basis"] == "published_unverified_no_measured_weight_trend"
+    assert budget["target_basis"] == "published_unverified_no_measured_weight_trend"
     assert t["calorie_target_check"]["method"] == "implied_deficit_vs_measured_weight_trend"
 
 
 def test_macros_grades_adherence_against_the_target_not_against_maintenance(monkeypatch):
-    """The re-base (#2310). A 1500 kcal day is 102% of the 1471 target -> a HIT; against
-    the retired 3055 maintenance figure it was 49% -> a miss. Same day, same food."""
-    rows = [mf("2026-05-01", total_calories_kcal=1500), withings("2026-05-01", weight_lbs=220.0)]
+    """A day inside 85-110 % of the ONE target is a HIT; the retired 3055 maintenance figure and
+    the retired TDEE - 500 figure are neither the reference."""
+    kcal = _one_target("2026-05-01")
+    rows = [mf("2026-05-01", total_calories_kcal=round(kcal * 0.95)), withings("2026-05-01", weight_lbs=220.0)]
     install(monkeypatch, rows, profile=PROFILE_WITH_HEIGHT)
     out = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-01"})
-    assert out["targets"]["calories_kcal"] == 1471
+    assert out["targets"]["calories_kcal"] == kcal
     assert out["daily_breakdown"][0]["hit_calorie_target"] is True
     assert out["adherence"]["calorie_target_hit_pct"] == 100.0
 
 
-def test_macros_falls_back_to_the_flat_default_when_no_weigh_in_exists(monkeypatch):
+def test_macros_grades_against_the_one_target_when_no_weigh_in_exists(monkeypatch):
+    """#5095: no weigh-in costs the maintenance budget, never the target — the flat 2400 default
+    is no longer anyone's calorie target."""
     install(monkeypatch, MACRO_ROWS, profile=PROFILE_WITH_HEIGHT)
     out = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})
-    assert out["targets"]["calories_kcal"] == 2400
+    assert out["targets"]["calories_kcal"] == _one_target()
+    assert out["targets"]["energy_budget"] is None
     assert out["targets"]["protein_g"] == 170
 
 
@@ -1002,7 +1017,7 @@ def test_macros_still_answers_when_the_weight_lookup_fails(monkeypatch):
     """A Withings outage costs the personalised target, not the whole report."""
     install(monkeypatch, MACRO_ROWS, profile=PROFILE_WITH_HEIGHT, raise_sources={"withings"})
     out = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})
-    assert out["targets"]["calories_kcal"] == 2400
+    assert out["targets"]["calories_kcal"] == _one_target()  # #5095: the target never depended on the weigh-in
     assert out["adherence"]["protein_target_hit_pct"] == 0.0  # 150 and 100 both short of 170*0.95
 
 
@@ -1014,14 +1029,13 @@ def test_macros_ignores_a_withings_row_that_carries_no_weight(monkeypatch):
     the tool tell a 220 lb man to eat 1508 kcal/day. An absent weight is not a weight."""
     install(monkeypatch, MACRO_ROWS + [withings("2026-05-02", fat_ratio=38.0)], profile=PROFILE_WITH_HEIGHT)
     out = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})
-    assert out["targets"]["calories_kcal"] == 2400
-    assert out["targets"]["calorie_target_basis"] == "flat_default_no_weight_or_height"
-    assert out["targets"]["calorie_target_detail"] is None
+    assert out["targets"]["energy_budget"] is None  # no weight -> no maintenance budget (ADR-104)
+    assert out["targets"]["calories_kcal"] == _one_target()  # #5095: the target is the resolver's either way
     # and a weightless row NEWER than a real weigh-in must not mask the weigh-in either
     rows = MACRO_ROWS + [withings("2026-05-01", weight_lbs=220.0), withings("2026-05-02", fat_ratio=38.0)]
     install(monkeypatch, rows, profile=PROFILE_WITH_HEIGHT)
     out = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})
-    assert out["targets"]["calories_kcal"] == 1471  # ADR-152: 1971 TDEE - 500 deficit
+    assert out["targets"]["energy_budget"]["tdee"] == 1971  # ADR-152: the weigh-in, not the weightless row
 
 
 def test_macros_excludes_a_day_with_no_calorie_rollup_from_the_hit_rate(monkeypatch):
@@ -1039,14 +1053,11 @@ def test_macros_excludes_a_day_with_no_calorie_rollup_from_the_hit_rate(monkeypa
     assert day2["calories_kcal"] is None and day2["calories_pct"] is None and day2["hit_calorie_target"] is None
 
 
-def test_macros_refuses_the_calorie_target_when_the_weight_trend_contradicts_it(monkeypatch):
-    """#3931 box 2/4: a 3,500-kcal-per-lb impossibility is never published as a target.
-
-    220 lb / 72 in -> BMR 1,971, no exercise rows -> TDEE 1,971. Intake averages 400
-    kcal/day across the window, so the model implies a 1,571 kcal/day deficit — 79.7% of
-    TDEE, past the stated 50% ceiling. The surface says REFUSED and grades no calorie
-    adherence; the protein floor is untouched and still grades.
-    """
+def test_a_refused_maintenance_budget_no_longer_withholds_the_calorie_target(monkeypatch):
+    """#3931 box 2/4 still refuses the BUDGET: 220 lb / 72 in -> TDEE 1,971; intake averaging 400
+    kcal/day implies a 1,571 kcal/day deficit — 79.7 % of TDEE, past the 50 % ceiling — so the
+    budget's own TDEE - 500 figure is refused. #5095: that figure is no longer the target, so the
+    refusal no longer withholds grading — the ONE target grades the day (400 kcal is a miss)."""
     rows = [
         mf("2026-05-01", total_calories_kcal=400, total_protein_g=190),
         mf("2026-05-02", total_calories_kcal=400, total_protein_g=190),
@@ -1055,15 +1066,12 @@ def test_macros_refuses_the_calorie_target_when_the_weight_trend_contradicts_it(
     ]
     install(monkeypatch, rows, profile=PROFILE_WITH_HEIGHT)
     t = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})
-    assert t["targets"]["calories_kcal"] is None
-    assert t["targets"]["calorie_target_basis"].startswith("refused: ")
-    assert t["targets"]["calorie_target_method"] == "mifflin_bmr_plus_worked_set_exercise"
+    assert t["targets"]["energy_budget"]["target"] is None
+    assert t["targets"]["energy_budget"]["target_basis"].startswith("refused: ")
     assert t["targets"]["calorie_target_check"]["implied_deficit_kcal_per_day"] == 1571
-    assert t["targets"]["note"].startswith("REFUSED:")
-    # ...and it does NOT quietly fall back to the 2400 flat default under another label
-    assert t["daily_breakdown"][0]["calories_pct"] is None
-    assert t["adherence"]["calorie_target_hit_pct"] is None
-    # the 170 g protein floor is unaffected and stays the primary nutrition gate (#3931)
+    assert t["targets"]["calories_kcal"] == _one_target()
+    assert t["adherence"]["calorie_target_hit_pct"] == 0.0
+    # the 170 g protein floor is unaffected (#3931)
     assert t["adherence"]["protein_target_hit_pct"] == 100.0
 
 
@@ -1089,19 +1097,24 @@ def test_the_macro_target_and_the_energy_view_agree_on_todays_calorie_target(mon
     install(monkeypatch, rows, profile=PROFILE_WITH_HEIGHT)
     macros = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": PT_TODAY})
     energy = th.tool_get_daily_metrics({"view": "energy"})
-    assert macros["targets"]["calories_kcal"] == energy["calorie_target_based_on_7d"] == 1557
-    # ...and not merely equal by luck: the same TDEE, deficit, method and inputs
-    # underneath. #3931 added a per-surface `trend_check`/`target_basis` pair, and the two
-    # surfaces measure intake over DIFFERENT windows by construction (macros over the
-    # caller's range, energy over a fixed trailing 7 days), so those two keys are compared
-    # separately below rather than folded into an equality that would pin an accident.
-    _shared = ("tdee", "deficit", "target", "method", "inputs", "target_published")
-    assert {k: macros["targets"]["calorie_target_detail"][k] for k in _shared} == {k: energy["calorie_target"][k] for k in _shared}
-    # both publish — neither surface is refusing here — and both name the same method.
-    assert macros["targets"]["calorie_target_detail"]["target_published"] is True
-    assert energy["calorie_target_method"] == macros["targets"]["calorie_target_method"]
-    assert energy["calorie_target"]["tdee"] == energy["tdee_7d_avg"] == 2057
-    assert energy["calorie_target"]["inputs"]["exercise_energy_days"] == 1
+    # #5095: the calorie TARGET both surfaces name is the ONE resolver's; the energy view's
+    # `maintenance_context_7d` is its deficit model's maintenance context (TDEE 2057, deficit 500), not a target (#5198).
+    assert macros["targets"]["calories_kcal"] == energy["calorie_target_platform"]["kcal"] == _one_target(PT_TODAY)
+    assert energy["maintenance_context_7d"]["deficit_kcal"] == 500
+    # ...and the maintenance budget underneath is the same: TDEE, deficit, method and inputs.
+    # #3931 added a per-surface `trend_check`/`target_basis` pair, and the two surfaces measure
+    # intake over DIFFERENT windows by construction, so those keys are not folded in.
+    eb, ctx = macros["targets"]["energy_budget"], energy["maintenance_context_7d"]
+    assert (eb["tdee"], eb["deficit"], eb["method"], eb["inputs"]) == (
+        ctx["estimated_maintenance_kcal"],
+        ctx["deficit_kcal"],
+        ctx["method"],
+        ctx["inputs"],
+    )
+    assert macros["targets"]["energy_budget"]["target_published"] is True
+    assert energy["maintenance_method"] == macros["targets"]["energy_budget"]["method"]
+    assert energy["maintenance_context_7d"]["estimated_maintenance_kcal"] == energy["tdee_7d_avg"] == 2057
+    assert energy["maintenance_context_7d"]["inputs"]["exercise_energy_days"] == 1
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1698,7 +1711,8 @@ def test_macros_and_the_protein_tripwire_count_the_same_week_the_same_way(monkey
 
 def test_a_lenient_macros_comparison_is_caught_by_the_agreement_test(monkeypatch):
     """Mutation control: restore the old `>= floor * 0.95` and the view marks 166 g a hit -> disagrees with the tripwire."""
-    monkeypatch.setattr(tn, "met_floor", lambda g, floor, tolerance_g=0.0: None if g is None else g >= floor * 0.95)
+    # #5098: the macros view grades through the protein engine's one hit, so the mutation restores the tolerance THERE
+    monkeypatch.setattr(tn.protein_engine, "hit", lambda g, floor=None: None if g is None else g >= floor * 0.95)
     out = _macros_week(monkeypatch)
     hits = [d["date"] for d in out["daily_breakdown"] if d["hit_protein_target"]]
     assert hits == ["2026-10-11", "2026-10-13", "2026-10-16"]  # the 42.9 % the owner saw

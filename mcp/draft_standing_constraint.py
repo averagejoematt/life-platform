@@ -147,19 +147,25 @@ def cardio_block(
         logger.warning("cardio block: pick failed: %s", e)
         return None, {"state": "failed", "error": type(e).__name__}
     key, kind = menu["machine"], menu["kind"]
-    minutes = cardio_menu.block_minutes(kind)
-    notes, audit = cardio_note.compose(
+    compose = lambda k, m: cardio_note.compose(  # noqa: E731 — one call shape, used twice below
         movement_key=key,
-        minutes=minutes,
+        minutes=m,
         target_date=target_date,
         archetype=archetype,
-        kind=kind,
+        kind=k,
         treadmill_sessions=hist["by_machine"].get(cardio_menu.TREADMILL),
         aerobic_block=layer,
         constraint=constraint,
         hr_ceiling_bpm=pick.get("hr_ceiling_bpm"),
         placement_why=menu["why"],
     )
+    minutes = cardio_menu.block_minutes(kind)
+    notes, audit = compose(kind, minutes)
+    if audit["kind"] != kind:  # the no-push gate demoted a hard kind: the minutes and the pick follow the kind the note carries
+        kind = audit["kind"]
+        minutes = cardio_menu.block_minutes(kind)
+        notes, audit = compose(kind, minutes)
+    pick = cardio_menu.align_pick(pick, kind, key)  # #5201: pick, block and note name one modality and one cue
     block = ExerciseBlock(
         movement_key=key,
         sets=[Set(duration_seconds=minutes * 60)],
@@ -186,6 +192,20 @@ def _cardio_index_failsoft() -> dict[str, list] | None:
         return None
 
 
+def _refresh_session_shape(ideal: Any) -> None:
+    """#5201: the shape the generator stamped was computed BEFORE this path appended the cardio block, so its
+    `cardio_blocks` read empty. Re-run the charter's shape enforcement over the routine as it now stands (one cardio
+    block, the cap) and fold the answer into `inputs_snapshot["session_shape"]`. Fail-soft: the block keeps its minutes."""
+    try:
+        from training import program_structure
+
+        shape = program_structure.enforce_session_shape(ideal.exercises, _catalog().get("movements") or {})
+        snap = ideal.inputs_snapshot or {}
+        ideal.inputs_snapshot = {**snap, "session_shape": {**(snap.get("session_shape") or {}), **shape}}
+    except Exception as e:  # noqa: BLE001 — named, never a lost draft
+        logger.warning("cardio block: session shape refresh failed: %s", e)
+
+
 def _is_accessory(ex: Any) -> bool:
     return str(getattr(ex, "rationale_tag", "") or "").split(":")[0] == "accessory"
 
@@ -198,12 +218,21 @@ def apply_gate(
     First exercise: the gate (sinus → the plan, ≤ RPE 8; not sinus → ≤ RPE 7, accessories and
     cardio optional; the 🟢 withheld line when tripped; the stop list), then the subtract-only load
     rule. Primaries: the gate cue instead of the 🟢/🟡/🔴 line. Accessories: optional when not sinus.
-    The stashed branches carry the sinus cap as the ceiling, so adherence grades against ≤ RPE 8."""
-    from training import standing_constraints
+    The stashed branches carry the sinus cap as the ceiling, so adherence grades against ≤ RPE 8.
+
+    #5167 (owner ruling 2026-10-23, the date split): a draft dated on/after the constraint's
+    `lifting_caps_retired_from` carries no lifting cap — the gate lines and the per-lift cue name the
+    charter's `effort_ceilings`, and every stashed branch's `rpe_cap` is the charter compound ceiling
+    (none when the charter cannot be read: adherence then falls to the program default). A draft dated
+    before that day is byte-identical to the pre-#5167 output."""
+    from training import effort_ceilings, standing_constraints
 
     from mcp.recovery_authoring import SUBTRACT_ONLY_RULE, render_loaded_streak_line
 
-    lines = standing_constraints.gate_lines(constraint, constraint.get("stop_list"), green_withheld)
+    day = str(getattr(ir, "target_date", "") or "")[:10] or None
+    caps = standing_constraints.lifting_caps_active(constraint, day)
+    bands = None if caps else effort_ceilings.class_bands()
+    lines = standing_constraints.gate_lines(constraint, constraint.get("stop_list"), green_withheld, target_date=day, ceilings=bands)
     lines.append(f"Load: {SUBTRACT_ONLY_RULE}")
     streak_line = render_loaded_streak_line(ctx)
     if streak_line:
@@ -214,19 +243,26 @@ def apply_gate(
     first.notes = ("\n".join(lines) + ("\n\n" + first.notes if first.notes else "")).strip()
 
     g = constraint["gate"]
-    cue = standing_constraints.gate_cue(constraint)
+    cue = standing_constraints.gate_cue(constraint, target_date=day, ceilings=bands)
+    if caps:
+        sinus_cap, not_sinus_cap = g["sinus_rpe_cap"], g["not_sinus_rpe_cap"]
+    else:  # #5167: the charter's compound ceiling on every branch — no cap below it
+        comp = effort_ceilings.ceiling(effort_ceilings.COMPOUNDS)
+        sinus_cap = not_sinus_cap = int(comp) if comp is not None and float(comp).is_integer() else comp
     structured: dict[str, Any] = {"session": ctx, "gate": constraint["id"], "exercises": {}}
+    if not caps:
+        structured["lifting_caps"] = {"retired_from": constraint.get("lifting_caps_retired_from"), "ceiling_rpe": sinus_cap}
     for ex in [e for e in ir.exercises if getattr(e, "skill_tier", 1) >= 2][:2]:
         ex.notes = ((ex.notes + "\n") if ex.notes else "") + cue
         structured["exercises"][ex.movement_key] = {
             "gate_cue": cue,
             "green": {
-                "rpe_cap": g["sinus_rpe_cap"],
+                "rpe_cap": sinus_cap,
                 "cue": "sinus rhythm + feel fine",
                 **({"withheld": green_withheld} if green_withheld else {}),
             },
-            "yellow": {"rpe_cap": g["sinus_rpe_cap"], "cue": "sinus rhythm + feel fine"},
-            "red": {"rpe_cap": g["not_sinus_rpe_cap"], "cue": "ECG not sinus, or feel off"},
+            "yellow": {"rpe_cap": sinus_cap, "cue": "sinus rhythm + feel fine"},
+            "red": {"rpe_cap": not_sinus_cap, "cue": "ECG not sinus, or feel off"},
         }
     if "accessory" in g["optional_when_not_sinus"]:
         for ex in ir.exercises:
@@ -256,6 +292,7 @@ def gate_draft(ideal: Any, target_date: str, adapt: Callable[[dict[str, Any] | N
     cardio, pick = cardio_block(target_date, getattr(ideal, "archetype", "") or "", constraint, layer=layer, cardio_index=cardio_index)
     if cardio is not None:
         ideal.exercises.append(cardio)
+        _refresh_session_shape(ideal)
         # #5048: the level comes from his ride history (fail-soft: a failed load keeps the note, no level)
         try:
             from training.routine_generator import attach_cardio_cues

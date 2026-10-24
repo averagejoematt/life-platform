@@ -102,6 +102,18 @@ from training.green_block import SESSION_SET_CEILINGS  # noqa: E402  (#4503 OD4)
 from training.redline_changelog import CHANGELOG_V1_TO_V2, CHANGELOG_V2_TO_V3  # noqa: E402
 from training.training_charter import charter_value as _charter_value  # noqa: E402  (#5069: the split is the charter's)
 
+# #5205 (owner ruling 2026-10-23: "150 kcal everywhere"): every tripwire that names a calorie step states the ONE step,
+# the weekly titration cap — read here, never retyped, so the text and the cap cannot drift apart.
+_CAL_STEP = _charter_value("nutrition.titration.max_step_kcal")
+CALORIE_STEP_TEXT = (
+    str(int(_CAL_STEP))
+    if isinstance(_CAL_STEP, (int, float)) and not isinstance(_CAL_STEP, bool)
+    else "<the charter step, nutrition.titration.max_step_kcal, unreadable>"
+)
+_FLOOR_WARNING = (
+    "a WARNING (owner ruling 2026-10-23 R1: the ~1,500 kcal target sits under this line by choice; the floors stay, reported, never a veto)"
+)
+
 LAST_REVIEWED_BY_OWNER: str | None = "2026-09-23"
 """ISO date the owner last read this file. None means never."""
 
@@ -183,7 +195,7 @@ REDLINES: dict[str, dict[str, Any]] = {
             },
         ],
         "overshoot_rule": (
-            "trend >cap for 2 consecutive weeks after week 3 → +150–250 kcal/day and ursodiol on; overshoot is a failure, not a win "
+            f"trend >cap for 2 consecutive weeks after week 3 → +{CALORIE_STEP_TEXT} kcal/day and ursodiol on; overshoot is a failure, not a win "
             "(unless strength, DXA and recovery are ALL clean — then `loss_excessive_clean` holds the trajectory; above 4.0 lb/wk `rate_ceiling` applies regardless)"
         ),
         "invariant": "lean cost of the week ≤ 0.5–0.7 lb/wk = model fat fraction (Forbes/Hall on his two DEXAs) × rate; hold the rate while that holds, taper as it rises",
@@ -203,41 +215,33 @@ REDLINES: dict[str, dict[str, Any]] = {
         ),
     },
     "energy_floor_kcal": {
-        "floor_7d_mean": 1800,
-        "floor_lifting_day": 1900,
-        "floor_any_day": 1600,
-        "planned_minimum_any_weight": 1700,
-        "opening_kcal": 2100,
-        "prescribed": [2000, 2100],
-        "titration": {
-            "read": "14-day trend of daily weigh-ins, read weekly",
-            "not_before_day": 21,
-            "never_on_a_week_with_fewer_complete_logs_than": 6,
-            "act_on": "two consecutive out-of-band reads (band = target ± 0.5 lb/wk)",
-            "step_kcal": 150,
-            "min_days_between_steps": 14,
-            "insufficient_loss_with_logging_intact": "walking hours FIRST (+2 h), then −150 — feet before fork",
-            "expected_path": "2,100 to 275 → 2,000 to 240 → 1,950 to 220 → rising to 2,000–2,150 through the landing → ~2,700–2,800 at maintenance (model; measure RMR)",
-        },
-        "provenance": "population-derived",
-        "derived_by": "red-team consensus 2026-09-22 (physician + nutritionist floors; the calibrated model's 'highest intake that reproduces the trajectory')",
-        "stated": "2026-09-22",
+        # #5095: the values are the charter's `nutrition.calories` (one calorie target; health.calorie_target resolves it)
+        "floor_7d_mean": _charter_value("nutrition.calories.floor_7d_mean_kcal"),
+        "floor_lifting_day": _charter_value("nutrition.calories.floor_lifting_day_kcal"),
+        "floor_any_day": _charter_value("nutrition.calories.floor_any_day_kcal"),
+        "planned_minimum_any_weight": _charter_value("nutrition.calories.planned_minimum_any_weight_kcal"),
+        "opening_kcal": _charter_value("nutrition.calories.target_kcal"),
+        "prescribed": _charter_value("nutrition.calories.prescribed_band_kcal"),
+        "titration": _charter_value("nutrition.titration"),  # #5096: the weekly engine's rule (health.titration)
+        "floor_role": _charter_value("nutrition.calories.floor_role"),  # owner ruling 2026-10-23 R1: the floors are warnings
+        "provenance": "population-derived",  # the FLOORS' label (ADR-105); the ~1,500 target itself is the owner's (R1)
+        "derived_by": "red-team consensus 2026-09-22 (physician + nutritionist floors), kept as warnings by owner ruling 2026-10-23 R1 (#5091: stay ~1,500)",
+        "stated": "2026-10-23",
         "note": (
-            "At the 2024–25 activity base (16 h walking, 5 lifts) ~2,000 kcal reproduces the campaign — −100 lb at week 29, 3.45 lb/wk — "
-            "exactly the measured record; at a 13 h base the same intake gives ~3.3. 1,500 kcal reproduces 3.5 only at today's 8.4 h "
-            "and cannot hold it below 260; its cost is ~30 g of carbohydrate a day for training and an estimated 3–6 lb more lean lost "
-            "(from practice, not a citation). There is no prize for eating 1,500: the same trajectory is available at ~2,000–2,100 with "
-            "the feet. `prescribed` is the OPENING band; a titration step moves it by a dated edit here, never silently. `floor_any_day` "
-            "and `floor_lifting_day` are what the nutrition critics grade single days against; the 7-day-mean floor is not yet computed by "
-            "any module and is reported, not enforced."
+            "Owner ruling 2026-10-23 (R1): stay at ~1,500 kcal; the charter is re-targeted there and the weekly engine does not push food up. "
+            "The 2026-09-22 red team's model read differently and is kept as the dissent: at the 2024–25 activity base (16 h walking, 5 lifts) "
+            "~2,000 kcal reproduced the campaign, and 1,500 was estimated to cost training carbohydrate and 3–6 lb more lean (from practice, not "
+            "a citation). The floors are therefore WARNINGS (`floor_role`): a day under `floor_any_day` / `floor_lifting_day` is reported "
+            "honestly and visibly, never vetoed and never clamped up; the 7-day-mean floor is reported, not enforced. `prescribed` is the "
+            "calorie band centred on the target (#5099); a titration record (health.titration) moves it, never silently."
         ),
     },
     "protein_floor_g": {
         "value": _PLAN_PROTEIN_FLOOR_G,
-        "target_g": 200,
-        "days_of_7": 6,
-        "feedings": 4,
-        "feeding_g": [45, 55],
+        "target_g": int(_charter_value("nutrition.protein.range_g.high") or 0),  # #5098: the charter's protein block
+        "days_of_7": int(_charter_value("nutrition.protein.days_of_7") or 0),
+        "feedings": int(_charter_value("nutrition.protein.feedings_per_day") or 0),
+        "feeding_g": list(_charter_value("nutrition.protein.feeding_target_g") or []),
         "g_per_kg_dxa_lean": {"target": 2.6, "floor": 2.3, "lean_kg": 77.4, "lean_source": "DXA 2026-03-30 (170.6 lb lean)"},
         "timing": "one feeding ≥ 40 g within 2 h of lifting; one pre-sleep",
         "provenance": "owner",
@@ -295,25 +299,25 @@ REDLINES: dict[str, dict[str, Any]] = {
         "evidence": f"Helms 2014 JISSN 11:20 doi:10.1186/1550-2783-11-20 (2.3–3.1 g/kg FFM in a deficit; {_PLAN_PROTEIN_FLOOR_G} g = {_PLAN_PROTEIN_FLOOR_G / 77.4:.2f} g/kg of 77.4 kg DXA lean)",
         "note": "missed >= 3 of the trailing 7 MEASURED days -> the lower band; < 3 -> the step target returns; < 4 measured days -> unknown, target unchanged",
     },
-    "fat_floor_g": {
-        "value": 65,
-        "per_meal_g": 10,
-        "meals_with_fat": 3,
-        "epa_dha_g": 2,
+    "fat_floor_g": {  # #5102: fat/carb/fibre floors are the charter's nutrition.floors
+        "value": _charter_value("nutrition.floors.fat.floor_g"),
+        "per_meal_g": _charter_value("nutrition.floors.fat.per_meal_g"),
+        "meals_with_fat": _charter_value("nutrition.floors.fat.meals_with_fat"),
+        "epa_dha_g": _charter_value("nutrition.floors.fat.epa_dha_g"),
         "provenance": "population-derived",
         "derived_by": "red-team consensus 2026-09-22 (nutritionist + physician: gallbladder emptying, Gebhard 1996; testosterone 361, Whittaker & Wu 2021)",
         "stated": "2026-09-22",
-        "note": "≥ 10 g at each of ≥ 3 meals is the gallbladder-emptying rule that pairs with ursodiol above 3.0 lb/wk. NEW in v3; no module grades it yet.",
+        "note": "≥ 10 g at each of ≥ 3 meals is the gallbladder-emptying rule that pairs with ursodiol above 3.0 lb/wk. The daily total is graded by health.macro_floors (#5102).",
     },
     "carb_floor_g": {
-        "value": 120,
-        "typical_g": [150, 180],
+        "value": _charter_value("nutrition.floors.carb.floor_g"),
+        "typical_g": _charter_value("nutrition.floors.carb.typical_g"),
         "bias": "toward lifting days; a high-carb refeed (300–350 g at maintenance) only below 240 and only when an anchor drops ≥ 5 % over two sessions with adherence intact",
-        "fibre_g": [35, 40],
+        "fibre_g": _charter_value("nutrition.floors.fibre.target_range_g"),
         "provenance": "population-derived",
         "derived_by": "red-team consensus 2026-09-22 (nutritionist + S&C coach)",
         "stated": "2026-09-22",
-        "note": "Carbohydrate is the remainder after protein and fat; 1,500 kcal leaves ~30 g, which is why the floor moved to 1,800. NEW in v3; no module grades it yet.",
+        "note": "Carbohydrate is the remainder after protein and fat. The daily totals (carb and fibre) are graded by health.macro_floors (#5102).",
     },
     "walking_floor_hr_wk": {
         "value": 8.5,
@@ -730,7 +734,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "threshold_days": 14,
         "provenance": "population-derived",
         "derived_by": "population (Garthe 2011) via the nutritionist and S&C seats",
-        "action": "+150–250 kcal/day; target −0.5 lb/wk",
+        "action": f"+{CALORIE_STEP_TEXT} kcal/day; target −0.5 lb/wk",
         "evaluated_by_engine": False,
         "note": "The flagged arm of the overshoot rule; `rate_overshoot` below is its cap-based v2 ancestor kept for the nutrition critics' read.",
     },
@@ -741,7 +745,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "threshold_days": 14,
         "provenance": "population-derived",
         "derived_by": "physician / nutritionist (red team 2026-09-22)",
-        "action": "+150 kcal/day regardless of every other signal",
+        "action": f"+{CALORIE_STEP_TEXT} kcal/day regardless of every other signal",
         "after_week": 3,
         "note": "An absolute ceiling above the schedule's caps; the only rate rule with no 'unless'.",
     },
@@ -752,11 +756,12 @@ TRIPWIRES: list[dict[str, Any]] = [
         "after_week": 3,
         "provenance": "population-derived",
         "derived_by": "transformation coach + physician (v2), re-based on the v3 caps",
-        "action": "+150–250 kcal/day and ursodiol on — unless strength, DXA and recovery are ALL clean (`loss_excessive_clean`: hold); overshoot is a failure, not a win",
+        "action": f"+{CALORIE_STEP_TEXT} kcal/day and ursodiol on — unless strength, DXA and recovery are ALL clean (`loss_excessive_clean`: hold); overshoot is a failure, not a win",
         "evaluated_by_engine": False,
         "note": (
             "Cap-based: the cap is the schedule step's `cap` at his current weight (the charter band's ceiling above the landing, #5074; his taper caps from the landing down). "
-            "`health.nutrition_critics` reads `threshold_weeks` and the overshoot rule's words and offers the +250 as a change; "
+            "`health.nutrition_critics` reads `threshold_weeks` and the overshoot rule's words and offers the one calorie step "
+            "(nutrition.titration.max_step_kcal, #5205) as an owner option — a warning, never an automatic change (owner ruling 2026-10-23 R1); "
             "its week gate is 'after week 4' from v2 and one week looser than v3's 'after week 3' — noted, not silently corrected."
         ),
     },
@@ -767,7 +772,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "threshold_days": 21,
         "provenance": "owner",
         "derived_by": "owner's rule: feet before fork",
-        "action": "walking +2 h FIRST; then −150 kcal (floor 1,800); never both inside 14 days",
+        "action": f"walking +2 h FIRST; then −{CALORIE_STEP_TEXT} kcal (floor 1,800); never both inside 14 days",
         "evaluated_by_engine": False,
         "note": "The only rule that lowers intake, and it lowers the feet first.",
     },
@@ -788,7 +793,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "threshold_days": 2,
         "provenance": "population-derived",
         "derived_by": "physician + nutritionist (v2), floors re-based to v3",
-        "action": "+250 kcal/day as protein + fruit for 7 days; the aggressive phase pauses until corrected",
+        "action": f"{_FLOOR_WARNING}: the step he may choose is +{CALORIE_STEP_TEXT} kcal/day as protein + fruit for 7 days",
         "evaluated_by_engine": False,
         "note": "Read by `health.nutrition_critics` against `energy_floor_kcal.floor_any_day` / `floor_lifting_day`; the 1,078 kcal day in the record is a violation, not a good day.",
     },
@@ -799,9 +804,9 @@ TRIPWIRES: list[dict[str, Any]] = [
         "threshold_days": 3,
         "provenance": "owner-history",
         "derived_by": "lived experience (red team 2026-09-22); firing today on his own record — 15 of 20 logged days",
-        "action": "+250 kcal for 7 days, protein to 200 g",
+        "action": f"{_FLOOR_WARNING}: the step he may choose is +{CALORIE_STEP_TEXT} kcal for 7 days, protein to 200 g",
         "evaluated_by_engine": False,
-        "note": "The planned-minimum arm (1,700 at any weight) as distinct from the hard floor above; the current block trips it.",
+        "note": "The pre-ruling planned-minimum arm (1,700 at any weight) as distinct from the hard floor above, kept at its owner-history threshold as a warning; the charter's planned minimum is 1,400 since 1.21.0 (owner ruling 2026-10-23), so the ~1,500 target trips this arm by choice.",
     },
     {
         "id": "logging_dark",
@@ -822,7 +827,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "threshold_days": 14,
         "provenance": "population-derived",
         "derived_by": "lived experience (red team 2026-09-22; from practice, not a citation)",
-        "action": "the deficit shrinks by 250 kcal — speed may not come from the fork when the feet are down",
+        "action": f"the deficit shrinks by {CALORIE_STEP_TEXT} kcal — speed may not come from the fork when the feet are down",
         "evaluated_by_engine": False,
         "note": "The rule that stops 1,500 kcal from quietly substituting for 16 hours of walking, which is exactly how the current block is producing its rate.",
     },

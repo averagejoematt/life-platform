@@ -8,6 +8,8 @@ beyond the one `strptime` that turns a record's own date into a day initial.
 `_compute_weekly_habit_review` from there.
 """
 
+from common.habit_registry import habit_tier  # #5232
+
 from content.brief_format import esc, pct_int
 
 
@@ -78,7 +80,7 @@ def _compute_weekly_habit_review(habit_7d_records, profile):
     # habit missed every day it applied at 4/7.
     t0_habits = []
     for name, meta in registry.items():
-        if meta.get("status") == "active" and meta.get("tier", 2) == 0:
+        if meta.get("status") == "active" and habit_tier(meta) == 0:
             applied = [d for d in daily if (name in d["applicable"] if d["applicable"] else d["measured"])]
             days_total = len(applied)
             days_done = sum(1 for d in applied if name not in d["missed"])

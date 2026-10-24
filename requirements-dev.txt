@@ -18,7 +18,7 @@ pytest-xdist==3.8.0
 # gates (tests/test_prop_*.py, #1664). Deterministic + bounded example counts so CI
 # stays fast; no browser/native deps. Version MUST equal the CI gate's pin (CQ-01,
 # #1963) — read from ci-test.yml / ci-cd.yml, not quoted here.
-hypothesis==6.169.0
+hypothesis==6.170.1
 # PyYAML — scripts/apply_branch_protection.py's preflight_contexts() parses
 # .github/workflows/*.yml to verify every required check context actually exists
 # as an unfiltered, un-gated job (#1662/#2198). tests/test_branch_protection_spec.py
@@ -34,7 +34,7 @@ pyyaml==6.0.3
 # CQ-01 (AUDIT 2026-06-30): pinned to MATCH the CI gate (ci-cd.yml) — CI is the
 # source of truth for the enforced gate versions; a mismatch let local formatting
 # diverge from what the build enforces. Bump both together, never one alone.
-playwright==1.63.0
+playwright==1.64.0
 # Pillow — visual_ai_qa._prepare_image downscales full-page captures that exceed
 # Bedrock's 8000px-per-dimension image limit (#2973: home.png at 1440x11827 drew a
 # ValidationException and the page went silently unevaluated). LOAD-BEARING in every
@@ -44,7 +44,7 @@ playwright==1.63.0
 # (test_ci_pin_consistency._UNGATED_DEV_PINS): the Lambda pillow LAYER
 # (lambdas/requirements/pillow.txt) is a separate runtime plane with its own
 # promote flow — matching it today is convenience, not a contract.
-pillow==12.3.0
+pillow==13.0.0
 
 # Linting & formatting (config in pyproject.toml). ruff owns lint + import-sort;
 # black owns formatting. (standalone isort removed — it fought ruff's sorter.)
@@ -55,7 +55,8 @@ pillow==12.3.0
 # via scripts/ci_pins.py like every other gate tool.
 flake8==7.4.1
 ruff==0.14.14
-black==26.3.1
+# 26.10.1 fixes CVE-2026-114134 (pip-audit, 2026-10-22); the whole tree is unchanged under it
+black==26.10.1
 
 # Type checking (ENFORCED/blocking on the clean-module set, advisory elsewhere —
 # see tests/test_mypy_clean_modules.py + mypy.ini). Version MUST equal ci-lint.yml's
@@ -64,8 +65,8 @@ mypy==2.4.0
 
 # AWS SDK (for tests that call boto3 directly). Versions MUST equal the CI gate's
 # pins (CQ-01, #1963) — read from ci-test.yml / ci-cd.yml, not quoted here.
-boto3==1.43.111
-botocore==1.43.111
+boto3==1.43.114
+botocore==1.43.114
 
 # CI supply-chain gates (#2760 — the one-legged-pin class): both were pinned as
 # workflow literals with NO Dependabot leg, so the pins could only rot. This file
@@ -80,7 +81,7 @@ pip-licenses==5.5.5
 # Remediation-agent runtime (remediation-agent.yml, ADR-064/065). Installed
 # UNPINNED (floating latest) until #2760; now pinned here and Dependabot-bumped,
 # resolved by the workflow via scripts/ci_pins.py.
-claude-agent-sdk==0.2.165
+claude-agent-sdk==0.2.168
 
 # CDK (synth + diff) — pinned exactly, MUST equal cdk/requirements.txt's pins
 # (#814, R22-MOD-01: a floor-only `>=` let an untested aws-cdk-lib release

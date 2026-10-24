@@ -139,21 +139,6 @@ def check_reuse_or_explain(table, coach_id: str, output_type: str, parts: dict):
     return fingerprint, None, None
 
 
-def reflection_parts(persona, voice_rules, example, facts) -> dict:
-    """The named semantic parts of a coach DAILY REFLECTION generation (#2889).
-
-    Same contract as `brief_parts`: the names live here so a call site cannot
-    quietly drop one (dropping a part narrows the fingerprint, the direction that
-    could serve stale output as fresh).
-    """
-    return {
-        "persona": persona,
-        "voice_rules": voice_rules,
-        "example": example,
-        "facts": facts,
-    }
-
-
 def ensemble_parts(coach_data, expected_coach_ids, system_prompt) -> dict:
     """The named semantic parts of an ENSEMBLE DIGEST generation (#2889).
 

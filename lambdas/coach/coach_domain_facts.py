@@ -13,7 +13,8 @@ The honesty contract, in order of importance:
   ``_resolve_mf_tdee`` the site calls), else ``health.tdee.energy_budget`` from
   profile height/DOB + the latest Withings weigh-in + measured trailing-7d Strava
   exercise energy. The phone and the site cannot tell two truths, and every
-  figure carries its source label.
+  figure carries its source label. The CALORIE TARGET is not derived from that
+  TDEE: it is the ONE resolver's (``health.calorie_target``, #5095).
 * Absence stays absent: a pack that cannot be computed contributes NOTHING —
   never a default, never an assumed height (ADR-104). The renderer says what is
   missing out loud so the coach can too.
@@ -45,7 +46,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Optional
 
 from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
@@ -136,9 +137,8 @@ def _nutrition_pack(table, today: str) -> list:
             logger.warning("[domain_facts] energy budget fallback failed: %s", e)
 
     if tdee:
-        from health.tdee import DEFAULT_DEFICIT_KCAL, METHOD as TDEE_METHOD
+        from health.tdee import METHOD as TDEE_METHOD
 
-        target = round(tdee - DEFAULT_DEFICIT_KCAL)
         label = (
             "MacroFactor adaptive expenditure (measured)"
             if source == "macrofactor_adaptive"
@@ -148,13 +148,22 @@ def _nutrition_pack(table, today: str) -> list:
         # a rename can never leave this surface publishing the old figure's old label.
         method_name = "macrofactor_adaptive_expenditure" if source == "macrofactor_adaptive" else TDEE_METHOD
         lines.append(f"TDEE (maintenance): {round(tdee)} kcal — source: {label}; method: {method_name}.")
-        lines.append(
-            f"ADR-152 calorie target: {target} kcal (TDEE minus the {DEFAULT_DEFICIT_KCAL} kcal deficit — the deficit lives in the target, never in TDEE)."
-        )
     else:
         lines.append(
-            "Calorie target: not computable right now (needs a recent weigh-in + profile height, or a MacroFactor expenditure record). Say so if asked."
+            "TDEE (maintenance): not computable right now (needs a recent weigh-in + profile height, or a MacroFactor expenditure record). Say so if asked."
         )
+    # #5095: the calorie target is the ONE resolver's (health.calorie_target) — the same number scoring, the
+    # emails, the macros tool and the critics use. It is no longer TDEE minus a flat 500 (a second target).
+    from health.calorie_target import resolve as resolve_calorie_target
+
+    ct = resolve_calorie_target(today)
+    if ct["kcal"]:
+        lines.append(
+            f"Calorie target: {ct['kcal']} kcal/day (prescribed band {ct['band_low']}–{ct['band_high']}; "
+            f"day floors {ct['floor_any_day_kcal']} any day / {ct['floor_lifting_day_kcal']} lifting day) — source: {ct['provenance']}."
+        )
+    else:
+        lines.append("Calorie target: none resolved right now (the charter's nutrition.calories block is unreadable). Say so if asked.")
 
     logged = [i for i in mf if _num(i.get("calories") or i.get("total_calories_kcal")) is not None]
     if logged:
@@ -497,16 +506,33 @@ _PACKS = {
 _TRAINING_ROUTE_KEYS = frozenset({"physical", "training"})
 
 
-def _training_context(today: str, clinical: str) -> str:
+def _training_context(today: str, clinical: str, table: Any = None) -> str:
     """`training.coach_context.assemble` for the owner's Telegram thread (published=False), the clinical block passed
-    in as its guidance section. Fail-soft: on any trouble the bare clinical block, as before."""
+    in as its guidance section and (#5200) the newest completed May-tracker week read from `table`. Fail-soft: on any
+    trouble the bare clinical block, as before."""
     try:
-        from training import coach_context
+        from training import coach_context, may_tracker
 
-        return coach_context.assemble(today, packet=None, constraint_block=None, guidance=clinical, published=False)["text"]
+        tracker = may_tracker.latest_completed_row(table, today) if table is not None else None
+        return coach_context.assemble(today, packet=None, constraint_block=None, tracker=tracker, guidance=clinical, published=False)[
+            "text"
+        ]
     except Exception as e:  # noqa: BLE001 — the chat runs on the clinical block alone
         logger.warning("[domain_facts] coach context unavailable: %s", e)
         return clinical
+
+
+def _nutrition_context(today: str) -> str:
+    """#5109: `training.coach_context.nutrition_context` for the owner's nutrition thread (published=False): the
+    charter's nutrition block, the redlines' rules and the ONE calorie target with its provenance. The day grade is
+    the brief's (this thread reads no single day row). Fail-soft: "" on any trouble."""
+    try:
+        from training import coach_context
+
+        return coach_context.nutrition_context(today, published=False)["text"]
+    except Exception as e:  # noqa: BLE001 — the chat runs on its domain facts alone
+        logger.warning("[domain_facts] nutrition context unavailable: %s", e)
+        return ""
 
 
 def _persona_id(coach_id: str) -> tuple:
@@ -602,7 +628,9 @@ def domain_facts_block(coach_id: str, table, today: Optional[str] = None) -> str
     except Exception as e:  # pragma: no cover — bundle edge; the renderer is itself fail-soft
         logger.warning("[domain_facts] clinical context unavailable: %s", e)
     if key in _TRAINING_ROUTE_KEYS:
-        clinical = _training_context(today, clinical)  # #5071: the one planning context, the clinical block inside it
+        clinical = _training_context(today, clinical, table)  # #5071: the one planning context, the clinical block inside it
+    elif key == "nutrition":
+        clinical = "\n\n".join(x for x in (clinical, _nutrition_context(today)) if x)  # #5109: the same assembly
     if clinical:
         sections.append(clinical)
     track_section = coach_team_texture.track_record_section(track_lines)

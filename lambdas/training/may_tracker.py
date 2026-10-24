@@ -17,8 +17,9 @@ already owns it — this module arranges and compares, it does not count:
   volume     the charter's `volume_priorities.sets_per_wk` rows over the week's
              `muscle_volume.working_sets_by_muscle` output (a key the per-muscle count does not
              carry is `absent`, with its parent bucket as context only — #5053 adds the keys);
-  fitness    the latest fitness-test battery (absent until #5078 stores one);
-  running    the distance to `gated_movements.running.gate_lb` and its prerequisites (#5090).
+  fitness    the battery's per-test trend and its cadence state (`training.fitness_tests`, #5078);
+  running    the run gate through `training.run_onramp.gate_state` (#5090): closed / prep / held / open,
+             lb to the prep and to the gate, and the walking weeks met / needed.
 
 Then the TRIGGERS — each names its LEVER (the review's calibration table): the rate below the
 floor two weeks running -> steps or food; above the ceiling -> the nutrition review; an anchor
@@ -28,8 +29,8 @@ measured is listed under `unevaluated`, never read as green (ADR-104).
 
 PRIVACY. The target date and the band are owner-only by ruling (no May countdown on any published
 surface). The row is stored at `USER#matthew#SOURCE#may_tracker / WEEK#<monday>` (Tier owner-only,
-CROSS_PHASE); the only readers are the owner's MCP tool `get_may_tracker` and `latest_row()` for
-the coach-context assembly (#5071). `tests/test_may_tracker_5073.py` holds that no `lambdas/web/`
+CROSS_PHASE); the only readers are the owner's MCP tool `get_may_tracker` and `latest_completed_row()`
+for the coach-context assembly (#5071, read on every planning caller path since #5200). `tests/test_may_tracker_5073.py` holds that no `lambdas/web/`
 or `lambdas/emails/` module imports this one.
 
 Pure core (`build_week`, `evaluate_triggers`); the store helpers take an injected table.
@@ -211,8 +212,19 @@ def target_projection(sunday: str, weight: Optional[float], rate_4wk: Optional[f
     return out
 
 
+def _tape_cadence(rows: Any, sunday: str) -> dict[str, Any]:
+    """#5061: the tape cycle as of Sunday (`training.calibration_cadence`) — state, due date, missed cycles. Dates only."""
+    from common.constants import EXPERIMENT_START_DATE
+
+    from training import calibration_cadence as cc
+
+    r = cc.tape_row(list(rows or ()), sunday, EXPERIMENT_START_DATE)
+    return {k: r.get(k) for k in ("state", "last_logged", "due_on", "missed_cycles", "prompt")}
+
+
 def waist_section(rows: Optional[Iterable[Mapping[str, Any]]], sunday: str, read_error: Optional[str] = None) -> dict[str, Any]:
     """The latest tape row on or before Sunday with any waist site. Absent until a tape exists — never 0."""
+    rows = list(rows) if rows is not None else None
     src = "USER#matthew#SOURCE#measurements (waist_*_in)"
     if read_error:
         return cell(READ_FAILED, None, src, error=read_error)
@@ -225,11 +237,11 @@ def waist_section(rows: Optional[Iterable[Mapping[str, Any]]], sunday: str, read
             best = {**r, "_d": d}
     every = _cv("calibration.tape_and_photos.every_weeks")
     if best is None:
-        return cell(ABSENT, None, src, "no tape row with a waist site yet (#5061 collects it)", every_weeks=every)
+        return cell(ABSENT, None, src, "no tape row with a waist site yet", every_weeks=every, cadence=_tape_cadence(rows, sunday))
     vals = {f: float(best[f]) for f in WAIST_FIELDS if best.get(f) is not None}
     age = _days_between(best["_d"], sunday)
     due = every is not None and age > int(every) * 7
-    return cell(MEASURED, vals, src, date=best["_d"], age_days=age, every_weeks=every, tape_due=due)
+    return cell(MEASURED, vals, src, date=best["_d"], age_days=age, every_weeks=every, tape_due=due, cadence=_tape_cadence(rows, sunday))
 
 
 def _resolved(day_row: Mapping[str, Any]) -> Optional[int]:
@@ -337,31 +349,68 @@ def volume_section(vol: Optional[Mapping[str, Any]], read_error: Optional[str] =
     return {"state": state, "source": src, "charter_path": "volume_priorities.sets_per_wk", "rows": rows}
 
 
-def fitness_section(record: Optional[Mapping[str, Any]], read_error: Optional[str] = None) -> dict[str, Any]:
-    src = "fitness-test battery (#5078)"
+def fitness_section(view: Optional[Mapping[str, Any]], sunday: Optional[str] = None, read_error: Optional[str] = None) -> dict[str, Any]:
+    """The fitness-test battery as of Sunday (#5078): each test's latest / previous / delta in its better
+    direction (`fitness_tests.trend`) and, when supplied, the cadence state (`fitness_tests.due`). `view` is
+    `{"batteries": [...], "due": {...} | None}` (mcp.tools_fitness_tests.read_view); None = nothing read."""
+    from training import fitness_tests
+
+    src = "fitness-test battery (#5078: training.fitness_tests over the BATTERY# record + Hevy)"
     every = _cv("calibration.fitness_tests.every_weeks")
     if read_error:
         return cell(READ_FAILED, None, src, error=read_error)
-    if not record:
-        return cell(ABSENT, None, src, "no fitness-test record is stored yet (#5078 builds the battery)", every_weeks=every)
-    return cell(MEASURED, dict(record), src, every_weeks=every)
+    batts = [b for b in (view or {}).get("batteries") or [] if sunday is None or str(b.get("date")) <= sunday]
+    cadence = (view or {}).get("due")
+    if not batts:
+        return cell(ABSENT, None, src, "no fitness-test battery is on file yet (#5078)", every_weeks=every, due=cadence)
+    return cell(
+        MEASURED,
+        fitness_tests.trend(batts),
+        src,
+        latest_date=batts[-1]["date"],
+        batteries=len(batts),
+        every_weeks=every,
+        due=cadence,
+    )
 
 
-def running_gate_section(weight: Optional[float]) -> dict[str, Any]:
+def running_gate_section(
+    weight: Optional[float],
+    walking_weeks: Optional[list[Mapping[str, Any]]] = None,
+    holds: Any = None,
+    stage4_done: bool = False,
+    onramp: Optional[Mapping[str, Any]] = None,
+    held_since: Optional[str] = None,
+) -> dict[str, Any]:
+    """The run gate (`training.run_onramp.gate_state`, the one gate): `walking_weeks` are the tracked week's
+    completed walking weeks (hours + a lower-leg pain flag each); `holds` the strain-hold causes, None = not read;
+    `onramp` the Stage 4 progress (`run_onramp.stage_progress`) from his logged run/walks, None = not read;
+    `held_since` the day a standing hold began (no run/walk counts from it)."""
+    from training import run_onramp
+
     gate = _cv("gated_movements.running")
     if not isinstance(gate, Mapping) or gate.get("gate_lb") is None:
         return cell(ABSENT, None, "gated_movements.running", "the charter carries no running gate")
-    gate_lb = float(gate["gate_lb"])
+    gs = run_onramp.gate_state(weight, walking_weeks, holds, stage4_done)
     return cell(
         MEASURED if weight is not None else ABSENT,
-        None if weight is None else round(max(weight - gate_lb, 0.0), 1),
-        "gated_movements.running",
+        gs["lb_to_gate"],
+        "training.run_onramp.gate_state over gated_movements.running",
         None if weight is not None else "no weigh-in",
         unit="lb to the gate weight",
-        gate_lb=gate_lb,
-        weight_cleared=None if weight is None else weight <= gate_lb,
+        gate_lb=gs["gate_lb"],
+        weight_cleared=None if weight is None else weight <= gs["gate_lb"],
+        gate_state=gs["state"],
+        reason=gs["reason"],
+        line=run_onramp.gate_line(gs),
+        prep_from_lb=gs["prep_from_lb"],
+        lb_to_prep=gs["lb_to_prep"],
+        walking=gs["walking"],
+        holds_read=gs["holds_read"],
+        holds=gs["holds"],
+        held_since=held_since,
+        onramp=dict(onramp) if onramp is not None else None,
         prerequisites=list(gate.get("prerequisites") or []),
-        prerequisites_state="not_evaluated: the walking-weeks condition and the on-ramp stage are #5090's",
         refs=gate.get("refs"),
     )
 
@@ -452,6 +501,7 @@ def build_week(
     fitness: Mapping[str, Any],
     prior: Optional[Mapping[str, Any]] = None,
     built_at: Optional[str] = None,
+    running: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any]:
     """The week's row from its sections (each built above), triggers evaluated against `prior`."""
     from training.training_charter import charter_version
@@ -471,7 +521,7 @@ def build_week(
         "anchors": dict(anchors),
         "volume": dict(volume),
         "fitness_tests": dict(fitness),
-        "running_gate": running_gate_section(w),
+        "running_gate": running_gate_section(w, **dict(running or {})),  # #5090: walking_weeks / holds from the caller
         "tier": "owner_only",
     }
     if built_at:
@@ -516,3 +566,38 @@ def latest_row(table: Any) -> dict[str, Any]:
     if not rows:
         return {"state": ABSENT, "row": None, "detail": "no May-tracker week is stored yet"}
     return {"state": MEASURED, "row": rows[0]}
+
+
+STALE = "stale"
+
+
+def latest_completed_row(table: Any, target_date: str) -> dict[str, Any]:
+    """#5200: the newest stored week whose Sunday is BEFORE `target_date` — what every planning caller's coach
+    context reads (plan_next_session, the nightly pre-draft, the session packet). `{state, row, expected_week_start}`:
+    `measured` when it is the newest completed week, `stale` when an older week is the newest stored one (supplied,
+    and said), `absent` with no stored week, `read_failed` with the exception class — never an empty tracker."""
+    from common.numeric import decimals_to_float
+
+    expected = last_completed_monday(target_date)
+    try:
+        resp = table.query(
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :lo AND :hi",
+            ExpressionAttributeValues={":pk": PK, ":lo": SK_PREFIX, ":hi": SK_PREFIX + expected},
+            ScanIndexForward=False,
+            Limit=1,
+        )
+    except Exception as e:  # noqa: BLE001 — reported by class; the context states it
+        return {"state": READ_FAILED, "row": None, "error": type(e).__name__, "expected_week_start": expected}
+    items = resp.get("Items") or []
+    if not items:
+        return {
+            "state": ABSENT,
+            "row": None,
+            "detail": f"no May-tracker week through {expected} is stored",
+            "expected_week_start": expected,
+        }
+    row = decimals_to_float(items[0])
+    if row.get("week_start") == expected:
+        return {"state": MEASURED, "row": row, "expected_week_start": expected}
+    detail = f"the newest stored week is {row.get('week_start')}; the newest completed week is {expected} (the nightly leg writes it)"
+    return {"state": STALE, "row": row, "detail": detail, "expected_week_start": expected}

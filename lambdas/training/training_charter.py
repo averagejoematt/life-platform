@@ -76,6 +76,8 @@ PUBLISHED_WHITELIST: tuple[str, ...] = (
     "deload.automatic",
     "deload.owner_gated",
     "concession_ledger",
+    "nutrition.protein.feeding_threshold_g",  # #5214: the one per-feeding protein threshold the review email prompt names (a rule, nothing private)
+    "nutrition.floors.fibre.floor_g",  # #5204: the one fibre floor the nutrition door and review email grade against (35 g, nothing private)
 )
 
 _CACHE_TTL_SECONDS = 900  # the platform's 15-min config-cache convention
@@ -149,7 +151,14 @@ def _from_s3(key: str) -> Optional[Dict[str, Any]]:
         response = getattr(e, "response", None)
         code = str(response.get("Error", {}).get("Code", "") or "") if isinstance(response, dict) else ""
         code = code or type(e).__name__
-        if code not in _ABSENT_ERROR_CODES:
+        if code in ("403", "Forbidden"):
+            code = "AccessDenied"  # a bare HTTP status is still a real denial: keep the literal the alarm filters on
+        if code in _ABSENT_ERROR_CODES:
+            # An absent optional object is the designed state (#5220): say so WITHOUT the denial literal, once.
+            if key not in _warned_keys:
+                _warned_keys.add(key)
+                logger.info("training-charter: s3://%s/%s absent — continuing without it; logged once per container", bucket, key)
+        else:
             if key in _warned_keys:
                 logger.debug("training-charter: s3://%s/%s still not read (%s)", bucket, key, code)
             else:

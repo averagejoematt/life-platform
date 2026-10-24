@@ -93,9 +93,11 @@ from training import (
     program_structure,
     recent_aerobic,
     redline_rate,
+    run_onramp,
     self_added_volume,
     steps_nudge,
     steps_ramp,
+    training_calendar,
     training_charter,
     training_context_registry,
 )
@@ -680,6 +682,8 @@ def _scheduled_session(
     skill_ceiling: int,
     block_workouts: list[dict[str, Any]] | None = None,
     deload_records: list[dict[str, Any]] | None = None,
+    weight_lb: float | None = None,
+    pain_flag_instances: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The session the program serves on `day` (#4064, #4110). Pure.
 
@@ -715,6 +719,7 @@ def _scheduled_session(
     if out.get("prescription"):
         # #5077: the block mesocycle model's week — the per-muscle set target, the ramp stage, the next block, no deload week
         out["block_model"] = block_model.for_session(out, deload_records)
+        run_onramp.attach_prep(out, day, weight_lb, pain_flag_instances, catalog_movements, skill_ceiling)  # #5090: lower-leg prep
     out["how_to_draft"] = (
         "manage_hevy_routine action=draft target_date=" + day + " builds exactly this session (the generator reads the same "
         "session sequence and prescription); draft_custom only for a deliberate departure"
@@ -747,11 +752,14 @@ def _deload_recommendation(
     return rec
 
 
-def _effort_blocks(date: str, rows: Any, catalog_movements: Any, states: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    """`progression` (#5052) + `ceiling_change_proposal` (#5058, over the prescription window's stored adherence)."""
+def _effort_blocks(
+    date: str, rows: Any, catalog_movements: Any, states: dict[str, dict[str, Any]], dis_records: Any, block_workouts: Any = None
+) -> dict[str, Any]:
+    """`progression` (#5052) + `ceiling_change_proposal` (#5058) + `training_day_fuel` (#5101, typed by the #5191 calendar)."""
     st = (states.get("hevy_workouts_prescription_window") or {}).get("state")
     proposal = ceiling_proposal.for_plan(date, rows, None if st == READ_FAILED else st, catalog_movements)
-    return {"progression": load_progression.rule_summary(), "ceiling_change_proposal": proposal}
+    fuel = training_calendar.plan_fuel(date, disruption.state(dis_records, date) if dis_records is not None else None, block_workouts)
+    return {"progression": load_progression.rule_summary(), "ceiling_change_proposal": proposal, "training_day_fuel": fuel}
 
 
 def _steps_ramp_block(
@@ -1016,7 +1024,7 @@ def constraint_block(
         block_boundaries=_block_boundaries(block_workouts, date),
     )
 
-    session = _scheduled_session(date, catalog_movements, skill_ceiling, block_workouts, deload_records)
+    session = _scheduled_session(date, catalog_movements, skill_ceiling, block_workouts, deload_records, weight_lb, pain_flag_instances)
     # #5070: signals recommend, the owner's recorded word applies — one block, also stamped on the served session
     deload_rec = _deload_recommendation(session, date, deload_records, fatigue, readiness_low_streak_days, tripwires, states)
 
@@ -1095,13 +1103,11 @@ def constraint_block(
         "program": program,
         "accessory_rotation_ok": rotation["ok"],
         "accessory_rotation": rotation,
-        # #5068 (ADR-164): the charter version this plan was built beside. None means no
-        # charter could be read and the plan says so. W1 (#5050) moves the engine's reads
-        # (steps, split, rate band, cadences) onto the charter; until then the literals
-        # above still come from owner_redlines/program_structure and this is a stamp only.
+        # #5068 (ADR-164): the charter version this plan was built beside (None = no charter could be read, and the plan says so).
+        # W1 (#5050) moves the engine's reads onto the charter; until then the literals above still come from owner_redlines/program_structure.
         "charter_version": training_charter.charter_version(),
         # #5052: the double progression + effort limits, stamped; #5058: the ceiling-change proposal (never auto-applied)
-        **_effort_blocks(date, hevy_workouts_prescription_window, catalog_movements, states),
+        **_effort_blocks(date, hevy_workouts_prescription_window, catalog_movements, states, disruption_records, block_workouts),
         "critics": dict(_CRITICS_NOT_WIRED),
         "honesty": [
             s

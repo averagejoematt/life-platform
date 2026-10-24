@@ -178,7 +178,9 @@ def test_ci_gate_call_sites_are_actually_wired():
 
 def test_allowlist_matches_the_wired_labels():
     """Registry and call sites cannot drift apart (charter primitive 1)."""
-    assert bedrock_client.ATTRIBUTABLE_FEATURES == frozenset({"visual-ai-qa", "reader-truth-qa", "comprehension_qa"})
+    assert bedrock_client.ATTRIBUTABLE_FEATURES == frozenset(
+        {"visual-ai-qa", "reader-truth-qa", "comprehension_qa", "fresh-eyes-discovery"}
+    )
 
 
 def test_comprehension_judge_call_site_is_actually_wired():

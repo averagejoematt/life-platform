@@ -83,8 +83,11 @@ def _history():
 
 
 def _redraft(no_warmups: bool = False):
-    """Re-draft the 2026-10-18 upper session from the wire (the engine path)."""
-    with patch.object(routine_generator, "_load_note_indexes", return_value=(_history(), WEIGHTS, {}, {})):
+    """Re-draft the 2026-10-18 upper session from the wire (the engine path), on upper-volume's template as it was served
+    that day — with the press, before #5162 traded it (`served_templates_5162`)."""
+    from served_templates_5162 import pre_5162_upper_days
+
+    with pre_5162_upper_days(), patch.object(routine_generator, "_load_note_indexes", return_value=(_history(), WEIGHTS, {}, {})):
         if no_warmups:
             with patch.object(warmup_sets, "attach_warmups", side_effect=lambda b, c: {"warmup_sets": 0, "movements": []}):
                 return routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date=DAY, block_workouts=ROWS))[0]

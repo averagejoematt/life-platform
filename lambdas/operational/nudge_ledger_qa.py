@@ -241,27 +241,82 @@ STEPS_ARMED_ON = "2026-10-23"  # first Pacific day the pass can exist on (merge 
 
 
 def check_steps_nudge_liveness(table, Check, tier, pt_now, *, lookback_days=STEPS_LOOKBACK_DAYS, armed_on=STEPS_ARMED_ON):
-    c = Check("steps_nudge:eval_liveness", "Data Freshness", tier)
+    return _eval_liveness(table, Check, tier, pt_now, STEPS_LEDGER_PK, "steps", "#5056 - the 19:00 PT pass", lookback_days, armed_on)
+
+
+# #5098: the protein breakfast-nudge dead-man — the same shape on its own ledger row (`COACH#protein_nudge / EVAL#<date>`),
+# stamped on every tick inside the charter's breakfast window (`nutrition.protein.breakfast_nudge`).
+PROTEIN_LEDGER_PK = "COACH#protein_nudge"
+PROTEIN_ARMED_ON = "2026-10-27"  # first Pacific day the pass can exist on (the nutrition wave merges + deploys after 10-22)
+
+
+def check_protein_nudge_liveness(table, Check, tier, pt_now, *, lookback_days=STEPS_LOOKBACK_DAYS, armed_on=PROTEIN_ARMED_ON):
+    return _eval_liveness(table, Check, tier, pt_now, PROTEIN_LEDGER_PK, "protein", "#5098 - the breakfast pass", lookback_days, armed_on)
+
+
+# #5106: the evening check-in prompt's dead-man — the same shape on `COACH#evening_checkin / EVAL#<date>`, stamped by
+# every scheduled 20:00 PT run (sent, dark, quiet, already logged), so a completed day with no row = the rule stopped.
+EVENING_CHECKIN_LEDGER_PK = "COACH#evening_checkin"  # = coach.evening_checkin.LEDGER_PK (contract test)
+EVENING_CHECKIN_ARMED_ON = "2026-10-27"  # first Pacific day the rule can exist on (the nutrition wave + the Serve apply)
+
+
+def check_evening_checkin_liveness(table, Check, tier, pt_now, *, lookback_days=STEPS_LOOKBACK_DAYS, armed_on=EVENING_CHECKIN_ARMED_ON):
+    what = "#5106 - the 20:00 PT check-in prompt"
+    return _eval_liveness(table, Check, tier, pt_now, EVENING_CHECKIN_LEDGER_PK, "evening_checkin", what, lookback_days, armed_on)
+
+
+def _eval_liveness(table, Check, tier, pt_now, ledger_pk, name, what, lookback_days, armed_on):
+    c = Check(f"{name}_nudge:eval_liveness", "Data Freshness", tier)
     today = pt_now().date()
     days = [(today - timedelta(days=n)).isoformat() for n in range(1, lookback_days + 1)]
     days = [d for d in days if d >= armed_on]
     if not days:
-        c.ok(f"steps nudge pending: armed on {armed_on}, no completed day to judge yet")
+        c.ok(f"{name} nudge pending: armed on {armed_on}, no completed day to judge yet")
         return [c]
     try:
         resp = table.query(
-            KeyConditionExpression=Key("pk").eq(STEPS_LEDGER_PK)
+            KeyConditionExpression=Key("pk").eq(ledger_pk)
             & Key("sk").between(f"{STEPS_EVAL_PREFIX}{min(days)}", f"{STEPS_EVAL_PREFIX}{max(days)}")
         )
         have = {str(r.get("sk"))[len(STEPS_EVAL_PREFIX) :] for r in resp.get("Items") or []}
     except Exception as exc:  # noqa: BLE001
-        c.fail(f"steps nudge ledger - DDB error: {exc}")
+        c.fail(f"{name} nudge ledger - DDB error: {exc}")
+        return [c]
+    missing = [d for d in days if d not in have]
+    if missing:
+        c.fail(f"{name} nudge evaluated on none of {len(missing)} completed day(s): {', '.join(sorted(missing))} ({what} did not run)")
+    else:
+        c.ok(f"{name} nudge evaluated on each of the last {len(days)} completed day(s)")
+    return [c]
+
+
+# #5211: the next-morning check-in / intake pair writer's dead-man. ``scenario-explorer`` (12:10Z) writes
+# ``checkin_intake_pairs / DATE#<previous Pacific day>`` EVERY run, with or without a check-in (``has_checkin``), so a
+# completed day with no row means the writer stopped or failed. The QA run is 18:30Z, after the writer.
+CHECKIN_PAIR_PK = "USER#matthew#SOURCE#checkin_intake_pairs"  # = health.checkin_intake_pairs.PK (contract test)
+CHECKIN_PAIR_ARMED_ON = "2026-10-27"  # first Pacific day a row can exist for (the row lands the morning after the deploy)
+
+
+def check_checkin_pair_liveness(table, Check, tier, pt_now, *, lookback_days=STEPS_LOOKBACK_DAYS, armed_on=CHECKIN_PAIR_ARMED_ON):
+    c = Check("checkin_pair:day_row_liveness", "Data Freshness", tier)
+    today = pt_now().date()
+    days = [d for d in ((today - timedelta(days=n)).isoformat() for n in range(1, lookback_days + 1)) if d >= armed_on]
+    if not days:
+        c.ok(f"check-in pair writer pending: armed on {armed_on}, no completed day to judge yet")
+        return [c]
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(CHECKIN_PAIR_PK) & Key("sk").between(f"DATE#{min(days)}", f"DATE#{max(days)}")
+        )
+        have = {str(r.get("sk"))[len("DATE#") :] for r in resp.get("Items") or []}
+    except Exception as exc:  # noqa: BLE001
+        c.fail(f"check-in pair rows - DDB error: {exc}")
         return [c]
     missing = [d for d in days if d not in have]
     if missing:
         c.fail(
-            f"steps nudge evaluated on none of {len(missing)} completed day(s): {', '.join(sorted(missing))} (#5056 - the 19:00 PT pass did not run)"
+            f"check-in pair row missing for {len(missing)} completed day(s): {', '.join(sorted(missing))} (#5211 - scenario-explorer's step did not write)"
         )
     else:
-        c.ok(f"steps nudge evaluated on each of the last {len(days)} completed day(s)")
+        c.ok(f"check-in pair row present for each of the last {len(days)} completed day(s)")
     return [c]

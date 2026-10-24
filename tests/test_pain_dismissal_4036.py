@@ -342,8 +342,19 @@ def test_the_write_is_wired_on_the_tool_that_owns_the_pain_flag_surface():
     from mcp.tools_descriptions import GET_EXERCISE_NOTES_INPUT
 
     action = GET_EXERCISE_NOTES_INPUT["properties"]["action"]
-    # #5070 adds the deload word; #5088 the disruption-mode switch
-    assert set(action["enum"]) == {"read", "dismiss", "dismissals", "deload", "deloads", "disruption", "disruption_end", "disruptions"}
+    # #5070 adds the deload word; #5088 the disruption-mode switch; #5078 the fitness battery
+    assert set(action["enum"]) == {
+        "read",
+        "dismiss",
+        "dismissals",
+        "deload",
+        "deloads",
+        "disruption",
+        "disruption_end",
+        "disruptions",
+        "fitness_test",
+        "fitness_tests",
+    }
     for field in ("site", "words", "flag_note_date", "dismissed_on"):
         assert field in GET_EXERCISE_NOTES_INPUT["properties"], f"{field} is not documented on the tool that writes it"
 
@@ -358,6 +369,8 @@ def test_the_write_is_wired_on_the_tool_that_owns_the_pain_flag_surface():
         "disruption",
         "disruption_end",
         "disruptions",
+        "fitness_test",
+        "fitness_tests",
     ]
 
     # a dismissal that cannot name its instance is refused BEFORE any read or write.

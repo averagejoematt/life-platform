@@ -65,3 +65,29 @@ owner-only per `docs/DATA_GOVERNANCE.md`'s `progress_photos` entry. A working
 copy also lives at `s3://matthew-life-platform/config/coaching/PROGRESS_PHOTO_PROTOCOL.md`
 beside the rest of the owner-private corpus, for convenience — this repo copy is
 the source of truth.
+
+## Owner notes on the coach-nudge tick
+
+Two deterministic, owner-only notes ride the hourly `coach-nudge` tick beside the coach's own
+nudge, each on its own ledger row and each at most once a Pacific day: the lifting-day steps
+note (#5056, `training.steps_nudge`) and the protein breakfast note (#5098,
+`health.protein_engine.nudge_decide`). The protein note reads the charter's
+`nutrition.protein` block — the range, four feedings at or above the feeding threshold, the
+breakfast cut-off — and the same engine owns the one definition of a protein hit that the
+scoring engine, the macros view, the critics and the `protein_floor_missed` tripwire share.
+
+## The weekly calorie titration
+
+The calorie target moves weekly by a rule the owner can read (#5096, `health.titration`): the
+charter's `nutrition.titration` block — the shared 14-day trend against the charter rate band,
+two consecutive weekly reads on the same side before a step, 14 days between steps, a step of
+at most 150 kcal sized from the miss (the ONE calorie step every tripwire states, owner ruling
+2026-10-23, #5205), feet before fork (below the band: the steps mean must be
+at the floor, then a walking-first week, and food comes down only 14 days after it with the
+trend still under the floor), complete logs counted against the redlines' dark-day line, and a
+hold whenever the data or any rule value is unreadable. The steps-floor precondition on top of
+the owner's walking-first rule is owner-ruled (2026-10-23, #5091: keep the steps check). The decision
+is made Friday night for the coming week, carried by every calorie surface through
+`health.calorie_target`, and shown with its reason in the Saturday nutrition-review email. The
+weekly refit runs on owner ruling 2026-10-23 R1 (#5091): the target stays ~1,500, losing faster than the band
+ceiling holds and WARNS (food is never pushed up on its own), and the energy floors are warnings, never a clamp.

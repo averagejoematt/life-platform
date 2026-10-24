@@ -158,8 +158,8 @@ class TestScoreNutrition:
         # not the profile row. Pinned to the figures this class's arithmetic was written
         # against; `_NUTRITION_PROFILE`'s own target fields are deliberately still present
         # (and deliberately ignored — see the last test).
-        monkeypatch.setattr(se, "PLAN_DAILY_CALORIES_TARGET", 2000)
-        monkeypatch.setattr(se, "PLAN_DAILY_PROTEIN_MIN_G", 170)
+        monkeypatch.setattr(se, "target_kcal", lambda *a, **k: 2000)  # #5095: the ONE resolver, pinned
+        monkeypatch.setattr(se.protein_engine, "range_low", lambda: 170)  # #5098: the floor is the charter range low
 
     def test_no_nutrition_record_drops_the_component(self):
         assert se.score_nutrition({}, _NUTRITION_PROFILE) == (None, {})
@@ -210,30 +210,51 @@ class TestScoreNutrition:
         data = {"macrofactor": {"total_protein_g": 85}}  # half the floor
         assert se.score_nutrition(data, _NUTRITION_PROFILE)[1]["protein_score"] == 40
 
-    def test_macros_on_target_score_full_marks(self):
-        data = {"macrofactor": {"total_fat_g": 60, "total_carbs_g": 125}}
+    def test_macros_at_the_floors_score_full_marks(self):
+        # #5102: the slot grades the charter's fat/carb/fibre floors (65 / 120 / 35 g), strictly at or above
+        data = {"macrofactor": {"total_fat_g": 65, "total_carbs_g": 120, "total_fiber_g": 35}}
         assert se.score_nutrition(data, _NUTRITION_PROFILE)[1]["macro_score"] == 100
 
-    def test_macros_one_hundred_percent_off_on_both_score_zero(self):
-        data = {"macrofactor": {"total_fat_g": 120, "total_carbs_g": 250}}
+    def test_macros_at_zero_score_zero(self):
+        data = {"macrofactor": {"total_fat_g": 0, "total_carbs_g": 0, "total_fiber_g": 0}}
         assert se.score_nutrition(data, _NUTRITION_PROFILE)[1]["macro_score"] == 0
 
-    def test_a_single_macro_alone_does_not_produce_a_macro_sub_score(self):
-        data = {"macrofactor": {"total_fat_g": 60}}
-        assert "macro_score" not in se.score_nutrition(data, _NUTRITION_PROFILE)[1]
+    def test_a_single_known_macro_is_graded_and_the_unknown_ones_leave_the_mean(self):
+        data = {"macrofactor": {"total_fat_g": 65}}
+        assert se.score_nutrition(data, _NUTRITION_PROFILE)[1]["macro_score"] == 100
 
     def test_the_component_composite_uses_the_documented_forty_forty_twenty_split(self):
         data = {
             "macrofactor": {
                 "total_calories_kcal": 2000,  # cal 100
                 "total_protein_g": 190,  # protein 100
-                "total_fat_g": 90,  # 50% off
-                "total_carbs_g": 125,  # on target → macro 100 - 50*0.5 = 75
+                "total_fat_g": 65,  # met = 100
+                "total_carbs_g": se.macro_floors.floor_g("carb") / 2,  # half the charter floor = 40 (the floor is the charter's)
+                "total_fiber_g": 35,  # met = 100
             }
         }
         score, details = se.score_nutrition(data, _NUTRITION_PROFILE)
-        assert (details["cal_score"], details["protein_score"], details["macro_score"]) == (100, 100, 75)
-        assert score == round(100 * 0.40 + 100 * 0.40 + 75 * 0.20)
+        assert (details["cal_score"], details["protein_score"], details["macro_score"]) == (100, 100, 80)
+        assert score == round(100 * 0.40 + 100 * 0.40 + 80 * 0.20)
+
+    def test_the_calorie_habit_is_a_band_and_an_under_floor_day_is_a_miss_5099(self, monkeypatch):
+        """#5099 at the live charter (owner ruling 2026-10-23 R1: ~1,500, the band centred on it): inside the band is a
+        hit at 100; under the band's floor is a MISS (never a success) and scores below 100; over the ceiling is a miss too."""
+        from health import calorie_target
+
+        monkeypatch.setattr(se, "target_kcal", calorie_target.target_kcal)  # this test reads the LIVE charter, unpinned
+        lo, hi = calorie_target.calorie_band(DATE)
+        assert lo < calorie_target.target_kcal(DATE) < hi
+
+        def cal(kcal):
+            return se.score_nutrition({"date": DATE, "macrofactor": {"total_calories_kcal": kcal}}, _NUTRITION_PROFILE)[1]
+
+        inside, under, over = cal(lo), cal(lo - 100), cal(hi + 100)
+        assert (inside["cal_band_hit"], inside["cal_score"], inside["cal_band"]) == (True, 100, [lo, hi])
+        assert under["cal_band_hit"] is False and under["cal_score"] < 100
+        assert over["cal_band_hit"] is False and over["cal_score"] < under["cal_score"], "a surplus is still penalised harder"
+        # mutation control: the pre-#5099 symmetric tolerance scored a day ~7 % under the target as 100
+        assert cal(round(calorie_target.target_kcal(DATE) * 0.93))["cal_score"] < 100
 
     def test_a_logged_day_carrying_no_usable_macro_field_drops_the_component(self):
         assert se.score_nutrition({"macrofactor": {"meals": 3}}, _NUTRITION_PROFILE)[0] is None

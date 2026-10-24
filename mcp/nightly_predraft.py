@@ -86,6 +86,7 @@ from typing import Any
 from training.routine_repo import ORPHAN_DRAFT_DAYS
 
 from mcp.plan_helpers import coach_context_brief  # #5071
+from mcp.predraft_summary import summary_line  # #5199
 
 logger = logging.getLogger("nightly_predraft")
 
@@ -698,16 +699,52 @@ def _may_tracker_leg() -> dict[str, Any]:
     return nightly_leg()
 
 
+def _fitness_battery_leg() -> dict[str, Any]:
+    """#5078: the battery's dead-man — a named, fail-soft check on the same run; never the pre-draft's outcome."""
+    try:
+        from mcp.tools_fitness_tests import nightly_leg
+    except Exception as e:  # noqa: BLE001 — an import failure is named on the result, never raised into the pre-draft
+        return {"outcome": "failed", "error": type(e).__name__}
+    return nightly_leg()
+
+
+def _calibration_leg() -> dict[str, Any]:
+    from mcp.calibration_leg import calibration_leg
+
+    return calibration_leg()
+
+
+def _titration_leg() -> dict[str, Any]:
+    from mcp.titration_leg import nightly_leg  # #5096: the weekly calorie titration (Fri-Sun nights); fail-soft
+
+    return nightly_leg()
+
+
+def _charter_version() -> Any:
+    try:
+        from training.training_charter import charter_version
+
+        return charter_version()
+    except Exception:  # noqa: BLE001 — the summary names a missing version as null, never raises
+        return None
+
+
 def lambda_entry(event: dict[str, Any]) -> dict[str, Any]:
     """The scheduled entry. Never raises: a failure is logged with its class and emits the
-    datapoint at 0 (#4568), so the dead-man — not a misattributed warmer Errors alarm — reports it."""
+    datapoint at 0 (#4568), so the dead-man — not a misattributed warmer Errors alarm — reports it.
+    #5200: the tracker leg runs FIRST so the draft's coach context reads the week this run just wrote."""
+    tracker = _may_tracker_leg()  # #5073: the newest completed week's tracker row; fail-soft, never the outcome
     try:
         result = run((event or {}).get("target_date"))
     except Exception as e:  # noqa: BLE001 — reported by name; the dead-man reads the 0
         logger.exception("nightly pre-draft failed")
         result = {"job": JOB["name"], "outcome": FAILED, "error": f"{type(e).__name__}: {e}"[:300]}
-    result["may_tracker"] = _may_tracker_leg()  # #5073: the newest completed week's tracker row; fail-soft, never the outcome
+    result["may_tracker"] = tracker
+    result["fitness_battery"] = _fitness_battery_leg()  # #5078: upcoming|due|overdue|missed + FitnessBatteryMissed; never the outcome
+    result["calibration"] = _calibration_leg()  # #5061: the tape/photo dead-man witness; fail-soft, never the outcome
+    result["titration"] = _titration_leg()  # #5096: the coming week's calorie titration record; never the outcome
     print(emf_line(result.get("outcome") or FAILED))
+    logger.info("%s", summary_line(result, _charter_version()))  # #5199: FIRST and compact — the detail line below is clipped
     logger.info("NIGHTLY_PREDRAFT %s", json.dumps(result, default=str)[:4000])
     return {"statusCode": 200, "body": json.dumps(result, default=str), "headers": {"Content-Type": "application/json"}}
 

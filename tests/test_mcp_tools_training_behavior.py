@@ -1448,6 +1448,14 @@ def test_acwr_coaching_note_is_keyed_off_the_precomputed_zone(sources, zone, fra
     assert fragment in out["coaching"]
 
 
+def test_acwr_rebaselining_zone_gets_no_optimal_verdict(sources):
+    """#5029: inside an HR regime window acwr-compute writes "re-baselining" — the note must not
+    fall through to None or to the safe zone's "optimal window" verdict."""
+    sources(computed_metrics=[computed_metrics_day(YESTERDAY, acwr=1.0, acwr_zone="re-baselining")])
+    out = call("get_acwr_status", {"date": YESTERDAY})
+    assert "re-baselining" in out["coaching"] and "optimal window" not in out["coaching"]
+
+
 def test_acwr_unknown_zone_yields_no_coaching_rather_than_a_default(sources):
     """A record with load but no zone must not inherit a neighbouring verdict."""
     sources(computed_metrics=[computed_metrics_day(YESTERDAY, acute_load_7d=12.0, chronic_load_28d=11.0)])

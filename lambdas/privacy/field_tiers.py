@@ -186,6 +186,9 @@ FIELD_TIERS: dict[str, dict[str, int]] = {
         "sleep_source_apple": TIER_OWNER_ONLY,
         "sleep_record_kind_apple": TIER_OWNER_ONLY,
         "_rd_sleep_apple": TIER_OWNER_ONLY,
+        # ── #5187: the timed protein entries HAE delivers intraday (ingestion/health_auto_export_protein.py).
+        #    Owner-only like every nutrition detail (the nutrition-flags rule): per-entry food timing is never served publicly. ──
+        "_rd_protein_hae": TIER_OWNER_ONLY,
     },
     # ADR-097 reading keyspace (BOOK#/READING# pks — a pseudo-source, see SOURCE_TIERS
     # note). The two named private fields from DATA_GOVERNANCE's reading row that exist
@@ -267,7 +270,7 @@ SOURCE_TIERS: dict[str, int] = {
     "genome": TIER_OWNER_ONLY,  # variants/identifiers (#1943); served risk projection is the gated non-variant surface
     "notion": TIER_OWNER_ONLY,  # journal entries, full text; publication only via the diary consent/publish gates
     "state_of_mind": TIER_OWNER_ONLY,  # mood / state-of-mind entries
-    "macrofactor": TIER_OWNER_ONLY,  # nutrition logs (every meal, every calorie); public meal views pass the privacy flags
+    "macrofactor": TIER_OWNER_ONLY,  # nutrition logs (every meal, every calorie); public meal views pass the privacy flags + #5112's approved-name list (privacy.food_names)
     "strava": TIER_OWNER_ONLY,  # activity GPS traces (location is never public — DATA_GOVERNANCE PII definition)
     "hevy": TIER_OWNER_ONLY,  # workout details; public training surfaces serve aggregates (muscle volume, PRs)
     "sick_days": TIER_OWNER_ONLY,  # sick-day records
@@ -305,6 +308,25 @@ SOURCE_TIERS: dict[str, int] = {
     # so the row takes that tier whole. Declared before the first row exists (ADR-154's ordering).
     # Readers: the owner's MCP tool `get_may_tracker` and the coach-context assembly (#5071).
     "may_tracker": TIER_OWNER_ONLY,
+    # #5078: the fitness test battery (BATTERY#<date>) — his walk and bike distances, hang time and pull-up
+    # assistance, trended toward the owner-only May target. Feeds the May tracker, so it takes that tier.
+    # Declared before the first row exists (ADR-154's ordering). Readers: get_exercise_notes
+    # action='fitness_tests', the May tracker and the coach packet (all owner channels).
+    "fitness_tests": TIER_OWNER_ONLY,
+    # #5096: the weekly calorie titration decision (WEEK#<monday>) — the week's target, the step and its inputs
+    # (his loss rate against the owner-only band, the steps mean, his bodyweight). The band is owner-only by ruling,
+    # so the row takes that tier whole. Declared before the first row exists (ADR-154's ordering). Readers: the
+    # calorie resolver (`health.calorie_target`, which states only the kcal), the owner's nutrition-review email
+    # and the calibration sweep's dead-man (owner Telegram).
+    "nutrition_titration": TIER_OWNER_ONLY,
+    # #5106: the evening check-in (hunger, stress, cravings, one word) and its weekly read against intake. Behavioural
+    # self-report about him, so owner-only with no public projection; the weekly read is stored APART from the public
+    # weekly_correlations record for exactly that reason. Declared before the first row exists (ADR-154's ordering).
+    # Carve-out (owner ruling 2026-10-23, #5125 R5): the weekly partner letter — ONE SSM-resolved recipient, never a
+    # public surface, never the model's prompt — reads a coarse projection (answered-evenings count + a
+    # low/moderate/high band per rating) through `health.checkin_partner_view`; the rows themselves stay owner-only.
+    "evening_checkin": TIER_OWNER_ONLY,
+    "checkin_intake_pairs": TIER_OWNER_ONLY,
     # #4078: chat writes queued for approval. A queued row carries the target write tool's exact
     # arguments — journal-grade text, a pain-site statement, a meal — so it takes the highest tier
     # of anything it can hold. Declared before the first row exists (ADR-154's ordering). MCP-only.

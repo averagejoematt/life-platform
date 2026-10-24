@@ -1,21 +1,15 @@
 # The panel rubric's regression gate (#5072, epic #5067) — OWNER-APPROVED WORKFLOW CHANGE.
-#
-# A change to the training charter, the engine templates, the planning skills or the coach prompts
-# can make the plan worse with every unit test green. `scripts/panel_rubric_gate.py` grades the golden
-# plan cases (tests/fixtures/panel_golden_5072/) against config/panel_rubric.json and fails when the
-# good charter plan drops below the charter's panel_target or a negative control passes what it must fail.
-#
-# Two steps (the script's docstring is the full contract):
+# A charter, engine-template, skill, coach-prompt or food-resolver change can make the plan worse with every
+# unit test green. `scripts/panel_rubric_gate.py` grades the golden training AND food cases (#5110) in
+# tests/fixtures/panel_golden_5072/ against config/panel_rubric.json: red when a good plan drops below
+# panel_target or a negative control passes what it must fail. The script's docstring is the full contract:
 #   * --recorded (gating, free, no AWS): the code pre-score + the replayed judge (also in the unit suite).
-#   * --live (gating): the blinded judge on route charter.judge_gate (band-3 CI feature charter_judge_gate),
-#     ~$0.15 a run. Soft ONLY on a budget pause (SKIPPED-BY-BUDGET + ::warning::). A judge that errors or
-#     replies with nothing gradeable is FAIL + ::error:: on every case, exit 1 — never a code-only green.
-# Degrade points today (read-only `aws iam get-role`/`get-role-policy`, 2026-10-19): the role EXISTS
-# (golden-brief-eval.yml, eval-harvest.yml assume it) but (a) its trust admits refs/heads/main only, so a
-# pull_request is refused at the OIDC step and the live step prints "live judge NOT run" + ::warning::;
-# (b) it grants Haiku only, so a dispatch on main reaches the JUDGE CALL, is denied (AccessDeniedException)
-# and the live step is RED ("0 of 5 cases behaved") until the owner's Sonnet 4.6 grant (PR #5169).
-# Path filter = the #5072 `## Set` (charter, engine templates, skills, coach prompts) + the gate's own inputs.
+#   * --live (gating): the blinded judge on charter.judge_gate (band 3), ~$0.30 a run. Soft ONLY on a budget
+#     pause (SKIPPED-BY-BUDGET + ::warning::); a judge error or ungradeable reply is FAIL + ::error::, exit 1.
+# Degrade points (read-only `aws iam get-role`/`get-role-policy`, 2026-10-19): the golden-eval role's trust admits
+# refs/heads/main only, so a pull_request is refused at the OIDC step ("live judge NOT run" + ::warning::); it
+# grants Haiku only, so a dispatch on main is denied at the judge call and the live step is RED until the
+# owner's Sonnet 4.6 grant (PR #5169). Path filter = the #5072 `## Set` + the gate's inputs + the food resolvers.
 
 name: Panel rubric gate
 
@@ -29,6 +23,11 @@ on:
       - 'lambdas/training/routine_generator.py'
       - 'lambdas/training/panel_rubric.py'
       - 'lambdas/training/panel_judge.py'
+      - 'lambdas/training/food_panel.py'
+      - 'lambdas/health/calorie_target.py'
+      - 'lambdas/health/protein_engine.py'
+      - 'lambdas/health/macro_floors.py'
+      - 'lambdas/health/titration.py'
       - 'lambdas/coach/critics*.py'
       - '.claude/skills/daily-debrief/SKILL.md'
       - 'docs/coaching/COACH_SESSION.md'

@@ -100,7 +100,15 @@ def _charter_prompt():
             tc.reset_cache()
 
 
+def _nutrition_critics_prompt():
+    """#5114: the nutrition critics' narrator — its fixed system text is the whole stable prefix."""
+    from health.nutrition_critics_ai import SYSTEM_PROMPT
+
+    return SYSTEM_PROMPT
+
+
 _PROMPTS = {
+    "nutrition-critics": _nutrition_critics_prompt,  # #5114
     "coach-quality-gate": _quality_gate_prompt,
     "coach-state-updater": _extraction_prompt,
     "daily-brief": _daily_brief_prompt,

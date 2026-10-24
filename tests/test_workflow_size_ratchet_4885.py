@@ -36,6 +36,7 @@ WORKFLOW_SIZE_COUNTS: dict = {
     "operating-calendar.yml": (67, 13),
     "pii-endpoint-sweep.yml": (119, 17),
     "panel-rubric-gate.yml": (82, 4),  # #5072: the panel rubric gate (new on the wave-2 PR; the owner's review of it is named there)
+    "iam-gate-pr.yml": (60, 4),  # #5221: the additive-IAM gate at PR time (new on the followups-a integration PR)
     "pr-checks.yml": (414, 44),
     "raw-kms-readability.yml": (112, 15),
     "remediation-agent.yml": (184, 33),

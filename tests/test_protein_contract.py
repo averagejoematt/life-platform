@@ -190,8 +190,8 @@ def test_no_consumer_reads_the_profile_targets_or_retypes_them():
             found += target_literal_findings(fh.read(), os.path.relpath(path, ROOT))
     assert swept > 300, f"the sweep walked only {swept} modules — the tree moved or the walk broke"
     assert not found, (
-        "nutrition targets come from common.constants (PLAN_DAILY_CALORIES_TARGET / PLAN_DAILY_PROTEIN_MIN_G), "
-        "generated from the plan root — not the profile row, not a literal:\n  " + "\n  ".join(found)
+        "nutrition targets come from common.constants (PLAN_DAILY_PROTEIN_MIN_G, generated from the plan root) and "
+        "health.calorie_target (the ONE calorie target, #5095) — not the profile row, not a literal:\n  " + "\n  ".join(found)
     )
 
 
@@ -219,7 +219,7 @@ def test_the_guard_sees_every_shape_it_exists_for():
         got = target_literal_findings(src)
         assert len(got) == n, f"{src!r}: expected {n} finding(s), got {got}"
     clean = [
-        "from common.constants import PLAN_DAILY_CALORIES_TARGET\ncal_target = PLAN_DAILY_CALORIES_TARGET",
+        "from health.calorie_target import target_kcal\ncal_target = target_kcal()",
         'calorie_target = args.get("calorie_target")',  # an MCP tool's own override argument
         'label = m.get("calorie_target")',  # a derived metrics dict, not the profile row
         "setTimeout = 1800\nweight_lbs = 190",  # the figures alone are not a nutrition target
@@ -230,8 +230,9 @@ def test_the_guard_sees_every_shape_it_exists_for():
 
 
 def test_generated_constants_are_the_plan_root():
-    """The bundle's two figures ARE the plan's: equal to `plan_facts` over the plan root,
-    and byte-identical to what the generator renders (a hand edit of either side fails)."""
+    """The bundle's protein floor IS the plan's: equal to `plan_facts` over the plan root, and
+    byte-identical to what the generator renders (a hand edit of either side fails). #5095: the
+    calorie target is no longer generated — it is health.calorie_target's — so the bundle carries none."""
     import sync_constants_from_config as gen
     from common import constants
     from experiment import plan_facts
@@ -239,7 +240,7 @@ def test_generated_constants_are_the_plan_root():
     with open(os.path.join(ROOT, "config", "user_goals.json"), encoding="utf-8") as fh:
         goals = json.load(fh)
     facts = plan_facts.plan_facts_from_goals(goals)
-    assert constants.PLAN_DAILY_CALORIES_TARGET == facts["daily_calories_target"]
+    assert not hasattr(constants, "PLAN_DAILY_CALORIES_TARGET"), "#5095: the calorie constant is retired"
     assert constants.PLAN_DAILY_PROTEIN_MIN_G == facts["daily_protein_min_g"]
     with open(os.path.join(ROOT, "lambdas", "common", "constants.py"), encoding="utf-8") as fh:
         assert fh.read() == gen.render(goals), "constants.py drifted — python3 deploy/sync_constants_from_config.py --apply"

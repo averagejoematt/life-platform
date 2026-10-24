@@ -1,99 +1,129 @@
-# Handover — Session BY: the second squeeze on an unfilled RULINGS paste, the owner's Desktop brief filed and laned, red-team round 3 fixed on the live pages, 14 closed on proof, 33 PRs merged, every AWS write under the six classes, wrapped early on the owner's word for the training-charter session — 2026-10-18 17:07Z → 00:0xZ 10-19
+# Handover — Session CC: proofs for waves A–C, one follow-up wave merged and deployed, 4 stories closed on live proof (2026-10-23)
 
 ## Driving instruction
-The owner pasted the plan `~/.claude/plans/eventual-wishing-marshmallow.md`'s prompt verbatim with the RULINGS template **unfilled** (placeholders intact, every `ran:` line present, #4536 with both alternatives). Read as: a line without a placeholder is his word (#4590 approve · #4629 relabel yes · #4537 promote on an empty blocking list · #4536's primary clause, retire), a line with one parks on its issue with the recommended answer (#4646, the Yoga sub-question, Core apply, the labs path), and every `ran:` line was verified read-only — none had happened. Mid-boot he added `~/Desktop/claude-code-brief-2026-10-18.md` ("create and close the issues as appropriate") and, three hours in, three Hevy asks (the three note types, cardio notes as noise, warm-up sets), each filed and laned the same hour. He also asked for an ELI5 of the week's production changes (answered in-session at ~20:3xZ).
+"Read and execute ~/.claude/plans/next-session-proofs-and-owner-acts-2026-10-22.md — use a workflow only for lanes."
+- The driver ran on Opus 5.5. The owner gave no word after the opening line.
+- One workflow ran three Sonnet lanes (build, review, one fix round). Everything else ran inline.
+- No AWS writes and no `cdk deploy`. The budget tier was never forced and read **2** throughout.
+- CI's own deploy shipped the merged wave; no manual gate was hit.
 
-## Shipped (merged to main; fleet + site-api + site deployed through the CI chain; main GREEN)
-| PR | what |
-|---|---|
-| #5011 #5022 | the #4629 write modes: duplicate removal + vendor relabel (`legacy_sport_name`); the zone history write-back |
-| #5012 | the two approved first-person sentences (draft marks + footer off front/Start) |
-| #5013 | the week-6 season-ledger backfill script |
-| #5014 #5034 | the #4993 staging-gate fixes (sign-off repeat, rate-unit body number, `--ledger-note`/`--dek`) + the Panel renderer on the one detector |
-| #5015 #5021 #5026 #5027 #5020 #5032 | the brief's B3 / B4 / B2 / A3 / A2 / C1–C4 |
-| #5016 | the Panel retire-by-name path |
-| #5017 | heartbeat GetObject on the MCP role (stack applied) |
-| #5019 | `paused_since` habits (applied: 22 entries) |
-| #5023 #5045 | the Garmin read sweep; the agreement surface cut to the watch era |
-| #5024 #5062 | the Hevy changelog review + setup-marker strip; the three note types mapped |
-| #5025 | the Whoop day row deduped on `cycle_id` |
-| #5028 | a paused source never a check-in context (the `food_delivery` flip prepared) |
-| #5030 | the 2026-10-10 HR regime marker: readiness RE-BASELINING |
-| #5031 | `config/schedules.json`, the one schedule table (zero synth diff) |
-| #5033 #5039 #5038 | the watch metrics registry + dead-man; Apple sleep as its own fields; the owner-only rhythm channel |
-| #5035 #5036 #5043 | epic rows on #4626 / #4625 / #4624 |
-| #5037 | one workout identity (fixtures) + `METRIC_TRUTH` modes mechanism (every entry on `primary`) |
-| #5040 #5041 | the discounted-night trend row; the journal-silence refusal on the daily coach line |
-| #5046 #5063 | red-team round 3: the site set and the Lambda set |
-| #5064 | the dead-man first-deploy grace (the `slo-source-freshness` regression) |
-| #5065 #5066 | the cardio note as one prescription; warm-up sets for the compound lifts |
-HELD, green, never merged by a session: **#4928** (the cut-over, Thursday on his go) · **#5044** (the remaining re-baselining surfaces — adds a PUBLIC `hr_regime` block, a reader-surface privacy change; recommended: strip the public block).
+## Phase 0 — what the owner had done
+- **Not done:** #5218, #5181 and #5226 are still open, and the `telegram-coach-evening-checkin` rule and the `fitness-battery-missed` alarm do not exist.
+- **Not done:** the habit_registry rows are still string-typed (`Protein Goal` "1"/"1", `Psyllium Husk` "2"/"0.5").
+- **Not done:** no answers on R1–R8 or the other rulings, and no MacroFactor export since 10-18.
+- **Already done:** the S3 config sync. All 41 twins match, synced 2026-10-21T02:05Z by wave C's own CI deploy, so that owner act is off the list.
 
-## Closed on live proof (verdict comments on each)
-#4590 #4629 #4627 #3495 (epic) #4276 #5009 #4976 #4998 #5004 #5005 #5007 #4999 #5002 #5042 — 14. Reopened on their own words: #5008 (C2) and #5048 (the live note is the proof). Open: 66 at boot → **106** at the wrap — the count rose because 54 issues were filed by three hands and none of this session's work failed: this session filed 16 (the brief's 12 #4999–#5010, the lane follow-up #5029, the three Hevy asks #5047–#5049), two advisories auto-filed and auto-closed (#5018 open on its window-class cause, #5042 closed), and **a parallel session filed 36** — the training-panel review (#5050–#5061, 21:33Z) and then the May-2027 training charter (#5067–#5090, 21:4x–23:5xZ), the next session's own plan; all left untouched. Net of this session alone: 66 + 16 − 14 = 68.
+## Shipped (merged to main, deployed by CI, verified by content with `verify_deployed_symbol.sh`)
+- **Wave PR #5253 (080532a8e)**, through integration branch `wave/cc-followups`:
+  - #5247 (PR #5249): the `NIGHTLY_PREDRAFT_SUMMARY` line now reports a single-prefix stamp, JSON lists and `may_tracker.state`. The missing constraint block is stated in the line rather than supplied.
+  - #5211 (PR #5250): a next-morning check-in / intake day row, `checkin_intake_pairs / DATE#<day>`, owner-only. It rides scenario-explorer at 12:10Z and is checked by the `checkin_pair:day_row_liveness` dead-man in qa-smoke, armed from 10-27.
+  - #5187 (PR #5251): HAE's intraday protein entries are captured as `_rd_protein_hae`, and `protein_nudge_runner` reads them before the breakfast cut-off.
+  - **Driver tip fixes:**
+    - the #5211 reads are recorded in the phase-filter ledger;
+    - the writer reads its three sources one call each (the conformance guard);
+    - the day shift goes through `shift_day_key` (the #3609 registry);
+    - the charter is bumped to **1.19.1** for the #5187 rule prose.
+- **PR #5254 (fbd0b6c72): black 26.3.1 → 26.10.1** for CVE-2026-114134.
+  - The new advisory turned main's Lint/pip-audit job red on the wave's own run (39872363142).
+  - I bumped the pin rather than allowlisting the advisory. black 26.10.1 leaves all 2,790 files unchanged.
+  - Run 39876019028 then deployed from base 496fd9e36, which carries the wave. Every bundle was in place by 00:22Z, ahead of the 02:00Z pre-draft.
 
-## AWS writes made (class · dry-run posted first · result)
-- class 2: `whoop_workout_history_4629.py --apply --keep-label Yoga` (183 deleted, 1,478 relabelled, 15 held, plan hash matched) · `whoop_zone_rebuild_4629.py --apply` (96 updated, 36 fabricated-zero sets removed) · `backfill_story_ledger_week.py --week 6 --apply` (`LEDGER#2026-10-13`) · `apply_habit_pause.py --apply` (22 supplement entries)
-- class 1: `cdk_deploy.sh LifePlatformMcp` (the heartbeat GetObject, diff read first) — #5009 closed on the freshness read
-- class 3: Panel `{"week":5|6,"retire":true}` (dry-runs first; holds untouched) · `life-platform-qa-smoke {}` ×2 (failed 0; the warn list emptied after #5040) · `ai-expert-analyzer {}` (physical HELD by the new labelled-fact check; the integrator needs ≥ 3 passing experts — the lead read regenerates Mon 14:00Z)
-- class 5: `config/board_of_directors.json` → both S3 keys after #5023 (S3 held the prior revision); the #4627 copies were already in place (md5 equal)
-- class 6: the memory backup sync at the wrap (00:0xZ 10-19)
-- Bedrock on the laptop: three season repair passes, **$10.40 against the $10 allowance** (the guard checked before each run; the last tipped it by $0.40) — the promote still refuses on 7 ordinary findings (#4537); no further pass.
-- **Never touched:** `.claude/settings.local.json` (verified by md5 across two rebases), the HELD #4928 lane, any experiment reset, any raw delete, IAM beyond the HELD PR's statements.
+## Closed on live proof (4)
+- **#5232:** the 10-22 17:05Z daily brief logged both `BoD:` and `TL;DR+Guidance:`, with the string rows still stored.
+- **#5214:** the S3 panel prompt has no per-meal gram literal.
+- **#5204:** `/api/nutrition_overview` returns `fiber_g.target = 35`, which equals the charter floor.
+- **#5247:** the 10-23 02:01:24Z summary line.
+- Outcome verdicts are posted on all four.
 
-## Rulings and where each landed
-| line | reading | landed |
-|---|---|---|
-| #4536 retire weeks 5 and 6 (or regenerate) | primary clause = the ruling | retire path built (#5016) and run; week 7 is the next episode; #4564's Panel leg ticks Wed |
-| #4590 approve | his word | live, closed |
-| #4646 `<A|B|C|D>` | unfilled | parked: recommended **C** |
-| #4629 relabel yes, Yoga `<yes|no>` | relabel acted; Yoga parked | #4629 + #4627 closed; the 15 Yoga rows wait on his word (recommended no) |
-| #4537 promote on an empty blocking list | acted in order | the promote refuses on 7 findings; budget spent; parked with the residual list |
-| Core apply `<ours|mine>` | unfilled | parked on #4777 #4814 #4875: recommended **ours** |
-| every `ran:` line | none had happened | each read posted on its issue |
+## Partial proofs posted (kept open)
+- **#5080:** night 3 (`SHADOW#2026-10-22`). Only the owner's flip test is left.
+- **#5052:**
+  - The 10-21 session graded 12 progressed sets and 0 breaches.
+  - No gain-rule `step` yet.
+  - A hold-message defect is noted: calf "2 of 2 at the top", while 360 lb < 435 lb prescribed.
+- **#5057:** box 2 is live. The 10-23 draft carried leg press "+2 reps to 10 at 360 lb" from the stall rule.
+- **#5058:** no +1 overage to grade yet. The owner's design call is flagged on the issue: an un-RPE'd cardio block makes the whole session's verdict `unknown`.
+- **#5076:** cycling is still served as the default cardio.
+- **#5085:** the draft is stamped 1.19.1, but it is not yet a committed routine.
+- **#5096:** a timing correction. The first deciding run is **10-24 02:00Z** (Pacific Friday); 10-23 was correctly `not_decision_day`.
+- **#5211 and #5187:** deploy notes posted, each waiting on its named event.
 
-## The owner's morning list (ranked by closes per word)
-1. **Thursday 10-22**: the checklist on #4588 — merge #4928, publish the redirect function, four curls — #4588 + #4580's cut-over box (unchanged).
-2. **Five readers** (#4587) by Wednesday noon.
-3. **One word each, nine closes:** #5003 "strict" (or a gram tolerance) · #5006 "pause it" (the `food_delivery` flip, dated) · #5047 "no" (the platform never writes pinned exercise notes) · #5049 "as is" (the warm-up numbers 50/70/85 % × 8/5/3, floor 95 lb) · #5008 C2 "the existing join meets it" · #5029 "strip the public block" (then #5044 merges) · #4629's 15 Yoga rows "Yoga" · #4646 a letter (C recommended) · #4537 "cap +5" (one more repair pass → re-audit → promote; #4545 #4549 close with it).
-4. **Core apply** (#4777 #4814 #4875): "ours" or run it yourself — `cdk_deploy.sh LifePlatformCore` then `backfill_training_notes --re-extract --apply`.
-5. The parallel session's **training-panel epics** (#5050 #5051 + 10 stories) — yours to rank; two of them (#5052 double progression, #5058 effort ceilings) touch the lanes that shipped tonight (#5049 warm-ups, #5048 cardio).
-6. The `ran:` acts that are still yours: Sunday photos (#3759), `GH_POSTURE_TOKEN` (#4887), one Strava edit + one Whoop delete (#4638), one DMARC test mail (#4633), four words on the cockpit (#4189), one override in your words (#4076), a labs export path (#4639), the 5.5 model agreement (#4772 …), the watch automations list (#4968 — the HRV/effort/RHR readings already arrive; sleep, ECG, VO2 max, temperature do not yet).
+## Filed
+- **#5252 (P3, Next):** I6 looks for a retired `daily-brief-schedule` rule, while the brief runs on the zoned Scheduler. It is red locally against live AWS.
+- **#5255 (P2, Now):**
+  - Strava re-ingest of a stored day raises `Decimal + float`.
+  - The 10-18 day errored every hourly run from 10-21 04:10Z until it left the window.
+  - This is the cause of the strava/liveness flaps.
 
-## Verified (reads with the proof on the issue)
-- Readiness 2026-10-18 → `RE-BASELINING` (was GREEN 82 before #5030); the protein hit rate 1 of 7 (was 3 of 7); one loss rate 4.12 lb/wk read by the packet and `get_nutrition`; the Whoop 10-18 row carries its own cycle; Zone 2 serves 13.0 Whoop minutes this week (was 0); the 09-19 sleep row is discounted; `get_capture_queues` reads `paused_habit_days 108`; the hypotheses artifact carries the derived threshold; the agreement table reads `too_few_nights` (n 1, from 2026-10-18); the visual QA passed 94/94 after the two site deploys.
-- Alarms: `coherence-overall` OK since 18:46Z; `qa-smoke-failures`, `qa-smoke-warnings` and `slo-source-freshness` read ALARM but their live cause lists are empty — all three evaluate a **daily Maximum**, so they go OK on the 2026-10-19 bucket; the spend pair clears as the 24 h window passes.
-- Budget tier 1 · dev-session Bedrock $29.5 in 24 h (BX's $19 + tonight's $10.40).
+## Gotchas
+- **The full suite on the wave tip caught three reds the lane reviews missed again:** the phase-filter ledger, the conformance guard and the ISO-parse registry. These are CB's classes. Keep the tip run mandatory.
+- **xdist-order flakes:** `test_repo_scan_cache_3224` and `test_doc_drift_date_stamp_2649` failed in parallel runs and pass alone. A different one failed each run.
+- **A new upstream CVE can red main on any merge.** The fix pattern is to bump the pin and prove the formatter leaves the tree unchanged. Don't allowlist it.
+- **`requirements-dev.txt` pins must sit alone on their line.** An inline comment broke `test_formatter_pin_resolution`.
+- **`alarm_citations.json` `cause_observed` must be a bare `YYYY-MM-DD`.** Prose there is ignored, so the gate falls back to `added`.
+- **The pre-draft runs at 02:00Z, which is the previous Pacific day.** A "Pacific Friday" leg first fires at 02:00Z on Saturday.
+- **The memory claim "a superseded CI run never deploys" is stale:** the plan step diffs from the last successful deploy (#4472).
 
-## Gotchas (new tonight; memory `project_session_by_2026_10_18.md`)
-- A burst of merges makes every open lane PR CONFLICTING in turn — one merge-main round per lane per batch; re-queue the PR in the verdict watcher (its done-list hides it).
-- A soft reset of an unpushed docs commit onto a moved main stages the REVERSE of main's newer merges — restore with `git restore --source=origin/main --staged --worktree -- . ':(exclude)<mine>'`; to rebase one docs commit over the dirty, untouchable settings file, mark it assume-unchanged for the rebase and verify the md5.
-- A new registry entry that feeds an SLO count lights the alarm on first deploy (the watch dead-man had no stamp yet) — test against the ALARM, not the digest; the checker sent six SNS alerts in fifteen minutes.
-- A lane `Fixes #N` on a `closure:live-proof` issue auto-closes it at squash → reopen, prove, close (#5009 #5008 #5048 tonight).
-- `check_alarm_citations.py`: `cause_observed` must be a bare date; a `cause: "-"` is a mismatch against an empty live list; a "PR #N" in a citation reads as a closed issue.
+## Owner acts (the morning list)
+1. **#5218 + `bash deploy/cdk_deploy.sh LifePlatformServe`.** Add the `owner-required-ack` label when you merge. Move `EVENING_CHECKIN_ARMED_ON` first if you merge after 10-27. This also starts #5211's `state: checkin` rows.
+2. **#5181 + `bash deploy/cdk_deploy.sh LifePlatformMcp`**, then the #5080 flip test. The SSM line is in the issue.
+3. **#5226.** It reads ALLOW-ADDITIVE, so a merge may ship it through CI.
+4. **Optional:** retype the two `habit_registry` strings in `PROFILE#v1`. The code no longer needs it.
+5. **Rulings:**
+   - R1–R8 on #5091; #5212, #5203, #5205, #5216, #5108; and #5162 and #5167.
+   - New: the #5058 cardio-RPE verdict question.
+6. **Exports:** MacroFactor (#5097) and the food-plan grades (#5110).
+7. **Memory backup:** `aws s3 sync ~/.claude/projects/-Users-matthewwalker-dev-life-platform/memory/ s3://matthew-life-platform/claude-memory-backup/ --region us-west-2`. It was skipped by CB and CC under the no-AWS-writes rule.
 
 ## Residual / next picks
-- **The next session** runs `~/.claude/plans/training-may-charter-build-2026-10-18.md` as a workflow (waves W0→W3) on the owner's word; its wave 0 takes **#3754** (the 10-12..18 window closed at 00:00Z 10-19 — `get_deficit_sustainability`, no offer → close on the window's own terms; an offer → his line) handed from this session.
-- #4580 round 3: the narrator ruling (A-01/A-09/A-22) and the draft footer are his; B-22's Food score proves on tomorrow's sheet; the lead read regenerates Mon 14:00Z.
-- #4935 box 4 = the 2026-10-19 18:30Z run; #4533 box 3 and #4914 = Wed 10-21 15:00Z; #4536 box 3 = week 7's episode.
-- #5001's second half (the first live stage-2 run), #5004/#5005/#5047/#5048/#5049's live notes = the next pre-draft.
-- #4974: Apple Health's pre-watch RHR was Whoop's own writes — the study must read per-reading source.
-- not-work — the morning list above is the owner's.
+- **Proofs, event-bound:**
+  - #5096: 10-24 02:00Z.
+  - #5211: the 12:10Z day row and the dead-man from 10-27.
+  - #5187: the first logged breakfast.
+  - #5095 and #5102: the first logged food day.
+  - #5052, #5057, #5058, #5076 and #5085: the next drafts.
+  - #5080: after #5181.
+  - #5109: a coach refresh at tier ≤1.
+  - #5215: the first disrupted week.
+  - #5221: its window, to 2026-11-20.
+  - #5220: after #5226.
+- **Lanes:**
+  - #5255 first: Strava edits to a stored day are being dropped.
+  - Then #5252.
+  - The `load_progression.py` hold message, noted on #5052.
+- **Next plan:** `~/.claude/plans/next-session-proofs-2026-10-24.md`. not-work — a pointer.
+- **Gated:** W3 (#5103, #5104, #5105, #5107, #5112 and #5113) waits on R3–R8. #5075 waits on Fable.
+- **Owner-attended CDK:** #5218, #5181 and #5226. not-work — owner-attended IAM/CDK acts, listed under owner acts.
 
 ## Marker lines
+**Build beat:** none — owner-only nutrition/training engine and CI-tooling work, with no reader-visible change.
+**Docs:**
+- The lanes updated SCHEMA (the day-pair and HAE-protein rows), DATA_GOVERNANCE and PROPORTIONALITY.
+- The wrap updated `docs/alarm_citations.json`.
+- `sync_doc_metadata.py` was already in sync.
 
-**Build beat:** none — the round lands on the preview tree and in the Lambdas; the public front page changes on Thursday's cut-over, which is the beat
-**Docs:** `docs/SCHEMA.md` (legacy_sport_name, cycle_id, the watch + Apple sleep + rhythm sections, paused habits, macrofactor fields), `docs/alarm_citations.json` (seven re-cites + two first-red entries), `docs/site-reviews/SITE_REVIEW_2026-10-18.md` § Round 3 + three JSON records, `docs/integrations/hevy-changes-2026-10.md` (§6 the three note types), `docs/CONVENTIONS.md` §1b (the schedule table), `docs/engines/READINESS.md` / `SCORING.md` / `COACH_STANCE.md` / `CHARACTER.md` re-stamped by their lanes, `docs/INCIDENT_LOG.md` (+1 row), `docs/OPERATING_KNOWLEDGE_LEDGER.md` (+2 rows, snapshot 570) in this commit
-**Decisions:** none needed — every ruling is quoted on its issue; the one governance question raised (the public `hr_regime` block) is parked on #5029 for the owner, not decided
-**Main:** green (57ae7ff7c)
-**Incidents:** 1 row added — the watch dead-man's first-deploy false positive (`slo-source-freshness` 21:34–21:45Z, six SNS alerts, fixed by the `armed_after` grace in PR #5064)
-**Stash/hooks:** clean — stash empty, hook freshness 🟢; the reaper removed 1 released lane at the gather and every merged lane is released for the next reap; the HELD #4928 lane stays locked
-**Closures:** #4590 #4629 #4627 #3495 #4276 #5009 #4976 #4998 #5004 #5005 #5007 #4999 #5002 #5042 commented · DoD: scanned 23, hits 3 — #4590 and #4976 are the word "reopened" inside a Shipped/Outcome comment (not-work — the pattern hit, no reopen happened), #4631 is Session BX's post-close Live proof (not-work — BX's disposition stands)
-**Backlog:** Now live at 3 actionable in the fable lane (no promotion taken — `--refill-now --lane fable` reports 0 short; 11 Now stories are gate:owner, the morning list is the unblock) · Later sweep — OK, 106 open satisfy the contract
-**Alarms:** 5 red, all cited — `qa-smoke-failures`, `qa-smoke-warnings`, `slo-source-freshness` self-clearing on the 2026-10-19 daily-Maximum bucket (live cause lists empty), `ai-daily-spend-high` + `ai-tokens-platform-daily-total` (+ their urgent composites) the owner-authorized Bedrock night, clearing as the 24 h window passes; `coherence-overall` OK since 18:46Z
-**CI warnings:** 5 on the latest green run (57ae7ff7c) — the `SKIPPED in CI — no playwright/chromium` annotations, the standing #3640 class: no action (the kit gate's own chromium job passes)
-**Ledger:** omitted — the new guards (the schedule-table test, the warm-up rule table, the cardio composer, the journal-silence refusal, the cycle-reference check) are registry-driven derivations under existing rows; the watch dead-man rides the freshness checker's row with no new alarm, Lambda or schedule
+**Decisions:** none needed. These are follow-ups inside ADR-164 and the #5106/#5098 stories. The charter 1.19.1 change is prose only and is logged in its change_log.
+**Main:** green (fbd0b6c7)
+**Incidents:** none.
+- Main was red ~49 min (23:35Z → 00:24Z) on an upstream CVE advisory, under the >1h threshold, and was fixed by #5254.
+- The Strava re-ingest errors are filed as #5255. The stored row exists, and no data gap is confirmed.
 
-**Memory backup:** synced to `s3://matthew-life-platform/claude-memory-backup/` at the wrap (class 6)
+**Stash/hooks:** clean
+**Closures:** #5232, #5214, #5204 and #5247 commented with outcome verdicts. · DoD: re-run after commenting (Phase 3).
+**Backlog:**
+- Now: 34 startable for opus and 30 for sonnet; no refill needed.
+- #5211 and #5187 promoted Next → Now, with both milestone and score line.
+- #5255 filed to Now; #5252 to Next.
+- Epic story lists updated (#4625, #4626, #5094).
+- Later sweep: OK.
 
-**Spend:** dev-session Bedrock $29.5 in the trailing 24 h (BX's $19 + tonight's three repair passes $10.40); budget tier 1. Subagents: 30 lanes/graders/verifiers ≈ 6 M tokens.
+**Alarms:**
+- `ingest-consecutive-failures-strava` and `ingest-liveness-unhealthy` flaps are cited to #5255.
+- `life-platform-budget-tier-escalation` was re-derived 2026-10-23: tier 2, unchanged since 10-19, the same cause on #5135.
+- `ingest-reconciliation-strava` has been lit since 10-21 17:21Z, under 72h. Its cause read is #5255's box 3.
+
+**CI warnings:** 6.
+- Five are `SKIPPED in CI — no playwright/chromium`, the standing #3640 class: no action.
+- One is `LifePlatformMcp has non-IAM CDK changes` (the fitness-battery alarm): owner act 2 (#5181 + the LifePlatformMcp apply).
+
+**Ledger:** none — no new standing machinery beyond the lanes' own rows. #5211's dead-man row was added to PROPORTIONALITY in PR #5250.

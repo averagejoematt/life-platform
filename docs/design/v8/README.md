@@ -65,14 +65,21 @@ keyboard focus ring. Section labels use the soft text colour.
 
 Nothing else was changed. The class names gained the `ck-` prefix.
 
-## A proposal the owner has not approved yet: the daily mark
+## The daily mark: C, the year frame (approved 2026-10-23)
 
-`ck-mark` (#4586) is one column a day for the last four weeks, drawn the same way every
-day in a frame whose height is the whole distance from the start weight to the goal:
-`ck-mark__gone` (accent) is what is gone as of that day, `ck-mark__left` is what is left,
-and a day with no weigh-in leaves a gap. It is
-the only addition to the sheet since the kit was approved, it is on the preview path only,
-and it comes out if he says no.
+The owner ruled on #4646 on 2026-10-23: **C, the year frame**, of the four drawings shown
+to him at phone size (A stripes, B the four-week columns, C the year frame, D a month line
+over a whole-distance bar). `ck-mark` is one frame one year wide from the experiment's
+first day (past a year, the 365 days ending today). Its top is the start weight and its
+floor the goal. Each weigh-in is one thin `ck-mark__day` column at its day, as tall as the
+weight still above the goal, inside a `ck-mark__frame` hairline; a day with no weigh-in
+draws nothing, and the empty right of the frame is the year not yet lived. One line under
+it names the frame (`markEndsHTML`).
+
+The columns are `--ck-soft`, not the accent. In the drawing he was shown they were green;
+a column here is the weight still to lose, and the accent on this kit means progress only,
+so `ck-mark__gone` left `KIT_ACCENT_USES`. The frame's width is a frame, not a deadline:
+no goal date is stated on the page.
 
 ## The sources
 

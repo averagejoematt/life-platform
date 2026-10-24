@@ -120,6 +120,12 @@
       "stack": "monitoring_budget_alarms",
       "via": "declaration"
     },
+    "calibration-deadman": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "mcp_stack",
+      "via": "declaration"
+    },
     "canary-no-invocations-1h": {
       "kind": "metric",
       "routing": "digest",
@@ -232,6 +238,12 @@
       "kind": "metric",
       "routing": "digest",
       "stack": "monitoring_silence_alarms",
+      "via": "declaration"
+    },
+    "fitness-battery-missed": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "mcp_stack",
       "via": "declaration"
     },
     "freshness-checker-errors": {
@@ -1010,8 +1022,8 @@
     }
   ],
   "cost_surface": {
-    "ai_features": 28,
-    "alarms": 139,
+    "ai_features": 30,
+    "alarms": 141,
     "emf_namespaces": 33,
     "schedules": 96,
     "secrets": 30
@@ -1239,6 +1251,27 @@
       "lambda": null,
       "module": "lambdas/coach/critics.py",
       "partition": "coach_thread",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/coach/evening_checkin.py",
+      "partition": "evening_checkin",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/evening_checkin.py",
+      "partition": "evening_checkin",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/coach/evening_checkin.py",
+      "partition": "evening_checkin",
       "via": "pk"
     },
     {
@@ -2887,13 +2920,6 @@
       "via": "fixed-seam"
     },
     {
-      "direction": "unknown",
-      "lambda": "partner-weekly-email",
-      "module": "lambdas/emails/partner_email_lambda.py",
-      "partition": "notion",
-      "via": "pk"
-    },
-    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/emails/podcast_script_v2.py",
@@ -2905,6 +2931,20 @@
       "lambda": null,
       "module": "lambdas/emails/podcast_script_v2.py",
       "partition": "panelcast",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/emails/protein_nudge_runner.py",
+      "partition": "apple_health",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/emails/protein_nudge_runner.py",
+      "partition": "macrofactor",
       "via": "pk"
     },
     {
@@ -3099,6 +3139,34 @@
     {
       "direction": "unknown",
       "lambda": null,
+      "module": "lambdas/health/calorie_target.py",
+      "partition": "nutrition_titration",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/health/checkin_intake_pairs.py",
+      "partition": "checkin_intake_pairs",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/health/checkin_intake_pairs.py",
+      "partition": "checkin_intake_pairs",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/health/checkin_partner_view.py",
+      "partition": "checkin_intake_pairs",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
       "module": "lambdas/health/clinical_facts.py",
       "partition": "clinical",
       "via": "pk"
@@ -3185,6 +3253,13 @@
       "lambda": null,
       "module": "lambdas/health/time_affluence.py",
       "partition": "time_affluence",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/health/titration.py",
+      "partition": "nutrition_titration",
       "via": "pk"
     },
     {
@@ -3909,6 +3984,20 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/operational/nudge_ledger_qa.py",
+      "partition": "checkin_intake_pairs",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/operational/nudge_ledger_qa.py",
+      "partition": "checkin_intake_pairs",
+      "via": "pk"
+    },
+    {
       "direction": "write",
       "lambda": "pipeline-health-check",
       "module": "lambdas/operational/pipeline_health_check_lambda.py",
@@ -4014,6 +4103,55 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/block_retro.py",
+      "partition": "training_constraints",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/calibration_cadence.py",
+      "partition": "clinical",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/calibration_cadence.py",
+      "partition": "dexa",
+      "via": "local-seam"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/calibration_cadence.py",
+      "partition": "food_delivery",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/calibration_cadence.py",
+      "partition": "labs",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/calibration_cadence.py",
+      "partition": "measurements",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/calibration_cadence.py",
+      "partition": "progress_photos",
+      "via": "local-seam"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/training/cardio_hr_store.py",
@@ -4093,6 +4231,20 @@
     {
       "direction": "unknown",
       "lambda": null,
+      "module": "lambdas/training/fitness_tests.py",
+      "partition": "fitness_tests",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/training/fitness_tests.py",
+      "partition": "fitness_tests",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
       "module": "lambdas/training/hevy_common.py",
       "partition": "hevy",
       "via": "pk"
@@ -4116,6 +4268,13 @@
       "lambda": null,
       "module": "lambdas/training/may_tracker.py",
       "partition": "may_tracker",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/panel_judge.py",
+      "partition": "training_constraints",
       "via": "pk"
     },
     {
@@ -5668,6 +5827,13 @@
     {
       "direction": "read",
       "lambda": "life-platform-mcp",
+      "module": "mcp/authoring_input_age.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
       "module": "mcp/coach_packet_today.py",
       "partition": "hevy",
       "via": "fixed-seam"
@@ -5797,6 +5963,13 @@
       "module": "mcp/plan_hevy_windows.py",
       "partition": "hevy",
       "via": "fixed-seam"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/predraft_shadow.py",
+      "partition": "training_constraints",
+      "via": "pk"
     },
     {
       "direction": "read",
@@ -7866,13 +8039,13 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead"
     },
     "counts": {
-      "alarms": 139,
+      "alarms": 141,
       "alarms_by_routing": {
-        "digest": 95,
+        "digest": 96,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
-        "urgent": 26,
+        "urgent": 27,
         "via-composite": 3
       },
       "alarms_composite": 4,
@@ -7880,23 +8053,23 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 757,
+      "edges": 780,
       "lambdas": 108,
-      "mcp_tool_modules": 37,
+      "mcp_tool_modules": 38,
       "mcp_tools": 89,
-      "partitions": 117,
-      "privacy_fields_owner_only": 67,
+      "partitions": 121,
+      "privacy_fields_owner_only": 68,
       "privacy_fields_owner_published": 11,
-      "privacy_sources_owner_only": 19,
+      "privacy_sources_owner_only": 23,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 81,
       "schedules": 96
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 369,
-        "sites_resolved": 954,
-        "sites_total": 1323
+        "sites_dynamic": 380,
+        "sites_resolved": 981,
+        "sites_total": 1361
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -7947,6 +8120,7 @@
       "ingestion": true,
       "method": "Health Auto Export webhook, near-real-time",
       "owner_only_fields": [
+        "_rd_protein_hae",
         "_rd_sleep_apple",
         "breathing_disturbances_apple",
         "sleep_awake_min_apple",
@@ -8005,6 +8179,11 @@
       "class": "experiment_scoped",
       "ingestion": false,
       "privacy_tier": "public"
+    },
+    "checkin_intake_pairs": {
+      "class": "cross_phase",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
     },
     "chronicle": {
       "class": "experiment_scoped",
@@ -8149,6 +8328,11 @@
       "ingestion": false,
       "privacy_tier": "public"
     },
+    "evening_checkin": {
+      "class": "raw_timeseries",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
+    },
     "evening_ritual": {
       "class": "raw_timeseries",
       "ingestion": false,
@@ -8184,6 +8368,11 @@
       "ingestion": false,
       "privacy_tier": "public"
     },
+    "fitness_tests": {
+      "class": "cross_phase",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
+    },
     "flourishing": {
       "class": "raw_timeseries",
       "ingestion": false,
@@ -8193,7 +8382,7 @@
       "category": "Manual logs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "Manual log",
+      "method": "Manual CSV upload every ~6 months (an upload ritual, paused between uploads; reminder via the calibration cadence)",
       "privacy_tier": "public",
       "stale_hours": 336
     },
@@ -8388,6 +8577,11 @@
       "class": "experiment_scoped",
       "ingestion": false,
       "privacy_tier": "public"
+    },
+    "nutrition_titration": {
+      "class": "cross_phase",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
     },
     "owner_words": {
       "class": "raw_timeseries",
@@ -8660,6 +8854,7 @@
     "default": "public \u2014 an unlisted source/field is TIER_PUBLIC by omission (field_tiers.py's stated rule)",
     "fields": {
       "apple_health": {
+        "_rd_protein_hae": "owner_only",
         "_rd_sleep_apple": "owner_only",
         "breathing_disturbances_apple": "owner_only",
         "cardio_recovery_bpm_apple": "internal",
@@ -8757,10 +8952,13 @@
     },
     "sources": {
       "cgm_readings": "owner_only",
+      "checkin_intake_pairs": "owner_only",
       "clinical": "internal",
       "coach_vision": "owner_only",
       "dexa": "owner_published",
+      "evening_checkin": "owner_only",
       "felt_probe": "owner_only",
+      "fitness_tests": "owner_only",
       "flourishing": "owner_only",
       "genome": "owner_only",
       "hevy": "owner_only",
@@ -8770,6 +8968,7 @@
       "measurements": "owner_published",
       "named_human_contact": "owner_only",
       "notion": "owner_only",
+      "nutrition_titration": "owner_only",
       "pending_writes": "owner_only",
       "private_intake": "owner_only",
       "progress_photos": "owner_only",

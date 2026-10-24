@@ -89,6 +89,10 @@ SWEEP_FILES = (
     ".claude/skills/daily-debrief/SKILL.md",
     ".claude/skills/speak-to-coaches/SKILL.md",
     ".claude/skills/coach-session/SKILL.md",  # swept when present
+    ".claude/skills/training-review/SKILL.md",  # #5079: the block retro reads its targets from the charter
+    "lambdas/health/nutrient_intake.py",  # #5204: the fibre target in MICRONUTRIENT_TARGETS reads the charter floor
+    "lambdas/emails/nutrition_review_lambda.py",  # #5204: the review footer renders the fibre floor from nutrient_intake, never a literal
+    "lambdas/experiment/plan_facts.py",  # #5204: the plan's fibre figure reads the charter floor
 )
 
 
@@ -154,6 +158,15 @@ def _patterns() -> Dict[str, Tuple[str, re.Pattern[str]]]:
     rpe_bands = _ranges(c["effort_ceilings"]["by_movement_class"].values())  # #5058: renamed from by_experience_tier
     words = {3: "three", 6: "six"}
     return {
+        "fibre_floor": (
+            "nutrition.floors.fibre.floor_g",
+            re.compile(
+                r"\bdaily_fiber_min_g\"?\s*[:=]\s*\d"
+                r"|\"fiber_g\"\s*:\s*\{\s*\"target\"\s*:\s*\d"
+                r"|\b\d+(?:\.\d+)?\s*g(?:rams)?\s+(?:of\s+)?fib",  # ANY number in prose: a drifted '38g fiber' is caught too
+                re.I,
+            ),
+        ),
         "steps_floor": (
             "steps.floor",
             re.compile(_thousands(int(c["steps"]["floor"])) + r'|"daily_movement_target"\s*:'),
@@ -324,6 +337,13 @@ def test_every_pattern_has_a_positive_control():
     probes = {
         "steps_floor": ["STEP_FLOOR = 12000  # steps", '"daily_movement_target": "3 miles"'],
         "steps_target": ["target 15,000 a day"],
+        "fibre_floor": [
+            '"daily_fiber_min_g": 25,',
+            '"fiber_g": {"target": 38, "label": "Fiber"},',
+            "a 35 g fibre floor",
+            "| 38g fiber |",
+            "a 21.5 g of fibre target",
+        ],
         "rate_band": ['"target": 3.5,  # lb/wk', "_TARGET_RATE_LB_WK = 3", "weekly_rate > 2.5", "a 3 lb/week cut"],
         "session_minutes": ['"session_minutes": [55, 70],'],
         "anchor_block_weeks": ['"weeks_per_block": 6,'],
@@ -345,6 +365,7 @@ def test_every_pattern_has_a_positive_control():
         "rate_band": ['"cap": 3.75,', '"target": 3.25,'],  # pre-charter taper steps are not charter numbers
         "movement_gate_lb": ['"above_lb": 295,', "if current_weight > RUN_GATE_LB:"],  # not a gate weight; a read, not a copy
         "effort_ceiling_rpe": ['"standing_rpe_cap": 8,', '"rpe_max": 7'],  # a standing-constraint cap and a layoff cap, not the ceiling
+        "fibre_floor": ['"fiber_g": {"target": macro_floors.floor_g("fibre"), "label": "Fiber"},', 'out["daily_fiber_min_g"] = floor_g()'],
         "volume_band_sets": ['out["weekly_sets_by_muscle"] = f()', 'row.get("avg_sets_per_week")'],  # computed / read
     }
     pats = _patterns()

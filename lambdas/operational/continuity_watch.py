@@ -73,6 +73,7 @@ AMBIENT_REASONS: dict[str, str] = {
     "apple_health": "watched on a value instead: the partition stays fresh from automations that need no person",
     "dropbox": "a transport poller — it reports on itself, not on anyone",
     "eightsleep": "device telemetry that continues while the bed is empty",
+    "food_delivery": "paused 2026-10-19 (#5108) — no orders logged since March; off by design, so no live schedule to be silent",
     "garmin": "paused at the vendor's insistence (ADR-074) — no live schedule to be silent",
     "habitify": "the habit engine writes a daily row whether or not anything was ticked",
     "mastodon": "schedule retired by the owner (Q39, 2026-10-17) — no live schedule to be silent",

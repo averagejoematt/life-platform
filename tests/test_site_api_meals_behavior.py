@@ -210,6 +210,17 @@ def _frozen_and_isolated(monkeypatch):
     freeze(DEFAULT_NOW)
 
 
+@pytest.fixture(autouse=True)
+def _every_fixture_food_name_approved(monkeypatch):
+    """#5112: the shipped owner-approved food-name list is EMPTY (fail closed), so on the shipped
+    default every name-keyed row below would be withheld. These tests pin the AGGREGATION
+    (windows, averages, grades, envelopes), not the privacy gate, so they run with every name
+    approved. The gate itself, on the real shipped list, is tests/test_food_name_allowlist_5112.py."""
+    from privacy import food_names
+
+    monkeypatch.setattr(food_names, "approved", lambda name: bool(food_names.normalise(name)))
+
+
 @pytest.fixture
 def delivery_public(monkeypatch):
     """Opt IN to the ungated food-delivery reader.

@@ -20,12 +20,14 @@ import json
 import re
 from datetime import datetime, timedelta, timezone
 
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.journal_silence import public_body  # #5131: the one public-surface guard
 from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.metric_truth import steps_series  # #4630: the ONE steps resolver
 from common.pacific_time import PACIFIC
+from health.calorie_target import target_kcal  # #5095: the ONE calorie target — masked like the intake
 
-from content import labs_scope  # #3728 — the /api/labs scope block
+from content import brief_hr_regime, labs_scope  # #3728 — the /api/labs scope block; #5029 the HR regime reading
 
 # ==============================================================================
 # MODULE STATE (set by init())
@@ -320,7 +322,9 @@ def sanitize_for_demo(html, data, profile):
         cal = mf.get("total_calories_kcal")
         if cal:
             html = html.replace(str(round(float(cal))), mask)
-        html = html.replace(str(PLAN_DAILY_CALORIES_TARGET), mask)
+        target = target_kcal(data.get("date"))
+        if target:
+            html = html.replace(str(target), mask)
 
     if "protein" in rv:
         mask = rv["protein"]
@@ -415,7 +419,7 @@ def write_public_stats_json(data, profile, streak_data=None):
         _s3.put_object(
             Bucket=_S3_BUCKET,
             Key="generated/public_stats.json",
-            Body=json.dumps(stats, default=str),
+            Body=public_body(json.dumps(stats, default=str), "application/json"),
             ContentType="application/json",
             CacheControl="max-age=300",
         )
@@ -470,14 +474,9 @@ def write_dashboard_json(
         apple_7d = data.get("apple_7d") or []
         glucose_sparkline = [_safe_float(d, "blood_glucose_avg") for d in apple_7d]
 
-        # Readiness training recommendation
-        training_rec = ""
-        if readiness_colour == "green":
-            training_rec = "Hard workout OK · Follow today's plan"
-        elif readiness_colour == "yellow":
-            training_rec = "Moderate effort · Zone 2 or easy strength"
-        elif readiness_colour == "red":
-            training_rec = "Active recovery only · Walk, yoga, stretch"
+        # Readiness + its training recommendation (#5029: "Re-baselining", no HR-derived rec, inside an HR regime window)
+        readiness_block = brief_hr_regime.dashboard_readiness(readiness_score, readiness_colour, yesterday)
+        training_rec = readiness_block["training_rec"]
 
         tsb = data.get("tsb")
         if tsb is not None:
@@ -546,12 +545,7 @@ def write_dashboard_json(
         dashboard = {
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "date": yesterday,
-            "readiness": {
-                "score": readiness_score,
-                "color": readiness_colour,
-                "label": {"green": "Go", "yellow": "Moderate", "red": "Easy", "gray": "No Data"}.get(readiness_colour, "—"),
-                "training_rec": training_rec,
-            },
+            "readiness": {**readiness_block, "training_rec": training_rec},
             "sleep": {
                 "score": sleep_score,
                 "duration_hrs": sleep_duration,
@@ -634,7 +628,7 @@ def write_dashboard_json(
         _s3.put_object(
             Bucket=_S3_BUCKET,
             Key=_DASHBOARD_KEY,
-            Body=json.dumps(dashboard, default=str),
+            Body=public_body(json.dumps(dashboard, default=str), "application/json"),
             ContentType="application/json",
             CacheControl="max-age=300",
         )
@@ -859,7 +853,7 @@ def write_clinical_json(data, profile, yesterday):
         _s3.put_object(
             Bucket=_S3_BUCKET,
             Key=f"dashboard/{_USER_ID}/clinical.json",
-            Body=json.dumps(clinical, default=str),
+            Body=public_body(json.dumps(clinical, default=str), "application/json"),
             ContentType="application/json",
             CacheControl="max-age=300",
         )
@@ -1189,7 +1183,7 @@ def write_buddy_json(data, profile, yesterday, character_sheet=None):
         _s3.put_object(
             Bucket=_S3_BUCKET,
             Key=f"buddy/{_USER_ID}/data.json",
-            Body=json.dumps(buddy_data, default=str),
+            Body=public_body(json.dumps(buddy_data, default=str), "application/json"),
             ContentType="application/json",
             CacheControl="max-age=300",
         )

@@ -79,6 +79,7 @@ _BEFORE_4770 = {
     "horizons_retrospective": _S46,
     "broadcast_sensitivity": _H45,
     "journal_enrichment": _H45,
+    "nutrition.critics": _H45,  # #5114: a NEW route for a new caller (the nutrition critics' narrator) — no model moved
     "plan_critics": _H45,
     "reader_truth_qa": _H45,
     "semantic_recall.embed": "amazon.titan-embed-text-v2:0",
@@ -92,7 +93,6 @@ _BEFORE_4770 = {
     "challenge_generator": _H45,
     "coach_chat_summary": _H45_PROFILE,
     "coach_checkin": _H45,
-    "coach_daily_reflection": _H45,
     "coach_telegram": _S46,
     "coach_thread_extract": _H45,
     "daily_insight": _H45,

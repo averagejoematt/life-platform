@@ -33,6 +33,7 @@ import json
 import logging
 from datetime import datetime, timezone
 
+from ingestion.health_auto_export_additive import received_stamp
 from ingestion.source_registry import raw_date_key, raw_layout_for
 
 _SOURCE = "apple_health"
@@ -166,7 +167,7 @@ def save_workouts_to_s3(s3_client, bucket, user_id, date_str, workouts_list):
     return 0
 
 
-def save_raw_payload(s3_client, bucket, user_id, payload):
+def save_raw_payload(s3_client, bucket, user_id, payload, received=None):
     """Archive the raw webhook payload to S3.
 
     #3119: the leaf used to be pure wall-clock (unbounded growth on
@@ -177,8 +178,14 @@ def save_raw_payload(s3_client, bucket, user_id, payload):
     `filename_legacy` facet for the pre-#3119 `DD_HHMMSS.json` generation this
     replaced (both are resolvable — #3119 is a DIL-028 generation flip, not a
     cutover).
+
+    #4628: `received` (the handler's receipt datetime) is stamped as the object's
+    `received-at` metadata, microsecond resolution, so a replay of this archive
+    orders deliveries as the writer received them — LastModified is whole
+    seconds, and the additive revisions are ordered by receipt
+    (health_auto_export_additive.merge_readings). The key and body are unchanged.
     """
-    now = datetime.now(timezone.utc)
+    now = received or datetime.now(timezone.utc)
     body = json.dumps(payload, default=str, sort_keys=True)
     content_hash = hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]
     # `timestamped` scheme: MANY objects a day, so no per-day key exists — the prefix comes from
@@ -189,5 +196,6 @@ def save_raw_payload(s3_client, bucket, user_id, payload):
         Key=s3_key,
         Body=body,
         ContentType="application/json",
+        Metadata={"received-at": received_stamp(now)},
     )
     return s3_key

@@ -707,6 +707,13 @@ _PENDING_PERMISSIONS_APPLY: dict[str, str] = {
     # config-drift.yml) was applied by the owner ~03:30Z with the same put-role-policy command;
     # post-apply `deploy/verify_oidc_iam.py --strict` reported CLEAN across all 15 targets.
     # Removed here per the same #2824 rule.
+    "github-actions-readonly-role": (
+        "2026-10-23 (#5252): SchedulerScheduleRead (`scheduler:GetSchedule` on "
+        "schedule/default/LifePlatform*) + SchedulerList (`scheduler:ListSchedules` on *) for I6's "
+        "zoned-schedule leg in ci-cd.yml post-deploy-checks; owner applies with "
+        "`aws iam put-role-policy --role-name github-actions-readonly-role --policy-name readonly-permissions "
+        "--policy-document file://infra/iam/github-actions-readonly-role.permissions.json`, then deletes this entry"
+    ),
 }
 
 

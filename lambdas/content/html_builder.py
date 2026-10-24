@@ -10,23 +10,20 @@ Exports:
   _section_error_html()  — graceful section error placeholder
 """
 
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G
-from common.digest_utils import compute_confidence
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_PROTEIN_MIN_G
+from common.digest_utils import compute_confidence, safe_float  # safe_float: shared bundled helper (#970; the local d2f copy was unused)
+from common.habit_registry import habit_tier  # #5232
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.pacific_time import day_in_words, shift_day_key  # #4182: dates in words, one PT spelling
+from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 from health.scoring_engine import habitify_reading  # #4362
 
-_HAS_CONFIDENCE = True
+from content import brief_hr_regime  # #5029: the brief's reading of the HR regime markers
+from content.brief_format import esc, supplement_timing_label, supplement_timing_order, v2_coach_header_titles, weather_context_cells
 
 # ==============================================================================
 # INLINE UTILITIES (tiny — avoids import dependency on daily_brief_lambda)
 # ==============================================================================
-
-
-from common.digest_utils import safe_float  # shared bundled helpers (#970; the local d2f copy was unused)
-
-from content.brief_format import esc, supplement_timing_label, supplement_timing_order, v2_coach_header_titles, weather_context_cells
-
 # S2-T1-10 Weekly Habit Review — compute + render live in their own module (#1654 shape).
 # Re-exported here because `daily_brief_lambda` and the behavior suite both reach for
 # `html_builder._compute_weekly_habit_review`.
@@ -473,7 +470,7 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
 
     Returns the HTML fragment for these sections; behavior-preserving extraction.
     """
-    out = ""
+    out, hr_rebase = "", brief_hr_regime.rebaselining(data)  # #5029: HR-derived labels withheld in the window
     # --- Scorecard ---
     try:
         out += "<!-- S:scorecard -->"
@@ -495,19 +492,7 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
         ]
 
         for label, score, emoji in score_items:
-            if score is None:
-                color = "#475569"
-                score_txt = "—"
-            elif score >= 80:
-                color = "#22c55e"
-                score_txt = str(score)
-            elif score >= 60:
-                color = "#f59e0b"
-                score_txt = str(score)
-            else:
-                color = "#ef4444"
-                score_txt = str(score)
-
+            color, score_txt = brief_hr_regime.score_tile(label, score, hr_rebase)
             out += (
                 '<div style="background:#1e293b;border-radius:8px;padding:10px;text-align:center;">'
                 '<p style="font-size:16px;margin:0;">' + emoji + "</p>"
@@ -608,6 +593,7 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
                 + str(round(hrv_val))
                 + "ms yesterday · "
                 + trend_s
+                + brief_hr_regime.hrv_line_suffix(hr_rebase)
                 + "</span></p>"
             )
 
@@ -626,7 +612,7 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
         tier0_status = tier_status.get(0, tier_status.get("0", {}))
         registry = profile.get("habit_registry", {})
 
-        tier0_names = [n for n, m in registry.items() if m.get("tier") == 0 and m.get("status") == "active"]
+        tier0_names = [n for n, m in registry.items() if habit_tier(m) == 0 and m.get("status") == "active"]
         if not tier0_names:
             tier0_names = list(profile.get("mvp_habits", []))
 
@@ -696,48 +682,9 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
     except Exception as _e:
         out += _section_error_html("Scorecard", _e)
 
-    # --- Readiness Signal ---
+    # --- Readiness Signal --- (#5029: RE-BASELINING inside an HR regime marker's window)
     try:
-        out += "<!-- S:readiness -->"
-        r_colors = {"green": "#22c55e", "yellow": "#f59e0b", "red": "#ef4444", "gray": "#64748b"}
-        r_labels = {"green": "GO", "yellow": "MODERATE", "red": "EASY DAY", "gray": "NO DATA"}
-        r_emojis = {"green": "🟢", "yellow": "🟡", "red": "🔴", "gray": "⚪"}
-        r_recs = {
-            "green": "System is ready. Hard training or high-focus work OK.",
-            "yellow": "Moderate effort day. Zone 2 or moderate strength.",
-            "red": "Recovery day. Walk, stretch, or easy Zone 2 only.",
-            "gray": "No readiness data available.",
-        }
-        r_col = r_colors.get(readiness_colour, "#64748b")
-        out += (
-            '<div style="background:#1e293b;padding:16px 24px;border-bottom:1px solid #2d2d5e;">'
-            '<div style="display:flex;align-items:center;gap:12px;">'
-            '<div style="background:rgba(0,0,0,0.3);border-radius:50%;width:48px;height:48px;'
-            'display:flex;align-items:center;justify-content:center;font-size:24px;">' + r_emojis.get(readiness_colour, "⚪") + "</div>"
-            '<div><p style="color:#94a3b8;font-size:10px;margin:0;font-weight:700;">READINESS SIGNAL</p>'
-            '<p style="color:' + r_col + ';font-size:20px;font-weight:700;margin:2px 0;">' + r_labels.get(readiness_colour, "—") + "</p>"
-            '<p style="color:#64748b;font-size:11px;margin:0;">' + r_recs.get(readiness_colour, "") + "</p>"
-            "</div></div>"
-        )
-
-        whoop = data.get("whoop") or {}
-        recovery = safe_float(whoop, "recovery_score")
-        strain = safe_float(whoop, "strain")
-        rhr = safe_float(whoop, "resting_heart_rate")
-        if recovery or strain or rhr:
-            out += '<div style="margin-top:10px;display:flex;gap:16px;">'
-            for r_label, r_val in [
-                ("Recovery", str(round(recovery)) + "%" if recovery else "—"),
-                ("Strain", str(round(strain, 1)) if strain else "—"),
-                ("RHR", str(round(rhr)) + " bpm" if rhr else "—"),
-            ]:
-                out += (
-                    '<div><p style="color:#e2e8f0;font-size:14px;font-weight:600;margin:0;">' + r_val + "</p>"
-                    '<p style="color:#475569;font-size:9px;margin:0;">' + r_label + "</p></div>"
-                )
-            out += "</div>"
-
-        out += "</div><!-- /S:readiness -->"
+        out += brief_hr_regime.readiness_signal_html(data, readiness_colour)
     except Exception as _e:
         out += _section_error_html("Readiness", _e)
 
@@ -765,7 +712,7 @@ def _habits_deep_dive(data, profile):
             ("TIER 1 — HIGH PRIORITY", 1, "#f59e0b"),
             ("TIER 2 — GOOD TO DO", 2, "#64748b"),
         ]:
-            tier_habits = [(n, m) for n, m in registry.items() if m.get("tier", 2) == tier_num and m.get("status") == "active"]
+            tier_habits = [(n, m) for n, m in registry.items() if habit_tier(m) == tier_num and m.get("status") == "active"]
             if not tier_habits:
                 continue
             out += '<p style="color:' + tier_color + ';font-size:9px;margin:8px 0 4px;font-weight:700;">' + tier_label + "</p>"
@@ -943,7 +890,7 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
             acwr_reason = str(computed_metrics.get("acwr_alert_reason", ""))
             if acwr_val is not None:
                 _av = float(acwr_val)
-                acwr_color = "#ef4444" if acwr_alert else "#f59e0b" if _av > 1.3 or _av < 0.8 else "#22c55e"
+                acwr_color = brief_hr_regime.acwr_colour(_av, acwr_alert, data)  # #5029: no green inside the window
                 zone_label = acwr_zone.upper() if acwr_zone else ""
                 out += (
                     '<p style="color:#475569;font-size:10px;margin:4px 0 0;">'
@@ -984,7 +931,7 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
         carbs = safe_float(mf, "total_carbs_g")
         fiber = safe_float(mf, "total_fiber_g")
 
-        cal_target = PLAN_DAILY_CALORIES_TARGET
+        cal_target = target_kcal(data.get("date"))
         protein_target = PLAN_DAILY_PROTEIN_MIN_G
 
         if cals is not None:
@@ -995,7 +942,7 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
 
             out += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">'
             macro_items = [
-                ("Calories", fmt_num(cals), "/" + str(cal_target), cal_color),
+                ("Calories", fmt_num(cals), "/" + str(cal_target or "—"), cal_color),
                 ("Protein", str(round(protein)) + "g" if protein else "—", "/" + str(protein_target) + "g", prot_color),
                 ("Fat", str(round(fat)) + "g" if fat else "—", "", "#94a3b8"),
                 ("Carbs", str(round(carbs)) + "g" if carbs else "—", "", "#94a3b8"),

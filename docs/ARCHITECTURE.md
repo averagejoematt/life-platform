@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-10-19 (v8.6.0 — 89 tools, 76-module MCP package, 20 data sources, 108 Lambdas, 26 secrets, 135 alarms, 10 CDK stacks deployed).
+Last updated: 2026-10-23 (v8.6.0 — 89 tools, 81-module MCP package, 20 data sources, 108 Lambdas, 26 secrets, 137 alarms, 10 CDK stacks deployed).
 
 > **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **Home + five doors** (v5 IA): the cockpit (`/cockpit/`, live data), the data (`/data/`, the evidence archive — old `/evidence/*` slugs 301), the coaching, the protocols, and the story (`/story/`, the writing hub); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **162 ADRs** (ADR-001 → ADR-164 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
@@ -85,7 +85,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | ACM Certificate | TLS | us-east-1 — `averagejoematt.com` + all subdomains (DNS-validated via Route 53) |
 | SES Receipt Rule Set | Inbound email routing | `life-platform-inbound` (active) — rule `insight-capture` routes `insight@aws.mattsusername.com` → S3 |
 | SES Configuration Set | Outbound delivery telemetry | `life-platform-emails` wired to `daily-brief`, `weekly-digest`, `monthly-digest`, `partner-weekly-email` |
-| CloudWatch | Alarms + logs | **~135 metric alarms**. Per-Lambda `ingestion-error-*` first-error alarms are retired across ingestion (2026-05-29), compute + email (#790/ADR-116, 2026-07-07 — 48 alarms) in favour of the shared `life-platform-ingestion-dlq` digest path (`life-platform-ingestion-dlq-messages` + `life-platform-dlq-depth-warning`). |
+| CloudWatch | Alarms + logs | **~137 metric alarms**. Per-Lambda `ingestion-error-*` first-error alarms are retired across ingestion (2026-05-29), compute + email (#790/ADR-116, 2026-07-07 — 48 alarms) in favour of the shared `life-platform-ingestion-dlq` digest path (`life-platform-ingestion-dlq-messages` + `life-platform-dlq-depth-warning`). |
 | CDK | Infrastructure as Code | `cdk/` — 10 stacks. CDK owns all Lambda IAM roles + every EventBridge schedule rule (the count is `model/platform_model.json` `meta.counts.schedules` — read it there, it is not restated here so a branch adding a schedule cannot strand it between the committed and the regenerated model; the live account holds more rules than CDK declares). Stacks: `core_stack`, `ingestion_stack`, `email_stack`, `compute_stack`, `mcp_stack`, `operational_stack`, `serve_stack` (public serving path: site-api + site-api-ai — #793, split via `cdk refactor` 2026-07-08), `web_stack`, `monitoring_stack`, `backup_stack` (DIL-027/#3042 — the `raw/` cross-region replica bucket + replication role, **us-east-2**; the only stack outside us-west-2 other than `web_stack`'s us-east-1). |
 | CloudTrail | Audit logging | `life-platform-trail` → S3. Data events enabled for `s3://matthew-life-platform/raw/` and `s3://matthew-life-platform/uploads/`. |
 | AWS Budget | Cost guardrail | **$215/mo all-in cap** (ADR-063; base $75 -> $85 -> $150 -> $215, surge-to-$252 rule per ADR-133), alerts at 50%/70%/85%/100%. Enforced via `cost_governor_lambda` (every 8h) → SSM `/life-platform/budget-tier` → `budget_guard.py` gates AI features by AUDIENCE band (ADR-125; ground truth = `_FEATURE_CUTOFF`): 1=internal/dev AI (ensemble, chronicle editor, the coherence/reader-truth/visual QA passes), 2=reader narratives (coach commentary, State of Matthew, chronicle, nudges), 3=hard cutoff — the public ask endpoints and the daily brief's AI, the two surfaces that degrade LAST, enforced in `bedrock_client.invoke()`. |
@@ -206,7 +206,7 @@ Later phases (B–E): MCP tools + rules-based recommender, the `/mind/` page, th
 
 DLQ coverage: every async-invoked Lambda routes terminal failures to `life-platform-ingestion-dlq` EXCEPT these, whose CDK construct passes no DLQ at all — `life-platform-delete-user-data`, `life-platform-dlq-consumer`, `life-platform-mcp-warmer`, `life-platform-remediation-dispatcher`, `telegram-coach-worker` (#3500 owns closing the gap; the set is derived from CDK and diffed against this sentence by `scripts/doc_facts_infra.py`). Alarm actions route to SNS `life-platform-alerts`.
 
-CloudWatch carries **~135 metric alarms** (CDK-declared; the count is auto-discovered by `deploy/sync_doc_metadata.py` and the inventory is regenerated into `docs/MONITORING.md`).
+CloudWatch carries **~137 metric alarms** (CDK-declared; the count is auto-discovered by `deploy/sync_doc_metadata.py` and the inventory is regenerated into `docs/MONITORING.md`).
 
 Additional safeguards — one per line so each cadence is a checkable claim (`scripts/doc_facts_infra.py` diffs both the
 `rate(...)` literal and the prose interval against the CDK schedule):
@@ -239,7 +239,7 @@ SK: DATE#YYYY-MM-DD
 
 ### MCP Server
 
-**Lambda:** `life-platform-mcp` | **Tools:** 89 | **Memory:** 768 MB | **Runtime:** python3.12 | **Modules:** 76 (`mcp/tools_*.py` + helpers)
+**Lambda:** `life-platform-mcp` | **Tools:** 89 | **Memory:** 768 MB | **Runtime:** python3.12 | **Modules:** 81 (`mcp/tools_*.py` + helpers)
 **Remote MCP:** `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>`
 **Auth:** OAuth 2.1 auto-approve + HMAC Bearer (remote). Source of truth for tool count: AST parse of top-level `TOOLS` dict keys via `deploy/sync_doc_metadata.py::_auto_discover_tool_count` (see CLAUDE.md — `grep '"name":'` over-counts nested schema fields).
 
@@ -250,6 +250,10 @@ Cold start: ~700–800ms. Warm: 23–30ms. Cached tools: <100ms.
 Compute → store → read pattern. Standalone Lambdas run before Daily Brief, store results to DynamoDB.
 
 **Live:** IC-1 (anomaly), IC-2 (training load), IC-3 (nutrition), IC-6 (CGM correlation), IC-7 (cross-pillar), IC-8 (intent vs execution), IC-15 (insights persistence), IC-16 (progressive context), IC-17 (readiness synthesis), IC-18 (hypothesis engine), IC-19 (N=1 experiments + slow drift + sustained anomaly), IC-23 (Character Sheet), IC-24 (adaptive mode), IC-25 (decisions), IC-29 (metabolic adaptation / deficit sustainability — TDEE divergence tracking, deployed v3.7.67), IC-30 (autonomic balance score — HRV + RHR + RR + sleep quality → 4-quadrant nervous system state, deployed v3.7.67).
+
+**One calorie target (#5095, epic #5091):** every surface that states or grades a calorie target — scoring, the character sheet, the daily brief, the weekly / monthly / nutrition-review / partner emails, the insight and hypothesis engines, the coach's domain facts, `get_nutrition view=macros`, the energy view's `calorie_target_platform` and the nutrition critics — reads `health.calorie_target.resolve(day)`: the week's titration record (`…SOURCE#nutrition_titration` / `WEEK#<iso-monday>`, written weekly by the #5096 titration engine, `health.titration`, on the nightly pre-draft's titration leg; a resolve inside a Lambda reads it through a cached default reader) else the charter's `nutrition.calories` block (`config/training_charter.json`; ~1,500 kcal, owner ruling 2026-10-23 R1), with its source and provenance; the energy floors are WARNINGS (`floor_warnings`), never a clamp, and a record written before the re-target (`records_from_version`) is not read. The generated 1,500 kcal constant is retired and `tests/test_calorie_target_one_resolver_5095.py` guards the set. TDEE (ADR-152, `health.tdee`) stays MAINTENANCE context, never a target. **The weekly titration (#5096):** `health.titration.decide` reads the shared 14-day loss rate against the charter rate band (the landing schedule from the landing down, the clinical cap applied), counts consecutive out-of-band weekly reads, honours the 14-day spacing and steps-before-food, and moves the target down by at most the charter's `nutrition.titration.max_step_kcal`; above the band ceiling it holds and warns (`above_ceiling_action` `warn`, owner ruling 2026-10-23: food is never pushed up on its own); insufficient data holds. The owner sees the decision in the Saturday nutrition-review email; a week with no record is the calibration sweep's dead-man.
+
+**Training-day fuel (#5101, epic #5091; owner rulings 2026-10-23 on R1, #5212 and the #5091 follow-ups):** the same resolver takes a `day_type` seam (`lifting | rest | travel | unknown`, from `calorie_target.classify_day_type`: a travel disruption or charter window, else the per-date training calendar, else unknown). The calendar is `training.training_calendar` (#5191): the split's sequence alone never types a date, so the calendar types the Mon–Sun Pacific week from the charter's `split.lifting_days_per_wk` and the week's credited program sessions (`session_sequence.completed_sessions`), laying the sessions still owed on the remaining dates (nominal lifting weekdays first) and typing every other date rest, so a rest-day postponement moves a session inside the week without changing its count. The plan (`training_calendar.plan_fuel`) and the weekly food panel read it; an unread Hevy record keeps `unknown` at the base with `if_lifting_day`/`if_rest_day` as conditional readings, and the typed block carries `week_days` / `week_mean_kcal` (the base plus the lifting uplift over the week; `week_balance_held` = no day under its base). `nutrition.training_day` in the charter holds the lifting-day uplift (+150 kcal, owner ruling 2026-10-23: rest days are NOT paid back below the target, so the week averages above the base by design — 1,650 lifting / 1,500 rest), the carbohydrate split (protein and fat held, fat never under its floor, carbohydrate moves) and the pre/post session targets (scaled to fit the 1,650 kcal lifting day's 96 g of carbohydrate); travel and unknown days stay at the base. Owner-only: the plan's `constraint_block.training_day_fuel` (no stored field, no public surface). `tests/test_training_day_fuel_5101.py`.
 
 **Data-gated next:** IC-4 (failure patterns, ~Apr 18), IC-5 (momentum warning, ~Apr 18), IC-26 (temporal mining, ~May), IC-27 (multi-resolution handoff, ~May).
 
@@ -427,7 +431,7 @@ There is deliberately **no per-driver cost table here**: a hand-maintained copy 
 ~/dev/life-platform/
   mcp_server.py                   ← MCP Lambda entry point
   mcp_bridge.py                   ← Local MCP adapter (Claude Desktop → Lambda HTTPS)
-  mcp/                            ← MCP server package (37 tool modules + helpers)
+  mcp/                            ← MCP server package (38 tool modules + helpers)
     handler.py, config.py, utils.py, core.py, helpers.py, registry.py, warmer.py, …
     tools_<domain>.py               ← one module per tool domain (`ls mcp/tools_*.py`);
                                       tools are wired in registry.py's TOOLS dict

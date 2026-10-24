@@ -99,7 +99,7 @@ test("front: the weight picture says so when it has nothing to draw, and the day
   const empty = structuredClone(EDITION);
   empty.blocks.week.data.weight_series = [];
   await run("", "front", empty);
-  assert.equal(seen("ck-mark"), "No weigh-in in the last 28 days.");
+  assert.equal(seen("ck-mark"), "No weigh-in since the start.");
 });
 
 // ── the trend page: the series it binds to, removed ──

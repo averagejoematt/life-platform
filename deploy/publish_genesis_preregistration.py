@@ -168,7 +168,7 @@ def build_body_markdown(goals: dict, frozen: dict, stamp: dict = None) -> str:
         f"{t['body_composition']['lean_mass_floor_lbs']} pounds of lean mass below which the deficit gives way, no argument.",
         f"**The fuel.** {nut['daily_calories_target']:,} calories a day as the working baseline — an aggressive, "
         f"deliberate deficit — with a protein floor of {nut['daily_protein_min_g']} grams and a fiber minimum of "
-        f"{nut['daily_fiber_min_g']} grams, eaten inside an {nut['eating_window']['window']} window. Hungry-day "
+        f"{genesis_prereg_stamp.GENESIS_FIBER_MIN_G} grams, eaten inside an {nut['eating_window']['window']} window. Hungry-day "
         "flexibility is written into the plan; starvation theater is not.",
         f"**The work.** The opening months are the {phase['phase']} phase: {phase['gym_days_per_week']} strength "
         f"days a week, roughly three miles of walking every day, and {t['training']['zone2_minutes_per_week_target']} "

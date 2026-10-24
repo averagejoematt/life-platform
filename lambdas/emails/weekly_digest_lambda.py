@@ -45,7 +45,6 @@ from common import digest_utils, send_ledger  # shared query_range impls (#970);
 from common.constants import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
     EXPERIMENT_START_DATE,
-    PLAN_DAILY_CALORIES_TARGET,
     PLAN_DAILY_PROTEIN_MIN_G,
 )  # ADR-058
 
@@ -62,6 +61,7 @@ from common.digest_utils import (
 from common.pacific_time import PACIFIC, pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058: default-deny pilot data
+from health.calorie_target import target_phrase  # #5095: the ONE calorie target
 from training import self_added_volume_report  # #4111: the end-of-week self_added_volume report
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
@@ -770,7 +770,7 @@ def call_haiku(data, profile):
         _week_num = max(1, (_days_in + 6) // 7)
         _start_w = profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
         _goal_w = profile.get("goal_weight_lbs", 185)
-        _cal = PLAN_DAILY_CALORIES_TARGET
+        _cal = target_phrase()  # #5095: "<n> kcal", or the absence stated
         _pro = PLAN_DAILY_PROTEIN_MIN_G
         if _week_num <= 4:
             _stage = "Foundation Stage — habit formation + consistency over intensity"
@@ -789,7 +789,7 @@ def call_haiku(data, profile):
             _coaching_note = f"Week {_week_num}: performance coaching fully applicable."
         journey_context = (
             f"JOURNEY STAGE: Week {_week_num} ({_days_in} days in) | {_start_w}→{_goal_w} lbs | {_stage}\n"
-            f"Current targets: {_cal} kcal/day, {_pro}g protein\n"
+            f"Current targets: {_cal}/day, {_pro}g protein\n"
             f"Week {_week_num} coaching principle: {_coaching_note}"
         )
     except Exception:
@@ -1211,7 +1211,7 @@ def build_html(data, commentary, profile):
     bl_rows = row("CTL — Fitness (42d)", fmt(tl.get("ctl")), highlight=True)
     bl_rows += row("ATL — Fatigue (7d)", fmt(tl.get("atl")))
     bl_rows += row("TSB — Form", f'<span style="color:{tcol};font-weight:700;">{fmt(tl.get("tsb"))} ({tlabel})</span>')
-    # BS-09: ACWR from computed_metrics
+    # BS-09: ACWR from computed_metrics (#5029: an HR-regime RE-BASELINING zone is grey; an alert stays red)
     try:
         _acwr_data = data.get("acwr_data") or {}
         _acwr_val = _acwr_data.get("acwr")
@@ -1219,7 +1219,7 @@ def build_html(data, commentary, profile):
             _av = float(_acwr_val)
             _zone = str(_acwr_data.get("zone", "")).upper()
             _acwr_alert = bool(_acwr_data.get("alert", False))
-            _acol = "#e74c3c" if _acwr_alert else "#e67e22" if _av > 1.3 or _av < 0.8 else "#27ae60"
+            _acol = "#e74c3c" if _acwr_alert else "#94a3b8" if "BASELINING" in _zone else "#e67e22" if not 0.8 <= _av <= 1.3 else "#27ae60"
             bl_rows += row(
                 "ACWR — Training Load",
                 f'<span style="color:{_acol};font-weight:700;">{round(_av, 2)}{" — " + _zone if _zone else ""}</span>',

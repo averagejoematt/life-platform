@@ -11,6 +11,7 @@ from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DA
 
 # BS-05 confidence helpers (bundled digest_utils) — same optional-import shape as the facade.
 from common.digest_utils import _confidence_badge, compute_confidence
+from common.journal_silence import public_body  # #5131: the one public-surface guard
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.text_utils import truncate_at_word
 from content import chronicle_schema  # #4191 — the ONE envelope→body / stat-line→words derivation
@@ -698,7 +699,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=post_key,
-        Body=post_html.encode("utf-8"),
+        Body=public_body(post_html.encode("utf-8"), "text/html; charset=utf-8"),
         ContentType="text/html; charset=utf-8",
         CacheControl="max-age=300",
     )
@@ -707,7 +708,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     s3.put_object(
         Bucket=S3_BUCKET,
         Key="generated/journal/posts.json",
-        Body=posts_json_str.encode("utf-8"),
+        Body=public_body(posts_json_str.encode("utf-8"), "application/json"),
         ContentType="application/json",
         CacheControl="max-age=300",
     )

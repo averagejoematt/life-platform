@@ -82,6 +82,15 @@ def macrofactor_series(rows: list[dict[str, Any]] | None, keys: list[str]) -> tu
     return intake, protein
 
 
+def macro_floor_series(rows: list[dict[str, Any]] | None, keys: list[str]) -> dict[str, list[float | None] | None]:
+    """(#5102) fat / carbohydrate / fibre g by day over `keys`; None per unlogged day; None series when unreadable."""
+    fields = (("fat_g_by_day", "total_fat_g"), ("carb_g_by_day", "total_carbs_g"), ("fiber_g_by_day", "total_fiber_g"))
+    if rows is None:
+        return {k: None for k, _ in fields}
+    by_day = {str(r.get("date") or str(r.get("sk") or "").replace("DATE#", ""))[:10]: r for r in rows}
+    return {k: [_num((by_day.get(d) or {}).get(f)) for d in keys] for k, f in fields}
+
+
 def lifting_day_flags(workouts: list[dict[str, Any]] | None, keys: list[str]) -> list[bool] | None:
     """True on a day with at least one Hevy exercise that is NOT a cardio modality and carries
     a set — the same modality lexicon `training.walking_volume` uses, so a treadmill-only
@@ -128,9 +137,13 @@ def withings_trend(rows: list[dict[str, Any]] | None, keys: list[str]) -> dict[s
         out["weight_trend_lb_wk"] = round(-rate["rate_lb_wk"], 2)  # SIGNED, negative = losing — the critic's contract
         out["rate_provisional"] = rate["provisional"]
     out["loss_rate"] = rate
-    out["weekly_loss_rates_lb_wk"] = shared_quantities.weekly_loss_rates_from_rows(usable, end)
+    out["weekly_loss_rates_lb_wk"] = shared_quantities.weekly_loss_rates_from_rows(
+        usable, end, trend_days=shared_quantities.LOSS_RATE_WINDOW_DAYS
+    )
     # #4150: every trailing week with its status — a partial/thin week is REPORTED here and never counted above
-    out["weekly_loss_rate_weeks"] = shared_quantities.weekly_loss_rate_weeks_from_rows(usable, end)
+    out["weekly_loss_rate_weeks"] = shared_quantities.weekly_loss_rate_weeks_from_rows(
+        usable, end, trend_days=shared_quantities.LOSS_RATE_WINDOW_DAYS
+    )
     return out
 
 
@@ -197,7 +210,9 @@ def resolve(
     unresolved: dict[str, str] = {}
     mf = _safe(query_source, "macrofactor", start, end_date)
     hevy = _safe(query_source, "hevy", start, end_date)
-    wt = _safe(query_source, "withings", start, end_date)
+    # the oldest weekly checkpoint (`end - 7`) reads its own 14-day trend, so weigh-ins reach back
+    # LOSS_RATE_WINDOW_DAYS + 7 days; a 14-day fetch left it the week's own slope (#5100, live 10-20)
+    wt = _safe(query_source, "withings", shift_day_key(start, -shared_quantities.WEEK_DAYS), end_date)
     for name, rows in (("macrofactor", mf), ("hevy", hevy), ("withings", wt)):
         if rows is None:
             unresolved[name] = "partition read raised"
@@ -227,6 +242,7 @@ def resolve(
         "window_end": end_date,
         "intake_kcal_by_day": intake,
         "protein_g_by_day": protein,
+        **macro_floor_series(mf, keys),
         "lifting_day_flags": lifting_day_flags(hevy, keys),
         **trend,
         "weeks_since_genesis": ((dn - 1) // 7) if dn else 0,
@@ -245,9 +261,25 @@ def resolve(
     return {"inputs": inputs, "unresolved": unresolved}
 
 
-def block(end_date: str, **kw: Any) -> dict[str, Any]:
+def model_layer(out: dict[str, Any], inputs: dict[str, Any], *, guard: Any = None, invoke: Callable | None = None) -> None:
+    """#5114: the critics' narrative, under the `nutrition_critics` budget feature (band 1). Reads the tier,
+    never moves it; the chokepoint is `bedrock_client.invoke` (ADR-062) unless a test hands one in. Never
+    raises — a failure here leaves the deterministic block exactly as it was and says why."""
+    from health import nutrition_critics_ai
+
+    try:
+        state = nutrition_critics_ai.gate(guard)
+        if state["allowed"] and invoke is None:
+            from ai.bedrock_client import invoke
+        nutrition_critics_ai.apply(out, nutrition_critics.build_packets(inputs), invoke=invoke, gate_state=state)
+    except Exception as e:  # noqa: BLE001
+        out["model_layer"] = {"state": "error", "error": f"{type(e).__name__}: {e}"[:200]}
+
+
+def block(end_date: str, *, model: bool = False, **kw: Any) -> dict[str, Any]:
     """The owner-facing block both surfaces embed: verdicts + decisions_offered + what could
-    not be read. Never raises — a resolver failure is reported in the block."""
+    not be read. Never raises — a resolver failure is reported in the block. `model=True` adds
+    the narrative layer (#5114); the verdicts and the decisions are identical either way."""
     try:
         resolved = resolve(end_date, **kw)
         logged = already_logged()
@@ -256,6 +288,8 @@ def block(end_date: str, **kw: Any) -> dict[str, Any]:
         out["inputs_unresolved"] = resolved["unresolved"]
         if logged is None:
             out["inputs_unresolved"]["decisions"] = "get_decisions could not be read — dedup against prior decisions did not run"
+        if model:
+            model_layer(out, resolved["inputs"])
         return out
     except Exception as e:  # noqa: BLE001 — the surface still ships; the block says why it is empty
         return {

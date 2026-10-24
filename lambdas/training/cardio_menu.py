@@ -87,12 +87,53 @@ def placement() -> dict[str, Any]:
     return menu().get("placement") or {}
 
 
-def block_minutes(kind: str) -> int:
-    """The block's own minutes when the menu names them (tempo: 'hard flat 40'), else the split's cardio block cap."""
+def own_minutes(kind: str) -> int | None:
+    """The minutes the menu itself names for a block (tempo: 'hard flat 40'), before the split's cardio cap."""
     own = block(kind).get("minutes")
-    if own:
-        return int(own)
+    return int(own) if own else None
+
+
+def cardio_cap_minutes() -> int:
+    """The charter's one-cardio-block ceiling (`split.session_minutes.cardio_block_max`)."""
     return int(training_charter.charter_value("split.session_minutes.cardio_block_max", 0) or 0)
+
+
+def block_minutes(kind: str) -> int:
+    """The block's minutes: the menu's own when it names them, else the cap — and NEVER above the cap (#5201).
+
+    The charter's tempo block names 40 min against a 30-min cardio cap; the draft path used to emit the 40 because
+    only the routine generator ran `enforce_session_shape`. The clamp lives here, at the one source, so every
+    reader of the minutes (the block, its note, the shape) agrees with the cap."""
+    cap, own = cardio_cap_minutes(), own_minutes(kind)
+    return min(own, cap) if own and cap else (own or cap)
+
+
+MODALITY_LABEL = {RECUMBENT: "cycling (recumbent)", TREADMILL: TREADMILL}
+
+
+def prescription(kind: str, machine: str) -> dict[str, Any]:
+    """THE cardio prescription for a placed block (#5201): modality, intensity cue and minutes, all from the menu.
+    The pick, the block's note and the session shape are each derived from (or checked against) this."""
+    return {
+        "movement_key": machine,
+        "modality": MODALITY_LABEL.get(machine, machine.replace("_", " ")),
+        "intensity": effort_words(kind),
+        "minutes": block_minutes(kind),
+        "kind": kind,
+    }
+
+
+def align_pick(pick: dict[str, Any], kind: str, machine: str) -> dict[str, Any]:
+    """`recent_aerobic.cardio_pick` re-stated to the menu's placed block: same modality and intensity cue as the
+    prescription. The stage-1 pick is kept whole under `stage1_pick` (nothing silently lost); a pick that already
+    agrees is returned unchanged."""
+    rx = prescription(kind, machine)
+    if pick.get("movement_key") == rx["movement_key"] and pick.get("intensity") == rx["intensity"]:
+        return pick
+    out = {**pick, "movement_key": rx["movement_key"], "modality": rx["modality"], "intensity": rx["intensity"]}
+    out["reason"] = f"{pick.get('reason', '')} -> the menu placed {kind} on the {rx['modality']}".strip()
+    out["stage1_pick"] = {k: pick.get(k) for k in ("movement_key", "modality", "intensity", "reason")}
+    return out
 
 
 def rpe_band(kind: str) -> tuple[int, int] | None:
@@ -199,11 +240,16 @@ def choose_kind(
     last_tempo_or_hills: str | None = None,
     machines: tuple[str, ...] | None = None,
     days_left: int | None = None,
+    run_walk: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """{kind, machine, why} for today's block. `machines` restricts the choice to a block that is already
     on one machine (a chat-drafted bike); None lets the menu pick the machine too.
 
-    `week_kinds` are this week's blocks before today (performed or placed), oldest first."""
+    `week_kinds` are this week's blocks before today (performed or placed), oldest first.
+
+    `run_walk` (#5090) is `run_onramp.run_day_verdict` for today: once the run gate is open, an eligible day's
+    EASY slot becomes the run/walk block (kind `run_walk`, on the treadmill, with its block) — never a conditioning
+    slot, and never under a yellow/red recovery band."""
     week = list(week_kinds or [])
     order = list(placement().get("conditioning_order") or [])[: conditioning_per_wk()]
     done = [k for k in week if k in HARD]
@@ -253,6 +299,14 @@ def choose_kind(
         machine, kind = _fit_machine(kind, machines)
     if on_recumbent and machine == RECUMBENT:
         why += f"; the recumbent: {recumbent_why}"
+    if run_walk and run_walk.get("eligible") and kind not in HARD and recovery_band not in ("yellow", "red") and not machines:
+        return {
+            "kind": "run_walk",
+            "machine": TREADMILL,
+            "why": f"{why}; run/walk: {run_walk.get('why')}",
+            "needed": needed,
+            "block": run_walk.get("block"),
+        }
     return {"kind": kind, "machine": machine, "why": why, "needed": needed}
 
 
@@ -274,13 +328,25 @@ def _fit_machine(kind: str, machines: tuple[str, ...]) -> tuple[str, str]:
     return m, ("incline_treadmill_walk" if m == TREADMILL else "easy")
 
 
-def place_week(days: list[dict[str, Any]], last_tempo_or_hills: str | None = None) -> list[dict[str, Any] | None]:
+def place_week(
+    days: list[dict[str, Any]],
+    last_tempo_or_hills: str | None = None,
+    run_gate: dict[str, Any] | None = None,
+    run_level: int | None = None,
+    runs_done: int = 0,
+) -> list[dict[str, Any] | None]:
     """The placement over a week of days, each `{date, archetype}` (None archetype = a rest day, no gym
     block) plus optional `legs_loaded`. Returns one `choose_kind` result per day (None on a rest day).
-    The same rule `choose_kind` applies to a single draft, iterated so the week can be read whole."""
+    The same rule `choose_kind` applies to a single draft, iterated so the week can be read whole.
+
+    `run_gate` (#5090, `run_onramp.gate_state`): once open, each day is offered a run/walk at `run_level` through
+    `run_onramp.run_day_verdict` — the weekly cap counts `runs_done` plus the runs placed so far."""
+    from training import run_onramp
+
     out: list[dict[str, Any] | None] = []
     week: list[str] = []
     prior: str | None = None
+    runs = int(runs_done)
     lifting = [d for d in days if d.get("archetype")]
     for d in days:
         if not d.get("archetype"):
@@ -296,7 +362,9 @@ def place_week(days: list[dict[str, Any]], last_tempo_or_hills: str | None = Non
             legs_loaded=d.get("legs_loaded", False),
             last_tempo_or_hills=last_tempo_or_hills,
             days_left=left,
+            run_walk=run_onramp.run_day_verdict(d["archetype"], gate=run_gate, runs_this_week=runs, level=run_level) if run_gate else None,
         )
+        runs += pick["kind"] == "run_walk"
         out.append(pick)
         week.append(pick["kind"])
         prior = pick["kind"]

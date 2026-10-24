@@ -363,6 +363,26 @@ _WHOOP_HISTORY_READ_REASON = (
 
 
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
+    "measurements::lambdas/training/calibration_cadence.py::read": (
+        "2026-10-19",
+        "#5061: the cadence reads ONLY the `date` (falling back to the `sk` DATE# suffix) of each tape row, to find when a tape was "
+        "last logged; the writer (measurements_ingestion_lambda) writes `sk` = DATE#<session_date> and `date` = session_date in one "
+        "put. A drift cannot fabricate a row: an unparseable value is skipped and the kind reads as never logged. Pinned on the real "
+        "writer's key shape by tests/test_calibration_cadence_5061.py::test_the_readers_parse_what_the_real_writers_store.",
+    ),
+    "progress_photos::lambdas/training/calibration_cadence.py::read": (
+        "2026-10-19",
+        "#5061: the cadence projects only `sk` and `date` of the photo index rows (never `s3_key`), the two fields "
+        "progress_capture.store writes with `index_sk(date, pose)` = DATE#<date>#<pose>. Pinned against the REAL writer "
+        "(progress_capture.store with a fake S3 and table) by tests/test_calibration_cadence_5061.py::"
+        "test_the_readers_parse_what_the_real_writers_store; an unparseable date is skipped, never a photo path read.",
+    ),
+    "progress_photos::lambdas/coach/progress_capture.py::write": (
+        "2026-10-19",
+        "#5061: the same seam as the cadence's read, seen from the writer: the index row's `sk` and `date` are what "
+        "`calibration_cadence` reads; no other field of the row is read by it. Pinned by "
+        "tests/test_calibration_cadence_5061.py::test_the_readers_parse_what_the_real_writers_store.",
+    ),
     "hevy::mcp/authoring_input_age.py::read": (
         "2026-10-19",
         "#5085: the authoring gate's input-age check reads ONLY the newest hevy `sk` (ProjectionExpression='sk', "
@@ -699,6 +719,15 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "`state: unknown` with avg/max None (never 0), a visible flip on the stored `cardio_hr` record. Pinned by "
         "tests/test_walking_volume_3930.py::test_no_overlap_or_thin_coverage_is_unknown_never_zero and "
         "::test_the_0925_treadmill_replays_joined_on_the_live_fixture (the live-row fixture).",
+    ),
+    # #5187 (2026-10-22): the breakfast nudge reads the apple_health day row's `_rd_protein_hae` map.
+    "apple_health::lambdas/emails/protein_nudge_runner.py::read": (
+        "2026-10-22",
+        "#5187: the runner projects ONE attribute, `_rd_protein_hae`, whose name is imported from the writer "
+        "(`ingestion.health_auto_export_protein.RD_FIELD`, the same constant both sides use), and hands the map unparsed to "
+        "`health.protein_engine.hae_feeding_rows`, which reads only the entry keys `t` and `g` that the writer stores. A drift cannot "
+        "fabricate a number: an entry missing either key is skipped, and no entries means the nudge withholds (`no_same_day_log`). "
+        "VERIFIED: tests/test_hae_protein_intraday_5187.py drives the writer's real output through the runner end to end.",
     ),
 }
 

@@ -40,6 +40,7 @@ def _prompts():
     from ai.ai_calls import daily_brief_shared_system
     from coach.coach_extraction_prompt import EXTRACTION_SYSTEM_PROMPT
     from coach.coach_quality_gate import QUALITY_GATE_SYSTEM_PROMPT
+    from health.nutrition_critics_ai import SYSTEM_PROMPT as NUTRITION_CRITICS_SYSTEM
 
     charter = _charter_prompt()
     return {
@@ -50,6 +51,7 @@ def _prompts():
         "charter-judge-gate": charter,  # #5072
         "charter-narrative": charter,
         "charter-retro": charter,
+        "nutrition-critics": NUTRITION_CRITICS_SYSTEM,  # #5114: declined, under every floor
     }
 
 
@@ -188,7 +190,9 @@ def test_a_registry_tier_swap_reds_every_declined_decision(monkeypatch):
     for fn in prompt_cache.CACHING_DECISIONS:
         problems = prompt_cache.decision_drift(fn, prompts[fn], {})
         assert any("re-measure" in p for p in problems), f"{fn}: a tier swap did not demand a re-measure: {problems}"
-        if not prompt_cache.CACHING_DECISIONS[fn]["engaged"]:  # #5084: an engaged caller still clears — the re-measure is its red
+        if not prompt_cache.CACHING_DECISIONS[fn]["engaged"] and prompt_cache.clears_floor(prompts[fn], "claude-haiku-5-5"):
+            # #5084: an engaged caller still clears — the re-measure is its red; #5114: a declined prefix under even the
+            # 512 floor stays declined on any model, so only the re-measure can red it
             assert any("now clears" in p for p in problems), f"{fn}: a tier swap to a 512 floor did not red the decline: {problems}"
 
 
@@ -242,6 +246,8 @@ def test_a_five_five_move_reds_every_declined_decision():
         assert prompt_cache.cache_floor(prompt_cache.resolved_model(fn, _FIVE_FIVE)) == 512
         if prompt_cache.CACHING_DECISIONS[fn]["engaged"]:
             continue  # #5084: an engaged caller still clears a 512 floor — the re-measure above is its red
+        if not prompt_cache.clears_floor(prompts[fn], prompt_cache.resolved_model(fn, _FIVE_FIVE)):
+            continue  # #5114: a prefix under even the 512 floor stays declined on a 5.5 model — the re-measure is its red
         assert any(
             "now clears" in p for p in problems
         ), f"{fn}: every recorded prefix is >=512 tok, so on a 512 floor the declined decision must red: {problems}"

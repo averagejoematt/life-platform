@@ -59,7 +59,7 @@ When "best for me daily" collides with "legible to a stranger," **me-daily wins.
 | **Evidence** | `/evidence/` | "What's the protocol, what's it built on, does the data hold up?" (the archive) |
 | Home | `/` | the cinematic hook into the above |
 
-### The moat (Constitution §7) — protect these, they're why a $300 ring can't reproduce it
+### The moat (Constitution §7) — protect these, they're why a $300 ring can't reproduce it <!-- drift-ok: a price, not the budget ceiling -->
 1. **The interpretation layer** — named characters who argue about Matthew, Elena's weekly story, the Third Wall. The *soul*, not a feature.
 2. **Honesty as design** — down weeks, relapses, pauses are *shown and narrated*, not hidden. Visible setbacks make the N=1 more credible, not less.
 3. **Radical accessibility** — "you could do this," built with consumer wearables, not a million-dollar lab.

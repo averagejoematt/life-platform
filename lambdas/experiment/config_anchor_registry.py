@@ -172,6 +172,13 @@ CONFIG_ANCHOR_REGISTRY: tuple[ConfigAnchor, ...] = (
         "an experiment anchor; a reset must never re-date a rubric version.",
     ),
     ConfigAnchor(
+        "training_scorecard.json",
+        "date",
+        NOT_ANCHORED,
+        "#5079: the scorecard's change_log dates and its baseline date (the day of the owner's panel review the first "
+        "block retro compares against) — history facts, not an experiment anchor; a reset never moves either.",
+    ),
+    ConfigAnchor(
         "board_of_directors.json",
         "retired_date",
         NOT_ANCHORED,

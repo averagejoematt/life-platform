@@ -475,6 +475,72 @@ def build_fingerprint(stats):
     return img
 
 
+def _fit_lines(draw, text, fnt, max_w):
+    """Greedy word-wrap by measured pixel width (the kit face is proportional)."""
+    lines, cur = [], ""
+    for word in str(text).split():
+        trial = f"{cur} {word}".strip()
+        if cur and draw.textlength(trial, font=fnt) > max_w:
+            lines.append(cur)
+            cur = word
+        else:
+            cur = trial
+    if cur:
+        lines.append(cur)
+    return lines
+
+
+_FRONT_SS = 2  # drawn at 2x and downsampled, so the 2.8 px day columns anti-alias evenly
+
+
+def build_front(stats):
+    """#4646: the front page's daily mark, drawing C ("the year frame"), as its share card.
+
+    The numbers are the site's own /api/edition (never public_stats, which holds only 30
+    weigh-ins) via ``web.og_front_frame``, which also owns the geometry and the words. On
+    ANY fetch or data failure this returns None and the handler writes nothing, so the
+    last good og-front.png stays served — never a wrong number. ``stats`` is unused: the
+    card reads nothing from public_stats.
+    """
+    from common.pacific_time import pacific_today  # #2414: the frame's "today" is the site's (PT)
+    from PIL import Image, ImageDraw
+
+    from web import og_front_frame
+
+    inputs = og_front_frame.load_front_inputs(pacific_today())
+    if inputs is None:
+        return None
+
+    k = _FRONT_SS
+    img = Image.new("RGB", (W * k, H * k), card_engine.KIT_BG)
+    draw = ImageDraw.Draw(img)
+    x0 = 80 * k
+    inner_w = W * k - 2 * x0
+    title_font = card_engine.font_weighted(card_engine.FONT_KIT, 60 * k, 600)
+    body_font = card_engine.font_weighted(card_engine.FONT_KIT, 28 * k, 400)
+    note_font = card_engine.font_weighted(card_engine.FONT_KIT, 23 * k, 400)
+
+    # The kit wordmark: the accent dash, the name, the premise (as the wordmark card).
+    draw.rectangle([x0, 58 * k, x0 + 64 * k, 62 * k], fill=card_engine.KIT_ACCENT)
+    draw.text((x0, 80 * k), "Average Joe Matt", fill=card_engine.KIT_FG, font=title_font)
+    draw.text((x0, 164 * k), inputs["premise"], fill=card_engine.KIT_SOFT, font=body_font)
+
+    # The year frame: a hairline box, one neutral column per weigh-in standing on the floor.
+    fy0, fh = 236 * k, 260 * k
+    draw.rectangle([x0, fy0, x0 + inner_w, fy0 + fh], outline=card_engine.KIT_LINE, width=2 * k)
+    pad = 2 * k  # columns stand inside the outline, on the floor's inner edge
+    for left, top, right, bottom in og_front_frame.column_rects(inputs["frame"], x0 + pad, fy0 + pad, inner_w - 2 * pad, fh - 2 * pad):
+        draw.rectangle([left, top, right, bottom], fill=card_engine.KIT_SOFT)
+
+    # The line naming the frame.
+    y = (fy0 + fh) + 22 * k
+    for line in _fit_lines(draw, inputs["names"], note_font, inner_w)[:2]:
+        draw.text((x0, y), line, fill=card_engine.KIT_SOFT, font=note_font)
+        y += 32 * k
+
+    return img.resize((W, H), Image.LANCZOS)
+
+
 PAGES = [
     ("og-home", build_home),
     ("og-sleep", build_sleep),
@@ -490,6 +556,7 @@ PAGES = [
     ("og-builders", build_builders),
     ("og-org-chart", build_essay_org_chart),  # #741 — the career-artifact essay card
     ("og-fingerprint", build_fingerprint),  # #1379 — the day's deterministic mark
+    ("og-front", build_front),  # #4646 — the front page's year frame; None = keep yesterday's
 ]
 
 
@@ -507,6 +574,11 @@ def lambda_handler(event, context):
     for name, builder in PAGES:
         try:
             img = builder(stats)
+            if img is None:
+                # #4646: a builder that cannot draw an honest card says so with None — write
+                # nothing, so the last good file stays served rather than a wrong number.
+                print(f"[SKIP] {name}: builder returned no card; the previous image stays served")
+                continue
             # PNG (original — keep for compatibility with crawlers that don't read WebP)
             buf = io.BytesIO()
             img.save(buf, format="PNG", optimize=True)

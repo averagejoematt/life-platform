@@ -188,6 +188,33 @@ def _safe_test(lever, v):
         return False
 
 
+def _write_checkin_pair(today_str: str) -> str:
+    """#5211: the next-morning evening check-in / intake pair for the previous Pacific day, riding this nightly run
+    (12:10Z, after 04:00 PT, no new schedule). Isolated: a failure here never fails the explorer's own job — it is logged
+    at ERROR and returns "failed:<ExcType>"; the missing ``DATE#`` row is what turns the nightly
+    ``checkin_pair:day_row_liveness`` dead-man (nudge_ledger_qa) red."""
+    try:
+        from datetime import timezone
+
+        from common import digest_utils
+        from common.pacific_time import shift_day_key
+        from experiment.phase_filter import source_reads_cross_phase
+        from health import checkin_intake_pairs
+
+        day = shift_day_key(today_str, -1)
+
+        def fetch(source, start, end):
+            return digest_utils.query_range_list(table, source, start, end, user_id=USER_ID, include_pilot=source_reads_cross_phase(source))
+
+        checkin_intake_pairs.write_day(
+            day, fetch=fetch, put_item=table.put_item, computed_at=datetime.now(timezone.utc).isoformat(timespec="seconds")
+        )
+        return f"written:{day}"
+    except Exception as e:  # noqa: BLE001 — optional step; the host's job continues
+        logger.error(f"#5211 check-in pair write failed (non-fatal): {type(e).__name__}: {e}")
+        return f"failed:{type(e).__name__}"
+
+
 def lambda_handler(event: dict, context) -> dict:
     try:
         # One day-row assembly for the whole platform (ADR-105): the hypothesis
@@ -221,6 +248,7 @@ def lambda_handler(event: dict, context) -> dict:
             "cells": cells,
             "cells_hidden_thin": payload["cells_hidden_thin"],
         }
+        result["checkin_pair"] = _write_checkin_pair(today_str)
         logger.info(json.dumps(result))
         return result
     except Exception as e:

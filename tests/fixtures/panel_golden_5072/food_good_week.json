@@ -1,0 +1,394 @@
+{
+  "case_id": "food_good_week",
+  "panel": "food",
+  "week_start": "2026-10-19",
+  "charter_version": "1.18.0",
+  "days": [
+    {
+      "date": "2026-10-19",
+      "day_type": "lifting",
+      "kcal": 2400,
+      "base_kcal": 2250,
+      "uplift_kcal": 150,
+      "band_low": 2150,
+      "band_high": 2250,
+      "floor_any_day_kcal": 1600,
+      "floor_lifting_day_kcal": 1900,
+      "source": "titration",
+      "provenance": "titration record WEEK#2026-10-19 (in the band: hold); lifting day +150 kcal (training_day rule, panel default R1)",
+      "charter_version": "1.18.0",
+      "balance_held": true,
+      "split": {
+        "protein_g": 170,
+        "fat_g": 75,
+        "carb_g": 261,
+        "rule": "protein and fat held at the base day's grams; the uplift and the rest-day offset are carbohydrate"
+      },
+      "pre_post_session": {
+        "pre": {
+          "carb_g": 40,
+          "protein_g": 20,
+          "minutes_before": [
+            60,
+            90
+          ]
+        },
+        "post": {
+          "carb_g": 60,
+          "protein_g": 40,
+          "minutes_after": 60,
+          "note": "the post-session protein is one of the four feedings (nutrition.protein.feeding_threshold_g)"
+        }
+      },
+      "feedings": [
+        {
+          "when": "first",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "post_session",
+          "protein_g": 40
+        }
+      ]
+    },
+    {
+      "date": "2026-10-20",
+      "day_type": "lifting",
+      "kcal": 2400,
+      "base_kcal": 2250,
+      "uplift_kcal": 150,
+      "band_low": 2150,
+      "band_high": 2250,
+      "floor_any_day_kcal": 1600,
+      "floor_lifting_day_kcal": 1900,
+      "source": "titration",
+      "provenance": "titration record WEEK#2026-10-19 (in the band: hold); lifting day +150 kcal (training_day rule, panel default R1)",
+      "charter_version": "1.18.0",
+      "balance_held": true,
+      "split": {
+        "protein_g": 170,
+        "fat_g": 75,
+        "carb_g": 261,
+        "rule": "protein and fat held at the base day's grams; the uplift and the rest-day offset are carbohydrate"
+      },
+      "pre_post_session": {
+        "pre": {
+          "carb_g": 40,
+          "protein_g": 20,
+          "minutes_before": [
+            60,
+            90
+          ]
+        },
+        "post": {
+          "carb_g": 60,
+          "protein_g": 40,
+          "minutes_after": 60,
+          "note": "the post-session protein is one of the four feedings (nutrition.protein.feeding_threshold_g)"
+        }
+      },
+      "feedings": [
+        {
+          "when": "first",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "post_session",
+          "protein_g": 40
+        }
+      ]
+    },
+    {
+      "date": "2026-10-21",
+      "day_type": "lifting",
+      "kcal": 2400,
+      "base_kcal": 2250,
+      "uplift_kcal": 150,
+      "band_low": 2150,
+      "band_high": 2250,
+      "floor_any_day_kcal": 1600,
+      "floor_lifting_day_kcal": 1900,
+      "source": "titration",
+      "provenance": "titration record WEEK#2026-10-19 (in the band: hold); lifting day +150 kcal (training_day rule, panel default R1)",
+      "charter_version": "1.18.0",
+      "balance_held": true,
+      "split": {
+        "protein_g": 170,
+        "fat_g": 75,
+        "carb_g": 261,
+        "rule": "protein and fat held at the base day's grams; the uplift and the rest-day offset are carbohydrate"
+      },
+      "pre_post_session": {
+        "pre": {
+          "carb_g": 40,
+          "protein_g": 20,
+          "minutes_before": [
+            60,
+            90
+          ]
+        },
+        "post": {
+          "carb_g": 60,
+          "protein_g": 40,
+          "minutes_after": 60,
+          "note": "the post-session protein is one of the four feedings (nutrition.protein.feeding_threshold_g)"
+        }
+      },
+      "feedings": [
+        {
+          "when": "first",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "post_session",
+          "protein_g": 40
+        }
+      ]
+    },
+    {
+      "date": "2026-10-22",
+      "day_type": "lifting",
+      "kcal": 2400,
+      "base_kcal": 2250,
+      "uplift_kcal": 150,
+      "band_low": 2150,
+      "band_high": 2250,
+      "floor_any_day_kcal": 1600,
+      "floor_lifting_day_kcal": 1900,
+      "source": "titration",
+      "provenance": "titration record WEEK#2026-10-19 (in the band: hold); lifting day +150 kcal (training_day rule, panel default R1)",
+      "charter_version": "1.18.0",
+      "balance_held": true,
+      "split": {
+        "protein_g": 170,
+        "fat_g": 75,
+        "carb_g": 261,
+        "rule": "protein and fat held at the base day's grams; the uplift and the rest-day offset are carbohydrate"
+      },
+      "pre_post_session": {
+        "pre": {
+          "carb_g": 40,
+          "protein_g": 20,
+          "minutes_before": [
+            60,
+            90
+          ]
+        },
+        "post": {
+          "carb_g": 60,
+          "protein_g": 40,
+          "minutes_after": 60,
+          "note": "the post-session protein is one of the four feedings (nutrition.protein.feeding_threshold_g)"
+        }
+      },
+      "feedings": [
+        {
+          "when": "first",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "post_session",
+          "protein_g": 40
+        }
+      ]
+    },
+    {
+      "date": "2026-10-23",
+      "day_type": "lifting",
+      "kcal": 2400,
+      "base_kcal": 2250,
+      "uplift_kcal": 150,
+      "band_low": 2150,
+      "band_high": 2250,
+      "floor_any_day_kcal": 1600,
+      "floor_lifting_day_kcal": 1900,
+      "source": "titration",
+      "provenance": "titration record WEEK#2026-10-19 (in the band: hold); lifting day +150 kcal (training_day rule, panel default R1)",
+      "charter_version": "1.18.0",
+      "balance_held": true,
+      "split": {
+        "protein_g": 170,
+        "fat_g": 75,
+        "carb_g": 261,
+        "rule": "protein and fat held at the base day's grams; the uplift and the rest-day offset are carbohydrate"
+      },
+      "pre_post_session": {
+        "pre": {
+          "carb_g": 40,
+          "protein_g": 20,
+          "minutes_before": [
+            60,
+            90
+          ]
+        },
+        "post": {
+          "carb_g": 60,
+          "protein_g": 40,
+          "minutes_after": 60,
+          "note": "the post-session protein is one of the four feedings (nutrition.protein.feeding_threshold_g)"
+        }
+      },
+      "feedings": [
+        {
+          "when": "first",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "post_session",
+          "protein_g": 40
+        }
+      ]
+    },
+    {
+      "date": "2026-10-24",
+      "day_type": "rest",
+      "kcal": 2250,
+      "base_kcal": 2250,
+      "uplift_kcal": 0,
+      "band_low": 2150,
+      "band_high": 2250,
+      "floor_any_day_kcal": 1600,
+      "floor_lifting_day_kcal": 1900,
+      "source": "titration",
+      "provenance": "titration record WEEK#2026-10-19 (in the band: hold)",
+      "charter_version": "1.18.0",
+      "balance_held": true,
+      "split": {
+        "protein_g": 170,
+        "fat_g": 75,
+        "carb_g": 224,
+        "rule": "protein and fat held at the base day's grams; the uplift and the rest-day offset are carbohydrate"
+      },
+      "pre_post_session": null,
+      "feedings": [
+        {
+          "when": "first",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        }
+      ]
+    },
+    {
+      "date": "2026-10-25",
+      "day_type": "rest",
+      "kcal": 2250,
+      "base_kcal": 2250,
+      "uplift_kcal": 0,
+      "band_low": 2150,
+      "band_high": 2250,
+      "floor_any_day_kcal": 1600,
+      "floor_lifting_day_kcal": 1900,
+      "source": "titration",
+      "provenance": "titration record WEEK#2026-10-19 (in the band: hold)",
+      "charter_version": "1.18.0",
+      "balance_held": true,
+      "split": {
+        "protein_g": 170,
+        "fat_g": 75,
+        "carb_g": 224,
+        "rule": "protein and fat held at the base day's grams; the uplift and the rest-day offset are carbohydrate"
+      },
+      "pre_post_session": null,
+      "feedings": [
+        {
+          "when": "first",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        },
+        {
+          "when": "meal",
+          "protein_g": 45
+        }
+      ]
+    }
+  ],
+  "protein": {
+    "range_low": 170.0,
+    "range_high": 200.0,
+    "feedings_per_day": 4.0,
+    "feeding_threshold_g": 40.0,
+    "feeding_target_g": [
+      45,
+      55
+    ]
+  },
+  "floors": {
+    "fat": 65.0,
+    "carb": 120.0,
+    "fibre": 35.0
+  },
+  "titration": {
+    "week": "2026-10-19",
+    "action": "hold",
+    "step_kcal": 0.0,
+    "kcal": 2250.0,
+    "band_low": 2150.0,
+    "band_high": 2250.0,
+    "position": "in",
+    "reason_code": "in_band",
+    "reason": "in the band: hold",
+    "inputs": {
+      "steps_avg": 13400.0,
+      "steps_floor": 12000.0
+    }
+  },
+  "kind": "good"
+}

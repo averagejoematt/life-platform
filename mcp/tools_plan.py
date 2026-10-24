@@ -52,6 +52,7 @@ from training.commit_binding import binding_for  # #4066
 from mcp.core import LAYER_UNKNOWN
 from mcp.plan_draft_evidence import ANCHOR_HISTORY_LOOKBACK_DAYS, BLOCK_LOOKBACK_DAYS, PAIN_LOOKBACK_DAYS  # noqa: F401 (#4161)
 from mcp.plan_helpers import (  # noqa: F401 (#4149)
+    PACKET_NOT_REREAD,  # #5200
     _catalog_and_ceiling,
     _days_between,
     _minus_days,
@@ -888,7 +889,7 @@ def tool_plan_next_session(args):
     out["nutrition_critics"] = _safe(_nutrition_critics_block) or {"error": "nutrition critics could not be built", "verdicts": []}
     # #4503 OD6: between DXA scans, Body Scan 2 is the lean/regional trend — labelled bioimpedance, never the DXA anchor
     out["between_dxa_lean"] = _safe(_between_dxa_lean, target_date, dxa, status["dxa_scans"]["state"]) or {"state": "read_failed"}
-    attach_coach_context(out, target_date, constraint_block=block)  # #5071: charter + panel + guidance + May frame
+    attach_coach_context(out, target_date, constraint_block=block, packet_reason=PACKET_NOT_REREAD)  # #5071/#5200
     if ir is None:  # #4084: the overnight pre-draft comes FIRST — the evening chat reviews it instead of rebuilding
         from mcp.nightly_predraft import attach_to_stage_1
 
@@ -922,7 +923,7 @@ def _nutrition_critics_block() -> dict[str, Any]:
     from mcp import nutrition_critics_inputs
     from mcp.tools_nutrition import _nutrition_through_date, tool_get_deficit_sustainability
 
-    res = _safe(tool_get_deficit_sustainability, {})
+    res = _safe(tool_get_deficit_sustainability, {"critics_model": False})  # #5114: no narrative on the plan surface
     if isinstance(res, dict) and isinstance(res.get("critics"), dict):
         block = dict(res["critics"])
         block["via"] = "get_deficit_sustainability"

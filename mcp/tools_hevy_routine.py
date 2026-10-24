@@ -202,7 +202,7 @@ def _gather_training_context(target_date: str) -> dict[str, Any]:
     try:
         from mcp.tools_nutrition import tool_get_deficit_sustainability
 
-        ds = tool_get_deficit_sustainability({})
+        ds = tool_get_deficit_sustainability({"critics_model": False})
         label = ((ds or {}).get("deficit") or {}).get("deficit_label")
         deficit_state = {"aggressive": "deep", "moderate": "moderate", "mild": "maintenance", "maintenance": "maintenance"}.get(
             label, "moderate"

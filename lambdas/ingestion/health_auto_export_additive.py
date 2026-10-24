@@ -25,6 +25,19 @@ Capture-all (owner rule 2026-10-04): every device source's readings are kept in 
 object; the day value sums them all rather than picking a winner. On the archive
 measured for #4628 every additive reading carries the one phone source tag.
 
+Revisions (#4628, the writer row recorded 2026-10-18): the phone sometimes re-delivers a
+reading's timestamp with a CHANGED quantity — 17 of 20,833 readings delivered
+2026-10-10..23, both directions (a later delivery replaces the flat placeholder minutes of an earlier
+one, or lowers a basal reading). Until this change the first-seen quantity was kept and the
+revision was thrown away, which capture-all forbids. Every distinct quantity is now kept in the
+object's `revisions` map with the time the webhook RECEIVED it, and the reading's value is the
+newest quantity the phone delivered for it; a quantity already seen for that timestamp never
+moves the value again, so a stale re-send (or a whole-day replay) is idempotent. Receipt time
+is the handler's own clock at microsecond resolution, also stamped on the raw delivery as S3
+metadata (`received-at`, health_auto_export_archive.save_raw_payload) so a replay of the raw
+archive orders deliveries the way the writer saw them — LastModified is whole seconds and two
+deliveries of 2026-10-15 00:47:23Z tie on it. Equal stamps resolve to processing order.
+
 Fail-safe ordering: if the archive cannot be read (anything but a missing object)
 or written, the field keeps TODAY's path for that delivery — the payload value under
 the GREATEST guard — so a deploy that lands before the IAM grant (or an S3 blip)
@@ -33,6 +46,7 @@ degrades to the old behaviour instead of lowering a stored day.
 
 import json
 import logging
+from datetime import timezone
 
 from ingestion.source_registry import raw_date_key
 
@@ -91,18 +105,39 @@ def payload_readings(metrics, metric_map, parse_date_str):
     return out
 
 
-def merge_readings(stored, new):
-    """Union of two {source: {ts: qty}} maps; a timestamp already stored is never overwritten
-    (a re-sent reading counts once). Returns (merged, number_of_new_readings)."""
+def received_stamp(when):
+    """A receipt time as a lexically ordered string (UTC, microseconds) — the `revisions` order key."""
+    return when.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ") if when else ""
+
+
+def merge_readings(stored, new, revisions=None, received_at=""):
+    """Union of two {source: {ts: qty}} maps. Returns (merged, changes, revisions).
+
+    A timestamp already stored with the same quantity counts once (a re-sent reading). A timestamp
+    re-delivered with a quantity never seen for it is a revision: every version is kept in
+    `revisions` ({source: {ts: [[received_at, qty], ...]}}, the archived version seeded with an
+    unknown receipt "" so it sorts first) and the reading takes the most recently received version.
+    `changes` counts new readings plus new revisions — anything that must be written back."""
     merged = {src: dict(tsq) for src, tsq in (stored or {}).items()}
-    added = 0
+    revs = {src: {ts: [list(v) for v in vs] for ts, vs in tsv.items()} for src, tsv in (revisions or {}).items()}
+    changes = 0
     for src, tsq in new.items():
         bucket = merged.setdefault(src, {})
         for ts, qty in tsq.items():
             if ts not in bucket:
                 bucket[ts] = qty
-                added += 1
-    return merged, added
+                changes += 1
+                continue
+            if qty == bucket[ts]:
+                continue
+            versions = revs.setdefault(src, {}).setdefault(ts, [["", bucket[ts]]])
+            if any(q == qty for _, q in versions):
+                continue  # a version already delivered never moves the value: stale re-sends are idempotent
+            versions.append([received_at, qty])
+            versions.sort(key=lambda v: v[0])  # stable: an equal stamp keeps processing order
+            bucket[ts] = versions[-1][1]
+            changes += 1
+    return merged, changes, revs
 
 
 def day_value(field, readings, units):
@@ -122,17 +157,19 @@ def _read(s3_client, bucket, key):
         return None
 
 
-def archive_and_sum(s3_client, bucket, date_str, field, entry):
+def archive_and_sum(s3_client, bucket, date_str, field, entry, received_at=""):
     """Merge one delivery's readings for (field, day) into the S3 archive; return the day value,
     or None when the archive is unavailable (the caller keeps the legacy guarded value)."""
     key = raw_date_key(_SOURCE, date_str, sub=f"additive_{field}")
     stored = _read(s3_client, bucket, key)
     if stored is None:
         return None
-    merged, added = merge_readings(stored.get("readings"), entry["readings"])
+    merged, changes, revisions = merge_readings(stored.get("readings"), entry["readings"], stored.get("revisions"), received_at)
     units = stored.get("units") or entry["units"]
-    if added:
+    if changes:
         body = {"field": field, "date": date_str, "units": units, "readings": merged}
+        if revisions:
+            body["revisions"] = revisions
         try:
             s3_client.put_object(Bucket=bucket, Key=key, Body=json.dumps(body, sort_keys=True), ContentType="application/json")
         except Exception as e:
@@ -143,17 +180,19 @@ def archive_and_sum(s3_client, bucket, date_str, field, entry):
     return day_value(field, merged, units)
 
 
-def apply_archived_sums(daily_data, metrics, metric_map, parse_date_str, s3_client, bucket):
+def apply_archived_sums(daily_data, metrics, metric_map, parse_date_str, s3_client, bucket, received=None):
     """Replace each additive field in `daily_data` with its archived day sum.
 
     Returns {date: set(fields)} — the fields whose value came from the archive, which the
     DynamoDB merge writes WITHOUT the GREATEST guard. A field missing from the set kept its
-    payload value and the guard (fail-safe, see the module docstring)."""
+    payload value and the guard (fail-safe, see the module docstring). `received` is the
+    webhook's receipt datetime — the order key of any revision this delivery carries."""
     archived = {}
+    received_at = received_stamp(received)
     for date_str, per_field in payload_readings(metrics, metric_map, parse_date_str).items():
         fields = daily_data.setdefault(date_str, {})
         for field, entry in per_field.items():
-            value = archive_and_sum(s3_client, bucket, date_str, field, entry)
+            value = archive_and_sum(s3_client, bucket, date_str, field, entry, received_at)
             if value is not None:
                 fields[field] = value
                 archived.setdefault(date_str, set()).add(field)

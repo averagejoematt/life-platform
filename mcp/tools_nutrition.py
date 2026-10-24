@@ -6,13 +6,14 @@ import math
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-from common.constants import PLAN_DAILY_PROTEIN_MIN_G
 from health import (
+    calorie_target as calorie_resolver,  # #5095: the ONE calorie target
     deficit_disclosures,  # #3754: BS-12 cutoff provenance + the ADR-104 sentence
+    macro_floors,
+    protein_engine,  # #5098: THE protein hit, the charter range and the feedings
     tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
     training_output_channel,  # #3754: THE training-output input (daily training load, never Strava kJ)
 )
-from health.protein_floor import met_floor
 
 from mcp.core import (
     get_profile,
@@ -86,8 +87,9 @@ def _latest_weight_lbs(wt_items):
     return None
 
 
-#: Last-resort calorie target when neither a weigh-in nor a profile height exists.
-#: Kept flat and labelled as such — it is the "we could not compute one" branch.
+#: Last-resort MAINTENANCE stand-in for the deficit views when neither a weigh-in nor a profile
+#: height exists — the "we could not compute one" branch. #5095: it is no longer anyone's calorie
+#: TARGET (the name is historical); the macros view grades against health.calorie_target.
 _DEFAULT_CALORIE_TARGET = 2400
 
 
@@ -236,11 +238,37 @@ def _energy_budget(end_date, deficit_kcal=tdee_core.DEFAULT_DEFICIT_KCAL, weight
     )
 
 
+def expenditure_reconciliation(end_date, model_measured_kcal=None, read=None):
+    """#5097: which of the three burn estimates matches the scale, for `end_date`.
+
+    The MCP binding of `health.expenditure_reconciler.reconcile_window`: the shared
+    loss rate (`shared_quantities.loss_rate_lb_wk`, through `read`), the macrofactor
+    rows, the ADR-152 TDEE (`model_measured_kcal`, or this module's `_energy_budget`)
+    and the platform-flat estimate. The calorie resolver (#5095) and the titration
+    engine (#5096) call this; `get_daily_metrics view=energy` carries it. A failed read
+    is named in the payload, never raised into the view that carries it."""
+    from health import expenditure_reconciler
+
+    from mcp import shared_quantities
+
+    read = read or query_source_cross_phase
+    try:
+        if model_measured_kcal is None:
+            model_measured_kcal = (_energy_budget(end_date) or {}).get("tdee")
+        return expenditure_reconciler.reconcile_window(
+            end_date,
+            read_loss_rate=lambda d: shared_quantities.loss_rate_lb_wk(d, read=read),
+            read_macrofactor=lambda s, e: read("macrofactor", s, e),
+            model_measured_kcal=model_measured_kcal,
+        )
+    except Exception as e:  # noqa: BLE001 — an unreadable reconciliation is unknown, never a verdict
+        return {"method": expenditure_reconciler.METHOD, "read_failed": f"{type(e).__name__}: {e}"[:160]}
+
+
 # ── MacroFactor reference data ──
 
 # RDA: NIH DRI for adult males 31-50. "optimal": longevity targets per Attia/Patrick (not official guidelines). "upper": NIH Tolerable Upper Intake Level.
 _LEUCINE_MPS_THRESHOLD = 2.5  # g leucine per meal to trigger MPS (Phillips / Attia)
-_FIBER_TARGET_G = 30
 
 
 def _avg_sleep_onset_hour(start_date, end_date):
@@ -527,8 +555,8 @@ def _get_nutrition_summary(args):
     # Matthew-specific targets: 2400 kcal deficit; protein is the plan's floor (common.constants, #4540)
     TARGETS = {
         "calories_kcal": 2400,
-        "protein_g": PLAN_DAILY_PROTEIN_MIN_G,
-        "fiber_g": _FIBER_TARGET_G,
+        "protein_g": protein_engine.range_low(),
+        "fiber_g": macro_floors.floor_g("fibre"),  # #5102: the charter floor, not a second 30 g literal
         "fiber_per_1000kcal": 14,  # Board rec 1A (Norton): minimum fiber density
         "sodium_mg": 2300,
         "omega3_total_g": 2.0,
@@ -587,15 +615,13 @@ def _get_macro_targets(args):
     _logged = [float(i["total_calories_kcal"]) for i in items if i.get("total_calories_kcal") not in (None, "")]
     _intake_avg = round(sum(_logged) / len(_logged), 1) if _logged else None
 
+    # #5095: the graded target is the ONE calorie target (health.calorie_target — the number scoring,
+    # the emails, the coach and the critics use), never TDEE minus a flat deficit. The ADR-152 budget
+    # still ships beside it as MAINTENANCE context (TDEE + its trend check), not as a target.
     budget = None if calorie_target else _energy_budget(end_date, intake_avg=_intake_avg)
-    # #3931 box 4: where the check refused, `budget["target"]` is None and the surface
-    # says REFUSED. It does NOT silently fall through to the flat default — that would
-    # republish a number under a different label, which is the failure this closes.
-    refused = bool(budget) and not budget.get("target_published", True)
-    if budget and not refused:
-        calorie_target = budget["target"]
-    calorie_target = None if refused else (calorie_target or _DEFAULT_CALORIE_TARGET)
-    protein_target = protein_target or PLAN_DAILY_PROTEIN_MIN_G  # the plan's floor (#4540)
+    resolved = calorie_resolver.resolve(end_date)
+    calorie_target = calorie_target or resolved["kcal"]
+    protein_target = protein_target or protein_engine.range_low()  # the charter range low = the plan's floor (#4540, #5098)
 
     def measured(item, field):
         """The day's rollup for `field`, or None when the day carries none.
@@ -624,8 +650,10 @@ def _get_macro_targets(args):
         carbs = measured(item, "total_carbs_g")
 
         hit_cal = (0.85 <= cal / calorie_target <= 1.10) if (cal is not None and calorie_target) else None
-        hit_prot = met_floor(prot, protein_target)  # #5003: strictly at/above the floor - the tripwire's definition
-        hit_fiber = (fiber >= _FIBER_TARGET_G) if fiber is not None else None
+        prot_day = protein_engine.evaluate_day(item, floor=protein_target)  # #5098: THE hit (strict, #5003) + the feedings
+        hit_prot = prot_day["hit"]
+        floors_day = macro_floors.evaluate_day(item)
+        hit_fiber = floors_day["fibre"]["met"]  # ONE fibre hit: the charter floor (#5102)
         for axis, hit in (("calorie", hit_cal), ("protein", hit_prot), ("fiber", hit_fiber)):
             if hit is not None:
                 measured_days[axis] += 1
@@ -643,7 +671,10 @@ def _get_macro_targets(args):
                 "fiber_g": round(fiber, 1) if fiber is not None else None,
                 "hit_calorie_target": hit_cal,
                 "hit_protein_target": hit_prot,
+                "protein_feedings_40g": prot_day["feedings_40g"],  # None = no timed food-log rows (unknown, never 0)
+                "protein_first_feeding_behind": prot_day["first_feeding_behind"],
                 "hit_fiber_target": hit_fiber,
+                "floors": floors_day,  # #5102: fat / carb / fibre floor, value + floor + met + unknown
             }
         )
 
@@ -662,33 +693,22 @@ def _get_macro_targets(args):
         "targets": {
             "calories_kcal": calorie_target,
             "protein_g": protein_target,
-            "fiber_g": _FIBER_TARGET_G,
-            # ADR-105: the target ships with its method and its inputs, so the number is
-            # checkable without reading this source. `None` when it was overridden by the
-            # caller or fell back to the flat default — see `calorie_target_basis`.
-            "calorie_target_detail": budget,
-            # #3931: the method name is DERIVED, never re-typed, so a rename can never
-            # leave a surface publishing the old number under the old label again.
-            "calorie_target_method": tdee_core.METHOD if budget else None,
-            "calorie_target_basis": (
-                "caller_override"
-                if args.get("calorie_target")
-                else (budget.get("target_basis") if budget else "flat_default_no_weight_or_height")
-            ),
+            "fiber_g": macro_floors.floor_g("fibre"),  # #5102: the charter floor, not a second 30 g literal
+            "macro_floors_g": {m: macro_floors.floor_g(m) for m in macro_floors.MACROS},  # #5102: the charter's floors
+            # ADR-105: the target ships with its source and provenance (#5095: the ONE resolver).
+            "calorie_target_detail": None if args.get("calorie_target") else resolved,
+            "calorie_target_method": "health.calorie_target.resolve",
+            "calorie_target_basis": "caller_override" if args.get("calorie_target") else resolved["source"],
+            # The ADR-152 energy budget: MAINTENANCE context (TDEE, method, inputs, trend check) — not the target.
+            "energy_budget": budget,
             "calorie_target_check": _labelled_trend_check(budget.get("trend_check")) if budget else None,
             "note": (
-                "REFUSED: the deficit this model implies cannot be reconciled with the measured weight trend, so no "
-                "calorie target is published and calorie adherence is not graded. Both figures are in "
-                "calorie_target_check. Protein (the plan's floor) is unaffected and remains the primary nutrition gate."
-                if refused
-                else (
-                    "Calorie target = TDEE − deficit, where TDEE is Mifflin-St Jeor BMR plus the WORKED-SET exercise "
-                    "term (#3931: rest between sets is no longer charged; a weight-rep set with no logged duration is "
-                    "assumed to be 40 s of work). It is the same figure get_daily_metrics(view='energy') publishes as "
-                    "calorie_target_based_on_7d. Adherence below is graded against this target."
-                    if budget
-                    else "No weigh-in or profile height available, so no TDEE could be computed — this is a flat default, not an estimate."
-                )
+                "Calorie target = the platform's ONE calorie target (health.calorie_target: the week's titration record "
+                "when one exists, else the charter's nutrition.calories target; the energy floors are warnings, never a clamp) — the same "
+                "number scoring, the emails, the coach and the critics use. Adherence below is graded against it. "
+                "energy_budget is maintenance context (TDEE), not a target."
+                if calorie_target
+                else "No calorie target could be resolved (charter unreadable) — calorie adherence is not graded."
             ),
         },
         "adherence": {
@@ -1021,16 +1041,20 @@ def tool_get_deficit_sustainability(args):
         # surface for HIM to log — this tool never writes one. Resolved by the MCP layer
         # (`mcp/nutrition_critics_inputs.py`) from the same window plus the trailing-14-day
         # Withings trend; a reader that fails is named in `critics.unknown`, never a crash.
-        **_nutrition_critics_block(end_date, severity, degraded_count, tdee_estimate if _deficit_published else None),
+        **_nutrition_critics_block(end_date, severity, degraded_count, tdee_estimate if _deficit_published else None, args),
     }
 
 
-def _nutrition_critics_block(end_date, severity, degraded_count, maintenance_kcal):
-    """`{"critics": ..., "decisions_offered": [...]}` for the deficit view (#3754 boxes 3+4)."""
+def _nutrition_critics_block(end_date, severity, degraded_count, maintenance_kcal, args=None):
+    """`{"critics": ..., "decisions_offered": [...]}` for the deficit view (#3754 boxes 3+4). The critics'
+    narrative layer (#5114) runs on the owner's own call; an internal reader of this tool passes
+    `critics_model: False` and gets the deterministic block alone."""
     from mcp import nutrition_critics_inputs
 
+    model = args is not None and args.get("critics_model", True) is not False
+
     block = nutrition_critics_inputs.block(
-        end_date, deficit_severity=severity, degraded_count=degraded_count, estimated_maintenance_kcal=maintenance_kcal
+        end_date, model=model, deficit_severity=severity, degraded_count=degraded_count, estimated_maintenance_kcal=maintenance_kcal
     )
     return {"critics": block, "decisions_offered": block.get("decisions_offered", [])}
 

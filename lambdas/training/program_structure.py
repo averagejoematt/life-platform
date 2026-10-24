@@ -254,8 +254,9 @@ ANCHORS: dict[str, dict[str, Any]] = {
     },
     "overhead_press": {
         "pattern": "vertical press",
-        # ruling 5: delts 3x/wk — the press anchors the delts on both upper days and the shoulders+arms day
-        "frequency_per_week": _frequency("delts_per_wk"),
+        # #5162 (owner ruling 2026-10-23): the press runs once a week (shoulders+arms); the delts' 3x/wk (ruling 5) is the
+        # lateral raise / face pull work, counted by `weekly_sets_by_muscle`
+        "frequency_per_week": _frequency("overhead_press_per_wk"),
         "catalog_keys": ["machine_shoulder_press", "db_shoulder_press"],
         "hevy_title_hints": ["overhead press", "shoulder press", "military press", "push press"],
         "primary_muscles": ["shoulders"],
@@ -586,13 +587,25 @@ EXPOSURES: dict[str, dict[str, Any]] = {
 ['lifting_sessions_per_wk']['rep_scheme']`; a test holds every number here to that string. The effort keys name a charter class band
 (`training.effort_ceilings`, #5058) — the RPE numbers themselves live only in the charter."""
 
+_PRESS_TRADE_RULE = (
+    "#5162 (owner ruling 2026-10-23, trade inside 75): four accessories, not 2–3 — the overhead press left this day and its "
+    "sets became a side/rear-delt accessory; `ROTATION_RULE`'s per-session count binds the lower days; every one is still "
+    "fixed for the block"
+)
+"""Why an upper day carries four accessories: the shoulder-press sets were traded for lateral raises and face pulls
+(closing the side/rear-delt band, charter `volume_priorities.sets_per_wk`) inside the 75-set week."""
+
 SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
     "upper_heavy": {
         "archetype": "upper",
-        "anchors": [["bench", "heavy"], ["row", "heavy"], ["overhead_press", "moderate"], ["vertical_pull", "moderate"]],
+        # #5162 (owner ruling 2026-10-23, "trade inside 75"): the press's 3 sets became 3 lateral-raise sets
+        "anchors": [["bench", "heavy"], ["row", "heavy"], ["vertical_pull", "moderate"]],
         "anchor_sets": {"vertical_pull": 2},
         # #5053: the rear-delt slot (delts 14–18/wk, charter `volume_priorities`) — the upper heavy day carries the pec deck
-        "accessories": ["cable_tricep_pushdown", "db_curl", "reverse_pec_deck"],
+        # the traded delt slot leads the accessories: a time trim drops last-listed first, so it goes last
+        "accessories": ["db_lateral_raise", "cable_tricep_pushdown", "db_curl", "reverse_pec_deck"],
+        "accessory_sets": {"db_lateral_raise": 3},
+        "accessory_rule": _PRESS_TRADE_RULE,
     },
     "lower_heavy": {
         "archetype": "lower",
@@ -604,8 +617,12 @@ SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
     # Archetype `upper` (the Upper folder; the sequence credits it like any upper session whose sets reach the delts).
     "shoulders_arms": {
         "archetype": "upper",
+        # #5162: the week's one press exposure, 1 set (it anchors the day in the sequence); its other 2 sets went to the
+        # lateral raise and the face pull below
         "anchors": [["overhead_press", "moderate"]],
+        "anchor_sets": {"overhead_press": 1},
         "accessories": ["db_lateral_raise", "face_pull", "db_curl", "cable_tricep_pushdown", "shrug_dumbbell"],
+        "accessory_sets": {"db_lateral_raise": 3, "face_pull": 3},
         "accessory_rule": (
             "the aesthetic day's accessories ARE the session (owner ruling 5): five of them, not 2–3 — `ROTATION_RULE`'s per-session "
             "count binds the other roles; every one is still fixed for the block"
@@ -613,9 +630,12 @@ SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
     },
     "upper_volume": {
         "archetype": "upper",
-        "anchors": [["bench", "volume"], ["row", "volume"], ["overhead_press", "volume"], ["vertical_pull", "volume"]],
+        # #5162: the press's 3 sets became 3 face-pull sets
+        "anchors": [["bench", "volume"], ["row", "volume"], ["vertical_pull", "volume"]],
         "anchor_sets": {"vertical_pull": 2},
-        "accessories": ["cable_chest_fly", "cable_tricep_pushdown", "db_curl"],
+        "accessories": ["face_pull", "cable_chest_fly", "cable_tricep_pushdown", "db_curl"],  # the delt slot leads (trim order)
+        "accessory_sets": {"face_pull": 3},
+        "accessory_rule": _PRESS_TRADE_RULE,
     },
     "lower_volume": {
         "archetype": "lower",
@@ -628,12 +648,14 @@ SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
 }
 """Per role: its archetype, the anchor exposures (pattern, intensity) and the block-fixed accessories, in the charter's order.
 
-Every anchor pattern is trained at least twice across the five roles, the overhead press three times (delts 3x/wk, owner
-ruling 5); every big redline muscle group sits inside its weekly band and each group's weekly FREQUENCY meets the charter's
+Every anchor pattern is trained at least twice across the five roles, bar the overhead press: since #5162 (owner ruling
+2026-10-23, "trade inside 75") it runs once, 1 set on shoulders+arms (the charter's `split.frequency.overhead_press_per_wk`),
+and its other 8 weekly sets are lateral raises and face pulls — delts are still trained 3x/wk (ruling 5), by that direct
+work. Every big redline muscle group sits inside its weekly band and each group's weekly FREQUENCY meets the charter's
 `split.frequency` (`weekly_sets_by_muscle`, held by tests). Accessories come from `ACCESSORY_POOL[archetype]`, fixed per
 role for the block (`ROTATION_RULE`). `anchor_sets` overrides an exposure's set count for one pattern: vertical pull runs
-2 sets so back (row + pulldown, twice) sits at 10. The four v0.4 roles are unchanged (#4147); v0.3's are
-`program_v03.SESSION_TEMPLATES`."""
+2 sets so back (row + pulldown, twice) sits at 10. v0.4's four roles were unchanged (#4147) until #5162 moved the press
+off the two upper days; v0.3's are `program_v03.SESSION_TEMPLATES`."""
 
 SESSION_DISTRIBUTION_PROVENANCE: dict[str, Any] = {
     # Owner ratification 2026-09-25 (session AU, answering "ratify the three platform-proposed sessions":

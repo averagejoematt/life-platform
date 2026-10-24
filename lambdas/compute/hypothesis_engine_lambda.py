@@ -73,7 +73,7 @@ from common import (
     digest_utils,  # shared query_range implementations (#970)
     stats_core,  # bundled shared module (#529): effect sizes + block-bootstrap CIs for the deterministic verdict
 )
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_PROTEIN_MIN_G  # ADR-058
 from common.input_manifest import COMPUTE_INPUTS  # #3049: the compute-input census
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
@@ -81,6 +81,7 @@ from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific
 from experiment import experiment_gates, prereg_effect  # #1371: the arming-threshold registry · #3552: the min_effect facet
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058: default-deny pilot data
 from experiment.phase_taxonomy import forbidden_provenance  # #3915: the calibration ledger carries no provenance
+from health.calorie_target import target_phrase  # #5095: the ONE calorie target
 
 from compute.compute_json_schemas import hypotheses_schema  # #4276: the generation output schema (module at its size ceiling)
 
@@ -1002,7 +1003,7 @@ def generate_hypotheses(daily_rows, existing_hypotheses, profile=None, journal_c
     start_w = p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
     goal_w = p.get("goal_weight_lbs", 185)
     total_loss = round(start_w - goal_w)
-    cal_target = PLAN_DAILY_CALORIES_TARGET
+    cal_target = target_phrase()  # #5095: "<n> kcal", or the absence stated
     pro_target = PLAN_DAILY_PROTEIN_MIN_G
 
     existing_texts = [h.get("hypothesis", "")[:100] for h in existing_hypotheses]
@@ -1017,7 +1018,7 @@ def generate_hypotheses(daily_rows, existing_hypotheses, profile=None, journal_c
 
 Context:
 - 36-year-old male, {total_loss} lb weight loss transformation (started {start_w} lbs, goal {goal_w} lbs)
-- Calorie target: {cal_target} cal/day, protein target: {pro_target}g/day
+- Calorie target: {cal_target}/day, protein target: {pro_target}g/day
 - 16:8 intermittent fasting (eating window ~11am-7pm)
 - Primary training: walking + strength training, building Zone 2 base
 - Data sources: Whoop (HRV/recovery), Eight Sleep (sleep onset), Strava (activities), MacroFactor (nutrition), Habitify (habits), Apple Health (steps/glucose/gait), Notion journal (mood/stress/energy)

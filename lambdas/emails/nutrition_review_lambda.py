@@ -39,11 +39,15 @@ from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.constants import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
     EXPERIMENT_START_DATE,
-    PLAN_DAILY_CALORIES_TARGET,
     PLAN_DAILY_PROTEIN_MIN_G,
 )  # ADR-058
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
-from health import nutrient_intake  # #4244: THE food + supplements micronutrient join (shared with the public door)
+from health import (  # #4244: THE food + supplements micronutrient join (shared with the public door)
+    calorie_target,
+    nutrient_intake,
+    protein_engine,
+    titration,  # #5096: the weekly calorie titration decision (owner-only; this email is an owner surface)
+)
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
@@ -109,6 +113,7 @@ except ImportError:
 from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
+from training.training_charter import public_view  # #5214 (a published surface reads the whitelist only, #5087)
 
 
 def query_range(source, start_date, end_date):
@@ -304,8 +309,9 @@ def extract_daily_nutrition(mf_data, supplements=None, habitify=None):
             "total_sugars_g": safe_float(rec, "total_sugars_g"),
             "total_sugars_added_g": safe_float(rec, "total_sugars_added_g"),
             "total_cholesterol_mg": safe_float(rec, "total_cholesterol_mg"),
-            "meals_above_30g_protein": safe_float(rec, "meals_above_30g_protein"),
-            "protein_distribution_score": safe_float(rec, "protein_distribution_score"),
+            # #5109: the protein engine's count of feedings at its per-feeding line (charter nutrition.protein), not the
+            # ingest's legacy 30 g-per-meal score (macrofactor_lambda.compute_protein_distribution). None = untimed day.
+            "feedings_at_threshold": protein_engine.evaluate_day(rec)["feedings_40g"],
             "total_meals": safe_float(rec, "total_meals"),
             # #4244: the JOINED figures — per nutrient {actual, target, pct, from_food,
             # from_supplements, channels_counted[, uncounted_supplements]}; the label fields
@@ -477,6 +483,12 @@ def compute_weekly_summary(days):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _feeding_threshold_text():
+    """#5214: THE per-feeding protein threshold (charter nutrition.protein.feeding_threshold_g) as prompt text."""
+    t = ((public_view().get("nutrition") or {}).get("protein") or {}).get("feeding_threshold_g")
+    return f"{t:g}" if isinstance(t, (int, float)) else "the plan's"
+
+
 def _build_nutrition_prompt_from_config(calorie_target, protein_target_g):
     """Build nutrition review system prompt from S3 board config.
 
@@ -527,6 +539,7 @@ def _render_board_prompt(calorie_target, protein_target_g):
         section = _rescope_micro_rule(section, mid)
         section = section.replace("{calorie_target}", str(calorie_target))
         section = section.replace("{protein_target_g}", str(protein_target_g))
+        section = section.replace("{feeding_threshold_g}", _feeding_threshold_text())  # #5214: the charter's, at build time
 
         expert_blocks.append(section)
 
@@ -628,7 +641,7 @@ _FALLBACK_SYSTEM_PROMPT = (
 Write as three distinct expert voices analyzing the week's nutrition data, followed by a unified tactical section.
 
 ### Marcus Webb - Macros, Protein & Adherence
-Analyze: Weekly calorie avg vs target ({calorie_target} kcal) and deficit consistency. Protein total AND distribution (flag meals <30g, praise >40g). Target: {protein_target_g}g. Protein source diversity. Carb/fat balance relative to training. Meal frequency and eating window. Fiber trend.
+Analyze: Weekly calorie avg vs target ({calorie_target} kcal) and deficit consistency. Protein total AND distribution (a feeding is {feeding_threshold_g} g or more of protein: flag days short of the plan's feedings, praise days that reach them). Target: {protein_target_g}g. Protein source diversity. Carb/fat balance relative to training. Meal frequency and eating window. Fiber trend.
 Tone: Direct, evidence-based. Reference HIS actual food log entries by deduced meal name.
 Principle: "Build from what's working. Don't overhaul - optimize."
 
@@ -703,7 +716,7 @@ def build_user_message(data):
         "genome_nutrient_snps": extract_genome_context(data["genome_snps"]),
         "dexa": extract_dexa_context(data["latest_dexa"]),
         "profile_targets": {
-            "calorie_target": PLAN_DAILY_CALORIES_TARGET,
+            "calorie_target": calorie_target.target_kcal(),  # #5095: the ONE calorie target
             "protein_target_g": PLAN_DAILY_PROTEIN_MIN_G,
             "goal_weight_lbs": data["profile"].get("goal_weight_lbs", 185),
         },
@@ -780,7 +793,7 @@ def _micro_column_scope(days):
 def build_summary_table(days, profile):
     if not days:
         return ""
-    cal_target = PLAN_DAILY_CALORIES_TARGET
+    cal_target = calorie_target.target_kcal() or 0  # #5095; 0 = none resolved: every intake reads amber/red, never green
     protein_target = PLAN_DAILY_PROTEIN_MIN_G
 
     def _cal_color(v):
@@ -843,6 +856,8 @@ def build_summary_table(days, profile):
     </tr>"""
 
     micro_scope, micro_basis = _micro_column_scope(days)
+    fiber_target = nutrient_intake.MICRONUTRIENT_TARGETS["fiber_g"]["target"]
+    fiber_txt = f"{fiber_target:g}g" if fiber_target else "—"  # ADR-104: an unknown floor reads unknown, never 0
     return f"""<table style="width:100%;border-collapse:collapse;background:#16213e;border-radius:8px;overflow:hidden;margin-bottom:20px;">
         <tr style="background:#0f1127;">
             <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:left;">DAY</th>
@@ -855,12 +870,36 @@ def build_summary_table(days, profile):
         </tr>
         {rows}
         <tr><td colspan="7" style="padding:4px 8px;color:#6b7280;font-size:10px;">
-            Targets: {int(cal_target)} kcal | {int(protein_target)}g protein | 38g fiber | Micro = avg sufficiency % of {micro_basis}{_unconverted_note(days)}
+            Targets: {cal_target or "—"} kcal | {int(protein_target)}g protein | {fiber_txt} fiber | Micro = avg sufficiency % of {micro_basis}{_unconverted_note(days)}
         </td></tr>
     </table>"""
 
 
-def build_email_html(summary_table, ai_content, dates, weight_info):
+def build_titration_html(today, read=None):
+    """#5096: the coming week's calorie titration decision and its reason — owner-only (this email goes to him alone).
+    A failed read is said, never a blank; no decision yet is said with when it is made."""
+    read = read or (lambda week: titration.read_record(table, week))
+    week = titration.target_week(today)
+    style = 'style="color:#e0e0e0;font-size:13px;margin-bottom:24px;padding:12px;border:1px solid #2a2d4a;border-radius:8px;"'
+    try:
+        rec = read(week)
+    except Exception as e:  # noqa: BLE001 — the email still ships; the absence is named
+        return f"<div {style}>Calorie titration for the week of {week}: the record read failed ({type(e).__name__}).</div>"
+    if not rec:
+        return (
+            f"<div {style}>Calorie titration for the week of {week}: no decision on file yet — the nightly titration run decides "
+            "on Friday night and retries over the weekend; until then the current target stands.</div>"
+        )
+    step = int(rec.get("step_kcal") or 0)
+    head = f"{rec.get('kcal')} kcal ({rec.get('action')}{f' {step:+d}' if step else ''})"
+    detail = f'<div style="color:#9ca3af;font-size:11px;margin-top:4px;">{rec.get("detail")}</div>' if rec.get("detail") else ""
+    return (
+        f'<div {style}><div style="font-size:12px;letter-spacing:1px;color:#9ca3af;font-weight:600;margin-bottom:6px;">'
+        f"CALORIE TARGET · WEEK OF {week}</div>{head} — {rec.get('reason')}{detail}</div>"
+    )
+
+
+def build_email_html(summary_table, ai_content, dates, weight_info, titration_html=""):
     try:
         dt_start = datetime.strptime(dates["this_start"], "%Y-%m-%d")
         dt_end = datetime.strptime(dates["this_end"], "%Y-%m-%d")
@@ -888,7 +927,7 @@ def build_email_html(summary_table, ai_content, dates, weight_info):
         <div style="font-size:12px;letter-spacing:1px;color:#9ca3af;font-weight:600;margin-bottom:10px;">WEEKLY SNAPSHOT</div>
         {summary_table}
     </div>
-    {ai_content}
+    {titration_html}{ai_content}
     <div style="text-align:center;padding:16px 0;border-top:1px solid #2a2d4a;margin-top:24px;">
         <div style="color:#6b7280;font-size:11px;">Life Platform - Saturday Nutrition Review</div>
         <div style="color:#9ca3af;font-size:9px;margin-top:6px;">&#9874;&#65039; Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your diet, exercise, or supplement regimen.</div>
@@ -1037,7 +1076,7 @@ def lambda_handler(event, context):
     user_message = build_user_message(data)
     logger.info(f"Prompt size: {len(user_message)} chars")
 
-    cal_target = PLAN_DAILY_CALORIES_TARGET
+    cal_target = calorie_target.target_kcal() or "—"  # #5095: the ONE calorie target; "—" = none resolved
     pro_target = PLAN_DAILY_PROTEIN_MIN_G
 
     # Try config-driven prompt first, fall back to hardcoded
@@ -1050,6 +1089,7 @@ def lambda_handler(event, context):
         system = _FALLBACK_SYSTEM_PROMPT.format(
             calorie_target=cal_target,
             protein_target_g=pro_target,
+            feeding_threshold_g=_feeding_threshold_text(),
         )
 
     # P2: Dynamic journey context — panel must know stage for appropriate coaching
@@ -1115,7 +1155,7 @@ def lambda_handler(event, context):
             logger.warning(f"[AI-3] Nutrition review warnings: {_val.warnings}")
 
     weight_info = extract_weight_trend(data["withings"])
-    html = build_email_html(summary_table, ai_content, dates, weight_info)
+    html = build_email_html(summary_table, ai_content, dates, weight_info, build_titration_html(pacific_now().date().isoformat()))
 
     summary = compute_weekly_summary(days_this)
     # #2221: a week of records that carry no totals (the partial-record case, and

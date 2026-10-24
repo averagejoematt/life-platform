@@ -129,6 +129,19 @@ SECTION_GUIDE: dict[str, str] = {
         "the date, not the band, not a countdown — may appear in any output that could reach a "
         "published surface."
     ),
+    "nutrition": (
+        "nutrition — the food targets, one subsection per lever. `protein` gives the daily range "
+        "(`range_g`: the low end is the floor a day is graded against, the high end the target), how "
+        "many days of seven must reach it, the number of feedings and the per-feeding threshold and "
+        "band, and `hit`, the one definition of a day that met the floor: strictly at or above the low "
+        "end, an unlogged day unknown and never a miss. A feeding is the food-log rows within the "
+        "merge window of its first row; a day with no timed rows has an unknown feeding count, never "
+        "zero. `breakfast_nudge` is an owner-only morning note, at most one a day, and it is "
+        "information, never a command. Judge protein against these fields, not against a remembered "
+        "number. `concession_ledger` is the FOOD panel: the nutrition schools and roles that grade the "
+        "week's food plan, each with what it concedes to the deadline and what it gets in return; grade a "
+        "food plan seat by seat against it the way the training plan is graded against the top-level ledger."
+    ),
     "panel_target": (
         "panel_target — the bar a plan is graded against: the overall letter it must reach, and "
         "the minimum score every individual seat must give out of the stated maximum. A plan "
