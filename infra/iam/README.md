@@ -131,7 +131,13 @@ Role.AssumeRolePolicyDocument` lists exactly the two `environment:` subjects;
 (d) CloudTrail `AssumeRoleWithWebIdentity` for `github-actions-deploy-role` shows only
 `environment:` subjects after step 5.
 
-### PENDING APPLY — the readonly role's Scheduler read for I6 (#5252, 2026-10-23)
+### APPLIED 2026-10-23 — the readonly role's Scheduler read for I6 (#5252)
+
+> Applied by the owner ~04:48Z with
+> `aws iam put-role-policy --role-name github-actions-readonly-role --policy-name readonly-permissions --policy-document file://infra/iam/github-actions-readonly-role.permissions.json`.
+> Post-apply `python3 deploy/verify_oidc_iam.py --strict` → **CLEAN — every checked-in identity
+> matches live exactly (17 targets)**. The role's entry was deleted from
+> `_PENDING_PERMISSIONS_APPLY` (`tests/test_grant_enumeration_drift.py`) per the #2824 rule.
 
 `github-actions-readonly-role.permissions.json` gains two read-only statements:
 `SchedulerScheduleRead` (`scheduler:GetSchedule` on
