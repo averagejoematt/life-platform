@@ -199,10 +199,11 @@ def _lab_draw(readers: Mapping[str, Callable], today: str) -> dict[str, Any]:
     out = {**base, **cycle_state("lab_draw", dates, today, days, anchor=anchor, dead_cycles=None)}
     if out["state"] == OK and out["days_until_due"] <= int(lead or 0):
         out["state"] = DUE  # the reminder window: at most one prompt per cycle (the prompt key is the cycle start)
-    if out.get("due_on") and isinstance(dead_weeks, int) and not isinstance(dead_weeks, bool) and dead_weeks > 0:
-        dead_on = _day(out["due_on"]) + _dt.timedelta(weeks=dead_weeks)
+    due_day, t = _day(out.get("due_on")), _day(today)
+    if due_day is not None and t is not None and isinstance(dead_weeks, int) and not isinstance(dead_weeks, bool) and dead_weeks > 0:
+        dead_on: _dt.date = due_day + _dt.timedelta(weeks=dead_weeks)
         out["dead_man_on"] = dead_on.isoformat()
-        if out["state"] == OVERDUE and _day(today) >= dead_on:
+        if out["state"] == OVERDUE and t >= dead_on:
             out["state"] = MISSED_2
             out["alert"] = (
                 f"The follow-up lab draw was due about {out['due_on']} and no draw is logged since {out.get('last_logged') or 'the last one'}. "
