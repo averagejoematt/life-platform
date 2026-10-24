@@ -8,14 +8,18 @@ Two jobs, both reading, neither counting:
     (`volume_priorities.sets_per_wk`) for each priority group.
   * LOGGED side — `below_mev_14d(window)` flags every muscle whose trailing-14-day working sets, per week, sit below its
     MEV. The counts are `muscle_volume.working_sets_by_muscle`'s (through `get_muscle_volume`'s trailing window — the one
-    per-muscle computation, #4071); this module only compares them with `config/training_landmarks.json`.
+    per-muscle computation, #4071); this module only compares them with `config/training_landmarks.json`. #5164 adds the
+    movement-counted floor beside the muscle rows: side/rear delts summed from the same count's per-exercise working sets
+    (`exercise_sets`, resolved to catalog keys by `logged_movement_sets`) over `FLOOR_MOVEMENTS['side_rear_delts']` only,
+    against the shoulders MEV — so continued pressing cannot keep a lateral/rear-delt lapse quiet.
 
 The incident it answers: from 2026-10-04 (the Flex day dropped) delts and core fell to 0 sets and calves sat at 6/wk with
 no alert. Landmarks are keyed by catalog muscle (`shoulders`, `abs`); logged counts by the `MUSCLES` label (`Shoulders`,
 `Core`) — `HEVY_MUSCLE_GROUP` is the one bridge. Granularity caveat: the logged taxonomy has no side/rear/trap split
-(`Shoulders` is all delts, presses included; `Back` carries traps), so the LOGGED flag for side/rear delts is the coarser
-`Shoulders` one and cannot see a drop that pressing masks (carrier: #5164, the movement-level logged flag; the template
-shortfall was closed by #5162's trade inside the 75-set week, owner ruling 2026-10-23). The TEMPLATE side counts the movement-specific floors and bands by movement
+(`Shoulders` is all delts, presses included; `Back` carries traps), so the `Shoulders` muscle row cannot see a drop that
+pressing masks — the live 2026-10-05..18 read was 16 Shoulders sets (8.0/wk, at MEV) with 0 lateral/rear-delt sets. The
+`movement_floors['side_rear_delts']` row (#5164) is the one that sees it (the template shortfall was closed by #5162's
+trade inside the 75-set week, owner ruling 2026-10-23). The TEMPLATE side counts the movement-specific floors and bands by movement
 (`FLOOR_MOVEMENTS`, `BAND_MOVEMENTS`), never by catalog muscle — a shoulder press is not side/rear-delt work, a flat bench
 press is not upper-chest work, a row or a shrug is not a vertical pull (ADR-104, honest numbers).
 """
@@ -27,6 +31,10 @@ from typing import Any
 ISSUE = "#5053"
 WINDOW_DAYS = 14
 FLAG_RULE = "a muscle whose trailing-14-day working sets per week sit below its landmark MEV (config/training_landmarks.json)"
+MOVEMENT_FLAG_RULE = (
+    "side/rear delts: the trailing-14-day working sets per week of FLOOR_MOVEMENTS['side_rear_delts'] only (presses excluded), "
+    "below the shoulders landmark MEV (#5164)"
+)
 
 # Charter `mev_floors_in_every_template` name -> the landmark key it is counted under
 FLOOR_LANDMARK: dict[str, str] = {"side_rear_delts": "shoulders", "traps": "back", "calves": "calves", "core": "abs"}
@@ -117,9 +125,71 @@ def _landmarks() -> dict[str, dict[str, Any]]:
     return block_model.load_landmarks() or {}
 
 
+def _catalog_movements() -> dict[str, Any]:
+    try:
+        from health.adherence_calc import _load_catalog
+
+        return (_load_catalog() or {}).get("movements", {}) or {}
+    except Exception:  # noqa: BLE001 — an unreadable catalog resolves nothing; the floor then reports `unavailable`
+        return {}
+
+
+def logged_movement_sets(exercise_sets: list[dict[str, Any]] | None, catalog: dict[str, Any] | None = None) -> dict[str, int] | None:
+    """`working_sets_by_muscle`'s `exercise_sets` -> {catalog movement key: working sets}, for the movement-counted keys
+    only (`MOVEMENT_COUNTED`). A logged exercise resolves by its Hevy template id against the entry's
+    `hevy_template_id_hint`, else by its exact title (case-insensitive — the hint-less entries such as `reverse_pec_deck`
+    resolve by title on the write side too, ADR-069). Unresolved exercises count toward no floor: a press is never
+    side/rear-delt work. None when the window carried no per-exercise counts or the catalog is unreadable."""
+    if exercise_sets is None:
+        return None
+    movements = catalog if catalog is not None else _catalog_movements()
+    if not movements:
+        return None
+    wanted = {m for keys in MOVEMENT_COUNTED.values() for m in keys}
+    by_id: dict[str, str] = {}
+    by_title: dict[str, str] = {}
+    for key in sorted(wanted):
+        entry = movements.get(key) or {}
+        if entry.get("hevy_template_id_hint"):
+            by_id.setdefault(str(entry["hevy_template_id_hint"]).upper(), key)
+        if entry.get("title"):
+            by_title.setdefault(str(entry["title"]).strip().lower(), key)
+    out: dict[str, int] = {}
+    for row in exercise_sets:
+        key = by_id.get(str(row.get("template_id") or "").upper()) or by_title.get(str(row.get("name") or "").strip().lower())
+        if key:
+            out[key] = out.get(key, 0) + int(row.get("working_sets") or 0)
+    return dict(sorted(out.items()))
+
+
+def _movement_floor_14d(window_14d: dict[str, Any], lm: dict[str, dict[str, Any]], weeks: float) -> dict[str, Any]:
+    """#5164: the side/rear-delt floor, counted by movement over the 14-day window, against the shoulders MEV."""
+    floor = "side_rear_delts"
+    key = FLOOR_LANDMARK[floor]
+    by_movement = window_14d.get("movement_sets")
+    mev = int((lm.get(key) or {}).get("MEV") or 0)
+    if not isinstance(by_movement, dict) or not mev:
+        reason = "no per-movement counts in the 14-day window" if not isinstance(by_movement, dict) else f"no {key} MEV"
+        return {"status": "unavailable", "reason": reason, "landmark_key": key, "counted_by": "movement"}
+    counted = {m: int(by_movement.get(m) or 0) for m in FLOOR_MOVEMENTS[floor] if by_movement.get(m)}
+    per_wk = round(sum(counted.values()) / weeks, 1)
+    return {
+        "status": "ok",
+        "sets_per_wk": per_wk,
+        "mev": mev,
+        "below_mev": per_wk < mev,
+        "landmark_key": key,
+        "counted_by": "movement",
+        "movements": counted,
+        "counts": "volume_floors.FLOOR_MOVEMENTS['side_rear_delts'] — lateral raises, face pulls, rear-delt flyes; presses excluded",
+    }
+
+
 def below_mev_14d(window_14d: dict[str, Any] | None, landmarks: dict[str, dict[str, Any]] | None = None) -> dict[str, Any]:
     """Per muscle label: its trailing-14-day sets/wk against its MEV, and the flag. `window_14d` is `get_muscle_volume`'s
-    `trailing_windows['14d']` ({"muscles": {label: {"total_sets": n}}, "days": 14}); None -> an honest `unavailable`."""
+    `trailing_windows['14d']` ({"muscles": {label: {"total_sets": n}}, "movement_sets": {key: n}, "days": 14}); None ->
+    an honest `unavailable`. #5164: `movement_floors['side_rear_delts']` is the movement-counted floor; when it is below
+    MEV `side_rear_delts` joins `flagged` beside the muscle labels."""
     if not window_14d or not isinstance(window_14d.get("muscles"), dict):
         return {"status": "unavailable", "reason": "no trailing 14-day window in the muscle-volume read", "rule": FLAG_RULE}
     lm = landmarks if landmarks is not None else _landmarks()
@@ -134,13 +204,16 @@ def below_mev_14d(window_14d: dict[str, Any] | None, landmarks: dict[str, dict[s
         sets = float((window_14d["muscles"].get(label) or {}).get("total_sets") or 0.0)
         per_wk = round(sets / weeks, 1)
         rows[label] = {"sets_per_wk": per_wk, "mev": int(row["MEV"]), "below_mev": per_wk < int(row["MEV"]), "landmark_key": key}
-    flagged = sorted(m for m, r in rows.items() if r["below_mev"])
+    movement_floors = {"side_rear_delts": _movement_floor_14d(window_14d, lm, weeks)}
+    flagged = sorted(m for m, r in rows.items() if r["below_mev"]) + sorted(f for f, r in movement_floors.items() if r.get("below_mev"))
     return {
         "status": "ok",
         "window": {"start": window_14d.get("start"), "end": window_14d.get("end"), "days": WINDOW_DAYS},
         "flagged": flagged,
         "muscles": rows,
+        "movement_floors": movement_floors,
         "rule": FLAG_RULE,
+        "movement_rule": MOVEMENT_FLAG_RULE,
     }
 
 

@@ -374,7 +374,8 @@ def working_sets_by_muscle(
       muscles[m] = {direct_sets (int), secondary_sets (float), total_sets (float), volume_lbs}
         `volume_lbs` is PRIMARY-attributed tonnage only, so it is never double-counted.
       pattern_sets, warmup_sets_excluded, working_sets_counted, dates_counted,
-      non_resistance (names excluded by design), unattributed (names this taxonomy does not know).
+      non_resistance (names excluded by design), unattributed (names this taxonomy does not know),
+      exercise_sets (#5164: the counted working sets per logged exercise — name + template id).
     """
     muscles: dict[str, dict[str, float]] = {}
     pattern_sets: dict[str, int] = {}
@@ -383,6 +384,7 @@ def working_sets_by_muscle(
     dates: set[str] = set()
     non_resistance: dict[str, int] = {}
     unattributed: dict[tuple[str, str], int] = {}
+    exercise_sets: dict[tuple[str, str], int] = {}
 
     def _row(m: str) -> dict[str, float]:
         return muscles.setdefault(m, {"direct_sets": 0, "secondary_sets": 0.0, "volume_lbs": 0.0})
@@ -411,6 +413,8 @@ def working_sets_by_muscle(
             if day:
                 dates.add(day)
             counted += n
+            ex_key = (ex.get("name") or "", str(ex.get("template_id") or ""))
+            exercise_sets[ex_key] = exercise_sets.get(ex_key, 0) + n
             primary = _row(attr["primary"])
             primary["direct_sets"] += n
             primary["volume_lbs"] += sum(float(s.get("weight_lbs") or 0) * int(s.get("reps") or 0) for s in working)
@@ -435,6 +439,10 @@ def working_sets_by_muscle(
         "dates_counted": sorted(dates),
         "non_resistance": [{"name": k, "sets": v} for k, v in sorted(non_resistance.items())],
         "unattributed": [{"name": k[0], "template_id": k[1] or None, "working_sets": v} for k, v in sorted(unattributed.items())],
+        # #5164: the same working sets, per logged exercise — what a movement-counted floor (side/rear delts) is summed
+        # from (`volume_floors.logged_movement_sets`), so pressing cannot stand in for lateral/rear-delt work. Not a
+        # second count: each entry is this loop's own `n`, keyed by exercise instead of credited to a muscle.
+        "exercise_sets": [{"name": k[0], "template_id": k[1] or None, "working_sets": v} for k, v in sorted(exercise_sets.items())],
     }
 
 
