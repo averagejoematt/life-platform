@@ -45,4 +45,13 @@ BASELINE = {
 # needs the owner to strike pages; until then the count may only fall. 24 since the owner's
 # 2026-09-26 14:10 PT ruling (#4182): the cycle count is internal, so /story/attempts/ left the
 # footer — the owner striking a page, served at its URL, unlinked.
-NAV_REACH_CEILING = 24
+# 17 since the 2026-10-22 front-page cut-over (#4588, owner ruling 2026-10-18): the kit front page
+# links its own doors and the footnote appendix; the appendix and the pages it lists are not
+# counted (tests/site_text.appendix_sinks). Measured 17 on the rebuilt rehearsal: the kit's own
+# nine (/ and the eight /next/v8/ pages it links), /subscribe/, the live /story/, and the six v5
+# doors /subscribe/'s v5 menu still walks.
+# 18 on the 2026-10-23 refresh onto main (00c91014c; owner's go "asap" on #4588): main had since
+# re-pointed /next/v8/coaches/'s "Every prediction, right and wrong" door from the v5
+# /coaching/scorecard/ to the kit's own /next/v8/call/, so the call list is a tenth kit page two
+# taps from /. Still a lowering from main's 24, set to what this tree measures, never raised past it.
+NAV_REACH_CEILING = 18

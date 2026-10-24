@@ -150,15 +150,15 @@ def test_dated_window_value_is_allowed_only_while_the_window_is_in_effect(facts)
     nothing had an opinion about the figure actually in force. The window pair is now
     allowed inside its dates and flagged outside them — an auto-revert matching the
     governor's own, with no deploy and nobody having to remember."""
-    inside, _ = facts._governor_ceilings(today=dt.date(2026, 8, 15))
-    outside, _ = facts._governor_ceilings(today=dt.date(2026, 9, 1))  # window end is exclusive
+    inside, _ = facts._governor_ceilings(today=dt.date(2026, 10, 15))
+    outside, _ = facts._governor_ceilings(today=dt.date(2026, 11, 1))  # window end is exclusive
 
-    assert {200, 235} <= inside, f"August's raised window must be allowed inside it, got {inside}"
-    assert 200 not in outside and 235 not in outside, f"September must reject August's window, got {outside}"
+    assert {300, 352} <= inside, f"October's raised window must be allowed inside it, got {inside}"
+    assert 300 not in outside and 352 not in outside, f"November must reject October's window, got {outside}"
 
-    line = "the budget ceiling is $200 all-in"
+    line = "the budget ceiling is $300 all-in"
     assert facts._budget_offenders(line, allowed=inside) == []
-    assert 200 in facts._budget_offenders(line, allowed=outside)
+    assert 300 in facts._budget_offenders(line, allowed=outside)
 
 
 # ── Non-vacuity + the live integration assertion ──────────────────────────────
@@ -293,18 +293,18 @@ def test_retired_window_scan_can_actually_fail(facts):
     """Mutation proof. A doc phrasing the retired pair with NO ceiling word nearby —
     the exact shape `BUDGET_NEAR` is blind to — must flag once the window closes, and
     must NOT flag while it is still in force."""
-    line = "August 2026 ONLY the base is $200 / surge $235, auto-reverting."
-    after = facts._retired_window_figures(today=dt.date(2026, 9, 2))
-    during = facts._retired_window_figures(today=dt.date(2026, 8, 15))
+    line = "October 2026 ONLY the base is $300 / surge $352, auto-reverting."
+    after = facts._retired_window_figures(today=dt.date(2026, 11, 2))
+    during = facts._retired_window_figures(today=dt.date(2026, 10, 15))
 
-    assert facts._budget_offenders(line, allowed={215, 252}, retired=after) == [200, 235], (
+    assert facts._budget_offenders(line, allowed={215, 252}, retired=after) == [300, 352], (
         "the retired-window scan did not fire on a stale claim after the revert — " "this gate cannot fail, so it is not a gate"
     )
     assert during == set(), "inside its own window the pair is truth, not drift"
-    assert facts._budget_offenders(line, allowed={150, 176, 200, 235}, retired=during) == []
+    assert facts._budget_offenders(line, allowed={215, 252, 300, 352}, retired=during) == []
 
     # ...and historical framing still exempts, or every honest retrospective reds.
-    framed = "For August 2026 only, a dated window raised the base to $200 / surge $235."
+    framed = "For October 2026 only, a dated window raised the base to $300 / surge $352."
     assert facts._budget_offenders(framed, allowed={215, 252}, retired=after) == []
 
 
@@ -312,6 +312,6 @@ def test_live_tree_states_no_retired_ceiling_after_the_window_reverts(facts):
     """The rollover assertion, run every day BEFORE the rollover. `test_live_site_...`
     (above) already does this for the site surface only; docs, source and the spend
     ledger had no equivalent, which is where all 12 missed occurrences lived."""
-    assert _at(facts, dt.date(2026, 8, 15)) == [], "the tree is not clean under today's own allowed set"
-    post = _at(facts, dt.date(2026, 9, 2))
-    assert post == [], "a live doc/source file states August's retired ceiling as current truth:\n" + "\n".join(post)
+    assert _at(facts, dt.date(2026, 10, 15)) == [], "the tree is not clean under today's own allowed set"
+    post = _at(facts, dt.date(2026, 11, 2))
+    assert post == [], "a live doc/source file states October's retired ceiling as current truth:\n" + "\n".join(post)

@@ -1044,14 +1044,14 @@ def test_lean_mass_uses_the_most_recent_scan_that_actually_carries_it():
 def test_micronutrient_sufficiency_is_stamped_with_the_day_it_came_from():
     src = FakeSources(
         macrofactor=[
-            mf("2026-05-06", total_fiber_g=19),  # 50%
-            mf("2026-05-07", total_fiber_g=34.2),  # 90%
+            mf("2026-05-06", total_fiber_g=19),  # 54.3% of the 35 g charter floor
+            mf("2026-05-07", total_fiber_g=34.2),  # 97.7%
         ]
     )
     m = overview(src)["micronutrients"]
     assert m["as_of"] == "2026-05-07"
-    assert m["sufficiency"]["fiber_g"]["pct"] == 90.0
-    assert m["avg_pct"] == 90.0
+    assert m["sufficiency"]["fiber_g"]["pct"] == 97.7
+    assert m["avg_pct"] == 97.7
 
 
 def test_the_public_door_joins_the_same_days_supplement_record_and_names_its_channels():
@@ -1078,8 +1078,8 @@ def test_the_public_door_joins_the_same_days_supplement_record_and_names_its_cha
     assert m["intake_channels"] == ["food", "supplements"]
     assert m["supplements_state"] == "recorded"
     assert [u["name"] for u in m["unconverted"]] == ["Multivitamin"]
-    assert m["food_only_avg_pct"] == 27.5  # (5% + 50%) / 2 — the old one-channel figure, still visible
-    assert m["avg_pct"] == 75.0  # (100% + 50%) / 2
+    assert m["food_only_avg_pct"] == 29.6  # (5% + 54.3%) / 2 — the old one-channel figure, still visible
+    assert m["avg_pct"] == 77.2  # (100% + 54.3%) / 2
     # Nothing but amounts and the unconvertible NAMES leaves the owner-only partition.
     assert set(m["unconverted"][0]) == {"name", "reason"}
     assert "counted" not in m

@@ -56,6 +56,9 @@ CFG = {
     "target_kcal": 2100,
     "band_kcal": [2000, 2100],
     "minimum_kcal": 1700,
+    # the pre-ruling 'up' arm keeps the step mechanics covered; the charter's live value is 'warn' (owner ruling
+    # 2026-10-23 R1) — test_above_the_ceiling_the_charter_warns_and_never_pushes_food_up pins it
+    "above_ceiling_action": "up",
     "dead_man_armed_from": "2026-11-03",
     "charter_version": "9.9.9",
 }
@@ -316,6 +319,56 @@ def test_the_charter_change_log_names_this_issue():
     assert any(e.get("version") == "1.16.0" and "#5096" in e.get("by", "") for e in log)
 
 
+# ── owner rulings 2026-10-23 (#5091 R1, #5205): stay ~1,500, ceiling flags warn, one 150 kcal step ─────────
+def test_above_the_ceiling_the_charter_warns_and_never_pushes_food_up():
+    c = ti.settings()
+    assert c["above_ceiling_action"] == "warn" == tc.charter_value("nutrition.titration.above_ceiling_action")
+    warn = {**CFG, "above_ceiling_action": c["above_ceiling_action"]}
+    d = decide(trend_lb_wk=4.0, history=[prev_hold("above")], cfg=warn)
+    assert (d["action"], d["reason_code"], d["step_kcal"], d["new_target_kcal"]) == ("hold", "above_ceiling_warning", 0, 2100)
+    assert d["reason"].startswith("WARNING") and f"+{int(CFG['max_step_kcal'])} kcal/day" in d["reason"] and d["warning"]
+    # the warning still counts the run, so a third read is read 3, not a fresh first read
+    d3 = decide(trend_lb_wk=4.0, history=[d], week="2026-11-02", cfg=warn)
+    assert (d3["out_of_band_reads"], d3["reason_code"]) == (3, "above_ceiling_warning")
+    # an unknown action is no rule: the week holds, never a guess
+    assert (
+        decide(trend_lb_wk=4.0, history=[prev_hold("above")], cfg={**CFG, "above_ceiling_action": None})["reason_code"]
+        == "insufficient_data"
+    )
+
+
+def test_the_charter_is_re_targeted_to_1500_and_a_pre_re_target_record_is_not_the_base():
+    c = ti.settings()
+    assert c["target_kcal"] == 1500 and c["band_kcal"][0] < 1500 < c["band_kcal"][1]
+    assert c["records_from_version"] == tc.charter_value("nutrition.calories.records_from_version")
+    old = {**prev_hold("in", kcal=2100), "charter_version": "1.19.1"}
+    cfg = {**CFG, "target_kcal": c["target_kcal"], "band_kcal": c["band_kcal"], "records_from_version": c["records_from_version"]}
+    d = decide(trend_lb_wk=3.2, history=[old], cfg=cfg)
+    assert (d["base_kcal"], d["inputs"]["base_source"]) == (1500, "charter nutrition.calories.target_kcal")
+    assert ct.resolve(WEEK, titration_reader=lambda week: old)["kcal"] == 1500, "the resolver skips the pre-re-target record too"
+    # main's 1.20.0 (#5261, food_delivery) predates the re-target, which landed as 1.21.0: its records are not the base either
+    assert ct.resolve(WEEK, titration_reader=lambda week: {**old, "charter_version": "1.20.0"})["kcal"] == 1500
+    assert ct.resolve(WEEK, titration_reader=lambda week: {**old, "charter_version": "1.21.0"})["kcal"] == 2100
+
+
+def test_one_calorie_step_everywhere_the_tripwire_text_is_the_cap_5205():
+    """#5205: the overshoot tripwires and every redline food step state max_step_kcal; '+150–250' is gone."""
+    import re
+
+    from training import owner_redlines
+
+    step = int(tc.charter_value("nutrition.titration.max_step_kcal"))
+    by_id = {t["id"]: t for t in owner_redlines.TRIPWIRES}
+    stepped = ("loss_excessive_flagged", "rate_overshoot", "rate_ceiling", "intake_floor_breached", "under_floor", "walking_vs_fork")
+    for tid in stepped:
+        kcal = {int(n) for n in re.findall(r"(?<![\d,])(\d+) kcal", by_id[tid]["action"])}
+        assert kcal == {step}, f"{tid}: {by_id[tid]['action']!r} states {kcal}, the cap is {step}"
+    assert f"−{step} kcal" in by_id["loss_insufficient_adherent"]["action"]
+    assert f"+{step} kcal/day" in owner_redlines.REDLINES["rate_schedule_lb_wk"]["overshoot_rule"]
+    blob = " ".join(by_id[t]["action"] for t in stepped) + owner_redlines.REDLINES["rate_schedule_lb_wk"]["overshoot_rule"]
+    assert "150–250" not in blob and "150-250" not in blob and "+250" not in blob
+
+
 # ── the record: the DynamoDB wire, written once ───────────────────────────────────────────
 class ConditionalCheckFailedException(Exception):
     pass
@@ -485,16 +538,16 @@ def test_the_deadman_row_states():
 
 
 def test_the_deadman_rides_the_calibration_block_and_the_telegram_sweep(monkeypatch):
-    from coach import coach_event_triggers as cet
+    from coach import calibration_deadman_alert as cda  # #5203: the dead-man is plain text, not an AI sweep candidate
     from training import calibration_cadence as cc, fitness_tests as ft
 
     monkeypatch.setattr(cc, "table_readers", lambda table: {k: (lambda: []) for k in cc.KINDS})
     monkeypatch.setattr(ft, "calibration_row_from_table", lambda table, today: {"kind": ft.CALIBRATION_KIND, "state": "ok"})
     block = cc.read(FakeTable(), "2026-11-04")
     assert block["kinds"][ti.CALIBRATION_KIND]["state"] == cc.MISSED_2 and ti.CALIBRATION_KIND in cc.deadman_kinds(block)
-    evs = [e for e in cet.detect_calibration(block, "2026-11-04") if ti.CALIBRATION_KIND in e["event_id"]]
+    evs = [e for e in cda.due(block) if ti.CALIBRATION_KIND in e["event_id"]]
     assert len(evs) == 1 and evs[0]["event_id"] == "CALIB_DEADMAN#nutrition_titration#2026-11-02"
-    assert "No calorie titration decision" in evs[0]["evidence"]
+    assert "No calorie titration decision" in evs[0]["text"]
     t = FakeTable()
     ti.write_decision(t, decide(week="2026-11-02"), "2026-10-30")
     assert cc.read(t, "2026-11-04")["kinds"][ti.CALIBRATION_KIND]["state"] == cc.OK

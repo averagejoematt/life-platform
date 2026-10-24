@@ -50,6 +50,7 @@ from decimal import Decimal
 import boto3
 from common import stats_core  # bundled shared module (#529/#535): effective-n so drift significance isn't inflated by autocorrelation
 from common.constants import PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's floor, never the profile row
+from common.habit_registry import habit_tier  # #5232
 from common.pacific_time import pacific_clock_label, pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 from health import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
@@ -337,7 +338,7 @@ def compute_habit_patterns(habit_score_records_7d, profile):
 
     t0_completion_rates = {}
     for name, meta in registry.items():
-        if meta.get("status") != "active" or meta.get("tier", 2) != 0:
+        if meta.get("status") != "active" or habit_tier(meta) != 0:
             continue
         days_missed = t0_miss_counts.get(name, 0)
         days_available = t0_total_days
@@ -1506,6 +1507,12 @@ def _build_acwr_signal(computed_7d):
             "if recovery metrics support it. Don't alarm — this is an opportunity."
         )
         priority = 4
+    elif zone == "re-baselining":  # #5029: HR regime window — no safe/optimal claim, informational only
+        instruction = (
+            "INSTRUCTION: Heart-rate-weighted load is re-baselining — do not call the training load optimal or "
+            "under-stimulated. Coach to the standing constraint."
+        )
+        priority = 8
     else:  # safe
         instruction = "Training load is in the optimal zone."
         priority = 8

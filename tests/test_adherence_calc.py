@@ -659,3 +659,66 @@ def test_5058_a_session_beaten_only_within_tolerance_reads_yes():
     assert lat["sets_within_tolerance"] == 3 and lat["sets_over_ceiling"] == 0 and lat["movement_class"] == "compound"
     assert out["intensity_adherence"]["sets_beat_ceiling"] == 3
     assert out["as_prescribed"]["verdict"] == "yes"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #5058 (owner ruling 2026-10-23): "grade lifting and cardio separately. An un-RPE'd cardio block shows `unknown` on
+# its own and no longer hides the lifting verdict." The 2026-10-21 session: every lifting set inside its ceiling, one
+# cycling block that carried its own RPE ceiling with no RPE logged — the whole session read `unknown`.
+# ─────────────────────────────────────────────────────────────────────────────
+def _lift_and_ride_ir() -> RoutineSpec:
+    return RoutineSpec(
+        routine_id="r-5058-split",
+        target_date="2026-10-21",
+        archetype="upper",
+        exercises=[
+            ExerciseBlock(movement_key="lat_pulldown", sets=[Set()] * 3, notes="RPE 8 cap."),
+            ExerciseBlock(movement_key="cycling", sets=[Set(duration_seconds=1200)], notes="Easy ride, RPE 6 max."),
+        ],
+    )
+
+
+def _ride(rpe=None):
+    return {"exercise_template_id": "D8F7F851", "sets": [{"type": "normal", "rpe": rpe, "duration_seconds": 1200}]}  # cycling
+
+
+def test_5058_an_unrpe_d_cardio_block_is_unknown_on_its_own_and_the_lifting_verdict_stands():
+    performed = {"exercises": [{"exercise_template_id": "6A6C31A5", "sets": _sets(7.0, 7.5, 8.0)}, _ride()]}
+    out = calculate_adherence(_lift_and_ride_ir(), performed)
+    kinds = {m["movement_key"]: m["kind"] for m in out["movements"]}
+    assert kinds == {"lat_pulldown": "lifting", "cycling": "cardio"}
+    by = out["as_prescribed_by_kind"]
+    assert by["lifting"]["verdict"] == "yes" and by["lifting"]["movements"] == ["lat_pulldown"]
+    assert by["cardio"]["verdict"] == "unknown" and by["cardio"]["intensity_status"] == "unreadable"
+    assert by["cardio"]["movements"] == ["cycling"]
+    assert out["as_prescribed"]["verdict"] == "yes" and out["as_prescribed"]["scope"] == "lifting"
+    assert out["as_prescribed"]["cardio_verdict"] == "unknown" and "cardio graded on its own" in out["as_prescribed"]["cardio_note"]
+    # mutation control: the pre-ruling whole-session AND over the same movements is the `unknown` the 10-21 session read
+    whole = adherence_calc._as_prescribed(out["overall_pct"], out["intensity_adherence"], out["movements"])
+    assert whole["verdict"] == "unknown" and "cycling" in whole["reasons"][0]
+
+
+def test_5058_a_lifting_breach_still_reads_no_beside_cardio_and_a_skipped_ride_never_fails_the_lift():
+    over = {"exercises": [{"exercise_template_id": "6A6C31A5", "sets": _sets(9.5, 9.5, 9.5)}, _ride(5.0)]}
+    out = calculate_adherence(_lift_and_ride_ir(), over)
+    assert out["as_prescribed"]["verdict"] == "no" and out["as_prescribed_by_kind"]["cardio"]["verdict"] == "yes"
+    assert "cardio_verdict" not in out["as_prescribed"]  # a `yes` ride is not a line on the lifting verdict
+    skipped = calculate_adherence(_lift_and_ride_ir(), {"exercises": [{"exercise_template_id": "6A6C31A5", "sets": _sets(7.0, 7.5, 8.0)}]})
+    assert skipped["as_prescribed"]["verdict"] == "yes" and skipped["as_prescribed_by_kind"]["cardio"]["verdict"] == "no"
+    assert skipped["overall_pct"] < 100.0  # the stored whole-session number keeps its meaning
+
+
+def test_5058_a_cardio_only_day_and_a_lifting_only_day_read_as_before():
+    ride_only = RoutineSpec(
+        routine_id="r-5058-ride",
+        target_date="2026-10-21",
+        archetype="aerobic",
+        exercises=[ExerciseBlock(movement_key="cycling", sets=[Set(duration_seconds=1200)], notes="Easy ride, RPE 6 max.")],
+    )
+    out = calculate_adherence(ride_only, {"exercises": [_ride()]})
+    assert out["as_prescribed"]["scope"] == "cardio" and out["as_prescribed"]["verdict"] == "unknown"
+    assert out["as_prescribed_by_kind"]["lifting"] is None
+    lift_only = calculate_adherence(_ir(), {"exercises": [{"exercise_template_id": "3601968B", "sets": [{}, {}, {}]}]})
+    whole = adherence_calc._as_prescribed(lift_only["overall_pct"], lift_only["intensity_adherence"], lift_only["movements"])
+    assert {k: lift_only["as_prescribed"][k] for k in ("verdict", "reasons")} == whole  # no cardio: the same verdict as before
+    assert lift_only["as_prescribed"]["scope"] == "lifting" and lift_only["as_prescribed_by_kind"]["cardio"] is None

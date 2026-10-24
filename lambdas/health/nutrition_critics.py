@@ -56,6 +56,7 @@ from typing import Any
 
 from coach.critics import deterministic_verdict, reconcile
 from training import owner_redlines
+from training.training_charter import charter_value
 
 from health import (
     calorie_target,
@@ -123,7 +124,61 @@ def _energy(inputs: dict[str, Any] | None = None) -> dict[str, Any]:
     e["floor_any_day"] = r["floor_any_day_kcal"] or e["floor_any_day"]
     e["floor_lifting_day"] = r["floor_lifting_day_kcal"] or e["floor_lifting_day"]
     e["target_kcal"], e["target_source"] = r["kcal"], r["source"]
+    # owner ruling 2026-10-23 R1 (#5091): the energy floors and the rate-ceiling flags stay, as WARNINGS — a breach is
+    # reported, never a veto or an automatic "eat more"; one calorie step everywhere (#5205): the titration cap
+    e["floors_are_warnings"] = charter_value("nutrition.calories.floor_role") == "warning"
+    e["ceiling_is_warning"] = charter_value("nutrition.titration.above_ceiling_action") == "warn"
+    e["step_kcal"] = _num(charter_value("nutrition.titration.max_step_kcal"))
     return e
+
+
+def _step_text(energy: dict[str, Any]) -> str:
+    """The one calorie step, as the lines that offer it state it ("+150 kcal/day"); unreadable is said so."""
+    step = energy.get("step_kcal")
+    return f"+{int(step)} kcal/day" if step is not None else "a step (nutrition.titration.max_step_kcal unreadable)"
+
+
+def _overshoot_cap_flag(
+    energy: dict[str, Any], cap: Any, run: list[float], weeks: Any, mean14: float | None, rule: str, provenance: str
+) -> dict[str, Any]:
+    """The over-the-cap run as a flag: a WARNING under owner ruling 2026-10-23 R1 (`above_ceiling_action` warn — food is
+    not pushed up), else a `change` of the one calorie step (#5205) from the 14-day mean."""
+    step, warn = energy.get("step_kcal"), energy.get("ceiling_is_warning")
+    to = (mean14 + step) if (mean14 is not None and step is not None and not warn) else None
+    return _flag(
+        "rate_over_cap_consecutive_weeks",
+        "info" if warn else "change",
+        ("WARNING (owner ruling 2026-10-23: the ceiling flag is a warning, food is not pushed up): " if warn else "")
+        + f"trend above the {cap} lb/wk cap for {len(run)} consecutive weeks ({', '.join(str(r) for r in run)}) in week {weeks} — '{rule}'",
+        provenance=provenance,
+        field=None if warn else "intake_kcal_per_day",
+        to=to,
+    )
+
+
+def _energy_floor_tripped(
+    p: dict[str, Any], energy: dict[str, Any], floor_t: dict[str, Any], counts: tuple, provenance: str, lo: Any
+) -> None:
+    """The intake-floor tripwire fired: a WARNING flag when the charter's floors are warnings (owner ruling 2026-10-23 R1,
+    never a veto), else the redline breach (a veto while the redlines are ACTIVE)."""
+    below, measured, breaches = counts
+    reason = (
+        f"{below} of {measured} measured days below the energy floor ({energy['floor_any_day']} kcal; {energy['floor_lifting_day']} on a lifting day) — "
+        f"lowest {min(breaches):.0f} kcal; tripwire `{floor_t['id']}` threshold {floor_t['threshold_days']} days — {floor_t['action']}"
+    )
+    if energy.get("floors_are_warnings"):
+        warning = "WARNING (owner ruling 2026-10-23: the floors are warnings, not a veto): "
+        p["flags"].append(_flag("energy_floor_days_below_7d", "info", warning + reason, provenance=provenance))
+        return
+    _redline_breach(
+        p,
+        redline="energy_floor_kcal",
+        metric="energy_floor_days_below_7d",
+        reason=reason,
+        provenance=provenance,
+        field="intake_kcal_per_day",
+        to=lo,
+    )
 
 
 def _tripwire(tid: str) -> dict[str, Any]:
@@ -354,18 +409,7 @@ def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
         # cap. `rates` holds only complete weeks (#4150), so a partial week never starts the clock.
         n["rate_over_cap_consecutive_weeks"] = sum(1 for _ in itertools.takewhile(lambda r: r > cap, reversed(rates))) if rates else None
         if over and all(over) and weeks is not None and weeks > 4:
-            to = (mean14 + 250) if mean14 is not None else None
-            flags.append(
-                _flag(
-                    "rate_over_cap_consecutive_weeks",
-                    "change",
-                    f"trend above the {cap} lb/wk cap for {need} consecutive weeks ({', '.join(str(r) for r in rates[-need:])}) in week {weeks} — "
-                    f"'{sched['overshoot_rule']}'",
-                    provenance=overshoot_t["provenance"],
-                    field="intake_kcal_per_day",
-                    to=to,
-                )
-            )
+            flags.append(_overshoot_cap_flag(energy, cap, rates[-need:], weeks, mean14, sched["overshoot_rule"], overshoot_t["provenance"]))
     sev = inputs.get("metabolic_adaptation_severity")
     if sev in IC29_FLAG_SEVERITIES:
         flags.append(
@@ -490,18 +534,7 @@ def build_muscle_defense_packet(inputs: dict[str, Any]) -> dict[str, Any]:
             unknown += ["energy_floor_days_below_7d", "mean_intake_kcal_7d"]
         else:
             if below >= floor_t["threshold_days"]:
-                _redline_breach(
-                    p,
-                    redline="energy_floor_kcal",
-                    metric="energy_floor_days_below_7d",
-                    reason=(
-                        f"{below} of {measured} measured days below the energy floor ({energy['floor_any_day']} kcal; {energy['floor_lifting_day']} on a lifting day) — "
-                        f"lowest {min(breaches):.0f} kcal; tripwire `{floor_t['id']}` threshold {floor_t['threshold_days']} days — {floor_t['action']}"
-                    ),
-                    provenance=energy_prov,
-                    field="intake_kcal_per_day",
-                    to=lo,
-                )
+                _energy_floor_tripped(p, energy, floor_t, (below, measured, breaches), energy_prov, lo)
             elif below > 0:
                 flags.append(
                     _flag(
@@ -743,6 +776,13 @@ def build_packets(inputs: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 # ── verdicts ───────────────────────────────────────────────────────────────────────────
+def _floor_miss_lines(packet: dict[str, Any]) -> list[str]:
+    """#5102: the fat / carbohydrate / fibre floor-miss lines of one packet — each states the floor and the measured value.
+    Approve-side information like `recommendation`: the flags are `info`, so they never touch the verdict."""
+    metrics = {f"{m}_days_missed_7d" for m in macro_floors.MACROS}
+    return [f["reason"] for f in packet.get("flags", []) if f["severity"] == "info" and f["metric"] in metrics]
+
+
 def run(inputs: dict[str, Any], *, model_allowed: bool = False) -> dict[str, Any]:
     """Three verdicts over three packets, through `coach.critics`' deterministic layer and
     `reconcile` (the ONE verdict rule). This never runs a model: `model_allowed` is accepted
@@ -756,6 +796,8 @@ def run(inputs: dict[str, Any], *, model_allowed: bool = False) -> dict[str, Any
         v = reconcile(det, None, packet)
         v["model"] = {"paused": MODEL_PAUSED_REASON}
         v["unknown"] = list(packet.get("unknown", []))
+        if lines := _floor_miss_lines(packet):
+            v["floor_misses"] = lines
         if v.get("verdict") == "veto":
             # ADR-105: a population-derived redline keeps its label even once it is a veto —
             # coach.critics stamps violations "owner" (his calibration doc); ours carry their own.
@@ -772,6 +814,7 @@ def run(inputs: dict[str, Any], *, model_allowed: bool = False) -> dict[str, Any
         "redlines_version": owner_redlines.REDLINES_VERSION,
         "verdicts": verdicts,
         "veto": any(v.get("verdict") == "veto" for v in verdicts),
+        "floor_misses": [line for v in verdicts for line in v.get("floor_misses", [])],  # #5102: also on the deterministic path
         "packet_numbers": {cid: p["numbers"] for cid, p in packets.items()},
         "unknown": {cid: p["unknown"] for cid, p in packets.items() if p["unknown"]},
     }
@@ -898,7 +941,7 @@ def decisions_offered(
                 ),
             )
 
-    # 2. rate overshoot — the schedule's own +250 rule
+    # 2. rate overshoot — the schedule's own rule, at the one calorie step (#5205: 150 kcal everywhere)
     weight = _num(inputs.get("weight_lb"))
     target = owner_redlines.rate_target_lb_per_wk(weight, guidance_cap_lb_wk=inputs.get("guidance_cap_lb_wk"))
     rates = [r for r in (_num(x) for x in (inputs.get("weekly_loss_rates_lb_wk") or [])) if r is not None]
@@ -934,7 +977,7 @@ def decisions_offered(
                 },
                 provenance=over_t["provenance"],
                 options=[
-                    f"+250 kcal/day ({'to ' + format(mean14 + 250, '.0f') if mean14 is not None else 'from an unknown mean'}) — '{over_t['action']}'",
+                    f"{_step_text(energy)} ({'to ' + format(mean14 + energy['step_kcal'], '.0f') if (mean14 is not None and energy.get('step_kcal') is not None) else 'from an unknown mean'}) — '{over_t['action']}'",
                     "hold",
                 ],
                 decision=f"trend over the {target['cap_lb_wk']} lb/wk cap {need} weeks running ({', '.join(str(r) for r in rates[-need:])}) — {over_t['action']}",

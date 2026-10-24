@@ -14,11 +14,13 @@ ORDER (first hit wins):
      (a cached, fail-soft table read), so every surface states the titrated target. Outside a Lambda
      (a unit test, a laptop) no reader is used unless one is injected.
   2. the charter's ``nutrition.calories`` block (config/training_charter.json): ``target_kcal``
-     inside ``prescribed_band_kcal`` (the panel default R1, pending the owner's answer: eat up to
-     the prescribed band now, refit weekly).
-The any-day floor (``floor_any_day_kcal``) clamps whatever was resolved, and the clamp is named in
-``provenance``. An unreadable charter resolves to ``kcal: None`` with ``source: "unavailable"`` —
-never a remembered number (ADR-104); every reader treats None as "no target", not zero.
+     inside ``prescribed_band_kcal`` (owner ruling 2026-10-23 R1, #5091: stay ~1,500).
+A titration record written under a charter version before ``records_from_version`` is not read (a
+record from before the re-target is not the base). The energy floors are WARNINGS (owner ruling R1:
+kept, not removed, never a clamp): a resolved target, or a typed day, under its floor carries the
+gap in ``floor_warnings`` and in ``provenance`` — nothing lifts it to the floor. An unreadable
+charter resolves to ``kcal: None`` with ``source: "unavailable"`` — never a remembered number
+(ADR-104); every reader treats None as "no target", not zero.
 
 PURE outside a Lambda: no table handle, no clock unless ``day`` is omitted (then Pacific today, the platform's day).
 The charter read goes through ``training.training_charter`` — bundled, read once per container and
@@ -43,7 +45,7 @@ CharterReader = Callable[[str], Any]
 DayLike = Union[str, date, None]
 
 TRAINING_DAY_PATH = "nutrition.training_day"
-DAY_TYPES = ("lifting", "rest", "travel", "unknown")
+DAY_TYPES = ("lifting", "rest", "travel", "disrupted", "unknown")  # disrupted: a recorded disruption covers the date (#5215)
 
 
 def _day(day: DayLike) -> date:
@@ -87,8 +89,8 @@ def _charter_version(charter_reader: Optional[CharterReader]) -> Optional[str]:
 
 
 # ── training-day fuel (#5101, epic #5091) ───────────────────────────────────────────────────
-# Built on the panel default R1 (eat up to the band now, refit weekly). The uplift on a lifting day is
-# balanced by the rest days, so the WEEK averages the base target; charter ``nutrition.training_day``.
+# A lifting day is the base plus the lifting uplift; a rest day stays at the base and is NOT paid back below it, so the
+# week averages above the base by design (owner ruling 2026-10-23, #5091 follow-up 2); charter ``nutrition.training_day``.
 
 
 def classify_day_type(
@@ -132,43 +134,38 @@ def _apply_day_type(
 ) -> None:
     dt = day_type if day_type in DAY_TYPES else "unknown"
     out["day_type"], out["uplift_kcal"], out["split"], out["pre_post_session"] = dt, 0, None, None
+    out["floor_warnings"] = []
     cfg = read(TRAINING_DAY_PATH)
     cfg = cfg if isinstance(cfg, dict) else {}
     if base is None:
         return
-    uplift = _num(cfg.get("lifting_uplift_kcal")) or 0.0
-    n_lift = list(week_types).count("lifting") if week_types is not None else (_num(read("split.lifting_days_per_wk")) or 0)
-    n_rest = list(week_types).count("rest") if week_types is not None else 7 - n_lift
-    delta = 0.0
-    if dt == "lifting":
-        delta = uplift
-    elif dt == "rest" and n_rest > 0:
-        delta = -uplift * n_lift / n_rest
+    p_low = _num(read("nutrition.protein.range_g.low"))
+    fat_pct = _num(cfg.get("fat_pct_of_base_kcal"))
+    fat_floor = _num(read("nutrition.floors.fat.floor_g"))
+    # split_rule: fat is the larger of fat_pct of the base and the fat floor (owner ruling 2026-10-23 on #5212: it stays)
+    fat_g = max(base * fat_pct / 100 / 9, fat_floor or 0.0) if fat_pct is not None else None
+    # rest_day_rule (owner ruling 2026-10-23, #5091 follow-up 2): +uplift on a lifting day, every other day at the base —
+    # no rest-day payback below the target, so the week averages above the base by design
+    delta = (_num(cfg.get("lifting_uplift_kcal")) or 0.0) if dt == "lifting" else 0.0
     final = base + delta
     floor_any, floor_lift = _num(out.get("floor_any_day_kcal")), _num(out.get("floor_lifting_day_kcal"))
     floor = floor_lift if (dt == "lifting" and floor_lift is not None) else floor_any
-    out["balance_held"] = True
-    if dt == "lifting" and delta and n_rest == 0:  # #5191: a typed week with no rest day (travel fills it) cannot pay the uplift
-        out["provenance"] += "; no rest day in the typed week pays the lifting uplift — the weekly balance is NOT held"
-        out["balance_held"] = False
+    out["balance_held"] = final >= base  # the training-day rule held: no planned day under its base target
     if floor is not None and final < floor:
-        out[
-            "provenance"
-        ] += f"; {dt} day clamped up to its floor {int(floor)} kcal (resolved {int(final)}) — the weekly balance is NOT held"
-        final, out["balance_held"] = floor, False
+        # owner ruling 2026-10-23 R1 (#5091): the floors stay as WARNINGS — reported, never a clamp that raises the target
+        warning = f"{dt} day {int(round(final))} kcal is {int(round(floor - final))} kcal under its {int(floor)} kcal floor (a warning, not a clamp)"
+        out["floor_warnings"].append(warning)
+        out["provenance"] += f"; {warning}"
     out["kcal"] = int(round(final))
     out["uplift_kcal"] = int(round(final - base))
-    if dt != "unknown" and delta:
-        out["provenance"] += f"; {dt} day {out['uplift_kcal']:+d} kcal (training_day rule, panel default R1)"
-    p_low = _num(read("nutrition.protein.range_g.low"))
-    fat_pct = _num(cfg.get("fat_pct_of_base_kcal"))
-    if p_low is not None and fat_pct is not None:
-        fat_g = base * fat_pct / 100 / 9
+    if delta:
+        out["provenance"] += f"; {dt} day {out['uplift_kcal']:+d} kcal (training_day rule, no rest-day payback)"
+    if p_low is not None and fat_g is not None:
         out["split"] = {
             "protein_g": int(round(p_low)),
             "fat_g": int(round(fat_g)),
             "carb_g": int(round(_grams(final, p_low, fat_g))),
-            "rule": "protein and fat held at the base day's grams; the uplift and the rest-day offset are carbohydrate",
+            "rule": "protein and fat held at the base day's grams (fat never under its floor); the lifting uplift is carbohydrate",
         }
     if dt in ("lifting", "travel"):
         pre, post = cfg.get("pre_session"), cfg.get("post_session")
@@ -178,7 +175,8 @@ def _apply_day_type(
 def plan_block(date: str, disruption: Optional[Dict[str, Any]] = None, calendar: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """The plan's `training_day_fuel` (#5101, owner-only). With a typed `calendar` (`training.training_calendar`,
     #5191) the date is lifting/rest/travel and the block carries the typed week (`week_days`, `week_mean_kcal`), whose
-    mean is the base target while `week_balance_held`. Without one (the Hevy record or the count unread) a non-travel
+    mean is the base plus the lifting uplift spread over the week (no rest-day payback, owner ruling 2026-10-23); `week_balance_held`
+    says no day of it sits under its base. Without one (the Hevy record or the count unread) a non-travel
     date is `unknown` at the base target plus `if_lifting_day` / `if_rest_day`, stated as conditional."""
     planned = (calendar or {}).get("planned_dates")
     if planned is not None:
@@ -254,7 +252,8 @@ def resolve(
     }
 
     record = titration_reader(week) if (titration_reader is not None and week) else None
-    rec_kcal = _num((record or {}).get("kcal"))
+    stale = record_predates_retarget(record, block.get("records_from_version"))
+    rec_kcal = None if stale else _num((record or {}).get("kcal"))
     if rec_kcal is not None and rec_kcal > 0:
         kcal: Optional[float] = rec_kcal
         out["source"] = "titration"
@@ -268,18 +267,34 @@ def resolve(
         kcal = _num(block.get("target_kcal"))
         if kcal is not None and kcal > 0:
             out["source"] = "charter"
-            out["provenance"] = (
-                f"charter {CHARTER_PATH}.target_kcal v{out['charter_version']} (panel default R1: eat up to the prescribed band)"
-            )
+            out["provenance"] = f"charter {CHARTER_PATH}.target_kcal v{out['charter_version']} (owner ruling 2026-10-23 R1: stay ~1,500)"
+            if stale:
+                out["provenance"] += (
+                    f"; the week's titration record {titration_sk(week)} was written under charter v{(record or {}).get('charter_version')}, "
+                    f"before the re-target at v{block.get('records_from_version')}, so it is not read"
+                )
         else:
             kcal = None
-
-    if kcal is not None and floor_any is not None and kcal < floor_any:
-        out["provenance"] += f"; clamped up to the any-day floor {int(floor_any)} kcal (resolved {int(kcal)})"
-        kcal = floor_any
     out["base_kcal"] = int(round(kcal)) if kcal is not None else None
     _apply_day_type(out, kcal, day_type, week_day_types, read)
     return out
+
+
+def _version(v: Any) -> Optional[tuple]:
+    try:
+        return tuple(int(x) for x in str(v).split("."))
+    except (TypeError, ValueError):
+        return None
+
+
+def record_predates_retarget(record: Optional[Dict[str, Any]], from_version: Any) -> bool:
+    """True when a titration record was written under a charter version before ``nutrition.calories.records_from_version``
+    (the 2026-10-23 re-target, R1): its kcal carried the old target, so neither the resolver nor the engine reads it as the
+    base. A record with no readable version, or no rebase version on the charter, is read as before."""
+    if not record or from_version is None:
+        return False
+    have, need = _version(record.get("charter_version")), _version(from_version)
+    return have is not None and need is not None and have < need
 
 
 def target_kcal(day: DayLike = None, **readers: Any) -> Optional[int]:
@@ -289,8 +304,16 @@ def target_kcal(day: DayLike = None, **readers: Any) -> Optional[int]:
     return int(kcal) if kcal is not None else None
 
 
+def calorie_band(day: DayLike = None, **readers: Any) -> Optional[tuple]:
+    """The calorie habit's floor and ceiling for ``day`` (#5099: ``prescribed_band_kcal``, centred on the target, moved
+    with it by a titration record): ``(band_low, band_high)``, or None when either edge is unresolved."""
+    r = resolve(day, **readers)
+    lo, hi = r.get("band_low"), r.get("band_high")
+    return (int(lo), int(hi)) if lo is not None and hi is not None and lo <= hi else None
+
+
 def target_phrase(day: DayLike = None, **readers: Any) -> str:
-    """``"2100 kcal"`` or ``"no calorie target resolved"`` — for prompt and email lines, so a missing
+    """``"1500 kcal"`` or ``"no calorie target resolved"`` — for prompt and email lines, so a missing
     charter reads as an absence, never as ``None kcal``."""
     kcal = target_kcal(day, **readers)
     return f"{kcal} kcal" if kcal is not None else "no calorie target resolved"

@@ -5,7 +5,7 @@
     {"key": "data", "label": "Detailed data pages"},
     {"key": "method", "label": "How things are measured and built"},
     {"key": "writing", "label": "Writing"},
-    {"key": "replaced", "label": "Replaced layouts", "empty": "The home page’s earlier layout will be listed here once the cut-over copies it. Nothing is here yet."}
+    {"key": "replaced", "label": "Replaced layouts", "empty": "No layout has been replaced yet."}
   ],
   "pages": [
     {"url": "/data/autonomic/", "title": "Autonomic balance", "line": "Stress against recovery, day by day, measured from his own baseline.", "kind": "data"},
@@ -76,7 +76,9 @@
     {"url": "/method/grade-your-coach/", "title": "Grade your coach", "line": "Score any AI coach’s predictions the way these coaches are scored.", "kind": "tools"},
     {"url": "/method/mirror/", "title": "Score your own wearable export", "line": "Score a wearable export on the same instruments, in the browser.", "kind": "tools", "codename": "Mirror"},
     {"url": "/coaching/qa/", "title": "Reader questions", "line": "A question form to the coaches, and the questions already answered.", "kind": "tools"},
-    {"url": "/method/scenarios/", "title": "Scenario explorer", "line": "Pick a kind of day and see what usually followed.", "kind": "tools"}
+    {"url": "/method/scenarios/", "title": "Scenario explorer", "line": "Pick a kind of day and see what usually followed.", "kind": "tools"},
+    {"url": "/reference/2026-10-22-home-v5/", "title": "The front page, before 22 October 2026", "line": "The earlier front page, kept as it was last served: the loop dial, the constellation of seven areas and the three doors.", "kind": "replaced", "earlier_of": "The front page"},
+    {"url": "/reference/2026-10-22-story-v5/", "title": "The story hub, before 22 October 2026", "line": "The earlier story page, kept as it was last served: the weekly write-ups, the journal and the lab notes in tabs.", "kind": "replaced", "earlier_of": "The story"}
   ],
   "held": [
     {"url": "/data/wall/", "why": "owner ruling pending (#4604)"},
@@ -88,7 +90,8 @@
     {"url": "/story/build/", "why": "its text shows a count of earlier starts, the class #4604 holds; held until ruled"},
     {"url": "/story/diary/", "why": "its text shows a count of earlier starts, the class #4604 holds; held until ruled"},
     {"url": "/journal/essays/org-chart-of-one/", "why": "its text shows a count of earlier starts, the class #4604 holds; held until ruled"},
-    {"url": "/", "why": "the current front page; the preview front page takes its place"},
+    {"url": "/", "why": "the front page: the kit page since the 2026-10-22 cut-over (#4588); its earlier layout is under Replaced layouts"},
+    {"url": "/start/", "why": "the kit's Start here page since the 2026-10-22 cut-over (#4588); the front page links it"},
     {"url": "/story/chronicle/", "why": "the preview's story page takes its place"},
     {"url": "/subscribe/", "why": "on the usual path: the preview's follow box links it"},
     {"url": "/data/", "why": "opens on the same view as /data/physical/"},
@@ -96,7 +99,8 @@
     {"url": "/coaching/coaches/", "why": "opens on the same view as /coaching/team/"},
     {"url": "/protocols/", "why": "opens on the same view as /protocols/supplements/"},
     {"url": "/method/", "why": "opens on the same view as /method/wrong/"},
-    {"url": "/story/", "why": "opens on the same view as /story/chronicle/"},
+    {"url": "/story/", "why": "the story: the kit page since the 2026-10-22 cut-over (#4588); its earlier layout is under Replaced layouts"},
+    {"url": "/coaches/", "why": "the kit's AI coaches page since the 2026-10-22 cut-over (#4588); the front page links it"},
     {"url": "/method/state/", "why": "already in the live sitemap, absent from the committed one until the #4604 regeneration; whether the appendix lists it is #4586's call"}
   ],
   "held_prefixes": [

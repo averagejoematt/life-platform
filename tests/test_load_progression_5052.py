@@ -86,6 +86,20 @@ def test_hold_one_top_of_range_exposure_is_not_two():
     assert "1 of 2" in out["reason"]
 
 
+def test_a_hold_below_the_prescribed_load_names_the_load_not_a_met_criterion():
+    """The 2026-10-23 pre-draft's calf line read "hold 435 lb: 2 of 2 top sets at the top of 8-15 at or under the ceiling"
+    while the sessions were at 360 lb — the gain rule (rightly) never counts a run below the prescribed load, so the text
+    claimed a met criterion beside a hold. The hold now names the case."""
+    hist = [_session("2026-10-21", 360, [21, 21, 21], [8, 8, 8]), _session("2026-10-16", 360, [21, 21, 21], [8, 8, 8])]
+    out = lp.next_prescription(hist, current_kg=_kg(435), rep_range=(8, 15), cls=lp.CLASS_ISOLATION)
+    assert out["basis"] == lp.BASIS_HOLD and out["next_load_kg"] == pytest.approx(_kg(435))
+    assert out["reason"].startswith("hold 435 lb: the top sets on 10-21 were at 360 lb, below the prescribed load"), out["reason"]
+    assert "2 of 2" not in out["reason"]
+    # the same run AT the prescribed load still steps (the case the gain rule exists for)
+    at = [_session("2026-10-21", 435, [15, 15], [8, 8]), _session("2026-10-16", 435, [15, 15], [8, 8])]
+    assert lp.next_prescription(at, current_kg=_kg(435), rep_range=(8, 15), cls=lp.CLASS_ISOLATION)["basis"] == lp.BASIS_STEP
+
+
 def test_step_two_top_sets_at_the_top_of_the_range_earn_one_step_reps_to_the_bottom():
     hist = [_session("2026-10-16", 185, [12, 12], [8, 7.5]), _session("2026-10-14", 185, [12, 11], [8, 8])]
     out = lp.next_prescription(hist, current_kg=_kg(185), rep_range=(8, 12), cls=lp.CLASS_COMPOUND)

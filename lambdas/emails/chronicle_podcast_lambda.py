@@ -48,6 +48,7 @@ from datetime import datetime, timezone
 import boto3
 from ai import google_tts
 from coach import persona_registry
+from common.journal_silence import public_body, scrub_document  # #5131: the one public-surface guard
 from content import chronicle_schema
 
 try:
@@ -95,7 +96,7 @@ def _markdown_to_narration(md: str) -> str:
 def _synthesize(text: str) -> bytes:
     """Google Chirp 3: HD MP3 in Elena's persistent voice (chunked + concatenated
     inside google_tts; same voice/bitrate, so MP3 frame concatenation is valid)."""
-    return google_tts.synthesize(text, _elena_voice())
+    return google_tts.synthesize(scrub_document(text), _elena_voice())
 
 
 def _published_posts() -> list:
@@ -160,7 +161,7 @@ def _write_indexes(episodes: list) -> None:
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=f"{PREFIX}/episodes.json",
-        Body=json.dumps({"episodes": episodes}, indent=1),
+        Body=public_body(json.dumps({"episodes": episodes}, indent=1), "application/json"),
         ContentType="application/json",
         CacheControl="max-age=3600, public",
     )
@@ -187,7 +188,7 @@ def _write_indexes(episodes: list) -> None:
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=f"{PREFIX}/feed.xml",
-        Body=feed,
+        Body=public_body(feed, "application/rss+xml; charset=utf-8"),
         ContentType="application/rss+xml; charset=utf-8",
         CacheControl="max-age=3600, public",
     )

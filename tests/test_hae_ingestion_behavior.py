@@ -1611,7 +1611,7 @@ class TestAdditiveIntegrityCheck:
         c = _run_check(_ListingS3(archived), table)
         assert c.passed is True and c.message.startswith("0 of 1 ")
         c = _run_check(_ListingS3(archived), FakeTable({"steps": Decimal("2600")}))  # the pre-#4962 specimen
-        assert c.passed is None and c.chronic is True
+        assert c.passed is False, "since the writer fix is live a shortfall is a FAIL, not a chronic warn (#4628)"
         assert c.message.startswith("1 of 1 Apple Health field-days stored BELOW") and "steps 1" in c.message
 
     def test_a_stored_day_equal_to_the_delivered_readings_is_green(self):

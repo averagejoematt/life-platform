@@ -363,9 +363,6 @@ _SANCTIONED_CURRENT_CYCLE_VIEWS: dict[str, str] = {
         "Unbounded partition scan, but its callers pass genome/labs/dexa — all CROSS_PHASE, so "
         "those rows are never tagged and the filter is a literal no-op."
     ),
-    "lambdas/emails/partner_email_lambda.py::query_journal_range": (
-        "Notion journal entries for the reported week only — a this-week digest by definition."
-    ),
     "lambdas/emails/weekly_digest_lambda.py::query_journal_range": (
         "Same shape: this week plus the prior week. Only the opening fortnight of a cycle straddles "
         "genesis, and a weekly digest is meant to be a current-cycle view."
@@ -582,6 +579,16 @@ _PER_SOURCE_READS: dict[str, str] = {
         "registry-published 90-day window's whoop/strava/macrofactor/apple_health/habitify/"
         "flourishing/withings/hevy callers all read cross-phase; the computed_metrics caller "
         "(EXPERIMENT_SCOPED) stays filtered. Pinned by tests/test_phase_filter_third_wave_3444.py."
+    ),
+    "lambdas/compute/scenario_explorer_lambda.py::_write_checkin_pair": (
+        "#5211: the next-morning check-in / intake day row. Its nested fetch passes "
+        "include_pilot=source_reads_cross_phase(source), the #2109 idiom, into "
+        "checkin_intake_pairs.write_day, the same reads as weekly_correlation_compute_lambda.fetch_range: "
+        "evening_checkin/macrofactor/apple_health read cross-phase per the registry."
+    ),
+    "lambdas/compute/scenario_explorer_lambda.py::fetch": (
+        "#5211: the nested reader inside _write_checkin_pair — include_pilot=source_reads_cross_phase(source), "
+        "the #2109 idiom; see the _write_checkin_pair entry."
     ),
     "lambdas/compute/hypothesis_engine_lambda.py::query_range": (
         "include_pilot=source_reads_cross_phase(source) — the #2109 idiom, closing #3444: every "

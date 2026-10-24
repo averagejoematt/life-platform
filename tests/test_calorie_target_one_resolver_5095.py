@@ -130,12 +130,24 @@ def test_an_absent_or_empty_titration_record_falls_through_to_the_charter():
         assert (r["kcal"], r["source"]) == (2100, "charter"), record
 
 
-def test_the_any_day_floor_clamps_whatever_was_resolved():
+def test_the_any_day_floor_is_a_warning_never_a_clamp():
+    """Owner ruling 2026-10-23 R1 (#5091): the floors stay, as WARNINGS — a target under the any-day floor is served as
+    resolved and the gap is named (the pre-ruling clamp lifted it to the floor)."""
     r = ct.resolve(FIXTURE_DAY, titration_reader=lambda week: {"kcal": 1400}, charter_reader=_charter())
-    assert r["kcal"] == 1600 and r["source"] == "titration"
-    assert "clamped up to the any-day floor 1600 kcal (resolved 1400)" in r["provenance"]
+    assert r["kcal"] == 1400 and r["source"] == "titration" and "clamped" not in r["provenance"]
+    assert r["floor_warnings"] == ["unknown day 1400 kcal is 200 kcal under its 1600 kcal floor (a warning, not a clamp)"]
+    assert r["floor_warnings"][0] in r["provenance"]
     r = ct.resolve(FIXTURE_DAY, charter_reader=_charter(target_kcal=1200))
-    assert r["kcal"] == 1600 and "clamped" in r["provenance"]
+    assert r["kcal"] == 1200 and r["floor_warnings"]
+    assert ct.resolve(FIXTURE_DAY, charter_reader=_charter())["floor_warnings"] == [], "at or above the floor: no warning"
+
+
+def test_the_live_charter_is_re_targeted_to_1500_with_a_band_centred_on_it():
+    r = ct.resolve(FIXTURE_DAY)
+    assert (r["kcal"], r["source"]) == (1500, "charter") and r["band_low"] < r["kcal"] < r["band_high"]
+    assert r["kcal"] - r["band_low"] == r["band_high"] - r["kcal"], "#5099: the band is centred on the target"
+    assert r["floor_warnings"], "1,500 sits under the 1,600 any-day floor: the warning is visible (owner ruling R1)"
+    assert ct.calorie_band(FIXTURE_DAY) == (r["band_low"], r["band_high"])
 
 
 def test_an_unreadable_charter_is_an_absence_never_a_remembered_number():
@@ -299,7 +311,10 @@ def test_every_surface_states_the_same_kcal_for_one_day(monkeypatch):
     plan = story_dossier.load_plan(load_plan_facts())
     nut = story_dossier._nutrition(None, {"start": FIXTURE_DAY, "end": FIXTURE_DAY}, plan, {})
     got["story_dossier"] = nut["targets_from_plan"]["calories_kcal"]
-    assert nut["targets_from_plan"]["genesis_calories_kcal"] != want, "the genesis figure is labelled apart, never the target"
+    # the genesis figure is labelled apart (history); since owner ruling 2026-10-23 R1 it happens to equal the target
+    assert nut["targets_from_plan"]["genesis_calories_kcal"] == plan.get(
+        "genesis_daily_calories_target"
+    ), "the genesis figure is labelled apart"
     logged = float(MF_ROW["total_calories_kcal"])
     assert nut["days_calories_at_or_under_target"] == (1 if logged <= want else 0), "the dossier counts against the resolver's kcal"
 
@@ -316,12 +331,15 @@ def test_the_character_engine_reads_the_app_target_by_its_stored_name_as_drift_o
     src = (_REPO / "lambdas" / "health" / "character_engine.py").read_text(encoding="utf-8")
     assert '"target_calories"' not in src and '"calorie_target"' not in src, "the misspelt / profile names are gone"
 
-    data = {"date": FIXTURE_DAY, "macrofactor": MF_ROW, "macrofactor_14d": [], "latest_weight": None}
+    # the row's app target 1500 now EQUALS the ruled target (owner ruling 2026-10-23 R1): no drift; a drifted row warns
+    drift_row = {**MF_ROW, "target_calories_kcal": Decimal("1300")}
+    drifted = {"date": FIXTURE_DAY, "macrofactor": drift_row, "macrofactor_14d": [], "latest_weight": None}
     with caplog.at_level(logging.WARNING, logger=character_engine.logger.name):
-        _, details = character_engine.compute_nutrition_raw(data, {"pillars": {"nutrition": {"components": {}}}})
-    assert any("MacroFactor app target 1500 kcal" in rec.getMessage() for rec in caplog.records), "drift signal on the stored name"
+        _, details = character_engine.compute_nutrition_raw(drifted, {"pillars": {"nutrition": {"components": {}}}})
+    assert any("MacroFactor app target 1300 kcal" in rec.getMessage() for rec in caplog.records), "drift signal on the stored name"
+    data = {"date": FIXTURE_DAY, "macrofactor": MF_ROW, "macrofactor_14d": [], "latest_weight": None}
 
-    # the score is graded against the ONE target, not the app's 1,500: |1561 - 2100| / 2100 > 20 % -> 0
+    # the score is graded against the ONE target (the resolver's), never the app's row value
     want = ct.target_kcal(FIXTURE_DAY)
     expected = max(0.0, min(100.0, round(100 - (abs(1561 - want) / want / 0.20) * 100, 1)))
     _, d2 = character_engine.compute_nutrition_raw(data, {"pillars": {"nutrition": {"components": {"calorie_adherence": {"weight": 1.0}}}}})

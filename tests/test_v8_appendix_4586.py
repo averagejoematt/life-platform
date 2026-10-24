@@ -84,6 +84,10 @@ def test_the_page_is_exactly_what_the_generator_writes():
 
 
 def test_every_listed_page_exists_is_indexable_and_is_in_the_sitemap():
+    """A listed page is a served, indexable, sitemap page — except a "Replaced layouts" row
+    (#4588, owner ruling 2026-10-18): a reference copy of a layout a cut-over replaced is served
+    under /reference/<date>-<slug>/, `noindex`, out of the sitemap, with the last live sha in its
+    head comment. It is listed so the old layout stays findable; it is never indexed."""
     sitemap = set(_sitemap_paths())
     offenders = []
     for row in build.load()["pages"]:
@@ -93,7 +97,18 @@ def test_every_listed_page_exists_is_indexable_and_is_in_the_sitemap():
             offenders.append(f"{url}: no page at site{url}index.html")
             continue
         head = index.read_text(encoding="utf-8")[:6000]
-        if re.search(r'<meta\s+name="robots"[^>]*noindex', head):
+        noindex = bool(re.search(r'<meta\s+name="robots"[^>]*noindex', head))
+        if row["kind"] == "replaced":
+            if not url.startswith("/reference/"):
+                offenders.append(f"{url}: a replaced layout lives under /reference/<date>-<slug>/")
+            if not noindex:
+                offenders.append(f"{url}: a reference copy is noindex (owner ruling 2026-10-18)")
+            if not re.search(r"<!-- reference copy of /\S* at [0-9a-f]{40}", head):
+                offenders.append(f"{url}: a reference copy names the last live sha in its head comment")
+            if url in sitemap:
+                offenders.append(f"{url}: a reference copy is out of site/sitemap.xml")
+            continue
+        if noindex:
             offenders.append(f"{url}: the page is noindex — an unlisted page is not a row in a reader's list")
         if 'http-equiv="refresh"' in head:
             offenders.append(f"{url}: the page is a redirect stub")
@@ -169,9 +184,14 @@ def test_the_jump_list_reaches_every_kind_and_an_empty_kind_prints_its_sentence(
     assert [k for k, _label in links] == keys
     assert [label for _k, label in links] == [k["label"] for k in data["kinds"]]
     assert re.findall(r'<section class="ck-section" id="kind-([a-z]+)">', html) == keys
+    # #4588: the cut-over copied the first replaced layouts, so no kind is empty on the live page;
+    # the empty sentence is proved on a render with the "replaced" rows taken out.
     empty = [k for k in data["kinds"] if not any(r["kind"] == k["key"] for r in data["pages"])]
-    assert [k["key"] for k in empty] == ["replaced"]
-    assert html.count(build.esc(empty[0]["empty"])) == 1
+    assert empty == [], f"a kind with no rows on the live page: {[k['key'] for k in empty]}"
+    replaced = next(k for k in data["kinds"] if k["key"] == "replaced")
+    without = {**data, "pages": [r for r in data["pages"] if r["kind"] != "replaced"]}
+    assert build.render(without).count(build.esc(replaced["empty"])) == 1
+    assert html.count(build.esc(replaced["empty"])) == 0
     assert "Replaced layouts" in html and 'href="/next/v8/">Back</a>' not in html
     for row in data["pages"]:
         line = build.row_line(row)

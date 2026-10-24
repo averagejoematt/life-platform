@@ -79,7 +79,9 @@ def _base(day):
     return ct.resolve(day)["kcal"]
 
 
-def test_the_typed_weeks_mean_is_the_base_target():
+def test_the_typed_week_lifts_above_the_base_and_rests_at_it():
+    """Owner ruling 2026-10-23 (#5091 follow-up 2): lifting days +150, rest days at the base, no payback — the typed
+    week's mean is the base + 150 x lifting days / 7 (above the base by design)."""
     # one test over every scenario (a parametrize would be one census gate per case)
     offenders = []
     for name, credited, today in [("fresh", [], MON), ("postponed", [MON], WED), ("on_plan", [MON, TUE], WED), ("late_week", [], FRI)]:
@@ -87,31 +89,32 @@ def test_the_typed_weeks_mean_is_the_base_target():
         blk = ct.plan_block(today, None, calendar=cal)
         lift = [d["kcal"] for d in blk["week_days"] if d["day_type"] == "lifting"]
         rest = [d["kcal"] for d in blk["week_days"] if d["day_type"] == "rest"]
+        base = _base(today)
         ok = (
             blk["day_type"] in ("lifting", "rest")
             and blk["day_type_basis"].startswith("per-date calendar")
             and "if_lifting_day" not in blk
             and blk["week_balance_held"]
-            and abs(blk["week_mean_kcal"] - _base(today)) < 0.5
-            and min(lift) > _base(today) > max(rest)
+            and abs(blk["week_mean_kcal"] - (base + 150 * len(lift) / 7)) < 0.5
+            and set(lift) == {base + 150}
+            and set(rest) <= {base}
         )
         if not ok:
             offenders.append((name, blk["week_days"], blk["provenance"]))
     assert not offenders, offenders
 
 
-def test_a_week_whose_rest_offset_hits_the_floor_is_named_unbalanced():
-    # six lifts and one rest day: the one rest day would carry the whole offset; the resolver clamps it at its floor
+def test_a_week_of_six_lifts_never_pays_its_one_rest_day_below_the_base():
+    # six lifts and one rest day: the rest day stays at the base (no payback, owner ruling 2026-10-23)
     cal = tc.week_calendar(SUN, [MON, TUE, WED, THU, FRI, SAT], today=SUN)
     blk = ct.plan_block(SUN, None, calendar=cal)
-    rest = blk["week_days"][6]
-    floor = blk["floor_any_day_kcal"]
-    assert floor is not None and _base(SUN) - 6 * ct.resolve(SUN, day_type="lifting")["uplift_kcal"] < floor  # the precondition
-    assert (
-        not blk["week_balance_held"]
-        and rest["kcal"] == floor
-        and "NOT held" in ct.resolve(SUN, day_type="rest", week_day_types=[d["day_type"] for d in blk["week_days"]])["provenance"]
-    )
+    types = [d["day_type"] for d in blk["week_days"]]
+    rest = ct.resolve(SUN, day_type="rest", week_day_types=types)
+    lift = ct.resolve(MON, day_type="lifting", week_day_types=types)
+    assert lift["uplift_kcal"] == training_charter.charter_value("nutrition.training_day.lifting_uplift_kcal")
+    assert rest["kcal"] == _base(SUN) and rest["uplift_kcal"] == 0
+    assert rest["split"]["carb_g"] >= training_charter.charter_value("nutrition.floors.carb.floor_g")
+    assert blk["week_balance_held"] and blk["week_mean_kcal"] > _base(SUN)
 
 
 def test_an_unread_calendar_keeps_the_conditional_reading():
@@ -124,7 +127,8 @@ def test_the_plan_engine_types_the_date_from_the_hevy_record():
 
     blk = plan_engine._effort_blocks(MON, [], [], {}, None, [])["training_day_fuel"]
     assert blk["day_type"] == "lifting" and blk["uplift_kcal"] > 0 and blk["calendar"]["lifting_days_per_wk"] == COUNT
-    assert abs(blk["week_mean_kcal"] - blk["base_kcal"]) < 0.5
+    n_lift = sum(d["day_type"] == "lifting" for d in blk["week_days"])
+    assert abs(blk["week_mean_kcal"] - (blk["base_kcal"] + blk["uplift_kcal"] * n_lift / 7)) < 0.5
     # no Hevy record read: the untyped reading, never a guessed calendar
     assert plan_engine._effort_blocks(MON, [], [], {}, None)["training_day_fuel"]["day_type"] == "unknown"
 
@@ -137,11 +141,9 @@ def test_a_travel_window_keeps_its_dates_travel_and_off_the_laying():
     assert blk["day_type"] == "travel"
     by = {d["date"]: d["day_type"] for d in blk["week_days"]}
     assert by[MON] == by[TUE] == "travel" and list(by.values()).count("lifting") == COUNT
-    # no rest day is left to pay the uplift (travel days hold the base): the resolver names the week unbalanced
-    assert not blk["week_balance_held"] and blk["week_mean_kcal"] > blk["base_kcal"]
-    lifting_day = next(d["date"] for d in blk["week_days"] if d["day_type"] == "lifting")
-    types = [d["day_type"] for d in blk["week_days"]]
-    assert "NOT held" in ct.resolve(lifting_day, day_type="lifting", week_day_types=types)["provenance"]
+    # travel days hold the base and nothing is paid back (owner ruling 2026-10-23): the week sits above the base, held
+    assert blk["week_balance_held"] and blk["week_mean_kcal"] > blk["base_kcal"]
+    assert {d["kcal"] for d in blk["week_days"] if d["day_type"] != "lifting"} == {blk["base_kcal"]}
 
 
 def test_the_food_panel_types_its_week_by_the_calendar(monkeypatch):

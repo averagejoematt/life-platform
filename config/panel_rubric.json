@@ -1,9 +1,10 @@
 {
   "_README": "#5072 (epic #5067): the panel rubric — a FIXED standard the training plan is graded against, one seat per school of the training charter's concession_ledger (the seat keys must equal the ledger's keys; tests/test_panel_rubric_5072.py holds it). Each criterion is graded by CODE (a named check in lambdas/training/panel_rubric.py CHECKS, ADR-105: deterministic computation before any model verdict) or by the JUDGE (lambdas/training/panel_judge.py, route charter.judge / charter.judge_gate) when code cannot check it. The concession each seat makes is READ from the charter at grade time, never copied here. The target (overall letter, every-seat floor) is the charter's panel_target. Hand-owned; a change is a new version with a change_log line.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "change_log": [
     {"version": "1.0.0", "date": "2026-10-19", "issue": "#5072", "what": "the eight seats, 40 criteria (32 by code, 8 by the judge), the letter scale"},
-    {"version": "1.1.0", "date": "2026-10-19", "issue": "#5110", "what": "food_panel: nine nutrition seats (six schools, three roles) from the charter's nutrition.concession_ledger, 45 criteria (36 by code against the resolved food plan, 9 by the judge), graded on the same letter scale and the same panel_target; built on the panel defaults, pending R1 and R2 (#5091)"}
+    {"version": "1.1.0", "date": "2026-10-19", "issue": "#5110", "what": "food_panel: nine nutrition seats (six schools, three roles) from the charter's nutrition.concession_ledger, 45 criteria (36 by code against the resolved food plan, 9 by the judge), graded on the same letter scale and the same panel_target; built on the panel defaults, pending R1 and R2 (#5091)"},
+    {"version": "1.2.0", "date": "2026-10-23", "issue": "#5091", "what": "food_panel energy rows (owner ruling 2026-10-23, #5091 follow-up 3: 'Food-plan grader: energy rows grade against the 1,500 target. The 1,600/1,800 lines show as warnings, not failures'): day_floors_held and week_mean_floor grade against the day's target and the week's mean target while the charter's nutrition.calories.floor_role is warning, the floor gaps shown as warnings in the evidence; week_balanced grades the no-payback training-day rule (follow-up 2: lifting days +150, rest days not paid back below the target)"}
   ],
   "scale": {"min": 0, "max": 10},
   "letters": [
@@ -46,7 +47,7 @@
           {"id": "target_resolved", "by": "code", "check": "calorie_target_resolved", "text": "every day's total comes from the one resolver, so the day's number is the plan, not a meal rule"},
           {"id": "split_accounts", "by": "code", "check": "split_accounts_for_kcal", "text": "each day's protein, fat and carbohydrate add up to the day's calories"},
           {"id": "protein_range", "by": "code", "check": "protein_range_every_day", "text": "the protein range is the one fixed priority every day"},
-          {"id": "steady_week", "by": "code", "check": "week_balanced", "text": "the week averages its base target, so one day over is paid back inside the week"},
+          {"id": "steady_week", "by": "code", "check": "week_balanced", "text": "the week follows the training-day rule: a lifting day is the target plus the uplift and no rest day is paid back below the target"},
           {"id": "flexibility", "by": "judge", "text": "the plan sets totals and a protein priority and leaves the food inside them flexible, so the week holds on an imperfect day without a rule broken"}
         ]
       },
@@ -65,8 +66,8 @@
         "criteria": [
           {"id": "fibre_and_floors", "by": "code", "check": "macro_floors_held", "text": "the fibre floor is carried and the carbohydrate and fat floors hold, so the plan is not built on low-volume food"},
           {"id": "rhythm", "by": "code", "check": "four_feedings_planned", "text": "a fixed feeding rhythm every day"},
-          {"id": "no_crash_day", "by": "code", "check": "day_floors_held", "text": "no day sits under its calorie floor"},
-          {"id": "steady_week", "by": "code", "check": "week_balanced", "text": "the week averages its base target with no day left unpaid"},
+          {"id": "no_crash_day", "by": "code", "check": "day_floors_held", "text": "no day sits under its calorie target (while the charter's floors are warnings the 1,600 / 1,900 floor gap is shown, not scored)"},
+          {"id": "steady_week", "by": "code", "check": "week_balanced", "text": "every day follows the training-day rule: lifting days fuelled above the target, no rest day paid back below it"},
           {"id": "environment", "by": "judge", "text": "the plan makes the default choice the easy one: satiating, high-volume, minimally processed food at the planned feedings, and nothing in it depends on willpower at the hungriest hour"}
         ]
       },
@@ -83,8 +84,8 @@
       "obesity_medicine": {
         "school": "obesity medicine",
         "criteria": [
-          {"id": "day_floors", "by": "code", "check": "day_floors_held", "text": "every day holds its floor (the lifting-day floor on a lifting day)"},
-          {"id": "week_floor", "by": "code", "check": "week_mean_floor", "text": "the week's mean holds the seven-day floor"},
+          {"id": "day_floors", "by": "code", "check": "day_floors_held", "text": "every day holds its calorie target (while the charter's floors are warnings the any-day and lifting-day floor gaps are shown, not scored)"},
+          {"id": "week_floor", "by": "code", "check": "week_mean_floor", "text": "the week's mean holds its target (while the charter's floors are warnings the seven-day floor gap is shown, not scored)"},
           {"id": "bounded_steps", "by": "code", "check": "titration_step_bounded", "text": "a titration step stays inside the step cap and never under the planned minimum"},
           {"id": "steps_before_food", "by": "code", "check": "steps_before_food", "text": "food comes down only with the step floor met (steps before food)"},
           {"id": "sustainable_pace", "by": "judge", "text": "the pace and the floors read as something a person can hold for months, with every cut earned by the trend and none taken on a hunch"}
@@ -106,7 +107,7 @@
           {"id": "rhythm", "by": "code", "check": "four_feedings_planned", "text": "the same feeding rhythm every day"},
           {"id": "small_changes", "by": "code", "check": "titration_step_bounded", "text": "a change to the target is small and bounded"},
           {"id": "reasons", "by": "code", "check": "numbers_carry_their_reason", "text": "every day's number carries its source and the charter version, and a titration decision carries its reason"},
-          {"id": "steady_week", "by": "code", "check": "week_balanced", "text": "the week balances, so a lifting day is not a debt"},
+          {"id": "steady_week", "by": "code", "check": "week_balanced", "text": "a lifting day is not a debt: no rest day is paid back below the target"},
           {"id": "repeatable", "by": "judge", "text": "the plan is a few repeatable rules rather than perfection: a missed feeding or a hard day has an obvious way back, and nothing in it is framed as failure"}
         ]
       },

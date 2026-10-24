@@ -15,7 +15,8 @@ WHAT LIVES HERE (and what does not)
 This repo is public. The constraint's clinical specifics stay owner-only in platform memory (the row
 named by `memory_sk`); this module carries only what the draft path has to ACT on — the date it took
 effect, that it invalidates HR-derived tiers, that it forbids HR prescriptions, and the gate's two RPE
-caps — each with its provenance (ADR-105). The stop list itself is read from the memory row at draft
+caps — each with its provenance (ADR-105). The caps are retired from `lifting_caps_retired_from` on
+(#5167, owner ruling 2026-10-23: the date split); from then the gate cues the charter's effort ceilings. The stop list itself is read from the memory row at draft
 time (`mcp.draft_standing_constraint.read_standing_constraint`); this module only says which numbered rule
 of that row carries it. Pure: no I/O, no boto3, stdlib only.
 
@@ -49,8 +50,14 @@ STANDING_CONSTRAINTS: list[dict[str, Any]] = [
         # The intensity half of this constraint (the cardio "no push" rule) is retired from this day on:
         # the owner ruling of 2026-10-18 (ruling 7) and his guidance record of the same day open intervals
         # and conditioning, prescribed by RPE / talk test. The HR half (no HR-derived tier, no HR target)
-        # stays in force. The lifting gate (`gate_lines`) is #5167's to retire (owner-gated).
+        # stays in force.
         "intensity_gate_retired_from": "2026-10-18",
+        # #5167 (owner ruling 2026-10-23: the date split, under his 2026-10-18 ruling 7): the lifting half's two RPE caps
+        # (`gate`) are retired from this day — a draft dated on/after it cues effort from the charter's `effort_ceilings`
+        # and stashes no cap below them; a draft dated before it is byte-identical to what it was. The day is the first
+        # after the rulings (the five-day cut-over's own day, `program_structure.SESSION_SEQUENCE.cutover.on`), so the
+        # owner's own hand-built 2026-10-18 routine — the pinned regression fixture — keeps its caps as he wrote them.
+        "lifting_caps_retired_from": "2026-10-19",
         "gate": {
             "kind": "ecg_and_feel",
             "sinus_rpe_cap": 8,
@@ -66,6 +73,7 @@ STANDING_CONSTRAINTS: list[dict[str, Any]] = [
             "sinus_rpe_cap": "owner — the 2026-10-18 brief §A2 / issue #5000 (the plan as written, every set at RPE 8 or below)",
             "cardio_minutes": "owner-history — the hand-built 2026-10-18 routine (014e1142…): recumbent, 20 min",
             "intensity_gate_retired_from": "owner — ruling 7 of 2026-10-18 (#5067): intervals and conditioning open, by RPE / talk test",
+            "lifting_caps_retired_from": "owner — ruling of 2026-10-23 on #5167 (the date split: no caps from the retirement day, older drafts byte-identical)",
         },
     },
 ]
@@ -117,24 +125,72 @@ def talk_test_pick(pick: dict[str, Any], constraint: dict[str, Any] | None) -> d
     return out
 
 
-def gate_cue(constraint: dict[str, Any]) -> str:
-    """The one-line per-lift cue under the gate (replaces the band-keyed 🟢/🟡/🔴 line)."""
+def lifting_caps_active(constraint: dict[str, Any] | None, target_date: str | None) -> bool:
+    """True when the gate's two lifting RPE caps still bind a draft dated `target_date` (#5167).
+
+    False from the entry's `lifting_caps_retired_from` day on. `target_date` None (a caller that names
+    no day) keeps the caps — the pre-#5167 output, never a silently dropped cap."""
+    if not constraint:
+        return False
+    retired = constraint.get("lifting_caps_retired_from")
+    return not (retired and target_date and str(target_date)[:10] >= str(retired))
+
+
+def _band(ceilings: dict[str, Any] | None, key: str) -> str | None:
+    band = (ceilings or {}).get(key)
+    return f"{band[0]:g}–{band[1]:g}" if band else None
+
+
+def charter_effort_text(ceilings: dict[str, Any] | None) -> str:
+    """The charter's class bands in words (`effort_ceilings.class_bands()`, passed in — this module reads nothing)."""
+    comp, last = _band(ceilings, "compounds_rpe"), _band(ceilings, "last_isolation_set_rpe")
+    parts = ([f"compounds RPE {comp}"] if comp else []) + ([f"last isolation set RPE {last}"] if last else [])
+    return "the charter effort ceilings" + (
+        f" ({', '.join(parts)})" if parts else " (the charter could not be read — use the plan's own cues)"
+    )
+
+
+def gate_cue(constraint: dict[str, Any], target_date: str | None = None, ceilings: dict[str, Any] | None = None) -> str:
+    """The one-line per-lift cue under the gate (replaces the band-keyed 🟢/🟡/🔴 line).
+
+    From `lifting_caps_retired_from` on (#5167) it names the charter's compound band and no cap."""
+    if not lifting_caps_active(constraint, target_date):
+        comp = _band(ceilings, "compounds_rpe")
+        return (f"RPE {comp} (charter compound ceiling)" if comp else "the charter compound ceiling") + " · no standing-constraint cap"
     g = constraint["gate"]
     return f"≤ RPE {g['sinus_rpe_cap']} (sinus rhythm) · ≤ RPE {g['not_sinus_rpe_cap']} (ECG not sinus, or feel off)"
 
 
-def gate_lines(constraint: dict[str, Any], stop_list: str | None, green_withheld: str | None) -> list[str]:
+def gate_lines(
+    constraint: dict[str, Any],
+    stop_list: str | None,
+    green_withheld: str | None,
+    target_date: str | None = None,
+    ceilings: dict[str, Any] | None = None,
+) -> list[str]:
     """The ECG + feel gate for the first exercise's notes, in place of the Whoop-band block.
 
-    `stop_list` None (the memory row could not be read) is NAMED, never silently dropped."""
+    `stop_list` None (the memory row could not be read) is NAMED, never silently dropped. From
+    `lifting_caps_retired_from` on (#5167) the two branches carry no RPE cap: sinus → the plan at the
+    charter's ceilings; not sinus → accessories and cardio optional. The ECG check, the stop list and
+    the HR half are unchanged."""
     g = constraint["gate"]
     since = constraint["active_from"]
     stop = stop_list or f"the stop list in platform memory ({since}) could not be read — re-read it before you train"
+    if lifting_caps_active(constraint, target_date):
+        branches = [
+            f"• Sinus rhythm + feel fine → the plan as written, every set ≤ RPE {g['sinus_rpe_cap']}.",
+            f"• ECG not sinus, or feel off → every set ≤ RPE {g['not_sinus_rpe_cap']}; accessories and cardio optional.",
+        ]
+    else:
+        branches = [
+            f"• Sinus rhythm + feel fine → the plan as written, at {charter_effort_text(ceilings)}.",
+            "• ECG not sinus, or feel off → accessories and cardio optional.",
+        ]
     lines = [
         f"— GATE: ECG + FEEL (Whoop bands invalid since {since}) —",
         "Take an ECG before you leave.",
-        f"• Sinus rhythm + feel fine → the plan as written, every set ≤ RPE {g['sinus_rpe_cap']}.",
-        f"• ECG not sinus, or feel off → every set ≤ RPE {g['not_sinus_rpe_cap']}; accessories and cardio optional.",
+        *branches,
     ]
     if green_withheld:
         lines.append(f"• No 🟢 this week — {green_withheld}.")

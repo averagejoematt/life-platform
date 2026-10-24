@@ -1122,16 +1122,17 @@ def test_nutrition_absent_says_nothing_was_logged():
 
 
 def test_nutrition_macro_grid_arithmetic():
-    mf = {"total_calories_kcal": 2080, "total_protein_g": 185.4, "total_fat_g": 55.2, "total_carbs_g": 120.6, "total_fiber_g": 31.4}
+    mf = {"total_calories_kcal": 1485, "total_protein_g": 185.4, "total_fat_g": 55.2, "total_carbs_g": 120.6, "total_fiber_g": 31.4}
     html = _training(data=_data(macrofactor=mf))
-    assert ">2,080</p>" in html  # fmt_num
+    assert ">1,485</p>" in html  # fmt_num
     assert f"Calories/{hb.target_kcal()}" in html  # the ONE calorie target ships with the number (#4540, #5095)
     assert ">185g</p>" in html  # round(185.4)
     assert f"Protein/{hb.PLAN_DAILY_PROTEIN_MIN_G}g" in html
     assert ">55g</p>" in html and ">121g</p>" in html  # round(55.2), round(120.6)
     assert "Fiber: 31g" in html
-    # cal_pct = round(2080 / 2100 * 100) = 99 -> inside 85..110 -> green (#5095: the ONE target, 2,100 at charter v1.8.0)
-    assert hb.target_kcal() == 2100
+    # cal_pct = round(1485 / 1500 * 100) = 99 -> inside 85..110 -> green (#5095: the ONE target, ~1,500 since charter
+    # 1.21.0, owner ruling 2026-10-23 R1)
+    assert hb.target_kcal() == 1500
     # prot_pct = round(185.4 / 170 * 100) = round(109.06) = 109 -> >= 95 -> green
     assert html.count("#22c55e") >= 2
 

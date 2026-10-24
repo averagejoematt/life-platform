@@ -288,3 +288,35 @@ def _eval_liveness(table, Check, tier, pt_now, ledger_pk, name, what, lookback_d
     else:
         c.ok(f"{name} nudge evaluated on each of the last {len(days)} completed day(s)")
     return [c]
+
+
+# #5211: the next-morning check-in / intake pair writer's dead-man. ``scenario-explorer`` (12:10Z) writes
+# ``checkin_intake_pairs / DATE#<previous Pacific day>`` EVERY run, with or without a check-in (``has_checkin``), so a
+# completed day with no row means the writer stopped or failed. The QA run is 18:30Z, after the writer.
+CHECKIN_PAIR_PK = "USER#matthew#SOURCE#checkin_intake_pairs"  # = health.checkin_intake_pairs.PK (contract test)
+CHECKIN_PAIR_ARMED_ON = "2026-10-27"  # first Pacific day a row can exist for (the row lands the morning after the deploy)
+
+
+def check_checkin_pair_liveness(table, Check, tier, pt_now, *, lookback_days=STEPS_LOOKBACK_DAYS, armed_on=CHECKIN_PAIR_ARMED_ON):
+    c = Check("checkin_pair:day_row_liveness", "Data Freshness", tier)
+    today = pt_now().date()
+    days = [d for d in ((today - timedelta(days=n)).isoformat() for n in range(1, lookback_days + 1)) if d >= armed_on]
+    if not days:
+        c.ok(f"check-in pair writer pending: armed on {armed_on}, no completed day to judge yet")
+        return [c]
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(CHECKIN_PAIR_PK) & Key("sk").between(f"DATE#{min(days)}", f"DATE#{max(days)}")
+        )
+        have = {str(r.get("sk"))[len("DATE#") :] for r in resp.get("Items") or []}
+    except Exception as exc:  # noqa: BLE001
+        c.fail(f"check-in pair rows - DDB error: {exc}")
+        return [c]
+    missing = [d for d in days if d not in have]
+    if missing:
+        c.fail(
+            f"check-in pair row missing for {len(missing)} completed day(s): {', '.join(sorted(missing))} (#5211 - scenario-explorer's step did not write)"
+        )
+    else:
+        c.ok(f"check-in pair row present for each of the last {len(days)} completed day(s)")
+    return [c]

@@ -45,8 +45,35 @@
           "reconciliation_ratio": {
             "type": "number"
           },
+          "residual_labels_since": {
+            "type": "string"
+          },
+          "residual_note": {
+            "type": "string"
+          },
+          "unattributed_before_labels_usd": {
+            "type": "number"
+          },
+          "unattributed_by_day": {
+            "items": {
+              "keys": {
+                "date": {
+                  "type": "string"
+                },
+                "usd": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 8,
+            "type": "array"
+          },
           "unattributed_label": {
             "type": "string"
+          },
+          "unattributed_since_labels_usd": {
+            "type": "number"
           },
           "unattributed_usd": {
             "type": "number"

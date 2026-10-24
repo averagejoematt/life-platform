@@ -672,16 +672,19 @@ def test_4408_the_ramp_still_fires_on_a_novel_again_anchor():
 
 def test_4408_generator_planner_and_chat_gate_read_one_held_number():
     """#4149: the generator writes the held load, the planner shows it, and the chat gate derives
-    the same floor from the drafted sets — so the generator's own draft commits."""
+    the same floor from the drafted sets — so the generator's own draft commits. Replayed on upper-heavy as it was served
+    on 09-29, with the press (#5162 moved it to shoulders+arms on 2026-10-23; `served_templates_5162`)."""
     import types
+
+    from served_templates_5162 import pre_5162_upper_days
 
     from mcp.hevy_prescription_gate import prescription_gate
 
     history, rows = _wire_history()
-    with patch.object(routine_generator, "_load_note_indexes", return_value=(history, WIRE_WEIGHTS, {}, {})):
+    with pre_5162_upper_days(), patch.object(routine_generator, "_load_note_indexes", return_value=(history, WIRE_WEIGHTS, {}, {})):
         ideal = routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date="2026-09-29", block_workouts=rows))[0]
+        rx = program_structure.planned_session("2026-09-29", block_workouts=rows, catalog_movements=MOVEMENTS)["prescription"]
     assert _top(ideal, BENCH) == pytest.approx(205 * LB, abs=0.01)
-    rx = program_structure.planned_session("2026-09-29", block_workouts=rows, catalog_movements=MOVEMENTS)["prescription"]
     load_ramp.annotate_prescription(rx, MOVEMENTS, history, WIRE_WEIGHTS, target_date="2026-09-29", week=1)
     planned = {e["movement_key"]: e["load"]["top_kg"] for e in rx["exposures"]}
     assert planned[BENCH] == _top(ideal, BENCH) and planned["db_shoulder_press"] == pytest.approx(52.5 * LB, abs=0.01)

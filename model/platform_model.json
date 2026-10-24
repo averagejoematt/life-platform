@@ -120,6 +120,12 @@
       "stack": "monitoring_budget_alarms",
       "via": "declaration"
     },
+    "calibration-deadman": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "mcp_stack",
+      "via": "declaration"
+    },
     "canary-no-invocations-1h": {
       "kind": "metric",
       "routing": "digest",
@@ -1017,7 +1023,7 @@
   ],
   "cost_surface": {
     "ai_features": 30,
-    "alarms": 140,
+    "alarms": 141,
     "emf_namespaces": 33,
     "schedules": 96,
     "secrets": 30
@@ -2914,13 +2920,6 @@
       "via": "fixed-seam"
     },
     {
-      "direction": "unknown",
-      "lambda": "partner-weekly-email",
-      "module": "lambdas/emails/partner_email_lambda.py",
-      "partition": "notion",
-      "via": "pk"
-    },
-    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/emails/podcast_script_v2.py",
@@ -2932,6 +2931,13 @@
       "lambda": null,
       "module": "lambdas/emails/podcast_script_v2.py",
       "partition": "panelcast",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/emails/protein_nudge_runner.py",
+      "partition": "apple_health",
       "via": "pk"
     },
     {
@@ -3148,6 +3154,13 @@
       "direction": "unknown",
       "lambda": null,
       "module": "lambdas/health/checkin_intake_pairs.py",
+      "partition": "checkin_intake_pairs",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/health/checkin_partner_view.py",
       "partition": "checkin_intake_pairs",
       "via": "pk"
     },
@@ -3971,6 +3984,20 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/operational/nudge_ledger_qa.py",
+      "partition": "checkin_intake_pairs",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/operational/nudge_ledger_qa.py",
+      "partition": "checkin_intake_pairs",
+      "via": "pk"
+    },
+    {
       "direction": "write",
       "lambda": "pipeline-health-check",
       "module": "lambdas/operational/pipeline_health_check_lambda.py",
@@ -4095,6 +4122,13 @@
       "module": "lambdas/training/calibration_cadence.py",
       "partition": "dexa",
       "via": "local-seam"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/calibration_cadence.py",
+      "partition": "food_delivery",
+      "via": "pk"
     },
     {
       "direction": "read",
@@ -8005,13 +8039,13 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead"
     },
     "counts": {
-      "alarms": 140,
+      "alarms": 141,
       "alarms_by_routing": {
         "digest": 96,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
-        "urgent": 26,
+        "urgent": 27,
         "via-composite": 3
       },
       "alarms_composite": 4,
@@ -8019,12 +8053,12 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 776,
+      "edges": 780,
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
       "partitions": 121,
-      "privacy_fields_owner_only": 67,
+      "privacy_fields_owner_only": 68,
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 23,
       "privacy_sources_owner_published": 3,
@@ -8033,9 +8067,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 378,
-        "sites_resolved": 977,
-        "sites_total": 1355
+        "sites_dynamic": 380,
+        "sites_resolved": 981,
+        "sites_total": 1361
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8086,6 +8120,7 @@
       "ingestion": true,
       "method": "Health Auto Export webhook, near-real-time",
       "owner_only_fields": [
+        "_rd_protein_hae",
         "_rd_sleep_apple",
         "breathing_disturbances_apple",
         "sleep_awake_min_apple",
@@ -8347,7 +8382,7 @@
       "category": "Manual logs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "Manual log (paused: no orders logged since March)",
+      "method": "Manual CSV upload every ~6 months (an upload ritual, paused between uploads; reminder via the calibration cadence)",
       "privacy_tier": "public",
       "stale_hours": 336
     },
@@ -8819,6 +8854,7 @@
     "default": "public \u2014 an unlisted source/field is TIER_PUBLIC by omission (field_tiers.py's stated rule)",
     "fields": {
       "apple_health": {
+        "_rd_protein_hae": "owner_only",
         "_rd_sleep_apple": "owner_only",
         "breathing_disturbances_apple": "owner_only",
         "cardio_recovery_bpm_apple": "internal",

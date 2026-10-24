@@ -234,7 +234,7 @@ Currently serves one user's data. Multi-user website options:
 |-----------|----------------------|-------------|--------------|
 | DynamoDB (on-demand) | ~$0.50 | ~$5 | ~$50 |
 | Lambda compute | ~$0.30 | ~$3 | ~$30 |
-| AI calls (Anthropic) | ~$3.00 | ~$30 | ~$300 |
+| AI calls (Anthropic) | ~$3.00 | ~$30 | ~$300 <!-- drift-ok: a multi-user cost projection, not the budget ceiling --> |
 | S3 storage | ~$0.05 | ~$0.50 | ~$5 |
 | SES emails | ~$0.10 | ~$1 | ~$10 |
 | CloudFront | ~$0.10 | ~$1 | ~$10 |

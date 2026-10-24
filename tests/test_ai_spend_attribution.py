@@ -141,13 +141,30 @@ def test_metric_period_exact_multiple_unchanged():
 
 def test_metric_period_rounds_up_never_down():
     start = datetime(2026, 6, 1, tzinfo=timezone.utc)
-    assert asa._metric_period(start, start + timedelta(seconds=61)) == 120
+    assert asa._metric_period(start, start + timedelta(seconds=61)) == 3600
+    assert asa._metric_period(start, start + timedelta(seconds=3601)) == 7200
 
 
-def test_metric_period_floor_60_for_degenerate_windows():
+def test_metric_period_floor_for_degenerate_windows():
     start = datetime(2026, 6, 1, tzinfo=timezone.utc)
-    assert asa._metric_period(start, start) == 60
-    assert asa._metric_period(start, start + timedelta(seconds=5)) == 60
+    assert asa._metric_period(start, start) == 3600
+    assert asa._metric_period(start, start + timedelta(seconds=5)) == 3600
+
+
+def test_metric_period_is_a_multiple_of_the_coarsest_retention_resolution():
+    """#5136: a Period that is a multiple of 60 but not of 300 (data 15-63 days old) or
+    3600 (older) does not error — CloudWatch silently returns only the recent datapoints.
+    The October 2026 run lost $30.72 of the `unknown` row and half the AWS/Bedrock total
+    that way. NEGATIVE CONTROL: reverting the rounding to 60 turns this red (verified).
+    One test over every window, reporting all offenders (one census gate, not twelve)."""
+    offenders = []
+    for now in _ARBITRARY_NOWS:
+        for offset_s in (1, 41, 3599, 86399):
+            start = now - timedelta(days=40, seconds=offset_s)
+            period = asa._metric_period(start, now)
+            if period % 3600 or period < (now - start).total_seconds():
+                offenders.append((now.isoformat(), offset_s, period))
+    assert not offenders, offenders
 
 
 # ── stubbed CloudWatch end-to-end ────────────────────────────────────────────

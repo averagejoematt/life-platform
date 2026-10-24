@@ -41,6 +41,7 @@ from boto3.dynamodb.conditions import Key
 from coach import persona_registry
 from common import quarter_utils
 from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor (#1691 freshness class)
+from common.journal_silence import public_body  # #5131: the one public-surface guard
 from common.numeric import decimals_to_float, floats_to_decimal
 from common.pacific_time import pacific_today
 from experiment import calibration_core
@@ -452,7 +453,7 @@ def lambda_handler(event: dict, context) -> dict:
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=OUTPUT_KEY,
-        Body=json.dumps(payload).encode("utf-8"),
+        Body=public_body(json.dumps(payload).encode("utf-8"), "application/json"),
         ContentType="application/json",
         CacheControl="max-age=3600",
     )

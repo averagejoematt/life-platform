@@ -28,7 +28,10 @@ REPO = os.path.dirname(_HERE)
 sys.path.insert(0, os.path.join(REPO, "lambdas"))
 
 from health.rhythm_channel import CHANNEL_FIELDS as RHYTHM_CHANNEL_FIELDS  # noqa: E402
-from ingestion import health_auto_export_sleep as _apple_sleep  # noqa: E402
+from ingestion import (
+    health_auto_export_protein as _hae_protein,  # noqa: E402
+    health_auto_export_sleep as _apple_sleep,  # noqa: E402
+)
 from privacy.field_tiers import (  # noqa: E402
     FIELD_TIERS,
     OWNER_CONSENT_ADR,
@@ -84,7 +87,10 @@ ROW_MAP: list[dict] = [
             ("field", "apple_health", "wrist_temp_sleep_c_apple"),
             ("field", "apple_health", "breathing_disturbances_apple"),
             # #4971: the Apple Watch's own night — derived from the writer's field tuple.
-            *(("field", "apple_health", f) for f in (*_apple_sleep.APPLE_SLEEP_FIELDS, _apple_sleep.RD_FIELD)),
+            *(
+                ("field", "apple_health", f)
+                for f in (*_apple_sleep.APPLE_SLEEP_FIELDS, _apple_sleep.RD_FIELD, *_hae_protein.HAE_PROTEIN_FIELDS)
+            ),
         ],
     },
     {

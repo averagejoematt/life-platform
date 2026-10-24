@@ -1326,14 +1326,21 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "desc": "Delivery behavioral signal",
         "category": "Manual logs",
         "behavioral": True,
-        # 14 days (was 90 — masked a 77-day gap, 2026-03-13 triage).
+        # 14 days (was 90 — masked a 77-day gap, 2026-03-13 triage). Deliberately NOT a
+        # `cadence_months` source although the upload is 6-monthly (#5006/#5108, owner ruling
+        # 2026-10-23): this number is also how long the stored STREAK#current stays an honest
+        # live-sounding claim after an upload (#2235), and a derived 6-month threshold would loosen
+        # that. The 6-month UPLOAD cadence is the charter's `nutrition.food_delivery.upload_every_months`,
+        # read by training.calibration_cadence's `food_delivery_upload` reminder row.
         "stale_hours": 14 * 24,
         "active_api": False,
         "expected_days": None,
         "qa_tier": None,
-        "method": "Manual log (paused: no orders logged since March)",
+        "method": "Manual CSV upload every ~6 months (an upload ritual, paused between uploads; reminder via the calibration cadence)",
         "metrics": "Delivery-order behavioral signal (incl. longest-ever streak)",
-        # PAUSED 2026-10-19 (#5108/#5006; built on the evidence, pending the owner's confirmation):
+        # PAUSED 2026-10-19 (#5108/#5006). Owner ruling 2026-10-23: it STAYS paused between uploads, so an
+        # upload writes its rows but never un-pauses the source (the reminder, not a live read, is the ritual).
+        # The evidence the pause was built on:
         # no delivery orders logged since 2026-03-28 (>200 days; the only S3 imports are the
         # 03-28 backfill CSVs). ADR-074 posture: off by design, shown as paused, never counted
         # stale, never a coach check-in context, no nudge, no "dark N days" stamp, and
