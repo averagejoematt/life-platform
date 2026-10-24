@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.27.0",
+  "version": "1.28.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -182,6 +182,13 @@
       "date": "2026-10-24",
       "by": "owner rulings 2026-10-23 (attended, Session CD): R3 'yes: the trip is a planned maintenance week, so the travel kit is needed by mid-December' (#5104, #5107); R6 'meal service on weekdays, the code-built menu at weekends'; R7 'no excluded foods'",
       "what": "#5104 N10: nutrition.travel_food, the travel food kit's dates and rulings: ready_by 2026-12-15 (mid-December), the owner-only reminder prompt_days_before_ready 14 days earlier and its dead-man on ready_by while the trip dates are still unset (training.calibration_cadence, kind travel_food_kit), retire_after once the trip is past, default_trip_days (the kit's length until travel.windows carries dates) and spare_days of packed food. The day plan, grocery list, packing list and hotel/restaurant playbook are built by code (health.travel_food) from the existing protein, floor, eating-window and calorie numbers; disruption mode carries the playbook on a travel template. travel.windows' late-December entry names the kit. No new target number.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.28.0",
+      "date": "2026-10-24",
+      "by": "the mind panel review 2026-10-18 (#5121, epic #5120); no new owner ruling: every new number is a platform default named as one, pending his ruling, except the two the owner's own words in config/user_goals.json failure_mode.early_warning_signals already state (under 3 sessions a week for 2 weeks; the weight trend reversing up over 7 days), which are restated here with that provenance",
+      "what": "#5121: early_warning, the relapse early-warning detector's thresholds as data (health.early_warning, run nightly by daily-insight-compute): min_signals 2 (two lapse signals together raise ONE owner-only flag, one alone never does), lookback_days 60 (a channel with no record inside it is absent, never silent), and six signals beside the four the detector already read: weigh_in_cadence (3 days without a weigh-in), food_log_gap (2 of the last 3 days under the titration rule's complete-log line), step_drop (the 7-day mean 35% or more under the 28 days before, n 5 and 14), checkin_silence (3 evenings with no answered check-in after at least one answered), weight_reversal (the 7-day weigh-in mean 1 lb or more above the 7 days before, n 3 each) and sessions_below_plan (under 3 Hevy sessions in each of the last 2 weeks). The flag is owner-only: stored in USER#matthew#SOURCE#early_warning_flag, sent by the response owner (failure_mode.response_owner) on the owner's own Telegram seat, never on a published surface and never in the shared brief context.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -502,6 +509,22 @@
     "step_back_up": {"days": 7, "serves": "the minimum session at the club", "then": "the full split"},
     "offer": {"travel_lead_days": 3, "missed_session_days": 4},
     "max_days": 28
+  },
+  "early_warning": {
+    "rule": "two or more lapse signals active together raise ONE private flag; one signal alone never does. The flag is owner-only (no published surface, not the shared brief context) and the response owner (config/user_goals.json failure_mode.response_owner) answers it on the owner's own Telegram seat; the support contact hears nothing unless the owner opts in (epic #5120 R2, pending)",
+    "reader": "health.early_warning (daily-insight-compute writes USER#matthew#SOURCE#early_warning_flag; coach.coach_event_triggers sends it; the mind coach's thread reads it)",
+    "provenance": "platform defaults (the mind panel review 2026-10-18, #5121), pending an owner ruling; sessions_below_plan and weight_reversal restate the owner's own words in config/user_goals.json failure_mode.early_warning_signals",
+    "min_signals": 2,
+    "lookback_days": 60,
+    "lookback_rule": "a channel with no record inside lookback_days is absent, never silent: a source that was never used cannot stop",
+    "signals": {
+      "weigh_in_cadence": {"silent_days": 3, "source": "withings", "reads": "consecutive days ending on the evaluated day with no weigh-in"},
+      "food_log_gap": {"window_days": 3, "min_gap_days": 2, "source": "macrofactor", "complete_day_rule": "nutrition.titration.complete_logs.complete_day_min_kcal_path", "reads": "days in the window with no food log or one under the complete-log line"},
+      "step_drop": {"recent_days": 7, "baseline_days": 28, "min_drop_pct": 35, "min_recent_n": 5, "min_baseline_n": 14, "source": "common.metric_truth steps", "reads": "the recent mean against the mean of the baseline days immediately before it"},
+      "checkin_silence": {"silent_days": 3, "source": "evening_checkin", "reads": "consecutive evenings ending on the evaluated day with no answered check-in (any of hunger, stress, cravings), after at least one answered inside lookback_days"},
+      "weight_reversal": {"window_days": 7, "min_rise_lb": 1.0, "min_n_per_window": 3, "source": "withings", "reads": "the mean weigh-in of the last window_days against the window_days before it"},
+      "sessions_below_plan": {"min_sessions_per_wk": 3, "consecutive_weeks": 2, "source": "hevy", "plan_ref": "split.lifting_days_per_wk", "reads": "logged Hevy sessions in each trailing 7-day week ending on the evaluated day"}
+    }
   },
   "calibration": {
     "tape_and_photos": {"every_weeks": 2, "dead_man_missed_cycles": 2},

@@ -105,6 +105,7 @@ KIND_RECOVERY_SLIDE = "recovery_slide"
 # than the data. Same candidate shape, same claim, same sweep.
 KIND_PROMISE = "promise"
 KIND_PRE_EVENT = "pre_event"
+KIND_EARLY_WARNING = "early_warning"  # #5121: the response owner answers the relapse flag
 
 # ── Who owns the lane ─────────────────────────────────────────────────────────
 # The ping comes from the DOMAIN-OWNING coach (the #2490 acceptance bullet), and
@@ -434,6 +435,37 @@ def detect_calibration(block: dict, today: str) -> list:
     return events
 
 
+# ── Trigger 7 (#5121): the relapse early-warning flag, answered by its ONE owner ─────────
+
+
+def detect_early_warning(block: dict, today: str) -> Optional[dict]:
+    """One text per early-warning EPISODE, from the response owner, on the owner's own seat.
+
+    The flag is ``health.early_warning``'s (two lapse signals together; daily-insight-compute writes the
+    owner-only ``early_warning_flag`` row). Who answers is NOT this module's call: it is
+    ``failure_mode.response_owner`` (``coach.response_protocol``, #5126) — no owner, no text (fail dark). The
+    event id is the day the episode STARTED, so a flag that stays up re-derives the id it already spent; an
+    explicit clear day ends the episode and the next one is new. Concern provenance: a light check-in, never a
+    diagnosis — the protocol's first step is to acknowledge it, with empathy. Never the support contact (R2)."""
+    from health import early_warning
+
+    block = block or {}
+    owner = str(block.get("owner") or "").strip()
+    ep = early_warning.episode(block.get("rows") or [])
+    if not owner or ep is None or not _fresh(ep["latest"], today):
+        return None
+    lines = early_warning.evidence_lines(ep["row"])
+    evidence = [f"Lapse signals active together since {ep['start']} (latest reading {ep['latest']}):", *lines]
+    evidence.append("Two or more of these at once is the platform's early-warning line; one alone never raises it.")
+    return _event(
+        kind=KIND_EARLY_WARNING,
+        event_id=f"{KIND_EARLY_WARNING}#{ep['start']}",
+        provenance=coach_outbound.PROVENANCE_CONCERN,
+        persona_id=owner,
+        evidence=evidence,
+    )
+
+
 # ── Candidates ────────────────────────────────────────────────────────────────
 
 
@@ -472,6 +504,7 @@ def candidates(signals: dict, today: str) -> list:
         (detect_lift_pr, (signals or {}).get("lift_bests") or {}),
         (detect_milestone, (signals or {}).get("milestones") or []),
         (detect_calibration, (signals or {}).get("calibration") or {}),
+        (detect_early_warning, (signals or {}).get("early_warning") or {}),
     ):
         try:
             ev = detector(arg, today)
@@ -551,6 +584,17 @@ def gather_signals(table, today: str) -> dict:
         signals["calibration"] = calibration_cadence.read(table, today)
     except Exception as e:
         logger.warning("[event-triggers] calibration read failed: %s", type(e).__name__)
+
+    # #5121: the owner-only early-warning flag rows + the ONE coach who answers them (failure_mode.response_owner).
+    try:
+        from health import early_warning
+
+        from coach import response_protocol
+
+        rp = response_protocol.current() or {}
+        signals["early_warning"] = {"rows": early_warning.read_recent(table, today), "owner": rp.get("owner")}
+    except Exception as e:
+        logger.warning("[event-triggers] early-warning read failed: %s", type(e).__name__)
 
     return signals
 

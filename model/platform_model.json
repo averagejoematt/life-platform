@@ -8083,19 +8083,19 @@
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
-      "partitions": 121,
+      "partitions": 122,
       "privacy_fields_owner_only": 68,
       "privacy_fields_owner_published": 11,
-      "privacy_sources_owner_only": 23,
+      "privacy_sources_owner_only": 24,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 81,
       "schedules": 97
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 382,
+        "sites_dynamic": 386,
         "sites_resolved": 984,
-        "sites_total": 1366
+        "sites_total": 1370
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8325,6 +8325,11 @@
       "class": "system_state",
       "ingestion": false,
       "privacy_tier": "public"
+    },
+    "early_warning_flag": {
+      "class": "experiment_scoped",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
     },
     "effect_fits": {
       "class": "cross_phase",
@@ -8982,6 +8987,7 @@
       "clinical": "internal",
       "coach_vision": "owner_only",
       "dexa": "owner_published",
+      "early_warning_flag": "owner_only",
       "evening_checkin": "owner_only",
       "felt_probe": "owner_only",
       "fitness_tests": "owner_only",

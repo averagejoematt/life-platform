@@ -444,6 +444,9 @@ NOT_APPLICABLE: Dict[str, str] = {
     "only by training.fitness_tests and printed from the charter by the protocol card (tests/test_fitness_tests_5078.py)",
     "phase_after_may.plan_prompt": "the post-deadline plan prompt's weeks (#5130): owner-only, read only by "
     "training.phase_after_may (tests/test_phase_after_may_5130.py); no swept file names them",
+    "early_warning": "the relapse early-warning thresholds (#5121): read only by health.early_warning, outside this guard's "
+    "swept set (the training consumers); every expected number in tests/test_relapse_early_warning_5121.py is read from the "
+    "charter, and the owner's own failure_mode prose in config/user_goals.json names no swept pattern's noun",
     "nutrition": "outside this guard's swept set (the training consumers): every nutrition number has ONE reader with its own "
     "contract test — calories: health.calorie_target (tests/test_calorie_target_one_resolver_5095.py, which also sweeps "
     "lambdas/ mcp/ deploy/ scripts/ for a new 1,500 kcal literal); eating_window: health.eating_window "
