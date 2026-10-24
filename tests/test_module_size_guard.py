@@ -187,7 +187,9 @@ BASELINE = {
     # site_api_vitals.py (2559 by the time the slice ran) drained to a ~220-line facade
     # by #1654 — the handler logic now lives in cohesive
     # web/site_api_{body,journey,character,sleep,biomarkers}.py, each under the ceiling.
-    "lambdas/compute/daily_insight_compute_lambda.py": 1775,
+    # 1775 -> 1722 2026-10-24, #5121: the IC-5 detector extracted to health/early_warning.py (1770 -> 1710
+    # measured, 60 lines out); the #2610 earned-headroom rule keeps 60/5 = 12, the rest is handed back.
+    "lambdas/compute/daily_insight_compute_lambda.py": 1722,
     # 2409 -> 2424 (+15) 2026-08-09, #2351: find_days mode='similar' schema (mode/target_date/
     # features/k params + description). Deliberate feature addition, reasoned in the commit.
     #

@@ -53,8 +53,12 @@ from common.constants import PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's floor
 from common.habit_registry import habit_tier  # #5232
 from common.pacific_time import pacific_clock_label, pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
-from health import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
+from health import (
+    early_warning,  # #5121: the relapse early-warning detector (IC-5), owner-only
+    personal_baselines,  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
+)
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
+from health.early_warning import _t0_rate  # #2221's T0 reader, moved with the detector
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -119,15 +123,6 @@ def _are_consecutive_days(date_strs):
     except (TypeError, ValueError):
         return False
     return all((days[i] - days[i - 1]).days == 1 for i in range(1, len(days)))
-
-
-def _t0_rate(rec):
-    """Tier-0 habit completion (0..1) off a `habit_scores` row (#2221). `tier0_pct` is what
-    BOTH writers of that partition write (daily_brief_lambda's store_habit_scores +
-    daily_metrics_compute); `t0_completion_rate` is a legacy alias nothing has ever written.
-    None-aware: `a or b` read a MEASURED 0.0 day as absence, dropping it from averages (ADR-104)."""
-    val = safe_float(rec, "tier0_pct")
-    return val if val is not None else safe_float(rec, "t0_completion_rate")
 
 
 def fetch_date(source, date_str):
@@ -803,71 +798,7 @@ def analyze_intention_execution_gap(yesterday_str, profile):
 # ==============================================================================
 
 
-def detect_early_warning(computed_records_7d, habit_7d, declining):
-    """IC-5: Detect early warning state from simultaneous multi-marker deterioration.
-
-    Fires when 2+ of the following markers are active at once:
-      1. journal_sparse   — journal component < 50 for 2 of last 3 days
-      2. nutrition_gap    — nutrition component < 40 for 2 of last 3 days
-      3. habit_declining  — T0 completion dropped >=15pp (last-3d avg vs prior-4d avg)
-      4. recovery_sliding — recovery or readiness_score already in declining list
-
-    Returns: (warning_active: bool, markers: list[str], warning_block: str)
-    """
-    markers = []
-
-    sorted_recs = sorted(computed_records_7d, key=lambda x: x.get("date", ""))
-    recent_3 = sorted_recs[-3:] if len(sorted_recs) >= 3 else sorted_recs
-
-    # Markers 1-2: one rule, one table — component under its floor on 2+ of the last 3 days.
-    for marker, field, floor in (("journal_sparse", "journal", 50), ("nutrition_gap", "nutrition", 40)):
-        scores = [safe_float(r.get("component_scores", {}), field) for r in recent_3]
-        if sum(1 for s in scores if s is not None and s < floor) >= 2:
-            markers.append(marker)
-
-    # Marker 3: habit completion dropping
-    sorted_habits = sorted(habit_7d, key=lambda x: x.get("date", ""))
-    if len(sorted_habits) >= 4:
-        recent_h = sorted_habits[-3:]
-        prior_h = sorted_habits[-7:-3] if len(sorted_habits) >= 7 else sorted_habits[:-3]
-
-        def avg_completion(records):
-            vals = [v for v in (_t0_rate(r) for r in records) if v is not None]
-            return sum(vals) / len(vals) if vals else None
-
-        recent_comp = avg_completion(recent_h)
-        prior_comp = avg_completion(prior_h)
-        if recent_comp is not None and prior_comp is not None:
-            drop_pp = prior_comp - recent_comp  # positive = drop
-            if drop_pp >= 0.15:  # 15 percentage point drop
-                markers.append("habit_declining")
-
-    # Marker 4: recovery / readiness sliding (reuse declining list from detect_metric_trends)
-    declining_metrics = {d["metric"] for d in declining}
-    if "recovery" in declining_metrics or "readiness_score" in declining_metrics:
-        markers.append("recovery_sliding")
-
-    warning_active = len(markers) >= 2
-
-    warning_block = ""
-    if warning_active:
-        marker_labels = {
-            "journal_sparse": "journal tracking dropped off (2+ of last 3 days)",
-            "nutrition_gap": "nutrition score critically low (2+ of last 3 days)",
-            "habit_declining": "T0 habit completion dropped 15%+ this week",
-            "recovery_sliding": "recovery/readiness declining 3 consecutive days",
-        }
-        active_desc = [marker_labels[m] for m in markers if m in marker_labels]
-        warning_block = (
-            "\u26a0\ufe0f EARLY WARNING: Multiple deterioration markers active simultaneously:\n"
-            + "\n".join(f"  \u2022 {d}" for d in active_desc)
-            + "\nThis pattern often precedes broader health score decline. Address proactively."
-        )
-        logger.warning(f"IC-5 EARLY WARNING active: markers={markers}")
-    else:
-        logger.info(f"IC-5: No early warning (active markers: {markers})")
-
-    return warning_active, markers, warning_block
+# #5121: the detector moved whole to ``health.early_warning`` (``detect`` / ``run``) — the handler's 5c step calls ``run``.
 
 
 # ==============================================================================
@@ -2120,11 +2051,9 @@ def lambda_handler(event, context):
         logger.warning(f"IC-8 failed (non-fatal): {e}")
 
     # ── 5c. IC-5: Early Warning Detection ──
-    ic5_warning, ic5_markers, early_warning_block = False, [], ""
-    try:
-        ic5_warning, ic5_markers, early_warning_block = detect_early_warning(computed_7d, habit_7d, declining)
-    except Exception as e:
-        logger.warning(f"IC-5 failed (non-fatal): {e}")
+    # #5121: ten markers, two together raise ONE owner-only flag, stored as SOURCE#early_warning_flag for the
+    # response owner's Telegram seat (failure_mode.response_owner). Fail-soft inside; never the brief context.
+    ic5_warning, ic5_markers = early_warning.run(table, fetch_range, yesterday_str, computed_7d, habit_7d, declining, USER_PREFIX)
 
     # ── 5d. IC-19: Slow Drift Detection (non-fatal) ──
     slow_drift_metrics = []
@@ -2303,7 +2232,7 @@ def lambda_handler(event, context):
         synergy_health,
         memory_ctx,
         intention_gap_ctx,
-        early_warning_block,
+        "",  # #5121: the early-warning flag is owner-only — the shared brief context (TL;DR = homepage pull-quote) never carries it
         slow_drift_metrics=slow_drift_metrics,
         experiment_ctx=experiment_ctx,
         social_flag=social_flag,
