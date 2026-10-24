@@ -21,7 +21,17 @@ registry entry — never one `registry_without_live` plus one `live_without_regi
 The id match is read from the journal entries' `id`; an entry with no `habitify_id` (or a
 fixture with no ids) falls back to the name rule above.
 
-Exit 1 when any of the three is non-zero, 0 otherwise.
+#5124 (M4, the core-12 calculation set): the charter's `habits.core` names twelve core habits; a
+Habitify-basis one is read from the registry entries whose `core` field is its id (the charter never
+names an entry — habit names are owner data). The check reports, as COUNTS too:
+
+  core_flag_unknown       an entry flagged with an id the charter does not carry (or a derived-basis id)
+  core_flag_inactive      a flagged entry whose status is not active (it can never be read)
+  core_ids_unflagged      a Habitify-basis core id no active entry carries — DRIFT ONLY ONCE ARMED
+                          (any entry flagged): before the owner flags the set, the score is the
+                          tier-weighted read and the check prints `CORE-SET: UNARMED`, not a failure
+
+Exit 1 when any of the drift counts is non-zero, 0 otherwise.
 
 Modes:
   --fixture PATH   offline, fixture-driven: a JSON file with `journal` (the vendor's
@@ -45,7 +55,17 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DRIFT_KEYS = ("live_without_registry", "registry_without_live", "bridge_without_live")
+DRIFT_KEYS = ("live_without_registry", "registry_without_live", "bridge_without_live", "core_flag_unknown", "core_flag_inactive")
+ARMED_DRIFT_KEYS = ("core_ids_unflagged",)  # #5124: drift only once the core set is armed
+
+
+def _core_habits():
+    """`health.core_habits` (the ONE core-set resolver), importable offline: it reads the charter file only."""
+    if str(ROOT / "lambdas") not in sys.path:
+        sys.path.insert(0, str(ROOT / "lambdas"))
+    from health import core_habits  # noqa: E402
+
+    return core_habits
 
 
 def live_names(journal) -> set[str]:
@@ -94,7 +114,10 @@ def drift_counts(live: set[str], registry, bridge_keys, ids: dict[str, str] | No
     def _bridge_live(key: str) -> bool:
         return key in live or any(key in names and _entry_live(i) for i, names in enumerate(entries))
 
+    core = _core_habits()
     return {
+        **core.flag_drift(registry),
+        "core_armed": int(core.is_armed(registry)),
         "live_habits": len(live),
         "registry_entries": len(entries),
         "bridge_keys": len(list(bridge_keys)),
@@ -151,7 +174,9 @@ def main(argv=None) -> int:
     else:
         for k, v in counts.items():
             print(f"{k}: {v}")
-    drifted = any(counts[k] for k in DRIFT_KEYS)
+    drifted = any(counts[k] for k in DRIFT_KEYS) or bool(counts["core_armed"] and any(counts[k] for k in ARMED_DRIFT_KEYS))
+    if not counts["core_armed"]:
+        print("CORE-SET: UNARMED (no registry entry carries a `core` flag; the score stays tier-weighted)")
     print("HABIT-REGISTRY-DRIFT: " + ("FAIL" if drifted else "OK"))
     return 1 if drifted else 0
 

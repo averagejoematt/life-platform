@@ -1027,7 +1027,7 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
     """
     try:
         hd = component_details.get("habits_mvp", {})
-        if not hd or hd.get("composite_method") != "tier_weighted":
+        if not hd or hd.get("composite_method") not in ("tier_weighted", "core_set"):  # #5124: core_set = the armed core-12
             return
 
         t0 = hd.get("tier0", {})
@@ -1060,7 +1060,7 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
             "pk": USER_PREFIX + "habit_scores",
             "sk": "DATE#" + date_str,
             "date": date_str,
-            "scoring_method": "tier_weighted_v1",
+            "scoring_method": "core_set_v1" if hd.get("composite_method") == "core_set" else "tier_weighted_v1",
             "composite_score": (
                 Decimal(str(component_scores.get("habits_mvp", 0))) if component_scores.get("habits_mvp") is not None else None
             ),
@@ -1082,6 +1082,10 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
             item["vice_streaks"] = json.loads(json.dumps(vice_streaks), parse_float=Decimal)
         if sg_pcts:
             item["synergy_groups"] = json.loads(json.dumps(sg_pcts), parse_float=Decimal)
+        # #5124: the core-12 calculation set's day — the same fields the primary writer stores (empty unarmed)
+        from health import core_habits
+
+        item.update(json.loads(json.dumps(core_habits.habit_scores_fields(hd.get("core"))), parse_float=Decimal))
         item = {k: v for k, v in item.items() if v is not None}
         # ADR-058 (#1814): phase-stamp — see store_day_grade above.
         from common.compute_metadata import tag_record

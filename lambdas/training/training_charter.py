@@ -84,6 +84,7 @@ PUBLISHED_WHITELIST: tuple[str, ...] = (
     "sleep.wake_time.every_day",
     "sleep.wake_time.weekends_included",
     "sleep.wake_time.hit",
+    "habits.core",  # #5124: the core-12 calculation set's ids, labels and bases (no reading, no registry name, nothing private)
     "nutrition.floors.fibre.floor_g",  # #5204: the one fibre floor the nutrition door and review email grade against (35 g, nothing private)
 )
 

@@ -693,15 +693,21 @@ def compute_mind_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[floa
 
     hs = data.get("habit_scores") or {}
 
-    # T0 habit compliance
-    t0_pct = _safe_float(hs, "tier0_pct")
+    # #5124: once the core-12 calculation set is armed, its day (`core_pct`, done over KNOWN core habits, written
+    # by health.core_habits.habit_scores_fields) IS the habit compliance: it fills BOTH habit components, so the
+    # pillar's habit weight is the core set's and no tier share is read — every other habit is retained and
+    # tracked, not scored. (Not None for t1: a behavioral component with no value scores 0 at full weight, ADR-104.)
+    core_set = hs.get("scoring_method") == "core_set_v1"
+
+    # T0 habit compliance (the core set's share when armed)
+    t0_pct = _safe_float(hs, "core_pct") if core_set else _safe_float(hs, "tier0_pct")
     if t0_pct is not None:
         scores["t0_habit_compliance"] = round(t0_pct * 100, 1) if t0_pct <= 1 else _clamp(t0_pct)
     else:
         scores["t0_habit_compliance"] = None
 
     # T1 habit compliance
-    t1_pct = _safe_float(hs, "tier1_pct")
+    t1_pct = _safe_float(hs, "core_pct") if core_set else _safe_float(hs, "tier1_pct")
     if t1_pct is not None:
         scores["t1_habit_compliance"] = round(t1_pct * 100, 1) if t1_pct <= 1 else _clamp(t1_pct)
     else:

@@ -24,7 +24,11 @@ from common.habit_pause import is_paused_on  # #5007: a paused habit is not sche
 from training.owner_redlines import REDLINES  # ADR-163: the walking floor the movement target defaults from
 from training.walking_volume import WALKING_VOLUME_VERSION, walking_minutes_for_day  # ADR-163: the ONE walking definition
 
-from health import macro_floors, protein_engine  # #5098: THE protein hit and the charter's range low
+from health import (
+    core_habits,  # #5124: THE core-12 calculation set
+    macro_floors,  # #5098: THE protein hit and the charter's range low
+    protein_engine,
+)
 from health.calorie_target import calorie_band, target_kcal  # #5095: the ONE calorie target; #5099: its band
 from health.habit_identity import day_name_for  # #4632: id first, then names, then ingest-derived aliases
 
@@ -312,6 +316,13 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
 
     applicable_days awareness: weekday-only habits don't penalize weekends.
     scoring_weight field allows down-weighting emerging-evidence habits.
+
+    #5124 (owner ruling 2026-10-18): once the registry is ARMED (any active entry carries a `core`
+    flag), the composite is the core-12 calculation set's — `health.core_habits.grade_day`, the share
+    of the day's KNOWN core habits done, each weighted equally — and `composite_method` is "core_set".
+    Every other habit is RETAINED: still read, still in `tier_status`/`vice_status`/the tier counts
+    (streaks and the per-habit readers are unchanged), just not scored. Unarmed, the tier-weighted
+    composite below is unchanged and `details["core"]["armed"]` is False.
     """
     habitify = data.get("habitify")
     if not habitify:
@@ -397,10 +408,13 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
     if type_drift:
         logger.warning("[habits] habit_registry fields not numeric, defaults used: %s", sorted(set(type_drift)))
 
-    if total_weight == 0:
+    core = _core_day(data, registry, habits_map, statuses, date_str, is_weekday)
+    if core["armed"]:
+        composite = core["score"]  # None when no core habit is known that day (ADR-104: unknown, never a miss)
+    elif total_weight == 0:
         return None, {}
-
-    composite = clamp(round(weighted_sum / total_weight))
+    else:
+        composite = clamp(round(weighted_sum / total_weight))
 
     t0_done = sum(1 for v in tier_status[0].values() if v)
     t0_total = len(tier_status[0])
@@ -417,7 +431,8 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
         "tier0": {"done": t0_done, "total": t0_total},
         "tier1": {"done": t1_done, "total": t1_total},
         "vices": {"held": vices_held, "total": vices_total},
-        "composite_method": "tier_weighted",
+        "composite_method": "core_set" if core["armed"] else "tier_weighted",
+        "core": core,
     }
     if unobserved:
         details["unobserved"] = unobserved
@@ -426,6 +441,48 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
     if type_drift:
         details["registry_type_drift"] = sorted(set(type_drift))
     return composite, details
+
+
+def core_day(data: dict[str, Any], profile: dict[str, Any]) -> dict[str, Any]:
+    """#5124: the day's core-12 verdict exactly as `score_habits_registry` grades it — for a reader (the coaches)
+    that holds the day's data and profile but not the scorer's details. `armed` False means the set is not driving
+    anything yet (no registry entry carries a `core` flag)."""
+    habitify = data.get("habitify") or {}
+    habitify = habitify if isinstance(habitify, dict) else {}
+    date_str = data.get("date") or (habitify.get("sk") or "").replace("DATE#", "") or habitify.get("date") or ""
+    try:
+        is_weekday = datetime.strptime(date_str, "%Y-%m-%d").weekday() < 5
+    except Exception:
+        is_weekday = True
+    registry = profile.get("habit_registry") or {}
+    return _core_day(data, registry, habitify.get("habits", {}), habitify.get("habit_statuses"), date_str, is_weekday)
+
+
+def _core_day(
+    data: dict[str, Any], registry: dict[str, Any], habits_map: dict[str, Any], statuses: Any, date_str: str, is_weekday: bool
+) -> dict[str, Any]:
+    """The day's core-12 verdict (#5124) through `health.core_habits`, the ONE resolver. A core member is read
+    exactly as the tier loop reads it (id, names, aliases; paused and off-day entries are not scheduled); the
+    derived bases read `data["core_inputs"]` (steps, wake times, check-in state) when the caller assembled them."""
+
+    def reading(name: str, meta: Any) -> Optional[float]:
+        meta = meta if isinstance(meta, dict) else {}
+        applicable = meta.get("applicable_days", "daily")
+        if applicable == "weekdays" and not is_weekday:
+            return None
+        if applicable == "post_training" and not (data.get("strava") or {}).get("activities"):
+            return None
+        return habitify_reading(habits_map, name, meta, statuses, date_str)
+
+    inputs = data.get("core_inputs") or {}
+    return core_habits.grade_day(
+        registry,
+        day=date_str or None,
+        reading=reading,
+        steps=inputs.get("steps"),  # steps-truth: resolved by common.metric_truth in daily_metrics_compute._core_inputs
+        wakes=inputs.get("wakes"),
+        checkin=inputs.get("checkin"),
+    )
 
 
 def _score_habits_mvp_legacy(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
