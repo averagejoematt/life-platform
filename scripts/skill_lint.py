@@ -72,9 +72,10 @@ def _registry():
 # longer exist as skills. The ceiling drops with them (17 -> 10, the exact remaining count): a
 # ratchet whose ceiling stays put while the corpus shrinks is headroom nobody voted for. The
 # replacement, `review`, is NOT added here — it ships with a contract test.
+# 2026-10-23 (#5055): daily-debrief retired — tests/test_draft_custom_departure_reason_5055.py
+# now pins its draft-by-default text. The ceiling drops with it (10 -> 9).
 NO_CONTRACT_TEST: dict[str, str] = {
     "cost-diligence": "2026-08-27",
-    "daily-debrief": "2026-08-27",
     "design-implement": "2026-08-27",
     "design-sync": "2026-08-27",
     "frontier-plan": "2026-08-27",
@@ -84,7 +85,7 @@ NO_CONTRACT_TEST: dict[str, str] = {
     "team-meeting": "2026-08-27",
     "uplevel": "2026-08-27",
 }
-RATCHET_CEILING = 10
+RATCHET_CEILING = 9
 
 MIN_DESCRIPTION = 80
 

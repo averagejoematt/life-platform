@@ -75,3 +75,35 @@ def test_the_daily_debrief_skill_names_draft_as_the_default_route():
     assert "departure_reason" in text and "deliberate departure" in text
     assert "`manage_hevy_routine` `draft_custom` →" not in text
     assert "Personal Board" not in text
+
+
+def test_the_coach_session_skill_names_draft_as_the_default_route():
+    # The ONE source for Claude Code and the claude.ai synced copy (#5086): the synced copy is
+    # refreshed from this file, so the pin sits here, not on the downstream copy.
+    text = (ROOT / ".claude/skills/coach-session/SKILL.md").read_text()
+    assert re.search(r"\*\*`manage_hevy_routine` action `draft`\*\* is the default", text)
+    assert "departure_reason" in text and "DEPARTURE_REASON_REQUIRED" in text
+    assert "never the default route" in text
+    assert "`manage_hevy_routine` draft_custom →" not in text
+
+
+# The issue's `## Set` (members at filing: 8), read by NAME — not a tree sweep. Each instruction
+# that orders the commit path must offer `draft` first and gate `draft_custom` on a reason.
+_SET_MEMBERS = (
+    ".claude/skills/daily-debrief/SKILL.md",
+    ".claude/skills/coach-session/SKILL.md",
+    "docs/coaching/CHAT_MODES.md",
+    "mcp/tools_descriptions.py",
+    "mcp/tools_plan.py",
+    "mcp/hevy_prescription_gate.py",
+)
+_CUSTOM_AS_FLOW = re.compile(r"manage_hevy_routine`?\s*\(?`?draft_custom`?\s*(?:→|->)")
+
+
+def test_no_set_member_orders_draft_custom_as_the_flow():
+    offenders = []
+    for rel in _SET_MEMBERS:
+        for n, line in enumerate((ROOT / rel).read_text().splitlines(), 1):
+            if _CUSTOM_AS_FLOW.search(line):
+                offenders.append(f"{rel}:{n}: {line.strip()}")
+    assert not offenders, "draft_custom ordered as the commit flow (draft is the default, #5055):\n" + "\n".join(offenders)
