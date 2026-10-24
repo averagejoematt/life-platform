@@ -450,7 +450,8 @@ NOT_APPLICABLE: Dict[str, str] = {
     "(tests/test_protein_engine_5098.py, tests/test_one_protein_feeding_definition_5214.py); expenditure: "
     "health.expenditure_reconciler (tests/test_expenditure_reconciler_5097.py); titration: health.titration "
     "(tests/test_titration_engine_5096.py); training_day: tests/test_training_day_fuel_5101.py; labs: "
-    "tests/test_lab_followup_5111.py; food_delivery: tests/test_food_delivery_upload_ritual_5006.py; floors: "
+    "tests/test_lab_followup_5111.py; food_delivery: tests/test_food_delivery_upload_ritual_5006.py; travel_food: health.travel_food "
+    "(tests/test_travel_food_kit_5104.py); floors: "
     "health.macro_floors (tests/test_macro_floors_5102.py) — the fibre floor alone is swept here (fibre_floor, #5204)",
 }
 

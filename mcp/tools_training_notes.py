@@ -204,6 +204,8 @@ def tool_get_exercise_notes(args):
         return _list_deload_words()
     if action in ("disruption", "disruption_end", "disruptions"):
         return {"disruption": _record_disruption, "disruption_end": _end_disruption, "disruptions": _list_disruptions}[action](args)
+    if action == "travel_kit":  # #5104: the travel food kit (a read)
+        return _travel_kit(args)
     if action in ("fitness_test", "fitness_tests"):  # #5078: the battery's owner write + its read (mcp/tools_fitness_tests.py)
         from mcp import tools_fitness_tests as ftt
 
@@ -211,7 +213,17 @@ def tool_get_exercise_notes(args):
     if action != "read":
         return {
             "error": f"Unknown action '{action}'.",
-            "valid_actions": ["read", "dismiss", "dismissals", "deload", "deloads", *_DISRUPTION_ACTIONS, "fitness_test", "fitness_tests"],
+            "valid_actions": [
+                "read",
+                "dismiss",
+                "dismissals",
+                "deload",
+                "deloads",
+                *_DISRUPTION_ACTIONS,
+                "travel_kit",
+                "fitness_test",
+                "fitness_tests",
+            ],
         }
     exercise = args.get("exercise") or args.get("template_id") or ""
     lookback_days = int(args.get("lookback_days") or PREFLIGHT_LOOKBACK_DAYS)
@@ -587,7 +599,44 @@ def _list_disruptions(args=None):
         "today": disruption.state(records, pacific_now().date().isoformat()),
         "policy": disruption.policy(),
         "records": records,
+        "travel_food": _travel_food_reminder(),
     }
+
+
+def _travel_food_reminder() -> dict:
+    """#5104: the travel food kit's dated reminder row (dates only), beside the travel templates it goes with."""
+    from health import travel_food
+
+    return travel_food.calibration_row(pacific_now().date().isoformat())
+
+
+def _positive_int(v, name: str):
+    if v is None or v == "":
+        return None, None
+    try:
+        n = int(v)
+    except (TypeError, ValueError):
+        return None, f"{name} must be a whole number, got {v!r}"
+    return (n, None) if n > 0 else (None, f"{name} must be positive, got {v!r}")
+
+
+def _travel_kit(args=None):
+    """action='travel_kit' (#5104, OWNER-ONLY READ) — the travel food kit: the day plan at today's resolved travel-day
+    target (and at `maintenance_kcal` when given: the trip is a planned maintenance week), the grocery list, the packing
+    list and the hotel/restaurant playbook, all built by `health.travel_food` from the charter. Nothing is written."""
+    from health import calorie_target, travel_food
+
+    args = args or {}
+    maint, err = _positive_int(args.get("maintenance_kcal"), "maintenance_kcal")
+    days, err2 = _positive_int(args.get("trip_days"), "trip_days")
+    if err or err2:
+        return {"error": err or err2}
+    today = pacific_now().date().isoformat()
+    target = calorie_target.resolve(today, day_type="travel")
+    kit = travel_food.build(target.get("kcal"), maintenance_kcal=maint, days=days)
+    kit["calorie_target"] = {k: target.get(k) for k in ("kcal", "source", "provenance", "day_type")}
+    kit["reminder"] = travel_food.calibration_row(today)
+    return kit
 
 
 def _now_z() -> str:
