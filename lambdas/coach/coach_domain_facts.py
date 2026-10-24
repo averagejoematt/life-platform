@@ -514,22 +514,48 @@ def _training_context(today: str, clinical: str, table: Any = None) -> str:
         from training import coach_context, may_tracker
 
         tracker = may_tracker.latest_completed_row(table, today) if table is not None else None
-        return coach_context.assemble(today, packet=None, constraint_block=None, tracker=tracker, guidance=clinical, published=False)[
-            "text"
-        ]
+        labs = _owner_labs(table, today)
+        return coach_context.assemble(
+            today,
+            packet=None,
+            constraint_block=None,
+            tracker=tracker,
+            guidance=clinical,
+            lab_priorities=labs.get("priorities"),
+            lab_followup=labs.get("followup"),
+            published=False,
+        )["text"]
     except Exception as e:  # noqa: BLE001 — the chat runs on the clinical block alone
         logger.warning("[domain_facts] coach context unavailable: %s", e)
         return clinical
 
 
-def _nutrition_context(today: str) -> str:
+def _owner_labs(table: Any, today: str) -> dict:
+    """#5111: the owner's lab-driven priorities and the next follow-up draw (`training.lab_priorities.read`) for an
+    owner Telegram thread. Dates, a state and his own priority lines; never a result. Fail-soft: {} on any trouble."""
+    if table is None:
+        return {}
+    try:
+        from training import lab_priorities
+
+        return lab_priorities.read(table, today)
+    except Exception as e:  # noqa: BLE001 — the chat runs without the lab lines
+        logger.warning("[domain_facts] lab follow-up unavailable: %s", type(e).__name__)
+        return {}
+
+
+def _nutrition_context(today: str, table: Any = None) -> str:
     """#5109: `training.coach_context.nutrition_context` for the owner's nutrition thread (published=False): the
     charter's nutrition block, the redlines' rules and the ONE calorie target with its provenance. The day grade is
-    the brief's (this thread reads no single day row). Fail-soft: "" on any trouble."""
+    the brief's (this thread reads no single day row). #5111: plus the lab-driven priorities and the next follow-up
+    draw (owner channel). Fail-soft: "" on any trouble."""
     try:
         from training import coach_context
 
-        return coach_context.nutrition_context(today, published=False)["text"]
+        labs = _owner_labs(table, today)
+        return coach_context.nutrition_context(
+            today, published=False, lab_priorities=labs.get("priorities"), lab_followup=labs.get("followup")
+        )["text"]
     except Exception as e:  # noqa: BLE001 — the chat runs on its domain facts alone
         logger.warning("[domain_facts] nutrition context unavailable: %s", e)
         return ""
@@ -630,7 +656,7 @@ def domain_facts_block(coach_id: str, table, today: Optional[str] = None) -> str
     if key in _TRAINING_ROUTE_KEYS:
         clinical = _training_context(today, clinical, table)  # #5071: the one planning context, the clinical block inside it
     elif key == "nutrition":
-        clinical = "\n\n".join(x for x in (clinical, _nutrition_context(today)) if x)  # #5109: the same assembly
+        clinical = "\n\n".join(x for x in (clinical, _nutrition_context(today, table)) if x)  # #5109: the same assembly
     if clinical:
         sections.append(clinical)
     track_section = coach_team_texture.track_record_section(track_lines)

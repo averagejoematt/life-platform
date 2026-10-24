@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.23.0",
+  "version": "1.24.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -154,6 +154,13 @@
       "date": "2026-10-23",
       "by": "the mind panel review 2026-10-18 (epic #5120: #5130 and #5133) and the charter derivation guard's widening (#5175, epic #5067); no new owner ruling: every new number is a platform default named as one, pending his ruling",
       "what": "#5130: governing_goal.target_date_role and phase_after_may.target_date_is state that the target date ends phase one, a milestone with a plan after it, never a finish line; phase_after_may.plan (null) and plan_location name where the post-deadline plan lives (this block, on his ruling); phase_after_may.plan_prompt dates the prompt to write it (12 weeks before the target date) and its dead-man (4 weeks before), read by training.phase_after_may as the calibration cadence's post_may_plan row. #5133: sleep.wake_time, the wake-time consistency rule as data (out of bed within 30 minutes of his own trailing 14-day median wake time every day, weekends included; an unreadable day is unknown, never a miss), graded by health.wake_consistency, the one reader the out-of-bed-on-time core habit (#5124) uses, stated to every daily coach in the shared charter lines; it reads sleep timing only, so the heart-rate regime re-baselining stays #5029's. #5175: no value changes; the derivation guard now covers every training numeric leaf here (digits and word forms).",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.24.0",
+      "date": "2026-10-23",
+      "by": "the nutrition panel review 2026-10-18 (#5111, epic #5094); no new owner ruling: the new number is a platform default named as one, pending his ruling",
+      "what": "nutrition.labs gains dead_man_weeks_after_due 4 (the follow-up draw's dead-man: still no draw 4 weeks after the due day is the owner-only calibration dead-man alert, the lab_draw row's missed_2), plus reader, rule and provenance lines; follow_up_weeks 16 and reminder_lead_days 14 are unchanged and now labelled as platform defaults. The owner-only coach contexts (the planning context and the owner's Telegram training and nutrition threads) now carry the next draw's due date and state beside the owner's lab-driven priorities; dates only, never a result.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -649,7 +656,11 @@
     "labs": {
       "_note": "The follow-up draw cadence only (#5111). Dates and weeks; no result, name or priority lives here. The owner-only due date, when no draw is readable, is the private twin's lab_followup.next_draw_on.",
       "follow_up_weeks": 16,
-      "reminder_lead_days": 14
+      "reminder_lead_days": 14,
+      "dead_man_weeks_after_due": 4,
+      "reader": "training.calibration_cadence (kind lab_draw; the owner-only coach contexts read the same row through training.lab_priorities)",
+      "rule": "next draw due = the latest draw date + follow_up_weeks; one owner-channel reminder from reminder_lead_days before the due day; still no draw dead_man_weeks_after_due weeks after the due day is the dead-man (the owner-only calibration dead-man alert). A new draw opens a new cycle",
+      "provenance": "follow_up_weeks: platform default sized to the issue's 'next draw about late January' (#5111, nutrition panel review 2026-10-18, filed on the owner's word; 16 weeks from the 2026-10-10 draw is 2027-01-30), pending an owner ruling on the weeks; reminder_lead_days and dead_man_weeks_after_due: platform defaults (#5111), pending an owner ruling"
     },
     "food_delivery": {
       "_note": "The food-delivery upload cadence only (#5006/#5108, owner ruling 2026-10-23). A 6-monthly manual upload ritual: the source stays paused between uploads and this number is when the owner-only reminder fires. No order, merchant or amount lives here.",

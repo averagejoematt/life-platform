@@ -185,6 +185,19 @@ def _freshness_from(guidance: Any, target_date: str) -> dict[str, Any]:
     return guidance_freshness.from_rows(guidance if isinstance(guidance, list) else None, target_date)
 
 
+def _lab_followup(guidance: Any, target_date: str) -> dict[str, Any]:
+    """#5111: the next follow-up draw's date and state (`training.lab_priorities.read`) over the clinical rows
+    `_clinical_guidance` already read — the clinical partition is not read again; only the labs partition's draw dates
+    are. A read_failed marker reads as a failed clinical read (the follow-up says read_failed)."""
+    from training import lab_priorities
+
+    from mcp.config import table
+
+    if not isinstance(guidance, list):
+        return {"priorities": None, "followup": lab_priorities.followup_view({"state": "read_failed", "error": "ClinicalReadFailed"})}
+    return lab_priorities.read(table, target_date, rows=guidance)
+
+
 def _may_tracker(target_date: str) -> dict[str, Any]:
     """#5200: the newest COMPLETED May-tracker week before `target_date` (`may_tracker.latest_completed_row`), read
     HERE so every caller path (plan_next_session, the nightly pre-draft, the session packet) is supplied the same row.
@@ -208,6 +221,7 @@ def coach_context_for(
         from training import coach_context, lab_priorities
 
         guidance = _clinical_guidance()
+        labs = _lab_followup(guidance, target_date)
         return coach_context.assemble(
             target_date,
             packet=packet,
@@ -217,6 +231,7 @@ def coach_context_for(
             guidance=guidance,
             guidance_freshness=_freshness_from(guidance, target_date),
             lab_priorities=lab_priorities.from_rows(guidance),
+            lab_followup=labs.get("followup"),
             published=False,
         )
     except Exception as e:  # noqa: BLE001

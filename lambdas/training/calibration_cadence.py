@@ -22,6 +22,12 @@ DEXA is a cadence, not a behavioural dead-man (a scan is booked, not forgotten):
 (never `missed_2`), and when no scan row is readable it is `unknown` and names the ingest that would supply it
 (#4639, not built) rather than guessing a date.
 
+LAB FOLLOW-UP DRAW (#5111). Booked, like DEXA, so it has no behavioural missed-cycle count; but a follow-up
+that nobody books is exactly the silence a dead-man exists for. So the row turns `missed_2` once the charter's
+`nutrition.labs.dead_man_weeks_after_due` weeks have passed since the due day with no draw, carries its own fixed
+alert (dates only) and rides the same dead-man paths as tape and photos. `lab_draw_row` is the row on its own, for
+the owner-only coach contexts (`training.lab_priorities.read`).
+
 FOOD-DELIVERY UPLOAD (#5006/#5108, owner ruling 2026-10-23). Food delivery is not a live feed: it is a
 6-monthly manual upload ritual, and tracking stays PAUSED between uploads (the registry's `paused` facet,
 so freshness, coach questions, the nudge and the daily-brief modifier never read it). This row is the
@@ -41,7 +47,7 @@ from __future__ import annotations
 import datetime as _dt
 from typing import Any, Callable, Mapping, Optional
 
-VERSION = "calibration-cadence@1.2.0"  # 1.2.0 #5006/#5108: food_delivery_upload; 1.1.0 #5111: lab_draw
+VERSION = "calibration-cadence@1.3.0"  # 1.3.0 #5111: the lab_draw dead-man + lab_draw_row; 1.2.0 #5006/#5108: food_delivery_upload; 1.1.0 #5111: lab_draw
 KINDS = ("tape", "photos", "dexa", "lab_draw", "food_delivery_upload")
 OK, DUE, OVERDUE, MISSED_2, UNKNOWN, READ_FAILED = "ok", "due", "overdue", "missed_2", "unknown", "read_failed"
 PROMPT_PREFIX = "CALIB_PROMPT"
@@ -171,9 +177,18 @@ def _dexa(readers: Mapping[str, Callable], today: str) -> dict[str, Any]:
 def _lab_draw(readers: Mapping[str, Callable], today: str) -> dict[str, Any]:
     """#5111: the follow-up draw cadence — the last draw date (`labs`, dates only) + `nutrition.labs.follow_up_weeks`.
     No draw readable: the owner-only `lab_followup.next_draw_on` (the private twin) is the due date; neither → unknown.
-    The reminder window opens `reminder_lead_days` before the due day (state `due`); nothing here reads a result."""
+    The reminder window opens `reminder_lead_days` before the due day (state `due`); `dead_man_weeks_after_due` weeks past
+    the due day with no draw is `missed_2`, the dead-man, with its own alert. Nothing here reads a result."""
     weeks, lead = _cv("nutrition.labs.follow_up_weeks"), _cv("nutrition.labs.reminder_lead_days", 0)
-    base = {"kind": "lab_draw", "source": SRC["lab_draw"], "cycle_weeks": weeks, "cadence": "approximate", "reminder_lead_days": lead}
+    dead_weeks = _cv("nutrition.labs.dead_man_weeks_after_due")
+    base = {
+        "kind": "lab_draw",
+        "source": SRC["lab_draw"],
+        "cycle_weeks": weeks,
+        "cadence": "approximate",
+        "reminder_lead_days": lead,
+        "dead_man_weeks_after_due": dead_weeks,
+    }
     dates, err = _read(readers.get("lab_draw"))
     if err:
         return {**base, "state": READ_FAILED, "error": err, "ingest": {"issue": DEXA_INGEST_ISSUE}}
@@ -184,9 +199,29 @@ def _lab_draw(readers: Mapping[str, Callable], today: str) -> dict[str, Any]:
     out = {**base, **cycle_state("lab_draw", dates, today, days, anchor=anchor, dead_cycles=None)}
     if out["state"] == OK and out["days_until_due"] <= int(lead or 0):
         out["state"] = DUE  # the reminder window: at most one prompt per cycle (the prompt key is the cycle start)
+    due_day, t = _day(out.get("due_on")), _day(today)
+    if due_day is not None and t is not None and isinstance(dead_weeks, int) and not isinstance(dead_weeks, bool) and dead_weeks > 0:
+        dead_on: _dt.date = due_day + _dt.timedelta(weeks=dead_weeks)
+        out["dead_man_on"] = dead_on.isoformat()
+        if out["state"] == OVERDUE and t >= dead_on:
+            out["state"] = MISSED_2
+            out["alert"] = (
+                f"The follow-up lab draw was due about {out['due_on']} and no draw is logged since {out.get('last_logged') or 'the last one'}. "
+                "Book it this week and tell your coach the date once it is done."
+            )
     if out["state"] == UNKNOWN:
         out["detail"] = "no draw date is readable and no owner-only follow-up date is set"
     return out
+
+
+def lab_draw_row(today: str, reader: Optional[Callable[[], Any]]) -> dict[str, Any]:
+    """#5111: the lab_draw row on its own (its prompt and prompt key included), for the owner-only coach contexts.
+    `reader` returns the draw dates or raises (a raise is `read_failed`). Pure."""
+    row = _lab_draw({"lab_draw": reader} if reader is not None else {}, today)
+    row["prompt"] = _prompt(row)
+    if row.get("cycle_start"):
+        row["prompt_key"] = prompt_key("lab_draw", row["cycle_start"])
+    return row
 
 
 def _food_delivery_upload(readers: Mapping[str, Callable], today: str) -> dict[str, Any]:
@@ -316,9 +351,11 @@ def upload_dates(table: Any) -> list[str]:
         kw["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
 
-def draw_dates(table: Any) -> list[str]:
-    """Every known draw date: the labs partition's plus the clinical record's — the latest draw may live in either."""
-    return sorted(set(_dates(table, "labs", "draw_date")) | set(_clinical_draw_dates(table)))
+def draw_dates(table: Any, clinical: Optional[list] = None) -> list[str]:
+    """Every known draw date: the labs partition's plus the clinical record's — the latest draw may live in either.
+    `clinical` = the clinical `LABS#` dates a caller already holds (no second clinical read); None reads them here."""
+    held = _clinical_draw_dates(table) if clinical is None else [str(d)[:10] for d in clinical if _day(d)]
+    return sorted(set(_dates(table, "labs", "draw_date")) | set(held))
 
 
 def table_readers(table: Any) -> dict[str, Callable[[], list[str]]]:

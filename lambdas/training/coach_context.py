@@ -44,7 +44,7 @@ from __future__ import annotations
 import json
 from typing import Any, Iterable, Optional
 
-CONTEXT_VERSION = "coach-context@1.4.0"  # 1.4.0 #5200: the May tracker read on every caller path + not_supplied_reason; 1.3.0 #5111: lab_priorities (owner channel, seam only); 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
+CONTEXT_VERSION = "coach-context@1.5.0"  # 1.5.0 #5111: lab_followup (the next draw, owner channel); 1.4.0 #5200: the May tracker read on every caller path + not_supplied_reason; 1.3.0 #5111: lab_priorities (owner channel, seam only); 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
 
 # ── the order contract, as data ───────────────────────────────────────────────────────────
 ORDER: tuple[str, ...] = ("pre_flight", "plan_next_session", "manage_hevy_routine draft")
@@ -305,6 +305,7 @@ def assemble(
     guidance: Any = None,
     guidance_freshness: Any = None,
     lab_priorities: Optional[dict[str, Any]] = None,
+    lab_followup: Optional[dict[str, Any]] = None,
     published: bool = False,
     packet_reason: Optional[str] = None,
 ) -> dict[str, Any]:
@@ -333,6 +334,7 @@ def assemble(
         "may_frame": frame,
         "run_gate": None if published else run_gate(tracker),
         "lab_priorities": None if published else lab_priorities,  # #5111: owner-only; absent -> nothing is said
+        "lab_followup": None if published else lab_followup,  # #5111: the next draw's date + state (training.lab_priorities.read)
         "not_supplied": sorted(k for k, s in sections.items() if s.get("state") == NOT_SUPPLIED),
     }
     out["not_supplied_reason"] = {k: sections[k].get("detail") for k in out["not_supplied"]}  # #5200: each absence says why
@@ -351,6 +353,7 @@ def summary(ctx: dict[str, Any]) -> dict[str, Any]:
         "may_tracker_week": ((ctx.get("sections") or {}).get("may_tracker") or {}).get("week_start"),
         "may_frame": (ctx.get("may_frame") or {}).get("line"),
         "run_gate": (ctx.get("run_gate") or {}).get("line"),
+        "lab_followup": (ctx.get("lab_followup") or {}).get("line"),
         "order": ctx.get("order"),
         "text": ctx.get("text"),
     }
@@ -434,6 +437,20 @@ def _render_guidance(g: dict[str, Any], published: bool) -> list[str]:
     return lines
 
 
+def _render_labs(ctx: dict[str, Any]) -> list[list[str]]:
+    """#5111: the owner's lab-driven priorities and the next follow-up draw — owner channel only; absent says nothing."""
+    if ctx.get("published"):
+        return []
+    parts: list[list[str]] = []
+    lp = ctx.get("lab_priorities")
+    if lp and lp.get("text"):  # the owner's own priorities, from his owner-only record (training.lab_priorities)
+        parts.append([f"LAB-DRIVEN PRIORITIES (owner-only) [{lp.get('source')}]", lp["text"]])
+    fu = ctx.get("lab_followup")
+    if fu and fu.get("line"):  # the calibration cadence's lab_draw row: dates and a state, never a result
+        parts.append([f"LAB FOLLOW-UP (owner-only) [{fu.get('source')}]", f"- {fu['line']}"])
+    return parts
+
+
 def render(ctx: dict[str, Any]) -> str:
     """The text block for a prompt: every section headed with its source; absence stated."""
     s = ctx["sections"]
@@ -461,9 +478,7 @@ def render(ctx: dict[str, Any]) -> str:
     if ctx.get("run_gate"):  # #5090: owner channel only (assemble sets None when published)
         rg = ctx["run_gate"]
         parts.append([f"RUN GATE (owner-only) [{rg['source']}; {rg['state']}]", rg["line"]])
-    lp = ctx.get("lab_priorities")
-    if lp and not ctx["published"]:  # #5111: the owner's own priorities, from his owner-only record (training.lab_priorities)
-        parts.append([f"LAB-DRIVEN PRIORITIES (owner-only) [{lp.get('source')}]", lp["text"]])
+    parts.extend(_render_labs(ctx))
     if not ctx["published"]:  # the order contract is the owner's planning conversation's, never a reader prompt's
         parts.append(["ORDER: " + " -> ".join(ctx["order"]) + " (pre-flight = " + ", ".join(PRE_FLIGHT) + ")"])
     return "\n\n".join("\n".join(p) for p in parts)
@@ -476,7 +491,7 @@ def render(ctx: dict[str, Any]) -> str:
 # carried example numbers that predated the charter and its only target was the system prompt's stale protein line.
 # PURE like `assemble`: the caller hands in the MacroFactor day row it already read; the resolver's own titration read
 # (inside a Lambda, cached) is the one I/O, and a failure there is a stated absence.
-NUTRITION_CONTEXT_VERSION = "nutrition-context@1.0.0"
+NUTRITION_CONTEXT_VERSION = "nutrition-context@1.1.0"  # 1.1.0 #5111: lab_priorities + lab_followup (owner channel)
 SRC_NUTRITION = "config/training_charter.json nutrition (training.training_charter)"
 SRC_REDLINES = "training.owner_redlines REDLINES (the nutrition rules; values read from the charter)"
 SRC_CALORIE = "health.calorie_target.resolve (the ONE calorie target: titration, else the charter)"
@@ -586,6 +601,8 @@ def nutrition_context(
     day_row: Optional[dict[str, Any]] = None,
     calorie: Optional[dict[str, Any]] = None,
     published: bool = True,
+    lab_priorities: Optional[dict[str, Any]] = None,
+    lab_followup: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """The nutrition coach's context for `target_date` (#5109): a dict for code and ``text`` for a prompt.
 
@@ -593,7 +610,8 @@ def nutrition_context(
     ``NUTRITION_PUBLISHED_PATHS``, the redlines' rules, the resolver's kcal and its public provenance, and the
     engines' grade of `day_row` without clock times. ``published=False`` (the owner's Telegram thread) adds the
     owner-only paths, the resolver's band and provenance and the feedings' times. `calorie` is a resolver result the
-    caller already holds (tests); None resolves it here."""
+    caller already holds (tests); None resolves it here. `lab_priorities` / `lab_followup` (#5111, `training.lab_priorities.read`)
+    ride the owner channel only: a published context drops both."""
     from training import training_charter as tc  # noqa: PLC0415
 
     protein, floors = _day_sections(day_row, published)
@@ -611,6 +629,8 @@ def nutrition_context(
         "published": published,
         "sections": sections,
         "rule": NUTRITION_CITE_RULE,
+        "lab_priorities": None if published else lab_priorities,
+        "lab_followup": None if published else lab_followup,
     }
     out["served_figures"] = served_figures(out)
     out["text"] = render_nutrition(out)
@@ -724,6 +744,7 @@ def render_nutrition(ctx: dict[str, Any]) -> str:
     )
     fl = s["floors_day"]
     parts.append(_render_fields("FLOORS — the engine's day", fl, ((m, fl.get(m)) for m in ("fat", "carb", "fibre") if m in fl)))
+    parts.extend(_render_labs(ctx))
     parts.append([f"RULE: {ctx['rule']}"])
     return "\n\n".join("\n".join(p) for p in parts)
 
