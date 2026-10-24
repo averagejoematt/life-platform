@@ -161,6 +161,11 @@ def lower_leg_holds(date: str, pain_flag_instances: Any, pain_dismissals: Any = 
     return [f"strain_flag:{e['site']}" for e in events if e["holds"]] + [f"standing_constraint:{i}" for i in _standing_lower_leg()[0]]
 
 
+def unknown(date: str, reason: str, charter_version: Optional[str]) -> dict[str, Any]:
+    """The ramp's `state: unknown` answer — said, never a climb to an invented floor. Carries the Pacific `weekday` (#5274)."""
+    return {"date": date, "weekday": pacific_weekday(date), "state": "unknown", "reason": reason, "charter_version": charter_version}
+
+
 def compute(
     date: str,
     window: Mapping[str, Any],
@@ -173,13 +178,7 @@ def compute(
     """The ramp for `date`. `window` is `steps_resolver.steps_range(*window_days(date), fetch=...)`'s return."""
     floor, target = training_charter.charter_value("steps.floor"), training_charter.charter_value("steps.target")
     if not (floor and target):  # the charter did not load (fail-soft loader): state it, never ramp to an invented floor
-        return {
-            "date": date,
-            "weekday": pacific_weekday(date),
-            "state": "unknown",
-            "reason": "the training charter did not load",
-            "charter_version": None,
-        }
+        return unknown(date, "the training charter did not load", None)
     floor, target = int(floor), int(target)
     days = list(window.get("days") or [])
     base = baseline(days)
