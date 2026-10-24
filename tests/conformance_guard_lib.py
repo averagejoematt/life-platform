@@ -38,6 +38,9 @@ import pathlib
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+if str(ROOT / "scripts") not in sys.path:
+    sys.path.insert(0, str(ROOT / "scripts"))
+import repo_walk  # noqa: E402 — the one shared exclusion (#5273)
 
 sys.path.insert(0, str(ROOT / "lambdas"))
 sys.path.insert(0, str(ROOT))
@@ -161,13 +164,18 @@ def site_key(relpath: str, vocab_name: str, matched: list[str]) -> str:
     return f"{relpath}::{vocab_name}::{','.join(matched)}"
 
 
-def sweep(vocabularies: dict[str, set[str]] | None = None) -> dict[str, list[str]]:
-    """Return {site_key: matched_members} for every hand-typed enumeration."""
+def sweep(vocabularies: dict[str, set[str]] | None = None, repo: pathlib.Path = ROOT) -> dict[str, list[str]]:
+    """Return {site_key: matched_members} for every hand-typed enumeration.
+
+    #5273: walked through `scripts/repo_walk.py` (the one shared exclusion — `cdk/_*_staging`,
+    `cdk.out`, nested lane checkouts) before the marker filter below, which stays as the
+    guard's own policy. `repo` is the planted-copy seam.
+    """
     vocabs = vocabularies if vocabularies is not None else load_vocabularies()
     findings: dict[str, list[str]] = {}
     for scan_root in SCAN_ROOTS:
-        for path in sorted((ROOT / scan_root).rglob("*.py")):
-            rel = path.relative_to(ROOT).as_posix()
+        for path in repo_walk.rglob(repo / scan_root, "*.py", repo=repo):
+            rel = path.relative_to(repo).as_posix()
             if any(marker in rel for marker in _SKIP_PATH_MARKERS):
                 continue
             if rel in _SANCTIONED_REGISTRY_FILES:

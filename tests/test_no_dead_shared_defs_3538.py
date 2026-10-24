@@ -61,6 +61,10 @@ if _DEPLOY_DIR not in sys.path:
     sys.path.insert(0, _DEPLOY_DIR)
 import build_bundle  # noqa: E402
 
+if str(_REPO / "scripts") not in sys.path:
+    sys.path.insert(0, str(_REPO / "scripts"))
+import repo_walk  # noqa: E402 — the one shared exclusion (#5273)
+
 
 def _staged_package_names() -> tuple[str, ...]:
     """The scan's package list, read from ``build_bundle.stage_tree()``'s OWN output —
@@ -516,13 +520,12 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
 }
 
 
-def _py_files(rel_dir: str):
-    for root, _dirs, files in os.walk(_REPO / rel_dir):
-        if "node_modules" in root or "cdk.out" in root:
-            continue
-        for name in sorted(files):
-            if name.endswith(".py"):
-                yield pathlib.Path(root) / name
+def _py_files(rel_dir: str, repo: pathlib.Path = _REPO):
+    """#5273: walked through `scripts/repo_walk.py`. LIVE_DIRS includes `cdk/`, and
+    `cdk/_*_staging` holds (possibly stale) byte copies of `lambdas/` — a caller deleted
+    from the source but still in a staging copy kept a dead def "live" on any machine that
+    had run a deploy. `repo` is the planted-copy seam."""
+    yield from repo_walk.rglob(repo / rel_dir, "*.py", repo=repo, skip_dirs={"node_modules"})
 
 
 def _live_surface() -> list[pathlib.Path]:

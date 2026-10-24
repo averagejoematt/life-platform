@@ -44,7 +44,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from worktree_paths import canonical_parent, true_case as _true_case  # noqa: E402
+from worktree_paths import canonical_parent, primary_checkout, true_case as _true_case  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -82,8 +82,15 @@ def lane_parent(repo: Path) -> Path:
 
 
 def new_lane(issue: int | str, slug: str, repo: Path = ROOT, base: str = "origin/main") -> Path:
-    """Create the lane worktree off up-to-date `base` and LOCK it. Returns its path."""
-    repo = _true_case(repo)
+    """Create the lane worktree off up-to-date `base` and LOCK it. Returns its path.
+
+    `repo` may be ANY worktree of the repository — the default is this script's own
+    checkout, which is a lane or an Agent-tool worktree as often as it is the primary. The
+    canonical parent is derived from the PRIMARY checkout (`git rev-parse --git-common-dir`),
+    never from the caller's tree, or a lane run from `.claude/worktrees/agent-<id>/` nests its
+    lane back inside the main checkout (#5273).
+    """
+    repo = _true_case(primary_checkout(_true_case(repo)))
     branch = f"issue-{issue}-{slug}"
     path = lane_parent(repo) / branch
 

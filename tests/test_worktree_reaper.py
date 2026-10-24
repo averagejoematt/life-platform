@@ -21,6 +21,7 @@ repo has already paid for (#2578).
 import importlib.util
 import os
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -304,6 +305,51 @@ def test_lane_creation_refuses_to_build_inside_the_repo(sandbox, monkeypatch):
     with pytest.raises(SystemExit) as e:
         lane.new_lane("3289", "in-repo", repo=sandbox)
     assert "INSIDE the repo" in str(e.value)
+
+
+# ── #5273: a lane created FROM a nested worktree still lands beside the PRIMARY ───────
+#
+# Five lanes in Session CD ran `lane_worktree.py new` from an Agent-tool worktree at
+# `.claude/worktrees/agent-<id>/`; the script took its repo root from its own `__file__`,
+# so the canonical parent came out as `.claude/worktrees/worktrees/agent-<id>/` — inside the
+# main checkout, where the harness then blocked git.
+
+
+def _nested_agent_worktree(sandbox: Path) -> Path:
+    nested = sandbox / ".claude" / "worktrees" / "agent-5273"
+    _run(["git", "worktree", "add", "--quiet", "--detach", str(nested), "origin/main"], sandbox)
+    return nested
+
+
+def test_a_lane_made_from_a_nested_worktree_lands_beside_the_primary(sandbox):
+    nested = _nested_agent_worktree(sandbox)
+    path = lane.new_lane("5273", "nested", repo=nested)
+    assert os.path.realpath(str(path.parent)) == os.path.realpath(str(paths.canonical_parent(sandbox))), path
+    assert not lane._is_within(path, sandbox), f"lane nested inside the primary checkout: {path}"
+
+
+def test_the_cli_run_from_inside_a_nested_worktree_lands_beside_the_primary(sandbox):
+    """The incident shape exactly: the SCRIPT FILE lives in the nested worktree, so its
+    `__file__`-derived default root IS that worktree. Real subprocess, real git."""
+    nested = _nested_agent_worktree(sandbox)
+    (nested / "scripts").mkdir()
+    for name in ("lane_worktree.py", "worktree_paths.py"):
+        (nested / "scripts" / name).write_text(Path(REPO, "scripts", name).read_text(encoding="utf-8"), encoding="utf-8")
+    p = subprocess.run(
+        [sys.executable, str(nested / "scripts" / "lane_worktree.py"), "new", "5273", "cli-nested"],
+        cwd=str(nested),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert p.returncode == 0, p.stdout + p.stderr
+    expected = paths.canonical_parent(sandbox) / "issue-5273-cli-nested"
+    assert expected.is_dir(), f"lane not at {expected}: {p.stdout}"
+    assert not (nested / ".." / "worktrees").exists() and not lane._is_within(expected, sandbox)
+
+
+def test_primary_checkout_falls_back_to_the_path_outside_a_repo(tmp_path):
+    assert paths.primary_checkout(tmp_path) == tmp_path
 
 
 def test_the_creation_path_is_the_one_the_lane_agent_is_told_to_use():

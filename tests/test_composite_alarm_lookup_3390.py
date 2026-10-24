@@ -57,8 +57,13 @@ from __future__ import annotations
 
 import ast
 import os
+import sys
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if os.path.join(_REPO, "scripts") not in sys.path:
+    sys.path.insert(0, os.path.join(_REPO, "scripts"))
+import repo_walk  # noqa: E402 — the one shared exclusion (#5273)
+
 _VERIFY = os.path.join(_REPO, "deploy", "restart_verify.py")
 
 # Every first-party tree that may talk to CloudWatch. `tests/` is excluded on purpose:
@@ -222,18 +227,16 @@ def alarm_read_violations(src: str, rel: str) -> list[str]:
     return problems
 
 
-def _first_party_sources() -> list[tuple[str, str]]:
+def _first_party_sources(repo: str = _REPO) -> list[tuple[str, str]]:
+    """#5273: walked through `scripts/repo_walk.py` — `cdk/_*_staging` holds byte copies of
+    `lambdas/`, and a lane worktree nested in the checkout is a full second copy; neither is
+    first-party source, and both doubled every finding on a local run. `repo` is the seam
+    `tests/test_repo_walk_5273.py` plants a copy through."""
     out = []
     for top in _SCANNED_DIRS:
-        root = os.path.join(_REPO, top)
-        for dirpath, dirnames, filenames in os.walk(root):
-            dirnames[:] = [d for d in dirnames if d not in {"__pycache__", "node_modules", "cdk.out", ".venv"}]
-            for fn in filenames:
-                if not fn.endswith(".py"):
-                    continue
-                path = os.path.join(dirpath, fn)
-                with open(path, encoding="utf-8") as fh:
-                    out.append((os.path.relpath(path, _REPO), fh.read()))
+        for path in repo_walk.rglob(os.path.join(repo, top), "*.py", repo=repo, skip_dirs={"__pycache__", "node_modules", ".venv"}):
+            with open(path, encoding="utf-8") as fh:
+                out.append((os.path.relpath(path, repo), fh.read()))
     return out
 
 

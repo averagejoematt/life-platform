@@ -379,15 +379,24 @@ def test_the_probe_names_a_lapsed_ledger_and_is_silent_before_it():
 # ═══════════════════════════════════════════════════════════════════════════════════════
 
 
+def new_interior_gap_count_sites(repo: Path = ROOT) -> list[str]:
+    """#5273: walked through `scripts/repo_walk.py`, so `cdk/_*_staging` copies of `lambdas/`
+    and a nested lane worktree are not read as the repo. `repo` is the planted-copy seam."""
+    repo_walk = _load("repo_walk", SCRIPTS / "repo_walk.py")
+    hits = []
+    for sub in ("lambdas", "cdk", "mcp"):
+        for path in repo_walk.rglob(repo / sub, "*.py", repo=repo, skip_dirs={"node_modules"}):
+            if "NewInteriorGapCount" in path.read_text(encoding="utf-8", errors="ignore"):
+                hits.append(path.relative_to(repo).as_posix())
+    return hits
+
+
 def test_new_interior_gap_count_was_not_added():
     """REJECTED in the forensic RCA's rent register: #3504's absence marker over every
     framework DAILY_SOURCE removes the condition instead of instrumenting it (asserted by
     tests/test_source_enumeration_drift.py)."""
-    for sub in ("lambdas", "cdk", "mcp"):
-        for path in (ROOT / sub).rglob("*.py"):
-            if "cdk.out" in path.parts or "node_modules" in path.parts:
-                continue
-            assert "NewInteriorGapCount" not in path.read_text(encoding="utf-8", errors="ignore"), path
+    hits = new_interior_gap_count_sites()
+    assert not hits, hits
 
 
 # premerge-gate: #3597: git ls-files + AST — a new `*_RESIDUE` ledger / tests/*_baseline.json must register a carrier + expiry
