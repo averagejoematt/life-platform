@@ -597,7 +597,6 @@ def _training_context(today: str, clinical: str, table: Any = None) -> str:
 
         tracker = may_tracker.latest_completed_row(table, today) if table is not None else None
         labs = _owner_labs(table, today)
-        response = _response_protocol()
         return coach_context.assemble(
             today,
             packet=None,
@@ -607,8 +606,8 @@ def _training_context(today: str, clinical: str, table: Any = None) -> str:
             lab_priorities=labs.get("priorities"),
             lab_followup=labs.get("followup"),
             published=False,
-            response_protocol=response,
-            day_mode=_day_mode(table, today, response),
+            response_protocol=_response_protocol(),
+            day_mode=_day_mode(table, today),
         )["text"]
     except Exception as e:  # noqa: BLE001 — the chat runs on the clinical block alone
         logger.warning("[domain_facts] coach context unavailable: %s", e)

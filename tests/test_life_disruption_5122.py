@@ -183,16 +183,7 @@ def test_flag_episode_matches_the_early_warning_modules_own_episode_when_it_is_o
 
 
 def test_the_live_read_states_not_wired_when_the_flag_reader_is_absent(monkeypatch):
-    import builtins
-
-    real = builtins.__import__
-
-    def _no_early_warning(name, *a, **k):
-        if name == "health" and a and a[2] and "early_warning" in a[2]:
-            raise ImportError("no health.early_warning")
-        return real(name, *a, **k)
-
-    monkeypatch.setattr(builtins, "__import__", _no_early_warning)
+    monkeypatch.setattr(ld, "FLAG_READER", "health.no_such_flag_reader_5122")
     assert ld.read_flag_rows(object(), "2026-11-05") is None
     m = ld.current(object(), "2026-11-05", records=[], response=RESPONSE)
     assert m is not None and m["flag"]["state"] == ld.FLAG_NOT_WIRED and m["lapse_offer"] is None
@@ -236,6 +227,10 @@ def _rendered_prompts() -> dict[str, str]:
         "playbook text": " ".join(str(v) for k, v in ld.playbook().items() if k not in ("language",)),
         "lapse protocol text": " ".join(str(v) for v in ld.lapse_protocol().values()),
     }
+
+
+def test_the_mode_holds_its_own_text_to_its_own_rule():
+    assert _mode_on()["language_violations"] == []
 
 
 def test_no_rendered_prompt_carries_streak_shaming_language_while_the_mode_is_on():

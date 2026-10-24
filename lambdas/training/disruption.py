@@ -566,13 +566,12 @@ def routines(target_date: str, role: str, mode: dict[str, Any], catalog: dict[st
 # ── the generator path's own read (MCP reads through mcp/tools_training_notes.py) ───────────
 def load_records(table: Any = None) -> list[dict[str, Any]]:
     """Every disruption record, newest first, from `table` (default: the generator's own). Raises on a failed read."""
-    from boto3.dynamodb.conditions import Key
-
     from training import exercise_history
 
     items: list[dict[str, Any]] = []
-    kwargs: dict[str, Any] = {
-        "KeyConditionExpression": Key("pk").eq(DISRUPTION_PK) & Key("sk").begins_with(DISRUPTION_SK_PREFIX),
+    kwargs: dict[str, Any] = {  # the string form: the same query, readable by every table double the coach tests use
+        "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+        "ExpressionAttributeValues": {":pk": DISRUPTION_PK, ":prefix": DISRUPTION_SK_PREFIX},
         "ScanIndexForward": False,
     }
     while True:

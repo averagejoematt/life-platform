@@ -34,6 +34,7 @@ PURE except ``current`` / ``read_flag_rows`` / ``records_failsoft`` (fail-soft I
 
 from __future__ import annotations
 
+import importlib
 import logging
 import re
 from typing import Any, Iterable, Optional
@@ -46,6 +47,7 @@ ISSUE = "#5122"
 VERSION = "life-disruption@1.0.0"
 SOURCE = "config/training_charter.json disruption.whole_day + disruption.lapse_protocol (training.life_disruption)"
 FLAG_SOURCE = "early_warning_flag (health.early_warning, #5121)"
+FLAG_READER = "health.early_warning"  # the one reader of the flag partition (#5121); this module never spells its key
 
 SCOPE_OFF, SCOPE_TRAINING, SCOPE_WHOLE_DAY = "off", "training", "whole_day"
 FLAG_ACTIVE, FLAG_CLEAR, FLAG_ABSENT, FLAG_NOT_WIRED = "active", "clear", "absent", "not_wired"
@@ -126,7 +128,8 @@ def published_language_line(records: Optional[list[dict[str, Any]]], days: Itera
     template, date, reason or flag (the brief's TL;DR reaches the site). Reads the disruption record only."""
     from training import disruption  # noqa: PLC0415
 
-    covered = any(is_whole_day((disruption.active_record(records, d) or {}).get("template")) for d in days)
+    whole = set(whole_day_templates())
+    covered = any((disruption.active_record(records, d) or {}).get("template") in whole for d in days)
     lang = language()
     if not covered or not lang.get("instead"):
         return ""
@@ -236,11 +239,13 @@ def mode(
         "paused_targets": list(pb.get("paused_targets") or []) if whole else None,
         "grading_paused": list((pb.get("grading") or {}).get("paused") or []) if whole else None,
         "language_on": whole,
+        "playbook_problems": habit_problems() if whole else None,  # a mis-specified held/paused split is stated, never hidden
         "runs": list(lp.get("runs") or []) if whole and tmpl.get("lapse") else None,
         "flag": flag,
         "lapse_offer": None if whole else _offer(flag, response),
     }
     out["lines"] = lines(out)
+    out["language_violations"] = shaming("\n".join(out["lines"]))  # its own text held to its own rule; [] = clean
     return out
 
 
@@ -271,6 +276,7 @@ def lines(m: dict[str, Any]) -> list[str]:
         if m.get("runs"):
             out.append("What runs: " + "; ".join(m["runs"]) + f". Resumes: {lp.get('resumes')}.")
         out.append(f"Language: {language().get('rule')}; {language().get('instead')}.")
+        out += [f"Playbook problem (charter disruption.whole_day): {p}" for p in m.get("playbook_problems") or []]
     elif m.get("scope") == SCOPE_TRAINING:
         out.append(
             f"Training disruption mode ({m.get('template')}, {m.get('phase')}) through {m.get('until')}: the training is held; "
@@ -299,8 +305,8 @@ def owner_lines(m: dict[str, Any], persona: Optional[str]) -> list[str]:
 # ── I/O (fail-soft) ───────────────────────────────────────────────────────────────────────
 def read_flag_rows(table: Any, day: str) -> Optional[list[dict[str, Any]]]:
     """The flag rows through ``health.early_warning.read_recent``; None when that reader is not on main (#5121)."""
-    try:
-        from health import early_warning  # noqa: PLC0415 — #5121; absent until it merges
+    try:  # by name: the module is #5121's and is not on main until it merges (a static import would not type-check)
+        early_warning = importlib.import_module(FLAG_READER)
     except ImportError:
         return None
     if table is None:
