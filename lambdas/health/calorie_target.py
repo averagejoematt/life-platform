@@ -146,7 +146,8 @@ def _apply_day_type(
     fat_g = max(base * fat_pct / 100 / 9, fat_floor or 0.0) if fat_pct is not None else None
     # rest_day_rule (owner ruling 2026-10-23, #5091 follow-up 2): +uplift on a lifting day, every other day at the base —
     # no rest-day payback below the target, so the week averages above the base by design
-    delta = (_num(cfg.get("lifting_uplift_kcal")) or 0.0) if dt == "lifting" else 0.0
+    # a planned maintenance date (#5107) is the whole day's estimated burn: no lifting uplift on top of it
+    delta = (_num(cfg.get("lifting_uplift_kcal")) or 0.0) if dt == "lifting" and not out.get("maintenance_day") else 0.0
     final = base + delta
     floor_any, floor_lift = _num(out.get("floor_any_day_kcal")), _num(out.get("floor_lifting_day_kcal"))
     floor = floor_lift if (dt == "lifting" and floor_lift is not None) else floor_any
@@ -263,6 +264,7 @@ def resolve(
         lo, hi = _num((record or {}).get("band_low")), _num((record or {}).get("band_high"))
         if lo is not None and hi is not None:
             out["band_low"], out["band_high"] = int(lo), int(hi)
+        kcal = _maintenance_day(out, record, day, rec_kcal)
     else:
         kcal = _num(block.get("target_kcal"))
         if kcal is not None and kcal > 0:
@@ -278,6 +280,24 @@ def resolve(
     out["base_kcal"] = int(round(kcal)) if kcal is not None else None
     _apply_day_type(out, kcal, day_type, week_day_types, read)
     return out
+
+
+def _maintenance_day(out: Dict[str, Any], record: Optional[Dict[str, Any]], day: DayLike, base: float) -> float:
+    """#5107: on a date the week's titration record lists as a planned maintenance date, the record's maintenance kcal
+    (and its band) serve; with no readable estimate the week's target serves and the provenance says so."""
+    from health import maintenance_week  # noqa: PLC0415 — lazy, like the titration reader
+
+    m = maintenance_week.resolve_day(record, _day(day).isoformat())
+    if m is None:
+        return base
+    out["maintenance_day"] = True
+    if m["kcal"] is None:
+        out["provenance"] += f"; planned maintenance date ({m['label']}) with no readable maintenance estimate: the week's target serves"
+        return base
+    out["provenance"] += f"; planned maintenance date ({m['label']}): maintenance at the {m['basis']}"
+    if m["band"]:
+        out["band_low"], out["band_high"] = m["band"]
+    return float(m["kcal"])
 
 
 def _version(v: Any) -> Optional[tuple]:

@@ -44,6 +44,7 @@ from common.constants import (
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 from health import (  # #4244: THE food + supplements micronutrient join (shared with the public door)
     calorie_target,
+    maintenance_week,  # #5107: the planned maintenance week's line on the titration card
     nutrient_intake,
     protein_engine,
     titration,  # #5096: the weekly calorie titration decision (owner-only; this email is an owner surface)
@@ -893,6 +894,8 @@ def build_titration_html(today, read=None):
     step = int(rec.get("step_kcal") or 0)
     head = f"{rec.get('kcal')} kcal ({rec.get('action')}{f' {step:+d}' if step else ''})"
     detail = f'<div style="color:#9ca3af;font-size:11px;margin-top:4px;">{rec.get("detail")}</div>' if rec.get("detail") else ""
+    maint = maintenance_week.email_line(rec)  # #5107: the planned maintenance dates and any window grade, owner-only
+    detail += f'<div style="color:#e0e0e0;font-size:12px;margin-top:6px;">{maint}</div>' if maint else ""
     return (
         f'<div {style}><div style="font-size:12px;letter-spacing:1px;color:#9ca3af;font-weight:600;margin-bottom:6px;">'
         f"CALORIE TARGET · WEEK OF {week}</div>{head} — {rec.get('reason')}{detail}</div>"
