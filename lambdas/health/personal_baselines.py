@@ -355,6 +355,46 @@ def derive_component_target(metric, baselines):
     return None, {"source": "population_prior", "label": POPULATION_PRIOR_LABEL, "n": n}
 
 
+# ── #5056: protocol targets — the training charter's daily steps rule ──
+# The owner's 2026-10-18 ruling put the steps floor (12,000) and target (15,000) in the
+# charter, EVERY day. That makes daily steps a PROTOCOL commitment, the class this module's
+# docstring carves out of personal derivation ("deriving them from observed behavior would
+# ratify drift"): a p75 of his own lifting-day steps would set a target under the floor the
+# coach states every morning. So when the charter is readable its numbers win — `target` is
+# the floor, `perfect_at` the target (the engine scores 100 at `perfect_at`; at the floor a
+# day scores target/perfect_at = 80) — and the personal band / authored prior below stay the
+# fallback for a process that cannot read the charter (fail-soft, never a fabricated value).
+# Read through `public_view()`: the site API builds this config, and steps.* is whitelisted.
+PROTOCOL_STEPS_PATHS = {"target": "steps.floor", "perfect_at": "steps.target"}
+
+
+def protocol_targets():
+    """{metric: component overlay} for the charter-owned character targets, or {} when the
+    charter's steps rule is unreadable or malformed. Never raises."""
+    try:
+        from training import training_charter  # noqa: PLC0415 — lazy: keeps this module import-light
+
+        rule = training_charter.public_view().get("steps") or {}  # steps-truth: the charter steps RULE (floor/target), not a reading
+    except Exception:  # noqa: BLE001 — fail-soft: the personal/prior path stands
+        return {}
+    floor, target = rule.get("floor"), rule.get("target")
+    ok = all(isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 for v in (floor, target))
+    if not ok or target < floor:
+        return {}
+    provenance = {"source": "charter", "metric": "daily_steps", "paths": dict(PROTOCOL_STEPS_PATHS)}
+    return {"daily_steps": {"target": int(floor), "perfect_at": int(target), "target_provenance": provenance}}
+
+
+def perfect_ratio(component, default):
+    """The `_pct_of_target` perfect multiple for a component: `perfect_at / target` when the
+    component carries both (the #5056 charter overlay), else ``default`` (the authored curve)."""
+    comp = component if isinstance(component, dict) else {}
+    target, perfect_at = comp.get("target"), comp.get("perfect_at")
+    if isinstance(target, (int, float)) and isinstance(perfect_at, (int, float)) and target > 0 and perfect_at >= target:
+        return perfect_at / target
+    return default
+
+
 def apply_character_targets(config, baselines):
     """Overlay personal-variance targets onto a character config (#1412).
 
@@ -366,19 +406,26 @@ def apply_character_targets(config, baselines):
     and either way the component gains `target_provenance` (method/window/n or
     the population-prior label), which the engine surfaces into component
     details and /api/character_config. Components with no derivation spec are
-    untouched — no fabricated labels (ADR-104). Deterministic: identical
-    (config, baselines) always yields an identical effective config, which is
-    what lets #1373 receipt config-hashes agree across write and replay.
+    untouched — no fabricated labels (ADR-104). A charter-owned metric (#5056,
+    `protocol_targets`) takes the charter's numbers and a `source: charter`
+    provenance instead, whatever the band says. Deterministic: identical
+    (config, baselines, charter steps rule) always yields an identical effective
+    config, which is what lets #1373 receipt config-hashes agree across write
+    and replay — a charter steps change shows as labeled config_drift.
     """
     if not config:
         return config
     import copy
 
     cfg = copy.deepcopy(config)
+    protocol = protocol_targets()
     for metric, spec in CHARACTER_TARGET_SPECS.items():
         component = (cfg.get("pillars") or {}).get(spec["pillar"], {}).get("components", {}).get(spec["component"])
         if not isinstance(component, dict):
             continue  # component absent from this config — nothing to personalize
+        if metric in protocol:  # #5056: a charter protocol commitment outranks his own distribution
+            component.update(protocol[metric])
+            continue
         value, provenance = derive_component_target(metric, baselines)
         if value is not None:
             component[spec["key"]] = value
