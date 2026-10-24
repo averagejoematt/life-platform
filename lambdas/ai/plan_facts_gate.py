@@ -216,7 +216,7 @@ def plan_figure_findings(
                 "claim": claim["claim"],
                 "detail": (
                     f'the narrative presents "{claim["claim"]}" as the plan, but the plan root '
-                    f"({plan_facts.get('source', 'config/user_goals.json')}) states {_QUANTITY_LABEL[q]} as "
+                    f"({plan_facts.get(f'{q}_source') or plan_facts.get('source', 'config/user_goals.json')}) states {_QUANTITY_LABEL[q]} as "
                     + (f"{plan_list[0]:g}-{plan_list[-1]:g}" if len(plan_list) > 1 else f"{plan_list[0]:g}")
                     + " — a figure from a shelf experiment or the model's memory is not the protocol"
                 ),

@@ -63,7 +63,7 @@ from __future__ import annotations
 from typing import Any, Callable, Iterable, Mapping, Optional
 
 from common import metric_truth
-from common.pacific_time import shift_day_key
+from common.pacific_time import pacific_weekday, shift_day_key
 
 from training.walking_volume import derived_steps_estimate, walking_minutes_for_day
 
@@ -151,6 +151,7 @@ def resolve_daily_steps(day: str, rows_by_source: Mapping[str, Any]) -> dict[str
         degraded = None
     return {
         "date": day,
+        "weekday": pacific_weekday(day),  # #5274: the Pacific weekday, quoted — never derived by the model
         "steps": steps,
         "winner": res.source,
         "winner_field": res.field,

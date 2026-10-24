@@ -77,6 +77,13 @@ PUBLISHED_WHITELIST: tuple[str, ...] = (
     "deload.owner_gated",
     "concession_ledger",
     "nutrition.protein.feeding_threshold_g",  # #5214: the one per-feeding protein threshold the review email prompt names (a rule, nothing private)
+    "sleep.wake_time.rule",  # #5133: the wake-time consistency rule every daily coach is told (a rule; no clock time, no reading)
+    "sleep.wake_time.tolerance_minutes",
+    "sleep.wake_time.anchor_window_days",
+    "sleep.wake_time.min_days_for_anchor",
+    "sleep.wake_time.every_day",
+    "sleep.wake_time.weekends_included",
+    "sleep.wake_time.hit",
     "nutrition.floors.fibre.floor_g",  # #5204: the one fibre floor the nutrition door and review email grade against (35 g, nothing private)
 )
 

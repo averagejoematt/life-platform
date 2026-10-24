@@ -608,7 +608,8 @@ GET_DEFICIT_SUSTAINABILITY_DESCRIPTION = (
 GET_WORKOUTS_DESCRIPTION = (
     "List normalized workouts across all logging sources (Hevy + MacroFactor) "
     "in a date range. Returns per-workout records with title, duration, "
-    "set count, total volume in kg, and source attribution. Use for: "
+    "set count, total volume in kg, and source attribution; each row's `weekday` "
+    "is its Pacific day of the week — quote it, never compute one (#5274). Use for: "
     "'what workouts did I do this week?', 'show recent training', "
     "'compare workouts across apps'."
 )

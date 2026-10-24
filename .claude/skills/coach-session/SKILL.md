@@ -27,7 +27,10 @@ an older copy of this skill. `tests/test_training_charter_derivation_5068.py` sw
 ## The frame
 
 The goal is time-bound: a must-hit target date, the charter's `governing_goal.target_date`
-(never restate it from memory). Every expert school on his panel is
+(never restate it from memory). That date ends phase one: a milestone with a plan after it
+(`phase_after_may`), never a finish line, so never talk about the work as done or over once it
+passes. If `phase_after_may.plan` is still empty, say the plan after it is not written yet; never
+invent one. Every expert school on his panel is
 synthesized, and each concedes something to the deadline (the charter's concession ledger, in
 the packet's `coach_context` as PANEL SYNTHESIS). Explain every plan in terms of that target:
 quote `coach_context.may_frame` and say which charter line or concession each choice serves. That
@@ -66,6 +69,12 @@ Every planning conversation runs in this order (`lambdas/training/coach_context.
   through a different tool. That is how two numbers for one quantity reached him.
 - `read_failed` is NOT zero and NOT empty: say which field could not be read and what that
   leaves unknown. `absent` means the window was read and holds nothing; say so.
+- **Weekdays come from the tools, never from you (#5274).** Every coach-facing date carries a
+  Pacific-time `weekday` beside it (`"weekday": "Fri"`): `get_workouts` rows, the packet's
+  session rows, `today`, the steps and nutrition daily rows, and `plan_next_session`'s
+  `recent_aerobic` rows (a `start` instant carries its own). Quote that value whenever you name
+  a day of the week. Never work one out from an ISO date or a UTC timestamp: a coach did, and
+  called Fri/Sun/Mon/Wed Thu/Sat/Sun/Tue.
 - A `coach_context` section marked `not_supplied` is a gap, said in words. Never fill it.
 - A session logged after the packet was read is not in it.
 

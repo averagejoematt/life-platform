@@ -27,6 +27,8 @@ import json
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas", "compute"))
 
@@ -37,6 +39,16 @@ from health import (
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _CONFIG_PATH = os.path.join(_ROOT, "config", "character_sheet.json")
+
+
+@pytest.fixture(autouse=True)
+def _no_charter_steps_overlay(monkeypatch):
+    """#5056: with the training charter readable, daily_steps takes the charter's floor/target
+    (personal_baselines.protocol_targets) and never the personal band. This suite pins the #1412
+    machinery itself — the band and population-prior path, which is the fallback whenever the
+    charter is unreadable — so the overlay is switched off here. tests/test_character_steps_charter_5056.py
+    pins the charter path."""
+    monkeypatch.setattr(pb, "protocol_targets", lambda: {})
 
 
 def _authored_config():

@@ -41,7 +41,10 @@ sys.path.insert(0, str(ROOT / "lambdas"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from coach import persona_registry  # noqa: E402  — canonical public roster (#1891)
-from health import character_engine as ce  # noqa: E402
+from health import (
+    character_engine as ce,  # noqa: E402
+    personal_baselines as pb,  # noqa: E402  — the #5056 charter steps overlay
+)
 from privacy import privacy_guard  # noqa: E402  — real-public-figure gate (#1891)
 from privacy.content_filter_channel import ContentFilterUnavailable  # noqa: E402  — #2370 hold-not-crash
 from v4_chrome import (
@@ -88,7 +91,19 @@ def engine_fingerprint() -> str:
 
 
 def load_config() -> dict:
-    return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    """The authored config with the charter-owned targets the engine actually runs under (#5056).
+
+    `daily_steps` is a protocol commitment: `personal_baselines.protocol_targets` sets its target
+    to the training charter's floor and its perfect point to the charter's target, so the page
+    states those, never the authored prior the engine no longer scores against. Only the two
+    numbers are copied (the provenance dict is not a page parameter)."""
+    config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    for metric, overlay in pb.protocol_targets().items():
+        spec = pb.CHARACTER_TARGET_SPECS.get(metric) or {}
+        comp = ((config.get("pillars") or {}).get(spec.get("pillar"), {}).get("components") or {}).get(spec.get("component"))
+        if isinstance(comp, dict):
+            comp.update({k: v for k, v in overlay.items() if k != "target_provenance"})
+    return config
 
 
 # ── Cast guard (drift tripwire #3 — #1891) ──────────────────────────────────
@@ -279,11 +294,14 @@ def _pillars_section(config: dict) -> str:
         "the behavior didn't happen and it scores <strong>0 at full weight</strong>; when a sensor has no data, the engine has no "
         "evidence either way, so the component drops out of the weight sum instead (ADR-104). "
         f"The pillar weights below sum to {esc(pct(weight_sum))} of the headline character level.</p>"
-        '<p class="rd-prose">A handful of component targets — sleep duration, deep and REM share, daily steps — are not fixed '
+        '<p class="rd-prose">A handful of component targets — sleep duration, deep and REM share — are not fixed '
         "opinions: once at least 30 observations of Matthew's own history exist, the target is re-derived monthly as the 75th "
         "percentile of his own distribution, clamped inside documented safety bounds (ADR-105 rule 4: thresholds come from "
         "personal variance, not authored taste). Until a metric clears that floor, the numbers below stand — explicitly labeled "
         "a population prior. Every derived target carries its provenance: method, window, and sample size.</p>"
+        '<p class="rd-prose">Daily steps is the exception, because it is a commitment rather than a habit to measure: its target '
+        "is the training plan's every-day floor and it scores full marks at the plan's step target, the same two numbers the "
+        "morning coaching line states. Deriving it from his own history would let a run of low days lower the bar.</p>"
     )
     return _sec("pillars", "The seven pillars", intro + f'<div class="gx-grid">{"".join(cards)}</div>')
 

@@ -288,7 +288,10 @@ def gate_draft(ideal: Any, target_date: str, adapt: Callable[[dict[str, Any] | N
         layer = shared_quantities.recent_aerobic_layer(target_date)
     except Exception as e:  # noqa: BLE001 — cardio_block names the failure itself on a None layer read below
         logger.warning("cardio block: recent-aerobic read failed: %s", e)
-    cardio_index = _cardio_index_failsoft()
+    from training.cardio_cues import with_served_kinds
+
+    # #5076: an empty-note ride counts as the kind its routine prescribed, so a performed tempo is not re-placed
+    cardio_index = with_served_kinds(_cardio_index_failsoft(), target_date)
     cardio, pick = cardio_block(target_date, getattr(ideal, "archetype", "") or "", constraint, layer=layer, cardio_index=cardio_index)
     if cardio is not None:
         ideal.exercises.append(cardio)

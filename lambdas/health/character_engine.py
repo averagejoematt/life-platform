@@ -37,7 +37,7 @@ from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_today  # #2811: the character sheet's DAY is the Pacific day
 
-from health import character_privacy, protein_engine  # #5129: owner-only components · #5214: THE per-feeding definition
+from health import character_privacy, personal_baselines, protein_engine  # #5129 owner-only · #5214 feedings · #5056 steps perfect
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 
 logger = logging.getLogger(__name__)
@@ -481,8 +481,8 @@ def compute_movement_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[
     # Daily steps
     # #4630: the day's steps through the ONE resolver (registry METRIC_TRUTH facet).
     steps = resolve_steps({"whoop": data.get("whoop"), "apple_health": data.get("apple"), "garmin": data.get("garmin")}).value
-    step_target = components.get("daily_steps", {}).get("target", 8000)
-    scores["daily_steps"] = _pct_of_target(steps, step_target, 1.5) if steps else None
+    sc = components.get("daily_steps", {})  # #5056: target = charter floor, perfect_at = charter target (personal_baselines overlay)
+    scores["daily_steps"] = _pct_of_target(steps, sc.get("target"), personal_baselines.perfect_ratio(sc, 1.5)) if steps else None
 
     # Strength sessions (#965/ADR-134 amendment): distinct hevy workout DAYS in
     # the trailing 7 — days, never sets/volume/tonnage, so logging junk volume

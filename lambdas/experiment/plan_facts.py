@@ -36,6 +36,11 @@ PLAN_SOURCE = "config/user_goals.json"
 LIVE_CALORIE_KEY = "calorie_target_live_kcal"
 # The resolved target alone (no band) — what a surface holding a stated target to the live one compares with.
 LIVE_CALORIE_TARGET_KEY = "calorie_target_kcal"
+# #5056: the training charter's steps rule [floor, target], added by `load_plan_facts` (never sealed into a
+# freeze). The owner's 2026-10-18 ruling superseded the genesis 6,000-7,000 range, so when it is present it IS
+# the sanctioned step set — a coach stating the 12,000 floor is the plan, not a contradiction of it.
+LIVE_STEPS_KEY = "steps_charter_live"
+LIVE_STEPS_SOURCE = "config/training_charter.json (steps.floor / steps.target)"
 
 # "roughly 6,000-7,000 steps" / "8,000+ steps" / "6,000 steps" inside the movement target
 # prose — the plan root states the step floor as a RANGE in free text, so it is parsed
@@ -103,7 +108,10 @@ def plan_figures(facts: Optional[Dict[str, Any]]) -> Dict[str, Set[float]]:
     facts = facts or {}
     out: Dict[str, Set[float]] = {"steps": set(), "protein_g": set(), "calories": set(), "fiber_g": set()}
     rng = facts.get("daily_steps_range")
-    if isinstance(rng, (list, tuple)) and len(rng) == 2 and all(isinstance(x, (int, float)) for x in rng):
+    live_steps = facts.get(LIVE_STEPS_KEY)
+    if isinstance(live_steps, (list, tuple)) and live_steps:
+        out["steps"] |= {float(v) for v in live_steps}  # #5056: the charter rule supersedes the genesis range
+    elif isinstance(rng, (list, tuple)) and len(rng) == 2 and all(isinstance(x, (int, float)) for x in rng):
         out["steps"] |= {float(rng[0]), float(rng[1])}
     elif isinstance(facts.get("daily_steps_floor"), (int, float)):
         out["steps"].add(float(facts["daily_steps_floor"]))
@@ -134,7 +142,7 @@ def load_plan_facts(bucket: Optional[str] = None) -> Optional[Dict[str, Any]]:
 
         path = config_path("user_goals.json")
         with open(path, encoding="utf-8") as fh:
-            return _with_live_calories(plan_facts_from_goals(json.load(fh)))
+            return _with_live_steps(_with_live_calories(plan_facts_from_goals(json.load(fh))))
     except Exception:  # noqa: BLE001 — no local file: fall through to S3
         pass
     try:
@@ -144,7 +152,7 @@ def load_plan_facts(bucket: Optional[str] = None) -> Optional[Dict[str, Any]]:
 
         s3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2"))
         resp = s3.get_object(Bucket=bucket or os.environ.get("S3_BUCKET", "matthew-life-platform"), Key=PLAN_SOURCE)
-        return _with_live_calories(plan_facts_from_goals(json.loads(resp["Body"].read())))
+        return _with_live_steps(_with_live_calories(plan_facts_from_goals(json.loads(resp["Body"].read()))))
     except Exception:  # noqa: BLE001 — fail-soft by contract (see module docstring)
         return None
 
@@ -165,3 +173,20 @@ def _with_live_calories(facts: Dict[str, Any]) -> Dict[str, Any]:
     if kcal is not None:
         out[LIVE_CALORIE_TARGET_KEY] = kcal
     return out
+
+
+def _with_live_steps(facts: Dict[str, Any]) -> Dict[str, Any]:
+    """#5056: add the training charter's steps rule [floor, target] under LIVE_STEPS_KEY (and its source under
+    ``steps_source``), so the plan-figure gate grades a step claim against the rule the coach states every day,
+    not the pre-charter genesis range. Fail-soft: an unreadable or malformed rule adds nothing (the genesis
+    range then stands)."""
+    try:
+        from training.training_charter import charter_value  # noqa: PLC0415 — lazy: keeps this module pure at import
+
+        floor, target = charter_value("steps.floor"), charter_value("steps.target")
+    except Exception:  # noqa: BLE001 — a gate never takes a surface down (#1691)
+        return dict(facts)
+    nums = [v for v in (floor, target) if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0]
+    if len(nums) != 2 or nums[1] < nums[0]:
+        return dict(facts)
+    return {**facts, LIVE_STEPS_KEY: [int(nums[0]), int(nums[1])], "steps_source": LIVE_STEPS_SOURCE}

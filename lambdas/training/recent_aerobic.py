@@ -40,7 +40,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Any
 
-from common.pacific_time import parse_day_key, shift_day_key
+from common.pacific_time import pacific_weekday, parse_day_key, shift_day_key
 
 from training import cardio_hr, owner_redlines, walking_volume
 
@@ -233,6 +233,7 @@ def _public_row(r: dict[str, Any]) -> dict[str, Any]:
     minutes = round(r["seconds"] / 60.0, 1)
     out = {
         "date": r["date"],
+        "weekday": pacific_weekday(r["date"]),  # #5274: the Pacific weekday, quoted — never derived by the model
         "source": r["source"],
         "device": r.get("device"),
         "modality": r["modality"],
