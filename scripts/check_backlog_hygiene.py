@@ -121,6 +121,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import backlog_contract as bc  # noqa: E402
 import backlog_next as bn  # noqa: E402
+import backlog_retirement as br  # noqa: E402  (#5141: the retirement-ledger rules, split out for the size ceiling)
 import closure_contract as cc  # noqa: E402  (#3853: ONE instrument-ledger discriminator, not a second predicate)
 import grounding_corpus_stamp as gcs  # noqa: E402  (#3614: ONE corpus loader — never a second glob over tests/grounding_corpus)
 
@@ -1021,6 +1022,7 @@ def check(
     lane: Optional[str] = None,
     closed_issues: Optional[List[Dict[str, Any]]] = None,
     specimens: Optional[List[Dict[str, Any]]] = None,
+    retirement: bool = False,  # #5141: arms backlog_retirement.run — on for the live corpus, `--retirement` for a fixture
 ) -> List[Finding]:
     """Every rule over the whole fetched corpus, in a stable order.
 
@@ -1065,6 +1067,8 @@ def check(
     # #3614: the only rule that grades CLOSED issues — closure is precisely when a
     # grounding finding's specimen either is in the corpus or is lost.
     findings.extend(rule_grounding_specimen(closed_issues, specimens=specimens, now=now))
+    if retirement:  # #5141 — a tracker/instrument row carries no `type:*`, so it is never a charter story
+        findings.extend(Finding(*r) for r in br.run(ctxs))
     return findings
 
 
@@ -1204,6 +1208,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Offline fixture path for the CLOSED corpus the #3614 grounding_specimen rule grades "
         "(gh issue list --state closed --json number,labels,body,closedAt output).",
     )
+    parser.add_argument("--retirement", action="store_true", help="Arm the #5141 retirement-ledger rules on a fixture (always on live).")
     args = parser.parse_args(argv)
 
     if args.issues_json:
@@ -1216,7 +1221,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         closed = json.loads(Path(args.closed_json).read_text(encoding="utf-8")) if args.closed_json else _fetch_closed_grounding_issues()
 
     now = _parse_iso(args.now) if args.now else None
-    findings = check(issues, now=now, lane=args.lane, closed_issues=closed)
+    findings = check(issues, now=now, lane=args.lane, closed_issues=closed, retirement=args.retirement or not args.issues_json)
     if args.rule:
         findings = [f for f in findings if f.rule in set(args.rule)]
 

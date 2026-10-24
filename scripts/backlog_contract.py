@@ -112,6 +112,15 @@ EPIC_LINE_PREFIX_RE = re.compile(r"^\*\*Epic:\*\*", re.IGNORECASE)
 
 ANY_HEADING_RE = re.compile(r"^#{1,6}[ \t]")
 
+# The `## Retires` statement (#5141): a charter story names what it removes, or says
+# `none — <reason>`. Either a `## Retires` heading (its first non-empty line is the
+# statement) or an inline `**Retires:** …` line. The `none` arm parses rather than
+# failing, the same split as the epic line: "is a reason given" is a value rule, and
+# `check_backlog_hygiene.rule_retires_section` is where it is enforced.
+RETIRES_HEADING_RE = re.compile(r"^#{2,}[ \t]*Retires[ \t]*$", re.IGNORECASE)
+RETIRES_LINE_RE = re.compile(r"^\*\*Retires:\*\*[ \t]*(?P<text>.*)$", re.IGNORECASE)
+RETIRES_NONE_RE = re.compile(r"^(?:[-*][ \t]+)?none\b[ \t]*(?:[—–:-][ \t]*(?P<reason>.*))?$", re.IGNORECASE)
+
 # Now first — the tiebreak direction, and the fall-through order. Roadmap is the
 # ADR-099 amendment (2026-08-22): product-vision items parked OUTSIDE the debt
 # corpus — ranked last, reached by the walk only when Now/Next/Later are empty,
@@ -159,6 +168,14 @@ class Score(NamedTuple):
     value: float  # the stored rank — impact * confidence / effort_points
     milestone: str  # "Now" | "Next" | "Later" | "Roadmap"
     raw: str  # the source line, verbatim
+
+
+class Retires(NamedTuple):
+    """A parsed `## Retires` / `**Retires:**` statement (#5141)."""
+
+    is_none: bool  # True for the explicit `none — <reason>` form
+    reason: Optional[str]  # the stated reason, for the `none` form
+    text: str  # the statement, verbatim (first non-empty line)
 
 
 class EpicLink(NamedTuple):
@@ -325,6 +342,29 @@ def set_section_has_count(body: Optional[str]) -> bool:
     """
     text = set_section_text(body)
     return bool(text) and re.search(r"\d", text) is not None
+
+
+def retires_statement(body: Optional[str]) -> Optional[Retires]:
+    """The story's `## Retires` statement, or None when it states none (#5141).
+
+    The heading form wins over the inline line; within the heading, the first non-empty
+    line is the statement (a list of removals may follow on later lines). Empty heading
+    = None — an empty section states nothing.
+    """
+    lines = [line.strip() for line in _section_lines(body, RETIRES_HEADING_RE) if line.strip()]
+    text: Optional[str] = lines[0] if lines else None
+    if text is None:
+        for line in normalize(body).splitlines():
+            m = RETIRES_LINE_RE.match(line.strip())
+            if m and m.group("text").strip():
+                text = m.group("text").strip()
+                break
+    if text is None:
+        return None
+    m = RETIRES_NONE_RE.match(text)
+    if m:
+        return Retires(is_none=True, reason=(m.group("reason") or "").strip() or None, text=text)
+    return Retires(is_none=False, reason=None, text=text)
 
 
 def filed_from_review_or_incident(labels: List[str]) -> bool:
