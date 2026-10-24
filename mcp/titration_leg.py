@@ -15,11 +15,15 @@ THE READS (the sanctioned ones, each failure named and turned into `insufficient
   logs       complete MacroFactor days (a calorie total at or above the redlines' dark-day line) in the
              last 7 completed days, and in the redlines' first-step window;
   model      `tools_nutrition.expenditure_reconciliation` — which burn model matches the scale (context);
-  history    the titration records of the last eight weeks (`titration.read_history`).
+  history    the titration records of the last eight weeks (`titration.read_history`);
+  maintenance (#5107) the reconciliation's best-matching model as the maintenance estimate, the trend window
+             (a trend across a maintenance date is not acted on), and, for a dated maintenance window whose
+             last day has passed inside the grading horizon, the Withings weigh-ins around it for the grade.
 
 DRY RUN (the post-deploy proof, no write): from a checkout with read-only AWS credentials,
   python3 -c "import sys; sys.path[:0]=['lambdas','.']; import json; from mcp import titration_leg as t; print(json.dumps(t.run(dry_run=True), indent=1, default=str))"
-prints the decision the coming week would get, whatever the weekday. Logs keys, actions and codes only.
+prints the decision the coming week would get, whatever the weekday. Logs keys, actions and codes only. The
+maintenance-week sequence on a fixture (no AWS): `python3 scripts/maintenance_week_dry_run.py` (#5107).
 """
 
 from __future__ import annotations
@@ -33,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 DECIDE_WEEKDAYS = (4, 5, 6)  # Friday, Saturday, Sunday (Pacific): Friday decides, the weekend retries
 LOG_WINDOW_DAYS = 7
+GRADE_HORIZON_DAYS = 14  # a window's grade rides the weekly decisions for two weeks after its last day (#5107)
 
 
 def _read(fn, *args, **kw) -> Tuple[Any, Optional[str]]:
@@ -69,7 +74,7 @@ def gather(today: str) -> Dict[str, Any]:
     """Every input `titration.decide` takes, read for a run on `today`. Never raises."""
     from common.constants import EXPERIMENT_START_DATE
     from common.macrofactor_fields import macro_value
-    from health import titration
+    from health import maintenance_week, titration
     from training import rate_band
     from training.steps_resolver import steps_range
 
@@ -109,6 +114,9 @@ def gather(today: str) -> Dict[str, Any]:
     history, err = _read(titration.read_history, core.table, week)
     if err:
         errors["history"] = err
+    grades, err = _read(maintenance_grades, today, cfg.get("maintenance"))
+    if err:
+        errors["maintenance_grade"] = err
     start, wk = parse_day_key(EXPERIMENT_START_DATE), parse_day_key(week)
     return {
         "week": week,
@@ -124,7 +132,32 @@ def gather(today: str) -> Dict[str, Any]:
         "experiment_day": (wk - start).days + 1 if (start and wk) else None,
         "read_errors": errors,
         "cfg": cfg,
+        "maintenance": {  # #5107: the maintenance estimate, the trend window and any ended window's grade
+            "estimate": maintenance_week.estimate(rec),
+            "trend_window": lr.get("window") if lr else None,
+            "grades": grades or None,
+        },
     }
+
+
+def maintenance_grades(today: str, mcfg: Optional[Dict[str, Any]]) -> list:
+    """#5107: the grade of every dated maintenance window whose last day passed within `GRADE_HORIZON_DAYS` of
+    `today`, over the Withings weigh-ins around it (read through the completed days only). Raises on a failed read."""
+    from health import maintenance_week
+
+    from mcp import core, shared_quantities
+
+    out = []
+    reach = int((mcfg or {}).get("reach_days") or 0)
+    for w in maintenance_week.dated(mcfg):
+        if not (w["end"] < today <= shift_day_key(w["end"], GRADE_HORIZON_DAYS)):
+            continue
+        hi = min(shift_day_key(w["end"], reach), shift_day_key(today, -1))
+        rows = core.query_source(shared_quantities.LOSS_RATE_SOURCE, shift_day_key(w["start"], -reach), hi) or []
+        g = maintenance_week.grade(w, shared_quantities._weighins(rows), today, mcfg or {})
+        if g:
+            out.append(g)
+    return out
 
 
 def run(today: Optional[str] = None, *, dry_run: bool = False) -> Dict[str, Any]:

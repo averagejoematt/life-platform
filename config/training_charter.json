@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.26.0",
+  "version": "1.27.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -172,6 +172,13 @@
     },
     {
       "version": "1.26.0",
+      "date": "2026-10-24",
+      "by": "owner ruling 2026-10-23 (Session CD) on epic #5093: R3 yes, the late-December trip is a planned maintenance week (eat at maintenance; pass within +/-2 lb of the start weight); R4 no second rehearsal near 240 lb. The reverse diet's numbers are the issue's posted defaults and the redlines' settle line, named as platform defaults pending his ruling",
+      "what": "#5107: nutrition.maintenance_weeks, the late-December window (dates null: the travel window's, owner-set; the engine is inert until set), maintenance at the expenditure reconciliation's best match, the +/-2 lb grade and its 3-day weigh-in reach (a platform default), the trend rule and R4's one rehearsal; nutrition.reverse_diet from 2027-06-01, stepping food up by the titration's own step each week until the 14-day trend is inside +/-0.5 lb/wk, entry step null pending his ruling. health.maintenance_week is the reader, through the weekly titration decision; the resolver serves the maintenance kcal on the window's dates.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.27.0",
       "date": "2026-10-24",
       "by": "the mind panel review 2026-10-18 (#5121, epic #5120); no new owner ruling: every new number is a platform default named as one, pending his ruling, except the two the owner's own words in config/user_goals.json failure_mode.early_warning_signals already state (under 3 sessions a week for 2 weeks; the weight trend reversing up over 7 days), which are restated here with that provenance",
       "what": "#5121: early_warning, the relapse early-warning detector's thresholds as data (health.early_warning, run nightly by daily-insight-compute): min_signals 2 (two lapse signals together raise ONE owner-only flag, one alone never does), lookback_days 60 (a channel with no record inside it is absent, never silent), and six signals beside the four the detector already read: weigh_in_cadence (3 days without a weigh-in), food_log_gap (2 of the last 3 days under the titration rule's complete-log line), step_drop (the 7-day mean 35% or more under the 28 days before, n 5 and 14), checkin_silence (3 evenings with no answered check-in after at least one answered), weight_reversal (the 7-day weigh-in mean 1 lb or more above the 7 days before, n 3 each) and sessions_below_plan (under 3 Hevy sessions in each of the last 2 weeks). The flag is owner-only: stored in USER#matthew#SOURCE#early_warning_flag, sent by the response owner (failure_mode.response_owner) on the owner's own Telegram seat, never on a published surface and never in the shared brief context.",
@@ -723,6 +730,38 @@
     "food_delivery": {
       "_note": "The food-delivery upload cadence only (#5006/#5108, owner ruling 2026-10-23). A 6-monthly manual upload ritual: the source stays paused between uploads and this number is when the owner-only reminder fires. No order, merchant or amount lives here.",
       "upload_every_months": 6
+    },
+    "maintenance_weeks": {
+      "_note": "Planned maintenance weeks (#5107, epic #5093). The one reader is health.maintenance_week, through the weekly titration decision (health.titration): one decision a week, so the charter band and a maintenance week never both rule a date.",
+      "windows": [
+        {
+          "label": "late December 2026 trip",
+          "travel_window": "late December 2026",
+          "start": null,
+          "end": null
+        }
+      ],
+      "dates_rule": "a window's own start and end (YYYY-MM-DD, both set) are its dates; while they are null the named travel.windows entry's start and end are (one place for the trip's dates). A window with no dates either way is INERT: listed as unscheduled, it changes nothing. The dates are the owner's to set; today none are set, so the engine is inert until he sets them",
+      "target": "maintenance: the expenditure reconciliation's best-matching model kcal (health.expenditure_reconciler best_match, the estimate the titration engine already reads), actionable only on a non-provisional loss-rate window; never a number written here",
+      "target_rule": "the titration record of every ISO week a window touches HOLDS the week's ordinary target (reason maintenance_week; it carries forward unchanged, so the cut resumes at the pre-window number) and lists maintenance_dates and maintenance_kcal; on those dates health.calorie_target.resolve serves maintenance_kcal with the prescribed band moved to it and no lifting uplift (the estimate is the whole day's burn). No actionable estimate: the dates carry the base target with a warning, never a guess",
+      "trend_rule": "a weekly read whose 14-day trend window holds a maintenance date is not acted on (reason maintenance_in_trend): a week of maintenance food and water would read as a stall",
+      "pass_band_lb": 2,
+      "weigh_in_reach_days": 3,
+      "grade_rule": "start weight = the latest weigh-in from weigh_in_reach_days before the window's first day up to that day; end weight = the earliest weigh-in in the weigh_in_reach_days after its last day. Pass when the end weight is within pass_band_lb of the start weight, else fail; pending while that reach is open with no weigh-in, unknown when a weight is missing. The grade rides the weekly titration records for two weeks after the window (maintenance_grades) and the owner's nutrition email",
+      "rehearsals": "the late-December week is the one maintenance rehearsal before the target date (owner ruling 2026-10-23 R4: no second rehearsal at an intermediate weight, so the redlines' landing.rehearsal_maintenance_weeks_at_lb 240 and 220 weeks are not scheduled; a new rehearsal is a new window here, on his ruling)",
+      "surface": "owner-only: the titration record and the owner's nutrition email; no public surface",
+      "provenance": "owner: the window, maintenance as the target and pass_band_lb (ruling 2026-10-23 R3, #5107); weigh_in_reach_days is a platform default (#5107), pending an owner ruling",
+      "ruling": "owner ruling 2026-10-23 (Session CD): R3 yes, the late-December trip is a planned maintenance week (eat at maintenance; pass if within +/-2 lb of the start weight); R4 no second rehearsal near 240 lb"
+    },
+    "reverse_diet": {
+      "_note": "The landing's reverse diet (#5107), planned from the redlines' landing.calories; read by health.maintenance_week through the weekly titration decision. phase_after_may.plan, once the owner writes it, re-versions this block on his ruling.",
+      "starts_on": "2027-06-01",
+      "entry_step_kcal": null,
+      "entry_step_note": "the redlines' landing.calories opens with one step of +300-400 kcal over days 1-7; it is null here pending an owner ruling, and while null the engine takes no entry step",
+      "weekly_step": "the titration's own step sizing (nutrition.titration: the miss above settle_trend_lb_wk x kcal_per_lb_wk, rounded to step_rounding_kcal, inside min_step_kcal..max_step_kcal): read, never copied; one step every weekly read, not min_days_between_steps",
+      "settle_trend_lb_wk": 0.5,
+      "rule": "from the ISO week holding starts_on, each weekly read on a measured trend with the week's complete logs: losing faster than settle_trend_lb_wk steps food UP by the weekly step; a trend inside +/-settle_trend_lb_wk holds (reverse_diet_settled); gaining faster than it holds with a warning (reverse_diet_gaining: the redlines' landing overshoot rules govern, the engine never steps food down here). Inside the reverse diet the cut band, the walking-first rule and the planned minimum do not govern (one decision a week, no double rule); a dated maintenance window still outranks it",
+      "provenance": "platform defaults from the issue's posted defaults (#5107: '+100-150 kcal/wk from 1 June'), the settle line from the redlines' landing.calories ('until the 14-day trend reads 0 +/- 0.5 lb/wk'); starts_on and settle_trend_lb_wk pending an owner ruling"
     },
     "floors": {
       "fat": {"floor_g": 65, "unit": "g", "per_meal_g": 10, "meals_with_fat": 3, "epa_dha_g": 2},

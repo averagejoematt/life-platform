@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from health import (
     calorie_target as calorie_resolver,  # #5095: the ONE calorie target
     deficit_disclosures,  # #3754: BS-12 cutoff provenance + the ADR-104 sentence
+    eating_window,  # #5099: THE eating window (charter nutrition.eating_window)
     macro_floors,
     protein_engine,  # #5098: THE protein hit, the charter range and the feedings
     tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
@@ -320,6 +321,17 @@ def _hour_from_iso_local(ts_str):
         return None
 
 
+def _charter_window_summary(daily_rows):
+    """#5099: the charter's eating window (nutrition.eating_window) and the period's inside / outside / unknown days."""
+    statuses = [r["charter_window"] for r in daily_rows]
+    return {
+        "window": eating_window.describe(),
+        "days_inside": statuses.count("inside"),
+        "days_outside": statuses.count("outside"),
+        "days_unknown": statuses.count("unknown"),
+    }
+
+
 def _get_meal_timing(args):
     """
     Eating window analysis: first bite, last bite, window duration, caloric distribution
@@ -412,6 +424,9 @@ def _get_meal_timing(args):
             },
             "late_eating_flag": lb >= 20.0,
             "entries_skipped": entries_skipped,
+            # #5099: the charter's window (nutrition.eating_window, 16:8) graded on the day's meal rows — inside /
+            # outside / unknown, one definition with the day grade (health.eating_window)
+            "charter_window": eating_window.evaluate_day(food_log)["status"],
         }
         first_bites.append(fb)
         last_bites.append(lb)
@@ -478,6 +493,7 @@ def _get_meal_timing(args):
             "last_bite_consistency_sd_hrs": lb_sd,
             "consistency_n_days": n,
             "trf_status": "OPTIMAL" if avg_win <= 10 else "BORDERLINE" if avg_win <= 12 else "WIDE",
+            "charter_window": _charter_window_summary(daily_rows),  # #5099: the PLAN's window, not the TRF line above
         },
         "late_eating": {"days_eating_after_8pm": late_days, "pct_days": round(late_days / n * 100, 1)},
         "sleep_overlap": {
