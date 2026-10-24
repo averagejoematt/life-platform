@@ -15,9 +15,10 @@ lateral raises and face pulls (side/rear delts 6 -> 14, the band's floor), and t
 lowered to what fits inside the 75-set week (charter 1.22.0: 4, 0, 6). `KNOWN_BAND_GAPS` is all zeros and stays
 shrink-only. Side/rear delts, upper chest and lats are still counted BY MOVEMENT (`volume_floors.FLOOR_MOVEMENTS` /
 `BAND_MOVEMENTS`): upper chest has 0 incline sets (the 8 catalog-'chest' sets are flat bench + cable fly), lats has 4
-(the lat pulldown; rows and the shrug are not lat work). The LOGGED Shoulders flag cannot
-see a side/rear-delt drop that continued pressing masks (live 2026-10-05..18: 16 Shoulders sets, 8.0/wk); that follow-on is
-#5164 — so the day-14 trip below is asserted for Calves and Core, and Shoulders is asserted NOT flagged, as it really was.
+(the lat pulldown; rows and the shrug are not lat work). The LOGGED Shoulders muscle row cannot
+see a side/rear-delt drop that continued pressing masks (live 2026-10-05..18: 16 Shoulders sets, 8.0/wk), so Shoulders is
+asserted NOT flagged, as it really was; the movement-counted side/rear-delt floor that does see it is #5164
+(`tests/test_side_rear_delt_flag_5164.py`, over the logged fortnight).
 """
 
 from __future__ import annotations
@@ -178,9 +179,10 @@ def test_the_2026_10_04_drop_trips_the_flag_on_day_14_and_not_day_13(tool):  # n
         assert day13["muscles"][m]["below_mev"] is False, (m, day13["muscles"][m])
         assert day14["muscles"][m]["below_mev"] is True and day14["muscles"][m]["sets_per_wk"] == 0.0, m
     assert {"Calves", "Core"} <= set(day14["flagged"]) and not {"Calves", "Core"} & set(day13["flagged"])
-    # the coarse Shoulders flag stays quiet because pressing carried on (the live read: 8.0/wk) — #5164 owns the finer flag
+    # the coarse Shoulders row stays quiet because pressing carried on (the live read: 8.0/wk) — #5164's movement floor trips
     assert day14["muscles"]["Shoulders"]["sets_per_wk"] == 8.0 and day14["muscles"]["Shoulders"]["below_mev"] is False
     assert day14["muscles"]["Shoulders"]["mev"] == 8  # the landmark, not a copy
+    assert "side_rear_delts" in day14["flagged"] and "side_rear_delts" not in day13["flagged"]
 
 
 def test_the_flag_compares_the_one_count_with_the_landmark_and_can_fail():

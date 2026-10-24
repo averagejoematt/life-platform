@@ -150,7 +150,7 @@ def tool_get_muscle_volume(args):
     The answer echoes what it did in `searched` (window, whose window, phases read) and `method`.
     """
     from training.muscle_volume import METHOD, MUSCLES, window_days, window_start, window_weeks, working_sets_by_muscle
-    from training.volume_floors import below_mev_14d
+    from training.volume_floors import below_mev_14d, logged_movement_sets
 
     end_date = args.get("end_date") or pacific_now().date().isoformat()
     period = args.get("period", "week")  # "week" or "month"
@@ -210,6 +210,9 @@ def tool_get_muscle_volume(args):
                 }
                 for m in MUSCLES
             },
+            # #5164: the movement-counted floors (side/rear delts, traps, upper chest, lats) from the same count's
+            # per-exercise working sets — a press is not side/rear-delt work, so the Shoulders row cannot carry this.
+            "movement_sets": logged_movement_sets(w.get("exercise_sets")),
             "warmup_sets_excluded": w["warmup_sets_excluded"],
         }
 
