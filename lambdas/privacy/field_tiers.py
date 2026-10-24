@@ -325,6 +325,8 @@ SOURCE_TIERS: dict[str, int] = {
     # Carve-out (owner ruling 2026-10-23, #5125 R5): the weekly partner letter — ONE SSM-resolved recipient, never a
     # public surface, never the model's prompt — reads a coarse projection (answered-evenings count + a
     # low/moderate/high band per rating) through `health.checkin_partner_view`; the rows themselves stay owner-only.
+    # #5129 (no carve-out, an owner-surface read): the character sheet reads `stress` into Mind's stress_management,
+    # which `health.character_privacy` holds OUT of the published pillar score and never names as a driver.
     "evening_checkin": TIER_OWNER_ONLY,
     "checkin_intake_pairs": TIER_OWNER_ONLY,
     # #4078: chat writes queued for approval. A queued row carries the target write tool's exact

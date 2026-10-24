@@ -97,8 +97,9 @@ def _section(label, fn):
 
 def _coach_checkin_section():
     """Persisted open questions only — see module docstring for why this
-    never triggers fresh-question generation."""
-    open_items = cc.open_checkins(cc.recent_checkins(table, COACH_IDS))
+    never triggers fresh-question generation. #5127: a question the queue would retire (paused
+    source, past its rotation window) is left out here too — read-only, the queue tool writes."""
+    open_items = cc.servable_open(cc.recent_checkins(table, COACH_IDS))
     questions = [_present_checkin(it) for it in open_items[: cc.MAX_OPEN_QUESTIONS]]
     return {"open_questions": questions, "count": len(questions)}
 

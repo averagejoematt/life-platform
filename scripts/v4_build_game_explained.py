@@ -81,7 +81,7 @@ MECHANICS_FUNCTIONS = (
     "_level_step",
     "evaluate_level_changes",
 )
-RECORDED_ENGINE_FINGERPRINT = "e56973e1c2ee"  # verified against engine v1.7.0 + #1412 provenance passthrough, 2026-07-19
+RECORDED_ENGINE_FINGERPRINT = "f1d96247c11a"  # re-read 2026-10-23 (#5129: owner-only components held out of _weighted_pillar_score — the table labels them); prior e56973e1c2ee, engine v1.7.0 + #1412, 2026-07-19
 
 
 def engine_fingerprint() -> str:
@@ -245,6 +245,9 @@ def _tbl(headers: list[str], rows: list[list[str]], aria: str) -> str:
 # ── Sections ───────────────────────────────────────────────────────────────────
 
 
+_UNRENDERED_KEYS = ("weight", "behavioral", "owner_only_input", "in_pillar_score")
+
+
 def _pillars_section(config: dict) -> str:
     pillars = config.get("pillars", {})
     neglect = (config.get("leveling", {}) or {}).get("neglect_decay", {})
@@ -257,7 +260,10 @@ def _pillars_section(config: dict) -> str:
             cfg = cfg if isinstance(cfg, dict) else {"weight": cfg}
             behavioral = bool(cfg.get("behavioral"))
             kind = '<span class="gx-kind gx-kind-b">behavior</span>' if behavioral else '<span class="gx-kind gx-kind-s">sensor</span>'
-            params = " · ".join(f"{esc(k.replace('_', ' '))} {esc(num(v))}" for k, v in cfg.items() if k not in ("weight", "behavioral"))
+            # #5129: an owner-only input is held out of the published score — say so, never as a parameter dump
+            if ce.character_privacy.component_visibility(comp, cfg)[1]:
+                kind = '<span class="gx-kind gx-kind-s">held out — owner-only input</span>'
+            params = " · ".join(f"{esc(k.replace('_', ' '))} {esc(num(v))}" for k, v in cfg.items() if k not in _UNRENDERED_KEYS)
             rows.append(
                 [
                     f'<span class="rd-name">{esc(comp.replace("_", " "))}</span>',

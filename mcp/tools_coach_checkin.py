@@ -12,7 +12,9 @@ a WRITE tool records the answer verbatim.
                             manual channel) generates fresh questions via the
                             Bedrock chokepoint, grounded in a compact live
                             snapshot (presence, adaptive mode, manual-source
-                            days-since).
+                            days-since). #5127: before serving, an open
+                            question on a paused source or past the 72 h
+                            rotation window is retired (never a skip).
   log_coach_checkin       — record Matthew's answer (or an explicit skip —
                             always valid, zero penalty) verbatim.
 
@@ -51,7 +53,7 @@ MANUAL_SOURCE_COACH = {
     "apple_health": "glucose",  # the hand-captured HAE streams (CGM/BP/mood)
     "notion": "mind",  # journaling
     "measurements": "physical",  # body tape measurements (MCP channel)
-    "food_delivery": "nutrition",  # delivery behavioral signal (MCP channel)
+    "food_delivery": "nutrition",  # delivery behavioral signal (MCP channel) — paused since #5006, so manual_capture_sources() omits it
     "macrofactor": "nutrition",  # food log
 }
 
@@ -239,20 +241,77 @@ def _find_checkin(checkin_id, coach_hint=""):
 # ── tools ────────────────────────────────────────────────────────────────────
 
 
+def _retire_stale(items):
+    """#5127: take down every open question whose driving source is paused or that stood past
+    the rotation window — status `retired` with the code and reason recorded on the row. The
+    write is conditional on the row still being open, so an answer that lands first wins.
+    Returns ([retired summaries], {(pk, sk) taken down}); a failed write is logged and the
+    question is still left out of this call's queue (it is no longer the right one to ask)."""
+    now = cc.utcnow()
+    paused = cc.paused_sources()
+    stamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    retired, gone = [], set()
+    for it in cc.open_checkins(items):
+        verdict = cc.retire_verdict(it, now=now, paused=paused)
+        if not verdict:
+            continue
+        code, reason = verdict
+        gone.add((it.get("pk"), it.get("sk")))
+        try:
+            _table_ref.update_item(
+                Key={"pk": it["pk"], "sk": it["sk"]},
+                UpdateExpression="SET #st = :ret, retired_at = :ts, retired_code = :code, retired_reason = :why",
+                ConditionExpression="#st = :open",
+                ExpressionAttributeNames={"#st": "status"},
+                ExpressionAttributeValues={":ret": cc.STATUS_RETIRED, ":ts": stamp, ":code": code, ":why": reason, ":open": cc.STATUS_OPEN},
+            )
+        except Exception as e:  # noqa: BLE001 — a lost retire write never blocks the queue
+            logger.warning(f"[#5127] retire write failed for {it.get('sk')}: {type(e).__name__}: {e}")
+            continue
+        retired.append({"checkin_id": it.get("sk"), "coach_id": it.get("coach_id"), "retired_code": code, "retired_reason": reason})
+    return retired, gone
+
+
+def _stamp_served(items):
+    """#5127: record that the queue handed these questions out — the nightly queue-age check
+    tells a question nobody has looked at (fine) from one served past its rotation (stuck)."""
+    stamp = cc.now_iso()
+    for it in items:
+        try:
+            _table_ref.update_item(
+                Key={"pk": it["pk"], "sk": it["sk"]},
+                UpdateExpression="SET last_served_at = :ts ADD served_count :one",
+                ExpressionAttributeValues={":ts": stamp, ":one": 1},
+            )
+        except Exception as e:  # noqa: BLE001 — bookkeeping only
+            logger.warning(f"[#5127] served stamp failed for {it.get('sk')}: {type(e).__name__}: {e}")
+
+
 def tool_get_coach_checkin_queue(args):
     """Up to 3 open coach check-in questions; generates (and persists) fresh
-    ones only when the queue is empty. Re-calls return the same open questions."""
+    ones only when the queue is empty. Re-calls return the same open questions.
+
+    #5127: an open question leaves first when its driving source is paused or it has
+    stood past the rotation window (cc.QUEUE_ROTATE_HOURS) — recorded as `retired`, never
+    as a skip — so the queue rotates to the next coach instead of sticking."""
     args = args or {}
-    already_open = cc.open_checkins(cc.recent_checkins(_table_ref, COACH_IDS))
+    recent = cc.recent_checkins(_table_ref, COACH_IDS)
+    retired, gone = _retire_stale(recent)
+    already_open = [it for it in cc.open_checkins(recent) if (it.get("pk"), it.get("sk")) not in gone]
     if already_open:
-        return {
-            "open_questions": [_present(it) for it in already_open[: cc.MAX_OPEN_QUESTIONS]],
+        served = already_open[: cc.MAX_OPEN_QUESTIONS]
+        _stamp_served(served)
+        out = {
+            "open_questions": [_present(it) for it in served],
             "generated": False,
             "how_to_use": (
                 "These are the coaches' standing questions — ask Matthew conversationally, one at a time, "
                 "then call log_coach_checkin with his verbatim answer (or skip=true; skipping always carries zero penalty)."
             ),
         }
+        if retired:
+            out["retired"] = retired
+        return out
 
     # Empty queue → one coach generates fresh questions, grounded in live context.
     count = args.get("count", cc.MAX_OPEN_QUESTIONS)
@@ -273,9 +332,10 @@ def tool_get_coach_checkin_queue(args):
     if requested_coach:
         if requested_coach not in COACH_IDS:
             return {"error": f"unknown coach_id '{requested_coach}'. Valid: " + ", ".join(COACH_IDS)}
-        coach_id, reason = requested_coach, "explicitly requested"
+        coach_id, reason, source_key = requested_coach, "explicitly requested", None
     else:
-        coach_id, reason = cc.pick_asking_coach(COACH_IDS, manual_signal, cc.recent_checkins(_table_ref, COACH_IDS, days=90))
+        pick = cc.pick_asking_coach_detail(COACH_IDS, manual_signal, cc.recent_checkins(_table_ref, COACH_IDS, days=90))
+        coach_id, reason, source_key = pick["coach"], pick["reason"], pick.get("source")
 
     coach_name = COACH_NAMES.get(coach_id, coach_id)
     questions = cc.generate_questions(coach_id, coach_name, _coach_bio(coach_id), snapshot, count)
@@ -305,12 +365,14 @@ def tool_get_coach_checkin_queue(args):
             "context_reason": reason,
             "generated_by": generated_by,
         }
+        if source_key:
+            item["source_key"] = source_key  # #5127: the driving channel, so a later pause retires it by key
         if cycle is not None:
             item["cycle"] = int(cycle)
         _table_ref.put_item(Item=item)
         saved.append(_present(item))
 
-    return {
+    out = {
         "open_questions": saved,
         "generated": True,
         "generated_by": generated_by,
@@ -320,6 +382,9 @@ def tool_get_coach_checkin_queue(args):
             "answer (or skip=true). Skipping is always valid with zero penalty. Never nag; this only makes the ask possible."
         ),
     }
+    if retired:
+        out["retired"] = retired
+    return out
 
 
 def tool_log_coach_checkin(args):

@@ -61,6 +61,7 @@ from operational import (
     chronicle_manifest_qa,  # noqa: E402  (#3485)
     chronicle_status_row_qa,  # noqa: E402  (#3563 dead-man)
     closure_probe_qa,  # noqa: E402  (#4022 close-on-first-live-output)
+    coach_checkin_queue_qa,  # noqa: E402  (#5127: the check-in queue served past rotation / on a paused source)
     ensemble_digest_qa,  # noqa: E402  (#3829 dead-man)
     habit_cross_source_qa,  # noqa: E402  (#3666 cross-source contract)
     hae_additive_integrity_qa,  # noqa: E402  (#4628: a stored Apple Health day total below the delivered readings)
@@ -1166,6 +1167,7 @@ def check_steps():
         ("protein_nudge_liveness", lambda: nudge_ledger_qa.check_protein_nudge_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5098
         ("evening_checkin_liveness", lambda: nudge_ledger_qa.check_evening_checkin_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5106
         ("checkin_pair_liveness", lambda: nudge_ledger_qa.check_checkin_pair_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5211
+        ("coach_checkin_queue_age", lambda: coach_checkin_queue_qa.check_queue_age(table, Check, CONTENT_TRUTH)),  # #5127
         # #3829 dead-man: coach-ensemble-digest writes exactly one ENSEMBLE#digest row per cycle on EVERY
         # non-crashing path (including the budget-tier pause), so a missing CYCLE# row is unambiguous. Two of
         # four cycles were missing for eight days with nothing reporting it but a DLQ alarm a human read at wrap.

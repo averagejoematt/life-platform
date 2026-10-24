@@ -3,26 +3,31 @@ Weekly Correlation Compute Lambda — v1.0.0 (R8-LT9)
 Scheduled Sunday at 11:30 AM PT (18:30 UTC via EventBridge).
 Runs after ingestion week is complete but before hypothesis engine (12:00 PM PT).
 
-Computes Pearson correlations between ~20 key metric pairs over a rolling 90-day
+Computes Pearson correlations between the CORRELATION_PAIRS metric pairs over a rolling 90-day
 window and stores results to SOURCE#weekly_correlations. MCP tools can read this
 partition for instant correlation lookups instead of computing from raw sources.
 
 DynamoDB partition written:
   SOURCE#weekly_correlations   sk: WEEK#<iso_week>   (e.g. WEEK#2026-W11)
 
-Correlation pairs computed:
-  Recovery/Sleep    hrv vs recovery, sleep_duration vs recovery, hrv vs sleep_score
-  Training          tsb vs recovery, strain vs hrv, zone2_min vs hrv
-  Nutrition         protein_g vs recovery, calories vs hrv, carbs vs glucose_mean
-  Habits            tier0_pct vs day_grade, tier01_pct vs recovery
-  Lifestyle         steps vs recovery, steps vs hrv, mood_score vs hrv
-  Weight            weight_lbs vs recovery, calories vs weight_change
-  Cross-domain (#1406, lagged, the fulfillment↔physiology boundary)
-                    values_lived today → protocol adherence tomorrow,
-                    glucose variability (%CV) today → mood valence tomorrow
+Correlation pairs computed (exactly the labels in CORRELATION_PAIRS below — #5129 pins the two
+against each other; the old list here named a mood/HRV pair that was never computed):
+  Recovery / HRV    `hrv_vs_recovery`, `sleep_duration_vs_recovery`, `sleep_score_vs_recovery`,
+                    `hrv_vs_sleep_score`, `rhr_vs_recovery`
+  Training          `tsb_vs_recovery`, `strain_vs_hrv`, `training_load_vs_hrv`, `training_mins_vs_recovery`
+  Nutrition         `protein_vs_recovery`, `calories_vs_hrv`, `carbs_vs_hrv`
+  Steps             `steps_vs_recovery`, `steps_vs_hrv`, `steps_vs_sleep`
+  Habits            `habit_pct_vs_day_grade`, `habit_pct_vs_recovery`, `tier0_streak_vs_day_grade`
+  Day grade         `calories_vs_day_grade`, `readiness_vs_day_grade`
+  Lagged (D -> D+1) `hrv_predicts_next_day_load`, `recovery_predicts_next_day_load`,
+                    `load_predicts_next_day_recovery`
+  Cross-domain (#1406, lagged, the fulfillment<->physiology boundary)
+                    `values_lived_predicts_next_day_adherence`,
+                    `glucose_variability_predicts_next_day_mood` (the ONE mood pair: glucose %CV -> mood valence)
   Diary-as-intervention (#1843, cross-sectional)
-                    video-diary/solo-recording session count vs same-day habit
-                    adherence — is the diary itself measurement reactivity?
+                    `diary_day_vs_habit_pct` — is the diary itself measurement reactivity?
+The owner-only check-in -> intake family (#5106) is computed by health.checkin_intake_pairs and
+stored apart from this record; it is not part of CORRELATION_PAIRS.
 
 Schedule: cron(30 18 ? * SUN *) — Sunday 11:30 AM PT (30 min before hypothesis engine)
 

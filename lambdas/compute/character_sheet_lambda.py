@@ -362,6 +362,10 @@ def assemble_data(yesterday_str):
     # journal_enrichment) — primary input for Relationships' social component and
     # the Mind values_alignment component. Absent row = uninstrumented day.
     data["flourishing"] = fetch_date("flourishing", yesterday_str)
+    # #5129: the evening check-in (#5106) for this Pacific evening — Mind's stress_management reads
+    # its owner-only `stress` rating (0-4). The partition stays out of collect_input_rows: the
+    # progression receipt is served publicly, and even the row key says whether he checked in.
+    data["evening_checkin"] = fetch_date("evening_checkin", yesterday_str)
 
     # #913: presence signal (adaptive_mode_lambda.compute_and_store_engagement)
     # — drives neglect atrophy + character_mood in the engine. The dated record
