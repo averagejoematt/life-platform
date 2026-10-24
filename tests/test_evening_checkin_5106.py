@@ -313,12 +313,18 @@ def test_dead_man_is_registered_in_the_nightly_run():
     assert "nudge_ledger_qa.check_evening_checkin_liveness(" in src
 
 
-def test_the_evening_rule_is_owner_required_cdk_and_not_on_main_yet():
-    """The schedule row, the rule (its Lambda permission) and the worker's write grant are owner-required CDK:
-    they land together in PR #5218 with the owner's attended `cdk_deploy.sh LifePlatformServe`, which replaces
-    this test with the quiet-hours/row/rule/grant assertions."""
+def test_the_schedule_row_lands_before_quiet_hours_in_both_offsets():
+    from coach.coach_outbound import QUIET_START_HOUR
+
     rows = json.load(open(os.path.join(REPO, "config", "schedules.json"), encoding="utf-8"))["schedules"]
-    assert "telegram-coach-worker#TelegramEveningCheckin" not in rows
+    row = rows["telegram-coach-worker#TelegramEveningCheckin"]
+    assert row["stack"] == "LifePlatformServe" and row["expression"] == "cron(0 3 * * ? *)" and "timezone" not in row
+    for offset in (7, 8):  # PDT, PST
+        assert (3 - offset) % 24 < QUIET_START_HOUR
+    stack = open(os.path.join(REPO, "cdk", "stacks", "serve_stack.py"), encoding="utf-8").read()
+    assert '"TelegramEveningCheckin"' in stack and '{"kind": "evening_checkin"}' in stack
+    grants = open(os.path.join(REPO, "cdk", "stacks", "role_policies_serve.py"), encoding="utf-8").read()
+    assert '"USER#matthew#SOURCE#evening_checkin"' in grants
 
 
 # ── the pair join ───────────────────────────────────────────────────────────────────────────────

@@ -1025,7 +1025,7 @@
     "ai_features": 30,
     "alarms": 141,
     "emf_namespaces": 33,
-    "schedules": 96,
+    "schedules": 97,
     "secrets": 30
   },
   "edges": [
@@ -7830,6 +7830,11 @@
           "resolution": "table"
         },
         {
+          "expr": "cron(0 3 * * ? *)",
+          "key": "telegram-coach-worker#TelegramEveningCheckin",
+          "resolution": "table"
+        },
+        {
           "expr": "cron(15 17 ? * MON-FRI *)",
           "key": "telegram-coach-worker#TelegramMorningCheckin",
           "resolution": "table"
@@ -8063,7 +8068,7 @@
       "privacy_sources_owner_only": 23,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 81,
-      "schedules": 96
+      "schedules": 97
     },
     "coverage": {
       "edge_sites": {
@@ -9034,6 +9039,13 @@
       "lambda": "site-stats-refresh",
       "resolution": "table",
       "stack": "operational_stack",
+      "utc": "03:00"
+    },
+    {
+      "expr": "cron(0 3 * * ? *)",
+      "lambda": "telegram-coach-worker",
+      "resolution": "table",
+      "stack": "serve_stack",
       "utc": "03:00"
     },
     {
