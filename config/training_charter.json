@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.26.0",
+  "version": "1.27.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -175,6 +175,13 @@
       "date": "2026-10-24",
       "by": "owner ruling 2026-10-23 (Session CD) on epic #5093: R3 yes, the late-December trip is a planned maintenance week (eat at maintenance; pass within +/-2 lb of the start weight); R4 no second rehearsal near 240 lb. The reverse diet's numbers are the issue's posted defaults and the redlines' settle line, named as platform defaults pending his ruling",
       "what": "#5107: nutrition.maintenance_weeks, the late-December window (dates null: the travel window's, owner-set; the engine is inert until set), maintenance at the expenditure reconciliation's best match, the +/-2 lb grade and its 3-day weigh-in reach (a platform default), the trend rule and R4's one rehearsal; nutrition.reverse_diet from 2027-06-01, stepping food up by the titration's own step each week until the 14-day trend is inside +/-0.5 lb/wk, entry step null pending his ruling. health.maintenance_week is the reader, through the weekly titration decision; the resolver serves the maintenance kcal on the window's dates.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.27.0",
+      "date": "2026-10-24",
+      "by": "owner rulings 2026-10-23 (attended, Session CD): R3 'yes: the trip is a planned maintenance week, so the travel kit is needed by mid-December' (#5104, #5107); R6 'meal service on weekdays, the code-built menu at weekends'; R7 'no excluded foods'",
+      "what": "#5104 N10: nutrition.travel_food, the travel food kit's dates and rulings: ready_by 2026-12-15 (mid-December), the owner-only reminder prompt_days_before_ready 14 days earlier and its dead-man on ready_by while the trip dates are still unset (training.calibration_cadence, kind travel_food_kit), retire_after once the trip is past, default_trip_days (the kit's length until travel.windows carries dates) and spare_days of packed food. The day plan, grocery list, packing list and hotel/restaurant playbook are built by code (health.travel_food) from the existing protein, floor, eating-window and calorie numbers; disruption mode carries the playbook on a travel template. travel.windows' late-December entry names the kit. No new target number.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -479,7 +486,7 @@
   },
   "travel": {
     "windows": [
-      {"label": "late December 2026", "start": null, "end": null, "templates": "#5088"}
+      {"label": "late December 2026", "start": null, "end": null, "templates": "#5088", "food": "nutrition.travel_food (#5104)"}
     ],
     "rule": "travel templates by mid-December; no calendar blocking"
   },
@@ -739,6 +746,20 @@
       "settle_trend_lb_wk": 0.5,
       "rule": "from the ISO week holding starts_on, each weekly read on a measured trend with the week's complete logs: losing faster than settle_trend_lb_wk steps food UP by the weekly step; a trend inside +/-settle_trend_lb_wk holds (reverse_diet_settled); gaining faster than it holds with a warning (reverse_diet_gaining: the redlines' landing overshoot rules govern, the engine never steps food down here). Inside the reverse diet the cut band, the walking-first rule and the planned minimum do not govern (one decision a week, no double rule); a dated maintenance window still outranks it",
       "provenance": "platform defaults from the issue's posted defaults (#5107: '+100-150 kcal/wk from 1 June'), the settle line from the redlines' landing.calories ('until the 14-day trend reads 0 +/- 0.5 lb/wk'); starts_on and settle_trend_lb_wk pending an owner ruling"
+    },
+    "travel_food": {
+      "_note": "The travel food kit (#5104 N10): its dates and the rulings it carries. The day plan, the grocery list, the packing list and the hotel/restaurant playbook are BUILT by health.travel_food from the protein, floors, eating-window and calorie numbers above (no number is restated here); the foods are generic, never the owner's log.",
+      "window_label": "late December 2026",
+      "ready_by": "2026-12-15",
+      "prompt_days_before_ready": 14,
+      "retire_after": "2027-01-10",
+      "default_trip_days": 7,
+      "spare_days": 1,
+      "maintenance_week": true,
+      "maintenance_rule": "owner ruling 2026-10-23 R3 (#5104, #5107): the trip is a planned maintenance week; the calorie target that week is the maintenance estimate (#5107), the protein floor, the feedings and the eating window are unchanged",
+      "meal_service": "owner ruling 2026-10-23 R6: weekday meal service, the code-built menu at weekends; the service does not travel, so it is paused for the trip dates",
+      "excluded_foods_rule": "owner ruling 2026-10-23 R7: no excluded foods; the core habits (habits.core) still apply",
+      "provenance": "owner (the dates and rulings); the kit's contents are platform-built for the owner's review"
     },
     "floors": {
       "fat": {"floor_g": 65, "unit": "g", "per_meal_g": 10, "meals_with_fat": 3, "epa_dha_g": 2},

@@ -231,6 +231,7 @@ def test_the_calibration_block_carries_the_battery_row_and_a_failed_read_is_read
         ft.CALIBRATION_KIND,
         "nutrition_titration",
         "post_may_plan",
+        "travel_food_kit",  # #5104: the dated travel-food-kit prompt (`health.travel_food.CALIBRATION_KIND`)
     } and ft.CALIBRATION_KIND not in cc.deadman_kinds(block)
 
 

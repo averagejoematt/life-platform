@@ -521,6 +521,12 @@ _CHARTER_PUBLISHED_READER_PY = (
 )
 
 # #5061: a published module (lambdas/emails) that imports the owner-only calibration cadence (tape / photo / DEXA due dates).
+_TRAVEL_FOOD_PUBLISHED_IMPORTER_PY = (
+    '"""census probe — a published importer of the owner-only travel food kit that must never exist."""\n\n'
+    "from health import travel_food\n\n\n"
+    "def handle():\n"
+    "    return travel_food.build(None)\n"
+)
 _CALIBRATION_PUBLISHED_IMPORTER_PY = (
     '"""census probe — a published importer of the owner-only calibration cadence that must never exist."""\n\n'
     "from training import calibration_cadence\n\n\n"
@@ -1424,6 +1430,17 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         plants=(("lambdas/health/_census_probe_5095.py", _CALORIE_LITERAL_PY),),
         track=False,  # the guard rglobs lambdas/ mcp/ deploy/ scripts/ on disk, so an untracked module is in scope
     ),
+    # #5104: the owner-only travel food kit — no published (web) or email module imports it.
+    "structural::test_travel_food_kit_5104.py": MutationSpec(
+        gate_id="structural::test_travel_food_kit_5104.py",
+        target="tests/test_travel_food_kit_5104.py",
+        detects=(
+            "a published module (lambdas/web or lambdas/emails) importing the owner-only travel food kit, which carries the "
+            "owner's trip dates, the maintenance-week target and the calorie plan (owner context, never a reader surface)"
+        ),
+        plants=(("lambdas/web/_census_probe_5104.py", _TRAVEL_FOOD_PUBLISHED_IMPORTER_PY),),
+        track=False,  # the guard os.walks lambdas/web + lambdas/emails on disk, so an untracked module is in scope
+    ),
     # #5099: the eating window is the charter's — no code string under lambdas/ mcp/ types its own.
     "structural::test_eating_window_reads_5099.py": MutationSpec(
         gate_id="structural::test_eating_window_reads_5099.py",
@@ -1502,6 +1519,15 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_travel_food_kit_5104.py": _proof(
+        "structural::test_travel_food_kit_5104.py",
+        "ARMED 1/1 — baseline: 14 passed in 10.03s | mutated: 1 failed, 13 passed in 10.07s :: "
+        "test_no_published_or_email_module_imports_the_kit | reverted: 14 passed in 8.88s",
+        "lambdas/web/ and lambdas/emails/ on disk (os.walk, every .py): any mention of `travel_food` fails and names the file. "
+        "STILL INVISIBLE, stated: a published module handed the kit by an unswept caller (mcp/, lambdas/coach), a dynamic import "
+        "by string, and a copy of the kit's contents under another name.",
+        proved_on="2026-10-24",
+    ),
     "structural::test_repo_walk_5273.py": _proof(
         "structural::test_repo_walk_5273.py",
         "ARMED 1/1 — baseline: 11 passed in 0.90s | mutated: 1 failed, 10 passed in 0.90s :: "
