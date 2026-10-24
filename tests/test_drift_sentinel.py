@@ -865,9 +865,15 @@ _RC_RULESET = {  # the #1662/ADR-148 fast-lane required-checks ruleset, as scrip
         }
     ],
 }
-_SECURITY_AND_ANALYSIS = {  # LIVE-SHAPE 2026-10-13 (#4887), trimmed to the fields the posture reads
+# LIVE-SHAPE 2026-10-23 (#4887): the WHOLE block `gh api repos/averagejoematt/life-platform
+# --jq .security_and_analysis` returned, untrimmed — the three sibling fields the posture does
+# not declare are kept so the comparison is proven to key on the right two, not on a lone pair.
+_SECURITY_AND_ANALYSIS = {
+    "dependabot_security_updates": {"status": "enabled"},
     "secret_scanning": {"status": "enabled"},
+    "secret_scanning_non_provider_patterns": {"status": "disabled"},
     "secret_scanning_push_protection": {"status": "enabled"},
+    "secret_scanning_validity_checks": {"status": "disabled"},
 }
 _REPO_AUTO_MERGE_ON = {
     "full_name": "averagejoematt/life-platform",
@@ -1100,6 +1106,28 @@ def test_github_config_secret_scanning_drifts_when_declaration_flipped(monkeypat
     monkeypatch.setattr(sg, "_load_github_posture", lambda: posture)
     _fake_gh(monkeypatch, _config_routes(env=(_ENV_WITH_REVIEWERS, None)))
     assert ds.check_github_config()["surfaces"]["secret_scanning"]["status"] == "drift"
+
+
+def test_github_config_secret_scanning_ignores_undeclared_sibling_fields(monkeypatch):
+    # #4887: the live block carries three fields the posture does not declare. Flipping every
+    # one of them must leave the surface clean (it keys on secret_scanning + push protection
+    # only), and the reported live map names exactly the two declared settings.
+    saa = {k: dict(v) for k, v in _SECURITY_AND_ANALYSIS.items()}
+    for field in ("dependabot_security_updates", "secret_scanning_non_provider_patterns", "secret_scanning_validity_checks"):
+        saa[field]["status"] = "enabled" if saa[field]["status"] == "disabled" else "disabled"
+    repo = ({**_REPO_AUTO_MERGE_ON, "security_and_analysis": saa}, None)
+    _fake_gh(monkeypatch, _config_routes(env=(_ENV_WITH_REVIEWERS, None), repo=repo))
+    ss = ds.check_github_config()["surfaces"]["secret_scanning"]
+    assert ss == {"status": "clean", "live": {"secret_scanning": "enabled", "push_protection": "enabled"}}
+
+
+def test_github_config_secret_scanning_drifts_when_push_protection_field_absent(monkeypatch):
+    # A block that omits the push-protection field is not "enabled" — it reads as drift, never clean.
+    saa = {k: dict(v) for k, v in _SECURITY_AND_ANALYSIS.items() if k != "secret_scanning_push_protection"}
+    repo = ({**_REPO_AUTO_MERGE_ON, "security_and_analysis": saa}, None)
+    _fake_gh(monkeypatch, _config_routes(env=(_ENV_WITH_REVIEWERS, None), repo=repo))
+    ss = ds.check_github_config()["surfaces"]["secret_scanning"]
+    assert ss["status"] == "drift" and ss["live"]["push_protection"] is None
 
 
 def test_github_config_secret_scanning_unavailable_without_admin_block(monkeypatch):
