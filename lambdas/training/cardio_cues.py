@@ -186,7 +186,8 @@ def attach_cardio_cues(
         )
         placed.append(audit["kind"])
         if existing and not cardio_note.is_composed(existing) and existing != note:
-            replaced.append({"movement_key": key, "notes": existing})
+            # #5312: old/new kind so the draft result can state what replaced what he authored
+            replaced.append({"movement_key": key, "notes": existing, "old_kind": authored, "new_kind": audit["kind"]})
         ex.notes = note
         audits.append({"movement_key": key, **audit})
         stamped += 1

@@ -256,7 +256,9 @@ def test_the_authors_own_note_is_replaced_by_the_prescription_and_kept_on_the_sn
     bike = ir.exercises[0]
     assert bike.notes.startswith("Recumbent bike · 40 min · level 15 ")  # the author's "flat" stands: an easy block
     assert "hold 115-120 bpm" not in bike.notes
-    assert ir.inputs_snapshot["cardio_notes_replaced"] == [{"movement_key": "cycling", "notes": "Level 10 flat, 40 min, hold 115-120 bpm"}]
+    rep = ir.inputs_snapshot["cardio_notes_replaced"]
+    assert [(r["movement_key"], r["notes"]) for r in rep] == [("cycling", "Level 10 flat, 40 min, hold 115-120 bpm")]
+    assert rep[0]["old_kind"] == "easy" and rep[0]["new_kind"]  # #5312: old and new kind are stated
 
 
 def test_the_cue_is_on_the_PERSISTED_draft_because_that_is_what_commit_pushes():

@@ -818,6 +818,13 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     # #5005 slot tags (the commit gate checks the engine's floors), #5049 the warm-up climb, #5057 the stall rule's step
     finished = finish_custom_draft(ir, catalog, args)
     draft_versioned(ir)
+    # #5312: every authored cardio note the composer replaced is stated, with its old and new kind
+    for r in (ir.inputs_snapshot or {}).get("cardio_notes_replaced") or []:
+        warnings = warnings + [
+            f"Replaced your authored {r.get('movement_key')} note ({str(r.get('notes') or '')[:80]!r}): "
+            f"read as {r.get('old_kind') or 'no recognised kind'}, wrote {r.get('new_kind')}. "
+            "The original is kept on the draft's inputs_snapshot.cardio_notes_replaced."
+        ]
     resp = {
         "status": "drafted_custom",
         "routine_id": ir.routine_id,

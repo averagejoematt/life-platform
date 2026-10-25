@@ -115,9 +115,24 @@ def composed_kind(note: str | None) -> str | None:
     return "tempo" if re.match(r"(?:hard flat \d+|tempo):", m.group("effort")) else "easy"
 
 
+# #5312 — a note that rules a kind OUT ("No intervals", "skip the hills", "without tempo") never names it.
+_NEGATED_KIND = re.compile(
+    r"\b(?:no|not|without|skip|skipping|avoid|avoiding|never|don'?t(?:\s+do)?|instead\s+of)\s+"
+    r"(?:(?:any|the|a|an|hard|fast|hill|high|intense|short)\s+)*"
+    r"(?:intervals?|interval\w*|hills?|hilly|climbs?|climbing|tempo|hard)\b",
+    re.IGNORECASE,
+)
+
+
+def strip_negated(note: str | None) -> str:
+    """`note` with every negated kind word ("no intervals", "not tempo", "skip the intervals") removed, so a kind
+    the author ruled out is never read as the kind he asked for."""
+    return _NEGATED_KIND.sub(" ", note or "")
+
+
 def shape_of(note: str | None) -> str:
     """The shape a performed ride's own note names. A note that names none is a flat ride."""
-    text = note or ""
+    text = strip_negated(note)
     if _INTERVAL_WORD.search(text):
         return "intervals"
     if _HILL_WORD.search(text):
