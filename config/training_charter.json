@@ -185,6 +185,13 @@
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     },
     {
+      "version": "1.28.0",
+      "date": "2026-10-24",
+      "by": "the mind panel review 2026-10-18 (#5121, epic #5120); no new owner ruling: every new number is a platform default named as one, pending his ruling, except the two the owner's own words in config/user_goals.json failure_mode.early_warning_signals already state (under 3 sessions a week for 2 weeks; the weight trend reversing up over 7 days), which are restated here with that provenance",
+      "what": "#5121: early_warning, the relapse early-warning detector's thresholds as data (health.early_warning, run nightly by daily-insight-compute): min_signals 2 (two lapse signals together raise ONE owner-only flag, one alone never does), lookback_days 60 (a channel with no record inside it is absent, never silent), and six signals beside the four the detector already read: weigh_in_cadence (3 days without a weigh-in), food_log_gap (2 of the last 3 days under the titration rule's complete-log line), step_drop (the 7-day mean 35% or more under the 28 days before, n 5 and 14), checkin_silence (3 evenings with no answered check-in after at least one answered), weight_reversal (the 7-day weigh-in mean 1 lb or more above the 7 days before, n 3 each) and sessions_below_plan (under 3 Hevy sessions in each of the last 2 weeks). The flag is owner-only: stored in USER#matthew#SOURCE#early_warning_flag, sent by the response owner (failure_mode.response_owner) on the owner's own Telegram seat, never on a published surface and never in the shared brief context.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
       "version": "1.29.0",
       "date": "2026-10-24",
       "by": "epic #5120 (owner-requested mind/coping/habits panel review 2026-10-18), M2 #5122: the playbook and the protocol are the panel's defaults, named as platform defaults pending his ruling; the switch stays his (the disruption-mode owner ruling of 2026-10-18: the coach offers, never imposes)",
@@ -200,7 +207,10 @@
     "rate_band_lb_per_wk": {
       "floor": 3.0,
       "ceiling": 3.5,
-      "shown_as": ["lb_per_wk", "pct_bodyweight_per_wk"],
+      "shown_as": [
+        "lb_per_wk",
+        "pct_bodyweight_per_wk"
+      ],
       "note": "always shown in lb AND as a percent of bodyweight"
     },
     "precedence": "the owner clinical guidance record (USER#matthew#SOURCE#clinical, GUIDANCE#current) outranks the rate band wherever the two conflict; it is reference context, never a gate on intensity",
@@ -222,9 +232,26 @@
   },
   "split": {
     "lifting_days_per_wk": 5,
-    "sequence": ["Upper-heavy", "Lower-heavy", "Shoulders+arms", "Upper-volume", "Lower-volume"],
-    "frequency": {"each_major_muscle_per_wk": 2, "delts_per_wk": 3, "overhead_press_per_wk": 1},
-    "session_minutes": {"lifting": [60, 75], "cardio_block_max": 30, "stretching_max": 10},
+    "sequence": [
+      "Upper-heavy",
+      "Lower-heavy",
+      "Shoulders+arms",
+      "Upper-volume",
+      "Lower-volume"
+    ],
+    "frequency": {
+      "each_major_muscle_per_wk": 2,
+      "delts_per_wk": 3,
+      "overhead_press_per_wk": 1
+    },
+    "session_minutes": {
+      "lifting": [
+        60,
+        75
+      ],
+      "cardio_block_max": 30,
+      "stretching_max": 10
+    },
     "minimum_session": {
       "minutes": 20,
       "shape": "anchors only, top set + one back-off",
@@ -238,14 +265,34 @@
   },
   "volume_priorities": {
     "sets_per_wk": {
-      "side_rear_delts": [14, 18],
-      "lats": [4, 4],
-      "upper_chest": [0, 0],
-      "legs": [8, 10],
-      "arms": [6, 6]
+      "side_rear_delts": [
+        14,
+        18
+      ],
+      "lats": [
+        4,
+        4
+      ],
+      "upper_chest": [
+        0,
+        0
+      ],
+      "legs": [
+        8,
+        10
+      ],
+      "arms": [
+        6,
+        6
+      ]
     },
     "legs_posture": "strong maintenance",
-    "mev_floors_in_every_template": ["side_rear_delts", "traps", "calves", "core"]
+    "mev_floors_in_every_template": [
+      "side_rear_delts",
+      "traps",
+      "calves",
+      "core"
+    ]
   },
   "steps": {
     "floor": 12000,
@@ -255,7 +302,9 @@
     "ramp": {
       "from": "the trailing average over `ramp_window_days`",
       "ramp_window_days": 14,
-      "owner_adjustable": ["ramp_window_days"],
+      "owner_adjustable": [
+        "ramp_window_days"
+      ],
       "held_by": "a lower-leg strain flag holds the ramp at its current level"
     },
     "gym_cardio_minutes_count_toward_movement": true,
@@ -280,18 +329,69 @@
   },
   "habits": {
     "core": [
-      {"id": "weigh_in", "label": "weigh in", "basis": "habitify"},
-      {"id": "food_logged", "label": "food logged", "basis": "habitify"},
-      {"id": "calories_in_band", "label": "calories in band", "basis": "habitify"},
-      {"id": "protein_floor", "label": "protein at or above the floor", "basis": "habitify", "rule_ref": "nutrition.protein.range_g.low"},
-      {"id": "steps_floor", "label": "steps at or above the floor", "basis": "steps", "rule_ref": "steps.floor"},
-      {"id": "planned_session_done", "label": "planned session done", "basis": "habitify"},
-      {"id": "evening_checkin", "label": "evening check-in", "basis": "evening_checkin"},
-      {"id": "no_alcohol", "label": "no alcohol", "basis": "habitify"},
-      {"id": "no_solo_takeout", "label": "no solo takeout", "basis": "habitify"},
-      {"id": "no_sweets_or_fried", "label": "no sweets or fried food", "basis": "habitify"},
-      {"id": "out_of_bed_on_time", "label": "out of bed on time", "basis": "wake_consistency", "rule_ref": "sleep.wake_time"},
-      {"id": "one_connection", "label": "one connection", "basis": "habitify"}
+      {
+        "id": "weigh_in",
+        "label": "weigh in",
+        "basis": "habitify"
+      },
+      {
+        "id": "food_logged",
+        "label": "food logged",
+        "basis": "habitify"
+      },
+      {
+        "id": "calories_in_band",
+        "label": "calories in band",
+        "basis": "habitify"
+      },
+      {
+        "id": "protein_floor",
+        "label": "protein at or above the floor",
+        "basis": "habitify",
+        "rule_ref": "nutrition.protein.range_g.low"
+      },
+      {
+        "id": "steps_floor",
+        "label": "steps at or above the floor",
+        "basis": "steps",
+        "rule_ref": "steps.floor"
+      },
+      {
+        "id": "planned_session_done",
+        "label": "planned session done",
+        "basis": "habitify"
+      },
+      {
+        "id": "evening_checkin",
+        "label": "evening check-in",
+        "basis": "evening_checkin"
+      },
+      {
+        "id": "no_alcohol",
+        "label": "no alcohol",
+        "basis": "habitify"
+      },
+      {
+        "id": "no_solo_takeout",
+        "label": "no solo takeout",
+        "basis": "habitify"
+      },
+      {
+        "id": "no_sweets_or_fried",
+        "label": "no sweets or fried food",
+        "basis": "habitify"
+      },
+      {
+        "id": "out_of_bed_on_time",
+        "label": "out of bed on time",
+        "basis": "wake_consistency",
+        "rule_ref": "sleep.wake_time"
+      },
+      {
+        "id": "one_connection",
+        "label": "one connection",
+        "basis": "habitify"
+      }
     ],
     "bases": {
       "habitify": "the day's Habitify check-in of every habit_registry entry whose `core` flag is this id (by vendor id, then names, then aliases; a paused entry is not scheduled); done when every member is done, missed when any member is observed not done, unknown otherwise",
@@ -309,22 +409,97 @@
   "cardio_menu": {
     "default": "incline_treadmill_walk",
     "conditioning_sessions_per_wk": 2,
-    "every_block_carries": ["level", "speed", "rpe_or_talk_test"],
+    "every_block_carries": [
+      "level",
+      "speed",
+      "rpe_or_talk_test"
+    ],
     "progression": "same RPE at a higher level",
     "blocks": {
-      "easy": {"rpe": [4, 5], "talk_test": "full sentences", "machines": ["cycling", "elliptical", "rowing_machine"]},
-      "tempo": {"label": "hard flat 40", "rpe": [6, 7], "minutes": 40, "talk_test": "short phrases", "machines": ["cycling", "elliptical", "rowing_machine"]},
-      "hills": {"rpe": [5, 7], "talk_test": "short phrases on the climbs", "shape": "incline then decline", "machines": ["treadmill", "cycling", "elliptical"]},
-      "intervals": {"rpe_hard_minutes": 8, "note": "RPE 8 on the hard minutes; open by RPE / talk test", "talk_test": "a few words on the hard minutes", "work_easy_minutes": [2, 2], "efforts": 5, "machines": ["cycling", "air_bike", "rowing_machine", "elliptical"]},
+      "easy": {
+        "rpe": [
+          4,
+          5
+        ],
+        "talk_test": "full sentences",
+        "machines": [
+          "cycling",
+          "elliptical",
+          "rowing_machine"
+        ]
+      },
+      "tempo": {
+        "label": "hard flat 40",
+        "rpe": [
+          6,
+          7
+        ],
+        "minutes": 40,
+        "talk_test": "short phrases",
+        "machines": [
+          "cycling",
+          "elliptical",
+          "rowing_machine"
+        ]
+      },
+      "hills": {
+        "rpe": [
+          5,
+          7
+        ],
+        "talk_test": "short phrases on the climbs",
+        "shape": "incline then decline",
+        "machines": [
+          "treadmill",
+          "cycling",
+          "elliptical"
+        ]
+      },
+      "intervals": {
+        "rpe_hard_minutes": 8,
+        "note": "RPE 8 on the hard minutes; open by RPE / talk test",
+        "talk_test": "a few words on the hard minutes",
+        "work_easy_minutes": [
+          2,
+          2
+        ],
+        "efforts": 5,
+        "machines": [
+          "cycling",
+          "air_bike",
+          "rowing_machine",
+          "elliptical"
+        ]
+      },
       "incline_treadmill_walk": {
-        "rpe": [4, 6],
+        "rpe": [
+          4,
+          6
+        ],
         "default": true,
         "talk_test": "full sentences",
-        "machines": ["treadmill"],
-        "starting_dose": {"incline_pct": [8, 12], "mph": [2.5, 3.0]},
-        "step": {"incline_pct": 1, "mph": 0.1}
+        "machines": [
+          "treadmill"
+        ],
+        "starting_dose": {
+          "incline_pct": [
+            8,
+            12
+          ],
+          "mph": [
+            2.5,
+            3.0
+          ]
+        },
+        "step": {
+          "incline_pct": 1,
+          "mph": 0.1
+        }
       },
-      "kettlebell_swings_and_circuits": {"available": "now", "prescribed_by": "RPE / talk test"},
+      "kettlebell_swings_and_circuits": {
+        "available": "now",
+        "prescribed_by": "RPE / talk test"
+      },
       "run_walk": {
         "on": "treadmill",
         "rpe_from": "easy",
@@ -335,9 +510,15 @@
       }
     },
     "placement": {
-      "conditioning_order": ["tempo_or_hills", "intervals"],
+      "conditioning_order": [
+        "tempo_or_hills",
+        "intervals"
+      ],
       "the_rest": "easy",
-      "recumbent_after": ["a lower day", "a heavy walking weekend"],
+      "recumbent_after": [
+        "a lower day",
+        "a heavy walking weekend"
+      ],
       "never_consecutive": "the same hard shape",
       "rule": "conditioning 2x/wk (one tempo-or-hills, one intervals), every other block easy; the recumbent after a lower day or a heavy walking weekend; never the same hard shape on consecutive days"
     },
@@ -347,14 +528,24 @@
     "scheduled": false,
     "automatic": false,
     "owner_gated": true,
-    "recommendation_triggers": ["rpe_drift", "recovery", "event_signals"],
+    "recommendation_triggers": [
+      "rpe_drift",
+      "recovery",
+      "event_signals"
+    ],
     "applied_only_on": "the owner's recorded word",
     "note": "fatigue signals become a recommendation; a deload happens only on his recorded word (owner ruling 2026-10-18)"
   },
   "effort_ceilings": {
     "by_movement_class": {
-      "compounds_rpe": [8, 9],
-      "last_isolation_set_rpe": [9, 10]
+      "compounds_rpe": [
+        8,
+        9
+      ],
+      "last_isolation_set_rpe": [
+        9,
+        10
+      ]
     },
     "ceiling_is": "the high end of the set's class band: the band is the prescription, its top is the ceiling a set is graded against",
     "overage_tolerance_rpe": 1,
@@ -417,23 +608,58 @@
     "accessory_slots_rotate_every_weeks": 3,
     "pool_seeded_from": "the owner's Hevy history",
     "pool": {
-      "traps": ["barbell shrug"],
-      "second_press": ["incline barbell press", "dumbbell flat press", "decline machine press"],
-      "rows": ["chest-supported T-bar row", "seated cable row"],
-      "vertical_pull": ["assisted pull-up", "assisted chin-up"],
-      "hinge": ["stiff-leg deadlift", "Romanian deadlift"],
-      "single_leg_progression": ["supported split squat", "reverse lunge", "Bulgarian split squat"],
-      "carries": ["farmer carry", "suitcase carry"],
-      "delts": ["lateral raise", "face pull"],
-      "core": ["Pallof press"]
+      "traps": [
+        "barbell shrug"
+      ],
+      "second_press": [
+        "incline barbell press",
+        "dumbbell flat press",
+        "decline machine press"
+      ],
+      "rows": [
+        "chest-supported T-bar row",
+        "seated cable row"
+      ],
+      "vertical_pull": [
+        "assisted pull-up",
+        "assisted chin-up"
+      ],
+      "hinge": [
+        "stiff-leg deadlift",
+        "Romanian deadlift"
+      ],
+      "single_leg_progression": [
+        "supported split squat",
+        "reverse lunge",
+        "Bulgarian split squat"
+      ],
+      "carries": [
+        "farmer carry",
+        "suitcase carry"
+      ],
+      "delts": [
+        "lateral raise",
+        "face pull"
+      ],
+      "core": [
+        "Pallof press"
+      ]
     }
   },
   "gated_movements": {
-    "conventional_deadlift": {"gate_lb": 275, "until_then": "trap bar"},
-    "power_clean": {"revisit_at_lb": 250},
+    "conventional_deadlift": {
+      "gate_lb": 275,
+      "until_then": "trap bar"
+    },
+    "power_clean": {
+      "revisit_at_lb": 250
+    },
     "running": {
       "gate_lb": 240,
-      "prerequisites": ["four weeks pain-free walking", "Stage 4 of the run/walk on-ramp completed"],
+      "prerequisites": [
+        "four weeks pain-free walking",
+        "Stage 4 of the run/walk on-ramp completed"
+      ],
       "walking_weeks": 4,
       "walking_hours_per_wk": 8.5,
       "walking_basis": "weight-bearing walking hours (training.walking_volume, the walking modality: Strava walks/hikes plus Hevy treadmill/walking blocks, de-duplicated), consecutive completed weeks, each without a lower-leg pain flag",
@@ -442,14 +668,54 @@
         "stage": 4,
         "where": "treadmill first",
         "levels": [
-          {"level": 1, "run_min": 1, "walk_min": 2, "rounds": 7},
-          {"level": 2, "run_min": 2, "walk_min": 2, "rounds": 6},
-          {"level": 3, "run_min": 3, "walk_min": 2, "rounds": 5},
-          {"level": 4, "run_min": 5, "walk_min": 2, "rounds": 4},
-          {"level": 5, "run_min": 8, "walk_min": 2, "rounds": 3},
-          {"level": 6, "run_min": 12, "walk_min": 2, "rounds": 2},
-          {"level": 7, "run_min": 20, "walk_min": 0, "rounds": 1},
-          {"level": 8, "run_min": 30, "walk_min": 0, "rounds": 1}
+          {
+            "level": 1,
+            "run_min": 1,
+            "walk_min": 2,
+            "rounds": 7
+          },
+          {
+            "level": 2,
+            "run_min": 2,
+            "walk_min": 2,
+            "rounds": 6
+          },
+          {
+            "level": 3,
+            "run_min": 3,
+            "walk_min": 2,
+            "rounds": 5
+          },
+          {
+            "level": 4,
+            "run_min": 5,
+            "walk_min": 2,
+            "rounds": 4
+          },
+          {
+            "level": 5,
+            "run_min": 8,
+            "walk_min": 2,
+            "rounds": 3
+          },
+          {
+            "level": 6,
+            "run_min": 12,
+            "walk_min": 2,
+            "rounds": 2
+          },
+          {
+            "level": 7,
+            "run_min": 20,
+            "walk_min": 0,
+            "rounds": 1
+          },
+          {
+            "level": 8,
+            "run_min": 30,
+            "walk_min": 0,
+            "rounds": 1
+          }
         ],
         "advance_rule": {
           "sessions_at_level": 2,
@@ -471,29 +737,91 @@
     },
     "lower_leg_prep": {
       "from_lb": 260,
-      "carve_out_from_plyometrics_exclusion": ["low-amplitude pogo hops", "calf work", "tibialis work", "brisk incline walking"],
-      "carve_out_catalog_keys": ["low_pogos"],
+      "carve_out_from_plyometrics_exclusion": [
+        "low-amplitude pogo hops",
+        "calf work",
+        "tibialis work",
+        "brisk incline walking"
+      ],
+      "carve_out_catalog_keys": [
+        "low_pogos"
+      ],
       "prescription": [
-        {"item": "calf work", "catalog_keys": ["standing_calf_raise_machine", "calf_raise_machine", "seated_calf_raise"], "sets": 2, "reps": [12, 20], "rpe": [6, 7]},
-        {"item": "tibialis work", "catalog_keys": [], "sets": 2, "reps": [15, 20], "rpe": [5, 6], "cue": "toes-up raises, back to a wall"},
-        {"item": "low-amplitude pogo hops", "catalog_keys": ["low_pogos"], "sets": 2, "reps": [15, 20], "rpe": [3, 4], "cue": "ankle-only bounce, heels barely leave the floor; stop on any shin or heel pain"}
+        {
+          "item": "calf work",
+          "catalog_keys": [
+            "standing_calf_raise_machine",
+            "calf_raise_machine",
+            "seated_calf_raise"
+          ],
+          "sets": 2,
+          "reps": [
+            12,
+            20
+          ],
+          "rpe": [
+            6,
+            7
+          ]
+        },
+        {
+          "item": "tibialis work",
+          "catalog_keys": [],
+          "sets": 2,
+          "reps": [
+            15,
+            20
+          ],
+          "rpe": [
+            5,
+            6
+          ],
+          "cue": "toes-up raises, back to a wall"
+        },
+        {
+          "item": "low-amplitude pogo hops",
+          "catalog_keys": [
+            "low_pogos"
+          ],
+          "sets": 2,
+          "reps": [
+            15,
+            20
+          ],
+          "rpe": [
+            3,
+            4
+          ],
+          "cue": "ankle-only bounce, heels barely leave the floor; stop on any shin or heel pain"
+        }
       ],
       "incline_walking": "the menu's default block (cardio_menu.blocks.incline_treadmill_walk) is the brisk incline walking",
       "placement": "lower days (the split.sequence names opening 'lower'), after the lifting",
       "held_by": "a lower-leg strain flag holds the pogo hops (the calf and tibialis work stay)",
       "note": "the carve-out is limited to the list; everything else plyometric stays excluded"
     },
-    "kettlebell_swings_and_circuits": {"available": "now", "prescribed_by": "RPE / talk test"}
+    "kettlebell_swings_and_circuits": {
+      "available": "now",
+      "prescribed_by": "RPE / talk test"
+    }
   },
   "equipment": {
     "assumed": "full commercial club — machines, cables, plate-loaded, T-bar, dumbbells to heavy, kettlebells, sled, full cardio deck",
     "not_available": [],
-    "owner_editable": ["not_available"],
+    "owner_editable": [
+      "not_available"
+    ],
     "rule": "the club is never named in this repo"
   },
   "travel": {
     "windows": [
-      {"label": "late December 2026", "start": null, "end": null, "templates": "#5088", "food": "nutrition.travel_food (#5104)"}
+      {
+        "label": "late December 2026",
+        "start": null,
+        "end": null,
+        "templates": "#5088",
+        "food": "nutrition.travel_food (#5104)"
+      }
     ],
     "rule": "travel templates by mid-December; no calendar blocking"
   },
@@ -501,28 +829,128 @@
     "owner_switched": true,
     "imposed": false,
     "rule": "the owner switches the mode on and off; the coach OFFERS it and never applies it (owner ruling 2026-10-18, #5088)",
-    "holds": ["steps.floor", "protein_floor", "sleep_floor", "one short session"],
+    "holds": [
+      "steps.floor",
+      "protein_floor",
+      "sleep_floor",
+      "one short session"
+    ],
     "templates": {
-      "travel": {"sessions_per_wk": [2, 3], "pools": ["hotel", "bodyweight"], "note": "a resort/hotel gym first, bodyweight when there is none"},
-      "busy": {"sessions_per_wk": [1, 5], "pools": ["gym_minimum", "bodyweight"], "note": "the 20-minute minimum at the usual club"},
-      "life": {"sessions_per_wk": [1, 3], "pools": ["gym_minimum", "bodyweight"], "whole_day": true, "max_days": 14, "note": "a life disruption (#5122): the whole day holds habits and the targets and grading pause, not only the training"},
-      "lapse": {"sessions_per_wk": [0, 1], "pools": ["gym_minimum", "bodyweight"], "whole_day": true, "lapse": true, "step_back_up": false, "note": "the 72-hour lapse protocol (#5122): its length is lapse_protocol.hours; the plan resumes the next morning, no step-back-up week"}
+      "travel": {
+        "sessions_per_wk": [
+          2,
+          3
+        ],
+        "pools": [
+          "hotel",
+          "bodyweight"
+        ],
+        "note": "a resort/hotel gym first, bodyweight when there is none"
+      },
+      "busy": {
+        "sessions_per_wk": [
+          1,
+          5
+        ],
+        "pools": [
+          "gym_minimum",
+          "bodyweight"
+        ],
+        "note": "the 20-minute minimum at the usual club"
+      },
+      "life": {
+        "sessions_per_wk": [
+          1,
+          3
+        ],
+        "pools": [
+          "gym_minimum",
+          "bodyweight"
+        ],
+        "whole_day": true,
+        "max_days": 14,
+        "note": "a life disruption (#5122): the whole day holds habits and the targets and grading pause, not only the training"
+      },
+      "lapse": {
+        "sessions_per_wk": [
+          0,
+          1
+        ],
+        "pools": [
+          "gym_minimum",
+          "bodyweight"
+        ],
+        "whole_day": true,
+        "lapse": true,
+        "step_back_up": false,
+        "note": "the 72-hour lapse protocol (#5122): its length is lapse_protocol.hours; the plan resumes the next morning, no step-back-up week"
+      }
     },
+    "step_back_up": {
+      "days": 7,
+      "serves": "the minimum session at the club",
+      "then": "the full split"
+    },
+    "offer": {
+      "travel_lead_days": 3,
+      "missed_session_days": 4
+    },
+    "max_days": 28,
     "whole_day": {
       "_note": "The life-disruption playbook (#5122, epic #5120): what the WHOLE day does while a whole_day template (life or lapse) is on. Read by training.life_disruption, carried to every coach through the one context assembly (training.coach_context) and the daily coaches' standing lines. Every list here is a platform default from the mind panel review 2026-10-18, pending an owner ruling.",
-      "held_habits": ["weigh_in", "food_logged", "protein_floor", "steps_floor", "evening_checkin", "out_of_bed_on_time", "one_connection", "no_alcohol"],
-      "paused_habits": ["calories_in_band", "planned_session_done", "no_solo_takeout", "no_sweets_or_fried"],
+      "held_habits": [
+        "weigh_in",
+        "food_logged",
+        "protein_floor",
+        "steps_floor",
+        "evening_checkin",
+        "out_of_bed_on_time",
+        "one_connection",
+        "no_alcohol"
+      ],
+      "paused_habits": [
+        "calories_in_band",
+        "planned_session_done",
+        "no_solo_takeout",
+        "no_sweets_or_fried"
+      ],
       "habits_rule": "every habits.core id is either held or paused, never both and never neither; a held habit is still asked for, a paused one is not asked for and is never a miss; one short session (split.minimum_session) stands in for planned_session_done",
-      "paused_targets": ["steps.target", "nutrition.calories.prescribed_band_kcal", "nutrition.titration", "governing_goal.rate_band_lb_per_wk", "split.lifting_days_per_wk", "volume_priorities.sets_per_wk", "progression.gain_rule"],
+      "paused_targets": [
+        "steps.target",
+        "nutrition.calories.prescribed_band_kcal",
+        "nutrition.titration",
+        "governing_goal.rate_band_lb_per_wk",
+        "split.lifting_days_per_wk",
+        "volume_priorities.sets_per_wk",
+        "progression.gain_rule"
+      ],
       "targets_rule": "a paused target is not set, chased or cited as owed; the floors (steps.floor, the protein floor, the sleep floor) are held instead; the cut resumes at the pre-mode numbers, never a make-up deficit",
       "grading": {
-        "paused": ["the day grade", "the habit score", "the character sheet", "the weekly panel grade", "the titration step"],
+        "paused": [
+          "the day grade",
+          "the habit score",
+          "the character sheet",
+          "the weekly panel grade",
+          "the titration step"
+        ],
         "rule": "no grade is given and no grade is owed for a day the mode covers: a held day is reported as held, never as a miss, a zero or a failure",
         "enforced_by": "the coaches through training.coach_context and ai.ai_calls' standing lines (#5122); the graders' own pause is a follow-up, so a stored grade may exist and is never cited while the mode is on"
       },
       "language": {
         "rule": "while the mode is on no brief, coach or email counts a broken streak or shames a miss: name what was held, not what lapsed",
-        "never": ["\\bstreak\\s+(?:is\\s+|was\\s+)?(?:broken|over|lost|reset|ended|gone)\\b", "\\b(?:broke|lost|ended|reset|killed|snapped)\\s+(?:your|his|the|a)\\s+(?:\\d+[- ]day\\s+)?streak\\b", "\\bback\\s+to\\s+(?:day\\s+(?:zero|one|0|1)|square\\s+one)\\b", "\\bstart(?:ing)?\\s+(?:over|from\\s+scratch)\\b", "\\bfell\\s+off\\b", "\\bfall(?:ing)?\\s+off\\s+the\\s+wagon\\b", "\\b0[- ]day\\s+streak\\b", "\\bstreak\\s*:\\s*0\\b", "\\bmissed\\s+\\d+\\s+days?\\s+in\\s+a\\s+row\\b", "\\b(?:you|he)\\s+failed\\b", "\\bno\\s+excuses\\b"],
+        "never": [
+          "\\bstreak\\s+(?:is\\s+|was\\s+)?(?:broken|over|lost|reset|ended|gone)\\b",
+          "\\b(?:broke|lost|ended|reset|killed|snapped)\\s+(?:your|his|the|a)\\s+(?:\\d+[- ]day\\s+)?streak\\b",
+          "\\bback\\s+to\\s+(?:day\\s+(?:zero|one|0|1)|square\\s+one)\\b",
+          "\\bstart(?:ing)?\\s+(?:over|from\\s+scratch)\\b",
+          "\\bfell\\s+off\\b",
+          "\\bfall(?:ing)?\\s+off\\s+the\\s+wagon\\b",
+          "\\b0[- ]day\\s+streak\\b",
+          "\\bstreak\\s*:\\s*0\\b",
+          "\\bmissed\\s+\\d+\\s+days?\\s+in\\s+a\\s+row\\b",
+          "\\b(?:you|he)\\s+failed\\b",
+          "\\bno\\s+excuses\\b"
+        ],
         "instead": "say what was held (the floors, the weigh-in, the food log, one short session) and that the plan resumes; one ask at most, from the response owner"
       }
     },
@@ -532,20 +960,90 @@
       "trigger": "the relapse early-warning flag (health.early_warning, #5121: USER#matthew#SOURCE#early_warning_flag, owner-only) is active: the response owner OFFERS the protocol in the owner's own channel; it is never applied without his word",
       "owner_ref": "config/user_goals.json failure_mode.response_owner (coach.response_protocol): the ONE coach who offers it and speaks while it runs; every other coach holds its domain to that and adds no second ask",
       "entered_by": "his word: get_exercise_notes action='disruption' template='lapse' (words verbatim); left by action='disruption_end' or when the hours run out",
-      "runs": ["the held habits (whole_day.held_habits)", "the weigh-in, even on a bad day", "the food log, whatever was eaten", "one walk", "one short session if he wants it (split.minimum_session), never owed", "the evening check-in", "one message from the response owner"],
-      "pauses": ["every whole_day.paused_targets entry", "every whole_day.grading.paused entry", "streak counts and streak language (whole_day.language)", "every coach's second ask"],
+      "runs": [
+        "the held habits (whole_day.held_habits)",
+        "the weigh-in, even on a bad day",
+        "the food log, whatever was eaten",
+        "one walk",
+        "one short session if he wants it (split.minimum_session), never owed",
+        "the evening check-in",
+        "one message from the response owner"
+      ],
+      "pauses": [
+        "every whole_day.paused_targets entry",
+        "every whole_day.grading.paused entry",
+        "streak counts and streak language (whole_day.language)",
+        "every coach's second ask"
+      ],
       "resumes": "the morning after the last covered day: the full plan at the pre-lapse numbers, no step-back-up week, no make-up sessions and no make-up deficit; a longer stretch is the life template, on his word"
-    },
-    "step_back_up": {"days": 7, "serves": "the minimum session at the club", "then": "the full split"},
-    "offer": {"travel_lead_days": 3, "missed_session_days": 4},
-    "max_days": 28
+    }
+  },
+  "early_warning": {
+    "rule": "two or more lapse signals active together raise ONE private flag; one signal alone never does. The flag is owner-only (no published surface, not the shared brief context) and the response owner (config/user_goals.json failure_mode.response_owner) answers it on the owner's own Telegram seat; the support contact hears nothing unless the owner opts in (epic #5120 R2, pending)",
+    "reader": "health.early_warning (daily-insight-compute writes USER#matthew#SOURCE#early_warning_flag; coach.coach_event_triggers sends it; the mind coach's thread reads it)",
+    "provenance": "platform defaults (the mind panel review 2026-10-18, #5121), pending an owner ruling; sessions_below_plan and weight_reversal restate the owner's own words in config/user_goals.json failure_mode.early_warning_signals",
+    "min_signals": 2,
+    "lookback_days": 60,
+    "lookback_rule": "a channel with no record inside lookback_days is absent, never silent: a source that was never used cannot stop",
+    "signals": {
+      "weigh_in_cadence": {
+        "silent_days": 3,
+        "source": "withings",
+        "reads": "consecutive days ending on the evaluated day with no weigh-in"
+      },
+      "food_log_gap": {
+        "window_days": 3,
+        "min_gap_days": 2,
+        "source": "macrofactor",
+        "complete_day_rule": "nutrition.titration.complete_logs.complete_day_min_kcal_path",
+        "reads": "days in the window with no food log or one under the complete-log line"
+      },
+      "step_drop": {
+        "recent_days": 7,
+        "baseline_days": 28,
+        "min_drop_pct": 35,
+        "min_recent_n": 5,
+        "min_baseline_n": 14,
+        "source": "common.metric_truth steps",
+        "reads": "the recent mean against the mean of the baseline days immediately before it"
+      },
+      "checkin_silence": {
+        "silent_days": 3,
+        "source": "evening_checkin",
+        "reads": "consecutive evenings ending on the evaluated day with no answered check-in (any of hunger, stress, cravings), after at least one answered inside lookback_days"
+      },
+      "weight_reversal": {
+        "window_days": 7,
+        "min_rise_lb": 1.0,
+        "min_n_per_window": 3,
+        "source": "withings",
+        "reads": "the mean weigh-in of the last window_days against the window_days before it"
+      },
+      "sessions_below_plan": {
+        "min_sessions_per_wk": 3,
+        "consecutive_weeks": 2,
+        "source": "hevy",
+        "plan_ref": "split.lifting_days_per_wk",
+        "reads": "logged Hevy sessions in each trailing 7-day week ending on the evaluated day"
+      }
+    }
   },
   "calibration": {
-    "tape_and_photos": {"every_weeks": 2, "dead_man_missed_cycles": 2},
-    "dexa": {"every_weeks_approx": 12},
+    "tape_and_photos": {
+      "every_weeks": 2,
+      "dead_man_missed_cycles": 2
+    },
+    "dexa": {
+      "every_weeks_approx": 12
+    },
     "fitness_tests": {
       "every_weeks": 6,
-      "battery": ["6-minute walk", "20-minute bike at RPE 6", "dead hang", "assisted pull-up assistance"],
+      "battery": [
+        "6-minute walk",
+        "20-minute bike at RPE 6",
+        "dead hang",
+        "assisted pull-up assistance"
+      ],
       "protocol_version": "1",
       "aligned_to": "the block: a battery is due in the program week that closes each block (program week a whole multiple of every_weeks)",
       "early_days_credited": 7,
@@ -553,11 +1051,20 @@
       "dead_man": "a due week passed with no battery is overdue for grace_weeks, then missed; missed is the dead-man state",
       "test_day": {
         "role": "Shoulders+arms",
-        "never_on": ["Lower-heavy", "Lower-volume"],
+        "never_on": [
+          "Lower-heavy",
+          "Lower-volume"
+        ],
         "session": "the role's minimum session (split.minimum_session) plus the tests in `order`",
         "why": "the lightest day of the split carries the tests, so no heavy leg work blunts the walk or the bike"
       },
-      "order": ["six_minute_walk", "dead_hang", "assisted_pull_up", "minimum_session", "bike_20min_rpe6"],
+      "order": [
+        "six_minute_walk",
+        "dead_hang",
+        "assisted_pull_up",
+        "minimum_session",
+        "bike_20min_rpe6"
+      ],
       "tests": {
         "six_minute_walk": {
           "label": "6-minute walk",
@@ -601,17 +1108,44 @@
       },
       "provenance": "the battery and its cadence: owner direction 2026-10-18 (#5078); the protocol detail (units, machines, order, test day): platform-proposed for the owner's review"
     },
-    "block_retro": {"every_weeks": 6, "scorecard_rows": 13}
+    "block_retro": {
+      "every_weeks": 6,
+      "scorecard_rows": 13
+    }
   },
   "concession_ledger": {
-    "nippard": {"concedes": "a faster deficit than it would pick", "in_return": "double progression, stretch-position work, rotation"},
-    "athlean_x": {"concedes": "looks-first over athletic carryover", "in_return": "corrective work, carries, single-leg work"},
-    "rp_israetel": {"concedes": "no scheduled deload and legs at maintenance", "in_return": "rising volume on shoulders, lats and upper chest plus MEV floors"},
-    "sbs_nuckols": {"concedes": "a deadline-set loss rate", "in_return": "coded progression and strength tracking that catches muscle loss early"},
-    "galpin": {"concedes": "no deload rhythm", "in_return": "weekly fatigue flags and a real hard/easy cardio split"},
-    "dan_john": {"concedes": "machines and isolation in the mix", "in_return": "carries and kettlebell work weekly"},
-    "hollywood_transformation_trainer": {"concedes": "nothing", "in_return": "gets the frame, the deadline, the steps and the session length"},
-    "clinical_exercise_physiologist": {"concedes": "fast loss alongside 5 lifting days", "in_return": "weekly strength, sleep and fat-free-mass tracking, effort by RPE"}
+    "nippard": {
+      "concedes": "a faster deficit than it would pick",
+      "in_return": "double progression, stretch-position work, rotation"
+    },
+    "athlean_x": {
+      "concedes": "looks-first over athletic carryover",
+      "in_return": "corrective work, carries, single-leg work"
+    },
+    "rp_israetel": {
+      "concedes": "no scheduled deload and legs at maintenance",
+      "in_return": "rising volume on shoulders, lats and upper chest plus MEV floors"
+    },
+    "sbs_nuckols": {
+      "concedes": "a deadline-set loss rate",
+      "in_return": "coded progression and strength tracking that catches muscle loss early"
+    },
+    "galpin": {
+      "concedes": "no deload rhythm",
+      "in_return": "weekly fatigue flags and a real hard/easy cardio split"
+    },
+    "dan_john": {
+      "concedes": "machines and isolation in the mix",
+      "in_return": "carries and kettlebell work weekly"
+    },
+    "hollywood_transformation_trainer": {
+      "concedes": "nothing",
+      "in_return": "gets the frame, the deadline, the steps and the session length"
+    },
+    "clinical_exercise_physiologist": {
+      "concedes": "fast loss alongside 5 lifting days",
+      "in_return": "weekly strength, sleep and fat-free-mass tracking, effort by RPE"
+    }
   },
   "panel_target": {
     "overall": "A",
@@ -622,7 +1156,10 @@
   "nutrition": {
     "calories": {
       "target_kcal": 1500,
-      "prescribed_band_kcal": [1400, 1600],
+      "prescribed_band_kcal": [
+        1400,
+        1600
+      ],
       "floor_any_day_kcal": 1600,
       "floor_lifting_day_kcal": 1900,
       "floor_7d_mean_kcal": 1800,
@@ -647,17 +1184,27 @@
     "expenditure": {
       "disagreement_threshold_kcal": 300,
       "min_logged_days": 7,
-      "compared": ["macrofactor_adaptive", "platform_measured", "platform_flat"],
+      "compared": [
+        "macrofactor_adaptive",
+        "platform_measured",
+        "platform_flat"
+      ],
       "against": "scale-trend-implied expenditure: mean logged intake over the shared 14-day loss-rate window + 3500 kcal per lb of that rate, per day",
       "owner": "health/expenditure_reconciler.py (#5097)"
     },
     "protein": {
-      "range_g": {"low": 170, "high": 200},
+      "range_g": {
+        "low": 170,
+        "high": 200
+      },
       "range_note": "low is the plan's floor (config/user_goals.json targets.nutrition.daily_protein_min_g, generated into common.constants.PLAN_DAILY_PROTEIN_MIN_G; a contract test holds the three equal); high is the target the redlines name",
       "days_of_7": 6,
       "feedings_per_day": 4,
       "feeding_threshold_g": 40,
-      "feeding_target_g": [45, 55],
+      "feeding_target_g": [
+        45,
+        55
+      ],
       "feeding_merge_minutes": 30,
       "hit": "a day is a hit when its logged total is at or above range_g.low, strictly: no tolerance below the floor until the owner rules one (#5003). An unlogged day is unknown, never a miss",
       "feeding_rule": "food-log rows within feeding_merge_minutes of a feeding's first row are one feeding; a feeding counts when its protein is at or above feeding_threshold_g. A day with no timed rows has an unknown feeding count, never 0",
@@ -709,8 +1256,15 @@
       "expected_path": "~1,500 (owner ruling 2026-10-23 R1: the engine never pushes food up, it holds and warns; follow-up 1: below the band floor, with the steps check met, it may step food down to the planned minimum 1,400, the band floor) → the landing's own refeed steps (owner_redlines landing.calories) → ~2,700–2,800 at maintenance (model; measure RMR). The pre-ruling model path (2,100 to 275 → 2,000 to 240 → 1,950 to 220) is retired",
       "never_below": "nutrition.calories.planned_minimum_any_weight_kcal",
       "insufficient_data": "no measured trend, a provisional trend window, no weigh-in, an unreadable band or guidance record, an unreadable rule value, or too few complete logs: the week holds with reason insufficient_data, never a guess",
-      "record": {"pk": "USER#matthew#SOURCE#nutrition_titration", "sk": "WEEK#<iso-monday>", "writer": "lambdas/health/titration.py via mcp/titration_leg.py on the nightly pre-draft run (Friday to Sunday nights, the first write for the coming week stands)"},
-      "dead_man": {"armed_from": "2026-11-03", "rule": "no record for the current week once armed: an owner-only alert (the calibration sweep's dead-man, token NUTRITION_TITRATION_MISSED)"},
+      "record": {
+        "pk": "USER#matthew#SOURCE#nutrition_titration",
+        "sk": "WEEK#<iso-monday>",
+        "writer": "lambdas/health/titration.py via mcp/titration_leg.py on the nightly pre-draft run (Friday to Sunday nights, the first write for the coming week stands)"
+      },
+      "dead_man": {
+        "armed_from": "2026-11-03",
+        "rule": "no record for the current week once armed: an owner-only alert (the calibration sweep's dead-man, token NUTRITION_TITRATION_MISSED)"
+      },
       "basis": "the redlines' titration rule, owner-approved v0.3 (#3753); the weekly refit as owner-ruled 2026-10-23 (#5091 R1: stay ~1,500, ceiling flags are warnings; the steps check kept; one 150 kcal step)"
     },
     "training_day": {
@@ -799,24 +1353,70 @@
       "provenance": "owner (the dates and rulings); the kit's contents are platform-built for the owner's review"
     },
     "floors": {
-      "fat": {"floor_g": 65, "unit": "g", "per_meal_g": 10, "meals_with_fat": 3, "epa_dha_g": 2},
-      "carb": {"floor_g": 58, "unit": "g", "typical_g": null, "typical_note": "the pre-ruling 150–180 g is retired: at ~1,500 kcal carbohydrate is the remainder after the protein and fat floors (~59 g)", "ruling": "owner ruling 2026-10-23 (#5212): lowered from 120 g to ~60 g at the ~1,500 kcal target; 58 g is the whole gram the base day holds after the protein and fat floors (58.75 g)"},
-      "fibre": {"floor_g": 35, "unit": "g", "target_range_g": [35, 40]},
+      "fat": {
+        "floor_g": 65,
+        "unit": "g",
+        "per_meal_g": 10,
+        "meals_with_fat": 3,
+        "epa_dha_g": 2
+      },
+      "carb": {
+        "floor_g": 58,
+        "unit": "g",
+        "typical_g": null,
+        "typical_note": "the pre-ruling 150–180 g is retired: at ~1,500 kcal carbohydrate is the remainder after the protein and fat floors (~59 g)",
+        "ruling": "owner ruling 2026-10-23 (#5212): lowered from 120 g to ~60 g at the ~1,500 kcal target; 58 g is the whole gram the base day holds after the protein and fat floors (58.75 g)"
+      },
+      "fibre": {
+        "floor_g": 35,
+        "unit": "g",
+        "target_range_g": [
+          35,
+          40
+        ]
+      },
       "hit": "a day meets a floor when its logged total is at or above it, strictly. A missing field is unknown, never a miss (health.macro_floors)",
       "grade_weight": "the three floors share the nutrition component's macro-split slot (0.20); calories 0.40 and protein 0.40 are untouched (docs/engines/SCORING.md)",
       "provenance": "population-derived",
       "derived_by": "red-team consensus 2026-09-22 (nutritionist, physician and S&C coach); moved from owner_redlines.py by #5102"
     },
     "concession_ledger": {
-      "evidence_based_hypertrophy_nutrition": {"concedes": "a deeper deficit than a muscle-first cut would pick", "in_return": "the protein range every day, the fat and carbohydrate floors held, training-day fuel"},
-      "flexible_dieting": {"concedes": "a fixed feeding count on top of the daily totals", "in_return": "daily totals that come from the one resolver, a split that adds up to them and a week that balances"},
-      "protein_lean_mass": {"concedes": "protein counted from a log, not a weighed meal plan", "in_return": "four feedings at the per-feeding threshold, the post-session protein counted as one"},
-      "appetite_food_environment": {"concedes": "a calorie target instead of a food-quality-only approach", "in_return": "the fibre floor, a fixed feeding rhythm and no day under its floor"},
-      "energy_balance_metabolism": {"concedes": "a population-derived starting target", "in_return": "a weekly refit against the measured trend in small, bounded steps"},
-      "obesity_medicine": {"concedes": "a faster rate than it would start with", "in_return": "floors on every day and on the week, and steps before food"},
-      "sports_dietitian": {"concedes": "no per-session periodised carbohydrate plan", "in_return": "a lifting-day uplift with pre and post session fuel; rest days are not paid back below the target (owner ruling 2026-10-23)"},
-      "behaviour_change_psychologist": {"concedes": "numeric targets over intuitive eating", "in_return": "a few repeatable rules, calorie changes no bigger than the step cap, every number with its reason"},
-      "studio_nutritionist": {"concedes": "nothing", "in_return": "gets the deadline pace, the weekly refit and the training-day fuel"}
+      "evidence_based_hypertrophy_nutrition": {
+        "concedes": "a deeper deficit than a muscle-first cut would pick",
+        "in_return": "the protein range every day, the fat and carbohydrate floors held, training-day fuel"
+      },
+      "flexible_dieting": {
+        "concedes": "a fixed feeding count on top of the daily totals",
+        "in_return": "daily totals that come from the one resolver, a split that adds up to them and a week that balances"
+      },
+      "protein_lean_mass": {
+        "concedes": "protein counted from a log, not a weighed meal plan",
+        "in_return": "four feedings at the per-feeding threshold, the post-session protein counted as one"
+      },
+      "appetite_food_environment": {
+        "concedes": "a calorie target instead of a food-quality-only approach",
+        "in_return": "the fibre floor, a fixed feeding rhythm and no day under its floor"
+      },
+      "energy_balance_metabolism": {
+        "concedes": "a population-derived starting target",
+        "in_return": "a weekly refit against the measured trend in small, bounded steps"
+      },
+      "obesity_medicine": {
+        "concedes": "a faster rate than it would start with",
+        "in_return": "floors on every day and on the week, and steps before food"
+      },
+      "sports_dietitian": {
+        "concedes": "no per-session periodised carbohydrate plan",
+        "in_return": "a lifting-day uplift with pre and post session fuel; rest days are not paid back below the target (owner ruling 2026-10-23)"
+      },
+      "behaviour_change_psychologist": {
+        "concedes": "numeric targets over intuitive eating",
+        "in_return": "a few repeatable rules, calorie changes no bigger than the step cap, every number with its reason"
+      },
+      "studio_nutritionist": {
+        "concedes": "nothing",
+        "in_return": "gets the deadline pace, the weekly refit and the training-day fuel"
+      }
     }
   }
 }

@@ -266,6 +266,13 @@ def test_current_phase_rows_are_not_excluded_by_the_fix():
 #     otherwise cross-phase function marks the whole function blind.
 
 _SANCTIONED_CURRENT_CYCLE_VIEWS: dict[str, str] = {
+    # #5121: the owner-only early-warning flag rows. EXPERIMENT_SCOPED and wiped at reset with computed_insights;
+    # a flag from a previous cycle is not a flag about this one, so an episode must never start before genesis.
+    "lambdas/health/early_warning.py::read_recent": (
+        "The flag is derived from this cycle's own rows and resets with it (restart_intelligence_wipe, pregenesis). "
+        "A pre-genesis row would open an early-warning episode about a different attempt — the mind coach would be "
+        "told a slide is under way that this cycle never had."
+    ),
     # #3741: the daily recap card. Current-cycle is not merely acceptable here, it is the
     # requirement — the card's own headline is "DAY N · ATTEMPT #17", so a row from attempt
     # #16 appearing in it would be a false public claim about this attempt. The card already

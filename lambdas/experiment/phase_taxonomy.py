@@ -404,6 +404,8 @@ SOURCE_CLASS: dict[str, str] = {
     # coach-consensus+calibration into one narrated brief — derived, recomputed weekly; nothing
     # it cites is lost by wiping it (the source records it summarizes have their own classes).
     "computed_insights": EXPERIMENT_SCOPED,
+    "early_warning_flag": EXPERIMENT_SCOPED,  # #5121: the daily owner-only relapse flag (DATE#<day>) — derived from the
+    # cycle's own rows by daily-insight-compute and recomputed every morning, so it resets with the cycle like its parent.
     "adaptive_mode": EXPERIMENT_SCOPED,
     "engagement_state": EXPERIMENT_SCOPED,  # presence / quiet-stretch state; resets with the cycle
     "circadian": EXPERIMENT_SCOPED,

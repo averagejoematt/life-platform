@@ -566,6 +566,12 @@ def _mind_pack(table, today: str) -> list:
         lines.extend(_checkin_lines(table, today))
     except Exception as e:  # noqa: BLE001 — the thread runs on the mood read alone
         logger.warning("[domain_facts] recent check-in unavailable: %s", type(e).__name__)
+    try:  # #5121: the owner-only flag this coach answers (health.early_warning), beside the protocol it runs
+        from health import early_warning
+
+        lines.extend(early_warning.owner_lines(early_warning.read_recent(table, today), today))
+    except Exception as e:  # noqa: BLE001 — the thread runs without the flag line
+        logger.warning("[domain_facts] early-warning flag unavailable: %s", type(e).__name__)
     rp = _response_protocol()
     if rp and rp.get("owner"):
         lines.append(f"Early-warning response: {rp['line']}")

@@ -25,7 +25,7 @@ from ingestion.source_registry import catalog_entries  # noqa: E402
 # because they have no ingestion pipe to classify — but they are real data.
 # #3669: `labs` LEFT this list — it is a SOURCE_REGISTRY entry now (with a 6-month
 # `cadence_months`), so `catalog_entries()` emits it and a row here would be a second,
-# drift-capable description of one source. `dexa` left the same way in #4639 (a 12-month
+# drift-capable description of one source. `dexa` left the same way in #4639 (a registry
 # `cadence_months` + the scripts/ingest_lab_report.py writer). genome stays: it has a dated
 # `UNREGISTERED_PARTITIONS` disposition rather than a registry entry (a one-off import has
 # no cadence to declare), so the catalogue is still its only public row.
