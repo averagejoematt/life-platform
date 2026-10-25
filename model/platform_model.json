@@ -1360,6 +1360,13 @@
     },
     {
       "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/support_contact_prompts.py",
+      "partition": "early_warning_flag",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
       "lambda": "telegram-coach-worker",
       "module": "lambdas/coach/telegram_worker_lambda.py",
       "partition": "computed_metrics",
@@ -8079,7 +8086,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 783,
+      "edges": 784,
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
@@ -8094,8 +8101,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 386,
-        "sites_resolved": 984,
-        "sites_total": 1370
+        "sites_resolved": 985,
+        "sites_total": 1371
       },
       "schedule_resolution": {
         "dynamic": 0,
