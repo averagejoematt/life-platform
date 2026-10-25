@@ -3861,3 +3861,54 @@ CI_PROOFS["ci::ci-cd.yml::rollback-on-smoke-failure::3"] = {
     ),
     "proved_on": "2026-10-24",
 }
+GUARD_PROOFS["guard::deploy/check_fleet_drift.py"] = {
+    "gate_name": "deploy/check_fleet_drift.py",
+    "command": (
+        "python3 -m pytest tests/test_rollback_serialise_5316.py -q   # baseline 19 passed; plus the CLI live and read-only: "
+        "python3 deploy/check_fleet_drift.py --expect <sha>"
+    ),
+    "mutation": (
+        "M1: `same_commit()`'s `return any(...)` replaced by `return True or any(...)` in the real tracked file (md5 "
+        "39fc31e7… before and after, restored by copying the file back) — every live sha reads as the expected deploy. "
+        "LIVE input the script exists for (unmutated): --expect d944d9521… while no function is live on it."
+    ),
+    "observed": (
+        "2026-10-25. BASELINE 19 passed. M1 RED: 7 failed, 12 passed (test_owner_check_is_pure_and_names_each_outcome, "
+        "test_THE_INCIDENT_a_function_a_newer_deploy_owns_is_SKIPPED_NEWER_and_never_written, "
+        "test_compare_buckets_every_function_and_drift_exits_1, test_deploy_base_mode_reads_a_later_main_deploy_as_ahead_and_the_"
+        "incident_as_drift, …); M1 LIVE --expect d944d9521… exit 0 ('every function is on d944d9521' — blind). REVERTED 19 "
+        "passed. UNMUTATED LIVE --expect d944d9521…: exit 1, '109 drifted, 0 unverified, 0 on d944d9521'. Control on "
+        "2026-10-24 (lane): --expect 6984087e0… exit 0, 'live build shas: 6984087e0 x109'."
+    ),
+    "scope": (
+        "Reads build_info.json git_sha per function over a ranged GET (check_deploy_deadman.read_build_sha); a function with "
+        "no fingerprint or a failed read is UNVERIFIED (exit 2), never on-sha. Fleet = ci/lambda_map.json minus not_deployed "
+        "plus both MCP functions. 'Ahead' (--expect-deploy-base) needs git ancestry; a sha git cannot place is drift. Wired "
+        "advisory (continue-on-error) in ci-cd.yml and as rollback_lambda.sh's --owner-check."
+    ),
+    "proved_on": "2026-10-25",
+}
+GUARD_PROOFS["guard::deploy/rollback_fleet.sh"] = {
+    "gate_name": "deploy/rollback_fleet.sh",
+    "command": (
+        "python3 -m pytest tests/test_rollback_serialise_5316.py -q   # baseline 19 passed; "
+        "test_the_fleet_rollback_tallies_skipped_newer_and_does_not_fail_on_it runs the real script against a PATH-first "
+        "fake `aws` serving a live bundle stamped by a NEWER run"
+    ),
+    "mutation": (
+        "Two, each in the real tracked file (md5 2a2beade… before and after, restored by copying back). M2: the per-function "
+        "call made `ROLLBACK_EXPECT_SHA= bash rollback_lambda.sh` — the sha check dropped, the 2026-10-24 sha-blind revert. "
+        "M3: the `3)` SKIPPED_NEWER case relabelled `3000)` — a skipped function falls into the failed branch."
+    ),
+    "observed": (
+        "2026-10-25. BASELINE 19 passed. M2 RED: 1 failed, 18 passed — the fleet run printed 'Rollback complete: 1 "
+        "succeeded' per function (a newer deploy's function reverted) instead of '3 skipped-newer'. M3 RED: 1 failed, 18 "
+        "passed — exit 1, '0 skipped-newer … 3 failed', '::error::3 Lambda(s) could not be rolled back'. REVERTED 19 passed."
+    ),
+    "scope": (
+        "The fleet list is the jq over ci/lambda_map.json (minus not_deployed) plus both MCP functions, the set "
+        "deploy_fleet.sh ships. Exit 1 only when a revert was attempted and broke; no-artifact (2) and skipped-newer (3) are "
+        "reported, not failed. With ROLLBACK_EXPECT_SHA unset it reverts unconditionally (attended path) and warns."
+    ),
+    "proved_on": "2026-10-25",
+}

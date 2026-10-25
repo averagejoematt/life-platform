@@ -1182,7 +1182,9 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # (ARMED 1/1: baseline 26 passed | mutated 1 failed | reverted 26 passed). Stacked, never max'd.
         # 290 -> 292 (2026-10-24, #5316): ci::ci-cd.yml::deploy::5 + ci::ci-cd.yml::rollback-on-smoke-failure::3, the fleet
         # drift checks, PROVEN via CI_PROOFS (live read-only: control exit 0, mutated exit 1). Stacked, never max'd.
-        <= 292
+        # 292 -> 294 (2026-10-25, #5316): guard::deploy/check_fleet_drift.py + guard::deploy/rollback_fleet.sh, PROVEN via
+        # GUARD_PROOFS (M1 7 failed, M2 1 failed, M3 1 failed; reverted 19 passed). Stacked, never max'd.
+        <= 294
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
