@@ -52,6 +52,15 @@ os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 from training import hevy_compiler, routine_generator, self_added_volume, warmup_sets  # noqa: E402
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set  # noqa: E402
 
+
+@pytest.fixture(autouse=True)
+def _pre_rotation_record():
+    """#5075: the wire is the 2026-10-18 record, drafted before accessory slots rotated — the rotation is held off (no
+    program position) so the re-draft serves the template that record was drafted from."""
+    with patch("training.variant_rotation.position", return_value=None):
+        yield
+
+
 DAY = "2026-10-18"
 WIRE = json.loads((REPO / "tests" / "fixtures" / "draft_custom_slot_5005" / "wire_2026_10_18.json").read_text())
 ROWS = WIRE["hevy_rows"]

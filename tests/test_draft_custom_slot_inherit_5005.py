@@ -49,6 +49,15 @@ from training.routine_ir import ExerciseBlock, RoutineSpec, Set  # noqa: E402
 
 from mcp import draft_custom_session  # noqa: E402
 
+
+@pytest.fixture(autouse=True)
+def _pre_rotation_record():
+    """#5075: the wire fixture is the 2026-10-18 record, drafted before accessory slots rotated — the rotation is held off
+    (no program position) so the engine and the custom draft compare against the template that record was drafted from."""
+    with patch("training.variant_rotation.position", return_value=None):
+        yield
+
+
 DAY = "2026-10-18"
 WIRE = json.loads((REPO / "tests" / "fixtures" / "draft_custom_slot_5005" / "wire_2026_10_18.json").read_text())
 ROWS = WIRE["hevy_rows"]

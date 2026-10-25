@@ -494,14 +494,13 @@ def test_generator_builds_the_five_day_order_after_the_cut_over_and_the_fifth_ro
     sa = got[0]
     assert sa.archetype == "upper" and sa.title.startswith("SHOULDERS+ARMS — W")
     assert sa.inputs_snapshot["session_prescription"]["hevy_folder"] == "Upper"
-    assert [b.movement_key for b in sa.exercises] == [
-        "machine_shoulder_press",
-        "db_lateral_raise",
-        "face_pull",
-        "db_curl",
-        "cable_tricep_pushdown",
-        "farmers_carry",  # #5318 (owner ruling B3): the farmer's carry replaced the dumbbell shrug
-    ]
+    # #5075: each accessory SLOT serves its rotation variant for the week (the template's accessory at block 1's first
+    # phase); the slots are the template's, in its order, and the pinned farmer's carry never rotates
+    rot = sa.inputs_snapshot["rotation"]
+    slots = ["db_lateral_raise", "face_pull", "db_curl", "cable_tricep_pushdown", "farmers_carry"]
+    assert program_structure.SESSION_TEMPLATES[SA]["accessories"] == slots
+    assert [b.movement_key for b in sa.exercises] == ["machine_shoulder_press"] + [rot["variants"].get(a, a) for a in slots]
+    assert sa.exercises[-1].movement_key == "farmers_carry"  # #5318 (owner ruling B3): the farmer's carry replaced the dumbbell shrug
     shape = sa.inputs_snapshot["session_shape"]
     assert shape["lifting_minutes"] <= shape["lifting_cap_minutes"] == 75 and shape["cardio_blocks"] == []
 
