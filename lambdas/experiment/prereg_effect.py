@@ -371,6 +371,12 @@ OUTCOME_UNITS = {
     "training_load": "kJ",
     "workout": "(0/1 indicator)",
     "diary_day": "(0/1 indicator)",
+    # #4979: the watch-enabled metrics (compute.watch_hypotheses)
+    "daylight_min": "minutes",
+    "cardio_recovery": "bpm",
+    "vo2max": "ml/kg/min",
+    "zone2_7d_min": "minutes",
+    "cardio_7d_min": "minutes",
 }
 
 _OP_WORDS = {">=": "at or above", "<=": "at or below"}

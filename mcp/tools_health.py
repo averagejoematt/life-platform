@@ -11,6 +11,13 @@ from health import (
     hr_regime,  # #4999: THE dated HR regime markers (re-baselining window, post-marker baselines, AF days)
     tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
 )
+
+# #4979: the Whoop vs Apple Watch cross-check moved to the watch views' module (same function, same output)
+from health.watch_views import (
+    overnight as _watch_overnight,
+    watch_daily_view as _watch_daily_view,
+    whoop_vs_apple_agreement as _whoop_vs_apple_agreement,
+)
 from training import rate_band, training_load  # #4075: the ONE load-provenance predicate for the TSB label
 
 from mcp import core as _mcp_core
@@ -42,7 +49,6 @@ PHYSIOLOGY_MIN_BASELINE_N = 7  # fewer readings than this and that signal is not
 # infection (Miller et al. 2020, PLoS ONE 15(12):e0243693; Mishra et al. 2020, Nat Biomed Eng 4:1208).
 RESP_RATE_TOLERANCE_BRPM, RESP_RATE_ZERO_BRPM = 0.5, 3.0
 SKIN_TEMP_TOLERANCE_C, SKIN_TEMP_ZERO_C = 0.3, 1.0
-APPLE_RHR_FIELD = "resting_heart_rate_apple"  # health_auto_export_lambda tier-2 field (Apple Watch only)
 
 READINESS_FORMULA: dict[str, Any] = {
     "score": "round(Σ score_i · w_i / Σ w_i, 1) over the components present (missing ones re-normalise)",
@@ -125,44 +131,6 @@ def overnight_physiology_component(night, baseline_rows):
     if not subscores:
         return None
     return {"score": round(min(subscores.values()), 1), "weight": READINESS_WEIGHTS["overnight_physiology"], "raw": raw}
-
-
-def _whoop_vs_apple_agreement(whoop_component, end_date, start_date):
-    """#4976: Whoop vs Apple Watch resting HR on the SAME night. HRV is never compared
-    (Whoop RMSSD vs Apple SDNN). Always a shaped dict with a reason (#492/M-7)."""
-    hrv_note = "HRV not compared: Whoop reports RMSSD and Apple reports SDNN — two different statistics."
-    if not whoop_component:
-        return {"status": "unavailable", "reason": "no whoop recovery record to cross-check against", "hrv_note": hrv_note}
-    whoop_raw = whoop_component["raw"]
-    night = whoop_raw.get("date")
-    apple_rows = query_source("apple_health", start_date, end_date)
-    apple_night = next((a for a in apple_rows if a.get("date") == night and a.get(APPLE_RHR_FIELD) is not None), None)
-    whoop_rhr = _num_or_none(whoop_raw.get("resting_hr"))
-    if apple_night is None or whoop_rhr is None:
-        return {
-            "status": "unavailable",
-            "reason": f"no Apple Watch resting heart rate for the Whoop night ({night}) — nothing to cross-check",
-            "hrv_note": hrv_note,
-        }
-    apple_rhr = float(apple_night[APPLE_RHR_FIELD])
-    delta = whoop_rhr - apple_rhr
-    status = "agree" if abs(delta) <= 3 else ("minor_variance" if abs(delta) <= 6 else "flag")
-    return {
-        "status": "available",
-        "devices": ["whoop", "apple_watch"],
-        "confidence": {"agree": "high", "minor_variance": "moderate", "flag": "low"}[status],
-        "checks": {
-            "rhr": {
-                "date": night,
-                "whoop_bpm": round(whoop_rhr, 1),
-                "apple_bpm": round(apple_rhr, 1),
-                "delta_bpm": round(delta, 1),
-                "status": status,
-            }
-        },
-        "hrv_note": hrv_note,
-        "note": "RHR Δ ≤ 3 bpm agree · ≤ 6 minor · else flag; a flagged night means the score may be less reliable",
-    }
 
 
 def tool_get_readiness_score(args):
@@ -427,7 +395,7 @@ def tool_get_readiness_score(args):
     # Garmin's feed is retired (#4640); the second wrist is the Apple Watch, worn
     # nightly (owner ruling 2026-10-17 b). Same night only — a different night is
     # not a cross-check.
-    device_agreement = _whoop_vs_apple_agreement(components.get("whoop_recovery"), end_date, d7_start)
+    device_agreement = _whoop_vs_apple_agreement(components.get("whoop_recovery"), end_date, d7_start, query_source)
 
     if (_regime := hr_regime.regime_status(end_date)) is not None:  # #4999: HR regime marker — re-baselining, not a tier
         return _rebaselining_result(end_date, components, device_agreement, _regime)
@@ -513,6 +481,8 @@ def tool_get_readiness_score(args):
         "recommendation": recommendation,
         "components": components,
         "device_agreement": device_agreement,
+        # #4979: both wrists labelled for RHR / HRV / sleep (HRV never blended)
+        "watch_overnight": _watch_overnight(as_of_date, query_source),
         "data_completeness": "full" if total_weight >= 0.99 else f"partial ({round(total_weight*100)}% weight covered)",
         "missing_components": missing if missing else None,
         "scoring_note": READINESS_SCORING_NOTE,
@@ -522,11 +492,7 @@ def tool_get_readiness_score(args):
         "_disclaimer": "For personal health tracking only. Not medical advice. Consult a qualified healthcare provider before making health decisions based on this data.",
     }
     if is_forward_dated:
-        result["staleness_warning"] = (
-            f"No data exists for the requested date ({end_date}) yet — its overnight hasn't been recorded. "
-            f"This score reflects the latest available data ({as_of_date}) and should be treated as a "
-            "current/trend signal, not the requested day's readiness."
-        )
+        result["staleness_warning"] = _readiness_staleness_warning(end_date, as_of_date)
     # Cross-check: show pre-computed readiness if available (computed by daily-metrics-compute
     # with slightly different weights — useful to spot drift between models)
     if _cm.get("readiness_score") is not None:
@@ -554,6 +520,15 @@ def tool_get_readiness_score(args):
                 "score above may be elapsed time rather than model drift."
             )
     return result
+
+
+def _readiness_staleness_warning(end_date, as_of_date):
+    """The forward-dated readiness caveat (extracted from tool_get_readiness_score, #4979 — same words)."""
+    return (
+        f"No data exists for the requested date ({end_date}) yet — its overnight hasn't been recorded. "
+        f"This score reflects the latest available data ({as_of_date}) and should be treated as a "
+        "current/trend signal, not the requested day's readiness."
+    )
 
 
 def _readiness_label(readiness_score):
@@ -1324,13 +1299,14 @@ def tool_get_daily_metrics(args):
         "movement": _get_movement_score,
         "energy": _get_energy_expenditure,
         "hydration": _get_hydration_score,
+        "watch": lambda a: _watch_daily_view(a, query_source),  # #4979: the Apple Watch's signals, labelled by source
     }
     view = (args.get("view") or "movement").lower().strip()
     if view not in VALID_VIEWS:
         return {
             "error": f"Unknown view '{view}'.",
             "valid_views": list(VALID_VIEWS.keys()),
-            "hint": "'movement' for NEAT/step score, 'energy' for calorie expenditure vs intake, 'hydration' for daily water intake adequacy.",
+            "hint": "'movement' for NEAT/step score, 'energy' for calorie expenditure vs intake, 'hydration' for daily water intake adequacy, 'watch' for the Apple Watch's signals.",
         }
     return VALID_VIEWS[view](args)
 

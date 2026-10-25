@@ -465,6 +465,12 @@ _KNOWN_CROSS_CYCLE_DEBT: dict[str, str] = {
 # per call or per source rather than fixed at the site. Recording them here is a
 # claim that the deciding expression is sound — cite where that soundness is pinned.
 _PER_SOURCE_READS: dict[str, str] = {
+    "lambdas/web/site_api_ai_context.py::_recent_day_rows": (
+        "#4979: the /api/ask watch block's trailing-window read. include_pilot=source_reads_cross_phase(source), "
+        "the #2109 idiom; it is only ever called for apple_health (RAW_TIMESERIES, so cross-phase) over the VO2 "
+        "arc's trailing 30 days — an instrument's readings are true in every cycle and each line it feeds is "
+        "dated by its own row (as_of), so a reset must not truncate the window."
+    ),
     "lambdas/operational/hevy_routine_cron_lambda.py::_read_partition": (
         "#4410: the cron's aerobic-minutes read (the bundled twin of mcp.core.query_source's derived read — "
         "the cron cannot import mcp/). include_pilot=source_reads_cross_phase(source), the #2109 idiom, "

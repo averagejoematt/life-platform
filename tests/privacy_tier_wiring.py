@@ -189,6 +189,13 @@ CONSUMERS: dict[tuple[str, str], dict] = {
         "Not a value read: a presence-signal name in the #4970 overnight-vitals "
         "hae_datatypes entry, the same any-of liveness set as the two above.",
     ),
+    ("lambdas/ingestion/source_registry.py", "sleep_total_hours_apple"): _d(
+        SAW,
+        "#4979 dual wear: the METRIC_TRUTH['sleep_hours'] `companions` facet names the watch's night total so "
+        "`common.metric_truth.dual_wear` can report it beside Whoop's, labelled. Never a truth source (not in "
+        "fallback_order). Its readers filter by audience: `health.watch_signals.allowed` drops it from every AI "
+        "and public context; only the owner's MCP views return it.",
+    ),
     # NOTE — `mcp/tools_data.py` is deliberately ABSENT. It was the #2809 leak site and
     # it carried a hand-written `TIER2_STRIP_FIELDS` literal naming all three fields.
     # #2803 made it derive from `field_tiers.strip_map()`, so it no longer names any of

@@ -2937,6 +2937,23 @@ def catalog_entries() -> list:
 # carried (treadmill, bike), and the two agree closely on outdoor-walk days. Garmin is paused
 # (ADR-074) and stays last so pre-pause history still resolves; its 1000 floor is the one the
 # site readers already applied to drop the phantom ~298 partial-sync row.
+# #4979 — dual wear (Whoop + Apple Watch). Optional facet keys, read ONLY by
+# `common.metric_truth.dual_wear` (the resolver never consults a companion):
+#   companions       — {source: field}: a second instrument's value for the same metric, stored
+#                      and reported beside the truth, labelled; NOT in fallback_order, so no
+#                      `resolve` answer changes
+#   companion_units  — {source: unit} when a companion's statistic differs from `unit`
+#   labels           — {source: label} overriding the registry's source label (the watch's
+#                      Tier-2 fields are Apple-DEVICE readings, so "Apple Watch", not "Apple Health")
+#   blend            — never | pending | active. `active` IS mode "mean" over fallback_order;
+#                      `never` can never be mode "mean"; `pending` = both tracked, no blend yet
+#   blend_ruling / blend_reason — the words the state rests on
+WATCH_BLEND_RULING = (
+    "owner 2026-10-23 (#4975, Session CD): 'Track both, then blend' — a labelled blended average per metric only where "
+    "the 30-night study (#4974) shows the two devices agree; HRV is never blended"
+)
+METRIC_TRUTH_BLEND_STATES = ("never", "pending", "active")
+
 METRIC_TRUTH: dict[str, dict[str, Any]] = {
     "steps": {
         "truth_source": "whoop",
@@ -2976,6 +2993,13 @@ METRIC_TRUTH: dict[str, dict[str, Any]] = {
         "overlap_rule": "first_positive_else_first_zero",
         "mode": "primary",
         "ruling": "#4975 gate:owner (mean vs primary/backup, after #4974) — pending; encodes today's Whoop-only answer",
+        # #4979: the watch's HRV rides beside Whoop's, labelled, and is NEVER blended (owner 2026-10-23).
+        "companions": {"apple_health": "hrv_sdnn_apple"},
+        "companion_units": {"apple_health": "ms (SDNN)"},
+        "labels": {"apple_health": "Apple Watch"},
+        "blend": "never",
+        "blend_ruling": WATCH_BLEND_RULING,
+        "blend_reason": "HRV is never blended: Whoop reports RMSSD in sleep, the Apple Watch reports SDNN spot readings — two statistics",
     },
     "rhr_bpm": {
         "truth_source": "whoop",
@@ -2986,6 +3010,11 @@ METRIC_TRUTH: dict[str, dict[str, Any]] = {
         "overlap_rule": "first_positive_else_first_zero",
         "mode": "primary",
         "ruling": "#4975 gate:owner (mean vs primary/backup, after #4974) — pending; encodes today's Whoop-only answer",
+        # #4979: the watch's value rides beside Whoop's, labelled; a blend waits on #4974 (owner 2026-10-23).
+        "companions": {"apple_health": "resting_heart_rate_apple"},
+        "labels": {"apple_health": "Apple Watch"},
+        "blend": "pending",
+        "blend_ruling": WATCH_BLEND_RULING,
     },
     "sleep_hours": {
         "truth_source": "whoop",
@@ -2996,6 +3025,11 @@ METRIC_TRUTH: dict[str, dict[str, Any]] = {
         "overlap_rule": "first_positive_else_first_zero",
         "mode": "primary",
         "ruling": "#4975 gate:owner (mean vs primary/backup, after #4974) — pending; encodes today's Whoop-only answer",
+        # #4979: the watch's value rides beside Whoop's, labelled; a blend waits on #4974 (owner 2026-10-23).
+        "companions": {"apple_health": "sleep_total_hours_apple"},
+        "labels": {"apple_health": "Apple Watch"},
+        "blend": "pending",
+        "blend_ruling": WATCH_BLEND_RULING,
     },
 }
 
@@ -3029,6 +3063,23 @@ def _validate_metric_truth() -> None:
                 raise ValueError(f"METRIC_TRUTH[{metric!r}]: primary_backup needs a `backup` from fallback_order other than truth_source")
         elif "backup" in facet:
             raise ValueError(f"METRIC_TRUTH[{metric!r}]: `backup` is only meaningful in mode primary_backup")
+        _validate_dual_wear(metric, facet, order, mode)
+
+
+def _validate_dual_wear(metric: str, facet: dict, order: tuple, mode: str) -> None:
+    """#4979: the companion / blend facet keys (see the WATCH_BLEND_RULING block)."""
+    blend = facet.get("blend", "active" if mode == "mean" else "pending")
+    if blend not in METRIC_TRUTH_BLEND_STATES:
+        raise ValueError(f"METRIC_TRUTH[{metric!r}]: unknown blend {blend!r}")
+    if blend == "never" and mode == "mean":
+        raise ValueError(f"METRIC_TRUTH[{metric!r}]: blend 'never' cannot be mode mean")
+    if (blend == "active") != (mode == "mean"):
+        raise ValueError(f"METRIC_TRUTH[{metric!r}]: blend 'active' and mode 'mean' go together")
+    for src in facet.get("companions", {}):
+        if src not in SOURCE_REGISTRY:
+            raise ValueError(f"METRIC_TRUTH[{metric!r}]: companion {src!r} is not a registered source")
+        if src in order:
+            raise ValueError(f"METRIC_TRUTH[{metric!r}]: companion {src!r} is also in fallback_order")
 
 
 _validate_metric_truth()
@@ -3046,4 +3097,8 @@ def metric_truth(metric: str) -> dict:
         "field_by_source": dict(facet["field_by_source"]),
         "min_by_source": dict(facet["min_by_source"]),
         "mode": facet.get("mode", "primary"),  # #4975: absent = primary (today's behaviour)
+        "companions": dict(facet.get("companions", {})),  # #4979: absent = no second instrument
+        "companion_units": dict(facet.get("companion_units", {})),
+        "labels": dict(facet.get("labels", {})),
+        "blend": facet.get("blend", "active" if facet.get("mode") == "mean" else "pending"),  # absent: follows the mode
     }

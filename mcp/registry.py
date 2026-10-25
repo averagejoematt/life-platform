@@ -467,8 +467,8 @@ TOOLS = {
                 "properties": {
                     "view": {
                         "type": "string",
-                        "description": "load (default), periodization, or recommendation.",
-                        "enum": ["load", "periodization", "recommendation"],
+                        "description": "load (default), periodization, recommendation, or cardio_fitness (the Apple Watch's VO2 max arc + cardio signals).",
+                        "enum": ["load", "periodization", "recommendation", "cardio_fitness"],
                     },
                     "start_date": {"type": "string", "description": "[load/periodization] Start date YYYY-MM-DD."},
                     "end_date": {"type": "string", "description": "[load/periodization] End date YYYY-MM-DD (default: today)."},
@@ -489,8 +489,8 @@ TOOLS = {
                 "properties": {
                     "view": {
                         "type": "string",
-                        "description": "movement (default), energy, or hydration.",
-                        "enum": ["movement", "energy", "hydration"],
+                        "description": "movement (default), energy, hydration, or watch (the Apple Watch's signals, labelled by source).",
+                        "enum": ["movement", "energy", "hydration", "watch"],
                     },
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 30d ago)."},
                     "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
@@ -701,6 +701,8 @@ TOOLS = {
                 "the output. No Body Battery. Also includes a device_agreement section showing Whoop vs "
                 "Apple Watch same-night resting-HR delta as a confidence signal — flag status means lower score reliability; "
                 "when the cross-check can't run it returns status=unavailable with a reason instead of null. "
+                "Also includes watch_overnight: Whoop and the Apple Watch side by side for resting HR, HRV and sleep on the scored "
+                "night, each labelled — never blended for HRV, and blended elsewhere only where the owner has ruled it. "
                 "Reduces cognitive load: one number instead of 5 separate metrics tells you "
                 "'train hard today' vs 'go easy' vs 'rest day'. Missing components are excluded and "
                 "remaining weights re-normalised. "

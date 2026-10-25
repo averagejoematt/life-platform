@@ -296,8 +296,9 @@ def test_latest_readiness_pre492_record_serves_no_components(monkeypatch):
 
 
 def test_device_agreement_never_silent_null():
-    """M-7: tools_health always explains an absent cross-check."""
-    src = open(os.path.join(_REPO, "mcp/tools_health.py")).read()
+    """M-7: the readiness cross-check always explains an absent result (#4979: the function moved
+    verbatim from tools_health to the watch views' module, lambdas/health/watch_views.py)."""
+    src = open(os.path.join(_REPO, "lambdas/health/watch_views.py")).read()
     assert '"reason": f"no Apple Watch resting heart rate for the Whoop night' in src
     # registry advertises the CODE's weights (40/5) — #4978: the 5% leg is overnight physiology, not Body Battery
     reg = open(os.path.join(_REPO, "mcp/registry.py")).read()

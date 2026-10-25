@@ -233,8 +233,10 @@ GET_TRAINING_DESCRIPTION = (
     "'load' (default) = Banister CTL/ATL/TSB fitness-fatigue model + ACWR injury risk. Warmed nightly. "
     "'periodization' = mesocycle detection (Base/Build/Peak/Deload), 80/20 polarization analysis, progressive overload tracking. Warmed nightly. "
     "'recommendation' = readiness-based workout suggestion synthesising Whoop, Eight Sleep, Garmin, training load. Board of Directors rationale. Warmed nightly. "
+    "'cardio_fitness' = the Apple Watch's cardio fitness read: VO2 max estimate arc (each point names its instrument; flags an arc spanning two devices), "
+    "cardio recovery, exercise minutes and walking gait, each with the date it is from. "
     "Use for: 'how fit am I?', 'am I overtraining?', 'training load', 'CTL', 'TSB', 'form', "
-    "'am I in a deload?', 'periodization', 'what should I do today?', 'training recommendation', 'ready to train?'."
+    "'am I in a deload?', 'periodization', 'what should I do today?', 'training recommendation', 'ready to train?', 'VO2 max trend', 'cardio recovery'."
 )
 
 GET_DAILY_METRICS_DESCRIPTION = (
@@ -242,8 +244,11 @@ GET_DAILY_METRICS_DESCRIPTION = (
     "'movement' (default) = NEAT analysis, movement score 0-100, step target tracking, sedentary day flags. "
     "'energy' = calorie expenditure vs intake balance — TDEE breakdown, activity energy, deficit/surplus trend. "
     "'hydration' = daily water intake adequacy scored against bodyweight-adjusted target (35ml/kg). "
+    "'watch' = the Apple Watch's signals per day (cardio recovery, daylight, audio, exercise minutes, gait, VO2 max, its owner-only sleep/SpO2/wrist "
+    "temperature) labelled by source, with Whoop and the watch side by side for resting HR, HRV and sleep — both kept, a blend only where the owner "
+    "ruled one after the 30-night agreement study, HRV never blended. "
     "Use for: 'am I moving enough?', 'NEAT', 'steps', 'sedentary days', "
-    "'energy balance', 'calorie burn', 'am I in a deficit?', 'hydration score', 'water intake'."
+    "'energy balance', 'calorie burn', 'am I in a deficit?', 'hydration score', 'water intake', 'what does the Apple Watch say?'."
 )
 
 GET_WEIGHT_LOSS_PROGRESS_DESCRIPTION = "The core weight-loss coaching report. Returns: weekly rate of loss with fast/slow flags, full BMI series with clinical milestone flags (Obese III→II→I→Overweight→Normal), projected goal date at current pace, plateau detection (14+ days of minimal movement), % complete toward goal, and recent_weights — the trailing 14 real Withings weigh-ins only (date + weight_lbs + source), where a logging gap shows as missing dates rather than being smoothed over. Use for: 'how is my weight loss going?', 'when will I reach my goal?', 'am I losing too fast?', 'am I in a plateau?', 'what BMI am I at?'. Requires journey_start_date, goal_weight_lbs in profile."

@@ -84,6 +84,7 @@ from experiment.phase_taxonomy import forbidden_provenance  # #3915: the calibra
 from health import eating_window  # #5099: THE eating window (charter nutrition.eating_window)
 from health.calorie_target import target_phrase  # #5095: the ONE calorie target
 
+from compute import watch_hypotheses  # #4979: the watch-enabled metrics + their three pre-registered hypotheses
 from compute.compute_json_schemas import hypotheses_schema  # #4276: the generation output schema (module at its size ceiling)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -191,6 +192,7 @@ SPEC_METRICS = frozenset(
         "habit_pct",  # #1843: Habitify tier-0/1 completion ratio (0-1) — the outcome
         # metric for the diary-intervention hypothesis; wasn't wired into this
         # vocabulary before even though habitify was already fetched by gather_data.
+        *watch_hypotheses.WATCH_METRICS,  # #4979: daylight / cardio recovery / VO2 max + the two trailing-7d volumes
         "diary_day",  # #1843: 1.0 if a video-diary/solo-recording session happened
         # that date (computed_metrics.diary_sessions >= 1), else 0.0. Absent (not 0)
         # on any date computed before #1843 shipped — an honest "not yet measured".
@@ -481,7 +483,7 @@ def build_data_narrative(data):
         if len(row) > 1:  # more than just date
             rows.append(row)
 
-    return rows
+    return watch_hypotheses.add_watch_metrics(rows, data)  # #4979: the watch-enabled metrics (absent stays absent)
 
 
 def check_data_completeness(daily_rows):
@@ -995,7 +997,9 @@ def format_journal_candidates(candidates):
 
 
 # #4276: the generation prompt's JSON shape, constrained at the model (compute/compute_json_schemas.py).
-HYPOTHESES_SCHEMA = hypotheses_schema(SPEC_METRICS)
+# #4979: the generator's vocabulary — the owner-channel metrics (cardio recovery, TIER_INTERNAL) stay out of public hypotheses.
+GENERATION_METRICS = SPEC_METRICS - watch_hypotheses.OWNER_CHANNEL_METRICS
+HYPOTHESES_SCHEMA = hypotheses_schema(GENERATION_METRICS)
 
 
 def generate_hypotheses(daily_rows, existing_hypotheses, profile=None, journal_candidates=None):
@@ -1015,14 +1019,14 @@ def generate_hypotheses(daily_rows, existing_hypotheses, profile=None, journal_c
 
     user_message = f"""Here is {len(daily_rows)} days of Matthew's health data:
 
-{json.dumps(daily_rows, indent=2)}
+{json.dumps(watch_hypotheses.generation_rows(daily_rows), indent=2)}
 
 Context:
 - 36-year-old male, {total_loss} lb weight loss transformation (started {start_w} lbs, goal {goal_w} lbs)
 - Calorie target: {cal_target}/day, protein target: {pro_target}g/day
 - Eating window: {eating_window.describe()} (the charter's nutrition.eating_window, #5099)
 - Primary training: walking + strength training, building Zone 2 base
-- Data sources: Whoop (HRV/recovery), Eight Sleep (sleep onset), Strava (activities), MacroFactor (nutrition), Habitify (habits), Apple Health (steps/glucose/gait), Notion journal (mood/stress/energy)
+- Data sources: Whoop (HRV/recovery), Eight Sleep (sleep onset), Strava (activities), MacroFactor (nutrition), Habitify (habits), Apple Health (steps/glucose/gait; the Apple Watch: daylight, VO2 max, cardio-session volume), Notion journal (mood/stress/energy)
 {existing_block}{candidates_block}
 
 Generate {MAX_NEW_HYPOTHESES} cross-domain hypotheses. Each should be:
@@ -1031,7 +1035,7 @@ Generate {MAX_NEW_HYPOTHESES} cross-domain hypotheses. Each should be:
 - Falsifiable with 2-4 weeks of continued observation
 
 METRIC VOCABULARY for test_spec (the ONLY valid condition_metric / outcome_metric values):
-{", ".join(sorted(SPEC_METRICS))}
+{", ".join(sorted(GENERATION_METRICS))}
 
 Return ONLY this JSON structure:
 {{
@@ -1559,6 +1563,9 @@ def lambda_handler(event, context):
         diary_hypothesis_result = seed_diary_intervention_hypothesis(all_hypotheses, daily_rows)
         if diary_hypothesis_result.get("registered"):
             pending_count += 1  # newly-seeded hypothesis starts "pending" — counts against the cap below
+        # 3.6. #4979: the three watch-enabled hypotheses, pre-registered in code (same contract as 3.5).
+        watch_seed = watch_hypotheses.seed_watch_hypotheses(all_hypotheses, daily_rows, validate_hypothesis, store_hypothesis)
+        pending_count += len(watch_seed["registered"])
 
         # 4. Generate new hypotheses if room exists AND data is sufficient
         new_hypotheses_stored = 0
@@ -1638,6 +1645,7 @@ def lambda_handler(event, context):
             "effect_refit": effect_refit,  # #1411 quarterly fit outcome
             "time_affluence": time_affluence,  # #1408 weekly proxy + edge outcome
             "diary_intervention_hypothesis": diary_hypothesis_result,  # #1843 AC3
+            "watch_hypotheses": watch_seed,  # #4979
         }
         logger.info(f"Complete: {summary}")
         return {"statusCode": 200, "body": json.dumps(summary)}
