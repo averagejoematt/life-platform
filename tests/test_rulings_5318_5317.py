@@ -204,7 +204,10 @@ def test_a4_a_draft_under_60_min_with_the_week_at_75_raises_no_warning_and_adds_
     ideal = _generate("2026-10-30", block_workouts=rows)[0]
     assert ideal.inputs_snapshot["calendar"]["session_role"] == SA
     working = {b.movement_key: [s for s in b.sets if s.type != "warmup"] for b in ideal.exercises}
-    assert {k: len(v) for k, v in working.items()} == {e["movement_key"]: len(e["sets"]) for e in rx["exposures"]}
+    # #5075: the draft serves each accessory slot's rotation variant — the same slots, the same set counts as the template
+    rxi = ideal.inputs_snapshot["session_prescription"]
+    assert {k: len(v) for k, v in working.items()} == {e["movement_key"]: len(e["sets"]) for e in rxi["exposures"]}
+    assert [len(e["sets"]) for e in rxi["exposures"]] == [len(e["sets"]) for e in rx["exposures"]]
     assert session_shape.session_shape_problems(ideal.exercises, MOVEMENTS) == []
     shape = session_shape.enforce_session_shape(list(ideal.exercises), MOVEMENTS)
     assert shape["actions"] == [] and shape["lifting_minutes"] < 60

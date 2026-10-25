@@ -293,10 +293,11 @@ def program_week(day: str, block_workouts: list[dict[str, Any]] | None = None) -
 
 
 def _block_boundaries(block_workouts: list[dict[str, Any]] | None, day: str) -> list[str] | None:
-    from training import session_sequence
+    """Where the accessory layer may legitimately change: a new block or a new accessory-rotation phase (#5075)."""
+    from training import session_sequence, variant_rotation
 
     try:
-        return session_sequence.block_boundaries(block_workouts, day)
+        return session_sequence.block_boundaries(block_workouts, day, every_weeks=variant_rotation.rotate_every_weeks())
     except ValueError:
         return None
 

@@ -85,10 +85,10 @@ def _boundary_honesty(window_start: str, window_end: str, block_boundaries: list
     inside = [d for d in block_boundaries if window_start < d <= window_end]
     if inside:
         return (
-            f"{lead}; the session sequence opened a new block on {inside[0]} inside it, so an accessory added from that day "
-            "is legitimate, not drift"
+            f"{lead}; the session sequence opened a new block on {inside[0]} inside it (a block or an accessory-rotation phase, "
+            "#5075), so an accessory added from that day is legitimate, not drift"
         )
-    return f"{lead}; the session sequence opened no new block inside it, so an addition here is drift"
+    return f"{lead}; the session sequence opened no new block inside it (nor a rotation phase), so an addition here is drift"
 
 
 def accessory_rotation(
@@ -207,7 +207,7 @@ def accessory_rotation(
         "detail": (
             f"{distinct_accessories} distinct accessory movement(s) over n={sessions} session(s) ({window_start}..{window_end}); "
             + (
-                f"{len(added)} added in the trailing 7 days that the prior days did not carry; {len(repeats)} repeated (by design — accessories are fixed for the block)"
+                f"{len(added)} added in the trailing 7 days that the prior days did not carry; {len(repeats)} repeated (by design — a slot holds its variant for its rotation phase)"
                 if measurable
                 else "no session before the trailing 7 days, so 'added' cannot be measured"
             )
