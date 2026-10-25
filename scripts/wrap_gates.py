@@ -170,6 +170,8 @@ GATHER = [
         ],
     ),
     Gate("alarm-citations", "e10", ["python3", "scripts/check_alarm_citations.py"], marker="Alarms"),
+    # #5143: the live alarm NAME set vs the model's alarms plane (both regions, read-only; fail-open UNVERIFIED offline).
+    Gate("alarm-census", "e10", ["python3", "scripts/check_alarm_census.py"]),
     Gate("ci-warnings", "e11", ["python3", "scripts/check_ci_warnings.py"], marker="CI warnings"),
     # #4262: backlog-hygiene (e7), unlinked-closures and merge-text-closures are NOT here any
     # more — they run nightly in `.github/workflows/wrap-nightly.yml` (see NIGHTLY, below),
