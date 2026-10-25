@@ -105,7 +105,7 @@
   - #4583, the 19:00Z move run;
   - #5136, Sun 10-25 15:00Z.
 - **Follow-up:** a per-day calorie-sum guard for Weekly Plate (noted on #5297).
-- **Next plan:** `~/.claude/plans/next-session-proofs-2026-10-25.md`.
+- **Next plan:** `~/.claude/plans/next-session-proofs-2026-10-25.md`. not-work — a pointer.
 
 ## Marker lines
 **Build beat:** the new front page is live (cut-over); the reader-visible privacy leak is closed.
