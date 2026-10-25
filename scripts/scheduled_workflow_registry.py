@@ -206,9 +206,9 @@ WATCH_POLICY: dict[str, dict[str, Any]] = {
         "floor until check_cron_freshness's live derivation has the sample to re-derive its own.",
         "reason": "The /wrap-only checks (backlog hygiene, handover lines, residual queue, the two "
         "closure detectors) ran only when a session remembered /wrap; this is their one "
-        "scheduled home — and, since #5316, the fleet-drift AWS leg's. "
+        "scheduled home — and, since #5316/#5143, the fleet-drift and alarm-census AWS legs'. "
         "Each leg's #1447 filer is armed on a run's RESULT, so a cron that "
-        "stops leaves six trackers silently closed — the armed-on-result defect this "
+        "stops leaves seven trackers silently closed — the armed-on-result defect this "
         "registry exists for.",
     },
     "remediation-agent.yml": {

@@ -253,13 +253,15 @@ def test_wrap_nightly_legs_cover_the_wrap_only_checks_it_claims():
     with open(_WRAP_NIGHTLY, encoding="utf-8") as fh:
         text = fh.read()
     all_legs = yaml.safe_load(text)["jobs"]["check"]["strategy"]["matrix"]["include"]
-    # #5316 box 2: a scheduled AWS read-only leg rides the same matrix (the
-    # degrade rule + per-leg tracker), but it is not a wrap gate — AWS legs carry an aws-role, and only they may.
+    # #5316 box 2 / #5143 box 4: two scheduled AWS read-only legs ride the same matrix (the
+    # degrade rule + per-leg tracker), but they are not wrap gates — they are the legs that
+    # carry an aws-role, and only they may.
     aws_legs = {leg["slug"]: leg for leg in all_legs if leg.get("aws-role")}
-    assert set(aws_legs) == {"fleet-drift"}, sorted(aws_legs)
+    assert set(aws_legs) == {"fleet-drift", "alarm-census"}, sorted(aws_legs)
     for leg in aws_legs.values():
         assert leg["aws-role"].endswith(":role/github-actions-readonly-role"), leg
     assert aws_legs["fleet-drift"]["cmd"] == "python3 deploy/check_fleet_drift.py --expect-deploy-base"
+    assert aws_legs["alarm-census"]["cmd"] == "python3 scripts/check_alarm_census.py"
     legs = [leg for leg in all_legs if not leg.get("aws-role")]
     import wrap_gates
 

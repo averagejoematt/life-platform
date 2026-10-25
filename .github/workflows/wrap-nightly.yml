@@ -31,8 +31,11 @@
 #   fleet-drift            leg  — NOT a wrap check (#5316 box 2): `check_fleet_drift.py
 #                                 --expect-deploy-base`, every fleet Lambda on main's last
 #                                 deployed sha. Exit 1 = drift; exit 2 = indeterminate, also red.
-#                                 It assumes github-actions-readonly-role (lambda:GetFunction);
-#                                 the role trusts main only.
+#   alarm-census           leg  — NOT a wrap check (#5143 box 4): live CloudWatch alarm NAMES
+#                                 vs the model; its UNVERIFIED fail-open reds by the rule below.
+#                                 Both AWS legs assume github-actions-readonly-role, which holds
+#                                 lambda:GetFunction + cloudwatch:DescribeAlarms (not History,
+#                                 hence alarm-citations stays out); the role trusts main only.
 #
 # Since the #4262 follow-up, backlog-hygiene, unlinked-closures and merge-text-closures run
 # ONLY here: they left `scripts/wrap_gates.py`'s interactive battery for its NIGHTLY list,
@@ -60,7 +63,7 @@ on:
 permissions:
   contents: read
   issues: write # the per-leg auto-filed tracker; `gh issue list` reads for three legs
-  id-token: write # OIDC for the AWS leg (read-only role)
+  id-token: write # OIDC for the two AWS legs (read-only role)
   actions: read # fleet-drift reads main's CI/CD run history for the last deployed sha
 
 concurrency:
@@ -88,6 +91,9 @@ jobs:
             cmd: python3 scripts/check_merge_commit_closures.py --days 7
           - slug: fleet-drift
             cmd: python3 deploy/check_fleet_drift.py --expect-deploy-base
+            aws-role: arn:aws:iam::205930651321:role/github-actions-readonly-role
+          - slug: alarm-census
+            cmd: python3 scripts/check_alarm_census.py
             aws-role: arn:aws:iam::205930651321:role/github-actions-readonly-role
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -128,4 +134,4 @@ jobs:
             A nightly check failed, or declined to look (UNVERIFIED / gh fail-open /
             indeterminate). Re-run the command named in the job log locally for the detail;
             a wrap leg's remedy is its step in .claude/skills/wrap/SKILL.md, fleet-drift's is
-            deploy/deploy_fleet.sh from main (#5316).
+            deploy/deploy_fleet.sh from main (#5316), alarm-census's is its own docstring (#5143).
