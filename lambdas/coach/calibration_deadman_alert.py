@@ -27,7 +27,16 @@ WHAT IT RESPECTS, AND WHAT IT DOES NOT.
   * A dark seat (no bot registered) sends nothing and says so; the email alarm still fires.
 
 Claim-then-send (the reserve-then-act idiom): a crash between the two never licenses a second text, and a failed
-send logs `CALIB_DEADMAN_TELEGRAM_FAILED` loudly — the email alarm is the independent second channel.
+send — or a claim the ledger could not WRITE (as opposed to one already taken) — logs `CALIB_DEADMAN_TELEGRAM_FAILED`
+loudly; the email alarm is the independent second channel.
+
+EVERY RETURN PATH LOGS (#5203, the 2026-10-24 16:00Z read). That run claimed both rows (`EVENT#CALIB_DEADMAN#tape#…`
+and `…#photos#…` under `pk=COACH#outbound_events`, written 16:00:21Z/16:00:22Z) and called Telegram with no failure
+logged, yet CloudWatch held no `[calib-deadman]` line: the module logged through a bare `logging.getLogger(__name__)`,
+whose INFO records propagate to a Lambda root logger that only surfaces WARNING (the #3283 box-3 class). So the
+logger is the worker's platform logger (its own stdout handler, INFO), and every path — quiet hours, none due, dark,
+read failed, and the per-kind claim outcome — ends in exactly one `[calib-deadman] reason=… due=[…]` line. The line
+carries kinds, event ids (kind + cycle-start date) and counts only — never a reading, a photo key or a chat id.
 """
 
 from __future__ import annotations
@@ -35,7 +44,13 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Mapping, Optional
 
-logger = logging.getLogger(__name__)
+try:  # the worker's own logger: a handler of its own at INFO, so these lines reach CloudWatch (#3283 / #5203)
+    from common.platform_logger import get_logger
+
+    logger: logging.Logger = get_logger("telegram-worker")
+except ImportError:  # pragma: no cover
+    logger = logging.getLogger("telegram-worker")
+    logger.setLevel(logging.INFO)
 
 PERSONA = "eli_marsh"  # the program lead's seat (coach_event_triggers.LEAD_OWNER) — owner-only by construction
 PREFIX = "Calibration dead-man: "
@@ -60,6 +75,12 @@ def due(block: Optional[Mapping[str, Any]]) -> list[dict[str, str]]:
     return out
 
 
+def _summary(reason: str, kinds: list, outcomes: Optional[dict] = None) -> None:
+    """The ONE closing line of every run — one grep (`[calib-deadman] reason=`) tells the whole story."""
+    tail = " " + " ".join(f"{k}={v}" for k, v in outcomes.items()) if outcomes else ""
+    logger.info("[calib-deadman] reason=%s due=[%s]%s", reason.replace(" ", "_"), ",".join(kinds), tail)
+
+
 def run(
     table: Any,
     now_pt: Any,
@@ -70,12 +91,15 @@ def run(
 ) -> dict[str, Any]:
     """Send each new dead-man alert as one plain text. Never raises; the result is identity-free and safe to log.
 
-    `seat(persona) -> (token, chat_id)` and `send(token, chat_id, text)` are the worker's transport (injected).
-    `block` defaults to `calibration_cadence.read(table, today)`.
+    `seat(persona) -> (token, chat_id)` and `send(token, chat_id, text)` are the worker's transport (injected); a
+    `send` that returns False (the worker's `_tg` swallows its own errors) is a failed send, like one that raises.
+    `block` defaults to `calibration_cadence.read(table, today)`. Every return path logs one
+    `[calib-deadman] reason=… due=[…]` line.
     """
     from coach import coach_outbound
 
     if coach_outbound.in_quiet_hours(now_pt):
+        _summary("quiet hours", [])
         return {"reason": "quiet hours", "sent": []}
     today = now_pt.strftime("%Y-%m-%d")
     try:
@@ -86,22 +110,45 @@ def run(
         alerts = due(block)
     except Exception as e:  # noqa: BLE001 — the email alarm is the other channel; never break the sweep
         logger.warning("[calib-deadman] %s cadence read failed (%s)", FAILED_TOKEN, type(e).__name__)
+        _summary("read_failed", [])
         return {"reason": "read_failed", "sent": []}
+    kinds = [a["kind"] for a in alerts]
     if not alerts:
+        _summary("none due", kinds)
         return {"reason": "none due", "sent": []}
     token, chat_id = seat(PERSONA)
     if not token or chat_id is None:
         logger.warning("[calib-deadman] %d dead-man alert(s) due but the lead's seat is dark — the email alarm carries it", len(alerts))
-        return {"reason": "dark", "sent": [], "due": [a["kind"] for a in alerts]}
-    sent = []
+        _summary("dark", kinds)
+        return {"reason": "dark", "sent": [], "due": kinds}
+    sent: list[str] = []
+    outcomes: dict[str, str] = {}
     for a in alerts:
-        if not coach_outbound.claim_event(table, a["event_id"]):
-            continue  # already delivered this cycle (or the ledger is unreadable — stand down, never double-send)
+        claim = coach_outbound.claim_event_outcome(table, a["event_id"])
+        if claim == coach_outbound.ALREADY_CLAIMED:
+            outcomes[a["kind"]] = "already-claimed"  # delivered this cycle already — quiet, by design
+            continue
+        if claim != coach_outbound.CLAIMED:
+            # The ledger could not be written: stand down (never double-send) but LOUDLY — a silent stand-down here
+            # is indistinguishable from "already told him", which is the silence this module exists to break.
+            outcomes[a["kind"]] = "claim-failed"
+            logger.warning("[calib-deadman] %s kind=%s claim write failed — not sent; the email alarm carries it", FAILED_TOKEN, a["kind"])
+            continue
         try:
-            send(token, chat_id, a["text"])
+            ok = send(token, chat_id, a["text"])
         except Exception as e:  # noqa: BLE001
+            outcomes[a["kind"]] = "send-failed"
             logger.warning("[calib-deadman] %s kind=%s (%s)", FAILED_TOKEN, a["kind"], type(e).__name__)
             continue
+        if ok is False:
+            outcomes[a["kind"]] = "send-failed"
+            logger.warning("[calib-deadman] %s kind=%s (send returned False)", FAILED_TOKEN, a["kind"])
+            continue
+        outcomes[a["kind"]] = "sent"
         sent.append(a["kind"])
         logger.info("[calib-deadman] sent kind=%s event=%s", a["kind"], a["event_id"])
-    return {"reason": "sent" if sent else "already sent", "sent": sent}
+    failed = [k for k, v in outcomes.items() if v.endswith("-failed")]
+    reason = "sent" if sent else ("failed" if failed else "already sent")
+    _summary(reason, kinds, outcomes)
+    out: dict[str, Any] = {"reason": reason, "sent": sent, "due": kinds, "outcomes": outcomes}
+    return out

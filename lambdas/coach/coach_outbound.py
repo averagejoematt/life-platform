@@ -253,22 +253,21 @@ def event_sk(event_id: str) -> str:
     return f"{EVENT_SK_PREFIX}{event_id}"
 
 
-def claim_event(table, event_id: str, *, now_ts: Optional[float] = None) -> bool:
-    """Write-once claim on ONE real-world event. False = it already fired.
+CLAIMED = "claimed"
+ALREADY_CLAIMED = "already-claimed"
+CLAIM_FAILED = "claim-failed"
 
-    The event id is derived from the FACT (the lift and its date, the milestone
-    id, the day a slide started), never from the moment of evaluation — which is
-    what makes a sweep idempotent and a three-day slide that runs to four days
-    silent on day four. The conditional put is the whole mechanism; there is
-    deliberately no update path and no delete path, so an event cannot be
-    un-fired by anything short of a manual write.
 
-    Any storage error returns False, matching ``claim_outbound``: a ledger the
-    platform cannot write is one it cannot be trusted to read, and the safe
-    reading of "I don't know whether I already said this" is "don't say it".
+def claim_event_outcome(table, event_id: str, *, now_ts: Optional[float] = None) -> str:
+    """Write-once claim on ONE real-world event, with the reason it did or did not take (#5203).
+
+    Returns ``CLAIMED`` (this caller owns the event), ``ALREADY_CLAIMED`` (the conditional put collided: it
+    already fired) or ``CLAIM_FAILED`` (no id, or any other storage error). ``claim_event`` collapses the two
+    refusals into False; a caller that must be LOUD about a ledger it cannot write (the calibration dead-man)
+    reads this instead — both refusals still mean "don't send", but only one of them is quiet.
     """
     if not event_id:
-        return False
+        return CLAIM_FAILED
     now = now_ts if now_ts is not None else time.time()
     try:
         table.put_item(
@@ -282,13 +281,32 @@ def claim_event(table, event_id: str, *, now_ts: Optional[float] = None) -> bool
             },
             ConditionExpression="attribute_not_exists(sk)",
         )
-        return True
+        return CLAIMED
     except Exception as e:  # noqa: BLE001 — ConditionalCheckFailed = already fired
         if "ConditionalCheckFailed" in type(e).__name__ or "ConditionalCheckFailed" in str(e):
             logger.info("[outbound] event %s already fired — standing down", event_id)
-        else:
-            logger.warning("[outbound] event claim failed (%s) — standing down", e)
-        return False
+            return ALREADY_CLAIMED
+        logger.warning("[outbound] event claim failed (%s) — standing down", e)
+        return CLAIM_FAILED
+
+
+def claim_event(table, event_id: str, *, now_ts: Optional[float] = None) -> bool:
+    """Write-once claim on ONE real-world event. False = it already fired.
+
+    The event id is derived from the FACT (the lift and its date, the milestone
+    id, the day a slide started), never from the moment of evaluation — which is
+    what makes a sweep idempotent and a three-day slide that runs to four days
+    silent on day four. The conditional put is the whole mechanism; there is
+    deliberately no update path and no delete path, so an event cannot be
+    un-fired by anything short of a manual write. The row is
+    ``pk=COACH#outbound_events`` / ``sk=EVENT#{event-id}`` (no ``USER#`` prefix).
+
+    Any storage error returns False, matching ``claim_outbound``: a ledger the
+    platform cannot write is one it cannot be trusted to read, and the safe
+    reading of "I don't know whether I already said this" is "don't say it".
+    ``claim_event_outcome`` tells the two refusals apart.
+    """
+    return claim_event_outcome(table, event_id, now_ts=now_ts) == CLAIMED
 
 
 def claim_outbound(
