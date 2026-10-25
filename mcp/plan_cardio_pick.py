@@ -24,10 +24,12 @@ def draft_cardio_warnings(blocks: list[Any], archetype: str, target_date: str) -
     session shape (#5069, owner ruling 5: lifting minutes, ONE cardio block, the cardio and stretching caps). The chat path
     flags; the generator enforces (`program_structure.enforce_session_shape`)."""
     from training import program_structure, recent_aerobic
+    from training.routine_generator import _load_json
 
+    catalog = (_load_json("movement_catalog.json") or {}).get("movements") or {}  # #5315: the real catalog, never {}
     shape = [
         f"session shape: {w} — allowed for a custom session, just flagging (#5069)"
-        for w in program_structure.session_shape_problems(blocks, {})
+        for w in program_structure.session_shape_problems(blocks, catalog)
     ]
 
     timed_wb = [
