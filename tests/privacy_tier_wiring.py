@@ -442,6 +442,14 @@ CONSUMERS[("lambdas/training/workout_identity.py", "apple_workouts")] = _d(
     "yet, and every output goes through public_projection, which strips names, places and owner-only blocks.",
 )
 
+# #5353: the zone-2 Apple leg reads the owner-only per-workout HR bins to compute aggregate minutes.
+CONSUMERS[("lambdas/training/zone2_minutes.py", "apple_workouts")] = _d(
+    SAW,
+    "The zone-2 minutes resolver (#5353) reads `apple_workouts[*].derived.hr_seconds_by_bpm5` (plus start/end) only to "
+    "sum Zone 2 minutes per day; no bin, workout id, name or other workout field leaves it — the public /api/zone2 "
+    "payload carries minutes only (tests/test_zone2_apple_leg_5353.py::test_public_zone2_payload_carries_minutes_only_never_bins).",
+)
+
 CONSUMERS[("lambdas/ingestion/health_auto_export_protein.py", "_rd_protein_hae")] = _d(
     SAW,
     "The HAE intraday protein writer (#5187) stores `_rd_protein_hae`; protein_nudge_runner reads it for the owner-only breakfast nudge.",

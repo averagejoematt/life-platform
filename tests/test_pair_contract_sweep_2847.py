@@ -148,6 +148,19 @@ PARTITION_WRITER_LEDGER = {
     "ai_analysis": {
         "lambdas/intelligence/ai_expert_analyzer_lambda.py": "enrolled — the pair below",
     },
+    # #5353 — the apple_workouts map -> the three Zone 2 readers
+    "apple_health": {
+        "lambdas/ingestion/health_auto_export_lambda.py": (
+            "enrolled — the webhook's workouts step calls health_auto_export_workouts.write_apple_workouts, the "
+            "contracted producer of the `apple_workouts` map on the DATE# day row (the model attributes the write "
+            "to the handler module)."
+        ),
+        "lambdas/emails/freshness_checker_lambda.py": (
+            "second writer, verified 2026-10-24: writes only two sentinel items (SK DATATYPE_LIVENESS and "
+            "ALERTSTATE#ah_activity_degraded, both outside the DATE# range) and never a DATE# row, so it cannot touch the `apple_workouts` map the Zone 2 readers "
+            "range-query by date."
+        ),
+    },
 }
 
 

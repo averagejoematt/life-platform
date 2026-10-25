@@ -258,13 +258,16 @@ producer's output is round-tripped through the real consumer, then a disagreemen
 injected into BOTH sides (`tests/test_pair_contract_sweep_2847.py`). Enrolling a pair is
 one registry entry in `tests/pair_contract_registry.py`. **Floor** = named in
 `KNOWN_MUST_AGREE_PAIRS` (only ever grows); **Enrolled** = a live `PairContract` backs it —
-a floor row reading `no` is a rotted registry entry. Ratchet: `ENROLLED_FLOOR` = 12.
+a floor row reading `no` is a rotted registry entry. Ratchet: `ENROLLED_FLOOR` = 15.
 See `meta.scope_cuts` for why this is not a census of every must-agree pair.
 
 | Pair | Producer | Consumer | Partition | Mutations | Floor | Enrolled |
 |------|----------|----------|-----------|-----------|-------|----------|
 | adaptive_mode -> /api/ask grounding reads | `compute.adaptive_mode_lambda::store_adaptive_mode` | `web.site_api_ai_context::_ask_fetch_computed_reads` | `adaptive_mode` | 3 | yes | yes |
 | ai_analysis EXPERT# -> observatory card journaling prompt | `intelligence.ai_expert_analyzer_lambda::generate_and_cache` | `coach.coach_observatory_renderer::journaling_prompt_for_domain` | `ai_analysis` | 3 | yes | yes |
+| apple_workouts map -> /api/zone2 Apple leg | `ingestion.health_auto_export_workouts::write_apple_workouts` | `web.site_api_autonomic::_compute_zone2_breakdown` | `apple_health` | 4 | yes | yes |
+| apple_workouts map -> MCP get_zone2_breakdown Apple leg | `ingestion.health_auto_export_workouts::write_apple_workouts` | `mcp.tools_correlation::tool_get_zone2_breakdown` | `apple_health` | 3 | yes | yes |
+| apple_workouts map -> MCP periodization weekly Zone 2 | `ingestion.health_auto_export_workouts::write_apple_workouts` | `mcp.tools_training::_zone2_by_iso_week` | `apple_health` | 3 | yes | yes |
 | coach PREDICTION# graded row -> ledger line (latest_checked) | `coach.coach_prediction_evaluator::_update_prediction_status` | `coach.latest_checked::for_coach` | — | 5 | yes | yes |
 | coach PREDICTION# resolutions -> the one record (K of N through <day>) | `coach.dispute_docket::_write_docket_prediction` | `coach.coach_record::record_from_rows` | — | 4 | yes | yes |
 | computed_metrics -> canonical facts | `compute.daily_metrics_compute_lambda::store_computed_metrics` | `experiment.canonical_facts::build_canonical_facts` | `computed_metrics` | 4 | yes | yes |

@@ -76,6 +76,9 @@ SITE_RULINGS = {
     # #4627: the same trailing window, now through THE Zone 2 computation (Whoop workout zones; Hevy cardio reported apart)
     ("handle_zone2_breakdown", "_query_source", "'whoop'", "site_api_autonomic.py"): HISTORY,
     ("handle_zone2_breakdown", "_query_source", "'hevy'", "site_api_autonomic.py"): HISTORY,
+    # #5353: the Apple Watch leg (apple_workouts bins, zoned at read time) — the same trailing 90-day window as
+    # its three siblings, a raw_timeseries source like them; the page states its window, not 'this experiment'
+    ("handle_zone2_breakdown", "_query_source", "'apple_health'", "site_api_autonomic.py"): HISTORY,
     ("glucose", "_query_source", "'apple_health'", "site_api_biomarkers.py"): CLAMPED,  # _experiment_date(30)
     # /api/vitals: live windows are max(..., EXPERIMENT_START) (#1084); time-travel passes ip
     ("vitals", "_query_source", "'whoop'", "site_api_body.py"): EXPLICIT,

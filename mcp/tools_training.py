@@ -1082,7 +1082,9 @@ def _get_training_recommendation(args):
         "muscle_recovery": muscle_recovery,
         "recent_activities_7d": recent_activities[:10],
         # #4075: hevy (the load model's set log) and computed_metrics (the one ACWR) are read.
-        "source": "whoop + eightsleep + strava + hevy + computed_metrics",
+        # #5353: apple_health is read by the Zone 2 weekly check (tool_get_zone2_breakdown's
+        # Apple-workouts leg) — aggregate minutes only feed the bod note.
+        "source": "whoop + eightsleep + strava + hevy + computed_metrics + apple_health",
     }
 
 
