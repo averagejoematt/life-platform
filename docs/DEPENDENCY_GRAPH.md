@@ -105,9 +105,9 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 `benchmarks`, `calibration`, `checkin_intake_pairs`, `chronicling`, `clinical`, `coach_corrections`, `coach_vision`, `dexa`, `effect_fits`, `eyeball_estimate`, `fitness_tests`, `genome`, `labs`, `may_tracker`, `milestones`, `nutrition_titration`, `progress_photos`, `recall_embeddings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
 
-### experiment_scoped (36)
+### experiment_scoped (37)
 
-`achievements`, `adaptive_mode`, `ai_analysis`, `anomalies`, `centenarian_progress`, `challenges`, `character_receipt`, `character_sheet`, `chronicle`, `circadian`, `coach_actions`, `computed_insights`, `computed_metrics`, `decisions`, `diary_claims`, `diary_reactions`, `discovery_annotations`, `early_warning_flag`, `engagement_state`, `experiments`, `field_notes`, `forecast`, `habit_scores`, `hypotheses`, `illness_triad_flag`, `insights`, `ledger`, `nutrition_review`, `panelcast`, `protocols`, `recap_cards`, `rewards`, `scenarios`, `state_of_matthew`, `weekly_correlations`, `what_changed`
+`achievements`, `adaptive_mode`, `ai_analysis`, `anomalies`, `centenarian_progress`, `challenges`, `character_receipt`, `character_sheet`, `chronicle`, `circadian`, `coach_actions`, `computed_insights`, `computed_metrics`, `decisions`, `diary_claims`, `diary_reactions`, `discovery_annotations`, `early_warning_flag`, `engagement_state`, `experiments`, `field_notes`, `field_notes_held`, `forecast`, `habit_scores`, `hypotheses`, `illness_triad_flag`, `insights`, `ledger`, `nutrition_review`, `panelcast`, `protocols`, `recap_cards`, `rewards`, `scenarios`, `state_of_matthew`, `weekly_correlations`, `what_changed`
 
 ### raw_timeseries (44)
 
@@ -586,7 +586,7 @@ Field-level rulings (only non-default fields are declared):
 - Alarms: 143 literal-named declarations across three idioms, 4 composite; routing digest 98 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 25 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 97 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
-- Record families referenced in code but outside the SOURCE_CLASS census (7): `coach_credibility`, `coach_thread`, `field_notes_held`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
+- Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
 
 ## 7. Cost-bearing surface (#3374 R1)

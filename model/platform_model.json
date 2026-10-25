@@ -8181,7 +8181,7 @@
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
-      "partitions": 123,
+      "partitions": 124,
       "privacy_fields_owner_only": 69,
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 25,
@@ -8203,7 +8203,6 @@
     "non_census_families": [
       "coach_credibility",
       "coach_thread",
-      "field_notes_held",
       "intelligence_quality",
       "journal",
       "platform_memory",
@@ -8495,6 +8494,11 @@
       "privacy_tier": "owner_only"
     },
     "field_notes": {
+      "class": "experiment_scoped",
+      "ingestion": false,
+      "privacy_tier": "public"
+    },
+    "field_notes_held": {
       "class": "experiment_scoped",
       "ingestion": false,
       "privacy_tier": "public"
