@@ -3605,7 +3605,12 @@ GUARD_PROOFS.update(
             "observed": (
                 "2026-10-19. M1: exit 1 — `FAIL neg_cardio_no_dose ... galpin.cardio_dosed scored 10.0`. M2: 1 failed / 10 passed "
                 "(test_the_gate_reds_when_a_check_stops_discriminating — the exit code stopped carrying the verdict). M3: exit 1 — "
-                "`FAIL good_charter_plan ... seats below 9: ['hollywood_transformation_trainer']`. RESTORED: exit 0, 11 passed."
+                "`FAIL good_charter_plan ... seats below 9: ['hollywood_transformation_trainer']`. RESTORED: exit 0, 11 passed. "
+                "RE-PROVED 2026-10-24 (#5318): owner ruling A4 dropped the charter's lifting-minute floor, so check_minutes_band "
+                "became check_minutes_under_ceiling (no floor to raise). M3 now lowers its ceiling 15 min (`m <= cap - 15`): "
+                "exit 1 — `FAIL good_charter_plan ... hollywood_transformation_trainer=8.0`, 7 of 8 cases behaved; lowered 10 "
+                "min the good plan still passes (its sessions sit at or under 65 min), recorded rather than hidden. md5 "
+                "panel_rubric.py 757f71f9c0fbb99f7144d66ffc7ad68c before and after; RESTORED: exit 0, 12 passed."
             ),
             "scope": (
                 "Proves the recorded-mode gate reds on a control that slips a criterion it exists to fail, on a good plan that "
@@ -3623,11 +3628,14 @@ CI_PROOFS["ci::panel-rubric-gate.yml::gate::3"] = {
     "mutation": (
         "The step's REAL `run:` text (read from the workflow YAML, unpiped) executed under `bash -eo pipefail`, with the "
         "same plants as guard::scripts/panel_rubric_gate.py: M1 check_cardio_dosed counts every cardio block as dosed; M3 "
-        "check_minutes_band's floor raised 10 min. md5 panel_rubric.py 9bf6ab224fd1df207535b58ab963b501 before and after."
+        "check_minutes_band's floor raised 10 min. md5 panel_rubric.py 9bf6ab224fd1df207535b58ab963b501 before and after. "
+        "#5318 (2026-10-24): M3 is now check_minutes_under_ceiling's ceiling lowered 15 min (the floor is gone, owner ruling "
+        "A4); md5 panel_rubric.py 757f71f9c0fbb99f7144d66ffc7ad68c before and after."
     ),
     "observed": (
         "2026-10-19. M1: step exit 1 (`FAIL neg_cardio_no_dose ... galpin.cardio_dosed scored 10.0`). M3: step exit 1 "
-        "(`FAIL good_charter_plan ... seats below 9`). RESTORED: step exit 0."
+        "(`FAIL good_charter_plan ... seats below 9`). RESTORED: step exit 0. 2026-10-24 (#5318) M3 re-run: step exit 1, "
+        "RESTORED: step exit 0."
     ),
     "scope": (
         "Proves the step carries the script's verdict (no pipe, no `|| true`). It does not prove the path filter fires on "

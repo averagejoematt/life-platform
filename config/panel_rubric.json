@@ -1,10 +1,11 @@
 {
   "_README": "#5072 (epic #5067): the panel rubric — a FIXED standard the training plan is graded against, one seat per school of the training charter's concession_ledger (the seat keys must equal the ledger's keys; tests/test_panel_rubric_5072.py holds it). Each criterion is graded by CODE (a named check in lambdas/training/panel_rubric.py CHECKS, ADR-105: deterministic computation before any model verdict) or by the JUDGE (lambdas/training/panel_judge.py, route charter.judge / charter.judge_gate) when code cannot check it. The concession each seat makes is READ from the charter at grade time, never copied here. The target (overall letter, every-seat floor) is the charter's panel_target. Hand-owned; a change is a new version with a change_log line.",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "change_log": [
     {"version": "1.0.0", "date": "2026-10-19", "issue": "#5072", "what": "the eight seats, 40 criteria (32 by code, 8 by the judge), the letter scale"},
     {"version": "1.1.0", "date": "2026-10-19", "issue": "#5110", "what": "food_panel: nine nutrition seats (six schools, three roles) from the charter's nutrition.concession_ledger, 45 criteria (36 by code against the resolved food plan, 9 by the judge), graded on the same letter scale and the same panel_target; built on the panel defaults, pending R1 and R2 (#5091)"},
-    {"version": "1.2.0", "date": "2026-10-23", "issue": "#5091", "what": "food_panel energy rows (owner ruling 2026-10-23, #5091 follow-up 3: 'Food-plan grader: energy rows grade against the 1,500 target. The 1,600/1,800 lines show as warnings, not failures'): day_floors_held and week_mean_floor grade against the day's target and the week's mean target while the charter's nutrition.calories.floor_role is warning, the floor gaps shown as warnings in the evidence; week_balanced grades the no-payback training-day rule (follow-up 2: lifting days +150, rest days not paid back below the target)"}
+    {"version": "1.2.0", "date": "2026-10-23", "issue": "#5091", "what": "food_panel energy rows (owner ruling 2026-10-23, #5091 follow-up 3: 'Food-plan grader: energy rows grade against the 1,500 target. The 1,600/1,800 lines show as warnings, not failures'): day_floors_held and week_mean_floor grade against the day's target and the week's mean target while the charter's nutrition.calories.floor_role is warning, the floor gaps shown as warnings in the evidence; week_balanced grades the no-payback training-day rule (follow-up 2: lifting days +150, rest days not paid back below the target)"},
+    {"version": "1.3.0", "date": "2026-10-24", "issue": "#5318", "what": "the Hollywood seat's session_length criterion grades the charter's lifting-minute CEILING only (check session_minutes_under_ceiling, was session_minutes_in_band): owner ruling A4 2026-10-24, 'Drop the 60-minute lifting floor: 75 minutes is a ceiling, not a target' — a session under the ceiling is never marked down"}
   ],
   "scale": {"min": 0, "max": 10},
   "letters": [
@@ -188,7 +189,7 @@
       "school": "Hollywood transformation trainer",
       "criteria": [
         {"id": "five_days", "by": "code", "check": "lifting_days_match", "text": "the charter's number of lifting days"},
-        {"id": "session_length", "by": "code", "check": "session_minutes_in_band", "text": "every lifting session sits inside the charter's lifting-minute band"},
+        {"id": "session_length", "by": "code", "check": "session_minutes_under_ceiling", "text": "every lifting session sits at or under the charter's lifting-minute ceiling (a ceiling, not a target: a shorter session is never marked down)"},
         {"id": "delts_frequency", "by": "code", "check": "delts_frequency", "text": "delts are trained the charter's number of times a week"},
         {"id": "steps", "by": "code", "check": "steps_floor_carried", "text": "the step floor and target are carried every day"},
         {"id": "the_frame", "by": "judge", "text": "the plan reads like a time-bound transformation: aesthetic priorities (delts, lats, upper chest, arms) get the emphasis and nothing in the week wastes the deadline"}

@@ -176,7 +176,9 @@ def test_week_grid_is_an_upper_lower_archetype_week_the_generator_can_read():
     assert set(grid["archetype_targets"]["lower"]) == {"quadriceps", "hamstrings", "glutes", "calves"}
     assert grid["session_set_ceiling"] == 20, "v0.5 OD4 (#4503): 20 base / 24 with 🟢 (training.green_block)"
     # #5069, ruling 5: "60-75 min of lifting" — the charter's lifting top, read, never restated
-    assert grid["session_minutes_ceiling"] == program_structure.lifting_minutes_cap() == charter_value("split.session_minutes.lifting")[1]
+    assert (
+        grid["session_minutes_ceiling"] == program_structure.lifting_minutes_cap() == charter_value("split.session_minutes.lifting_ceiling")
+    )  # #5318: a ceiling only
     assert grid["weekly_volume_cap_per_muscle"] == 22, "the fail-safe cap does not move; the 8–12 target lives in owner_redlines"
     assert grid["exercise_notes_mode"] == "one_best_line" and grid["exercise_notes_lookback_days"] == 3650
 
