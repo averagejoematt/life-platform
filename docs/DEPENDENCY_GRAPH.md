@@ -119,7 +119,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-787 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+790 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -132,7 +132,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `adaptive_mode` | adaptive_mode_lambda.py | tools_coach_checkin.py, tools_reading.py |
 | `ai_analysis` | ai_expert_analyzer_lambda.py | ai_expert_analyzer_lambda.py, chronicle_data.py, coherence_sentinel_lambda.py, site_api_coach_narrative.py, site_api_coach_stance.py, state_of_matthew_lambda.py |
 | `anomalies` | anomaly_detector_lambda.py | anomaly_detector_lambda.py, daily_brief_lambda.py |
-| `apple_health` | freshness_checker_lambda.py, health_auto_export_lambda.py | ai_expert_analyzer_lambda.py, evening_nudge_lambda.py, freshness_checker_lambda.py, health_auto_export_lambda.py, instrument_presence.py, protein_nudge_runner.py, qa_smoke_lambda.py, site_api_biomarkers.py, site_api_body.py, site_api_fingerprint.py, site_api_freshness.py, site_api_journey.py, site_api_meals.py, site_api_mind.py, site_api_physical.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, site_stats_refresh_lambda.py, tools_cgm.py, tools_health.py, tools_lifestyle.py |
+| `apple_health` | freshness_checker_lambda.py, health_auto_export_lambda.py | ai_expert_analyzer_lambda.py, evening_nudge_lambda.py, freshness_checker_lambda.py, health_auto_export_lambda.py, instrument_presence.py, protein_nudge_runner.py, qa_smoke_lambda.py, site_api_autonomic.py, site_api_biomarkers.py, site_api_body.py, site_api_fingerprint.py, site_api_freshness.py, site_api_journey.py, site_api_meals.py, site_api_mind.py, site_api_physical.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, site_stats_refresh_lambda.py, tools_cgm.py, tools_correlation.py, tools_health.py, tools_lifestyle.py, tools_training.py |
 | `benchmarks` | — | site_api_training.py |
 | `calibration` | — | state_of_matthew_lambda.py |
 | `centenarian_progress` | weekly_correlation_compute_lambda.py | — |
@@ -578,7 +578,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1380 total · 990 resolved · 390 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1388 total · 993 resolved · 395 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (108 lambdas total)
 - Alarms: 143 literal-named declarations across three idioms, 4 composite; routing digest 98 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 25 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only

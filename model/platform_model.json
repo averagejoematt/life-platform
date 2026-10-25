@@ -4587,6 +4587,13 @@
       "direction": "read",
       "lambda": null,
       "module": "lambdas/web/site_api_autonomic.py",
+      "partition": "apple_health",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_autonomic.py",
       "partition": "hevy",
       "via": "seam"
     },
@@ -6120,6 +6127,13 @@
       "direction": "read",
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_correlation.py",
+      "partition": "apple_health",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_correlation.py",
       "partition": "hevy",
       "via": "seam"
     },
@@ -6492,6 +6506,13 @@
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_todoist.py",
       "partition": "todoist",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_training.py",
+      "partition": "apple_health",
       "via": "seam"
     },
     {
@@ -8119,7 +8140,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 787,
+      "edges": 790,
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
@@ -8133,9 +8154,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 390,
-        "sites_resolved": 990,
-        "sites_total": 1380
+        "sites_dynamic": 395,
+        "sites_resolved": 993,
+        "sites_total": 1388
       },
       "schedule_resolution": {
         "dynamic": 0,
