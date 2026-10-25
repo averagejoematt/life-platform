@@ -6450,13 +6450,6 @@
     {
       "direction": "read",
       "lambda": "life-platform-mcp",
-      "module": "mcp/tools_strength.py",
-      "partition": "hevy",
-      "via": "seam"
-    },
-    {
-      "direction": "read",
-      "lambda": "life-platform-mcp",
       "module": "mcp/tools_todoist.py",
       "partition": "todoist",
       "via": "seam"
@@ -8086,7 +8079,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 784,
+      "edges": 783,
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
@@ -8101,8 +8094,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 386,
-        "sites_resolved": 985,
-        "sites_total": 1371
+        "sites_resolved": 984,
+        "sites_total": 1370
       },
       "schedule_resolution": {
         "dynamic": 0,
