@@ -548,6 +548,20 @@ LEDGER: dict[str, dict] = {
         series_budget=5,
         note="RecallsDue, documented in CHANGELOG, read by nothing. A gauge with no dial.",
     ),
+    "LifePlatform/FieldNotes": _row(
+        owner="lambdas/intelligence/field_notes_lambda.py (#5128)",
+        verdict=KEEP,
+        cardinality=FIXED,
+        driver=None,
+        live_series=0,
+        series_budget=2,
+        note=(
+            "#5128 (added 2026-10-25, after MEASURED_ON — hence 0 live series). FieldNotesOutcome{Job=field_notes_generate}: "
+            "1 when the weekly edition exists, 0 when the grounding gate held it or the run crashed — the heartbeat behind "
+            "field-notes-missing. Invocations/Errors cannot see a HELD edition (the function succeeds and writes nothing); "
+            "W42 went unreported that way."
+        ),
+    ),
     "LifePlatform/HevyRoutine": _row(
         owner="hevy_restamp + hevy_routine_cron + hevy-backfill (index rebuild) + nightly pre-draft (#4084)",
         verdict=KEEP,

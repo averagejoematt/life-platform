@@ -65,6 +65,11 @@ def wired(monkeypatch):
     return t
 
 
+def _reader_puts(t):
+    """Puts into the partition /api/field_notes serves (the #5128 marker lives elsewhere)."""
+    return [p for p in t.puts if p["pk"] == fnl.FN_PK]
+
+
 BAD = {"ai_present": "Resting heart rate held at 53 bpm all week.", "ai_tone": "mixed"}
 GOOD = {"ai_present": "Resting heart rate held at 64 bpm all week.", "ai_tone": "mixed"}
 STILL_BAD = {"ai_present": "Resting heart rate sat at 51 bpm.", "ai_tone": "mixed"}
@@ -100,7 +105,7 @@ def test_unimproved_rewrite_holds_the_note(wired, monkeypatch):
     result = fnl.generate_field_notes("2026-W27")
     assert len(calls) == 2
     assert result["status"] == "held"
-    assert wired.puts == [], "a held note must never reach the WEEK# row /api/field_notes serves"
+    assert _reader_puts(wired) == [], "a held note must never reach the WEEK# row /api/field_notes serves"
 
 
 def test_grounded_note_generates_once(wired, monkeypatch):
@@ -132,7 +137,7 @@ def test_fabricated_number_without_contradiction_is_caught(wired, monkeypatch):
     result = fnl.generate_field_notes("2026-W27")
     assert len(calls) == 2  # flagged → one rewrite (same fabrication) → held
     assert result["status"] == "held"
-    assert wired.puts == []
+    assert _reader_puts(wired) == []
 
 
 def test_no_facts_record_still_gates_on_the_allowlist(monkeypatch):
@@ -156,7 +161,7 @@ def test_no_facts_record_still_gates_on_the_allowlist(monkeypatch):
     result = fnl.generate_field_notes("2026-W27")
     assert len(calls) == 2  # fabricated 53 → rewrite → still fabricated → held
     assert result["status"] == "held"
-    assert t.puts == []
+    assert _reader_puts(t) == []
 
 
 def test_broken_gate_holds_never_waves_through(wired, monkeypatch):
@@ -176,7 +181,7 @@ def test_broken_gate_holds_never_waves_through(wired, monkeypatch):
     monkeypatch.setattr(fnl, "_call_notes_model", model)
     result = fnl.generate_field_notes("2026-W27")
     assert result["status"] == "held"
-    assert wired.puts == []
+    assert _reader_puts(wired) == []
 
 
 def test_spelled_out_numbers_are_caught():
