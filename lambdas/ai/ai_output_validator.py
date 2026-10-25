@@ -89,6 +89,9 @@ class AIValidationResult:
     blocked: bool = False
     block_reason: str = ""
     safe_fallback: str = ""
+    # #5297: the per-day meal-sum guard's record ({} when it found no day heading to group under).
+    # Stored with the edition so a pass is as visible as a block: {"day": {"total_kcal", "meals"}}.
+    day_sums: dict = field(default_factory=dict)
 
     @property
     def sanitized_text(self) -> str:
@@ -426,6 +429,12 @@ def validate_ai_output(
                 logger.error("[ai_validator] BLOCKED low-cal rec: %s", blocked_cals)
                 return result
 
+    # ── Check 5b (#5297): a day of small labelled meal figures that SUM under the floor ──
+    if output_type in (AIOutputType.NUTRITION_COACH, AIOutputType.GUIDANCE, AIOutputType.BOD_COACHING):
+        _day_sum_guard(_calorie_check_text(stripped), result)
+        if result.blocked:
+            return result
+
     # ── Check 6: Aggressive training with borderline recovery (WARN) ───────────
     if recovery_score is not None and 34 <= recovery_score < 50:
         aggressive_found = _find_patterns(stripped, _AGGRESSIVE_TRAINING_PHRASES)
@@ -557,6 +566,80 @@ def _low_calorie_fallback() -> str:
     minimum = _planned_minimum_kcal()
     floor_line = f"Planned minimum: {minimum:,} kcal/day. " if minimum else ""
     return f"⚠️ Calorie guidance review needed. {floor_line}" "Consult your nutritionist if you're uncertain about your calorie target."
+
+
+# #5297 — the per-day sum guard. The meal / snack exemption above trusts a labelled figure on
+# its own; this closes the gap it opened: a plan whose labelled meals ADD UP to a starvation day.
+#   * Grouping: a day HEADING is a short line that opens with a weekday or "Day N" and carries no
+#     calorie figure. A day block runs to the next day heading (or the end of the text).
+#   * Only per-item (labelled) figures are summed; a figure with day framing is Check 5's, not ours.
+#   * A day is judged only when it lists at least _MIN_MEALS_FOR_A_DAY figures: fewer is a partial
+#     list (one dinner under a heading), not a day, and a sum of it proves nothing.
+#   * The margin: meal figures are approximate ("~", "about"), so a day blocks only when its total is
+#     under the charter's planned minimum x _DAY_SUM_MARGIN. The fallback names the minimum itself.
+#   * FALLBACK when grouping fails (labelled figures, but no day heading): PASS WITH A RECORDED
+#     WARNING, never silently. The real Weekly Plate is Greatest Hits + Try This cards, not a day
+#     plan, so treating every figure in the text as one day would re-block the edition for the very
+#     false positive #5297 fixed; the warning lands in the stored edition's qa. A day heading that
+#     exists but holds too few figures, or an unreadable charter, are recorded the same way.
+_DAY_HEADING_RE = re.compile(r"^\W{0,6}(?:(?:mon|tues|wednes|thurs|fri|satur|sun)day|day\s*\d{1,2})\b[^\n]{0,50}$", re.I)
+_DAY_FIGURE_RE = re.compile(r"(?<![\d.,])(\d{1,2},\d{3}|\d{2,4})\s*(?:kcal|calories|cal)\b", re.I)
+_MIN_MEALS_FOR_A_DAY = 3
+_DAY_SUM_MARGIN = 0.9
+
+
+def _day_blocks(text: str) -> list[tuple[str, str]]:
+    """[(heading, block text)] for each day heading; [] when the text has none."""
+    blocks: list[tuple[str, list[str]]] = []
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if stripped and _DAY_HEADING_RE.match(stripped) and not _DAY_FIGURE_RE.search(stripped):
+            blocks.append((stripped.strip(" :-\u2014\u00b7*#"), []))
+        elif blocks:
+            blocks[-1][1].append(line)
+    return [(h, "\n".join(lines)) for h, lines in blocks]
+
+
+def _day_sum_guard(cal_text: str, result: "AIValidationResult") -> None:
+    """Block a day whose labelled meal figures sum under the charter minimum x margin (#5297)."""
+    if not _DAY_FIGURE_RE.search(cal_text):
+        return
+    blocks = _day_blocks(cal_text)
+    if not blocks:
+        result.warnings.append("day-sum guard: labelled meal figures but no day heading to group them under; not judged as a day")
+        result.day_sums = {"_ungrouped": {"judged": False}}
+        return
+    minimum = _planned_minimum_kcal()
+    for heading, block in blocks:
+        figures = []
+        for m in _DAY_FIGURE_RE.finditer(block):
+            if _is_per_item_calorie_figure(block, m):
+                figures.append(int(m.group(1).replace(",", "")))
+        if not figures:
+            continue
+        total = sum(figures)
+        entry = {"total_kcal": total, "meals": len(figures), "judged": False}
+        result.day_sums[heading] = entry
+        if len(figures) < _MIN_MEALS_FOR_A_DAY:
+            result.warnings.append(
+                f"day-sum guard: {heading} lists {len(figures)} meal figure(s), a partial day; total {total} kcal not judged"
+            )
+            continue
+        if minimum is None:
+            result.warnings.append(f"day-sum guard: charter minimum unreadable; {heading} total {total} kcal not judged")
+            continue
+        entry["judged"] = True
+        entry["floor_kcal"] = int(minimum * _DAY_SUM_MARGIN)
+        if total < entry["floor_kcal"]:
+            entry["blocked"] = True
+            result.blocked = True
+            result.block_reason = (
+                f"Dangerously low calorie day: {heading} meals sum to {total} kcal across {len(figures)} meals "
+                f"(under {entry['floor_kcal']} = planned minimum {minimum:,} x {_DAY_SUM_MARGIN})"
+            )
+            result.safe_fallback = _low_calorie_fallback()
+            logger.error("[ai_validator] BLOCKED low-cal day sum: %s", result.block_reason)
+            return
 
 
 def _enclosing_segment(text: str, match: re.Match) -> str:
