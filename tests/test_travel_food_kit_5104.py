@@ -56,6 +56,20 @@ def _reader(**overrides):
     return read
 
 
+def _undated(**overrides):
+    """The live charter with the trip window's dates removed: the not-yet-dated branches (default length, prompt, dead-man)."""
+
+    def read(dotted):
+        if dotted in overrides:
+            return overrides[dotted]
+        v = charter_value(dotted)
+        if dotted == "travel.windows":
+            return [{**w, "start": None, "end": None} for w in v]
+        return v
+
+    return read
+
+
 def _d(s: str) -> _dt.date:
     return _dt.date.fromisoformat(s)
 
@@ -183,7 +197,9 @@ def test_the_whole_kit_sizes_to_the_trip_and_uses_the_maintenance_day_when_known
     assert tf.build(_resolved())["maintenance_pending"], "no maintenance estimate is stated, never guessed"
     days, basis = tf.trip_days(_reader(**{"travel.windows": [{"label": "late December 2026", "start": "2026-12-20", "end": "2026-12-27"}]}))
     assert (days, "2026-12-20" in basis) == (8, True)
-    assert tf.trip_days()[0] == charter_value("nutrition.travel_food.default_trip_days")
+    assert tf.trip_days(_undated())[0] == charter_value("nutrition.travel_food.default_trip_days")
+    live_days, live_basis = tf.trip_days()  # the live charter: owner ruling 2026-10-25, 20th-27th December (#5107)
+    assert (live_days, "2026-12-20..2026-12-27" in live_basis) == (8, True)
 
 
 # ── 4. the playbook ─────────────────────────────────────────────────────────────────────────────────────────
@@ -234,7 +250,7 @@ def test_the_reminder_is_due_before_mid_december_with_a_dead_man_and_no_clock():
         ("ready", ready),
         ("past", retire + _dt.timedelta(days=1)),
     ):
-        rows[label] = tf.calibration_row(day.isoformat())
+        rows[label] = tf.calibration_row(day.isoformat(), read=_undated())
     got = {k: r["state"] for k, r in rows.items()}
     assert got == {"before": cc.OK, "due": cc.DUE, "eve": cc.DUE, "ready": cc.MISSED_2, "past": cc.OK}, got
     assert rows["due"]["prompt_key"] == rows["eve"]["prompt_key"] == cc.prompt_key(tf.CALIBRATION_KIND, due.isoformat())
@@ -245,6 +261,7 @@ def test_the_reminder_is_due_before_mid_december_with_a_dead_man_and_no_clock():
     assert tf.calibration_row(ready.isoformat(), read=dated)["state"] == cc.OK, "dates set: the kit is sized, no dead-man"
     assert tf.calibration_row(due.isoformat(), read=_reader(**{"nutrition.travel_food": {}}))["state"] == cc.UNKNOWN
     assert tf.calibration_row("not-a-day")["state"] == cc.UNKNOWN
+    assert tf.calibration_row(ready.isoformat())["state"] == cc.OK, "the live charter's trip is dated (2026-10-25 ruling): no dead-man"
 
 
 def test_the_cadence_block_carries_the_row_so_the_prompt_and_the_dead_man_ride_the_existing_paths(monkeypatch):
@@ -255,6 +272,7 @@ def test_the_cadence_block_carries_the_row_so_the_prompt_and_the_dead_man_ride_t
     monkeypatch.setattr(fitness_tests, "calibration_row_from_table", lambda table, today: {"kind": "fitness_tests", "state": "ok"})
     monkeypatch.setattr(titration, "calibration_row_from_table", lambda table, today: {"kind": "nutrition_titration", "state": "ok"})
     monkeypatch.setattr(phase_after_may, "calibration_row", lambda today: {"kind": "post_may_plan", "state": "ok"})
+    monkeypatch.setattr(tf, "_default_reader", _undated())
     pol = tf.policy()
     due = (_d(pol["ready_by"]) - _dt.timedelta(days=pol["prompt_days_before_ready"])).isoformat()
     block = cc.read(object(), due)
