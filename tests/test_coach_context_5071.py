@@ -264,5 +264,5 @@ def test_the_stale_role_play_and_the_retired_stance_file_are_gone():
     debrief = (_REPO / ".claude" / "skills" / "daily-debrief" / "SKILL.md").read_text()
     assert "Personal Board" not in debrief and "Sarah Chen" not in debrief
     assert not (_REPO / "config" / "coaches" / "training_coach_stance.json").exists()
-    # the voice spec stays: tests/test_persona_registry.py holds a retired coach's spec on disk for its published byline
-    assert (_REPO / "config" / "coaches" / "training_coach.json").exists()
+    # #5071 box 3: the retired voice spec went too — the byline is the personas.json entry, not the spec
+    assert not (_REPO / "config" / "coaches" / "training_coach.json").exists()

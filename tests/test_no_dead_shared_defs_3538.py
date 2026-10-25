@@ -136,15 +136,9 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
         "tests/test_workout_identity_4973.py instead. The first live caller is #4973 box 1 (full Apple "
         "workout capture); delete this entry when it lands."
     ),
-    "lambdas/ai/ai_calls.py:call_training_coach_v2": (
-        "one seat of a symmetric ADR-153 coach family (sleep / nutrition / training / mind, "
-        "each a 3-line `_run_coach_v2_pipeline(<seat>, ...)` wrapper). The daily-brief tests "
-        "patch it BY NAME as part of the brief's coach roster "
-        "(tests/test_daily_brief_grounding_and_hold.py: 'ADR-153: call_training_coach_v2 "
-        "stays mocked here even though the seat is...'), so removing one member breaks the "
-        "roster and leaves an asymmetric family. Retiring a coach seat is a coaching-team "
-        "decision, not a dead-code sweep."
-    ),
+    # `ai_calls.call_training_coach_v2` was allowlisted here as one seat of the ADR-153 coach
+    # family, kept until retiring the seat was a coaching-team decision. #5071 box 3 is that
+    # decision: the wrapper is deleted and the entry with it.
     "lambdas/common/email_identity.py:is_verified_sender": (
         "the predicate half of #3568's sending-vocabulary registry, and the thing its gate "
         "asserts with. Runtime code consumes the registry's CONSTANTS (CHRONICLE_SENDER et al. "

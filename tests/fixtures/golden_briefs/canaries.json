@@ -94,8 +94,8 @@
   },
   {
     "id": "canary_anti_pattern",
-    "coach_id": "training_coach",
-    "mutation": "otherwise-grounded output containing two blacklisted phrases (Beast mode, Push through)",
+    "coach_id": "physical_coach",
+    "mutation": "otherwise-grounded output containing two blacklisted phrases (Your body is telling you, At the end of the day)",
     "authoritative_facts": {
       "recovery_pct": 64
     },
@@ -110,7 +110,7 @@
         "trends": {}
       }
     },
-    "mutated_output": "Recovery at 64% is plenty — time to go into Beast mode this week. Push through the fatigue; the plan does not care how you feel.",
+    "mutated_output": "Recovery at 64% is plenty — your body is telling you to go hard this week. At the end of the day, the plan does not care how you feel.",
     "expect_checks": [
       "anti_pattern"
     ]

@@ -50,7 +50,6 @@
       "coach_config_key": "training_coach",
       "engine_id": "training_coach",
       "short_id": "training",
-      "voice_spec_ref": "config/coaches/training_coach.json",
       "board_persona_key": "sarah_chen",
       "board_role": "Sports Scientist",
       "tts_voice": "en-US-Chirp3-HD-Leda",

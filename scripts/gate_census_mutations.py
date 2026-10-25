@@ -583,6 +583,14 @@ _EARLY_WARNING_PUBLISHED_IMPORTER_PY = (
     "def handle(table, today):\n"
     "    return early_warning.read_recent(table, today)\n"
 )
+# #5071 box 3: a live caller of the retired training seat's v2 wrapper. Assembled with `_lit`:
+# tests/test_training_coach_retired_5071.py sweeps scripts/ for the wrapper's name as a string constant.
+_RETIRED_TRAINING_WRAPPER_CALLER_PY = (
+    '"""census probe — a caller of the retired training seat that must never exist."""\n\n'
+    "from ai import ai_calls\n\n\n"
+    "def handle(data, profile):\n"
+    "    return ai_calls." + _lit("call_training_", "coach_v2") + "(data, profile)\n"
+)
 _MAY_TRACKER_PUBLISHED_IMPORTER_PY = (
     '"""census probe — a published importer that must never exist."""\n\n'
     "from training import may_tracker\n\n\n"
@@ -1498,6 +1506,17 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         plants=(("lambdas/web/_census_probe_5121.py", _EARLY_WARNING_PUBLISHED_IMPORTER_PY),),
         track=False,  # the guard os.walks lambdas/ mcp/ site/ and the site generators on disk
     ),
+    # #5071 box 3: the retired training seat's daily-brief wrapper stays deleted.
+    "structural::test_training_coach_retired_5071.py": MutationSpec(
+        gate_id="structural::test_training_coach_retired_5071.py",
+        target="tests/test_training_coach_retired_5071.py",
+        detects=(
+            "a live module (lambdas/emails) calling the retired training seat's v2 wrapper again — the seat ADR-153 "
+            "retired and #5071 box 3 deleted, re-armed by one call site"
+        ),
+        plants=(("lambdas/emails/_census_probe_5071.py", _RETIRED_TRAINING_WRAPPER_CALLER_PY),),
+        track=False,  # the guard rglobs lambdas/ mcp/ deploy/ scripts/ cdk/ qa/ on disk
+    ),
 }
 
 
@@ -1590,6 +1609,19 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "(tests/test_daily_insight_compute_behavior.py). STILL INVISIBLE, stated: a module handed flag rows as an "
         "argument by an allowed caller, a dynamic import by string, a pk built from variables, and the live table.",
         proved_on="2026-10-24",
+    ),
+    "structural::test_training_coach_retired_5071.py": _proof(
+        "structural::test_training_coach_retired_5071.py",
+        "ARMED 1/1 — baseline: 4 passed in 0.39s | mutated: 1 failed, 3 passed in 0.38s :: "
+        "test_no_live_module_references_the_retired_wrapper_or_role_play_text | reverted: 4 passed in 0.36s",
+        "lambdas/, mcp/, deploy/, scripts/, cdk/ and qa/ on disk (rglob, every .py): an AST-confirmed def, name, attribute, "
+        "import alias or string constant carrying the retired training seat's v2 wrapper name fails and names the file and "
+        "line; .claude/skills/, docs/coaching/ and config/coaches/ on disk: any line carrying the role-play board phrase "
+        "(case-insensitive). Also pinned: the retired voice spec + stance files absent, the retired personas.json entry "
+        "naming no voice_spec_ref, and ai_calls exporting no such wrapper. STILL INVISIBLE, stated: a name assembled at "
+        "runtime (getattr by a built string), a re-created wrapper under another name, and the claude.ai synced copy of "
+        "the coach-session skill outside the repo (scripts/check_synced_skill_drift.py owns that).",
+        proved_on="2026-10-25",
     ),
     "structural::test_repo_walk_5273.py": _proof(
         "structural::test_repo_walk_5273.py",

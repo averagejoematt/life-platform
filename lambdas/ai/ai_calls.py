@@ -60,7 +60,6 @@ from ai.ai_context import (  # noqa: F401
     _build_sleep_data,
     _build_surprise_context,
     _build_tdee_context,
-    _build_training_data,
     _build_weight_context,
     _compute_data_quality,
     _compute_diminishing_returns,
@@ -2220,11 +2219,6 @@ def call_sleep_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: 
 def call_nutrition_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str = "") -> str:
     """Run Coach Intelligence pipeline for nutrition coach. Returns text or None."""
     return _run_coach_v2_pipeline("nutrition_coach", _build_nutrition_data(data), "nutrition", data, api_key)
-
-
-def call_training_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str = "") -> str:
-    """Run Coach Intelligence pipeline for training coach. Returns text or None."""
-    return _run_coach_v2_pipeline("training_coach", _build_training_data(data), "training", data, api_key)
 
 
 def call_mind_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str = "") -> str:

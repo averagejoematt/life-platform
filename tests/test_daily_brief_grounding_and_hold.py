@@ -247,10 +247,8 @@ _PIPELINE_KWARGS = dict(
 _COACH_FN_NAMES = [
     "call_sleep_coach_v2",
     "call_nutrition_coach_v2",
-    # ADR-153: call_training_coach_v2 stays mocked here even though the seat is
-    # retired from the brief's v2 roster — a regression re-adding the call must
-    # hit a mock, never a real Bedrock invocation.
-    "call_training_coach_v2",
+    # ADR-153 retired the training seat from the brief's v2 roster; #5071 box 3
+    # deleted its wrapper (tests/test_training_coach_retired_5071.py holds it gone).
     "call_mind_coach_v2",
     "call_physical_coach_v2",
     "call_glucose_coach_v2",
@@ -278,20 +276,16 @@ def _mock_brief_ai(monkeypatch, m, v2_returns=None):
 
 def test_training_seat_retired_v2_never_called_legacy_intact(monkeypatch):
     """ADR-153 (the Performance merge): the training v2 seat is retired from the
-    brief's roster. Its call must never be attempted, its _v2_text stays "", and
-    the legacy training/nutrition narrative flows through undropped — no hold
+    brief's roster and (#5071 box 3) its wrapper is gone, so its _v2_text stays ""
+    and the legacy training/nutrition narrative flows through undropped — no hold
     can originate from a seat that no longer runs."""
     import daily_brief_lambda as m
 
-    _mock_brief_ai(
-        monkeypatch,
-        m,
-        v2_returns={"call_training_coach_v2": ai_calls.CoachHold("training_coach", "quality_gate")},
-    )
+    _mock_brief_ai(monkeypatch, m)
     result = m._run_ai_coach_pipeline(**_PIPELINE_KWARGS)
 
-    # The retired seat is never invoked — even a would-be hold is unreachable.
-    m.ai_calls.call_training_coach_v2.assert_not_called()
+    # The retired seat has no wrapper to invoke — even a would-be hold is unreachable.
+    assert not hasattr(m.ai_calls, "call_training_coach_v2")
     assert result["training_coach_v2_text"] == ""
     # Legacy call runs and keeps BOTH domains: no gate judged training.
     m.ai_calls.call_training_nutrition_coach.assert_called_once()
@@ -338,7 +332,9 @@ def test_error_caused_none_still_falls_back_to_legacy(monkeypatch):
     orchestrator is not a gate judgment, and the reader should still get a brief."""
     import daily_brief_lambda as m
 
-    _mock_brief_ai(monkeypatch, m, v2_returns={"call_training_coach_v2": None})
+    # The infra failure lands on a live training_nutrition seat (nutrition): a None
+    # is not a hold, so the legacy narrative keeps BOTH domains.
+    _mock_brief_ai(monkeypatch, m, v2_returns={"call_nutrition_coach_v2": None})
     result = m._run_ai_coach_pipeline(**_PIPELINE_KWARGS)
 
     m.ai_calls.call_training_nutrition_coach.assert_called_once()
