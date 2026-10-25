@@ -154,11 +154,11 @@ def _days_since_last_workout(history_index: dict[str, list], target_date: str) -
 
 def _load_indexes() -> tuple[dict[str, list], dict[str, float], str | None]:
     """The two live indexes the floor needs. Fail-soft, and the failure is NAMED."""
-    from training.exercise_history import DEFAULT_LOOKBACK_DAYS, FLOOR_LOOKBACK_DAYS, load_bodyweight_index, load_history_indexes
+    from mcp import plan_call_scope
 
     try:
-        history = load_history_indexes(lookback_days=max(DEFAULT_LOOKBACK_DAYS, FLOOR_LOOKBACK_DAYS))[0]
-        weights = load_bodyweight_index()
+        # #5313: memoized inside a plan_next_session call (the session loads read the same pair); a plain read elsewhere
+        history, weights = plan_call_scope.anchor_indexes()
     except Exception as e:  # noqa: BLE001
         logger.warning("subtract-only gate: index load failed (%s) — the floor arm cannot run", e)
         return {}, {}, f"{type(e).__name__}: {e}"

@@ -393,7 +393,12 @@ def test_each_critic_is_a_separate_call_over_only_its_own_packet():
 
     c.run_critics(P, d, invoke=capture, model_allowed=True)
     assert len(seen) == 4
-    for body, cid in zip(seen, c.CRITIC_IDS):
+    # #5313: the four calls run concurrently, so ARRIVAL order is not CRITIC_IDS order — pair each
+    # prompt with the critic it names, and require every critic exactly once.
+    by_critic = {cid: [b for b in seen if f"You are the {cid} critic" in b["system"]] for cid in c.CRITIC_IDS}
+    assert all(len(v) == 1 for v in by_critic.values()), {k: len(v) for k, v in by_critic.items()}
+    for cid in c.CRITIC_IDS:
+        body = by_critic[cid][0]
         assert cid in body["system"]
         sent = json.loads(body["messages"][0]["content"].split("\nReturn the JSON object.")[0])
         assert set(sent["packet"]["numbers"]) == set(P[cid]["numbers"])
