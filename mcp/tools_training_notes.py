@@ -206,6 +206,8 @@ def tool_get_exercise_notes(args):
         return {"disruption": _record_disruption, "disruption_end": _end_disruption, "disruptions": _list_disruptions}[action](args)
     if action == "travel_kit":  # #5104: the travel food kit (a read)
         return _travel_kit(args)
+    if action == "weekly_menu":  # #5103: the week's menu built by code from his anchor foods (a read)
+        return _weekly_menu(args)
     if action in ("fitness_test", "fitness_tests"):  # #5078: the battery's owner write + its read (mcp/tools_fitness_tests.py)
         from mcp import tools_fitness_tests as ftt
 
@@ -221,6 +223,7 @@ def tool_get_exercise_notes(args):
                 "deloads",
                 *_DISRUPTION_ACTIONS,
                 "travel_kit",
+                "weekly_menu",
                 "fitness_test",
                 "fitness_tests",
             ],
@@ -651,6 +654,31 @@ def _travel_kit(args=None):
     kit["calorie_target"] = {k: target.get(k) for k in ("kcal", "source", "provenance", "day_type")}
     kit["reminder"] = travel_food.calibration_row(today)
     return kit
+
+
+def _weekly_menu(args=None):
+    """action='weekly_menu' (#5103, OWNER-ONLY READ) — the week's menu, built by `health.weekly_menu` from his anchor
+    foods (the owner-only charter twin) over the week's food plan: the same `training.food_panel.build_food_plan` the
+    weekly panel grade reads (`mcp.panel_weekly_grade.read_food_plan`: the resolver's seven days, typed by the training
+    calendar, the titration record). `week_start` (YYYY-MM-DD, a Monday) defaults to the coming week — today when today
+    is a Monday. Nothing is written; an unbuildable menu returns its named reason, never a remembered one."""
+    from common.pacific_time import parse_day_key, shift_day_key
+    from health import calorie_target, weekly_menu
+
+    from mcp import panel_weekly_grade
+
+    args = args or {}
+    today = pacific_now().date().isoformat()
+    given = str(args.get("week_start") or "").strip()
+    if given and (parse_day_key(given[:10]) is None or calorie_target.week_monday(given[:10]) != given[:10]):
+        return {"error": f"week_start must be a Monday as YYYY-MM-DD, got {given!r}"}
+    monday = calorie_target.week_monday(today)
+    week = given[:10] if given else (monday if monday == today else shift_day_key(monday, 7))
+    end = shift_day_key(week, 6)
+    plan = panel_weekly_grade.read_food_plan(week, panel_weekly_grade.read_routines(week, end))
+    if plan is None:
+        return {"error": "the week's food plan is unreadable (see the MCP log); no menu is built without it", "week_start": week}
+    return weekly_menu.build(plan)
 
 
 def _now_z() -> str:

@@ -7,7 +7,8 @@ The charter is two halves that read as one:
     value it can ship (#3675 class). S3 ``config/training_charter.json`` (the twin the
     config sync uploads) is the fallback for a process with no config/ dir.
   * PRIVATE ``target_picture`` / ``appearance_brief`` — the owner's body and appearance
-    targets, NEVER in a tracked file (the repo is public). Same channel shape as
+    targets — and ``anchor_foods`` (#5103, the weekly menu's own foods) — NEVER in a
+    tracked file (the repo is public). Same channel shape as
     lambdas/privacy/content_filter_channel.py: env ``TRAINING_CHARTER_PRIVATE_JSON`` ->
     gitignored ``config/training_charter.private.local.json`` -> owner-private S3
     ``config/coaching/training_charter.private.json`` (#3043 prefix). The committed
@@ -48,11 +49,12 @@ PRIVATE_EXAMPLE_BASENAME = "training_charter.private.example.json"
 
 # The twin's top-level keys. The repo file must carry none of them; the whitelist may
 # name none of them (tests/test_training_charter_privacy_5087.py guards both as a SET).
-PRIVATE_KEYS: tuple[str, ...] = ("target_picture", "appearance_brief")
+# `anchor_foods` (#5103): the weekly menu's anchor-food table (health.weekly_menu) — the owner's own foods, owner data.
+PRIVATE_KEYS: tuple[str, ...] = ("target_picture", "appearance_brief", "anchor_foods")
 
 # Dotted prefixes NO published surface may show, whatever the whitelist says: the May
 # target (date, frame, rate band) and the owner-only twin.
-NEVER_PUBLISHED: tuple[str, ...] = ("governing_goal", "phase_after_may", "target_picture", "appearance_brief")
+NEVER_PUBLISHED: tuple[str, ...] = ("governing_goal", "phase_after_may", "target_picture", "appearance_brief", "anchor_foods")
 
 # The dotted charter fields a PUBLISHED surface may show. Everything else is owner/engine
 # context. Adding a `governing_goal.*` or private path here is a test failure, not a choice.

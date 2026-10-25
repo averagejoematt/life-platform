@@ -71,6 +71,9 @@ GET_EXERCISE_NOTES_DESCRIPTION = (
     "action='travel_kit' (#5104, a read): the travel food kit for the late-December trip — a day plan built to the "
     "charter's protein, floors and calorie target (optional maintenance_kcal for the maintenance week, trip_days), the "
     "destination grocery list, the packing list and the hotel/restaurant playbook. "
+    "action='weekly_menu' (#5103, a read, OWNER-ONLY): the week's menu built by code from his anchor foods — every day "
+    "fitted to its resolved calorie target and day type, four feedings at the protein threshold, the macro floors — with "
+    "each day's fit verdict and the cook days' grocery list (optional week_start, a Monday; default the coming week). "
     "action='fitness_test' (#5078, OWNER-ONLY): record fitness-battery results — results {test: value} "
     "(six_minute_walk m, bike_20min_rpe6 m, dead_hang s, assisted_pull_up lb of assistance), optional notes and "
     "date; action='fitness_tests' lists the batteries, each test's trend and whether the battery is due."
@@ -99,6 +102,7 @@ GET_EXERCISE_NOTES_INPUT = {
                 "disruption_end",
                 "disruptions",
                 "travel_kit",
+                "weekly_menu",
                 "fitness_test",
                 "fitness_tests",
             ],
@@ -109,6 +113,7 @@ GET_EXERCISE_NOTES_INPUT = {
                 "`start_date`, `days`, `sets_pct`). deloads = list them. disruption / disruption_end = HIS switch for "
                 "disruption mode (#5088, OWNER-ONLY WRITE; `words` verbatim, `template`, `until` / `ended_on`). disruptions = list. "
                 "travel_kit = the travel food kit (#5104, read): day plan, grocery list, packing list, hotel/restaurant playbook. "
+                "weekly_menu = the week's menu built by code from his anchor foods (#5103, read): per-day fit, feedings, grocery list. "
                 "fitness_test = record fitness-battery results (#5078, OWNER-ONLY WRITE; `results`, optional `notes`, `date`). "
                 "fitness_tests = the batteries, trend and due state."
             ),
@@ -150,6 +155,10 @@ GET_EXERCISE_NOTES_INPUT = {
         "trip_days": {
             "type": "integer",
             "description": "action='travel_kit': trip length in days (default: the charter window's dates, else its default).",
+        },
+        "week_start": {
+            "type": "string",
+            "description": "action='weekly_menu': YYYY-MM-DD, the Monday of the week to build (default: the coming week).",
         },
         "until": {"type": "string", "description": "action='disruption': YYYY-MM-DD, the last day the mode covers. Required."},
         "ended_on": {"type": "string", "description": "action='disruption_end': YYYY-MM-DD, the first day back. Defaults to today."},

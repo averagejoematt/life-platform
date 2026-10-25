@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.28.0",
+  "version": "1.29.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -189,6 +189,13 @@
       "date": "2026-10-24",
       "by": "the mind panel review 2026-10-18 (#5121, epic #5120); no new owner ruling: every new number is a platform default named as one, pending his ruling, except the two the owner's own words in config/user_goals.json failure_mode.early_warning_signals already state (under 3 sessions a week for 2 weeks; the weight trend reversing up over 7 days), which are restated here with that provenance",
       "what": "#5121: early_warning, the relapse early-warning detector's thresholds as data (health.early_warning, run nightly by daily-insight-compute): min_signals 2 (two lapse signals together raise ONE owner-only flag, one alone never does), lookback_days 60 (a channel with no record inside it is absent, never silent), and six signals beside the four the detector already read: weigh_in_cadence (3 days without a weigh-in), food_log_gap (2 of the last 3 days under the titration rule's complete-log line), step_drop (the 7-day mean 35% or more under the 28 days before, n 5 and 14), checkin_silence (3 evenings with no answered check-in after at least one answered), weight_reversal (the 7-day weigh-in mean 1 lb or more above the 7 days before, n 3 each) and sessions_below_plan (under 3 Hevy sessions in each of the last 2 weeks). The flag is owner-only: stored in USER#matthew#SOURCE#early_warning_flag, sent by the response owner (failure_mode.response_owner) on the owner's own Telegram seat, never on a published surface and never in the shared brief context.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.29.0",
+      "date": "2026-10-24",
+      "by": "owner rulings 2026-10-23 (attended, Session CD): R6 'meal service on weekdays, the code-built menu at weekends' and R7 'no excluded foods' (#5103); the three numbers are platform defaults named as such, pending his ruling",
+      "what": "#5103 N9: nutrition.weekly_menu, the weekly menu built by code (health.weekly_menu) from the owner's anchor foods, which live ONLY in the owner-only charter twin (never in this public file). cook_days (Saturday, Sunday: the code-built menu is cooked, the grocery list covers them; the other days are meal-service days whose fitted day is the template the service order matches), min_anchors 6 (fewer usable anchors and the menu is not built, reason too_few_anchors), max_servings_per_anchor_per_day 3 (the default per-food cap; a row's own max_per_day in his table replaces it) and core_anchors_max 2 (a feeding's protein core is at most two anchors). Every target the menu fits to is read from the existing calorie resolver, protein, floors, eating-window and training_day numbers; no new target number. No model call: the menu's words are templates over the code's numbers.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -783,6 +790,18 @@
       "meal_service": "owner ruling 2026-10-23 R6: weekday meal service, the code-built menu at weekends; the service does not travel, so it is paused for the trip dates",
       "excluded_foods_rule": "owner ruling 2026-10-23 R7: no excluded foods; the core habits (habits.core) still apply",
       "provenance": "owner (the dates and rulings); the kit's contents are platform-built for the owner's review"
+    },
+    "weekly_menu": {
+      "_note": "The weekly menu (#5103 N9, epic #5092). BUILT by health.weekly_menu: a deterministic per-day fit of the owner's anchor foods to the week's resolved days (health.calorie_target.resolve through training.food_panel.build_food_plan: the day's kcal, its type from the training calendar, the lifting uplift), the protein range, the four feedings at the threshold, the macro floors and the eating window above. No number here is a target. The anchor foods (names, servings, label values) are owner data: they live only in the owner-only charter twin (config/training_charter.private.example.json documents the shape), never in this public file.",
+      "cook_days": ["Saturday", "Sunday"],
+      "cook_days_rule": "owner ruling 2026-10-23 R6: weekday meal service, the code-built menu cooked at weekends. Every day is fitted; a cook day's food is on the grocery list, a meal-service day's fit is the template the service order matches",
+      "excluded_foods_rule": "owner ruling 2026-10-23 R7: no excluded foods. An anchor the owner marks off_limits in his table is never placed (the switch exists; no food is marked)",
+      "min_anchors": 6,
+      "max_servings_per_anchor_per_day": 3,
+      "core_anchors_max": 2,
+      "tolerance_rule": "a day fits when its kcal sits within half the prescribed band's width of the day's resolved kcal (the band centred on the day, so a lifting day's band moves up with its uplift), protein is at or above the range low, every one of the feedings is at or above the feeding threshold (the post-session one at the post-session protein), and the fat, carbohydrate and fibre floors are met (a lifting day's carbohydrate line is the larger of the floor and the pre + post session carbohydrate)",
+      "failure_rule": "a missing anchor table, fewer than min_anchors usable anchors, or no feeding core reaching the threshold: the menu is not built, with the named reason code; a day the anchors cannot fit is built and marked fits=false with each miss named (never hidden, never a remembered day)",
+      "provenance": "owner (cook_days, the R6/R7 rules); min_anchors, max_servings_per_anchor_per_day and core_anchors_max are platform defaults pending his ruling"
     },
     "floors": {
       "fat": {"floor_g": 65, "unit": "g", "per_meal_g": 10, "meals_with_fat": 3, "epa_dha_g": 2},
