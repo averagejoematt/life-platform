@@ -271,6 +271,7 @@ def test_a_held_event_ping_emits_the_hold_token(wired, monkeypatch):
         monkeypatch.setattr(worker_mod.coach_chat, "run_turn", lambda **kw: _held())
         out = worker_mod.lambda_handler({"kind": "event_outbound"}, None)
     out.pop("calibration_deadman", None)  # #5203: the plain-text dead-man's own result rides beside the sweep's
+    out.pop("support_contact", None)  # #5125: the support-contact prompts ride beside it the same way
     assert out == {"ok": True, "reason": "held"}
     assert h.sends == []
     lines = _hold_lines(h, worker_mod.HOLD_KIND_EVENT)
