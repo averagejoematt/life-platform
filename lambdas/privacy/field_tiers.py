@@ -189,6 +189,9 @@ FIELD_TIERS: dict[str, dict[str, int]] = {
         # ── #5187: the timed protein entries HAE delivers intraday (ingestion/health_auto_export_protein.py).
         #    Owner-only like every nutrition detail (the nutrition-flags rule): per-entry food timing is never served publicly. ──
         "_rd_protein_hae": TIER_OWNER_ONLY,
+        # ── #4973: every Apple workout, one summary per HAE workout id (ingestion/health_auto_export_workouts.py).
+        #    Owner-only: per-workout heart-rate series summaries, device names and times; the route is never stored here. ──
+        "apple_workouts": TIER_OWNER_ONLY,
     },
     # ADR-097 reading keyspace (BOOK#/READING# pks — a pseudo-source, see SOURCE_TIERS
     # note). The two named private fields from DATA_GOVERNANCE's reading row that exist
