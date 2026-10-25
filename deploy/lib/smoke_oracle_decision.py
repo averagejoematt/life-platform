@@ -57,10 +57,22 @@ Exit codes:
     1  FAIL       — the oracle reported a failure/unhealthy status.
     1  PARSE_ERROR — the result could not be parsed as a status-bearing JSON
                      object (GATING as of #1345; was fail-open before).
+
+#5316 — the exit code gates the PIPELINE; it no longer licenses the ROLLBACK by
+itself. On 2026-10-24 (run 40086869374, 98877ab7e) the qa-smoke `aws lambda
+invoke` hit the CLI's 60 s default read timeout three times (qa-smoke ran 72 s,
+76 s, 68 s — the CLI's automatic retries) and the step exited 255 BEFORE this
+oracle ever read a payload, so a transport timeout counted as a smoke failure and
+reverted the fleet. Only a verdict THIS module reached may revert code: on a FAIL,
+`emit_verdict_output()` writes `smoke_verdict=failed_deploy_health` to
+$GITHUB_OUTPUT, and ci-cd.yml's rollback job requires that output. An invoke
+error, a PARSE_ERROR or a missing oracle still fails the pipeline, without
+reverting anything.
 """
 
 import argparse
 import json
+import os
 import sys
 
 # Statuses accepted as healthy for every oracle. The canary additionally
@@ -301,6 +313,39 @@ def print_non_gating_annotations(path, label, out=print):
     return printed
 
 
+#: #5316: the ONE output value that licenses ci-cd.yml's auto-rollback. Written only
+#: from a FAIL this module decided; a PARSE_ERROR (we could not read the oracle) and
+#: any transport failure upstream of it (the oracle never ran) leave it unset.
+ROLLBACK_VERDICT = "failed_deploy_health"
+VERDICT_OUTPUT_KEY = "smoke_verdict"
+
+
+def rollback_verdict(verdicts):
+    """Pure. ROLLBACK_VERDICT iff EVERY verdict is an oracle FAIL, else None.
+
+    A list because the canary gate (canary_gate_retry.py) reaches its decision over
+    several attempts: one attempt that was a PARSE_ERROR or an invoke error means
+    the evidence for "the deploy broke it" is incomplete, so the pipeline still goes
+    red but nothing is reverted. An empty list is None — no oracle, no rollback.
+    """
+    verdicts = list(verdicts)
+    if verdicts and all(v == "FAIL" for v in verdicts):
+        return ROLLBACK_VERDICT
+    return None
+
+
+def emit_verdict_output(verdicts, env=None):
+    """Append `smoke_verdict=<v>` to $GITHUB_OUTPUT when `rollback_verdict` licenses a
+    rollback. Returns the value written (or None). Outside Actions it only returns."""
+    env = os.environ if env is None else env
+    value = rollback_verdict(verdicts)
+    path = env.get("GITHUB_OUTPUT")
+    if value and path:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(f"{VERDICT_OUTPUT_KEY}={value}\n")
+    return value
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Smoke-oracle PASS/FAIL/PARSE_ERROR decision (#1345).")
     parser.add_argument("result", help="path to the Lambda invoke result JSON")
@@ -335,6 +380,7 @@ def main(argv=None):
         return 1
 
     print(f"::error::{args.label} reported failure: {detail}")
+    emit_verdict_output([verdict])
     return 1
 
 

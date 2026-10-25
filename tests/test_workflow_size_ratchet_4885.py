@@ -19,7 +19,7 @@ _WF = _REPO / ".github" / "workflows"
 # workflow -> (physical lines, inline run: lines). Down-only. Named *_COUNTS: a *_BASELINE name is
 # read as a gate registry by the census.
 WORKFLOW_SIZE_COUNTS: dict = {
-    "ci-cd.yml": (1732, 783),
+    "ci-cd.yml": (1732, 744),  # #5316: the rollback loop moved to deploy/rollback_fleet.sh
     "ci-lint.yml": (451, 168),
     "ci-test.yml": (439, 124),
     "citation-network-check.yml": (78, 21),

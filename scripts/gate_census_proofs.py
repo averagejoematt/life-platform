@@ -3801,3 +3801,55 @@ STRUCTURAL_HAND_PROOFS["structural::test_journal_silence_public_surfaces_5131.py
     ),
     "proved_on": "2026-10-23",
 }
+
+# ── #5316: the fleet drift checks (a rollback overlapped a newer deploy and finished last) ──
+CI_PROOFS["ci::ci-cd.yml::deploy::5"] = {
+    "gate_name": "deploy / Fleet drift check (#5316)",
+    "command": (
+        "The step's own `run:` line with ${{ github.sha }} and ${{ needs.reconcile.outputs.build_sha }} substituted: "
+        "`python3 deploy/check_fleet_drift.py --expect '<sha>,<sha>'`, run LIVE and read-only (lambda:GetFunction + a "
+        "ranged GET of each presigned code URL) against the real fleet from the lane checkout."
+    ),
+    "mutation": (
+        "The input the step exists for: the expected sha set to d944d9521 (CI's last deploy) while every function is "
+        "live on 6984087e0 (the attended fleet redeploy of 2026-10-25) — a fleet that is not on the sha this run stamped. "
+        "Unit level: tests/test_rollback_serialise_5316.py (the deploy-job mode holds the exact sha; a descendant is still a "
+        "mismatch there)."
+    ),
+    "observed": (
+        "2026-10-24 (lane). CONTROL (--expect 6984087e0…,6984087e0…): exit 0, 'live build shas: 6984087e0 x109', 'every "
+        "function is on 6984087e0'. MUTATED (--expect d944d9521…): exit 1, '::error title=Fleet drift (#5316)::109 drifted, "
+        "0 unverified, 0 on d944d9521'."
+    ),
+    "scope": (
+        "ADVISORY (continue-on-error): an exit 1 marks the step, never the deploy job, so smoke-test and the rollback still "
+        "key on the deploy. Reads build_info.json's git_sha, so a function whose bundle carries none, or whose read fails, is "
+        "UNVERIFIED (exit 2), never on-sha. The fleet list is ci/lambda_map.json minus not_deployed plus both MCP functions."
+    ),
+    "proved_on": "2026-10-24",
+}
+CI_PROOFS["ci::ci-cd.yml::rollback-on-smoke-failure::3"] = {
+    "gate_name": "rollback-on-smoke-failure / Post-rollback fleet drift",
+    "command": (
+        "The step's own `run:` line, `python3 deploy/check_fleet_drift.py --expect-deploy-base`, run LIVE and read-only from "
+        "the lane checkout with GH_TOKEN set (the deploy base is check_deploy_deadman.last_deployed_sha, the base Plan diffs "
+        "from)."
+    ),
+    "mutation": (
+        "The 2026-10-24 incident shape, live: main(['--expect-deploy-base']) with collect_deployed_shas() wrapped to replace "
+        "daily-brief's live build sha by 2f7595a3c (d944d9521~1) — one function left on code older than main's newest "
+        "successful deploy, as the overlapping rollback left 62."
+    ),
+    "observed": (
+        "2026-10-24 (lane). CONTROL: exit 0 — deploy base d944d952163f, 'AHEAD: 109 function(s) on a later deploy from main' "
+        "(the attended 6984087e0 redeploy descends from it). MUTATED: exit 1 — 'DRIFT: 1 function(s) are NOT on main's "
+        "expected deploy: daily-brief live 2f7595a3c', '1 drifted, 0 unverified, 0 on d944d9521, 108 ahead'."
+    ),
+    "scope": (
+        "ADVISORY (continue-on-error), reporting into the rollback's SNS message. 'Ahead' needs git ancestry, so the job's "
+        "checkout is fetch-depth 0; a sha git cannot place is drift, never ahead. Right after a rollback with no newer deploy "
+        "the reverted functions read as drift against this run's own deploy — that IS the state to report (the fleet is behind "
+        "main and nothing redeploys it until the next code push or a deploy_all)."
+    ),
+    "proved_on": "2026-10-24",
+}

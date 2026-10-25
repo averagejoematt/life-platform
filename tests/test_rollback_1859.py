@@ -36,6 +36,8 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 ROLLBACK_SCRIPT = os.path.join(REPO_ROOT, "deploy", "rollback_lambda.sh")
 LAMBDA_MAP_PATH = os.path.join(REPO_ROOT, "ci", "lambda_map.json")
 CI_CD_WORKFLOW = os.path.join(REPO_ROOT, ".github", "workflows", "ci-cd.yml")
+# #5316: the rollback loop moved out of the workflow (the #4885 size ratchet's prescribed fix).
+ROLLBACK_FLEET_SCRIPT = os.path.join(REPO_ROOT, "deploy", "rollback_fleet.sh")
 
 
 def _read(path):
@@ -145,10 +147,14 @@ def test_rollback_script_still_sourceable_and_guards_main():
 
 
 def _rollback_job_body():
+    """The rollback job's text PLUS the fleet-rollback script it runs (#5316 moved the loop
+    into deploy/rollback_fleet.sh), so every assertion below reads what CI executes."""
     text = _read(CI_CD_WORKFLOW)
     start = text.index("rollback-on-smoke-failure:")
     end = text.index("\n  notify-failure:")
-    return text[start:end]
+    job = text[start:end]
+    assert "bash deploy/rollback_fleet.sh" in job, "the rollback job no longer runs deploy/rollback_fleet.sh"
+    return job + "\n" + _read(ROLLBACK_FLEET_SCRIPT)
 
 
 def test_rollback_job_runs_after_the_deploy_and_the_smoke_test():
