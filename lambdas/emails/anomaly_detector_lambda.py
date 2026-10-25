@@ -72,6 +72,7 @@ import boto3
 from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.metric_truth import resolve, resolve_by_date, sources_for  # #4630: the ONE multi-source resolver
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
+from health import illness_triad  # #4978: the owner-only early-illness/overload triad — its own row, never this mail
 from ingestion.source_registry import METRIC_TRUTH  # #4630: metrics resolved per day across sources
 
 _logger_std = logging.getLogger()
@@ -1121,6 +1122,10 @@ def lambda_handler(event, context):
         sustained_alert_sent=sustained_alert_sent,
     )
 
+    # #4978: the triad writes its OWN owner-only row (illness_triad_flag) — never the anomalies row above, which
+    # the chronicle and the daily brief read, and never the mail. Fail-soft: it never raises.
+    triad = illness_triad.run(table, fetch_range, today.isoformat(), dry_run=dry_run)
+
     # The completion row the status page reads. It shares pk+sk with the
     # per-send write above, so it necessarily OVERWRITES it — which is why its
     # period key is chosen, not copied. On an alerting day it repeats the send's
@@ -1146,6 +1151,7 @@ def lambda_handler(event, context):
                 "sustained_count": len(sustained_metrics),
                 "sustained_alert_sent": sustained_alert_sent,
                 "detector_version": DETECTOR_VERSION,
+                "illness_triad_active": triad["active"],
             }
         ),
     }

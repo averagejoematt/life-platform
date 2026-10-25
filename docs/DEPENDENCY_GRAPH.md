@@ -105,9 +105,9 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 `benchmarks`, `calibration`, `checkin_intake_pairs`, `chronicling`, `clinical`, `coach_corrections`, `coach_vision`, `dexa`, `effect_fits`, `eyeball_estimate`, `fitness_tests`, `genome`, `labs`, `may_tracker`, `milestones`, `nutrition_titration`, `progress_photos`, `recall_embeddings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
 
-### experiment_scoped (35)
+### experiment_scoped (36)
 
-`achievements`, `adaptive_mode`, `ai_analysis`, `anomalies`, `centenarian_progress`, `challenges`, `character_receipt`, `character_sheet`, `chronicle`, `circadian`, `coach_actions`, `computed_insights`, `computed_metrics`, `decisions`, `diary_claims`, `diary_reactions`, `discovery_annotations`, `early_warning_flag`, `engagement_state`, `experiments`, `field_notes`, `forecast`, `habit_scores`, `hypotheses`, `insights`, `ledger`, `nutrition_review`, `panelcast`, `protocols`, `recap_cards`, `rewards`, `scenarios`, `state_of_matthew`, `weekly_correlations`, `what_changed`
+`achievements`, `adaptive_mode`, `ai_analysis`, `anomalies`, `centenarian_progress`, `challenges`, `character_receipt`, `character_sheet`, `chronicle`, `circadian`, `coach_actions`, `computed_insights`, `computed_metrics`, `decisions`, `diary_claims`, `diary_reactions`, `discovery_annotations`, `early_warning_flag`, `engagement_state`, `experiments`, `field_notes`, `forecast`, `habit_scores`, `hypotheses`, `illness_triad_flag`, `insights`, `ledger`, `nutrition_review`, `panelcast`, `protocols`, `recap_cards`, `rewards`, `scenarios`, `state_of_matthew`, `weekly_correlations`, `what_changed`
 
 ### raw_timeseries (44)
 
@@ -119,7 +119,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-785 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+790 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -132,7 +132,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `adaptive_mode` | adaptive_mode_lambda.py | tools_coach_checkin.py, tools_reading.py |
 | `ai_analysis` | ai_expert_analyzer_lambda.py | ai_expert_analyzer_lambda.py, chronicle_data.py, coherence_sentinel_lambda.py, site_api_coach_narrative.py, site_api_coach_stance.py, state_of_matthew_lambda.py |
 | `anomalies` | anomaly_detector_lambda.py | anomaly_detector_lambda.py, daily_brief_lambda.py |
-| `apple_health` | freshness_checker_lambda.py, health_auto_export_lambda.py | ai_expert_analyzer_lambda.py, evening_nudge_lambda.py, freshness_checker_lambda.py, health_auto_export_lambda.py, instrument_presence.py, protein_nudge_runner.py, qa_smoke_lambda.py, site_api_biomarkers.py, site_api_body.py, site_api_fingerprint.py, site_api_freshness.py, site_api_journey.py, site_api_meals.py, site_api_mind.py, site_api_physical.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, site_stats_refresh_lambda.py, tools_cgm.py, tools_health.py, tools_lifestyle.py |
+| `apple_health` | freshness_checker_lambda.py, health_auto_export_lambda.py | ai_expert_analyzer_lambda.py, evening_nudge_lambda.py, freshness_checker_lambda.py, health_auto_export_lambda.py, instrument_presence.py, protein_nudge_runner.py, qa_smoke_lambda.py, site_api_autonomic.py, site_api_biomarkers.py, site_api_body.py, site_api_fingerprint.py, site_api_freshness.py, site_api_journey.py, site_api_meals.py, site_api_mind.py, site_api_physical.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, site_stats_refresh_lambda.py, tools_cgm.py, tools_correlation.py, tools_health.py, tools_lifestyle.py, tools_training.py |
 | `benchmarks` | — | site_api_training.py |
 | `calibration` | — | state_of_matthew_lambda.py |
 | `centenarian_progress` | weekly_correlation_compute_lambda.py | — |
@@ -173,6 +173,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `eyeball_estimate` | — | — |
 | `felt_probe` | — | site_api_fulfillment.py |
 | `field_notes` | field_notes_lambda.py, tools_lifestyle.py | ai_expert_analyzer_lambda.py, chronicle_data.py, field_notes_lambda.py, site_api_thirdwall.py, tools_lifestyle.py |
+| `field_notes_held` | field_notes_lambda.py | — |
 | `fitness_tests` | fitness_tests.py | — |
 | `flourishing` | flourishing.py | site_api_fulfillment.py, theme_river.py, tools_journal.py |
 | `food_delivery` | food_delivery_lambda.py | digest_utils.py, site_api_meals.py, site_api_nutrition.py |
@@ -257,13 +258,16 @@ producer's output is round-tripped through the real consumer, then a disagreemen
 injected into BOTH sides (`tests/test_pair_contract_sweep_2847.py`). Enrolling a pair is
 one registry entry in `tests/pair_contract_registry.py`. **Floor** = named in
 `KNOWN_MUST_AGREE_PAIRS` (only ever grows); **Enrolled** = a live `PairContract` backs it —
-a floor row reading `no` is a rotted registry entry. Ratchet: `ENROLLED_FLOOR` = 12.
+a floor row reading `no` is a rotted registry entry. Ratchet: `ENROLLED_FLOOR` = 15.
 See `meta.scope_cuts` for why this is not a census of every must-agree pair.
 
 | Pair | Producer | Consumer | Partition | Mutations | Floor | Enrolled |
 |------|----------|----------|-----------|-----------|-------|----------|
 | adaptive_mode -> /api/ask grounding reads | `compute.adaptive_mode_lambda::store_adaptive_mode` | `web.site_api_ai_context::_ask_fetch_computed_reads` | `adaptive_mode` | 3 | yes | yes |
 | ai_analysis EXPERT# -> observatory card journaling prompt | `intelligence.ai_expert_analyzer_lambda::generate_and_cache` | `coach.coach_observatory_renderer::journaling_prompt_for_domain` | `ai_analysis` | 3 | yes | yes |
+| apple_workouts map -> /api/zone2 Apple leg | `ingestion.health_auto_export_workouts::write_apple_workouts` | `web.site_api_autonomic::_compute_zone2_breakdown` | `apple_health` | 4 | yes | yes |
+| apple_workouts map -> MCP get_zone2_breakdown Apple leg | `ingestion.health_auto_export_workouts::write_apple_workouts` | `mcp.tools_correlation::tool_get_zone2_breakdown` | `apple_health` | 3 | yes | yes |
+| apple_workouts map -> MCP periodization weekly Zone 2 | `ingestion.health_auto_export_workouts::write_apple_workouts` | `mcp.tools_training::_zone2_by_iso_week` | `apple_health` | 3 | yes | yes |
 | coach PREDICTION# graded row -> ledger line (latest_checked) | `coach.coach_prediction_evaluator::_update_prediction_status` | `coach.latest_checked::for_coach` | — | 5 | yes | yes |
 | coach PREDICTION# resolutions -> the one record (K of N through <day>) | `coach.dispute_docket::_write_docket_prediction` | `coach.coach_record::record_from_rows` | — | 4 | yes | yes |
 | computed_metrics -> canonical facts | `compute.daily_metrics_compute_lambda::store_computed_metrics` | `experiment.canonical_facts::build_canonical_facts` | `computed_metrics` | 4 | yes | yes |
@@ -283,7 +287,7 @@ traced through the stack, the factory body under that call's own arguments, or t
 helper the alarm variable is handed to. `via-composite` = the member routes nowhere
 itself; its composite does. `unresolved` is stated, never guessed.
 
-Routing: digest 96 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 — of 141 alarms (4 composite)
+Routing: digest 98 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 — of 143 alarms (4 composite)
 
 | Alarm | Stack | Kind | Routing | Via | Audience |
 |-------|-------|------|---------|-----|----------|
@@ -322,6 +326,7 @@ Routing: digest 96 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 
 | `daily-debrief-no-invocations-24h` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `email-subscriber-errors` | web_stack | metric | urgent | helper:add_web_alarms |  |
 | `expert-gate-infra-hold` | monitoring_silence_alarms | metric | digest | declaration |  |
+| `field-notes-missing` | compute_stack | metric | digest | declaration |  |
 | `fitness-battery-missed` | mcp_stack | metric | digest | declaration |  |
 | `freshness-checker-errors` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
 | `freshness-interior-gap` | monitoring_stack | metric | digest | factory:_alarm |  |
@@ -394,6 +399,7 @@ Routing: digest 96 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 
 | `nightly-predraft-missing` | mcp_stack | metric | digest | declaration |  |
 | `paging-budget-tier-3` | monitoring_stack | metric | paging | declaration |  |
 | `paging-pipeline-dead` | monitoring_stack | metric | paging | declaration |  |
+| `panel-weekly-grade-missing` | mcp_stack | metric | digest | declaration |  |
 | `panelcast-autopublish-held` | monitoring_silence_alarms | metric | digest | declaration |  |
 | `permanence-errors` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
 | `permanence-heartbeat` | operational_stack | metric | digest | declaration |  |
@@ -463,6 +469,7 @@ Default: public — an unlisted source/field is TIER_PUBLIC by omission (field_t
 | `flourishing` | owner_only |
 | `genome` | owner_only |
 | `hevy` | owner_only |
+| `illness_triad_flag` | owner_only |
 | `labs` | owner_published |
 | `macrofactor` | owner_only |
 | `may_tracker` | owner_only |
@@ -574,12 +581,12 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1374 total · 987 resolved · 387 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1388 total · 993 resolved · 395 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (108 lambdas total)
-- Alarms: 141 literal-named declarations across three idioms, 4 composite; routing digest 96 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
-- Privacy: 24 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only
+- Alarms: 143 literal-named declarations across three idioms, 4 composite; routing digest 98 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
+- Privacy: 25 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 97 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
-- Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
+- Record families referenced in code but outside the SOURCE_CLASS census (7): `coach_credibility`, `coach_thread`, `field_notes_held`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
 
 ## 7. Cost-bearing surface (#3374 R1)
@@ -593,8 +600,8 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 | Surface | Count | Registry |
 |---------|-------|----------|
 | ai_features | 30 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
-| alarms | 141 | this model's alarms plane (CDK AST) |
-| emf_namespaces | 33 | `deploy/emf_namespace_ledger.py::LEDGER` |
+| alarms | 143 | this model's alarms plane (CDK AST) |
+| emf_namespaces | 34 | `deploy/emf_namespace_ledger.py::LEDGER` |
 | schedules | 97 | this model's schedules plane (CDK AST) |
 | secrets | 30 | `tests/test_secret_references.py::KNOWN_SECRETS` |
 

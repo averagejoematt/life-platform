@@ -240,6 +240,12 @@
       "stack": "monitoring_silence_alarms",
       "via": "declaration"
     },
+    "field-notes-missing": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "compute_stack",
+      "via": "declaration"
+    },
     "fitness-battery-missed": {
       "kind": "metric",
       "routing": "digest",
@@ -672,6 +678,12 @@
       "stack": "monitoring_stack",
       "via": "declaration"
     },
+    "panel-weekly-grade-missing": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "mcp_stack",
+      "via": "declaration"
+    },
     "panelcast-autopublish-held": {
       "kind": "metric",
       "routing": "digest",
@@ -921,6 +933,36 @@
       "producer": "intelligence.ai_expert_analyzer_lambda::generate_and_cache"
     },
     {
+      "consumer": "web.site_api_autonomic::_compute_zone2_breakdown",
+      "enrolled": true,
+      "floor": true,
+      "mutations": 4,
+      "name": "apple_workouts map -> /api/zone2 Apple leg",
+      "note": "#5353 / #4973: the public payload carries minutes, dates and the sport only \u2014 never a bin or an id (tests/test_zone2_apple_leg_5353.py).",
+      "partition": "apple_health",
+      "producer": "ingestion.health_auto_export_workouts::write_apple_workouts"
+    },
+    {
+      "consumer": "mcp.tools_correlation::tool_get_zone2_breakdown",
+      "enrolled": true,
+      "floor": true,
+      "mutations": 3,
+      "name": "apple_workouts map -> MCP get_zone2_breakdown Apple leg",
+      "note": "#5353: the owner's MCP tool reads the same map /api/zone2 reads, through the same zone2_minutes resolver.",
+      "partition": "apple_health",
+      "producer": "ingestion.health_auto_export_workouts::write_apple_workouts"
+    },
+    {
+      "consumer": "mcp.tools_training::_zone2_by_iso_week",
+      "enrolled": true,
+      "floor": true,
+      "mutations": 3,
+      "name": "apple_workouts map -> MCP periodization weekly Zone 2",
+      "note": "#5353: view=periodization's polarization reads weekly Zone 2 from the same resolver; the week is the Pacific week of the start.",
+      "partition": "apple_health",
+      "producer": "ingestion.health_auto_export_workouts::write_apple_workouts"
+    },
+    {
       "consumer": "coach.latest_checked::for_coach",
       "enrolled": true,
       "floor": true,
@@ -1023,8 +1065,8 @@
   ],
   "cost_surface": {
     "ai_features": 30,
-    "alarms": 141,
-    "emf_namespaces": 33,
+    "alarms": 143,
+    "emf_namespaces": 34,
     "schedules": 97,
     "secrets": 30
   },
@@ -3774,6 +3816,20 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": "field-notes-generate",
+      "module": "lambdas/intelligence/field_notes_lambda.py",
+      "partition": "field_notes_held",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "field-notes-generate",
+      "module": "lambdas/intelligence/field_notes_lambda.py",
+      "partition": "field_notes_held",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": "field-notes-generate",
       "module": "lambdas/intelligence/field_notes_lambda.py",
@@ -4556,6 +4612,13 @@
       "module": "lambdas/web/site_api_ai_context.py",
       "partition": "what_changed",
       "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_autonomic.py",
+      "partition": "apple_health",
+      "via": "seam"
     },
     {
       "direction": "read",
@@ -6094,6 +6157,13 @@
       "direction": "read",
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_correlation.py",
+      "partition": "apple_health",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_correlation.py",
       "partition": "hevy",
       "via": "seam"
     },
@@ -6466,6 +6536,13 @@
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_todoist.py",
       "partition": "todoist",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_training.py",
+      "partition": "apple_health",
       "via": "seam"
     },
     {
@@ -8079,9 +8156,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead"
     },
     "counts": {
-      "alarms": 141,
+      "alarms": 143,
       "alarms_by_routing": {
-        "digest": 96,
+        "digest": 98,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
@@ -8089,27 +8166,27 @@
         "via-composite": 3
       },
       "alarms_composite": 4,
-      "contracts": 12,
-      "contracts_enrolled": 12,
-      "contracts_known": 12,
-      "contracts_ratchet": 12,
-      "edges": 785,
+      "contracts": 15,
+      "contracts_enrolled": 15,
+      "contracts_known": 15,
+      "contracts_ratchet": 15,
+      "edges": 790,
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
-      "partitions": 122,
+      "partitions": 123,
       "privacy_fields_owner_only": 69,
       "privacy_fields_owner_published": 11,
-      "privacy_sources_owner_only": 24,
+      "privacy_sources_owner_only": 25,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 81,
       "schedules": 97
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 387,
-        "sites_resolved": 987,
-        "sites_total": 1374
+        "sites_dynamic": 395,
+        "sites_resolved": 993,
+        "sites_total": 1388
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8119,6 +8196,7 @@
     "non_census_families": [
       "coach_credibility",
       "coach_thread",
+      "field_notes_held",
       "intelligence_quality",
       "journal",
       "platform_memory",
@@ -8500,6 +8578,11 @@
       "class": "experiment_scoped",
       "ingestion": false,
       "privacy_tier": "public"
+    },
+    "illness_triad_flag": {
+      "class": "experiment_scoped",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
     },
     "ingest_liveness": {
       "class": "system_state",
@@ -9010,6 +9093,7 @@
       "flourishing": "owner_only",
       "genome": "owner_only",
       "hevy": "owner_only",
+      "illness_triad_flag": "owner_only",
       "labs": "owner_published",
       "macrofactor": "owner_only",
       "may_tracker": "owner_only",

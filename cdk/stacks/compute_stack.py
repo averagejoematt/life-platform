@@ -121,6 +121,37 @@ class ComputeStack(Stack):
             **shared,
         )
 
+        # #5128: the field-notes dead-man. The W42 edition (2026-10-18T18:00:28Z) was HELD by the
+        # grounding gate and nothing reported it: a hold writes no WEEK# row and the function still
+        # "succeeded", so Errors and Invocations alarms stayed green. field_notes_lambda.emit_outcome()
+        # emits FieldNotesOutcome = 1 (edition exists) / 0 (held or crashed) as EMF on every run.
+        # Sum < 1 over seven daily buckets, missing = BREACHING (a dead cron emits nothing; seven
+        # daily periods is the CloudWatch ceiling, #3685). Digest (ADR-050): a missed edition is a
+        # missing weekly note, never a wrong one.
+        field_notes_missing = cloudwatch.Alarm(
+            self,
+            "FieldNotesMissing",
+            alarm_name="field-notes-missing",
+            alarm_description=(
+                "#5128: no field-notes edition written in 7 days — the Sunday 18:00Z run was held by the grounding gate "
+                "(see the field_notes_held WEEK# marker: reason, detail), crashed, or never ran. Re-invoke with "
+                '{"manual_week": "YYYY-Www"} once the cause is understood.'
+            ),
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/FieldNotes",
+                metric_name="FieldNotesOutcome",
+                dimensions_map={"Job": "field_notes_generate"},
+                period=Duration.seconds(86400),
+                statistic="Sum",
+            ),
+            evaluation_periods=7,
+            datapoints_to_alarm=7,
+            threshold=1,
+            comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        )
+        field_notes_missing.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
         create_platform_lambda(
             self,
             "JournalAnalyzer",

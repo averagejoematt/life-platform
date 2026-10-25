@@ -189,6 +189,13 @@ CONSUMERS: dict[tuple[str, str], dict] = {
         "Not a value read: a presence-signal name in the #4970 overnight-vitals "
         "hae_datatypes entry, the same any-of liveness set as the two above.",
     ),
+    ("lambdas/ingestion/source_registry.py", "sleep_total_hours_apple"): _d(
+        SAW,
+        "#4979 dual wear: the METRIC_TRUTH['sleep_hours'] `companions` facet names the watch's night total so "
+        "`common.metric_truth.dual_wear` can report it beside Whoop's, labelled. Never a truth source (not in "
+        "fallback_order). Its readers filter by audience: `health.watch_signals.allowed` drops it from every AI "
+        "and public context; only the owner's MCP views return it.",
+    ),
     # NOTE — `mcp/tools_data.py` is deliberately ABSENT. It was the #2809 leak site and
     # it carried a hand-written `TIER2_STRIP_FIELDS` literal naming all three fields.
     # #2803 made it derive from `field_tiers.strip_map()`, so it no longer names any of
@@ -244,6 +251,17 @@ CONSUMERS: dict[tuple[str, str], dict] = {
         SAW,
         "#4978: the owner MCP readiness tool scores the night's Whoop skin temperature against his own "
         "30-night baseline (overnight_physiology) and returns the deviation on the owner's own surface only.",
+    ),
+    ("lambdas/health/illness_triad.py", "skin_temp_celsius"): _d(
+        SAW,
+        "#4978: the illness/overload triad scores the night's Whoop skin temperature against his own baseline "
+        "and stores the deviation in the owner-only illness_triad_flag row; its one reader is the owner's own "
+        "Performance coach thread. Never the anomalies row, the anomaly mail or a published surface.",
+    ),
+    ("lambdas/health/illness_triad.py", "wrist_temp_sleep_c_apple"): _d(
+        SAW,
+        "#4978: the triad reports the Apple Watch wrist temperature against the watch's own baseline as a "
+        "corroboration line (never counted) inside the same owner-only illness_triad_flag row.",
     ),
     ("mcp/tools_health.py", "bmr_kcal"): _d(
         SAW,
@@ -422,6 +440,14 @@ CONSUMERS[("lambdas/training/workout_identity.py", "apple_workouts")] = _d(
     SAW,
     "The one-workout-identity resolver (#4973) reads `apple_workouts` records to cluster sessions; no live caller "
     "yet, and every output goes through public_projection, which strips names, places and owner-only blocks.",
+)
+
+# #5353: the zone-2 Apple leg reads the owner-only per-workout HR bins to compute aggregate minutes.
+CONSUMERS[("lambdas/training/zone2_minutes.py", "apple_workouts")] = _d(
+    SAW,
+    "The zone-2 minutes resolver (#5353) reads `apple_workouts[*].derived.hr_seconds_by_bpm5` (plus start/end) only to "
+    "sum Zone 2 minutes per day; no bin, workout id, name or other workout field leaves it — the public /api/zone2 "
+    "payload carries minutes only (tests/test_zone2_apple_leg_5353.py::test_public_zone2_payload_carries_minutes_only_never_bins).",
 )
 
 CONSUMERS[("lambdas/ingestion/health_auto_export_protein.py", "_rd_protein_hae")] = _d(

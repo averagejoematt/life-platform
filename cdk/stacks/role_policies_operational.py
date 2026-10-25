@@ -26,6 +26,8 @@ from stacks.role_policies_base import (
     SES_IDENTITY,
     TABLE_ARN,
     _bedrock_statement,
+    _charter_twin_list,
+    _charter_twin_read,
     _s3,
     _secret_arn,
     _ses_reader_resources,
@@ -615,6 +617,9 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
             #   in the lambda — an alarmed warn naming this grant until it deploys.
             resources=_s3("dashboard/*", "config/*", "blog/*", "ai-canary-log/*", "raw/matthew/health_auto_export/*"),
         ),
+        # #5220: qa-smoke reads the charter (config/* GetObject above covers the twin); the missing twin must answer 404
+        # `absent`, not 403, or every cold start trips swallowed-permission-denial.
+        _charter_twin_list(),
         iam.PolicyStatement(
             sid="S3List",
             actions=["s3:ListBucket"],
@@ -861,6 +866,10 @@ def operational_coherence_sentinel() -> list[iam.PolicyStatement]:
                 actions=["ssm:GetParameter"],
                 resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
             ),
+            # #5220: reads the charter through the shared loader; GetObject on the one twin key + the prefix list make the
+            # absent twin a 404 instead of an AccessDenied the swallowed-denial alarm counts on every cold start.
+            _charter_twin_read(),
+            _charter_twin_list(),
         ],
     )
 
@@ -921,6 +930,9 @@ def operational_ai_quality_canary() -> list[iam.PolicyStatement]:
                 actions=["s3:GetObject"],
                 resources=_s3("config/content_filter.json", "config/personas.json"),
             ),
+            # #5220: same shared-loader charter read as coherence_sentinel — the one twin key + the prefix list.
+            _charter_twin_read(),
+            _charter_twin_list(),
             _bedrock_statement(),
             iam.PolicyStatement(
                 sid="BudgetTierRead",

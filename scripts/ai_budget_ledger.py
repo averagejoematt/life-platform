@@ -193,11 +193,14 @@ LEDGER: dict[str, dict] = {
     ),
     "charter_judge": _row(
         owner="lambdas/training/charter_ai.py",
-        attribution=NONE,
+        attribution=SHARED,
+        attribution_keys=("life-platform-mcp-warmer",),
         note="#5084/#5072: the charter's panel-rubric judge, the WEEKLY real-plan grade — one Sonnet call per plan with "
         "every seat in it, the real plan + 4 negative controls, then the food plan + 2 (#5110), back-to-back, the cached "
-        "charter block written once and read by the rest. Hosted by the MCP Lambda's weekly job once scheduled (no "
-        "dimension value of its own: it lands under the host's). Estimate (#5110): ~$0.30 a weekly run, ~$1.30/month",
+        "charter block written once and read by the rest. Hosted by life-platform-mcp-warmer's PanelWeeklyGrade rule "
+        "(mcp_stack, Monday 15:30Z): in a Lambda the dimension is the function name, and the warmer also carries the "
+        "02:00Z nightly pre-draft's AI, so the key is SHARED (no per-feature dollars). Estimate (#5110): ~$0.30 a "
+        "weekly run, ~$1.30/month",
     ),
     "charter_judge_gate": _row(
         owner="lambdas/training/panel_judge.py",

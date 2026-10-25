@@ -61,6 +61,7 @@ from web.site_api_ai_context import (  # noqa: F401
     _latest_item,
     _soft_block,
     age_annotation as _age_annotation,
+    watch_ask_block as _watch_ask_block,  # #4979
 )
 from web.site_api_ai_prompt import (  # noqa: F401
     _EXPLAIN_GROUNDING_REFUSAL,
@@ -488,7 +489,7 @@ CURRENT DATA:
   T0 habit streak: {ctx.get('tier0_streak', '?')} days
   Pillars:
 {pillars_str or '    Not available'}
-{reads_section}{archive_section}
+{reads_section}{_watch_ask_block(ctx)}{archive_section}
 RULES:
 - You answer READERS of Matthew's public experiment — the reader is NOT Matthew. Never tell the reader to check, sync, or refresh "your" device: the devices are Matthew's (Whoop, Withings, Eight Sleep). If a reading is missing, say the platform hasn't received it yet.
 - A metric line carrying "(as of <date>)" is from THAT day, not today — say so when you cite it ("his last weigh-in, August 11th, was…"), and NEVER present a reading marked STALE as current.

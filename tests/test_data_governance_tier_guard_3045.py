@@ -181,6 +181,13 @@ ROW_MAP: list[dict] = [
         "requirements": [("source", "evening_checkin", OO), ("source", "checkin_intake_pairs", OO)],
         "claims": [],
     },
+    # #4978: the illness/overload triad flag — raw-biometric deviations; no public projection, so no `claims`.
+    {
+        "key": "illness_triad_flag",
+        "pattern": r"^Illness/overload triad flag",
+        "requirements": [("source", "illness_triad_flag", OO)],
+        "claims": [],
+    },
     # #5121: the relapse early-warning flag — a sensitive mind state; no public projection, so no `claims`.
     {
         "key": "early_warning_flag",

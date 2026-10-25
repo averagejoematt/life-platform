@@ -548,6 +548,20 @@ LEDGER: dict[str, dict] = {
         series_budget=5,
         note="RecallsDue, documented in CHANGELOG, read by nothing. A gauge with no dial.",
     ),
+    "LifePlatform/FieldNotes": _row(
+        owner="lambdas/intelligence/field_notes_lambda.py (#5128)",
+        verdict=KEEP,
+        cardinality=FIXED,
+        driver=None,
+        live_series=0,
+        series_budget=2,
+        note=(
+            "#5128 (added 2026-10-25, after MEASURED_ON — hence 0 live series). FieldNotesOutcome{Job=field_notes_generate}: "
+            "1 when the weekly edition exists, 0 when the grounding gate held it or the run crashed — the heartbeat behind "
+            "field-notes-missing. Invocations/Errors cannot see a HELD edition (the function succeeds and writes nothing); "
+            "W42 went unreported that way."
+        ),
+    ),
     "LifePlatform/HevyRoutine": _row(
         owner="hevy_restamp + hevy_routine_cron + hevy-backfill (index rebuild) + nightly pre-draft (#4084)",
         verdict=KEEP,
@@ -569,8 +583,8 @@ LEDGER: dict[str, dict] = {
             "#4568: a FAILED run emits the same series at 0 (no new series, no new dimension), so the alarm's Sum < 1 "
             "still breaches while SampleCount separates a run that crashed (1) from a run that never happened (0). "
             "#5072 adds PanelGradeOutcome{Job=panel_weekly_grade} (mcp/panel_weekly_grade.py, the weekly panel-rubric "
-            "grade): 1 for a graded or honestly-empty week, 0 for a failure — the series the job's dead-man alarm reads "
-            "once its EventBridge rule is applied (an owner CDK change). "
+            "grade): 1 for a graded or honestly-empty week, 0 for a failure — the series behind panel-weekly-grade-missing "
+            "(7 empty daily buckets), read on the warmer's Monday 15:30Z PanelWeeklyGrade rule. "
             "#5203 adds CalibrationDeadman{Job=calibration} (mcp/calibration_leg.py on the same 02:00Z pre-draft run): the "
             "number of calibration kinds at the dead-man, the series behind the calibration-deadman email alarm."
         ),

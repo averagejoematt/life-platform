@@ -619,7 +619,17 @@ WRITER_TRUTH = {
     "garmin": {"avg_stress": 34, "body_battery_high": 81, "steps": 9412},
     "macrofactor": {"total_calories_kcal": 1810, "total_protein_g": 182, "total_carbs_g": 140, "total_fat_g": 61},
     "withings": {"weight_lbs": 318.4},
-    "apple_health": {"steps": 9800, "active_calories": 620, "mindful_minutes": 12, "blood_glucose_avg": 96, "walking_speed_mph": 3.1},
+    "apple_health": {
+        "steps": 9800,
+        "active_calories": 620,
+        "mindful_minutes": 12,
+        "blood_glucose_avg": 96,
+        "walking_speed_mph": 3.1,
+        # #4979: the Apple Watch's own fields (health_auto_export_watch.py / the VO2 map entry)
+        "daylight_minutes_apple": 48,
+        "cardio_recovery_bpm_apple": 24,
+        "vo2max": 31.5,
+    },
     "strava": {"activity_count": 2, "total_zone2_seconds": 1800, "total_kilojoules": 900.0},
     "notion": {"enriched_mood": 7, "enriched_energy": 6, "enriched_stress": 3, "enriched_social_quality": "good"},
     "eightsleep": {"time_to_sleep_min": 14},
@@ -650,12 +660,29 @@ class TestVocabularyIsMeasurable:
         row = eng.build_data_narrative(_data(READER_TRUTH))[0]
         emitted = set(row) - {"date"}
         # `social` is emitted for prompt colour but is deliberately not testable
-        # (it is a free-text quality label, not a number).
-        assert emitted - {"social"} == set(eng.SPEC_METRICS)
+        # (it is a free-text quality label, not a number). #4979: the two trailing-7-day
+        # volumes need a whole week of rows, so a lone day cannot carry them — the
+        # multi-day twin below proves they are emitted from the same writers' fields.
+        assert emitted - {"social"} == set(eng.SPEC_METRICS) - eng.watch_hypotheses.TRAILING_METRICS
 
     def test_every_vocabulary_metric_is_producible_from_what_its_writer_stores(self):
         row = eng.build_data_narrative(_data(WRITER_TRUTH))[0]
-        assert set(eng.SPEC_METRICS) - set(row) == set()
+        assert set(eng.SPEC_METRICS) - set(row) == set(eng.watch_hypotheses.TRAILING_METRICS)
+
+    def test_the_trailing_volumes_are_producible_from_a_week_of_writer_rows(self):
+        """#4979: seven days of the writers' rows (a Strava activity carrying zone seconds each day)
+        give the seventh day both trailing-7-day volumes; the first six stay absent (partial week)."""
+        days = [(date(2026, 8, 1) + timedelta(days=i)).isoformat() for i in range(7)]
+        act = {"strava_id": "s", "sport_type": "Walk", "start_date": "T", "elapsed_time_seconds": 1800, "zone2_seconds": 600}
+        data = {src: [{"date": d, **fields} for d in days] for src, fields in WRITER_TRUTH.items()}
+        data["strava"] = [
+            {"date": d, **WRITER_TRUTH["strava"], "activities": [dict(act, strava_id=f"s{i}", start_date=f"{d}T16:00:00Z")]}
+            for i, d in enumerate(days)
+        ]
+        rows = eng.build_data_narrative(data)
+        assert set(eng.SPEC_METRICS) - set(rows[-1]) == set()
+        assert rows[-1]["zone2_7d_min"] == 70.0 and rows[-1]["cardio_7d_min"] == 210.0
+        assert not any("zone2_7d_min" in r for r in rows[:-1])
 
     def test_garmin_stress_is_read_from_the_field_garmin_writes(self):
         row = eng.build_data_narrative(_data({"garmin": WRITER_TRUTH["garmin"]}))[0]
@@ -689,8 +716,10 @@ class TestVocabularyIsMeasurable:
         monkeypatch.setattr(retry_utils, "call_anthropic_raw", fake)
         eng.generate_hypotheses([{"date": DAY, "protein_g": 180}], [])
         prompt = _prompt_of(fake.calls[0])
-        missing = [m for m in eng.SPEC_METRICS if m not in prompt]
+        missing = [m for m in eng.GENERATION_METRICS if m not in prompt]
         assert missing == []
+        # #4979: the owner-channel metrics (cardio recovery, TIER_INTERNAL) are the ONLY ones withheld.
+        assert eng.SPEC_METRICS - eng.GENERATION_METRICS == eng.watch_hypotheses.OWNER_CHANNEL_METRICS
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1512,6 +1541,7 @@ def handler_env(monkeypatch, table, frozen_clock):
     monkeypatch.setattr(eng, "refit_cross_pillar_effects", lambda force=False: {"ran": False, "reason": "not_due"})
     monkeypatch.setattr(eng, "run_time_affluence_weekly", lambda *a, **k: {"ran": False, "reason": "no_weeks"})
     monkeypatch.setattr(eng, "seed_diary_intervention_hypothesis", lambda *a, **k: {"registered": False, "reason": "already_registered"})
+    monkeypatch.setattr(eng.watch_hypotheses, "seed_watch_hypotheses", lambda *a, **k: {"registered": [], "skipped": {}})  # #4979
 
     def _generate(daily_rows, existing, profile=None, journal_candidates=None):
         state["generation_calls"].append(daily_rows)

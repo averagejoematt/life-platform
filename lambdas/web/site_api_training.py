@@ -268,7 +268,11 @@ def training_overview(*, _g) -> dict:
     # average-HR-in-60–70%-of-184 whole-activity method this replaced is gone from every split.
     z2_target = zone2_minutes.WEEKLY_TARGET_MIN  # minutes/week
     _z2_hevy = _query_source("hevy", d30, today)
-    z2_sessions = zone2_minutes.counted_sessions(strava_items, _query_source("whoop", d90, _next_day(today)))
+    z2_sessions = zone2_minutes.counted_sessions(
+        strava_items,
+        _query_source("whoop", d90, _next_day(today)),
+        _query_source("apple_health", d90, today),  # #5353: the watch is the third source
+    )
     z2_by_sid = zone2_minutes.zone2_by_strava_id(z2_sessions)
 
     def _z2_weekly_stats(total_min):

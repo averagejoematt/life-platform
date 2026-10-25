@@ -949,7 +949,11 @@ def _consume_coach_record_rows(payload):
     from coach import coach_record
     from common.constants import EXPERIMENT_START_DATE
 
-    return coach_record.record_from_rows(payload["rows"], genesis=EXPERIMENT_START_DATE)
+    # #5356: ``through`` is the day the record is complete through, bounded by an as-of day.
+    # The pair pins the COUNTED half, so the as-of is genesis — no later than any resolution,
+    # which leaves ``through`` = the latest counted outcome_date and keeps the pair off the
+    # wall clock. The as-of bound itself is pinned in tests/test_coach_record_through_5356.py.
+    return coach_record.record_from_rows(payload["rows"], genesis=EXPERIMENT_START_DATE, as_of=str(EXPERIMENT_START_DATE))
 
 
 def _agree_coach_record_rows(produced, consumed):
@@ -1183,6 +1187,10 @@ KNOWN_MUST_AGREE_PAIRS = (
     "source_freshness -> the absent coach (engine gate + v7 darkCoaches)",
     # E2 / #4189 — the morning note: the owner's door and the coach fact read one row.
     "morning note row -> the coach fact",
+    # #5353 — the Apple Watch workout map and the three Zone 2 readers that zone its bins.
+    "apple_workouts map -> /api/zone2 Apple leg",
+    "apple_workouts map -> MCP get_zone2_breakdown Apple leg",
+    "apple_workouts map -> MCP periodization weekly Zone 2",
 )
 
 
@@ -1268,9 +1276,277 @@ register(
     )
 )
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #5353 — the Apple Watch workout map -> the three Zone 2 readers
+# ══════════════════════════════════════════════════════════════════════════════
+# Producer: the REAL #4973 writer `write_apple_workouts`, over a stateful stand-in for the
+# table that applies its SET expression (plain + if_not_exists), so the payload is the stored
+# apple_health DAY row — `apple_workouts` map, Decimals and all — exactly as DynamoDB returns it.
+# The INPUT is one HAE-shaped workout (vendor keys as in tests/fixtures/hae_workouts_mixed_4973.json):
+# a Sunday-evening Pacific walk whose UTC start is already Monday, so the writer files it under
+# the Monday DATE# while every reader must date it Sunday (Pacific, from `start`) — the day-frame
+# seam a reader falling back to the row's sk would get wrong, in a different ISO week.
+#
+# Consumers: the three modules #5353 taught to read the map — /api/zone2's payload builder, the
+# MCP `get_zone2_breakdown` tool and the MCP periodization weekly Zone 2 — each driven for real,
+# the transport (`query_source`) answering with the produced row. The minutes must equal the
+# writer's own bins zoned at the default maximum through `common.hr_zones`, the date must be the
+# Pacific day of the writer's `start`, and (where the reader surfaces it) the sport must be the
+# writer's `name`.
+
+_APPLE_WALK_ID = "PC-WLK-5357"
+_APPLE_WALK = {
+    "id": _APPLE_WALK_ID,
+    "name": "Outdoor Walk",
+    "start": "2026-10-18 17:30:00 -0700",  # Sunday PT = 2026-10-19 00:30Z, a Monday UTC day key
+    "end": "2026-10-18 18:10:00 -0700",
+    "duration": 2400.0,
+    "heartRateData": [
+        {
+            "Avg": 118,
+            "Max": 121,
+            "Min": 115,
+            "date": f"2026-10-18 17:{30 + i:02d}:00 -0700" if i < 30 else f"2026-10-18 18:{i - 30:02d}:00 -0700",
+            "units": "bpm",
+        }
+        for i in range(40)
+    ],
+}
+_APPLE_PK = "USER#matthew#SOURCE#apple_health"
+
+
+class _SetApplyingTable:
+    """Applies the writer's `SET #a = :v, #b = if_not_exists(#b, :w)` to one in-memory item per key."""
+
+    def __init__(self):
+        self.items = {}
+
+    def get_item(self, Key=None, **_kw):  # noqa: N803
+        item = self.items.get(Key["sk"])
+        return {"Item": dict(item)} if item else {}
+
+    def update_item(
+        self, Key=None, UpdateExpression="", ExpressionAttributeNames=None, ExpressionAttributeValues=None, **_kw
+    ):  # noqa: N803
+        import re
+
+        item = self.items.setdefault(Key["sk"], {"pk": Key["pk"], "sk": Key["sk"]})
+        for attr, rhs, guarded in re.findall(r"(#\w+) = (if_not_exists\(#\w+, (:\w+)\)|:\w+)", UpdateExpression[4:]):
+            name = ExpressionAttributeNames[attr]
+            if guarded:
+                item.setdefault(name, ExpressionAttributeValues[guarded])
+            else:
+                item[name] = ExpressionAttributeValues[rhs]
+        return {}
+
+
+def _produce_apple_workouts():
+    for k, v in (("S3_BUCKET", "matthew-life-platform"), ("DYNAMODB_TABLE", "life-platform"), ("AWS_DEFAULT_REGION", "us-west-2")):
+        os.environ.setdefault(k, v)
+    from ingestion import health_auto_export_lambda as hae, health_auto_export_workouts as hw
+
+    table = _SetApplyingTable()
+    # day_of is the webhook's own frame (`parse_date_str`: the UTC day of the start, TD-19), as `ingest` passes it.
+    written = hw.write_apple_workouts(
+        [_APPLE_WALK], table, hae.parse_date_str, lambda d: {"pk": _APPLE_PK, "sk": f"DATE#{d}"}, phase_for_date=None
+    )
+    assert written == 1 and list(table.items) == ["DATE#2026-10-19"], table.items
+    return table.items["DATE#2026-10-19"]
+
+
+def _apple_expected(row):
+    """What every reader must say about the produced row: minutes from the writer's own bins, the
+    Pacific day of the writer's `start`, the writer's `name`."""
+    from common.hr_zones import zone_seconds_from_bpm_bins
+    from common.max_hr import DEFAULT_MAX_HR
+    from common.pacific_time import pacific_date_of
+
+    w = row["apple_workouts"][_APPLE_WALK_ID]
+    z2 = round(zone_seconds_from_bpm_bins(w["derived"]["hr_seconds_by_bpm5"], float(DEFAULT_MAX_HR))["zone_2"] / 60.0, 1)
+    return {"zone_2_minutes": z2, "date": pacific_date_of(str(w["start"])), "sport": w["name"]}
+
+
+def _apple_mcp_env():
+    for k, v in (
+        ("TABLE_NAME", "life-platform"),
+        ("AWS_REGION", "us-west-2"),
+        ("S3_BUCKET", "matthew-life-platform"),
+        ("USER_ID", "matthew"),
+    ):
+        os.environ.setdefault(k, v)
+
+
+def _apple_rows_answering(row):
+    def _query_source(source, *_a, **_kw):
+        return [_copy_row(row)] if source == "apple_health" else []
+
+    return _query_source
+
+
+def _copy_row(row):
+    import copy as _copy
+
+    return _copy.deepcopy(row)
+
+
+# ── consumer 1: /api/zone2's payload builder ────────────────────────────────
+
+
+def _consume_apple_zone2_site(row):
+    os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
+    from web import site_api_autonomic as sa
+
+    p = sa._compute_zone2_breakdown([], [], [], today="2026-10-24", start_date="2026-09-01", apple_items=[_copy_row(row)])
+    if not p.get("available"):
+        return {"available": False}
+    return {
+        "available": True,
+        "zone_2_minutes": p["summary"]["total_zone_2_min"],
+        "unmeasured": p["summary"]["unmeasured_sessions"],
+        "date": p["period"]["start_date"],
+        "week": p["weeks"][0]["week_start"] if p["weeks"] else None,
+        "sports": sorted(s["sport_type"] for s in p["sport_breakdown"]),
+    }
+
+
+def _agree_apple_zone2_site(produced, consumed):
+    exp = _apple_expected(produced)
+    assert consumed["available"], consumed
+    assert consumed["zone_2_minutes"] == exp["zone_2_minutes"] > 0, (consumed, exp)
+    assert consumed["unmeasured"] == 0
+    assert consumed["date"] == exp["date"] == "2026-10-18", "the reader dates the walk by its Pacific start, not the UTC row key"
+    assert consumed["week"] == "2026-10-12", "a Sunday walk belongs to the week it was walked in"
+    assert consumed["sports"] == [exp["sport"]]
+
+
+register(
+    PairContract(
+        name="apple_workouts map -> /api/zone2 Apple leg",
+        producer="ingestion.health_auto_export_workouts::write_apple_workouts",
+        consumer="web.site_api_autonomic::_compute_zone2_breakdown",
+        partition="apple_health",
+        produce=_produce_apple_workouts,
+        consume=_consume_apple_zone2_site,
+        agree=_agree_apple_zone2_site,
+        mutations=(
+            Mutation(("apple_workouts", _APPLE_WALK_ID, "derived", "hr_seconds_by_bpm5"), "drop", why="the bins ARE the minutes"),
+            Mutation(
+                ("apple_workouts", _APPLE_WALK_ID, "start"),
+                "rename",
+                to="startDate",
+                why="the day frame — a missing start falls back to the UTC row key, a day and a week late",
+            ),
+            Mutation(("apple_workouts", _APPLE_WALK_ID, "name"), "rename", to="workoutName", why="the sport the public breakdown names"),
+            Mutation(("apple_workouts",), "rename", to="workouts", why="the map itself — the field the writer owns on the shared day row"),
+        ),
+        note="#5353 / #4973: the public payload carries minutes, dates and the sport only — never a bin or an id (tests/test_zone2_apple_leg_5353.py).",
+    )
+)
+
+
+# ── consumer 2: the MCP get_zone2_breakdown tool ────────────────────────────
+
+
+def _consume_apple_zone2_mcp(row):
+    _apple_mcp_env()
+    from mcp import tools_correlation as tc
+
+    saved = tc.query_source
+    tc.query_source = _apple_rows_answering(row)
+    try:
+        out = tc.tool_get_zone2_breakdown({"start_date": "2026-10-12", "end_date": "2026-10-25"})
+    finally:
+        tc.query_source = saved
+    if "error" in out:
+        return {"error": out["error"]}
+    acts = [a for w in out["weekly_breakdown"] for a in w["zone_2_activities"]] if "weekly_breakdown" in out else None
+    return {"zone_2_minutes": out["summary"]["total_zone_2_min"], "activities": acts}
+
+
+def _agree_apple_zone2_mcp(produced, consumed):
+    exp = _apple_expected(produced)
+    assert "error" not in consumed, consumed
+    assert consumed["zone_2_minutes"] == exp["zone_2_minutes"] > 0, (consumed, exp)
+    assert consumed["activities"] == [
+        {"date": exp["date"], "sport": exp["sport"], "minutes": consumed["activities"][0]["minutes"], "source": "apple_health"}
+    ], consumed
+    assert round(consumed["activities"][0]["minutes"], 1) == exp["zone_2_minutes"]
+
+
+register(
+    PairContract(
+        name="apple_workouts map -> MCP get_zone2_breakdown Apple leg",
+        producer="ingestion.health_auto_export_workouts::write_apple_workouts",
+        consumer="mcp.tools_correlation::tool_get_zone2_breakdown",
+        partition="apple_health",
+        produce=_produce_apple_workouts,
+        consume=_consume_apple_zone2_mcp,
+        agree=_agree_apple_zone2_mcp,
+        mutations=(
+            Mutation(("apple_workouts", _APPLE_WALK_ID, "derived", "hr_seconds_by_bpm5"), "drop", why="the bins ARE the minutes"),
+            Mutation(
+                ("apple_workouts", _APPLE_WALK_ID, "start"), "drop", why="the day frame — the activity is re-dated to the UTC row key"
+            ),
+            Mutation(
+                ("apple_workouts", _APPLE_WALK_ID, "name"), "rename", to="workoutName", why="the sport each Zone 2 activity is listed under"
+            ),
+        ),
+        note="#5353: the owner's MCP tool reads the same map /api/zone2 reads, through the same zone2_minutes resolver.",
+    )
+)
+
+
+# ── consumer 3: the MCP periodization weekly Zone 2 ─────────────────────────
+
+
+def _consume_apple_zone2_weekly(row):
+    _apple_mcp_env()
+    from mcp import tools_training as tt
+
+    saved = tt.query_source
+    tt.query_source = _apple_rows_answering(row)
+    try:
+        return tt._zone2_by_iso_week([], "2026-10-12", "2026-10-25")
+    finally:
+        tt.query_source = saved
+
+
+def _agree_apple_zone2_weekly(produced, consumed):
+    exp = _apple_expected(produced)
+    assert set(consumed) == {"2026-W42"}, f"the Sunday-PT walk is ISO week 42, not the UTC row key's week 43: {consumed}"
+    assert round(consumed["2026-W42"], 1) == exp["zone_2_minutes"] > 0, (consumed, exp)
+
+
+register(
+    PairContract(
+        name="apple_workouts map -> MCP periodization weekly Zone 2",
+        producer="ingestion.health_auto_export_workouts::write_apple_workouts",
+        consumer="mcp.tools_training::_zone2_by_iso_week",
+        partition="apple_health",
+        produce=_produce_apple_workouts,
+        consume=_consume_apple_zone2_weekly,
+        agree=_agree_apple_zone2_weekly,
+        mutations=(
+            Mutation(("apple_workouts", _APPLE_WALK_ID, "derived", "hr_seconds_by_bpm5"), "drop", why="the bins ARE the minutes"),
+            Mutation(
+                ("apple_workouts", _APPLE_WALK_ID, "start"), "drop", why="the day frame — the minutes move to the UTC row key's ISO week"
+            ),
+            Mutation(
+                ("apple_workouts", _APPLE_WALK_ID, "derived"),
+                "retype",
+                to={},
+                why="a summary with no derived block is unmeasured, not zero",
+            ),
+        ),
+        note="#5353: view=periodization's polarization reads weekly Zone 2 from the same resolver; the week is the Pacific week of the start.",
+    )
+)
+
+
 #: The enrollment ratchet (see the sweep's module docstring for why this, and not
 #: a 299-entry exemption ledger, is the coverage instrument). Raise it in the same
 #: PR that enrolls a pair; it may never be lowered.
-ENROLLED_FLOOR = 12  # 9 -> 10 (2026-09-26, #4217: the absent coach) -> 11 (2026-09-27, #4220: the one record) -> 12 (2026-09-27, #4189: the morning note)
+ENROLLED_FLOOR = 15  # 9 -> 10 (2026-09-26, #4217: the absent coach) -> 11 (2026-09-27, #4220: the one record) -> 12 (2026-09-27, #4189: the morning note) -> 15 (2026-10-24, #5353: the apple_workouts map -> the three Zone 2 readers)
 
 __all__ = ["ENROLLED_FLOOR", "KNOWN_MUST_AGREE_PAIRS"]

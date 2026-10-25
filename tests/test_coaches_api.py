@@ -802,6 +802,9 @@ def _assert_obituaries_are_the_record(short_id, record, wrong):
 
 
 def test_4220_the_four_endpoints_serve_one_record_per_coach(monkeypatch):
+    from coach import coach_record
+
+    monkeypatch.setattr(coach_record, "today_pt", lambda: _day(20))  # #5356: the as-of day, frozen
     table, rows = _write_live_0926_wire(monkeypatch)
     served = _served_four(monkeypatch, table)
     coaches, calibration, predictions, wrong = served
@@ -809,7 +812,9 @@ def test_4220_the_four_endpoints_serve_one_record_per_coach(monkeypatch):
     webb = _assert_one_record("nutrition", *served)
     assert webb == {"confirmed": 0, "refuted": 5, "n": 5, "through": _day(20)}
     brandt = _assert_one_record("explorer", *served)
-    assert brandt == {"confirmed": 3, "refuted": 1, "n": 4, "through": _day(19)}
+    # #5356: Brandt's latest grade is day 19 but no call of his is open and due, so his record
+    # is complete through the frozen as-of day, the same day as Webb's.
+    assert brandt == {"confirmed": 3, "refuted": 1, "n": 4, "through": _day(20)}
     # Every operational coach, not just the two the issue named.
     for c in calibration["coaches"]:
         if f"{c['coach_id']}_coach" in {x["persona_id"] for x in coaches["coaches"]}:
@@ -828,7 +833,7 @@ def test_4220_the_four_endpoints_serve_one_record_per_coach(monkeypatch):
     from coach.coach_record import day_words
 
     assert roster["nutrition_coach"]["headline_stat"] == f"0 of 5 checked calls right through {day_words(_day(20))}"
-    assert roster["explorer_coach"]["headline_stat"] == f"3 of 4 checked calls right through {day_words(_day(19))}"
+    assert roster["explorer_coach"]["headline_stat"] == f"3 of 4 checked calls right through {day_words(_day(20))}"
     assert "%" not in roster["nutrition_coach"]["headline_stat"]
 
 
@@ -1090,8 +1095,12 @@ def test_4220_obituaries_are_the_records_refutations_on_the_live_wire(monkeypatc
     assert sum("dispute docket on August 10" in o["what_changed"] for o in before["obituaries"]) == 20
 
     records = {r["coach"]: r for r in wrong["predictions"]["by_coach"]}
-    # The record itself is unchanged by this fix — it is what the live ledger served.
-    assert {c: records[c] for c in records} == {r["coach"]: r for r in before["by_coach"]}
+    # The record's counts are unchanged by this fix — they are what the live ledger served.
+    # #5356 re-defined ``through`` (the day the record is complete through, never earlier
+    # than the latest grade the live wire dated it by), so it is compared as a bound.
+    counts = ("coach", "confirmed", "refuted", "n")
+    assert {c: {k: records[c][k] for k in counts} for c in records} == {r["coach"]: {k: r[k] for k in counts} for r in before["by_coach"]}
+    assert all(records[r["coach"]]["through"] >= r["through"] for r in before["by_coach"] if r.get("through"))
     for coach in ("explorer", "nutrition"):
         _assert_obituaries_are_the_record(coach, records[coach], wrong)
     assert records["explorer"]["refuted"] == 3
@@ -1149,7 +1158,14 @@ def test_4220_a_prediction_resolves_once_and_in_the_cycle_it_resolved_in():
 
     once = cr.resolved_once(rows)
     assert [r["sk"] for r in once] == ["PREDICTION#p2", "PREDICTION#p3", "PREDICTION#p1", "PREDICTION#p4"]
-    assert cr.record_from_rows(rows, genesis=EXPERIMENT_START) == {"confirmed": 0, "refuted": 1, "n": 1, "through": _day(12)}
+    # #5356: ``through`` is the day the record is complete through — the as-of day here, since
+    # the one open call (p3) carries no created_date and so is not a call the grader owes.
+    assert cr.record_from_rows(rows, genesis=EXPERIMENT_START, as_of=_day(14)) == {
+        "confirmed": 0,
+        "refuted": 1,
+        "n": 1,
+        "through": _day(14),
+    }
     assert cr.record_from_rows(rows, genesis=EXPERIMENT_START, career=True) == {"confirmed": 2, "refuted": 1, "n": 3, "through": _day(12)}
     # The pre-genesis original is visible (no stamp) and still excluded: resolved_date < genesis.
     assert cr.counts_this_cycle(original, EXPERIMENT_START) is False

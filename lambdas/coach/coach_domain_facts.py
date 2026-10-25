@@ -191,7 +191,23 @@ def _sleep_pack(table, today: str) -> list:
     if len(durations) >= 3:
         avg = sum(v for _, v in durations) / len(durations)
         lines.append(f"Average over the last {len(durations)} recorded nights: {round(avg, 1)} h.")
-    return lines
+    return lines + _watch_lines(table, today, "sleep", rows)
+
+
+def _watch_lines(table, today: str, domain: str, whoop_rows: list) -> list:
+    """#4979: the Apple Watch's signals for this domain, source-labelled and dated, with Whoop beside it
+    where both wrists measure the metric (`health.watch_signals`, audience OWNER_AI: this block feeds the
+    owner's own thread, so INTERNAL fields may appear and no OWNER_ONLY field ever does). Fail-soft: []."""
+    try:
+        from health import watch_signals
+
+        start = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=watch_signals.ARC_DAYS - 1)).strftime("%Y-%m-%d")
+        apple = _query_source(table, watch_signals.APPLE, start, today)
+        garmin = _query_source(table, "garmin", start, today) if domain == "training" else []
+        return watch_signals.fact_lines(apple, whoop_rows, today, audience=watch_signals.OWNER_AI, domain=domain, garmin_rows=garmin)
+    except Exception as e:  # noqa: BLE001 — the pack runs without the watch lines
+        logger.warning("[domain_facts] watch signals unavailable: %s", e)
+        return []
 
 
 # ── Performance: recovery trend + the last real session ──────────────────────
@@ -200,7 +216,8 @@ def _sleep_pack(table, today: str) -> list:
 def _physical_pack(table, today: str) -> list:
     d7 = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=6)).strftime("%Y-%m-%d")
     lines: list = []
-    rec = [_num(i.get("recovery_score")) for i in _query_source(table, "whoop", d7, today)]
+    whoop7 = _query_source(table, "whoop", d7, today)
+    rec = [_num(i.get("recovery_score")) for i in whoop7]
     rec = [r for r in rec if r is not None]
     if len(rec) >= 3:
         lines.append(f"Whoop recovery, 7-day average: {round(sum(rec) / len(rec))}% over {len(rec)} recorded days.")
@@ -213,7 +230,13 @@ def _physical_pack(table, today: str) -> list:
         lines.append(f"Last logged lift: {when}" + (f" ({name})." if name else "."))
     else:
         lines.append("No logged lifts in the last 14 days — absence of logs, not proof of rest days.")
-    return lines
+    try:  # #4978: the owner-only illness/overload triad this seat weighs before the session (health.illness_triad)
+        from health import illness_triad
+
+        lines.extend(illness_triad.owner_lines(illness_triad.read_recent(table, today), today))
+    except Exception as e:  # noqa: BLE001 — the thread runs without the triad line
+        logger.warning("[domain_facts] illness triad unavailable: %s", type(e).__name__)
+    return lines + _watch_lines(table, today, "training", whoop7)
 
 
 # ── The experiment frame: what day of which cycle this is ────────────────────
