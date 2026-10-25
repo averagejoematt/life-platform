@@ -105,3 +105,27 @@ test("no HR-chart renderer hard-codes the date or names a reason", async () => {
     assert.doesNotMatch(src, /\b(atrial|fibrillation|metoprolol)\b/i, `${f} names a clinical reason`);
   }
 });
+
+test("the training page's resting-HR hero footnotes the baseline change and stops scoring the drop as a win", async () => {
+  const { trainingRHRHero } = await import("../../site/assets/js/evidence_body.js");
+  const html = trainingRHRHero(series, BC);
+  assert.match(html, /<span class="chart-bc-note">baseline change<\/span> Oct 10/, "the footnote renders under the hero chart");
+  assert.equal(breaks(lineD(html, "chart-line")), 2, "the hero line lifts the pen at the change");
+  assert.match(html, /read within each side of the baseline change/);
+  assert.match(html, /the baseline moving, not a fitness gain/);
+  assert.match(html, /since the change it&#39;s drifting down|since the change it's drifting down/);
+  assert.doesNotMatch(html, /down is the win/, "the softened copy replaces the fitness-win line across the break");
+  assert.doesNotMatch(html, /the engine answering/);
+  assert.doesNotMatch(html, FORBIDDEN);
+  // one side only (no change in the window, or every point after it): the original read is unchanged
+  for (const plain of [trainingRHRHero(series), trainingRHRHero(series.slice(5), BC)]) {
+    assert.doesNotMatch(plain, /baseline change/);
+    assert.match(plain, /the engine answering/);
+  }
+});
+
+test("renderTraining hands the pulse_history payload's baseline_change to the hero", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../../site/assets/js/evidence_body.js", import.meta.url), "utf8");
+  assert.match(src, /trainingRHRHero\(\(ph && ph\.pulse_history\) \|\| \[\], \(ph && ph\.baseline_change\) \|\| null\)/);
+});

@@ -141,9 +141,11 @@
   },
   "swallowed-permission-denial": {
     "added": "2026-10-20",
-    "cause": "charter-private-twin-absent-403",
-    "cause_observed": "2026-10-20T05:10:19Z",
-    "citation": "#5220 — the loader's 'training_charter.private.json not read (AccessDenied)' line, once per cold container: the owner-only twin does not exist and the roles lack s3:ListBucket on config/, so S3 answers absence with 403. The nutrition charter waves made more filtered functions read the charter (coach-nudge at 05:10:19Z), so cold starts after the 2026-10-20 deploys lit it. The prior episode (2026-10-03, a qa-smoke share-kit read) was a different cause."
+    "cause": "charter-private-twin-absent-403 — RESOLVED by the charter-twin grant",
+    "cause_observed": "2026-10-25",
+    "updated": "2026-10-25",
+    "citation": "#5220 resolution — the cause (the loader's 'training_charter.private.json not read (AccessDenied)' line on every cold start of a charter-reading function: the owner-only twin is absent and the roles lacked s3:ListBucket on config/, so S3 answered absence with 403) was closed by the charter-twin grant (PR 5354), applied with LifePlatformOperational + LifePlatformServe at 2026-10-25 06:33Z. The last flap episodes (2026-10-25 03:02Z-03:18Z, 04:46Z-05:01Z, 05:31Z-05:46Z, read with describe-alarm-history) all PRECEDE the apply; the alarm has been OK since 05:46:55Z and get-metric-statistics LifePlatform/Lambda SwallowedPermissionDenied (Sum, 1 h) holds no datapoint after the 05:00Z hour (read 08:06Z). PRUNE this entry once the alarm has been OK past the 72h flap window (on or after 2026-10-28) and #5220 closes.",
+    "note": "Prior citation (2026-10-20, cause observed 2026-10-20T05:10:19Z): the open #5220 cause above — the nutrition charter waves made more filtered functions read the charter (coach-nudge at 05:10:19Z), so cold starts after the 2026-10-20 deploys lit it. The episode before that (2026-10-03, a qa-smoke share-kit read) was a different cause."
   },
   "nightly-predraft-missing": {
     "added": "2026-10-04",

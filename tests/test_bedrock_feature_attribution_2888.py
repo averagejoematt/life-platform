@@ -173,7 +173,10 @@ def test_ci_gate_call_sites_are_actually_wired():
         src = fh.read()
     assert '_attributed(bedrock, "visual-ai-qa")' in src, "the vision judge no longer labels its spend"
     assert '_attributed_invoke(bedrock, "reader-truth-qa")' in src, "the reader-truth pass no longer labels its spend"
-    assert "reader_truth_qa.assess_prose(surfaces, truth_invoke" in src, "assess_prose is back on the unlabelled invoke"
+    # #5358: the first pass runs per PT render day through _judge_by_render_day, which receives the
+    # labelled invoke and hands it to every assess_prose call it makes.
+    assert "_judge_by_render_day(reader_truth_qa, surfaces, truth_invoke" in src, "assess_prose is back on the unlabelled invoke"
+    assert "rubric.assess_prose(groups[day], invoke," in src, "the per-day first pass dropped the invoke it was handed"
 
 
 def test_allowlist_matches_the_wired_labels():
