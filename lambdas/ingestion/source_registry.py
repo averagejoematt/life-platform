@@ -350,6 +350,10 @@ DEFAULT_STALE_HOURS = 48
 #                  sub-datatype: `field` holds an instant (epoch seconds), and older
 #                  than `stale_hours` counts toward StaleSourceCount. Read by
 #                  ingestion.watch_presence.check_dead_men(); today only `watch`.
+#                  `device_group` (#4970) names the device whose metric group this entry is
+#                  ("watch"): the day-level groups get their own per-group staleness row
+#                  (`stale_days` is the bar) in get_freshness_status.device_metric_groups,
+#                  read by ingestion.watch_presence.check_metric_groups(). Report-only.
 #                  `evidence_for` (#3294) is the SUB-datatype's answer to the same
 #                  question the source-level facet asks, and apple_health is the one
 #                  source that needs both: every HAE stream shares ONE partition, so a
@@ -989,6 +993,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             # nightly (owner ruling 2026-10-17), so two dark days means a missed capture.
             {
                 "key": "watch_overnight_vitals",
+                "device_group": "watch",
                 "label": "Apple Watch overnight vitals",
                 "fields": ["wrist_temp_sleep_c_apple", "respiratory_rate_apple", "spo2_pct_apple", "breathing_disturbances_apple"],
                 "stale_days": 2,
@@ -999,6 +1004,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             # rest day through the first two.
             {
                 "key": "watch_heart",
+                "device_group": "watch",
                 "label": "Apple Watch heart (HRV / resting / walking HR / cardio recovery)",
                 "fields": ["hrv_sdnn_apple", "resting_heart_rate_apple", "walking_heart_rate_avg", "cardio_recovery_bpm_apple"],
                 "stale_days": 2,
@@ -1007,6 +1013,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             # Activity rings + exposure: every worn waking day carries stand hours at least.
             {
                 "key": "watch_activity",
+                "device_group": "watch",
                 "label": "Apple Watch activity (exercise / stand / effort / daylight / audio)",
                 "fields": [
                     "exercise_minutes_apple",
@@ -1024,6 +1031,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             # estimate stopped, not a missed day.
             {
                 "key": "watch_fitness",
+                "device_group": "watch",
                 "label": "Apple Watch fitness estimates (VO2 max / walking steadiness)",
                 "fields": ["vo2max", "walking_steadiness_pct"],
                 "stale_days": 14,

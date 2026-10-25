@@ -250,6 +250,108 @@ def check_dead_men(
     return rows
 
 
+METRIC_GROUP_LOOKBACK_FLOOR_DAYS = 30
+
+
+def metric_group_specs(device: str = "watch") -> list[dict[str, Any]]:
+    """Registry `hae_datatypes` entries tagged `device_group == device`: {key, label, fields, stale_days}."""
+    from ingestion.source_registry import hae_datatype_thresholds
+
+    return [
+        {"key": str(d["key"]), "label": str(d["label"]), "fields": list(d["fields"]), "stale_days": float(d["stale_days"])}
+        for d in hae_datatype_thresholds()
+        if d.get("device_group") == device
+    ]
+
+
+def evaluate_groups(specs: list[dict[str, Any]], records: list[dict[str, Any]], today: Any) -> list[dict[str, Any]]:
+    """Pure: per-group last-seen day (any-of field present on a DATE# record) and staleness.
+
+    Same rule as the checker's compute_datatype_liveness (stale when age_days > stale_days).
+    A group with no record in the window is `stale` with last_seen None (ADR-104: no invented age).
+    """
+    rows: list[dict[str, Any]] = []
+    for spec in specs:
+        last = None
+        for it in records:
+            sk = str(it.get("sk", ""))
+            if not sk.startswith("DATE#") or not any(it.get(f) is not None for f in spec["fields"]):
+                continue
+            d = sk[5:15]
+            if len(d) == 10 and (last is None or d > last):
+                last = d
+        if last is None:
+            rows.append(
+                {
+                    "key": spec["key"],
+                    "label": spec["label"],
+                    "status": STATUS_STALE,
+                    "last_seen": None,
+                    "age_days": None,
+                    "stale_days": spec["stale_days"],
+                    "detail": f"no {spec['label']} field on any day in the lookback window",
+                }
+            )
+            continue
+        age = (today - datetime.strptime(last, "%Y-%m-%d").date()).days
+        stale = age > spec["stale_days"]
+        rows.append(
+            {
+                "key": spec["key"],
+                "label": spec["label"],
+                "status": STATUS_STALE if stale else STATUS_OK,
+                "last_seen": last,
+                "age_days": age,
+                "stale_days": spec["stale_days"],
+                "detail": f"last {spec['label']} field on {last} ({age}d) {'>' if stale else '<='} {spec['stale_days']:.0f}d bar",
+            }
+        )
+    return rows
+
+
+def check_metric_groups(table: Any, now: datetime, user_id: str = "matthew", device: str = "watch") -> list[dict[str, Any]]:
+    """Per-metric-group staleness for a device, from the registry `device_group` facet.
+
+    One bounded newest-first read of the apple_health partition (window = the widest
+    group bar + 16 days, floor 30); fail-soft: a read error is one `unknown` row per group.
+    """
+    specs = metric_group_specs(device)
+    if not specs:
+        return []
+    window = max(METRIC_GROUP_LOOKBACK_FLOOR_DAYS, int(max(s["stale_days"] for s in specs)) + 16)
+    floor_date = (now.date() - timedelta(days=window)).isoformat()
+    fields = sorted({f for s in specs for f in s["fields"]})
+    kwargs: dict[str, Any] = {
+        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :lo AND :hi",
+        "ExpressionAttributeValues": {":pk": f"USER#{user_id}#SOURCE#apple_health", ":lo": f"DATE#{floor_date}", ":hi": "DATE#~"},
+        "ProjectionExpression": "sk, " + ", ".join(fields),
+        "ScanIndexForward": False,
+    }
+    records: list[dict[str, Any]] = []
+    try:
+        for _ in range(10):
+            resp = table.query(**kwargs)
+            records.extend(cast("list[dict[str, Any]]", resp.get("Items", []) or []))
+            lek = resp.get("LastEvaluatedKey")
+            if not lek:
+                break
+            kwargs["ExclusiveStartKey"] = lek
+    except Exception as e:  # noqa: BLE001
+        return [
+            {
+                "key": s["key"],
+                "label": s["label"],
+                "status": STATUS_UNKNOWN,
+                "last_seen": None,
+                "age_days": None,
+                "stale_days": s["stale_days"],
+                "detail": f"the group check failed ({type(e).__name__}: {e}) - status unknown, not fresh",
+            }
+            for s in specs
+        ]
+    return evaluate_groups(specs, records, now.date())
+
+
 def not_ok(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """The rows that must reach the alarm path (stale or unknown; a pending bootstrap row is not)."""
     return [r for r in rows if r.get("status") not in (STATUS_OK, STATUS_PENDING)]
