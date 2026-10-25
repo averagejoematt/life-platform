@@ -86,3 +86,14 @@ def attach_custom_cardio_notes(ir: Any, target_date: str) -> int:
     except Exception as e:  # noqa: BLE001
         logger.warning(f"draft_custom: cardio cue pass failed ({e}); notes untouched")
         return 0
+
+
+def replaced_note_warnings(ir: Any) -> list[str]:
+    """#5312: one warning per authored cardio note the composer replaced (`inputs_snapshot.cardio_notes_replaced`,
+    written by `training.cardio_cues`), stating the kind it was read as and the kind written."""
+    return [
+        f"Replaced your authored {r.get('movement_key')} note ({str(r.get('notes') or '')[:80]!r}): "
+        f"read as {r.get('old_kind') or 'no recognised kind'}, wrote {r.get('new_kind')}. "
+        "The original is kept on the draft's inputs_snapshot.cardio_notes_replaced."
+        for r in (getattr(ir, "inputs_snapshot", None) or {}).get("cardio_notes_replaced") or []
+    ]

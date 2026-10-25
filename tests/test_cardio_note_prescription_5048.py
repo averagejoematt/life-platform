@@ -110,7 +110,8 @@ def test_the_rewritten_2026_10_18_note_is_two_lines_with_the_prescription_first(
     assert why == "Seated, so the feet rest after 2.8 h on them in 48 h; the week is already 1.7 h over the walking ramp."
     assert len(re.findall(r"[.!?](?:\s|$)", why)) == 1
     # the author's prose is replaced, never silently lost
-    assert spec.inputs_snapshot["cardio_notes_replaced"] == [{"movement_key": "cycling", "notes": FIX["live_note"]}]
+    rep = spec.inputs_snapshot["cardio_notes_replaced"]
+    assert [(r["movement_key"], r["notes"]) for r in rep] == [("cycling", FIX["live_note"])]
 
 
 def test_the_level_is_still_derived_from_the_last_ride_and_the_week_shapes_are_read():
