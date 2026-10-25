@@ -240,6 +240,12 @@
       "stack": "monitoring_silence_alarms",
       "via": "declaration"
     },
+    "field-notes-missing": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "compute_stack",
+      "via": "declaration"
+    },
     "fitness-battery-missed": {
       "kind": "metric",
       "routing": "digest",
@@ -1029,8 +1035,8 @@
   ],
   "cost_surface": {
     "ai_features": 30,
-    "alarms": 142,
-    "emf_namespaces": 33,
+    "alarms": 143,
+    "emf_namespaces": 34,
     "schedules": 97,
     "secrets": 30
   },
@@ -3777,6 +3783,20 @@
       "lambda": "field-notes-generate",
       "module": "lambdas/intelligence/field_notes_lambda.py",
       "partition": "field_notes",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "field-notes-generate",
+      "module": "lambdas/intelligence/field_notes_lambda.py",
+      "partition": "field_notes_held",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "field-notes-generate",
+      "module": "lambdas/intelligence/field_notes_lambda.py",
+      "partition": "field_notes_held",
       "via": "pk"
     },
     {
@@ -8085,9 +8105,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead"
     },
     "counts": {
-      "alarms": 142,
+      "alarms": 143,
       "alarms_by_routing": {
-        "digest": 97,
+        "digest": 98,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
@@ -8099,7 +8119,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 785,
+      "edges": 787,
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
@@ -8114,8 +8134,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 387,
-        "sites_resolved": 987,
-        "sites_total": 1374
+        "sites_resolved": 990,
+        "sites_total": 1377
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8125,6 +8145,7 @@
     "non_census_families": [
       "coach_credibility",
       "coach_thread",
+      "field_notes_held",
       "intelligence_quality",
       "journal",
       "platform_memory",

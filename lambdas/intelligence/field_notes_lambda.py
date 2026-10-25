@@ -29,6 +29,12 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 FN_PK = f"{USER_PREFIX}field_notes"
+# #5128: a HELD edition's marker lives in its OWN partition. /api/field_notes list mode queries FN_PK
+# whole, so a marker row there would render as a bogus week; the reader never touches this one.
+FN_HELD_PK = f"{USER_PREFIX}field_notes_held"
+METRIC_NAMESPACE = "LifePlatform/FieldNotes"
+METRIC_NAME = "FieldNotesOutcome"
+METRIC_DIMENSION = {"Job": "field_notes_generate"}
 AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/ai-keys")
 from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
 
@@ -430,6 +436,75 @@ def _note_grounding_findings(analysis, prompt):
     return findings
 
 
+def emit_outcome(value):
+    """#5128 dead-man heartbeat (EMF, one stdout line — no PutMetricData grant needed).
+
+    1 = an edition exists for the week (written now, or already there); 0 = held or crashed.
+    The `field-notes-missing` alarm reads Sum < 1 over 7 daily buckets with missing = BREACHING, so
+    a dead cron (no datapoint) and a held/failed edition (only zeros) both breach. Fail-soft."""
+    try:
+        print(
+            json.dumps(
+                {
+                    "_aws": {
+                        "Timestamp": int(datetime.now(timezone.utc).timestamp() * 1000),
+                        "CloudWatchMetrics": [
+                            {
+                                "Namespace": METRIC_NAMESPACE,
+                                "Dimensions": [sorted(METRIC_DIMENSION)],
+                                "Metrics": [{"Name": METRIC_NAME, "Unit": "Count"}],
+                            }
+                        ],
+                    },
+                    **METRIC_DIMENSION,
+                    METRIC_NAME: 1 if value else 0,
+                }
+            )
+        )
+    except Exception:  # noqa: BLE001 — the heartbeat is never load-bearing for the generation itself
+        pass
+
+
+def write_held_marker(iso_week, reason, detail, findings=0):
+    """#5128: a held edition leaves a visible row — `generated: false, reason, detail` — so the
+    absence is explained (and a later manual invoke knows why). Fail-soft; never in FN_PK."""
+    try:
+        table.put_item(
+            Item={
+                "pk": FN_HELD_PK,
+                "sk": f"WEEK#{iso_week}",
+                "week": iso_week,
+                "generated": False,
+                "reason": reason,
+                "detail": str(detail)[:500],
+                "n_findings": findings,
+                "held_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+    except Exception as e:  # noqa: BLE001 — the marker is evidence, never a reason to crash the hold path
+        logger.warning(f"[field_notes] held marker write failed ({type(e).__name__}): {e}")
+
+
+def clear_held_marker(iso_week):
+    """A later successful run supersedes the marker — only if one exists (conditional update: no
+    read, no DeleteItem grant needed; a missing marker is the normal case and not an error)."""
+    try:
+        table.update_item(
+            Key={"pk": FN_HELD_PK, "sk": f"WEEK#{iso_week}"},
+            UpdateExpression="SET generated = :t, reason = :r, detail = :d, resolved_at = :at",
+            ConditionExpression="attribute_exists(pk)",
+            ExpressionAttributeValues={
+                ":t": True,
+                ":r": "resolved",
+                ":d": "a later run wrote the edition",
+                ":at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+    except Exception as e:  # noqa: BLE001 — ConditionalCheckFailed (no marker) is the normal path
+        if "ConditionalCheckFailed" not in f"{type(e).__name__} {e}":
+            logger.warning(f"[field_notes] held marker clear failed ({type(e).__name__})")
+
+
 def generate_field_notes(iso_week):
     start, end = week_bounds(iso_week)
     logger.info(f"Generating field notes for {iso_week} ({start} to {end})")
@@ -500,6 +575,7 @@ def generate_field_notes(iso_week):
             # surface reads the WEEK# row, so an absent row is an absent note, never
             # failed text. A later manual invoke can regenerate the week.
             logger.warning(f"[grounding] HELD {iso_week}: {len(findings)} finding(s) after the one rewrite — {detail}")
+            write_held_marker(iso_week, "grounding_held", detail, len(findings))
             return {"status": "held", "week": iso_week, "findings": len(findings)}
 
     now = datetime.now(timezone.utc).isoformat()
@@ -519,6 +595,7 @@ def generate_field_notes(iso_week):
         item["ai_affirming"] = analysis["ai_affirming"]
 
     table.put_item(Item=item)
+    clear_held_marker(iso_week)
     logger.info(f"Wrote field notes for {iso_week}: {len(item.get('ai_present', ''))} chars")
 
     # #1441: generation-time archive — the published note fields exactly as the
@@ -546,7 +623,10 @@ def lambda_handler(event: dict, context) -> dict:
 
     try:
         result = generate_field_notes(iso_week)
+        emit_outcome(result.get("status") in ("ok", "already_exists"))
         return {"statusCode": 200, "body": json.dumps(result)}
     except Exception as e:
         logger.error(f"Failed to generate field notes for {iso_week}: {e}")
+        write_held_marker(iso_week, "generation_failed", f"{type(e).__name__}: {e}")
+        emit_outcome(False)
         return {"statusCode": 500, "body": json.dumps({"error": str(e), "week": iso_week})}

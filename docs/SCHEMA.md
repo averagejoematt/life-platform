@@ -2525,6 +2525,8 @@ Weekly AI-vs-Matthew lab notebook. AI generates three paragraphs every Sunday; M
 
 Access via `get_field_notes`, `log_field_note_response` MCP tools.
 
+**Held-edition marker (#5128):** `pk: USER#matthew#SOURCE#field_notes_held`, `sk: WEEK#<iso-week>` — written when the grounding gate holds an edition (`generated: false, reason: grounding_held`) or the run crashes (`reason: generation_failed`); fields `week`, `generated`, `reason`, `detail`, `n_findings`, `held_at`. A later successful run flips it to `generated: true, reason: resolved`. A separate partition on purpose: `/api/field_notes` list mode queries the whole `field_notes` pk. Read by nothing but the owner/ops.
+
 ---
 
 ## Ledger Partition (BL-03, v4.6.0)
