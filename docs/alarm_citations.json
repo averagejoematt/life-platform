@@ -214,5 +214,33 @@
     "added": "2026-10-23",
     "cause": "the composite liveness view of the same Strava episode (RunSuccess 0 on each errored run)",
     "citation": "#5255 — same episode as ingest-consecutive-failures-strava: ALARM 2026-10-21 10:11 PT → OK 2026-10-22 10:11 PT. Expiry: re-cite if it fires again before #5255 is fixed."
+  },
+  "ingest-reconciliation-strava": {
+    "added": "2026-10-25",
+    "cause_observed": "2026-10-25",
+    "cause": "strava store-vs-vendor reconcile: three backdated walks Strava holds that the store lacks",
+    "citation": "#5257 — three backdated Strava walks (created ~10-21, local clock +9 h) the store lacks; deleting the duplicates is an owner phone act (owner acts list, Session CE). Self-clears once they leave the 14-day reconcile window (~10-27/28) or are deleted.",
+    "note": "Read from the alarm's StateReason (3 missing, 2026-10-20 17:21Z datapoint) and #5257's evidence; a Session CE audit found two duplicates remain (20673636264, 20673636369)."
+  },
+  "ingestion-error-og-image-generator": {
+    "added": "2026-10-25",
+    "cause_observed": "2026-10-24",
+    "cause": "one og-image-generator error episode, 2026-10-24 19:31Z → 20:31Z, self-cleared",
+    "citation": "self-clearing single episode (describe-alarm-history: OK→ALARM 2026-10-24T19:31:52Z, ALARM→OK 20:31:52Z); filter-log-events on /aws/lambda/og-image-generator 19:20–19:40Z printed no error line, so the cause is unread — re-cite with #N if it recurs.",
+    "note": "Session CE, 2026-10-25."
+  },
+  "panel-weekly-grade-missing": {
+    "added": "2026-10-25",
+    "cause_observed": "2026-10-25",
+    "cause": "new dead-man created with missing data = BREACHING until its first datapoint",
+    "citation": "#5072 — alarm created by the owner-approved LifePlatformMcp apply at 2026-10-25T06:29Z; ALARM by design (no PanelGradeOutcome datapoint yet) until the forced panel_weekly_grade run at 14:05Z wrote PANEL#2026-10-24 and PanelGradeOutcome=1, then cleared.",
+    "note": "Read from describe-alarm-history and the CloudWatch metric LifePlatform/HevyRoutine PanelGradeOutcome, Session CE."
+  },
+  "qa-smoke-warnings": {
+    "added": "2026-10-25",
+    "cause_observed": "2026-10-25",
+    "cause": "data:pk_family_census",
+    "citation": "#5128 — SOURCE#field_notes_held (the held-edition marker partition added by PR 5342) was UNCLASSIFIED by phase_taxonomy; fixed by PR 5364 (EXPERIMENT_SCOPED + reset wipe). Earlier in the episode the cause was the 3 stale food-delivery check-in questions, retired 2026-10-25T03:15:53Z.",
+    "note": "Live cause read from the qa-smoke log CAUSE line '[QA] CAUSE warn 7874a28b data:pk_family_census' (filter-log-events, /aws/lambda/life-platform-qa-smoke, 2026-10-25)."
   }
 }
