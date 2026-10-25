@@ -249,10 +249,10 @@ def _tg_body(payload: dict) -> tuple:
     return urllib.parse.urlencode(payload).encode(), "application/x-www-form-urlencoded"
 
 
-def _tg(token: str, method: str, payload: dict) -> None:
+def _tg(token: str, method: str, payload: dict) -> bool:
     """One Telegram Bot API call. Fire-and-log — a failed typing indicator or even a
     failed send must never crash the worker into Lambda retries (which would re-run
-    inference and double-charge the budget for one message)."""
+    inference and double-charge the budget for one message). True = it went through (#5203)."""
     try:
         data, content_type = _tg_body(payload)
         req = urllib.request.Request(
@@ -262,8 +262,15 @@ def _tg(token: str, method: str, payload: dict) -> None:
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             r.read()
+        return True
     except Exception as e:
         logger.warning("[telegram] %s failed: %s", method, e)
+        return False
+
+
+# One plain fixed-text message (the calibration dead-man, the evening prompt): no model, any tier; False = not delivered.
+def _send_text(token: str, chat_id, text: str) -> bool:
+    return _tg(token, "sendMessage", {"chat_id": chat_id, "text": text})
 
 
 def _react(token: str, chat_id, message_id, persona_id: str, coach_name: str, text: str, thread: list) -> bool:
@@ -1048,9 +1055,7 @@ def _event_outbound() -> dict:
     from coach import calibration_deadman_alert, coach_event_triggers
 
     # #5203: the calibration dead-man goes first, as plain text, at ANY budget tier (no model call). Never raises.
-    deadman = calibration_deadman_alert.run(
-        _table(), _pacific_now(), _bot_seat, lambda tok, chat, t: _tg(tok, "sendMessage", {"chat_id": chat, "text": t})
-    )
+    deadman = calibration_deadman_alert.run(_table(), _pacific_now(), _bot_seat, _send_text)
     out = coach_event_triggers.run_sweep(
         now_pt=_pacific_now(),
         table=_table(),
@@ -1060,7 +1065,8 @@ def _event_outbound() -> dict:
         tier=_current_tier(),
     )
     _emit_metric(EVENT_SWEEP_METRIC, EVENT_SWEEP_DIMENSION, float(out.get("candidates") or 0))
-    logger.info("[telegram] event sweep done (reason=%s candidates=%s)", out.get("reason"), out.get("candidates"))
+    dm = deadman["reason"]  # one grep tells the whole 16:00Z story (#5203)
+    logger.info("[telegram] event sweep done (reason=%s candidates=%s deadman=%s)", out.get("reason"), out.get("candidates"), dm)
     return {**out, "calibration_deadman": deadman}
 
 
@@ -1139,9 +1145,7 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
     if (event or {}).get("kind") == "evening_checkin":  # #5106: one fixed prompt, deterministic (coach.evening_checkin)
         from coach import evening_checkin
 
-        return evening_checkin.run_prompt(
-            _table(), _pacific_now(), _bot_seat, lambda tok, chat, t: _tg(tok, "sendMessage", {"chat_id": chat, "text": t})
-        )
+        return evening_checkin.run_prompt(_table(), _pacific_now(), _bot_seat, _send_text)
 
     order = event or {}
     coach_id = order.get("coach_id")
