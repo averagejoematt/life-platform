@@ -26,6 +26,14 @@ the ONE function every reader already goes through, so a mode change is a regist
     same rule that keeps a device's 0 from zeroing a day another device counted).
 Which mode a metric gets is the owner's ruling (#4975 gate:owner, after the #4974 agreement
 study); every facet on main is on `primary`.
+
+Dual wear (#4979). `dual_wear` is the ONE place a second instrument's value for a resolved
+metric is read: every source in the facet's `fallback_order` AND every `companions` source,
+each labelled, plus the blend the facet's `blend` state allows. The owner ruled 2026-10-23
+"track both, then blend" (a blend per metric only once #4974 shows agreement) and "HRV is
+never blended" — so `blend: never` reports both readings and no blended value, `pending`
+reports both and says why there is no blend yet, and `active` is exactly `resolve` under mode
+`mean`. A companion is never consulted by `resolve`, so no existing answer moves.
 """
 
 from __future__ import annotations
@@ -39,6 +47,9 @@ from ingestion.source_registry import metric_truth, source_label
 
 STEPS = "steps"
 VO2_MAX = "vo2_max"
+HRV_MS = "hrv_ms"  # #4979: the dual-wear metric names (registry facet keys)
+RHR_BPM = "rhr_bpm"
+SLEEP_HOURS = "sleep_hours"
 
 
 @dataclass(frozen=True)
@@ -305,3 +316,89 @@ def steps_label() -> str:
     """Human label for the precedence, derived from the facet (e.g. for a 'source' caption)."""
     order = sources_for(STEPS)
     return ", else ".join(source_label(s) for s in order)
+
+
+# ── dual wear: both instruments labelled, the ruled blend (#4979) ────────────────
+
+
+@dataclass(frozen=True)
+class Reading:
+    """One instrument's value for a metric on one day, labelled by source."""
+
+    source: str
+    label: str
+    field: str
+    value: Optional[float]
+    unit: str
+    role: str  # "truth" (in fallback_order) or "companion"
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"source": self.source, "label": self.label, "field": self.field, "value": self.value, "unit": self.unit, "role": self.role}
+
+
+@dataclass(frozen=True)
+class DualWear:
+    """One day's readings for a metric from every instrument the registry names, and the blend."""
+
+    metric: str
+    readings: tuple[Reading, ...]
+    truth: Resolution
+    blend: str
+    blend_value: Optional[float]
+    blend_reason: str
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "metric": self.metric,
+            "readings": [r.as_dict() for r in self.readings],
+            "blend": {"state": self.blend, "value": self.blend_value, "reason": self.blend_reason},
+        }
+
+
+def _companion_value(raw: Any) -> Optional[float]:
+    """A companion physiological reading: 0 or negative is a failed measurement, absent (ADR-104)."""
+    v = _num(raw)
+    return v if v is not None and v > 0 else None
+
+
+def dual_wear(metric: str, rows: Mapping[str, Optional[Mapping[str, Any]]]) -> DualWear:
+    """`metric` on one day from `{source_id: stored DATE# row or None}` — every truth source
+    and every companion, labelled; the blend per the facet's `blend` state."""
+    facet = metric_truth(metric)
+    truth = resolve(metric, rows)
+    labels, units = facet["labels"], facet["companion_units"]
+    readings = [
+        Reading(src, labels.get(src) or source_label(src), facet["field_by_source"][src], truth.candidates.get(src), facet["unit"], "truth")
+        for src in facet["fallback_order"]
+    ]
+    for src, fld in facet["companions"].items():
+        row = rows.get(src) or {}
+        readings.append(
+            Reading(
+                src, labels.get(src) or source_label(src), fld, _companion_value(row.get(fld)), units.get(src, facet["unit"]), "companion"
+            )
+        )
+    state = facet["blend"]
+    if state == "active":
+        value = truth.value if truth.n_sources >= 2 else None
+        why = truth.reason if value is not None else f"blend needs two instruments; {truth.reason}"
+        return DualWear(metric, tuple(readings), truth, state, value, why)
+    why = facet.get("blend_reason") or facet.get("blend_ruling") or "no blend ruled for this metric"
+    if state == "pending" and not facet["companions"]:
+        why = "one instrument only — nothing to blend"
+    return DualWear(metric, tuple(readings), truth, state, None, why)
+
+
+def dual_wear_by_date(metric: str, rows_by_source: Mapping[str, Iterable[Mapping[str, Any]]]) -> dict[str, DualWear]:
+    """`dual_wear` for every date present in `{source_id: [stored DATE# rows]}` (day rows only;
+    the last day row per source and date answers)."""
+    per_source: dict[str, dict[str, Mapping[str, Any]]] = {}
+    for src, rows in rows_by_source.items():
+        by_date: dict[str, Mapping[str, Any]] = {}
+        for row in rows or ():
+            d = _row_date(row)
+            if d:
+                by_date[d] = row
+        per_source[src] = by_date
+    dates = sorted({d for by_date in per_source.values() for d in by_date})
+    return {d: dual_wear(metric, {src: per_source[src].get(d) for src in per_source}) for d in dates}

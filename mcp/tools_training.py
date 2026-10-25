@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from health import hr_regime  # #4999: THE dated HR regime markers
+from health.watch_views import cardio_fitness_view  # #4979: the Apple Watch view
 from training import (
     training_load,  # #4075: the ONE load model (computed_metrics' TSB)
     zone2_minutes,  # #4627: THE Zone 2 computation
@@ -1275,12 +1276,13 @@ def tool_get_training(args):
         "load": _get_training_load,
         "periodization": _get_training_periodization,
         "recommendation": _gated_training_recommendation,  # #4999: HR regime marker gate
+        "cardio_fitness": lambda a: cardio_fitness_view(a, query_source),  # #4979: VO2 max arc + the watch's cardio signals
     }
     view = (args.get("view") or "load").lower().strip()
     if view not in VALID_VIEWS:
         return {
             "error": f"Unknown view '{view}'.",
             "valid_views": list(VALID_VIEWS.keys()),
-            "hint": "'load' for CTL/ATL/TSB fitness-fatigue model, 'periodization' for mesocycle analysis, 'recommendation' for today's workout suggestion.",
+            "hint": "'load' for CTL/ATL/TSB fitness-fatigue model, 'periodization' for mesocycle analysis, 'recommendation' for today's workout suggestion, 'cardio_fitness' for the Apple Watch's VO2 max arc and cardio signals.",
         }
     return VALID_VIEWS[view](args)

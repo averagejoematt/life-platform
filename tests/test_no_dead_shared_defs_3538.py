@@ -423,13 +423,7 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
     "lambdas/privacy/diary_publish.py:format_publish_log_row": (
         "#3609 box 2 widen: exercised only by tests/test_diary_publish_1845.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
     ),
-    "lambdas/privacy/field_tiers.py:is_publishable": (
-        "#3609 box 2 widen: exercised only by tests/test_privacy_tier_wiring_2803.py (also named in docs/DECISIONS.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
-    ),
     "lambdas/privacy/field_tiers.py:source_tier_of": (
-        "#3609 box 2 widen: exercised only by tests/test_privacy_tier_wiring_2803.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
-    ),
-    "lambdas/privacy/field_tiers.py:tier_of": (
         "#3609 box 2 widen: exercised only by tests/test_privacy_tier_wiring_2803.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
     ),
     "lambdas/privacy/privacy_guard.py:reset_vocabulary_cache": (

@@ -275,6 +275,18 @@ def _ask_fetch_context() -> dict:
     def _computed_reads() -> None:
         ctx["reads"] = _hook("_ask_fetch_computed_reads")()
 
+    def _watch() -> None:
+        # #4979: the Apple Watch's PUBLISHABLE signals (health.watch_signals, audience PUBLIC — no
+        # internal or owner-only field can pass), each dated; the arc window covers the VO2 estimate.
+        from health import watch_signals
+
+        rows = _recent_day_rows(watch_signals.APPLE, watch_signals.ARC_DAYS, today_str)
+        summaries = watch_signals.signal_summaries(rows, today_str, audience=watch_signals.PUBLIC)
+        arc = watch_signals.vo2_arc({watch_signals.APPLE: rows}, today_str)
+        if summaries or arc:
+            ctx["watch"] = {"signals": summaries, "vo2_max": arc}
+            ctx["as_of"]["watch"] = max([s["as_of"] for s in summaries] + ([arc["as_of"]] if arc else []))
+
     for _label, _block in (
         ("withings", _withings),
         ("whoop", _whoop),
@@ -282,10 +294,43 @@ def _ask_fetch_context() -> dict:
         ("habit_scores", _habit_scores),
         ("profile", _profile),
         ("computed_reads", _computed_reads),
+        ("watch", _watch),
     ):
         _soft_block(_label, _block)
     ctx.setdefault("reads", {})
     return ctx
+
+
+def _recent_day_rows(source: str, days: int, today: str) -> list:
+    """#4979: `source`'s DATE# rows over the trailing `days` (today inclusive), per-source cross-phase
+    (#2109 — the watch partition is a raw timeseries, true in every cycle)."""
+    start = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    resp = _table().query(
+        **with_phase_filter(
+            {"KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}{source}") & Key("sk").between(f"DATE#{start}", f"DATE#{today}~")},
+            include_pilot=source_reads_cross_phase(source),
+        )
+    )
+    return strava_read_seam(source, _decimal_to_float(resp.get("Items", [])))
+
+
+def watch_lines(ctx: dict) -> list:
+    """#4979: the watch's dated, source-labelled lines from `ctx["watch"]` ([] when the watch is silent)."""
+    from health import watch_signals
+
+    w = ctx.get("watch") or {}
+    lines = [watch_signals.vo2_line(w["vo2_max"])] if w.get("vo2_max") else []
+    return lines + [watch_signals.signal_line(s) for s in w.get("signals") or ()]
+
+
+def watch_ask_block(ctx: dict) -> str:
+    """The /api/ask prompt section for the watch, or "" (the prompt is then byte-identical to before #4979)."""
+    lines = watch_lines(ctx)
+    if not lines:
+        return ""
+    return (
+        "\nAPPLE WATCH (Matthew's second wearable; each line carries the date it is from):\n" + "\n".join(f"  {ln}" for ln in lines) + "\n"
+    )
 
 
 def _ask_fetch_computed_reads() -> dict:
@@ -469,4 +514,5 @@ def _board_facts_block(ctx: dict = None) -> str:
         lines.append(f"pillar {pname}: {pd.get('raw_score', 0):.0f}/100")
     if ctx.get("habit_completion_pct") is not None:
         lines.append(f"habit completion: {ctx['habit_completion_pct']:.0f}%")
+    lines += [ln.rstrip(".") for ln in watch_lines(ctx)]  # #4979: dated in-line, source-labelled
     return "; ".join(lines) if lines else "no current data available"

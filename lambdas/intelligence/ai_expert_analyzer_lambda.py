@@ -165,7 +165,9 @@ from common.constants import (
     EXPERIMENT_START_DATE as EXPERIMENT_START,  # ADR-058
     PLAN_DAILY_PROTEIN_MIN_G,  # #4540: the plan's targets
 )
-from health import calorie_target, protein_floor as _pf  # #5095: the ONE calorie target; #5098: THE protein hit (strict, #5003)
+
+# #5095: the ONE calorie target; #5098: THE protein hit (strict, #5003); #4979: the Apple Watch block (public fields only)
+from health import calorie_target, protein_floor as _pf, watch_signals as _ws
 from health.pillar_absence import absence_gate_map, nutrition_absence_facts  # #2756
 
 from intelligence import labelled_facts as _lf  # #4580 B-01/A-X1: labelled-fact + reader-surface findings
@@ -1103,7 +1105,8 @@ def _gate_json_record(label, parsed, key, partial, prompt, api_key, reader_keys=
 
 def generate_and_cache(expert_key, shared_system=None):
     logger.info(f"Generating analysis for expert: {expert_key}")
-    data = gather_data_for_expert(expert_key)
+    # #4979: training/sleep experts get the watch's publishable signals, each dated (as_of) — this output is public.
+    data = _ws.with_analyzer_block(gather_data_for_expert(expert_key), _query_source, pacific_today())
 
     # Read prior analysis + recommendation to prevent repetition (#1969: tombstone-guarded)
     prior_summary, prior_recommendation = _load_prior_analysis(expert_key)
