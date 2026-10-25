@@ -1187,7 +1187,9 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # 294 -> 295 (2026-10-25, #5143, stacked onto #5316 in batch 2): guard::scripts/check_alarm_census.py, PROVEN via
         # GUARD_PROOFS (planted live name + dropped modelled name both named, exit 1; unmutated exit 0). Stacked, never max'd.
         # 295 -> 296 (2026-10-25, #4978 stacked in batch 3): structural::test_illness_triad_4978.py, PROVEN via MutationSpec (ARMED 1/1). Stacked, never max'd.
-        <= 296
+        # 296 -> 297 (2026-10-25, #5071 box 3): structural::test_training_coach_retired_5071.py, PROVEN via MutationSpec + STRUCTURAL_PROOFS
+        # (ARMED 1/1: baseline 4 passed | mutated 1 failed | reverted 4 passed). Stacked, never max'd.
+        <= 297
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

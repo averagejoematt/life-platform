@@ -166,7 +166,7 @@ personas **in order**. Order matters.
 ### 5a. Voice spec — `config/coaches/reading_coach.json`
 
 The personality/voice config the narrative pipeline reads. Copy an existing one
-(`config/coaches/training_coach.json` is a good template) and rewrite for the new coach. Shape
+(`config/coaches/physical_coach.json` is a good template) and rewrite for the new coach. Shape
 (see any existing file for the full spec):
 
 - `coach_id` (**must equal `coach_config_key`**), `display_name`, `domain`

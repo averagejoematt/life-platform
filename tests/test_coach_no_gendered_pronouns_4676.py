@@ -36,7 +36,6 @@ MATTHEW_REFERENTS = {
 # (coach file, dotted path in the served slice) -> the pronoun refers to Matthew.
 SERVED_MATTHEW_REFERENTS = {
     ("mind_coach.json", "structural_voice_rules.signature_moves.1"),  # "in his journal" (Matthew's)
-    ("training_coach.json", "structural_voice_rules.sentence_rhythm"),  # "in his specific case" (Matthew's)
 }
 
 # (member, dotted path, sentence prefix): a male pronoun in that exact sentence refers to Matthew.
@@ -66,7 +65,6 @@ COACH_FILE_PRONOUN_COUNTS = {
     "pattern_coach.json": 12,
     "physical_coach.json": 9,
     "sleep_coach.json": 21,
-    "training_coach.json": 1,
     "tuning_log.json": 14,
 }
 

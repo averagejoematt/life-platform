@@ -76,7 +76,6 @@ def test_plan_runs_nothing_on_an_off_day_and_holds_nothing_either_way():
 _V2 = [
     "call_sleep_coach_v2",
     "call_nutrition_coach_v2",
-    "call_training_coach_v2",
     "call_mind_coach_v2",
     "call_physical_coach_v2",
     "call_glucose_coach_v2",
@@ -145,9 +144,7 @@ def test_a_narrative_day_runs_the_whole_roster_and_the_fan_out(brief, monkeypatc
     monkeypatch.setattr(m, "pacific_today", lambda: THURSDAY)
     result = m._run_ai_coach_pipeline(**_KW)
 
-    for name in _V2:
-        if name == "call_training_coach_v2":  # ADR-153: the training seat is retired from the roster
-            continue
+    for name in _V2:  # ADR-153: the training seat is retired (#5071 box 3 deleted its wrapper)
         getattr(m.ai_calls, name).assert_called_once()
     m.ai_calls.call_training_nutrition_coach.assert_called_once()
     assert result["sleep_coach_v2_text"] == "v2 text"

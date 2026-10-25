@@ -253,17 +253,18 @@ def test_coach_contrast_guard_catches_a_planted_sub_floor_color():
 
 
 def test_config_coaches_match_operational_personas():
-    """*_coach.json voice specs == operational + chat + retired registry keys.
+    """*_coach.json voice specs == operational + chat registry keys.
 
     Chat-tier coaches text through the same persona_core path, so they carry a
-    voice spec; a retired coach's spec stays on disk because published history
-    still renders under their byline. (eli_marsh's spec has no _coach suffix, so
-    it lives outside this glob by construction.)"""
+    voice spec. A retired coach carries none (#5071 box 3): nothing writes in
+    their voice again, and their published byline renders from the registry
+    entry (name, colour, emoji), never from the spec. (eli_marsh's spec has no
+    _coach suffix, so it lives outside this glob by construction.)"""
     config_keys = set(_coach_config_keys())
     registry_keys = {
         p["coach_config_key"]
         for p in _personas().values()
-        if p.get("coach_config_key", "").endswith("_coach") and (p.get("operational") or p.get("chat") or p.get("retired"))
+        if p.get("coach_config_key", "").endswith("_coach") and (p.get("operational") or p.get("chat")) and not p.get("retired")
     }
     assert config_keys == registry_keys, (
         f"config/coaches vs registry mismatch: "
