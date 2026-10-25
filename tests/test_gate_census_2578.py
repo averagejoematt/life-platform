@@ -1180,7 +1180,9 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # 288 -> 289 (2026-10-24, #5104): structural::test_travel_food_kit_5104.py (MutationSpec + STRUCTURAL_PROOFS). Stacked, never max'd.
         # 289 -> 290 (2026-10-24, #5121): structural::test_relapse_early_warning_5121.py, PROVEN via MutationSpec + STRUCTURAL_PROOFS
         # (ARMED 1/1: baseline 26 passed | mutated 1 failed | reverted 26 passed). Stacked, never max'd.
-        <= 290
+        # 290 -> 291 (2026-10-24, #4978): structural::test_illness_triad_4978.py, PROVEN via MutationSpec + STRUCTURAL_PROOFS
+        # (ARMED 1/1: baseline 26 passed | mutated 1 failed | reverted 26 passed). Stacked, never max'd.
+        <= 291
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

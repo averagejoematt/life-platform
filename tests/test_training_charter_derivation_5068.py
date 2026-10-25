@@ -447,6 +447,8 @@ NOT_APPLICABLE: Dict[str, str] = {
     "early_warning": "the relapse early-warning thresholds (#5121): read only by health.early_warning, outside this guard's "
     "swept set (the training consumers); every expected number in tests/test_relapse_early_warning_5121.py is read from the "
     "charter, and the owner's own failure_mode prose in config/user_goals.json names no swept pattern's noun",
+    "illness_triad": "the early-illness / overload triad thresholds (#4978): read only by health.illness_triad, outside this guard's "
+    "swept set (the training consumers); every expected number in tests/test_illness_triad_4978.py is read from the charter",
     "nutrition": "outside this guard's swept set (the training consumers): every nutrition number has ONE reader with its own "
     "contract test — calories: health.calorie_target (tests/test_calorie_target_one_resolver_5095.py, which also sweeps "
     "lambdas/ mcp/ deploy/ scripts/ for a new 1,500 kcal literal); eating_window: health.eating_window "

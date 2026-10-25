@@ -300,6 +300,12 @@ SOURCE_TIERS: dict[str, int] = {
     # (coach.coach_event_triggers) and the mind coach's own thread (coach.coach_domain_facts). Declared before the
     # first row exists (ADR-154's ordering).
     "early_warning_flag": TIER_OWNER_ONLY,
+    # #4978: the early-illness / overload triad flag — which of resting heart rate, skin temperature and respiratory
+    # rate rose above his own baseline on a night, by how much, and whether two together raised it. Raw-biometric
+    # deviations (skin temperature is owner-only at the field level), so owner-only with no public projection; the one
+    # reader is the Performance coach's own Telegram thread (coach.coach_domain_facts). Declared before the first row
+    # exists (ADR-154's ordering).
+    "illness_triad_flag": TIER_OWNER_ONLY,
     "progress_photos": TIER_OWNER_ONLY,  # body photos (S3 raw/matthew/progress_photos/ + the DDB index); no public projection, ever
     # #3759: the weekly coach-vision observation DERIVED from those photos — a sentence about
     # his body and a body-fat band that is an estimate, not a measurement. Takes the tier of

@@ -270,6 +270,7 @@ _WHOOP_CONSUMER_REGISTRY = {
     "lambdas/ingestion/enrichment_lambda.py": (1, "shared-guard", "filter_day_rows on the by-date whoop index (#3442 member 5)"),
     "lambdas/intelligence/ai_expert_analyzer_lambda.py": (2, "shared-guard", "filter_day_rows on both whoop fetches (#3442 member 6)"),
     "lambdas/intelligence/latest_readings.py": (1, "shared-guard", "filter_day_rows in hrv_series_facts (#4866)"),
+    "lambdas/health/illness_triad.py": (1, "shared-guard", "filter_day_rows on the triad's whoop night read (#4978)"),
     "lambdas/intelligence/field_notes_lambda.py": (1, "shared-guard", "_DAY_SK_RE is the shared predicate (the 2026-W26 prior art)"),
     "lambdas/emails/chronicle_data.py": (
         1,
