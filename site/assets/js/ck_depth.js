@@ -42,7 +42,8 @@ const shift = (iso, days) => new Date(Date.parse(`${iso}T12:00:00Z`) + days * 86
 // key -> its name, unit, where its daily values come from and how a value is written.
 export const MEASURES = {
   weight: { name: "Weight", unit: "lb", write: (v) => `${v.toFixed(1)} lb`, about: "Every weigh-in since the start." },
-  steps: { name: "Steps", unit: "steps", write: (v) => whole(v), about: "The wrist strap’s step count, or the phone and watch’s on a day the strap counted none. A day nothing was worn or carried reads low, so some days here are lower than the training recorded suggests.", source: "wrist strap, else phone" },
+  // #4980: each day's steps say whose count they are (the served `steps_source`, the resolver's answer).
+  steps: { name: "Steps", unit: "steps", write: (v) => whole(v), about: "The wrist strap’s step count, or the phone and watch’s on a day the strap counted none; each day below says whose count it is. A day nothing was worn or carried reads low, so some days here are lower than the training recorded suggests.", source: "wrist strap, else phone and watch" },
   sleep: { name: "Sleep", unit: "hours", write: (v) => `${trim1(v)} hours`, about: "Hours asleep each night." },
   // One unit for recovery on every kit page (site-to-A round 1, re-graded 2026-10-18): the unit the
   // route serves beside the score — " out of 100" (prediction_reason.MEASURE_UNITS, PR #4964) — so the
@@ -54,12 +55,17 @@ export const MEASURES = {
   carbs: { name: "Carbs", unit: "g", write: (v) => `${whole(v)} g`, about: "Grams of carbohydrate logged each day." },
   fat: { name: "Fat", unit: "g", write: (v) => `${whole(v)} g`, about: "Grams of fat logged each day." },
   training: { name: "Training time", unit: "minutes", write: (v) => `${whole(v)} minutes`, about: "Minutes of training recorded each day." },
+  // #4980: the watch's active energy, from the day it arrived only (before it, a phone-only estimate — a
+  // different instrument, left out rather than joined into one line).
+  energy: { name: "Active energy", unit: "kcal", write: (v) => `${whole(v)} kcal`, about: "Calories the watch counted as burned by moving, each day since it arrived. Before the watch only the phone estimated this, a different instrument, so those days are left out. A day the watch was off reads low.", source: "watch" },
+  // #4980: every VO2 max estimate on record, each labelled with the device that made it (/api/vitals_depth).
+  vo2max: { name: "VO2 max", unit: "ml/kg/min", write: (v) => `${trim1(v)} ml/kg/min`, about: "A wearable’s estimate of the most oxygen the body can use, in millilitres per kilogram of body weight per minute. Every estimate on record, most from before the experiment began, each labelled with the device that made it. Two makers’ estimates are not one scale, so the line breaks where one device hands over to the next." },
 };
 
 // Own keys only: the measure name arrives from the address bar.
 export const isMeasure = (m) => Object.prototype.hasOwnProperty.call(MEASURES, String(m));
 // The field each measure is read from, so a served unit can be looked up by it.
-const FIELD_OF = { weight: "weight_lbs", steps: "steps", sleep: "sleep_hours", recovery: "recovery_pct", protein: "protein_g", calories: "calories", carbs: "carbs_g", fat: "fat_g", training: "total_min" };
+const FIELD_OF = { weight: "weight_lbs", steps: "steps", sleep: "sleep_hours", recovery: "recovery_pct", protein: "protein_g", calories: "calories", carbs: "carbs_g", fat: "fat_g", training: "total_min", energy: "active_kcal", vo2max: "vo2max" };
 /** The unit the route serves for a measure (lane E of #4580): `units: {field: unit}` on any served
  *  body, or the `unit` beside the measure on the edition's week (`measures[measure].data.unit`,
  *  served with its leading space — " lb", " out of 100"). Absent, the measure's own unit stands.
@@ -96,6 +102,16 @@ export function writerFor(measure, src) {
 export const trendHref = (base, measure, lift = "", from = "") => `${base}trend/?m=${encodeURIComponent(measure)}${lift ? `&x=${encodeURIComponent(lift)}` : ""}${isDay(from) ? `&from=${from}` : ""}`;
 export const dayHref = (base, iso) => `${base}day/?d=${encodeURIComponent(iso)}`;
 
+// #4980: whose count a day's steps are, in the kit's words. The served `steps_source` is the
+// resolver's answer; Apple Health's count is the phone's alone before the watch's first day (the
+// served `watch_first_day`) and the phone's and watch's together from it. "" when not served.
+export function stepsBy(source, iso, watchFirstDay = "") {
+  if (source === "whoop") return "wrist strap";
+  if (source === "apple_health") return isDay(watchFirstDay) && iso >= watchFirstDay ? "phone and watch" : "phone";
+  if (source === "garmin") return "Garmin watch";
+  return "";
+}
+
 // One {date, value} series for a measure from the served bodies. Null readings are dropped:
 // a day with no value is a gap in the line, never a zero.
 export function seriesOf(measure, src, today = "") {
@@ -108,8 +124,20 @@ export function seriesOf(measure, src, today = "") {
     switch (measure) {
       case "weight":
         return pick(pulse, "weight_lbs");
-      case "steps":
-        return pick(pulse, "steps").filter((p) => p.date !== today);
+      case "steps": {
+        const by = Object.fromEntries((pulse || []).filter((r) => r && isDay(r.date)).map((r) => [r.date, r.steps_source]));
+        const first = src.pulse && src.pulse.watch_first_day;
+        return pick(pulse, "steps")
+          .filter((p) => p.date !== today)
+          .map((p) => (stepsBy(by[p.date], p.date, first) ? { ...p, device: stepsBy(by[p.date], p.date, first) } : p));
+      }
+      case "energy":
+        return pick(pulse, "active_kcal");
+      case "vo2max": {
+        const vo = src.vitals && src.vitals.vo2max;
+        const rows = vo && vo.available && Array.isArray(vo.series) ? vo.series : [];
+        return rows.filter((r) => r && isDay(r.date) && num(r.value) !== null).map((r) => (r.device ? { date: r.date, value: r.value, device: String(r.device) } : { date: r.date, value: r.value }));
+      }
       case "sleep":
         return pick(pulse, "sleep_hours");
       case "recovery":
@@ -181,8 +209,32 @@ export function liftSeries(workouts, name) {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+// #4980: where a series changes device. Each point may carry `device`; a run is a stretch of
+// consecutive points from one device. [] when no point names one.
+export function deviceRuns(points) {
+  const runs = [];
+  (points || []).forEach((p, i) => {
+    if (!p || !p.device) return;
+    const last = runs[runs.length - 1];
+    if (last && last.device === p.device && last.end === i - 1) {
+      last.end = i;
+      last.last = p.date;
+    } else runs.push({ device: p.device, start: i, end: i, first: p.date, last: p.date });
+  });
+  return runs;
+}
+// The sentence under a chart whose line spans more than one device: which device, when. "" for one.
+export function deviceRunsText(points, day = shortDay) {
+  const runs = deviceRuns(points);
+  if (runs.length < 2) return "";
+  const span = (r) => (r.first === r.last ? `${r.device}, ${day(r.first)}` : `${r.device}, ${day(r.first)} to ${day(r.last)}`);
+  return `The line breaks where the device changes: ${runs.map(span).join("; ")}.`;
+}
+// A day with its year, always (a record that spans years; no clock is read, so nothing moves as the year turns).
+export const yearDay = (iso) => (isDay(iso) ? `${shortDay(iso)}, ${iso.slice(0, 4)}` : "");
+
 // ── the chart: one line, both ends labelled, and a sentence saying what it shows ─
-export function trendChartHTML(points, write, name, { fromZero = false, baselineChange = null } = {}) {
+export function trendChartHTML(points, write, name, { fromZero = false, baselineChange = null, day = shortDay } = {}) {
   const pts = (points || []).filter((p) => p && isDay(p.date) && num(p.value) !== null);
   if (pts.length < 2) return "";
   const t = (iso) => Date.parse(`${iso}T12:00:00Z`);
@@ -201,13 +253,19 @@ export function trendChartHTML(points, write, name, { fromZero = false, baseline
   const bcI = bcDay && pts[0].date < bcDay ? pts.findIndex((p) => p.date >= bcDay) : -1;
   const pair = (p) => `${x(p).toFixed(1)},${y(p).toFixed(1)}`;
   const line = pts.map(pair).join(" ");
-  const lineEls = bcI > 0
-    ? `<polyline class="ck-chart__line" points="${pts.slice(0, bcI).map(pair).join(" ")}"/><polyline class="ck-chart__line" points="${pts.slice(bcI).map(pair).join(" ")}"/><line class="ck-chart__bc" x1="${((x(pts[bcI - 1]) + x(pts[bcI])) / 2).toFixed(1)}" x2="${((x(pts[bcI - 1]) + x(pts[bcI])) / 2).toFixed(1)}" y1="14" y2="150"/>`
-    : `<polyline class="ck-chart__line" points="${line}"/>`;
+  // #4980: the line also breaks where the device changes — two makers' estimates are not one
+  // series, so a step at the hand-over must not be drawn as the body changing.
+  const runs = deviceRuns(pts);
+  const cuts = [...new Set([...(bcI > 0 ? [bcI] : []), ...(runs.length > 1 ? runs.slice(1).map((r) => r.start) : [])])].sort((a, b) => a - b);
+  const bounds = [0, ...cuts, pts.length];
+  const polylines = bounds.slice(0, -1).map((a, k) => `<polyline class="ck-chart__line" points="${pts.slice(a, bounds[k + 1]).map(pair).join(" ")}"/>`).join("");
+  const bcRule = bcI > 0 ? `<line class="ck-chart__bc" x1="${((x(pts[bcI - 1]) + x(pts[bcI])) / 2).toFixed(1)}" x2="${((x(pts[bcI - 1]) + x(pts[bcI])) / 2).toFixed(1)}" y1="14" y2="150"/>` : "";
+  const lineEls = cuts.length ? `${polylines}${bcRule}` : `<polyline class="ck-chart__line" points="${line}"/>`;
   const area = fromZero ? `<polygon class="ck-chart__area" points="8.0,164 ${line} 632.0,164"/>` : "";
   const [first, last] = [pts[0], pts[pts.length - 1]];
-  const aria = `${name} from ${write(first.value)} on ${shortDay(first.date)} to ${write(last.value)} on ${shortDay(last.date)}, ${pts.length} readings, lowest ${write(lo)}, highest ${write(hi)}${bcI > 0 ? `, line broken at the baseline change on ${shortDay(bcDay)}` : ""}`;
-  return `<svg class="ck-chart" viewBox="0 0 640 164" role="img" aria-label="${esc(aria)}">${area}${lineEls}<circle class="ck-chart__now" cx="${x(last).toFixed(1)}" cy="${y(last).toFixed(1)}" r="5"/></svg><div class="ck-ends"><span>${esc(`${shortDay(first.date)} · ${write(first.value)}`)}</span><span>${esc(`${shortDay(last.date)} · ${write(last.value)}`)}</span></div>${bcI > 0 ? `<p class="ck-soft ck-bc-note">baseline change · ${esc(shortDay(bcDay))}</p>` : ""}`;
+  const runsText = deviceRunsText(pts, day);
+  const aria = `${name} from ${write(first.value)} on ${day(first.date)} to ${write(last.value)} on ${day(last.date)}, ${pts.length} readings, lowest ${write(lo)}, highest ${write(hi)}${bcI > 0 ? `, line broken at the baseline change on ${day(bcDay)}` : ""}${runsText ? `, line broken where the device changes` : ""}`;
+  return `<svg class="ck-chart" viewBox="0 0 640 164" role="img" aria-label="${esc(aria)}">${area}${lineEls}<circle class="ck-chart__now" cx="${x(last).toFixed(1)}" cy="${y(last).toFixed(1)}" r="5"/></svg><div class="ck-ends"><span>${esc(`${day(first.date)} · ${write(first.value)}`)}</span><span>${esc(`${day(last.date)} · ${write(last.value)}`)}</span></div>${bcI > 0 ? `<p class="ck-soft ck-bc-note">baseline change · ${esc(day(bcDay))}</p>` : ""}${runsText ? `<p class="ck-soft">${esc(runsText)}</p>` : ""}`;
 }
 // A daily COUNT as bars from zero. A bar at or above the target is drawn in the accent (the
 // kit's colour for progress); the line over the bars is the average of the seven readings
@@ -237,17 +295,17 @@ export function barChartHTML(points, write, name, { target = null, targetWords =
 // `today` (a running daily count only): today's reading is a day still in progress, so it is
 // left out of the lowest, highest, average and floor count and said on its own as "today so far"
 // (red team round 3, B-12: a partial Sunday's 41 minutes was printed as the 30 days' lowest).
-export function trendSentence(points, write, { average = true, floor = null, floorWords = "", today = "" } = {}) {
+export function trendSentence(points, write, { average = true, floor = null, floorWords = "", today = "", day = shortDay } = {}) {
   const all = points || [];
   if (!all.length) return "";
   const partial = isDay(today) && all.length > 2 && all[all.length - 1].date === today ? all[all.length - 1] : null;
-  if (partial) return `${trendSentence(all.slice(0, -1), write, { average, floor, floorWords })} Today so far: ${write(partial.value)}.`;
+  if (partial) return `${trendSentence(all.slice(0, -1), write, { average, floor, floorWords, day })} Today so far: ${write(partial.value)}.`;
   const pts = all;
   const values = pts.map((p) => p.value);
   const [lo, hi] = [Math.min(...values), Math.max(...values)];
-  if (pts.length === 1) return `One reading so far: ${write(pts[0].value)} on ${shortDay(pts[0].date)}.`;
+  if (pts.length === 1) return `One reading so far: ${write(pts[0].value)} on ${day(pts[0].date)}.`;
   const mean = (list) => list.reduce((a, b) => a + b, 0) / list.length;
-  const parts = [`${pts.length} readings from ${shortDay(pts[0].date)} to ${shortDay(pts[pts.length - 1].date)}.`, `Lowest ${write(lo)}, highest ${write(hi)}${average ? `, average ${write(mean(values))}` : ""}.`];
+  const parts = [`${pts.length} readings from ${day(pts[0].date)} to ${day(pts[pts.length - 1].date)}.`, `Lowest ${write(lo)}, highest ${write(hi)}${average ? `, average ${write(mean(values))}` : ""}.`];
   if (floor !== null) parts.push(`At or above ${floorWords || write(floor)} on ${values.filter((v) => v >= floor).length} of ${values.length} days.`);
   return parts.join(" ");
 }
@@ -259,11 +317,15 @@ export function weekOnWeek(points, write) {
   const mean = (list) => list.reduce((a, b) => a + b, 0) / list.length;
   return `The last seven readings average ${write(mean(v.slice(-7)))}; the seven before, ${write(mean(v.slice(-14, -7)))}.`;
 }
-// The most recent readings, newest first, each a door to its day.
-export function recentRowsHTML(points, write, base, first = 7) {
+// The most recent readings, newest first, each a door to its day. #4980: a reading that names its
+// device says so ("· wrist strap", "· Garmin watch"); `link: false` (a measure whose record runs
+// from before the experiment, which has no day pages) lists the readings without doors, each
+// with its year.
+export function recentRowsHTML(points, write, base, first = 7, { link = true } = {}) {
   const rows = [...(points || [])].reverse();
   if (!rows.length) return "";
-  const li = (p) => `<li><a href="${esc(dayHref(base, p.date))}">${esc(`${fmtShort(p.date)} · ${dayInWords(p.date).split(",")[0]} · ${p.set && !p.bodyweight ? `${p.set} · est. max ${write(p.value)}` : write(p.value)}`)} <span aria-hidden="true">→</span></a></li>`;
+  const text = (p) => `${link ? fmtShort(p.date) : `${fmtShort(p.date)}, ${p.date.slice(0, 4)}`} · ${dayInWords(p.date).split(",")[0]} · ${p.set && !p.bodyweight ? `${p.set} · est. max ${write(p.value)}` : write(p.value)}${p.device ? ` · ${p.device}` : ""}`;
+  const li = (p) => (link ? `<li><a href="${esc(dayHref(base, p.date))}">${esc(text(p))} <span aria-hidden="true">→</span></a></li>` : `<li><span>${esc(text(p))}</span></li>`);
   const list = (items) => `<ul class="ck-rows ck-rows--more">${items.map(li).join("")}</ul>`;
   const rest = rows.slice(first);
   // The newest week is on the page; the rest is one tap away, never dropped.
@@ -446,7 +508,7 @@ export function frequentMealsHTML(body) {
     .join("")}</ul>`;
 }
 // The other trends a reader on this one is most likely to want next.
-const RELATED = { protein: ["calories", "carbs", "fat"], calories: ["protein", "carbs", "fat"], carbs: ["calories", "protein", "fat"], fat: ["calories", "protein", "carbs"], weight: ["calories", "steps", "training"], steps: ["training", "weight"], sleep: ["recovery"], recovery: ["sleep", "training"], training: ["steps", "recovery"] };
+const RELATED = { protein: ["calories", "carbs", "fat"], calories: ["protein", "carbs", "fat"], carbs: ["calories", "protein", "fat"], fat: ["calories", "protein", "carbs"], weight: ["calories", "steps", "training"], steps: ["training", "energy", "weight"], sleep: ["recovery"], recovery: ["sleep", "training"], training: ["steps", "recovery"], energy: ["steps", "training"], vo2max: ["training", "steps"] };
 export function relatedHTML(measure, base, from = "") {
   const keys = measure === "lift" ? ["training", "weight"] : RELATED[measure] || [];
   if (!keys.length) return "";
@@ -459,7 +521,7 @@ export function relatedHTML(measure, base, from = "") {
 export const TREND_AREAS = [
   { name: "Body", measures: ["weight"] },
   { name: "Food", measures: ["calories", "protein", "carbs", "fat"] },
-  { name: "Training", measures: ["training", "steps"] },
+  { name: "Training", measures: ["training", "steps", "energy", "vo2max"] },
   { name: "Sleep", measures: ["sleep", "recovery"] },
 ];
 // A lift's trend is reached from the lift itself on a day page, so the index lists the
@@ -540,13 +602,17 @@ async function mountDay(base) {
 // How each measure is drawn and described: a COUNT is scaled from zero and has a meaningful
 // average; a LEVEL (weight, sleep, recovery, a lift) is a line with no average.
 export const NO_READINGS = "Nothing has been recorded for this yet.";
-const COUNTS = new Set(["steps", "protein", "calories", "carbs", "fat", "training"]);
+const COUNTS = new Set(["steps", "protein", "calories", "carbs", "fat", "training", "energy"]);
+// The line above a trend's title, when it is not the whole experiment (#4980: the watch's measures).
+const TREND_LABEL = { training: "The last 30 days", energy: "Since the watch arrived", vo2max: "Every estimate on record" };
+// The rows of a record older than the experiment have no day pages, so their section says what they are instead.
+export const LONG_RECORD_LEDE = "Each estimate with the device that made it. Most are from before the experiment, so they have no day page.";
 
 async function mountTrend(base) {
   const measure = param("m");
   if (!measure) {
     // The same bodies the measure pages read, so each row's latest reading is the page's own.
-    const src = await load({ pulse: "/api/pulse_history", nutrition: "/api/nutrition_overview", training: "/api/training_overview" });
+    const src = await load({ pulse: "/api/pulse_history", nutrition: "/api/nutrition_overview", training: "/api/training_overview", vitals: "/api/vitals_depth" });
     fill("ck-label", "The detail");
     fill("ck-title", "Every trend");
     document.title = "Every trend — Average Joe Matt";
@@ -580,9 +646,12 @@ async function mountTrend(base) {
     write = bodyweight ? (v) => `${whole(v)} reps` : (v) => `${whole(v)} lb`;
   } else if (isMeasure(measure)) {
     const food = ["protein", "calories", "carbs", "fat"].includes(measure);
-    const src = await load(food ? { nutrition: "/api/nutrition_overview", meals: "/api/frequent_meals" } : measure === "training" ? { training: "/api/training_overview" } : { pulse: "/api/pulse_history" });
+    const routes = food ? { nutrition: "/api/nutrition_overview", meals: "/api/frequent_meals" } : measure === "training" ? { training: "/api/training_overview" } : measure === "vo2max" ? { vitals: "/api/vitals_depth" } : { pulse: "/api/pulse_history" };
+    const src = await load(routes);
     points = seriesOf(measure, src, today);
     if (measure === "recovery") bcDate = (src.pulse && src.pulse.baseline_change) || null;
+    // #5029 / #4980: a wearable's VO2 max estimate is derived from heart rate, so it breaks at the baseline change too.
+    if (measure === "vo2max") bcDate = (src.vitals && src.vitals.baseline_change) || null;
     ({ name, about } = MEASURES[measure]);
     write = writerFor(measure, src);
     sentenceOpts = { average: COUNTS.has(measure), today: COUNTS.has(measure) ? today : "" };
@@ -604,16 +673,28 @@ async function mountTrend(base) {
     fill("ck-about", soft("This address does not name a measure the site records."));
     return;
   }
-  fill("ck-label", esc(measure === "training" ? "The last 30 days" : "Over the whole experiment"));
+  fill("ck-label", esc(TREND_LABEL[measure] || "Over the whole experiment"));
   fill("ck-title", esc(name));
   document.title = `${name} — Average Joe Matt`;
   fill("ck-about", soft(about));
+  // #4980: VO2 max runs back years before the experiment, so its dates carry their year and its
+  // readings are listed without day doors (a day page exists only inside the experiment).
+  const longRecord = measure === "vo2max";
+  const day = longRecord ? yearDay : shortDay;
   const chart = COUNTS.has(measure)
     ? barChartHTML(points, write, name, { target: sentenceOpts.floor ?? null, targetWords: sentenceOpts.floorWords ? sentenceOpts.floorWords.replace(/^my /, "the ") : "" })
-    : trendChartHTML(points, write, name, { baselineChange: bcDate });
-  fill("ck-chart", points.length ? `${soft(trendSentence(points, write, sentenceOpts))}${chart}${COUNTS.has(measure) ? soft(weekOnWeek(points, write)) : ""}` : soft(NO_READINGS));
+    : trendChartHTML(points, write, name, { baselineChange: bcDate, day });
+  fill("ck-chart", points.length ? `${soft(trendSentence(points, write, { ...sentenceOpts, day }))}${chart}${COUNTS.has(measure) ? soft(weekOnWeek(points, write)) : ""}` : soft(NO_READINGS));
   // No reading, no list: the section goes with its heading rather than standing empty (#4586 box 2).
-  fill("ck-recent", recentRowsHTML(points, write, base));
+  fill("ck-recent", recentRowsHTML(points, write, base, 7, { link: !longRecord }));
+  if (longRecord) {
+    // The shell's "each day opens to everything recorded on it" is not true of these rows: say what they are.
+    const sec = document.getElementById("ck-recent-section");
+    const h2 = sec && sec.querySelector("h2");
+    const lede = sec && sec.querySelector("p.ck-soft");
+    if (h2) h2.textContent = "Estimate by estimate.";
+    if (lede) lede.textContent = LONG_RECORD_LEDE;
+  }
   if (!points.length) document.getElementById("ck-recent-section")?.remove();
   fill("ck-extra", extra);
   if (!extra) document.getElementById("ck-extra-section")?.remove();

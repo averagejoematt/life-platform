@@ -59,7 +59,9 @@ def test_vitals_depth_payload_carries_it(monkeypatch):
 
 def test_pulse_history_wraps_its_payload():
     src = open(os.path.join(LAMBDAS, "web", "site_api_pulse.py"), encoding="utf-8").read()
-    assert '_ok(with_baseline_change({"pulse_history": days}), cache_seconds=3600)' in src
+    assert (
+        '_ok(with_baseline_change({"pulse_history": days, "watch_first_day": instruments.watch_first_day()}), cache_seconds=3600)' in src
+    )  # #4980 adds the watch era
 
 
 def test_public_layer_names_nothing_clinical_and_never_imports_the_marker_module():

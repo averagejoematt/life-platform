@@ -449,7 +449,11 @@ test("Trend index: each row carries its latest served reading and the day, and t
   const today = EDITION.as_of;
   const html = D.trendIndexHTML("/next/v8/", src, today);
   assert.match(html, /Weight · 302\.2 lb <span>October 17 <span aria-hidden="true">→<\/span><\/span>/);
+  // #4980: the watch's two measures read fields the 2026-10-18 capture predates (active_kcal on
+  // /api/pulse_history, /api/vitals_depth) — named here, so a recapture that serves them can drop the skip.
+  const NOT_IN_CAPTURE = new Set(["energy", "vo2max"]);
   for (const [key, m] of Object.entries(D.MEASURES)) {
+    if (NOT_IN_CAPTURE.has(key)) continue;
     const pts = D.seriesOf(key, src, today);
     const last = pts[pts.length - 1];
     assert.ok(last, `${key} has a served reading`);
@@ -952,7 +956,7 @@ test("round 3 B-12: a running count's partial today is said as today so far, out
 
 test("round 3 B-10: the trend index says whose step count it prints", () => {
   const src = { pulse: load("pulse_history"), nutrition: load("nutrition_overview"), training: load("training_overview") };
-  assert.match(D.trendIndexHTML("/next/v8/", src, EDITION.as_of), />Steps \(wrist strap, else phone\) · [\d,]+ <span>/);
+  assert.match(D.trendIndexHTML("/next/v8/", src, EDITION.as_of), />Steps \(wrist strap, else phone and watch\) · [\d,]+ <span>/);
   assert.doesNotMatch(D.MEASURES.steps.about, /as my phone and watch counted them/, "the old line named the wrong device first");
 });
 

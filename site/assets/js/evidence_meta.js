@@ -360,55 +360,66 @@ function verifyRawSample() {
     "");
 }
 
+// #4980: "two instruments" — which device answers for each measure both can report, and what the
+// other does, as the producer derives it from the registry (`instruments`, METRIC_TRUTH). Words only:
+// no heart-rate value is served for the watch (its resting HR, HRV and sleep are not publishable).
+export function verifyInstruments(d) {
+  const rows = (d && Array.isArray(d.instruments) ? d.instruments : []).filter((r) => r && r.measure && r.answers);
+  if (!rows.length) return "";
+  return sec("Two instruments", `<p class="rd-prose">Matthew wears two devices day and night: a Whoop strap and an Apple Watch, made by different companies and never connected to each other. For each measure both can report, one answers on this site and the other is kept beside it. Nothing is averaged across the two until their comparison has been read and ruled on.</p>` +
+    `<ul class="rd-tierlist">${rows.map((r) => `<li><strong>${esc(r.measure)}</strong> — ${esc(r.answers)}${r.other ? ` ${esc(r.other)}` : ""}</li>`).join("")}</ul>`);
+}
+
+// #4980: the comparison itself. Before the dual-wear study has ruled (`study.state` collecting or
+// awaiting_ruling) the page counts nights and states no agreement — no rate, no verdict, no per-night
+// band. Only a ruled study (`status: "ok"`) shows the counts, and even then a night is its date and its
+// band, never either device's number.
+function verifyComparison(d, watchFrom, watchLabel) {
+  const nNights = d.n_nights != null ? d.n_nights : (d.period ? d.period.overlapping_days : 0);
+  const minN = d.min_nights || 30;
+  const nightsFig = figs([fig(nNights, `nights Whoop and the ${watchLabel} both recorded`)]);
+  const hrvNote = d.hrv_note ? `<p class="rd-meta label">${esc(d.hrv_note)}</p>` : "";
+  const title = "Do the two agree? — the comparison";
+  if (d.status === "too_few_nights") {
+    return sec(title, nightsFig +
+      empty(`Too few nights to compare yet — ${nNights} of the ${minN} the agreement study needs. The comparison starts when the Apple Watch did${watchFrom ? ` (${esc(watchFrom)})` : ""}; earlier Apple Health heart-rate readings came from other devices, so they are left out rather than padded in.`) +
+      hrvNote) + note("No agreement is stated until the study has its nights and has been read — the count above is nights recorded, not a finding.");
+  }
+  if (d.status === "awaiting_ruling") {
+    return sec(title, nightsFig + empty(d.study_reason || `${nNights} nights are in. The result is published once the comparison has been read and ruled on.`) + hrvNote) +
+      note("The study has its nights; its result is not published until it has been read and ruled on.");
+  }
+  const rhr = d.rhr_agreement;
+  const agreeDays = rhr ? rhr.agree_days : 0, minorDays = rhr ? rhr.minor_days : 0, flagDays = rhr ? rhr.flagged_days : 0;
+  const headFigs = figs([
+    fig(nNights, `nights Whoop and the ${watchLabel} both recorded`),
+    d.combined_agreement_rate_pct != null && fig(d.combined_agreement_rate_pct + "%", "agreement rate"),
+    rhr && fig(flagDays, "nights flagged (RHR diff >6bpm)"),
+  ]);
+  const archivalNote = d.archival && d.archival.pre_cycle ? `<p class="rd-meta label">${esc(_dayFrame(d.archival.label))} — the comparison window itself.</p>` : "";
+  const period = d.period ? ` — ${esc(d.period.start)} to ${esc(d.period.end)}` : "";
+  const band = { agree: "within 3 bpm", minor_variance: "within 6 bpm", flag: "flagged" };
+  const rows = (d.daily || []).slice(0, 30).map((r) => `<tr class="${r.rhr_agreement === "flag" ? "rd-flag" : ""}"><td class="rd-name">${esc(r.date)}</td><td>${esc(band[r.rhr_agreement] || "—")}</td></tr>`).join("");
+  const table = rows ? sec(`Whoop vs ${watchLabel}, night by night (resting heart rate)${period}`, `<table class="rd-tbl"><thead><tr><th>date</th><th>agreement</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
+  return sec(title, headFigs +
+      `<p class="rd-prose">Across every overlapping night since the watch arrived${watchFrom ? ` (${esc(watchFrom)})` : ""}: ${esc(agreeDays)} agreed within 3bpm, ${esc(minorDays)} were within 6bpm, and ${esc(flagDays)} disagreed enough to flag. Two real pieces of hardware produce a correlated-but-imperfect pattern like this; identical numbers would be the red flag.</p>` +
+      hrvNote + archivalNote) + table +
+    note(d.interpretation || "Cross-device resting-heart-rate comparison, thresholded from real inter-device variance — not a claim either sensor is 'right.'");
+}
+
 export function renderVerify(d) {
   const links = verifyDeviceLinks();
   const sample = verifyRawSample();
   const methodLink = `<p class="rd-archive">Every statistic this platform publishes — its exact formula, the window it runs over, what it can't tell you — is documented at <a href="/method/registry/">the Methods Registry</a>, generated straight from the code, not hand-written. The devices behind these readings — what each measures and where to get it — are on <a href="/gear/">the gear page</a> (kept separate from this page's honesty checks on purpose).</p>`;
+  const two = verifyInstruments(d);
   if (!d || d.status === "unavailable") {
-    return sec("Cross-device agreement — the credibility signal", empty(d && d.reason ? d.reason : "No overlapping device data recorded yet.")) + links + sample + methodLink + note("Nothing here is fabricated to fill a gap — an empty section says so.");
+    return two + sec("Do the two agree? — the comparison", empty(d && d.reason ? d.reason : "No overlapping device data recorded yet.")) + links + sample + methodLink + note("Nothing here is fabricated to fill a gap — an empty section says so.");
   }
-  // #5042: the comparison is the Apple WATCH era only (the producer floors it at the
-  // registry's first watch day) — every heading names that start, and below the agreement
-  // study's floor (#4974, 30 nights) the page shows the nights but no verdict.
+  // #5042: the comparison is the Apple WATCH era only (the producer floors it at the registry's
+  // first watch day) — every heading names that start.
   const watchFrom = d.watch_era && d.watch_era.start ? d.watch_era.start : null;
   const watchLabel = watchFrom ? `Apple Watch (from ${esc(watchFrom)})` : "Apple Watch";
-  const rows = (d.daily || []).slice(0, 30).map((r) => {
-    const flagged = r.rhr_agreement === "flag" || r.hrv_agreement === "flag";
-    return `<tr class="${flagged ? "rd-flag" : ""}"><td class="rd-name">${esc(r.date)}</td><td class="num">${r.whoop_rhr_bpm != null ? fmt(r.whoop_rhr_bpm) : "—"}</td><td class="num">${r.apple_rhr_bpm != null ? fmt(r.apple_rhr_bpm) : "—"}</td><td class="num">${r.rhr_abs_diff_bpm != null ? fmt(r.rhr_abs_diff_bpm) : "—"}</td><td>${esc(r.rhr_agreement || "—")}</td></tr>`;
-  }).join("");
-  // #2957: the table's own caption now bounds the window it's actually showing —
-  // whatever the pause note says, a bare "night by night" table with no dates in
-  // its heading reads as live to a skimming reader. `archival` (the producer's own
-  // site_api_phase_frame.archival_frame call, off the window's newest night) adds
-  // the same "previous cycle" framing every other cross-phase surface uses.
-  const period = d.period ? ` — ${esc(d.period.start)} to ${esc(d.period.end)}` : "";
-  const table = rows ? sec(`Whoop vs ${watchLabel}, night by night (resting heart rate, bpm)${period}`, `<table class="rd-tbl"><thead><tr><th>date</th><th>Whoop</th><th>Apple Watch</th><th>diff</th><th>agreement</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
-  // #4976: HRV is not compared (Whoop RMSSD vs Apple SDNN) — the producer says so, the page repeats it.
-  const hrvNote = d.hrv_note ? `<p class="rd-meta label">${esc(d.hrv_note)}</p>` : "";
-  const nNights = d.n_nights != null ? d.n_nights : (d.period ? d.period.overlapping_days : 0);
-  if (d.status === "too_few_nights") {
-    const minN = d.min_nights || 30;
-    return sec("Cross-device agreement — the credibility signal", figs([fig(nNights, `nights Whoop and the ${watchLabel} both recorded`)]) +
-        empty(`Too few nights to compare yet — ${nNights} of the ${minN} the agreement study needs. The comparison starts when the Apple Watch did${watchFrom ? ` (${esc(watchFrom)})` : ""}; earlier Apple Health heart-rate readings came from other devices, so they are left out rather than padded in.`) +
-        hrvNote) +
-      table + links + sample + methodLink +
-      note("Nothing is graded until the study's minimum is reached — the nights above are raw readings, not a finding.");
-  }
-  const rhr = d.rhr_agreement;
-  const headFigs = figs([
-    d.period && fig(nNights, `nights Whoop and the ${watchLabel} both recorded`),
-    d.combined_agreement_rate_pct != null && fig(d.combined_agreement_rate_pct + "%", "agreement rate"),
-    rhr && fig(rhr.flagged_days, "nights flagged (RHR diff >6bpm)"),
-  ]);
-  const archivalNote = d.archival && d.archival.pre_cycle
-    ? `<p class="rd-meta label">${esc(_dayFrame(d.archival.label))} — the comparison window itself.</p>`
-    : "";
-  const agreeDays = rhr ? rhr.agree_days : 0, minorDays = rhr ? rhr.minor_days : 0, flagDays = rhr ? rhr.flagged_days : 0;
-  return sec("Cross-device agreement — the credibility signal", headFigs +
-      `<p class="rd-prose">Whoop and the Apple Watch are two independently-made sensors, worn the same nights, that were never designed to talk to each other. Across every overlapping night since the watch arrived${watchFrom ? ` (${esc(watchFrom)})` : ""}: ${esc(agreeDays)} agreed within 3bpm, ${esc(minorDays)} were within 6bpm, and ${esc(flagDays)} disagreed enough to flag. That specific, correlated-but-imperfect pattern is what two real pieces of hardware produce — synthetic or copy-pasted numbers don't misbehave this particular way.</p>` +
-      hrvNote + archivalNote) +
-    table + links + sample + methodLink +
-    note(d.interpretation || "Cross-device resting-heart-rate comparison, thresholded from real inter-device variance — not a claim either sensor is 'right.'");
+  return two + verifyComparison(d, watchFrom, watchLabel) + links + sample + methodLink;
 }
 
 export function renderPipeline(d) {

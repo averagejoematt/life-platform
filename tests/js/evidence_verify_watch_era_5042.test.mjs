@@ -12,7 +12,8 @@ import assert from "node:assert/strict";
 const { renderVerify } = await import("../../site/assets/js/evidence_meta.js");
 
 const ERA = { start: "2026-10-17", determined_by: "the earliest Apple Watch-sourced RHR reading" };
-const night = (date, w, a) => ({ date, whoop_rhr_bpm: w, apple_rhr_bpm: a, rhr_abs_diff_bpm: Math.abs(w - a), rhr_agreement: Math.abs(w - a) <= 3 ? "agree" : "flag" });
+// #4980: a served night is its date and (once the study has ruled) its band — never a bpm value.
+const night = (date, band = "agree") => ({ date, rhr_agreement: band });
 
 test("below the study minimum the page shows the honest-empty state, n and the era start, no verdict", () => {
   const html = renderVerify({
@@ -24,7 +25,7 @@ test("below the study minimum the page shows the honest-empty state, n and the e
     rhr_agreement: null,
     combined_agreement_rate_pct: null,
     device_confidence: null,
-    daily: [night("2026-10-18", 51, 48)],
+    daily: [],
     hrv_note: "HRV is not compared.",
   });
   assert.match(html, /Too few nights to compare yet — 1 of the 30/);
@@ -32,12 +33,12 @@ test("below the study minimum the page shows the honest-empty state, n and the e
   assert.doesNotMatch(html, /agreement rate/);
   assert.doesNotMatch(html, /Across every overlapping night/);
   assert.doesNotMatch(html, /HIGH|LOW|MODERATE/);
-  // the raw night is still shown — it is a reading, not a finding
-  assert.match(html, /2026-10-18/);
+  // #4980: no per-night table before the study rules — the nights are counted, not listed
+  assert.doesNotMatch(html, /night by night/);
 });
 
-test("at the study minimum the verdict renders, captioned with the watch era", () => {
-  const daily = Array.from({ length: 30 }, (_, i) => night(`2026-11-${String(i + 1).padStart(2, "0")}`, 55, 54));
+test("once the study has ruled the verdict renders, captioned with the watch era", () => {
+  const daily = Array.from({ length: 30 }, (_, i) => night(`2026-11-${String(i + 1).padStart(2, "0")}`));
   const html = renderVerify({
     status: "ok",
     period: { start: "2026-11-01", end: "2026-11-30", overlapping_days: 30 },

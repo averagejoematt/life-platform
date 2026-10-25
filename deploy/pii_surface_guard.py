@@ -303,6 +303,30 @@ _CHRON_AGE_KEY_RE = re.compile(
     re.IGNORECASE,
 )
 
+# #4980: the watch's private readings. Owner ruling 2026-10-17 (c): heart-rhythm data is
+# owner-only; SpO2, wrist temperature, breathing disturbances and the watch's own sleep are
+# owner-only in lambdas/privacy/field_tiers.py, and its resting HR / HRV are internal. A payload
+# KEY naming one of them is the leak tell, whatever its value — the 2026-10-25 finding was
+# /api/device_agreement serving the watch's resting HR per night as `apple_rhr_bpm`, an alias
+# no DynamoDB-name check could see. Underscore-aware like the genetic arm; `rhythm` alone is
+# not a tell (`meal_rhythm`, `sentence_rhythm` are copy), only the rhythm channel's prefix is.
+_WATCH_PRIVATE_KEY_RE = re.compile(
+    r"^rhythm_|heart_rhythm|(?:^|_)ecg(?:_|$)|afib|spo2|blood_oxygen|wrist_temp|breathing_disturb|apple_rhr|apple_hrv|hrv_sdnn|(?:^|_)sleep_\w*_apple$",
+    re.IGNORECASE,
+)
+
+
+def _restricted_field_names() -> frozenset:
+    """Every field name `lambdas/privacy/field_tiers.py` declares NOT publishable (owner-only or
+    internal), read from the registry — never restated here. Lazy, stdlib-only import."""
+    lam = os.path.join(_ROOT, "lambdas")
+    if lam not in sys.path:
+        sys.path.insert(0, lam)
+    from privacy.field_tiers import FIELD_TIERS, is_publishable  # noqa: E402 — lazy by design
+
+    return frozenset(f for fields in FIELD_TIERS.values() for f, t in fields.items() if not is_publishable(t))
+
+
 _SNAPSHOT_DIR = os.path.join(_ROOT, "tests", "api_schemas")
 
 
@@ -393,9 +417,13 @@ def iter_shape_keys(node, path="$"):
 
 
 def _scan_keys(key_iter) -> list:
-    """The genetic-tell + chronological-age key arms over any (json_path, key) stream."""
+    """The genetic-tell, chronological-age and (#4980) restricted-field key arms over any
+    (json_path, key) stream."""
     out = []
+    restricted = _restricted_field_names()
     for jp, key in key_iter:
+        if key in restricted or _WATCH_PRIVATE_KEY_RE.search(key):
+            out.append(("pii-restricted-field-key", f"{jp} ({key})"))
         if _GENETIC_KEY_RE.search(key) and key.lower() not in _GENETIC_AGGREGATE_KEYS:
             out.append(("pii-genetic-key", f"{jp} ({key})"))
         if _CHRON_AGE_KEY_RE.search(key):

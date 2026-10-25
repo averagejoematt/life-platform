@@ -39,6 +39,7 @@ from datetime import datetime, timedelta
 from common import metric_truth
 from ingestion.source_registry import source_label
 
+from web import instruments  # #4980 — the device behind each reading, in the site's words
 from web.baseline_change import with_baseline_change  # #5029 — the neutral public date of the HR baseline change
 from web.site_api_common import (
     PT,
@@ -184,7 +185,9 @@ def _vo2max_arc():
     for d, r in sorted(metric_truth.resolve_by_date(_VO2, rows_by_source).items()):
         if r.value is None or r.value <= 0:
             continue
-        series.append({"date": d, "value": round(r.value, 1), "source": r.source})
+        # #4980: each point names its device (the Apple Watch only from its first day; an older
+        # Apple Health estimate is said as Apple Health), so a reader can label every point.
+        series.append({"date": d, "value": round(r.value, 1), "source": r.source, "device": instruments.device_of(r.source, d)})
     if not series:
         return {"available": False, "reason": "No recorded VO2max estimates yet."}
     values = [p["value"] for p in series]
@@ -206,6 +209,7 @@ def _vo2max_arc():
         "source": source_label(current["source"]) or current["source"],
         "sources": arc_sources,
         "mixed_devices": len(arc_sources) > 1,
+        "devices": list(dict.fromkeys(p["device"] for p in series)),  # #4980: every device on the arc, oldest first
         "unit": "ml/kg/min",
         "series": series,
         "n": len(series),

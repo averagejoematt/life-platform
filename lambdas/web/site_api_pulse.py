@@ -20,8 +20,12 @@ facade; no import cycle. Every other shared helper comes straight from
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
-from common.metric_truth import steps_by_date as resolved_steps_by_date  # #4630 — the ONE steps resolver
+from common.metric_truth import (
+    steps_by_date as resolved_steps_by_date,  # #4630 — the ONE steps resolver
+    steps_sources_by_date as resolved_steps_sources_by_date,  # #4980 — whose count it is
+)
 
+from web import instruments  # #4980 — the watch's first day
 from web.baseline_change import with_baseline_change  # #5029 — the neutral public date of the HR baseline change
 from web.journey_direction import DOWN, EVEN, UNKNOWN, UP, classify_delta  # #3293 — the ONE ruling on the sign of a weight delta
 from web.site_api_common import (
@@ -805,6 +809,32 @@ def pulse(*, _g) -> dict:
     )
 
 
+_ACTIVE_KCAL_FIELD = "active_calories"  # the Apple Health partition's active energy (TIER_PUBLIC by omission)
+
+
+def _watch_active_kcal_by_date(ah_items) -> dict[str, int]:
+    """`{date: whole kcal}` of the Apple Watch's active energy, from its first day on (#4980).
+
+    Before the watch the partition's active energy is a phone-only estimate, a different
+    instrument, so those days are left out rather than joined to the watch's into one line.
+    A day row only (a sub-row never answers for a day); a zero or absent value is no reading."""
+    first = instruments.watch_first_day()
+    out: dict[str, int] = {}
+    for r in ah_items or ():
+        sk = str(r.get("sk") or "")
+        d = sk[5:15] if sk.startswith("DATE#") and len(sk) == 15 else str(r.get("date") or "")[:10]
+        v = r.get(_ACTIVE_KCAL_FIELD)
+        if not d or d < first or v is None or isinstance(v, bool):
+            continue
+        try:
+            kcal = round(float(v))
+        except (TypeError, ValueError):
+            continue
+        if kcal > 0:
+            out[d] = max(kcal, out.get(d, 0))
+    return out
+
+
 def pulse_history(*, _g) -> dict:
     """
     GET /api/pulse_history
@@ -837,7 +867,12 @@ def pulse_history(*, _g) -> dict:
     # step_count, else Apple Health, else Garmin at >=1000, which still drops the phantom
     # ~298 partial-sync record). Raw whoop_items, NOT whoop_by_date: a day whose recovery
     # is not yet scored can still carry the wrist's count.
-    steps_by_date: dict[str, int] = resolved_steps_by_date({"whoop": whoop_items, "apple_health": ah_items, "garmin": garmin_items})
+    steps_rows = {"whoop": whoop_items, "apple_health": ah_items, "garmin": garmin_items}
+    steps_by_date: dict[str, int] = resolved_steps_by_date(steps_rows)
+    # #4980: whose count each day's steps are (the resolver's answer, never re-decided here),
+    # and the Apple Watch's active energy from its first day on (before it, the phone alone).
+    steps_source_by_date = resolved_steps_sources_by_date(steps_rows)
+    active_kcal_by_date = _watch_active_kcal_by_date(ah_items)
 
     # Build daily summaries
     days = []
@@ -881,10 +916,12 @@ def pulse_history(*, _g) -> dict:
                 "rhr_bpm": round(rhr) if rhr is not None else None,
                 "strain": round(strain, 1) if strain is not None else None,
                 "steps": steps,
+                "steps_source": steps_source_by_date.get(d) if steps else None,
+                "active_kcal": active_kcal_by_date.get(d),
                 "headline": " · ".join(headline_parts) if headline_parts else "No data recorded",
             }
         )
         current += timedelta(days=1)
         day_num += 1
 
-    return _ok(with_baseline_change({"pulse_history": days}), cache_seconds=3600)
+    return _ok(with_baseline_change({"pulse_history": days, "watch_first_day": instruments.watch_first_day()}), cache_seconds=3600)

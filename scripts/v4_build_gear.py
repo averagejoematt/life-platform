@@ -136,16 +136,20 @@ GEAR: dict[str, dict] = {
             "href": "/method/verify/",
         },
     },
+    # #4980: the Apple Watch Ultra 4, worn day and night beside Whoop since 2026-10-17 (epic #4967,
+    # owner rulings 2026-10-17 (a)/(b)). The card names what the site publishes from it and says
+    # plainly that not every reading is published — without naming the private kinds.
     "apple_health": {
         "kind": "gear",
-        "product": "Apple Watch + Health Auto Export",
+        "product": "Apple Watch Ultra 4 + Health Auto Export",
         "vendor": "Apple / Health Auto Export",
         "icon": "vitals",
         "affiliate_url": "",  # ← Apple affiliate + / or Health Auto Export link
         "accountability": {
-            "text": "Resting heart rate is the independent sensor Whoop is cross-checked against; steps and active energy overlap with the other movement sensors; CGM, blood pressure and mood are hand-captured through the same webhook.",
+            "text": "The second instrument: worn day and night beside Whoop, so the two can be compared on the same nights before either is trusted over the other; nothing is averaged across them until that comparison has been read. Steps and active energy overlap with the other movement sensors; CGM, blood pressure and mood are hand-captured through the same webhook.",
             "href": "/method/verify/",
         },
+        "note": "Published from the watch: steps, active energy and VO2 max, each labelled as the watch&rsquo;s. Not every reading the watch takes is published.",
     },
     "garmin": {
         "kind": "gear",
