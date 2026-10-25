@@ -1030,7 +1030,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
                 "manual": False,
             },
         ],
-        # #4638: stated default (owner ruling pending). The webhook path is append-only by design:
+        # #4638: ACCEPTED -- owner ruling 2026-10-11 ~22:50Z: "accept not propagated". The webhook path is append-only by design:
         # merge_day_to_dynamo(monotonic_guard=True) never lowers a total, the per-reading maps never
         # overwrite an existing timestamp, and the rebuild-a-day path (monotonic_guard=False) has no
         # operator caller. tests/test_upstream_changes_4638.py pins all three facts.
@@ -1038,7 +1038,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             "edits": "not_propagated",
             "deletes": "not_propagated",
             "window_days": None,
-            "standing": "stated_default",
+            "standing": "accepted",
             "note": (
                 "A corrected amount is ignored and a deleted reading stays counted: per-reading maps never "
                 "overwrite an existing timestamp, workouts dedup on id (id-less ones are dropped) and additive "
