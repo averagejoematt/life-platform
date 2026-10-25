@@ -1202,6 +1202,12 @@ jobs:
           echo "═══ Deploying the one bundle fleet-wide (plan: fleet_changed=${{ needs.plan.outputs.fleet_changed }}, mcp_changed=${{ needs.plan.outputs.mcp_changed }}) ═══"
           bash deploy/deploy_fleet.sh
 
+      # #5316: every fleet function's live build_info sha vs the sha this run stamped. Reporting
+      # (continue-on-error): a mismatch here is a concurrent writer, named while it is fresh.
+      - name: Fleet drift check (#5316)
+        continue-on-error: true
+        run: python3 deploy/check_fleet_drift.py --expect "${{ github.sha }},${{ needs.reconcile.outputs.build_sha }}"
+
       # ── Public site deploy: NOT here anymore (#750) ────────────────────────
       # #393 shipped the site inside this approval-gated job; #750 moved it to
       # .github/workflows/site-deploy.yml, which fires directly on any push to
@@ -1219,6 +1225,9 @@ jobs:
     timeout-minutes: 10
     needs: [reconcile, deploy]   # reconcile: read build_sha for the checkout below (#1345 fix)
     if: ${{ !cancelled() && needs.deploy.result == 'success' }}   # #5298: a skipped deploy-iam ancestor must not skip this
+    # #5316: set ONLY by smoke_oracle_decision.py on an oracle FAIL — the rollback's licence.
+    outputs:
+      smoke_verdict: ${{ steps.smoke.outputs.smoke_verdict || steps.canary.outputs.smoke_verdict }}
     steps:
       # The smoke + canary steps call deploy/lib/smoke_oracle_decision.py (#1345 extracted
       # the oracle to a repo file). This job had NO checkout — the old inline Python needed
@@ -1235,6 +1244,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Run QA smoke test
+        id: smoke
         run: |
           echo "Running qa-smoke Lambda..."
 
@@ -1262,11 +1272,14 @@ jobs:
             SMOKE_PAYLOAD='{"synthetic_fail": true}'
           fi
 
+          # #5316: no 60 s CLI read timeout — qa-smoke ran 68-76 s on 2026-10-24 and the default
+          # exited 255 before the oracle read a payload (its 240 s Lambda timeout bounds this).
           aws lambda invoke \
             --function-name life-platform-qa-smoke \
             --payload "$SMOKE_PAYLOAD" \
             --region ${{ env.AWS_REGION }} \
             --cli-binary-format raw-in-base64-out \
+            --cli-read-timeout 0 --cli-connect-timeout 10 \
             /tmp/smoke.json
 
           echo "Smoke test result:"
@@ -1278,6 +1291,7 @@ jobs:
           python3 deploy/lib/smoke_oracle_decision.py /tmp/smoke.json "Smoke test"
 
       - name: Verify canary
+        id: canary
         run: |
           echo "Checking canary Lambda (retry-before-gate, #3830)..."
 
@@ -1592,15 +1606,32 @@ jobs:
     # canary's since #2051) reach this job; content-truth and stored-state
     # findings warn, alarm and email instead. Neither can be fixed by reverting
     # code, and each has reverted a healthy fleet at least once.
-    if: always() && needs.smoke-test.result == 'failure' && needs.deploy.result == 'success'
+    #
+    # #5316: the failure must ALSO carry the oracle's own verdict. 2026-10-24 a qa-smoke invoke
+    # hit the CLI read timeout (exit 255) before the oracle ran and reverted the fleet anyway.
+    if: >-
+      always() && needs.smoke-test.result == 'failure' && needs.deploy.result == 'success'
+      && needs.smoke-test.outputs.smoke_verdict == 'failed_deploy_health'
+    # #5316: the deploy job's group, so a rollback and a deploy SERIALISE (2026-10-24 this job
+    # ran 11:04:59–11:31:06Z over the next Deploy, 11:05:46–11:16:16Z, and finished last).
+    # Safe here, unlike deploy-iam: `ungated-deploy` has no reviewers, so it never parks at a
+    # gate. A newer pending deploy may cancel a queued rollback (newer code supersedes it).
+    concurrency:
+      group: ci-cd-deploy-${{ github.ref }}
+      cancel-in-progress: false
     # #4257: the deploy role trusts only `environment:` subjects, never a bare main ref. This
     # environment has NO reviewers (ADR-158: code ships on green) and a main-only branch
     # policy — it is the job's identity, not a gate. The one human click stays `production`.
     environment: ungated-deploy
+    permissions:   # actions: read — the drift step reads main's last successful deploy (#5316)
+      id-token: write
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.reconcile.outputs.build_sha }}   # #1173: same tree the deploy used
+          fetch-depth: 0   # #5316: the drift step's ancestry read (a later deploy is ahead, not drift)
 
       - name: Configure AWS credentials (OIDC)
         uses: ./.github/actions/setup-ci
@@ -1609,54 +1640,22 @@ jobs:
           aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
+      # The loop + tally live in deploy/rollback_fleet.sh (#5316). ROLLBACK_EXPECT_SHA = the
+      # shas this run's deploy stamped (build_info.json carries GITHUB_SHA); a function live on
+      # anything else is owned by a newer deploy and is SKIPPED_NEWER, never reverted.
       - name: Rollback deployed Lambdas
-        run: |
-          echo "⚠️  Smoke test failed after successful deploy — initiating auto-rollback"
-          echo ""
+        env:
+          ROLLBACK_EXPECT_SHA: ${{ github.sha }} ${{ needs.reconcile.outputs.build_sha }}
+        run: bash deploy/rollback_fleet.sh
 
-          # #4255: every code deploy is a fleet deploy (deploy/deploy_fleet.sh), which
-          # redeploys and re-seeds deploys/<fn>/previous.zip for EVERY mapped function plus
-          # both MCP functions. So the rollback set is always that same list, rebuilt from
-          # ci/lambda_map.json — the source deploy_fleet.sh iterates (#1859 gap 2 was the
-          # per-function deploy_matrix reading "[]" on a fleet push; there is no other path now).
-          MATRIX=$(jq -c '[.lambdas | to_entries[] | select((.value.not_deployed // false) | not) | {function: .value.function}]
-                     + [{function:"life-platform-mcp"}, {function:"life-platform-mcp-warmer"}]
-                     | unique_by(.function)' "${{ env.LAMBDA_MAP }}")
-          COUNT=$(echo "$MATRIX" | jq 'length')
-          echo "   $COUNT function(s) to roll back"
-
-          ROLLED_BACK=0
-          MISSING=0
-          FAILED=0
-
-          # Roll back individual Lambdas. rollback_lambda.sh exit codes (#1848):
-          # 0 = reverted, 2 = no previous.zip (function LEFT ON CURRENT CODE — report,
-          # don't fail), else = attempted and broke (manual intervention).
-          for row in $(echo "$MATRIX" | jq -r '.[] | @base64'); do
-            FUNC=$(echo "$row" | base64 -d | jq -r '.function')
-            echo "→ Rolling back $FUNC..."
-            RC=0
-            bash deploy/rollback_lambda.sh "$FUNC" || RC=$?
-            case "$RC" in
-              0) ROLLED_BACK=$((ROLLED_BACK + 1)) ;;
-              2) MISSING=$((MISSING + 1)) ;;
-              *) echo "  ❌ Rollback failed for $FUNC — manual intervention required"
-                 FAILED=$((FAILED + 1)) ;;
-            esac
-          done
-
-          echo ""
-          echo "═══ Rollback complete: $ROLLED_BACK reverted, $MISSING no-artifact (left on current code), $FAILED failed ═══"
-
-          if [ "$MISSING" -gt 0 ]; then
-            echo "::warning::$MISSING function(s) had no previous.zip and stayed on the just-deployed code — the fleet is MIXED-VERSION if any reverted. Verify before trusting either state."
-          fi
-          if [ "$FAILED" -gt 0 ]; then
-            echo "::error::$FAILED Lambda(s) could not be rolled back — manual redeploy required"
-            exit 1
-          fi
-
-          echo "✅ Rollback pass finished. Investigate smoke test failure before re-deploying."
+      # #5316: reporting — every function's live sha vs main's last successful deploy.
+      - name: Post-rollback fleet drift
+        id: drift
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 deploy/check_fleet_drift.py --expect-deploy-base
 
       # #418/ADR-117: every rollback event must produce a notification (no silent
       # revert). (#749/actionlint: the old, now-retired shared-layer runbook branch
@@ -1672,6 +1671,7 @@ jobs:
           Commit: $SHORT (${{ github.ref_name }})
           Run: $RUN_URL
           Rollback job result: ${{ job.status }}
+          Fleet drift after rollback: ${{ steps.drift.outputs.summary }}
 
           Investigate the smoke-test failure before re-deploying."
           aws sns publish \
