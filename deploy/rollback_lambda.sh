@@ -18,6 +18,17 @@
 # (deploy/s3_lifecycle.json, #3368) expires noncurrent versions after 1 day,
 # keeping only the newest noncurrent generation — beyond that window,
 # re-deploy from a git ref (deploy_lambda.sh on a checkout of the wanted sha).
+#
+# Exit codes (#1848, #5316): 0 = reverted · 2 = no previous.zip (left on current code)
+# · 3 = SKIPPED_NEWER (left on current code: ROLLBACK_EXPECT_SHA is set and the live
+# build is not that sha — a newer deploy owns the function, or its sha is unreadable)
+# · anything else = attempted and broke.
+#
+# ROLLBACK_EXPECT_SHA (#5316): space/comma-separated shas the deploy being reverted
+# stamped into build_info.json. When set, a function is reverted ONLY while it is still
+# live on one of them. 2026-10-24: a rollback that overlapped a newer successful deploy
+# finished last and put 62 functions behind main. Unset = the old unconditional revert
+# (attended, by hand).
 
 set -euo pipefail
 
@@ -31,6 +42,7 @@ DEFAULT_REGION="us-west-2"
 S3_REGION="us-west-2"
 BUCKET="matthew-life-platform"
 LAMBDA_MAP="${LAMBDA_MAP:-ci/lambda_map.json}"
+ROLLBACK_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # ── Region resolution (#1859) ──
 # ci/lambda_map.json's "region" field lives on the SOURCE-FILE entry, keyed by
@@ -89,6 +101,19 @@ rollback_one() {
         return 1
     fi
 
+    # ── #5316: revert only what THIS run still owns ──
+    # Checked after the existence probes and immediately before the write, so the window
+    # between the ownership read and update-function-code is as short as it can be (the
+    # rollback job also shares the deploy job's concurrency group, so a deploy cannot
+    # start inside it).
+    if [ -n "${ROLLBACK_EXPECT_SHA:-}" ]; then
+        if ! python3 "$ROLLBACK_ROOT/deploy/check_fleet_drift.py" --owner-check "$FUNCTION_NAME" \
+            --region "$REGION" --expect "$ROLLBACK_EXPECT_SHA"; then
+            rm -rf "$WORK_DIR"
+            return 3
+        fi
+    fi
+
     # ── Download previous artifact (always from the S3 bucket's home region) ──
     echo "  📥 Downloading s3://$BUCKET/$S3_PREVIOUS..."
     aws s3 cp "s3://$BUCKET/$S3_PREVIOUS" "$WORK_DIR/rollback.zip" \
@@ -143,6 +168,7 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     FAILED=0
     ROLLED_BACK=0
     MISSING=0
+    SKIPPED_NEWER=0
 
     for func in "$@"; do
         RC=0
@@ -150,18 +176,23 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
         case "$RC" in
             0) ROLLED_BACK=$((ROLLED_BACK + 1)) ;;
             2) MISSING=$((MISSING + 1)) ;;
+            3) SKIPPED_NEWER=$((SKIPPED_NEWER + 1)) ;;
             *) FAILED=$((FAILED + 1)) ;;
         esac
     done
 
     echo ""
     echo "════════════════════════════════════"
-    echo "Rollback complete: $ROLLED_BACK succeeded, $MISSING no-artifact (left as-is), $FAILED failed"
+    echo "Rollback complete: $ROLLED_BACK succeeded, $MISSING no-artifact (left as-is), $SKIPPED_NEWER skipped-newer (left as-is), $FAILED failed"
     echo "════════════════════════════════════"
 
     if [ "$FAILED" -gt 0 ]; then
         echo "❌ Some rollbacks failed — check output above"
         exit 1
+    fi
+    if [ "$SKIPPED_NEWER" -gt 0 ] && [ "$ROLLED_BACK" -eq 0 ]; then
+        # #5316: nothing reverted because a newer deploy owns it — distinct from no-artifact.
+        exit 3
     fi
     if [ "$MISSING" -gt 0 ] && [ "$ROLLED_BACK" -eq 0 ]; then
         # Nothing was actually reverted — signal the no-artifact class distinctly so

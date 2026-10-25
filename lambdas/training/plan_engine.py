@@ -716,6 +716,8 @@ def _scheduled_session(
     elif out.get("prescription"):
         # #4090: the week's direct hard sets per redline muscle, beside the range each must sit in
         out["weekly_sets_by_muscle"] = program_structure.weekly_sets_by_muscle(catalog_movements or {}, skill_ceiling)
+        # #5311: the charter's volume_priorities bands against the week's prescribed sets (side/rear delts by movement, presses out)
+        out["volume_bands"] = program_structure.volume_floor_coverage(catalog_movements or {}, skill_ceiling)["bands"]
     if out.get("prescription"):
         # #5077: the block mesocycle model's week — the per-muscle set target, the ramp stage, the next block, no deload week
         out["block_model"] = block_model.for_session(out, deload_records)

@@ -71,7 +71,15 @@ def _blocks_from_prescription(
             continue
         mdef = catalog.get("movements", {}).get(key, {})
         sets_spec = e["sets"][:2] if top_plus_one else e["sets"]
-        sets = [Set(type="normal", rep_range_start=sp["reps"][0], rep_range_end=sp["reps"][1]) for sp in sets_spec]
+        # #5318: a carry set is timed (no rep range, no load — his first-exposure pick); every other set is a rep range
+        sets = [
+            (
+                Set(type="normal", duration_seconds=int(sp["duration_seconds"]))
+                if sp.get("duration_seconds")
+                else Set(type="normal", rep_range_start=sp["reps"][0], rep_range_end=sp["reps"][1])
+            )
+            for sp in sets_spec
+        ]
         note = ""
         if not anchors_only:
             note = _build_exercise_note(
@@ -85,7 +93,8 @@ def _blocks_from_prescription(
             )
         # History first (the ADR-068 one-best-line convention every note reader expects to
         # lead), then the §3 prescription; the floor cue is appended after both.
-        cue = e["cue"]
+        # #5317: the cue is generated from the sets THIS block carries (the Minimum Viable Session cuts them to two)
+        cue = program_structure.exposure_cue(e["intensity"], sets_spec)
         notes = f"{note} {cue}".strip() if note else cue
         tag = f"{e['kind']}:{e.get('pattern') or key}:{e['intensity']}"
         blocks.append(
@@ -99,7 +108,7 @@ def _blocks_from_prescription(
                 rationale_tag=tag,
             )
         )
-        used.append({**e, "sets": sets_spec})
+        used.append({**e, "sets": sets_spec, "cue": cue})
     return blocks, used, unresolved
 
 

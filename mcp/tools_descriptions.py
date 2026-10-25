@@ -66,8 +66,9 @@ GET_EXERCISE_NOTES_DESCRIPTION = (
     "action='deload' (#5070, OWNER-ONLY): record his word that a deload starts (words VERBATIM, optional "
     "start_date/days/sets_pct) — the ONLY way a deload ever applies; action='deloads' lists them. "
     "action='disruption' (#5088, OWNER-ONLY): record his word that disruption mode is ON (words VERBATIM, "
-    "template travel|busy, until, optional start_date) — habits held instead of targets, the short session "
-    "served; action='disruption_end' switches it OFF (step back up); action='disruptions' lists them. "
+    "template travel|busy|life|lapse, until, optional start_date) — habits held instead of targets, the short session "
+    "served; life and lapse (#5122) hold the WHOLE day (targets and grading paused, no streak language; lapse is the "
+    "72-hour protocol, until defaults to its end); action='disruption_end' switches it OFF; action='disruptions' lists them. "
     "action='travel_kit' (#5104, a read): the travel food kit for the late-December trip — a day plan built to the "
     "charter's protein, floors and calorie target (optional maintenance_kcal for the maintenance week, trip_days), the "
     "destination grocery list, the packing list and the hotel/restaurant playbook. "
@@ -142,7 +143,11 @@ GET_EXERCISE_NOTES_INPUT = {
         "start_date": {"type": "string", "description": "action='deload': YYYY-MM-DD the deload starts. Defaults to today (Pacific)."},
         "days": {"type": "integer", "description": "action='deload': days the deload covers (default 7)."},
         "sets_pct": {"type": "integer", "description": "action='deload': the set cut, negative (default -40)."},
-        "template": {"type": "string", "enum": ["travel", "busy"], "description": "action='disruption': travel or busy."},
+        "template": {
+            "type": "string",
+            "enum": ["travel", "busy", "life", "lapse"],
+            "description": "action='disruption': travel, busy, life or lapse (#5122).",
+        },
         "maintenance_kcal": {
             "type": "integer",
             "description": "action='travel_kit': the maintenance week's calorie target; sizes the maintenance-week day. Omitted: #5107's own maintenance estimate (the expenditure reconciliation's actionable best match).",
@@ -151,7 +156,10 @@ GET_EXERCISE_NOTES_INPUT = {
             "type": "integer",
             "description": "action='travel_kit': trip length in days (default: the charter window's dates, else its default).",
         },
-        "until": {"type": "string", "description": "action='disruption': YYYY-MM-DD, the last day the mode covers. Required."},
+        "until": {
+            "type": "string",
+            "description": "action='disruption': YYYY-MM-DD, the last day the mode covers. Required (lapse: defaults to its end).",
+        },
         "ended_on": {"type": "string", "description": "action='disruption_end': YYYY-MM-DD, the first day back. Defaults to today."},
         "results": {
             "type": "object",

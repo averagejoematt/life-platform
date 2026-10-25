@@ -38,9 +38,10 @@ set ceilings count WORKING sets (`working_set_count`) — a ceiling of hard sets
 by the climb to the first one.
 
 PROVENANCE (ADR-105). Every number in `WARMUP_PRESCRIPTION` is the owner's own issue text, labelled
-`owner-pending`: #5049 carries `gate:owner` on exactly these numbers ("recommended: 50/70/85 %
-x 8/5/3 for the first compound, 1 set at 70 % for later ones, floor 95 lb"). His word is a
-one-line change to this table and to its `provenance`.
+`owner-ruled`: #5049 carried `gate:owner` on exactly these numbers ("recommended: 50/70/85 %
+x 8/5/3 for the first compound, 1 set at 70 % for later ones, floor 95 lb") and the owner ruled
+2026-10-23 (attended, Session CD): "warm-ups as they are" (#5049 comment; handovers/HANDOVER_LATEST.md).
+Any change is a new ruling and a one-line change to this table and to its `provenance`.
 """
 
 from __future__ import annotations
@@ -60,10 +61,10 @@ WARMUP_PRESCRIPTION: dict[str, Any] = {
     # the anchor families (`movement_catalog.anchor_family`) that are the big lifts the issue names:
     # bench / squat / deadlift (hinge) / overhead press / row. The vertical pull is not one of them.
     "compound_families": ("bench", "squat", "hinge", "overhead_press", "row"),
-    "provenance": "owner-pending",
+    "provenance": "owner-ruled",
     "provenance_detail": (
-        "#5049 gate:owner — the owner's recommended numbers (50/70/85 % x 8/5/3 first compound, "
-        "1 set at 70 % later, floor 95 lb), built as the default until he confirms or changes them (ADR-105)"
+        "#5049 gate:owner — the recommended numbers (50/70/85 % x 8/5/3 first compound, "
+        "1 set at 70 % later, floor 95 lb), owner-ruled 2026-10-23: warm-ups as they are (ADR-105)"
     ),
 }
 

@@ -67,7 +67,7 @@ from typing import Any, Callable
 
 from training import owner_redlines, training_context_registry
 
-from coach import critics_fatigue
+from coach import critics_fatigue, critics_models
 
 CRITICS_VERSION = "critics@1.5.0"  # #4161: gap-scaled stale cap, performance/readiness fatigue trigger, the advocate adds nothing
 # critics@1.4.0 (#4149): every numeric change computed in code; critic loads clamped to the subtract-only floor
@@ -970,23 +970,22 @@ def run_critics(
     invoke: Callable[[dict[str, Any]], dict[str, Any]] | None,
     model_allowed: bool,
     model_paused_reason: str | None = None,
+    model_timeout_s: float | None = None,
 ) -> list[dict[str, Any]]:
-    """Four verdicts, one per packet, each a SEPARATE model call over its own packet.
+    """Four verdicts, one per packet, each a SEPARATE model call over its own packet — run concurrently
+    (#5313, `critics_models`), a reply missing at `model_timeout_s` recorded as a model error.
 
     `invoke` is the Bedrock chokepoint (or a test double). With `model_allowed` False the
     deterministic layer alone decides and every verdict records why the model did not run —
     a paused critic is reported as paused, never as an approval."""
+    models: dict[str, dict[str, Any]] = {}
+    if model_allowed and invoke is not None:
+        prompts = {cid: _prompt(packets[cid], draft) for cid in CRITIC_IDS}
+        models = critics_models.model_verdicts(prompts, invoke, parse_model_verdict, timeout_s=model_timeout_s)
     out: list[dict[str, Any]] = []
     for cid in CRITIC_IDS:
         packet = packets[cid]
-        det = deterministic_verdict(packet)
-        model = None
-        if model_allowed and invoke is not None:
-            try:
-                model = parse_model_verdict(invoke(_prompt(packet, draft)))
-            except Exception as e:  # noqa: BLE001 — a model failure is recorded on the verdict, not raised past it
-                model = {"error": f"{type(e).__name__}: {e}"[:200]}
-        v = reconcile(det, model, packet)
+        v = reconcile(deterministic_verdict(packet), models.get(cid), packet)
         if not model_allowed:
             v["model"] = {"paused": model_paused_reason or "budget tier"}
         v["unknown"] = list(packet.get("unknown", []))

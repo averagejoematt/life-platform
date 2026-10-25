@@ -24,10 +24,12 @@ def draft_cardio_warnings(blocks: list[Any], archetype: str, target_date: str) -
     session shape (#5069, owner ruling 5: lifting minutes, ONE cardio block, the cardio and stretching caps). The chat path
     flags; the generator enforces (`program_structure.enforce_session_shape`)."""
     from training import program_structure, recent_aerobic
+    from training.routine_generator import _load_json
 
+    catalog = (_load_json("movement_catalog.json") or {}).get("movements") or {}  # #5315: the real catalog, never {}
     shape = [
         f"session shape: {w} — allowed for a custom session, just flagging (#5069)"
-        for w in program_structure.session_shape_problems(blocks, {})
+        for w in program_structure.session_shape_problems(blocks, catalog)
     ]
 
     timed_wb = [
@@ -84,3 +86,14 @@ def attach_custom_cardio_notes(ir: Any, target_date: str) -> int:
     except Exception as e:  # noqa: BLE001
         logger.warning(f"draft_custom: cardio cue pass failed ({e}); notes untouched")
         return 0
+
+
+def replaced_note_warnings(ir: Any) -> list[str]:
+    """#5312: one warning per authored cardio note the composer replaced (`inputs_snapshot.cardio_notes_replaced`,
+    written by `training.cardio_cues`), stating the kind it was read as and the kind written."""
+    return [
+        f"Replaced your authored {r.get('movement_key')} note ({str(r.get('notes') or '')[:80]!r}): "
+        f"read as {r.get('old_kind') or 'no recognised kind'}, wrote {r.get('new_kind')}. "
+        "The original is kept on the draft's inputs_snapshot.cardio_notes_replaced."
+        for r in (getattr(ir, "inputs_snapshot", None) or {}).get("cardio_notes_replaced") or []
+    ]

@@ -216,6 +216,22 @@ def _response_protocol() -> dict[str, Any] | None:
     return response_protocol.current()
 
 
+def _day_mode(target_date: str) -> dict[str, Any] | None:
+    """#5122: the whole-day disruption mode + the lapse offer (`training.life_disruption.current`) over the MCP's own
+    disruption read (`tools_training_notes._disruption_records`) and the early-warning flag, or None (fail-soft)."""
+    from training import life_disruption
+
+    from mcp.config import table
+    from mcp.tools_training_notes import _disruption_records
+
+    try:
+        records = _disruption_records()
+    except Exception as e:  # noqa: BLE001 — no record read: no mode is claimed
+        logger.warning("[#5122] disruption records unreadable: %s", type(e).__name__)
+        records = []
+    return life_disruption.current(table, target_date, records=records, response=_response_protocol())
+
+
 def coach_context_for(
     target_date: str,
     *,
@@ -241,6 +257,7 @@ def coach_context_for(
             lab_followup=labs.get("followup"),
             published=False,
             response_protocol=_response_protocol(),
+            day_mode=_day_mode(target_date),
         )
     except Exception as e:  # noqa: BLE001
         logger.warning("[#5071] coach context could not be assembled: %s", type(e).__name__)

@@ -94,7 +94,13 @@ import smoke_oracle_decision as oracle  # noqa: E402  — sibling module, same d
 # A verdict that would gate the deploy. PARSE_ERROR is included because #1345 made an
 # unreadable oracle GATING, and an unreadable response is exactly as likely to be a
 # one-off (a truncated payload, a throttled invoke) as an unhealthy one.
-GATING_VERDICTS = frozenset({"FAIL", "PARSE_ERROR"})
+#
+# INVOKE_ERROR (#5316): the `aws lambda invoke` itself failed (transport, throttle,
+# read timeout), so the oracle never saw a payload. It gates and is retried like the
+# others, but it is NOT an oracle FAIL, so `oracle.emit_verdict_output` never licenses
+# the auto-rollback on it — the pipeline goes red without reverting the fleet.
+INVOKE_ERROR = "INVOKE_ERROR"
+GATING_VERDICTS = frozenset({"FAIL", "PARSE_ERROR", INVOKE_ERROR})
 
 DEFAULT_ATTEMPTS = 2  # first-occurrence parity: one failure is an observation, two are a signal
 DEFAULT_DELAY_SECONDS = 20.0
@@ -174,13 +180,16 @@ def _aws_invoke(function: str, region: str, out: Path, label: str, ok_extra: tup
             "--payload", payload_for(n),
             "--region", region,
             "--cli-binary-format", "raw-in-base64-out",
+            # #5316: the CLI's default 60 s read timeout is shorter than a healthy run can
+            # take (qa-smoke ran 68-76 s on 2026-10-24); the Lambda's own timeout bounds it.
+            "--cli-read-timeout", "0", "--cli-connect-timeout", "10",
             str(target),
         ]  # fmt: skip
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
             # The invoke itself failed (throttle, transport). Treat as a gating verdict so
             # the retry applies, rather than crashing the step with no second look.
-            return "FAIL", f"aws lambda invoke exited {proc.returncode}: {proc.stderr.strip()[:200]}"
+            return INVOKE_ERROR, f"aws lambda invoke exited {proc.returncode}: {proc.stderr.strip()[:200]}"
         try:
             print(f"Canary result (attempt {n}):")
             print(json.dumps(json.loads(target.read_text()), indent=2)[:4000])
@@ -224,6 +233,9 @@ def main(argv=None) -> int:
     verdicts = run_attempts(invoke, attempts, args.delay)
     code, summary = gate(verdicts)
     print(f"{args.label} decision: {'PASS' if code == 0 else 'FAIL'} — {summary}")
+    if code != 0:
+        # #5316: the rollback licence is the shared oracle's call, never this wrapper's.
+        oracle.emit_verdict_output([v for v, _d in verdicts])
     if code == 0 and len(verdicts) > 1:
         print(f"::warning::{args.label} needed {len(verdicts)} attempts — the first was a transient, not a deploy defect (#3830).")
     return code

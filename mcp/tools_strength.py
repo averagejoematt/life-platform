@@ -51,8 +51,14 @@ def _read_hevy_all_phases(start_date: str, end_date: str) -> tuple[list, list[st
     that core helper directly — so there is a single read path, not a second one that can
     drift from this docstring.
     """
-    items = query_source_cross_phase("hevy", start_date, end_date)
-    return items, phases_of(items)
+    from mcp import plan_call_scope
+
+    # #5313: one read per window while a `hevy_all_phases` memo scope is open (stage 2's per-exercise history loop);
+    # outside one, a plain read. A fresh list per caller; the rows are shared, read-only by every scoped consumer.
+    items = plan_call_scope.memoized(
+        plan_call_scope.HEVY_ALL_PHASES, (start_date, end_date), query_source_cross_phase, "hevy", start_date, end_date
+    )
+    return list(items), phases_of(items)
 
 
 def template_alias_map() -> tuple[dict[str, str], dict]:

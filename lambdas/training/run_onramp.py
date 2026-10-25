@@ -161,8 +161,10 @@ def gate_state(
     walking_weeks: Optional[Iterable[Mapping[str, Any]]],
     pain_flags: Any,
     stage4_done: Optional[bool] = False,
+    weight_date: Optional[str] = None,
 ) -> dict[str, Any]:
-    """The run gate for one reading: state, distance and reason (see the module docstring)."""
+    """The run gate for one reading: state, distance and reason (see the module docstring). `weight_date` (#5314) is the
+    day of the weigh-in `weight_lb` came from; it is carried so a line can say WHICH weight the distance is measured from."""
     cfg, prep = running(), prep_cfg()
     gate, prep_from = _num(cfg.get("gate_lb")), _num(prep.get("from_lb"))
     walk = walking_weeks_status(walking_weeks)
@@ -172,6 +174,7 @@ def gate_state(
         "version": RUN_ONRAMP_VERSION,
         "charter_version": training_charter.charter_version(),
         "weight_lb": w,
+        "weight_date": str(weight_date) if weight_date else None,
         "gate_lb": gate,
         "prep_from_lb": prep_from,
         "lb_to_gate": None if w is None or gate is None else round(max(w - gate, 0.0), 1),
@@ -215,7 +218,10 @@ def gate_line(gs: Optional[Mapping[str, Any]]) -> str:
     """One line for a coach prompt or the tracker: the state and its distance."""
     if not gs:
         return "Run gate: not read."
-    return f"Run gate: {gs.get('state')} — {gs.get('reason')}."
+    wl, wd = gs.get("weight_lb"), gs.get("weight_date")
+    # #5314: the distance is only comparable between surfaces when its weight and that weight's date are named
+    at = f" (from {wl:g} lb{' on ' + str(wd) if wd else ', weigh-in undated'})" if wl is not None else ""
+    return f"Run gate: {gs.get('state')} — {gs.get('reason')}{at}."
 
 
 def rule_line() -> str:

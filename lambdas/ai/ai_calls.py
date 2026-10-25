@@ -33,7 +33,7 @@ import coach.coach_presence_gate as _presence  # #4217 — the absent coach is n
 from coach import coach_brief_input_gate as _in_gate  # #3107 — the upstream change-gate + the shared data-inventory block
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_PROTEIN_MIN_G
 from common.metric_truth import STEPS  # #4630: the resolved steps key build_data_summary fills
-from common.pacific_time import pacific_today
+from common.pacific_time import pacific_today, shift_day_key
 from health.calorie_target import target_kcal, target_phrase  # #5095: the ONE calorie target
 from training.coach_context import charter_goal_lines  # #5109: the standing targets are the charter's, never typed here
 
@@ -1113,6 +1113,24 @@ Respond in EXACTLY this JSON format, no other text:
 # Cache computation results within a single daily brief run to avoid
 # invoking the computation engine Lambda multiple times.
 _comp_results_cache = None
+_disruption_language_cache: dict = {}
+
+
+def _disruption_language_line() -> str:
+    """#5122: the published-safe language line while a whole-day disruption template covers today or yesterday (the
+    brief's data day), else "". Reads the disruption record only — never the early-warning flag. Cached per day."""
+    today = pacific_today()
+    if today not in _disruption_language_cache:
+        try:
+            from training import disruption, life_disruption  # noqa: PLC0415
+
+            days = (today, shift_day_key(today, -1))
+            _disruption_language_cache[today] = life_disruption.published_language_line(disruption.load_records_failsoft(), days)
+        except Exception as e:  # noqa: BLE001 — the coaches run on the standing lines alone
+            print(f"[COACH-V2] disruption language line unavailable: {type(e).__name__}")
+            _disruption_language_cache[today] = ""
+    return _disruption_language_cache[today]
+
 
 # N-06 (#390): bounded retry cap for the quality-gate regenerate-or-hold loop.
 # One corrective rewrite, then hold — mirrors the established regen_once
@@ -1801,7 +1819,7 @@ MATTHEW'S GOALS (standing targets — the fixed backdrop, not your read):
 - Target weight: 185 lbs (starting {int(round(EXPERIMENT_BASELINE_WEIGHT_LBS))})
 - Body composition: reduce body fat, preserve lean mass
 - Timeline: 12-month experiment, genesis {EXPERIMENT_START_DATE}
-{charter_goal_lines()}
+{charter_goal_lines(_disruption_language_line())}
 
 {_facts_block}
 

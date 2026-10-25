@@ -163,6 +163,57 @@ def _emit_output_schema_mismatch(tool_name):
         pass
 
 
+# R6: the per-tool soft timeout. Module-level since #5313 so plan_next_session's stage-2 write deadline
+# (`mcp.plan_call_scope.STAGE_2_WRITE_DEADLINE_SECS`) can be held below it by a test.
+TOOL_TIMEOUT_SECS = 30
+
+
+def _timeout_error(name, arguments):
+    """The structured error for a tool that missed `TOOL_TIMEOUT_SECS` — what is TRUE of each case (#5313).
+
+    The worker thread is not left to finish: the Lambda freezes when this response returns, so the old
+    in-flight code and its "still completing" advice were false — nothing is in flight after the return.
+      * plan_next_session stage 2 (routine_id given): stage 2 refuses to START its write past its own
+        deadline, which sits below this cap, so a run the cap cut off stored nothing: VERDICTS_NOT_WRITTEN.
+      * any other write tool: a step that ran before the deadline may have landed, nothing after it did —
+        WRITE_NOT_CONFIRMED, read the target back before re-issuing.
+      * a read tool: QUERY_TOO_BROAD, as before.
+    """
+    if name == "plan_next_session" and (arguments or {}).get("routine_id"):
+        try:
+            from mcp.plan_call_scope import STAGE_2_WRITE_DEADLINE_SECS as _deadline
+        except Exception:  # noqa: BLE001 — the message must never fail the response
+            _deadline = None
+        rid = arguments.get("routine_id")
+        guard = f"Stage 2 refuses to start its write after {_deadline:.0f}s and" if _deadline else "The"
+        message = (
+            f"plan_next_session stage 2 did not return within {TOOL_TIMEOUT_SECS}s: the red-team verdicts were NOT written. "
+            f"{guard} the Lambda freezes when this response returns, so nothing was stored and routine {rid} is NOT "
+            "red-teamed (a commit will say so). Run stage 2 again (plan_next_session with the same routine_id); "
+            "manage_hevy_routine get shows `critics` only once a run has landed."
+        )
+        return mcp_error(message=message, error_code="VERDICTS_NOT_WRITTEN")
+    try:
+        from mcp.audit import is_write_tool as _is_write_tool
+
+        _is_write = _is_write_tool(name)
+    except Exception:  # noqa: BLE001 — classification must never fail the response
+        _is_write = False
+    if _is_write:
+        # A write tool is not "scanning too much data" — telling the caller that sends them to narrow a
+        # date range that was never the problem, and hides the real question: did the write land?
+        message = (
+            f"Tool '{name}' did not return within {TOOL_TIMEOUT_SECS}s and was stopped: the Lambda freezes when this "
+            "response returns, so nothing the tool had not finished by then will complete. Its write is NOT confirmed — "
+            "a step that ran before the deadline may have landed, anything after it did not. Do NOT retry blindly: read "
+            "the target back first (for a routine draft: manage_hevy_routine action=list for today) and re-issue only "
+            "what is missing."
+        )
+        return mcp_error(message=message, error_code="WRITE_NOT_CONFIRMED")
+    message = f"Tool '{name}' timed out after {TOOL_TIMEOUT_SECS}s. The query is likely scanning too much data."
+    return mcp_error(message=message, error_code="QUERY_TOO_BROAD")
+
+
 def handle_tools_call(params):
     name = params.get("name")
     arguments = params.get("arguments", {})
@@ -197,42 +248,22 @@ def handle_tools_call(params):
     # shutdown(wait=True), so the `return` inside it BLOCKED until the tool finished — the
     # client waited the tool's full duration and was then told it had timed out at 30s.
     # Reproduced: a 3s task with timeout=1 returned after 3.01s carrying the timeout error.
-    # The pool is now shut down without waiting, so the deadline is real. The worker thread
-    # keeps running until the Lambda freezes; that is deliberate — a write already in flight
-    # should be allowed to land, which is why the audit line says "may or may not have
-    # landed" and why the response now carries what the caller needs to check.
-    _TOOL_TIMEOUT_SECS = 30
+    # The pool is now shut down without waiting, so the deadline is real. The worker thread is
+    # NOT left to finish: the Lambda freezes as soon as this response returns, so whatever the tool
+    # had not done by the deadline does not happen (#5313 — the message used to call the write still
+    # in flight; nothing was). `_timeout_error` says what is actually true.
     _pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     try:
         _future = _pool.submit(TOOLS[name]["fn"], arguments)
         try:
-            result = _future.result(timeout=_TOOL_TIMEOUT_SECS)
+            result = _future.result(timeout=TOOL_TIMEOUT_SECS)
         except concurrent.futures.TimeoutError:
             _pool.shutdown(wait=False)
-            _emit_tool_metric(name, _TOOL_TIMEOUT_SECS * 1000, success=False)
-            # #753: a timed-out write may or may not have landed — audit it.
-            _audit_tool_call(name, arguments, "timeout", _TOOL_TIMEOUT_SECS * 1000)
-            logger.warning(f"Tool '{name}' exceeded {_TOOL_TIMEOUT_SECS}s soft timeout")
-            # A write tool is not "scanning too much data" — telling the caller that sends
-            # them to narrow a date range that was never the problem, and hides the real
-            # question: did the write land? Say what is actually true of each case.
-            try:
-                from mcp.audit import is_write_tool as _is_write_tool
-
-                _is_write = _is_write_tool(name)
-            except Exception:  # noqa: BLE001 — classification must never fail the response
-                _is_write = False
-            if _is_write:
-                message = (
-                    f"Tool '{name}' did not return within {_TOOL_TIMEOUT_SECS}s. It is a WRITE tool and may still be "
-                    "completing — do NOT retry blindly. Read the target back first (for a routine draft: "
-                    "manage_hevy_routine action=list for today) and only re-issue if nothing landed."
-                )
-                code = "WRITE_IN_FLIGHT"
-            else:
-                message = f"Tool '{name}' timed out after {_TOOL_TIMEOUT_SECS}s. The query is likely scanning too much data."
-                code = "QUERY_TOO_BROAD"
-            return _call_result(name, mcp_error(message=message, error_code=code), is_error=True)
+            _emit_tool_metric(name, TOOL_TIMEOUT_SECS * 1000, success=False)
+            # #753: a timed-out write may have landed in part before the deadline — audit it.
+            _audit_tool_call(name, arguments, "timeout", TOOL_TIMEOUT_SECS * 1000)
+            logger.warning(f"Tool '{name}' exceeded {TOOL_TIMEOUT_SECS}s soft timeout")
+            return _call_result(name, _timeout_error(name, arguments), is_error=True)
         _pool.shutdown(wait=False)
         _emit_tool_metric(name, (time.time() - _t0) * 1000, success=True)
         _audit_tool_call(name, arguments, "success", (time.time() - _t0) * 1000)  # #753

@@ -236,7 +236,7 @@ def kind_of_performed(machine_key: str, note: str | None, served_kind: str | Non
     2026-10-21/22/23/24 drafts). With neither, the machine's easy kind."""
     from training import cardio_note
 
-    text = note or ""
+    text = cardio_note.strip_negated(note)  # #5312: "No intervals" never names intervals
     shape = cardio_note.shape_of(text)
     if shape == "intervals":
         return "intervals"

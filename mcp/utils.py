@@ -132,6 +132,9 @@ _ERROR_CODE_SPECS: dict[str, tuple[str, str]] = {
     "HEVY_RETRYABLE": (KIND_TRANSPORT, "Hevy was unreachable or answered 5xx through the retry budget; nothing was written."),
     "HEVY_AUTH": (KIND_TRANSPORT, "Hevy rejected the platform's write credential."),
     "HEVY_ORPHAN_CREATED": (KIND_TRANSPORT, "Hevy created the routine but answered with an error; the platform IR is now linked to it."),
+    # #5313: a write tool missed the MCP cap. The Lambda freezes on return, so nothing is "in flight" after it.
+    "WRITE_NOT_CONFIRMED": (KIND_TRANSPORT, "A write tool missed the time cap: steps before it may have landed, none after it did."),
+    "VERDICTS_NOT_WRITTEN": (KIND_TRANSPORT, "plan_next_session stage 2 missed the time cap: no red-team verdict was stored."),
     # ── the call is wrong ────────────────────────────────────────────────────
     "DATE_RANGE": (KIND_ARGUMENT, "Invalid or out-of-bound date range."),
     "MISSING_ARG": (KIND_ARGUMENT, "A required argument was not provided."),
@@ -292,6 +295,12 @@ _DEFAULT_SUGGESTIONS: dict[str, list[str]] = {
     ],
     "HEVY_AUTH": [
         "Rotate the life-platform/hevy-write secret; the Lambda's cached copy refreshes within 15 minutes, then retry.",
+    ],
+    "WRITE_NOT_CONFIRMED": [
+        "Read the target back before anything else (a routine draft: manage_hevy_routine action=list for today) — re-issue only what is missing.",
+    ],
+    "VERDICTS_NOT_WRITTEN": [
+        "Run plan_next_session again with the same routine_id — nothing was stored, so the re-run is the first verdict, not a second cut.",
     ],
     "HEVY_ORPHAN_CREATED": [
         "Inspect the created routine in the Hevy app; the platform IR is linked to it, so the next commit of this routine_id UPDATES it rather than creating another.",

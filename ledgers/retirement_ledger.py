@@ -153,9 +153,11 @@ RETIREMENTS = {
         "sheet, the three emails) — replaced by one calorie resolver. The VALUE stays ~1,500 (owner ruling R1, "
         "PR #5265); what retires is the constant as a second source of the number.",
         "story": 5095,
-        "status": "planned",
-        "record": "#5095 title: 'retire the 1500 constant'; acceptance: 'The 1500 constant has no remaining readers; a "
-        "guard test fails on a new literal'.",
+        "status": "retired",
+        "pr": 5190,
+        "date": "2026-10-19",
+        "record": "PR #5190 removed `PLAN_DAILY_CALORIES_TARGET` from lambdas/ (git log -S); #5095 closed on live proof "
+        "2026-10-25 (one resolver, every surface reads health.calorie_target).",
     },
     "personal-board-text-and-training-coach-config": {
         "what": "the 'Personal Board' role-play text (`.claude/skills/daily-debrief/SKILL.md`, the coach-session prompt) "

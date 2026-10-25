@@ -3605,7 +3605,12 @@ GUARD_PROOFS.update(
             "observed": (
                 "2026-10-19. M1: exit 1 — `FAIL neg_cardio_no_dose ... galpin.cardio_dosed scored 10.0`. M2: 1 failed / 10 passed "
                 "(test_the_gate_reds_when_a_check_stops_discriminating — the exit code stopped carrying the verdict). M3: exit 1 — "
-                "`FAIL good_charter_plan ... seats below 9: ['hollywood_transformation_trainer']`. RESTORED: exit 0, 11 passed."
+                "`FAIL good_charter_plan ... seats below 9: ['hollywood_transformation_trainer']`. RESTORED: exit 0, 11 passed. "
+                "RE-PROVED 2026-10-24 (#5318): owner ruling A4 dropped the charter's lifting-minute floor, so check_minutes_band "
+                "became check_minutes_under_ceiling (no floor to raise). M3 now lowers its ceiling 15 min (`m <= cap - 15`): "
+                "exit 1 — `FAIL good_charter_plan ... hollywood_transformation_trainer=8.0`, 7 of 8 cases behaved; lowered 10 "
+                "min the good plan still passes (its sessions sit at or under 65 min), recorded rather than hidden. md5 "
+                "panel_rubric.py 757f71f9c0fbb99f7144d66ffc7ad68c before and after; RESTORED: exit 0, 12 passed."
             ),
             "scope": (
                 "Proves the recorded-mode gate reds on a control that slips a criterion it exists to fail, on a good plan that "
@@ -3623,11 +3628,14 @@ CI_PROOFS["ci::panel-rubric-gate.yml::gate::3"] = {
     "mutation": (
         "The step's REAL `run:` text (read from the workflow YAML, unpiped) executed under `bash -eo pipefail`, with the "
         "same plants as guard::scripts/panel_rubric_gate.py: M1 check_cardio_dosed counts every cardio block as dosed; M3 "
-        "check_minutes_band's floor raised 10 min. md5 panel_rubric.py 9bf6ab224fd1df207535b58ab963b501 before and after."
+        "check_minutes_band's floor raised 10 min. md5 panel_rubric.py 9bf6ab224fd1df207535b58ab963b501 before and after. "
+        "#5318 (2026-10-24): M3 is now check_minutes_under_ceiling's ceiling lowered 15 min (the floor is gone, owner ruling "
+        "A4); md5 panel_rubric.py 757f71f9c0fbb99f7144d66ffc7ad68c before and after."
     ),
     "observed": (
         "2026-10-19. M1: step exit 1 (`FAIL neg_cardio_no_dose ... galpin.cardio_dosed scored 10.0`). M3: step exit 1 "
-        "(`FAIL good_charter_plan ... seats below 9`). RESTORED: step exit 0."
+        "(`FAIL good_charter_plan ... seats below 9`). RESTORED: step exit 0. 2026-10-24 (#5318) M3 re-run: step exit 1, "
+        "RESTORED: step exit 0."
     ),
     "scope": (
         "Proves the step carries the script's verdict (no pipe, no `|| true`). It does not prove the path filter fires on "
@@ -3800,4 +3808,107 @@ STRUCTURAL_HAND_PROOFS["structural::test_journal_silence_public_surfaces_5131.py
         "guarded module that calls the guard on one write and not another (the check is per module)."
     ),
     "proved_on": "2026-10-23",
+}
+
+# ── #5316: the fleet drift checks (a rollback overlapped a newer deploy and finished last) ──
+CI_PROOFS["ci::ci-cd.yml::deploy::5"] = {
+    "gate_name": "deploy / Fleet drift check (#5316)",
+    "command": (
+        "The step's own `run:` line with ${{ github.sha }} and ${{ needs.reconcile.outputs.build_sha }} substituted: "
+        "`python3 deploy/check_fleet_drift.py --expect '<sha>,<sha>'`, run LIVE and read-only (lambda:GetFunction + a "
+        "ranged GET of each presigned code URL) against the real fleet from the lane checkout."
+    ),
+    "mutation": (
+        "The input the step exists for: the expected sha set to d944d9521 (CI's last deploy) while every function is "
+        "live on 6984087e0 (the attended fleet redeploy of 2026-10-25) — a fleet that is not on the sha this run stamped. "
+        "Unit level: tests/test_rollback_serialise_5316.py (the deploy-job mode holds the exact sha; a descendant is still a "
+        "mismatch there)."
+    ),
+    "observed": (
+        "2026-10-24 (lane). CONTROL (--expect 6984087e0…,6984087e0…): exit 0, 'live build shas: 6984087e0 x109', 'every "
+        "function is on 6984087e0'. MUTATED (--expect d944d9521…): exit 1, '::error title=Fleet drift (#5316)::109 drifted, "
+        "0 unverified, 0 on d944d9521'."
+    ),
+    "scope": (
+        "ADVISORY (continue-on-error): an exit 1 marks the step, never the deploy job, so smoke-test and the rollback still "
+        "key on the deploy. Reads build_info.json's git_sha, so a function whose bundle carries none, or whose read fails, is "
+        "UNVERIFIED (exit 2), never on-sha. The fleet list is ci/lambda_map.json minus not_deployed plus both MCP functions."
+    ),
+    "proved_on": "2026-10-24",
+}
+CI_PROOFS["ci::ci-cd.yml::rollback-on-smoke-failure::3"] = {
+    "gate_name": "rollback-on-smoke-failure / Post-rollback fleet drift",
+    "command": (
+        "The step's own `run:` line, `python3 deploy/check_fleet_drift.py --expect-deploy-base`, run LIVE and read-only from "
+        "the lane checkout with GH_TOKEN set (the deploy base is check_deploy_deadman.last_deployed_sha, the base Plan diffs "
+        "from)."
+    ),
+    "mutation": (
+        "The 2026-10-24 incident shape, live: main(['--expect-deploy-base']) with collect_deployed_shas() wrapped to replace "
+        "daily-brief's live build sha by 2f7595a3c (d944d9521~1) — one function left on code older than main's newest "
+        "successful deploy, as the overlapping rollback left 62."
+    ),
+    "observed": (
+        "2026-10-24 (lane). CONTROL: exit 0 — deploy base d944d952163f, 'AHEAD: 109 function(s) on a later deploy from main' "
+        "(the attended 6984087e0 redeploy descends from it). MUTATED: exit 1 — 'DRIFT: 1 function(s) are NOT on main's "
+        "expected deploy: daily-brief live 2f7595a3c', '1 drifted, 0 unverified, 0 on d944d9521, 108 ahead'."
+    ),
+    "scope": (
+        "ADVISORY (continue-on-error), reporting into the rollback's SNS message. 'Ahead' needs git ancestry, so the job's "
+        "checkout is fetch-depth 0; a sha git cannot place is drift, never ahead. Right after a rollback with no newer deploy "
+        "the reverted functions read as drift against this run's own deploy — that IS the state to report (the fleet is behind "
+        "main and nothing redeploys it until the next code push or a deploy_all)."
+    ),
+    "proved_on": "2026-10-24",
+}
+GUARD_PROOFS["guard::deploy/check_fleet_drift.py"] = {
+    "gate_name": "deploy/check_fleet_drift.py",
+    "command": (
+        "python3 -m pytest tests/test_rollback_serialise_5316.py -q   # baseline 19 passed; plus the CLI live and read-only: "
+        "python3 deploy/check_fleet_drift.py --expect <sha>"
+    ),
+    "mutation": (
+        "M1: `same_commit()`'s `return any(...)` replaced by `return True or any(...)` in the real tracked file (md5 "
+        "39fc31e7… before and after, restored by copying the file back) — every live sha reads as the expected deploy. "
+        "LIVE input the script exists for (unmutated): --expect d944d9521… while no function is live on it."
+    ),
+    "observed": (
+        "2026-10-25. BASELINE 19 passed. M1 RED: 7 failed, 12 passed (test_owner_check_is_pure_and_names_each_outcome, "
+        "test_THE_INCIDENT_a_function_a_newer_deploy_owns_is_SKIPPED_NEWER_and_never_written, "
+        "test_compare_buckets_every_function_and_drift_exits_1, test_deploy_base_mode_reads_a_later_main_deploy_as_ahead_and_the_"
+        "incident_as_drift, …); M1 LIVE --expect d944d9521… exit 0 ('every function is on d944d9521' — blind). REVERTED 19 "
+        "passed. UNMUTATED LIVE --expect d944d9521…: exit 1, '109 drifted, 0 unverified, 0 on d944d9521'. Control on "
+        "2026-10-24 (lane): --expect 6984087e0… exit 0, 'live build shas: 6984087e0 x109'."
+    ),
+    "scope": (
+        "Reads build_info.json git_sha per function over a ranged GET (check_deploy_deadman.read_build_sha); a function with "
+        "no fingerprint or a failed read is UNVERIFIED (exit 2), never on-sha. Fleet = ci/lambda_map.json minus not_deployed "
+        "plus both MCP functions. 'Ahead' (--expect-deploy-base) needs git ancestry; a sha git cannot place is drift. Wired "
+        "advisory (continue-on-error) in ci-cd.yml and as rollback_lambda.sh's --owner-check."
+    ),
+    "proved_on": "2026-10-25",
+}
+GUARD_PROOFS["guard::deploy/rollback_fleet.sh"] = {
+    "gate_name": "deploy/rollback_fleet.sh",
+    "command": (
+        "python3 -m pytest tests/test_rollback_serialise_5316.py -q   # baseline 19 passed; "
+        "test_the_fleet_rollback_tallies_skipped_newer_and_does_not_fail_on_it runs the real script against a PATH-first "
+        "fake `aws` serving a live bundle stamped by a NEWER run"
+    ),
+    "mutation": (
+        "Two, each in the real tracked file (md5 2a2beade… before and after, restored by copying back). M2: the per-function "
+        "call made `ROLLBACK_EXPECT_SHA= bash rollback_lambda.sh` — the sha check dropped, the 2026-10-24 sha-blind revert. "
+        "M3: the `3)` SKIPPED_NEWER case relabelled `3000)` — a skipped function falls into the failed branch."
+    ),
+    "observed": (
+        "2026-10-25. BASELINE 19 passed. M2 RED: 1 failed, 18 passed — the fleet run printed 'Rollback complete: 1 "
+        "succeeded' per function (a newer deploy's function reverted) instead of '3 skipped-newer'. M3 RED: 1 failed, 18 "
+        "passed — exit 1, '0 skipped-newer … 3 failed', '::error::3 Lambda(s) could not be rolled back'. REVERTED 19 passed."
+    ),
+    "scope": (
+        "The fleet list is the jq over ci/lambda_map.json (minus not_deployed) plus both MCP functions, the set "
+        "deploy_fleet.sh ships. Exit 1 only when a revert was attempted and broke; no-artifact (2) and skipped-newer (3) are "
+        "reported, not failed. With ROLLBACK_EXPECT_SHA unset it reverts unconditionally (attended path) and warns."
+    ),
+    "proved_on": "2026-10-25",
 }

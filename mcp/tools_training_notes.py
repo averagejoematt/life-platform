@@ -666,15 +666,17 @@ def _put_disruption(record: dict) -> None:
 
 def _record_disruption(args):
     """action='disruption' — his word that the mode is ON from `start_date` (default today, Pacific) through `until`."""
-    from training import disruption
+    from common.pacific_time import shift_day_key
+    from training import disruption, life_disruption
 
+    start = args.get("start_date") or pacific_now().date().isoformat()
+    template = str(args.get("template") or "").strip().lower()
+    until = args.get("until") or ""
+    if not until and life_disruption.template(template).get("lapse"):  # #5122: the lapse protocol's own length
+        until = shift_day_key(str(start)[:10], disruption.template_max_days(template) - 1)
     try:
         record = disruption.build_disruption_record(
-            start_date=args.get("start_date") or pacific_now().date().isoformat(),
-            until=args.get("until") or "",
-            words=args.get("words") or "",
-            template=str(args.get("template") or "").strip().lower(),
-            recorded_at=_now_z(),
+            start_date=start, until=until, words=args.get("words") or "", template=template, recorded_at=_now_z()
         )
     except ValueError as e:
         return {"error": f"refused: {e}", "policy": disruption.policy(), "wrote": False}
@@ -685,6 +687,7 @@ def _record_disruption(args):
         "sk": record["sk"],
         "record": record,
         "holds": disruption.holds(record["template"]),
+        "whole_day": life_disruption.mode([record], record["start_date"]) if life_disruption.is_whole_day(record["template"]) else None,
         "next": "plan_next_session reads `disruption.active: true` for these days; the drafted session is the short one.",
     }
 

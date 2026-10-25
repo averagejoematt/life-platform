@@ -12,10 +12,11 @@ alert (`muscle_volume` counted it; nothing compared the count with the landmark)
 
 RESIDUAL — CLOSED by #5162 (owner ruling 2026-10-23, "trade inside 75"): 8 of the 9 weekly shoulder-press sets became
 lateral raises and face pulls (side/rear delts 6 -> 14, the band's floor), and the lats / upper-chest / arms bands were
-lowered to what fits inside the 75-set week (charter 1.22.0: 4, 0, 6). `KNOWN_BAND_GAPS` is all zeros and stays
-shrink-only. Side/rear delts, upper chest and lats are still counted BY MOVEMENT (`volume_floors.FLOOR_MOVEMENTS` /
-`BAND_MOVEMENTS`): upper chest has 0 incline sets (the 8 catalog-'chest' sets are flat bench + cable fly), lats has 4
-(the lat pulldown; rows and the shrug are not lat work). The LOGGED Shoulders muscle row cannot
+lowered to what fits inside the 75-set week (charter 1.22.0: 4, 0, 6). #5318 (owner ruling B2, 2026-10-24) swapped
+upper-volume's flat bench for the incline DB press (same 3 sets) and raised the upper-chest band to them (charter 1.30.0:
+[3, 3]). `KNOWN_BAND_GAPS` is all zeros and stays shrink-only. Side/rear delts, upper chest and lats are still counted BY MOVEMENT (`volume_floors.FLOOR_MOVEMENTS` /
+`BAND_MOVEMENTS`): upper chest has the 3 incline sets (the flat bench and the cable fly are not upper-chest work), lats has 4
+(the lat pulldown; rows and the carry are not lat work). The LOGGED Shoulders muscle row cannot
 see a side/rear-delt drop that continued pressing masks (live 2026-10-05..18: 16 Shoulders sets, 8.0/wk), so Shoulders is
 asserted NOT flagged, as it really was; the movement-counted side/rear-delt floor that does see it is #5164
 (`tests/test_side_rear_delt_flag_5164.py`, over the logged fortnight).
@@ -63,7 +64,7 @@ def test_every_charter_floor_muscle_has_a_slot_and_meets_its_mev(coverage):
     # #5162: the press sets traded for lateral raises + face pulls (presses are NOT side/rear-delt work: 6 before)
     assert (delts["sets"], delts["mev"], delts["meets_mev"]) == (14, 8, True)
     assert delts["slot_roles"] == ["upper_heavy", "shoulders_arms", "upper_volume"]
-    assert floors["traps"]["sets"] == 2  # the shrug slot, not all Back
+    assert floors["traps"]["sets"] == 2  # the trap slot (the farmer's carry since #5318), not all Back
     assert floors["traps"]["slot_roles"] == ["shoulders_arms"]
     assert floors["calves"]["sets"] >= 8 and floors["core"]["sets"] >= 4
 
@@ -71,7 +72,8 @@ def test_every_charter_floor_muscle_has_a_slot_and_meets_its_mev(coverage):
 def test_every_floor_movement_is_in_a_role_and_in_the_pool():
     accs = {r: t["accessories"] for r, t in program_structure.SESSION_TEMPLATES.items()}
     flat = {a for v in accs.values() for a in v}
-    assert {"db_lateral_raise", "face_pull", "reverse_pec_deck", "shrug_dumbbell", "calf_raise_machine", "machine_crunch"} <= flat
+    # #5318 (owner ruling B3): the farmer's carry is the trap slot now (it replaced the dumbbell shrug)
+    assert {"db_lateral_raise", "face_pull", "reverse_pec_deck", "farmers_carry", "calf_raise_machine", "machine_crunch"} <= flat
     pool = {k for v in program_structure.ACCESSORY_POOL.values() for k in v}
     assert flat <= pool
     # delts 3x/week, with a rear-delt slot on an upper day and the lateral raise on the aesthetic day
@@ -89,11 +91,13 @@ def test_weekly_sets_by_muscle_delts_frequency_and_the_real_side_rear_count(cove
 
 def test_upper_chest_and_lats_are_counted_by_movement_not_catalog_muscle(coverage):
     by = coverage["sets_by_muscle"]
-    # catalog 'chest' 8 = 6 flat bench + 2 cable fly: none of it is incline, so none of it is upper-chest work
-    assert by["chest"] == 8 and by["upper_chest_direct"] == 0
-    assert coverage["bands"]["upper_chest"]["member_sets"] == [0]
-    # catalog 'back' 12 = 6 machine row + 4 lat pulldown + 2 dumbbell shrug: only the pulldown is a vertical pull
-    assert by["back"] == 12 and by["lats_direct"] == 4
+    # catalog 'chest' 8 = 3 flat barbell bench (upper-heavy) + 3 incline DB press (upper-volume, #5318 B2) + 2 cable fly:
+    # only the incline counts as upper-chest work
+    assert by["chest"] == 8 and by["upper_chest_direct"] == 3
+    assert coverage["bands"]["upper_chest"]["member_sets"] == [3]
+    # catalog 'back' 10 = 6 machine row + 4 lat pulldown (the shrug's 2 became the carry, #5318): only the pulldown is a
+    # vertical pull
+    assert by["back"] == 10 and by["lats_direct"] == 4
     assert coverage["bands"]["lats"]["member_sets"] == [4]
     for excluded in ("barbell_bench_press", "cable_chest_fly", "machine_chest_press"):
         assert excluded not in volume_floors.BAND_MOVEMENTS["upper_chest"], excluded
@@ -126,14 +130,15 @@ def test_5162_the_ruled_trade_inside_75():
     assert "leg_curl" not in tmpl["lower_volume"]["accessories"] and by_mv["leg_curl"] == 2
     # the lowered bands are the week's own counts — a band above what the week carries would re-open a gap
     bands = charter_value("volume_priorities.sets_per_wk")
-    assert (bands["lats"], bands["upper_chest"], bands["arms"]) == ([4, 4], [0, 0], [6, 6])
+    # #5318 (owner ruling B2, 2026-10-24) raised upper chest to the incline's 3 sets; lats stay at 4 by the same ruling
+    assert (bands["lats"], bands["upper_chest"], bands["arms"]) == ([4, 4], [3, 3], [6, 6])
 
 
 def test_the_week_and_every_session_stay_inside_the_caps():
     total = sum(program_structure.session_prescription_for_role(r, catalog_movements=CATALOG)["total_sets"] for r in ROLES)
     lo, hi = owner_redlines.REDLINES["lifting_sessions_per_wk"]["total_hard_sets_wk"]
     assert lo <= total <= hi, total
-    cap = charter_value("split.session_minutes.lifting")[1]
+    cap = charter_value("split.session_minutes.lifting_ceiling")
     for r in ROLES:
         rx = program_structure.session_prescription_for_role(r, catalog_movements=CATALOG)
         est = session_shape.session_minutes_estimate(rx["exposures"])
@@ -221,3 +226,18 @@ def test_the_coach_packet_and_the_plan_packet_carry_it(monkeypatch):
     assert block["below_mev_14d"] == flag
     tools_plan._attach_below_mev(block, {})
     assert block["below_mev_14d"]["status"] == "unavailable"
+
+
+def test_5311_the_plan_carries_volume_bands_and_labels_the_redline_range(coverage):
+    """#5311: `volume_bands` is the charter's band per priority on the real 5-role week; the delt range says it is the v0.4 floor."""
+    import inspect
+
+    from training import plan_engine
+
+    sr = coverage["bands"]["side_rear_delts"]
+    assert sr["member_sets"] == [14] and sr["band"] == [14, 18] and sr["gap_to_floor"] == 0
+    assert set(coverage["bands"]) == {"side_rear_delts", "lats", "upper_chest", "legs", "arms"}
+    week = program_structure.weekly_sets_by_muscle(CATALOG)
+    assert "redline floor" in week["delts"]["range_source"] and "charter band" in week["delts"]["range_source"]
+    assert "floor" not in week["quads"]["range_source"]
+    assert 'out["volume_bands"] = program_structure.volume_floor_coverage(' in inspect.getsource(plan_engine)

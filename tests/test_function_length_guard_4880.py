@@ -178,7 +178,7 @@ FUNCTION_LENGTH_COUNTS = {
     "mcp/tools_lifestyle.py::tool_create_experiment": 207,
     "mcp/tools_lifestyle.py::tool_get_experiment_results": 166,
     "mcp/tools_nutrition.py::tool_get_deficit_sustainability": 211,
-    "mcp/tools_plan.py::tool_plan_next_session": 228,  # 236 -> 229 (#5070: the pain-scope status extracted, the deload-word read added) -> 228 (#5088: both owner-word reads extracted)
+    "mcp/tools_plan.py::tool_plan_next_session": 227,  # 236 -> 229 (#5070: the pain-scope status extracted, the deload-word read added) -> 228 (#5088: both owner-word reads extracted) -> 227 (#5313: mcp_error imported once at module level; the plan_call decorator added)
     "mcp/tools_training.py::_get_training_periodization": 296,
     "mcp/tools_training.py::_get_training_recommendation": 361,
     "scripts/apply_branch_protection.py::main": 165,

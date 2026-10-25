@@ -61,7 +61,21 @@ SEED_KEYS_2026_10_23 = {
     "bluesky-schedule",
     "mastodon-schedule",
 }
-SEED_RETIRED_2026_10_23 = {k for k in SEED_KEYS_2026_10_23 if L.RETIREMENTS.get(k, {}).get("status") == "retired"}
+SEED_RETIRED_2026_10_23 = frozenset(
+    {
+        "bluesky-schedule",
+        "character-steps-8000-fallback",
+        "coach-daily-reflection",
+        "garmin-direct-api",
+        "hand-copied-rate-targets",
+        "lifting-rpe-caps",
+        "mastodon-schedule",
+        "partner-email-journal-section",
+        "scheduled-program-week-6-deload",
+        "titration-payback-cap",
+        "youtube-schedule",
+    }
+)  # frozen at the 2026-10-23 seed: a planned row that later retires joins the ledger, never this floor
 NAMES_A_REMOVAL = ("planned", "retired", "demoted")
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 

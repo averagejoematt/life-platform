@@ -44,7 +44,7 @@ from __future__ import annotations
 import json
 from typing import Any, Iterable, Optional
 
-CONTEXT_VERSION = "coach-context@1.6.0"  # 1.6.0 #5126: response_protocol (the ONE early-warning owner, owner channel); 1.5.0 #5111: lab_followup (the next draw, owner channel); 1.4.0 #5200: the May tracker read on every caller path + not_supplied_reason; 1.3.0 #5111: lab_priorities (owner channel, seam only); 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
+CONTEXT_VERSION = "coach-context@1.7.0"  # 1.7.0 #5122: day_mode (the whole-day disruption mode + the lapse offer, owner channel); 1.6.0 #5126: response_protocol (the ONE early-warning owner, owner channel); 1.5.0 #5111: lab_followup (the next draw, owner channel); 1.4.0 #5200: the May tracker read on every caller path + not_supplied_reason; 1.3.0 #5111: lab_priorities (owner channel, seam only); 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
 
 # ── the order contract, as data ───────────────────────────────────────────────────────────
 ORDER: tuple[str, ...] = ("pre_flight", "plan_next_session", "manage_hevy_routine draft")
@@ -309,6 +309,7 @@ def assemble(
     published: bool = False,
     packet_reason: Optional[str] = None,
     response_protocol: Optional[dict[str, Any]] = None,
+    day_mode: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """The planning context for `target_date`: a dict for code and ``text`` for a prompt.
 
@@ -337,6 +338,7 @@ def assemble(
         "lab_priorities": None if published else lab_priorities,  # #5111: owner-only; absent -> nothing is said
         "lab_followup": None if published else lab_followup,  # #5111: the next draw's date + state (training.lab_priorities.read)
         "response_protocol": None if published else response_protocol,  # #5126: coach.response_protocol.view (owner channel)
+        "day_mode": None if published else day_mode,  # #5122: training.life_disruption.mode (owner channel)
         "not_supplied": sorted(k for k, s in sections.items() if s.get("state") == NOT_SUPPLIED),
     }
     out["not_supplied_reason"] = {k: sections[k].get("detail") for k in out["not_supplied"]}  # #5200: each absence says why
@@ -357,6 +359,8 @@ def summary(ctx: dict[str, Any]) -> dict[str, Any]:
         "run_gate": (ctx.get("run_gate") or {}).get("line"),
         "lab_followup": (ctx.get("lab_followup") or {}).get("line"),
         "response_owner": (ctx.get("response_protocol") or {}).get("owner"),  # #5126
+        "day_mode": (ctx.get("day_mode") or {}).get("scope"),  # #5122
+        "lapse_offered": bool((ctx.get("day_mode") or {}).get("lapse_offer")),  # #5122
         "order": ctx.get("order"),
         "text": ctx.get("text"),
     }
@@ -485,6 +489,9 @@ def render(ctx: dict[str, Any]) -> str:
     rp = None if ctx["published"] else ctx.get("response_protocol")
     if rp and rp.get("line"):  # #5126: the ONE coach who answers an early-warning signal, and its protocol
         parts.append([f"EARLY-WARNING RESPONSE (owner-only) [{rp.get('source')}]", f"- {rp['line']}"])
+    dm = None if ctx["published"] else ctx.get("day_mode")
+    if dm and dm.get("lines"):  # #5122: the whole-day mode and the lapse offer; nothing when the day is off
+        parts.append([f"DAY MODE (owner-only) [{dm.get('source')}]"] + [f"- {ln}" for ln in dm["lines"]])
     if not ctx["published"]:  # the order contract is the owner's planning conversation's, never a reader prompt's
         parts.append(["ORDER: " + " -> ".join(ctx["order"]) + " (pre-flight = " + ", ".join(PRE_FLIGHT) + ")"])
     return "\n\n".join("\n".join(p) for p in parts)
@@ -643,7 +650,7 @@ def nutrition_context(
     return out
 
 
-def charter_goal_lines() -> str:
+def charter_goal_lines(language_line: str = "") -> str:
     """The daily coaches' standing training + priorities lines (`ai.ai_calls._run_coach_v2_pipeline`'s system prompt),
     read from the charter (#5109). They were typed into the prompt before the charter existed (a 190 g protein target
     and an 8,000-step line the charter never set, and strength training "planned but not yet started"). The steps and
@@ -662,7 +669,7 @@ def charter_goal_lines() -> str:
         f"- Key priorities: sleep quality, protein adherence (at or above the {lo:g} g floor on {days} of 7 days; range {lo:g}-{hi:g} g), "
         f"consistent movement ({steps['floor']:,} steps/day floor, {steps.get('target'):,} target)\n"
         f"{wake_time_line()}\n"
-        f"{core_habits_line()}"
+        f"{core_habits_line()}" + (f"\n{language_line}" if language_line else "")  # #5122: training.life_disruption.published_language_line
     )
 
 

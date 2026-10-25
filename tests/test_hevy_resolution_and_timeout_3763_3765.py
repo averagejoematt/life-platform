@@ -405,10 +405,14 @@ def test_the_handler_uses_a_non_blocking_shutdown_on_timeout():
 
 def test_a_timed_out_write_tool_is_not_told_to_narrow_its_date_range():
     """'The query is likely scanning too much data' is false for a write, and it hides
-    the only question that matters: did it land?"""
+    the only question that matters: did it land?
+
+    #5313: and it must not claim the write is still running. The Lambda freezes when the
+    response returns, so the old "WRITE_IN_FLIGHT ... may still be completing" was false; the
+    behaviour of each case is held in tests/test_plan_stage2_latency_5313.py."""
     src = (REPO / "mcp" / "handler.py").read_text()
-    assert "WRITE_IN_FLIGHT" in src
-    assert "may still be" in src and "do NOT retry blindly" in src
+    assert "WRITE_NOT_CONFIRMED" in src and "Do NOT retry blindly" in src
+    assert "WRITE_IN_FLIGHT" not in src and "may still be completing" not in src
 
 
 if __name__ == "__main__":  # pragma: no cover

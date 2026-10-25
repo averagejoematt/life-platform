@@ -93,6 +93,13 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
+    "lambdas/training/training_charter.py:load_charter": (
+        "The loader's documented merged-charter read (ADR-164, the module docstring), held by the charter tests "
+        "(test_training_charter_derivation_5068, test_training_charter_privacy_5087, test_disruption_mode_5088). Its "
+        "one live caller was `charter_value`, which since #5313 reads the cache in place instead of deep-copying the "
+        "WHOLE charter per value (~2,900 copies per plan_next_session stage 2). Delete this entry when a live caller "
+        "needs the whole merged object again."
+    ),
     "lambdas/training/cardio_menu.py:performed_movement_minutes": (
         "#5076's performed side of `movement_minutes` (the gym cardio minutes a performed day adds to the "
         "steps/movement goal, charter `steps.gym_cardio_minutes_count_toward_movement`), landed fixture-tested "
@@ -400,11 +407,6 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
     ),
     "lambdas/privacy/content_filter_channel.py:last_channel_errors": (
         "#3609 box 2 widen: exercised only by tests/test_content_filter_channel_errors_2655.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
-    ),
-    "lambdas/training/program_structure.py:volume_floor_coverage": (
-        "#5053: the five roles' weekly sets against the charter's MEV floors and sets_per_wk bands — the measurement "
-        "tests/test_volume_floors_5053.py pins (KNOWN_BAND_GAPS, shrink-only) and the numbers the owner ruling #5162 is "
-        "decided on. No live caller yet by design: the coach-facing reader is the volume block #5162's ruling unblocks."
     ),
     "lambdas/training/training_charter.py:reset_cache": (
         "The charter loader's cache reset (#5068, ADR-164) — the same shape as content_filter_channel.reset_cache "

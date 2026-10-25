@@ -83,11 +83,11 @@ from typing import Any
 from training import effort_ceilings, in_block_variant, program_conflicts, program_v03, program_v04
 from training.accessory_check import CARDIO_NAME_HINTS, accessory_rotation, classify_movement  # noqa: F401 — re-exported (#5069 split)
 from training.program_v03 import BLOCK_CALENDAR  # noqa: F401 — v0.3 history; `load_ramp.block_1_start()` reads it (#4107)
+from training.session_cues import CARRY_EXPOSURE, _default_sets, exposure_cue  # noqa: F401 — #5317/#5318, re-exported
 from training.session_shape import (  # noqa: F401 — #5069: a session's length and shape (ruling 5), re-exported from here
     SESSION_TIME_MODEL,
     enforce_session_shape,
     lifting_minutes_cap,
-    lifting_minutes_range,
     routine_minutes,
     session_minutes_estimate,
     session_shape_problems,
@@ -290,12 +290,13 @@ CORE_ANCHORS: tuple[str, ...] = ("bench", "row", "squat", "hinge")
 # movements new to the trailing week that the prior week did not carry — rather than
 # repeats. Repeats are still reported, as a measurement, not a verdict.
 ACCESSORY_POOL: dict[str, list[str]] = {
-    # #5069: face_pull (rear delts, 93 logged sessions) and shrug_dumbbell (traps) join for the shoulders+arms day
-    "upper": ["cable_chest_fly", "cable_tricep_pushdown", "db_curl", "reverse_pec_deck", "db_lateral_raise", "face_pull", "shrug_dumbbell"],
+    # #5069: face_pull (rear delts, 93 logged sessions) joins for the shoulders+arms day; #5318 (owner ruling B3, 2026-10-24):
+    # the farmer's carry replaced the dumbbell shrug there (traps, grip and core)
+    "upper": ["cable_chest_fly", "cable_tricep_pushdown", "db_curl", "reverse_pec_deck", "db_lateral_raise", "face_pull", "farmers_carry"],
     "lower": ["leg_press", "leg_curl", "calf_raise_machine", "machine_crunch", "machine_hip_thrust"],
 }
 """The pools, one per archetype, the block's accessories are chosen FROM at block start (v0.4's machines/cables, plus the
-shoulders+arms day's face pull and dumbbell shrug, #5069); not a rotation menu (the rotation is #5075's). `leg_press` is a squat-family member used here as a lower ACCESSORY — the committed first v0.4
+shoulders+arms day's face pull, #5069, and the farmer's carry that replaced its dumbbell shrug, #5318); not a rotation menu (the rotation is #5075's). `leg_press` is a squat-family member used here as a lower ACCESSORY — the committed first v0.4
 session carries it at 2 x 8–10 beside the barbell squat. v0.3's single `full` pool is `program_v03.ACCESSORY_POOL`."""
 
 ROTATION_RULE: dict[str, Any] = {
@@ -323,8 +324,8 @@ ROTATION_RULE: dict[str, Any] = {
 DAY_SHAPE: dict[str, Any] = {
     "am": (
         f"lift the next session in ORDER ({', '.join(n.lower() for n in SPLIT_SEQUENCE_NAMES)}) on a lifting day — the hard, loaded "
-        f"work; {charter_value('split.session_minutes.lifting')[0]}–{charter_value('split.session_minutes.lifting')[1]} min of lifting "
-        f"(charter `split.session_minutes`), one cardio block <= {charter_value('split.session_minutes.cardio_block_max')} min and "
+        f"work; up to {lifting_minutes_cap()} min of lifting — a ceiling, not a target (charter `split.session_minutes`, owner "
+        f"ruling A4 2026-10-24: a shorter session is never padded), one cardio block <= {charter_value('split.session_minutes.cardio_block_max')} min and "
         f"stretching <= {charter_value('split.session_minutes.stretching_max')} min on top"
     ),
     "pm": "easy walking EVERY day (HR avg ≤ 120 with the talk test, 105 the target; 2–3 walks, weekday none over 75 min, one long-walk slot a week; never intervals)",
@@ -332,7 +333,7 @@ DAY_SHAPE: dict[str, Any] = {
     "cardio_placement": "no walking in the 2 h before lifting; the lightest walking day follows the heavy session; cycling is the knee-sparing substitute (OD2 deleted the ≤ 2 h cap)",
     "provenance": "owner-history",
     "stated": "2026-06-19",
-    "minutes_provenance": "owner ruling 5, 2026-10-18 (#5067) — read from the charter",
+    "minutes_provenance": "owner ruling 5, 2026-10-18 (#5067); a ceiling only since owner ruling A4, 2026-10-24 (#5318) — read from the charter",
     "note": (
         "The owner-private blueprint records AM lift + PM easy cardio as the pattern during the campaign that held, and the v0.3 "
         "historian shows the RATE was made by the walking (16–19 h/wk in the first nine weeks). The WALKING FLOOR and targets are not "
@@ -411,7 +412,7 @@ WEEK_GRID_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "session_minutes_ceiling": {
         "changed_from": "70 (v0.3 §3's band top)",
-        "value": "the charter's `split.session_minutes.lifting` top",
+        "value": "the charter's `split.session_minutes.lifting_ceiling` (no floor since owner ruling A4, 2026-10-24, #5318)",
         "provenance": "owner",
         "stated": "2026-10-18",
         "note": (
@@ -548,7 +549,6 @@ must name the same strings (held by a test); a folder is found-or-created at the
 # (top set, moderate, volume) reads the compounds band, an accessory's earlier sets the compounds band and its LAST set
 # the last-isolation-set band. Back-offs are prescribed by % of the top set only — the charter rules no back-off RPE.
 _EFFORT = effort_ceilings.class_bands()
-_C, _L = (f"{_EFFORT[k][0]:g}–{_EFFORT[k][1]:g}" for k in (effort_ceilings.COMPOUNDS, effort_ceilings.LAST_ISOLATION_SET))
 
 EXPOSURES: dict[str, dict[str, Any]] = {
     "heavy": {
@@ -558,14 +558,12 @@ EXPOSURES: dict[str, dict[str, Any]] = {
         "back_off_sets": 2,
         "back_off_pct": -10,
         "rest_seconds": 180,
-        "cue": f"HEAVY: 1 top set of 4–6 @ RPE {_C}, then 2 back-offs at −10 % of the top set (charter ceilings).",
     },
     "moderate": {
         "sets": 3,
         "reps": [6, 10],
         "effort": effort_ceilings.COMPOUNDS,
         "rest_seconds": 120,
-        "cue": f"MODERATE: 3 sets of 6–10 @ RPE {_C} (charter compound ceiling).",
     },
     # #4147 v0.4: the volume days' anchor exposure (owner: "Volume days: 8–12 reps").
     "volume": {
@@ -573,7 +571,6 @@ EXPOSURES: dict[str, dict[str, Any]] = {
         "reps": [8, 12],
         "effort": effort_ceilings.COMPOUNDS,
         "rest_seconds": 120,
-        "cue": f"VOLUME: 3 sets of 8–12 @ RPE {_C} (charter compound ceiling).",
     },
     "accessory": {
         "sets": 2,
@@ -581,12 +578,16 @@ EXPOSURES: dict[str, dict[str, Any]] = {
         "effort": effort_ceilings.COMPOUNDS,
         "last_set_effort": effort_ceilings.LAST_ISOLATION_SET,
         "rest_seconds": 90,
-        "cue": f"ACCESSORY: 2 sets of 8–15 @ RPE {_C}; last set RPE {_L} (charter ceilings).",
     },
 }
 """The rep scheme as numbers (v0.3 §3's heavy / moderate / accessory, plus v0.4's volume). The one PROSE home is `owner_redlines.REDLINES
 ['lifting_sessions_per_wk']['rep_scheme']`; a test holds every number here to that string. The effort keys name a charter class band
-(`training.effort_ceilings`, #5058) — the RPE numbers themselves live only in the charter."""
+(`training.effort_ceilings`, #5058) — the RPE numbers themselves live only in the charter. Each `cue` is GENERATED (#5317,
+`exposure_cue`) from the spec's default sets; a prescribed exposure's cue is generated from ITS sets (`anchor_sets` /
+`accessory_sets` overrides and every trim included), so the cue and the sets cannot disagree."""
+
+for _i, _spec in EXPOSURES.items():  # #5317: the DEFAULT cue, generated from the default sets — a per-exposure cue is its own sets'
+    _spec["cue"] = exposure_cue(_i, _default_sets(_spec, _i))
 
 _PRESS_TRADE_RULE = (
     "#5162 (owner ruling 2026-10-23, trade inside 75): four accessories, not 2–3 — the overhead press left this day and its "
@@ -622,8 +623,11 @@ SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
         # lateral raise and the face pull below
         "anchors": [["overhead_press", "moderate"]],
         "anchor_sets": {"overhead_press": 1},
-        "accessories": ["db_lateral_raise", "face_pull", "db_curl", "cable_tricep_pushdown", "shrug_dumbbell"],
+        # #5318 (owner ruling B3, 2026-10-24): the farmer's carry replaced the 2 dumbbell shrug sets (set-neutral) — traps,
+        # grip and core; Hevy's existing 'Farmers Carry' template (catalog `farmers_carry`), timed (`CARRY_EXPOSURE`)
+        "accessories": ["db_lateral_raise", "face_pull", "db_curl", "cable_tricep_pushdown", "farmers_carry"],
         "accessory_sets": {"db_lateral_raise": 3, "face_pull": 3},
+        "accessory_shapes": {"farmers_carry": "carry"},
         "accessory_rule": (
             "the aesthetic day's accessories ARE the session (owner ruling 5): five of them, not 2–3 — `ROTATION_RULE`'s per-session "
             "count binds the other roles; every one is still fixed for the block"
@@ -634,6 +638,10 @@ SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
         # #5162: the press's 3 sets became 3 face-pull sets
         "anchors": [["bench", "volume"], ["row", "volume"], ["vertical_pull", "volume"]],
         "anchor_sets": {"vertical_pull": 2},
+        # #5318 (owner ruling B2, 2026-10-24): "Swap upper_volume's flat bench for incline DB press — same set count. Flat bench
+        # stays on upper_heavy as the strength anchor." The slot's ONLY member is the incline (the upper-chest band counts it);
+        # upper_heavy keeps the bench family's own order (the barbell first), so the strength tripwire keeps its bench template
+        "anchor_keys": {"bench": ["incline_db_press"]},
         "accessories": ["face_pull", "cable_chest_fly", "cable_tricep_pushdown", "db_curl"],  # the delt slot leads (trim order)
         "accessory_sets": {"face_pull": 3},
         "accessory_rule": _PRESS_TRADE_RULE,
@@ -655,7 +663,9 @@ and its other 8 weekly sets are lateral raises and face pulls — delts are stil
 work. Every big redline muscle group sits inside its weekly band and each group's weekly FREQUENCY meets the charter's
 `split.frequency` (`weekly_sets_by_muscle`, held by tests). Accessories come from `ACCESSORY_POOL[archetype]`, fixed per
 role for the block (`ROTATION_RULE`). `anchor_sets` overrides an exposure's set count for one pattern: vertical pull runs
-2 sets so back (row + pulldown, twice) sits at 10. v0.4's four roles were unchanged (#4147) until #5162 moved the press
+2 sets so back (row + pulldown, twice) sits at 10. `anchor_keys` pins a pattern's slot to named members (#5318, owner ruling
+B2: upper-volume's bench slot is the incline dumbbell press only; upper-heavy keeps the barbell bench, the strength anchor).
+`accessory_shapes` names a timed accessory (#5318, ruling B3: the shoulders+arms farmer's carry, `CARRY_EXPOSURE`). v0.4's four roles were unchanged (#4147) until #5162 moved the press
 off the two upper days; v0.3's are `program_v03.SESSION_TEMPLATES`."""
 
 SESSION_DISTRIBUTION_PROVENANCE: dict[str, Any] = {
@@ -678,8 +688,9 @@ SESSION_DISTRIBUTION_PROVENANCE: dict[str, Any] = {
         f"delts {charter_value('split.frequency.delts_per_wk')}x/wk, the trap bar until the charter's gate and the "
         "RDL as the moderate hinge. `lower_heavy` is the session he committed on 2026-09-23 (routine b1b9960468f374e30dcdeca8630dd18f). "
         "Three v0.4 placements are the platform's, owner-ratified unchanged on 2026-09-25. The `shoulders_arms` day's movements "
-        "(overhead press, lateral raise, face pull, curl, pushdown, dumbbell shrug) are the platform's choice from his logged "
-        "history under the contents ruling 5 names. The v0.4 block lock is lifted (ruling 6; history: `program_v04.BLOCK_LOCK`)."
+        "(overhead press, lateral raise, face pull, curl, pushdown) are the platform's choice from his logged history under the "
+        "contents ruling 5 names; its farmer's carry (in place of the dumbbell shrug) and the upper_volume role's incline dumbbell press "
+        "(in place of the flat bench) are the owner's, rulings B3 and B2 of 2026-10-24 (#5318). The v0.4 block lock is lifted (ruling 6; history: `program_v04.BLOCK_LOCK`)."
     ),
 }
 
@@ -881,8 +892,10 @@ def session_prescription_for_role(
     exposures: list[dict[str, Any]] = []
     for pattern, intensity in tmpl["anchors"]:
         spec = EXPOSURES[intensity]
-        keys = list(ANCHORS[pattern]["catalog_keys"])
-        if intensity == "moderate":
+        # #5318: a role may pin a pattern's slot to named members (upper_volume's bench slot is the incline DB press only)
+        override = (tmpl.get("anchor_keys") or {}).get(pattern)
+        keys = list(override or ANCHORS[pattern]["catalog_keys"])
+        if intensity == "moderate" and not override:
             # #4147: a pattern may name members allowed ONLY at moderate (the RDL as the moderate hinge)
             keys = list(ANCHORS[pattern].get("moderate_catalog_keys") or []) + keys
         pref = in_block_variant.prefer(in_block, role, pattern, intensity, keys, ANCHORS[pattern].get("moderate_catalog_keys"))
@@ -914,12 +927,13 @@ def session_prescription_for_role(
                 "resolution_note": why,
                 "sets": sets,
                 "rest_seconds": spec["rest_seconds"],
-                "cue": spec["cue"],
                 **in_block_variant.exposure_fields(pref, key),
             }
         )
-    acc = EXPOSURES["accessory"]
     for k in tmpl["accessories"]:
+        # #5318: a carry slot is timed (`CARRY_EXPOSURE`), every other accessory is a rep range (`EXPOSURES['accessory']`)
+        shape = (tmpl.get("accessory_shapes") or {}).get(k, "accessory")
+        acc = CARRY_EXPOSURE if shape == "carry" else EXPOSURES["accessory"]
         n_acc = int((tmpl.get("accessory_sets") or {}).get(k, acc["sets"]))  # #5053: a floor slot may run more than 2 sets
         # an accessory is named by its catalog key already; without the catalog it is still
         # prescribable by that key, it just has not been checked against the skill ceiling
@@ -930,12 +944,11 @@ def session_prescription_for_role(
             {
                 "kind": "accessory",
                 "pattern": None,
-                "intensity": "accessory",
+                "intensity": shape,
                 "movement_key": key,
                 "resolution_note": why,
-                "sets": [{"kind": "working", "reps": list(acc["reps"])} for _ in range(n_acc)],
+                "sets": _default_sets({**acc, "sets": n_acc}, shape),
                 "rest_seconds": acc["rest_seconds"],
-                "cue": acc["cue"],
             }
         )
     time_trim = trim_to_time(exposures)  # #5069: the charter's lifting-minute cap, accessories first
@@ -943,6 +956,8 @@ def session_prescription_for_role(
     deload_info = None
     if deload:
         deload_info = _deload_trim(exposures, int(deload_sets_pct if deload_sets_pct is not None else _deload_cfg()["sets_pct"]))
+    for e in exposures:  # #5317: the cue is the sets' own, stamped after every trim — never a literal beside them
+        e["cue"] = exposure_cue(e["intensity"], e["sets"])
     return {
         "archetype": tmpl["archetype"],
         "program_version": PROGRAM_VERSION,
@@ -1060,6 +1075,9 @@ def weekly_sets_by_muscle(catalog_movements: dict[str, Any], skill_ceiling: int 
         out[g] = {
             "sets": sum(by_muscle.get(m, 0) for m in spec["primary_muscles"]),
             "range": list(lift[spec["range_key"]]),
+            # #5311: say WHICH number the range is — the owner_redlines v0.4 floor, never the charter's volume_priorities band
+            "range_source": f"owner_redlines.lifting_sessions_per_wk.{spec['range_key']} (v0.4 redline"
+            + (" floor, not the charter band — see volume_bands)" if not spec.get("band_top_binds", True) else " range)"),
             "band_top_binds": bool(spec.get("band_top_binds", True)),
             "frequency_per_wk": len(roles),
             "frequency_target": int(charter_value(f"split.frequency.{spec['frequency_key']}")),
@@ -1135,7 +1153,7 @@ def summary() -> dict[str, Any]:
         "decision_sk": DECISION_SK,
         "block_lock_history": BLOCK_LOCK_HISTORY,  # #5069: lifted by owner ruling 6 — history, never a guard
         "session_time_model": SESSION_TIME_MODEL,
-        "lifting_minutes_range": lifting_minutes_range(),
+        "lifting_minutes_cap": lifting_minutes_cap(),  # #5318 (A4): a ceiling only — there is no lifting-minute floor
         "charter_version": CHARTER_VERSION,
         "excluded_methods": EXCLUDED_METHODS,
         "superseded_programs": SUPERSEDED_PROGRAMS,

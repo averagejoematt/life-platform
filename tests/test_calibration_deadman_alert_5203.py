@@ -18,8 +18,10 @@ from __future__ import annotations
 
 import ast
 import json
+import logging
 import re
 import sys
+from contextlib import contextmanager
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -66,6 +68,35 @@ def _today() -> str:
     return MORNING.strftime("%Y-%m-%d")
 
 
+class _Recorder(logging.Handler):
+    """Listens on the worker's PLATFORM logger, where CloudWatch does. `caplog` only hears root, and a line that
+    reached root but not the wire is exactly the 2026-10-24 16:00Z silence (#5203, the #3283 class)."""
+
+    def __init__(self):
+        super().__init__(level=logging.INFO)
+        self.lines: list[str] = []
+
+    def emit(self, record):
+        self.lines.append(record.getMessage())
+
+
+@contextmanager
+def _wire():
+    from common.platform_logger import get_logger
+
+    lg = get_logger("telegram-worker")
+    h = _Recorder()
+    lg.addHandler(h)
+    try:
+        yield h.lines
+    finally:
+        lg.removeHandler(h)
+
+
+def _summaries(lines: list[str]) -> list[str]:
+    return [x for x in lines if x.startswith("[calib-deadman] reason=")]
+
+
 # ── the AI sweep no longer carries it ──────────────────────────────────────────────────────
 def test_the_deadman_is_not_an_ai_sweep_candidate():
     today = plus(LAST, CYCLE * 3)
@@ -104,7 +135,7 @@ def test_sends_plain_text_once_per_cycle():
     ledger, sent = Ledger(), []
     seat = lambda p: ("tok", 4242)  # noqa: E731
     out = cda.run(ledger, MORNING, seat, lambda t, c, text: sent.append((t, c, text)), block=block)
-    assert out == {"reason": "sent", "sent": ["tape"]}
+    assert out == {"reason": "sent", "sent": ["tape"], "due": ["tape"], "outcomes": {"tape": "sent"}}
     assert sent == [("tok", 4242, cda.PREFIX + cc.deadman_alert(block["kinds"]["tape"]))]
     assert "tape has gone" in sent[0][2] and LAST in sent[0][2]
     again = cda.run(ledger, MORNING, seat, lambda t, c, text: sent.append(text), block=block)
@@ -118,12 +149,13 @@ def test_quiet_hours_and_a_dark_seat_send_nothing():
     assert dark["reason"] == "dark" and dark["due"] == ["tape"] and sent == []
 
 
-def test_a_failed_send_or_read_is_loud_never_raised(caplog):
+def test_a_failed_send_or_read_is_loud_never_raised():
     def boom(*a):
         raise RuntimeError("telegram down")
 
-    out = cda.run(Ledger(), MORNING, lambda p: ("tok", 1), boom, block=dead_block(_today()))
-    assert out["sent"] == [] and cda.FAILED_TOKEN in caplog.text
+    with _wire() as lines:
+        out = cda.run(Ledger(), MORNING, lambda p: ("tok", 1), boom, block=dead_block(_today()))
+    assert out["sent"] == [] and out["reason"] == "failed" and any(cda.FAILED_TOKEN in x for x in lines)
 
     class Broken:
         def query(self, **kw):
@@ -152,6 +184,114 @@ def test_delivered_through_the_worker_at_budget_tier(tier, monkeypatch):
     assert out["calibration_deadman"]["sent"] == ["tape"]  # ... and the dead-man went anyway
     assert [(t, m, p["chat_id"]) for t, m, p in sends] == [("lead-token", "sendMessage", 777)]
     assert sends[0][2]["text"].startswith(cda.PREFIX) and turns == []  # no model turn
+
+
+# ── every return path logs, on the wire (the 2026-10-24 16:00Z run was silent) ─────────────────────────
+LIVE_DAY = datetime(2026, 10, 24, 9, 0, tzinfo=PACIFIC)  # the silent run: 16:00Z = 09:00 PT, tier 0
+
+
+def live_block() -> dict:
+    """The shape of the live 16:00Z read: tape and photos never logged since genesis, three cycles missed."""
+    return cc.compute(LIVE_DAY.strftime("%Y-%m-%d"), {"tape": lambda: [], "photos": lambda: [], "dexa": lambda: []}, anchor=GENESIS)
+
+
+def test_the_logger_reaches_the_wire_not_a_root_that_drops_info():
+    from common.platform_logger import PlatformLogger
+
+    assert isinstance(cda.logger, PlatformLogger) and cda.logger.propagate is False and cda.logger.handlers
+    assert cda.logger.isEnabledFor(logging.INFO)
+
+
+def test_the_live_run_shape_logs_one_sent_line_per_kind_through_the_worker(monkeypatch):
+    from coach import telegram_worker_lambda as worker
+
+    block = live_block()
+    assert cc.deadman_kinds(block) == ["tape", "photos"]
+    ledger, sends = Ledger(), []
+    monkeypatch.setattr(worker, "_tg", lambda token, method, payload: sends.append(payload["text"]) or True)
+    monkeypatch.setattr(worker, "_current_tier", lambda: 0)
+    monkeypatch.setattr(worker, "_table", lambda: ledger)
+    monkeypatch.setattr(worker, "_pacific_now", lambda: LIVE_DAY)
+    monkeypatch.setattr(worker, "_bot_seat", lambda persona: ("lead-token", 777) if persona == cet.LEAD_OWNER else (None, None))
+    monkeypatch.setattr(worker, "_emit_metric", lambda *a, **k: None)
+    monkeypatch.setattr(cc, "read", lambda table, today: block)
+    monkeypatch.setattr(cet, "run_sweep", lambda **kw: {"reason": None, "candidates": 2})
+
+    with _wire() as lines:
+        out = worker.lambda_handler({"kind": "event_outbound"}, None)
+    assert out["calibration_deadman"]["sent"] == ["tape", "photos"]
+    assert set(ledger.rows) == {f"EVENT#CALIB_DEADMAN#tape#{GENESIS}", f"EVENT#CALIB_DEADMAN#photos#{GENESIS}"}
+    assert f"[calib-deadman] sent kind=tape event=CALIB_DEADMAN#tape#{GENESIS}" in lines
+    assert f"[calib-deadman] sent kind=photos event=CALIB_DEADMAN#photos#{GENESIS}" in lines
+    assert _summaries(lines) == ["[calib-deadman] reason=sent due=[tape,photos] tape=sent photos=sent"]
+    done = [x for x in lines if x.startswith("[telegram] event sweep done")]
+    assert done == ["[telegram] event sweep done (reason=None candidates=2 deadman=sent)"]
+    assert len(sends) == 2 and all(t.startswith(cda.PREFIX) for t in sends)
+
+
+def test_quiet_hours_none_due_dark_and_already_claimed_each_log_their_reason():
+    seat = lambda p: ("tok", 1)  # noqa: E731
+    with _wire() as lines:
+        cda.run(Ledger(), NIGHT, seat, lambda *a: True, block=live_block())
+    assert _summaries(lines) == ["[calib-deadman] reason=quiet_hours due=[]"]
+
+    with _wire() as lines:
+        cda.run(Ledger(), LIVE_DAY, seat, lambda *a: True, block={"kinds": {}})
+    assert _summaries(lines) == ["[calib-deadman] reason=none_due due=[]"]
+
+    with _wire() as lines:
+        cda.run(Ledger(), LIVE_DAY, lambda p: (None, None), lambda *a: True, block=live_block())
+    assert _summaries(lines) == ["[calib-deadman] reason=dark due=[tape,photos]"]
+
+    ledger = Ledger()
+    cda.run(ledger, LIVE_DAY, seat, lambda *a: True, block=live_block())
+    with _wire() as lines:
+        again = cda.run(ledger, LIVE_DAY, seat, lambda *a: pytest.fail("double send"), block=live_block())
+    assert again["reason"] == "already sent" and again["outcomes"] == {"tape": "already-claimed", "photos": "already-claimed"}
+    assert _summaries(lines) == ["[calib-deadman] reason=already_sent due=[tape,photos] tape=already-claimed photos=already-claimed"]
+    assert not any(cda.FAILED_TOKEN in x for x in lines)
+
+
+def test_a_claim_write_failure_is_loud_and_never_sends():
+    class Unwritable:
+        def put_item(self, Item, ConditionExpression=None):  # noqa: N803
+            raise RuntimeError("ProvisionedThroughputExceededException")
+
+    sent = []
+    with _wire() as lines:
+        out = cda.run(Unwritable(), LIVE_DAY, lambda p: ("tok", 1), lambda *a: sent.append(a), block=live_block())
+    assert sent == [] and out["reason"] == "failed" and out["outcomes"] == {"tape": "claim-failed", "photos": "claim-failed"}
+    assert sum(cda.FAILED_TOKEN in x and "claim write failed" in x for x in lines) == 2
+    assert _summaries(lines) == ["[calib-deadman] reason=failed due=[tape,photos] tape=claim-failed photos=claim-failed"]
+
+
+def test_a_send_that_reports_false_is_a_failed_send():
+    with _wire() as lines:
+        out = cda.run(Ledger(), LIVE_DAY, lambda p: ("tok", 1), lambda *a: False, block=live_block())
+    assert out["sent"] == [] and out["outcomes"] == {"tape": "send-failed", "photos": "send-failed"}
+    assert sum(cda.FAILED_TOKEN in x for x in lines) == 2
+
+
+def test_claim_event_outcome_tells_the_two_refusals_apart():
+    from coach import coach_outbound as co
+
+    class Unwritable:
+        def put_item(self, **kw):
+            raise RuntimeError("AccessDenied")
+
+    ledger = Ledger()
+    assert co.claim_event_outcome(ledger, "CALIB_DEADMAN#tape#2026-09-06") == co.CLAIMED
+    assert co.claim_event_outcome(ledger, "CALIB_DEADMAN#tape#2026-09-06") == co.ALREADY_CLAIMED
+    assert co.claim_event_outcome(Unwritable(), "CALIB_DEADMAN#tape#2026-09-06") == co.CLAIM_FAILED
+    assert co.claim_event_outcome(ledger, "") == co.CLAIM_FAILED
+    assert ledger.rows["EVENT#CALIB_DEADMAN#tape#2026-09-06"]["pk"] == "COACH#outbound_events"
+    assert co.claim_event(Ledger(), "x") is True and co.claim_event(ledger, "CALIB_DEADMAN#tape#2026-09-06") is False
+
+
+def test_no_log_line_carries_a_chat_id_or_a_token():
+    with _wire() as lines:
+        cda.run(Ledger(), LIVE_DAY, lambda p: ("SECRET-TOKEN", 987654321), lambda *a: True, block=live_block())
+    assert lines and not any("SECRET-TOKEN" in x or "987654321" in x for x in lines)
 
 
 # ── the email alarm ─────────────────────────────────────────────────────────────────────────

@@ -32,6 +32,39 @@ BLOCK_LOOKBACK_DAYS = 56  # 8 weeks, enough to count the trailing consistent blo
 def _gather_draft_evidence(ir: Any, target_date: str, layer_status: str) -> dict[str, Any]:
     """Per-draft-exercise evidence for the critics: anchor-lift trend, pain flags, days since.
     Plus the two streaks (#4067) and the lifting-session count from the performed record."""
+    from mcp import plan_call_scope
+
+    # #5313: every drafted exercise asks get_exercise_history for the SAME 400-day window; one read serves them all.
+    with plan_call_scope.scope(plan_call_scope.HEVY_ALL_PHASES):
+        exercises = _draft_exercise_rows(ir, target_date)
+
+    dates = _safe(_workout_dates, _minus_days(target_date, BLOCK_LOOKBACK_DAYS), target_date)
+    streaks = _safe(_training_streaks, target_date) or {"active_day_streak": None, "loaded_lifting_streak": None}
+    week_start = _minus_days(target_date, 7)
+    lifting_7d = len({d for d in dates if week_start <= d < target_date}) if dates is not None else None
+    weeks_in_block = _weeks_in_block(dates, target_date) if dates is not None else None
+    # the per-movement reads each carry the derived layer's own status; a dark read on ANY
+    # drafted movement makes the whole pain input unknown (never clear by omission, #3768)
+    statuses = [e.get("pain_layer_status") for e in exercises if e.get("pain_layer_status")]
+    if statuses and all(s not in ("dark", "unknown") for s in statuses):
+        layer_status = statuses[0]
+    elif statuses:
+        layer_status = next(s for s in statuses if s in ("dark", "unknown"))
+    return {
+        "exercises": exercises,
+        # #4067/#4161: the loaded-lifting streak is context (the fatigue trigger is performance or readiness).
+        # #4411: it is the ONLY streak a critic input carries; the active-day count stays on the
+        # measured `streaks` record for the evidence trail and reaches no packet and no note.
+        "loaded_lifting_streak": streaks.get("loaded_lifting_streak"),
+        "streaks": streaks,
+        "lifting_sessions_7d": lifting_7d,
+        "weeks_in_block": weeks_in_block,
+        "pain_layer_status": layer_status,
+    }
+
+
+def _draft_exercise_rows(ir: Any, target_date: str) -> list[dict[str, Any]]:
+    """One evidence row per drafted exercise: anchor trend, exposure history, pain flags (extracted for #5313's memo scope)."""
     from mcp.tools_strength import tool_get_exercise_history
     from mcp.tools_training_notes import _pain_notes, tool_get_exercise_notes
 
@@ -74,30 +107,7 @@ def _gather_draft_evidence(ir: Any, target_date: str, layer_status: str) -> dict
             row["pain_notes"] = _pain_notes(pain.get("timeline") or [])  # #4174: per-site instances need the words
             row["pain_layer_status"] = pain.get("layer_status")
         exercises.append(row)
-
-    dates = _safe(_workout_dates, _minus_days(target_date, BLOCK_LOOKBACK_DAYS), target_date)
-    streaks = _safe(_training_streaks, target_date) or {"active_day_streak": None, "loaded_lifting_streak": None}
-    week_start = _minus_days(target_date, 7)
-    lifting_7d = len({d for d in dates if week_start <= d < target_date}) if dates is not None else None
-    weeks_in_block = _weeks_in_block(dates, target_date) if dates is not None else None
-    # the per-movement reads each carry the derived layer's own status; a dark read on ANY
-    # drafted movement makes the whole pain input unknown (never clear by omission, #3768)
-    statuses = [e.get("pain_layer_status") for e in exercises if e.get("pain_layer_status")]
-    if statuses and all(s not in ("dark", "unknown") for s in statuses):
-        layer_status = statuses[0]
-    elif statuses:
-        layer_status = next(s for s in statuses if s in ("dark", "unknown"))
-    return {
-        "exercises": exercises,
-        # #4067/#4161: the loaded-lifting streak is context (the fatigue trigger is performance or readiness).
-        # #4411: it is the ONLY streak a critic input carries; the active-day count stays on the
-        # measured `streaks` record for the evidence trail and reaches no packet and no note.
-        "loaded_lifting_streak": streaks.get("loaded_lifting_streak"),
-        "streaks": streaks,
-        "lifting_sessions_7d": lifting_7d,
-        "weeks_in_block": weeks_in_block,
-        "pain_layer_status": layer_status,
-    }
+    return exercises
 
 
 def _exposure_history(sessions: list[dict[str, Any]], target_date: str) -> dict[str, Any]:

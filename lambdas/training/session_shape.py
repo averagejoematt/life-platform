@@ -1,7 +1,10 @@
 """session_shape.py — a session's LENGTH and SHAPE, from the training charter (#5069, owner ruling 5).
 
-Owner ruling 5 (2026-10-18, epic #5067): "5 lifting days, 60-75 min of lifting." The charter's
-`split.session_minutes` carries the lifting band, the one cardio block's cap and the stretching cap.
+Owner ruling 5 (2026-10-18, epic #5067) set the lifting minutes; owner ruling A4 (2026-10-24, #5318) made them a CEILING
+ONLY: "Accept shorter sessions. 75 sets a week stays the ceiling. Drop the 60-minute lifting floor: 75 minutes is a ceiling,
+not a target." The charter's `split.session_minutes` carries the lifting ceiling, the one cardio block's cap and the
+stretching cap. There is no floor: a session under the ceiling is reported as its length and nothing ever adds a set to
+fill it (the old `under_range` flag is gone with the floor it measured).
 This module is the ONE estimate of a session's lifting minutes (`session_minutes_estimate` for a
 prescription, `routine_minutes` for a routine's blocks), the trim that fits a prescription to the cap
 (`trim_to_time` — accessories first, anchors never), and the shape check / enforcement on a routine's
@@ -18,7 +21,7 @@ from training import warmup_sets
 from training.training_charter import charter_value, charter_version
 
 # ── the session's LENGTH ─────────────────────────────────────────────────────
-# "60-75 min of lifting": the charter's `split.session_minutes`. One estimate, from the prescription's own numbers: every
+# The lifting ceiling: the charter's `split.session_minutes.lifting_ceiling` (A4, #5318 — a ceiling, not a target). One estimate, from the prescription's own numbers: every
 # working and warm-up set costs the set itself plus the exposure's rest (`EXPOSURES[*].rest_seconds`). Cardio and
 # stretching are NOT lifting minutes — they have their own caps (one cardio block, stretching), enforced on the routine's
 # blocks by `enforce_session_shape` / reported by `session_shape_problems`.
@@ -37,15 +40,9 @@ SESSION_TIME_MODEL: dict[str, Any] = {
 }
 
 
-def lifting_minutes_range() -> list[int]:
-    """The charter's lifting-minute band (owner ruling 5) — [low, high]."""
-    lo, hi = charter_value("split.session_minutes.lifting")
-    return [int(lo), int(hi)]
-
-
 def lifting_minutes_cap() -> int:
-    """The lifting-minute ceiling a session is trimmed to (the top of `lifting_minutes_range`)."""
-    return lifting_minutes_range()[1]
+    """The lifting-minute ceiling a session is trimmed to (`split.session_minutes.lifting_ceiling`). There is no floor (A4)."""
+    return int(charter_value("split.session_minutes.lifting_ceiling"))
 
 
 def _side_caps() -> dict[str, int]:
@@ -70,20 +67,21 @@ def _assumed_warmups(exposures: list[dict[str, Any]]) -> list[int]:
 
 
 def session_minutes_estimate(exposures: list[dict[str, Any]]) -> dict[str, Any]:
-    """The lifting-time estimate for a prescription's exposures (`SESSION_TIME_MODEL`), against the charter's band."""
+    """The lifting-time estimate for a prescription's exposures (`SESSION_TIME_MODEL`), against the charter's ceiling.
+
+    A4 (#5318): the ceiling is the only bound — an estimate under it is just its length; there is no `under_range` and no
+    fill action anywhere downstream."""
     set_s = int(SESSION_TIME_MODEL["set_seconds"])
     warm = _assumed_warmups(exposures)
     seconds = sum((len(e["sets"]) + w) * (set_s + int(e.get("rest_seconds") or 0)) for e, w in zip(exposures, warm))
     minutes = round(seconds / 60.0, 1)
-    lo, hi = lifting_minutes_range()
+    hi = lifting_minutes_cap()
     return {
         "lifting_minutes": minutes,
         "working_sets": sum(len(e["sets"]) for e in exposures),
         "warmup_sets_assumed": sum(warm),
-        "range": [lo, hi],
         "cap": hi,
         "within_cap": minutes <= hi,
-        "under_range": minutes < lo,
         **_side_caps(),
         "excludes": "cardio and stretching (their own caps)",
         "charter_version": charter_version(),
@@ -111,19 +109,43 @@ def trim_to_time(exposures: list[dict[str, Any]]) -> dict[str, Any] | None:
         "estimate_after_min": est["lifting_minutes"],
         "dropped_accessories": dropped,
         "over_cap_after_trim": not est["within_cap"],
-        "rule": "accessories first, last-listed first; anchors are never cut for time (charter split.session_minutes.lifting, owner ruling 5)",
+        "rule": "accessories first, last-listed first; anchors are never cut for time (charter split.session_minutes.lifting_ceiling, owner rulings 5 + A4)",
     }
 
 
+LOADED_TIMED_TYPES: frozenset[str] = frozenset({"weight_duration", "short_distance_weight"})
+"""Hevy exercise types that are a timed or distance set UNDER LOAD (a carry): lifting, never a cardio or stretching block."""
+
+# Titles that name a mobility block (#5315). Matched on the RESOLVED title (catalog entry, `tmpl:<id>` hint, rationale_tag);
+# the catalog stays the source where it carries the exercise, this list is only for titles it cannot resolve.
+_MOBILITY_HINTS = ("stretch", "mobility", "foam roll", "cool down", "cooldown", "cool-down")
+
+
 def _block_title(block: Any, catalog_movements: dict[str, Any]) -> str:
+    """The block's title: its catalog entry (by key, or by the `tmpl:<id>` hint of a Hevy template block), else a mobility
+    `rationale_tag`, else the key's own words. A `tmpl:` key nothing resolves stays `tmpl:<id>` — see `_block_kind`."""
     key = str(getattr(block, "movement_key", "") or "")
-    return str((catalog_movements.get(key) or {}).get("title") or key.replace("_", " "))
+    entry = catalog_movements.get(key)
+    if entry is None and key.startswith("tmpl:"):
+        tid = key.split(":", 1)[1].upper()
+        entry = next((e for e in catalog_movements.values() if str(e.get("hevy_template_id_hint") or "").upper() == tid), None)
+    if entry and entry.get("title"):
+        return str(entry["title"])
+    tag = str(getattr(block, "rationale_tag", "") or "")
+    if any(h in tag.lower() for h in _MOBILITY_HINTS):
+        return tag
+    return key if key.startswith("tmpl:") else key.replace("_", " ")
 
 
 def _block_kind(block: Any, catalog_movements: dict[str, Any]) -> str:
-    """'stretching' | 'cardio' | 'lifting' for one routine block. A TIMED block (every set carries a duration and no reps or
+    """'stretching' | 'cardio' | 'lifting' | 'unclassified' for one routine block. A TIMED block (every set carries a duration and no reps or
     load) is cardio or stretching — stretching when its title names a stretch, mobility or foam rolling; anything else is
-    lifting. By the set shape, not the name alone: a 'walking lunge' or a 'cable stretch curl' is a lift."""
+    lifting. By the set shape, not the name alone: a 'walking lunge' or a 'cable stretch curl' is a lift. #5318: a LOADED timed
+    movement (Hevy `weight_duration` / `short_distance_weight` — the farmer's carry) is lifting even before its load is
+    written: its first load is the owner's pick, so the drafted set carries a duration and no weight."""
+    entry = catalog_movements.get(str(getattr(block, "movement_key", "") or "")) or {}
+    if entry.get("hevy_type") in LOADED_TIMED_TYPES:
+        return "lifting"
     sets = list(getattr(block, "sets", None) or [])
     timed = bool(sets) and all(
         getattr(st, "duration_seconds", None)
@@ -135,7 +157,10 @@ def _block_kind(block: Any, catalog_movements: dict[str, Any]) -> str:
     if not timed:
         return "lifting"
     title = _block_title(block, catalog_movements).strip().lower()
-    return "stretching" if any(h in title for h in ("stretch", "mobility", "foam roll")) else "cardio"
+    if any(h in title for h in _MOBILITY_HINTS):
+        return "stretching"
+    # a timed Hevy template nothing resolves is NOT guessed as cardio (#5315): it is reported as unclassified
+    return "unclassified" if title.startswith("tmpl:") else "cardio"
 
 
 def _block_seconds(block: Any) -> int:
@@ -145,16 +170,23 @@ def _block_seconds(block: Any) -> int:
 def routine_minutes(blocks: list[Any], catalog_movements: dict[str, Any]) -> dict[str, Any]:
     """A routine's minutes by kind: lifting (sets as written, warm-ups included, x set time + rest), each cardio block, stretching."""
     set_s = int(SESSION_TIME_MODEL["set_seconds"])
-    lifting_s, cardio, stretch_s = 0, [], 0
+    lifting_s, cardio, stretch_s, unclassified = 0, [], 0, []
     for b in blocks:
         kind = _block_kind(b, catalog_movements)
         if kind == "lifting":
             lifting_s += len(getattr(b, "sets", None) or []) * (set_s + int(getattr(b, "rest_seconds", None) or 0))
         elif kind == "cardio":
             cardio.append({"movement_key": b.movement_key, "minutes": round(_block_seconds(b) / 60.0, 1)})
+        elif kind == "unclassified":
+            unclassified.append(b.movement_key)
         else:
             stretch_s += _block_seconds(b)
-    return {"lifting_minutes": round(lifting_s / 60.0, 1), "cardio_blocks": cardio, "stretching_minutes": round(stretch_s / 60.0, 1)}
+    return {
+        "lifting_minutes": round(lifting_s / 60.0, 1),
+        "cardio_blocks": cardio,
+        "stretching_minutes": round(stretch_s / 60.0, 1),
+        "unclassified_blocks": unclassified,
+    }
 
 
 def session_shape_problems(blocks: list[Any], catalog_movements: dict[str, Any]) -> list[str]:
@@ -170,6 +202,10 @@ def session_shape_problems(blocks: list[Any], catalog_movements: dict[str, Any])
         f"cardio block {c['movement_key']} is {c['minutes']} min, over the {caps['cardio_block_max_minutes']}-min cap"
         for c in m["cardio_blocks"]
         if c["minutes"] > caps["cardio_block_max_minutes"]
+    ]
+    out += [
+        f"timed block {k} could not be classified (no catalog title, not a mobility tag) — not counted as cardio or stretching (#5315)"
+        for k in m["unclassified_blocks"]
     ]
     if m["stretching_minutes"] > caps["stretching_max_minutes"]:
         out.append(f"stretching {m['stretching_minutes']} min is over the {caps['stretching_max_minutes']}-min cap")
