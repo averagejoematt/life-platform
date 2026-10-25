@@ -81,6 +81,7 @@ from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific
 from experiment import experiment_gates, prereg_effect  # #1371: the arming-threshold registry · #3552: the min_effect facet
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058: default-deny pilot data
 from experiment.phase_taxonomy import forbidden_provenance  # #3915: the calibration ledger carries no provenance
+from health import eating_window  # #5099: THE eating window (charter nutrition.eating_window)
 from health.calorie_target import target_phrase  # #5095: the ONE calorie target
 
 from compute.compute_json_schemas import hypotheses_schema  # #4276: the generation output schema (module at its size ceiling)
@@ -1019,7 +1020,7 @@ def generate_hypotheses(daily_rows, existing_hypotheses, profile=None, journal_c
 Context:
 - 36-year-old male, {total_loss} lb weight loss transformation (started {start_w} lbs, goal {goal_w} lbs)
 - Calorie target: {cal_target}/day, protein target: {pro_target}g/day
-- 16:8 intermittent fasting (eating window ~11am-7pm)
+- Eating window: {eating_window.describe()} (the charter's nutrition.eating_window, #5099)
 - Primary training: walking + strength training, building Zone 2 base
 - Data sources: Whoop (HRV/recovery), Eight Sleep (sleep onset), Strava (activities), MacroFactor (nutrition), Habitify (habits), Apple Health (steps/glucose/gait), Notion journal (mood/stress/energy)
 {existing_block}{candidates_block}

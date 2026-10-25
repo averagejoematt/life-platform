@@ -34,7 +34,15 @@ sys.path.insert(0, str(REPO / "lambdas"))
 
 from coach import progress_capture as pc  # noqa: E402
 
-JPEG = b"\xff\xd8\xff\xe0" + b"body bytes" * 40
+# A well-formed header (SOI, APP0/JFIF, SOS) so `strip_metadata` (#5061) walks it as a camera JPEG; it carries no
+# APP1, so the stored bytes equal the sent bytes and the sha/bytes assertions below hold unchanged.
+JPEG = (
+    b"\xff\xd8"
+    + b"\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
+    + b"\xff\xda\x00\x08\x01\x01\x00\x00\x3f\x00"
+    + b"body bytes" * 40
+    + b"\xff\xd9"
+)
 OWNER_CHAT = 8675309
 CHAT_IDS = [OWNER_CHAT, -100999]  # the group id is there on purpose — it must never win
 

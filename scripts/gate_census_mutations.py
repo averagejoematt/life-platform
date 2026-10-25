@@ -521,6 +521,12 @@ _CHARTER_PUBLISHED_READER_PY = (
 )
 
 # #5061: a published module (lambdas/emails) that imports the owner-only calibration cadence (tape / photo / DEXA due dates).
+_TRAVEL_FOOD_PUBLISHED_IMPORTER_PY = (
+    '"""census probe — a published importer of the owner-only travel food kit that must never exist."""\n\n'
+    "from health import travel_food\n\n\n"
+    "def handle():\n"
+    "    return travel_food.build(None)\n"
+)
 _CALIBRATION_PUBLISHED_IMPORTER_PY = (
     '"""census probe — a published importer of the owner-only calibration cadence that must never exist."""\n\n'
     "from training import calibration_cadence\n\n\n"
@@ -530,6 +536,11 @@ _CALIBRATION_PUBLISHED_IMPORTER_PY = (
 
 # #5095: a module that grades against a hand-typed 1,500 kcal calorie target instead of the ONE resolver.
 _CALORIE_LITERAL_PY = '"""census probe — a second calorie target that must never exist."""\n\n\ndef grade(cal):\n    cal_target = 1500\n    return cal <= cal_target\n'
+
+# #5099: a prompt module typing its own eating window instead of reading the charter's (nutrition.eating_window).
+_EATING_WINDOW_LITERAL_PY = (
+    '"""census probe — a second eating window that must never exist."""\n\nPROMPT = "Targets: eating window ~11am-7pm."\n'
+)
 
 # #5106: a published module (lambdas/web) that reads the owner-only evening check-in partition — his stress and
 # hunger ratings would then be one call from a served page.
@@ -559,6 +570,12 @@ _ASSEMBLE_WITHOUT_TRACKER_PY = (
 
 # #5073: a published module (lambdas/emails) that imports the owner-only May tracker — the target
 # date, the band and the projected weight would then be one call from an email body.
+_EARLY_WARNING_PUBLISHED_IMPORTER_PY = (
+    '"""census probe — a published reader of the owner-only early-warning flag that must never exist."""\n\n'
+    "from health import early_warning\n\n\n"
+    "def handle(table, today):\n"
+    "    return early_warning.read_recent(table, today)\n"
+)
 _MAY_TRACKER_PUBLISHED_IMPORTER_PY = (
     '"""census probe — a published importer that must never exist."""\n\n'
     "from training import may_tracker\n\n\n"
@@ -1419,6 +1436,28 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         plants=(("lambdas/health/_census_probe_5095.py", _CALORIE_LITERAL_PY),),
         track=False,  # the guard rglobs lambdas/ mcp/ deploy/ scripts/ on disk, so an untracked module is in scope
     ),
+    # #5104: the owner-only travel food kit — no published (web) or email module imports it.
+    "structural::test_travel_food_kit_5104.py": MutationSpec(
+        gate_id="structural::test_travel_food_kit_5104.py",
+        target="tests/test_travel_food_kit_5104.py",
+        detects=(
+            "a published module (lambdas/web or lambdas/emails) importing the owner-only travel food kit, which carries the "
+            "owner's trip dates, the maintenance-week target and the calorie plan (owner context, never a reader surface)"
+        ),
+        plants=(("lambdas/web/_census_probe_5104.py", _TRAVEL_FOOD_PUBLISHED_IMPORTER_PY),),
+        track=False,  # the guard os.walks lambdas/web + lambdas/emails on disk, so an untracked module is in scope
+    ),
+    # #5099: the eating window is the charter's — no code string under lambdas/ mcp/ types its own.
+    "structural::test_eating_window_reads_5099.py": MutationSpec(
+        gate_id="structural::test_eating_window_reads_5099.py",
+        target="tests/test_eating_window_reads_5099.py",
+        detects=(
+            "a module typing its own eating window in a code string (`~11am-7pm`) instead of reading the charter's "
+            "nutrition.eating_window through health.eating_window — the four-prompts-four-windows class #5099 retired"
+        ),
+        plants=(("lambdas/emails/_census_probe_5099.py", _EATING_WINDOW_LITERAL_PY),),
+        track=False,  # the guard rglobs lambdas/ mcp/ on disk, so an untracked module is in scope
+    ),
     "structural::test_repo_walk_5273.py": MutationSpec(
         gate_id="structural::test_repo_walk_5273.py",
         target="tests/test_repo_walk_5273.py",
@@ -1427,6 +1466,18 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
             "that swallows real source would hide it from every scanner while every planted-copy test stays green"
         ),
         plants=(("cdk/_census_probe_5273_staging/probe.py", '"""probe."""\n'),),
+    ),
+    # #5121: the owner-only relapse early-warning flag — read only by the owner channels.
+    "structural::test_relapse_early_warning_5121.py": MutationSpec(
+        gate_id="structural::test_relapse_early_warning_5121.py",
+        target="tests/test_relapse_early_warning_5121.py",
+        detects=(
+            "a published-surface module (lambdas/web) importing the owner-only relapse early-warning detector and reading "
+            "the flag rows — a sensitive mind state (which lapse signals are active together, and since when) one call "
+            "from a served page"
+        ),
+        plants=(("lambdas/web/_census_probe_5121.py", _EARLY_WARNING_PUBLISHED_IMPORTER_PY),),
+        track=False,  # the guard os.walks lambdas/ mcp/ site/ and the site generators on disk
     ),
 }
 
@@ -1486,6 +1537,28 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_travel_food_kit_5104.py": _proof(
+        "structural::test_travel_food_kit_5104.py",
+        "ARMED 1/1 — baseline: 14 passed in 10.03s | mutated: 1 failed, 13 passed in 10.07s :: "
+        "test_no_published_or_email_module_imports_the_kit | reverted: 14 passed in 8.88s",
+        "lambdas/web/ and lambdas/emails/ on disk (os.walk, every .py): any mention of `travel_food` fails and names the file. "
+        "STILL INVISIBLE, stated: a published module handed the kit by an unswept caller (mcp/, lambdas/coach), a dynamic import "
+        "by string, and a copy of the kit's contents under another name.",
+        proved_on="2026-10-24",
+    ),
+    "structural::test_relapse_early_warning_5121.py": _proof(
+        "structural::test_relapse_early_warning_5121.py",
+        "ARMED 1/1 — baseline: 26 passed in 1.45s | mutated: 1 failed, 25 passed in 1.11s :: "
+        "test_only_the_owner_channels_read_the_flag | reverted: 26 passed in 0.81s",
+        "lambdas/, mcp/, site/ and the scripts/v4_build_*.py site generators on disk (os.walk, .py/.js/.mjs/.html): any "
+        "file naming the `early_warning_flag` partition or importing `health.early_warning` must be one of the six "
+        "owner-channel modules (the detector, its writer, the response owner's Telegram ping, the mind coach's thread, "
+        "the two registries); a planted lambdas/web importer is named. Also pinned: the owner-only tier, the "
+        "EXPERIMENT_SCOPED class, and the shared brief context (`ai_context_block`) never carrying an active flag "
+        "(tests/test_daily_insight_compute_behavior.py). STILL INVISIBLE, stated: a module handed flag rows as an "
+        "argument by an allowed caller, a dynamic import by string, a pk built from variables, and the live table.",
+        proved_on="2026-10-24",
+    ),
     "structural::test_repo_walk_5273.py": _proof(
         "structural::test_repo_walk_5273.py",
         "ARMED 1/1 — baseline: 11 passed in 0.90s | mutated: 1 failed, 10 passed in 0.90s :: "
@@ -2442,6 +2515,18 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "comment, prose, `_call_`). STILL INVISIBLE, stated: a target in prose, a target computed from other literals, the "
         "sealed plan root's genesis figure (config/user_goals.json), and a calorie target at a different number.",
         proved_on="2026-10-19",
+    ),
+    "structural::test_eating_window_reads_5099.py": _proof(
+        "structural::test_eating_window_reads_5099.py",
+        "ARMED 1/1 — baseline: 15 passed in 5.64s | mutated: 1 failed, 14 passed in 5.49s :: "
+        "test_no_code_string_types_its_own_eating_window | reverted: 15 passed in 5.90s",
+        "lambdas/ mcp/ on disk (rglob, every .py, AST): any code string — a constant or an f-string part, docstrings "
+        "excluded — carrying a fasting:eating ratio that completes a day (16:8, 14:10, 18:6, 20:4), a clock window "
+        "(`11am-7pm`, `11:30am–7:30pm`) or an `N-hour eating window` fails and names the line; in-test controls prove each "
+        "shape and the clean ones (a docstring, a comment, a time of day, 16:9, an interpolated window). STILL INVISIBLE, "
+        "stated: comments and docstrings, config files (config/user_goals.json's practice note), site/ JS, and a window "
+        "built from other literals.",
+        proved_on="2026-10-24",
     ),
 }
 

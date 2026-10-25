@@ -20,7 +20,7 @@ prompt is sent at most once per cycle and a new log opens a new key.
 
 DEXA is a cadence, not a behavioural dead-man (a scan is booked, not forgotten): it carries `due_on`/`state`
 (never `missed_2`), and when no scan row is readable it is `unknown` and names the ingest that would supply it
-(#4639, not built) rather than guessing a date.
+(#4639: `scripts/ingest_lab_report.py dexa`) rather than guessing a date.
 
 LAB FOLLOW-UP DRAW (#5111). Booked, like DEXA, so it has no behavioural missed-cycle count; but a follow-up
 that nobody books is exactly the silence a dead-man exists for. So the row turns `missed_2` once the charter's
@@ -47,13 +47,15 @@ from __future__ import annotations
 import datetime as _dt
 from typing import Any, Callable, Mapping, Optional
 
-VERSION = "calibration-cadence@1.3.0"  # 1.3.0 #5111: the lab_draw dead-man + lab_draw_row; 1.2.0 #5006/#5108: food_delivery_upload; 1.1.0 #5111: lab_draw
+VERSION = "calibration-cadence@1.4.0"  # 1.4.0 #5061: the DEXA prompt names the built ingest; 1.3.0 #5111: the lab_draw dead-man + lab_draw_row; 1.2.0 #5006/#5108: food_delivery_upload; 1.1.0 #5111: lab_draw
 KINDS = ("tape", "photos", "dexa", "lab_draw", "food_delivery_upload")
 OK, DUE, OVERDUE, MISSED_2, UNKNOWN, READ_FAILED = "ok", "due", "overdue", "missed_2", "unknown", "read_failed"
 PROMPT_PREFIX = "CALIB_PROMPT"
 DEADMAN_PREFIX = "CALIB_DEADMAN"
 DEADMAN_TOKEN = DEADMAN_PREFIX  # the log token the nightly dead-man check emits
 DEXA_INGEST_ISSUE = 4639
+# #5061: the ingest #4639 built (PR #4981) — a scan lands through this command, then the next read moves `due_on`.
+DEXA_INGEST_COMMAND = "python3 scripts/ingest_lab_report.py dexa <scan.csv|scan.json> --scan-date YYYY-MM-DD --document <report.pdf>"
 SRC = {
     "tape": "USER#matthew#SOURCE#measurements (DATE# rows)",
     "photos": "USER#matthew#SOURCE#progress_photos (DATE#<day>#<pose> index rows; dates only, never a key)",
@@ -64,7 +66,10 @@ SRC = {
 PROMPTS = {
     "tape": "Tape day: measure waist (navel, narrowest, iliac crest) and the other sites, then log it with your coach. Last tape {last}.",
     "photos": "Photo day: front, side and back, same light and spot as last time; send each to the bot as /progress front (side, back). Last set {last}.",
-    "dexa": "DEXA is due about now ({due}). Book the scan; the labs/DEXA ingest (#4639) is not built, so tell your coach the date once it is done.",
+    "dexa": (
+        "DEXA is due about now ({due}; last scan {last}). Book the scan; once it is done, load the report with "
+        "scripts/ingest_lab_report.py dexa (review first, then --apply) and the next due date moves on its own."
+    ),
     "lab_draw": "The follow-up draw is due about {due}. Book it; tell your coach the date once it is done. Last draw {last}.",
     "food_delivery_upload": (
         "The food-delivery upload is due ({due}): export the delivery transactions since the last upload as CSV "
@@ -169,8 +174,8 @@ def _dexa(readers: Mapping[str, Callable], today: str) -> dict[str, Any]:
     cyc = cycle_state("dexa", dates, today, int(weeks) * 7, anchor=None, dead_cycles=None)
     out = {**base, **cyc}
     if not dates:
-        out["detail"] = f"no DEXA scan row is readable — the labs/DEXA ingest is #{DEXA_INGEST_ISSUE} (not built)"
-        out["ingest"] = {"issue": DEXA_INGEST_ISSUE, "built": False}
+        out["detail"] = f"no DEXA scan row is readable — load one with the #{DEXA_INGEST_ISSUE} ingest: {DEXA_INGEST_COMMAND}"
+        out["ingest"] = {"issue": DEXA_INGEST_ISSUE, "built": True, "command": DEXA_INGEST_COMMAND}
     return out
 
 
@@ -374,9 +379,10 @@ def read(table: Any, today: str) -> dict[str, Any]:
     """The block over one table, plus the fitness battery's row (#5078): its due date and prompt come from
     `training.fitness_tests` (the program's own week), carried here so the owner channel has ONE prompt path —
     and the weekly calorie titration's dead-man row (#5096, `health.titration`: no decision for the week), and the
-    dated prompt to write the post-deadline plan with its dead-man (#5130, `training.phase_after_may`)."""
+    dated prompt to write the post-deadline plan with its dead-man (#5130, `training.phase_after_may`), and the dated
+    travel-food-kit prompt before the late-December trip with its dead-man (#5104, `health.travel_food`)."""
     from common.constants import EXPERIMENT_START_DATE
-    from health import titration
+    from health import titration, travel_food
 
     from training import fitness_tests, phase_after_may
 
@@ -384,4 +390,5 @@ def read(table: Any, today: str) -> dict[str, Any]:
     block["kinds"][fitness_tests.CALIBRATION_KIND] = fitness_tests.calibration_row_from_table(table, today)
     block["kinds"][titration.CALIBRATION_KIND] = titration.calibration_row_from_table(table, today)
     block["kinds"][phase_after_may.CALIBRATION_KIND] = phase_after_may.calibration_row(today)
+    block["kinds"][travel_food.CALIBRATION_KIND] = travel_food.calibration_row(today)
     return block

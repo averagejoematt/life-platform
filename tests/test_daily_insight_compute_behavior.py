@@ -936,70 +936,78 @@ class TestAnalyzeIntentionExecutionGap:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
+def _detect_early_warning(computed_records_7d, habit_7d, declining):
+    """The pre-#5121 four-marker call, through ``health.early_warning`` (the detector moved there whole)."""
+    from health import early_warning
+
+    r = early_warning.detect(computed_records_7d, habit_7d, declining)
+    return r["active"], r["markers"], early_warning.summary_block(r)
+
+
 class TestDetectEarlyWarning:
     def test_a_single_marker_is_not_a_warning(self):
         recs = [_cm(f"2026-05-0{d}", journal=10) for d in (6, 7, 8)]
-        active, markers, block = di.detect_early_warning(recs, [], [])
+        active, markers, block = _detect_early_warning(recs, [], [])
         assert markers == ["journal_sparse"] and active is False and block == ""
 
     def test_two_simultaneous_markers_raise_the_warning(self):
         recs = [_cm(f"2026-05-0{d}", journal=10, nutrition=10) for d in (6, 7, 8)]
-        active, markers, block = di.detect_early_warning(recs, [], [])
+        active, markers, block = _detect_early_warning(recs, [], [])
         assert active is True and set(markers) == {"journal_sparse", "nutrition_gap"}
         assert "EARLY WARNING" in block
 
     def test_the_journal_marker_needs_two_low_days_of_the_last_three(self):
         recs = [_cm("2026-05-06", journal=10), _cm("2026-05-07", journal=90), _cm("2026-05-08", journal=90)]
-        assert di.detect_early_warning(recs, [], [])[1] == []
+        assert _detect_early_warning(recs, [], [])[1] == []
 
     def test_the_journal_threshold_is_strictly_below_fifty(self):
         recs = [_cm(f"2026-05-0{d}", journal=50) for d in (6, 7, 8)]
-        assert di.detect_early_warning(recs, [], [])[1] == []
+        assert _detect_early_warning(recs, [], [])[1] == []
 
     def test_the_nutrition_threshold_is_strictly_below_forty(self):
         recs = [_cm(f"2026-05-0{d}", nutrition=40) for d in (6, 7, 8)]
-        assert di.detect_early_warning(recs, [], [])[1] == []
+        assert _detect_early_warning(recs, [], [])[1] == []
 
     def test_only_the_last_three_days_of_the_window_are_examined(self):
         recs = [_cm(f"2026-05-0{d}", journal=10) for d in (1, 2, 3)] + [_cm(f"2026-05-0{d}", journal=90) for d in (6, 7, 8)]
-        assert di.detect_early_warning(recs, [], [])[1] == []
+        assert _detect_early_warning(recs, [], [])[1] == []
 
     def test_a_declining_recovery_run_is_a_marker(self):
         declining = [{"metric": "recovery"}]
-        assert di.detect_early_warning([], [], declining)[1] == ["recovery_sliding"]
+        assert _detect_early_warning([], [], declining)[1] == ["recovery_sliding"]
 
     def test_absent_component_scores_produce_no_markers_rather_than_low_ones(self):
         """ADR-104: a missing journal score is not a journal score of zero."""
         recs = [_cm(f"2026-05-0{d}") for d in (6, 7, 8)]
-        assert di.detect_early_warning(recs, [], [])[1] == []
+        assert _detect_early_warning(recs, [], [])[1] == []
 
     def test_the_habit_marker_needs_at_least_four_days_of_habit_history(self):
         habits = [_hs(f"2026-05-0{d}", t0_completion_rate=r) for d, r in zip((6, 7, 8), (0.9, 0.2, 0.2))]
-        assert "habit_declining" not in di.detect_early_warning([], habits, [])[1]
+        assert "habit_declining" not in _detect_early_warning([], habits, [])[1]
 
     def test_a_fifteen_point_habit_drop_is_a_marker(self):
         """prior (05-01..05-04) mean 0.90; recent (05-06..05-08) mean 0.75; drop = 0.15."""
         prior = [_hs(f"2026-05-0{d}", t0_completion_rate=0.90) for d in (1, 2, 3, 4)]
         recent = [_hs(f"2026-05-0{d}", t0_completion_rate=0.75) for d in (6, 7, 8)]
-        assert "habit_declining" in di.detect_early_warning([], prior + recent, [])[1]
+        assert "habit_declining" in _detect_early_warning([], prior + recent, [])[1]
 
     def test_a_habit_drop_under_the_bar_is_not_a_marker(self):
         prior = [_hs(f"2026-05-0{d}", t0_completion_rate=0.90) for d in (1, 2, 3, 4)]
         recent = [_hs(f"2026-05-0{d}", t0_completion_rate=0.80) for d in (6, 7, 8)]
-        assert "habit_declining" not in di.detect_early_warning([], prior + recent, [])[1]
+        assert "habit_declining" not in _detect_early_warning([], prior + recent, [])[1]
 
     def test_the_habit_marker_fires_on_the_field_the_writers_actually_write(self):
         """#2221: both writers of habit_scores write `tier0_pct`; the marker read an alias
         nothing has ever written, so on real data it could never contribute to the gate."""
         prior = [_hs(f"2026-05-0{d}", tier0_pct=0.95) for d in (1, 2, 3, 4)]
         recent = [_hs(f"2026-05-0{d}", tier0_pct=0.20) for d in (6, 7, 8)]
-        assert "habit_declining" in di.detect_early_warning([], prior + recent, [])[1]
+        assert "habit_declining" in _detect_early_warning([], prior + recent, [])[1]
 
     def test_a_zero_completion_day_pulls_the_habit_marker_average_down(self):
         """ADR-104 the other way: a measured 0.0 is data, and it is the day that matters."""
         prior = [_hs(f"2026-05-0{d}", tier0_pct=0.90) for d in (1, 2, 3, 4)]
         recent = [_hs("2026-05-06", tier0_pct=0.0), _hs("2026-05-07", tier0_pct=0.9), _hs("2026-05-08", tier0_pct=0.9)]
-        assert "habit_declining" in di.detect_early_warning([], prior + recent, [])[1]
+        assert "habit_declining" in _detect_early_warning([], prior + recent, [])[1]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1981,6 +1989,21 @@ class TestHandler:
 
     def test_an_unreachable_inference_key_leaves_the_intent_gap_inactive(self, offline_handler):
         assert di.lambda_handler({}, None)["ic8_active"] is False
+
+    def test_an_active_early_warning_is_stored_owner_only_and_never_reaches_the_brief_context(self, offline_handler, monkeypatch):
+        """#5121: the flag row is written (owner-only) and the shared brief context — whose TL;DR is the homepage
+        pull-quote — never carries the warning, its markers or its evidence."""
+        from health import early_warning
+
+        lines = {"weigh_in_cadence": "No weigh-in for 4 day(s)", "step_drop": "Steps: 7-day mean 3,100"}
+        monkeypatch.setattr(early_warning, "gather", lambda *a, **k: {})
+        monkeypatch.setattr(early_warning, "cadence_markers", lambda *a, **k: (list(lines), dict(lines), []))
+        out = di.lambda_handler({}, None)
+        assert out["ic5_warning"] is True and out["ic5_markers"] == ["weigh_in_cadence", "step_drop"]
+        flag = [p for p in offline_handler.puts if p["pk"].endswith("#SOURCE#early_warning_flag")]
+        assert len(flag) == 1 and flag[0]["active"] is True and flag[0]["tier"] == "owner_only" and flag[0]["sk"] == "DATE#" + YESTERDAY
+        block = offline_handler.puts[-1]["ai_context_block"]
+        assert "EARLY WARNING" not in block and not any(v in block for v in lines.values()) and "weigh_in_cadence" not in block
 
     def test_prior_guidance_from_the_last_three_days_is_injected_for_anti_repetition(self, offline_handler):
         seed(offline_handler, _date_row("computed_insights", "2026-05-07", guidance_given=json.dumps(["walk after dinner"])))

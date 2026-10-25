@@ -47,10 +47,10 @@ from web.site_api_common import (
 # disagreeing. `due_months()` is spliced in LAST so the registry always wins: a source
 # that declares `cadence_months` owns its cadence outright, and the literals below are
 # only the rows the registry does not hold yet — each a candidate for the same treatment
-# (dexa's 12-month cadence was the named residual on #3669; it moved to the registry in #4639).
+# (dexa's cadence was the named residual on #3669; it moved to the registry in #4639).
 # `tests/test_source_registry_coverage_3669.py` asserts the two are the same number, in
 # both directions: the panel's months AND the registry's derived `stale_hours`.
-# "dexa" left this literal in #4639 — it is a registry source with `cadence_months: 12` now, so due_months() carries it.
+# "dexa" left this literal in #4639 — it is a registry source with `cadence_months` (3 since #5061) now, so due_months() carries it.
 # "food_delivery" is 6 since #5006/#5108 (owner ruling 2026-10-23: a 6-monthly upload ritual). Its home is the charter's
 # `nutrition.food_delivery.upload_every_months` (the reminder reads it there); tests/test_food_delivery_upload_ritual_5006.py
 # holds this copy equal to it. Not a registry `cadence_months`: that would derive a 6-month stale_hours (see the registry row).

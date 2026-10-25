@@ -120,6 +120,7 @@ PARTITIONS = [
     ("anomalies", "pregenesis", {}),  # DATE# keyed daily anomaly flags
     ("weekly_correlations", "pregenesis", {}),  # WEEK# keyed correlations
     ("computed_insights", "pregenesis", {}),  # DATE# keyed daily insight blobs
+    ("early_warning_flag", "pregenesis", {}),  # #5121: DATE# keyed owner-only relapse flag, derived from computed_insights' inputs
     # ADR-077: derived compute outputs the original wipe MISSED (they leaked stale
     # pilot intelligence onto the site / into coach context). pregenesis keeps
     # post-genesis records accumulating from Day 1.

@@ -68,7 +68,9 @@ def test_character_engine_has_no_30_default_or_30_literal():
 def test_threshold_is_interpolated_from_the_charter():
     t = charter_value("nutrition.protein.feeding_threshold_g")
     assert nrl._feeding_threshold_text() == f"{t:g}"
-    system = nrl._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1, protein_target_g=1, feeding_threshold_g=nrl._feeding_threshold_text())
+    system = nrl._FALLBACK_SYSTEM_PROMPT.format(
+        calorie_target=1, protein_target_g=1, feeding_threshold_g=nrl._feeding_threshold_text(), eating_window="16:8"
+    )
     assert f"a feeding is {t:g} g or more" in system and "{" not in system
 
 

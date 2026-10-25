@@ -68,6 +68,9 @@ GET_EXERCISE_NOTES_DESCRIPTION = (
     "action='disruption' (#5088, OWNER-ONLY): record his word that disruption mode is ON (words VERBATIM, "
     "template travel|busy, until, optional start_date) — habits held instead of targets, the short session "
     "served; action='disruption_end' switches it OFF (step back up); action='disruptions' lists them. "
+    "action='travel_kit' (#5104, a read): the travel food kit for the late-December trip — a day plan built to the "
+    "charter's protein, floors and calorie target (optional maintenance_kcal for the maintenance week, trip_days), the "
+    "destination grocery list, the packing list and the hotel/restaurant playbook. "
     "action='fitness_test' (#5078, OWNER-ONLY): record fitness-battery results — results {test: value} "
     "(six_minute_walk m, bike_20min_rpe6 m, dead_hang s, assisted_pull_up lb of assistance), optional notes and "
     "date; action='fitness_tests' lists the batteries, each test's trend and whether the battery is due."
@@ -95,6 +98,7 @@ GET_EXERCISE_NOTES_INPUT = {
                 "disruption",
                 "disruption_end",
                 "disruptions",
+                "travel_kit",
                 "fitness_test",
                 "fitness_tests",
             ],
@@ -104,6 +108,7 @@ GET_EXERCISE_NOTES_INPUT = {
                 "deload = record HIS word that a deload starts (#5070, OWNER-ONLY WRITE; `words` verbatim, optional "
                 "`start_date`, `days`, `sets_pct`). deloads = list them. disruption / disruption_end = HIS switch for "
                 "disruption mode (#5088, OWNER-ONLY WRITE; `words` verbatim, `template`, `until` / `ended_on`). disruptions = list. "
+                "travel_kit = the travel food kit (#5104, read): day plan, grocery list, packing list, hotel/restaurant playbook. "
                 "fitness_test = record fitness-battery results (#5078, OWNER-ONLY WRITE; `results`, optional `notes`, `date`). "
                 "fitness_tests = the batteries, trend and due state."
             ),
@@ -138,6 +143,14 @@ GET_EXERCISE_NOTES_INPUT = {
         "days": {"type": "integer", "description": "action='deload': days the deload covers (default 7)."},
         "sets_pct": {"type": "integer", "description": "action='deload': the set cut, negative (default -40)."},
         "template": {"type": "string", "enum": ["travel", "busy"], "description": "action='disruption': travel or busy."},
+        "maintenance_kcal": {
+            "type": "integer",
+            "description": "action='travel_kit': the maintenance week's calorie target; sizes the maintenance-week day. Omitted: #5107's own maintenance estimate (the expenditure reconciliation's actionable best match).",
+        },
+        "trip_days": {
+            "type": "integer",
+            "description": "action='travel_kit': trip length in days (default: the charter window's dates, else its default).",
+        },
         "until": {"type": "string", "description": "action='disruption': YYYY-MM-DD, the last day the mode covers. Required."},
         "ended_on": {"type": "string", "description": "action='disruption_end': YYYY-MM-DD, the first day back. Defaults to today."},
         "results": {

@@ -1218,6 +1218,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [reconcile, deploy]   # reconcile: read build_sha for the checkout below (#1345 fix)
+    if: ${{ !cancelled() && needs.deploy.result == 'success' }}   # #5298: a skipped deploy-iam ancestor must not skip this
     steps:
       # The smoke + canary steps call deploy/lib/smoke_oracle_decision.py (#1345 extracted
       # the oracle to a repo file). This job had NO checkout — the old inline Python needed
@@ -1357,6 +1358,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 50
     needs: [reconcile, plan, deploy]   # #1173: reconcile listed to read build_sha; #4589: plan for deploy_base
+    if: ${{ !cancelled() && needs.deploy.result == 'success' }}   # #5298: as smoke-test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1452,7 +1454,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [reconcile, deploy]   # #1173: reconcile listed to read build_sha
-    if: needs.deploy.result == 'success'
+    if: ${{ !cancelled() && needs.deploy.result == 'success' }}   # #5298: as smoke-test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1580,10 +1582,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [reconcile, plan, deploy, smoke-test]   # #1173: reconcile listed to read build_sha
-    # `always() &&` is REQUIRED: a job whose dependency (smoke-test) failed is
-    # skipped by default unless its `if` contains a status-check function — so
-    # without always() this rollback never actually fires (#418/ADR-117 fix; the
-    # bare condition here was previously dormant).
+    # `always() &&` is REQUIRED: with no status function in `if`, a failed or SKIPPED ancestor skips the
+    # job (#418/ADR-117; #5298 — tests/test_workflow_needs_status_guard_5298.py holds every workflow to it).
     #
     # #2051: WHAT can turn smoke-test red is the lane question, and it is
     # answered upstream in smoke_oracle_decision.py, not here — deliberately, so
