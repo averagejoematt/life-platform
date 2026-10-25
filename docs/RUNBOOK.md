@@ -2,13 +2,14 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-10-24 (v8.6.0 — 89 MCP tools, 82-module package, 108 Lambdas, 20 data sources)
+Last updated: 2026-10-25 (v8.6.0 — 89 MCP tools, 82-module package, 108 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 108 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
 - Shared layer: **RETIRED** (#781/ADR-131) — shared modules ship in every bundle. Invariant check: `aws lambda list-functions --region us-west-2 --query "Functions[?Layers[?contains(Arn, 'life-platform-shared-utils')]].FunctionName"` → must be empty
 - Account concurrency limit: **100** (raised from 10 via Support case 177921309700709 — verified live 2026-07-10 via `aws lambda get-account-settings`; see `docs/RESERVED_CONCURRENCY.md` for the reservation strategy)
 - Alarms currently firing: point-in-time — check `aws cloudwatch describe-alarms --state-value ALARM --query 'MetricAlarms[].AlarmName' --output table --region us-west-2`
+- Alarm hygiene rule (#5137): an alarm red for more than 3 days is fixed, retuned or retired the same week; `scripts/boot_brief.py` prints a `LONG RED` line (duration + `docs/alarm_citations.json` citation, or UNCITED) for each one at every boot.
 - DLQ: `life-platform-ingestion-dlq`, retention 14d, normally near-empty — check depth via `aws sqs get-queue-attributes --queue-url $(aws sqs get-queue-url --queue-name life-platform-ingestion-dlq --query QueueUrl --output text) --attribute-names ApproximateNumberOfMessages`; investigate via `dlq-consumer` Lambda logs
 - SES configuration set: `life-platform-emails` — wired to the email Lambdas that name it (`grep -rl life-platform-emails lambdas/`; see "SES Email Pipeline"), CloudWatch event destination tracks open/click/bounce/complaint/delivery
 - CloudTrail: `life-platform-trail` now has data events on `s3://matthew-life-platform/raw/*` and `uploads/*`

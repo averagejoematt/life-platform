@@ -342,6 +342,10 @@ def add_token_alarms(scope, topic, digest) -> None:
         scope,
         "AiDailySpendHigh",
         alarm_name="ai-daily-spend-high",
+        alarm_description=(
+            "Daily total of estimated AI spend (LifePlatform/AI EstimatedCostUSD, Sum over a 24h period) "
+            "at or above the daily budget bar. Routes via the -urgent / -genesis-window composites."
+        ),
         metric=cloudwatch.Metric(
             namespace="LifePlatform/AI",
             metric_name="EstimatedCostUSD",
