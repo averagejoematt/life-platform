@@ -38,6 +38,7 @@
 - **#5111:** parked by the owner ("Later"); the priorities row is his words, nothing to build.
 - **#5097 / #5010 / #5083 / #5103 / #5105 / #5061:** owner acts not reached (MacroFactor export, Hevy pin + screenshot, anchor foods, tape + photos — the owner said "not this session" to tape). `calibration-deadman` stays red until a tape row lands.
 - **#4772 / #4775 / #4778:** gated on AWS Sales (account-level 5.5 block).
+- **#5369 / #5370 / #5371 (filed 22:4xZ on the owner's ruling that Hevy is the one routine source):** wire `workout_identity` into the zone-2 reader + the no-summing guard (#5369, opus, Now); the post-watch gym-workflow audit with the owner's recording-protocol decision box (#5370, gate:owner); the Strava uploader inventory + best-practice doc (#5371, gate:owner, mostly app-side). Evidence: one 10-25 gym visit = 1 Hevy session, 3 Apple workouts of three HealthKit origins, 4 Strava pushes → one counted session, ride identity lost.
 - **#4545 / #4537:** the season; untouched, the owner's optional decision.
 - **#5314 / #5080 / #5072 / #5132 / #5109 / #5110 / #4814 / #4777 / #4250 / #5220:** Session CF's event-bound reads, unchanged (Monday 02:00Z predraft, 15:30Z panel grade, 17:15Z morning check-in, 17:00Z coach run, Cost Explorer after 10-26 18:00Z, the 10-27 re-measure, swallowed-permission-denial OK through 10-28).
 - not-work — `s3://matthew-life-platform/config/coaches/training_coach.json` is orphaned after #5366; deleting it is an optional owner AWS write.
