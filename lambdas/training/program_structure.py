@@ -1075,6 +1075,9 @@ def weekly_sets_by_muscle(catalog_movements: dict[str, Any], skill_ceiling: int 
         out[g] = {
             "sets": sum(by_muscle.get(m, 0) for m in spec["primary_muscles"]),
             "range": list(lift[spec["range_key"]]),
+            # #5311: say WHICH number the range is — the owner_redlines v0.4 floor, never the charter's volume_priorities band
+            "range_source": f"owner_redlines.lifting_sessions_per_wk.{spec['range_key']} (v0.4 redline"
+            + (" floor, not the charter band — see volume_bands)" if not spec.get("band_top_binds", True) else " range)"),
             "band_top_binds": bool(spec.get("band_top_binds", True)),
             "frequency_per_wk": len(roles),
             "frequency_target": int(charter_value(f"split.frequency.{spec['frequency_key']}")),

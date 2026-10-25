@@ -226,3 +226,18 @@ def test_the_coach_packet_and_the_plan_packet_carry_it(monkeypatch):
     assert block["below_mev_14d"] == flag
     tools_plan._attach_below_mev(block, {})
     assert block["below_mev_14d"]["status"] == "unavailable"
+
+
+def test_5311_the_plan_carries_volume_bands_and_labels_the_redline_range(coverage):
+    """#5311: `volume_bands` is the charter's band per priority on the real 5-role week; the delt range says it is the v0.4 floor."""
+    import inspect
+
+    from training import plan_engine
+
+    sr = coverage["bands"]["side_rear_delts"]
+    assert sr["member_sets"] == [14] and sr["band"] == [14, 18] and sr["gap_to_floor"] == 0
+    assert set(coverage["bands"]) == {"side_rear_delts", "lats", "upper_chest", "legs", "arms"}
+    week = program_structure.weekly_sets_by_muscle(CATALOG)
+    assert "redline floor" in week["delts"]["range_source"] and "charter band" in week["delts"]["range_source"]
+    assert "floor" not in week["quads"]["range_source"]
+    assert 'out["volume_bands"] = program_structure.volume_floor_coverage(' in inspect.getsource(plan_engine)
