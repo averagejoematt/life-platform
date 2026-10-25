@@ -266,6 +266,12 @@ def test_current_phase_rows_are_not_excluded_by_the_fix():
 #     otherwise cross-phase function marks the whole function blind.
 
 _SANCTIONED_CURRENT_CYCLE_VIEWS: dict[str, str] = {
+    # #4978: the owner-only illness/overload triad flag rows. EXPERIMENT_SCOPED and wiped at reset with anomalies; the
+    # coach line reads only the newest night (fresh within two days), so a previous cycle's row is never the answer.
+    "lambdas/health/illness_triad.py::read_recent": (
+        "The flag rows reset with the cycle (restart_intelligence_wipe, pregenesis) and the coach reads only the newest "
+        "night within two days; a pre-genesis row could only ever be a stale flag about a different attempt's night."
+    ),
     # #5121: the owner-only early-warning flag rows. EXPERIMENT_SCOPED and wiped at reset with computed_insights;
     # a flag from a previous cycle is not a flag about this one, so an episode must never start before genesis.
     "lambdas/health/early_warning.py::read_recent": (

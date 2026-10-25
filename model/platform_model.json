@@ -8123,19 +8123,19 @@
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
-      "partitions": 122,
+      "partitions": 123,
       "privacy_fields_owner_only": 69,
       "privacy_fields_owner_published": 11,
-      "privacy_sources_owner_only": 24,
+      "privacy_sources_owner_only": 25,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 81,
       "schedules": 97
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 387,
+        "sites_dynamic": 390,
         "sites_resolved": 990,
-        "sites_total": 1377
+        "sites_total": 1380
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8527,6 +8527,11 @@
       "class": "experiment_scoped",
       "ingestion": false,
       "privacy_tier": "public"
+    },
+    "illness_triad_flag": {
+      "class": "experiment_scoped",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
     },
     "ingest_liveness": {
       "class": "system_state",
@@ -9037,6 +9042,7 @@
       "flourishing": "owner_only",
       "genome": "owner_only",
       "hevy": "owner_only",
+      "illness_triad_flag": "owner_only",
       "labs": "owner_published",
       "macrofactor": "owner_only",
       "may_tracker": "owner_only",

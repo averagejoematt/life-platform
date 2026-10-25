@@ -570,6 +570,13 @@ _ASSEMBLE_WITHOUT_TRACKER_PY = (
 
 # #5073: a published module (lambdas/emails) that imports the owner-only May tracker — the target
 # date, the band and the projected weight would then be one call from an email body.
+# #4978: a published module (lambdas/web) that imports the owner-only illness/overload triad and reads its flag rows.
+_ILLNESS_TRIAD_PUBLISHED_IMPORTER_PY = (
+    '"""census probe — a published reader of the owner-only illness-triad flag that must never exist."""\n\n'
+    "from health import illness_triad\n\n\n"
+    "def handle(table, today):\n"
+    "    return illness_triad.read_recent(table, today)\n"
+)
 _EARLY_WARNING_PUBLISHED_IMPORTER_PY = (
     '"""census probe — a published reader of the owner-only early-warning flag that must never exist."""\n\n'
     "from health import early_warning\n\n\n"
@@ -1468,6 +1475,18 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         plants=(("cdk/_census_probe_5273_staging/probe.py", '"""probe."""\n'),),
     ),
     # #5121: the owner-only relapse early-warning flag — read only by the owner channels.
+    # #4978: the owner-only illness/overload triad flag — its writer and the Performance coach's thread only.
+    "structural::test_illness_triad_4978.py": MutationSpec(
+        gate_id="structural::test_illness_triad_4978.py",
+        target="tests/test_illness_triad_4978.py",
+        detects=(
+            "a published-surface module (lambdas/web) importing the owner-only illness/overload triad and reading the "
+            "flag rows — nightly raw-biometric deviations (resting heart rate, skin temperature, respiratory rate) one "
+            "call from a served page"
+        ),
+        plants=(("lambdas/web/_census_probe_4978.py", _ILLNESS_TRIAD_PUBLISHED_IMPORTER_PY),),
+        track=False,  # the guard os.walks lambdas/ mcp/ site/ and the site generators on disk
+    ),
     "structural::test_relapse_early_warning_5121.py": MutationSpec(
         gate_id="structural::test_relapse_early_warning_5121.py",
         target="tests/test_relapse_early_warning_5121.py",
@@ -1544,6 +1563,19 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "lambdas/web/ and lambdas/emails/ on disk (os.walk, every .py): any mention of `travel_food` fails and names the file. "
         "STILL INVISIBLE, stated: a published module handed the kit by an unswept caller (mcp/, lambdas/coach), a dynamic import "
         "by string, and a copy of the kit's contents under another name.",
+        proved_on="2026-10-24",
+    ),
+    "structural::test_illness_triad_4978.py": _proof(
+        "structural::test_illness_triad_4978.py",
+        "ARMED 1/1 — baseline: 26 passed in 0.88s | mutated: 1 failed, 25 passed in 0.67s :: "
+        "test_only_the_writer_and_the_owner_thread_touch_the_flag | reverted: 26 passed in 0.61s",
+        "lambdas/, mcp/, site/ and the scripts/v4_build_*.py site generators on disk (os.walk, .py/.js/.mjs/.html): any "
+        "file naming the `illness_triad_flag` partition or importing `health.illness_triad` must be one of the five "
+        "allowed modules (the triad, its one writer the anomaly detector, the Performance coach's thread, the two "
+        "registries); a planted lambdas/web importer is named. Also pinned: inside the anomaly detector only "
+        "`lambda_handler` touches the triad (never the anomalies row or the mail builders), the owner-only tier and the "
+        "EXPERIMENT_SCOPED class. STILL INVISIBLE, stated: a module handed flag rows as an argument by an allowed caller, "
+        "a dynamic import by string, a pk built from variables, and the live table.",
         proved_on="2026-10-24",
     ),
     "structural::test_relapse_early_warning_5121.py": _proof(

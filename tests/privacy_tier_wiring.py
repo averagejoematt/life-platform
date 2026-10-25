@@ -245,6 +245,17 @@ CONSUMERS: dict[tuple[str, str], dict] = {
         "#4978: the owner MCP readiness tool scores the night's Whoop skin temperature against his own "
         "30-night baseline (overnight_physiology) and returns the deviation on the owner's own surface only.",
     ),
+    ("lambdas/health/illness_triad.py", "skin_temp_celsius"): _d(
+        SAW,
+        "#4978: the illness/overload triad scores the night's Whoop skin temperature against his own baseline "
+        "and stores the deviation in the owner-only illness_triad_flag row; its one reader is the owner's own "
+        "Performance coach thread. Never the anomalies row, the anomaly mail or a published surface.",
+    ),
+    ("lambdas/health/illness_triad.py", "wrist_temp_sleep_c_apple"): _d(
+        SAW,
+        "#4978: the triad reports the Apple Watch wrist temperature against the watch's own baseline as a "
+        "corroboration line (never counted) inside the same owner-only illness_triad_flag row.",
+    ),
     ("mcp/tools_health.py", "bmr_kcal"): _d(
         SAW,
         "Owner MCP energy-budget tool: reads tdee.py's computed bmr_kcal output "

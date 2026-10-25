@@ -213,6 +213,12 @@ def _physical_pack(table, today: str) -> list:
         lines.append(f"Last logged lift: {when}" + (f" ({name})." if name else "."))
     else:
         lines.append("No logged lifts in the last 14 days — absence of logs, not proof of rest days.")
+    try:  # #4978: the owner-only illness/overload triad this seat weighs before the session (health.illness_triad)
+        from health import illness_triad
+
+        lines.extend(illness_triad.owner_lines(illness_triad.read_recent(table, today), today))
+    except Exception as e:  # noqa: BLE001 — the thread runs without the triad line
+        logger.warning("[domain_facts] illness triad unavailable: %s", type(e).__name__)
     return lines
 
 
