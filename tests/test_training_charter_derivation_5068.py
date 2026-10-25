@@ -352,6 +352,26 @@ LEAF_PATTERNS: Dict[str, Tuple[Tuple[str, ...], Tuple[str, ...]]] = {
         (r"{n}\s+(?:short\s+)?sessions\s+(?:a|per)\s+(?:week|wk)", r"\"busy\"\s*:\s*\{\s*\"sessions_per_wk\"\s*:\s*{list}"),
         ("{n} sessions a week",),
     ),
+    "disruption.templates.life.sessions_per_wk": (
+        (r"{n}\s+(?:short\s+)?sessions\s+(?:a|per)\s+(?:week|wk)", r"\"life\"\s*:\s*\{[^}\n]*\"sessions_per_wk\"\s*:\s*{list}"),
+        ("{n} sessions a week",),
+    ),
+    "disruption.templates.lapse.sessions_per_wk": (
+        (r"{n}\s+(?:short\s+)?sessions\s+(?:a|per)\s+(?:week|wk)", r"\"lapse\"\s*:\s*\{[^}\n]*\"sessions_per_wk\"\s*:\s*{list}"),
+        ("{n} sessions a week",),
+    ),
+    "disruption.templates.life.max_days": (  # #5122: the no-grading window
+        (
+            r"{n}\s+days\s+(?:of\s+)?(?:life[\s-]+)?disruption",
+            r"\bno[\s-]+grading\b[^\n]{0,30}?{n}\s+days",
+            r"\b(?:life|whole[\s-]+day)\b[^\n]{0,30}?(?:at\s+most|up\s+to|max(?:imum)?)\s+{n}\s+days",
+        ),
+        ("{n} days of disruption", "a no-grading window of up to {n} days"),
+    ),
+    "disruption.lapse_protocol.hours": (  # #5122: the lapse protocol's length
+        (r"{n}[\s-]+hours?\b", r"\bhours\"?\s*[:=]\s*{n}\b"),
+        ("the {n}-hour lapse protocol", "{n} hours"),
+    ),
     "disruption.step_back_up.days": (
         (r"{n}[\s-]+day\s+step[\s-]+back", r"\bstep[\s-]+back[\s-]+up\b[^\n]{0,30}?{n}\s+days"),
         ("a {n}-day step back up",),
