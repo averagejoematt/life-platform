@@ -306,6 +306,12 @@ def steps_by_date(rows_by_source: Mapping[str, Iterable[Mapping[str, Any]]]) -> 
     return {d: c for d, r in resolve_by_date(STEPS, rows_by_source).items() if (c := r.count)}
 
 
+def steps_sources_by_date(rows_by_source: Mapping[str, Iterable[Mapping[str, Any]]]) -> dict[str, str]:
+    """`{date: source id that answered}` for the same dates `steps_by_date` returns (#4980) — so a
+    public reader can say whose count a day's steps are without re-deciding precedence."""
+    return {d: r.source for d, r in resolve_by_date(STEPS, rows_by_source).items() if r.count and r.source}
+
+
 def steps_series(rows_by_source: Mapping[str, Iterable[Mapping[str, Any]]]) -> list[float]:
     """The resolved daily step counts in date order — a zero-report day is IN (#1658: a genuine
     0-step day is a reading), a day with no usable count from any source is out."""

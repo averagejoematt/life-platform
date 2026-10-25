@@ -51,20 +51,11 @@
       "daily": {
         "items": {
           "keys": {
-            "apple_rhr_bpm": {
-              "type": "number"
-            },
             "date": {
               "type": "string"
             },
-            "rhr_abs_diff_bpm": {
-              "type": "number"
-            },
             "rhr_agreement": {
               "type": "string"
-            },
-            "whoop_rhr_bpm": {
-              "type": "number"
             }
           },
           "type": "object"
@@ -87,13 +78,6 @@
           "keys": {
             "date": {
               "type": "string"
-            },
-            "flags": {
-              "items": {
-                "type": "string"
-              },
-              "length_sample": 1,
-              "type": "array"
             }
           },
           "type": "object"
@@ -106,6 +90,27 @@
       },
       "hrv_note": {
         "type": "string"
+      },
+      "instruments": {
+        "items": {
+          "keys": {
+            "measure": {
+              "type": "string"
+            },
+            "answers": {
+              "type": "string"
+            },
+            "other": {
+              "type": "string"
+            },
+            "combined": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 5,
+        "type": "array"
       },
       "interpretation": {
         "type": "string"
@@ -145,6 +150,26 @@
         "type": "object"
       },
       "status": {
+        "type": "string"
+      },
+      "study": {
+        "keys": {
+          "state": {
+            "type": "string"
+          },
+          "n_nights": {
+            "type": "integer"
+          },
+          "min_nights": {
+            "type": "integer"
+          },
+          "verdict_published": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "study_reason": {
         "type": "string"
       }
     },

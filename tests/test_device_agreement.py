@@ -23,6 +23,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
 from web import (
+    instruments,  # noqa: E402
     site_api_data as sad,  # noqa: E402
     site_api_freshness as saf,  # noqa: E402
 )
@@ -32,8 +33,10 @@ WATCH_FIRST_DAY = "2026-10-17"  # the registry's apple_health.watch_first_day fa
 
 @pytest.fixture
 def low_floor(monkeypatch):
-    """Threshold tests run 1-3 nights; lift the 30-night study floor so the verdict path is exercised."""
+    """Threshold tests run 1-3 nights; lift the 30-night study floor and mark the study ruled
+    (#4980: no agreement figure is published before the owner's ruling) so the verdict path runs."""
     monkeypatch.setattr(saf, "_DEVICE_AGREEMENT_MIN_NIGHTS", 1)
+    monkeypatch.setattr(instruments, "study_ruled", lambda metric=None: True)
 
 
 def _fake_query_source(per_source):
@@ -83,7 +86,8 @@ def test_rhr_agreement_thresholds_and_flagging(monkeypatch, low_floor):
     assert flagged and flagged[0]["date"] == "2026-10-18"
     # newest-first ordering
     assert [r["date"] for r in body["daily"]] == ["2026-10-19", "2026-10-18", "2026-10-17"]
-    assert body["daily"][0]["apple_rhr_bpm"] == 56.0
+    # #4980: a night carries its band, never a heart-rate value (the watch's RHR is TIER_INTERNAL)
+    assert body["daily"][0] == {"date": "2026-10-19", "rhr_agreement": "minor_variance"}
     assert body["hrv_agreement"] is None
 
 
@@ -106,7 +110,7 @@ def test_workout_subitems_never_corrupt_the_comparison(monkeypatch, low_floor):
     )
     body = json.loads(sad.handle_device_agreement()["body"])
     assert body["status"] == "ok"
-    assert body["daily"][0]["whoop_rhr_bpm"] == 61.0
+    assert body["daily"][0] == {"date": "2026-10-19", "rhr_agreement": "minor_variance"}
 
 
 def test_hrv_is_never_compared_across_rmssd_and_sdnn(monkeypatch):
@@ -126,7 +130,7 @@ def test_hrv_is_never_compared_across_rmssd_and_sdnn(monkeypatch):
     body = json.loads(sad.handle_device_agreement()["body"])
     assert body["hrv_agreement"] is None
     assert "RMSSD" in body["hrv_note"] and "SDNN" in body["hrv_note"]
-    assert "hrv_abs_diff_ms" not in body["daily"][0]
+    assert body["daily"] == []  # #4980: before the study rules no per-night row is served at all
 
 
 def test_garmin_rows_are_never_read(monkeypatch):
@@ -195,8 +199,7 @@ def test_phone_era_nights_never_enter_the_comparison(monkeypatch):
     monkeypatch.setattr(sad, "_query_source", fn)
     body = json.loads(sad.handle_device_agreement()["body"])
     assert body["n_nights"] == 2
-    assert body["period"]["start"] == WATCH_FIRST_DAY
-    assert [r["date"] for r in body["daily"]] == ["2026-10-18", "2026-10-17"]
+    assert body["period"] == {"start": WATCH_FIRST_DAY, "end": "2026-10-18", "overlapping_days": 2}
     assert body["watch_era"]["start"] == WATCH_FIRST_DAY and body["watch_era"]["determined_by"]
     assert all(start == WATCH_FIRST_DAY for _, start in asked), asked
 
@@ -212,16 +215,34 @@ def test_fewer_than_thirty_nights_is_too_few_not_a_verdict(monkeypatch):
     assert "Too few nights to compare yet" in body["too_few_reason"] and WATCH_FIRST_DAY in body["too_few_reason"]
 
 
-def test_thirty_watch_nights_earn_a_verdict(monkeypatch):
+def _thirty_nights():
     from datetime import date, timedelta
 
     start = date.fromisoformat(WATCH_FIRST_DAY)
     days = [(start + timedelta(days=i)).isoformat() for i in range(30)]
-    rows = {
+    return {
         "whoop": [{"date": d, "resting_heart_rate": 55} for d in days],
         "apple_health": [{"date": d, "resting_heart_rate_apple": 54} for d in days],
     }
-    monkeypatch.setattr(sad, "_query_source", _fake_query_source(rows))
+
+
+def test_thirty_nights_without_a_ruling_state_no_agreement(monkeypatch):
+    """#4980: 30 nights is the study's floor, not its verdict. Until the owner rules a
+    combination in METRIC_TRUTH (#4975, after #4974) the payload says the nights are in and
+    the result waits on the ruling — no rate, no confidence words, no per-night band.
+    (Mutation control: drop the `state == "ruled"` gate and the rate reappears here.)"""
+    monkeypatch.setattr(sad, "_query_source", _fake_query_source(_thirty_nights()))
+    body = json.loads(sad.handle_device_agreement()["body"])
+    assert body["status"] == "awaiting_ruling" and body["n_nights"] == 30
+    assert body["study"] == {"state": "awaiting_ruling", "n_nights": 30, "min_nights": 30, "verdict_published": False}
+    assert body["combined_agreement_rate_pct"] is None and body["rhr_agreement"] is None
+    assert body["device_confidence"] is None and body["daily"] == []
+    assert "ruled on" in body["study_reason"]
+
+
+def test_thirty_watch_nights_earn_a_verdict_once_ruled(monkeypatch):
+    monkeypatch.setattr(instruments, "study_ruled", lambda metric=None: True)
+    monkeypatch.setattr(sad, "_query_source", _fake_query_source(_thirty_nights()))
     body = json.loads(sad.handle_device_agreement()["body"])
     assert body["status"] == "ok" and body["n_nights"] == 30
     assert body["combined_agreement_rate_pct"] == 100.0
