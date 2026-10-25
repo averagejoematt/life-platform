@@ -3,7 +3,7 @@
   the component rings, the small-multiples grid). Split out of evidence.js (#581) — no
   behavior change.
 */
-import { sparkline, ring, autonomicHero, autonomicQuadrant, arcTrend, ciWhisker, nDots } from "/assets/js/charts.js";
+import { sparkline, BASELINE_CHANGE_LABEL, baselineChangeIndex, ring, autonomicHero, autonomicQuadrant, arcTrend, ciWhisker, nDots } from "/assets/js/charts.js";
 import { esc, tryJSON, isBad, has, fmt, fig, figs, sec, empty } from "/assets/js/evidence_shared.js";
 
 // Live Pulse — current status narrative + daily vitals trends (the old /live).
@@ -187,7 +187,7 @@ export function scopeStamp(o, opts = {}) {
 // metric beside the daily vitals. Real recorded device estimates only, read through the server's
 // metric-truth resolver (#4976: Apple Watch from now on, Garmin history before it); the date-positioned trend
 // shows gaps as gaps. Renders nothing (no placeholder) until real estimates exist.
-export function vitalsVo2max(vo) {
+export function vitalsVo2max(vo, baselineChange = null) {
   if (!vo || !vo.available) return "";
   const dirWord = vo.trend === "improving" ? "climbing" : vo.trend === "declining" ? "declining" : "holding";
   const deltaLbl = (vo.delta > 0 ? "+" : "") + fmt(vo.delta, 1);
@@ -196,20 +196,20 @@ export function vitalsVo2max(vo) {
   return sec("VO₂max — the aerobic arc",
     scopeStamp(vo) +
     figs([fig(fmt(vo.current, 1), "now · ml/kg/min"), fig(fmt(vo.peak, 1), "recorded peak"), fig(deltaLbl, "arc-to-date")]) +
-    arcTrend(vo.series, { valueKey: "value", unit: " ml/kg/min", label: "VO₂max", height: 180, decimals: 1 }) +
+    arcTrend(vo.series, { valueKey: "value", unit: " ml/kg/min", label: "VO₂max", height: 180, decimals: 1, baselineChange }) +
     `<p class="rd-meta label">The estimated maximal oxygen uptake from ${fromLbl} — the single best-studied fitness-longevity number. This is an <strong>arc metric</strong>, not a daily dial: ${vo.n} recorded estimates, ${dirWord} (${esc(deltaLbl)} ml/kg/min across the record). The line is positioned by real date, so the sparse recent cadence reads as honest gaps — a device estimate, not a lab CPET, so read the multi-month direction, not any one reading.</p>`);
 }
 
 // #421 (VIT-02, PHY-06) — walking heart rate. A genuine walking-HR capture source: the average
 // HR of real Strava `Walk` activities. Not a continuous intraday curve (no such capture exists) —
 // a per-walk average trend, honestly labelled. Renders nothing until real walks with HR exist.
-export function vitalsWalkingHr(w) {
+export function vitalsWalkingHr(w, baselineChange = null) {
   if (!w || !w.available) return "";
   const total = w.n_total != null ? w.n_total : w.n;
   return sec("Walking heart rate — what the heart does at a stroll",
     scopeStamp(w) +
     figs([fig(fmt(w.current, 0), "latest walk · bpm"), fig(fmt(w.avg, 0), `${w.n}-walk avg`)]) +
-    arcTrend(w.series, { valueKey: "value", unit: " bpm", label: "Walking HR", height: 150, decimals: 0 }) +
+    arcTrend(w.series, { valueKey: "value", unit: " bpm", label: "Walking HR", height: 150, decimals: 0, baselineChange }) +
     `<p class="rd-meta label">The average heart rate of your ${esc(w.source)} — the daytime, at-a-stroll signal the overnight resting figure misses. Each dot is one walk (${w.n} in the last ${w.window_days} days, ${total} recorded all-time), positioned by real date so quiet stretches read as gaps. It's a per-walk <strong>average</strong>, not a continuous intraday curve — the platform has no continuous-HR capture, so we don't draw one.</p>`);
 }
 
@@ -238,7 +238,7 @@ export async function renderPulse(d) {
   // ── ALTITUDE 2 — the synthesis ──
   parts.push(vitalsNarrative(p, comps)); // P1.1 — today's pulse, two-voice, tied to the autonomic story
   if (hist.length >= 4) parts.push(sec("Autonomic recovery — RHR + HRV, one frame", // P1.2 — autonomic hero
-    autonomicHero(hist, { label: "Resting HR (inverted) + HRV" }) +
+    autonomicHero(hist, { label: "Resting HR (inverted) + HRV", baselineChange: ph && ph.baseline_change }) +
     `<p class="rd-meta label">Resting heart rate and HRV are the two halves of one autonomic signal. RHR's axis is <strong>inverted</strong> so a falling resting HR reads as a rising line — because down is good. Both climbing together = the parasympathetic "rest &amp; repair" side taking over: the body downshifting. Last night's read; n=1, early moves partly water/novelty.</p>`));
   parts.push(vitalsReadinessDecomposed(comps)); // P1.3 — recovery broken into its drivers
   // ── ALTITUDE 3 — the analysis ──
@@ -246,10 +246,10 @@ export async function renderPulse(d) {
   parts.push(sec("Autonomic balance — where the body's sat lately", // P2.1 — 2x2 snapshot
     `<div class="aq-wrap">${autonomicQuadrant(qpts)}</div>` +
     `<p class="rd-meta label">Day strain against recovery, the last ${qpts.length} days — recovered <em>and</em> training hard is flow; depleted and still pushing is stress. A snapshot of the spread, not a trajectory; no arrow drawn at this n.</p>`));
-  parts.push(vitalsSmallMultiples(hist)); // P2.2 — small-multiples grid (replaces the 8 equal charts) + P2.5 remove
+  parts.push(vitalsSmallMultiples(hist, ph && ph.baseline_change)); // P2.2 — small-multiples grid (replaces the 8 equal charts) + P2.5 remove
   // #421 — vitals DEPTH: the slow-moving arc reads (each renders only when its real data exists).
-  parts.push(vitalsVo2max(vd && vd.vo2max)); // VIT-03 — VO2max arc
-  parts.push(vitalsWalkingHr(vd && vd.walking_hr)); // VIT-02 / PHY-06 — walking heart rate
+  parts.push(vitalsVo2max(vd && vd.vo2max, vd && vd.baseline_change)); // VIT-03 — VO2max arc
+  parts.push(vitalsWalkingHr(vd && vd.walking_hr, vd && vd.baseline_change)); // VIT-02 / PHY-06 — walking heart rate
   parts.push(vitalsFitnessAge(vd && vd.fitness_age)); // VIT-04 — fitness age (Option A privacy)
   parts.push(vitalsBackgroundStrip(p)); // P2.3 — background vitals (honest empty until captured)
   parts.push(vitalsCaptureBacklog(p)); // P3.1–P3.6 — capture + relationships, honestly gated
@@ -278,7 +278,9 @@ export function vitalsCaptureBacklog(p) {
 // P2.2 — small-multiples grid: every signal as a labelled sparkline (latest value + trend +
 // temporal frame), replacing the eight big equal charts. P2.5: this IS the removal of the old
 // charts. Refuses a sparkline under 2 points (shows "fills in").
-export function vitalsSmallMultiples(hist) {
+export function vitalsSmallMultiples(hist, baselineChange = null) {
+  // #5029 — the heart-rate-derived signals break their sparkline at the baseline change and say so.
+  const HR_DERIVED = new Set(["recovery_pct", "hrv_ms", "rhr_bpm", "strain"]);
   const SM = [
     { k: "recovery_pct", lbl: "recovery", unit: "%", frame: "last night", dp: 0 },
     { k: "hrv_ms", lbl: "HRV", unit: " ms", frame: "last night", dp: 0 },
@@ -288,12 +290,14 @@ export function vitalsSmallMultiples(hist) {
     { k: "steps", lbl: "steps", unit: "", frame: "same-day", dp: 0 },
   ];
   const cells = SM.map((m) => {
-    const vals = hist.map((h) => Number(h[m.k])).filter((v) => Number.isFinite(v));
+    const dated = hist.map((h) => ({ v: Number(h[m.k]), d: h.date })).filter((p) => Number.isFinite(p.v));
+    const vals = dated.map((p) => p.v);
+    const bc = HR_DERIVED.has(m.k) ? baselineChange : null;
     if (vals.length < 2) return `<div class="sm-cell"><div class="sm-head"><span class="sm-lbl">${esc(m.lbl)}</span><span class="sm-frame label">${esc(m.frame)}</span></div><p class="sm-empty label">fills in</p></div>`;
     const latest = vals[vals.length - 1], first = vals[0];
     const arrow = latest > first ? "↑" : latest < first ? "↓" : "→";
     return `<div class="sm-cell"><div class="sm-head"><span class="sm-lbl">${esc(m.lbl)}</span><span class="sm-frame label">${esc(m.frame)}</span></div>` +
-      `${sparkline(vals)}<div class="sm-foot"><span class="sm-v mono">${esc(fmt(latest, m.dp))}${esc(m.unit)}</span><span class="sm-trend mono">${arrow}</span></div></div>`;
+      `${sparkline(bc ? dated : vals, { baselineChange: bc })}<div class="sm-foot"><span class="sm-v mono">${esc(fmt(latest, m.dp))}${esc(m.unit)}</span><span class="sm-trend mono">${arrow}</span>${bc && baselineChangeIndex(dated.map((p) => p.d), bc) > 0 ? `<span class="chart-bc-note label">${BASELINE_CHANGE_LABEL}</span>` : ""}</div></div>`;
   }).join("");
   return sec("Every signal, small — the full grid",
     `<div class="sm-grid">${cells}</div>` +

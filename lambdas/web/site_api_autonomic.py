@@ -27,6 +27,7 @@ from datetime import datetime, timedelta
 
 from training import zone2_minutes as z2m  # #4627: THE Zone 2 computation
 
+from web.baseline_change import with_baseline_change  # #5029 — the neutral public date of the HR baseline change
 from web.site_api_common import (
     PT,
     _error,
@@ -404,7 +405,7 @@ def handle_zone2_breakdown() -> dict:
         hevy = _query_source("hevy", start, today)
         payload = _compute_zone2_breakdown(strava, whoop, hevy, today=today, start_date=start)
         _last = (payload.get("current_week") or {}).get("source_last_activity")
-        return _ok(payload, cache_seconds=1800, content_as_of=_last)
+        return _ok(with_baseline_change(payload), cache_seconds=1800, content_as_of=_last)
     except Exception as e:
         logger.error(f"[site_api] /api/zone2 failed: {e}")
         return _error(500, "zone 2 breakdown unavailable")

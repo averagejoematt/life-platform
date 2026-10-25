@@ -22,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 from boto3.dynamodb.conditions import Key
 from common.metric_truth import steps_by_date as resolved_steps_by_date  # #4630 — the ONE steps resolver
 
+from web.baseline_change import with_baseline_change  # #5029 — the neutral public date of the HR baseline change
 from web.journey_direction import DOWN, EVEN, UNKNOWN, UP, classify_delta  # #3293 — the ONE ruling on the sign of a weight delta
 from web.site_api_common import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
@@ -886,4 +887,4 @@ def pulse_history(*, _g) -> dict:
         current += timedelta(days=1)
         day_num += 1
 
-    return _ok({"pulse_history": days}, cache_seconds=3600)
+    return _ok(with_baseline_change({"pulse_history": days}), cache_seconds=3600)
