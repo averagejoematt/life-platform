@@ -157,6 +157,13 @@ def _overshoot_cap_flag(
     )
 
 
+def _overshoot_to_text(energy: dict[str, Any]) -> str:
+    """The decision option's destination — the resolver's target + one step, exactly as
+    `_overshoot_cap_flag` computes `to` (#5325 box 3), never the logged mean."""
+    base, step = energy.get("target_kcal"), energy.get("step_kcal")
+    return f"to {base + step:.0f}" if (base is not None and step is not None) else "from an unknown target"
+
+
 def _energy_floor_tripped(
     p: dict[str, Any], energy: dict[str, Any], floor_t: dict[str, Any], counts: tuple, provenance: str, lo: Any
 ) -> None:
@@ -988,7 +995,7 @@ def decisions_offered(
                 },
                 provenance=over_t["provenance"],
                 options=[
-                    f"{_step_text(energy)} ({'to ' + format(mean14 + energy['step_kcal'], '.0f') if (mean14 is not None and energy.get('step_kcal') is not None) else 'from an unknown mean'}) — '{over_t['action']}'",
+                    f"{_step_text(energy)} ({_overshoot_to_text(energy)}) — '{over_t['action']}'",
                     "hold",
                 ],
                 decision=f"trend over the {target['cap_lb_wk']} lb/wk cap {need} weeks running ({', '.join(str(r) for r in rates[-need:])}) — {over_t['action']}",

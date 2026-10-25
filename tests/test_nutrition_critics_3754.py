@@ -508,6 +508,23 @@ def test_rate_overshoot_offers_the_one_step_decision_5205():
     assert d["log_decision_payload"]["decision"].startswith("[rate_overshoot]")
 
 
+def test_rate_overshoot_option_reads_the_target_not_the_logged_mean_5325():
+    """#5325 box 3: the decision option's `to` is the resolver's target + one step (as
+    `_overshoot_cap_flag` computes it), never mean logged intake + step."""
+    cap = rl.rate_target_lb_per_wk(317.0)["cap_lb_wk"]
+    need = TW["rate_overshoot"]["threshold_weeks"]
+    inputs = _inputs(
+        intake_kcal_by_day=[MID - 400] * 14,
+        weekly_loss_rates_lb_wk=[cap + 0.5] * need,
+        weight_trend_lb_wk=-(cap + 0.5),
+        weeks_since_genesis=5,
+    )
+    offered = nc.decisions_offered(nc.run(inputs)["verdicts"], inputs, already_logged=[])
+    (d,) = [d for d in offered if d["trigger"]["id"] == "rate_overshoot"]
+    assert any(f"to {MID + STEP}" in o for o in d["options"]), d["options"]
+    assert not any(f"to {MID - 400 + STEP}" in o for o in d["options"]), "the logged mean must not set the destination"
+
+
 def test_ic29_flag_and_deficit_critical_each_offer_a_decision():
     inputs = _inputs(metabolic_adaptation_severity="SEVERE", metabolic_adaptation_flag=True, deficit_severity="CRITICAL", degraded_count=4)
     offered = nc.decisions_offered(nc.run(inputs)["verdicts"], inputs, already_logged=[])

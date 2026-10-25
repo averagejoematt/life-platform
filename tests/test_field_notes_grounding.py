@@ -168,7 +168,7 @@ def test_broken_gate_holds_never_waves_through(wired, monkeypatch):
     """Fail-closed: if the gate machinery itself dies, the note is held — the
     horizons posture, replacing the old fail-soft 'served unchecked'."""
 
-    def boom(analysis, prompt):
+    def boom(analysis, prompt, week=None):
         return [{"type": "gate_error", "detail": "synthetic gate failure"}]
 
     monkeypatch.setattr(fnl, "_note_grounding_findings", boom)
