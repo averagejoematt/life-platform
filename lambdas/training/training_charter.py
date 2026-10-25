@@ -248,8 +248,16 @@ def _get(d: Any, dotted: str) -> Any:
 
 
 def charter_value(dotted: str, default: Any = None) -> Any:
-    """One charter value by dotted path (``"steps.floor"``), or ``default`` when absent."""
-    v = _get(load_charter(), dotted)
+    """One charter value by dotted path (``"steps.floor"``), or ``default`` when absent.
+
+    #5313: reads the cached merged charter in place and copies only the VALUE. It used to go
+    through ``load_charter()``, which deep-copies the WHOLE charter, and then copy the value
+    again. One ``plan_next_session`` stage 2 makes ~2,900 of these calls (``block_model``
+    reads per-week values), so the full copies were ~2.5 s of CPU on a laptop and several times
+    that on the 768 MB MCP Lambda: the largest single cost in the stage that hit the 30 s cap.
+    A caller still gets its own copy, so mutating it cannot reach the cache."""
+    _refresh()
+    v = _get(_cache, dotted) if _cache is not None else _MISSING
     return default if v is _MISSING else copy.deepcopy(v)
 
 

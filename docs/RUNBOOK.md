@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-10-24 (v8.6.0 — 89 MCP tools, 82-module package, 108 Lambdas, 20 data sources)
+Last updated: 2026-10-25 (v8.6.0 — 89 MCP tools, 83-module package, 108 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 108 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)

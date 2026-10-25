@@ -49,6 +49,7 @@ from typing import Any, Optional
 from common.pacific_time import pacific_today
 from training.commit_binding import binding_for  # #4066
 
+from mcp import plan_call_scope  # #5313: one read per plan call, the call clock, stage 2's write deadline
 from mcp.core import LAYER_UNKNOWN
 from mcp.plan_draft_evidence import ANCHOR_HISTORY_LOOKBACK_DAYS, BLOCK_LOOKBACK_DAYS, PAIN_LOOKBACK_DAYS  # noqa: F401 (#4161)
 from mcp.plan_helpers import (  # noqa: F401 (#4149)
@@ -64,6 +65,7 @@ from mcp.plan_helpers import (  # noqa: F401 (#4149)
     critics_with_charter,  # #5071
 )
 from mcp.plan_hevy_windows import _block_workouts, _prescription_window, _rotation_window  # noqa: F401  (#4110 size fix)
+from mcp.utils import mcp_error
 
 logger = logging.getLogger("tools_plan")
 
@@ -138,10 +140,8 @@ def _read(name: str, fn, *a, **kw) -> tuple[Any, dict[str, Any]]:
 
 
 def _load_anchor_indexes() -> tuple[dict[str, list], dict[str, float]]:
-    """(Hevy history index, bodyweight index) — the two reads the band anchor needs (#4090)."""
-    from training.exercise_history import DEFAULT_LOOKBACK_DAYS, FLOOR_LOOKBACK_DAYS, load_bodyweight_index, load_history_indexes
-
-    return load_history_indexes(lookback_days=max(DEFAULT_LOOKBACK_DAYS, FLOOR_LOOKBACK_DAYS))[0], load_bodyweight_index()
+    """(Hevy history index, bodyweight index) — the band anchor's two reads (#4090), read once per plan call (#5313)."""
+    return plan_call_scope.anchor_indexes()
 
 
 def _attach_session_loads(block: dict[str, Any], target_date: str, catalog_movements: dict[str, Any] | None) -> None:
@@ -600,6 +600,7 @@ def _pain_scope_of(
     return pain_scope
 
 
+@plan_call_scope.plan_call  # #5313
 def tool_plan_next_session(args):
     """Stage 1: the deterministic constraint block (#3751). Stage 2, with `routine_id`: the
     four critics over disjoint evidence, verdicts stored on the draft (#3752)."""
@@ -614,8 +615,6 @@ def tool_plan_next_session(args):
     overrides: list[dict[str, Any]] = []
     if args.get("veto_override") not in (None, [], {}):
         from coach.critic_overrides import parse_overrides
-
-        from mcp.utils import mcp_error
 
         if not routine_id:
             return mcp_error("veto_override needs routine_id — it overrides a stage-2 veto on that routine", error_code="MISSING_ARG")
@@ -633,8 +632,6 @@ def tool_plan_next_session(args):
     ir = None
     if routine_id:
         from training.routine_repo import get_current
-
-        from mcp.utils import mcp_error
 
         ir = _safe(get_current, routine_id)
         if not ir:
@@ -923,11 +920,11 @@ def tool_plan_next_session(args):
             overrides=overrides,
         )
         out["how_to_use"] = (
-            "Stage 2 ran. Read `critics.verdicts` — each names the metric and number it argued from. A `veto` blocks "
-            "commit: redraft and run stage 2 again, or — if Matthew overrules that one critic — run stage 2 again with "
-            "veto_override={critic, owner_words} carrying his words verbatim (#4076); every other critic's changes still "
-            "apply. `change` verdicts are already applied to the draft (see `critics.changes`); dry_run shows the revised "
-            "body. Then commit — the verdicts, and any override, ride in the Hevy notes."
+            "Stage 2 ran. FIRST read `critics.written`: false means the verdicts were NOT stored (#5313, `critics.next` says why) "
+            "— run stage 2 again. Read `critics.verdicts` — each names its metric and number. A `veto` blocks commit: redraft and "
+            "run stage 2 again, or — if Matthew overrules that one critic — run stage 2 again with veto_override={critic, "
+            "owner_words} carrying his words verbatim (#4076); every other critic's changes still apply. `change` verdicts are "
+            "applied to the draft (see `critics.changes`); dry_run shows the revised body. Then commit — verdicts ride in the Hevy notes."
         )
     return out
 
@@ -1055,7 +1052,9 @@ def _run_stage_2(
         from ai.bedrock_client import invoke as _invoke
 
         invoke = _invoke
-    verdicts = critics.run_critics(packets, draft, invoke=invoke, model_allowed=allowed, model_paused_reason=paused)
+    # #5313: the four model calls run concurrently, their wait bounded by the time left before the write deadline
+    wait = plan_call_scope.model_budget_secs()
+    verdicts = critics.run_critics(packets, draft, invoke=invoke, model_allowed=allowed, model_paused_reason=paused, model_timeout_s=wait)
     ran_at = datetime.now(timezone.utc).isoformat()
     # #4076: the owner's override marks ONLY the named critic's veto; it runs before the
     # changes so the record is complete, and it moves no change — `apply_changes` below sees
@@ -1092,6 +1091,9 @@ def _run_stage_2(
         # the coach's draft as critiqued, so a re-run re-evaluates THIS, not its own output
         "draft_exercises": draft_exercises,
     }
+    late = plan_call_scope.past_write_deadline()  # #5313: past it, store NOTHING and say so — never race the MCP cap
+    if late:
+        return {**record, "routine_id": ir.routine_id, "written": False, "verdict_state": "not_written", "next": late}
     ir.inputs_snapshot = {**(getattr(ir, "inputs_snapshot", None) or {}), "critics": record}
     # LIVE FINDING 2026-09-20: Hevy's routine object carries NO `notes` field on the API (GET keys
     # are created_at/exercises/folder_id/id/title/updated_at; a PUT with notes reads back without
@@ -1109,7 +1111,7 @@ def _run_stage_2(
     put_versioned(ir)
     out = dict(record)
     out["routine_id"] = ir.routine_id
-    out["routine_version"] = ir.version
+    out["routine_version"], out["written"], out["verdict_state"] = ir.version, True, "landed"
     out["thread"] = _write_thread(ir, pacific_today())
     out["notes_preview"] = critics.notes_block(ir)
     if record["veto"]:
