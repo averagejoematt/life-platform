@@ -52,6 +52,16 @@ MAX_TOKENS = 240  # one JSON object with two short sentences
 NARRATIVE_MAX_CHARS = 280
 
 # The verdict fields the model may never write (the no-override rule, tested).
+DISSENT_MAX_CHARS = 300
+
+
+def _clip(text: str, limit: int) -> str:
+    """Cut at a word boundary with an ellipsis, never mid-word (#5325)."""
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rsplit(None, 1)[0].rstrip(",;:—- ") + "…"
+
+
 VERDICT_KEYS = ("verdict", "metric", "value", "field", "to", "reason", "redline", "provenance")
 
 DESCRIPTIVE_ONLY = "descriptive only — n=1, his own logged days; no interval and no causal claim (ADR-105 rule 1)"
@@ -138,7 +148,7 @@ def _parse(resp: dict[str, Any]) -> dict[str, Any]:
     sentences = re.split(r"(?<=[.!?])\s", narrative)
     out = {"narrative": " ".join(sentences[:2])[:NARRATIVE_MAX_CHARS], "agrees": obj.get("agrees") is not False}
     if obj.get("dissent"):
-        out["dissent"] = str(obj["dissent"]).strip()[:200]
+        out["dissent"] = _clip(str(obj["dissent"]).strip(), DISSENT_MAX_CHARS)
     if "verdict" in obj:
         out["model_verdict_ignored"] = f"the model returned verdict={obj['verdict']!r}; the deterministic verdict stands (#5114)"
     return out

@@ -763,3 +763,28 @@ def test_a_protein_miss_below_the_tripwire_is_not_a_floor_miss_line():
     res = nc.run(_inputs(protein_g_by_day=[205] * 13 + [150]))
     assert res["floor_misses"] == []
     assert not any("floor_misses" in v for v in res["verdicts"])
+
+
+def test_overshoot_to_reads_the_resolver_target_not_the_logged_mean(pre_ruling):
+    """#5325: mean logged intake differs from the target; the option is target + step."""
+    cap = rl.rate_target_lb_per_wk(317.0)["cap_lb_wk"]
+    need = TW["rate_overshoot"]["threshold_weeks"]
+    p = nc.build_deficit_advocate_packet(
+        _inputs(
+            intake_kcal_by_day=[MID - 400] * 14,
+            weekly_loss_rates_lb_wk=[cap + 0.5] * need,
+            weight_trend_lb_wk=-(cap + 0.5),
+            weeks_since_genesis=5,
+        )
+    )
+    (f,) = _flags(p, "rate_over_cap_consecutive_weeks")
+    assert f["to"] == MID + STEP and f["to"] != (MID - 400) + STEP
+
+
+def test_approve_beside_an_over_cap_warning_states_the_run_in_its_rationale():
+    cap = rl.rate_target_lb_per_wk(317.0)["cap_lb_wk"]
+    need = TW["rate_overshoot"]["threshold_weeks"]
+    out = nc.run(_inputs(weekly_loss_rates_lb_wk=[cap + 0.5] * need, weight_trend_lb_wk=-(cap + 0.5), weeks_since_genesis=5))
+    v = next(x for x in out["verdicts"] if x.get("critic") == "deficit_advocate" or x.get("critic_id") == "deficit_advocate")
+    assert v["verdict"] == "approve"
+    assert v["reason"] == f"approve — ceiling is a warning by ruling R1; rate over cap {need} consecutive weeks"

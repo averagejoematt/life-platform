@@ -323,3 +323,12 @@ def test_the_sweep_goes_red_on_a_caller_without_the_opt_out():
     assert _deficit_tool_uses_without_opt_out(attr_bare, "x") == (1, ["x:5"])
     assert _deficit_tool_uses_without_opt_out(alias % "{'critics_model': False}", "x") == (1, [])
     assert _deficit_tool_uses_without_opt_out(alias % "{}", "x") == (1, ["x:5"])
+
+
+def test_dissent_is_cut_at_a_word_boundary_with_an_ellipsis_5325():
+    from health import nutrition_critics_ai as ai
+
+    long = "word " * 100
+    out = ai._clip(long.strip(), ai.DISSENT_MAX_CHARS)
+    assert out.endswith("…") and len(out) <= ai.DISSENT_MAX_CHARS and out[:-1].split()[-1] == "word"
+    assert ai._clip("short.", ai.DISSENT_MAX_CHARS) == "short."
