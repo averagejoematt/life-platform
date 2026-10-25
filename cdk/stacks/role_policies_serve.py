@@ -102,6 +102,7 @@ def site_api() -> list[iam.PolicyStatement]:
                 f"{BUCKET_ARN}/generated/*",
             ],
         ),
+        _charter_twin_list(),  # #5220: site-api still logged `not read (AccessDenied)` on 2026-10-24 — config/* GET without the prefix list
         iam.PolicyStatement(
             sid="S3FindingsWrite",
             actions=["s3:PutObject"],
