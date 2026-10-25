@@ -108,6 +108,10 @@ that it is automated at his request. No metric, mood, intake, note, number or da
 term) and refuses to render otherwise; ``tests/test_named_human_contact_4063.py`` holds
 the same contract plus the sensitive-content filter.
 
+THE OWNER-SIDE PROMPTS ARE NOT HERE (#5125). The weekly "have you checked in with your support person?" text and
+the pre-agreed disruption-call reminder go to HIM, from ``coach.support_contact_prompts`` on the Telegram worker; that
+module never imports this one or reads the private config. This leg stays the ONLY path that reaches the contact.
+
 HOST. A fail-soft leg of the existing daily ``evening-nudge`` Lambda (03:00 UTC) — no
 new cron. Every failure logs ``CONTACT_LEG_FAILED_TOKEN`` and never breaks the nudge.
 """
