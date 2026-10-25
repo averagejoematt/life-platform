@@ -479,3 +479,23 @@ def test_stage_4_survives_its_early_levels_leaving_the_anchor_window(monkeypatch
     assert reads == [min(start, block_start())]  # still ONE Hevy read; #5078's battery position reaches the block start through it
     gate = row["running_gate"]
     assert gate["onramp"]["level"] == LEVELS[-1]["level"] and gate["onramp"]["stage4_done"] is True
+
+
+def test_the_gate_line_names_its_weight_and_date_and_agrees_with_the_plan_gate_5314():
+    """#5314: the packet reads a stored tracker week, the plan the latest weigh-in; one function, so the same weight
+    gives the same distance, and the packet line names which weight and day it was measured from."""
+    from training import coach_context, may_tracker as mt
+
+    series = {"2026-10-18": 302.2, "2026-10-24": 298.3}
+    d, w = max(series.items())
+    plan_gate = run_onramp.gate_state(w, None, [])
+    packet = mt.running_gate_section(w, None, [], weight_date=d)
+    assert (packet["lb_to_prep"], packet["value"]) == (plan_gate["lb_to_prep"], plan_gate["lb_to_gate"])
+    assert packet["weight_date"] == d and f"{w:g} lb on {d}" in packet["line"]
+    old = mt.running_gate_section(302.2, None, [], weight_date="2026-10-18")
+    assert "302.2 lb on 2026-10-18" in old["line"]
+    ctx = coach_context.assemble(
+        "2026-10-24", packet=None, constraint_block=None, tracker={"state": "measured", "row": {"running_gate": old}}
+    )
+    assert "on 2026-10-18" in ctx["text"]
+    assert "weigh-in undated" in run_onramp.gate_line(run_onramp.gate_state(w, None, []))

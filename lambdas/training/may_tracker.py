@@ -381,6 +381,7 @@ def running_gate_section(
     stage4_done: bool = False,
     onramp: Optional[Mapping[str, Any]] = None,
     held_since: Optional[str] = None,
+    weight_date: Optional[str] = None,
 ) -> dict[str, Any]:
     """The run gate (`training.run_onramp.gate_state`, the one gate): `walking_weeks` are the tracked week's
     completed walking weeks (hours + a lower-leg pain flag each); `holds` the strain-hold causes, None = not read;
@@ -391,7 +392,7 @@ def running_gate_section(
     gate = _cv("gated_movements.running")
     if not isinstance(gate, Mapping) or gate.get("gate_lb") is None:
         return cell(ABSENT, None, "gated_movements.running", "the charter carries no running gate")
-    gs = run_onramp.gate_state(weight, walking_weeks, holds, stage4_done)
+    gs = run_onramp.gate_state(weight, walking_weeks, holds, stage4_done, weight_date=weight_date)
     return cell(
         MEASURED if weight is not None else ABSENT,
         gs["lb_to_gate"],
@@ -399,6 +400,8 @@ def running_gate_section(
         None if weight is not None else "no weigh-in",
         unit="lb to the gate weight",
         gate_lb=gs["gate_lb"],
+        weight_lb=gs["weight_lb"],
+        weight_date=gs["weight_date"],
         weight_cleared=None if weight is None else weight <= gs["gate_lb"],
         gate_state=gs["state"],
         reason=gs["reason"],
@@ -508,6 +511,7 @@ def build_week(
 
     sunday = shift(monday, 6)
     w = ((weight.get("weight_lb") or {}).get("value")) if isinstance(weight, Mapping) else None
+    w_date = ((weight.get("weight_lb") or {}).get("date")) if isinstance(weight, Mapping) else None  # #5314
     row: dict[str, Any] = {
         "pk": PK,
         "sk": SK_PREFIX + monday,
@@ -521,7 +525,9 @@ def build_week(
         "anchors": dict(anchors),
         "volume": dict(volume),
         "fitness_tests": dict(fitness),
-        "running_gate": running_gate_section(w, **dict(running or {})),  # #5090: walking_weeks / holds from the caller
+        "running_gate": running_gate_section(
+            w, **{**dict(running or {}), "weight_date": w_date}
+        ),  # #5090: walking_weeks / holds from the caller
         "tier": "owner_only",
     }
     if built_at:
