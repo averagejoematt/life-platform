@@ -42,9 +42,24 @@ whose season pairs are built from the SAME row-set), ``/api/predictions.by_coach
 ``tests/test_coaches_api.py`` and the producer/consumer pair is enrolled in
 ``tests/pair_contract_registry.py`` (charter rule 3).
 
-Pure over an injected table handle: no clock, no write, one Query on the coach's own
-partition (unfiltered — the tombstoned original of a re-written row is exactly what
-decides which cycle the resolution belongs to).
+Pure over an injected table handle: no write, one Query on the coach's own partition
+(unfiltered — the tombstoned original of a re-written row is exactly what decides which
+cycle the resolution belongs to). ONE clock read, behind the ``today_pt`` seam, and only
+when a caller names no ``as_of`` day (#5356 — the day the record is complete through).
+
+WHAT "THROUGH <day>" SAYS (#5356)
+---------------------------------
+``through`` used to be the ``outcome_date`` of the coach's LATEST decided call. That is a
+fact about one call, not about the record: on 2026-10-24 (Day 49) Lisa Park's record read
+"19 of 47 checked calls right (40%) through October 18" while every other coach read
+"through October 23". Grading was not behind — her next call fell due October 26, so no
+call of hers had come due since the 18th — but "through October 18" claims the record
+stops a week ago, and the reader-truth judge flagged it high (finding e8f2c1). ``through``
+is now the day the record is COMPLETE through: every call of this coach that fell due on
+or before it has been checked. That is ``as_of`` (today, Pacific) unless an open call fell
+due on or before ``as_of`` and is still unchecked, in which case it is the day before the
+earliest such call's due date — so a stalled grader shows as a record that stops
+advancing, never as a current one. It is never earlier than the latest decided call.
 """
 
 from __future__ import annotations
@@ -54,12 +69,19 @@ import re
 from typing import Any, Iterable
 
 from boto3.dynamodb.conditions import Key
+from common import pacific_time
+from common.pacific_time import shift_day_key
 from experiment.phase_filter import singleton_visible
+
+from coach.prediction_windows import due_date
 
 logger = logging.getLogger(__name__)
 
 #: The terminal verdicts a record counts. Anything else is not a checked call.
 GRADED_STATUSES = ("confirmed", "refuted")
+
+#: The statuses the grader still owes a verdict (``coach_prediction_evaluator.EVALUABLE_STATUSES``).
+OPEN_STATUSES = ("pending", "confirming")
 
 #: Below this many decided calls the headline prints counts, never a percentage
 #: (#4220 acceptance: "below n = 10 the page prints counts").
@@ -85,6 +107,9 @@ _PROJECTION_NAMES = {
     "#src": "source",
     "#conf": "confidence",
     "#cn": "claim_natural",  # #4617: what the record counts (``call_class``) reads the sentence
+    # #5356: an open call's due day (``prediction_windows.due_date``) bounds ``through``.
+    "#cd": "created_date",
+    "#sd": "subdomain",
 }
 
 
@@ -166,13 +191,46 @@ def decided_rows(rows: Iterable[Any], *, genesis: str | None, career: bool = Fal
     return out
 
 
-def record_from_rows(rows: Iterable[Any], *, genesis: str | None, career: bool = False) -> dict:
+def today_pt() -> str:
+    """The Pacific day — the module's ONE clock read (#5356). Read through the module so a
+    ``freeze_pacific`` of ``common.pacific_time`` reaches it; tests may also patch this."""
+    return pacific_time.pacific_today()
+
+
+def complete_through(rows: Iterable[Any], *, latest_decided: str, as_of: str) -> str:
+    """The day a coach's record is complete through (#5356): ``as_of``, pulled back to the
+    day before the earliest still-open call that fell due on or before ``as_of``, never
+    earlier than ``latest_decided``. Lexical on ISO days, no parse beyond ``due_date``.
+
+    Only phase-visible open rows bound it (an archived cycle's leftovers are not this
+    record's debt), and a row whose due day cannot be computed is one the grader cannot
+    grade either (it skips a row with no ``created_date``), so it bounds nothing.
+    """
+    bound = str(as_of or "")[:10]
+    for row in rows or []:
+        if not isinstance(row, dict) or not singleton_visible(row):
+            continue
+        if str(row.get("status") or "").strip().lower() not in OPEN_STATUSES:
+            continue
+        raw_spec = row.get("evaluation")
+        try:
+            due = due_date(row.get("created_date"), raw_spec if isinstance(raw_spec, dict) else {}, row.get("subdomain") or "")
+        except (ValueError, TypeError):  # a non-numeric stated window: the grader cannot date it either
+            continue
+        if due and due <= bound:
+            bound = shift_day_key(due, -1)
+    return max(bound, latest_decided)
+
+
+def record_from_rows(rows: Iterable[Any], *, genesis: str | None, career: bool = False, as_of: str | None = None) -> dict:
     """``{confirmed, refuted, n, through}`` over a coach's PREDICTION# rows.
 
-    ``through`` is the latest ``outcome_date`` counted (ISO), or None when no counted row
-    carries one. ``career=True`` counts every cycle (each resolution once); the default is
-    the current cycle only.
+    ``through`` is the day the current-cycle record is complete through (``complete_through``
+    at ``as_of``, today Pacific when None — #5356), or None when nothing is counted. A
+    ``career=True`` record counts every cycle (each resolution once) and keeps the latest
+    counted ``outcome_date``: past cycles owe nothing, so there is no open call to bound it.
     """
+    rows = list(rows or [])
     confirmed = refuted = 0
     through = ""
     for row in decided_rows(rows, genesis=genesis, career=career):
@@ -184,6 +242,8 @@ def record_from_rows(rows: Iterable[Any], *, genesis: str | None, career: bool =
         outcome_date = str(row.get("outcome_date") or "")[:10]
         if outcome_date > through:
             through = outcome_date
+    if through and not career:
+        through = complete_through(rows, latest_decided=through, as_of=as_of or today_pt())
     return {"confirmed": confirmed, "refuted": refuted, "n": confirmed + refuted, "through": through or None}
 
 
@@ -322,12 +382,12 @@ def _query_rows(table: Any, coach_id: str) -> list:
     return rows
 
 
-def for_coach(table: Any, coach_id: str, *, genesis: str | None) -> dict | None:
+def for_coach(table: Any, coach_id: str, *, genesis: str | None, as_of: str | None = None) -> dict | None:
     """The current-cycle record for one coach, or None when the read failed."""
-    return for_coach_with_rows(table, coach_id, genesis=genesis)[0]
+    return for_coach_with_rows(table, coach_id, genesis=genesis, as_of=as_of)[0]
 
 
-def for_coach_with_rows(table: Any, coach_id: str, *, genesis: str | None) -> tuple[dict | None, list[dict]]:
+def for_coach_with_rows(table: Any, coach_id: str, *, genesis: str | None, as_of: str | None = None) -> tuple[dict | None, list[dict]]:
     """``(record, decided_rows)`` from ONE read — the record and the exact rows it counted.
 
     ``(None, [])`` when the read failed: a consumer drawing cards from the rows draws none
@@ -337,7 +397,7 @@ def for_coach_with_rows(table: Any, coach_id: str, *, genesis: str | None) -> tu
         return None, []
     try:
         rows = _query_rows(table, coach_id)
-        return record_from_rows(rows, genesis=genesis), decided_rows(rows, genesis=genesis)
+        return record_from_rows(rows, genesis=genesis, as_of=as_of), decided_rows(rows, genesis=genesis)
     except Exception as exc:  # noqa: BLE001 — absence is the honest degradation, logged
         logger.warning("[coach_record] %s: %s", coach_id, exc)
         return None, []
