@@ -320,6 +320,7 @@ def volume_section(vol: Optional[Mapping[str, Any]], read_error: Optional[str] =
     press is never side/rear-delt work; legs and arms are per-member catalog-muscle sums. The row's `value` is the
     WORST member's sets (the band is per member); `member_sets` carries every member beside the charter `band`."""
     from training import volume_floors
+    from training.muscle_volume import LABEL_TO_LANDMARK_KEY
 
     src = "training.volume_floors (movement counts) over training.muscle_volume.working_sets_by_muscle (Monday-Sunday)"
     if read_error:
@@ -328,7 +329,8 @@ def volume_section(vol: Optional[Mapping[str, Any]], read_error: Optional[str] =
     muscles = (vol or {}).get("muscles") or {}
     exercise_sets = (vol or {}).get("exercise_sets")
     by_movement = volume_floors.logged_movement_sets(exercise_sets) if exercise_sets is not None else None
-    by_muscle = {m: int(round(float((r or {}).get("total_sets") or 0))) for m, r in muscles.items()}
+    # #5073: `muscles` is keyed by MUSCLES labels; the band members are landmark keys — bridge via the one derived map.
+    by_muscle = {LABEL_TO_LANDMARK_KEY.get(m, m): int(round(float((r or {}).get("total_sets") or 0))) for m, r in muscles.items()}
     counted = volume_floors.movement_counts(by_muscle, by_movement or {})
     band_rows = volume_floors.charter_band_rows(counted)
     rows: dict[str, Any] = {}

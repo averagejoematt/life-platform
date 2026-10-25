@@ -109,6 +109,14 @@ HEVY_MUSCLE_GROUP: dict[str, tuple[str | None, str]] = {
     "other": (None, "other"),
 }
 
+#: The `MUSCLES` label -> planner/landmark key (`quadriceps`, `abs`, ...), DERIVED from `HEVY_MUSCLE_GROUP` (no second table).
+#: A label several Hevy groups credit ("Back") takes the first group's key. #5073: the may-tracker keys `by_muscle` by
+#: label while `volume_floors.BAND_MEMBERS` reads landmark keys; this is the one bridge between the two vocabularies.
+LABEL_TO_LANDMARK_KEY: dict[str, str] = {}
+for _label, _key in HEVY_MUSCLE_GROUP.values():
+    if _label:
+        LABEL_TO_LANDMARK_KEY.setdefault(_label, _key)
+
 _HALF = SECONDARY_FRACTION
 
 #: (keywords, primary, {secondary: fraction}, movement_pattern) — FIRST MATCH WINS, so the

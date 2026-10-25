@@ -227,11 +227,44 @@ def test_a_press_only_week_counts_zero_side_rear_delts():
 
 
 def test_upper_chest_and_legs_arms_members_are_counted_with_their_bands():
-    muscles = {"quadriceps": {"total_sets": 9.0}, "hamstrings": {"total_sets": 3.0}, "glutes": {"total_sets": 2.0}}
+    muscles = {"Quads": {"total_sets": 9.0}, "Hamstrings": {"total_sets": 3.0}, "Glutes": {"total_sets": 2.0}}
     v = mt.volume_section(_vol([(*INCLINE, 4)], muscles))["rows"]
     assert v["upper_chest"]["member_sets"] == [4]
     assert v["legs"]["member_sets"] == [9, 5] and v["legs"]["band"] == list(charter_value("volume_priorities.sets_per_wk")["legs"])
     assert v["arms"]["member_sets"] == [0, 0]
+
+
+LAT_PULLDOWN = ("Lat Pulldown (Cable)", "LATPD000")
+
+
+def test_5073_legs_and_arms_read_the_muscles_display_labels():
+    """The live repro (2026-10-25): `muscles` is keyed by MUSCLES labels; legs/arms read [0, 0] before the bridge."""
+    muscles = {"Quads": {"total_sets": 18}, "Biceps": {"total_sets": 13.5}, "Triceps": {"total_sets": 12}}
+    muscles.update({"Hamstrings": {"total_sets": 6}, "Glutes": {"total_sets": 4}})
+    rows = mt.volume_section(_vol([(*LAT_PULLDOWN, 5)], muscles))["rows"]
+    assert rows["legs"]["member_sets"] == [18, 10]
+    assert rows["arms"]["member_sets"] == [14, 12]  # 13.5 rounds half-even to 14
+    assert rows["legs"]["value"] == 10
+
+
+def test_5073_legs_and_arms_meeting_their_bands_are_not_below_floor():
+    bands = charter_value("volume_priorities.sets_per_wk")
+    muscles = {"Quads": {"total_sets": 18}, "Hamstrings": {"total_sets": 6}, "Glutes": {"total_sets": 6}}
+    muscles.update({"Biceps": {"total_sets": 13}, "Triceps": {"total_sets": 12}})
+    rows = mt.volume_section(_vol([], muscles))["rows"]
+    for g in ("legs", "arms"):
+        assert min(rows[g]["member_sets"]) >= bands[g][0]
+        assert rows[g]["below_floor"] is False and rows[g]["gap_to_floor"] == 0
+
+
+def test_5073_the_bridge_is_derived_from_the_hevy_table_and_covers_the_band_members():
+    from training import muscle_volume as mv, volume_floors as vf
+
+    assert mv.LABEL_TO_LANDMARK_KEY["Quads"] == "quadriceps" and mv.LABEL_TO_LANDMARK_KEY["Biceps"] == "biceps"
+    keys = set(mv.LABEL_TO_LANDMARK_KEY.values())
+    for group in ("legs", "arms"):
+        for member in vf.BAND_MEMBERS[group]:
+            assert set(member) <= keys, (group, member)
 
 
 def test_no_per_exercise_counts_leaves_the_movement_bands_absent():
