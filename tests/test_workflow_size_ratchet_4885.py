@@ -47,7 +47,7 @@ WORKFLOW_SIZE_COUNTS: dict = {
     "v4-gate.yml": (170, 31),
     "visual-qa.yml": (326, 107),
     "webkit-mobile-qa.yml": (179, 26),
-    "wrap-nightly.yml": (116, 10),
+    "wrap-nightly.yml": (131, 11),  # #5316 box 2: the fleet-drift AWS read-only leg (matrix row + header, one guarded pip line)
 }
 
 

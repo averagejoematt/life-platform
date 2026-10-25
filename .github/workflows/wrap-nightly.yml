@@ -28,6 +28,12 @@
 #                                 UNVERIFIED and exits 0, so a creds-less leg would red every
 #                                 night and file a permanent tracker. Parked on #4262.
 #
+#   fleet-drift            leg  — NOT a wrap check (#5316 box 2): `check_fleet_drift.py
+#                                 --expect-deploy-base`, every fleet Lambda on main's last
+#                                 deployed sha. Exit 1 = drift; exit 2 = indeterminate, also red.
+#                                 It assumes github-actions-readonly-role (lambda:GetFunction);
+#                                 the role trusts main only.
+#
 # Since the #4262 follow-up, backlog-hygiene, unlinked-closures and merge-text-closures run
 # ONLY here: they left `scripts/wrap_gates.py`'s interactive battery for its NIGHTLY list,
 # which `tests/test_advisory_failure_issue.py` holds equal to this matrix in both directions.
@@ -54,6 +60,8 @@ on:
 permissions:
   contents: read
   issues: write # the per-leg auto-filed tracker; `gh issue list` reads for three legs
+  id-token: write # OIDC for the AWS leg (read-only role)
+  actions: read # fleet-drift reads main's CI/CD run history for the last deployed sha
 
 concurrency:
   group: wrap-nightly
@@ -78,19 +86,26 @@ jobs:
             cmd: python3 scripts/check_unlinked_closures.py
           - slug: wrap-merge-text-closures
             cmd: python3 scripts/check_merge_commit_closures.py --days 7
+          - slug: fleet-drift
+            cmd: python3 deploy/check_fleet_drift.py --expect-deploy-base
+            aws-role: arn:aws:iam::205930651321:role/github-actions-readonly-role
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # unlinked-closures reads origin/main history; merge-text reads merge commits
 
       - uses: ./.github/actions/setup-ci
+        with:
+          aws-role: ${{ matrix.aws-role }}
 
       - name: Run the wrap-only check (a degrade is a red)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CHECK_CMD: ${{ matrix.cmd }}
+          AWS_LEG: ${{ matrix.aws-role }}
         run: |
           set -u
+          if [ -n "${AWS_LEG:-}" ]; then PINS=$(python3 scripts/ci_pins.py boto3 botocore); pip install --quiet $PINS; fi
           OUT="$(mktemp)"
           rc=0
           $CHECK_CMD > "$OUT" 2>&1 || rc=$?
@@ -110,7 +125,7 @@ jobs:
           job-status: ${{ job.status }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           failure-summary: >-
-            A /wrap-only check (#4262) failed on its nightly run, or declined to look
-            (UNVERIFIED / gh fail-open). Re-run the command named in the job log locally
-            for the detail; the owning step in .claude/skills/wrap/SKILL.md documents the
-            remedy.
+            A nightly check failed, or declined to look (UNVERIFIED / gh fail-open /
+            indeterminate). Re-run the command named in the job log locally for the detail;
+            a wrap leg's remedy is its step in .claude/skills/wrap/SKILL.md, fleet-drift's is
+            deploy/deploy_fleet.sh from main (#5316).
