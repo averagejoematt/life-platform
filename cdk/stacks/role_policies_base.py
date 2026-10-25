@@ -79,6 +79,17 @@ def _charter_twin_list() -> "iam.PolicyStatement":
     )
 
 
+def _charter_twin_read() -> "iam.PolicyStatement":
+    """#5220: GetObject on the ONE private charter twin object, for a role whose function reads the charter
+    (training_charter.load_charter) but holds no `config/*` read. Pairs with `_charter_twin_list()`: a role needs
+    BOTH to see 404 `absent` instead of 403 for the optional twin. Object-scoped, never `config/coaching/*`."""
+    return iam.PolicyStatement(
+        sid="CharterTwinRead",
+        actions=["s3:GetObject"],
+        resources=[f"{BUCKET_ARN}/config/coaching/training_charter.private.json"],
+    )
+
+
 def _s3(*prefixes: str) -> list[str]:
     """S3 object ARNs for the given key prefixes."""
     return [f"{BUCKET_ARN}/{p}" for p in prefixes]
