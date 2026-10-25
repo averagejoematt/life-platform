@@ -323,6 +323,11 @@ rather than being executed unattended by a session:
 aws cloudwatch delete-alarms --region us-east-1 --alarm-names life-platform-cf-auth-errors
 ```
 
+**EXECUTED 2026-10-25** — owner ruling on #5143 ("Retire cf-auth-errors"); the owner deleted the alarm in the
+us-east-1 console (~21:20Z; post-delete `describe-alarms` returns 0). `scripts/check_alarm_census.py`'s
+`ACCEPTED_ORPHANS` dropped the entry the same day (left in, it reds as `stale-accept`); the two `dash-*` orphans
+of Decision 2 remain the accepted set.
+
 #### Decision 2 — `dash-5xx-rate` / `dash-total-errors`: DECIDED NOT TO ADOPT
 
 This is #2961 acceptance box 2's explicitly sanctioned branch ("or the decision not to adopt

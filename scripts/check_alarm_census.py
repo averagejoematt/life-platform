@@ -43,7 +43,9 @@ HOME_REGION = "us-west-2"
 ACCEPTED_ORPHANS: dict[str, str] = {
     "life-platform-dash-5xx-rate": "us-east-1 console alarm, routed to life-platform-alerts-us-east-1; #2961 decided NOT to adopt",
     "life-platform-dash-total-errors": "us-east-1 console alarm on the MAIN distribution E3S424OXQZ8NBE (name is a lie); #2961 not adopted, rename = history loss",
-    "life-platform-cf-auth-errors": "us-east-1 console alarm, AlarmActions=[], watches an unassociated Lambda@Edge fn; candidate for OWNER retirement (#2961/#2962)",
+    # life-platform-cf-auth-errors (us-east-1, AlarmActions=[], a detached Lambda@Edge fn) — RETIRED 2026-10-25 by owner
+    # ruling on #5143 ("Retire cf-auth-errors"); the owner deleted it in the console (describe-alarms returns 0), so the
+    # entry is pruned: left in, it would red here as `stale-accept`.
 }
 
 

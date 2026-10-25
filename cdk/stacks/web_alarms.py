@@ -18,14 +18,15 @@ has zero us-east-1 mentions). WebStack is the only stack that deploys to us-east
                                       the issue is titled after.
   life-platform-dash-5xx-rate        orphan — routed live, not in any cdk/stacks file
   life-platform-dash-total-errors    orphan — routed live, not in any cdk/stacks file
-  life-platform-cf-auth-errors       orphan — AlarmActions=[], not in any cdk/stacks file
+  life-platform-cf-auth-errors       DELETED 2026-10-25 (#5143, owner ruling) — was: orphan,
+                                      AlarmActions=[], not in any cdk/stacks file
   life-platform-cost-alert           DELETED 2026-08-31 (#3377) — was: AlarmActions=[],
                                       not in any cdk/stacks file
   life-platform-ai-cost-soft-alarm   DELETED 2026-08-31 (#3377) — was: routed to
                                       life-platform-billing-alerts, not in any
                                       cdk/stacks file
 
-The 5 orphans (2 now deleted, #3377) trace to three archived onetime scripts: deploy/archive/onetime/
+The 5 orphans (3 now deleted: 2 on #3377, cf-auth-errors on #5143) trace to three archived onetime scripts: deploy/archive/onetime/
 create_cloudfront_5xx_alarm.sh (dash-5xx-rate + dash-total-errors + the
 life-platform-alerts-us-east-1 topic itself), deploy/archive/onetime/
 create_lambda_edge_alarm.sh (cf-auth-errors, deliberately created with NO action per its
@@ -65,8 +66,13 @@ even that script and duplicates its metric/threshold exactly with no action at a
                                        RECOMMENDED, not executed: renaming a CloudWatch
                                        alarm is a delete-and-recreate that discards alarm
                                        history.
-    life-platform-cf-auth-errors      RETIRE, not adopt — routed to the owner batch
-                                       alongside the #2962 deletes. It watches AWS/Lambda
+    life-platform-cf-auth-errors      RETIRED 2026-10-25 by owner ruling on #5143 ("Retire
+                                       cf-auth-errors"): the owner deleted it in the us-east-1
+                                       console (post-delete describe-alarms returns 0) and
+                                       scripts/check_alarm_census.py's ACCEPTED_ORPHANS no
+                                       longer names it. Still never construct it here — the
+                                       reason it was ruled RETIRE-not-adopt stands:
+                                       It watched AWS/Lambda
                                        Errors on FunctionName=life-platform-cf-auth, and
                                        that function — though it still exists and is
                                        Active — is associated with ZERO Lambda@Edge cache
@@ -176,8 +182,9 @@ def add_web_alarms(
 
     # ── The three orphan adoptions are CLOSED: DO NOT ADOPT (#2961, resolved 2026-08-27) ──
     #
-    # `life-platform-dash-5xx-rate`, `life-platform-dash-total-errors` and
-    # `life-platform-cf-auth-errors` already EXIST in us-east-1, created outside CDK.
+    # `life-platform-dash-5xx-rate` and `life-platform-dash-total-errors` already EXIST in
+    # us-east-1, created outside CDK (`life-platform-cf-auth-errors` did too, until the owner
+    # deleted it on 2026-10-25, #5143 — it stays out for the substantive reason below).
     # Declaring them here with their real names makes CloudFormation attempt a CREATE,
     # and it pre-validates the name is free. It is not:
     #
