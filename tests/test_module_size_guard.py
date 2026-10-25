@@ -329,7 +329,10 @@ BASELINE = {
     # #4970 (2026-10-18): the Apple Watch map + its field sets went to the sibling
     # `health_auto_export_watch.py` and the day-field unit pass to
     # `health_auto_export_units.py` — 1255 -> 1236, all handed back (no headroom banked).
-    "lambdas/ingestion/health_auto_export_lambda.py": 1236,
+    # #4973 (2026-10-24): the workout step (recovery aggregates, process_workouts and the handler's
+    # workouts block) went to the sibling `health_auto_export_workouts.py` beside the new all-type
+    # summary — 1236 -> 1131, all handed back (no headroom banked).
+    "lambdas/ingestion/health_auto_export_lambda.py": 1131,
     # deploy/sync_doc_metadata.py LEFT the baseline 2026-09-29 (#4271): deleting the seven CLAUDE.md
     # sync rules took it to 966 lines, under the 1000 ceiling — the ratchet tightened, entry removed.
     # 2026-08-09 (#2334): +3 — a hand-typed roster literal became the registry import

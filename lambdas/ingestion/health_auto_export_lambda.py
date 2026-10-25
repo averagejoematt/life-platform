@@ -71,6 +71,8 @@ v1.6.0 — Workout ingestion (Pliability, Breathwrk, recovery workouts)
   - Non-recovery workouts (strength, running, etc.) stored to S3 but NOT
     aggregated to DynamoDB to avoid double-counting with Strava SOT
   - Enables mobility/recovery tracking and sleep-quality correlations
+  - #4973: every workout type now ALSO gets an owner-only DynamoDB summary per
+    workout id (`apple_workouts` map) — health_auto_export_workouts.py
 v1.5.0 — State of Mind ingestion (How We Feel / Apple Health)
   - Detects State of Mind payloads (separate HAE automation Data Type)
   - Stores individual check-ins to S3 raw/matthew/state_of_mind/YYYY/MM/DD.json
@@ -152,6 +154,7 @@ from ingestion import (
     health_auto_export_sleep as _sleep,  # #4971: Apple's own night, sleep_*_apple fields
     health_auto_export_units as _units,  # #4970: day-field units + derived totals
     health_auto_export_watch as _watch,  # #4970: the Apple Watch's daily-metric map
+    health_auto_export_workouts as _workouts,  # #4973: every workout type, one summary per id
     watch_presence as _watch_presence,  # #4970: the watch dead-man's presence stamp
 )
 
@@ -1287,137 +1290,14 @@ def process_state_of_mind(payload):
     return daily_entries, daily_agg
 
 
-# ── Workout Processing (v1.6.0) ────────────────────────────────────────────────
-
-# Recovery workout types — these are NOT tracked by Strava and represent
-# mobility/breathwork/recovery modalities we want to aggregate.
-# Maps HealthKit workout name → category for DynamoDB fields.
-RECOVERY_WORKOUT_TYPES = {
-    # Flexibility / Mobility (Pliability, stretching apps)
-    "Flexibility": "flexibility",
-    "flexibility": "flexibility",
-    # Breathwork (Breathwrk, Wim Hof, etc.)
-    "Mind and Body": "breathwork",
-    "mind_and_body": "breathwork",
-    "Breathing": "breathwork",
-    "breathing": "breathwork",
-    # Yoga / Pilates
-    "Yoga": "yoga",
-    "yoga": "yoga",
-    "Pilates": "pilates",
-    "pilates": "pilates",
-    # Cooldown / Tai Chi
-    "Cooldown": "cooldown",
-    "cooldown": "cooldown",
-    "Tai Chi": "tai_chi",
-    "tai_chi": "tai_chi",
-}
+# ── Workout Processing (v1.6.0; all-type summary #4973) ─────────────────────────
+# Bodies live in health_auto_export_workouts.py; these names stay for existing callers.
+RECOVERY_WORKOUT_TYPES = _workouts.RECOVERY_WORKOUT_TYPES
 
 
 def process_workouts(workouts):
-    """
-    Process workouts from HAE payload (v1.6.0).
-
-    Classifies each workout, stores all to S3, and aggregates
-    recovery-type workouts (flexibility, breathwork, yoga, etc.) to DynamoDB.
-    Non-recovery workouts (strength, running, cycling) are stored to S3
-    for reference but NOT written to DynamoDB to avoid double-counting with Strava.
-
-    Returns:
-        daily_workouts: dict of date → list of normalized workout dicts (all types, for S3)
-        daily_agg: dict of date → {flexibility_minutes, breathwork_minutes, etc.} (recovery only, for DDB)
-    """
-    daily_workouts = defaultdict(list)
-
-    for w in workouts:
-        date = parse_date_str(w.get("start", ""))
-        if not date:
-            continue
-
-        name = w.get("name", "Unknown")
-        duration_sec = w.get("duration", 0)
-        try:
-            duration_sec = float(duration_sec)
-        except (ValueError, TypeError):
-            duration_sec = 0
-        duration_min = round(duration_sec / 60, 1)
-
-        # Active energy: prefer summary field, fall back to summing readings
-        energy_kcal = 0
-        aeb = w.get("activeEnergyBurned", {})
-        if isinstance(aeb, dict) and aeb.get("qty") is not None:
-            try:
-                energy_kcal = round(float(aeb["qty"]), 1)
-            except (ValueError, TypeError):
-                pass
-        elif not energy_kcal:
-            ae_readings = w.get("activeEnergy", [])
-            if ae_readings:
-                energy_kcal = round(sum(float(r.get("qty", 0)) for r in ae_readings), 1)
-
-        category = RECOVERY_WORKOUT_TYPES.get(name, "other")
-
-        workout_record = {
-            "id": w.get("id", ""),
-            "name": name,
-            "category": category,
-            "start": w.get("start", ""),
-            "end": w.get("end", ""),
-            "duration_min": duration_min,
-            "active_energy_kcal": energy_kcal,
-            "is_indoor": w.get("isIndoor"),
-            "is_recovery_type": category != "other",
-        }
-        daily_workouts[date].append(workout_record)
-
-    # ── Build daily aggregates for recovery workouts only ──
-    daily_agg = {}
-    for date, wkts in daily_workouts.items():
-        recovery = [w for w in wkts if w["is_recovery_type"]]
-        if not recovery:
-            continue
-
-        agg = {}
-
-        # Per-category minutes and sessions
-        cat_minutes = defaultdict(float)
-        cat_sessions = defaultdict(int)
-        for w in recovery:
-            cat = w["category"]
-            cat_minutes[cat] += w["duration_min"]
-            cat_sessions[cat] += 1
-
-        if cat_minutes.get("flexibility"):
-            agg["flexibility_minutes"] = round(cat_minutes["flexibility"], 1)
-            agg["flexibility_sessions"] = cat_sessions["flexibility"]
-
-        if cat_minutes.get("breathwork"):
-            agg["breathwork_minutes"] = round(cat_minutes["breathwork"], 1)
-            agg["breathwork_sessions"] = cat_sessions["breathwork"]
-
-        if cat_minutes.get("yoga"):
-            agg["yoga_minutes"] = round(cat_minutes["yoga"], 1)
-            agg["yoga_sessions"] = cat_sessions["yoga"]
-
-        if cat_minutes.get("pilates"):
-            agg["pilates_minutes"] = round(cat_minutes["pilates"], 1)
-            agg["pilates_sessions"] = cat_sessions["pilates"]
-
-        if cat_minutes.get("cooldown"):
-            agg["cooldown_minutes"] = round(cat_minutes["cooldown"], 1)
-
-        if cat_minutes.get("tai_chi"):
-            agg["tai_chi_minutes"] = round(cat_minutes["tai_chi"], 1)
-
-        # Totals across all recovery types
-        total_min = sum(cat_minutes.values())
-        agg["recovery_workout_minutes"] = round(total_min, 1)
-        agg["recovery_workout_sessions"] = len(recovery)
-        agg["recovery_workout_types"] = ", ".join(sorted(set(w["category"] for w in recovery)))
-
-        daily_agg[date] = agg
-
-    return daily_workouts, daily_agg
+    """Recovery aggregates + S3 sub-archive records (see health_auto_export_workouts.py)."""
+    return _workouts.process_workouts(workouts, parse_date_str)
 
 
 def save_workouts_to_s3(date_str, workouts_list):
@@ -1642,38 +1522,16 @@ def lambda_handler(event, context):
                 break  # #483/D-1: break only after the systolic metric is found+processed
                 # (was one level out → broke on the first metric regardless of name)
 
-    # ── Process workouts (v1.6.0) ──
-    workout_days = workout_new = recovery_days = 0
-
-    if workouts:
-        daily_workouts, workout_daily_agg = process_workouts(workouts)
-
-        # Log workout types found
-        all_types = set()
-        for wkts in daily_workouts.values():
-            for w in wkts:
-                all_types.add(f"{w['name']} ({w['category']})")
-        logger.info(f"Workout types found: {sorted(all_types)}")
-
-        # Save ALL workouts to S3 (including non-recovery, for reference)
-        for date_str, wkts in daily_workouts.items():
-            n = save_workouts_to_s3(date_str, wkts)
-            if n > 0:
-                workout_new += n
-                workout_days += 1
-
-        # Write recovery-type aggregates to DynamoDB
-        for date_str, agg in workout_daily_agg.items():
-            merge_day_to_dynamo(date_str, agg)
-            recovery_days += 1
-
-        if workout_new or recovery_days:
-            print(
-                f"Workouts: {workout_new} new saved to S3 across {workout_days} days, "
-                f"{recovery_days} days with recovery aggregates written to DynamoDB"
-            )
-    else:
-        logger.info("No workouts in payload")
+    # ── Process workouts (v1.6.0 recovery aggregates + S3; #4973 all-type DDB summary) ──
+    wk = _workouts.ingest(
+        workouts,
+        save_s3=save_workouts_to_s3,
+        merge_day=merge_day_to_dynamo,
+        table=table,
+        day_of=parse_date_str,
+        key_of=lambda d: {"pk": PK, "sk": f"DATE#{d}"},
+    )
+    workout_days, workout_new, recovery_days = wk["workout_days"], wk["workout_new"], wk["recovery_days"]
 
     # ── Summary ──
     duration_ms = int((datetime.now(timezone.utc) - _request_start).total_seconds() * 1000) if _request_start else 0
@@ -1687,6 +1545,7 @@ def lambda_handler(event, context):
         "workout_days": workout_days,
         "workout_new": workout_new,
         "recovery_days": recovery_days,
+        "workout_summary_days": wk["workout_summary_days"],  # #4973: all-type apple_workouts rows
         "rhythm_channel": _rhythm.webhook_ingest(table, data, user_id=USER_ID),  # #4972: counts only, fail-soft
         "metrics_received": [m.get("name") for m in metrics],
         "workouts_received": len(workouts),

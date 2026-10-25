@@ -134,7 +134,7 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/health/character_engine.py::evaluate_level_changes": 189,
     "lambdas/health/nutrition_critics.py::build_muscle_defense_packet": 152,
     "lambdas/ingestion/food_delivery_lambda.py::ingest_food_delivery_rows": 177,
-    "lambdas/ingestion/health_auto_export_lambda.py::lambda_handler": 223,
+    "lambdas/ingestion/health_auto_export_lambda.py::lambda_handler": 207,  # #4973: workouts block -> health_auto_export_workouts.ingest
     "lambdas/ingestion/health_auto_export_lambda.py::process_state_of_mind": 152,
     "lambdas/ingestion/hevy_backfill_lambda.py::lambda_handler": 163,
     "lambdas/ingestion/ingestion_framework.py::run_ingestion": 202,

@@ -567,7 +567,7 @@ The watch also lights up fields mapped before it existed. They keep the names th
 
 **Freshness (registry `apple_health.hae_datatypes`):** `watch_overnight_vitals` (2 d), `watch_heart` (2 d), `watch_activity` (2 d) and `watch_fitness` (14 d) are day-level liveness groups: they narrate and never alarm. `watch` carries the one alarming bar, `dead_man: {field: watch_last_reading_epoch_apple, stale_hours: 36, armed_after: 2026-10-20T00:00Z}`; before `armed_after` an absent stamp is status `pending` (reported, never counted: the field exists only from the webhook deploy), after it an absent stamp is stale. The freshness checker (`ingestion.watch_presence.check_dead_men`) folds a stale or unreadable dead-man into `StaleSourceCount`, the metric the existing `slo-source-freshness` alarm watches (`to_digest=True`: it reaches the daily digest). The checker runs daily, so it fires on the first run after the 36 h mark (60 h at the latest). `get_freshness_status` reports the same rows as `device_dead_men`.
 
-**Not here, by lane:** Apple sleep stages (`sleep_*_apple`) are #4971's. ECG results, heart-rate notifications, AFib burden and the medication log are #4972's (event-class rhythm data, owner-only). Workouts are #4973's.
+**Not here, by lane:** Apple sleep stages (`sleep_*_apple`) are #4971's. ECG results, heart-rate notifications, AFib burden and the medication log are #4972's (event-class rhythm data, owner-only). Workouts are #4973's (the `apple_workouts` map, below).
 
 **Apple sleep fields (webhook `sleep_analysis` — Apple devices only, #4971, epic #4967):**
 
@@ -674,6 +674,20 @@ Note: Individual BP readings stored in S3 at `raw/matthew/blood_pressure/YYYY/MM
 | `pilates_sessions` | number | Pilates session count |
 | `cooldown_minutes` | number | Cooldown minutes |
 | `tai_chi_minutes` | number | Tai chi minutes |
+
+**Apple workouts — every type (webhook `workouts`, #4973, epic #4967):**
+
+Writer: `lambdas/ingestion/health_auto_export_workouts.py` (`tests/test_hae_workouts_all_types_4973.py` pins every rule below). The recovery fields above are unchanged; this map is **added beside them** and holds every workout type the payload carries (walks, runs, rides, lifts, recovery types alike). Capture-all, per source: HAE's own vendor keys are kept verbatim — no field is renamed, combined with Strava/Hevy/Whoop or picked as truth, and **no `METRIC_TRUTH` facet reads it**. Combining is the read-side resolver's job: `lambdas/training/workout_identity.py` takes these day rows directly (`apple_members`) and clusters an Apple / Strava / Hevy trio into ONE workout identity. **Privacy: Tier-2 owner-only** (`lambdas/privacy/field_tiers.py`); the route is never stored in the table.
+
+- **Identity by vendor id.** Keyed by HAE's workout `id`. A re-send of the same workout is the same entry, field-merged (a top-level key the new copy carries replaces the stored one, `derived` is merged one level down; a key it lacks is kept — a partial re-send never erases a fuller summary). A workout with no `id` is not stored here (it stays in the raw payload archive). If the stored map cannot be read the day is skipped, never written payload-only.
+- **Day frame.** The UTC day (apple_health `day_key_frame`, #3677) of the workout's `start`, via the webhook's `parse_date_str` — the day the `workouts` S3 sub-archive uses. An evening workout after 17:00 PDT is on the next `DATE#`; a reader resolving a Pacific day passes the neighbouring row too (a vendor id seen on both rows is one member).
+- **Absence (ADR-104).** No workout → no map. A series HAE did not send → no `derived.series` entry, no HR bins, no `hr_recovery` (never 0). The watch dead-man and staleness are #4970's; a day without a workout is behaviour, not staleness.
+- **Not here:** the route (GPS fixes), per-sample series, segments and splits — those stay only in the owner-only raw payload archive (`raw_layout` of `apple_health`, `save_raw_payload`).
+- **HealthKit is an aggregator.** WHOOP, Hevy or a stretching app can write a workout into HealthKit, and HAE exports it here with its own `source.name`. It is stored (capture-all); the resolver treats it as the source `apple_health/<origin>`, distinct from the watch's own `apple_health`, so it folds into the watch's identity instead of being counted beside it.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `apple_workouts` | map | `{<HAE workout id>: summary}`. Each summary keeps every vendor scalar and dict under HAE's own key (`id`, `name` = workout type, `start`/`end` with the device offset, `duration` s, `isIndoor`, `location` = Indoor/Outdoor, `activeEnergyBurned`/`totalEnergy` kcal, `distance`, `avgHeartRate`/`maxHeartRate`/`heartRate.{avg,max,min}` bpm, `estimatedEffortScore`, `intensity`, `elevationUp`, `stepCadence`, `temperature`, `humidity`, `source.{name,identifier}` = recording device/app, `metadata` …; each a `{qty, units}` dict as sent), `activities` (a multi-sport workout's legs, scalars/dicts only), and `derived`: `version`, `series.<vendor key>` = `{n, mean, min, max, units}` for every per-sample list (heart rate, active energy, steps, running power / stride length / ground-contact time / vertical oscillation — whatever HAE sends), `hr_seconds_by_bpm5` (seconds per 5-bpm bin of the HR series; no zone band assumed — #4627), `hr_recovery` (`end_bpm`, `bpm_60s`/`bpm_120s`, `drop_60s`/`drop_120s`, `samples`), `counts.<key>` for segments/splits/events, `route_points` (count only) |
 
 ### eightsleep
 | Field | Type | Description |
