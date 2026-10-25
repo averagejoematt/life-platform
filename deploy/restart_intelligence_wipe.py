@@ -116,6 +116,7 @@ PARTITIONS = [
     # in the original wipe and caused stale state to leak through to the site.
     ("rewards", "all", {}),  # earned milestones — full reset
     ("field_notes", "pregenesis", {}),  # WEEK#YYYY-WNN keyed; weeks pre-genesis hidden
+    ("field_notes_held", "pregenesis", {}),  # #5128: held-edition markers, WEEK# keyed like field_notes
     ("discovery_annotations", "pregenesis", {}),  # date-attr keyed
     ("anomalies", "pregenesis", {}),  # DATE# keyed daily anomaly flags
     ("weekly_correlations", "pregenesis", {}),  # WEEK# keyed correlations

@@ -425,6 +425,7 @@ SOURCE_CLASS: dict[str, str] = {
     "challenges": EXPERIMENT_SCOPED,
     "protocols": EXPERIMENT_SCOPED,
     "field_notes": EXPERIMENT_SCOPED,
+    "field_notes_held": EXPERIMENT_SCOPED,  # #5128: held-edition markers (WEEK#YYYY-WNN), same lifecycle as field_notes
     "discovery_annotations": EXPERIMENT_SCOPED,
     "ledger": EXPERIMENT_SCOPED,  # TOTALS#current resets; txns tombstone + LIFETIME# (dec F)
     # #1624: the achievement first-earn ledger (BADGE#<id> — written once, on first
