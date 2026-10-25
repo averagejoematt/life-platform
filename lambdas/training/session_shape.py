@@ -115,13 +115,29 @@ def trim_to_time(exposures: list[dict[str, Any]]) -> dict[str, Any] | None:
     }
 
 
+# Titles that name a mobility block (#5315). Matched on the RESOLVED title (catalog entry, `tmpl:<id>` hint, rationale_tag);
+# the catalog stays the source where it carries the exercise, this list is only for titles it cannot resolve.
+_MOBILITY_HINTS = ("stretch", "mobility", "foam roll", "cool down", "cooldown", "cool-down")
+
+
 def _block_title(block: Any, catalog_movements: dict[str, Any]) -> str:
+    """The block's title: its catalog entry (by key, or by the `tmpl:<id>` hint of a Hevy template block), else a mobility
+    `rationale_tag`, else the key's own words. A `tmpl:` key nothing resolves stays `tmpl:<id>` — see `_block_kind`."""
     key = str(getattr(block, "movement_key", "") or "")
-    return str((catalog_movements.get(key) or {}).get("title") or key.replace("_", " "))
+    entry = catalog_movements.get(key)
+    if entry is None and key.startswith("tmpl:"):
+        tid = key.split(":", 1)[1].upper()
+        entry = next((e for e in catalog_movements.values() if str(e.get("hevy_template_id_hint") or "").upper() == tid), None)
+    if entry and entry.get("title"):
+        return str(entry["title"])
+    tag = str(getattr(block, "rationale_tag", "") or "")
+    if any(h in tag.lower() for h in _MOBILITY_HINTS):
+        return tag
+    return key if key.startswith("tmpl:") else key.replace("_", " ")
 
 
 def _block_kind(block: Any, catalog_movements: dict[str, Any]) -> str:
-    """'stretching' | 'cardio' | 'lifting' for one routine block. A TIMED block (every set carries a duration and no reps or
+    """'stretching' | 'cardio' | 'lifting' | 'unclassified' for one routine block. A TIMED block (every set carries a duration and no reps or
     load) is cardio or stretching — stretching when its title names a stretch, mobility or foam rolling; anything else is
     lifting. By the set shape, not the name alone: a 'walking lunge' or a 'cable stretch curl' is a lift."""
     sets = list(getattr(block, "sets", None) or [])
@@ -135,7 +151,10 @@ def _block_kind(block: Any, catalog_movements: dict[str, Any]) -> str:
     if not timed:
         return "lifting"
     title = _block_title(block, catalog_movements).strip().lower()
-    return "stretching" if any(h in title for h in ("stretch", "mobility", "foam roll")) else "cardio"
+    if any(h in title for h in _MOBILITY_HINTS):
+        return "stretching"
+    # a timed Hevy template nothing resolves is NOT guessed as cardio (#5315): it is reported as unclassified
+    return "unclassified" if title.startswith("tmpl:") else "cardio"
 
 
 def _block_seconds(block: Any) -> int:
@@ -145,16 +164,23 @@ def _block_seconds(block: Any) -> int:
 def routine_minutes(blocks: list[Any], catalog_movements: dict[str, Any]) -> dict[str, Any]:
     """A routine's minutes by kind: lifting (sets as written, warm-ups included, x set time + rest), each cardio block, stretching."""
     set_s = int(SESSION_TIME_MODEL["set_seconds"])
-    lifting_s, cardio, stretch_s = 0, [], 0
+    lifting_s, cardio, stretch_s, unclassified = 0, [], 0, []
     for b in blocks:
         kind = _block_kind(b, catalog_movements)
         if kind == "lifting":
             lifting_s += len(getattr(b, "sets", None) or []) * (set_s + int(getattr(b, "rest_seconds", None) or 0))
         elif kind == "cardio":
             cardio.append({"movement_key": b.movement_key, "minutes": round(_block_seconds(b) / 60.0, 1)})
+        elif kind == "unclassified":
+            unclassified.append(b.movement_key)
         else:
             stretch_s += _block_seconds(b)
-    return {"lifting_minutes": round(lifting_s / 60.0, 1), "cardio_blocks": cardio, "stretching_minutes": round(stretch_s / 60.0, 1)}
+    return {
+        "lifting_minutes": round(lifting_s / 60.0, 1),
+        "cardio_blocks": cardio,
+        "stretching_minutes": round(stretch_s / 60.0, 1),
+        "unclassified_blocks": unclassified,
+    }
 
 
 def session_shape_problems(blocks: list[Any], catalog_movements: dict[str, Any]) -> list[str]:
@@ -170,6 +196,10 @@ def session_shape_problems(blocks: list[Any], catalog_movements: dict[str, Any])
         f"cardio block {c['movement_key']} is {c['minutes']} min, over the {caps['cardio_block_max_minutes']}-min cap"
         for c in m["cardio_blocks"]
         if c["minutes"] > caps["cardio_block_max_minutes"]
+    ]
+    out += [
+        f"timed block {k} could not be classified (no catalog title, not a mobility tag) — not counted as cardio or stretching (#5315)"
+        for k in m["unclassified_blocks"]
     ]
     if m["stretching_minutes"] > caps["stretching_max_minutes"]:
         out.append(f"stretching {m['stretching_minutes']} min is over the {caps['stretching_max_minutes']}-min cap")
