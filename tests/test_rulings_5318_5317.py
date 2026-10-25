@@ -383,7 +383,9 @@ def test_b3_the_panel_reads_the_carry_as_the_trap_and_carry_slot():
 def test_the_charter_is_bumped_with_a_change_log_line_quoting_the_rulings():
     c = json.loads((REPO / "config" / "training_charter.json").read_text())
     line = next(e for e in c["change_log"] if "#5318" in e["by"])
-    assert line["version"] == c["version"] and line is c["change_log"][-1]
+    # a later ruling (#5076's 1.31.0) appends after this line: the line holds its own version, the charter only moves up
+    ver = lambda v: [int(x) for x in v.split(".")]  # noqa: E731
+    assert line["version"] == "1.30.0" and ver(line["version"]) <= ver(c["version"])
     for quote in (
         "Accept shorter sessions. 75 sets a week stays the ceiling. Drop the 60-minute lifting floor: 75 minutes is a ceiling, not a target.",
         "Swap upper_volume's flat bench for incline DB press — same set count. Flat bench stays on upper_heavy as the strength anchor. "
