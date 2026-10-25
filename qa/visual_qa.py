@@ -1279,6 +1279,16 @@ def _a11y_gate(page, path, a11y_baseline, theme, viewport, issues, warnings):
     return result
 
 
+def render_day_pt():
+    """The Pacific calendar day right now (#5358), or None when the canonical clock is not importable
+    (a caller that never put lambdas/ on sys.path) — the judge then falls back to the sweep's clock."""
+    try:
+        from common.pacific_time import pacific_today  # #1964: the one Pacific frame
+    except Exception:  # noqa: BLE001 — fail-soft: no stamp means "use the sweep clock", never a crash
+        return None
+    return pacific_today()
+
+
 def capture_page(
     context,
     page_def,
@@ -1549,7 +1559,13 @@ def capture_page(
                 prose = page.evaluate("() => document.body.innerText") or ""
                 with open(os.path.join(screenshot_dir, f"{slug}.txt"), "w") as pf:
                     pf.write(prose)
-                shots.append({"kind": "prose", "path": os.path.join(screenshot_dir, f"{slug}.txt")})
+                # #5358: the PT day THIS page rendered on, read now — not the sweep-start clock —
+                # so a sweep that crosses Pacific midnight judges each page against its own day.
+                shot = {"kind": "prose", "path": os.path.join(screenshot_dir, f"{slug}.txt")}
+                day = render_day_pt()
+                if day:
+                    shot["today_pt"] = day
+                shots.append(shot)
             except Exception:
                 pass
 

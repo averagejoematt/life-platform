@@ -821,7 +821,7 @@ def _truth_finding_key(f):
     return (f.get("page"), f.get("category"))
 
 
-def _confirm_new_truth_highs(would_gate, surfaces_by_path, invoke, today_iso):
+def _confirm_new_truth_highs(would_gate, surfaces_by_path, invoke, today_iso, day_by_path=None):
     """#3102: confirm-before-gate for NEW reader-truth highs — the CI deploy-time
     gate's sibling to #2741's `qa_check_reader_truth._confirm_high_findings`
     (the nightly post-deploy check already learned this lesson: the same
@@ -868,7 +868,7 @@ def _confirm_new_truth_highs(would_gate, surfaces_by_path, invoke, today_iso):
             confirmed.extend(page_findings)
             continue
         try:
-            again, _errs = reader_truth_qa.assess_prose([surface], invoke, today_iso=today_iso)
+            again, _errs = reader_truth_qa.assess_prose([surface], invoke, today_iso=(day_by_path or {}).get(page) or today_iso)
         except Exception as e:  # noqa: BLE001 — includes BudgetExceeded; any exception fails closed
             confirmed.extend(page_findings)
             errors.append(f"{page}: {str(e)[:120]}")
@@ -887,6 +887,34 @@ def _confirm_new_truth_highs(would_gate, surfaces_by_path, invoke, today_iso):
             f"the same content and were NOT gated (#3102 — mirrors #2741's measured 2/8 flake): {ids}"
         )
     return confirmed, unconfirmed, ("; ".join(notes) if notes else None)
+
+
+def _judge_by_render_day(rubric, surfaces, invoke, today_iso, day_by_path):
+    """First-pass judge, one `assess_prose` call per PT render day (#5358).
+
+    #3030 pinned ONE clock at sweep start so a page captured before Pacific midnight is never
+    judged against the next day. The mirror case stayed open: a sweep that STARTS before
+    midnight renders its later pages after it, and those pages correctly show Day N+1 while the
+    judge was told Day N (run 40170579285: /story/theme-river/ and /coaching/qa/ flagged
+    "Day 50" against "Day 49"). Each prose capture now carries the PT day it was rendered on
+    (visual_qa.capture_page stamps `today_pt`), so every page is judged against the day its own
+    pixels were made. A capture with no stamp falls back to the sweep's clock — a sweep that
+    never crosses midnight is exactly one group and one call sequence, as before.
+    Returns (findings, errors, n_batches).
+    """
+    groups = {}
+    for s in surfaces:
+        groups.setdefault(day_by_path.get(s["path"]) or today_iso, []).append(s)
+    size = max(1, getattr(rubric, "DEFAULT_BATCH_SIZE", 5))
+    findings, errors, n_batches = [], [], 0
+    for day in sorted(groups, key=lambda d: d or ""):
+        if len(groups) > 1:
+            print(f"  Reader-truth: {len(groups[day])} surface(s) rendered on PT day {day} — judged against that day (#5358)")
+        f, e = rubric.assess_prose(groups[day], invoke, today_iso=day)
+        findings.extend(f)
+        errors.extend(e)
+        n_batches += -(-len(groups[day]) // size)
+    return findings, errors, n_batches
 
 
 def assess_reader_truth(results, today_iso=None):
@@ -947,7 +975,7 @@ def assess_reader_truth(results, today_iso=None):
     except ImportError:
         pass  # fail-open, same posture as the guard itself
 
-    surfaces, by_path = [], {}
+    surfaces, by_path, day_by_path = [], {}, {}
     for r in results:
         shot = next((s for s in r.get("screenshots", []) if s.get("kind") == "prose"), None)
         if not shot:
@@ -961,12 +989,14 @@ def assess_reader_truth(results, today_iso=None):
             continue
         surfaces.append({"name": r["page"], "path": r["path"], "prose": prose})
         by_path[r["path"]] = r
+        if shot.get("today_pt"):
+            day_by_path[r["path"]] = shot["today_pt"]  # the PT day the pixels were made (#5358)
     if not surfaces:
         print("  ⚠ Reader-truth QA: no prose captures found — run visual_qa.py with --reader-truth")
         return {"status": "no_surfaces"}
 
     truth_invoke = _attributed_invoke(bedrock, "reader-truth-qa")
-    findings, errors = reader_truth_qa.assess_prose(surfaces, truth_invoke, today_iso=today_iso)
+    findings, errors, n_batches = _judge_by_render_day(reader_truth_qa, surfaces, truth_invoke, today_iso, day_by_path)
 
     # ── #3540: batches the judge did not answer ──────────────────────────────
     # THE RULING FOR THIS CALLER IS FAIL. This pass gates the deploy pipeline
@@ -1009,7 +1039,6 @@ def assess_reader_truth(results, today_iso=None):
             )
             r["status"] = "FAIL"
             unread_pages.append(r["page"])
-    n_batches = -(-len(surfaces) // max(1, getattr(reader_truth_qa, "DEFAULT_BATCH_SIZE", 5)))
     line = f"  Reader-truth: {n_batches - len(errors)}/{n_batches} batch(es) judged over {len(surfaces)} surface(s)"
     if unread:
         line += f"; {len(unread)} UNEVALUATED → FAIL ({', '.join(unread_pages[:6]) or 'no matching page rows'})"
@@ -1048,7 +1077,7 @@ def assess_reader_truth(results, today_iso=None):
     reproduced_ids = set()
     if would_gate:
         surfaces_by_path = {s["path"]: s for s in surfaces}
-        confirmed, _unconfirmed, conf_note = _confirm_new_truth_highs(would_gate, surfaces_by_path, truth_invoke, today_iso)
+        confirmed, _unconfirmed, conf_note = _confirm_new_truth_highs(would_gate, surfaces_by_path, truth_invoke, today_iso, day_by_path)
         reproduced_ids = {_truth_finding_key(f) for f in confirmed}
         if conf_note:
             print(f"  ⟳ reader-truth confirm (#3102): {conf_note}")
