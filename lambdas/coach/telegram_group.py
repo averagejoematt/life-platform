@@ -40,7 +40,13 @@ import re
 import urllib.request
 from typing import Optional
 
-logger = logging.getLogger(__name__)
+try:  # the worker's own logger: a handler of its own at INFO, so these lines reach CloudWatch (#3283 / #5106)
+    from common.platform_logger import get_logger
+
+    logger: logging.Logger = get_logger("telegram-worker")
+except ImportError:  # pragma: no cover
+    logger = logging.getLogger("telegram-worker")
+    logger.setLevel(logging.INFO)
 
 # The shared room thread. Runs through coach_chat.chat_pk() like every other chat
 # partition (→ COACH#board_room_coach) so storage, taxonomy classification and any

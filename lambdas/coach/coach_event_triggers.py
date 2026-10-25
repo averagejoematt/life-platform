@@ -77,7 +77,13 @@ from health.personal_baselines import percentile
 
 from coach import coach_outbound
 
-logger = logging.getLogger(__name__)
+try:  # the worker's own logger: a handler of its own at INFO, so these lines reach CloudWatch (#3283 / #5106)
+    from common.platform_logger import get_logger
+
+    logger: logging.Logger = get_logger("telegram-worker")
+except ImportError:  # pragma: no cover
+    logger = logging.getLogger("telegram-worker")
+    logger.setLevel(logging.INFO)
 
 # ── Thresholds (ADR-105: every one of these is a window or an n, not a verdict) ─
 
