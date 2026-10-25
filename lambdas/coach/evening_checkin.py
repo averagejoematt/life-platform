@@ -37,7 +37,13 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping, Optional
 
-logger = logging.getLogger(__name__)
+try:  # the worker's own logger: a handler of its own at INFO, so these lines reach CloudWatch (#3283 / #5106)
+    from common.platform_logger import get_logger
+
+    logger: logging.Logger = get_logger("telegram-worker")
+except ImportError:  # pragma: no cover
+    logger = logging.getLogger("telegram-worker")
+    logger.setLevel(logging.INFO)
 
 VERSION = "evening-checkin@1.0.0"
 SOURCE = "evening_checkin"

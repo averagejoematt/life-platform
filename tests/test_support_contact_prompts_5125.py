@@ -179,7 +179,7 @@ def test_the_call_text_carries_dates_and_counts_only():
 
 
 # ── failure shapes ──────────────────────────────────────────────────────────────────────────
-def test_quiet_hours_a_dark_seat_and_a_failed_send_send_nothing_and_never_raise(caplog):
+def test_quiet_hours_a_dark_seat_and_a_failed_send_send_nothing_and_never_raise():
     sent = []
     assert scp.run(Ledger(), NIGHT, seat, lambda *a: sent.append(a), flag_rows=[], disruption_state=OFF)["reason"] == "quiet hours"
     dark = scp.run(Ledger(), SUNDAY_9AM, lambda p: (None, None), lambda *a: sent.append(a), flag_rows=[], disruption_state=OFF)
@@ -188,9 +188,19 @@ def test_quiet_hours_a_dark_seat_and_a_failed_send_send_nothing_and_never_raise(
     def boom(*a):
         raise RuntimeError("telegram down")
 
-    with caplog.at_level(logging.WARNING):
+    heard: list[str] = []
+
+    class _Tap(logging.Handler):  # the module logs on the worker's PLATFORM logger (#5106), which does not propagate to root
+        def emit(self, record):
+            heard.append(record.getMessage())
+
+    tap = _Tap(level=logging.WARNING)
+    scp.logger.addHandler(tap)
+    try:
         out = scp.run(Ledger(), SUNDAY_9AM, seat, boom, flag_rows=[], disruption_state=OFF)
-    assert out["sent"] == [] and scp.FAILED_TOKEN in caplog.text
+    finally:
+        scp.logger.removeHandler(tap)
+    assert out["sent"] == [] and any(scp.FAILED_TOKEN in m for m in heard)
 
 
 def test_an_unreadable_partition_is_not_up():
