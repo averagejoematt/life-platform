@@ -1,7 +1,14 @@
 """#5353 — the zone-2 reader's Apple leg reads the `apple_workouts` map the #4973 writer produces and
 derives zone seconds at READ time from `derived.hr_seconds_by_bpm5` through `common.hr_zones` (the one band)."""
 
+import os
+
 import pytest
+
+os.environ.setdefault("S3_BUCKET", "test-bucket")
+os.environ.setdefault("USER_ID", "matthew")
+os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
+
 from common.hr_zones import HR_ZONE_BOUNDS, zone_seconds_from_bpm_bins
 from common.max_hr import DEFAULT_MAX_HR
 from training import zone2_minutes as z2

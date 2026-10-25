@@ -23,7 +23,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "cdk"))
 
-KEY_ARN = "arn:aws:s3:::matthew-life-platform/config/coaching/training_charter.private.json"
+KEY_PATH = "config/coaching/training_charter.private.json"
+# Bucket-agnostic: sibling tests set S3_BUCKET=test-bucket at import, and role_policies builds ARNs from it.
 # Functions whose CloudWatch logs carried `training_charter.private.json not read (AccessDenied)` on 2026-10-24.
 LOGGED_DENIAL = {
     "life-platform-qa-smoke": "operational_qa_smoke",
@@ -86,7 +87,12 @@ def _grants(factory: str):
     can_get = can_list = False
     for st in getattr(rp, factory)():
         acts, res = list(st.actions), [str(r) for r in st.resources]
-        if any(a in ("s3:GetObject", "s3:*", "*") for a in acts) and any(fnmatch.fnmatch(KEY_ARN, r) for r in res):
+        if any(a in ("s3:GetObject", "s3:*", "*") for a in acts) and any(
+            r.startswith("arn:aws:s3:::")
+            and "/" in r
+            and fnmatch.fnmatch(r.split(":::", 1)[1].split("/", 1)[0] + "/" + KEY_PATH, r.split(":::", 1)[1])
+            for r in res
+        ):
             can_get = True
         if st.sid == "CharterTwinList" and "s3:ListBucket" in acts:
             can_list = True
