@@ -382,12 +382,6 @@ _SANCTIONED_CURRENT_CYCLE_VIEWS: dict[str, str] = {
         "The strava window starts at EXPERIMENT_START_DATE — explicitly genesis-anchored, so the "
         "phase filter is redundant with the date clamp the taxonomy asks for."
     ),
-    # #5125: the pre-agreed disruption call reads the same owner-only early-warning flag rows (#5121) as the
-    # episode it reminds him about. Current-cycle for the #5121 reason: the flag resets with the cycle.
-    "lambdas/coach/support_contact_prompts.py::read_flag_rows": (
-        "The flag is EXPERIMENT_SCOPED and wiped at reset (#5121). A pre-genesis row would open a disruption-call "
-        "episode about a different attempt — he would be told to make the call for a slide this cycle never had."
-    ),
 }
 
 # Same defect class as #1203/#2023, found by this scan, deliberately NOT fixed in the

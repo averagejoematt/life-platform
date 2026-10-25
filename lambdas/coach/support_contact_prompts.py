@@ -57,7 +57,7 @@ CALL_AFTER_DAYS = 3  # DEFAULT: days the flag / the mode has been up before the 
 FLAG_FRESH_DAYS = 2  # a flag whose newest row is older than this is not read as up (a stalled writer is not a signal)
 FLAG_LOOKBACK_DAYS = 30
 
-FLAG_PK = "USER#matthew#SOURCE#early_warning_flag"  # #5121's owner-only partition (written by daily-insight-compute)
+FLAG_PK = "USER#matthew#SOURCE#early_warning_flag"  # #5121's owner-only partition (health.early_warning.SOURCE)
 
 TRIGGER_EARLY_WARNING = "early_warning"
 TRIGGER_DISRUPTION = "disruption"
@@ -89,11 +89,6 @@ def _day(v: Any) -> Optional[date]:
         return None
 
 
-def _row_day(row: Mapping[str, Any]) -> Optional[str]:
-    d = row.get("date") or str(row.get("sk", ""))[len("DATE#") :][:10]
-    return str(d)[:10] if _day(d) else None
-
-
 def week_key(today: str) -> Optional[str]:
     """The ISO week's Monday for `today` (the weekly prompt's idempotency key), or None."""
     d = _day(today)
@@ -111,21 +106,20 @@ def weekly_due(today: str, weekday: int = WEEKLY_PROMPT_WEEKDAY) -> Optional[dic
 def flag_episode(rows: Optional[list], today: str, fresh_days: int = FLAG_FRESH_DAYS) -> Optional[dict[str, Any]]:
     """The current early-warning episode — {start, latest} — when the newest row is active and fresh, else None.
 
-    A day with no row does not end an episode (a missed run is not a clear day); an explicit inactive row does —
-    the same rule as #5121's own reader, restated here because that module may not be on main yet."""
+    The episode rule is #5121's own (``health.early_warning.episode``: a day with no row does not end an episode, an
+    explicit inactive row does) — imported, never restated. This module adds only two input bars: ``active`` counts
+    only as a real ``True`` (a string or a number is read as not up — a reminder never rides a malformed row), and
+    a newest row older than ``fresh_days`` is a stalled writer, not a signal."""
+    from health import early_warning
+
     t = _day(today)
-    ordered = sorted((r for r in rows or [] if _row_day(r)), key=lambda r: _row_day(r) or "")
-    if t is None or not ordered or ordered[-1].get("active") is not True:
+    ep = early_warning.episode([{**r, "active": r.get("active") is True} for r in rows or []])
+    if t is None or ep is None:
         return None
-    latest = _row_day(ordered[-1]) or ""
-    if (t - (_day(latest) or t)).days > fresh_days:
+    latest = _day(ep["latest"])
+    if latest is None or (t - latest).days > fresh_days:
         return None
-    start = latest
-    for r in reversed(ordered[:-1]):
-        if r.get("active") is not True:
-            break
-        start = _row_day(r) or start
-    return {"start": start, "latest": latest}
+    return {"start": ep["start"], "latest": ep["latest"]}
 
 
 def _days_up(start: Optional[str], today: str) -> Optional[int]:
