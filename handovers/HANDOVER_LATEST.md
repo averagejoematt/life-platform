@@ -107,6 +107,16 @@
 - **Follow-up:** a per-day calorie-sum guard for Weekly Plate (noted on #5297).
 - **Next plan:** `~/.claude/plans/next-session-proofs-2026-10-25.md`. not-work — a pointer.
 
+## Addendum (2026-10-25 ~01:45Z, owner attended)
+- **Production had drifted behind main** (#5316). An auto-rollback (run 40086869374, 98877ab7e smoke failure) overlapped d944d9521's successful deploy and finished last, leaving 62 functions on older code. The owner approved `deploy_fleet.sh` from main 6984087e0: **116 deployed, 0 failed**, verified by content (the MCP charter is 1.28.0 and `early_warning.py` is live). The root-cause fix (serialise or sha-check the rollback, plus a drift alarm) is the top P1.
+- **Owner applied `LifePlatformMonitoring`:** the AI-spend pager is now at 22.93 / 459000 (#4517). The 7-day clean read is due about 10-31.
+- **A Claude-chat bug list was validated before filing.**
+  - Five claims were wrong or already fixed by #5266/#5286: delts at 14/wk, press only on shoulders_arms, core prescribed but skipped.
+  - Filed: #5311 (no prescribed-vs-band report), #5312 ("No intervals" parsed as intervals), #5313 (stage-2 red team times out at 30 s), #5314 (run-gate weights undated), #5315 (stretching counted as cardio), #5317 (the cue says "3 sets" while 1 is prescribed).
+- **Owner rulings recorded verbatim on #5318:** A4 accept shorter sessions (75-min ceiling, no floor); B2 incline DB press replaces upper_volume's flat bench, with the RP concession amended; B3 farmer's carry replaces the shrugs.
+- **In flight:** a lane is building #5318 + #5317 as one PR. Merge it after CI, then check the next upper_volume and shoulders_arms drafts.
+- **The next session also lands #5306 and #5308** (see above).
+
 ## Marker lines
 **Build beat:** the new front page is live (cut-over); the reader-visible privacy leak is closed.
 **Docs:** each lane updated SCHEMA, DATA_GOVERNANCE and PROPORTIONALITY; the engine docs were re-stamped on merge day.
