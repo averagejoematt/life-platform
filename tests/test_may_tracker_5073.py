@@ -196,16 +196,48 @@ def test_an_anchor_with_too_few_sessions_is_absent_with_the_reason():
     assert a["state"] == "absent"
 
 
-def test_volume_rows_are_the_charters_and_a_missing_key_is_absent_with_parent_context():
+def _ex(title, tid, n):
+    return {"name": title, "template_id": tid, "working_sets": n}
+
+
+LATERAL = ("Lateral Raise (Dumbbell)", "422B08F1")
+FACE_PULL = ("Face Pull", "BE640BA0")
+OHP = ("Overhead Press (Barbell)", "7B8D84E8")
+INCLINE = ("Incline Bench Press (Dumbbell)", "07B38369")
+
+
+def _vol(exercises, muscles=None):
+    return {"muscles": muscles or {}, "exercise_sets": [_ex(*e) for e in exercises]}
+
+
+def test_side_rear_delt_sets_by_movement_show_beside_the_charter_band():
     bands = charter_value("volume_priorities.sets_per_wk")
-    v = mt.volume_section({"muscles": {"Shoulders": {"total_sets": 9.0}}})
+    # 5 lateral + 4 face-pull sets = 9 by movement, whatever the Shoulders bucket says
+    v = mt.volume_section(_vol([(*LATERAL, 5), (*FACE_PULL, 4), (*OHP, 6)], {"shoulders": {"total_sets": 15.0}}))
     assert set(v["rows"]) == set(bands)
     srd = v["rows"]["side_rear_delts"]
-    assert srd["state"] == "absent" and srd["value"] is None and srd["parent_bucket_sets"] == {"Shoulders": 9.0}
-    key = next(iter(bands))
-    lo = bands[key][0]
-    hit = mt.volume_section({"muscles": {key: {"total_sets": lo - 1}}})["rows"][key]
-    assert hit["state"] == "measured" and hit["below_floor"] is True and hit["band"] == list(bands[key])
+    assert srd["state"] == "measured" and srd["value"] == 9 and srd["member_sets"] == [9]
+    assert srd["band"] == list(bands["side_rear_delts"]) and srd["below_floor"] is True
+
+
+def test_a_press_only_week_counts_zero_side_rear_delts():
+    v = mt.volume_section(_vol([(*OHP, 8)], {"shoulders": {"total_sets": 8.0}}))
+    srd = v["rows"]["side_rear_delts"]
+    assert srd["state"] == "measured" and srd["value"] == 0 and srd["below_floor"] is True
+
+
+def test_upper_chest_and_legs_arms_members_are_counted_with_their_bands():
+    muscles = {"quadriceps": {"total_sets": 9.0}, "hamstrings": {"total_sets": 3.0}, "glutes": {"total_sets": 2.0}}
+    v = mt.volume_section(_vol([(*INCLINE, 4)], muscles))["rows"]
+    assert v["upper_chest"]["member_sets"] == [4]
+    assert v["legs"]["member_sets"] == [9, 5] and v["legs"]["band"] == list(charter_value("volume_priorities.sets_per_wk")["legs"])
+    assert v["arms"]["member_sets"] == [0, 0]
+
+
+def test_no_per_exercise_counts_leaves_the_movement_bands_absent():
+    v = mt.volume_section({"muscles": {}})["rows"]
+    assert v["side_rear_delts"]["state"] == "absent" and v["side_rear_delts"]["value"] is None
+    assert mt.volume_section(None)["rows"]["legs"]["state"] == "absent"
 
 
 def test_fitness_tests_are_absent_until_the_battery_exists():
@@ -271,7 +303,7 @@ def test_a_steps_day_under_the_floor_is_amber_and_a_mean_under_it_is_red():
 def test_a_priority_muscle_below_its_floor_two_weeks_is_amber_naming_a_slot():
     bands = charter_value("volume_priorities.sets_per_wk")
     key = next(iter(bands))
-    vol = mt.volume_section({"muscles": {k: {"total_sets": b[0] - 1} for k, b in bands.items()}})
+    vol = mt.volume_section(_vol([(*LATERAL, 3)]))
     prior = _row(volume=vol, monday="2026-10-05")
     t = _fired(_row(volume=vol, prior=prior))["priority_volume_below_floor"]
     assert t["level"] == "amber" and key in t["evidence"] and "slot" in t["lever"]
@@ -323,6 +355,11 @@ def test_write_week_stores_decimals_and_latest_row_reads_back_the_newest():
     mt.write_week(t, _row())
     stored = t.items[(mt.PK, "WEEK#" + MON)]
     assert isinstance(stored["weight"]["band"]["floor_lb_wk"], Decimal)
+    t2 = _Table()
+    mt.write_week(t2, _row(volume=mt.volume_section(_vol([(*LATERAL, 5)])), monday="2026-10-05"))
+    srd = t2.items[(mt.PK, "WEEK#2026-10-05")]["volume"]["rows"]["side_rear_delts"]
+    assert isinstance(srd["value"], (int, Decimal)) and srd["value"] == 5 and all(isinstance(n, (int, Decimal)) for n in srd["member_sets"])
+    assert not any(isinstance(n, float) for n in [*srd["band"], *srd["member_sets"], srd["value"]])
     got = mt.latest_row(t)
     assert got["state"] == "measured" and got["row"]["week_start"] == MON
     assert isinstance(got["row"]["weight"]["band"]["floor_lb_wk"], float)
