@@ -198,6 +198,28 @@ _DAY_FRAMING_IN_SEGMENT = [
     r"\bcombined\b",
 ]
 
+# #5324 — a REPORTED intake figure. The Nutrition Review quotes what the subject actually logged
+# ("logged 779 kcal on Tuesday"): a past-tense statement of fact, not a recommendation. A
+# retrospective marker in the figure's own SEGMENT exempts it, even beside "daily"/"today"
+# framing, UNLESS the segment also carries a prescriptive marker ("eat only", "limit to",
+# "should", "aim for", "target of"...), which keeps a recommendation dressed as a report blocked.
+_REPORTED_INTAKE_CONTEXT = [
+    r"\b(?:logged|recorded|tracked|reported|consumed|ate|eaten|had)\b",
+    r"\b(?:came|landed|finished|ended|totall?ed|averaged)\s+(?:in\s+)?(?:at|up|to)?\b",
+    r"\bactual(?:ly)?\b",
+    r"\b(?:your|his|the)\s+(?:logged|actual|recorded)\b",
+    r"\bintake\s+(?:was|of|came|at)\b",
+]
+_PRESCRIPTIVE_CONTEXT = [
+    r"\bshould\b",
+    r"\b(?:aim|try|recommend|suggest|cap|limit|restrict|reduce|cut|drop)(?:s|ing)?\s+(?:for|to|at|at\s+to|your|him|you|intake|calories)\b",
+    r"\b(?:aim|try|recommend|suggest)\w*\b",
+    r"\b(?:eat|stay|keep|go)\s+(?:only|just|under|below|at|to)\b",
+    r"\bno\s+more\s+than\b",
+    r"\bnext\s+(?:week|time|day)\b",
+    r"\btomorrow\b",
+]
+
 # How far either side of the figure we look for that context.
 _CALORIE_CONTEXT_WINDOW = 80
 
@@ -514,9 +536,11 @@ def _is_per_item_calorie_figure(text: str, match: re.Match) -> bool:
     a starvation target with macros must not buy an exemption.
     """
     window = text[max(0, match.start() - _CALORIE_CONTEXT_WINDOW) : match.end() + _CALORIE_CONTEXT_WINDOW]
+    segment = _enclosing_segment(text, match)
+    if _is_reported_intake(segment):  # #5324: a logged figure being reported back, not prescribed
+        return True
     if _find_patterns(window, _DAILY_INTAKE_CONTEXT):
         return False
-    segment = _enclosing_segment(text, match)
     if _find_patterns(segment, _DAY_FRAMING_IN_SEGMENT):  # #5297
         return False
     if _find_patterns(window, _PER_ITEM_CALORIE_CONTEXT):
@@ -525,6 +549,11 @@ def _is_per_item_calorie_figure(text: str, match: re.Match) -> bool:
         return True
     macro_classes = sum(1 for token in _MACRO_BREAKDOWN_TOKENS.values() if token.search(segment))
     return macro_classes >= 2
+
+
+def _is_reported_intake(segment: str) -> bool:
+    """#5324 — the segment states what was logged/eaten and prescribes nothing."""
+    return bool(_find_patterns(segment, _REPORTED_INTAKE_CONTEXT)) and not _find_patterns(segment, _PRESCRIPTIVE_CONTEXT)
 
 
 def _calorie_check_text(text: str) -> str:
