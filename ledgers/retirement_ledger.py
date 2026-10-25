@@ -163,7 +163,9 @@ RETIREMENTS = {
         "what": "the 'Personal Board' role-play text (`.claude/skills/daily-debrief/SKILL.md`, the coach-session prompt) "
         "and the retired `config/coaches/training_coach.json` + `training_coach_stance.json`",
         "story": 5071,
-        "status": "planned",
+        "status": "retired",
+        "pr": 5366,
+        "date": "2026-10-25",
         "record": '#5071 acceptance: \'The "Personal Board" role-play text and the stale retired training_coach config '
         "are removed' (Set: 4 retirement targets).",
     },

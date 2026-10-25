@@ -238,9 +238,12 @@
   },
   "qa-smoke-warnings": {
     "added": "2026-10-25",
-    "cause_observed": "2026-10-25",
-    "cause": "data:pk_family_census",
-    "citation": "#5128 — SOURCE#field_notes_held (the held-edition marker partition added by PR 5342) was UNCLASSIFIED by phase_taxonomy; fixed by PR 5364 (EXPERIMENT_SCOPED + reset wipe). Earlier in the episode the cause was the 3 stale food-delivery check-in questions, retired 2026-10-25T03:15:53Z.",
-    "note": "Live cause read from the qa-smoke log CAUSE line '[QA] CAUSE warn 7874a28b data:pk_family_census' (filter-log-events, /aws/lambda/life-platform-qa-smoke, 2026-10-25)."
+    "citation": "Dated, self-clearing: the daily-period WarnCount alarm (Period 86400, Maximum) still holds the 2026-10-25 datapoint from runs before 16:52Z. Both causes in that window are fixed: SOURCE#field_notes_held was UNCLASSIFIED (PR 5364, clear from the 16:52Z run on) and the stale food-delivery check-in questions were retired at 03:15:53Z. The 16:52Z run reported 0 alarmed warnings and the CAUSE channel is empty. The alarm expires at the first daily evaluation with no alarmed warning, expected by 2026-10-26T17:00Z; if it is still red after 2026-10-27, re-cite against the live CAUSE line.",
+    "note": "Re-cited by Session CF 2026-10-25 ~19:40Z after the closed-owner and contradicted-cause gates flagged the old entry."
+  },
+  "field-notes-missing": {
+    "added": "2026-10-25",
+    "citation": "#5128 (closed on live proof) — the dead-man fired correctly on 2026-10-24/25 for the W42 miss (generated:false after the Sunday cron), cleared after the W42 regenerate at 15:18Z and stayed OK through the W43 run at 18:00:05Z. A true positive by the instrument this issue built, not a defect.",
+    "note": "Session CF 2026-10-25: answered as a flap per the fired-and-cleared rule; state OK at 19:06Z."
   }
 }
