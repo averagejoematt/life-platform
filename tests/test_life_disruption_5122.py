@@ -13,7 +13,7 @@ acceptance boxes, one block each:
 
 The lapse trigger is the #5121 early-warning flag (`USER#matthew#SOURCE#early_warning_flag`); the rows here are that
 module's row contract. When `health.early_warning` is importable the parity test holds `flag_episode` to its
-`episode`; until #5121 merges it skips, and the live read states `not_wired`.
+`episode` (#5121 is on main, so it always runs); the live read states `not_wired` only if that import ever fails.
 
 Every date is a fixed literal; nothing asserted here reads the clock (#4848).
 """
@@ -169,7 +169,8 @@ def test_a_mode_already_on_is_not_offered_again():
 
 
 def test_flag_episode_matches_the_early_warning_modules_own_episode_when_it_is_on_main():
-    ew = pytest.importorskip("health.early_warning", reason="#5121 (PR #5305) not merged: the flag reader is not on main")
+    from health import early_warning as ew  # #5121 (PR #5305) is on main: the parity test runs, never skips
+
     cases = [
         [_flag("2026-11-01", True), _flag("2026-11-02", False), _flag("2026-11-03", True), _flag("2026-11-05", True)],
         [_flag("2026-11-01", True), _flag("2026-11-02", False)],

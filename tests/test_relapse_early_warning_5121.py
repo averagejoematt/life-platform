@@ -425,6 +425,7 @@ ALLOWED = {
     "lambdas/coach/coach_domain_facts.py",
     "lambdas/privacy/field_tiers.py",
     "lambdas/experiment/phase_taxonomy.py",
+    "lambdas/training/life_disruption.py",  # #5122: the lapse protocol reads the flag through health.early_warning.read_recent
 }
 _TOKENS = ("early_warning_flag", "from health import early_warning", "health.early_warning", "from health.early_warning")
 
