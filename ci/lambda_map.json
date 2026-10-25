@@ -7,7 +7,7 @@
       "lambdas/cf-auth/index.mjs": {
         "cloudfront_distribution": "EM5NPX6NJN095",
         "function": "life-platform-cf-auth",
-        "note": "Manually deployed \u2014 NOT CDK-managed. Lambda@Edge requires us-east-1 and cannot be deployed from us-west-2 CDK stacks. Secret: life-platform/cf-auth (must exist in us-east-1). Alarm: life-platform-cf-auth-errors (us-east-1 CloudWatch).",
+        "note": "Manually deployed \u2014 NOT CDK-managed. Lambda@Edge requires us-east-1 and cannot be deployed from us-west-2 CDK stacks. Secret: life-platform/cf-auth (must exist in us-east-1). Alarm: none \u2014 life-platform-cf-auth-errors (us-east-1 CloudWatch) was retired by the owner 2026-10-25 (#5143; it watched a function on no request path).",
         "protects": "dash.averagejoematt.com",
         "region": "us-east-1"
       }

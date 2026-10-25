@@ -131,11 +131,13 @@ def wakes_from_sleep_rows(rows: Any) -> dict[str, str]:
 
 
 def checkin_state(row: Any, prompt_row: Any) -> Optional[bool]:
-    """The evening check-in core habit's input: True when the day's row carries every rating, False when it does not
-    but the prompt went out that evening (`status == "sent"`), None (unknown) otherwise — a dark channel is no miss."""
-    from coach.evening_checkin import FIELDS  # noqa: PLC0415 — the check-in's own field set
+    """The evening check-in core habit's input: True when the day's row carries the three ratings a complete check-in
+    needs (hunger, stress, cravings — the optional mood of #5123 is never required, so an older row stays complete),
+    False when it does not but the prompt went out that evening (`status == "sent"`), None (unknown) otherwise — a
+    dark channel is no miss."""
+    from coach.evening_checkin import COMPLETE_FIELDS  # noqa: PLC0415 — the check-in's own completeness set
 
-    if isinstance(row, Mapping) and all(row.get(f) is not None for f in FIELDS):
+    if isinstance(row, Mapping) and all(row.get(f) is not None for f in COMPLETE_FIELDS):
         return True
     if isinstance(prompt_row, Mapping) and str(prompt_row.get("status")) == "sent":
         return False

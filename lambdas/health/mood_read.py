@@ -7,8 +7,12 @@ one word) lands most evenings. This module makes the choice once, states it, and
 
   * ``journal``        — enough scored journal entries in the window: the #549 aggregate, as before.
   * ``evening_checkin`` — the journal is below the floor and enough check-ins carry ``stress``: the stress
-    trajectory on the check-in's own 0-4 scale. The check-in asks nothing about mood, connection or
-    flourishing, so those are ``None`` with the reason in words, never borrowed from somewhere else.
+    trajectory on the check-in's own 0-4 scale, and — since evening-checkin@1.1.0 (#5123, owner ruling
+    2026-10-25) — the ``mood`` trajectory from the check-in's own 0-4 mood rating (0 = rough, 4 = great) whenever
+    an evening in the window carries one. The check-in asks nothing about connection or flourishing, so those are
+    ``None`` with the reason in words, never borrowed from somewhere else; and when NO evening carries a mood
+    rating (every row predates 1.1.0, or he answered with three numbers) mood is ``None`` with that reason —
+    it is never inferred from stress or cravings.
   * ``unavailable``    — both are below the floor: no trend and no number, only the two counts.
 
 PRIVACY (``privacy.field_tiers``: ``evening_checkin`` is TIER_OWNER_ONLY; DATA_GOVERNANCE: "no public projection
@@ -46,8 +50,10 @@ PUBLISHED_SOURCES = frozenset({SOURCE_JOURNAL})
 OWNER_ONLY_SOURCES = frozenset({SOURCE_CHECKIN})
 
 CHECKIN_SCALE = "0-4"  # coach/evening_checkin.py SCALE_MIN..SCALE_MAX, 4 = the most
-CHECKIN_FIELDS = ("stress", "hunger", "cravings")
-NOT_ASKED = "the evening check-in asks hunger, stress and cravings (0-4) and one word; nothing about this"
+CHECKIN_FIELDS = ("stress", "hunger", "cravings", "mood")
+MOOD_SCALE = "0-4, 4 = great"  # the check-in's mood rating (coach/evening_checkin.py, 1.1.0): 0 = rough, 4 = great
+NOT_ASKED = "the evening check-in asks hunger, stress, cravings and mood (0-4) and one word; nothing about this"
+MOOD_UNRATED = "no evening in the window carried a mood rating (the check-in's mood question arrived with evening-checkin@1.1.0, #5123)"
 
 JOURNAL_PK = "USER#matthew#SOURCE#notion"
 CHECKIN_PK = "USER#matthew#SOURCE#evening_checkin"
@@ -136,7 +142,8 @@ def journal_signal(entries: list, window_days: int = WINDOW_DAYS) -> Optional[di
 def checkin_signal(rows: list, window_days: int = WINDOW_DAYS) -> Optional[dict[str, Any]]:
     """The check-in fallback, or None when fewer than MIN_ENTRIES evenings carry a ``stress`` rating.
 
-    Numbers only: the ``word`` is never read into the result. Mood, connection and flourishing are None with
+    Numbers only: the ``word`` is never read into the result. ``mood_trend`` is the check-in's own mood rating
+    (1.1.0) over the evenings that carry one, else None with the reason; connection and flourishing are None with
     the reason — the check-in does not ask about them, and borrowing them from another source would be a guess."""
     rows = sorted((r for r in rows or [] if not r.get("tombstone")), key=_entry_date)
     series: dict[str, list] = {f: [] for f in CHECKIN_FIELDS}
@@ -158,7 +165,8 @@ def checkin_signal(rows: list, window_days: int = WINDOW_DAYS) -> Optional[dict[
         "stress_trend": trend(series["stress"]),
         "hunger_trend": trend(series["hunger"]),
         "cravings_trend": trend(series["cravings"]),
-        "mood_trend": None,
+        "mood_trend": trend(series["mood"]) if series["mood"] else None,  # his own rating, never inferred (#5123)
+        "mood_unrated": None if series["mood"] else MOOD_UNRATED,
         "social_quality": None,
         "flourishing": None,
         "not_measured": NOT_ASKED,
@@ -276,14 +284,22 @@ def owner_lines(read: Optional[Mapping[str, Any]]) -> list:
             lines.append(f"Flourishing in the journal (LLM-coded from his entries): {parts}.")
         return lines
     if src == SOURCE_CHECKIN:
-        return [
+        lines = [
             f"Mood read source: the evening check-in — the journal had {read.get('journal_scored_entries')} scored entries in "
             f"the last {w} days, under the {MIN_ENTRIES}-entry floor. {read.get('evenings_answered')} evenings answered.",
             f"Reported stress: {_trend_words(read.get('stress_trend'), CHECKIN_SCALE)}.",
             f"Reported hunger: {_trend_words(read.get('hunger_trend'), CHECKIN_SCALE)}.",
             f"Reported cravings: {_trend_words(read.get('cravings_trend'), CHECKIN_SCALE)}.",
-            f"Mood, connection and flourishing: not measured this window — {NOT_ASKED}. Ask him; do not infer them.",
         ]
+        if read.get("mood_trend"):
+            lines.append(f"Reported mood (his own 0-4 rating, 4 = great): {_trend_words(read.get('mood_trend'), MOOD_SCALE)}.")
+            lines.append(f"Connection and flourishing: not measured this window — {NOT_ASKED}. Ask him; do not infer them.")
+        else:
+            lines.append(
+                f"Mood: not measured this window — {read.get('mood_unrated') or MOOD_UNRATED}. Connection and flourishing: "
+                f"not measured — {NOT_ASKED}. Ask him; do not infer them."
+            )
+        return lines
     return [
         f"Mood read: unavailable — the journal had {read.get('journal_scored_entries')} scored entries and the evening "
         f"check-in {read.get('checkin_stress_evenings')} stress ratings in the last {w} days (each needs {MIN_ENTRIES}). "

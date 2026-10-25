@@ -360,9 +360,9 @@ LOG_EVENING_INTAKE_DESCRIPTION = (
     "to the Matthew-private intake ledger. One tap, no free text. Idempotent: "
     "re-logging the same evening updates it (returns previous_count), never double-counts. "
     "Use for: 'log 2 drinks tonight', 'zero drinks yesterday' (pass date). "
-    "Also the 20-second evening check-in (#5106): hunger, stress, cravings (0-4 each) and one word, "
-    "to the private evening_checkin ledger (count is then optional; same idempotent overwrite). "
-    "Use for: 'check-in: hunger 2 stress 3 cravings 1, tired'."
+    "Also the 20-second evening check-in (#5106): hunger, stress, cravings, mood (0-4 each; mood 4 = great, #5123) "
+    "and one word, to the private evening_checkin ledger (count is then optional; same idempotent overwrite). "
+    "Use for: 'check-in: hunger 2 stress 3 cravings 1 mood 3, tired'."
 )
 
 # #5106: the input table rides beside its description (the #3759 extraction shape) so mcp/registry.py, at its size
@@ -377,6 +377,7 @@ LOG_EVENING_INTAKE_INPUT = {
         "hunger": {"type": "integer", "description": "#5106 evening check-in: hunger 0-4."},
         "stress": {"type": "integer", "description": "#5106 evening check-in: stress 0-4."},
         "cravings": {"type": "integer", "description": "#5106 evening check-in: cravings 0-4."},
+        "mood": {"type": "integer", "description": "#5123 evening check-in: mood today 0-4 (0 = rough, 4 = great). Optional."},
         "word": {"type": "string", "description": "#5106 evening check-in: one word for the day."},
         "date": {
             "type": "string",

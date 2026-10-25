@@ -173,6 +173,10 @@ MUST_NOT_BE_CONSTRUCTED = {
         "a CloudWatch alarm is a delete-and-recreate that discards alarm history."
     ),
     "life-platform-cf-auth-errors": (
+        "RETIRED 2026-10-25 — the owner deleted it in the us-east-1 console on #5143's ruling "
+        "('Retire cf-auth-errors'; post-delete describe-alarms returns 0) and "
+        "scripts/check_alarm_census.py's ACCEPTED_ORPHANS no longer names it. Never construct it "
+        "here either: the substantive reason below still holds. "
         "RETIRE, DO NOT ADOPT (#2961, 2026-08-27): life-platform-cf-auth is associated with "
         "ZERO Lambda@Edge cache behaviours on all four distributions in the account, so this "
         "alarm's metric can never receive a datapoint (no cf-auth dimension in list-metrics "

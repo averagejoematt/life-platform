@@ -1,8 +1,14 @@
 """coach/evening_checkin.py — the 20-second evening check-in (#5106, epic #5093).
 
-WHAT IT CAPTURES. Three ratings and one word for the evening: ``hunger``, ``stress`` and ``cravings``,
-each on the 0-4 scale the evening tools already use (``log_evening_intake``'s count and the felt probe
-are both 0-4), plus ``word`` — one free word for the day. Nothing else: no meal, no number about the body.
+WHAT IT CAPTURES. Four ratings and one word for the evening: ``hunger``, ``stress``, ``cravings`` and
+``mood``, each on the 0-4 scale the evening tools already use (``log_evening_intake``'s count and the felt probe
+are both 0-4; for mood 0 = rough, 4 = great — the ``mood_valence`` labels the evening ritual uses), plus ``word``
+— one free word for the day. Nothing else: no meal, no number about the body.
+
+``mood`` arrived with evening-checkin@1.1.0 (#5123, owner ruling 2026-10-25 "(a) Add one 0-4 mood question"), so
+``health.mood_read`` gets a real number on journal-dark days instead of "not measured". A three-number reply
+(``2 3 1 tired``) still parses — mood absent — so an older habit, an older row and ``decide``'s already-logged
+check (``COMPLETE_FIELDS``, the three) are unchanged; a four-number reply (``2 3 1 3 tired``) sets mood.
 
 THE CHANNELS (no new surface).
   * Telegram: the coach worker's scheduled ``{"kind": "evening_checkin"}`` run texts ONE fixed prompt at
@@ -45,23 +51,27 @@ except ImportError:  # pragma: no cover
     logger = logging.getLogger("telegram-worker")
     logger.setLevel(logging.INFO)
 
-VERSION = "evening-checkin@1.0.0"
+VERSION = "evening-checkin@1.1.0"  # 1.1.0: + the mood rating (#5123)
 SOURCE = "evening_checkin"
 PK = f"USER#matthew#SOURCE#{SOURCE}"
 LEDGER_PK = "COACH#evening_checkin"
 PROMPT_PREFIX = "PROMPT#"
 EVAL_PREFIX = "EVAL#"
-FIELDS = ("hunger", "stress", "cravings")
+FIELDS = ("hunger", "stress", "cravings", "mood")  # every rating the check-in captures, in reply order
+COMPLETE_FIELDS = ("hunger", "stress", "cravings")  # the three a complete check-in needs; mood (1.1.0, #5123) is welcome, never required
 SCALE_MIN, SCALE_MAX = 0, 4  # the 0-4 scale log_evening_intake and the felt probe already use
 WORD_MAX_CHARS = 24
 ROLLOVER_HOUR_PT = 4  # a reply before 04:00 PT belongs to the previous evening
 # Who texts the prompt: the nutrition coach's bot, else the lead's (persona_registry.LEAD_PERSONA_ID), resolved by the worker's seat.
 PROMPT_PERSONA = "nutrition_coach"
-PROMPT_TEXT = "Evening check-in, 20 seconds: hunger, stress, cravings (0-4 each) and one word for today. Reply like: 2 3 1 tired"
-USAGE_TEXT = "Check-in format: three numbers 0-4 (hunger, stress, cravings) and one word, e.g. /checkin 2 3 1 tired"
+PROMPT_TEXT = "Evening check-in, 20 seconds: hunger, stress, cravings, mood (0-4 each) and one word for today. Reply like: 2 3 1 3 tired"
+USAGE_TEXT = (
+    "Check-in format: four numbers 0-4 (hunger, stress, cravings, mood) and one word, e.g. /checkin 2 3 1 3 tired (mood may be left out)"
+)
 
 _COMMAND = "/checkin"
-_REPLY_RE = re.compile(r"^([0-4])[\s,/]*([0-4])[\s,/]*([0-4])(?:[\s,.;:-]+([A-Za-z][A-Za-z'-]*))?[\s.!]*$")
+# hunger stress cravings [mood] [word] — the fourth number is optional (a pre-1.1.0 three-number reply still parses).
+_REPLY_RE = re.compile(r"^([0-4])[\s,/]*([0-4])[\s,/]*([0-4])(?:[\s,/]*([0-4]))?(?:[\s,.;:-]+([A-Za-z][A-Za-z'-]*))?[\s.!]*$")
 
 
 def evening_day(now_pt: datetime) -> str:
@@ -70,7 +80,8 @@ def evening_day(now_pt: datetime) -> str:
 
 
 def validate(values: Mapping[str, Any]) -> dict[str, Any]:
-    """The check-in fields present in ``values``, checked: ints 0-4 and one word. ValueError on junk.
+    """The check-in fields present in ``values``, checked: ints 0-4 (hunger, stress, cravings, mood) and one word.
+    ValueError on junk.
 
     Partial is allowed (the MCP path may log only stress); an empty result means no check-in field was given."""
     out: dict[str, Any] = {}
@@ -103,9 +114,11 @@ def parse_reply(text: str) -> tuple[Optional[dict[str, Any]], bool]:
     m = _REPLY_RE.match(t)
     if not m:
         return None, explicit
-    values: dict[str, Any] = dict(zip(FIELDS, (int(m.group(i)) for i in (1, 2, 3))))
-    if m.group(4) and len(m.group(4)) <= WORD_MAX_CHARS:
-        values["word"] = m.group(4).lower()
+    values: dict[str, Any] = dict(zip(COMPLETE_FIELDS, (int(m.group(i)) for i in (1, 2, 3))))
+    if m.group(4):  # the optional fourth number: mood (1.1.0)
+        values["mood"] = int(m.group(4))
+    if m.group(5) and len(m.group(5)) <= WORD_MAX_CHARS:
+        values["word"] = m.group(5).lower()
     return values, explicit
 
 
@@ -113,7 +126,7 @@ def write(table, day: str, values: Mapping[str, Any], source: str, now_utc: Opti
     """Overwrite the evening's row with the given fields (idempotent); report what it replaced."""
     clean = validate(values)
     if not clean:
-        raise ValueError("no check-in field given (hunger, stress, cravings 0-4, word)")
+        raise ValueError("no check-in field given (hunger, stress, cravings, mood 0-4, word)")
     datetime.strptime(day, "%Y-%m-%d")  # a calendar-day key; raises on junk
     stamp = (now_utc or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
     sets = {**clean, "source": source, "logged_at": stamp, "version": VERSION, "date": day}
@@ -138,7 +151,7 @@ def mcp_count(args: Mapping[str, Any]) -> Optional[int]:
     try:
         count = int(args.get("count"))
     except (TypeError, ValueError):
-        raise ValueError("count is required (integer 0-4; 4 = four or more) unless hunger/stress/cravings/word is given")
+        raise ValueError("count is required (integer 0-4; 4 = four or more) unless hunger/stress/cravings/mood/word is given")
     if not (0 <= count <= 4):
         raise ValueError("count must be between 0 and 4 (4 = four or more)")
     return count
@@ -213,7 +226,7 @@ def decide(table, day: str, now_pt: datetime, seat: Callable[[str], tuple]) -> t
     if in_quiet_hours(now_pt):
         return "quiet_hours", None
     row = read_day(table, day) or {}
-    if all(row.get(f) is not None for f in FIELDS):
+    if all(row.get(f) is not None for f in COMPLETE_FIELDS):  # the three; a row without mood is still tonight's answer
         return "already_logged", None
     from coach.persona_registry import LEAD_PERSONA_ID
 

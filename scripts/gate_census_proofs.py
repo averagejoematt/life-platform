@@ -1023,8 +1023,10 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
         "observed": (
             "2026-10-25: MUTATED exit 1 — `only-live: planted-extra-5143` and `only-model: ai-canary-overall`, "
             "'alarm census: DIFFERENT'. UNMUTATED exit 0 — 'live=144 model=141 accepted-orphans=3 ... CLEAN' "
-            "(144 = 141 modelled + the three #2961 console orphans in ACCEPTED_ORPHANS). The offline suite adds a "
-            "same-count-different-names case (a count comparison passes it; the set comparison reds it)."
+            "(144 = 141 modelled + the three #2961 console orphans in ACCEPTED_ORPHANS). Re-proved 2026-10-25 after the "
+            "owner retired life-platform-cf-auth-errors (#5143): the same in-process mutation reds, and the unmutated run "
+            "reads 'live=145 model=143 accepted-orphans=2 ... CLEAN' (145 = 143 modelled + the two remaining #2961 console orphans). The offline "
+            "suite adds a same-count-different-names case (a count comparison passes it; the set comparison reds it)."
         ),
         "scope": (
             "Compares alarm NAMES (metric + composite) and their region; does not compare thresholds, actions or "

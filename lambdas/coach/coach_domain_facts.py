@@ -513,7 +513,7 @@ def _labs_pack(table, today: str) -> list:  # noqa: ARG001 — pack signature
 # The mind coach's OWN Telegram thread is an owner channel, so it reads the owner-only check-in (#5106) the way the
 # character sheet's Mind pillar does (#5129: an owner-surface read, no carve-out) — ratings only, never the one
 # word (#5123's rule for this thread), never on a published surface.
-_CHECKIN_FIELDS = ("stress", "hunger", "cravings")
+_CHECKIN_FIELDS = ("stress", "hunger", "cravings", "mood")  # mood from evening-checkin@1.1.0 (#5123); a line only when rated
 _CHECKIN_WINDOW_DAYS = 7
 
 
