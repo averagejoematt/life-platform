@@ -739,7 +739,7 @@ def compose(
             continue
         rows = coach_record.resolved_once(raw or [])
         decided = coach_record.decided_rows(rows, genesis=genesis)
-        records[short_id] = record_block(names[short_id], coach_record.record_from_rows(rows, genesis=genesis), decided)
+        records[short_id] = record_block(names[short_id], coach_record.record_from_rows(rows, genesis=genesis, as_of=today), decided)
         for row in decided:
             if row.get("source") == "dispute_docket":
                 continue  # one page per BET, built from the docket row below — never one per side

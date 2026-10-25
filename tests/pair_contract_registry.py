@@ -949,7 +949,11 @@ def _consume_coach_record_rows(payload):
     from coach import coach_record
     from common.constants import EXPERIMENT_START_DATE
 
-    return coach_record.record_from_rows(payload["rows"], genesis=EXPERIMENT_START_DATE)
+    # #5356: ``through`` is the day the record is complete through, bounded by an as-of day.
+    # The pair pins the COUNTED half, so the as-of is genesis — no later than any resolution,
+    # which leaves ``through`` = the latest counted outcome_date and keeps the pair off the
+    # wall clock. The as-of bound itself is pinned in tests/test_coach_record_through_5356.py.
+    return coach_record.record_from_rows(payload["rows"], genesis=EXPERIMENT_START_DATE, as_of=str(EXPERIMENT_START_DATE))
 
 
 def _agree_coach_record_rows(produced, consumed):

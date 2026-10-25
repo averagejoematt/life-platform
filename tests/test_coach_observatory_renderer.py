@@ -710,8 +710,14 @@ def _docket_learnings(n, status="confirmed"):
 
 def test_card_track_record_is_the_one_record(monkeypatch):
     """#4220: the card's record is coach_record's — PREDICTION#, this cycle, one resolution
-    per prediction — never a LEARNING# tally. Genesis is pinned to 2026-08-01."""
+    per prediction — never a LEARNING# tally. Genesis is pinned to 2026-08-01, and the
+    Pacific day to 2026-08-12 (#5356: ``through`` is the day the record is complete
+    through — p5, filed 07-21 on a 21-day window, fell due 08-11 and is still open, so the
+    record is complete through 08-10, not "today" and not the latest grade's 08-08)."""
+    from coach import coach_record
+
     monkeypatch.setattr(cobs, "EXPERIMENT_START", "2026-08-01")
+    monkeypatch.setattr(coach_record, "today_pt", lambda: "2026-08-12")
     rows = [
         _output(content="analysis"),
         _ledger("p1", "confirmed", "2026-08-05"),
@@ -719,14 +725,14 @@ def test_card_track_record_is_the_one_record(monkeypatch):
         _ledger("p2", "confirmed", "2026-08-07"),
         _ledger("p3", "refuted", "2026-08-08"),
         _ledger("p4", "refuted", "2026-07-20"),  # resolved before genesis — not this cycle
-        _ledger("p5", "pending", ""),
+        _ledger("p5", "pending", "", created_date="2026-07-21", evaluation={"type": "directional"}),
         *_docket_learnings(9),  # nine blank-id learnings the old tally counted as "confirmed"
     ]
     _install(monkeypatch, rows)
     track = cobs._render_coach_card("sleep")["track_record"]
-    assert track["record"] == {"confirmed": 2, "refuted": 1, "n": 3, "through": "2026-08-08"}
+    assert track["record"] == {"confirmed": 2, "refuted": 1, "n": 3, "through": "2026-08-10"}
     assert (track["confirmed"], track["refuted"], track["decided_count"]) == (2, 1, 3)
-    assert track["summary"] == "2 of 3 checked calls right through August 8"
+    assert track["summary"] == "2 of 3 checked calls right through August 10"
     assert "%" not in track["summary"]  # below n = 10 the record prints counts
     assert track["scope"] == "this cycle"
 
@@ -741,7 +747,10 @@ def test_card_track_record_mutation_control_the_learning_tally_disagrees(monkeyp
 
 
 def test_card_track_record_keeps_conversation_learnings_out_of_the_record(monkeypatch):
+    from coach import coach_record
+
     monkeypatch.setattr(cobs, "EXPERIMENT_START", "2026-08-01")
+    monkeypatch.setattr(coach_record, "today_pt", lambda: "2026-08-06")  # #5356: nothing open — complete through today
     rows = [
         _output(content="analysis"),
         _ledger("p1", "confirmed", "2026-08-05"),
