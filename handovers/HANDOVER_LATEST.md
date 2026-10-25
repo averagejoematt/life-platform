@@ -28,7 +28,7 @@
 - **The data-reconciliation Lambda is not the Strava DI-2 reconcile.** `life-platform-data-reconciliation` is the weekly gap report; invoking it proves nothing about `MissingActivityCount{strava}`.
 
 ## Residual / next picks
-- **#5368 deploy:** approve the production gate on run 40239419208 (tip 6311b7962) if it is still waiting; then read the 2026-10-26 03:00Z prompt text for "mood" and the first 4-number reply's `DATE#` row (`version evening-checkin@1.1.0`) → #5123 live proof; #5143 closes on the census line already pasted in the PR.
+- **#5368 deployed** (run 40240244414 success 22:45Z, worker bundle carries `evening-checkin@1.1.0`; the IAM gate was skipped NO-IAM-CHANGE — no approval was needed; #5143 closed on the live census read). **#5123:** read the 2026-10-26 03:00Z prompt text for "mood" and the first 4-number reply's `DATE#` row (`version evening-checkin@1.1.0`) → #5123 live proof; #5143 closes on the census line already pasted in the PR.
 - **#5274 / #5055 / #5086:** re-run `scripts/check_synced_skill_drift.py` at boot; on "2 of 2 match" close all three (the Hevy screenshot leg of #5083 stays the owner's).
 - **#5257:** read the 2026-10-26 ~17:20Z Strava reconcile; `MissingActivityCount{strava}` 0 + alarm OK closes it.
 - **#4969 / #5353:** re-run the 48 h raw-capture diff after 2026-10-27 for the eight nightly metrics; #5353 box 5 on the first Apple-only workout day.
@@ -44,10 +44,10 @@
 - not-work — `s3://matthew-life-platform/config/coaches/training_coach.json` is orphaned after #5366; deleting it is an optional owner AWS write.
 - not-work — the `~/.claude/skills/synced/…/coach-session/SKILL.md` copy from Sep 27 is a Claude Code download, refreshed by the app, not by the repo.
 
-**Build beat:** none — the session's reader-visible change (the mood question) was merged but not yet deployed at wrap
+**Build beat:** none — the mood question is deployed but its first live output is tonight's prompt; nothing reader-visible shipped
 **Docs:** docs/SCHEMA.md + docs/DATA_GOVERNANCE.md (evening_checkin `mood`), docs/MCP_TOOL_CATALOG.md regenerated, docs/reviews/CLOUDWATCH_AUDIT_2026-07.md §9a executed note — all inside PR #5368
 **Decisions:** none needed — every ruling is a product/ops call recorded verbatim on its issue; no governance change
-**Main:** green (6311b7962 — CI/CD run 40239419208 in progress at wrap; last completed run 40228019776 success on 5572e539c)
+**Main:** green (6311b7962 deployed by run 40240244414 — Deploy + Smoke success 22:45Z; 40239419208 was cancelled by concurrency, same code)
 **Incidents:** none
 **Stash/hooks:** clean — reaper removed issue-5071 lane; `fix/walk-completeness` is a dirty worktree named and untouched (pre-existing)
 **Closures:** #5203 #5325 #5141 #5126 #5125 commented with outcome verdicts (+#5325 Live-proof line) · DoD: scanned=51, hits 10 — #5325 Live-proof line added this wrap; #4978/#5121/#5136/#5309/#5052 unhomed-residual hits are Session CE/CF's post-close dispositions (informational, residuals already dispositioned not-work or homed in those sessions' handovers); #5085/#5107/#5128/#5165 are post-close Live-proof / owner-ruling comments, already homed
