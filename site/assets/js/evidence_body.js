@@ -829,12 +829,12 @@ export function trainingVolumeRamp(workouts) {
 // §0 hero (twin) — RHR decline (P0.3), promoted out of vitals. The inversion: RHR-DOWN is
 // the WIN → reads ember-positive (the engine answering), with a multi-factorial caveat in
 // mono. Refuses <4 points. Binds pulse_history rhr_bpm.
-export function trainingRHRHero(hist) {
+export function trainingRHRHero(hist, baselineChange = null) {
   const series = (hist || []).map((h) => ({ date: h.date, value: h.rhr_bpm })).filter((p) => Number.isFinite(Number(p.value)));
   if (series.length < 4) return "";
   const first = series[0].value, last = series[series.length - 1].value, delta = Math.round(last - first);
   const down = delta < 0;
-  const chart = lineChart(series, { valueKey: "value", unit: " bpm", label: "Resting heart rate · nightly", spine: true });
+  const chart = lineChart(series, { valueKey: "value", unit: " bpm", label: "Resting heart rate · nightly", spine: true, baselineChange });
   const machine = `RHR ${fmt(first)} → ${fmt(last)} bpm · ${delta <= 0 ? "−" : "+"}${fmt(Math.abs(delta))} since the cut began · multi-factorial (fluid · sleep · deload), not a VO2max claim`;
   const serif = down
     ? `The resting heart rate is drifting down — and down is the win here: the engine starting to answer the work. Early in a cut that's the body responding, not a fitness verdict yet, but it's the direction you want.`

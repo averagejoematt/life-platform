@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.30.0",
+  "version": "1.33.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -203,6 +203,27 @@
       "date": "2026-10-24",
       "by": "owner rulings 2026-10-24 (#5318, epic #5067), verbatim: A4 'Accept shorter sessions. 75 sets a week stays the ceiling. Drop the 60-minute lifting floor: 75 minutes is a ceiling, not a target.' B2 'Swap upper_volume's flat bench for incline DB press — same set count. Flat bench stays on upper_heavy as the strength anchor. Lats stay at 4. Amend the RP concession to match.' B3 'Replace the 2 DB shrug sets on shoulders_arms with 2 sets of farmer's carry.'",
       "what": "A4: split.session_minutes.lifting [60, 75] -> lifting_ceiling 75 (the 60-minute floor is dropped; a session under the ceiling is reported as its length and never filled with sets; lifting_rule says so). B2: the upper_volume bench slot is the incline dumbbell press at the same 3 sets (program_structure SESSION_TEMPLATES anchor_keys); upper_heavy keeps the barbell bench, so the anchor_lift_strength_drop tripwire keeps its bench template; volume_priorities.sets_per_wk.upper_chest [0, 0] -> [3, 3] (the incline sets); lats unchanged at [4, 4]; concession_ledger.rp_israetel.in_return -> 'rising volume on shoulders; upper chest via the upper_volume incline slot; lats held at 4; MEV floors'. The incline's load comes from the existing novel-movement path (nearest-band anchor, then the re-entry ramp), or his first logged set. B3: the shoulders_arms dumbbell shrug (2 sets) -> 2 sets of the farmer's carry on Hevy's existing 'Farmers Carry' template (movement_catalog farmers_carry, never created by the platform); it counts toward the traps, core and forearms floors (training.volume_floors); its first load is the owner's pick, logged, and the engine anchors from that log, never from the shrug. Weekly hard sets unchanged at 75.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.31.0",
+      "date": "2026-10-25",
+      "by": "owner ruling 2026-10-25 (#5107, epic #5093; the travel kit #5104 reads the same window), verbatim: '20th-27th december is the mexico christmas trip.'",
+      "what": "#5107: the late-December 2026 trip window is dated 2026-12-20 to 2026-12-27 in its one place, the travel.windows entry labelled 'late December 2026' (start and end, inclusive); nutrition.maintenance_weeks.windows[0] keeps null start and end and reads that window (dates_rule), so the planned maintenance week is now scheduled, not inert: the weekly titration holds the ordinary target for the ISO weeks 2026-12-14 and 2026-12-21, serves maintenance kcal on the eight dates, and holds the cut for the 14-day trend window after it. The travel kit (#5104) reads the same dates. The label stays 'late December 2026 trip'; no other trip detail is stored here.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.32.0",
+      "date": "2026-10-25",
+      "by": "owner ruling 2026-10-25 on #5076 (attended, Session CE), verbatim: \"a\" — option (a): \"after a lower day\" means only the day immediately after a heavy lower session, and only for conditioning blocks; easy days stay on the incline walk [restacked 1.31.0 -> 1.32.0 at the batch-2 merge, 2026-10-25]",
+      "what": "cardio_menu.placement.recumbent_after: \"a lower day\" -> \"the day immediately after a heavy lower session, for a conditioning block only\"; adds recumbent_after_session (Lower-heavy, a split.sequence name), recumbent_after_kinds (tempo, hills, intervals) and recumbent_after_rule. The previous session is the previous PERFORMED lifting session (the Hevy sequence), never the charter order and never today's own role: a lower session is no longer itself a recumbent day. On fresh legs a conditioning block takes the treadmill when its block lists it (hills), else the menu's own first machine (tempo and intervals list no treadmill, so they stay on the bike by cardio_menu.blocks.<kind>.machines, not by recumbent_after); the tempo/hills alternation is unchanged. The heavy-walking-weekend clause is unchanged. Weekly cardio minutes unchanged: every block keeps its menu minutes under split.session_minutes.cardio_block_max.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.33.0",
+      "date": "2026-10-24",
+      "by": "owner rulings 2026-10-23 (attended, Session CD): R6 'meal service on weekdays, the code-built menu at weekends' and R7 'no excluded foods' (#5103); the three numbers are platform defaults named as such, pending his ruling [restacked 1.29.0 -> 1.33.0 at the batch-2 merge, 2026-10-25]",
+      "what": "#5103 N9: nutrition.weekly_menu, the weekly menu built by code (health.weekly_menu) from the owner's anchor foods, which live ONLY in the owner-only charter twin (never in this public file). cook_days (Saturday, Sunday: the code-built menu is cooked, the grocery list covers them; the other days are meal-service days whose fitted day is the template the service order matches), min_anchors 6 (fewer usable anchors and the menu is not built, reason too_few_anchors), max_servings_per_anchor_per_day 3 (the default per-food cap; a row's own max_per_day in his table replaces it) and core_anchors_max 2 (a feeding's protein core is at most two anchors). Every target the menu fits to is read from the existing calorie resolver, protein, floors, eating-window and training_day numbers; no new target number. No model call: the menu's words are templates over the code's numbers.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -521,11 +542,18 @@
       ],
       "the_rest": "easy",
       "recumbent_after": [
-        "a lower day",
+        "the day immediately after a heavy lower session, for a conditioning block only",
         "a heavy walking weekend"
       ],
+      "recumbent_after_session": "Lower-heavy",
+      "recumbent_after_kinds": [
+        "tempo",
+        "hills",
+        "intervals"
+      ],
+      "recumbent_after_rule": "the recumbent serves a conditioning block (tempo, hills, intervals) only when the previous PERFORMED lifting session (the Hevy sequence's last credited session and its role: training.session_sequence.next_session advanced_by) was recumbent_after_session and was performed the day before; an easy day after it stays on the incline treadmill walk; on fresh legs a conditioning block takes the treadmill when its block lists it (hills), else the menu's first machine for it (tempo, intervals: the treadmill is not among them)",
       "never_consecutive": "the same hard shape",
-      "rule": "conditioning 2x/wk (one tempo-or-hills, one intervals), every other block easy; the recumbent after a lower day or a heavy walking weekend; never the same hard shape on consecutive days"
+      "rule": "conditioning 2x/wk (one tempo-or-hills, one intervals), every other block easy; the recumbent for a conditioning block the day after a heavy lower session, or after a heavy walking weekend; never the same hard shape on consecutive days"
     },
     "movement_minutes": "gym cardio minutes count toward the daily steps/movement goal (steps.gym_cardio_minutes_count_toward_movement)"
   },
@@ -822,8 +850,8 @@
     "windows": [
       {
         "label": "late December 2026",
-        "start": null,
-        "end": null,
+        "start": "2026-12-20",
+        "end": "2026-12-27",
         "templates": "#5088",
         "food": "nutrition.travel_food (#5104)"
       }
@@ -1321,7 +1349,7 @@
           "end": null
         }
       ],
-      "dates_rule": "a window's own start and end (YYYY-MM-DD, both set) are its dates; while they are null the named travel.windows entry's start and end are (one place for the trip's dates). A window with no dates either way is INERT: listed as unscheduled, it changes nothing. The dates are the owner's to set; today none are set, so the engine is inert until he sets them",
+      "dates_rule": "a window's own start and end (YYYY-MM-DD, both set) are its dates; while they are null the named travel.windows entry's start and end are (one place for the trip's dates). A window with no dates either way is INERT: listed as unscheduled, it changes nothing. The dates are the owner's to set; the late-December trip's are set on its travel window (2026-12-20 to 2026-12-27, owner ruling 2026-10-25)",
       "target": "maintenance: the expenditure reconciliation's best-matching model kcal (health.expenditure_reconciler best_match, the estimate the titration engine already reads), actionable only on a non-provisional loss-rate window; never a number written here",
       "target_rule": "the titration record of every ISO week a window touches HOLDS the week's ordinary target (reason maintenance_week; it carries forward unchanged, so the cut resumes at the pre-window number) and lists maintenance_dates and maintenance_kcal; on those dates health.calorie_target.resolve serves maintenance_kcal with the prescribed band moved to it and no lifting uplift (the estimate is the whole day's burn). No actionable estimate: the dates carry the base target with a warning, never a guess",
       "trend_rule": "a weekly read whose 14-day trend window holds a maintenance date is not acted on (reason maintenance_in_trend): a week of maintenance food and water would read as a stall",
@@ -1422,6 +1450,21 @@
         "concedes": "nothing",
         "in_return": "gets the deadline pace, the weekly refit and the training-day fuel"
       }
+    },
+    "weekly_menu": {
+      "_note": "The weekly menu (#5103 N9, epic #5092). BUILT by health.weekly_menu: a deterministic per-day fit of the owner's anchor foods to the week's resolved days (health.calorie_target.resolve through training.food_panel.build_food_plan: the day's kcal, its type from the training calendar, the lifting uplift), the protein range, the four feedings at the threshold, the macro floors and the eating window above. No number here is a target. The anchor foods (names, servings, label values) are owner data: they live only in the owner-only charter twin (config/training_charter.private.example.json documents the shape), never in this public file.",
+      "cook_days": [
+        "Saturday",
+        "Sunday"
+      ],
+      "cook_days_rule": "owner ruling 2026-10-23 R6: weekday meal service, the code-built menu cooked at weekends. Every day is fitted; a cook day's food is on the grocery list, a meal-service day's fit is the template the service order matches",
+      "excluded_foods_rule": "owner ruling 2026-10-23 R7: no excluded foods. An anchor the owner marks off_limits in his table is never placed (the switch exists; no food is marked)",
+      "min_anchors": 6,
+      "max_servings_per_anchor_per_day": 3,
+      "core_anchors_max": 2,
+      "tolerance_rule": "a day fits when its kcal sits within half the prescribed band's width of the day's resolved kcal (the band centred on the day, so a lifting day's band moves up with its uplift), protein is at or above the range low, every one of the feedings is at or above the feeding threshold (the post-session one at the post-session protein), and the fat, carbohydrate and fibre floors are met (a lifting day's carbohydrate line is the larger of the floor and the pre + post session carbohydrate)",
+      "failure_rule": "a missing anchor table, fewer than min_anchors usable anchors, or no feeding core reaching the threshold: the menu is not built, with the named reason code; a day the anchors cannot fit is built and marked fits=false with each miss named (never hidden, never a remembered day)",
+      "provenance": "owner (cook_days, the R6/R7 rules); min_anchors, max_servings_per_anchor_per_day and core_anchors_max are platform defaults pending his ruling"
     }
   }
 }

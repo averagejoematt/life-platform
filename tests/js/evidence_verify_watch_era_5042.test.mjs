@@ -53,3 +53,12 @@ test("at the study minimum the verdict renders, captioned with the watch era", (
   assert.match(html, /since the watch arrived \(2026-10-17\)/);
   assert.doesNotMatch(html, /Too few nights/);
 });
+
+// #5309: the raw-payload sample must be a night inside the current experiment (genesis 2026-09-06),
+// not a pre-cycle June night the reader-truth gate reads as a temporal contradiction.
+test("the raw payload sample is dated inside the current experiment, never June", () => {
+  const html = renderVerify({ status: "unavailable", reason: "x" });
+  assert.doesNotMatch(html, /June 15|2026-06-/);
+  assert.match(html, /One real night from this experiment \(September 20\)/);
+  assert.match(html, /DATE#2026-09-20/);
+});

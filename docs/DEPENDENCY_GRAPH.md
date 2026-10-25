@@ -119,7 +119,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-783 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+785 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -232,7 +232,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `temptations` | — | site_api_mind.py |
 | `time_affluence` | — | — |
 | `todoist` | — | daily_insight_compute_lambda.py, intelligence_common.py, site_api_fulfillment.py, site_api_sleep.py, tools_todoist.py |
-| `training_constraints` | tools_training_notes.py | — |
+| `training_constraints` | tools_training_notes.py, variant_rotation.py | — |
 | `training_notes` | training_notes_llm.py | tools_training_notes.py, training_notes_llm.py |
 | `training_reference` | — | episode_detect_lambda.py, site_api_nutrition.py, site_api_training.py |
 | `travel` | — | adaptive_mode_lambda.py, anomaly_detector_lambda.py, tools_lifestyle.py |
@@ -486,6 +486,7 @@ Field-level rulings (only non-default fields are declared):
 |--------|-------|------|
 | `apple_health` | `_rd_protein_hae` | owner_only |
 | `apple_health` | `_rd_sleep_apple` | owner_only |
+| `apple_health` | `apple_workouts` | owner_only |
 | `apple_health` | `breathing_disturbances_apple` | owner_only |
 | `apple_health` | `cardio_recovery_bpm_apple` | internal |
 | `apple_health` | `hrv_sdnn_apple` | internal |
@@ -573,10 +574,10 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1370 total · 984 resolved · 386 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1374 total · 987 resolved · 387 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (108 lambdas total)
 - Alarms: 141 literal-named declarations across three idioms, 4 composite; routing digest 96 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
-- Privacy: 24 owner-only + 3 owner-published sources; 68 owner-only + 11 owner-published fields — non-default entries only
+- Privacy: 24 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 97 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)

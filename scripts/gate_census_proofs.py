@@ -1012,6 +1012,28 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-06",
     },
+    "guard::scripts/check_alarm_census.py": {
+        "gate_name": "scripts/check_alarm_census.py",
+        "command": "python3 scripts/check_alarm_census.py   # live read-only describe_alarms in every stack region; tests/test_alarm_census_5143.py covers the set comparison offline (10 passed)",
+        "mutation": (
+            "Two defects planted into the live read ONE RUN, in-process, by wrapping `live_alarms` — a never-modelled "
+            "name `planted-extra-5143` added to the live set, and the modelled `ai-canary-overall` removed from it — "
+            "then `main()` run against the real model and the real live estate."
+        ),
+        "observed": (
+            "2026-10-25: MUTATED exit 1 — `only-live: planted-extra-5143` and `only-model: ai-canary-overall`, "
+            "'alarm census: DIFFERENT'. UNMUTATED exit 0 — 'live=144 model=141 accepted-orphans=3 ... CLEAN' "
+            "(144 = 141 modelled + the three #2961 console orphans in ACCEPTED_ORPHANS). The offline suite adds a "
+            "same-count-different-names case (a count comparison passes it; the set comparison reds it)."
+        ),
+        "scope": (
+            "Compares alarm NAMES (metric + composite) and their region; does not compare thresholds, actions or "
+            "state. The model enumerates only literal-named CDK alarms (its scope_cuts) — a dynamically named alarm "
+            "would read only-live. Fail-open UNVERIFIED when a region cannot be read. Wired into the wrap gather "
+            "battery (scripts/wrap_gates.py), not CI."
+        ),
+        "proved_on": "2026-10-25",
+    },
     "guard::scripts/check_deploy_deadman.py": {
         "gate_name": "scripts/check_deploy_deadman.py",
         "command": "python3 -m pytest tests/test_head_coverage_scheduled_consumer_2826.py -k deadman -q   # + the live read-only run below",

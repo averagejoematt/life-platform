@@ -115,7 +115,13 @@ from typing import Callable, Optional
 
 from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
-logger = logging.getLogger(__name__)
+try:  # the worker's own logger: a handler of its own at INFO, so these lines reach CloudWatch (#3283 / #5106)
+    from common.platform_logger import get_logger
+
+    logger: logging.Logger = get_logger("telegram-worker")
+except ImportError:  # pragma: no cover
+    logger = logging.getLogger("telegram-worker")
+    logger.setLevel(logging.INFO)
 
 SUMMARY_SK_PREFIX = "CHAT#summary#"
 from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry

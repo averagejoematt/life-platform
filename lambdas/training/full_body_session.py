@@ -24,7 +24,7 @@ from __future__ import annotations
 import functools
 from typing import Any
 
-from training import in_block_variant, load_ramp, program_structure, routine_generator as _rg, warmup_sets
+from training import in_block_variant, load_ramp, program_structure, routine_generator as _rg, variant_rotation, warmup_sets
 from training.routine_generator import (
     LAYOFF_DAYS_DEFAULT,
     GeneratorInputs,
@@ -217,6 +217,28 @@ def _session_loads(
     return load_floors
 
 
+def _prescription(
+    inputs: GeneratorInputs, day_entry: dict[str, Any], catalog: dict[str, Any], block_workouts: Any, deload: bool, skill_ceiling: int
+) -> tuple[Any, dict[str, Any], dict[str, Any]]:
+    """(in-block record, rotation, prescription) for the served role. #4409: within a block an ANCHOR slot keeps the variant
+    he performed in it (`in_block_variant`); #5075: each ACCESSORY slot serves its rotation variant
+    (`variant_rotation`, the ledger read here unless `inputs.rotation_rows` injects it) — anchors are fixed for the block."""
+    movements = catalog.get("movements") or {}
+    in_block = in_block_variant.performed_in_block(block_workouts, movements, inputs.target_date)
+    rotation = variant_rotation.for_session(
+        {**day_entry, "date": inputs.target_date}, movements, rows=inputs.rotation_rows, skill_ceiling=skill_ceiling
+    )
+    rx = program_structure.session_prescription_for_role(
+        day_entry["session_role"],
+        deload=deload,
+        catalog_movements=movements,
+        skill_ceiling=skill_ceiling,
+        in_block=in_block,
+        accessory_variants=rotation["variants"],
+    )
+    return in_block, rotation, rx
+
+
 def full_body_routines(
     inputs: GeneratorInputs,
     day_entry: dict[str, Any],
@@ -234,11 +256,7 @@ def full_body_routines(
     archetype = program_structure.SESSION_TEMPLATES[role]["archetype"]
     deload = bool(day_entry.get("deload"))
     skill_ceiling = int(week_cfg.get("skill_ceiling", 2))
-    # #4409: within a block a slot keeps the variant he performed in it (`in_block_variant`)
-    in_block = in_block_variant.performed_in_block(block_workouts, catalog.get("movements") or {}, inputs.target_date)
-    rx = program_structure.session_prescription_for_role(
-        role, deload=deload, catalog_movements=catalog.get("movements") or {}, skill_ceiling=skill_ceiling, in_block=in_block
-    )
+    in_block, rotation, rx = _prescription(inputs, day_entry, catalog, block_workouts, deload, skill_ceiling)
     # a kept title-only variant (ADR-069) loads from its wire template id; the snapshot keeps the catalog's own hash
     load_catalog = in_block_variant.with_performed_template_ids(catalog, rx, in_block)  # #4431: the one resolver
     autoreg = _autoreg_multiplier(inputs.recovery_tier, inputs.acwr_flag)
@@ -247,6 +265,7 @@ def full_body_routines(
         f"archetype={archetype}; program=v{program_structure.PROGRAM_VERSION}; session_role={role}; autoreg={autoreg:.2f} (recovery={inputs.recovery_tier}, acwr={inputs.acwr_flag})",
     ]
     rationale.append(_sequence_line(day_entry))
+    rationale += rotation["rationale"]
     if deload and rx.get("deload_trim"):
         t = rx["deload_trim"]
         rationale.append(f"deload: sets {t['sets_before']} -> {t['sets_after']} ({t['pct']}%), loads held")
@@ -336,6 +355,7 @@ def full_body_routines(
             "calendar": calendar_snapshot,
             "warmups": warmups,
             "session_shape": shape,
+            "rotation": rotation,  # #5075: routine_repo.draft_versioned records its ledger_writes
         },
         rationale=rationale,
         caps=caps,

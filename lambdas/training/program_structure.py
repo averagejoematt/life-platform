@@ -80,7 +80,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from training import effort_ceilings, in_block_variant, program_conflicts, program_v03, program_v04
+from training import effort_ceilings, in_block_variant, program_conflicts, program_v03, program_v04, variant_rotation
 from training.accessory_check import CARDIO_NAME_HINTS, accessory_rotation, classify_movement  # noqa: F401 — re-exported (#5069 split)
 from training.program_v03 import BLOCK_CALENDAR  # noqa: F401 — v0.3 history; `load_ramp.block_1_start()` reads it (#4107)
 from training.session_cues import CARRY_EXPOSURE, _default_sets, exposure_cue  # noqa: F401 — #5317/#5318, re-exported
@@ -300,7 +300,7 @@ shoulders+arms day's face pull, #5069, and the farmer's carry that replaced its 
 session carries it at 2 x 8–10 beside the barbell squat. v0.3's single `full` pool is `program_v03.ACCESSORY_POOL`."""
 
 ROTATION_RULE: dict[str, Any] = {
-    "rule": "accessories are FIXED for the block: 2–3 per session, 2 sets, machines/cables, none added after week 1; the set changes only at a block boundary",
+    "rule": "anchors are FIXED for the block; each accessory SLOT holds one variant per rotation phase (charter cadence, #5075 variant_rotation) — the slot's sets never change",
     "window_days": 14,
     # #5077: the block's length is the charter's `rotation.anchors_fixed_weeks` (`block_model.block_weeks()`), not a copy here
     "per_session": [2, 3],
@@ -868,6 +868,7 @@ def session_prescription_for_role(
     anchor_exempt: bool = True,
     in_block: list[dict[str, Any]] | None = None,
     deload_sets_pct: int | None = None,
+    accessory_variants: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """The session for one role, as data: exposures, sets (top / back_off / working), reps, and its lifting minutes.
 
@@ -876,6 +877,10 @@ def session_prescription_for_role(
     every trim (`session_minutes_estimate`).
 
     `in_block` (#4409): `in_block_variant.performed_in_block` — a slot keeps its in-block variant.
+
+    `accessory_variants` (#5075): {template accessory: the variant its slot serves this rotation phase}
+    (`variant_rotation.plan`). The slot keeps the template's set count, shape and rest — only the movement changes — and
+    an unreachable variant falls back to the template's own movement.
 
     Pure. `catalog_movements` (the movement catalog's `movements` dict) resolves each
     pattern to the first member the generator may prescribe; without it the movements are
@@ -937,13 +942,14 @@ def session_prescription_for_role(
         n_acc = int((tmpl.get("accessory_sets") or {}).get(k, acc["sets"]))  # #5053: a floor slot may run more than 2 sets
         # an accessory is named by its catalog key already; without the catalog it is still
         # prescribable by that key, it just has not been checked against the skill ceiling
-        key, why = _resolve_movement([k], catalog_movements, skill_ceiling, taken) if catalog_movements is not None else (k, None)
+        key, why = variant_rotation.resolve_slot(k, accessory_variants, catalog_movements, skill_ceiling, taken)  # #5075: rotation
         if key:
             taken.add(key)
         exposures.append(
             {
                 "kind": "accessory",
                 "pattern": None,
+                "slot": k,  # #5075: the template accessory this slot is (the movement may be its rotation variant)
                 "intensity": shape,
                 "movement_key": key,
                 "resolution_note": why,
@@ -1004,6 +1010,8 @@ def planned_session(
     role = entry.get("session_role")
     if role in SESSION_TEMPLATES:
         ib = in_block_variant.performed_in_block(block_workouts, catalog_movements, day)  # #4409
+        # #5075: the plan view computes the rotation (no hidden ledger read)
+        out["rotation"] = variant_rotation.for_session(out, catalog_movements or {}, read=False, skill_ceiling=skill_ceiling)
         applied = ((entry.get("deload_recommendation") or {}).get("applied_on")) or {}  # #5070: his recorded word's own cut
         out["prescription"] = session_prescription_for_role(
             role,
@@ -1012,6 +1020,7 @@ def planned_session(
             skill_ceiling=skill_ceiling,
             in_block=ib,
             deload_sets_pct=applied.get("sets_pct"),
+            accessory_variants=out["rotation"]["variants"],
         )
     return out
 

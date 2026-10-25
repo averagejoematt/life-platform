@@ -411,6 +411,19 @@ for _field in (
         "sleep_analysis, Apple devices only; writer-only footprint, no reader yet.",
     )
 
+# #4973: the all-type Apple workout summary. The workouts sibling writes it; the one-workout-
+# identity resolver reads the map's records by vendor key (id/name/start/end/duration/source) and
+# its public_projection strips names, places and device origins (tests/test_hae_workouts_all_types_4973.py).
+CONSUMERS[("lambdas/ingestion/health_auto_export_workouts.py", "apple_workouts")] = _d(
+    SAW,
+    "The Apple workout writer (#4973) stores one summary per HAE workout id under `apple_workouts`; writer-only footprint.",
+)
+CONSUMERS[("lambdas/training/workout_identity.py", "apple_workouts")] = _d(
+    SAW,
+    "The one-workout-identity resolver (#4973) reads `apple_workouts` records to cluster sessions; no live caller "
+    "yet, and every output goes through public_projection, which strips names, places and owner-only blocks.",
+)
+
 CONSUMERS[("lambdas/ingestion/health_auto_export_protein.py", "_rd_protein_hae")] = _d(
     SAW,
     "The HAE intraday protein writer (#5187) stores `_rd_protein_hae`; protein_nudge_runner reads it for the owner-only breakfast nudge.",

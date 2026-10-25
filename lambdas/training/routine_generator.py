@@ -96,6 +96,7 @@ class GeneratorInputs:
         deload_records: list[dict[str, Any]] | None = None,  # #5070: the owner's recorded deload words; None = read it here (fail-soft)
         disruption_records: list[dict[str, Any]] | None = None,  # #5088: his disruption-mode records; None = read it here (fail-soft)
         fitness_batteries: list[dict[str, Any]] | None = None,  # #5078: the battery records; None = read it here on a test day only
+        rotation_rows: list[dict[str, Any]] | None = None,  # #5075: the rotation ledger's rows; None = read it here (fail-soft)
     ) -> None:
         self.target_date = target_date
         self.recovery_tier = recovery_tier
@@ -109,6 +110,7 @@ class GeneratorInputs:
         self.deload_records = deload_records
         self.disruption_records = disruption_records
         self.fitness_batteries = fitness_batteries
+        self.rotation_rows = rotation_rows
 
 
 def _archetype_for_date(target_date: str, week_cfg: dict[str, Any]) -> str:

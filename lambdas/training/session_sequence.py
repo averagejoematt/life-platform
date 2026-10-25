@@ -581,6 +581,8 @@ def next_session(
             {k: last[k] for k in ("date", "title", "workout_id", "sequence_index", "loaded_logs_that_day")}
             | {"weekday": pacific_weekday(last["date"])}  # #5274
             | {"was": led[-2]["position_label"]}
+            # #5076: the role the sequence credited the last performed session as (the cardio menu's recumbent rule reads it)
+            | {"session_role": led[-2]["session_role"]}
             if last
             else None
         ),
@@ -627,11 +629,12 @@ def program_week(day: str, workouts: Iterable[dict[str, Any]] | None, deload_rec
     return entry.get("week")
 
 
-def block_boundaries(workouts: Iterable[dict[str, Any]] | None, before_day: str) -> list[str] | None:
-    """The dates on which a block after the first opened (the session that opened its first week)."""
+def block_boundaries(workouts: Iterable[dict[str, Any]] | None, before_day: str, every_weeks: int | None = None) -> list[str] | None:
+    """The dates on which a block after the first opened (the session that opened its first week). `every_weeks` (#5075)
+    counts a boundary every that many weeks instead — the accessory-rotation phases (`variant_rotation`), which divide a block."""
     if workouts is None:
         return None
-    per_block = int(_seq()["weeks_per_block"])
+    per_block = int(every_weeks or _seq()["weeks_per_block"])
     return [p["date"] for p in completed_positions(workouts, before_day) if p["week_basis"]["advanced_here"] and p["week"] % per_block == 1]
 
 

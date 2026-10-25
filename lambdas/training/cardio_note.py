@@ -317,13 +317,15 @@ def compose(
     recovery_band: str | None = None,
     hr_ceiling_bpm: int | None = None,
     placement_why: str | None = None,
+    previous: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """(the note, the audit). ≤ 2 lines; line 1 matches `LINE1_RE` and carries the dose.
 
     `kind` is the menu block (`cardio_menu.choose_kind`); None = the machine's easy kind. `constraint` is
     the active standing constraint (`standing_constraints.active_constraint`), None when there is none.
     `recovery_band` is the day's green/yellow/red when known, None at draft time (the note then answers
-    both branches). `hr_ceiling_bpm` is printed only when there is no constraint."""
+    both branches). `hr_ceiling_bpm` is printed only when there is no constraint. `previous` is
+    `cardio_menu.previous_performed` (the recumbent rule, ruling 2026-10-25 on #5076); None = not read."""
     from training import cardio_menu, standing_constraints
 
     machine = machine_for(movement_key) or str(movement_key).replace("_", " ").capitalize()
@@ -350,7 +352,7 @@ def compose(
 
     # #5076: a block off the default walk says why. A conditioning kind the menu never runs on the treadmill states
     # that (its machines are the reason, not the feet); every other case keeps the seated/on-your-feet sentence.
-    off = cardio_menu.off_default(kind, movement_key, archetype, recent_aerobic.legs_loaded(aerobic_block)[0])
+    off = cardio_menu.off_default(kind, movement_key, recent_aerobic.legs_loaded(aerobic_block)[0], previous)
     why = off["reason"] if off and off["charter"] and off["charter"].startswith("cardio_menu.blocks.") else ""
     parts = (
         recovery_answer(kind=kind, hold=hold, constraint=constraint, gate=gate, recovery_band=recovery_band),

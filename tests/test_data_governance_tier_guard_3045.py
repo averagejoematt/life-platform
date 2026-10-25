@@ -31,6 +31,7 @@ from health.rhythm_channel import CHANNEL_FIELDS as RHYTHM_CHANNEL_FIELDS  # noq
 from ingestion import (
     health_auto_export_protein as _hae_protein,  # noqa: E402
     health_auto_export_sleep as _apple_sleep,  # noqa: E402
+    health_auto_export_workouts as _hae_workouts,  # noqa: E402
 )
 from privacy.field_tiers import (  # noqa: E402
     FIELD_TIERS,
@@ -91,6 +92,8 @@ ROW_MAP: list[dict] = [
                 ("field", "apple_health", f)
                 for f in (*_apple_sleep.APPLE_SLEEP_FIELDS, _apple_sleep.RD_FIELD, *_hae_protein.HAE_PROTEIN_FIELDS)
             ),
+            # #4973: every Apple workout's summary (heart-rate series summaries, device, times) — raw biometrics.
+            ("field", "apple_health", _hae_workouts.WORKOUTS_FIELD),
         ],
     },
     {

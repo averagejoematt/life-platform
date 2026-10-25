@@ -103,3 +103,36 @@ def test_unreachable_aws_is_unverified_never_blank():
 
     lines = bb.red_alarm_lines(NOW, boom)
     assert len(lines) == 1 and "UNVERIFIED" in lines[0] and "no credentials" in lines[0]
+
+
+# --- #5137: LONG RED (> 3 days) -------------------------------------------------------------
+def _long(ages, cites=None):
+    red = [(age, name, "") for name, age in ages.items()]
+    return bb.long_red_lines(red, cites or {})
+
+
+def test_exactly_three_days_is_not_long_red():
+    assert _long({"a": dt.timedelta(days=3)}) == []
+
+
+def test_three_days_plus_one_second_is_long_red_and_uncited():
+    out = _long({"a": dt.timedelta(days=3, seconds=1)})
+    assert len(out) == 1 and "LONG RED" in out[0] and "UNCITED" in out[0] and "3d00h" in out[0]
+
+
+def test_long_red_carries_citation_and_orders_longest_first():
+    cites = {"old": {"citation": "#5257 owner act"}, "new": {"citation": "#1"}}
+    out = _long({"new": dt.timedelta(days=4), "old": dt.timedelta(days=9), "short": dt.timedelta(days=1)}, cites)
+    assert [("old" in o, "new" in o) for o in out] == [(True, False), (False, True)]
+    assert "#5257 owner act" in out[0]
+
+
+def test_region_tag_still_matches_citation():
+    out = bb.long_red_lines([(dt.timedelta(days=5), "x [us-east-1]", "")], {"x": {"citation": "#9"}})
+    assert "#9" in out[0] and "UNCITED" not in out[0]
+
+
+def test_red_alarm_lines_emits_long_red_for_fake_estate():
+    out = bb.red_alarm_lines(NOW, FakeCW)
+    assert any(line.lstrip().startswith("LONG RED") and "compute-pipeline-stale" in line for line in out)
+    assert not any(line.lstrip().startswith("LONG RED") and "ai-composite" in line for line in out)

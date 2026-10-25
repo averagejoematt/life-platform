@@ -4432,6 +4432,20 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/variant_rotation.py",
+      "partition": "training_constraints",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/training/variant_rotation.py",
+      "partition": "training_constraints",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/web/ask_retrieval.py",
@@ -8079,12 +8093,12 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 783,
+      "edges": 785,
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
       "partitions": 122,
-      "privacy_fields_owner_only": 68,
+      "privacy_fields_owner_only": 69,
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 24,
       "privacy_sources_owner_published": 3,
@@ -8093,9 +8107,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 386,
-        "sites_resolved": 984,
-        "sites_total": 1370
+        "sites_dynamic": 387,
+        "sites_resolved": 987,
+        "sites_total": 1374
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8148,6 +8162,7 @@
       "owner_only_fields": [
         "_rd_protein_hae",
         "_rd_sleep_apple",
+        "apple_workouts",
         "breathing_disturbances_apple",
         "sleep_awake_min_apple",
         "sleep_core_min_apple",
@@ -8887,6 +8902,7 @@
       "apple_health": {
         "_rd_protein_hae": "owner_only",
         "_rd_sleep_apple": "owner_only",
+        "apple_workouts": "owner_only",
         "breathing_disturbances_apple": "owner_only",
         "cardio_recovery_bpm_apple": "internal",
         "hrv_sdnn_apple": "internal",

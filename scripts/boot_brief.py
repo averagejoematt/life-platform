@@ -284,6 +284,9 @@ def render_lines(model: dict, now: _dt.datetime | None = None) -> list[str]:
 ALARM_REGIONS = ("us-west-2", "us-east-1")
 FLAP_WINDOW_HOURS = 24
 _MAX_HISTORY_PAGES = 5
+# #5137 — the alarm-hygiene rule: red > 3 days is fixed, retuned or retired the same week.
+LONG_RED_AFTER = _dt.timedelta(days=3)
+ALARM_CITATIONS_PATH = pathlib.Path(__file__).resolve().parent.parent / "docs" / "alarm_citations.json"
 
 
 def _fmt_duration(delta: _dt.timedelta) -> str:
@@ -303,6 +306,32 @@ def _entered_alarm(item: dict) -> bool:
         return (data.get("newState") or {}).get("stateValue") == "ALARM"
     except (ValueError, AttributeError):
         return "to ALARM" in (item.get("HistorySummary") or "")
+
+
+def _load_alarm_citations(path=None) -> dict:
+    """docs/alarm_citations.json as {alarm: entry}; missing/malformed reads as empty (every long-red then reads UNCITED)."""
+    try:
+        data = json.loads((path or ALARM_CITATIONS_PATH).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def long_red_lines(red: list, citations: dict | None = None) -> list[str]:
+    """#5137 — one LONG RED line per (age, name, note) alarm red STRICTLY longer than 3 days,
+    with its duration and the citation/owner from docs/alarm_citations.json, else UNCITED.
+    Exactly 3 days is not long-red. Pure: takes the already-read alarm list."""
+    cites = _load_alarm_citations() if citations is None else citations
+    out: list[str] = []
+    for age, name, _note in sorted(red, key=lambda r: -r[0].total_seconds()):
+        if age <= LONG_RED_AFTER:
+            continue
+        entry = cites.get(name.split(" [")[0])
+        text = (entry.get("citation") if isinstance(entry, dict) else entry) or ""
+        text = " ".join(str(text).split())
+        label = (text[:90] + ("..." if len(text) > 90 else "")) if text else "UNCITED"
+        out.append(f"  LONG RED    {name} — red {_fmt_duration(age)} (>3d: fix, retune or retire this week) — {label}")
+    return out
 
 
 def _make_cw_client(region: str):
@@ -362,6 +391,7 @@ def red_alarm_lines(now: _dt.datetime | None = None, client_factory=None, region
     red_names = {n for _, n, _ in red}
     for age, name, note in sorted(red, key=lambda r: -r[0].total_seconds()):
         lines.append(f"  RED ALARM   {name} — in ALARM for {_fmt_duration(age)}{note}")
+    lines.extend(long_red_lines(red))
     for name, (ts, _summary) in sorted(fired.items()):
         if name not in red_names:
             lines.append(f"  flapped 24h {name} — fired {_fmt_duration(now - ts)} ago, now cleared")

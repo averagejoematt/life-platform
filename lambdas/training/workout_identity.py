@@ -37,6 +37,16 @@ Apple's `route`, Strava's polyline and `location_*`, any lat/lon/GPS field and e
 drops that block and strips any `OWNER_ONLY_KEYS` key at any depth; tests/test_workout_identity_4973.py
 pins it.
 
+THE STORED APPLE RECORD
+
+Since #4973's capture lane every Apple workout of every type is stored on the apple_health day row
+as `apple_workouts` (one summary per HAE workout id — `ingestion.health_auto_export_workouts`);
+`apple_members` takes those day rows directly. The rows are keyed by the UTC day of the workout's
+start, so a reader resolving a Pacific day passes the neighbouring row too — a vendor id seen on
+both is one member. A workout another app wrote into HealthKit (WHOOP, Hevy) is the source
+`apple_health/<origin>`, distinct from the watch's own `apple_health`, so it can fold into the
+watch's identity instead of standing beside it.
+
 Pure functions only — no AWS. Wired into no live reader yet: walking_volume's #4068 de-dup is a
 different, ruled rule (a partly-overlapping Strava walk keeps its UNcovered seconds), so it is
 cross-checked against this resolver in tests rather than routed through it.
@@ -79,6 +89,8 @@ APPLE_FAMILY: dict[str, str] = {
     "cycling": "cycling",
     "outdoor cycle": "cycling",
     "indoor cycle": "cycling",
+    "outdoor cycling": "cycling",  # the name HAE sends for a watch ride (live raw archive, 2026-10-21)
+    "indoor cycling": "cycling",
     "traditional strength training": "strength",
     "functional strength training": "strength",
     "strength training": "strength",
@@ -148,10 +160,39 @@ def _hevy_family(name: str) -> Optional[str]:
 # ── members: one normalised record per (source, vendor id, family) ───────────────────
 
 
+_APPLE_DEVICE_TOKENS = ("apple watch", "iphone", "ipad")
+
+
+def _apple_source(w: dict[str, Any]) -> str:
+    """`apple_health` for a workout the watch/phone recorded (or one with no origin on record);
+    `apple_health/<origin>` for one another app wrote INTO HealthKit (a WHOOP or Hevy workout
+    HAE re-exports) — so the two are distinct sources the resolver may fold into one identity,
+    never two records of one source that it must keep apart."""
+    src = w.get("source")
+    name = str((src.get("name") if isinstance(src, dict) else src) or "").replace("\xa0", " ").strip().lower()
+    if not name or any(tok in name for tok in _APPLE_DEVICE_TOKENS):
+        return "apple_health"
+    return "apple_health/" + "".join(ch if ch.isalnum() else "_" for ch in name).strip("_")
+
+
+def _apple_records(items: Iterable[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """Bare workout records, or apple_health DATE# day rows whose `apple_workouts` map
+    (health_auto_export_workouts.py, #4973) holds one summary per HAE workout id."""
+    out: list[dict[str, Any]] = []
+    for item in items or ():
+        nested = item.get("apple_workouts")
+        if isinstance(nested, dict):
+            out.extend(v for v in nested.values() if isinstance(v, dict))
+        else:
+            out.append(item)
+    return out
+
+
 def apple_members(workouts: Iterable[dict[str, Any]] | None) -> list[dict[str, Any]]:
-    """Apple workouts as HAE's `process_workouts` records them: {id, name, start, end, duration_min, route?…}."""
+    """Apple workouts: HAE's `process_workouts` records ({id, name, start, end, duration_min, route?…}),
+    the stored `apple_workouts` summaries (vendor `duration` in seconds), or day rows carrying them."""
     out = []
-    for w in workouts or ():
+    for w in _apple_records(workouts):
         name = str(w.get("name") or "")
         start, end = _parse(w.get("start")), _parse(w.get("end"))
         seconds = _float(w.get("duration_min")) * 60.0 or _float(w.get("duration"))
@@ -161,7 +202,7 @@ def apple_members(workouts: Iterable[dict[str, Any]] | None) -> list[dict[str, A
             seconds = (end - start).total_seconds()
         out.append(
             {
-                "source": "apple_health",
+                "source": _apple_source(w),
                 "id": str(w.get("id") or ""),
                 "family": APPLE_FAMILY.get(name.strip().lower(), "other:" + name.strip().lower()),
                 "start": start,

@@ -350,13 +350,13 @@ function verifyDeviceLinks() {
 }
 
 function verifyRawSample() {
-  // One real day (2026-06-15), straight from DynamoDB — partition/sort keys (pk/sk,
+  // One real day (2026-09-20, inside the current experiment, day 15), straight from DynamoDB — partition/sort keys (pk/sk,
   // which carry the internal user-id shape) stripped; every remaining field is exactly
   // what the ingestion pipeline wrote, unedited. #4976: the Garmin half of this sample
   // is gone with the Garmin comparison (its stored rows are untouched).
-  const whoop = { source: "whoop", date: "2026-06-15", phase: "experiment", ingested_at: "2026-06-15T23:00:41.814388+00:00", resting_heart_rate: 61, hrv: 42.34, recovery_score: 76, sleep_duration_hours: 10.4, sleep_efficiency_percentage: 96.74, respiratory_rate: 13.3, strain: 3.56 };
-  return sec("A raw payload, identifiers stripped", `<p class="rd-prose">One real night (June 15), as Whoop actually reported it. Partition/sort keys (the internal row-id shape) are removed; every other field is untouched.</p>` +
-    `<pre class="rd-code">// Whoop — DATE#2026-06-15\n${esc(JSON.stringify(whoop, null, 2))}</pre>` +
+  const whoop = { source: "whoop", date: "2026-09-20", phase: "experiment", ingested_at: "2026-09-23T04:00:34.808956+00:00", resting_heart_rate: 53, hrv: 51.38, recovery_score: 97, sleep_duration_hours: 7.51, sleep_efficiency_percentage: 81.52, respiratory_rate: 13.6, strain: 13.19 };
+  return sec("A raw payload, identifiers stripped", `<p class="rd-prose">One real night from this experiment (September 20), as Whoop actually reported it. Partition/sort keys (the internal row-id shape) are removed; every other field is untouched.</p>` +
+    `<pre class="rd-code">// Whoop — DATE#2026-09-20\n${esc(JSON.stringify(whoop, null, 2))}</pre>` +
     "");
 }
 

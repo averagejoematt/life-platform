@@ -59,6 +59,17 @@ def with_served_kinds(
     return cardio_menu.annotate_served(cardio_index, served, catalog)
 
 
+def previous_of(spec: Any, target_date: str) -> dict[str, Any] | None:
+    """The previous PERFORMED lifting session for a draft (#5076, ruling 2026-10-25): the session the Hevy sequence last
+    credited and its role (`inputs_snapshot["calendar"]["advanced_by"]`, `session_sequence.next_session`), so the cardio
+    menu reads it without a second Hevy read. None when the draft carries no calendar (a chat draft): not read."""
+    from training import cardio_menu
+
+    snap = getattr(spec, "inputs_snapshot", None)
+    cal = (snap or {}).get("calendar") if isinstance(snap, dict) else None
+    return cardio_menu.previous_performed((cal or {}).get("advanced_by") if isinstance(cal, dict) else None, target_date)
+
+
 def attach_cardio_cues(
     spec: Any,
     catalog: dict[str, Any] | None = None,
@@ -133,6 +144,7 @@ def attach_cardio_cues(
     target_date = str(getattr(spec, "target_date", "") or "")[:10]
     constraint = standing_constraints.active_constraint(target_date) if target_date else None
     archetype = getattr(spec, "archetype", "") or ""
+    previous = previous_of(spec, target_date)
 
     def _tid(key: str) -> str | None:
         return movements.get(key, {}).get("hevy_template_id_hint") or (key[5:] if key.startswith("tmpl:") else None)
@@ -168,6 +180,7 @@ def attach_cardio_cues(
                 legs_loaded=loaded,
                 last_tempo_or_hills=hist["last_tempo_or_hills"],
                 machines=(key,),
+                previous=previous,
             )
             kind, why = pick["kind"], pick["why"]
         note, audit = cardio_note.compose(
@@ -183,6 +196,7 @@ def attach_cardio_cues(
             constraint=constraint,
             hr_ceiling_bpm=None if constraint else recent_aerobic.HR_CEILING_BPM,
             placement_why=why,
+            previous=previous,
         )
         placed.append(audit["kind"])
         if existing and not cardio_note.is_composed(existing) and existing != note:

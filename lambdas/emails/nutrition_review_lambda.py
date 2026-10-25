@@ -591,7 +591,9 @@ Write clean HTML with inline styles. Design:
 {colors_text}
 - Unified section: border #4cc9f0
 - Grocery list: checkboxes for print
-- ~1500-2000 words. No <html>/<head>/<body> tags.
+- ~1000-1400 words. Finish every expert section and the unified section: a short complete edition beats a long one cut off mid-list. No <html>/<head>/<body> tags.
+- Put inline styles on the section and card containers only; never repeat a style attribute on every <p>, <span> or <li> inside them.
+- When you report what he LOGGED (a past day's intake), say so on the same line ("logged ... kcal on Tuesday"); never phrase a reported figure as something he should eat.
 - Each expert section in a div with border-left, padding, margin-bottom.
 - Section headers: font-size 15px, font-weight 700, color matching border.
 
@@ -690,7 +692,9 @@ Write clean HTML with inline styles. Design:
 - Webb card: left border #10b981. Patel: #8b5cf6. Okafor: #f59e0b
 - Unified section: border #4cc9f0
 - Grocery list: checkboxes for print
-- ~1500-2000 words. No <html>/<head>/<body> tags.
+- ~1000-1400 words. Finish every expert section and the unified section: a short complete edition beats a long one cut off mid-list. No <html>/<head>/<body> tags.
+- Put inline styles on the section and card containers only; never repeat a style attribute on every <p>, <span> or <li> inside them.
+- When you report what he LOGGED (a past day's intake), say so on the same line ("logged ... kcal on Tuesday"); never phrase a reported figure as something he should eat.
 - Each expert section in a div with border-left, padding, margin-bottom.
 - Section headers: font-size 15px, font-weight 700, color matching border.
 
@@ -735,16 +739,25 @@ def build_user_message(data):
     return json.dumps(payload, indent=2, default=str)
 
 
+# #5324: 4096 truncated the 2026-10-24 edition (output_tokens=4096). Same reasoning as the Weekly Plate
+# (#5299): inline-styled HTML runs ~15.8 chars a visible word, i.e. ~5,400-9,500 tokens for the prompt's
+# former 1,500-2,000 words. The prompt is now bounded to ~1,000-1,400 words with styles on containers
+# only, and the cap leaves headroom. Timing: 8192 tokens at the slowest observed ~87 tok/s is ~94 s, so
+# the call's HTTP timeout is 150 s (was 90), well inside the Lambda's 300 s.
+MAX_OUTPUT_TOKENS = 8192
+CALL_TIMEOUT_SECONDS = 150
+
+
 def call_anthropic(system_prompt, user_message):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
     from common import retry_utils
 
     return retry_utils.call_anthropic_api(
         prompt=user_message,
-        max_tokens=4096,
+        max_tokens=MAX_OUTPUT_TOKENS,
         system=system_prompt,
         temperature=0.3,
-        timeout=90,
+        timeout=CALL_TIMEOUT_SECONDS,
     )
 
 
@@ -995,7 +1008,7 @@ _NO_FOOD_LOG_HTML = (
     "</div>"
 )
 
-# A compliant edition is ~1500-2000 words of inline-styled HTML — far past the
+# A compliant edition is ~1000-1400 words of inline-styled HTML — far past the
 # validator's 5k default, which would otherwise emit the "unusually long" WARN on
 # every single edition and mean nothing. This bound is set from the shape the
 # prompt actually demands, so the warning still fires on runaway generation.

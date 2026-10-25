@@ -236,6 +236,20 @@ def extract_plate_summary(ai_content, top_food_names, date_str):
     return summary
 
 
+def plate_qa_record(val):
+    """#5297: the AI-3 verdict as a DynamoDB-safe map (strings, ints, bools only), so the stored
+    edition shows whether it passed, which warnings fired and each day's meal sum."""
+    return {
+        "validator": "blocked" if val.blocked else ("warned" if getattr(val, "warnings", None) else "passed"),
+        "blocked_reason": getattr(val, "block_reason", "") or "",
+        "warnings": [str(w)[:300] for w in (getattr(val, "warnings", None) or [])[:10]],
+        "day_sums": {
+            str(day)[:60]: {k: (v if isinstance(v, (bool, str)) else int(v)) for k, v in entry.items()}
+            for day, entry in (getattr(val, "day_sums", None) or {}).items()
+        },
+    }
+
+
 def store_plate_summary(summary, today_str):
     """Store condensed plate summary to platform_memory DDB partition."""
     try:
@@ -252,6 +266,9 @@ def store_plate_summary(summary, today_str):
             item["wildcard"] = summary["wildcard"]
         if summary.get("recipes"):
             item["recipes"] = summary["recipes"]
+        if summary.get("qa"):
+            item["qa"] = summary["qa"]
+            item["blocked_reason"] = summary["qa"].get("blocked_reason", "")
         table.put_item(Item=item)
         logger.info(
             f"Plate summary stored: {today_str} | wildcard='{summary.get('wildcard', '')}' | recipes={len(summary.get('recipes', []))}"
@@ -692,6 +709,7 @@ def lambda_handler(event, context):
     # replayed into later meal-planning prompts. A flag set where the failure happens
     # cannot drift the way a substring probe of model-authored HTML does.
     ai_written = True
+    qa = {"validator": "not_run"}  # #5297: the AI-3 verdict, stored with the edition
     try:
         ai_content = call_anthropic(system_prompt, user_message)
     except Exception as e:
@@ -702,6 +720,7 @@ def lambda_handler(event, context):
     # AI-3: Validate output before rendering
     if _HAS_AI_VALIDATOR and ai_content and ai_written:
         _val = validate_ai_output(ai_content, AIOutputType.NUTRITION_COACH)
+        qa = plate_qa_record(_val)
         if _val.blocked:
             logger.error(f"[AI-3] Weekly Plate output BLOCKED: {_val.block_reason}")
             ai_content = _val.safe_fallback or AI_UNAVAILABLE_HTML
@@ -720,6 +739,7 @@ def lambda_handler(event, context):
         patterns_store = analyze_food_patterns(all_foods_store)
         top_food_names = [f["name"] for f in patterns_store.get("top_foods", [])[:8]]
         plate_summary = extract_plate_summary(ai_content, top_food_names, dates["end"])
+        plate_summary["qa"] = qa
         store_plate_summary(plate_summary, today_str)
     except Exception as e:
         logger.warning(f"Plate summary storage failed (non-fatal): {e}")

@@ -731,6 +731,22 @@ def _device_dead_men_rows():
         return [{"key": "watch", "label": "Device dead-man check", "status": "unknown", "detail": f"{type(e).__name__}: {e}"}]
 
 
+def _device_metric_group_rows():
+    """#4970: per-metric-group Apple Watch staleness (registry `device_group` facet, `stale_days`
+    bar). Report-only like the dead-man; a failed check is a row saying so."""
+    try:
+        from ingestion.watch_presence import check_metric_groups
+
+        return check_metric_groups(table, pacific_now())
+    except Exception as e:  # noqa: BLE001
+        logger.warning("device metric-group check failed: %s", e)
+        return [{"key": "watch_groups", "label": "Device metric-group check", "status": "unknown", "detail": f"{type(e).__name__}: {e}"}]
+
+
+def _device_rows():
+    return {"device_dead_men": _device_dead_men_rows(), "device_metric_groups": _device_metric_group_rows()}
+
+
 def tool_get_freshness_status(args):
     """Per-source data freshness summary (WR-48 Enhancement 4, PR-reentry-4).
 
@@ -965,8 +981,6 @@ def tool_get_freshness_status(args):
         if _stale_art:
             overall = "red"
 
-    device_dead_men = _device_dead_men_rows()  # #4970: report-only; the checker Lambda pages
-
     # "stale_sources" is the needs-attention bucket; an unreadable source belongs in
     # it, because the one thing it must never do is disappear from the answer.
     stale_sources = [s for s in per_source if s.get("status") in ("stale", "no_data", "unreadable")]
@@ -1068,7 +1082,7 @@ def tool_get_freshness_status(args):
         "paused_sources": paused_sources,
         "output_artifacts": output_artifacts,
         "output_artifacts_not_ok": [r["label"] for r in output_artifacts if r.get("status") != "fresh"],
-        "device_dead_men": device_dead_men,
+        **_device_rows(),  # #4970: device_dead_men (the checker Lambda pages) + device_metric_groups, both report-only
         "interior_gaps": interior_gaps,
         "interior_gap_count": interior_gap_count,
         "macrofactor_format_drift": macro_drift,

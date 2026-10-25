@@ -147,7 +147,7 @@ def draft_versioned(ir: RoutineSpec) -> RoutineSpec:
     stamp_charter_version(ir)
     existing = get_current(ir.routine_id)
     if not existing:
-        return put_versioned(ir)
+        return _record_rotation(put_versioned(ir))
     ir.parent_version = int(existing.version)
     ir.version = int(existing.version) + 1
     if existing.status != "archived":
@@ -156,7 +156,20 @@ def draft_versioned(ir: RoutineSpec) -> RoutineSpec:
         ir.hevy_folder_id = ir.hevy_folder_id or existing.hevy_folder_id
         ir.hevy_pushed_at = ir.hevy_pushed_at or existing.hevy_pushed_at
     logger.info(f"re-draft of {ir.routine_id} adopted as version {ir.version} (hevy={ir.hevy_routine_id or 'unpushed'})")
-    return put_versioned(ir)
+    return _record_rotation(put_versioned(ir))
+
+
+def _record_rotation(ir: RoutineSpec) -> RoutineSpec:
+    """#5075: a persisted draft records its accessory rotation in the ledger (`variant_rotation.record_failsoft`, each phase
+    `if_not_exists` — the first draft of a phase decides it, a re-draft reads it back). Fail-soft: the draft has landed."""
+    from datetime import datetime, timezone
+
+    from training import variant_rotation
+
+    rotation = (getattr(ir, "inputs_snapshot", None) or {}).get("rotation")
+    if rotation and rotation.get("ledger_writes"):
+        variant_rotation.record_failsoft(rotation, _table, datetime.now(timezone.utc).isoformat(timespec="seconds"))
+    return ir
 
 
 def list_by_date_range(start_date: str, end_date: str, limit: int = 100) -> list[RoutineSpec]:

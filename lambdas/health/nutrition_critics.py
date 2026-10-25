@@ -144,7 +144,8 @@ def _overshoot_cap_flag(
     """The over-the-cap run as a flag: a WARNING under owner ruling 2026-10-23 R1 (`above_ceiling_action` warn — food is
     not pushed up), else a `change` of the one calorie step (#5205) from the 14-day mean."""
     step, warn = energy.get("step_kcal"), energy.get("ceiling_is_warning")
-    to = (mean14 + step) if (mean14 is not None and step is not None and not warn) else None
+    base = energy.get("target_kcal")  # the resolver's target (#5095), never the logged mean (#5325): the step moves the PLAN
+    to = (base + step) if (base is not None and step is not None and not warn) else None
     return _flag(
         "rate_over_cap_consecutive_weeks",
         "info" if warn else "change",
@@ -783,6 +784,15 @@ def _floor_miss_lines(packet: dict[str, Any]) -> list[str]:
     return [f["reason"] for f in packet.get("flags", []) if f["severity"] == "info" and f["metric"] in metrics]
 
 
+def _state_over_cap_run(v: dict[str, Any], packet: dict[str, Any]) -> None:
+    """#5325: an approve that sits beside a WARNING over-cap run (ruling R1: the ceiling is a warning) says so in its own
+    rationale, so the verdict and its counter never disagree silently. The verdict itself is unchanged."""
+    run_n = (packet.get("numbers") or {}).get("rate_over_cap_consecutive_weeks")
+    warned = any(f["metric"] == "rate_over_cap_consecutive_weeks" and f["severity"] == "info" for f in packet.get("flags", []))
+    if v.get("verdict") == "approve" and warned and run_n:
+        v["reason"] = f"approve — ceiling is a warning by ruling R1; rate over cap {run_n} consecutive weeks"
+
+
 def run(inputs: dict[str, Any], *, model_allowed: bool = False) -> dict[str, Any]:
     """Three verdicts over three packets, through `coach.critics`' deterministic layer and
     `reconcile` (the ONE verdict rule). This never runs a model: `model_allowed` is accepted
@@ -796,6 +806,7 @@ def run(inputs: dict[str, Any], *, model_allowed: bool = False) -> dict[str, Any
         v = reconcile(det, None, packet)
         v["model"] = {"paused": MODEL_PAUSED_REASON}
         v["unknown"] = list(packet.get("unknown", []))
+        _state_over_cap_run(v, packet)
         if lines := _floor_miss_lines(packet):
             v["floor_misses"] = lines
         if v.get("verdict") == "veto":

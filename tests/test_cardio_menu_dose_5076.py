@@ -2,8 +2,8 @@
 
 Every block carries a dose (a bike's level + his speed at it, a treadmill's incline + mph) and an RPE /
 talk-test target; the incline treadmill walk is the default 'cardio'; conditioning is placed twice a week
-(one tempo-or-hills, one intervals), never the same hard shape on consecutive days, the recumbent after a
-lower day or on loaded legs; progression is the same RPE at a higher level / incline, written as the reason;
+(one tempo-or-hills, one intervals), never the same hard shape on consecutive days, the recumbent for
+conditioning the day after Lower-heavy or on loaded legs (ruling 2026-10-25); progression is the same RPE at a higher level / incline, written as the reason;
 the 2026-10-10 constraint's "no push" half is retired from 2026-10-18; the `draft` path appends the day's
 block from the menu; and gym cardio minutes are exposed as `movement_minutes`.
 
@@ -124,7 +124,12 @@ def test_the_numbers_are_read_from_the_charter_not_restated(monkeypatch):
 # ── the default and the incline walk's starting dose (his treadmill history) ───────────
 def test_fresh_legs_on_an_upper_day_with_the_week_done_get_the_default_incline_walk():
     pick = cm.choose_kind(target_date="2026-10-23", archetype="Upper-volume", week_kinds=["tempo", "intervals"], legs_loaded=False)
-    assert pick == {"kind": "incline_treadmill_walk", "machine": "treadmill", "why": "the week's conditioning is done: easy", "needed": []}
+    assert pick == {
+        "kind": "incline_treadmill_walk",
+        "machine": "treadmill",
+        "why": "the week's conditioning is done: easy; the incline walk: an easy day stays on the walk (the session before was not read)",
+        "needed": [],
+    }
 
 
 def test_the_incline_walk_starts_at_the_band_floor_from_his_treadmill_history():
@@ -208,14 +213,21 @@ def test_the_week_places_two_conditioning_blocks_and_the_rest_easy():
     placed = cm.place_week(WEEK)
     kinds = [p["kind"] if p else None for p in placed]
     machines = [p["machine"] if p else None for p in placed]
-    assert kinds == ["tempo", "easy", "intervals", "incline_treadmill_walk", "easy", None, None], kinds
-    assert machines == ["cycling", "cycling", "cycling", "treadmill", "cycling", None, None], machines
+    assert kinds == ["tempo", "incline_treadmill_walk", "intervals", "incline_treadmill_walk", "incline_treadmill_walk", None, None], kinds
+    assert machines == ["cycling", "treadmill", "cycling", "treadmill", "treadmill", None, None], machines
     hard = [k for k in kinds if k in cm.HARD]
     assert len(hard) == cm.conditioning_per_wk() and "intervals" in hard and ({"tempo", "hills"} & set(hard))
     assert all(not (a in cm.HARD and a == b) for a, b in zip(kinds, kinds[1:])), "the same hard shape on consecutive days"
-    # the recumbent after a lower day: the day after Lower-heavy, and both lower days themselves
-    assert placed[2]["why"].endswith(f"the recumbent: the session before was {SEQ[1]}")
-    assert placed[1]["why"].endswith("the recumbent: a lower day") and placed[4]["why"].endswith("the recumbent: a lower day")
+    # ruling 2026-10-25 (#5076, "a"): the recumbent only for conditioning the day after Lower-heavy; lower days walk
+    assert placed[2]["why"].endswith(
+        f"the recumbent: conditioning the day after {SEQ[1]} (the session before was lower_heavy on 2026-10-20)"
+    )
+    assert placed[1]["why"].endswith("the incline walk: an easy day stays on the walk (the session before was upper_heavy on 2026-10-19)")
+    assert "the recumbent" not in placed[4]["why"]
+    # tempo on a fresh Monday rides the bike by the menu's own machines (no treadmill tempo), never by the recumbent rule
+    assert placed[0]["why"].endswith(
+        "tempo on the bike: the menu's machines for tempo (cardio_menu.blocks.tempo.machines), not the recumbent rule"
+    )
 
 
 def test_tempo_and_hills_alternate_week_to_week():

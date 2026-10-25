@@ -114,7 +114,12 @@ def green_withheld_reason(trip: dict[str, Any]) -> str | None:
 
 
 def cardio_block(
-    target_date: str, archetype: str, constraint: dict[str, Any] | None, layer: Any = None, cardio_index: dict[str, list] | None = None
+    target_date: str,
+    archetype: str,
+    constraint: dict[str, Any] | None,
+    layer: Any = None,
+    cardio_index: dict[str, list] | None = None,
+    previous: dict[str, Any] | None = None,
 ) -> tuple[Any, dict[str, Any]]:
     """(ExerciseBlock | None, pick) — the day's block from the charter's cardio menu (#5076).
 
@@ -124,7 +129,9 @@ def cardio_block(
     `rationale_tag` carries the kind (`cardio:<key>:menu:<kind>`) so the history pass that follows
     (`attach_cardio_cues`) doses the same block rather than re-placing it. `pick` is
     `recent_aerobic.cardio_pick` (the served stage-1 pick, HR fields dropped under the constraint) with the
-    menu's choice under `menu`. Under a constraint that forbids HR prescriptions the note carries no HR."""
+    menu's choice under `menu`. Under a constraint that forbids HR prescriptions the note carries no HR.
+    `previous` (`cardio_menu.previous_performed`) is the previous performed session: the recumbent serves a
+    conditioning block only the day after the heavy lower session (owner ruling 2026-10-25 on #5076)."""
     from training import cardio_menu, cardio_note, recent_aerobic
     from training.routine_ir import ExerciseBlock, Set
 
@@ -142,6 +149,7 @@ def cardio_block(
             prior_day_kind=hist["prior_day_kind"],
             legs_loaded=recent_aerobic.legs_loaded(layer)[0],
             last_tempo_or_hills=hist["last_tempo_or_hills"],
+            previous=previous,
         )
     except Exception as e:  # noqa: BLE001 — named, never a lost draft
         logger.warning("cardio block: pick failed: %s", e)
@@ -158,6 +166,7 @@ def cardio_block(
         constraint=constraint,
         hr_ceiling_bpm=pick.get("hr_ceiling_bpm"),
         placement_why=menu["why"],
+        previous=previous,
     )
     minutes = cardio_menu.block_minutes(kind)
     notes, audit = compose(kind, minutes)
@@ -172,7 +181,8 @@ def cardio_block(
         notes=notes,
         rationale_tag=f"cardio:{key}:menu:{audit['kind']}",
     )
-    return block, {**pick, "menu": {"kind": audit["kind"], "machine": key, "minutes": minutes, "why": menu["why"]}}
+    menu_out = {"kind": audit["kind"], "machine": key, "minutes": minutes, "why": menu["why"], "previous_session": previous}
+    return block, {**pick, "menu": menu_out}
 
 
 def _catalog() -> dict[str, Any]:
@@ -292,7 +302,12 @@ def gate_draft(ideal: Any, target_date: str, adapt: Callable[[dict[str, Any] | N
 
     # #5076: an empty-note ride counts as the kind its routine prescribed, so a performed tempo is not re-placed
     cardio_index = with_served_kinds(_cardio_index_failsoft(), target_date)
-    cardio, pick = cardio_block(target_date, getattr(ideal, "archetype", "") or "", constraint, layer=layer, cardio_index=cardio_index)
+    from training.cardio_cues import previous_of
+
+    previous = previous_of(ideal, target_date)  # #5076: the session the Hevy sequence last credited, from the calendar
+    cardio, pick = cardio_block(
+        target_date, getattr(ideal, "archetype", "") or "", constraint, layer=layer, cardio_index=cardio_index, previous=previous
+    )
     if cardio is not None:
         ideal.exercises.append(cardio)
         _refresh_session_shape(ideal)

@@ -539,6 +539,14 @@ def test_the_screen_is_meaningful_only_because_the_keys_differ():
 # ── H6: names never reach an off-box log ─────────────────────────────────────
 
 
+@pytest.fixture(autouse=True)
+def _hear_the_platform_logger(caplog):
+    """chat_summary logs on the worker's platform logger (#5106), which does not propagate to the root that caplog taps."""
+    ccs.logger.addHandler(caplog.handler)
+    yield
+    ccs.logger.removeHandler(caplog.handler)
+
+
 def _logged(caplog):
     return "\n".join([r.getMessage() for r in caplog.records] + [str(r.msg) for r in caplog.records])
 
