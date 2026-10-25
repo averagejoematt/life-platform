@@ -386,7 +386,63 @@ def note_contradiction_hits(analysis, metrics_record):
     return hits
 
 
-def _note_grounding_findings(analysis, prompt):
+# #5128: hit metric → the observed_facts key that can ground it.
+_HIT_FACT_KEY = {"resting HR": "rhr_bpm", "Whoop recovery": "recovery_pct", "HRV": "hrv_ms"}
+
+
+def _week_metrics_rows(week):
+    """The computed_metrics DAY rows of the note's ISO week (#5128) — the data the
+    week is about, not the newest row. ``week`` = (start, end) ISO dates; ``None``
+    keeps the legacy newest-row read for callers that pass no week."""
+    pk = "USER#matthew#SOURCE#computed_metrics"
+    if not week:
+        resp = table.query(KeyConditionExpression=Key("pk").eq(pk), ScanIndexForward=False, Limit=1)
+        return resp.get("Items", [])
+    start, end = week
+    resp = table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{start}", f"DATE#{end}~"))
+    return [i for i in resp.get("Items", []) if "sk" not in i or _DAY_SK_RE.match(str(i.get("sk", "")))]
+
+
+def _week_mean_row(rows):
+    """One synthetic row holding the week's mean of each grounding fact — a note's
+    'averaged 48%' is grounded by the week it summarises, not only by a single day."""
+    from experiment.canonical_facts import observed_facts
+
+    mean = {}
+    for key in _HIT_FACT_KEY.values():
+        vals = [v for v in (observed_facts(r).get(key) for r in rows) if v is not None]
+        if vals:
+            mean[key] = sum(vals) / len(vals)
+    return mean
+
+
+def week_contradiction_hits(analysis, rows):
+    """#5128 — contradiction hits against a WEEK of computed_metrics rows.
+
+    A metric's claim is a contradiction only if NO candidate (each day row of the
+    week, plus the week's mean) that carries that metric accepts it — a figure
+    present anywhere in the week's data is grounded. A claim that contradicts every
+    day of the week is still returned (reported against the newest day), so a number
+    absent from the week's data keeps the hold."""
+    from experiment.canonical_facts import observed_facts
+
+    rows = [r for r in rows or [] if r]
+    if not rows:
+        return []
+    rows = sorted(rows, key=lambda r: str(r.get("sk") or r.get("date") or ""))
+    candidates = rows + [_week_mean_row(rows)]
+    per_candidate = [(observed_facts(c), note_contradiction_hits(analysis, c)) for c in candidates]
+    out = []
+    for metric, key in _HIT_FACT_KEY.items():
+        carrying = [(facts, hits) for facts, hits in per_candidate if facts.get(key) is not None]
+        if not carrying or any(not any(h.get("metric") == metric for h in hits) for _, hits in carrying):
+            continue
+        day_carrying = [hits for facts, hits in per_candidate[: len(rows)] if facts.get(key) is not None] or [carrying[-1][1]]
+        out.extend(h for h in day_carrying[-1] if h.get("metric") == metric)  # reported against the newest day
+    return out
+
+
+def _note_grounding_findings(analysis, prompt, week=None):
     """#2426 — the standard ``grounding_findings`` chokepoint for the field note.
 
     Replaces the weaker single-check gate (hard_canonical_contradictions against one
@@ -400,6 +456,11 @@ def _note_grounding_findings(analysis, prompt):
     (the #812 extraction the golden-surface eval harness replays fixtures through);
     it stays best-effort — a missing metrics row degrades to allow-list-only gating,
     it no longer waves the note through entirely.
+
+    #5128: the contradiction check grounds against the NOTE'S OWN WEEK — every
+    ``computed_metrics`` day row in ``week`` = (start, end), plus the week's mean —
+    not the newest single row (``Limit=1``), which held a correct mid-week figure
+    and, on a manual past-week run, compared against a day outside the week.
 
     Fail-closed at the top level: if the gate machinery itself is unavailable or
     raises, a synthetic finding is returned and the caller HOLDS — a broken gate
@@ -422,15 +483,8 @@ def _note_grounding_findings(analysis, prompt):
         return [{"type": "gate_error", "detail": f"grounding gate unavailable ({type(e).__name__}) — note held, never served ungated"}]
 
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq("USER#matthew#SOURCE#computed_metrics"),
-            ScanIndexForward=False,
-            Limit=1,
-        )
-        items = resp.get("Items", [])
-        if items:
-            for h in note_contradiction_hits(analysis, items[0]):
-                findings.append({"type": "contradiction", **h})
+        for h in week_contradiction_hits(analysis, _week_metrics_rows(week)):
+            findings.append({"type": "contradiction", **h})
     except Exception as e:  # noqa: BLE001 — facts check stays best-effort; the allow-list classes above still gate
         logger.info(f"[grounding] canonical-facts check unavailable ({type(e).__name__}) — allow-list gating only")
     return findings
@@ -535,7 +589,7 @@ def generate_field_notes(iso_week):
     # and if the best draft STILL carries findings, the note is HELD: nothing is
     # written, so /api/field_notes never serves failed text (regenerate-once-
     # then-hold, the ADR-151/#2395 posture).
-    findings = _note_grounding_findings(analysis, prompt)
+    findings = _note_grounding_findings(analysis, prompt, week=(start, end))
     if findings:
         detail = "; ".join(str(f.get("detail", "")) for f in findings[:3])
         _draft_note = {f: analysis.get(f) for f in _NOTE_FIELDS}  # #812/#744: pre-rewrite note for retention
@@ -548,7 +602,7 @@ def generate_field_notes(iso_week):
         )
         try:
             retry = _call_notes_model(fix_prompt, api_key)
-            retry_findings = _note_grounding_findings(retry, prompt)
+            retry_findings = _note_grounding_findings(retry, prompt, week=(start, end))
             if len(retry_findings) < len(findings):
                 logger.info(f"[grounding] rewrite kept ({len(findings)} → {len(retry_findings)})")
                 analysis, findings = retry, retry_findings
