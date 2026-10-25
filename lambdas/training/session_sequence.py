@@ -581,6 +581,8 @@ def next_session(
             {k: last[k] for k in ("date", "title", "workout_id", "sequence_index", "loaded_logs_that_day")}
             | {"weekday": pacific_weekday(last["date"])}  # #5274
             | {"was": led[-2]["position_label"]}
+            # #5076: the role the sequence credited the last performed session as (the cardio menu's recumbent rule reads it)
+            | {"session_role": led[-2]["session_role"]}
             if last
             else None
         ),

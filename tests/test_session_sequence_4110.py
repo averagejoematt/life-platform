@@ -229,6 +229,7 @@ def test_the_committed_lower_heavy_performed_serves_upper_volume_next():
     assert (e["session_role"], e["archetype"], e["week"], e["session_in_week"]) == (UV, "upper", 1, 2)
     assert e["position_label"] == "week 1 · session 2 of 4 · upper-volume"
     assert e["advanced_by"]["date"] == FIRST_TARGET and e["advanced_by"]["was"] == "week 1 · session 1 of 4 · lower-heavy"
+    assert e["advanced_by"]["session_role"] == LH  # #5076: the cardio menu's recumbent rule reads the credited role
 
 
 def test_the_committed_lower_heavy_not_performed_is_still_next():

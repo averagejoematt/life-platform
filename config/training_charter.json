@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.31.0",
+  "version": "1.32.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -210,6 +210,13 @@
       "date": "2026-10-25",
       "by": "owner ruling 2026-10-25 (#5107, epic #5093; the travel kit #5104 reads the same window), verbatim: '20th-27th december is the mexico christmas trip.'",
       "what": "#5107: the late-December 2026 trip window is dated 2026-12-20 to 2026-12-27 in its one place, the travel.windows entry labelled 'late December 2026' (start and end, inclusive); nutrition.maintenance_weeks.windows[0] keeps null start and end and reads that window (dates_rule), so the planned maintenance week is now scheduled, not inert: the weekly titration holds the ordinary target for the ISO weeks 2026-12-14 and 2026-12-21, serves maintenance kcal on the eight dates, and holds the cut for the 14-day trend window after it. The travel kit (#5104) reads the same dates. The label stays 'late December 2026 trip'; no other trip detail is stored here.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.32.0",
+      "date": "2026-10-25",
+      "by": "owner ruling 2026-10-25 on #5076 (attended, Session CE), verbatim: \"a\" — option (a): \"after a lower day\" means only the day immediately after a heavy lower session, and only for conditioning blocks; easy days stay on the incline walk [restacked 1.31.0 -> 1.32.0 at the batch-2 merge, 2026-10-25]",
+      "what": "cardio_menu.placement.recumbent_after: \"a lower day\" -> \"the day immediately after a heavy lower session, for a conditioning block only\"; adds recumbent_after_session (Lower-heavy, a split.sequence name), recumbent_after_kinds (tempo, hills, intervals) and recumbent_after_rule. The previous session is the previous PERFORMED lifting session (the Hevy sequence), never the charter order and never today's own role: a lower session is no longer itself a recumbent day. On fresh legs a conditioning block takes the treadmill when its block lists it (hills), else the menu's own first machine (tempo and intervals list no treadmill, so they stay on the bike by cardio_menu.blocks.<kind>.machines, not by recumbent_after); the tempo/hills alternation is unchanged. The heavy-walking-weekend clause is unchanged. Weekly cardio minutes unchanged: every block keeps its menu minutes under split.session_minutes.cardio_block_max.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -528,11 +535,18 @@
       ],
       "the_rest": "easy",
       "recumbent_after": [
-        "a lower day",
+        "the day immediately after a heavy lower session, for a conditioning block only",
         "a heavy walking weekend"
       ],
+      "recumbent_after_session": "Lower-heavy",
+      "recumbent_after_kinds": [
+        "tempo",
+        "hills",
+        "intervals"
+      ],
+      "recumbent_after_rule": "the recumbent serves a conditioning block (tempo, hills, intervals) only when the previous PERFORMED lifting session (the Hevy sequence's last credited session and its role: training.session_sequence.next_session advanced_by) was recumbent_after_session and was performed the day before; an easy day after it stays on the incline treadmill walk; on fresh legs a conditioning block takes the treadmill when its block lists it (hills), else the menu's first machine for it (tempo, intervals: the treadmill is not among them)",
       "never_consecutive": "the same hard shape",
-      "rule": "conditioning 2x/wk (one tempo-or-hills, one intervals), every other block easy; the recumbent after a lower day or a heavy walking weekend; never the same hard shape on consecutive days"
+      "rule": "conditioning 2x/wk (one tempo-or-hills, one intervals), every other block easy; the recumbent for a conditioning block the day after a heavy lower session, or after a heavy walking weekend; never the same hard shape on consecutive days"
     },
     "movement_minutes": "gym cardio minutes count toward the daily steps/movement goal (steps.gym_cardio_minutes_count_toward_movement)"
   },

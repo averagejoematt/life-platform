@@ -15,9 +15,12 @@ WHAT IT DECIDES (pure: no I/O, no clock — every date is passed in)
     `conditioning_sessions_per_wk` times a week in `placement.conditioning_order` (one
     tempo-or-hills, then one intervals), every other block easy; never the same hard shape on
     consecutive days; a hard day is followed by an easy one while the week still has room;
-  * the MACHINE — the recumbent after a lower day (today's or the session before it in
-    `split.sequence`) or on loaded legs (a heavy walking weekend, `recent_aerobic.legs_loaded`);
-    otherwise the menu's default, the incline treadmill walk, for an easy block;
+  * the MACHINE — the recumbent for a CONDITIONING block the day immediately after a heavy lower
+    session (owner ruling 2026-10-25 on #5076, "a": `placement.recumbent_after_session`, read from the
+    previous PERFORMED session — `previous_performed`), or on loaded legs (a heavy walking weekend,
+    `recent_aerobic.legs_loaded`); an easy block stays on the menu's default, the incline treadmill walk,
+    and a conditioning block on fresh legs takes the treadmill when its block allows it (hills), else the
+    menu's own machines for it (tempo, intervals: never the treadmill, so the bike by the menu, not the rule);
   * the DOSE — bike: the level (the last ride's, one up on a `cardio_progression.level_verdict`
     raise: same RPE at a higher level) and the speed he rides at it; treadmill: incline % and mph
     from his treadmill history inside the charter's starting band, one step up when the last two
@@ -145,14 +148,17 @@ def _or_list(words: list[str]) -> str:
     return words[0] if len(words) == 1 else ", ".join(words[:-1]) + " or " + words[-1]
 
 
-def off_default(kind: str, movement_key: str, archetype: Any = "", legs_loaded: bool | None = None) -> dict[str, Any] | None:
+def off_default(
+    kind: str, movement_key: str, legs_loaded: bool | None = None, previous: dict[str, Any] | None = None
+) -> dict[str, Any] | None:
     """Why today's block is not the menu's default (the incline treadmill walk), with the charter key that makes it so;
     None when it is the default. #5076: the live drafts served the bike day after day and said nothing about the walk.
 
     A conditioning kind the menu never runs on the treadmill (tempo, intervals: `cardio_menu.blocks.<kind>.machines`)
-    is on the bike/elliptical/rower BY CHARTER; an easy or hills block off the treadmill is the recumbent rule
-    (`cardio_menu.placement.recumbent_after`: a lower day, loaded legs); otherwise the block's machine was fixed by
-    its author (a chat draft), which no charter line decides."""
+    is on the bike/elliptical/rower BY CHARTER; a hills block on the recumbent the day after a heavy lower session, or
+    any block on loaded legs, is the recumbent rule (`cardio_menu.placement.recumbent_after`, ruling 2026-10-25: an easy
+    block after a heavy lower session is NOT — easy days stay on the walk); otherwise the block's machine was fixed by
+    its author (a chat draft), which no charter line decides. `previous` is `previous_performed`'s answer."""
     if movement_key == TREADMILL and kind in ("incline_treadmill_walk", "run_walk"):
         return None
     machines = list(block(kind).get("machines") or [])
@@ -164,9 +170,16 @@ def off_default(kind: str, movement_key: str, archetype: Any = "", legs_loaded: 
         }
     if movement_key == TREADMILL:  # hills on the treadmill: the week's conditioning slot
         return {"reason": f"{kind.capitalize()} is the week's conditioning slot.", "charter": "cardio_menu.placement.conditioning_order"}
-    if is_lower(archetype) or legs_loaded:
-        why = "a lower day" if is_lower(archetype) else "loaded legs"
-        return {"reason": f"The recumbent after {why}, in place of the incline walk.", "charter": "cardio_menu.placement.recumbent_after"}
+    if kind in recumbent_after_kinds() and movement_key == RECUMBENT and after_heavy_lower(previous):
+        return {
+            "reason": f"The recumbent: conditioning the day after {recumbent_after_session()}, in place of the incline walk.",
+            "charter": "cardio_menu.placement.recumbent_after",
+        }
+    if legs_loaded:
+        return {
+            "reason": "The recumbent after loaded legs, in place of the incline walk.",
+            "charter": "cardio_menu.placement.recumbent_after",
+        }
     if legs_loaded is None:
         return {"reason": "The recumbent: the walking load was not read.", "charter": None}
     return {"reason": f"The block was drafted on the {MACHINE_WORD.get(movement_key, movement_key)}.", "charter": None}
@@ -215,14 +228,49 @@ def is_lower(archetype: Any) -> bool:
     return str(archetype or "").strip().lower() in lower_names()
 
 
-def session_before(archetype: Any) -> str | None:
-    """The session before `archetype` in `split.sequence` (wrapping), or None when it is not a sequence name."""
-    seq = [str(s) for s in training_charter.charter_value("split.sequence", []) or []]
-    low = [s.lower() for s in seq]
-    a = str(archetype or "").strip().lower()
-    if a not in low:
+def recumbent_after_session() -> str:
+    """The `split.sequence` name whose next day puts conditioning on the recumbent (`placement.recumbent_after_session`,
+    owner ruling 2026-10-25 on #5076), read with no fallback: a missing key is a loud error."""
+    name = placement().get("recumbent_after_session")
+    if not name:
+        raise KeyError("training charter has no cardio_menu.placement.recumbent_after_session")
+    return str(name)
+
+
+def recumbent_after_kinds() -> tuple[str, ...]:
+    """The conditioning kinds the recumbent rule covers (`placement.recumbent_after_kinds`)."""
+    return tuple(str(k) for k in placement().get("recumbent_after_kinds") or ())
+
+
+def previous_performed(advanced_by: dict[str, Any] | None, target_date: str) -> dict[str, Any] | None:
+    """{role, date, day_before} of the previous PERFORMED lifting session, or None when it was not read.
+
+    `advanced_by` is `session_sequence.next_session(...)["advanced_by"]` — the last credited Hevy session and the role the
+    sequence credited it as (the draft's `inputs_snapshot["calendar"]`, so no second read). `day_before` is True when it
+    was performed on the Pacific day before `target_date`: the ruling's "the day immediately after"."""
+    from common.pacific_time import shift_day_key
+
+    if not isinstance(advanced_by, dict) or not advanced_by.get("session_role") or not advanced_by.get("date"):
         return None
-    return seq[(low.index(a) - 1) % len(seq)]
+    day = str(advanced_by["date"])[:10]
+    try:
+        yesterday = shift_day_key(str(target_date)[:10], -1)
+    except (TypeError, ValueError):
+        yesterday = None
+    return {"role": str(advanced_by["session_role"]), "date": day, "day_before": day == yesterday}
+
+
+def after_heavy_lower(previous: dict[str, Any] | None) -> bool:
+    """True when the previous performed session was the heavy lower session AND it was yesterday (ruling 2026-10-25)."""
+    from training.program_structure import role_id
+
+    return bool(previous and previous.get("day_before") and previous.get("role") == role_id(recumbent_after_session()))
+
+
+def _previous_words(previous: dict[str, Any] | None) -> str:
+    if not previous:
+        return "the session before was not read"
+    return f"the session before was {previous['role']} on {previous['date']}"
 
 
 # ── placement ─────────────────────────────────────────────────────────────────────────
@@ -334,6 +382,7 @@ def choose_kind(
     machines: tuple[str, ...] | None = None,
     days_left: int | None = None,
     run_walk: dict[str, Any] | None = None,
+    previous: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """{kind, machine, why} for today's block. `machines` restricts the choice to a block that is already
     on one machine (a chat-drafted bike); None lets the menu pick the machine too.
@@ -342,7 +391,14 @@ def choose_kind(
 
     `run_walk` (#5090) is `run_onramp.run_day_verdict` for today: once the run gate is open, an eligible day's
     EASY slot becomes the run/walk block (kind `run_walk`, on the treadmill, with its block) — never a conditioning
-    slot, and never under a yellow/red recovery band."""
+    slot, and never under a yellow/red recovery band.
+
+    `previous` (`previous_performed`) decides the recumbent (owner ruling 2026-10-25 on #5076, "a"): a conditioning
+    block goes on the recumbent only the day immediately after the heavy lower session; an easy block stays on the
+    incline walk; on fresh legs a conditioning block takes the treadmill when its block allows it (hills), else the
+    menu's first machine for it. The tempo/hills alternation is unchanged. Loaded or unread walking legs keep
+    the recumbent for every block (`placement.recumbent_after`'s second clause, unchanged). Today's own role is never
+    the trigger."""
     week = list(week_kinds or [])
     order = list(placement().get("conditioning_order") or [])[: conditioning_per_wk()]
     done = [k for k in week if k in HARD]
@@ -355,16 +411,9 @@ def choose_kind(
         else:
             needed.append(slot)
     left = lifting_days_left(target_date) if days_left is None else int(days_left)
-    lower_today = is_lower(archetype)
-    before = session_before(archetype)
-    lower_before = is_lower(before) if before else False
-    recumbent_why = (
-        "a lower day"
-        if lower_today
-        else (f"the session before was {before}" if lower_before else ("the legs carry a heavy walking load" if legs_loaded else None))
-    )
-    if legs_loaded is None and not (lower_today or lower_before):
-        recumbent_why = "the walking load was not read"
+    heavy = after_heavy_lower(previous)
+    walk_why = "the legs carry a heavy walking load" if legs_loaded else ("the walking load was not read" if legs_loaded is None else None)
+    bike_conditioning = heavy or walk_why is not None
 
     kind, why = None, ""
     if recovery_band in ("yellow", "red"):
@@ -384,14 +433,13 @@ def choose_kind(
             break
         if kind is None:
             why = f"yesterday was {prior_day_kind}: never the same hard shape twice running"
-    on_recumbent = recumbent_why is not None
     if kind is None:
-        kind = "easy" if on_recumbent else default_kind()
+        kind = "easy" if walk_why else default_kind()
+    on_recumbent = (kind in HARD and bike_conditioning) or (kind not in HARD and walk_why is not None)
     machine = _machine_for(kind, on_recumbent)
     if machines:
         machine, kind = _fit_machine(kind, machines)
-    if on_recumbent and machine == RECUMBENT:
-        why += f"; the recumbent: {recumbent_why}"
+    why += "; " + _machine_why(kind, machine, heavy, walk_why, previous)
     if run_walk and run_walk.get("eligible") and kind not in HARD and recovery_band not in ("yellow", "red") and not machines:
         return {
             "kind": "run_walk",
@@ -403,10 +451,29 @@ def choose_kind(
     return {"kind": kind, "machine": machine, "why": why, "needed": needed}
 
 
+def _machine_why(kind: str, machine: str, heavy: bool, walk_why: str | None, previous: dict[str, Any] | None) -> str:
+    """Why the bike or the walk (#5076): the rule that put the block on its machine, in words, with the session before."""
+    word = MACHINE_WORD.get(machine, machine.replace("_", " "))
+    if machine == RECUMBENT and kind in HARD and heavy:
+        return f"the recumbent: conditioning the day after {recumbent_after_session()} ({_previous_words(previous)})"
+    if machine == RECUMBENT and walk_why:
+        return f"the recumbent: {walk_why}"
+    if machine == TREADMILL and kind == "hills":
+        return f"hills on the treadmill: fresh legs ({_previous_words(previous)}; the recumbent is for conditioning the day after {recumbent_after_session()})"
+    if machine == TREADMILL:
+        tail = f", also the day after {recumbent_after_session()}" if heavy else ""
+        return f"the incline walk: an easy day stays on the walk{tail} ({_previous_words(previous)})"
+    if kind in HARD:
+        return f"{kind} on the {word}: the menu's machines for {kind} (cardio_menu.blocks.{kind}.machines), not the recumbent rule"
+    return f"the {word}: the block's machine was fixed by its author"
+
+
 def _machine_for(kind: str, on_recumbent: bool) -> str:
     machines = list(block(kind).get("machines") or [])
     if on_recumbent and RECUMBENT in machines:
         return RECUMBENT
+    if not on_recumbent and TREADMILL in machines:
+        return TREADMILL
     if machines:
         return machines[0]
     return RECUMBENT
@@ -433,19 +500,28 @@ def place_week(
     The same rule `choose_kind` applies to a single draft, iterated so the week can be read whole.
 
     `run_gate` (#5090, `run_onramp.gate_state`): once open, each day is offered a run/walk at `run_level` through
-    `run_onramp.run_day_verdict` — the weekly cap counts `runs_done` plus the runs placed so far."""
+    `run_onramp.run_day_verdict` — the weekly cap counts `runs_done` plus the runs placed so far.
+
+    #5076: each day's `previous` is the lifting day placed before it in this week (its archetype as the role), or the
+    day's own `previous` when it carries one (the first day reads the performed session before the week)."""
     from training import run_onramp
+    from training.program_structure import role_id
 
     out: list[dict[str, Any] | None] = []
     week: list[str] = []
     prior: str | None = None
     runs = int(runs_done)
     lifting = [d for d in days if d.get("archetype")]
+    before: dict[str, Any] | None = None
     for d in days:
         if not d.get("archetype"):
             out.append(None)
             prior = None
             continue
+        previous = d.get("previous") or (
+            previous_performed({"session_role": before["role"], "date": before["date"]}, d["date"]) if before else None
+        )
+        before = {"role": role_id(d["archetype"]), "date": d["date"]}
         left = len(lifting) - sum(1 for x in out if x)
         pick = choose_kind(
             target_date=d["date"],
@@ -456,6 +532,7 @@ def place_week(
             last_tempo_or_hills=last_tempo_or_hills,
             days_left=left,
             run_walk=run_onramp.run_day_verdict(d["archetype"], gate=run_gate, runs_this_week=runs, level=run_level) if run_gate else None,
+            previous=previous,
         )
         runs += pick["kind"] == "run_walk"
         out.append(pick)

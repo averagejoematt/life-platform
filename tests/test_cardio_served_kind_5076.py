@@ -117,7 +117,7 @@ LIVE_ROUTINES = [
 ]
 
 
-def _ideal(archetype: str, role: str) -> RoutineSpec:
+def _ideal(archetype: str, role: str, advanced_by: dict | None = None) -> RoutineSpec:
     d = FIX5000["draft_2167c0e68e25f311d46f1015cbefc047"]
     exercises = [
         ExerciseBlock(
@@ -129,13 +129,15 @@ def _ideal(archetype: str, role: str) -> RoutineSpec:
         )
         for e in d["exercises"]
     ]
-    snap = {"calendar": {"session_role": role}}
+    snap = {"calendar": {"session_role": role, "advanced_by": advanced_by}}
     return RoutineSpec(
         routine_id=f"fixture-{role}", target_date=DAY, archetype=archetype, variant="ideal", exercises=exercises, inputs_snapshot=snap
     )
 
 
-def _predraft(monkeypatch, *, archetype: str, role: str, layer: dict, items=None, routines=None, routines_fail: bool = False) -> tuple:
+def _predraft(
+    monkeypatch, *, archetype: str, role: str, layer: dict, items=None, routines=None, routines_fail: bool = False, advanced_by=None
+) -> tuple:
     """The nightly pre-draft's draft step for DAY, every I/O seam patched. Returns (the persisted ideal, the payload)."""
     from training import routine_generator, routine_repo
 
@@ -156,7 +158,7 @@ def _predraft(monkeypatch, *, archetype: str, role: str, layer: dict, items=None
         return [r for r in (LIVE_ROUTINES if routines is None else routines) if start <= r.target_date <= end]
 
     monkeypatch.setattr(routine_repo, "list_by_date_range", _list)
-    ideal = _ideal(archetype, role)
+    ideal = _ideal(archetype, role, advanced_by)
     persisted: list = []
     ctx = FIX5000["draft_2167c0e68e25f311d46f1015cbefc047"]["training_context"]
     monkeypatch.setattr(thr, "_authoring_freshness_gate", lambda d: {"ok": True, "gaps": [], "data_current_through": "2026-10-23"})
@@ -240,21 +242,49 @@ def test_a_shoulders_arms_day_on_fresh_legs_serves_the_incline_walk_with_its_dos
     assert audit["incline_pct"] == lo_i and audit["mph"] == lo_s
 
 
-def test_a_lower_day_serves_the_recumbent_by_charter_and_says_so(monkeypatch):
-    """Same week, same fresh legs, a lower day -> the recumbent, because the charter puts it there
-    (`cardio_menu.placement.recumbent_after`: "a lower day"). The note's why names it and the audit carries the key."""
-    assert "a lower day" in tc.charter_value("cardio_menu.placement.recumbent_after")
-    ideal, out = _predraft(monkeypatch, archetype="lower", role="lower_volume", layer=FRESH, routines=DONE_WEEK_ROUTINES)
+# ── the recumbent rule as ruled 2026-10-25 ("a"): conditioning, the day after Lower-heavy, only ─────────────────
+AFTER_LOWER_HEAVY = {"date": "2026-10-23", "session_role": "lower_heavy", "was": "week 5 · session 2 of 5 · lower-heavy"}
+AFTER_UPPER_VOLUME = {"date": "2026-10-23", "session_role": "upper_volume", "was": "week 5 · session 4 of 5 · upper-volume"}
+
+
+def test_the_day_after_lower_heavy_a_conditioning_block_rides_the_recumbent_and_says_why(monkeypatch):
+    """The live 10-24 week (tempo done 10-23, intervals still due), fresh legs, and the Hevy sequence's last credited
+    session was Lower-heavy YESTERDAY (`calendar.advanced_by`) -> the intervals on the recumbent, and the menu's why
+    names the rule and the session before; the pick carries the previous session it read."""
+    assert "the day immediately after a heavy lower session, for a conditioning block only" in tc.charter_value(
+        "cardio_menu.placement.recumbent_after"
+    )
+    ideal, out = _predraft(monkeypatch, archetype="upper", role="shoulders_arms", layer=FRESH, advanced_by=AFTER_LOWER_HEAVY)
     block, audit = _cardio(ideal)
-    assert block.movement_key == "cycling" and audit["kind"] == "easy"
-    assert out["cardio_block"]["pick"]["menu"]["why"].endswith("the recumbent: a lower day")
-    assert audit["off_default"] == {
-        "reason": "The recumbent after a lower day, in place of the incline walk.",
-        "charter": "cardio_menu.placement.recumbent_after",
-    }
-    line1, line2 = block.notes.split("\n")
-    assert " level " in line1 and " mph " in line1 and "RPE " in line1
-    assert line2.endswith("Seated, so the legs keep today's lifting as their work.")
+    menu = out["cardio_block"]["pick"]["menu"]
+    assert block.movement_key == "cycling" and audit["kind"] == "intervals" == menu["kind"]
+    assert menu["why"].endswith("the recumbent: conditioning the day after Lower-heavy (the session before was lower_heavy on 2026-10-23)")
+    assert menu["previous_session"] == {"role": "lower_heavy", "date": "2026-10-23", "day_before": True}
+    assert audit["placement_why"] == "placed by the draft"  # the cue pass doses the block the menu placed, never re-places it
+
+
+def test_the_day_after_lower_heavy_an_easy_day_stays_on_the_incline_walk(monkeypatch):
+    """Same day after Lower-heavy, the week's conditioning done -> the incline treadmill walk, never the bike: the ruling
+    keeps easy days on the walk. No off-default reason, and the why says the walk held on purpose."""
+    ideal, out = _predraft(
+        monkeypatch, archetype="upper", role="shoulders_arms", layer=FRESH, routines=DONE_WEEK_ROUTINES, advanced_by=AFTER_LOWER_HEAVY
+    )
+    block, audit = _cardio(ideal)
+    assert block.movement_key == "treadmill" and audit["kind"] == "incline_treadmill_walk" and audit["off_default"] is None
+    assert out["cardio_block"]["pick"]["menu"]["why"].endswith(
+        "the incline walk: an easy day stays on the walk, also the day after Lower-heavy (the session before was lower_heavy on 2026-10-23)"
+    )
+
+
+def test_a_lower_day_itself_is_no_longer_a_recumbent_day(monkeypatch):
+    """Before the ruling a lower session put its own easy block on the bike ("a lower day"). Now a Lower-volume day after
+    Upper-volume, conditioning done, fresh legs -> the incline walk."""
+    ideal, out = _predraft(
+        monkeypatch, archetype="lower", role="lower_volume", layer=FRESH, routines=DONE_WEEK_ROUTINES, advanced_by=AFTER_UPPER_VOLUME
+    )
+    block, audit = _cardio(ideal)
+    assert block.movement_key == "treadmill" and audit["kind"] == "incline_treadmill_walk" and audit["off_default"] is None
+    assert "the recumbent" not in out["cardio_block"]["pick"]["menu"]["why"]
 
 
 # ── the pure seams ──────────────────────────────────────────────────────────────────────
