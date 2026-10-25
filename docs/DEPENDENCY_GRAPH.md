@@ -283,7 +283,7 @@ traced through the stack, the factory body under that call's own arguments, or t
 helper the alarm variable is handed to. `via-composite` = the member routes nowhere
 itself; its composite does. `unresolved` is stated, never guessed.
 
-Routing: digest 96 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 — of 141 alarms (4 composite)
+Routing: digest 97 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 — of 142 alarms (4 composite)
 
 | Alarm | Stack | Kind | Routing | Via | Audience |
 |-------|-------|------|---------|-----|----------|
@@ -394,6 +394,7 @@ Routing: digest 96 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 
 | `nightly-predraft-missing` | mcp_stack | metric | digest | declaration |  |
 | `paging-budget-tier-3` | monitoring_stack | metric | paging | declaration |  |
 | `paging-pipeline-dead` | monitoring_stack | metric | paging | declaration |  |
+| `panel-weekly-grade-missing` | mcp_stack | metric | digest | declaration |  |
 | `panelcast-autopublish-held` | monitoring_silence_alarms | metric | digest | declaration |  |
 | `permanence-errors` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
 | `permanence-heartbeat` | operational_stack | metric | digest | declaration |  |
@@ -576,7 +577,7 @@ Field-level rulings (only non-default fields are declared):
 
 - Edge sites: 1374 total · 987 resolved · 387 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (108 lambdas total)
-- Alarms: 141 literal-named declarations across three idioms, 4 composite; routing digest 96 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
+- Alarms: 142 literal-named declarations across three idioms, 4 composite; routing digest 97 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 24 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 97 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
@@ -593,7 +594,7 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 | Surface | Count | Registry |
 |---------|-------|----------|
 | ai_features | 30 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
-| alarms | 141 | this model's alarms plane (CDK AST) |
+| alarms | 142 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 33 | `deploy/emf_namespace_ledger.py::LEDGER` |
 | schedules | 97 | this model's schedules plane (CDK AST) |
 | secrets | 30 | `tests/test_secret_references.py::KNOWN_SECRETS` |
