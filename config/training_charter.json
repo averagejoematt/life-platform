@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.32.0",
+  "version": "1.33.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -217,6 +217,13 @@
       "date": "2026-10-25",
       "by": "owner ruling 2026-10-25 on #5076 (attended, Session CE), verbatim: \"a\" — option (a): \"after a lower day\" means only the day immediately after a heavy lower session, and only for conditioning blocks; easy days stay on the incline walk [restacked 1.31.0 -> 1.32.0 at the batch-2 merge, 2026-10-25]",
       "what": "cardio_menu.placement.recumbent_after: \"a lower day\" -> \"the day immediately after a heavy lower session, for a conditioning block only\"; adds recumbent_after_session (Lower-heavy, a split.sequence name), recumbent_after_kinds (tempo, hills, intervals) and recumbent_after_rule. The previous session is the previous PERFORMED lifting session (the Hevy sequence), never the charter order and never today's own role: a lower session is no longer itself a recumbent day. On fresh legs a conditioning block takes the treadmill when its block lists it (hills), else the menu's own first machine (tempo and intervals list no treadmill, so they stay on the bike by cardio_menu.blocks.<kind>.machines, not by recumbent_after); the tempo/hills alternation is unchanged. The heavy-walking-weekend clause is unchanged. Weekly cardio minutes unchanged: every block keeps its menu minutes under split.session_minutes.cardio_block_max.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.33.0",
+      "date": "2026-10-24",
+      "by": "owner rulings 2026-10-23 (attended, Session CD): R6 'meal service on weekdays, the code-built menu at weekends' and R7 'no excluded foods' (#5103); the three numbers are platform defaults named as such, pending his ruling [restacked 1.29.0 -> 1.33.0 at the batch-2 merge, 2026-10-25]",
+      "what": "#5103 N9: nutrition.weekly_menu, the weekly menu built by code (health.weekly_menu) from the owner's anchor foods, which live ONLY in the owner-only charter twin (never in this public file). cook_days (Saturday, Sunday: the code-built menu is cooked, the grocery list covers them; the other days are meal-service days whose fitted day is the template the service order matches), min_anchors 6 (fewer usable anchors and the menu is not built, reason too_few_anchors), max_servings_per_anchor_per_day 3 (the default per-food cap; a row's own max_per_day in his table replaces it) and core_anchors_max 2 (a feeding's protein core is at most two anchors). Every target the menu fits to is read from the existing calorie resolver, protein, floors, eating-window and training_day numbers; no new target number. No model call: the menu's words are templates over the code's numbers.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -1443,6 +1450,21 @@
         "concedes": "nothing",
         "in_return": "gets the deadline pace, the weekly refit and the training-day fuel"
       }
+    },
+    "weekly_menu": {
+      "_note": "The weekly menu (#5103 N9, epic #5092). BUILT by health.weekly_menu: a deterministic per-day fit of the owner's anchor foods to the week's resolved days (health.calorie_target.resolve through training.food_panel.build_food_plan: the day's kcal, its type from the training calendar, the lifting uplift), the protein range, the four feedings at the threshold, the macro floors and the eating window above. No number here is a target. The anchor foods (names, servings, label values) are owner data: they live only in the owner-only charter twin (config/training_charter.private.example.json documents the shape), never in this public file.",
+      "cook_days": [
+        "Saturday",
+        "Sunday"
+      ],
+      "cook_days_rule": "owner ruling 2026-10-23 R6: weekday meal service, the code-built menu cooked at weekends. Every day is fitted; a cook day's food is on the grocery list, a meal-service day's fit is the template the service order matches",
+      "excluded_foods_rule": "owner ruling 2026-10-23 R7: no excluded foods. An anchor the owner marks off_limits in his table is never placed (the switch exists; no food is marked)",
+      "min_anchors": 6,
+      "max_servings_per_anchor_per_day": 3,
+      "core_anchors_max": 2,
+      "tolerance_rule": "a day fits when its kcal sits within half the prescribed band's width of the day's resolved kcal (the band centred on the day, so a lifting day's band moves up with its uplift), protein is at or above the range low, every one of the feedings is at or above the feeding threshold (the post-session one at the post-session protein), and the fat, carbohydrate and fibre floors are met (a lifting day's carbohydrate line is the larger of the floor and the pre + post session carbohydrate)",
+      "failure_rule": "a missing anchor table, fewer than min_anchors usable anchors, or no feeding core reaching the threshold: the menu is not built, with the named reason code; a day the anchors cannot fit is built and marked fits=false with each miss named (never hidden, never a remembered day)",
+      "provenance": "owner (cook_days, the R6/R7 rules); min_anchors, max_servings_per_anchor_per_day and core_anchors_max are platform defaults pending his ruling"
     }
   }
 }
