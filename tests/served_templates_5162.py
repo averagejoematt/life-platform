@@ -30,7 +30,8 @@ def _as_served() -> dict[str, dict[str, Any]]:
             "accessory_sets": {},
         },
         "upper_volume": {
-            **t["upper_volume"],
+            # served with the bench family's own order (the flat barbell bench) — #5318's incline pin came later
+            **{k: v for k, v in t["upper_volume"].items() if k != "anchor_keys"},
             "anchors": [["bench", "volume"], ["row", "volume"], ["overhead_press", "volume"], ["vertical_pull", "volume"]],
             "accessories": ["cable_chest_fly", "cable_tricep_pushdown", "db_curl"],
             "accessory_sets": {},

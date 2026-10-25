@@ -255,7 +255,7 @@ def test_weekly_hard_sets_per_muscle_sit_inside_the_redline_ranges():
         lo, hi = row["range"]
         # #5069: the shoulders+arms day (owner ruling 5) puts delts and arms over v0.4's 4–6 by design — a floor for them now
         assert lo <= row["sets"] and (row["sets"] <= hi or not row["band_top_binds"]), (group, row)
-    assert week["back"]["sets"] == 12 and week["delts"]["sets"] == 15
+    assert week["back"]["sets"] == 10 and week["delts"]["sets"] == 15  # #5318: the shrug's 2 back sets became the carry
     # the five-day week sits in v0.5's 60–75 (#4503 OD4) with no 🟢 tail
     total = sum(
         program_structure.session_prescription_for_role(r)["total_sets"] for r in program_structure.SESSION_SEQUENCE["session_roles"]
@@ -265,14 +265,22 @@ def test_weekly_hard_sets_per_muscle_sit_inside_the_redline_ranges():
 
 
 def test_mutation_control_the_pre_4090_shape_breaks_delts():
-    """#4090's fix, re-applied to the five-day split (#5069): pulldown at 3 sets on both upper days puts back at 14 — over
-    the 8–12 top (the shoulders+arms day's shrug already holds back at 12). Delts are no longer the tell: their 4–6 top
-    stopped binding when ruling 5 added the aesthetic day."""
+    """#4090's fix, re-applied to the five-day split (#5069): pulldown at 3 sets on both upper days put back at 14 — over
+    the 8–12 top — while the shoulders+arms day's shrug held back at 12. Since #5318 (owner ruling B3) that day's 2 back sets
+    are a farmer's carry (Hevy files it `other`), so the pre-4090 3-set pulldown reaches the top exactly (12) and one more
+    pulldown set a day (4) is what crosses it (14). Delts are no longer the tell: their 4–6 top stopped binding when ruling 5
+    added the aesthetic day."""
     upper_heavy = program_structure.SESSION_TEMPLATES["upper_heavy"]
     upper_volume = program_structure.SESSION_TEMPLATES["upper_volume"]
     with (
         patch.dict(upper_heavy, {"anchor_sets": {}, "accessories": ["cable_tricep_pushdown", "db_lateral_raise"]}),
         patch.dict(upper_volume, {"anchor_sets": {}}),
+    ):
+        week = program_structure.weekly_sets_by_muscle(MOVEMENTS)
+    assert week["back"]["sets"] == 12 == week["back"]["range"][1]
+    with (
+        patch.dict(upper_heavy, {"anchor_sets": {"vertical_pull": 4}, "accessories": ["cable_tricep_pushdown", "db_lateral_raise"]}),
+        patch.dict(upper_volume, {"anchor_sets": {"vertical_pull": 4}}),
     ):
         week = program_structure.weekly_sets_by_muscle(MOVEMENTS)
     assert week["back"]["sets"] == 14 > week["back"]["range"][1] and week["back"]["band_top_binds"]
@@ -295,7 +303,8 @@ def test_plan_next_session_2026_09_24_carries_week_1_ramp_loads():
     assert session["session_role"] == "upper_heavy"
     assert session["loads"]["status"] == "applied" and session["loads"]["week"] == 1
     back = session["weekly_sets_by_muscle"]["back"]
-    assert (back["sets"], back["range"], back["frequency_per_wk"]) == (12, [8, 12], 3)  # #5069: + the shoulders+arms day's shrug
+    # #5069 added the shoulders+arms day's shrug (12, 3x); #5318 (ruling B3) made it a carry, which Hevy files `other`
+    assert (back["sets"], back["range"], back["frequency_per_wk"]) == (10, [8, 12], 2)
     ideal = _generate()[0]
     assert set(HEAVY_ANCHORS) <= {e["movement_key"] for e in session["prescription"]["exposures"]}
     for e in session["prescription"]["exposures"]:

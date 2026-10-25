@@ -21,7 +21,9 @@ pressing masks — the live 2026-10-05..18 read was 16 Shoulders sets (8.0/wk, a
 `movement_floors['side_rear_delts']` row (#5164) is the one that sees it (the template shortfall was closed by #5162's
 trade inside the 75-set week, owner ruling 2026-10-23). The TEMPLATE side counts the movement-specific floors and bands by movement
 (`FLOOR_MOVEMENTS`, `BAND_MOVEMENTS`), never by catalog muscle — a shoulder press is not side/rear-delt work, a flat bench
-press is not upper-chest work, a row or a shrug is not a vertical pull (ADR-104, honest numbers).
+press is not upper-chest work, a row or a shrug is not a vertical pull (ADR-104, honest numbers). Since #5318 (owner ruling
+B3) the farmer's carry is the trap slot and counts toward the core and forearms too (`CARRY_MOVEMENTS`, `CARRY_CREDITS`), and
+the upper-chest band counts upper_volume's incline dumbbell press (ruling B2).
 """
 
 from __future__ import annotations
@@ -51,11 +53,17 @@ FLOOR_MOVEMENTS: dict[str, tuple[str, ...]] = {
         "db_rear_delt_rows",
         "band_pullaparts",
     ),
-    "traps": ("shrug_dumbbell", "shrug_barbell", "seated_shrugs"),
+    # #5318 (owner ruling B3, 2026-10-24): the farmer's carry replaced the shrug on shoulders+arms — "it covers traps (the
+    # shrug's job), adds grip and core" — so it counts toward the trap floor AND the core floor (and the forearms, below)
+    "traps": ("shrug_dumbbell", "shrug_barbell", "seated_shrugs", "farmers_carry"),
     "calves": ("calf_raise_machine",),
-    "core": ("machine_crunch", "cable_pallof_press", "pallof_press"),
+    "core": ("machine_crunch", "cable_pallof_press", "pallof_press", "farmers_carry"),
 }
 TRAP_MOVEMENTS = FLOOR_MOVEMENTS["traps"]
+# #5318: the loaded carries. Hevy files the 'Farmers Carry' template under `other`, so its catalog muscle credits nothing; its
+# sets are credited to the core (`abs`, the core floor's landmark key) and the forearms (grip) by movement, beside it.
+CARRY_MOVEMENTS: tuple[str, ...] = ("farmers_carry",)
+CARRY_CREDITS: tuple[str, ...] = ("abs", "forearms")
 # The movements that COUNT toward the two movement-specific charter bands that are not floors.
 #   upper_chest — incline presses and incline flyes only. A flat bench press or a flat/neutral fly is catalog 'chest' but
 #     not upper-chest work; the charter's `rotation.pool.second_press` names the incline barbell press as the upper-chest slot.
@@ -242,10 +250,14 @@ def floor_coverage(
 
 def movement_counts(by_muscle: dict[str, int], by_movement: dict[str, int]) -> dict[str, int]:
     """`by_muscle` plus the movement-counted keys (`MOVEMENT_COUNTED`: side/rear delts, traps, upper chest, lats) tallied
-    from the roles' own per-movement sets — the same exposures, summed by movement instead of by catalog muscle."""
+    from the roles' own per-movement sets — the same exposures, summed by movement instead of by catalog muscle — and the
+    carries' sets credited to `CARRY_CREDITS` (core and forearms, #5318)."""
     out = dict(by_muscle)
     for key, movements in MOVEMENT_COUNTED.items():
         out[key] = sum(int(by_movement.get(m, 0)) for m in movements)
+    carried = sum(int(by_movement.get(m, 0)) for m in CARRY_MOVEMENTS)
+    for key in CARRY_CREDITS:
+        out[key] = int(out.get(key, 0)) + carried
     return out
 
 

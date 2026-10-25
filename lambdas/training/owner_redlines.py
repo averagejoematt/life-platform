@@ -88,7 +88,8 @@ v3.4 (2026-10-18, #5070): owner ruling — NO scheduled or automatic deload; v3.
 deload applies only on his recorded word (`training.deload_word`; the response is `lifting_sessions_per_wk.deload`)."""
 # Same day (#5069), owner rulings 5 + 6: five lifting days in the charter's order, 60-75 min of lifting, and the v0.4 lock
 # lifted. `lifting_sessions_per_wk` low/high, `structure` and `session_minutes` are READ from the training charter
-# (`split.lifting_days_per_wk`, `split.sequence`, `split.session_minutes.lifting`). The v0.4 values — 3–4 sessions/wk, the
+# (`split.lifting_days_per_wk`, `split.sequence`, `split.session_minutes.lifting_ceiling` — since owner ruling A4, 2026-10-24
+# (#5318), a 75-minute ceiling with no floor). The v0.4 values — 3–4 sessions/wk, the
 # four-session order (`training.program_v04`), 55–70 min, and v0.4's 50–65 hard sets/wk — are this comment's history.
 
 RED_TEAM_RECORD = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.3_redteam.md"
@@ -374,7 +375,8 @@ REDLINES: dict[str, dict[str, Any]] = {
         # #4503 OD4 (A, owner 2026-09-30): base 60–75, was v0.4's 50–65. The five-day week (#5069) sits inside it; the v0.4
         # lock that held the four-session week under it is lifted (ruling 6; history: `program_v04.BLOCK_LOCK`).
         "total_hard_sets_wk": [60, 75],
-        "session_minutes": list(_charter_value("split.session_minutes.lifting") or []),  # #5069: the charter's lifting minutes
+        # #5069: the charter's lifting minutes; #5318 (owner ruling A4, 2026-10-24): a ceiling only, no floor
+        "session_minutes_ceiling": int(_charter_value("split.session_minutes.lifting_ceiling") or 0),
         "anchors_per_week": 2,
         "load_rule": "hold — gains are rep-triggered (double progression, #4503 OD5)",
         "load_entry": {

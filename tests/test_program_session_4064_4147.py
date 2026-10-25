@@ -164,7 +164,7 @@ def test_sets_per_muscle_per_week_sit_in_the_band_and_the_aesthetic_day_lifts_de
         "quads": 8,
         "hams_glutes": 8,  # #5053: the lower-volume second leg curl traded for the calves/core floors (the 75-set week is full)
         "chest": 8,
-        "back": 12,
+        "back": 10,  # #5318 (ruling B3): the shrug's 2 catalog-'back' sets became the farmer's carry (Hevy files it `other`)
         "delts": 15,  # #5053: + the rear-delt pec deck on the upper heavy day
         "biceps": 6,
         "triceps": 6,
@@ -191,17 +191,17 @@ def test_mutation_control_without_the_aesthetic_days_press_and_raises_delts_fall
     """The frequency check can fail: strip the shoulders+arms day of its press, lateral raise and face pull and the delts
     are trained on two sessions only — under the charter's 3."""
     sa = program_structure.SESSION_TEMPLATES[SA]
-    with patch.dict(sa, {"anchors": [], "accessories": ["db_curl", "cable_tricep_pushdown", "shrug_dumbbell"]}):
+    with patch.dict(sa, {"anchors": [], "accessories": ["db_curl", "cable_tricep_pushdown", "farmers_carry"]}):
         delts = program_structure.weekly_sets_by_muscle(CATALOG["movements"])["delts"]
     assert delts["frequency_per_wk"] == 2 < delts["frequency_target"]
 
 
 def test_mutation_control_three_more_pulldown_sets_push_back_over_the_band_top():
     """The band check can fail: the same week with vertical pull at 5 sets on upper-volume puts
-    back at 15, over the 8–12 top — the per-group assertion above would red on it."""
+    back at 13 (15 before #5318 moved the shrug to a carry), over the 8–12 top — the per-group assertion above would red on it."""
     with patch.dict(program_structure.SESSION_TEMPLATES[UV]["anchor_sets"], {"vertical_pull": 5}):
         back = program_structure.weekly_sets_by_muscle(CATALOG["movements"])["back"]
-    assert back["sets"] == 15 and back["sets"] > back["range"][1] and back["band_top_binds"]
+    assert back["sets"] == 13 and back["sets"] > back["range"][1] and back["band_top_binds"]
 
 
 def test_sessions_fit_the_ceiling_and_the_week_total_sits_in_the_redline_band():
@@ -240,7 +240,10 @@ def test_no_plyometrics_and_no_max_effort_singles():
     assert set(excl["methods"]) >= {"plyometrics", "max_effort_singles"} and excl["provenance"] == "owner"
     for role in program_structure.SESSION_TEMPLATES:
         for e in _rx(role)["exposures"]:
-            assert all(s["reps"][0] >= excl["min_reps_any_exposure"] for s in e["sets"]), (role, e["movement_key"])
+            # #5318: a carry is timed, not a rep range — it carries a duration instead, and no rep floor applies
+            assert all(
+                s["reps"][0] >= excl["min_reps_any_exposure"] if e["intensity"] != "carry" else s["duration_seconds"] > 0 for s in e["sets"]
+            ), (role, e["movement_key"])
             assert not any(w in (e["movement_key"] or "") for w in ("jump", "plyo", "box", "bound")), (role, e["movement_key"])
 
 
@@ -308,13 +311,13 @@ def test_deload_cuts_about_40_percent_of_sets_and_keeps_every_top_set_and_anchor
                 assert e["sets"][0]["kind"] == "top"
 
 
-# ── #5069: the session's LENGTH (ruling 5: "60-75 min of lifting") and its shape ──────────────
+# ── #5069: the session's LENGTH (ruling 5: "60-75 min of lifting"; #5318 A4: a 75-min ceiling, no floor) and its shape ──
 def test_every_session_fits_the_charters_lifting_minutes_untrimmed():
     """Each role's estimate (working + assumed warm-up sets x (set time + the exposure's rest)) is inside the charter's
     cap with nothing trimmed. Upper-heavy by hand before #5162: bench 3+3 warm-up and row 3+1 at 180 s rest, the press 3+1 and
     the pulldown 2 at 120 s, two accessories x 2 at 90 s, set time 45 s -> (6+4)x225 + 4x165 + 2x165 + 4x135 = 3780 s = 63.0 min.
     #5162 traded the press (3 sets + a warm-up at 120 s) for a 3-set lateral raise at 90 s: 67.5 -> 63.2 min."""
-    cap = charter_value("split.session_minutes.lifting")[1]
+    cap = charter_value("split.session_minutes.lifting_ceiling")
     assert program_structure.lifting_minutes_cap() == cap == 75
     got = {r: _rx(r)["session_minutes"]["lifting_minutes"] for r in program_structure.SESSION_TEMPLATES}
     # #5162: were 67.5 / 51.5 / 39 / 57.5 / 45.5 (#5053: 63 / 47 / 39 / 57.5 / 41)
@@ -497,7 +500,7 @@ def test_generator_builds_the_five_day_order_after_the_cut_over_and_the_fifth_ro
         "face_pull",
         "db_curl",
         "cable_tricep_pushdown",
-        "shrug_dumbbell",
+        "farmers_carry",  # #5318 (owner ruling B3): the farmer's carry replaced the dumbbell shrug
     ]
     shape = sa.inputs_snapshot["session_shape"]
     assert shape["lifting_minutes"] <= shape["lifting_cap_minutes"] == 75 and shape["cardio_blocks"] == []

@@ -594,7 +594,7 @@ def _patterns() -> Dict[str, Tuple[str, re.Pattern[str]]]:
     # 2.5: tools_health's pre-charter ACSM line. Integer forms too: `_TARGET_RATE_LB_WK = 3` is a copy of 3.0.
     rate_nums = "|".join(f for x in sorted({floor, ceiling, 2.5}) for f in _num_forms(x))
     seq = "|".join(re.escape(s) for s in c["split"]["sequence"])
-    lift_lo, lift_hi = c["split"]["session_minutes"]["lifting"]
+    lift_hi = c["split"]["session_minutes"]["lifting_ceiling"]  # #5318 (owner ruling A4): a ceiling only, no floor
     anchors = c["rotation"]["anchors_fixed_weeks"]
     rotate = c["rotation"]["accessory_slots_rotate_every_weeks"]
     gate_lb = "|".join(str(n) for n in sorted(_lb_leaves(c["gated_movements"])))
@@ -626,10 +626,11 @@ def _patterns() -> Dict[str, Tuple[str, re.Pattern[str]]]:
             ),
         ),
         "session_minutes": (
-            "split.session_minutes.lifting",
+            "split.session_minutes.lifting_ceiling",
             re.compile(
                 rf"\bsession_minutes(?:_ceiling)?\"?\s*(?:[:=]|\s)\s*(?:\[\s*\d+\s*,\s*\d+\s*\]|[1-9]\d\b)"
-                rf"|\b{lift_lo}\s*[-–]\s*{lift_hi}\s*min"
+                # any band ending at the ceiling ("60-75 min"): a re-stated floor is a hand copy too (#5318 dropped it)
+                rf"|\b\d{{2}}\s*[-–]\s*{lift_hi}\s*min"
             ),
         ),
         "anchor_block_weeks": (
@@ -790,7 +791,7 @@ def test_every_pattern_has_a_positive_control():
             "a 21.5 g of fibre target",
         ],
         "rate_band": ['"target": 3.5,  # lb/wk', "_TARGET_RATE_LB_WK = 3", "weekly_rate > 2.5", "a 3 lb/week cut"],
-        "session_minutes": ['"session_minutes": [55, 70],'],
+        "session_minutes": ['"session_minutes": [55, 70],', "lift for 60-75 min", "a 70–75 min session"],
         "anchor_block_weeks": ['"weeks_per_block": 6,'],
         "accessory_rotation_weeks": ["accessories rotate on a three-week cadence"],
         "sequence_names": ["the next session is Upper-heavy"],

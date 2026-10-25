@@ -61,6 +61,7 @@ _DELT = re.compile(r"lateral raise|rear delt|reverse fly|face pull|shoulder pres
 _TRAPS = re.compile(r"shrug", re.I)
 _CORE = re.compile(r"crunch|pallof|dead bug|plank|leg raise|ab wheel|bird dog|carry", re.I)
 _CARRY = re.compile(r"carry|farmer|suitcase", re.I)
+_FARMERS = re.compile(r"farmer", re.I)
 _KETTLEBELL = re.compile(r"kettlebell", re.I)
 _UNILATERAL_LOWER = re.compile(r"split squat|lunge|single leg|step.?up|bulgarian|pistol", re.I)
 _CORRECTIVE = re.compile(r"face pull|pallof|rear delt|reverse fly|external rotation|band pull|dead bug|bird dog|scap", re.I)
@@ -75,7 +76,8 @@ _DELOAD_VARIANTS = ("deload",)
 # Charter `volume_priorities.mev_floors_in_every_template` group -> the classifier that finds it in a session.
 _MEV_FLOOR_MATCH: dict[str, Callable[[dict[str, Any]], bool]] = {
     "side_rear_delts": lambda b: bool(_SIDE_REAR_DELT.search(b["title"])),
-    "traps": lambda b: b["muscle"] == "traps",
+    # #5318 (owner ruling B3, 2026-10-24): the farmer's carry replaced the shrug and covers traps (the shrug's job)
+    "traps": lambda b: b["muscle"] == "traps" or bool(_FARMERS.search(b["title"])),
     "calves": lambda b: b["muscle"] == "calves",
     "core": lambda b: b["muscle"] == "abs",
 }
@@ -399,12 +401,14 @@ def check_days(f: dict[str, Any]) -> tuple[float, str]:
     return (10.0 if gap == 0 else (6.0 if gap == 1 else 0.0)), f"{n} lifting sessions, charter {want}"
 
 
-def check_minutes_band(f: dict[str, Any]) -> tuple[float, str]:
-    lo, hi = session_shape.lifting_minutes_range()
-    ok = [m for m in f["session_minutes"] if lo <= m <= hi]
+def check_minutes_under_ceiling(f: dict[str, Any]) -> tuple[float, str]:
+    """Owner ruling A4 (2026-10-24, #5318): the lifting minutes are a CEILING, not a target — a shorter session is never
+    marked down, only one past the charter's `split.session_minutes.lifting_ceiling` is."""
+    cap = session_shape.lifting_minutes_cap()
+    ok = [m for m in f["session_minutes"] if m <= cap]
     return (
         _share(len(ok), len(f["session_minutes"])),
-        f"{len(ok)} of {len(f['session_minutes'])} sessions inside {lo}-{hi} lifting min: {f['session_minutes']}",
+        f"{len(ok)} of {len(f['session_minutes'])} sessions at or under the {cap}-min lifting ceiling (no floor): {f['session_minutes']}",
     )
 
 
@@ -446,7 +450,7 @@ CHECKS: dict[str, Callable[[dict[str, Any]], tuple[float, str]]] = {
     "fundamental_patterns": check_patterns,
     "sessions_within_cap": check_within_cap,
     "lifting_days_match": check_days,
-    "session_minutes_in_band": check_minutes_band,
+    "session_minutes_under_ceiling": check_minutes_under_ceiling,
     "delts_frequency": check_delts,
     "recovery_tripwires_wired": check_recovery_tripwires,
 }

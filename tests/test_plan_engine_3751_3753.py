@@ -330,12 +330,13 @@ def test_v3_floors_and_new_redlines_carry_the_plans_numbers():
     )
     lift = R["lifting_sessions_per_wk"]
     # #4147 v0.4 (owner 2026-09-23): ~10 hard sets/muscle/wk -> [8, 12]. #5069 (owner ruling 5, 2026-10-18: "5 lifting days,
-    # 60-75 min of lifting"): the per-week count and the lifting minutes are READ from the training charter
+    # 60-75 min of lifting"): the per-week count and the lifting minutes are READ from the training charter. #5318 (owner
+    # ruling A4, 2026-10-24: "Drop the 60-minute lifting floor: 75 minutes is a ceiling, not a target"): a ceiling only
     from training.training_charter import charter_value
 
-    days, minutes = charter_value("split.lifting_days_per_wk"), charter_value("split.session_minutes.lifting")
-    assert (lift["low"], lift["high"], lift["sets_per_muscle_wk"], lift["session_minutes"]) == (days, days, [8, 12], minutes)
-    assert (days, minutes) == (5, [60, 75])
+    days, minutes = charter_value("split.lifting_days_per_wk"), charter_value("split.session_minutes.lifting_ceiling")
+    assert (lift["low"], lift["high"], lift["sets_per_muscle_wk"], lift["session_minutes_ceiling"]) == (days, days, [8, 12], minutes)
+    assert (days, minutes) == (5, 75) and "session_minutes" not in lift and charter_value("split.session_minutes.lifting") is None
     # #4503 OD3: the tissue clause is 4 wk weight-bearing >= 8.5 h pain-free AND Stage 4; no running or impact intervals at any weight
     rg = R["run_gate_lb"]
     assert (

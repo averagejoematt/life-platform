@@ -149,7 +149,8 @@ does not carry:
 The charter's split: the charter's lifting days (`split.lifting_days_per_wk`), in the charter's
 fixed sequence (`split.sequence`); the next session is the one after the last performed lift
 whatever the date (`split.rule`), delts on the charter's weekly frequency
-(`split.frequency.delts_per_wk`), lifting minutes inside `split.session_minutes`. `plan_next_session`'s `session` is what the
+(`split.frequency.delts_per_wk`), lifting minutes at or under `split.session_minutes.lifting_ceiling` (a ceiling, not a target:
+a shorter session is never padded with sets). `plan_next_session`'s `session` is what the
 program serves; argue with it out loud, never silently replace it.
 
 - **Effort ceilings by movement class.** Compounds and the last isolation set each have a
