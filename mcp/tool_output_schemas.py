@@ -183,6 +183,7 @@ _FRESHNESS_STATUS = _obj(
         "output_artifacts": _ARR,
         "output_artifacts_not_ok": _ARR,
         "device_dead_men": _ARR,  # #4970: the Apple Watch dead-man rows
+        "device_metric_groups": _ARR,  # #4970: per-group Apple Watch staleness rows
         "thresholds_note": _STR,
         "training_notes_health": _OBJ,
     },
