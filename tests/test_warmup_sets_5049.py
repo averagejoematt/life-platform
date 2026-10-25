@@ -20,7 +20,7 @@ capture of that day, and `tests/fixtures/hevy_openapi_5010`, the 10-18 Hevy spec
      warm-ups (10-18 bench: programmed working 3), and doing the programmed climb adds no volume;
      the 10-16 squat, hand-drafted WITH four warm-ups, is never stacked or rewritten.
   5. THE RULE TABLE — later compounds get one 70 % x 5 set; the 95 lb floor is inclusive; the
-     table is owner-pending (ADR-105).
+     table is owner-ruled 2026-10-23 (ADR-105).
   6. THE CEILINGS AND THE CUT count working sets: the green-block check and stage 2's total-sets
      trim never count or pop a warm-up.
   7. THE CHAT PATH — draft_custom's bench gets the same climb; `warmups=false` opts out.
@@ -244,8 +244,8 @@ def test_the_cue_table_names_one_movement_per_family_and_none_otherwise():
     assert any(s.type == "warmup" for s in row.sets) and not row.notes
 
 
-def test_the_numbers_are_owner_pending_per_adr_105():
-    assert warmup_sets.WARMUP_PRESCRIPTION["provenance"] == "owner-pending"
+def test_the_numbers_are_owner_ruled_per_adr_105():
+    assert warmup_sets.WARMUP_PRESCRIPTION["provenance"] == "owner-ruled"
     assert "#5049" in warmup_sets.WARMUP_PRESCRIPTION["provenance_detail"]
     assert warmup_sets.WARMUP_PRESCRIPTION["first_compound"] == ((0.50, 8), (0.70, 5), (0.85, 3))
     assert warmup_sets.WARMUP_PRESCRIPTION["later_compound"] == ((0.70, 5),) and warmup_sets.WARMUP_PRESCRIPTION["floor_lb"] == 95.0
