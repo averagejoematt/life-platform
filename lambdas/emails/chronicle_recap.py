@@ -62,6 +62,16 @@ def _recap_contains_raw_vitals(text):
     return bool(_RECAP_VITAL_RE.search(text or ""))
 
 
+def _mask_titles(text, titles):
+    """#4537: blank out verbatim installment titles before the raw-vital check. A title is reader-approved, audited text
+    (the story-auditor passes it), so "76% and 2/10" quoted as a title is a name, not a vital. Only EXACT title strings
+    from the installment list are masked, longest first; a figure anywhere else in the text still trips the guard."""
+    out = text or ""
+    for t in sorted({t for t in titles if t and len(t) > 2}, key=len, reverse=True):
+        out = out.replace(t, " ")
+    return out
+
+
 def _published_installments(data):
     """Published installments only, newest-first — the recap's grounding spine.
     A draft that hasn't cleared the approve gate is NOT yet part of the public story."""
@@ -92,6 +102,7 @@ def build_recap(data, new_installment_md=None, new_meta=None, *, _g):
         # The set of dates a beat may legitimately cite — published history plus, when
         # generating alongside a new week, that week (it is being published in this run).
         allowed = {i.get("date") for i in published if i.get("date")}
+        titles = [i.get("title") for i in published] + [(new_meta or {}).get("title")]
         if new_meta and new_meta.get("date"):
             allowed.add(new_meta["date"])
 
@@ -144,7 +155,7 @@ def build_recap(data, new_installment_md=None, new_meta=None, *, _g):
                 logger.info("[recap] dropping beat with non-published date %s", b.get("date"))
                 continue
             # Guard 2 — strip beats that smuggle a raw vital.
-            if _recap_contains_raw_vitals(b.get("beat", "")):
+            if _recap_contains_raw_vitals(_mask_titles(b.get("beat", ""), titles)):
                 logger.info("[recap] dropping beat with raw vital: %s", b.get("beat"))
                 continue
             beats.append({"week": _as_int(b.get("week")), "date": b.get("date"), "beat": (b.get("beat") or "").strip()})
@@ -152,7 +163,7 @@ def build_recap(data, new_installment_md=None, new_meta=None, *, _g):
 
         story = (recap.get("story_so_far") or "").strip()
         # Guard 3 — the headline paragraph must not invent vitals either.
-        _story_vital = _recap_raw_vital(story)
+        _story_vital = _recap_raw_vital(_mask_titles(story, titles))
         if _story_vital:
             logger.warning("[recap] story_so_far cites a raw vital (%r) — skipping recap", _story_vital)
             return None
