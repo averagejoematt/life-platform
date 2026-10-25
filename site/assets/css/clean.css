@@ -160,6 +160,7 @@ h2 { font-size: var(--ck-fs-h2); line-height: 1.2; letter-spacing: -0.02em; font
 .ck-chart { width: 100%; height: auto; display: block; }
 .ck-chart__area { fill: var(--ck-accent-wash); }
 .ck-chart__line { fill: none; stroke: var(--ck-accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.ck-chart__bc { stroke: var(--ck-faint); stroke-dasharray: 3 4; }
 .ck-chart__now { fill: var(--ck-accent); }
 
 /* The daily mark: C, the year frame (owner, #4646, 2026-10-23). One column per weigh-in,

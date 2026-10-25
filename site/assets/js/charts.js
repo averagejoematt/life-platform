@@ -37,6 +37,29 @@ function _points(data, valueKey, dateKey) {
     .filter((p) => Number.isFinite(p.v));
 }
 
+// #5029 — the BASELINE CHANGE marker (owner ruling 2026-10-25). Every public chart of a heart-rate-
+// derived series (resting HR, HRV, recovery, strain, walking HR, VO2max, zone-2 minutes) is told the
+// date the baseline changed by its own API payload (`baseline_change`, from lambdas/web/baseline_change.py
+// — the date is NEVER hard-coded here) and, when the series spans it, BREAKS its line there and footnotes
+// the break with the words "baseline change" — and nothing else: no reason, no state, no window. The
+// numbers after that date are on a different baseline, so a drop across it must not read as a fitness gain.
+export const BASELINE_CHANGE_LABEL = "baseline change";
+const _bcDay = (v) => (/^\d{4}-\d{2}-\d{2}/.test(String(v || "")) ? String(v).slice(0, 10) : null);
+// Index of the first point ON/AFTER the change date, only when the series has points on both sides.
+export function baselineChangeIndex(dates, bc) {
+  const b = _bcDay(bc);
+  if (!b) return -1;
+  const ds = (dates || []).map(_bcDay);
+  const i = ds.findIndex((d) => d !== null && d >= b);
+  return i > 0 && ds.slice(0, i).some((d) => d !== null && d < b) ? i : -1;
+}
+// A path through `items` (already x/y-mapped by `xy`) that lifts the pen at index `brk` (-1 = no break).
+function _bcPath(items, xy, brk) {
+  return items.map((p, i) => { const [px, py] = xy(p, i); return `${i && i !== brk ? "L" : "M"}${px.toFixed(1)} ${py.toFixed(1)}`; }).join(" ");
+}
+const _bcRule = (xv, y1, y2) => `<line class="chart-bc" x1="${xv.toFixed(1)}" x2="${xv.toFixed(1)}" y1="${y1}" y2="${y2}" vector-effect="non-scaling-stroke"/>`;
+export const baselineChangeNote = (bc) => ` · <span class="chart-bc-note">${BASELINE_CHANGE_LABEL}</span> ${escAttr(_shortDate(bc))}`;
+
 // A trend line with optional goal line + filled area. data: [{<dateKey>,<valueKey>}] or [numbers].
 // #3556 — THE DOMAIN RULE (weightTrendChart's HARD RULE 4, generalised to every caller): the
 // y-domain is derived from the data this chart PLOTS — the series, plus the projection endpoint
@@ -51,7 +74,7 @@ function _points(data, valueKey, dateKey) {
 // re-derived here (the whole point is to plot ONE authoritative projection, not a second one that
 // disagrees with it); the segment only engages when the value is finite, the series carries dates,
 // and the projection date sits after the last actual date. Absent/invalid → solid line only.
-export function lineChart(data, { valueKey = "value", dateKey = "date", goal = null, height = 130, unit = "", label = "", emptyMsg = "", spine = false, projection = null } = {}) {
+export function lineChart(data, { valueKey = "value", dateKey = "date", goal = null, height = 130, unit = "", label = "", emptyMsg = "", spine = false, projection = null, baselineChange = null } = {}) {
   const pts = _points(data || [], valueKey, dateKey);
   // Fewer than 4 points can't show a real trend — two points draw a straight diagonal that
   // reads as broken/misleading. Show an honest count + latest value instead of a fake line.
@@ -92,8 +115,12 @@ export function lineChart(data, { valueKey = "value", dateKey = "date", goal = n
   if (min === max) { min -= 1; max += 1; }
   const x = (i) => P + (i / (pts.length - 1)) * frac * (W - 2 * P);
   const y = (v) => P + (1 - (v - min) / (max - min)) * (H - 2 * P);
-  const line = pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
-  const area = `M${x(0).toFixed(1)} ${(H - P).toFixed(1)} ` + pts.map((p, i) => `L${x(i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ") + ` L${x(pts.length - 1).toFixed(1)} ${(H - P).toFixed(1)} Z`;
+  const bcI = baselineChangeIndex(pts.map((p) => p.d), baselineChange); // #5029 — the break, -1 = none
+  const line = _bcPath(pts, (p, i) => [x(i), y(p.v)], bcI);
+  const _area = (a, b) => `M${x(a).toFixed(1)} ${(H - P).toFixed(1)} ` + pts.slice(a, b + 1).map((p, i) => `L${x(a + i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ") + ` L${x(b).toFixed(1)} ${(H - P).toFixed(1)} Z`;
+  const area = bcI > 0 ? `${_area(0, bcI - 1)} ${_area(bcI, pts.length - 1)}` : _area(0, pts.length - 1);
+  const bcRule = bcI > 0 ? _bcRule((x(bcI - 1) + x(bcI)) / 2, P, H - P) : "";
+  const bcCap = bcI > 0 ? baselineChangeNote(baselineChange) : "";
   const delta = last.v - pts[0].v;
   // The flat/up/down verdict is a claim about THE DATA, so its threshold is 2% of the DATA's own
   // range — never of a domain some annotation or forecast widened. (`<=` keeps a genuinely
@@ -124,7 +151,7 @@ export function lineChart(data, { valueKey = "value", dateKey = "date", goal = n
   const goalY = goalV == null ? 0 : (goalOff === 0 ? y(goalV) : (goalOff > 0 ? P / 2 : H - P / 2));
   const goalGap = goalV == null ? null : _r(Math.abs((goalOff > 0 ? max : min) - goalV));
   const goalTxt = goalV == null ? "" : `goal ${_r(goalV)}${unit}${goalOff ? ` — off scale, ${goalGap}${unit} ${goalOff > 0 ? "above" : "below"} the plotted range` : ""}`;
-  const summary = `${label || "Trend"}: ${pts.length} readings${_span ? `, ${_span}` : ""}, latest ${_r(last.v)}${unit}, ${dir}${goalV != null ? `, ${goalTxt}` : ""}${projActive ? `, projected ${_r(projVal)}${unit} by month-end (estimate)` : ""}.`;
+  const summary = `${label || "Trend"}: ${pts.length} readings${_span ? `, ${_span}` : ""}, latest ${_r(last.v)}${unit}, ${dir}${goalV != null ? `, ${goalTxt}` : ""}${projActive ? `, projected ${_r(projVal)}${unit} by month-end (estimate)` : ""}${bcI > 0 ? `, line broken at the ${BASELINE_CHANGE_LABEL} on ${_shortDate(baselineChange)}` : ""}.`;
   const goalLine = goalV != null ? `<line class="chart-goal${goalOff ? " chart-goal--off" : ""}" x1="${P}" y1="${goalY.toFixed(1)}" x2="${W - P}" y2="${goalY.toFixed(1)}" vector-effect="non-scaling-stroke"/>` : "";
   // SIGNATURE 1 — a measuring-rule tick spine on the y-axis: a ticked rail with the
   // max (top) and min (bottom) value, giving the trend a real scale. Token-driven ticks.
@@ -135,10 +162,10 @@ export function lineChart(data, { valueKey = "value", dateKey = "date", goal = n
   // data-cpts and draws a focus dot + tooltip, making every lineChart explorable at once.
   const cpts = pts.map((p, i) => ({ x: +(x(i) / W).toFixed(4), y: +(y(p.v) / H).toFixed(4), l: (p.d ? _short(p.d) + " · " : "") + _r(p.v) + unit }));
   return `<figure class="chart${spine ? " chart--spined" : ""}">${spineEl}<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}" data-cpts="${escAttr(JSON.stringify(cpts))}">` +
-    `<path class="chart-fill" d="${area}"/>${goalLine}` +
+    `<path class="chart-fill" d="${area}"/>${goalLine}${bcRule}` +
     `<path class="chart-line" d="${line}" vector-effect="non-scaling-stroke"/>${projSeg}` +
     `<circle class="chart-dot" cx="${x(pts.length - 1).toFixed(1)}" cy="${y(last.v).toFixed(1)}" r="3.5"/></svg>` +
-    `<figcaption class="chart-cap label">${escAttr(label)}${goalV != null ? ` · ${escAttr(goalTxt)} (annotation, not the axis)` : ""}${_span ? ` · ${escAttr(_span)}` : ""} · ${pts.length} pts${escAttr(projCap)}</figcaption></figure>`;
+    `<figcaption class="chart-cap label">${escAttr(label)}${goalV != null ? ` · ${escAttr(goalTxt)} (annotation, not the axis)` : ""}${_span ? ` · ${escAttr(_span)}` : ""} · ${pts.length} pts${escAttr(projCap)}${bcCap}</figcaption></figure>`;
 }
 
 // #421 — arc-trend line for slow-moving, long-horizon metrics (VO2max, walking HR). Unlike
@@ -146,7 +173,7 @@ export function lineChart(data, { valueKey = "value", dateKey = "date", goal = n
 // so an irregular / sparse cadence renders as honest horizontal GAPS ("gaps shown as gaps").
 // Faint raw dots + an optional centered moving-average trend line (edge-clamped, no lag). Refuses
 // <4 points → an honest empty caption. readings: [{date, value}]. One ember hue, never red.
-export function arcTrend(readings, { valueKey = "value", dateKey = "date", unit = "", label = "", height = 150, decimals = 1, smooth = true } = {}) {
+export function arcTrend(readings, { valueKey = "value", dateKey = "date", unit = "", label = "", height = 150, decimals = 1, smooth = true, baselineChange = null } = {}) {
   const pts = (readings || [])
     .map((r) => ({ v: Number(r[valueKey]), d: String(r[dateKey] || "") }))
     .filter((p) => Number.isFinite(p.v) && /^\d{4}-\d{2}-\d{2}/.test(p.d))
@@ -166,15 +193,18 @@ export function arcTrend(readings, { valueKey = "value", dateKey = "date", unit 
   const x = (iso) => P + ((Date.parse(iso) - t0) / span) * (W - 2 * P);
   const y = (v) => P + (1 - (v - min) / (max - min)) * (H - 2 * P);
   // Centered moving average — symmetric window, edge-clamped (honest smoothing, no lag).
+  const bcI = baselineChangeIndex(pts.map((p) => p.d), baselineChange);
   const k = smooth ? Math.min(3, Math.floor((pts.length - 1) / 2)) : 0;
   const trend = pts.map((_, i) => {
     if (!k) return { v: pts[i].v, d: pts[i].d };
     let s = 0, c = 0;
-    for (let j = Math.max(0, i - k); j <= Math.min(pts.length - 1, i + k); j++) { s += pts[j].v; c++; }
+    // #5029 — never average ACROSS the baseline change: each side smooths only against itself.
+    for (let j = Math.max(0, i - k); j <= Math.min(pts.length - 1, i + k); j++) { if (bcI > 0 && (j >= bcI) !== (i >= bcI)) continue; s += pts[j].v; c++; }
     return { v: s / c, d: pts[i].d };
   });
   const dots = pts.map((p) => `<circle class="wt-raw" cx="${x(p.d).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="2.0"/>`).join("");
-  const line = trend.map((p, i) => `${i ? "L" : "M"}${x(p.d).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
+  const line = _bcPath(trend, (p) => [x(p.d), y(p.v)], bcI);
+  const bcRule = bcI > 0 ? _bcRule(x(_bcDay(baselineChange)), P, H - P) : "";
   const last = pts[pts.length - 1];
   // A multi-year arc labels its dates WITH the year — "Apr 25–May 19" on a 2022→2026 span
   // reads as a 3-week window, which is exactly the dishonesty this chart exists to avoid.
@@ -189,12 +219,12 @@ export function arcTrend(readings, { valueKey = "value", dateKey = "date", unit 
   const cpts = pts.map((p) => ({ x: +(x(p.d) / W).toFixed(4), y: +(y(p.v) / H).toFixed(4), v: p.v, l: `${_sd(p.d)} · ${_r(p.v)}${unit}` }));
   return `<figure class="chart wt-chart" data-wt-min="${min.toFixed(2)}" data-wt-max="${max.toFixed(2)}" data-wt-h="${H}" data-wt-p="${P}">` +
     `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}" data-cpts="${escAttr(JSON.stringify(cpts))}">` +
-    `<path class="wt-trend" d="${line}" fill="none" vector-effect="non-scaling-stroke"/>${dots}` +
+    `${bcRule}<path class="wt-trend" d="${line}" fill="none" vector-effect="non-scaling-stroke"/>${dots}` +
     `<circle class="chart-dot" cx="${x(last.d).toFixed(1)}" cy="${y(trend[trend.length - 1].v).toFixed(1)}" r="3.5"/></svg>` +
     `<figcaption class="chart-cap label">${escAttr(label || "Trend")} · ${escAttr(span_lbl)} · ${pts.length} readings` +
     ` · <span class="wt-key"><i class="wt-swatch wt-swatch-raw"></i>faint dots = each reading</span>` +
     ` <span class="wt-key"><i class="wt-swatch wt-swatch-trend"></i>line = smoothed arc</span>` +
-    ` · x positioned by real date, so gaps show as gaps</figcaption></figure>`;
+    ` · x positioned by real date, so gaps show as gaps${bcI > 0 ? baselineChangeNote(baselineChange) : ""}</figcaption></figure>`;
 }
 
 // P0.1 — the trend-weight hero. Dual-layer: faint TRUE daily dots (scale noise) + a
@@ -527,7 +557,7 @@ export function ring({ value = "", sub = "", label = "", fill = 0, tone = "ember
 // its own range; RHR is INVERTED (low RHR plots high) so that BOTH lines rising = the body
 // downshifting into recovery — direction reads ember-positive even though RHR falls. Never red.
 // Tick-spine signature. Refuses <4 points. hist items: {date, rhr_bpm, hrv_ms}.
-export function autonomicHero(hist, { height = 190, label = "" } = {}) {
+export function autonomicHero(hist, { height = 190, label = "", baselineChange = null } = {}) {
   const rhr = (hist || []).map((h) => ({ d: String(h.date || ""), v: Number(h.rhr_bpm) })).filter((p) => Number.isFinite(p.v) && /^\d{4}-\d{2}-\d{2}/.test(p.d)).sort((a, b) => a.d.localeCompare(b.d));
   const hrv = (hist || []).map((h) => ({ d: String(h.date || ""), v: Number(h.hrv_ms) })).filter((p) => Number.isFinite(p.v) && /^\d{4}-\d{2}-\d{2}/.test(p.d)).sort((a, b) => a.d.localeCompare(b.d));
   if (rhr.length < 4 || hrv.length < 4) {
@@ -539,12 +569,14 @@ export function autonomicHero(hist, { height = 190, label = "" } = {}) {
   const x = (d) => P + ((Date.parse(d) - t0) / span) * (W - 2 * P);
   const norm = (arr, invert) => { const vs = arr.map((p) => p.v); const lo = Math.min(...vs), hi = Math.max(...vs); return arr.map((p) => ({ d: p.d, n: hi === lo ? 0.5 : (invert ? 1 - (p.v - lo) / (hi - lo) : (p.v - lo) / (hi - lo)) })); };
   const y = (n) => P + (1 - n) * (H - 2 * P);
-  const path = (arr) => arr.map((p, i) => `${i ? "L" : "M"}${x(p.d).toFixed(1)} ${y(p.n).toFixed(1)}`).join(" ");
+  const path = (arr) => _bcPath(arr, (p) => [x(p.d), y(p.n)], baselineChangeIndex(arr.map((q) => q.d), baselineChange));
+  const bcSpans = baselineChangeIndex([...rhr, ...hrv].map((p) => p.d).sort(), baselineChange) > 0;
+  const bcRule = bcSpans ? _bcRule(x(_bcDay(baselineChange)), P, H - P) : "";
   const rhrN = norm(rhr, true), hrvN = norm(hrv, false);
   const _r = (n) => Math.round(n * 10) / 10;
   const rhrDir = rhr[rhr.length - 1].v <= rhr[0].v ? "down" : "up";
   const hrvDir = hrv[hrv.length - 1].v >= hrv[0].v ? "up" : "down";
-  const summary = `Autonomic hero: resting HR ${rhrDir} (${_r(rhr[0].v)}→${_r(rhr[rhr.length - 1].v)} bpm), HRV ${hrvDir} (${_r(hrv[0].v)}→${_r(hrv[hrv.length - 1].v)} ms). Both toward recovery read ember-positive.`;
+  const summary = `Autonomic hero: resting HR ${rhrDir} (${_r(rhr[0].v)}→${_r(rhr[rhr.length - 1].v)} bpm), HRV ${hrvDir} (${_r(hrv[0].v)}→${_r(hrv[hrv.length - 1].v)} ms). Both toward recovery read ember-positive.${bcSpans ? ` Lines broken at the ${BASELINE_CHANGE_LABEL} on ${_shortDate(baselineChange)}.` : ""}`;
   // Interactive hover/tap: cpts on the HRV line (ember primary) with the REAL
   // values — the plot is normalized, so the tooltip is where the truth lives.
   // Same-night RHR joins the label when present. Date-positioned x → nearest-by-x.
@@ -554,11 +586,11 @@ export function autonomicHero(hist, { height = 190, label = "" } = {}) {
     l: `${_shortDate(p.d)} · HRV ${_r(hrv[i].v)} ms` + (rhrByD.has(p.d) ? ` · RHR ${_r(rhrByD.get(p.d))} bpm` : ""),
   }));
   return `<figure class="chart ah-chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}" data-cpts="${escAttr(JSON.stringify(cpts))}">` +
-    `<path class="ah-hrv" d="${path(hrvN)}" fill="none" vector-effect="non-scaling-stroke"/>` +
+    `${bcRule}<path class="ah-hrv" d="${path(hrvN)}" fill="none" vector-effect="non-scaling-stroke"/>` +
     `<path class="ah-rhr" d="${path(rhrN)}" fill="none" vector-effect="non-scaling-stroke"/>` +
     `<circle class="chart-dot" cx="${x(hrvN[hrvN.length - 1].d).toFixed(1)}" cy="${y(hrvN[hrvN.length - 1].n).toFixed(1)}" r="3.2"/>` +
     `<circle class="chart-dot" cx="${x(rhrN[rhrN.length - 1].d).toFixed(1)}" cy="${y(rhrN[rhrN.length - 1].n).toFixed(1)}" r="3.2"/></svg>` +
-    `<figcaption class="chart-cap label">${escAttr(label || "Autonomic recovery")} · <span class="ah-key"><i class="ah-sw ah-sw-hrv"></i>HRV ${escAttr(hrvDir)} (${_r(hrv[hrv.length - 1].v)} ms)</span> <span class="ah-key"><i class="ah-sw ah-sw-rhr"></i>resting HR ${escAttr(rhrDir)} (${_r(rhr[rhr.length - 1].v)} bpm, axis inverted)</span> · both lines rising = the body downshifting into recovery — early moves are partly water & novelty.</figcaption></figure>`;
+    `<figcaption class="chart-cap label">${escAttr(label || "Autonomic recovery")} · <span class="ah-key"><i class="ah-sw ah-sw-hrv"></i>HRV ${escAttr(hrvDir)} (${_r(hrv[hrv.length - 1].v)} ms)</span> <span class="ah-key"><i class="ah-sw ah-sw-rhr"></i>resting HR ${escAttr(rhrDir)} (${_r(rhr[rhr.length - 1].v)} bpm, axis inverted)</span> · both lines rising = the body downshifting into recovery — early moves are partly water & novelty.${bcSpans ? baselineChangeNote(baselineChange) : ""}</figcaption></figure>`;
 }
 
 // P2.1 — autonomic-balance 2×2: recovery (y) vs day strain (x), last 7-8 days as dots. Four
@@ -594,7 +626,7 @@ export function autonomicQuadrant(points, { size = 300 } = {}) {
     `</svg><figcaption class="chart-cap label">Each dot a day; today is ember. A snapshot of where the body's sat lately — no trend arrow drawn at this n. Recovered + working = flow; depleted + working = stress; a low day is just low, not an alarm.</figcaption></figure>`;
 }
 
-export function sparkline(values, { height = 34 } = {}) {
+export function sparkline(values, { height = 34, baselineChange = null } = {}) {
   const pts = _points(values || [], "v", "d");
   if (pts.length < 2) return `<span class="spark spark--empty"></span>`;
   const W = 120, H = height, P = 2;
@@ -602,11 +634,13 @@ export function sparkline(values, { height = 34 } = {}) {
   if (min === max) { min -= 1; max += 1; }
   const x = (i) => P + (i / (pts.length - 1)) * (W - 2 * P);
   const y = (v) => P + (1 - (v - min) / (max - min)) * (H - 2 * P);
-  const line = pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
+  const bcI = baselineChangeIndex(pts.map((p) => p.d), baselineChange); // #5029 (dated points only)
+  const line = _bcPath(pts, (p, i) => [x(i), y(p.v)], bcI);
+  const bcRule = bcI > 0 ? _bcRule((x(bcI - 1) + x(bcI)) / 2, 0, H) : "";
   // Interactive hover/tap (#582): decorative aria-hidden, but a touch still surfaces
   // the value. motion.js reads data-cpts (normalized coords + label per point).
   const cpts = pts.map((p, i) => ({ x: +(x(i) / W).toFixed(4), y: +(y(p.v) / H).toFixed(4), l: (p.d ? _shortDate(p.d) + " · " : "") + (Math.round(p.v * 10) / 10) }));
-  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true" data-cpts="${escAttr(JSON.stringify(cpts))}"><path class="chart-line" d="${line}" vector-effect="non-scaling-stroke"/></svg>`;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true" data-cpts="${escAttr(JSON.stringify(cpts))}">${bcRule}<path class="chart-line" d="${line}" vector-effect="non-scaling-stroke"/></svg>`;
 }
 
 // Horizontal 100%-stacked bar — for a composition (e.g. macro split P/C/F). segments:
@@ -913,16 +947,16 @@ export function correlationChip(items, { label = "", outcome = "the score" } = {
 }
 
 // Vertical bars. items: [{<labelKey>,<valueKey>}]. Down bars (below 0 or flagged) muted.
-export function barChart(items, { valueKey = "value", labelKey = "label", height = 130, label = "" } = {}) {
-  const rows = (items || []).map((it) => ({ l: it[labelKey], v: Number(it[valueKey]) })).filter((r) => Number.isFinite(r.v));
+export function barChart(items, { valueKey = "value", labelKey = "label", height = 130, label = "", bcKey = "bc" } = {}) {
+  const rows = (items || []).map((it) => ({ l: it[labelKey], v: Number(it[valueKey]), bc: it[bcKey] === true })).filter((r) => Number.isFinite(r.v));
   if (!rows.length) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">No data yet.</figcaption></figure>`;
   const max = Math.max(1, ...rows.map((r) => r.v));
-  const bars = rows.map((r) => `<div class="cbar"><span class="cbar-fill" style="height:${Math.max(3, (r.v / max) * 100)}%"></span><span class="cbar-l label">${escAttr(r.l)}</span></div>`).join("");
+  const bars = rows.map((r) => `<div class="cbar${r.bc ? " cbar--bc" : ""}"><span class="cbar-fill" style="height:${Math.max(3, (r.v / max) * 100)}%"></span><span class="cbar-l label">${escAttr(r.l)}</span></div>`).join("");
   // Interactive hover/tap (#582): a point at each bar top — nearest-by-x lands on the
   // bar under the finger. Replaces the native title tooltip.
   const n = rows.length;
   const cpts = rows.map((r, i) => ({ x: +((i + 0.5) / n).toFixed(4), y: +Math.max(0.05, Math.min(0.95, 1 - r.v / max)).toFixed(4), l: `${r.l}: ${Math.round(r.v * 10) / 10}` }));
-  return `<figure class="chart"><div class="cbars" role="img" aria-label="${escAttr(label || "bar chart")}" data-cpts="${escAttr(JSON.stringify(cpts))}" style="--cbar-h:${height}px">${bars}</div>${label ? `<figcaption class="chart-cap label">${escAttr(label)}</figcaption>` : ""}</figure>`;
+  return `<figure class="chart"><div class="cbars" role="img" aria-label="${escAttr(label || "bar chart")}" data-cpts="${escAttr(JSON.stringify(cpts))}" style="--cbar-h:${height}px">${bars}</div>${label || rows.some((r) => r.bc) ? `<figcaption class="chart-cap label">${escAttr(label)}${rows.some((r) => r.bc) ? ` · dashed bar = the week of the <span class="chart-bc-note">${BASELINE_CHANGE_LABEL}</span>` : ""}</figcaption>` : ""}</figure>`;
 }
 
 /* ── The character sheet (§8.6) ──────────────────────────────────────────────

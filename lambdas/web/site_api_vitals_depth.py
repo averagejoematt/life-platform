@@ -39,6 +39,7 @@ from datetime import datetime, timedelta
 from common import metric_truth
 from ingestion.source_registry import source_label
 
+from web.baseline_change import with_baseline_change  # #5029 — the neutral public date of the HR baseline change
 from web.site_api_common import (
     PT,
     _error,
@@ -317,7 +318,7 @@ def handle_vitals_depth() -> dict:
             "fitness_age": fitness_age,
             "deferred": _DEFERRED,
         }
-        return _ok(payload, cache_seconds=3600)
+        return _ok(with_baseline_change(payload), cache_seconds=3600)
     except Exception as e:  # noqa: BLE001 — surface a clean 500, log the detail
         logger.error(f"[vitals_depth] failed: {e}")
         return _error(500, "vitals_depth failed")

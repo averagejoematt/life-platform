@@ -169,7 +169,12 @@ export function renderZone2(d) {
   // dates, the weeks before the start are counted and named, and the since-start tally is
   // stated separately from the whole-window one.
   if (weeks.length) {
-    const items = weeks.map((w) => ({ label: String(w.week_start).slice(5), value: w.zone_2_minutes }));
+    // #5029 — the week that contains the baseline change is dashed and footnoted "baseline change":
+    // minutes of heart-rate zone time either side of it are not on the same baseline.
+    const bcDay = /^\d{4}-\d{2}-\d{2}/.test(String(d.baseline_change || "")) ? String(d.baseline_change).slice(0, 10) : "";
+    const weekEnd = (w) => String(w.week_end || w.week_start || "").slice(0, 10);
+    const bcWeek = bcDay ? weeks.findIndex((w) => String(w.week_start).slice(0, 10) <= bcDay && bcDay <= weekEnd(w)) : -1;
+    const items = weeks.map((w, i) => ({ label: String(w.week_start).slice(5), value: w.zone_2_minutes, bc: i === bcWeek && bcWeek > 0 }));
     const first = String(weeks[0].week_start || "").slice(0, 10);
     const lastEnd = String(weeks[weeks.length - 1].week_end || weeks[weeks.length - 1].week_start || "").slice(0, 10);
     const win = `${monthDay(first)} – ${monthDay(lastEnd)}`;

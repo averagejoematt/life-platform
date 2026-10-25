@@ -182,7 +182,7 @@ export function liftSeries(workouts, name) {
 }
 
 // ── the chart: one line, both ends labelled, and a sentence saying what it shows ─
-export function trendChartHTML(points, write, name, { fromZero = false } = {}) {
+export function trendChartHTML(points, write, name, { fromZero = false, baselineChange = null } = {}) {
   const pts = (points || []).filter((p) => p && isDay(p.date) && num(p.value) !== null);
   if (pts.length < 2) return "";
   const t = (iso) => Date.parse(`${iso}T12:00:00Z`);
@@ -195,11 +195,19 @@ export function trendChartHTML(points, write, name, { fromZero = false } = {}) {
   const floor = fromZero ? 0 : lo;
   const x = (p) => 8 + (624 * (t(p.date) - t0)) / (t1 - t0 || 1);
   const y = (p) => 20 + (122 * (hi - p.value)) / (hi - floor || 1);
-  const line = pts.map((p) => `${x(p).toFixed(1)},${y(p).toFixed(1)}`).join(" ");
+  // #5029 — a heart-rate-derived measure breaks its line at the baseline change (two polylines, one
+  // dashed rule); the caller footnotes it. `bcI` is the first point on/after the date, -1 = no break.
+  const bcDay = /^\d{4}-\d{2}-\d{2}/.test(String(baselineChange || "")) ? String(baselineChange).slice(0, 10) : "";
+  const bcI = bcDay && pts[0].date < bcDay ? pts.findIndex((p) => p.date >= bcDay) : -1;
+  const pair = (p) => `${x(p).toFixed(1)},${y(p).toFixed(1)}`;
+  const line = pts.map(pair).join(" ");
+  const lineEls = bcI > 0
+    ? `<polyline class="ck-chart__line" points="${pts.slice(0, bcI).map(pair).join(" ")}"/><polyline class="ck-chart__line" points="${pts.slice(bcI).map(pair).join(" ")}"/><line class="ck-chart__bc" x1="${((x(pts[bcI - 1]) + x(pts[bcI])) / 2).toFixed(1)}" x2="${((x(pts[bcI - 1]) + x(pts[bcI])) / 2).toFixed(1)}" y1="14" y2="150"/>`
+    : `<polyline class="ck-chart__line" points="${line}"/>`;
   const area = fromZero ? `<polygon class="ck-chart__area" points="8.0,164 ${line} 632.0,164"/>` : "";
   const [first, last] = [pts[0], pts[pts.length - 1]];
-  const aria = `${name} from ${write(first.value)} on ${shortDay(first.date)} to ${write(last.value)} on ${shortDay(last.date)}, ${pts.length} readings, lowest ${write(lo)}, highest ${write(hi)}`;
-  return `<svg class="ck-chart" viewBox="0 0 640 164" role="img" aria-label="${esc(aria)}">${area}<polyline class="ck-chart__line" points="${line}"/><circle class="ck-chart__now" cx="${x(last).toFixed(1)}" cy="${y(last).toFixed(1)}" r="5"/></svg><div class="ck-ends"><span>${esc(`${shortDay(first.date)} · ${write(first.value)}`)}</span><span>${esc(`${shortDay(last.date)} · ${write(last.value)}`)}</span></div>`;
+  const aria = `${name} from ${write(first.value)} on ${shortDay(first.date)} to ${write(last.value)} on ${shortDay(last.date)}, ${pts.length} readings, lowest ${write(lo)}, highest ${write(hi)}${bcI > 0 ? `, line broken at the baseline change on ${shortDay(bcDay)}` : ""}`;
+  return `<svg class="ck-chart" viewBox="0 0 640 164" role="img" aria-label="${esc(aria)}">${area}${lineEls}<circle class="ck-chart__now" cx="${x(last).toFixed(1)}" cy="${y(last).toFixed(1)}" r="5"/></svg><div class="ck-ends"><span>${esc(`${shortDay(first.date)} · ${write(first.value)}`)}</span><span>${esc(`${shortDay(last.date)} · ${write(last.value)}`)}</span></div>${bcI > 0 ? `<p class="ck-soft ck-bc-note">baseline change · ${esc(shortDay(bcDay))}</p>` : ""}`;
 }
 // A daily COUNT as bars from zero. A bar at or above the target is drawn in the accent (the
 // kit's colour for progress); the line over the bars is the average of the seven readings
@@ -560,6 +568,7 @@ async function mountTrend(base) {
   let write = (v) => trim1(v);
   let extra = "";
   let sentenceOpts = { average: false };
+  let bcDate = null; // #5029 — the served baseline-change date, for the heart-rate-derived measure (recovery) only
   if (measure === "lift" && lift) {
     const src = await load({ workouts: "/api/workouts" });
     points = liftSeries(src.workouts && src.workouts.workouts, lift);
@@ -573,6 +582,7 @@ async function mountTrend(base) {
     const food = ["protein", "calories", "carbs", "fat"].includes(measure);
     const src = await load(food ? { nutrition: "/api/nutrition_overview", meals: "/api/frequent_meals" } : measure === "training" ? { training: "/api/training_overview" } : { pulse: "/api/pulse_history" });
     points = seriesOf(measure, src, today);
+    if (measure === "recovery") bcDate = (src.pulse && src.pulse.baseline_change) || null;
     ({ name, about } = MEASURES[measure]);
     write = writerFor(measure, src);
     sentenceOpts = { average: COUNTS.has(measure), today: COUNTS.has(measure) ? today : "" };
@@ -600,7 +610,7 @@ async function mountTrend(base) {
   fill("ck-about", soft(about));
   const chart = COUNTS.has(measure)
     ? barChartHTML(points, write, name, { target: sentenceOpts.floor ?? null, targetWords: sentenceOpts.floorWords ? sentenceOpts.floorWords.replace(/^my /, "the ") : "" })
-    : trendChartHTML(points, write, name);
+    : trendChartHTML(points, write, name, { baselineChange: bcDate });
   fill("ck-chart", points.length ? `${soft(trendSentence(points, write, sentenceOpts))}${chart}${COUNTS.has(measure) ? soft(weekOnWeek(points, write)) : ""}` : soft(NO_READINGS));
   // No reading, no list: the section goes with its heading rather than standing empty (#4586 box 2).
   fill("ck-recent", recentRowsHTML(points, write, base));
