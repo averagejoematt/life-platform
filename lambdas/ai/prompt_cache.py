@@ -280,6 +280,9 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
     # #5124 (charter v1.25.0: the core-12 `habits` block + its reading-guide paragraph, on top of v1.19-v1.24's growth)
     # re-scaled all four together to 23,771 (est 23,464 x 7,738/7,638) — the same method, no wire count taken; the
     # per-run dollar figures in the `why` lines are still the v1.18.0 pricing. Re-measure from the first run's usage block.
+    # Session CE 2026-10-25 (charter v1.34.0: weekly_menu, illness_triad, recumbent rule, trip dates on top of v1.25-v1.30)
+    # re-scaled the four charter prefixes the same way (estimate x the 7,738/7,638 Haiku wire ratio) — no wire count taken;
+    # re-measure from the first live run's usage block.
     "charter-judge": {
         "engaged": True,
         "route": "charter.judge",
@@ -287,7 +290,7 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_JUDGE_MODEL",
         "cdk_stack": None,
         "measured_on": "sonnet-4-6",
-        "prefix_tokens": 23771,
+        "prefix_tokens": 32860,
         "calls_within_ttl": 8,
         "decided": "2026-10-19",
         "issue": 5072,
@@ -306,7 +309,7 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_JUDGE_GATE_MODEL",
         "cdk_stack": None,
         "measured_on": "sonnet-4-6",
-        "prefix_tokens": 23771,
+        "prefix_tokens": 32860,
         "calls_within_ttl": 8,
         "decided": "2026-10-19",
         "issue": 5072,
@@ -323,7 +326,7 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_NARRATIVE_MODEL",
         "cdk_stack": None,
         "measured_on": "haiku-4-5",
-        "prefix_tokens": 23771,
+        "prefix_tokens": 32860,
         "calls_within_ttl": 3,
         "decided": "2026-10-19",
         "issue": 5084,
@@ -343,7 +346,7 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
         "caller_var": "CHARTER_RETRO_MODEL",
         "cdk_stack": None,
         "measured_on": "haiku-4-5",
-        "prefix_tokens": 23771,
+        "prefix_tokens": 32860,
         "calls_within_ttl": 8,
         "decided": "2026-10-19",
         "issue": 5084,
