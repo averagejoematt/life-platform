@@ -291,7 +291,11 @@ def test_the_new_views_are_advertised_on_the_existing_tools():
 
 
 def _apple_workout(wid, start, end, z2):
-    return {"sk": f"DATE#2026-10-20#WORKOUT#{wid}", "start_time": start, "end_time": end, "zone2_seconds": z2, "zone1_seconds": 60}
+    """#5353: the day row carries the `apple_workouts` map (the #4973 writer's shape); the watch's heart-rate
+    bins are zoned at read time (max 183: 115 and 120 are Zone 2, 100 is Zone 1)."""
+    half = z2 / 2.0
+    summary = {"start": start, "end": end, "name": "Run", "derived": {"hr_seconds_by_bpm5": {"100": 60.0, "115": half, "120": half}}}
+    return {"sk": "DATE#2026-10-20", "date": "2026-10-20", "apple_workouts": {wid: summary}}
 
 
 def test_apple_hr_is_the_third_zone2_source():

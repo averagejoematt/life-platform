@@ -112,13 +112,7 @@ def warm_start_seed(daily_values_chrono, days=7):
 #   Zone 1: 50-60%  (recovery)      Zone 4: 80-90%  (threshold)
 #   Zone 2: 60-70%  (aerobic base)  Zone 5: 90-100% (VO2 max)
 #   Zone 3: 70-80%  (tempo — Seiler's "no man's land")
-HR_ZONE_BOUNDS = (
-    ("zone_1", "Zone 1 (Recovery)", 0.50, 0.60),
-    ("zone_2", "Zone 2 (Aerobic)", 0.60, 0.70),
-    ("zone_3", "Zone 3 (Tempo)", 0.70, 0.80),
-    ("zone_4", "Zone 4 (Threshold)", 0.80, 0.90),
-    ("zone_5", "Zone 5 (VO2 Max)", 0.90, 1.00),
-)
+from common.hr_zones import HR_ZONE_BOUNDS  # noqa: E402  (#5353: the one table, shared with training.zone2_minutes)
 
 
 def classify_hr_zone(avg_hr, max_hr):

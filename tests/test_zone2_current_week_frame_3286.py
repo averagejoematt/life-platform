@@ -244,5 +244,5 @@ def test_the_handler_passes_a_pacific_today_not_a_utc_one():
     src = open(os.path.join(_REPO, "lambdas", "web", "site_api_autonomic.py"), encoding="utf-8").read()
     assert "today = datetime.now(PT).strftime" in src
     assert (
-        "_compute_zone2_breakdown(strava, whoop, hevy, today=today, start_date=start)" in src
+        "_compute_zone2_breakdown(strava, whoop, hevy, today=today, start_date=start, apple_items=apple)" in src
     ), "the handler's Pacific day must reach the computation"
