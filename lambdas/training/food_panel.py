@@ -254,6 +254,7 @@ def plan_features(case: dict[str, Any]) -> dict[str, Any]:
         "protein": case.get("protein") or {},
         "floors": case.get("floors") or {},
         "titration": case.get("titration") if isinstance(case.get("titration"), dict) else None,
+        "quality_days": case.get("quality_days") if isinstance(case.get("quality_days"), list) else None,
         "rules": rules(),
     }
 
@@ -402,10 +403,34 @@ def check_post_session(f: dict[str, Any]) -> tuple[float, str]:
     return _share(len(ok), len(f["lifting"])), f"{len(ok)} of {len(f['lifting'])} lifting days count a post-session feeding at {thr:g} g"
 
 
+def _food_quality(f: dict[str, Any]) -> tuple[float, str, dict[str, str]]:
+    """The week's food-quality targets (#5105) on a MENU-built plan (`weekly_menu.food_plan` carries `quality_days`),
+    through the SAME `health.food_quality.check_week` the menu reports with: (the fatty-fish share 0-10, the evidence,
+    {date: fibre miss}). A plan with no menu (intended feedings only, no foods) is not checked and says so; an
+    unreadable target scores 0 with its name (absence is not credit)."""
+    from health import food_quality  # noqa: PLC0415 — lazy: the health engines only when grading
+
+    rows = f.get("quality_days")
+    if not rows:
+        return 10.0, "; food quality: no menu on the plan (intended feedings only) — not checked", {}
+    q = food_quality.check_week(rows, food_quality.policy(charter_value))
+    if q["problems"]:
+        return 0.0, f"; food quality unreadable: {q['problems']}", {}
+    fish = q.get(food_quality.FISH) or {}
+    lo, hi, n = (fish.get("range") or [0, 0])[0], (fish.get("range") or [0, 0])[1], float(fish.get("servings") or 0)
+    share = 10.0 if fish.get("met") else (_share(int(n), lo) if n < lo else _share(hi, math.ceil(n)))
+    fib = q.get(food_quality.FIBRE) or {}
+    under = {str(dt): f"{line} fibre" for dt, line in zip(fib.get("under_dates") or [], fib.get("under") or [])}
+    return share, "; food quality: " + ("met" if q["met"] else "; ".join(q["misses"])), under
+
+
 def check_macro_floors(f: dict[str, Any]) -> tuple[float, str]:
+    """The fat and carbohydrate floors every day (the plan must carry the fibre floor); on a menu-built plan also the
+    menu's fibre every day and the week's fatty-fish count (#5105, `_food_quality`) — the lower of the two shares."""
     r = f["rules"]
     if r["fibre"] is None or (_n(f["floors"].get("fibre")) or 0) < r["fibre"]:
         return 0.0, f"the plan does not carry the fibre floor ({f['floors'].get('fibre')!r} vs {r['fibre']!r})"
+    fish_share, quality_note, fibre_short = _food_quality(f)
     miss, short_days = [], set()
     for d in f["days"]:
         if _reduced(d) and minimum_day_held(d, r):
@@ -415,9 +440,14 @@ def check_macro_floors(f: dict[str, Any]) -> tuple[float, str]:
             if r[macro] is None or (_n(s.get(key)) or 0) < r[macro]:
                 miss.append(f"{d.get('date')} {macro} {s.get(key)!r}")
                 short_days.add(d.get("date"))
+        if d.get("date") in fibre_short:
+            miss.append(fibre_short[str(d.get("date"))])
+            short_days.add(d.get("date"))
     ok = len(f["days"]) - len(short_days)
-    return _over_week(ok, f), f"{ok} of {len(f['days'])} days hold the fat and carbohydrate floors{_note(f)}" + (
-        f"; under: {miss[:7]}" if miss else ""
+    what = "fat, carbohydrate and menu fibre floors" if f.get("quality_days") else "fat and carbohydrate floors"
+    return (
+        min(_over_week(ok, f), fish_share),
+        f"{ok} of {len(f['days'])} days hold the {what}{_note(f)}" + (f"; under: {miss[:7]}" if miss else "") + quality_note,
     )
 
 
