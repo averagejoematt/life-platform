@@ -15,8 +15,9 @@ already owns it — this module arranges and compares, it does not count:
   anchors    the four core anchors' e1RM trends through `plan_engine.anchor_e1rm_trend` (the one
              trend computation) and the redline's own threshold (`anchor_drop_tripped`);
   volume     the charter's `volume_priorities.sets_per_wk` rows over the week's
-             `muscle_volume.working_sets_by_muscle` output (a key the per-muscle count does not
-             carry is `absent`, with its parent bucket as context only — #5053 adds the keys);
+             `muscle_volume.working_sets_by_muscle` output, counted BY MOVEMENT through
+             `volume_floors` (side/rear delts, upper chest, lats; presses excluded) with the charter
+             band beside each count (`absent` only when the week carries no per-exercise counts);
   fitness    the battery's per-test trend and its cadence state (`training.fitness_tests`, #5078);
   running    the run gate through `training.run_onramp.gate_state` (#5090): closed / prep / held / open,
              lb to the prep and to the gate, and the walking weeks met / needed.
@@ -50,17 +51,6 @@ MEASURED, ABSENT, READ_FAILED = "measured", "absent", "read_failed"
 AMBER, RED = "amber", "red"
 _LEVEL_RANK = {None: 0, "green": 0, AMBER: 1, RED: 2}
 WAIST_FIELDS = ("waist_navel_in", "waist_narrowest_in", "waist_iliac_crest_in")
-
-# The per-muscle count (`muscle_volume.MUSCLES`) has no key for most charter priorities yet
-# (#5053 adds them). Until it does, the closest PARENT bucket is shown beside an `absent`
-# value as context — never as the measure. A charter key the count carries verbatim is measured.
-PARENT_BUCKETS: dict[str, tuple[str, ...]] = {
-    "side_rear_delts": ("Shoulders",),
-    "lats": ("Back",),
-    "upper_chest": ("Chest",),
-    "legs": ("Quads", "Hamstrings", "Glutes"),
-    "arms": ("Biceps", "Triceps"),
-}
 
 # The calibration table (owner review 2026-10-18): trigger -> the lever it names.
 LEVERS: dict[str, str] = {
@@ -323,27 +313,47 @@ def anchors_section(
 
 
 def volume_section(vol: Optional[Mapping[str, Any]], read_error: Optional[str] = None) -> dict[str, Any]:
-    """The charter's `volume_priorities.sets_per_wk` rows against the week's working sets."""
-    src = "training.muscle_volume.working_sets_by_muscle (Monday-Sunday)"
+    """The charter's `volume_priorities.sets_per_wk` rows against the week's working sets, counted BY MOVEMENT (#5073/#5053).
+
+    `vol` is `muscle_volume.working_sets_by_muscle` output. The movement-counted bands (side/rear delts, upper chest,
+    lats) are summed through `volume_floors.FLOOR_MOVEMENTS`/`BAND_MOVEMENTS` over the week's per-exercise sets, so a
+    press is never side/rear-delt work; legs and arms are per-member catalog-muscle sums. The row's `value` is the
+    WORST member's sets (the band is per member); `member_sets` carries every member beside the charter `band`."""
+    from training import volume_floors
+
+    src = "training.volume_floors (movement counts) over training.muscle_volume.working_sets_by_muscle (Monday-Sunday)"
     if read_error:
         return {"state": READ_FAILED, "source": src, "error": read_error}
     bands = _cv("volume_priorities.sets_per_wk") or {}
     muscles = (vol or {}).get("muscles") or {}
+    exercise_sets = (vol or {}).get("exercise_sets")
+    by_movement = volume_floors.logged_movement_sets(exercise_sets) if exercise_sets is not None else None
+    by_muscle = {m: int(round(float((r or {}).get("total_sets") or 0))) for m, r in muscles.items()}
+    counted = volume_floors.movement_counts(by_muscle, by_movement or {})
+    band_rows = volume_floors.charter_band_rows(counted)
     rows: dict[str, Any] = {}
     for key, band in bands.items():
         lo, hi = band
-        if key in muscles:
-            sets = float(muscles[key].get("total_sets") or 0)
-            rows[key] = cell(MEASURED, sets, src, band=[lo, hi], below_floor=sets < lo)
+        members = volume_floors.BAND_MEMBERS.get(key, ())
+        needs_movements = any(m.endswith("_direct") for member in members for m in member)
+        if vol is None or not members or (needs_movements and by_movement is None):
+            why = (
+                "the week carried no per-exercise counts or the movement catalog is unreadable"
+                if members
+                else f"no member keys for `{key}`"
+            )
+            rows[key] = cell(ABSENT, None, src, why, band=[lo, hi])
             continue
-        parents = {p: (muscles.get(p) or {}).get("total_sets", 0) for p in PARENT_BUCKETS.get(key, ())}
+        r = band_rows[key]
+        member_sets = [int(n) for n in r["member_sets"]]
         rows[key] = cell(
-            ABSENT,
-            None,
+            MEASURED,
+            min(member_sets),
             src,
-            f"the per-muscle count carries no `{key}` key yet (#5053); the parent bucket is context, not the measure",
             band=[lo, hi],
-            parent_bucket_sets=parents or None,
+            member_sets=member_sets,
+            below_floor=bool(r["gap_to_floor"]),
+            gap_to_floor=int(r["gap_to_floor"]),
         )
     state = MEASURED if any(r["state"] == MEASURED for r in rows.values()) else ABSENT
     return {"state": state, "source": src, "charter_path": "volume_priorities.sets_per_wk", "rows": rows}
@@ -480,7 +490,9 @@ def evaluate_triggers(row: Mapping[str, Any], prior: Optional[Mapping[str, Any]]
     prior_v = (((prior or {}).get("volume") or {}).get("rows")) or {}
     absent_v = [k for k, r in vrows.items() if r.get("state") != MEASURED]
     if absent_v:
-        unevaluated.append({"id": "priority_volume_below_floor", "why": f"no per-muscle key for {', '.join(sorted(absent_v))} (#5053)"})
+        unevaluated.append(
+            {"id": "priority_volume_below_floor", "why": f"no movement-level count for {', '.join(sorted(absent_v))} (#5053)"}
+        )
     low2 = [k for k, r in vrows.items() if r.get("below_floor") and (prior_v.get(k) or {}).get("below_floor")]
     if low2:
         fired.append(_trigger("priority_volume_below_floor", AMBER, "a priority muscle sat below its weekly floor two weeks running", low2))
