@@ -59,7 +59,7 @@ from mcp.hevy_routine_commit_report import (
 
 # #3971: the subtract-only rule as a GATE on this path rather than a discipline. Its own
 # module for the same reason — this file sits at the ratchet's ceiling.
-from mcp.plan_cardio_pick import attach_custom_cardio_notes  # #3700/#5048: the chat path's cardio note pass
+from mcp.plan_cardio_pick import attach_custom_cardio_notes, replaced_note_warnings  # #3700/#5048: the chat path's cardio note pass
 from mcp.utils import mcp_error
 
 logger = logging.getLogger("tools_hevy_routine")
@@ -818,13 +818,6 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     # #5005 slot tags (the commit gate checks the engine's floors), #5049 the warm-up climb, #5057 the stall rule's step
     finished = finish_custom_draft(ir, catalog, args)
     draft_versioned(ir)
-    # #5312: every authored cardio note the composer replaced is stated, with its old and new kind
-    for r in (ir.inputs_snapshot or {}).get("cardio_notes_replaced") or []:
-        warnings = warnings + [
-            f"Replaced your authored {r.get('movement_key')} note ({str(r.get('notes') or '')[:80]!r}): "
-            f"read as {r.get('old_kind') or 'no recognised kind'}, wrote {r.get('new_kind')}. "
-            "The original is kept on the draft's inputs_snapshot.cardio_notes_replaced."
-        ]
     resp = {
         "status": "drafted_custom",
         "routine_id": ir.routine_id,
@@ -834,7 +827,7 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         "total_sets": total_sets,
         "cardio_cues": cardio_cues,
         **finished,  # warmup_sets, program_slot, step_due
-        "warnings": warnings,
+        "warnings": warnings + replaced_note_warnings(ir),  # #5312
         "note": "Run action=dry_run with this routine_id to preview the exact Hevy "
         "body, then action=commit to push. Commit requires explicit routine_id.",
     }
