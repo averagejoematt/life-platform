@@ -20,7 +20,10 @@ names the row or imports this one.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Iterable, Optional
+
+logger = logging.getLogger(__name__)
 
 SK = "PRIORITIES#current"
 LABS_PREFIX = "LABS#"
@@ -40,6 +43,17 @@ def from_rows(rows: Any) -> Optional[dict[str, Any]]:
                 return None
             return {"text": text[:MAX_CHARS], "updated_at": str(r.get("updated_at") or "")[:10] or None, "source": f"clinical {SK}"}
     return None
+
+
+def read_priorities(table: Any) -> Optional[dict[str, Any]]:
+    """The priorities row alone, for an owner read that holds no clinical rows (the weekly menu's quality report,
+    #5105): one key-and-priorities projection of the clinical partition. A failed read is None (nothing is weighted),
+    logged, never raised."""
+    try:
+        return from_rows(_clinical_keys(table))
+    except Exception as e:  # noqa: BLE001 — a broken read leaves the priorities unweighted, never breaks the caller
+        logger.warning("lab priorities unreadable: %s", type(e).__name__)
+        return None
 
 
 def _clinical_draw_dates(rows: Any) -> list[str]:

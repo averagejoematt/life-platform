@@ -57,7 +57,7 @@ ANCHORS = [
     _food("t_isolate", 100, 24, 0.5, 0.4, 0, package={"label": "test tub", "servings": 10}),
     _food("t_lean", 120, 26, 0, 1.5, 0),
     _food("t_white", 90, 20, 1, 0.5, 0),
-    _food("t_fish", 200, 22, 0, 12, 0),
+    _food("t_fish", 200, 22, 0, 12, 0, fatty_fish=True, nutrient_tags=["omega3"]),
     _food("t_egg", 70, 6, 0.5, 5, 0),
     _food("t_veg", 25, 2, 5, 0.2, 4, max_per_day=6),
     _food("t_berry", 60, 1.5, 14, 0.7, 8),
@@ -287,6 +287,9 @@ def test_the_mcp_read_builds_the_menu_over_the_weekly_food_plan(monkeypatch):
     seen = {}
     monkeypatch.setattr(pwg, "read_routines", lambda start, end: seen.setdefault("routines", (start, end)) and [])
     monkeypatch.setattr(pwg, "read_food_plan", lambda week, routines: seen.setdefault("plan", week) and _plan())
+    from training import lab_priorities
+
+    monkeypatch.setattr(lab_priorities, "read_priorities", lambda table: None)  # #5105: no DDB read in a test
     monkeypatch.setenv(tc.PRIVATE_ENV_VAR, json.dumps({wm.ANCHORS_PATH: ANCHORS}))
     tc.reset_cache()
     out = ttn.tool_get_exercise_notes({"action": "weekly_menu", "week_start": WEEK})

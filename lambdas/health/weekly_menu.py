@@ -36,6 +36,13 @@ THE FIT (per day, deterministic — the same plan and table always give the same
   3. THE CHECK: kcal inside the day's band (the resolved kcal +/- half the prescribed band's width), protein at the
      range low, every feeding at its threshold, every floor met. `fits` is all of them; `misses` names each one short.
 
+THE FOOD-QUALITY TARGETS (#5105, `nutrition.food_quality`, read and checked by `health.food_quality`): the fibre floor is
+one of the day's floors above (the ONE fibre floor); the fatty-fish weekly range is enforced across the week — every day
+is fitted with the fatty-fish anchors (rows tagged `fatty_fish: true`) kept off it, then the range's low end is placed
+as one pinned serving on each of that many spread days (`_fit_week`); the owner-only lab-driven priorities row, when the
+caller holds it, rides the report. The menu's `quality` names every target the week misses (`quality.misses`) and every
+unreadable one (`quality.problems`) — never silently — and `food_plan` carries the rows the food panel checks the same way.
+
 The feedings are laid inside the one eating window (`nutrition.eating_window`): feeding i opens at i x (eating hours /
 feedings) hours after the window opens, so all of them sit inside it. On a lifting day one feeding is the post-session
 feeding (it moves with the session; the window offset is where it sits when the session is mid-window).
@@ -57,11 +64,11 @@ import math
 from datetime import datetime
 from typing import Any, Callable, Iterable, Mapping, Optional, Sequence
 
-from health import travel_food
+from health import food_quality, travel_food
 
 logger = logging.getLogger(__name__)
 
-VERSION = "weekly-menu@1.0.0"
+VERSION = "weekly-menu@1.1.0"  # 1.1.0 #5105: the food-quality targets (fatty fish placed, the quality report)
 ISSUE = "#5103"
 POLICY_PATH = "nutrition.weekly_menu"
 ANCHORS_PATH = "anchor_foods"  # the owner-only twin's key (training_charter.PRIVATE_KEYS)
@@ -163,6 +170,7 @@ def parse_anchors(raw: Any, cap: int) -> tuple[list[dict[str, Any]], list[str]]:
                 **{m: float(v or 0.0) for m, v in vals.items()},
                 "cap": own or cap,
                 "package": {"label": pkg.get("label"), "servings": _num(pkg.get("servings"))},
+                **food_quality.tags(row),  # #5105: fatty_fish, nutrient_tags (optional columns)
             }
         )
     usable.sort(key=lambda a: a["id"])
@@ -319,19 +327,26 @@ def _merge(a: Mapping[str, int], b: Mapping[str, int]) -> dict[str, int]:
 
 
 def _search_day(
-    picked: list[Counts], pools: Sequence[Sequence[Counts]], anchors: Sequence[Mapping[str, Any]], t: Mapping[str, Any]
+    picked: list[Counts],
+    pools: Sequence[Sequence[Counts]],
+    anchors: Sequence[Mapping[str, Any]],
+    t: Mapping[str, Any],
+    fixed_vec: Optional[Sequence[float]] = None,
 ) -> tuple[list[Counts], Counts]:
     """Best-improvement local search from the day's starting cores: a side move (`_side_moves`) or one feeding's core
     replaced by another core from that feeding's pool, every move inside the per-day caps. Ties go to the fewest
     servings, then the move's text (ids), so it is deterministic; every move taken strictly lowers the cost, so it
-    ends at a local optimum (or MAX_MOVES). Totals are kept as a running vector, so a move costs a few additions."""
+    ends at a local optimum (or MAX_MOVES). Totals are kept as a running vector, so a move costs a few additions.
+    `fixed_vec` is the macro vector of servings pinned into the day (a placed fatty-fish serving, #5105): counted in
+    every total, never moved."""
     by_id = {a["id"]: a for a in anchors}
     caps = {a["id"]: int(a["cap"]) for a in anchors}
     unit = {k: _vec({k: 1}, by_id) for k in caps}
     ids = sorted(caps)
     sides: Counts = {}
     used = _used(picked, sides)
-    tot = _vec(used, by_id)
+    base = tuple(fixed_vec) if fixed_vec is not None else (0.0,) * len(MACROS)
+    tot = tuple(x + b for x, b in zip(_vec(used, by_id), base))
     best = (_cost_vec(tot, t), sum(used.values()))
     for _ in range(MAX_MOVES):
         choice: Optional[tuple[tuple[tuple[float, float], int], str, dict[str, int], Optional[tuple[int, Counts]]]] = None
@@ -363,7 +378,7 @@ def _search_day(
         else:
             picked = [*picked[: core_move[0]], core_move[1], *picked[core_move[0] + 1 :]]
         used = {k: n for k, n in _merge(used, delta).items() if n}
-        tot = _vec(used, by_id)
+        tot = tuple(x + b for x, b in zip(_vec(used, by_id), base))
         best = (sc[0], sum(used.values()))
     return picked, sides
 
@@ -419,9 +434,18 @@ def _lay_out(
 
 
 def fit_day(
-    day: Mapping[str, Any], anchors: Sequence[Mapping[str, Any]], pol: Mapping[str, Any], index: int, read: Optional[CharterReader] = None
+    day: Mapping[str, Any],
+    anchors: Sequence[Mapping[str, Any]],
+    pol: Mapping[str, Any],
+    index: int,
+    read: Optional[CharterReader] = None,
+    *,
+    exclude: Iterable[str] = (),
+    fixed: Optional[Mapping[str, int]] = None,
 ) -> dict[str, Any]:
-    """One plan day fitted from the anchors. `index` is the day's position in the week (the core rotation)."""
+    """One plan day fitted from the anchors. `index` is the day's position in the week (the core rotation). `exclude`
+    keeps anchors off the day; `fixed` pins servings into it (counted, never moved) — the week's fatty-fish placement
+    (#5105) uses both."""
     t = day_targets(day, read)
     weekday = WEEKDAY_NAMES[datetime.strptime(str(day.get("date"))[:10], "%Y-%m-%d").weekday()]  # a calendar-day key
     base = {
@@ -434,7 +458,11 @@ def fit_day(
     if not _ready(t):
         return {**base, "fits": False, "reason_code": NO_CALORIE_TARGET, "misses": ["no resolved kcal or an unreadable charter rule"]}
     by_id = {a["id"]: a for a in anchors}
+    pinned: Counts = {k: int(n) for k, n in (fixed or {}).items() if n and k in by_id}
+    off = set(exclude) | set(pinned)
+    anchors = [a for a in anchors if a["id"] not in off]  # the foods the search may move
     caps = {a["id"]: int(a["cap"]) for a in anchors}
+    fixed_vec = _vec(pinned, by_id)
     post_slot = 1 if (t["post_session_protein_g"] is not None and t["feedings"] > 1) else (0 if t["post_session_protein_g"] else None)
     share = float(t["kcal"]) / t["feedings"]  # a core is at most one feeding's share of the day: protein-led, never a whole meal plan
     cores = [c for c in feeding_cores(anchors, float(t["feeding_threshold_g"]), pol["core_max"]) if _totals(c, by_id)["kcal"] <= share]
@@ -457,7 +485,8 @@ def fit_day(
         start = _pick_cores(cores, post_cores, t["feedings"], post_slot, offset, caps)
         if start is None:
             continue
-        picked, sides = _search_day(start, pools, anchors, t)
+        picked, sides = _search_day(start, pools, anchors, t, fixed_vec)
+        sides = _merge(sides, pinned)
         feedings = _lay_out(picked, sides, t, post_slot, by_id)
         tot = _totals(_used(picked, sides), by_id)
         checks, misses = _check(tot, feedings, t)
@@ -477,11 +506,61 @@ def _refused(code: str, reason: str, **extra: Any) -> dict[str, Any]:
     return {"version": VERSION, "issue": ISSUE, "tier": "owner_only", "built": False, "reason_code": code, "reason": reason, **extra}
 
 
-def build(plan: Optional[Mapping[str, Any]], *, read: Optional[CharterReader] = None, anchors_raw: Any = None) -> dict[str, Any]:
+def _fish_ids(anchors: Sequence[Mapping[str, Any]]) -> list[str]:
+    return sorted(a["id"] for a in anchors if a.get("fatty_fish"))
+
+
+def _fit_week(
+    days: Sequence[Mapping[str, Any]],
+    anchors: Sequence[Mapping[str, Any]],
+    pol: Mapping[str, Any],
+    qpol: Mapping[str, Any],
+    read: CharterReader,
+) -> list[dict[str, Any]]:
+    """Every day fitted, with the fatty-fish target enforced (#5105): every day is first fitted with the fatty-fish
+    anchors kept off it, then the low end of the charter's weekly range is placed — one pinned serving on each of that
+    many days, spread across the week (the day nearest each even slot first, the next nearest when a day cannot fit
+    it), the fish anchors taken in turn. A day the fish-free fit cannot build (fish was its only protein core) is
+    fitted with fish allowed; the quality report then names any count outside the range. With no readable range or no
+    tagged anchor the week is fitted as before."""
+    fish = _fish_ids(anchors)
+    rng = qpol.get("fish_range")
+    if not fish or rng is None:
+        return [fit_day(d, anchors, pol, i, read) for i, d in enumerate(days)]
+    fitted = []
+    for i, d in enumerate(days):
+        day = fit_day(d, anchors, pol, i, read, exclude=fish)
+        fitted.append(fit_day(d, anchors, pol, i, read) if day.get("reason_code") == NO_FEEDING_CORE else day)
+    placed = [sum(i_["servings"] for f in d.get("feedings") or [] for i_ in f["items"] if i_["item"] in fish) for d in fitted]
+    free = [i for i, n in enumerate(placed) if not n]
+    need = max(0, math.ceil(rng[0] - sum(placed)))
+    chosen: set[int] = set()
+    for k in range(min(need, len(free))):
+        ideal = (k + 0.5) * len(days) / need
+        for i in sorted(free, key=lambda j: (abs(j + 0.5 - ideal), j)):
+            if i in chosen:
+                continue
+            cand = fit_day(days[i], anchors, pol, i, read, exclude=fish, fixed={fish[k % len(fish)]: 1})
+            if cand.get("fits") or (not fitted[i].get("fits") and cand.get("feedings")):
+                fitted[i] = cand
+                chosen.add(i)
+                break
+    return fitted
+
+
+def build(
+    plan: Optional[Mapping[str, Any]],
+    *,
+    read: Optional[CharterReader] = None,
+    anchors_raw: Any = None,
+    priorities: Optional[Mapping[str, Any]] = None,
+) -> dict[str, Any]:
     """The week's menu over a `food_panel.build_food_plan` plan. `anchors_raw` is the anchor table (default: the
-    owner-only twin's `anchor_foods`). Never raises: an unbuildable menu is `{built: False, reason_code, reason}` with
-    a code from REASON_CODES; a built menu with a day the anchors cannot fit carries `fits_all: False`,
-    `reason_code: day_unfit` and each day's misses."""
+    owner-only twin's `anchor_foods`); `priorities` is the owner-only lab-driven priorities row
+    (`training.lab_priorities.from_rows`, #5111) when the caller holds one. Never raises: an unbuildable menu is
+    `{built: False, reason_code, reason}` with a code from REASON_CODES; a built menu with a day the anchors cannot fit
+    carries `fits_all: False`, `reason_code: day_unfit` and each day's misses; a week that misses a food-quality target
+    (#5105) carries `quality_met: False` and each miss named in `quality.misses`."""
     read = read or _default_reader
     days = [d for d in (plan or {}).get("days") or [] if isinstance(d, dict)]
     if not days:
@@ -499,13 +578,19 @@ def build(plan: Optional[Mapping[str, Any]], *, read: Optional[CharterReader] = 
             f"{len(anchors)} usable anchor food(s), fewer than the charter's min_anchors {pol['min_anchors']}",
             anchor_problems=problems,
         )
-    fitted = [fit_day(d, anchors, pol, i, read) for i, d in enumerate(days)]
+    qpol = food_quality.policy(read)
+    fitted = _fit_week(days, anchors, pol, qpol, read)
     refused = next((d for d in fitted if d.get("reason_code") in (NO_CALORIE_TARGET, NO_FEEDING_CORE)), None)
     if refused is not None:
         return _refused(str(refused["reason_code"]), f"{refused['date']}: {'; '.join(refused['misses'])}", anchor_problems=problems)
     unfit = [d for d in fitted if not d["fits"]]
     if unfit:
         logger.warning("weekly menu: %d day(s) the anchors cannot fit: %s", len(unfit), [(d["date"], d["misses"]) for d in unfit])
+    by_id = {a["id"]: a for a in anchors}
+    note = "" if _fish_ids(anchors) else "no anchor in the table is tagged fatty_fish"
+    quality = food_quality.check_week(food_quality.day_rows(fitted, by_id), qpol, priorities, fish_note=note)
+    if not quality["met"]:
+        logger.warning("weekly menu: food-quality targets missed: %s %s", quality["misses"], quality["problems"])
     menu = {
         "version": VERSION,
         "issue": ISSUE,
@@ -516,6 +601,8 @@ def build(plan: Optional[Mapping[str, Any]], *, read: Optional[CharterReader] = 
         "fits_all": not unfit,
         "reason_code": DAY_UNFIT if unfit else None,
         "unfit_days": [{"date": d["date"], "misses": d["misses"]} for d in unfit],
+        "quality_met": quality["met"],
+        "quality": quality,
         "anchors_used": len(anchors),
         "anchor_problems": problems,
         "days": fitted,
@@ -536,6 +623,8 @@ def food_plan(plan: Mapping[str, Any], menu: Mapping[str, Any]) -> dict[str, Any
         if m is not None:
             d["feedings"] = [{"when": f["when"], "protein_g": f["protein_g"]} for f in m["feedings"]]
     out["case_id"] = f"{out.get('case_id') or 'food'}::menu"
+    q = menu.get("quality") or {}
+    out["quality_days"] = q.get("rows") or []  # #5105: what training.food_panel checks the week's quality targets over
     return out
 
 
@@ -586,4 +675,13 @@ def lines(menu: Mapping[str, Any]) -> list[str]:
             f"menu {tot.get('kcal'):g} kcal, protein {tot.get('protein_g'):g} g, fat {tot.get('fat_g'):g} g, "
             f"carbohydrate {tot.get('carb_g'):g} g, fibre {tot.get('fibre_g'):g} g — {verdict}. {fed}"
         )
+    q = menu.get("quality")
+    if isinstance(q, dict):
+        fish = q.get(food_quality.FISH) or {}
+        head = "Food quality: " + (
+            "every target met" if q.get("met") else "MISSED: " + "; ".join([*q.get("misses", []), *q.get("problems", [])])
+        )
+        if fish:
+            head += f". Fatty fish {fish.get('servings'):g} serving(s) (target {fish['range'][0]}-{fish['range'][1]}) on {', '.join(fish.get('days') or []) or 'no day'}"
+        out.append(f"{head}. {(q.get(food_quality.PRIORITIES) or {}).get('line', '')}".rstrip())
     return out

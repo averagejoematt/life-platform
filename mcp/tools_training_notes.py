@@ -661,9 +661,11 @@ def _weekly_menu(args=None):
     foods (the owner-only charter twin) over the week's food plan: the same `training.food_panel.build_food_plan` the
     weekly panel grade reads (`mcp.panel_weekly_grade.read_food_plan`: the resolver's seven days, typed by the training
     calendar, the titration record). `week_start` (YYYY-MM-DD, a Monday) defaults to the coming week — today when today
-    is a Monday. Nothing is written; an unbuildable menu returns its named reason, never a remembered one."""
+    is a Monday. Nothing is written; an unbuildable menu returns its named reason, never a remembered one. The menu's
+    `quality` report (#5105) carries the food-quality targets met or missed by name and his lab-driven priorities row."""
     from common.pacific_time import parse_day_key, shift_day_key
     from health import calorie_target, weekly_menu
+    from training import lab_priorities
 
     from mcp import panel_weekly_grade
 
@@ -678,7 +680,8 @@ def _weekly_menu(args=None):
     plan = panel_weekly_grade.read_food_plan(week, panel_weekly_grade.read_routines(week, end))
     if plan is None:
         return {"error": "the week's food plan is unreadable (see the MCP log); no menu is built without it", "week_start": week}
-    return weekly_menu.build(plan)
+    # #5105: the owner-only lab-driven priorities row rides the menu's quality report (None -> nothing is weighted)
+    return weekly_menu.build(plan, priorities=lab_priorities.read_priorities(table))
 
 
 def _now_z() -> str:
