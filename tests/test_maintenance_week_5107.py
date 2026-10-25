@@ -2,7 +2,7 @@
 
 Owner ruling 2026-10-23: R3 yes (the late-December trip is a planned maintenance week: eat at maintenance,
 pass within +/-2 lb of the start weight); R4 no (no second rehearsal near 240 lb). Covered: the charter
-blocks (inert while the window has no dates), the window's dates (its own, else the travel window's), the
+blocks (the late-December window is dated 2026-12-20 to 2026-12-27 on its travel window, owner ruling 2026-10-25), the window's dates (its own, else the travel window's), the
 weekly decision on a window week (the target holds and carries forward; the record lists the maintenance
 dates and kcal from the expenditure estimate, never a charter number), the trend-window hold after it, the
 resolver serving maintenance on exactly those dates (no lifting uplift), the record round trip through the
@@ -35,7 +35,8 @@ from health import (  # noqa: E402
 )
 from training import training_charter as tc  # noqa: E402
 
-START, END = "2026-12-24", "2026-12-31"  # fixture dates: the live charter's are null (owner-set)
+START, END = "2026-12-24", "2026-12-31"  # fixture dates, deliberately not the live trip's (LIVE_START, LIVE_END)
+LIVE_START, LIVE_END = "2026-12-20", "2026-12-27"  # owner ruling 2026-10-25
 WK1, WK2, WK3 = "2026-12-21", "2026-12-28", "2027-01-04"
 BAND = {"floor_lb_wk": 3.0, "ceiling_lb_wk": 3.5, "source": "charter rate band", "guidance_capped": False}
 RECON = {"best_match": "platform_measured", "best_match_actionable": True, "models": {"platform_measured": {"kcal": 2873.6}}}
@@ -87,19 +88,25 @@ def decide(cfg, week, trend=3.2, history=(), estimate=RECON, trend_window=None, 
 
 
 # ── the charter ──────────────────────────────────────────────────────────────────────────────
-def test_the_charter_carries_the_owner_ruling_and_is_inert_until_he_dates_the_window():
+def test_the_charter_carries_the_owner_ruling_and_the_window_is_scheduled():
     block = tc.charter_value("nutrition.maintenance_weeks")
     assert block["pass_band_lb"] == 2, "owner ruling R3: pass within +/-2 lb of the start weight"
     assert "R3" in block["ruling"] and "R4" in block["ruling"] and "R4" in block["rehearsals"]
     assert [w["travel_window"] for w in block["windows"]] == [w["label"] for w in tc.charter_value("travel.windows")]
     assert isinstance(block["target"], str), "maintenance is the expenditure estimate, never a number in the charter"
     c = ti.settings()
-    assert c["maintenance"]["readable"] and mw.dated(c["maintenance"]) == []  # no dates anywhere: inert
-    for week in (WK1, WK2, WK3):
-        d = decide(c, week)
-        assert d["reason_code"] == "in_band" and "maintenance_dates" not in d
+    assert c["maintenance"]["readable"]
+    live = mw.dated(c["maintenance"])  # the window is scheduled from the travel window, not inert
+    assert [(w["start"], w["end"], w["dates_basis"]) for w in live] == [(LIVE_START, LIVE_END, "travel window 'late December 2026'")]
+    assert block["windows"][0]["start"] is None and block["windows"][0]["end"] is None, "the one place for the dates is travel.windows"
+    assert [(w["start"], w["end"]) for w in tc.charter_value("travel.windows")] == [(LIVE_START, LIVE_END)]
+    d = decide(c, WK1)
+    assert d["reason_code"] == "maintenance_week" and d["maintenance_dates"][0] == "2026-12-21" and d["maintenance_dates"][-1] == LIVE_END
+    assert len(d["maintenance_dates"]) == 7, "the ISO week of 2026-12-21 holds 12-21..12-27"
+    assert decide(c, "2026-12-14")["maintenance_dates"] == ["2026-12-20"]
     log = tc.charter_value("change_log")
     assert any("#5107" in e["what"] and "R3" in e["by"] for e in log)
+    assert any("20th-27th december" in e["by"] and "5107" in e["by"] for e in log)
 
 
 def test_the_reverse_diet_block_reads_the_titration_step_and_names_its_defaults():
@@ -263,7 +270,8 @@ def test_the_leg_reads_the_weigh_ins_around_an_ended_window_for_two_weeks(monkey
     assert [x["state"] for x in g] == ["pass"] and seen == [("withings", "2026-12-21", "2027-01-03")]
     assert tl.maintenance_grades("2027-01-14", m)[0]["state"] == "pass"
     assert tl.maintenance_grades("2027-01-15", m) == [], "past the grading horizon"
-    assert tl.maintenance_grades("2027-01-08", ti.settings()["maintenance"]) == [], "the live charter: inert"
+    live = tl.maintenance_grades("2027-01-08", ti.settings()["maintenance"])  # the live window, no weigh-in in its reach
+    assert [(x["end"], x["state"]) for x in live] == [("2026-12-27", "unknown")]
 
 
 def test_the_fixture_dry_run_shows_the_sequence():
@@ -286,7 +294,7 @@ def test_the_fixture_dry_run_shows_the_sequence():
 
 def test_gather_hands_the_maintenance_reads_to_decide(monkeypatch):
     """The leg's real gather, its reads stubbed at their modules: the maintenance seam carries the estimate from the
-    reconciliation and the trend window, and the live (undated) charter reads no weigh-ins for a grade."""
+    reconciliation and the trend window, and a live window not yet ended reads no weigh-ins for a grade."""
     from training import rate_band, steps_resolver
 
     from mcp import core, shared_quantities, titration_leg as tl, tools_nutrition
