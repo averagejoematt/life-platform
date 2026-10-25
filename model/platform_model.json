@@ -3795,6 +3795,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": "field-notes-generate",
+      "module": "lambdas/intelligence/field_notes_lambda.py",
+      "partition": "computed_metrics",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": "field-notes-generate",
       "module": "lambdas/intelligence/field_notes_lambda.py",
@@ -8170,7 +8177,7 @@
       "contracts_enrolled": 15,
       "contracts_known": 15,
       "contracts_ratchet": 15,
-      "edges": 790,
+      "edges": 791,
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
@@ -8185,8 +8192,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 395,
-        "sites_resolved": 993,
-        "sites_total": 1388
+        "sites_resolved": 995,
+        "sites_total": 1390
       },
       "schedule_resolution": {
         "dynamic": 0,
