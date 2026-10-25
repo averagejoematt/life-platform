@@ -214,7 +214,7 @@ def test_z1_ceiling_is_derived_from_the_platforms_one_zone_table():
                 return ast.literal_eval(node.value)
         raise AssertionError(f"{name} not found in {rel}")
 
-    helpers = _bounds("mcp/helpers.py", "HR_ZONE_BOUNDS")
+    helpers = _bounds("lambdas/common/hr_zones.py", "HR_ZONE_BOUNDS")
     assert helpers[0][0] == "zone_1"
     assert tl.Z1_CEILING_FRACTION_OF_MAX == helpers[0][3]
     assert tl.Z1_CEILING_HR == round(tl.MAX_HR * tl.Z1_CEILING_FRACTION_OF_MAX, 1) == 109.8

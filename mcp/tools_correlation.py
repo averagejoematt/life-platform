@@ -79,7 +79,11 @@ def tool_get_zone2_breakdown(args):
     whoop_end = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")  # Pacific evening -> next UTC key
     whoop_items = query_source("whoop", start_date, whoop_end)
     hevy_items = query_source("hevy", start_date, end_date)
-    sessions = [s for s in z2m.counted_sessions(strava_items, whoop_items) if start_date <= s["date"] <= end_date]
+    sessions = [
+        s
+        for s in z2m.counted_sessions(strava_items, whoop_items, query_source("apple_health", start_date, end_date))
+        if start_date <= s["date"] <= end_date
+    ]
     if not sessions:
         return {"error": "No recorded sessions for range.", "start_date": start_date, "end_date": end_date}
     window = z2m.zone2_window(None, None, hevy_items, start_date, end_date, sessions=sessions)

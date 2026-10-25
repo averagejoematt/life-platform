@@ -241,7 +241,9 @@ def _zone2_by_iso_week(strava_items, start_date, end_date):
     Whoop read reaches one UTC key past `end_date` (a Pacific evening workout is keyed the next day)."""
     whoop_end = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
     out = defaultdict(float)
-    for s in zone2_minutes.counted_sessions(strava_items, query_source("whoop", start_date, whoop_end)):
+    for s in zone2_minutes.counted_sessions(
+        strava_items, query_source("whoop", start_date, whoop_end), query_source("apple_health", start_date, end_date)
+    ):
         if s["source"] and start_date <= s["date"] <= end_date:
             out[datetime.strptime(s["date"], "%Y-%m-%d").strftime("%G-W%V")] += s["zone_2_minutes"]
     return dict(out)

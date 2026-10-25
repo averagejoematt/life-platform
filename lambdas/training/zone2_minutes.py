@@ -57,6 +57,8 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from common.activity_overlap import overlap_seconds
+from common.hr_zones import ZONE_KEYS, zone_seconds_from_bpm_bins
+from common.max_hr import DEFAULT_MAX_HR
 from common.pacific_time import pacific_date_of, parse_iso_utc
 from common.strava_read_seam import STRAVA_SOURCE
 
@@ -69,7 +71,8 @@ TRAILING_DAYS = 7
 #: Tie-break between sources that measured the same number of seconds of a session.
 WHOOP = "whoop"  # the partition the Whoop workout sub-rows live in
 STRAVA = STRAVA_SOURCE  # the read seam's own name for its partition
-APPLE = "apple_health"  # #4979: the Apple Watch's own workout sub-rows (the #4973 box-1 writer)
+APPLE = "apple_health"  # #4979: the Apple Watch's own workouts (the #4973 `apple_workouts` map)
+APPLE_WORKOUTS_FIELD = "apple_workouts"  # owner-only (privacy.field_tiers); never served raw
 # #4979 (per the #4627 ruling, "devices' own Zone 2 · minutes in zone"): the Apple Watch's own
 # Zone 2 joins as the THIRD source — it counts only where no Whoop or Strava recording measured the
 # session (or it measured materially more of it), so no number served before the watch moves.
@@ -78,7 +81,6 @@ SOURCE_PRIORITY = (WHOOP, STRAVA, APPLE)
 START_WINDOW_MIN = 15
 CONTAINMENT_SHARE = 0.8
 #: Zone keys every result carries; Whoop's zone 0 and anything below Strava's zone 1 is below_zone_1.
-ZONE_KEYS = ("below_zone_1", "zone_1", "zone_2", "zone_3", "zone_4", "zone_5")
 #: Hevy exercise-name tokens that mark a steady-cardio block (moved verbatim from the
 #: training_overview handler's P0.4 fold, so the set of blocks reported is unchanged).
 HEVY_CARDIO_TOKENS = ("cycling", "elliptical", "rowing", "treadmill", "stair", "ski erg", "ski-erg", "assault", "echo bike", "air bike")
@@ -195,32 +197,43 @@ def strava_recordings(strava_rows: Optional[Iterable[Mapping[str, Any]]]) -> Lis
     return out
 
 
-def apple_recordings(apple_rows: Optional[Iterable[Mapping[str, Any]]]) -> List[Dict[str, Any]]:
-    """#4979: Apple Watch WORKOUT sub-rows (`DATE#d#WORKOUT#<id>` in apple_health) -> one recording per id.
+def apple_recordings(apple_rows: Optional[Iterable[Mapping[str, Any]]], max_hr: Optional[float] = None) -> List[Dict[str, Any]]:
+    """#5353: Apple Watch workouts from the apple_health DAY rows' owner-only `apple_workouts` map
+    (`{vendor workout id: summary}`, the #4973 writer) -> one recording per id.
 
-    The reader contract for the #4973 box-1 writer: `start_time` / `end_time` (ISO) and the watch's own
-    time-in-zone as `zone{n}_seconds` (n = 1..5, Strava's names). A row without zone seconds is
-    unmeasured (it still groups with the same session from another device, it just measures nothing)."""
+    The watch's zone seconds are derived HERE, at read time, from `derived.hr_seconds_by_bpm5` (seconds
+    per 5-bpm bin) through `common.hr_zones` — the one zone-band table — at `max_hr` (default
+    `common.max_hr.DEFAULT_MAX_HR`; callers holding the profile pass its value). The writer assumes no band
+    (#4627); a workout with no bins is unmeasured (it still groups with the same session from another
+    device, it just measures nothing). A bin straddling a zone edge is split by overlap width."""
+    mx = float(max_hr) if max_hr else float(DEFAULT_MAX_HR)
     by_id: Dict[str, Dict[str, Any]] = {}
     for row in apple_rows or []:
-        sk = str(row.get("sk", ""))
-        if "#WORKOUT#" not in sk:
+        workouts = row.get(APPLE_WORKOUTS_FIELD)
+        if not isinstance(workouts, Mapping):
             continue
-        wid = str(row.get("workout_id") or sk.split("#WORKOUT#", 1)[1])
-        start, end = parse_iso_utc(row.get("start_time")), parse_iso_utc(row.get("end_time"))
-        rec = {
-            "source": APPLE,
-            "id": wid,
-            "device": APPLE,
-            "date": pacific_date_of(row.get("start_time") or "") or _row_date(row),
-            "sport": row.get("workout_name") or row.get("name") or "Activity",
-            "start": start,
-            "end": end,
-            "duration_s": (end - start).total_seconds() if (start and end and end > start) else 0.0,
-            "zones": _strava_zones(row),
-        }
-        if wid not in by_id or (by_id[wid]["zones"] is None and rec["zones"] is not None):
-            by_id[wid] = rec
+        for wid, w in workouts.items():
+            if not isinstance(w, Mapping):
+                continue
+            wid = str(wid)
+            start, end = parse_iso_utc(w.get("start")), parse_iso_utc(w.get("end"))
+            bins = (w.get("derived") or {}).get("hr_seconds_by_bpm5") if isinstance(w.get("derived"), Mapping) else None
+            zones = zone_seconds_from_bpm_bins(bins, mx) if bins else None
+            if zones is not None and sum(zones.values()) <= 0:
+                zones = None
+            rec = {
+                "source": APPLE,
+                "id": wid,
+                "device": APPLE,
+                "date": pacific_date_of(str(w.get("start") or "")) or _row_date(row),
+                "sport": w.get("name") or "Activity",
+                "start": start,
+                "end": end,
+                "duration_s": (end - start).total_seconds() if (start and end and end > start) else 0.0,
+                "zones": zones,
+            }
+            if wid not in by_id or (by_id[wid]["zones"] is None and zones is not None):
+                by_id[wid] = rec
     return list(by_id.values())
 
 
@@ -302,10 +315,11 @@ def _choose(cands: Mapping[str, Tuple[float, Dict[str, float], List[Dict[str, An
     return next(s for s in SOURCE_PRIORITY if s in cands and cands[s][0] >= CONTAINMENT_SHARE * best)
 
 
-def counted_sessions(strava_rows, whoop_rows, apple_rows=None) -> List[Dict[str, Any]]:
+def counted_sessions(strava_rows, whoop_rows, apple_rows=None, max_hr: Optional[float] = None) -> List[Dict[str, Any]]:
     """Every session once, with the zone minutes of the source that measured the most of it.
-    `apple_rows` (#4979): the apple_health rows whose WORKOUT sub-rows carry the watch's own zones."""
-    recs = strava_recordings(strava_rows) + whoop_recordings(whoop_rows) + apple_recordings(apple_rows)
+    `apple_rows` (#4979/#5353): the apple_health day rows whose `apple_workouts` map carries the watch's
+    heart-rate bins, zoned at read time at `max_hr`."""
+    recs = strava_recordings(strava_rows) + whoop_recordings(whoop_rows) + apple_recordings(apple_rows, max_hr)
     sessions: List[Dict[str, Any]] = []
     for group in _groups(recs, _same_session):
         cands = {}
