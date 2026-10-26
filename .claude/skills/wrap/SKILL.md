@@ -266,6 +266,10 @@ an absent "carries one line" marker prints `PROMPT`), (e4), (e12) (advisory), th
 `tests/test_operating_knowledge_ledger_2848.py`, and **the Docs-CI leg** (`docs_ci_gate_commands()`
 minus `MUTATING_GATES`) AFTER Phase 2 wrote `docs/INCIDENT_LOG.md`, `docs/alarm_citations.json`,
 `docs/PROPORTIONALITY.md`, `docs/**` and `CLAUDE.md` (#3682). **It must exit 0 before (f).**
+It also runs `scripts/check_staged_secrets.py` (#5405): gitleaks with `.gitleaks.toml` over the
+diff (f) is about to commit — the wrap goes to `main` with no PR, so CI's scan otherwise sees it
+only after it lands (4907f0a5a). No binary prints `UNVERIFIED` + the install line (exit 0, repeated
+in the closing `UNVERIFIED LEGS` line — say so in the handover); `WRAP_REQUIRE_GITLEAKS=1` blocks.
 
 ## Phase 4 — Commit
 

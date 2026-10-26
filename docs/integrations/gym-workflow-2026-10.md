@@ -1,6 +1,6 @@
 # Gym workflow after the Apple Watch: one visit, counted once
 
-**Issue:** #5370 (epic #4967), with #5371 (the Strava half: [strava-best-practices-2026-10.md](strava-best-practices-2026-10.md)) · **Verified:** 2026-10-26 against integration/session-ch-w2 @ 4907f0a5a (main + #5369, PR #5383)
+**Issue:** #5370 (epic #4967), with #5371 (the Strava half: [strava-best-practices-2026-10.md](strava-best-practices-2026-10.md)) · **Verified:** 2026-10-26 against integration/session-ch-w2 @ 4907f0a5a (main + #5369, PR #5383); row 1's SH and WW cells re-read 2026-10-26 for #5390 against main @ 8e9223903
 **Shared fixture:** `tests/test_gym_visit_one_source_5369.py`, the 2026-10-25 wire's structure with synthetic numbers (one Hevy session holding a lift, a 60-minute Cycling block and a Stretching block; three HealthKit workouts of three origins; four Strava activities; the matching Whoop rows)
 **Status:** the protocol is ruled (§1); the table (§4) covers every reader found; the cells that count twice or never count each have an issue (§5)
 
@@ -62,7 +62,7 @@ The grep misses steps, conditioning, muscle volume and every reader that counts 
 
 | # | Reader (served as) | H | HC | HM | AW | AP | AH | SW | SH | WW | SX |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | **Zone 2, sessions, exercise minutes**: `zone2_minutes.counted_sessions` (`/api/zone2`, `/api/training_overview` Zone 2, MCP `get_zone2_breakdown`, the correlation tool) | C the lift part [G1 G2] | C once, as the ride's duration; also the separate `hevy_cardio_minutes` bucket, never summed [G2 G3 N1] | C the mobility part [G1 G2] | F into the ride, zones the ride [G1 G7] | F into mobility [G9] | F into the lift [G8] | F into the ride [G7] | I dropped as the Hevy session's echo [G4]. Its own heart rate is dropped too (#5390) | F, its zones win [G6] | F: lift pieces fold into SH by the seam, or join the lift as chunks; the ride joins the ride [G4 G5] |
+| 1 | **Zone 2, sessions, exercise minutes**: `zone2_minutes.counted_sessions` (`/api/zone2`, `/api/training_overview` Zone 2, MCP `get_zone2_breakdown`, the correlation tool) | C the lift part [G1 G2] | C once, as the ride's duration; also the separate `hevy_cardio_minutes` bucket, never summed [G2 G3 N1] | C the mobility part [G1 G2] | F into the ride, zones the ride [G1 G7] | F into mobility [G9] | F into the lift [G8] | F into the ride [G7] | F into the lift as its heart-rate member when it carries its own heart rate (every push from 2026-10-18) and the session holds a lift: no part, no minute, zone time claimed once against the ride and the mobility block inside its span (#5390). I dropped as the echo when it carries none, or the session holds no lift [G4 H1 H2 H3] | F, its zones win unless another recording measured materially more (over the lift, the push does) [G6 H4] | F: lift pieces fold into SH by the seam, or join the lift as chunks; the ride joins the ride [G4 G5] |
 | 2 | **Hypothesis-engine trailing volumes**: `watch_hypotheses._trailing_volumes` (`cardio_7d_min`, `zone2_7d_min`) | I (Hevy not fetched) | I (Hevy not fetched) | I | C as the ride inside SH's span: **2×** in `cardio_7d_min` [P1] **#5388** | C as mobility inside SH's span: **2×** [P1] **#5388** | F into SH [P1] | F into the ride [P1] | C stands for the whole visit [P1] | F [P1] | F (seam) [G4, its no-Hevy half] |
 | 3 | **Training load** (TSB/ACWR): `training_load.daily_training_load` (computed TSB, MCP `get_training_load`, the deficit tracker's channel 5) | C worked-set time [L2] | C only on the share no heart-rate record covers [L2 L3] | I, 0 by definition [L4] | I (reaches load only as SW) (code) | I (code) | I (code) | C by heart rate, covers HC [L2] | I echo-skipped when Hevy has the day [L1] | I (code) | lift pieces I (echo) [L5]; walks and rides C, cover HC [L3] |
 | 3a | its `basis["sessions"]` ledger | C | — | — | — | — | — | C as a second session: **2×** [P1] **#5387** | I | — | walks and rides inside the visit **2×** [P1] **#5387** |
@@ -82,7 +82,7 @@ The grep misses steps, conditioning, muscle volume and every reader that counts 
 - **G1** `test_the_wire_is_one_lift_one_ride_one_mobility_block`
 - **G2** `test_minutes_are_counted_once_and_the_parts_sum_to_the_visit`
 - **G3** `test_hevy_cardio_stays_its_own_bucket_beside_zone2`
-- **G4** `test_the_seam_folds_the_whoop_pieces_into_hevys_push_which_drops_as_its_echo`
+- **G4** `test_the_seam_folds_the_whoop_pieces_into_hevys_push_and_an_hr_less_push_drops_as_its_echo`
 - **G5** `test_without_hevys_push_the_two_whoop_pieces_are_chunks_of_one_lift`
 - **G6** `test_the_full_wire_with_whoop_rows_is_still_three_parts_with_whoops_own_zones`
 - **G7** `test_readers_work_without_whoops_strava_copies`
@@ -91,6 +91,13 @@ The grep misses steps, conditioning, muscle volume and every reader that counts 
 - **G10** `test_a_walk_only_the_watch_recorded_is_counted`, `test_a_walk_in_strava_and_apple_is_counted_once_with_or_without_whoops_copy`, `test_a_hevy_treadmill_block_claims_the_watch_walk_inside_it`
 - **G11** `test_the_watch_backstop_reads_only_the_watchs_own_workouts`
 - **G13** `test_recent_aerobic_carries_the_watch_walk_as_a_row_without_its_heart_rate`
+
+The **H** proofs are `tests/test_hevy_push_lift_hr_5390.py` (#5390, the same shared fixture):
+
+- **H1** `test_a_push_carrying_its_own_heart_rate_is_the_lifts_heart_rate_member_on_both_wires` + `test_the_kept_push_is_counted_once_identities_and_minutes_unchanged` + `test_the_session_count_is_one_visit_and_the_push_is_no_parts_activity`
+- **H2** `test_zone2_reads_the_lifts_heart_rate_from_the_push_and_claims_time_once` + its mutation control `test_mutation_control_dropping_the_push_is_the_under_read`
+- **H3** `test_a_push_with_no_heart_rate_of_its_own_is_still_an_echo`, `test_a_push_over_a_session_holding_no_lift_is_still_an_echo`, `test_a_push_whose_sport_is_not_a_lifts_is_still_an_echo`, `test_mutation_control_keying_the_push_as_plain_strava_splits_the_lift`
+- **H4** `test_whoops_own_lift_pieces_do_not_outrank_a_push_that_measured_the_whole_lift`
 
 The other proofs:
 
@@ -121,7 +128,7 @@ The other proofs:
 | Row 2, AW/AP against SH | the engine never fetches Hevy, so Hevy's push stands for the whole visit and the ride and the mobility session are counted again. `cardio_7d_min` reads 240 for a 160-minute visit; with Hevy rows it reads 160 | **#5388** |
 | Rows 3a and 12, SW/SX against SH | 15 readers count Strava activities directly: Hevy's push of the whole session plus the ride (or, before 2026-10-26, WHOOP's ride or walk) inside it. Two sessions and 220 minutes for one 160-minute visit. Since 2026-10-18 Hevy's push also carries its own zones, so a day's summed `zone2_seconds` can hold the ride's minutes twice | **#5387** |
 | Row 13, every column | the character sheet's Zone 2 reads a key no writer stores, so it is 0 every day | **#5389** |
-| Row 1, SH (an under-read, not a double count) | the resolver drops Hevy's push as an echo. Since 2026-10-18 the push is the one record with heart rate over the whole lift; the Hevy-origin HealthKit workout spans only part of it | **#5390** |
+| Row 1, SH (an under-read, not a double count) | the resolver dropped Hevy's push as an echo. Since 2026-10-18 the push is the one record with heart rate over the whole lift; the Hevy-origin HealthKit workout spans only part of it. Decided in code on #5390: a push carrying its own heart rate is the lift's heart-rate member (row 1, SH) | **#5390** (rule decided; the 2026-10-26-protocol read of raw Strava + HAE spans is still open on the issue) |
 
 Already fixed and cited, not re-filed: the zone-2 over-merge of a whole visit into one session (#5369, G1), the Hevy-origin and pliability-origin HealthKit fold (#5369, G8 G9), the HealthKit-origin read in the walking layer (#5369, G11), Hevy cardio minutes summed with wearable minutes (#5369, N1), the WHOOP treadmill walk inside a Hevy session (#4068, W1), and the Hevy cardio block charged twice for energy and load (#4158 E1, #4075 L2).
 

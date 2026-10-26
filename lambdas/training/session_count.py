@@ -17,7 +17,9 @@ THE RULE
   * PARTS are `training.workout_identity`'s identities — the ONE cross-source rule (Hevy's own
     Strava push dropped as an echo of the Hevy session in hand, a wearable's ride joined to the
     Hevy cycling block, WHOOP's lift pieces folded by the read seam). A gym visit is its parts:
-    the lift, the ride, the mobility block, each labelled by what it was.
+    the lift, the ride, the mobility block, each labelled by what it was. A Hevy push kept as the
+    lift's heart-rate member (#5390, resolver source `strava/hevy`) adds no part, no minute and no
+    activity here: a part's `activities` are its `strava` members only.
   * A VISIT (what every reader here calls a session or a workout) is the parts that belong to one
     occasion: parts of one Hevy session, or parts whose intervals overlap. One gym visit is one
     visit, whichever device uploaded the ride and whether or not the reader holds the Hevy rows

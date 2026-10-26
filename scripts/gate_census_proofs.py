@@ -1036,6 +1036,28 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-10-25",
     },
+    "guard::scripts/check_staged_secrets.py": {
+        "gate_name": "scripts/check_staged_secrets.py",
+        "command": "python3 -m pytest tests/test_staged_secret_scan_5405.py -q   # gitleaks driven through the runner seam by a stand-in; the binary is not installed on the laptop",
+        "mutation": (
+            "Four defects planted one at a time into the real script: M1 the wrap's stage list dropped (`if present:` -> `if False:`, "
+            "so an UNSTAGED handover edit never reaches the scanner); M2 the verdict ignores findings and the scanner's exit 1; "
+            "M3 the absent-binary UNVERIFIED line deleted (the silent pass the issue forbids); M4 GIT_INDEX_FILE dropped so the "
+            "leg stages into the REAL index."
+        ),
+        "observed": (
+            "2026-10-26 BASELINE 19 passed. M1 5 failed / 14 passed. M2 2 failed / 17 passed. M3 3 failed / 16 passed. M4 1 failed / 18 passed. "
+            "REVERTED (copied back from the pre-mutation backup): 19 passed."
+        ),
+        "scope": (
+            "The tests prove the leg's plumbing (which diff reaches the scanner, the verdict mapping, the loud absent-binary path), "
+            "NOT that gitleaks' own generic-api-key rule matches the 4907f0a5a shape: the scanner is a stand-in that reads the same "
+            "diff and answers in gitleaks' report format, because the binary is not installed here and the gate may not fetch one. "
+            "Absent binary is UNVERIFIED (exit 0) by default, so on a machine without gitleaks this gate judges nothing and says so; "
+            "WRAP_REQUIRE_GITLEAKS=1 / --require makes it block. Wired into the wrap VERIFY battery (scripts/wrap_gates.py), not CI."
+        ),
+        "proved_on": "2026-10-26",
+    },
     "guard::scripts/check_deploy_deadman.py": {
         "gate_name": "scripts/check_deploy_deadman.py",
         "command": "python3 -m pytest tests/test_head_coverage_scheduled_consumer_2826.py -k deadman -q   # + the live read-only run below",

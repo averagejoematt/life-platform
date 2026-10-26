@@ -181,14 +181,17 @@ def test_minutes_are_counted_once_and_the_parts_sum_to_the_visit():
     assert fams["mobility"]["duration_minutes"] == 18.0
     assert fams["strength"]["duration_minutes"] == 160.0 - 60.0 - 18.0
     assert sum(s["duration_minutes"] for s in sessions) == 160.0, "the parts sum to the visit, never more"
-    # zone time: the lift (Hevy's watch app, 12:00–12:21) and the mobility block (pliability,
-    # 12:02–12:22) carry the same minutes — they are measured once across the read
+    # zone time: the lift's heart rate is Hevy's own push (#5390: kept as the lift's heart-rate member),
+    # whose interval (16:40–19:20) also spans the ride (18:00–19:00) and 18 minutes of the pliability
+    # session (19:02–19:22). Time is claimed once across the read, tightest recording first, so the ride
+    # and the mobility block keep their own minutes and the push keeps the share of its interval left.
     assert fams["mobility"]["measured_minutes"] == 20.0 and fams["mobility"]["overlap_minutes_removed"] == 0.0
-    assert fams["strength"]["measured_minutes"] == pytest.approx(2.0, abs=0.01)
-    assert fams["strength"]["overlap_minutes_removed"] == pytest.approx(19.0, abs=0.01)
     assert fams["cycling"]["measured_minutes"] == 60.0
-    union_min = 60.0 + 22.0  # 11:00–12:00 and 12:00–12:22 PDT
-    assert sum(s["measured_minutes"] for s in sessions) == pytest.approx(union_min, abs=0.01)
+    assert fams["strength"]["used_ids"] == ["strava/hevy:90000001"]
+    push_share = (9600 - 3600 - 18 * 60) / 9600
+    assert fams["strength"]["measured_minutes"] == pytest.approx(9000 * push_share / 60.0, abs=0.01)
+    union_min = 162.0  # the measuring recordings' union: 16:40–19:22 UTC (the push, then the pliability tail)
+    assert sum(s["measured_minutes"] for s in sessions) <= union_min, "no minute of the visit is measured twice"
 
 
 def test_hevy_cardio_stays_its_own_bucket_beside_zone2():
@@ -199,11 +202,19 @@ def test_hevy_cardio_stays_its_own_bucket_beside_zone2():
     assert win["zone_2_minutes"] + win["hevy_cardio_minutes"] != win["zone_2_minutes"]  # two buckets, never summed
 
 
-def test_the_seam_folds_the_whoop_pieces_into_hevys_push_which_drops_as_its_echo():
+def test_the_seam_folds_the_whoop_pieces_into_hevys_push_and_an_hr_less_push_drops_as_its_echo():
     """Both WHOOP WeightTraining pieces lie inside Hevy's push (different devices, >= 80% contained),
-    so the read seam folds them into it; the push is then dropped as the Hevy session's echo."""
+    so the read seam folds them into it. The push carries its own heart rate (the 2026-10-18+ wire),
+    so it stays as the lift's heart-rate member (#5390); a push with none (the 10-11 → 10-16 wire) is
+    dropped as the Hevy session's echo."""
     kept = wi.strava_without_echoes([_strava_row(*ALL_STRAVA)], [HEVY])
-    assert [a["strava_id"] for a in kept[0]["activities"]] == ["90000003"]
+    assert [(a["strava_id"], a.get(wi.LIFT_HR_OF)) for a in kept[0]["activities"]] == [
+        ("90000001", "hv-synth-5369#strength"),
+        ("90000003", None),
+    ]
+    hr_less_push = _act("90000001", "WeightTraining", "Hevy", "16:40:00", 9600)
+    dropped = wi.strava_without_echoes([_strava_row(hr_less_push, STRAVA_WHOOP_RIDE)], [HEVY])
+    assert [a["strava_id"] for a in dropped[0]["activities"]] == ["90000003"]
     without_hevy = wi.strava_without_echoes([_strava_row(*ALL_STRAVA)], [])
     assert sorted(a["strava_id"] for a in without_hevy[0]["activities"]) == ["90000001", "90000003"]
 

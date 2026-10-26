@@ -42,6 +42,28 @@ its Strava copy is an echo. A Hevy push carrying a seam graft (`hr_from_strava_i
 are the folded wearable copy's, the only trace of that record. Whoop's own workout rows are a source
 (`whoop_members`), last in precedence.
 
+THE LIFT'S HEART-RATE MEMBER (#5390). From 2026-10-18 every Hevy push carries its OWN heart rate
+(Hevy's watch app; 0 of 4 pushes 10-11 → 10-16 did, 5 of 5 pushes 10-18 → 10-25 do — raw Strava,
+read-only), and it is the one record whose heart rate spans the whole lift: the Hevy-origin HealthKit
+workout and WHOOP's pieces cover only parts of it. The owner's recording protocol (2026-10-26) names
+Hevy's watch app as the lift's heart-rate recorder. So a push that carries its own heart rate
+(`carries_own_hr`: no graft, and Strava's heart-rate flag, an average or zone seconds) is KEPT —
+not as a part, but as the lift's heart-rate member — when the Hevy session it overlaps holds a lift
+(a `strength` member). `strava_without_echoes` stamps the kept copy `LIFT_HR_OF` = that lift
+member's id, `strava_members` keys it as its own source (`HEVY_PUSH_SOURCE`, "strava/hevy", the way
+a Hevy-origin HealthKit workout is `apple_health/hevy`), and the resolver places it in that lift's
+identity by id, never by overlap. Counted once: the identity's duration stays Hevy's (precedence),
+so `identity_totals` and `training.session_count` count no new minute and no new part (the member
+is not a part's activity there — `session_count` lists only `strava` members). Its heart rate spans
+the cardio and mobility blocks too; `training.zone2_minutes` claims time once across the read
+(tightest recording first), so the watch's ride and the pliability session keep their own minutes
+and the push keeps only the share no tighter recording covered.
+Still dropped as an echo, with the reason: a push with no heart rate of its own (nothing to lose —
+the Hevy session is the record), and a push of a Hevy session holding NO lift (a cardio- or
+mobility-only session: those blocks' heart rate is the watch's Workout app / the pliability app per
+the protocol, and a whole-session copy would only re-measure their minutes), and a push whose sport
+is not a lift's (it could not be the lift's record).
+
 COUNTED ONCE
 
 An identity's duration is ONE source's, by precedence — the logged Hevy block, else Strava's moving
@@ -84,12 +106,21 @@ from common.strava_read_seam import STRAVA_SOURCE, strava_read_seam
 
 from training.walking_volume import APPLE_COUNTED_NAMES, HEVY_COUNTED_NAMES, STRAVA_COUNTED_TYPES, apple_workout_source
 
-WORKOUT_IDENTITY_VERSION = "workout-identity@1.1.0"  # 1.1.0 (#5369): mobility, Whoop, chunks, unnamed-label overlap, Hevy echoes
+# 1.2.0 (#5390): the lift's heart-rate member · 1.1.0 (#5369): mobility, Whoop, chunks, unnamed-label overlap, Hevy echoes
+WORKOUT_IDENTITY_VERSION = "workout-identity@1.2.0"
 
 MOBILITY = "mobility"
 OTHER_PREFIX = "other:"
 
 OVERLAP_SHARE = 0.5
+
+#: #5390: the source key of Hevy's own Strava push kept as a lift's heart-rate member — distinct from
+#: `strava`, so WHOOP's Strava pieces of the same lift still join it as another source's chunks.
+HEVY_PUSH_SOURCE = f"{STRAVA_SOURCE}/{HEVY_DEVICE}"
+#: #5390: the stamp `strava_without_echoes` puts on a kept push (on a copy): the id of the Hevy lift
+#: member (`<workout id>#strength`) whose heart-rate member it is.
+LIFT_HR_OF = "lift_hr_of"
+_ZONE_SECONDS_KEYS = tuple(f"zone{i}_seconds" for i in range(1, 6))
 
 # Strava `sport_type`/`type` (lower-cased) → family, beyond walking_volume's counted set.
 _STRAVA_EXTRA: dict[str, str] = {
@@ -277,18 +308,25 @@ def strava_members(items: Iterable[dict[str, Any]] | None) -> list[dict[str, Any
             t = str(a.get("sport_type") or a.get("type") or "").strip().lower()
             start = _parse(a.get("start_date"))
             elapsed = _float(a.get("elapsed_time_seconds") or a.get("elapsed_time"))
-            out.append(
-                {
-                    "source": "strava",
-                    "id": str(a.get("strava_id") or a.get("id") or ""),
-                    "family": STRAVA_FAMILY.get(t, "other:" + t),
-                    "start": start,
-                    "end": start + timedelta(seconds=elapsed) if start is not None and elapsed > 0 else None,
-                    "seconds": _float(a.get("moving_time_seconds") or a.get("moving_time")) or elapsed,
-                    "owner_only": _owner_only(a),
-                }
-            )
+            m = {
+                "source": strava_identity_source(a),
+                "id": str(a.get("strava_id") or a.get("id") or ""),
+                "family": STRAVA_FAMILY.get(t, "other:" + t),
+                "start": start,
+                "end": start + timedelta(seconds=elapsed) if start is not None and elapsed > 0 else None,
+                "seconds": _float(a.get("moving_time_seconds") or a.get("moving_time")) or elapsed,
+                "owner_only": _owner_only(a),
+            }
+            if a.get(LIFT_HR_OF):
+                m[LIFT_HR_OF] = str(a[LIFT_HR_OF])
+            out.append(m)
     return out
+
+
+def strava_identity_source(activity: dict[str, Any]) -> str:
+    """`HEVY_PUSH_SOURCE` for a Hevy push kept as a lift's heart-rate member (stamped `LIFT_HR_OF` by
+    `strava_without_echoes`, #5390), else `strava`."""
+    return HEVY_PUSH_SOURCE if activity.get(LIFT_HR_OF) else STRAVA_SOURCE
 
 
 def _hevy_id(w: dict[str, Any]) -> str:
@@ -372,35 +410,100 @@ def _hevy_intervals(workouts: Iterable[dict[str, Any]] | None) -> list[tuple[dat
     return out
 
 
-def is_hevy_echo(activity: dict[str, Any], hevy_intervals: list[tuple[datetime, datetime]]) -> bool:
-    """True for Hevy's own Strava push of a session whose timed Hevy record is in hand (#5369) —
-    `common.activity_overlap.HEVY_DEVICE`, overlapping one of `hevy_intervals`. A push carrying a
-    seam graft (`hr_from_strava_id`) is not an echo: its zones are a folded wearable record's."""
-    if str(activity.get("device_name") or "").strip().lower() != HEVY_DEVICE or activity.get("hr_from_strava_id"):
-        return False
+def _is_hevy_push(activity: dict[str, Any]) -> bool:
+    return str(activity.get("device_name") or "").strip().lower() == HEVY_DEVICE
+
+
+def _activity_interval(activity: dict[str, Any]) -> Optional[tuple[datetime, datetime]]:
     start = _parse(activity.get("start_date"))
     elapsed = _float(activity.get("elapsed_time_seconds") or activity.get("elapsed_time") or activity.get("moving_time_seconds"))
     if start is None or elapsed <= 0:
+        return None
+    return start, start + timedelta(seconds=elapsed)
+
+
+def carries_own_hr(activity: dict[str, Any]) -> bool:
+    """True when a Strava activity carries a heart rate of its OWN (#5390): Strava's `has_heartrate`
+    flag, an average, or any zone seconds — and no seam graft (`hr_from_strava_id`), whose heart rate
+    is a folded wearable copy's, not this record's."""
+    if activity.get("hr_from_strava_id"):
         return False
-    return overlap_seconds(start, start + timedelta(seconds=elapsed), hevy_intervals) > 0
+    if activity.get("has_heartrate") is True or _float(activity.get("average_heartrate")) > 0:
+        return True
+    return any(_float(activity.get(k)) > 0 for k in _ZONE_SECONDS_KEYS)
+
+
+def is_hevy_echo(activity: dict[str, Any], hevy_intervals: list[tuple[datetime, datetime]]) -> bool:
+    """True for Hevy's own Strava push of a session whose timed Hevy record is in hand (#5369) —
+    `common.activity_overlap.HEVY_DEVICE`, overlapping one of `hevy_intervals`. A push carrying a
+    seam graft (`hr_from_strava_id`) is not an echo: its zones are a folded wearable record's.
+    (Whether an echo that carries its own heart rate is kept as a lift's heart-rate member is
+    `lift_hr_member_of`, #5390 — this test only says the push is a copy of the Hevy session.)"""
+    if not _is_hevy_push(activity) or activity.get("hr_from_strava_id"):
+        return False
+    iv = _activity_interval(activity)
+    if iv is None:
+        return False
+    return overlap_seconds(iv[0], iv[1], hevy_intervals) > 0
+
+
+def _hevy_lifts(hevy: Iterable[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """The timed `strength` members of the Hevy sessions in hand — the lifts a push can be the
+    heart-rate member of."""
+    return [m for m in hevy_members(hevy) if m["family"] == "strength" and m["start"] is not None and m["end"] is not None]
+
+
+def lift_hr_member_of(activity: dict[str, Any], lifts: list[dict[str, Any]]) -> Optional[str]:
+    """The id of the Hevy lift (`<workout id>#strength`) whose heart-rate member this Strava record is,
+    or None (#5390). Kept only for Hevy's own push (device `Hevy`) that `carries_own_hr` and whose
+    family is a lift's, overlapping a Hevy session that holds a lift — the one it overlaps most. Every
+    other push is left to `is_hevy_echo` (see the module docstring for the reasons a push is dropped)."""
+    if not _is_hevy_push(activity) or not carries_own_hr(activity):
+        return None
+    t = str(activity.get("sport_type") or activity.get("type") or "").strip().lower()
+    if STRAVA_FAMILY.get(t) != "strength":
+        return None
+    iv = _activity_interval(activity)
+    if iv is None:
+        return None
+    best, best_s = None, 0.0
+    for m in lifts:
+        s = overlap_seconds(iv[0], iv[1], [(m["start"], m["end"])])
+        if s > best_s:
+            best, best_s = m["id"], s
+    return best
 
 
 def strava_without_echoes(items: Iterable[dict[str, Any]] | None, hevy: Iterable[dict[str, Any]] | None) -> list[dict[str, Any]]:
     """The Strava records the resolver may see: the read seam over the day rows (idempotent — a row
     already through it passes unchanged), then Hevy's own pushes dropped where the Hevy session is in
-    hand (`is_hevy_echo`). Day rows keep their shape (only `activities` is filtered); bare activities
-    are filtered directly."""
+    hand (`is_hevy_echo`) — except a push that is a lift's heart-rate member (`lift_hr_member_of`,
+    #5390), which stays, stamped `LIFT_HR_OF` on a copy. Day rows keep their shape (only `activities`
+    is filtered); bare activities are filtered directly."""
     rows = strava_read_seam(STRAVA_SOURCE, [r for r in items or () if isinstance(r, dict)]) or []
     intervals = _hevy_intervals(hevy)
     if not intervals:
         return list(rows)
+    lifts = _hevy_lifts(hevy)
+
+    def keep(acts: list[Any]) -> list[Any]:
+        out_acts = []
+        for a in acts:
+            if not isinstance(a, dict) or not is_hevy_echo(a, intervals):
+                out_acts.append(a)
+                continue
+            lift = lift_hr_member_of(a, lifts)
+            if lift:
+                out_acts.append({**a, LIFT_HR_OF: lift})
+        return out_acts
+
     out: list[dict[str, Any]] = []
     for item in rows:
         nested = item.get("activities")
         if isinstance(nested, list):
-            out.append({**item, "activities": [a for a in nested if not is_hevy_echo(a, intervals)]})
-        elif not is_hevy_echo(item, intervals):
-            out.append(item)
+            out.append({**item, "activities": keep(nested)})
+        else:
+            out.extend(keep([item]))
     return out
 
 
@@ -461,8 +564,9 @@ def resolve_workout_identities(
     block anchors its identity and supplies its duration), each joining the compatible identity it
     overlaps most — at least OVERLAP_SHARE of the shorter interval against a member of ANOTHER source.
     An identity already holding the member's source takes it only as a disjoint chunk (it overlaps
-    none of that source's members there). Strava arrives through `strava_without_echoes`. An untimed
-    record cannot be placed in time and is its own identity (`untimed: true`)."""
+    none of that source's members there). Strava arrives through `strava_without_echoes`; a Hevy push
+    it kept as a lift's heart-rate member (#5390) joins that lift's identity by id. An untimed record
+    cannot be placed in time and is its own identity (`untimed: true`)."""
     seen: set[tuple[str, str]] = set()
     members: list[dict[str, Any]] = []
     sources = (
@@ -481,6 +585,11 @@ def resolve_workout_identities(
 
     clusters: list[list[dict[str, Any]]] = []
     for m in members:
+        if m.get(LIFT_HR_OF):  # #5390: a lift's heart-rate member joins that lift by id, never by overlap
+            home = next((c for c in clusters if any(x["source"] == "hevy" and x["id"] == m[LIFT_HR_OF] for x in c)), None)
+            if home is not None:
+                home.append(m)
+                continue
         best, best_share = None, 0.0
         for c in clusters:
             if not compatible(c[0]["family"], m["family"]):

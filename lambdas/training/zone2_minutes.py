@@ -39,7 +39,10 @@ COUNTED ONCE
     cross-source workout rule: Hevy, Strava, the watch's `apple_workouts` and Whoop's workout rows,
     same family (or a label naming none — Whoop's "activity" / "Cross Training") overlapping by
     half the shorter interval, Hevy's own Strava push dropped as an echo of the Hevy session in
-    hand, a HealthKit workout Hevy or the pliability app wrote folded into that app's record. So a
+    hand — unless it carries its own heart rate and the session holds a lift, when it is that lift's
+    heart-rate member (#5390: the one record whose heart rate spans the whole lift, a recording of
+    the lift's identity like any other, its time claimed once below) — a HealthKit workout Hevy or
+    the pliability app wrote folded into that app's record. So a
     gym visit is its PARTS — the lift, the ride, the mobility block — each once and each labelled
     by what it was; before #5369 a zone2-local union-find (`_same_session` / `_groups`) chained the
     whole visit into one session called WeightTraining and lost the ride. A timed Hevy part no
@@ -204,7 +207,8 @@ def strava_recordings(strava_rows: Optional[Iterable[Mapping[str, Any]]]) -> Lis
             out.append(
                 {
                     "source": STRAVA,
-                    "identity_source": STRAVA,
+                    # #5390: Hevy's push kept as a lift's heart-rate member is the resolver's `strava/hevy`
+                    "identity_source": workout_identity.strava_identity_source(act),
                     "graft": bool(act.get("hr_from_strava_id")),
                     "id": sid,
                     "device": str(act.get("device_name") or "").lower(),
