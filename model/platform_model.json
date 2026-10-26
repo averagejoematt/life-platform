@@ -54,6 +54,12 @@
       "stack": "monitoring_token_alarms",
       "via": "declaration"
     },
+    "ai-dev-session-month-high": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_token_alarms",
+      "via": "factory:_token_alarm"
+    },
     "ai-tokens-daily-brief-runaway": {
       "kind": "metric",
       "routing": "digest",
@@ -1065,7 +1071,7 @@
   ],
   "cost_surface": {
     "ai_features": 30,
-    "alarms": 143,
+    "alarms": 144,
     "emf_namespaces": 34,
     "schedules": 97,
     "secrets": 30
@@ -8163,9 +8169,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead"
     },
     "counts": {
-      "alarms": 143,
+      "alarms": 144,
       "alarms_by_routing": {
-        "digest": 98,
+        "digest": 99,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,

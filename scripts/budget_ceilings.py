@@ -321,3 +321,34 @@ def dearest_output_usd_per_mtok(src: Path | None = None) -> float:
     if not rates:
         raise RuntimeError(f"output price table not derivable from {src} — refusing to guess (#4517)")
     return max(rates)
+
+
+# ── #5135: the dev-session envelope (owner ruling 2026-10-26: "$60/month, alarm at 80%") ──
+#
+# Not part of the ADR-063/133 ceiling family: a separate monthly cap on laptop + agent AI,
+# enforced in `lambdas/ai/dev_session_cap.py` (which owns the number) and alarmed by
+# `ai-dev-session-month-high` in cdk/stacks/monitoring_token_alarms.py, which reads the alarm
+# bar from here so the two cannot drift. Parsed, not imported, for the reason above: the cap
+# module imports `ai.budget_guard`, which cdk synth does not have on its path.
+
+DEV_SESSION_CAP_SRC = ROOT / "lambdas" / "ai" / "dev_session_cap.py"
+DEV_SESSION_MONTH_NAME = "PER_MONTH_USD"
+DEV_SESSION_ALARM_FRACTION_NAME = "MONTH_ALARM_FRACTION"
+
+
+def dev_session_month_cap_usd(src: Path | None = None) -> float:
+    """The monthly dev-session envelope in USD. Raises if it cannot be read."""
+    src = src or DEV_SESSION_CAP_SRC
+    cap = _module_literal(src, DEV_SESSION_MONTH_NAME)
+    if not isinstance(cap, (int, float)) or cap <= 0:
+        raise RuntimeError(f"dev-session monthly envelope not derivable from {src} — refusing to guess (#5135)")
+    return float(cap)
+
+
+def dev_session_month_alarm_usd(src: Path | None = None) -> float:
+    """The envelope's alarm bar in USD: `MONTH_ALARM_FRACTION` × `PER_MONTH_USD`, to the cent."""
+    src = src or DEV_SESSION_CAP_SRC
+    fraction = _module_literal(src, DEV_SESSION_ALARM_FRACTION_NAME)
+    if not isinstance(fraction, (int, float)) or not 0 < fraction < 1:
+        raise RuntimeError(f"dev-session alarm fraction not derivable from {src} — refusing to guess (#5135)")
+    return round(dev_session_month_cap_usd(src) * float(fraction), 2)

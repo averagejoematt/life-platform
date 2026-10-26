@@ -144,3 +144,40 @@ def report(active_days_by_class: dict, episodic_classes, projected: float, proje
             f"bills like a schedule; projected=${projected:.2f} vs all-classes=${projected_all_classes:.2f}"
         )
     return broken
+
+
+def publish_dev_session_month(cw, dimension: str, month_start: datetime, now: datetime) -> float | None:
+    """#5135: publish month-to-date dev-session AI spend as `LifePlatform/Budget::DevSessionSpendMTD`.
+
+    The owner's dev-session envelope is $60 a calendar month (ruling 2026-10-26), enforced on
+    the laptop by `ai/dev_session_cap.py` and alarmed at 80 % by `ai-dev-session-month-high`
+    (cdk/stacks/monitoring_token_alarms.py). A CloudWatch alarm cannot sum a calendar month,
+    so this gauge is the month: the `CallerClass=dev-session` copy of EstimatedCostUSD summed
+    from 00:00 UTC on the 1st — the series the cap reads, MCP Lambda dev calls included.
+
+    It lives beside the premise check because it is the same class's measurement, and it
+    changes no arithmetic: dev-session stays out of the projection and never moves a tier.
+    Published even when the sum is 0, so the alarm returns to OK at rollover. No new IAM (the
+    governor holds cloudwatch:GetMetricStatistics and PutMetricData on `*`). Never raises;
+    returns what it published, or None on any failure.
+    """
+    try:
+        resp = cw.get_metric_statistics(
+            Namespace="LifePlatform/AI",
+            MetricName="EstimatedCostUSD",
+            Dimensions=[{"Name": dimension, "Value": "dev-session"}],
+            StartTime=month_start,
+            EndTime=now,
+            Period=2678400,
+            Statistics=["Sum"],
+        )
+        mtd = float(sum(float(d.get("Sum") or 0.0) for d in resp.get("Datapoints", [])))
+        cw.put_metric_data(
+            Namespace="LifePlatform/Budget",
+            MetricData=[{"MetricName": "DevSessionSpendMTD", "Value": mtd, "Unit": "None"}],
+        )
+        logger.info(f"dev_session_mtd={mtd:.2f} (DevSessionSpendMTD, #5135)")
+        return mtd
+    except Exception as e:  # noqa: BLE001 — alarm feed only; never fails the tier decision
+        logger.warning(f"DevSessionSpendMTD gauge failed (non-fatal): {e}")
+        return None
