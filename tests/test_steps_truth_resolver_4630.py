@@ -336,7 +336,20 @@ def test_the_reproduce_command_names_the_winner_and_rebuilds_the_movement_score(
         {
             (WHOOP_ROW["pk"], WHOOP_ROW["sk"]): WHOOP_ROW,
             (APPLE_ROW["pk"], APPLE_ROW["sk"]): APPLE_ROW,
-            ("USER#matthew#SOURCE#strava", "DATE#" + day): {"activity_count": Decimal("1"), "total_moving_time_seconds": Decimal("10057")},
+            # the wire's shape (#5387: THE session count reads the activity, never the row's stored totals)
+            ("USER#matthew#SOURCE#strava", "DATE#" + day): {
+                "activity_count": Decimal("1"),
+                "total_moving_time_seconds": Decimal("10057"),
+                "activities": [
+                    {
+                        "strava_id": "s-4630",
+                        "sport_type": "WeightTraining",
+                        "start_date": day + "T16:00:00Z",
+                        "elapsed_time_seconds": Decimal("10057"),
+                        "moving_time_seconds": Decimal("10057"),
+                    }
+                ],
+            },
             ("USER#matthew", "PROFILE#v1"): {"step_target": Decimal("7000")},
             ("USER#matthew#SOURCE#day_grade", "DATE#" + day): {"component_movement": Decimal("100")},
         }
@@ -344,7 +357,7 @@ def test_the_reproduce_command_names_the_winner_and_rebuilds_the_movement_score(
     lines = cmd.explain_day(table, day)
     assert "  whoop         17,739" in lines and "  garmin        no row" in lines
     assert lines[4] == "resolved 17739 from whoop — whoop is the truth source and has a count"
-    # ADR-163: the movement line scores walking time; this strava row carries no activities and there is
+    # ADR-163: the movement line scores walking time; this strava row carries no walk and there is
     # no hevy session, so walking reads 0 of the 73-minute default and the stored (steps-era) 100 differs
     assert lines[5] == (
         "movement 50 = exercise 100 x0.50 + walking 0 x0.50 (0 min of walking_minutes_target 73; strava 0, hevy no records)"

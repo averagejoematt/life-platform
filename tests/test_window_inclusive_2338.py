@@ -57,14 +57,11 @@ WEB = ROOT / "lambdas" / "web"
 # "<module>:<lineno-independent description>" so a waiver cannot silently widen:
 # the test matches on module + the unparsed expression, never on a line number
 # (which drifts) and never on a whole file (which would waive future code too).
-EXCLUSIVE_BOUND_WAIVERS = {
-    # site_api_training's modality trend partitions the last 60 days into two ADJACENT
-    # 30-day blocks: the current window is [d30, today] and the prior window is
-    # everything before it, `d60 <= d < d30`. The `<` is not an off-by-one repair — it
-    # is the boundary between two windows, and making it `<=` would double-count d30 in
-    # both blocks. The prior block's own span is measured against its real inclusive end
-    # (the day before d30) — see `_prior_end` in site_api_training.py.
-    ("site_api_training.py", "d60 <= d < d30"): "adjacent-window partition, not a lower bound (#2338)",
+EXCLUSIVE_BOUND_WAIVERS: dict = {
+    # (empty since #5387) site_api_training's modality trend used to partition the last 60 days
+    # with `d60 <= d < d30`; it now reads the prior block through `session_count.totals(visits,
+    # d60, _prior_end)` — both bounds inclusive, `_prior_end` the day before d30 — so no exclusive
+    # bound is left to waive.
 }
 
 

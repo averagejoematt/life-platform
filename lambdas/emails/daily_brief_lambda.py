@@ -186,7 +186,10 @@ from experiment import phase_taxonomy  # ADR-077: the class registry the reads d
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 from ingestion import source_registry  # #2003: the canonical freshness set + thresholds
 from intelligence import brief_domain_inputs, weight_recency  # #1894/#1924: a weigh-in carries its own date; #4358/#4359 coach blocks
-from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
+from training import (
+    session_count,  # #5387: THE session count; its zone2_total reads THE Zone 2 computation
+    training_load,  # shared TSS-like load model + Banister core (layer module, #490)
+)
 
 from emails import brief_lines  # #5056: fail-soft one-line readouts, extracted for the module-size ratchet
 from emails.brief_data_status import (  # #2326 quiet notice / #3049 partial-input notice
@@ -658,6 +661,22 @@ def _emit_source_fetch_metrics(sources: dict) -> None:
             logger.warning("[_emit_source_fetch_metrics] metric emit failed for %s: %s", source, _e)
 
 
+def training_facts(data):
+    """(Zone 2 minutes this week, miles over 30 days, sessions over 30 days) for the brief and its public stats.
+
+    #2221/#1917: Zone 2 is measured zone minutes, never a whole activity's moving time. #5387: it is THE Zone 2
+    computation (#4627, as /api/zone2) — each session once, Hevy's own push of a gym visit an echo of the Hevy
+    session — never Strava's day `total_zone2_seconds`, which held the ride's minutes under both; and the 30-day
+    count is THE session count (one gym visit is one session). The 30-day totals are None on an empty partition:
+    absence, not a measured "you did nothing" (#2221)."""
+    strava_30d, hevy = data.get("strava_30d") or [], data.get("hevy_30d")
+    z2 = session_count.zone2_total(data.get("strava_7d") or [], hevy=hevy)
+    if not strava_30d:
+        return z2, None, None
+    miles = round(sum(float(d.get("total_distance_miles") or 0) for d in strava_30d), 1)
+    return z2, miles, session_count.count(strava=strava_30d, hevy=hevy)["sessions"]
+
+
 def gather_daily_data(profile, yesterday):
     today = pacific_now().date()
 
@@ -707,12 +726,7 @@ def gather_daily_data(profile, yesterday):
     # Weight: latest + 7-day ago for weekly delta
     # 30-day lookback so a few days without weighing doesn't null out the homepage
     withings_recent = fetch_range("withings", (today - timedelta(days=30)).isoformat(), yesterday)
-    latest_weight = None
-    for w in reversed(withings_recent):
-        wt = safe_float(w, "weight_lbs")
-        if wt:
-            latest_weight = wt
-            break
+    latest_weight = next((wt for w in reversed(withings_recent) if (wt := safe_float(w, "weight_lbs"))), None)
     # G-3 FIX: extend to 90-day lookback if 30-day found nothing (e.g. scale not used for weeks)
     if not latest_weight:
         withings_90d_wt = fetch_range("withings", (today - timedelta(days=90)).isoformat(), yesterday)
@@ -940,6 +954,7 @@ def gather_daily_data(profile, yesterday):
         "bp_data": bp_data,
         "strava_7d": strava_7d,
         "strava_30d": strava_30d,
+        "hevy_30d": fetch_range("hevy", strava_30d_cutoff, yesterday),  # #5387: anchors each gym visit's parts
         "todoist": todoist_yesterday,
         "computed_insights": computed_insights,
         "computed_metrics": computed_metrics,  # BS-09: ACWR + training load alert
@@ -1653,16 +1668,11 @@ def lambda_handler(event, context):
         # #2255: report honestly — a dry run generated it, it did not send it.
         return {"statusCode": 200, "body": f"Recovery brief {'generated (DRY_RUN, not sent)' if _dry_run else 'sent'} for {yesterday}"}
 
-    # Deduplicate multi-device Strava activities
+    # Deduplicate multi-device Strava activities (idempotent after the read seam). #5387: the day's
+    # session count and minutes are `training.session_count`'s, so the day totals are not restated here.
     strava = data.get("strava")
     if strava and strava.get("activities"):
-        orig_count = len(strava["activities"])
         strava["activities"] = dedup_activities(strava["activities"])
-        deduped_count = len(strava["activities"])
-        if deduped_count < orig_count:
-            strava["activity_count"] = deduped_count
-            strava["total_moving_time_seconds"] = sum(float(a.get("moving_time_seconds") or 0) for a in strava["activities"])
-            logger.info("Dedup: " + str(orig_count) + " → " + str(deduped_count) + " activities")
 
     # Try to read pre-computed metrics from daily-metrics-compute Lambda (9:40 AM PT).
     # If the record exists, we skip all inline scoring and stores — they already happened.
@@ -2290,32 +2300,8 @@ def lambda_handler(event, context):
             # G-4 FIX: always compute progress from constants; negative = gained back (honest)
             _prog_pct = round((_start_wt - _curr_wt) / (_start_wt - _goal_wt) * 100, 1) if _curr_wt and _start_wt != _goal_wt else None
 
-            # TSB/training from data
-            # #2221/#1917: this summed the FULL moving time of every aerobic-ish
-            # activity — no zone filter at all — against a 150-min ZONE 2 target, so a
-            # max-effort interval session counted in full. CORRECTION to the marker: no
-            # HR band is re-derived here. strava_lambda already stores the MEASURED
-            # `zone2_seconds` per activity + `total_zone2_seconds` per day (Strava's own
-            # /zones), which /api/zone2 reads. A gated/unzoned activity contributes 0.
-            _strava_7d = data.get("strava_7d") or []
-            _z2_this_week = 0.0
-            for _act_day in _strava_7d:
-                _day_z2 = _act_day.get("total_zone2_seconds")
-                if _day_z2 is not None:
-                    _z2_this_week += float(_day_z2 or 0) / 60
-                    continue
-                for _act in _act_day.get("activities") or []:
-                    _z2_this_week += float(_act.get("zone2_seconds") or 0) / 60
-
-            # #2221: 30-day totals from the window gather already sliced. None on an
-            # empty partition — absence, not a measured "you did nothing".
-            _strava_30d = data.get("strava_30d") or []
-            _miles_30d = None
-            _activity_count_30d = None
-            if _strava_30d:
-                _m = sum(float(_d.get("total_distance_miles") or 0) for _d in _strava_30d)
-                _miles_30d = round(_m, 1)
-                _activity_count_30d = sum(len(_d.get("activities") or []) for _d in _strava_30d)
+            # TSB/training from data — Zone 2 this week and the 30-day totals (#2221, #5387: `training_facts`)
+            _z2_this_week, _miles_30d, _activity_count_30d = training_facts(data)
 
             # #2221: RHR trend, measured. Lower is better, so the polarity is the
             # inverse of hrv_trend_str's; absent either window, absent trend.

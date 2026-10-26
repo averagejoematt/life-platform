@@ -81,7 +81,8 @@ def test_cycling_is_not_walking_time_and_a_walk_outside_the_session_counts():
 def test_no_strava_row_and_no_hevy_session_drops_the_walking_half():
     """The dropout semantics are the step half's, mirrored: unknown walking leaves the exercise half alone."""
     score, details = se.score_movement({"date": "2026-09-23", "strava": None, "hevy": []}, {})
-    assert score == 0 and details == {"exercise_score": 0}
+    # #5387: the exercise half states THE session count it read (no session, no minutes) beside its score
+    assert score == 0 and details == {"exercise_score": 0, "exercise_sessions": 0, "exercise_minutes": 0.0}
     assert wv.walking_minutes_for_day(day="2026-09-23", strava_items=[], hevy_workouts=[]) is None
 
 

@@ -402,6 +402,8 @@ def assemble_data(yesterday_str):
     z2_end = (dt + timedelta(days=1)).strftime("%Y-%m-%d")
     data["whoop_7d"] = fetch_range("whoop", strava_7d_start, z2_end)
     data["apple_7d"] = fetch_range("apple_health", strava_7d_start, z2_end)
+    # #5387 + #5389: the week's Hevy sessions — they anchor a gym visit's parts in movement's session
+    # count and in THE Zone 2 computation
     data["hevy_7d"] = fetch_range("hevy", strava_7d_start, yesterday_str)
 
     # Strava 42d (progressive overload / CTL trend)

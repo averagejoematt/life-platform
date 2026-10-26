@@ -241,8 +241,26 @@ RAW = {
     "strava": {
         "2026-07-30": {
             "activities": [
-                {"average_heartrate": 120, "moving_time_seconds": 1800},  # in zone 2 (111.6–130.2)
-                {"average_heartrate": 160, "moving_time_seconds": 600},  # above zone 2
+                # the wire's shape (#5387): a vendor id, a start, and each device's own zone seconds
+                {
+                    "strava_id": "p1",
+                    "sport_type": "Walk",
+                    "start_date": "2026-07-30T15:00:00Z",
+                    "elapsed_time_seconds": 1800,
+                    "average_heartrate": 120,
+                    "moving_time_seconds": 1800,
+                    "zone1_seconds": 600,
+                    "zone2_seconds": 1200,
+                },
+                {
+                    "strava_id": "p2",
+                    "sport_type": "Run",
+                    "start_date": "2026-07-30T18:00:00Z",
+                    "elapsed_time_seconds": 600,
+                    "average_heartrate": 160,
+                    "moving_time_seconds": 600,
+                    "zone4_seconds": 600,
+                },
             ]
         }
     },
@@ -336,11 +354,11 @@ def test_gather_all_nutrition_hit_rates_use_the_ten_percent_calorie_grace(monkey
     assert nu["prot_target"] == 190
 
 
-def test_gather_all_zone2_counts_only_activities_inside_the_hr_band(monkeypatch):
+def test_gather_all_zone2_is_the_devices_own_zone_minutes(monkeypatch):
     _wire_gather(monkeypatch)
     tr = partner.gather_all()["training"]
-    assert tr["activity_count"] == 2  # both activities counted
-    assert tr["zone2_minutes"] == 30  # only the 120 bpm / 30 min one is in-band
+    assert tr["activity_count"] == 2  # two separate sessions (#5387: THE session count)
+    assert tr["zone2_minutes"] == 20  # #4627: the devices' own Zone 2 minutes (20 of the walk's 30), never an average-HR band
     assert tr["zone2_target"] == 150
 
 

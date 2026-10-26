@@ -22,14 +22,13 @@ from common.digest_utils import (
     _normalize_whoop_sleep,
     avg,
     compute_banister_from_dict,  # #490: shared TSS-like Banister
-    dedup_activities,
     fmt,
     safe_float,
 )
-from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 from health.protein_floor import met_floor  # #5098: THE protein hit predicate (strict, #5003)
+from training import session_count  # #5387: THE session count; its zone2_total reads THE Zone 2 computation
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PURE CELL FORMATTERS — summary dict → the HTML fragment a table cell carries.
@@ -201,42 +200,45 @@ def ex_withings(recs_dict):
     }
 
 
-def ex_strava(recs_dict, profile):
+#: The Zone 2 band the digests now print: each device's own zones (#4627), never an average-HR band.
+ZONE2_BAND = "devices' own zones"
+
+
+def ex_strava(recs_dict, profile, hevy=None):
+    """The week's training block. #5387: `activity_count` and `total_minutes` are THE session count
+    (`training.session_count`) over the Strava rows and the week's Hevy sessions — one gym visit is one
+    session, its minutes once, never Hevy's whole-session push plus the ride inside it. `zone2_minutes`
+    is THE Zone 2 computation (#4627: devices' own zones, minutes in zone) — the average-HR method this
+    replaced counted a whole activity as Zone 2. `profile` is kept for the call shape."""
     recs = list(recs_dict.values()) if recs_dict else []
     if not recs:
         return None
-    max_hr = max_hr_from_profile(profile)
-    z2_low = max_hr * 0.60
-    z2_high = max_hr * 0.70
+    visits = session_count.visits(strava=recs, hevy=hevy)
+    counted = session_count.totals(visits)
     acts = []
-    zone2_mins = 0
-    daily_loads = []
-    for r in recs:
-        day_kj = 0
-        day_acts = r.get("activities", [])
-        day_acts = dedup_activities(day_acts)
-        for a in day_acts:
-            hr = float(a.get("average_heartrate") or 0)
-            secs = float(a.get("moving_time_seconds") or 0)
-            kj = float(a.get("kilojoules") or 0)
-            day_kj += kj
-            obj = {
-                "date": r.get("date", ""),
-                "name": a.get("enriched_name") or a.get("name", ""),
-                "sport": a.get("sport_type", ""),
-                "miles": round(float(a.get("distance_miles") or 0), 1),
-                "elev": round(float(a.get("total_elevation_gain_feet") or 0)),
-                "hr": round(hr) if hr else None,
-                "mins": round(secs / 60),
-                "kj": kj,
-            }
-            acts.append(obj)
-            if hr and z2_low <= hr <= z2_high:
-                zone2_mins += obj["mins"]
-        if day_kj > 0:
-            daily_loads.append(day_kj)
-    total_mins = sum(a["mins"] for a in acts)
-    z2_pct = round(zone2_mins / total_mins * 100) if total_mins else 0
+    day_kj: dict = defaultdict(float)
+    for v in visits:
+        for p in v["parts"]:
+            whole = p["seconds"] if len(p["activities"]) == 1 else None  # session-count: one activity is its part's minutes
+            for a in p["activities"]:
+                hr = float(a.get("average_heartrate") or 0)
+                kj = float(a.get("kilojoules") or 0)
+                day_kj[p["date"]] += kj
+                acts.append(
+                    {
+                        "date": p["date"] or "",
+                        "name": a.get("enriched_name") or a.get("name", ""),
+                        "sport": a.get("sport_type", ""),
+                        "miles": round(float(a.get("distance_miles") or 0), 1),
+                        "elev": round(float(a.get("total_elevation_gain_feet") or 0)),
+                        "hr": round(hr) if hr else None,
+                        "mins": round((whole if whole is not None else float(a.get("moving_time_seconds") or 0)) / 60),
+                        "kj": kj,
+                    }
+                )
+    daily_loads = [kj for kj in day_kj.values() if kj > 0]
+    total_mins = round(counted["minutes"])
+    zone2_mins = session_count.zone2_total(recs, hevy=hevy)
     mono = (
         round(statistics.mean(daily_loads) / statistics.stdev(daily_loads), 2)
         if len(daily_loads) >= 3 and statistics.stdev(daily_loads) > 0
@@ -246,11 +248,11 @@ def ex_strava(recs_dict, profile):
         "total_miles": round(sum(a["miles"] for a in acts), 1),
         "total_elevation_feet": round(sum(a["elev"] for a in acts)),
         "total_minutes": total_mins,
-        "activity_count": len(acts),
+        "activity_count": counted["sessions"],
         "zone2_minutes": round(zone2_mins),
-        "zone2_pct": z2_pct,
+        "zone2_pct": round(zone2_mins / total_mins * 100) if total_mins else 0,
         "zone2_target": 150,
-        "zone2_hr_range": f"{round(z2_low)}-{round(z2_high)}",
+        "zone2_band": ZONE2_BAND,
         "training_monotony": mono,
         "activities": acts,
     }

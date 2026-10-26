@@ -36,6 +36,7 @@ from common.macrofactor_fields import app_target_kcal, macro_value  # #4580 B-22
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_today  # #2811: the character sheet's DAY is the Pacific day
+from training import session_count  # #5387: THE session count — one gym visit is one session
 
 from health import character_privacy, character_zone2, personal_baselines, protein_engine  # #5129 owner-only · #5214 · #5056 · #5389 Zone 2
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
@@ -418,17 +419,12 @@ def compute_movement_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[
     components = pillar_cfg.get("components", {})
     scores = {}
 
-    # Training frequency (sessions/week)
+    # Training frequency (sessions/week) — #5387: THE session count over the week's Strava rows and the
+    # Hevy sessions that anchor them: one gym visit is one session (never Hevy's push + the ride inside it)
     strava_7d = data.get("strava_7d", [])
-    session_count = 0
-    for day in strava_7d:
-        acts = day.get("activities", [])
-        if acts:
-            session_count += len(acts)
-        elif day.get("activity_count"):
-            session_count += int(day["activity_count"])
+    week = session_count.count(strava=strava_7d, hevy=data.get("hevy_7d"))
     freq_target = components.get("training_frequency", {}).get("target_sessions_week", 5)
-    scores["training_frequency"] = _pct_of_target(session_count, freq_target, 1.4)
+    scores["training_frequency"] = _pct_of_target(week["sessions"], freq_target, 1.4)
 
     # Zone 2 adequacy
     z2_target = components.get("zone2_adequacy", {}).get("target_minutes", 150)
@@ -460,15 +456,11 @@ def compute_movement_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[
     else:
         scores["progressive_overload"] = None
 
-    # Movement diversity
-    activity_types = set()
-    for day in strava_7d:
-        for act in day.get("activities") or []:
-            sport = act.get("sport_type") or act.get("type", "")
-            if sport:
-                activity_types.add(sport.lower())
+    # Movement diversity — the kinds among the week's counted parts (#5387: a gym visit's lift, ride and
+    # mobility block are three kinds; an echo of one of them is not a fourth)
+    kinds = {str(k).lower() for k in week["by_sport"]}
     diversity_target = components.get("movement_diversity", {}).get("target_types", 4)
-    scores["movement_diversity"] = _pct_of_target(len(activity_types), diversity_target, 1.5)
+    scores["movement_diversity"] = _pct_of_target(len(kinds), diversity_target, 1.5)
 
     # Daily steps
     # #4630: the day's steps through the ONE resolver (registry METRIC_TRUTH facet).

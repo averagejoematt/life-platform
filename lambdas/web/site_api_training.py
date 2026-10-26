@@ -12,13 +12,16 @@ site_api_common (identical binding semantics to the pre-split facade).
 import json
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Any, cast
+from typing import cast
 
 from boto3.dynamodb.conditions import Key
 from common.digest_utils import filter_day_rows
 from common.metric_truth import steps_by_date as resolved_steps_by_date  # #4630 — the ONE steps resolver
 from experiment.phase_filter import with_phase_filter  # ADR-058
-from training import zone2_minutes  # #4627: THE Zone 2 computation (shared with /api/zone2 and the MCP tool)
+from training import (
+    session_count,  # #5387: THE session count — one gym visit is one visit, its minutes once
+    zone2_minutes,  # #4627: THE Zone 2 computation (shared with /api/zone2 and the MCP tool)
+)
 from training.muscle_volume import normalize_hevy_items, working_sets_by_muscle  # #4071/#4095 — THE per-muscle computation
 
 from web.site_api_common import (
@@ -99,42 +102,11 @@ def _act_minutes(a):
     return float(a.get("duration_minutes") or a.get("moving_time_minutes") or (a.get("moving_time_seconds") or 0) / 60 or 0)
 
 
-def _flatten_day_activities(day_items):
-    """Day-level Strava rows -> their activities, each stamped with its row's day (`_day_date`).
-
-    A row with no `activities` list stands in as one activity itself. The stamp is written
-    onto the row's own dicts, as it always was."""
-    out: list[dict[str, Any]] = []
-    for s in day_items:
-        acts = s.get("activities") or []
-        if acts:
-            for a in acts:
-                a["_day_date"] = s.get("date") or s.get("sk", "").replace("DATE#", "")
-            out.extend(acts)
-        else:
-            # Fallback: treat day record itself as a single activity
-            s["_day_date"] = s.get("date") or s.get("sk", "").replace("DATE#", "")
-            out.append(s)
-    return out
-
-
-def _dedup_whoop(activities):
-    """Deduplicate WHOOP auto-detected activities that overlap with Garmin recordings.
-
-    WHOOP pushes duplicate workouts to Strava (often with 0 distance). If a Garmin activity of
-    the same sport_type exists on the same day, drop the WHOOP duplicate."""
-    by_day_type = {}
-    for a in activities:
-        key = (a.get("_day_date", ""), (a.get("sport_type") or "").lower())
-        by_day_type.setdefault(key, []).append(a)
-    deduped = []
-    for key, group in by_day_type.items():
-        if len(group) > 1:
-            non_whoop = [a for a in group if (a.get("device_name") or "").upper() != "WHOOP"]
-            deduped.extend(non_whoop if non_whoop else [group[0]])
-        else:
-            deduped.extend(group)
-    return deduped
+def _dated_activities(visits) -> list:
+    """The Strava activities the counted visits hold (seam-folded, Hevy's own push dropped as its
+    session's echo — #5387 retired `_dedup_whoop`, the pre-seam same-day same-sport WHOOP drop),
+    each stamped with its part's Pacific day (`_day_date`) on a copy."""
+    return [{**a, "_day_date": p["date"]} for v in visits for p in v["parts"] for a in p["activities"]]
 
 
 _MODALITY_MAP = {
@@ -148,22 +120,20 @@ _MODALITY_MAP = {
     "Yoga": "stretching",
     "Soccer": "soccer",
     "Breathwork": "breathwork",
+    "Mobility": "stretching",  # #5387: a Hevy mobility block (the pliability session folds into it)
 }
 _MOD_KEYS = ["strength", "walking", "cycling", "stretching", "soccer", "hiking", "breathwork", "other"]
 
 
-def _daily_modality_minutes(activities_30d, ah_30d, experiment_start: str) -> list:
-    """`daily_modality_minutes_30d`: one row per Pacific day (genesis-clamped, at most 30),
-    minutes per modality from the deduplicated Strava activities plus Apple Health breathwork."""
+def _daily_modality_minutes(visits_30d, ah_30d, experiment_start: str) -> list:
+    """`daily_modality_minutes_30d`: one row per Pacific day (genesis-clamped, at most 30), minutes
+    per modality from the counted visits' parts (#5387: a gym visit's lift, ride and mobility block
+    each once, never Hevy's whole-session push on top) plus Apple Health breathwork."""
     from collections import defaultdict as _dd2
 
     _daily_mod: dict[str, dict[str, float]] = _dd2(lambda: _dd2(float))
-    for a in activities_30d:
-        _dm_date = a.get("_day_date", "")
-        _dm_sport = a.get("sport_type") or a.get("type") or "Other"
-        _dm_mapped = _MODALITY_MAP.get(_dm_sport, "other")
-        _dm_dur = _act_minutes(a)
-        _daily_mod[_dm_date][_dm_mapped] += _dm_dur
+    for p in (p for v in visits_30d for p in v["parts"]):
+        _daily_mod[p["date"] or ""][_MODALITY_MAP.get(p["sport"], "other")] += p["seconds"] / 60.0
     # Add Apple Health breathwork minutes
     for h in ah_30d:
         _bw_d = h.get("date") or h.get("sk", "").replace("DATE#", "")
@@ -260,7 +230,6 @@ def training_overview(*, _g) -> dict:
 
     # Strava activities (90 days)
     strava_items = _query_source("strava", d90, today)
-    strava_30d = [s for s in strava_items if (s.get("date") or s.get("sk", "").replace("DATE#", "")) >= d30]
 
     # #4627: Zone 2 is THE shared computation (`training.zone2_minutes`) — minutes actually in
     # each recording device's own Zone 2 band, from the stored time-in-zone rows, each session
@@ -286,22 +255,21 @@ def training_overview(*, _g) -> dict:
         pct = round(wa / z2_target * 100) if (wa is not None and z2_target) else None
         return wa, pct
 
-    # Flatten nested activities lists from day-level Strava records, then drop the WHOOP
-    # duplicates (module-level since #4607, shared with `edition_training`).
-    all_activities_30d = _dedup_whoop(_flatten_day_activities(strava_30d))
-    all_activities_90d = _dedup_whoop(_flatten_day_activities(strava_items))
+    # #5387: sessions and minutes are THE count (`training.session_count`): the resolver's parts (the
+    # lift, the ride, the mobility block), one visit per occasion, minutes claimed once — never Hevy's
+    # whole-session push plus the ride inside it. Hevy (read above) anchors its own sessions.
+    visits_90d = session_count.in_window(session_count.visits(strava=strava_items, hevy=_z2_hevy_90), d90, today)
+    visits_30d = session_count.in_window(visits_90d, d30, today)
+    counted_30d = session_count.totals(visits_30d)
+    all_activities_30d = _dated_activities(visits_30d)
 
-    total_workouts_90d = len(all_activities_90d)
-    total_workouts_30d = len(all_activities_30d)
+    total_workouts_90d = len(visits_90d)
+    total_workouts_30d = counted_30d["sessions"]
     # #1084: real-window weekly rate, None below the floor (was a fixed /4.3).
     weekly_avg = round(total_workouts_30d / _win_weeks, 1) if _win_weeks is not None else None
 
-    # Activity type breakdown (30d)
-    type_counts: dict[str, int] = {}
-    for a in all_activities_30d:
-        sport = a.get("sport_type") or a.get("type") or "Other"
-        type_counts[sport] = type_counts.get(sport, 0) + 1
-    top_activities = sorted(type_counts.items(), key=lambda x: -x[1])[:8]
+    # Activity type breakdown (30d) — each part once, under its sport
+    top_activities = sorted(((k, v["parts"]) for k, v in counted_30d["by_sport"].items()), key=lambda x: -x[1])[:8]
 
     # Total training minutes and distance (30d)
     def _act_miles(a):
@@ -313,7 +281,7 @@ def training_overview(*, _g) -> dict:
             return float(a["distance"]) / 1609.34
         return 0.0
 
-    total_minutes_30d = sum(_act_minutes(a) for a in all_activities_30d)
+    total_minutes_30d = counted_30d["minutes"]
     total_distance_mi = sum(_act_miles(a) for a in all_activities_30d)
 
     # ── Modality breakdown (30d) — group by sport_type with per-modality stats ──
@@ -332,16 +300,8 @@ def training_overview(*, _g) -> dict:
     )
     # Also compute prior 30d for trend (days 31-60)
     d60 = _experiment_date(60)
-    prior_30d_acts: list[dict[str, Any]] = []
-    for s in strava_items:
-        d = s.get("date") or s.get("sk", "").replace("DATE#", "")
-        if d60 <= d < d30:
-            acts = s.get("activities") or [s]
-            prior_30d_acts.extend(acts)
-    prior_type_counts: dict[str, int] = {}
-    for a in prior_30d_acts:
-        sport = a.get("sport_type") or a.get("type") or "Other"
-        prior_type_counts[sport] = prior_type_counts.get(sport, 0) + 1
+    _prior_end = (datetime.strptime(d30, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+    prior_type_counts = {k: v["parts"] for k, v in session_count.totals(visits_90d, d60, _prior_end)["by_sport"].items()}
 
     # #1919 — `trend_vs_prior_30d` is a window-OVER-window comparison, so it needs
     # BOTH 30-day windows to be genuinely full, not just the current one: when the
@@ -355,22 +315,20 @@ def training_overview(*, _g) -> dict:
     # half-open `d60 <= d < d30` used by the loop above — its real inclusive end is the
     # day BEFORE d30, not d30 itself. Passing d30 would count 31 dates and call a
     # 29-real-day prior window "full". Measure the window the loop actually reads.
-    _prior_end = (datetime.strptime(d30, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
     _prior_window_full = _window_span(d60, _prior_end, 30)["full"]
 
-    for a in all_activities_30d:
-        sport = a.get("sport_type") or a.get("type") or "Other"
-        m = modality_map[sport]
+    for p in (p for v in visits_30d for p in v["parts"]):  # #5387: each part once, its minutes once
+        m = modality_map[p["sport"]]
         m["count"] += 1
-        dur = _act_minutes(a)
-        m["total_min"] += dur
-        m["total_mi"] += _act_miles(a)
-        m["total_elev_ft"] += float(a.get("total_elevation_gain_feet") or 0)
-        avg_hr = a.get("average_heartrate") or a.get("avg_hr")
-        if avg_hr:
-            m["hr_sum"] += float(avg_hr)
-            m["hr_count"] += 1
-        m["z2_min"] += z2_by_sid.get(str(a.get("strava_id")), 0.0)
+        m["total_min"] += p["seconds"] / 60.0
+        for a in p["activities"]:
+            m["total_mi"] += _act_miles(a)
+            m["total_elev_ft"] += float(a.get("total_elevation_gain_feet") or 0)
+            avg_hr = a.get("average_heartrate") or a.get("avg_hr")
+            if avg_hr:
+                m["hr_sum"] += float(avg_hr)
+                m["hr_count"] += 1  # session-count: the average-HR denominator, not a session count
+            m["z2_min"] += z2_by_sid.get(str(a.get("strava_id")), 0.0)
 
     modality_breakdown = []
     for sport, m in sorted(modality_map.items(), key=lambda x: -x[1]["count"]):
@@ -437,8 +395,8 @@ def training_overview(*, _g) -> dict:
         # reason says why (front-ends self-hide on the null either way).
         "avg_daily_steps_n": avg_daily_steps_n,
         "avg_daily_steps_reason": avg_daily_steps_reason,
-        "total_walks_30d": len(walk_activities),
-        "total_rucks_30d": len(ruck_activities),
+        "total_walks_30d": len(walk_activities),  # session-count: walks among THE count's activities (seam-folded, echoes dropped)
+        "total_rucks_30d": len(ruck_activities),  # session-count: the same list, rucks
         "total_miles_30d": round(sum(_act_miles(a) for a in walk_activities), 1),
         "avg_pace_min_per_mi": None,
         "z2_minutes_walking": round(sum(z2_by_sid.get(str(a.get("strava_id")), 0.0) for a in walk_activities)),
@@ -489,7 +447,7 @@ def training_overview(*, _g) -> dict:
     }
 
     # ── V2: Daily modality minutes (30 days) for stacked bar chart ──
-    daily_modality_minutes_30d = _daily_modality_minutes(all_activities_30d, ah_30d, EXPERIMENT_START)
+    daily_modality_minutes_30d = _daily_modality_minutes(visits_30d, ah_30d, EXPERIMENT_START)
     _exp_start_date = datetime.strptime(EXPERIMENT_START, "%Y-%m-%d")
     _days_since_exp = (datetime.now(timezone.utc) - _exp_start_date.replace(tzinfo=timezone.utc)).days + 1
 
@@ -521,16 +479,10 @@ def training_overview(*, _g) -> dict:
     from collections import defaultdict as _dd
 
     week_buckets: dict[str, dict[str, float]] = _dd(lambda: {"workouts": 0, "minutes": 0, "z2_min": 0})
-    for a in all_activities_90d:
-        d = a.get("_day_date") or ""
-        try:
-            dt = datetime.strptime(d, "%Y-%m-%d")
-            week_key = dt.strftime("%G-W%V")
-        except Exception:
-            continue
+    for v in visits_90d:  # #5387: a visit once, its minutes once
+        week_key = datetime.strptime(v["date"], "%Y-%m-%d").strftime("%G-W%V")
         week_buckets[week_key]["workouts"] += 1
-        dur = _act_minutes(a)
-        week_buckets[week_key]["minutes"] += dur
+        week_buckets[week_key]["minutes"] += v["minutes"]
     for _s in z2_sessions:  # #4627: the weekly Z2 bar is the shared computation's sessions
         if _s["source"] and _s["date"] >= d90:
             week_buckets[datetime.strptime(_s["date"], "%Y-%m-%d").strftime("%G-W%V")]["z2_min"] += _s["zone_2_minutes"]
@@ -913,9 +865,9 @@ def workouts(*, _g) -> dict:
 
 # ── /api/edition's narrow read (#4607) ─────────────────────────────────────────────
 #: The Strava day-row fields `daily_modality_minutes_30d` depends on: the activities (whole —
-#: the #4419 read seam's multi-device dedup reads their start, device and distance), the day,
-#: the seam's own marker, and the fields a row with no `activities` list is read by when it
-#: stands in as one activity (`_act_minutes`, the sport, the device `_dedup_whoop` checks).
+#: the #4419 read seam and the #5387 session count read their start, device, duration and id), the
+#: day, the seam's own marker, and the fields a row with no `activities` list is read by when it
+#: stands in as one activity (its minutes, the sport, the device).
 _EDITION_STRAVA_FIELDS = (
     "date",
     "activities",
@@ -929,6 +881,8 @@ _EDITION_STRAVA_FIELDS = (
 )
 #: The Apple Health fields the breathwork column reads.
 _EDITION_AH_FIELDS = ("date", "breathwork_minutes")
+#: The Hevy workout fields the session count anchors a gym visit with (#5387): its id, span and blocks.
+_EDITION_HEVY_FIELDS = ("date", "workout_id", "workout_uid", "start_time", "end_time", "exercises")
 
 
 def edition_training(*, _g) -> dict:
@@ -938,10 +892,11 @@ def edition_training(*, _g) -> dict:
     The route reads ~790 KB of DynamoDB JSON (90 days of Strava, Garmin, Apple Health twice,
     Whoop twice, Hevy twice and the training reference) to build a dozen panels; the edition's
     week block reads only the per-day modality minutes, which come from the 30-day Strava
-    window and Apple Health's breathwork. Same windows, same `_query_source` (so the same
-    phase decision and the same Strava read seam), same flatten → WHOOP dedup → per-day sum
-    — the module-level functions the route itself calls. Returns `{"training": <body subset>}`;
-    a failed read raises and the edition serves the training measure unavailable.
+    window, the 30-day Hevy window that anchors a gym visit's parts (#5387) and Apple Health's
+    breathwork. Same windows, same `_query_source` (so the same phase decision and the same Strava
+    read seam), the same session count → per-day sum the route itself calls. Returns
+    `{"training": <body subset>}`; a failed read raises and the edition serves the training measure
+    unavailable.
     """
     _query_source = _g["_query_source"]
     today = datetime.now(PT).strftime("%Y-%m-%d")
@@ -952,5 +907,7 @@ def edition_training(*, _g) -> dict:
         if (s.get("date") or s.get("sk", "").replace("DATE#", "")) >= d30
     ]
     ah_30d = _query_source("apple_health", d30, today, projection=_EDITION_AH_FIELDS)
-    minutes = _daily_modality_minutes(_dedup_whoop(_flatten_day_activities(strava_30d)), ah_30d, _g["EXPERIMENT_START"])
+    hevy_30d = _query_source("hevy", d30, today, projection=_EDITION_HEVY_FIELDS)
+    visits = session_count.in_window(session_count.visits(strava=strava_30d, hevy=hevy_30d), d30, today)
+    minutes = _daily_modality_minutes(visits, ah_30d, _g["EXPERIMENT_START"])
     return {"training": {"daily_modality_minutes_30d": minutes}}

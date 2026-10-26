@@ -202,9 +202,9 @@ def build_html(data, goals, commentary, windows):
         tr_rows += row("Activities", str(st_c.get("activity_count", 0)), delta(st_c.get("activity_count"), st_p.get("activity_count")))
         z2 = st_c.get("zone2_minutes", 0)
         z2pct = st_c.get("zone2_pct", 0)
-        z2_range = st_c.get("zone2_hr_range", f"{ZONE2_HR_LOW}–{ZONE2_HR_HIGH}")
+        z2_band = st_c.get("zone2_band") or "devices' own zones"  # #5387: THE Zone 2 computation's band
         z2col = "#27ae60" if z2 >= 500 else "#e67e22" if z2 >= 200 else "#e74c3c"
-        tr_rows += row(f"Zone 2 ({z2_range} bpm)", f'<span style="color:{z2col};font-weight:700;">{z2} min ({z2pct}% of cardio)</span>')
+        tr_rows += row(f"Zone 2 ({z2_band})", f'<span style="color:{z2col};font-weight:700;">{z2} min ({z2pct}% of cardio)</span>')
     # ADR-104 (#1658): the fitness verdict is only published when something was
     # actually measured. These rows used to render outside the `if st_c:` guard, so
     # a month with no recorded activity at all still published "CTL — 42-day

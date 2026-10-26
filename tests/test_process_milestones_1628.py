@@ -71,6 +71,20 @@ def _strava_day(d: str) -> dict:
     return {"pk": USER_PREFIX + "strava", "sk": f"DATE#{d}"}
 
 
+def _z2_day(d: str, z2_seconds: float) -> dict:
+    """A Strava day row in the wire's shape (#5387): the zones live on its activity — Zone 2 is THE
+    computation over them (#4627), never the row's stored `total_zone2_seconds` (kept here, unread)."""
+    act = {
+        "strava_id": f"z2-{d}",
+        "sport_type": "Ride",
+        "start_date": f"{d}T16:00:00Z",
+        "elapsed_time_seconds": z2_seconds,
+        "moving_time_seconds": z2_seconds,
+        "zone2_seconds": z2_seconds,
+    }
+    return {**_strava_day(d), "total_zone2_seconds": z2_seconds, "activities": [act]}
+
+
 def _habit_day(d: str, streak: int) -> dict:
     return {"pk": USER_PREFIX + "habit_scores", "sk": f"DATE#{d}", "t0_perfect_streak": streak}
 
@@ -433,7 +447,7 @@ def test_return_beats_every_other_ladder_on_the_same_run():
     _sweep(table, "2026-05-01")
     # 630 Zone 2 minutes in the 4-week window, all on the return day itself (#4976: Zone 2
     # is strava-only now, and spreading it over 21 strava days would erase the gap).
-    table.put_item(Item={**_strava_day("2026-05-05"), "total_zone2_seconds": 630 * 60})
+    table.put_item(Item=_z2_day("2026-05-05", 630 * 60))
     r = _sweep(table, "2026-05-05")
     assert [e["milestone_id"] for e in r["announced"]] == ["return_after_gap_2026-05-05"]
     assert set(r["deferred"]) == {"zone2_4w_300", "zone2_4w_600"}, "the other satisfied ladder must defer, not vanish"
@@ -505,9 +519,9 @@ def test_zone2_reads_strava_only_and_never_a_garmin_row():
     (Mutation control: restore the garmin max() leg and 07-20 reads 40 from garmin, 07-21 25.)"""
     table = FakeTable()
     table.put_item(Item={"pk": "USER#matthew#SOURCE#garmin", "sk": "DATE#2026-07-20", "zone2_minutes": 40})
-    table.put_item(Item={"pk": "USER#matthew#SOURCE#strava", "sk": "DATE#2026-07-20", "total_zone2_seconds": 1200})
+    table.put_item(Item=_z2_day("2026-07-20", 1200))
     table.put_item(Item={"pk": "USER#matthew#SOURCE#garmin", "sk": "DATE#2026-07-21", "zone2_minutes": 25})
-    table.put_item(Item={"pk": "USER#matthew#SOURCE#strava", "sk": "DATE#2026-07-22", "total_zone2_seconds": 1800})
+    table.put_item(Item=_z2_day("2026-07-22", 1800))
     garmin_before = {k: dict(v) for k, v in table.items.items() if k[0].endswith("#garmin")}
 
     signals = ml.collect_signals(table, "USER#matthew#SOURCE#", None, "2026-07-23")
@@ -639,8 +653,8 @@ def test_collect_signals_discloses_zone2_source_by_day():
     implied garmin contribution."""
     table = FakeTable()
     table.put_item(Item={"pk": "USER#matthew#SOURCE#garmin", "sk": "DATE#2026-07-20", "zone2_minutes": 40})
-    table.put_item(Item={"pk": "USER#matthew#SOURCE#strava", "sk": "DATE#2026-07-20", "total_zone2_seconds": 2400})
-    table.put_item(Item={"pk": "USER#matthew#SOURCE#strava", "sk": "DATE#2026-07-22", "total_zone2_seconds": 1800})
+    table.put_item(Item=_z2_day("2026-07-20", 2400))
+    table.put_item(Item=_z2_day("2026-07-22", 1800))
 
     signals = ml.collect_signals(table, "USER#matthew#SOURCE#", None, "2026-07-23")
     src = signals["zone2_source_by_day"]
