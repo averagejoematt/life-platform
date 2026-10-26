@@ -37,7 +37,7 @@ from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_today  # #2811: the character sheet's DAY is the Pacific day
 
-from health import character_privacy, personal_baselines, protein_engine  # #5129 owner-only · #5214 feedings · #5056 steps perfect
+from health import character_privacy, character_zone2, personal_baselines, protein_engine  # #5129 owner-only · #5214 · #5056 · #5389 Zone 2
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 
 logger = logging.getLogger(__name__)
@@ -432,15 +432,7 @@ def compute_movement_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[
 
     # Zone 2 adequacy
     z2_target = components.get("zone2_adequacy", {}).get("target_minutes", 150)
-    z2_minutes = 0
-    for day in strava_7d:
-        z2 = _safe_float(day, "zone2_minutes") or _safe_float(day, "time_in_zone_2_minutes")
-        if z2:
-            z2_minutes += z2
-        for act in day.get("activities") or []:
-            z2a = _safe_float(act, "zone2_minutes")
-            if z2a:
-                z2_minutes += z2a
+    z2_minutes = character_zone2.zone2_minutes_7d(data)  # #5389: THE Zone 2 computation
     scores["zone2_adequacy"] = _pct_of_target(z2_minutes, z2_target, 1.3)
 
     # Training load balance (TSB)
