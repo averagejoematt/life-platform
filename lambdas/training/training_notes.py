@@ -38,6 +38,13 @@ from typing import Any
 
 from common.pacific_time import pacific_today  # #2798: workout DATE# keys name Pacific days
 
+# #5374: a performed cardio block's own note as a structured clock shape — his grammar ("A/B for N mins for M mins",
+# "+X level(s) every N mins from T1 to T2", "<L> level up every N mins from T1 to T2 to level <L2>", "sprint N every M")
+# is `training.wrist_clock.parse_note`'s, the SAME grammar the composed note's clock rule is rendered in, so adherence
+# grades a performed shape against the prescribed one (`wrist_clock.grade`). Lives in `cardio_note` (it reads a pasted
+# composed line 1 through `LINE1_RE`) and is re-exported here, its home in the notes layer. The extractor's stored
+# signals are unchanged by it.
+from training.cardio_note import performed_shape  # noqa: F401
 from training.pinned_setup import is_setup_only, split_setup  # #5010: owner-marked setup lines
 
 # The head-key scheme lives in ONE module (#3918) and is re-exported here, so every

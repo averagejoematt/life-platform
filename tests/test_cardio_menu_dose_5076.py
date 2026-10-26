@@ -103,7 +103,10 @@ def test_every_block_carries_a_dose_and_an_rpe_or_talk_test_target():
 def test_the_bike_carries_level_speed_and_rpe():
     note = cn.compose(movement_key="cycling", minutes=30, target_date="2026-10-20", kind="easy", facts=_bike_facts())[0]
     lo, hi = tc.charter_value("cardio_menu.blocks.easy.rpe")
-    assert note.split("\n")[0] == f"Recumbent bike · 30 min · level 11 at 13.4 mph flat · RPE {lo}–{hi}, full sentences"
+    assert (
+        note.split("\n")[0]
+        == f"Recumbent bike · 30 min · level 11 at 13.4 mph flat · level 11 for 30 · check in every 10 min · RPE {lo}–{hi}, full sentences"
+    )
 
 
 def test_the_numbers_are_read_from_the_charter_not_restated(monkeypatch):
@@ -156,7 +159,9 @@ def test_a_raise_verdict_moves_the_bike_one_level_and_writes_why():
     note, audit = cn.compose(
         movement_key="cycling", minutes=30, target_date="2026-10-20", kind="easy", facts=_bike_facts(), verdict=verdict
     )
-    assert note.split("\n")[0].startswith("Recumbent bike · 30 min · level 12 at 13.4 mph flat · RPE ")
+    assert note.split("\n")[0].startswith(
+        "Recumbent bike · 30 min · level 12 at 13.4 mph flat · level 12 for 30 · check in every 10 min · RPE "
+    )
     assert f"+1 level: {verdict['basis']} — same RPE, one level up." in note.split("\n")[1]
     assert audit["level"] == 12 and audit["hold_level"] == 11
 
@@ -322,7 +327,9 @@ def test_the_draft_path_appends_the_menus_block_with_its_dose_and_movement_minut
     assert cardio.movement_key == "treadmill" and cardio.rationale_tag == "cardio:treadmill:menu:incline_treadmill_walk"
     minutes = tc.charter_value("split.session_minutes.cardio_block_max")
     assert [s.duration_seconds for s in cardio.sets] == [minutes * 60]
-    assert cardio.notes.split("\n")[0].startswith(f"Treadmill · {minutes} min · incline 8% at 2.8 mph walk · RPE ")
+    assert cardio.notes.split("\n")[0].startswith(
+        f"Treadmill · {minutes} min · incline 8% at 2.8 mph walk · 8% for {minutes} · check in every 10 min · RPE "
+    )
     assert out["cardio_block"]["pick"]["menu"]["kind"] == "incline_treadmill_walk"
     plan = ideal.inputs_snapshot["cardio_plan"]
     assert plan["movement_minutes"] == minutes == out["cardio_block"]["movement_minutes"]

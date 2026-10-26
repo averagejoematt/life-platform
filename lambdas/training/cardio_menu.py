@@ -51,8 +51,9 @@ TREADMILL = "treadmill"
 TEMPO_LEVEL_STEP = 1
 # PLATFORM-CHOSEN: how many consecutive walks at the same dose earn the next step.
 HELD_WALKS_FOR_STEP = 2
-# PLATFORM-CHOSEN: the treadmill hill shape climbs one incline step every this many minutes, then back.
-HILL_STEP_MINUTES = 3
+# PLATFORM-CHOSEN: a hill climbs one step (an incline step, or `cardio_note.HILL_LEVEL_STEP` levels) every this many
+# minutes, then back. #5374: 2, not 3 — every change point sits on the owner's 2/5/10-minute watch-clock grid.
+HILL_STEP_MINUTES = 2
 LABELS = {
     "tempo_level_step": "platform-chosen",
     "held_walks_for_step": "platform-chosen",
