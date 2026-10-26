@@ -36,7 +36,9 @@ THE SHAPE (gather → write → verify → commit)
   --verify            Run the gates that DO read the finished handover — the #3006 line
                       assertion (residual section only since #4262; markers are
                       prompts), the residual-queue gate, the proportionality-ledger
-                      gate (advisory since #4262), the beat validators — plus the Docs-CI leg, ONCE, after the
+                      gate (advisory since #4262), the beat validators, the gitleaks scan of the
+                      diff the wrap is about to commit (#5405; UNVERIFIED if the binary is
+                      absent) — plus the Docs-CI leg, ONCE, after the
                       wrap has written the docs it judges (#4262). Must exit 0 before the
                       wrap commit (step (f)).
 
@@ -209,6 +211,11 @@ VERIFY = [
     # blocks only on the residual section; every other marker line is a printed prompt.
     Gate("proportionality-ledger", "e12", ["python3", "scripts/check_proportionality_ledger.py"], ok_when=lambda rc, out: True),
     Gate("content-policy", "d", ["python3", "scripts/content_policy_scan.py"]),
+    # #5405: gitleaks over the diff this wrap is about to commit (a throwaway index = the staged
+    # diff `git add` is about to produce). The wrap commit goes to main with no PR, so CI's gitleaks
+    # step otherwise sees it only after it lands (4907f0a5a: main red ~71 min on a handover line).
+    # No binary => `UNVERIFIED`, exit 0, repeated in the closing UNVERIFIED LEGS line below.
+    Gate("staged-secrets", "f", ["python3", "scripts/check_staged_secrets.py"]),
     Gate("beats-schema", "d", ["python3", "scripts/validate_beats.py"]),
     # #2848/#3682's sixth Set member: step (c) regenerates docs/OPERATING_KNOWLEDGE_LEDGER.md's
     # committed snapshot, but the ledger check is a pytest test, not a docs-ci.yml step, so
@@ -282,6 +289,15 @@ def _head_coverage(out: str) -> tuple:
     """(state, sha8) from the gate's HEAD-COVERAGE line, or (None, "") if absent."""
     m = _HEAD_COV_RE.search(out or "")
     return (m.group(1), m.group(2) or "") if m else (None, "")
+
+
+def unverified_legs(results) -> list:
+    """Names of gates that PASSED while printing UNVERIFIED — the legs that did not actually judge (#5405).
+
+    A fail-open leg exits 0 by design; without this its UNVERIFIED sits mid-output under a `[PASS]`
+    header and the closing `VERIFY OK` line reads as a clean bill. Listed once, at the bottom.
+    """
+    return [g.name for g, ok, _rc, out in results if ok and "UNVERIFIED" in (out or "")]
 
 
 def _last_line(out: str) -> str:
@@ -417,6 +433,11 @@ def main(argv=None) -> int:
 
     slowest = max(results, key=lambda r: _ELAPSED.get(r[0].name, 0.0))[0].name if results else "-"
     print(f"WRAP-GATES-TIMING phase={phase} gates={len(results)} wall={wall:.1f}s slowest={slowest}")
+    skipped = unverified_legs(results)
+    if skipped:
+        print(
+            f"UNVERIFIED LEGS — {', '.join(skipped)} passed WITHOUT judging (see each leg's UNVERIFIED line above); say so in the handover."
+        )
     if failures:
         print(f"{phase.upper()} FAIL — {len(failures)} gate(s) red: " + ", ".join(f"{g.name} (step ({g.step}))" for g in failures))
         print("Each step in .claude/skills/wrap/SKILL.md documents its own remediation; fix and re-run this batch.")
