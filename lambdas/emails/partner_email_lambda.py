@@ -48,12 +48,12 @@ from common.constants import (
     PLAN_DAILY_PROTEIN_MIN_G,
 )  # ADR-058
 from common.journal_silence import reader_mail  # #5131: the one public-surface guard
-from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from health import checkin_partner_view  # #5125 R5: the ONE owner-consented projection of the evening check-in
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 from health.protein_floor import met_floor  # #5098: THE protein hit predicate (strict, #5003)
+from training import session_count  # #5387: THE session count; its zone2_total reads THE Zone 2 computation
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -142,6 +142,14 @@ def _normalize_whoop_sleep(item):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def training_week(strava_by_date):
+    """(workouts, Zone 2 minutes) for the week's {date: Strava day row}. #5387: "N workouts" is THE session
+    count — one gym visit is one workout, never Hevy's push plus the ride inside it; Zone 2 is THE
+    computation (#4627: devices' own zones, each session once), never an average-HR band."""
+    rows = list((strava_by_date or {}).values())
+    return session_count.count(strava=rows)["sessions"], session_count.zone2_total(rows)
+
+
 def gather_all():
     today = pacific_now().date()
     w_end = (today - timedelta(days=1)).isoformat()
@@ -201,17 +209,7 @@ def gather_all():
     days_logged = len(raw["macrofactor"])
 
     # ── Training ──
-    total_acts = 0
-    zone2_mins = 0
-    max_hr = max_hr_from_profile(profile)
-    z2_low, z2_high = max_hr * 0.60, max_hr * 0.70
-    for r in raw["strava"].values():
-        for a in r.get("activities", []):
-            total_acts += 1
-            hr = float(a.get("average_heartrate") or 0)
-            mins = float(a.get("moving_time_seconds") or 0) / 60
-            if hr and z2_low <= hr <= z2_high:
-                zone2_mins += mins
+    total_acts, zone2_mins = training_week(raw["strava"])
 
     # ── Weight ──
     weight_rows = [(d, safe_float(r, "weight_lbs")) for d, r in sorted(raw["withings"].items()) if safe_float(r, "weight_lbs")]
@@ -382,7 +380,7 @@ def build_commentary(data):
         nights=sl.get("nights", 0),
         sleep_dur_avg=fmt(sl.get("duration_avg")),
         recovery_avg=fmt(rec.get("avg")),
-        activity_count=tr.get("activity_count", 0),
+        activity_count=tr.get("activity_count", 0),  # session-count: training_week's own count (THE count)
         days_logged=nu.get("days_logged", 0),
         cal_hit_rate=fmt(nu.get("cal_hit_rate"), "unknown"),
         prot_hit_rate=fmt(nu.get("prot_hit_rate"), "unknown"),

@@ -135,15 +135,17 @@ def reader_surface_findings(text: str) -> list:
 
 # ── the labelled facts themselves (moved out of ai_expert_analyzer_lambda, which sits at its size ceiling) ──
 def served_sessions_30d(query_source, today_str: str, floor: str) -> int:
-    """The 30-day workout count the site serves (/api/training_overview `workouts_30d`): the day-level Strava rows'
-    activities, WHOOP duplicates dropped, over the 30-date window ending today — the served definition itself,
-    imported, never re-derived (the prompt's old "Hevy + Strava ROWS" count said 54 where the page said 39)."""
+    """The 30-day workout count the site serves (/api/training_overview `workouts_30d`) over the 30-date window
+    ending today: THE session count (`training.session_count`, #5387) over the Strava and Hevy rows — one gym visit
+    is one workout, never Hevy's push plus the ride inside it — the served definition itself, never re-derived
+    (the prompt's old "Hevy + Strava ROWS" count said 54 where the page said 39)."""
     from datetime import datetime, timedelta
 
-    from web.site_api_training import _dedup_whoop, _flatten_day_activities
+    from training import session_count
 
-    start = (datetime.strptime(today_str, "%Y-%m-%d") - timedelta(days=29)).strftime("%Y-%m-%d")
-    return len(_dedup_whoop(_flatten_day_activities(query_source("strava", max(start, floor), today_str))))
+    start = max((datetime.strptime(today_str, "%Y-%m-%d") - timedelta(days=29)).strftime("%Y-%m-%d"), floor)
+    strava, hevy = query_source("strava", start, today_str), query_source("hevy", start, today_str)
+    return session_count.count(strava=strava, hevy=hevy, start_date=start, end_date=today_str)["sessions"]
 
 
 def _journal_gap(signal: Optional[dict]) -> Optional[int]:

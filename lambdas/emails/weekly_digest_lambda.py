@@ -525,7 +525,7 @@ def gather_all():
         "day_grades": ex_day_grades(raw_this["day_grade"]),
         "whoop": ex_whoop(raw_this["whoop"]),
         "sleep": ex_whoop_sleep(raw_this["whoop"]),
-        "strava": ex_strava(raw_this["strava"], profile),
+        "strava": ex_strava(raw_this["strava"], profile, hevy_this),  # #5387: Hevy anchors a gym visit
         "apple": ex_apple_health(raw_this["apple_health"], raw_this["whoop"]),
         "macrofactor": ex_macrofactor(raw_this["macrofactor"], profile),
         "mf_workouts": ex_hevy_workouts(hevy_this),
@@ -538,7 +538,7 @@ def gather_all():
         "day_grades": ex_day_grades(raw_prior["day_grade"]),
         "whoop": ex_whoop(raw_prior["whoop"]),
         "sleep": ex_whoop_sleep(raw_prior["whoop"]),
-        "strava": ex_strava(raw_prior["strava"], profile),
+        "strava": ex_strava(raw_prior["strava"], profile, hevy_prior),  # #5387: Hevy anchors a gym visit
         "apple": ex_apple_health(raw_prior["apple_health"], raw_prior["whoop"]),
         "macrofactor": ex_macrofactor(raw_prior["macrofactor"], profile),
         "mf_workouts": ex_hevy_workouts(hevy_prior),
@@ -1171,7 +1171,7 @@ def build_html(data, commentary, profile):
         z2_pct = s.get("zone2_pct", 0)
         z2col = "#27ae60" if z2 >= z2_target else "#e67e22" if z2 >= 60 else "#e74c3c"
         tr_rows += row(
-            f'Zone 2 ({s.get("zone2_hr_range", "?")} bpm)',
+            f'Zone 2 ({s.get("zone2_band", "?")})',
             f'<span style="color:{z2col};font-weight:700;">{z2} / {z2_target} min ({z2_pct}% of cardio)</span>',
             delta_html(z2, sp.get("zone2_minutes"), " min") if sp.get("zone2_minutes") is not None else "",
             highlight=True,

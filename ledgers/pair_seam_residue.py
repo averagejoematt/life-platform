@@ -362,6 +362,18 @@ _WHOOP_HISTORY_READ_REASON = (
 )
 
 
+#: #5387: the one reason two Hevy reads that feed THE session count share (both hand the rows to it, read nothing themselves).
+REASON_5387_HEVY = (
+    "#5387: the read hands Hevy workout rows to the pure `training.session_count` (over `training.workout_identity`"
+    "), which reads only `sk` (the `#WORKOUT#<id>` key; `workout_id`/`id` first when present), `date`, `start_time`"
+    "/`end_time`, `exercises[].name`, `exercises[].sets[].duration_sec` and `tombstone` — the names `hevy_common` w"
+    "rites (VERIFIED read-only against live rows 2026-10-26: start_time, end_time, exercises[name, sets[duration_se"
+    "c, reps, weight_kg]], sk, date). A drift cannot fabricate a session: an unparsable span makes the Hevy session"
+    " untimed (its own visit, never folded into another), missing exercises make it no part, and the visit count fa"
+    "lls back to the Strava records. Pinned on the #5369 shared fixture by tests/test_strava_session_count_set_5387"
+    ".py."
+)
+
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
     "measurements::lambdas/training/calibration_cadence.py::read": (
         "2026-10-19",
@@ -399,13 +411,14 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "test_reader_parses_exactly_what_normalize_writes; a stale or missing field degrades to the vendor call.",
     ),
     "strava::lambdas/intelligence/labelled_facts.py::read": (
-        "2026-10-18",
-        "#4580 B-01: the analyzer's served 30-day workout count reads the strava day rows ONLY through "
-        "`web.site_api_training._flatten_day_activities` + `_dedup_whoop` — imported, not re-derived — the same two "
-        "functions /api/training_overview's `workouts_30d` is computed with, so this reader cannot disagree with that "
-        "consumer about the row shape; it counts activities and reads no field of its own. A drift in the strava writer "
-        "moves both counts together. tests/test_analyzer_labelled_facts_4580.py pins the gate on the count.",
+        "2026-10-26",
+        "#4580 B-01, re-pointed by #5387: the analyzer's served 30-day workout count reads the strava day rows ONLY through "
+        "`training.session_count.count` — the same call /api/training_overview's `workouts_30d` is computed with, so this "
+        "reader cannot disagree with that consumer about the row shape; it reads no field of its own. A drift in the strava "
+        "writer moves both counts together. tests/test_analyzer_labelled_facts_4580.py pins the gate on the count.",
     ),
+    "hevy::lambdas/intelligence/labelled_facts.py::read": ("2026-10-26", REASON_5387_HEVY),
+    "hevy::lambdas/intelligence/field_notes_lambda.py::read": ("2026-10-26", REASON_5387_HEVY),
     "whoop::lambdas/ingestion/whoop_cycle_day.py::read": (
         "2026-10-18",
         "#5002: the cycle-id guard reads back ONLY `sk` and `cycle_id` of the neighbouring whoop day rows. Both sides of "

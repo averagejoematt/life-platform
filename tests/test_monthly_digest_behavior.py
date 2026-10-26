@@ -270,8 +270,9 @@ def _text(html):
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _act(hr=120, secs=1800, miles=2.0, sport="Run", start="2026-07-04T08:00:00", name="AM"):
-    return {
+def _act(hr=120, secs=1800, miles=2.0, sport="Run", start="2026-07-04T08:00:00", name="AM", z2=None):
+    """A Strava activity; `z2` = its device's own Zone 2 seconds (`zone2_seconds`, #4627)."""
+    act = {
         "average_heartrate": hr,
         "moving_time_seconds": secs,
         "distance_miles": miles,
@@ -279,6 +280,9 @@ def _act(hr=120, secs=1800, miles=2.0, sport="Run", start="2026-07-04T08:00:00",
         "start_date_local": start,
         "name": name,
     }
+    if z2 is not None:
+        act.update(zone1_seconds=max(0, secs - z2), zone2_seconds=z2)
+    return act
 
 
 def _strava_day(acts, miles, secs, elev=0, date_str="2026-07-04"):
@@ -456,22 +460,23 @@ def test_no_strava_records_reports_absence_not_a_zero_month():
 def test_strava_totals_come_from_the_day_records():
     recs = [
         _strava_day([_act()], miles=2.0, secs=1800, elev=100, date_str="2026-07-04"),
-        _strava_day([_act(start="2026-07-05T08:00:00")], miles=3.5, secs=2400, elev=250, date_str="2026-07-05"),
+        _strava_day([_act(secs=2400, start="2026-07-05T08:00:00")], miles=3.5, secs=2400, elev=250, date_str="2026-07-05"),
     ]
     s = m.ex_strava(recs)
     assert s["total_miles"] == 5.5  # 2.0 + 3.5
-    assert s["total_minutes"] == 70  # round((1800 + 2400) / 60)
+    assert s["total_minutes"] == 70  # #5387: THE session count's minutes, round((1800 + 2400) / 60)
     assert s["total_elevation_feet"] == 350  # 100 + 250
     assert s["activity_count"] == 2
 
 
-def test_zone_two_minutes_count_only_activities_inside_the_default_hr_band():
-    """Default band is ZONE2_HR_LOW..ZONE2_HR_HIGH = 110..129 with no profile."""
+def test_zone_two_minutes_are_the_devices_own_zone_minutes():
+    """#5387/#4627: Zone 2 is THE computation — each activity's own `zone2_seconds` — never a whole
+    activity whose AVERAGE heart rate fell in a band (the method this replaced)."""
     recs = [
         _strava_day(
             [
-                _act(hr=120, secs=1800, start="2026-07-04T06:00:00"),  # in band -> 30 min
-                _act(hr=150, secs=1800, sport="Ride", start="2026-07-04T09:00:00"),  # above band
+                _act(hr=120, secs=1800, start="2026-07-04T06:00:00", z2=600),  # 10 of its 30 minutes in Zone 2
+                _act(hr=150, secs=1800, sport="Ride", start="2026-07-04T09:00:00", z2=1200),  # avg above any band: still 20
             ],
             miles=4.0,
             secs=3600,
@@ -479,24 +484,14 @@ def test_zone_two_minutes_count_only_activities_inside_the_default_hr_band():
     ]
     s = m.ex_strava(recs)
     assert s["zone2_minutes"] == 30
-    assert s["zone2_hr_range"] == f"{m.ZONE2_HR_LOW}-{m.ZONE2_HR_HIGH}"
-    assert s["zone2_pct"] == 50  # round(30 / round(3600/60) * 100)
+    assert s["zone2_band"] == "devices' own zones" and "zone2_hr_range" not in s
+    assert s["zone2_pct"] == 50  # round(30 / 60 * 100)
 
 
-def test_the_zone_two_band_is_derived_from_the_profile_max_heart_rate():
-    recs = [_strava_day([_act(hr=120, secs=1800)], miles=2.0, secs=1800)]
-    s = m.ex_strava(recs, {"max_heart_rate": 190})
-    # 190 * 0.60 = 114, 190 * 0.70 = 133
-    assert s["zone2_hr_range"] == "114-133"
-    assert s["zone2_minutes"] == 30  # 120 bpm sits inside 114-133
-
-
-def test_an_activity_outside_the_profile_band_is_excluded_even_if_the_default_band_would_keep_it():
-    recs = [_strava_day([_act(hr=112, secs=1800)], miles=2.0, secs=1800)]
-    default_band = m.ex_strava(recs)
-    profile_band = m.ex_strava(recs, {"max_heart_rate": 190})
-    assert default_band["zone2_minutes"] == 30  # 112 is inside 110-129
-    assert profile_band["zone2_minutes"] == 0  # 112 is below 114
+def test_the_profile_max_heart_rate_no_longer_moves_zone_two():
+    """The retired band read the profile's maximum; the devices' own zones do not."""
+    recs = [_strava_day([_act(hr=112, secs=1800, z2=900)], miles=2.0, secs=1800)]
+    assert m.ex_strava(recs)["zone2_minutes"] == m.ex_strava(recs, {"max_heart_rate": 190})["zone2_minutes"] == 15
 
 
 def test_an_activity_with_no_heart_rate_is_counted_but_not_credited_to_zone_two():
@@ -530,12 +525,12 @@ def test_duplicate_activities_are_counted_once():
 # is halved against the denominator, so zone2_pct is reported as half its true value — and activity_count (deduped) disagrees
 # with total_miles (not). Both sides of the ratio must come from the same deduped set.
 def test_the_zone_two_percentage_is_not_halved_by_a_duplicate_activity():
-    dup = _act(hr=120, secs=1800, miles=2.0, start="2026-07-04T08:00:00")
+    dup = _act(hr=120, secs=1800, miles=2.0, start="2026-07-04T08:00:00", z2=1800)
     # the ingested day record double-counts the duplicate: 3600 s / 4.0 mi
     recs = [_strava_day([dup, dict(dup)], miles=4.0, secs=3600)]
     s = m.ex_strava(recs)
     assert s["activity_count"] == 1
-    assert s["zone2_pct"] == 100  # 30 deduped zone-2 minutes out of 30 deduped minutes
+    assert s["zone2_pct"] == 100  # 30 deduped zone-2 minutes (its own zones, #4627) out of 30 deduped minutes
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1254,8 +1249,8 @@ def test_gather_sums_completed_tasks_per_arm_with_the_days_behind_them(monkeypat
 def test_gather_reads_the_profile_for_target_aware_extraction(monkeypatch, frozen_monday):
     monkeypatch.setattr(m, "table", _seeded_table())
     data, _ = m.gather_all()
-    # max_heart_rate 190 -> the zone-2 band is derived, not the module default
-    assert data["cur"]["strava"]["zone2_hr_range"] == "114-133"
+    # #5387: Zone 2 is the devices' own zones — no band is derived from the profile any more
+    assert data["cur"]["strava"]["zone2_band"] == "devices' own zones"
     assert data["profile"]["goal_weight_lbs"] == 220.0
     assert data["profile"]["journey_start_weight_lbs"] == 321.6
 
@@ -1265,7 +1260,7 @@ def test_gather_survives_a_missing_profile(monkeypatch, frozen_monday):
     monkeypatch.setattr(m, "table", _table_with(rows))
     data, _ = m.gather_all()
     assert data["profile"]["journey_start_weight_lbs"] is None
-    assert data["cur"]["strava"]["zone2_hr_range"] == f"{m.ZONE2_HR_LOW}-{m.ZONE2_HR_HIGH}"
+    assert data["cur"]["strava"]["zone2_band"] == "devices' own zones"
 
 
 def test_a_failed_profile_read_falls_back_to_the_module_targets(monkeypatch, frozen_monday):
@@ -1278,7 +1273,7 @@ def test_a_failed_profile_read_falls_back_to_the_module_targets(monkeypatch, fro
     monkeypatch.setattr(m, "table", table)
     data, _ = m.gather_all()
     assert data["profile"]["goal_weight_lbs"] == m.GOAL_WEIGHT_LBS
-    assert data["cur"]["strava"]["zone2_hr_range"] == f"{m.ZONE2_HR_LOW}-{m.ZONE2_HR_HIGH}"
+    assert data["cur"]["strava"]["zone2_band"] == "devices' own zones"
 
 
 def test_gather_derives_sleep_from_the_whoop_partition(monkeypatch, frozen_monday):
@@ -1358,7 +1353,7 @@ def test_each_extractor_runs_once_per_arm(monkeypatch, frozen_monday):
     monkeypatch.setattr(m, "table", _seeded_table())
     calls = []
     real = m.ex_strava
-    monkeypatch.setattr(m, "ex_strava", lambda recs, profile=None: calls.append(1) or real(recs, profile))
+    monkeypatch.setattr(m, "ex_strava", lambda recs, profile=None, hevy=None: calls.append(1) or real(recs, profile, hevy))
     m.gather_all()
     assert len(calls) == 2  # one current arm, one prior arm
 
@@ -1389,7 +1384,7 @@ def _data(**over):
                 "activity_count": 18,
                 "zone2_minutes": 520,
                 "zone2_pct": 55,
-                "zone2_hr_range": "114-133",
+                "zone2_band": "devices' own zones",
                 "total_elevation_feet": 3400,
             },
             "withings": {"weight_latest": 305.0, "weight_avg": 307.4, "weight_min": 304.0, "weight_max": 311.0, "body_fat_avg": 36.0},
@@ -1495,7 +1490,7 @@ def test_the_training_section_shows_the_month_over_month_direction():
 def test_the_zone_two_row_states_the_band_it_was_measured_in():
     html = _html()
     label = [r[0] for r in _rows(html) if r and r[0].startswith("Zone 2")][0]
-    assert "114-133 bpm" in label
+    assert "devices' own zones" in label or "devices&#x27; own zones" in label, label
 
 
 def test_the_recovery_section_reports_the_hrv_range_it_observed():

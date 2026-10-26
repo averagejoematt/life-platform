@@ -36,8 +36,6 @@ def test_load_model_pins_the_same_value():
 # enter the gate census (a concurrent-lane pin), and this row's residual is stated on the PR — a NEW
 # reader's own default is not caught here, only a regression in these.
 READERS = (
-    "lambdas/emails/partner_email_lambda.py",
-    "lambdas/emails/weekly_digest_extractors.py",
     "lambdas/content/output_writers.py",
     "lambdas/compute/dashboard_refresh_lambda.py",
     "mcp/tools_training.py",
@@ -61,11 +59,22 @@ def _numeric_defaults(source):
     return out
 
 
+# #5387: two of the seven read a maximum only for an average-HR Zone 2 band; that band is retired (they read THE Zone 2
+# computation, #4627, which assumes no maximum), so they read none — and still may not regrow their own default.
+BAND_RETIRED = (
+    "lambdas/emails/partner_email_lambda.py",
+    "lambdas/emails/weekly_digest_extractors.py",
+)
+
+
 def test_the_known_readers_use_the_one_default():
-    for rel in READERS:
+    for rel in READERS + BAND_RETIRED:
         src = (ROOT / rel).read_text()
         assert not _numeric_defaults(src), f"{rel}: numeric max_heart_rate default — use common.max_hr.max_hr_from_profile"
-        assert "max_hr_from_profile(" in src, f"{rel}: no longer reads the one resolver"
+        if rel in READERS:
+            assert "max_hr_from_profile(" in src, f"{rel}: no longer reads the one resolver"
+        else:
+            assert "max_heart_rate" not in src and "session_count" in src, f"{rel}: its Zone 2 is THE computation, never a band"
 
 
 def test_detector_fires_on_the_old_pattern():

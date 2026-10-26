@@ -630,7 +630,23 @@ WRITER_TRUTH = {
         "cardio_recovery_bpm_apple": 24,
         "vo2max": 31.5,
     },
-    "strava": {"activity_count": 2, "total_zone2_seconds": 1800, "total_kilojoules": 900.0},
+    # #5387: the day row carries its activities (the zones live on each one; Zone 2 is THE computation over them)
+    "strava": {
+        "activity_count": 1,
+        "total_zone2_seconds": 1800,
+        "total_kilojoules": 900.0,
+        "activities": [
+            {
+                "strava_id": "wt-1",
+                "sport_type": "Ride",
+                "start_date": "2026-08-01T16:00:00Z",
+                "elapsed_time_seconds": 3600,
+                "moving_time_seconds": 3600,
+                "zone1_seconds": 1800,
+                "zone2_seconds": 1800,
+            }
+        ],
+    },
     "notion": {"enriched_mood": 7, "enriched_energy": 6, "enriched_stress": 3, "enriched_social_quality": "good"},
     "eightsleep": {"time_to_sleep_min": 14},
     "habitify": {"habits": {"a": True, "b": True, "c": True, "d": False, "e": False}},
@@ -743,9 +759,10 @@ class TestDataNarrative:
         assert row["calories"] == 1810.0 and row["protein_g"] == 182.0
         assert row["weight_lbs"] == 318.4  # #484: never the MacroFactor TDEE column
 
-    def test_workout_is_a_boolean_flag_derived_from_the_activity_count(self):
-        busy = eng.build_data_narrative(_data({"strava": {"activity_count": 2}}))[0]
-        rest = eng.build_data_narrative(_data({"strava": {"activity_count": 0}}))[0]
+    def test_workout_is_a_boolean_flag_derived_from_the_session_count(self):
+        # #5387: THE session count over the day's activities, never the row's stored activity_count
+        busy = eng.build_data_narrative(_data({"strava": WRITER_TRUTH["strava"]}))[0]
+        rest = eng.build_data_narrative(_data({"strava": {"activity_count": 2, "activities": []}}))[0]
         assert busy["workout"] is True
         assert rest["workout"] is False
 

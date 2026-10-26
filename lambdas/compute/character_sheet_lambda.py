@@ -401,6 +401,8 @@ def assemble_data(yesterday_str):
 
     # #965: hevy strength days (trailing 7) — movement's strength_sessions
     data["hevy_workout_days_7d"] = fetch_hevy_workout_days(strava_7d_start, yesterday_str)
+    # #5387: the week's Hevy sessions — they anchor a gym visit's parts in movement's session count
+    data["hevy_7d"] = fetch_range("hevy", strava_7d_start, yesterday_str)
 
     # #965: reading-session days (trailing 7, ADR-097 GSI2) — mind's reading_practice
     data["reading_session_days_7d"] = fetch_reading_session_days(strava_7d_start, yesterday_str)
@@ -671,7 +673,7 @@ def collect_input_rows(data, history_records, challenge_items=None):
 
     for key in ("whoop", "macrofactor", "apple", "habit_scores", "flourishing", "engagement_state", "todoist", "labs_latest"):
         _add(data.get(key))
-    for key in ("journal_entries", "sleep_14d", "strava_7d", "strava_42d", "macrofactor_14d", "withings_30d"):
+    for key in ("journal_entries", "sleep_14d", "strava_7d", "strava_42d", "macrofactor_14d", "withings_30d", "hevy_7d"):
         for rec in data.get(key) or []:
             _add(rec)
     for rec in history_records or []:  # the 21-day EMA window of prior sheets

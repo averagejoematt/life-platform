@@ -59,6 +59,7 @@ from health import (
 )
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 from health.early_warning import _t0_rate  # #2221's T0 reader, moved with the detector
+from training import session_count  # #5387: THE session count
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -480,16 +481,13 @@ def _fetch_execution_metrics(date_str, profile):
             metrics["protein_g"] = int(prot)
             metrics["protein_target_g"] = prot_target
 
-    # Activity (Strava)
+    # Activity — #5387: THE session count over the day's Strava row and its Hevy sessions (the routine
+    # source): one gym visit is one session, never Hevy's push plus the ride inside it.
     strava = fetch_date("strava", date_str)
-    if strava:
-        act_count = int(strava.get("activity_count") or 0)
-        activities = strava.get("activities", [])
-        metrics["exercise_sessions"] = act_count
-        if activities:
-            metrics["exercise_types"] = [a.get("sport_type", "?") for a in activities[:3]]
-    else:
-        metrics["exercise_sessions"] = 0
+    day = session_count.count(strava=[strava] if strava else [], hevy=fetch_range("hevy", date_str, date_str))
+    metrics["exercise_sessions"] = day["sessions"]
+    if day["by_sport"]:
+        metrics["exercise_types"] = list(day["by_sport"])[:3]
 
     # Sleep (Whoop -- for bed-time intention checking)
     whoop = fetch_date("whoop", date_str)

@@ -84,6 +84,8 @@ from common.hevy_schema import SET_DURATION_FIELD  # #4158: the ONE stored-set d
 from common.max_hr import DEFAULT_MAX_HR  # #4624: the ONE fallback max HR
 from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive == UTC)
 
+from training import session_count  # #5387: THE session count (the ledger's `total`)
+
 # ~200 W FTP → 720 kJ/h at threshold = 100 TSS-like points.
 KJ_PER_TSS_POINT = 7.2
 # Low-intensity locomotion (IF ≈ 0.5 → 25 points/h). The walk fallback that fixes C-6.
@@ -377,8 +379,10 @@ def daily_training_load(strava_60d, hevy_60d, today=None):
     ``basis["sessions"]`` is the model's own ledger of what it scored (#3754, ADR-104):
     ``strava`` = activities left after the multi-device dedupe AND the echo skip (a Zone-1
     walk that scores 0 is still a measured session), ``hevy`` = non-tombstoned workouts,
-    ``total`` their sum, plus what was set aside (``strava_echoes_skipped``,
-    ``strava_duplicates_dropped``). A caller that needs "how many sessions" reads this,
+    plus what was set aside (``strava_echoes_skipped``, ``strava_duplicates_dropped``).
+    ``total`` is THE session count (#5387, ``training.session_count``): one gym visit is ONE
+    session — the Hevy session and the wearable's ride inside it are its parts, not two
+    sessions (``parts`` counts those). A caller that needs "how many sessions" reads ``total``,
     never the raw record count — the raw count overstates every duplicated walk and every
     Hevy echo, and those are exactly the records this function refuses to score.
     """
@@ -471,6 +475,7 @@ def daily_training_load(strava_60d, hevy_60d, today=None):
             load_by_day[d] = round(day_load, 1)
 
     total = kj_load + hr_load_total + proxy_load + worked_set_load
+    counted = session_count.count(strava=strava_60d, hevy=[w for ws in hevy_by_day.values() for w in ws])
     present = [
         name
         for name, v in (("power", kj_load), ("hr", hr_load_total), ("worked_set", worked_set_load), ("duration_proxy", proxy_load))
@@ -499,7 +504,8 @@ def daily_training_load(strava_60d, hevy_60d, today=None):
         # channel reports `total` as its session count, and a duplicated walk or a Hevy echo
         # is a record this function set aside, not a session the owner trained twice.
         "sessions": {
-            "total": (strava_deduped - echoes_skipped) + sum(len(ws) for ws in hevy_by_day.values()),
+            "total": counted["sessions"],
+            "parts": counted["parts"],
             "strava": strava_deduped - echoes_skipped,
             "hevy": sum(len(ws) for ws in hevy_by_day.values()),
             "strava_echoes_skipped": echoes_skipped,

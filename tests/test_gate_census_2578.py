@@ -1191,7 +1191,9 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # (ARMED 1/1: baseline 4 passed | mutated 1 failed | reverted 4 passed). Stacked, never max'd.
         # 297 -> 298 (2026-10-26, #5369 box 3): structural::test_hevy_cardio_never_summed_5369.py, PROVEN via MutationSpec +
         # STRUCTURAL_PROOFS (ARMED 1/1: baseline 3 passed | mutated 1 failed | reverted 3 passed). Stacked, never max'd.
-        <= 298
+        # 298 -> 299 (2026-10-26, #5387): structural::test_strava_counters_read_the_one_count_5387.py, PROVEN via MutationSpec +
+        # STRUCTURAL_PROOFS (ARMED 1/1: baseline 5 passed | mutated 1 failed | reverted 5 passed). Stacked, never max'd.
+        <= 299
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

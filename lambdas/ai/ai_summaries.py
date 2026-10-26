@@ -14,6 +14,7 @@ access — keep working unchanged.
 from typing import Any
 
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
+from training import session_count  # #5387: THE session count
 
 
 def _safe_float(rec, field, default=None):
@@ -41,6 +42,9 @@ def build_data_summary(data: dict[str, Any], profile: dict[str, Any]) -> dict[st
     # "primary" day — today-if-finalized else yesterday), falling back to the legacy
     # yesterday record when a caller hasn't set primary_whoop.
     _pw = data.get("primary_whoop") or data.get("whoop")
+    # #5387: the day's sessions and minutes are THE count over the Strava row and the Hevy sessions — one
+    # gym visit once (the row's activity_count counted Hevy's push and the ride inside it as two).
+    _day = session_count.count(strava=[strava] if strava else [], hevy=data.get("hevy"))
     return {
         "date": data.get("date"),
         "recovery_score": _safe_float(_pw, "recovery_score"),
@@ -70,8 +74,8 @@ def build_data_summary(data: dict[str, Any], profile: dict[str, Any]) -> dict[st
         "walking_asymmetry_pct": _safe_float(apple, "walking_asymmetry_pct"),
         "habits_completed": _safe_float(habitify, "total_completed"),
         "habits_possible": _safe_float(habitify, "total_possible"),
-        "exercise_count": _safe_float(strava, "activity_count"),
-        "exercise_minutes": round((_safe_float(strava, "total_moving_time_seconds") or 0) / 60, 1),
+        "exercise_count": _day["sessions"] if (strava or data.get("hevy")) else None,
+        "exercise_minutes": _day["minutes"],
         "journal_mood": journal.get("mood_avg"),
         "journal_energy": journal.get("energy_avg"),
         "journal_stress": journal.get("stress_avg"),

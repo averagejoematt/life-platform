@@ -98,6 +98,7 @@ from decimal import Decimal
 from typing import Any, NamedTuple
 
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
+from training import session_count  # #5387: its zone2_by_date reads THE Zone 2 computation
 
 from health import process_milestones  # #1628: the pure window functions (no I/O — this module remains the ONE writer)
 
@@ -648,24 +649,17 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
             if vol is not None:
                 strength_volume_by_day[day] = strength_volume_by_day.get(day, 0.0) + vol
 
-    # Zone 2 minutes: strava's per-activity total_zone2_seconds, summed per day.
+    # Zone 2 minutes per day: THE Zone 2 computation (#4627 via #5387's `session_count.zone2_by_date`) over
+    # the Strava rows and the Hevy sessions in hand — each session once, Hevy's push of a gym visit an echo
+    # of the Hevy session; Strava's day `total_zone2_seconds` summed the ride's minutes under both.
     # #4976: the garmin all-day leg is gone — Garmin's direct feed is retired (#4640),
     # its zone2_minutes field produced zero live records in its whole life (0/1461,
     # 2026-07-26 review), and the watch's activities already arrive through Strava, so
     # max(garmin, strava) only ever resolved strava. Garmin's stored rows are untouched.
-    strava_z2_by_day: dict[str, float] = {}
-    for item in strava:
-        sk = str(item.get("sk") or "")
-        if not sk.startswith("DATE#"):
-            continue
-        day = sk[5:15]
-        training_days.add(day)
-        z2s = _f(item.get("total_zone2_seconds"))
-        if z2s is not None:
-            strava_z2_by_day[day] = strava_z2_by_day.get(day, 0.0) + z2s / 60.0
-    zone2_by_day: dict[str, float] = dict(strava_z2_by_day)
-    # #1809: which source carried each day — measured, never implied (one source today).
-    zone2_source_by_day: dict[str, str] = {day: "strava" for day in strava_z2_by_day}
+    training_days.update(str(item.get("sk") or "")[5:15] for item in strava if str(item.get("sk") or "").startswith("DATE#"))
+    zone2_by_day: dict[str, float] = session_count.zone2_by_date(strava, hevy=hevy)
+    # #1809: which source carried each day — measured, never implied (one source: Strava's zones).
+    zone2_source_by_day: dict[str, str] = {day: "strava" for day in zone2_by_day}
 
     # RHR / HRV: whoop daily records (skip interleaved #WORKOUT# sub-records).
     rhr_by_day: dict[str, float] = {}

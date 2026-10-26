@@ -65,6 +65,7 @@ from common import digest_utils  # #3442: the shared day-row predicate (DAY_SK_R
 from common.numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
+from training import session_count  # #5387: THE session count
 
 
 def get_iso_week(dt=None):
@@ -160,23 +161,14 @@ def gather_week_data(start_date, end_date):
             "avg_protein_g": round(sum(protein) / len(protein), 1) if protein else None,
         }
 
-    # Training (Strava) — items are DAY rollups (activity_count, total_moving_time_seconds,
-    # activities[]), not individual activities. Reading per-activity fields off the day
-    # record produced "N sessions / 0 minutes", which the AI then publicly flagged as a
-    # data-entry bug in the 2026-W26 note.
+    # Training — items are Strava DAY rollups (activities[] inside), not individual activities: reading
+    # per-activity fields off the day record produced "N sessions / 0 minutes", which the AI then publicly
+    # flagged as a data-entry bug in the 2026-W26 note. #5387: sessions and minutes are THE session count
+    # over those rows and the week's Hevy sessions — one gym visit is one session, its minutes once.
     day_records = _query_day_records("strava", start_date, end_date)
     if day_records:
-
-        def _day_minutes(rec):
-            total = rec.get("total_moving_time_seconds")
-            if total is None:
-                total = sum(float(a.get("moving_time_seconds") or a.get("elapsed_time_seconds") or 0) for a in rec.get("activities") or [])
-            return float(total or 0) / 60
-
-        data["training"] = {
-            "sessions": sum(int(rec.get("activity_count") or len(rec.get("activities") or []) or 1) for rec in day_records),
-            "total_minutes": round(sum(_day_minutes(rec) for rec in day_records)),
-        }
+        week = session_count.count(strava=day_records, hevy=_query_source("hevy", start_date, end_date))
+        data["training"] = {"sessions": week["sessions"], "total_minutes": round(week["minutes"])}
 
     # Weight (Withings)
     weights = _query_day_records("withings", start_date, end_date)
