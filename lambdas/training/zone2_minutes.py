@@ -42,8 +42,10 @@ COUNTED ONCE
     hand, a HealthKit workout Hevy or the pliability app wrote folded into that app's record. So a
     gym visit is its PARTS — the lift, the ride, the mobility block — each once and each labelled
     by what it was; before #5369 a zone2-local union-find (`_same_session` / `_groups`) chained the
-    whole visit into one session called WeightTraining and lost the ride. A Hevy-only identity (no
-    wearable recorded it) is not a Zone 2 session: its blocks are `hevy_cardio_minutes`, as before.
+    whole visit into one session called WeightTraining and lost the ride. A timed Hevy part no
+    wearable recorded is an UNMEASURED session (its minutes stay in the visit, counted once — the
+    visit Hevy's own Strava push used to stand for); its cardio blocks are ALSO reported as
+    `hevy_cardio_minutes`, a separate bucket never added to anything (#5369 box 3's guard).
     Each session's zones come from ONE source: the first in `SOURCE_PRIORITY` (Whoop, the device
     worn throughout and the one whose own band Strava re-zones when Whoop pushes a workout) whose
     recordings measured at least `CONTAINMENT_SHARE` of the most any source measured of the session
@@ -326,9 +328,10 @@ def _choose(cands: Mapping[str, Tuple[float, Dict[str, float], List[Dict[str, An
 def _sessions_by_identity(
     strava_rows, whoop_rows, apple_rows, max_hr, hevy_rows
 ) -> List[Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]]:
-    """[(identity or None, its wearable recordings)] — one entry per identity holding at least one
-    recording (a Hevy-only identity is not a Zone 2 session). A recording the resolver could not key
-    (no vendor id) stands alone."""
+    """[(identity or None, its wearable recordings)] — one entry per identity holding a recording,
+    plus each TIMED Hevy-only identity with none (an unmeasured part of a visit; an untimed Hevy row
+    cannot be placed and is left to `hevy_cardio_minutes`, as before #5369). A recording the resolver
+    could not key (no vendor id) stands alone."""
     strava_rows = workout_identity.strava_without_echoes(strava_read_seam(STRAVA, list(strava_rows or [])), hevy_rows)
     recs = strava_recordings(strava_rows) + whoop_recordings(whoop_rows) + apple_recordings(apple_rows, max_hr)
     identities = workout_identity.resolve_workout_identities(apple=apple_rows, strava=strava_rows, hevy=hevy_rows, whoop=whoop_rows)
@@ -341,11 +344,13 @@ def _sessions_by_identity(
         if members:
             placed.update(id(m) for m in members)
             out.append((ident, members))
+        elif ident["sources"] == ["hevy"] and not ident["untimed"]:
+            out.append((ident, []))
     out.extend((None, [r]) for r in recs if id(r) not in placed)
     return out
 
 
-def _sport(ident: Optional[Mapping[str, Any]], rep: Optional[Mapping[str, Any]], first: Mapping[str, Any]) -> Any:
+def _sport(ident: Optional[Mapping[str, Any]], rep: Optional[Mapping[str, Any]], first: Optional[Mapping[str, Any]]) -> Any:
     """Strava's word for the session when a Strava recording is in it; for a Hevy-anchored part with
     none, its family in Strava's vocabulary (`FAMILY_SPORT` — "Ride", "Mobility"); otherwise the
     earliest recording's own name, as before #5369."""
@@ -353,7 +358,7 @@ def _sport(ident: Optional[Mapping[str, Any]], rep: Optional[Mapping[str, Any]],
         return rep["sport"]
     if ident and "hevy" in ident["sources"] and ident["family"] in FAMILY_SPORT:
         return FAMILY_SPORT[ident["family"]]
-    return first["sport"]
+    return first["sport"] if first else (ident or {}).get("family")
 
 
 def counted_sessions(strava_rows, whoop_rows, apple_rows=None, max_hr: Optional[float] = None, hevy_rows=None) -> List[Dict[str, Any]]:
@@ -380,7 +385,7 @@ def counted_sessions(strava_rows, whoop_rows, apple_rows=None, max_hr: Optional[
 
     sessions: List[Dict[str, Any]] = []
     for (ident, group), (chosen, cands) in zip(groups, chosen_by_group):
-        first = min(group, key=lambda m: (m["start"] is None, m["start"].timestamp() if m["start"] else 0.0, m["date"]))
+        first = min(group, key=lambda m: (m["start"] is None, m["start"].timestamp() if m["start"] else 0.0, m["date"])) if group else None
         strava_members = [m for m in group if m["source"] == STRAVA]
         rep = max(strava_members, key=lambda m: m["duration_s"]) if strava_members else None
         family = ident["family"] if ident else None
@@ -392,7 +397,7 @@ def counted_sessions(strava_rows, whoop_rows, apple_rows=None, max_hr: Optional[
         hevy_ids = [f"hevy:{i}" for i in (ident or {}).get("members", {}).get("hevy", [])]
         sessions.append(
             {
-                "date": first["date"],
+                "date": first["date"] if first else pacific_date_of(str((ident or {}).get("start") or "")),
                 "source": chosen,
                 "family": family,
                 "workout_identity": ident["workout_identity"] if ident else None,
@@ -401,7 +406,7 @@ def counted_sessions(strava_rows, whoop_rows, apple_rows=None, max_hr: Optional[
                 "sport": _sport(ident, rep, first),
                 "strava_id": rep["id"] if rep else None,
                 "duration_minutes": round(
-                    (ident["seconds"] if ident and ident["seconds"] else max(m["duration_s"] for m in group)) / 60.0,
+                    (ident["seconds"] if ident and ident["seconds"] else max((m["duration_s"] for m in group), default=0.0)) / 60.0,
                     1,
                 ),
                 "zones_minutes": zones_min,

@@ -253,6 +253,22 @@ def test_the_family_split_keeps_the_watch_ride_out_of_the_lift(monkeypatch):
     assert "apple_health:AW-CYC-0001" not in ride_ids()
 
 
+def test_a_hevy_part_no_wearable_recorded_is_an_unmeasured_session_in_the_visit():
+    """Only the watch ride recorded: the lift and the mobility block are still parts of the visit —
+    unmeasured (no zones, never a 0), their minutes counted once — and the Cycling block is ALSO the
+    separate `hevy_cardio_minutes` bucket, never added to anything."""
+    sessions = _sessions(strava=(), apple=(APPLE_CYCLING,))
+    fams = {s["family"]: s for s in sessions}
+    assert sorted(fams) == ["cycling", "mobility", "strength"]
+    assert fams["strength"]["source"] is None and fams["strength"]["zone_2_minutes"] is None
+    assert fams["mobility"]["source"] is None and fams["strength"]["date"] == DAY
+    assert sum(s["duration_minutes"] for s in sessions) == 160.0
+    win = z2m.zone2_window(None, None, [HEVY], DAY, DAY, sessions=sessions)
+    assert win["unmeasured_sessions"] == 2 and win["sessions_counted"] == 1
+    untimed = {k: v for k, v in HEVY.items() if k not in ("start_time", "end_time")}
+    assert z2m.counted_sessions([], [], [], hevy_rows=[untimed]) == [], "an untimed Hevy row cannot be placed in a visit"
+
+
 # ── box 2: HealthKit-origin workouts fold into their source's record ───────────────────
 
 
@@ -277,8 +293,8 @@ def test_the_hevy_origin_fold_can_fail(monkeypatch):
 
 def test_a_pliability_session_folds_into_the_hevy_mobility_block():
     sessions = _sessions(strava=(), apple=(APPLE_FLEX,))
-    (mob,) = sessions
-    assert mob["family"] == "mobility" and mob["sport"] == "Mobility"
+    (mob,) = _by_family(sessions)["mobility"]
+    assert mob["family"] == "mobility" and mob["sport"] == "Mobility" and mob["source"] == "apple_health"
     assert mob["ids"] == sorted(["hevy:hv-synth-5369#mobility", "apple_health/pliability:AW-FLX-0003"])
     assert wv.apple_workout_source(APPLE_FLEX) == "apple_health/pliability"
     assert wv.apple_workout_source(APPLE_LIFT) == "apple_health/hevy"
