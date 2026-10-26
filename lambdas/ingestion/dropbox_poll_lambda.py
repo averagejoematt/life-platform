@@ -336,24 +336,200 @@ def mark_file_processed(filename, file_hash, file_size):
     )
 
 
+# #5097: MacroFactor's "Granular Export" is ONE workbook with ONE SHEET PER TICKED METRIC
+# (Calories & Macros, Scale Weight, Weight Trend, Expenditure, Steps), each keyed by a Date
+# column. A sheet whose value column carries a header the ingester does not know is renamed
+# from its SHEET NAME to the header `macrofactor_lambda.SUMMARY_SCALAR_COLUMNS` reads — never
+# across a unit (a "kg" header stays verbatim and lands in `summary_unmapped_columns`).
+_XLSX_SHEET_TO_COLUMN = {
+    "scale weight": "Weight (lbs)",
+    "weight trend": "Trend Weight (lbs)",
+    "expenditure": "Expenditure",
+    "steps": "Steps",
+}
+_XLSX_KNOWN_HEADERS = frozenset(
+    {
+        "Expenditure",
+        "Steps",
+        "Weight (lbs)",
+        "Trend Weight (lbs)",
+        "Calories (kcal)",
+        "Protein (g)",
+        "Fat (g)",
+        "Carbs (g)",
+    }
+)
+_XLSX_NS_MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+_XLSX_NS_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+
+
+def excel_serial_to_iso(value):
+    """Excel serial day number (1900 date system) -> 'YYYY-MM-DD'.
+
+    A cell that is already a date string comes back as its leading 'YYYY-MM-DD' (a time
+    component is dropped); anything else that is not a plain serial is returned unchanged.
+
+    Excel counts 1900-02-29 as day 60 although that day never existed (the Lotus 1-2-3
+    leap-year bug it inherited). From day 61 on, serial n is 1899-12-30 + n days; days 1-59
+    are 1899-12-31 + n days; day 60 has no real date and is returned unchanged.
+    """
+    from datetime import date, timedelta
+
+    text = str(value).strip() if value is not None else ""
+    if len(text) >= 10 and text[4:5] == "-" and text[7:8] == "-" and text[:4].isdigit():
+        return text[:10]
+    try:
+        n = float(text)
+    except ValueError:
+        return value
+    if n != n or n < 1 or n >= 2958466:  # NaN, before 1900-01-01, past 9999-12-31
+        return value
+    day = int(n)
+    if day == 60:
+        return value
+    epoch = date(1899, 12, 30) if day > 60 else date(1899, 12, 31)
+    return (epoch + timedelta(days=day)).isoformat()
+
+
+def _xlsx_col_index(ref):
+    """'C7' -> 2 (zero-based column index of a cell reference); None when no letters."""
+    n = 0
+    seen = False
+    for ch in ref:
+        if not ch.isalpha():
+            break
+        n = n * 26 + (ord(ch.upper()) - 64)
+        seen = True
+    return n - 1 if seen else None
+
+
+def _xlsx_read_rows(zf, sheet_path, shared_strings, ET, NS):
+    """Rows of one worksheet as lists of strings, cells placed by their `r=` reference so a
+    blank cell (which OOXML omits) cannot shift a value into its neighbour's column."""
+    with zf.open(sheet_path) as f:
+        tree = ET.parse(f)
+    rows_data = []
+    for row in tree.getroot().findall(".//x:row", NS):
+        row_cells = []
+        for cell in row.findall("x:c", NS):
+            cell_type = cell.get("t", "n")  # default 'n' for numeric
+            v_elem = cell.find("x:v", NS)
+            value = v_elem.text if v_elem is not None else ""
+            if cell_type == "s":
+                try:
+                    value = shared_strings[int(value)]
+                except (ValueError, IndexError):
+                    pass
+            elif cell_type == "inlineStr":
+                is_elem = cell.find("x:is/x:t", NS)
+                value = is_elem.text if is_elem is not None else ""
+            idx = _xlsx_col_index(cell.get("r", ""))
+            if idx is None:
+                idx = len(row_cells)
+            while len(row_cells) < idx:
+                row_cells.append("")
+            if idx < len(row_cells):
+                row_cells[idx] = value or ""
+            else:
+                row_cells.append(value or "")
+        rows_data.append(row_cells)
+    return rows_data
+
+
+def _xlsx_sheet_paths(zf, ET, NS):
+    """[(sheet name, part path)] in workbook order. Falls back to the sorted worksheet
+    parts, unnamed, when the workbook index is absent or unreadable."""
+    names = zf.namelist()
+    try:
+        with zf.open("xl/_rels/workbook.xml.rels") as f:
+            rel_targets = {r.get("Id"): r.get("Target", "") for r in ET.parse(f).getroot()}
+        with zf.open("xl/workbook.xml") as f:
+            sheet_elems = ET.parse(f).getroot().findall(".//x:sheets/x:sheet", NS)
+        out = []
+        for sh in sheet_elems:
+            target = rel_targets.get(sh.get("{%s}id" % _XLSX_NS_REL), "").lstrip("/")
+            path = target if target.startswith("xl/") else "xl/" + target
+            if path in names:
+                out.append((sh.get("name", ""), path))
+        if out:
+            return out
+    except (KeyError, ET.ParseError):
+        pass
+    parts = sorted(n for n in names if n.startswith("xl/worksheets/") and n.endswith(".xml"))
+    return [("", p) for p in parts]
+
+
+def _xlsx_join_sheets(sheets):
+    """Outer-join per-metric sheets on their Date column -> (header, rows), or None.
+
+    `sheets` is [(sheet name, rows)]. A sheet with no header row or no Date column is
+    skipped. Dates become ISO; a column name met in several sheets keeps the first
+    non-blank value per day. None when no sheet is joinable.
+    """
+    columns = ["Date"]
+    by_date = {}
+    joined_any = False
+    for name, rows in sheets:
+        if not rows:
+            continue
+        header = [str(h or "").strip() for h in rows[0]]
+        date_idx = next((i for i, h in enumerate(header) if h.lower() == "date"), None)
+        if date_idx is None:
+            logger.warning(f"  XLSX sheet {name!r} has no Date column — skipped")
+            continue
+        joined_any = True
+        value_idx = [i for i, h in enumerate(header) if h and i != date_idx]
+        rename = {}
+        wanted = _XLSX_SHEET_TO_COLUMN.get(name.strip().lower())
+        if wanted and len(value_idx) == 1 and header[value_idx[0]] not in _XLSX_KNOWN_HEADERS:
+            if "kg" not in header[value_idx[0]].lower():
+                rename[value_idx[0]] = wanted
+                logger.info(f"  XLSX sheet {name!r}: column {header[value_idx[0]]!r} -> {wanted!r}")
+        for i in value_idx:
+            col = rename.get(i, header[i])
+            if col not in columns:
+                columns.append(col)
+        for r in rows[1:]:
+            raw = r[date_idx] if date_idx < len(r) else ""
+            if not str(raw).strip():
+                continue
+            day = excel_serial_to_iso(raw)
+            if not isinstance(day, str):
+                continue
+            cell = by_date.setdefault(day, {})
+            for i in value_idx:
+                v = r[i] if i < len(r) else ""
+                col = rename.get(i, header[i])
+                if str(v).strip() and not str(cell.get(col, "")).strip():
+                    cell[col] = v
+    if not joined_any:
+        return None
+    return columns, [[d] + [by_date[d].get(c, "") for c in columns[1:]] for d in sorted(by_date)]
+
+
 def xlsx_to_csv(xlsx_bytes: bytes) -> bytes:
-    """Convert a single-sheet XLSX file to CSV using stdlib only.
+    """Convert a MacroFactor XLSX export to CSV using stdlib only.
 
     Reentry sweep (2026-05-03): MacroFactor exports XLSX by default; the rest of
     this pipeline expects CSV. Rather than ask the user to manually re-export,
     do the conversion in-Lambda. Implementation reads the XLSX as a zip and
     parses the OOXML SpreadsheetML directly — no openpyxl dependency.
 
-    Limitations: only the first worksheet, only string + numeric cells. Sufficient
-    for MacroFactor's tabular exports. If MacroFactor changes their export shape
-    we'll see a parse error and surface a real CSV re-export request as fallback.
+    One worksheet (the routine diary export): that sheet verbatim, as before.
+    Several worksheets (#5097, the Granular Export, one sheet per ticked metric): every
+    sheet is read, outer-joined on its Date column, Excel serial dates become ISO dates,
+    and ONE CSV is emitted — `Date` plus every metric column — so `detect_csv_type`
+    sees Expenditure + Date + Calories (kcal) and classifies it `daily_summary`.
+
+    Limitations: only string + numeric cells. If MacroFactor changes their export shape
+    we'll see a parse error / unknown-type archive and surface a re-export request.
     """
     import csv as _csv
     import xml.etree.ElementTree as ET
     import zipfile
     from io import BytesIO, StringIO
 
-    NS = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    NS = {"x": _XLSX_NS_MAIN}
 
     with zipfile.ZipFile(BytesIO(xlsx_bytes)) as zf:
         # Shared strings table
@@ -369,36 +545,18 @@ def xlsx_to_csv(xlsx_bytes: bytes) -> bytes:
             # No shared strings (rare)
             pass
 
-        # First sheet
-        sheet_name = "xl/worksheets/sheet1.xml"
-        if sheet_name not in zf.namelist():
-            # Try to find any worksheet
-            sheets = [n for n in zf.namelist() if n.startswith("xl/worksheets/") and n.endswith(".xml")]
-            if not sheets:
-                raise ValueError("XLSX has no worksheet")
-            sheet_name = sorted(sheets)[0]
+        sheet_paths = _xlsx_sheet_paths(zf, ET, NS)
+        if not sheet_paths:
+            raise ValueError("XLSX has no worksheet")
+        sheets = [(name, _xlsx_read_rows(zf, path, shared_strings, ET, NS)) for name, path in sheet_paths]
 
-        with zf.open(sheet_name) as f:
-            tree = ET.parse(f)
-
-        rows_data = []
-        for row in tree.getroot().findall(".//x:row", NS):
-            row_cells = []
-            for cell in row.findall("x:c", NS):
-                cell_type = cell.get("t", "n")  # default 'n' for numeric
-                v_elem = cell.find("x:v", NS)
-                value = v_elem.text if v_elem is not None else ""
-                if cell_type == "s":
-                    # Shared-string reference
-                    try:
-                        value = shared_strings[int(value)]
-                    except (ValueError, IndexError):
-                        pass
-                elif cell_type == "inlineStr":
-                    is_elem = cell.find("x:is/x:t", NS)
-                    value = is_elem.text if is_elem is not None else ""
-                row_cells.append(value or "")
-            rows_data.append(row_cells)
+    rows_data = sheets[0][1]
+    if len(sheets) > 1:
+        joined = _xlsx_join_sheets(sheets)
+        if joined is not None:
+            header, body = joined
+            rows_data = [header] + body
+            logger.info(f"  XLSX: joined {len(sheets)} sheets on Date -> {len(body)} days, columns={header}")
 
     # Write to CSV
     out = StringIO()
