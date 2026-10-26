@@ -361,7 +361,11 @@ _GAP_SINCE_DATE = re.compile(
 )
 # A window the sentence names for its protein figure, beyond "N logged days" (which the
 # shared extractor already returns as a `days_logged` claim).
-_NAMED_WINDOW = re.compile(r"\b(\d{1,2})[- ](?:calendar\s+)?days?\b|\b(?:this|past|last)\s+week\b|\b7-day\b", re.IGNORECASE)
+# #5413: "5-7 days after hitting N g" is a LAG after a future event, not an averaging window.
+_NAMED_WINDOW = re.compile(
+    r"\b(\d{1,2})[- ](?:calendar\s+)?days?\b(?!\s+(?:after|later|from\s+now)\b)|\b(?:this|past|last)\s+week\b|\b7-day\b",
+    re.IGNORECASE,
+)
 # #4343: the average refutes only a figure the sentence frames as his daily intake or an
 # average of it. "Morning smoothie delivers 15 g, protein shake adds 30 g", "redistribute
 # 40g of protein away from dinner" and "if protein reaches 190g next week" are a serving,
@@ -384,7 +388,12 @@ _TARGET_BEFORE = re.compile(
     # consistently and reach 170 grams of protein daily"). The ask/aim word is required: a bare
     # "(to) hit N" is also a past-tense report ("he managed to hit 190 grams"), which stays judged.
     r"|\b(?:ask\w*|aim\w*|want\w*|needs?|should|must|try\w*|push\w*|plan\w*|urg\w*|encourag\w*|told|tell\w*)"
-    r"(?:\s+(?!managed\b|able\b|did\b|finally\b)[\w']+){0,6}?(?:\s+(?:to|and|or))?\s+(?:reach|hit)\s+)"
+    r"(?:\s+(?!managed\b|able\b|did\b|finally\b)[\w']+){0,6}?(?:\s+(?:to|and|or))?\s+(?:reach|hit)\s+"
+    # #5413: a level named as a FUTURE MILESTONE is a goal too ("shift 5-7 days after hitting 190 g", "once he
+    # hits 190", "if we move to 190"). The gerund / present-tense forms only: "after he hit 190" and "he hit
+    # 190 yesterday" stay past-tense reports and stay judged.
+    r"|\b(?:after|once|until|before|upon|when)\s+(?:(?:he|she|we|you|they|it)\s+(?:hits|reaches)|hitting|reaching)\s+"
+    r"|\b(?:move|moves|moving)\s+to\s+)"
     r"(?:about\s+|around\s+|roughly\s+)?$",
     re.IGNORECASE,
 )

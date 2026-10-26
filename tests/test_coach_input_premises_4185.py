@@ -444,6 +444,31 @@ def test_4690_a_past_tense_hit_is_judged_and_an_ask_to_hit_is_a_goal():
     assert protein("The aim is to hit 190 grams of protein daily.") == []
 
 
+# #5413 (served-coach-facts #5411, 2026-W43 labs dispute): a protein level named as a FUTURE
+# MILESTONE, beside an "N days after" lag, was read as his intake over a 7-day window.
+W43_SHAPE = "Fasting glucose would shift 5-7 days after hitting 190 g of protein a day, not before."
+
+
+def test_5413_a_future_milestone_and_its_lag_are_not_an_intake_claim():
+    facts = _facts_4690()
+
+    def protein(s):
+        return [f["cited"] for f in ci.served_fact_findings(s, facts, today="2026-09-26") if f["metric"] == "protein_g"]
+
+    assert protein(W43_SHAPE) == []
+    assert protein("Glucose should settle once he hits 190 g of protein a day.") == []
+    assert protein("Nothing changes until reaching 190 g of protein daily.") == []
+    assert protein("If we move to 190 g of protein a day, expect a lag of 5 days after.") == []
+    assert protein("Before hitting 190 g of protein daily, hold the supplement.") == []
+    # the lag is not a window; a real window and a past-tense report are still judged
+    assert ci._named_windows("shift 5-7 days after hitting 190 g") == []
+    assert ci._named_windows("averaging 190 g across 7 days") == [7]
+    assert protein("He hit 190 grams of protein a day yesterday.") == [190.0]
+    assert protein("After he hit 190 grams of protein daily, glucose moved.") == [190.0]
+    assert protein("He is averaging 190 g of protein across 7 days.") == [190.0]
+    assert protein("He is averaging 190 g of protein across 7 days after the reset.") == [190.0]
+
+
 def test_mutation_control_without_the_target_frame_the_labs_coach_is_held(monkeypatch):
     monkeypatch.setattr(ci, "_target_framed", lambda _s, _v: False)
     facts = _facts("2026-09-25", "2026-09-26")
