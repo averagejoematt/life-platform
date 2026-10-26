@@ -448,6 +448,12 @@ CI_MIRROR_SITES: dict[str, dict[str, str]] = {
         "notes": "NIGHTLY names the wrap checks that run only as wrap-nightly.yml matrix legs (#4262); "
         "tests/test_advisory_failure_issue.py holds the list and the matrix equal in both directions",
     },
+    "scripts/check_staged_secrets.py": {
+        "clause": "C",
+        "claim": ".github/workflows/secret-scan.yml",
+        "notes": "the wrap's local run of CI's gitleaks scan over the diff the wrap commit is about to land (#5405); the version pin is READ from "
+        "secret-scan.yml, not restated, and an absent binary is a loud UNVERIFIED rather than a claimed parity",
+    },
     "deploy/README.md": {
         "clause": "C",
         "claim": ".github/workflows/site-deploy.yml",
@@ -608,7 +614,9 @@ CI_MIRROR_SITES: dict[str, dict[str, str]] = {
 # C 27 -> 28 (2026-10-11, #4634): scripts/raw_kms_readability_inventory.py names
 # raw-kms-readability.yml, the weekly workflow that runs its --check-against-record mode, by
 # path — registered, not reworded.
-MIRROR_CLAUSE_BASELINE_2026_09_19 = {"A": 3, "B": 4, "C": 28}
+# C 28 -> 29 (2026-10-26, #5405): scripts/check_staged_secrets.py is the wrap's local run of
+# secret-scan.yml's gitleaks scan and names it by path (and reads its version pin from it).
+MIRROR_CLAUSE_BASELINE_2026_09_19 = {"A": 3, "B": 4, "C": 29}
 
 
 def main() -> None:
