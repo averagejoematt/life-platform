@@ -34,7 +34,7 @@
 - **#5412** (sonnet, filed this wrap): one weekly analyzer run's Bedrock 503 burst lights `slo-ai-coaching-success` for a day, two Mondays running.
 - **#5413** (sonnet, filed this wrap): the served-fact gate reads a protein target named as a future milestone ("after hitting N", beside an N-day lag) as his intake. That is the one finding behind the auto-filed #5411 (`served-coach-facts` red since 17:48Z), which auto-closes on the next green run.
 - **Next build wave:** the Now board (13 opus-startable, 5 sonnet), coaching/routines/nutrition first, then #5220 #5221 #5211 #4517 #4250.
-- not-work — main red on e1b66eef3: the visual gate's Bedrock 503s (incident row). It clears on the next main run whose visual QA evaluates; this wrap's push is that run.
+- not-work — main red on e1b66eef3: the visual gate's Bedrock 503s (incident row). The wrap commit b0f9ceaf3's run 40380970969 is green, but it was docs-only, so Visual QA was skipped, not re-evaluated. The next code merge's run is the first to re-check it; re-run that gate once if Bedrock image calls are still 503ing.
 - not-work — `fix/walk-completeness` is a dirty pre-existing worktree, and `.claude/worktrees/agent-a42658e0db0d0302d` belongs to another session; both reported by the reaper and left untouched.
 
 ## For Matthew (the only things waiting on you)
