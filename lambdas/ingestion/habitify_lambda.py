@@ -336,7 +336,6 @@ def _corrects_a_completion(prev_status, cur: dict, date_str: str) -> bool:
 
 SUPPLEMENT_MAP = {
     # ── Morning batch (fasted) ──
-    "Probiotics": {"dose": 1, "unit": "capsule", "timing": "morning", "category": "supplement"},
     "L Glutamine": {"dose": 5, "unit": "g", "timing": "morning", "category": "supplement"},
     "Collagen": {"dose": 10, "unit": "g", "timing": "morning", "category": "supplement"},
     "Electrolytes": {"dose": 1, "unit": "packet", "timing": "morning", "category": "supplement"},
@@ -347,18 +346,13 @@ SUPPLEMENT_MAP = {
     "Zinc Picolinate": {"dose": 30, "unit": "mg", "timing": "with_meal", "category": "mineral"},
     "Basic B Complex": {"dose": 1, "unit": "capsule", "timing": "with_meal", "category": "vitamin"},
     "Creatine": {"dose": 5, "unit": "g", "timing": "with_meal", "category": "supplement"},
-    "Lions Mane": {"dose": 1000, "unit": "mg", "timing": "with_meal", "category": "supplement"},
-    "Green Tea Phytosome": {"dose": 500, "unit": "mg", "timing": "with_meal", "category": "supplement"},
     "NAC": {"dose": 600, "unit": "mg", "timing": "with_meal", "category": "supplement"},
-    "Cordyceps": {"dose": 1000, "unit": "mg", "timing": "with_meal", "category": "supplement"},
     "Inositol": {"dose": 2000, "unit": "mg", "timing": "with_meal", "category": "supplement"},
-    "Protein Supplement": {"dose": 25, "unit": "g", "timing": "with_meal", "category": "supplement"},
     # ── Evening batch (before bed — sleep stack) ──
     "Glycine": {"dose": 3, "unit": "g", "timing": "before_bed", "category": "supplement"},
     "L-Threonate": {"dose": 2000, "unit": "mg", "timing": "before_bed", "category": "supplement"},
     "Apigenin": {"dose": 50, "unit": "mg", "timing": "before_bed", "category": "supplement"},
     "Theanine": {"dose": 200, "unit": "mg", "timing": "before_bed", "category": "supplement"},
-    "Reishi": {"dose": 1000, "unit": "mg", "timing": "before_bed", "category": "supplement"},
 }
 
 
