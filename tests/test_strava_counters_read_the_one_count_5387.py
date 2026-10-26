@@ -67,6 +67,18 @@ SET = (
     "lambdas/training/training_load.py",
 )
 
+#: The follow-up's Set (#5398): six readers outside #5387's Set, now on THE count — module -> the `(package, name)`
+#: it imports to read it (the AI analyst reads it through its extracted `training_session_facts`, a module at its
+#: size ceiling). Each must trip nothing and may never rejoin the residual.
+READERS_5398: dict[str, tuple[str, str]] = {
+    "lambdas/intelligence/ai_expert_analyzer_lambda.py": ("intelligence", "training_session_facts"),
+    "lambdas/content/output_writers.py": ("training", "session_count"),
+    "lambdas/emails/chronicle_render.py": ("training", "session_count"),
+    "lambdas/compute/weekly_correlation_compute_lambda.py": ("compute", "training_mins_series"),
+    "mcp/tools_health.py": ("training", "session_count"),
+    "mcp/tools_training.py": ("training", "session_count"),
+}
+
 #: Modules the detector trips that are NOT the issue's Set — read by hand on this branch, each with its
 #: disposition. `not-a-count` = the shape is there but nothing is counted across a day's sources;
 #: `residual (follow-up)` = a real direct count the issue's grep missed, left for a carrier issue (the PR
@@ -89,13 +101,6 @@ RESIDUAL: dict[str, str] = {
     "lambdas/compute/dashboard_refresh_lambda.py": "not-a-count: the pre-seam dedupe's early return (len <= 1)",
     "lambdas/emails/daily_brief_signals.py": "not-a-count: the pre-seam dedupe (early return, richness score)",
     "lambdas/compute/episode_detect_lambda.py": "not-a-count: counts its own classified episodes by kind",
-    # residual: direct counters the issue's grep missed (follow-up named on the PR)
-    "lambdas/intelligence/ai_expert_analyzer_lambda.py": "residual (follow-up): strava_sessions = len(activities), total_active_min = hevy_min + strava_min",
-    "lambdas/content/output_writers.py": "residual (follow-up): total_sessions over 28 days of Strava activities, an average-HR Zone 2",
-    "lambdas/emails/chronicle_render.py": "residual (follow-up): training_sessions = len(the day's activities)",
-    "lambdas/compute/weekly_correlation_compute_lambda.py": "residual (follow-up): training_mins = the day's summed moving_time_seconds",
-    "mcp/tools_health.py": "residual (follow-up): a day's exercise minutes = summed moving_time_seconds",
-    "mcp/tools_training.py": "residual (follow-up): weekly sessions counted per Strava activity",
 }
 
 
@@ -218,12 +223,31 @@ def test_every_set_member_reads_the_one_count_and_trips_nothing():
         assert rel not in swept_hits, f"{rel}: {swept_hits.get(rel)}"
 
 
+def test_the_six_follow_up_readers_read_the_one_count_and_trip_nothing():
+    """#5398: the six residual `follow-up` entries were taken off the map; each now trips nothing and imports the
+    count (directly or through its extracted helper, which itself imports `training.session_count`)."""
+    swept_hits = dict(_swept()[1])
+    assert len(READERS_5398) == 6
+    for rel, (pkg, name) in READERS_5398.items():
+        assert rel not in RESIDUAL, rel
+        with open(os.path.join(ROOT, rel), encoding="utf-8") as fh:
+            tree = ast.parse(fh.read())
+        imports = {a.name for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module == pkg for a in n.names}
+        assert name in imports, f"{rel}: does not import {pkg}.{name}"
+        assert rel not in swept_hits, f"{rel}: {swept_hits.get(rel)}"
+        helper = os.path.join(ROOT, "lambdas", pkg, name + ".py")
+        if pkg != "training":
+            with open(helper, encoding="utf-8") as fh:
+                assert "session_count" in fh.read(), f"{helper} does not read training.session_count"
+
+
 def test_the_residual_is_a_ratchet():
     """Every residual entry still trips the detector (prune it the day it stops) and names its disposition."""
     tripped = {rel for rel, _ in _swept()[1]}
     stale = sorted(rel for rel in RESIDUAL if rel not in tripped)
     assert not stale, f"residual entries whose module no longer counts on its own — delete them: {stale}"
     assert all(r.split(":", 1)[0] in ("not-a-count", "residual (follow-up)") for r in RESIDUAL.values())
+    assert not [r for r, why in RESIDUAL.items() if why.startswith("residual")], "#5398 retired the six follow-up entries"
 
 
 def test_every_shape_is_caught_and_a_write_is_not():
@@ -256,4 +280,4 @@ def test_every_shape_is_caught_and_a_write_is_not():
 def test_the_population_is_live():
     """Not vacuous: the sweep finds the residual's real hits (a vocabulary rename would empty it)."""
     _, found = _swept()
-    assert len(found) >= len([r for r in RESIDUAL.values() if r.startswith("residual")]), found
+    assert len(found) >= len(RESIDUAL), found

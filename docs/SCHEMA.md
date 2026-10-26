@@ -2282,6 +2282,7 @@ Pearson correlations between 20 key metric pairs computed weekly over a 90-day r
 | `n_pairs` | number | Number of correlation pairs computed |
 | `correlations` | map | Per-pair results (see below) |
 | `computed_at` | string | ISO timestamp |
+| `series_amendments` | list | Dated changes of a metric's definition (ADR-105, #5398): `training_mins` is the summed Strava activity times before `effective_from` and THE session count's minutes (a gym visit once) from it. Each entry: `amendment_id`, `effective_from`, `metrics`, `pairs`, `issue`, `change`. A window spanning the date mixes the two definitions |
 
 **`correlations` sub-fields** (per pair, e.g. `correlations.hrv_vs_recovery`):
 

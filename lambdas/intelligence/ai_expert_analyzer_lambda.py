@@ -244,6 +244,7 @@ from experiment.phase_filter import singleton_visible  # hoisted from two functi
 
 from intelligence import (
     held_record_ttl as _held,  # #4703: a HOLD renews the prior record's ttl
+    training_session_facts,  # #5398: THE session count over the 30-day read (module at its size ceiling)
     weight_recency,
 )
 
@@ -401,8 +402,9 @@ def gather_data_for_expert(expert_key):
         hevy_sets = sum(int(float(h.get("set_count") or 0)) for h in hevy_items)
         hevy_min = round(sum(float(h.get("duration_sec") or 0) / 60 for h in hevy_items))
 
-        # Strava (aerobic/NEAT) — secondary; only counted when live.
-        strava_min = sum(float(a.get("moving_time_seconds") or a.get("elapsed_time_seconds") or 0) / 60 for a in activities)
+        # Strava (aerobic/NEAT) — secondary; only counted when live. #5398: THE session count (training.session_count) —
+        # Hevy's whole-session push and the ride inside it are ONE visit, its minutes claimed once.
+        _sc = training_session_facts.session_facts(activities, hevy_items)
         strava_dates = set(a.get("sk", "")[:15].replace("DATE#", "") for a in activities if a.get("sk"))
         recovery_vals = [float(w["recovery_score"]) for w in whoop_items if w.get("recovery_score")]
         avg_recovery = round(sum(recovery_vals) / len(recovery_vals), 1) if recovery_vals else None
@@ -410,9 +412,8 @@ def gather_data_for_expert(expert_key):
         modalities = {}
         if hevy_sessions:
             modalities["strength"] = hevy_sessions
-        for a in activities:
-            t = a.get("type", "unknown")
-            modalities[t] = modalities.get(t, 0) + 1
+        for t, n in _sc["other_parts"].items():
+            modalities[t] = modalities.get(t, 0) + n
 
         # A training day = a day with ANY logged workout (Hevy OR Strava).
         training_dates = hevy_dates | strava_dates
@@ -446,9 +447,9 @@ def gather_data_for_expert(expert_key):
             "hevy_sessions": hevy_sessions,
             "hevy_sets": hevy_sets,
             "hevy_active_min": hevy_min,
-            "strava_sessions": len(activities),
-            "strava_active_min": round(strava_min),
-            "total_active_min": round(hevy_min + strava_min),
+            "strava_sessions": _sc["outside_sessions"],
+            "strava_active_min": round(_sc["outside_min"]),
+            "total_active_min": round(_sc["minutes"]),
             "avg_daily_steps": avg_steps,
             "step_source": step_source,
             "step_completeness_pct": step_completeness_pct,
