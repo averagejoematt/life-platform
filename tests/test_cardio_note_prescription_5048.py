@@ -98,7 +98,9 @@ def test_the_rewritten_2026_10_18_note_is_two_lines_with_the_prescription_first(
     assert reader_offences(note) == [], note
     line1, line2 = note.split("\n")
     # #5076: the dose (level + his speed at it) and the menu's RPE band + talk test; his "flat" stands as easy
-    assert line1 == "Recumbent bike · 20 min · level 11 at 13.4 mph flat · RPE 4–5, full sentences"
+    assert (
+        line1 == "Recumbent bike · 20 min · level 11 at 13.4 mph flat · level 11 for 20 · check in every 10 min · RPE 4–5, full sentences"
+    )  # #5374: the clock rule
     assert cn.LINE1_RE.match(line1)
     # the recovery question, answered under the constraint's HR half: by feel, no HR number at all.
     # The "no push" half is retired from 2026-10-18 (owner ruling 7), so it is not on this day's note.
@@ -183,7 +185,10 @@ def test_every_number_the_note_acts_on_is_labelled():
 # ── box 3: the default is easy; the harder kinds are the menu's placement (#5076) ─────────
 def test_the_default_kind_is_easy_flat_and_the_treadmills_is_the_incline_walk():
     assert cn.compose(movement_key="cycling", minutes=20, target_date="2026-09-30")[1]["kind"] == "easy"
-    assert _flat().split("\n")[0] == "Recumbent bike · 20 min · level 11 flat · RPE 4–5, full sentences"
+    assert (
+        _flat().split("\n")[0]
+        == "Recumbent bike · 20 min · level 11 flat · level 11 for 20 · check in every 10 min · RPE 4–5, full sentences"
+    )
     assert cn.compose(movement_key="treadmill", minutes=30, target_date="2026-09-30")[1]["kind"] == "incline_treadmill_walk"
 
 

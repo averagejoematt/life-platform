@@ -20,6 +20,10 @@ THE READS (the sanctioned ones, each failure named and turned into `insufficient
              (a trend across a maintenance date is not acted on), and, for a dated maintenance window whose
              last day has passed inside the grading horizon, the Withings weigh-ins around it for the grade.
 
+BAND DESCRIPTION (#5099): after a `written` outcome whose band differs from the previous stored week's, the leg
+rewrites the Habitify calorie-band habit's description through `health.band_description` (vendor id from the registry's
+`calories_in_band` core flag; fail-soft, logged as one line; the record is already on file whatever it returns).
+
 DRY RUN (the post-deploy proof, no write): from a checkout with read-only AWS credentials,
   python3 -c "import sys; sys.path[:0]=['lambdas','.']; import json; from mcp import titration_leg as t; print(json.dumps(t.run(dry_run=True), indent=1, default=str))"
 prints the decision the coming week would get, whatever the weekday. Logs keys, actions and codes only. The
@@ -173,7 +177,8 @@ def run(today: Optional[str] = None, *, dry_run: bool = False) -> Dict[str, Any]
         return {"outcome": "not_decision_day", "today": today}
     if history_has(core.table, titration.target_week(today)) and not dry_run:
         return {"outcome": "exists", "week": titration.target_week(today)}
-    decision = titration.decide(**gather(today))
+    inputs = gather(today)
+    decision = titration.decide(**inputs)
     out = {
         "week": decision["week"],
         "action": decision["action"],
@@ -183,6 +188,8 @@ def run(today: Optional[str] = None, *, dry_run: bool = False) -> Dict[str, Any]
     if dry_run:
         return {"outcome": "dry_run", **out, "decision": decision}
     out["outcome"] = titration.write_decision(core.table, decision, today)
+    if out["outcome"] == "written":
+        out["band_description"] = _sync_band_description((inputs.get("history") or [None])[0], decision)
     logger.info(
         "%s week=%s action=%s step=%s code=%s",
         titration.DECISION_LOG_MARK,
@@ -192,6 +199,19 @@ def run(today: Optional[str] = None, *, dry_run: bool = False) -> Dict[str, Any]
         out["reason_code"],
     )
     return out
+
+
+def _sync_band_description(previous: Optional[Dict[str, Any]], decision: Dict[str, Any]) -> str:
+    """#5099: rewrite the Habitify calorie-band habit's description when the band moved. Never raises."""
+    try:
+        from health import band_description
+
+        from mcp import core
+
+        return band_description.sync(previous, decision, (core.get_profile() or {}).get("habit_registry") or {})
+    except Exception as e:  # noqa: BLE001 — the record is already written; this is a courtesy to the app
+        logger.warning("[titration] band description sync failed (%s)", type(e).__name__)
+        return "failed"
 
 
 def history_has(table: Any, week: str) -> bool:

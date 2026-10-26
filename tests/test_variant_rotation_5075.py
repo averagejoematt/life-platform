@@ -112,10 +112,10 @@ def test_anchors_and_the_owners_pins_never_rotate():
         for r in ROLES:
             rx = _rx(r, plan["variants_by_role"].get(r))
             assert [(e["movement_key"], len(e["sets"])) for e in rx["exposures"] if e["kind"] == "anchor"] == template[r], (week, r)
-        assert plan["variants_by_role"]["shoulders_arms"]["farmers_carry"] == "farmers_carry"
+        assert plan["variants_by_role"]["shoulders_arms"]["farmers_walk"] == "farmers_walk"
         uv = _rx("upper_volume", plan["variants_by_role"]["upper_volume"])
         assert next(e for e in uv["exposures"] if e.get("pattern") == "bench")["movement_key"] == "incline_db_press"
-    assert set(vr.PINNED_ANCHORS) == {"upper_volume.bench"} and "farmers_carry" in next(iter(vr.PINNED_SLOTS))
+    assert set(vr.PINNED_ANCHORS) == {"upper_volume.bench"} and "farmers_walk" in next(iter(vr.PINNED_SLOTS))
 
 
 def test_the_weekly_75_sets_and_every_floor_and_band_hold_across_every_rotation():
@@ -164,7 +164,7 @@ def test_the_rationale_names_the_rotation_and_the_week_of_the_block():
     assert "this is week 4" in first and "[upper_heavy.db_lateral_raise, computed]" in first
     assert vr.plan(_entry(1), CATALOG)["rationale"][0].startswith("template: Lateral Raise (Dumbbell), week 1 of block 1")
     sa = vr.plan(_entry(4, "shoulders_arms"), CATALOG)
-    assert any(line.startswith("pinned: Farmers Carry") for line in sa["rationale"])
+    assert any(line.startswith("pinned: Farmers Walk") for line in sa["rationale"])
 
 
 # ── the ledger ───────────────────────────────────────────────────────────────

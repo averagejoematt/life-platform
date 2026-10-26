@@ -55,14 +55,14 @@ FLOOR_MOVEMENTS: dict[str, tuple[str, ...]] = {
     ),
     # #5318 (owner ruling B3, 2026-10-24): the farmer's carry replaced the shrug on shoulders+arms — "it covers traps (the
     # shrug's job), adds grip and core" — so it counts toward the trap floor AND the core floor (and the forearms, below)
-    "traps": ("shrug_dumbbell", "shrug_barbell", "seated_shrugs", "farmers_carry"),
+    "traps": ("shrug_dumbbell", "shrug_barbell", "seated_shrugs", "farmers_walk"),
     "calves": ("calf_raise_machine",),
-    "core": ("machine_crunch", "cable_pallof_press", "pallof_press", "farmers_carry"),
+    "core": ("machine_crunch", "cable_pallof_press", "pallof_press", "farmers_walk"),
 }
 TRAP_MOVEMENTS = FLOOR_MOVEMENTS["traps"]
-# #5318: the loaded carries. Hevy files the 'Farmers Carry' template under `other`, so its catalog muscle credits nothing; its
+# #5318/#5372: the loaded carries. Hevy files the 'Farmers Walk' template under `other`, so its catalog muscle credits nothing; its
 # sets are credited to the core (`abs`, the core floor's landmark key) and the forearms (grip) by movement, beside it.
-CARRY_MOVEMENTS: tuple[str, ...] = ("farmers_carry",)
+CARRY_MOVEMENTS: tuple[str, ...] = ("farmers_walk",)
 CARRY_CREDITS: tuple[str, ...] = ("abs", "forearms")
 # The movements that COUNT toward the two movement-specific charter bands that are not floors.
 #   upper_chest — incline presses and incline flyes only. A flat bench press or a flat/neutral fly is catalog 'chest' but

@@ -162,7 +162,7 @@ def attach_cardio_cues(
         tid = _tid(key)
         sessions = (cardio_index or {}).get(tid or "") or []
         facts = cardio_facts(tid, cardio_index, whoop_index) if sessions else {}
-        verdict = level_verdict(facts.get("series"), facts.get("last_level")) if sessions else None
+        verdict = level_verdict(facts.get("series"), facts.get("last_level"), facts.get("shaped")) if sessions else None
         minutes = round(sum(int(getattr(s, "duration_seconds", 0) or 0) for s in ex.sets) / 60)
         tag = str(getattr(ex, "rationale_tag", "") or "").split(":")
         existing = (getattr(ex, "notes", "") or "").strip()
