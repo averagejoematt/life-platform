@@ -39,7 +39,7 @@ LINE_MARKER = "# session-count:"
 
 #: The writers (`lambdas/ingestion/*`) and the shared rules every reader calls.
 EXEMPT_PREFIXES = ("lambdas/ingestion/",)
-SHARED_RULES = frozenset(
+SHARED_RULE_MODULES = frozenset(
     {
         "lambdas/common/strava_read_seam.py",  # the multi-device fold, which restates the day totals it dedupes
         "lambdas/training/workout_identity.py",  # the cross-source resolver
@@ -186,7 +186,7 @@ def _swept() -> tuple[int, tuple[tuple[str, tuple[str, ...]], ...]]:
                 full = os.path.join(dirpath, name)
                 rel = os.path.relpath(full, ROOT).replace(os.sep, "/")
                 swept += 1
-                if rel.startswith(EXEMPT_PREFIXES) or rel in SHARED_RULES:
+                if rel.startswith(EXEMPT_PREFIXES) or rel in SHARED_RULE_MODULES:
                     continue
                 with open(full, encoding="utf-8") as fh:
                     text = fh.read()
@@ -210,7 +210,7 @@ def test_no_module_counts_strava_activities_on_its_own():
 def test_every_set_member_reads_the_one_count_and_trips_nothing():
     swept_hits = dict(_swept()[1])
     for rel in SET:
-        assert rel not in RESIDUAL and rel not in SHARED_RULES, rel
+        assert rel not in RESIDUAL and rel not in SHARED_RULE_MODULES, rel
         with open(os.path.join(ROOT, rel), encoding="utf-8") as fh:
             tree = ast.parse(fh.read())
         imports = {a.name for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module == "training" for a in n.names}
