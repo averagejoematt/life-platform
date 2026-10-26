@@ -122,6 +122,7 @@ from typing import Any
 from common.repo_config import config_dir
 from training import effort_ceilings
 from training.intensity_prescription import grade_sets, resolve_ceiling
+from training.movement_catalog import canonical_key
 from training.program_structure import classify_movement
 from training.routine_ir import RoutineSpec
 
@@ -202,6 +203,7 @@ def _ir_movement_to_template(catalog: dict[str, Any], movement_key: str, cache: 
     movements). (3) resolved template cache for title-resolved movements (no hint on purpose)."""
     if movement_key and movement_key.startswith("tmpl:"):
         return movement_key[len("tmpl:") :]
+    movement_key = canonical_key(movement_key)  # #5372: a stored IR still naming a retired key reads as the key it folded into
     hint = catalog.get("movements", {}).get(movement_key, {}).get("hevy_template_id_hint")
     if hint:
         return hint
@@ -254,6 +256,7 @@ def _catalog_entry_for(movement_key: str, catalog: dict[str, Any]) -> dict[str, 
     therefore missed 7 of 9 movements on the 09-22 legs session — no default ceiling, and
     `per_muscle: {unknown: 100}`. Case-insensitive: Hevy ids appear in both cases."""
     movements = catalog.get("movements", {}) or {}
+    movement_key = canonical_key(movement_key)  # #5372: a retired key reads as the key it folded into
     entry = movements.get(movement_key)
     if entry or not (movement_key or "").startswith("tmpl:"):
         return entry or {}

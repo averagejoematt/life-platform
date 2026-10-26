@@ -176,6 +176,16 @@ RETIREMENTS = {
         "status": "planned",
         "record": "#5103 acceptance: 'The two 1500-prompted emails are retired or rewired'.",
     },
+    "farmers-carry-programmed-key": {
+        "what": "`farmers_carry` as a separate programmed catalog key (`config/movement_catalog.json`) — the custom Hevy 'Farmers Carry' "
+        "template (ce871c4e…) the B3 ruling programmed and the owner never logged. Folds into `farmers_walk` (Hevy's standard "
+        "'Farmers Walk', 50C613D0, the template he logs); `training.movement_catalog.RETIRED_KEYS` keeps a stored routine that still "
+        "names the old key readable. The custom template stays on his Hevy account (the platform never deletes templates).",
+        "story": 5372,
+        "status": "planned",
+        "record": "#5372 `## Retires`: '`farmers_carry` as a separate programmed key ... Folds into `farmers_walk`; the custom Hevy "
+        "template is left alone on the owner's account.' Flip to `retired` with the merged PR and its merge date.",
+    },
     # ── kept, with the reason (acceptance box 4: the legacy routine generator) ──
     "program-v04-revert-generator": {
         "what": "the frozen v0.4 plan (`lambdas/training/program_v04.py`, `program_v04.build_session` as the "

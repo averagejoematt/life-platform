@@ -21,6 +21,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from common.pacific_time import pacific_now, pacific_weekday  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from training.carry_line import carry_line  # #5372: a carry's own line — load and steps, outside the rep tonnage
 from training.legacy_workouts import LEGACY_WORKOUTS_PARTITION, day_workouts  # #4636: the ONE retired-shape reader
 
 from mcp.core import query_source_range
@@ -152,6 +153,14 @@ def _slim_workout(item: dict, include_sets: bool = False) -> dict:
     }
     if include_sets:
         out["exercises"] = item.get("exercises", [])
+        # #5372: a carry (the farmers walk) is reported on its own line — load as logged and the step count from the distance
+        # field — and stays out of `total_volume_kg` (weight x reps; a carry has no reps). Never weight x distance.
+        carries = []
+        for ex in item.get("exercises") or []:
+            line = carry_line(ex.get("name") or ex.get("title") or "", ex.get("sets"))
+            if line:
+                carries.append({"name": ex.get("name") or ex.get("title"), "template_id": ex.get("template_id"), **line})
+        out["carries"] = carries
         out["description"] = item.get("description", "")
         out["raw_ref"] = item.get("raw_ref")
     return out

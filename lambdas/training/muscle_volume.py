@@ -304,7 +304,7 @@ def normalize_hevy_items(hevy_items: list) -> list[dict]:
     new-shape workout was invisible to the read tools.
     """
 
-    def _set(s: dict) -> dict:
+    def _set(s: dict, carry: bool = False) -> dict:
         w_kg = s.get("weight_kg")
         w_lbs = s.get("weight_lbs")
         if w_kg is not None and w_lbs is None:
@@ -326,17 +326,32 @@ def normalize_hevy_items(hevy_items: list) -> list[dict]:
         # (None, never 0): most of the 2024 corpus predates RPE logging (ADR-104).
         rpe = s.get("rpe")
         out["rpe"] = float(rpe) if rpe not in (None, "") else None
+        # #5372: a distance or timed set kept its distance and time on the wire and lost both here — the coach packet's session rows
+        # (this normalizer's reader) showed the farmers walk as `reps 0` with nothing else, and the chat reported no distance.
+        # Additive, only when present. On a carry the distance field is his STEP COUNT (owner, 2026-10-25), so it is named
+        # `steps` there and never `distance_m`: the reader must not call a step count metres.
+        dist = s.get("distance_m") if s.get("distance_m") is not None else s.get("distance_meters")
+        if dist not in (None, "", 0):
+            out["steps" if carry else "distance_m"] = float(dist)
+        dur = s.get("duration_sec") if s.get("duration_sec") is not None else s.get("duration_seconds")
+        if dur not in (None, "", 0):
+            out["duration_sec"] = float(dur)
         return out
 
     def _exercise(ex: dict) -> dict:
+        from training.carry_line import carry_line
+
+        name = ex.get("name") or ex.get("exercise_name") or ""
+        line = carry_line(name, ex.get("sets"))  # #5372: a carry's own line — load and steps, outside the rep tonnage
         return {
-            "name": ex.get("name") or ex.get("exercise_name") or "",
+            **({"carry": line} if line else {}),
+            "name": name,
             # #3766: the stable Hevy template id and the freeform note, both additive. The
             # id is what lets a caller ask by template rather than by a fuzzy name; the note
             # is the raw text the derived signal layer is built FROM, and stays sovereign.
             "template_id": str(ex.get("template_id") or ""),
             "notes": (ex.get("notes") or "").strip(),
-            "sets": [_set(s) for s in (ex.get("sets") or [])],
+            "sets": [_set(s, carry=bool(line)) for s in (ex.get("sets") or [])],
         }
 
     out = []

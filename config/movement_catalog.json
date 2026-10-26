@@ -9,12 +9,12 @@
     "history_through": "2026-10-18",
     "workouts": 518,
     "distinct_templates": 538,
-    "entries": 544,
+    "entries": 543,
     "reviewed": 26,
-    "coach_added": 3,
+    "coach_added": 2,
     "generated": 515,
     "entries_by_skill_tier": {
-      "1": 279,
+      "1": 278,
       "2": 197,
       "3": 68
     },
@@ -13124,27 +13124,6 @@
       "last_done": null,
       "anchor_family": null,
       "notes": "coach_added for the #5088 bodyweight travel variants (owner ruling 2026-10-18); template id from the Hevy template index built 2026-10-18"
-    },
-    "farmers_carry": {
-      "title": "Farmers Carry",
-      "hevy_template_id_hint": "ce871c4e-6071-4523-bc2a-333e29f58114",
-      "primary_muscle": "other",
-      "secondary_muscles": [],
-      "volume_muscle": null,
-      "hevy_primary_muscle_group": "other",
-      "hevy_type": "weight_duration",
-      "is_custom": true,
-      "skill_tier": 1,
-      "skill_tier_source": "hevy_equipment:none",
-      "joint_friendly_score": 1,
-      "equipment": "none",
-      "provenance": "coach_added",
-      "reviewed": false,
-      "sessions": 0,
-      "first_done": null,
-      "last_done": null,
-      "anchor_family": null,
-      "notes": "coach_added for the shoulders+arms farmer's carry (owner ruling B3 2026-10-24, #5318: 'Replace the 2 DB shrug sets on shoulders_arms with 2 sets of farmer's carry' — Hevy's existing template, never created). The template already existed on his Hevy account: exact title 'Farmers Carry' in the Hevy template index built 2026-10-24T13:40Z (822 templates), id read back by GET /v1/exercise_templates (type weight_duration, equipment none, custom). Never logged, so no load history: the first exposure's load is his pick, logged, and the engine anchors from that log, never from the shrug."
     }
   }
 }
