@@ -94,7 +94,11 @@ def _trailing_volumes(data: Mapping[str, list], dates: list[str]) -> dict[str, d
     fetched window (a partial week is not a 7-day volume, so it stays absent — ADR-104)."""
     if not dates:
         return {}
-    sessions = z2.counted_sessions(strava_read_seam("strava", data.get("strava") or []), data.get("whoop") or [], data.get(_APPLE) or [])
+    # #5369: Hevy anchors a gym visit's parts when the caller fetched it (the hypothesis engine's
+    # input manifest does not list hevy today, so the wearables resolve among themselves).
+    sessions = z2.counted_sessions(
+        strava_read_seam("strava", data.get("strava") or []), data.get("whoop") or [], data.get(_APPLE) or [], hevy_rows=data.get("hevy")
+    )
     first = dates[0]
     out: dict[str, dict[str, float]] = {}
     for d in dates:

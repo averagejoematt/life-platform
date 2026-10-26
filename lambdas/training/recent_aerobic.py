@@ -30,6 +30,13 @@ A total cannot say "yesterday was 2¾ hours on foot". This block can:
 The OD2 heart-rate line (owner 2026-09-30): `hr_ceiling_bpm` is the cap on a walk's AVERAGE (120,
 with the talk test) and `hr_target_bpm` the aim (105) — `avg_hr_over_ceiling` flags the cap only.
 
+THE WATCH BACKSTOP (#5369/#5371): from 2026-10-26 WHOOP no longer shares to Strava and the watch
+uploads its own workouts. A caller may hand in the apple_health day rows (`apple_items`); the watch's
+own walks and rides (`walking_volume.apple_sessions`) join LAST in the same time de-dup — Hevy, then
+Strava, then Apple (`walking_volume.dedup_sources`) — so a walk only the watch recorded is a row and a
+walk it also uploaded is one row. An Apple row carries the modality, minutes and start only: its
+heart rate, distance and device stay in the owner-only map (the walk's HR flag reads unknown).
+
 It is PURE: the partitions are read by `mcp.shared_quantities.recent_aerobic_layer`, the one
 module that owns the walking definition, and handed in. `None` for a source means it could not
 be read — never zero hours.
@@ -44,7 +51,7 @@ from common.pacific_time import pacific_weekday, parse_day_key, shift_day_key
 
 from training import cardio_hr, owner_redlines, walking_volume
 
-RECENT_AEROBIC_VERSION = "recent-aerobic@1.0.0"
+RECENT_AEROBIC_VERSION = "recent-aerobic@1.1.0"  # 1.1.0 (#5369): the watch's own walks/rides as a third source
 
 RECENT_DAYS = 3  # the rows: target − 3 .. target − 1 (tonight's plan sees today)
 READ_DAYS = 14  # the partition read: covers the prior Mon–Sun week and the trailing-7 comparison
@@ -130,6 +137,27 @@ def _strava_rows(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return rows
 
 
+def _apple_rows(items: Any, start: str, end: str) -> list[dict[str, Any]]:
+    """The watch's own counted walks/rides over [start, end] (Pacific) as block rows — minutes and
+    start only; HR, distance and elevation unknown (owner-only, #5369)."""
+    counted, _skipped = walking_volume.apple_sessions(items or [], start, end)
+    rows: list[dict[str, Any]] = []
+    for c in counted:
+        indoor = "indoor" in str(c.get("label") or "").lower()
+        rows.append(
+            {
+                **c,
+                "modality": "cycling" if c["modality"] == "cycling" else ("treadmill" if indoor else "walk"),
+                "seconds_as_recorded": c["seconds"],
+                "distance_mi": None,
+                "elevation_ft": None,
+                "avg_hr": None,
+                "max_hr": None,
+            }
+        )
+    return rows
+
+
 def _block_hr(w: dict[str, Any], idx: int, activities: list[dict[str, Any]]) -> dict[str, Any] | None:
     """The block's OWN heart rate (#4412): the stored `cardio_hr` join when it is joined, else the same
     pure join over the Strava activities in hand (the stored copy may predate the wearable's arrival)."""
@@ -201,13 +229,25 @@ def gym_windows(workouts: list[dict[str, Any]] | None) -> list[tuple[Any, Any]]:
     return out
 
 
-def standalone_walks(strava_raw: list[dict[str, Any]], workouts: list[dict[str, Any]] | None, start: str, end: str) -> dict[str, Any]:
-    """The OD7 walk count over [start, end]: Strava walks whose de-duplicated minutes OUTSIDE every gym
-    window reach the redline's `min_minutes`. Pure. The time rule is `walking_volume.dedup_strava`'s,
-    with every Hevy session claiming its interval first — so a WHOOP + Garmin pair of one walk counts
-    once, and a walk inside a session counts only its minutes outside it."""
+def standalone_walks(
+    strava_raw: list[dict[str, Any]],
+    workouts: list[dict[str, Any]] | None,
+    start: str,
+    end: str,
+    apple_raw: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """The OD7 walk count over [start, end]: Strava walks — and, wired, the watch's own walks (#5369),
+    last — whose de-duplicated minutes OUTSIDE every gym window reach the redline's `min_minutes`.
+    Pure. The time rule is `walking_volume.dedup_strava`'s, with every Hevy session claiming its
+    interval first — so a WHOOP + Garmin pair of one walk counts once, a walk the watch also uploaded
+    counts once, and a walk inside a session counts only its minutes outside it."""
     walks = [r for r in strava_raw if r["modality"] == "walk" and start <= r["date"] <= end]
-    kept, _ = walking_volume.dedup_strava(walks, gym_windows(workouts))
+    if apple_raw is None:
+        kept, _ = walking_volume.dedup_strava(walks, gym_windows(workouts))
+    else:
+        a_walks = [r for r in apple_raw if r["modality"] in WEIGHT_BEARING and start <= r["date"] <= end]
+        s_kept, a_kept, _ = walking_volume.dedup_sources(walks, a_walks, gym_windows(workouts))
+        kept = s_kept + a_kept
     min_s = float(_STANDALONE["min_minutes"]) * 60.0
     timed = [r for r in kept if r.get("start") is not None and r.get("end") is not None]
     counted = sorted((r for r in timed if r["seconds"] >= min_s), key=lambda r: r["start"])
@@ -281,20 +321,33 @@ def build(
     today: str,
     strava_items: list[dict[str, Any]] | None,
     hevy_workouts: list[dict[str, Any]] | None,
+    apple_items: Any = walking_volume.NOT_WIRED,
 ) -> dict[str, Any]:
     """The `constraint_block.recent_aerobic` block for a plan on `target_date`. Pure.
 
     `today` is the Pacific day the plan is made: when it is target − 1 (the nightly pre-draft,
-    the evening chat) today's activities are IN, and the block says the day is still in progress."""
+    the evening chat) today's activities are IN, and the block says the day is still in progress.
+    `apple_items` (#5369): the apple_health day rows over the read (one UTC day past it); a failed
+    Apple read (None) makes the totals a floor, as any unreadable source does."""
     w = window(target_date)
     end = w["end"]
+    wired = apple_items is not walking_volume.NOT_WIRED
     s_raw = _strava_rows(strava_items or [])
+    a_raw = _apple_rows(apple_items, w["start"], end) if wired else None
     h_rows = _hevy_rows(hevy_workouts or [], strava_items or [])
-    s_kept, dedup = walking_volume.dedup_strava(s_raw, walking_volume.hevy_cardio_intervals(hevy_workouts or []))
-    for r in s_kept:  # dedup_strava copies each row it keeps, with `seconds` cut to the unclaimed part
+    hevy_iv = walking_volume.hevy_cardio_intervals(hevy_workouts or [])
+    if a_raw is None:
+        s_kept, dedup = walking_volume.dedup_strava(s_raw, hevy_iv)
+        a_kept: list[dict[str, Any]] = []
+    else:
+        s_kept, a_kept, dedup = walking_volume.dedup_sources(s_raw, a_raw, hevy_iv)
+    for r in s_kept + a_kept:  # the de-dup copies each row it keeps, with `seconds` cut to the unclaimed part
         r["seconds_removed"] = max(0.0, r["seconds_as_recorded"] - r["seconds"])
-    rows = sorted((_public_row(r) for r in s_kept + h_rows), key=lambda r: (r["date"], r["start_utc"] or ""))
-    unreadable = [n for n, v in (("strava", strava_items), ("hevy", hevy_workouts)) if v is None]
+    rows = sorted((_public_row(r) for r in s_kept + a_kept + h_rows), key=lambda r: (r["date"], r["start_utc"] or ""))
+    sources: tuple[tuple[str, Any], ...] = (("strava", strava_items), ("hevy", hevy_workouts))
+    if wired:
+        sources += (("apple_health", apple_items),)
+    unreadable = [n for n, v in sources if v is None]
     wtd_start = _monday(end)
     prior_start, prior_end = shift_day_key(wtd_start, -7), shift_day_key(wtd_start, -1)
     wtd = _sum_hr(rows, wtd_start, end)
@@ -315,7 +368,7 @@ def build(
     return {
         "layer": "recent_aerobic",
         "version": RECENT_AEROBIC_VERSION,
-        "state": "read_failed" if len(unreadable) == 2 else "read",
+        "state": "read_failed" if strava_items is None and hevy_workouts is None else "read",
         "window": {"start": w["recent_start"], "end": end, "days": RECENT_DAYS, "end_in_progress": in_progress},
         "rows": recent,
         "totals": {
@@ -339,9 +392,12 @@ def build(
             "standalone_walks": {
                 "min_per_wk": int(_STANDALONE["min_per_wk"]),
                 "min_minutes": int(_STANDALONE["min_minutes"]),
-                "rule": "a Strava walk whose de-duplicated minutes outside every Hevy session (the gym window) reach min_minutes",
-                "trailing_7d": standalone_walks(s_raw, hevy_workouts, shift_day_key(end, -6), end),
-                "prior_7d": standalone_walks(s_raw, hevy_workouts, shift_day_key(end, -13), shift_day_key(end, -7)),
+                "rule": (
+                    "a Strava walk (or the watch's own walk, when the apple rows were read — #5369) whose de-duplicated "
+                    "minutes outside every Hevy session (the gym window) reach min_minutes"
+                ),
+                "trailing_7d": standalone_walks(s_raw, hevy_workouts, shift_day_key(end, -6), end, a_raw),
+                "prior_7d": standalone_walks(s_raw, hevy_workouts, shift_day_key(end, -13), shift_day_key(end, -7), a_raw),
             },
         },
         "totals_are_floor": bool(unreadable),

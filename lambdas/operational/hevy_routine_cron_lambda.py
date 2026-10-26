@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 import boto3
-from common.pacific_time import pacific_today  # #2798: routine target_date is a Pacific-day WRITE KEY
+from common.pacific_time import pacific_today, shift_day_key  # #2798: routine target_date is a Pacific-day WRITE KEY
 
 if TYPE_CHECKING:  # #1656: the annotation-only import (runtime import stays inside the function)
     from training.routine_generator import GeneratorInputs
@@ -137,7 +137,21 @@ def _z2_minutes_7d(target_date: str, read=None) -> float | None:
             logger.warning(f"recent-aerobic read failed for {source}: {e}")
             return None
 
-    block = recent_aerobic.build(target_date=target_date, today=pacific_today(), strava_items=_safe("strava"), hevy_workouts=_safe("hevy"))
+    def _safe_apple() -> list[dict[str, Any]] | None:
+        # #5369: the watch backstop — one UTC day past the window (a workout is keyed by its UTC start day)
+        try:
+            return (read or _read_partition)("apple_health", w["start"], shift_day_key(w["end"], 1))
+        except Exception as e:  # noqa: BLE001 — unreadable is a floor, never zero hours
+            logger.warning(f"recent-aerobic read failed for apple_health: {e}")
+            return None
+
+    block = recent_aerobic.build(
+        target_date=target_date,
+        today=pacific_today(),
+        strava_items=_safe("strava"),
+        hevy_workouts=_safe("hevy"),
+        apple_items=_safe_apple(),
+    )
     return recent_aerobic.aerobic_minutes_7d(block)
 
 

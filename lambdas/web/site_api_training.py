@@ -267,11 +267,15 @@ def training_overview(*, _g) -> dict:
     # counted once across Strava + Whoop; Hevy cardio blocks are reported, never Zone 2. The
     # average-HR-in-60–70%-of-184 whole-activity method this replaced is gone from every split.
     z2_target = zone2_minutes.WEEKLY_TARGET_MIN  # minutes/week
-    _z2_hevy = _query_source("hevy", d30, today)
+    # #5369: Hevy (the routine source) anchors each gym visit's parts over the sessions' own 90 days;
+    # the cardio-minutes bucket keeps its 30-day window.
+    _z2_hevy_90 = _query_source("hevy", d90, today)
+    _z2_hevy = [r for r in _z2_hevy_90 if str(r.get("date") or str(r.get("sk", ""))[5:15])[:10] >= d30]
     z2_sessions = zone2_minutes.counted_sessions(
         strava_items,
         _query_source("whoop", d90, _next_day(today)),
-        _query_source("apple_health", d90, today),  # #5353: the watch is the third source
+        _query_source("apple_health", d90, _next_day(today)),  # #5353: the watch is the third source (UTC-start keyed)
+        hevy_rows=_z2_hevy_90,
     )
     z2_by_sid = zone2_minutes.zone2_by_strava_id(z2_sessions)
 

@@ -242,7 +242,10 @@ def _zone2_by_iso_week(strava_items, start_date, end_date):
     whoop_end = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
     out = defaultdict(float)
     for s in zone2_minutes.counted_sessions(
-        strava_items, query_source("whoop", start_date, whoop_end), query_source("apple_health", start_date, end_date)
+        strava_items,
+        query_source("whoop", start_date, whoop_end),
+        query_source("apple_health", start_date, whoop_end),  # UTC-start keyed, like Whoop
+        hevy_rows=query_source("hevy", start_date, end_date),  # #5369: the routine source anchors a visit's parts
     ):
         if s["source"] and start_date <= s["date"] <= end_date:
             out[datetime.strptime(s["date"], "%Y-%m-%d").strftime("%G-W%V")] += s["zone_2_minutes"]
