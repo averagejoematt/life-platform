@@ -627,7 +627,8 @@ RA_MINUTES = 611.4  # 10.19 h × 60 — the trailing 7 days through target − 1
 
 
 def _fixture_read(source: str, start: str, end: str) -> list[dict]:
-    data = {"strava": _ra_rows("strava"), "hevy": _ra_rows("hevy")}
+    # #5369: the paths also read apple_health (the watch backstop); the fixture week predates the watch
+    data = {"strava": _ra_rows("strava"), "hevy": _ra_rows("hevy"), "apple_health": []}
     return [r for r in data[source] if start <= r["date"] <= end]
 
 

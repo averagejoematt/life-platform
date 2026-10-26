@@ -53,6 +53,19 @@ So the union is now de-duplicated IN TIME, one rule for both overlaps:
     by the uncovered fraction of elapsed time).
 A record without a timestamp cannot be placed in time; it is counted whole and the output
 says how many such records the de-dup could not see (`dedup.untimed`).
+
+THE WATCH BACKSTOP (#5369/#5371, owner acts 2026-10-26)
+
+Until 2026-10-26 every walk reached this layer through Strava, because WHOOP pushed what it
+detected there. From that day WHOOP no longer shares to Strava and the watch uploads its own
+workouts — but an outdoor walk the watch does not upload would vanish from a Strava-only read.
+So a caller may hand in the apple_health day rows (`apple_items`): the watch's OWN walking and
+cycling workouts in the owner-only `apple_workouts` map join the union as a third source, last
+in the same time de-dup — Hevy claims first, then Strava, then Apple, each counting only the
+time no earlier claim covers. A walk only the watch recorded counts; a walk the watch also
+uploaded to Strava counts once. A HealthKit workout another app wrote (Hevy, the pliability
+app, WHOOP) is that app's record, not the watch's, and is not read here (`apple_workout_source`).
+History keeps its WHOOP copies in Strava and the future will not; the rule needs neither.
 """
 
 from __future__ import annotations
@@ -60,9 +73,11 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
-from common.pacific_time import pacific_weekday, parse_iso_utc
+from common.pacific_time import pacific_date_of, pacific_weekday, parse_iso_utc
 
-WALKING_VOLUME_VERSION = "walking-volume@1.1.0"  # 1.1.0 (#4068): time de-dup across Strava devices and against Hevy sessions
+WALKING_VOLUME_VERSION = (
+    "walking-volume@1.2.0"  # 1.1.0 (#4068): time de-dup across Strava devices and against Hevy sessions; 1.2.0 (#5369): the watch backstop
+)
 
 # ── what counts ──────────────────────────────────────────────────────────────────────
 # Strava activity `type`/`sport_type` (lower-cased) → the modality it counts as.
@@ -88,6 +103,24 @@ HEVY_COUNTED_NAMES: tuple[tuple[str, str], ...] = (
     ("echo bike", "cycling"),
     ("assault bike", "cycling"),
 )
+
+# HealthKit workout names as Health Auto Export sends them (lower-cased) → modality. The walking
+# and cycling half of `training.workout_identity.APPLE_FAMILY`, which builds on this map so the
+# two layers share one vocabulary ("outdoor cycling" is the name HAE sends for a watch ride, live
+# raw archive 2026-10-21; "indoor cycling" the watch's gym-bike workout, 2026-10-25).
+APPLE_COUNTED_NAMES: dict[str, str] = {
+    "walking": "walking",
+    "outdoor walk": "walking",
+    "indoor walk": "walking",
+    "hiking": "walking",
+    "cycling": "cycling",
+    "outdoor cycle": "cycling",
+    "indoor cycle": "cycling",
+    "outdoor cycling": "cycling",
+    "indoor cycling": "cycling",
+}
+APPLE_SOURCE = "apple_health"
+APPLE_WORKOUTS_FIELD = "apple_workouts"  # owner-only (privacy.field_tiers); read for start/end/duration/name/source only
 
 # The floor is a WALKING/CYCLING volume floor derived from the campaign that worked. Rowing,
 # elliptical and stair machines produce real minutes and are deliberately NOT folded in —
@@ -176,6 +209,90 @@ def _parse_utc(v: Any) -> datetime | None:
     return parse_iso_utc(v)
 
 
+_APPLE_DEVICE_TOKENS = ("apple watch", "iphone", "ipad")
+
+
+def apple_workout_source(w: dict[str, Any]) -> str:
+    """`apple_health` for a workout the watch/phone recorded (or one with no origin on record);
+    `apple_health/<origin>` for one another app wrote INTO HealthKit — Hevy's own lift
+    (`com.hevyapp.hevy`), the pliability app's mobility session (`com.romwodllc.romwod`), a
+    WHOOP workout — so the identity resolver can fold it into that app's record, never count it
+    as a second watch session (#5369). An identifier under `com.apple.` is the watch/phone."""
+    src = w.get("source")
+    name = str((src.get("name") if isinstance(src, dict) else src) or "").replace("\xa0", " ").strip().lower()
+    ident = str((src.get("identifier") if isinstance(src, dict) else "") or "").strip().lower()
+    if ident.startswith("com.apple.") or not name or any(tok in name for tok in _APPLE_DEVICE_TOKENS):
+        return APPLE_SOURCE
+    return APPLE_SOURCE + "/" + "".join(ch if ch.isalnum() else "_" for ch in name).strip("_")
+
+
+def apple_workout_records(items: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """Bare workout records, or apple_health DATE# day rows whose `apple_workouts` map
+    (`ingestion.health_auto_export_workouts`, #4973) holds one summary per HAE workout id. A
+    summary without its own `id` takes the map key; one id seen twice (a neighbouring row) is
+    one record."""
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in items or []:
+        nested = item.get(APPLE_WORKOUTS_FIELD)
+        pairs = list(nested.items()) if isinstance(nested, dict) else [(None, item)]
+        for key, w in pairs:
+            if not isinstance(w, dict):
+                continue
+            wid = str(w.get("id") or key or "")
+            if wid and wid in seen:
+                continue
+            if wid:
+                seen.add(wid)
+            out.append(w if w.get("id") or not wid else {**w, "id": wid})
+    return out
+
+
+def apple_sessions(
+    items: list[dict[str, Any]] | None, window_start: str | None = None, window_end: str | None = None
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """(the watch's own counted walking/cycling workouts, names seen and NOT counted).
+
+    Only `apple_workout_source(w) == "apple_health"` — the watch's own record. The rows are keyed by
+    the UTC day of the start, so a caller reads one UTC day past its window and this keeps the
+    workouts whose PACIFIC start date lies in [window_start, window_end] (either bound optional).
+    No heart rate, distance, route or device name leaves this function — only the modality, the
+    workout's name as its label, its duration and its interval."""
+    counted: list[dict[str, Any]] = []
+    skipped: list[str] = []
+    for w in apple_workout_records(items):
+        if apple_workout_source(w) != APPLE_SOURCE:
+            continue
+        name = str(w.get("name") or "").strip()
+        start, end = _parse_utc(w.get("start")), _parse_utc(w.get("end"))  # ISO or HAE's 'YYYY-MM-DD HH:MM:SS -0700'
+        day = pacific_date_of(str(w.get("start") or "")) or ""
+        if (window_start and day and day < window_start) or (window_end and day and day > window_end):
+            continue
+        modality = APPLE_COUNTED_NAMES.get(name.lower())
+        if not modality:
+            if name and name not in skipped:
+                skipped.append(name)
+            continue
+        seconds = _float(w.get("duration")) or _float(w.get("duration_min")) * 60.0
+        if not seconds and start is not None and end is not None:
+            seconds = (end - start).total_seconds()
+        if start is not None and end is None and seconds > 0:
+            end = start + timedelta(seconds=seconds)
+        counted.append(
+            {
+                "date": day,
+                "source": APPLE_SOURCE,
+                "modality": modality,
+                "label": name,
+                "device": "apple_watch",
+                "seconds": seconds,
+                "start": start,
+                "end": end,
+            }
+        )
+    return counted, skipped
+
+
 def hevy_cardio_intervals(workouts: list[dict[str, Any]]) -> list[tuple[datetime, datetime]]:
     """[start_time, end_time] of every Hevy session that carries a COUNTED cardio block.
 
@@ -213,6 +330,66 @@ def _uncovered_seconds(start: datetime, end: datetime, claimed: list[tuple[datet
     return max(0.0, (end - start).total_seconds() - covered)
 
 
+def uncovered_seconds(start: datetime, end: datetime, claimed: list[tuple[datetime, datetime]]) -> float:
+    """Seconds of [start, end] that no interval in `claimed` covers (the #4068 primitive, public for
+    `training.zone2_minutes`' cross-session claim, #5369)."""
+    return _uncovered_seconds(start, end, claimed)
+
+
+_WHY = {
+    "strava": "overlaps a Hevy cardio session or a longer Strava activity already counted",
+    APPLE_SOURCE: "overlaps a Hevy cardio session, a Strava activity or a longer watch workout already counted",
+}
+
+
+def _claim_in_time(
+    records: list[dict[str, Any]], claimed: list[tuple[datetime, datetime]], source: str
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int]:
+    """(kept, removed, untimed) — each record, longest first, keeps only the moving time proportional
+    to the part of its elapsed interval nothing in `claimed` covers; its interval then joins `claimed`
+    (mutated). An untimed record is kept whole."""
+    kept: list[dict[str, Any]] = []
+    removed: list[dict[str, Any]] = []
+    untimed = 0
+    for c in sorted(records, key=lambda c: -c["seconds"]):
+        start, end = c.get("start"), c.get("end")
+        if start is None or end is None:
+            untimed += 1
+            kept.append(c)
+            continue
+        elapsed = (end - start).total_seconds()
+        free = _uncovered_seconds(start, end, claimed)
+        keep_s = c["seconds"] * (free / elapsed) if elapsed > 0 else c["seconds"]
+        if keep_s < c["seconds"] - 0.5:
+            entry = {
+                "date": c["date"],
+                "weekday": pacific_weekday(c["date"]),  # #5274: today.dedup / walking.dedup / recent_aerobic.dedup removed[]
+                "label": c["label"],
+                "device": c.get("device"),
+                "hours_removed": _hours(c["seconds"] - keep_s),
+                "why": _WHY[source],
+            }
+            if source != "strava":
+                entry["source"] = source
+            removed.append(entry)
+        claimed.append((start, end))
+        if keep_s > 0.5:
+            kept.append({**c, "seconds": keep_s})
+    return kept, removed, untimed
+
+
+def _dedup_record(removed: list[dict[str, Any]], untimed: int, with_apple: bool) -> dict[str, Any]:
+    record = {
+        "rule": "Hevy cardio sessions claim their interval first; Strava activities, longest first, count only unclaimed time",
+        "removed": sorted(removed, key=lambda r: r["date"]),
+        "hours_removed": _hours(sum(float(r["hours_removed"]) * 3600.0 for r in removed)),
+        "untimed": untimed,
+    }
+    if with_apple:
+        record["apple_rule"] = "then the watch's own workouts, longest first, count only the time Hevy and Strava left unclaimed (#5369)"
+    return record
+
+
 def dedup_strava(
     strava_counted: list[dict[str, Any]], hevy_intervals: list[tuple[datetime, datetime]]
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -223,40 +400,22 @@ def dedup_strava(
     their elapsed interval nothing earlier claimed. One rule covers both overlaps the live
     record carries: a WHOOP walk inside a Hevy treadmill session, and a Garmin + WHOOP pair
     recording one outdoor walk. Untimed activities are kept whole and counted in `untimed`."""
+    kept, removed, untimed = _claim_in_time(strava_counted, list(hevy_intervals), "strava")
+    return kept, _dedup_record(removed, untimed, with_apple=False)
+
+
+def dedup_sources(
+    strava_counted: list[dict[str, Any]],
+    apple_counted: list[dict[str, Any]],
+    hevy_intervals: list[tuple[datetime, datetime]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    """(Strava kept, Apple kept, the de-dup record) — `dedup_strava`'s rule with the watch's own
+    workouts LAST (#5369): Hevy claims, then Strava (longest first), then Apple (longest first),
+    each counting only the time every earlier claim left free."""
     claimed = list(hevy_intervals)
-    kept: list[dict[str, Any]] = []
-    removed: list[dict[str, Any]] = []
-    untimed = 0
-    for c in sorted(strava_counted, key=lambda c: -c["seconds"]):
-        start, end = c.get("start"), c.get("end")
-        if start is None or end is None:
-            untimed += 1
-            kept.append(c)
-            continue
-        elapsed = (end - start).total_seconds()
-        free = _uncovered_seconds(start, end, claimed)
-        keep_s = c["seconds"] * (free / elapsed) if elapsed > 0 else c["seconds"]
-        if keep_s < c["seconds"] - 0.5:
-            removed.append(
-                {
-                    "date": c["date"],
-                    "weekday": pacific_weekday(c["date"]),  # #5274: today.dedup / walking.dedup / recent_aerobic.dedup removed[]
-                    "label": c["label"],
-                    "device": c.get("device"),
-                    "hours_removed": _hours(c["seconds"] - keep_s),
-                    "why": "overlaps a Hevy cardio session or a longer Strava activity already counted",
-                }
-            )
-        claimed.append((start, end))
-        if keep_s > 0.5:
-            kept.append({**c, "seconds": keep_s})
-    record = {
-        "rule": "Hevy cardio sessions claim their interval first; Strava activities, longest first, count only unclaimed time",
-        "removed": sorted(removed, key=lambda r: r["date"]),
-        "hours_removed": _hours(sum(float(r["hours_removed"]) * 3600.0 for r in removed)),
-        "untimed": untimed,
-    }
-    return kept, record
+    s_kept, s_removed, s_untimed = _claim_in_time(strava_counted, claimed, "strava")
+    a_kept, a_removed, a_untimed = _claim_in_time(apple_counted, claimed, APPLE_SOURCE)
+    return s_kept, a_kept, _dedup_record(s_removed + a_removed, s_untimed + a_untimed, with_apple=True)
 
 
 def hevy_sessions(workouts: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
@@ -313,22 +472,39 @@ def derived_steps_estimate(walking_hours: float | None, cadence_spm: int = ASSUM
     }
 
 
+#: `apple_items` default: the caller did not wire the watch backstop (distinct from None = the read failed).
+NOT_WIRED: Any = object()
+
+
 def build(
     *,
     window_start: str,
     window_end: str,
     strava_items: list[dict[str, Any]] | None,
     hevy_workouts: list[dict[str, Any]] | None,
+    apple_items: Any = NOT_WIRED,
 ) -> dict[str, Any]:
     """The derived walking-volume layer: Strava UNION Hevy cardio blocks, in HOURS.
 
     `None` for either argument means the source could not be READ — which is not zero hours.
     An unreadable or silent source makes the total a FLOOR (`total_is_floor`) and says so in
     `honesty`; it never quietly contributes 0.
+
+    `apple_items` (#5369, the watch backstop): the apple_health day rows over the window (one UTC
+    day past it — see `apple_sessions`). The watch's own walking/cycling workouts join LAST in the
+    time de-dup. Unlike Strava and Hevy, an Apple read with nothing counted is ordinary (a watch
+    workout only adds what no other source holds) and never makes the total a floor; a FAILED
+    Apple read (None) does, because a walk only the watch recorded could be missing.
     """
     s_raw, s_skipped = strava_sessions(strava_items or [])
     h_counted, h_skipped = hevy_sessions(hevy_workouts or [])
-    s_counted, dedup = dedup_strava(s_raw, hevy_cardio_intervals(hevy_workouts or []))
+    wired = apple_items is not NOT_WIRED
+    a_raw, a_skipped = apple_sessions(apple_items or [], window_start, window_end) if wired else ([], [])
+    if wired:
+        s_counted, a_counted, dedup = dedup_sources(s_raw, a_raw, hevy_cardio_intervals(hevy_workouts or []))
+    else:
+        s_counted, dedup = dedup_strava(s_raw, hevy_cardio_intervals(hevy_workouts or []))
+        a_counted = []
 
     def _source_block(raw: list[dict[str, Any]] | None, counted: list[dict[str, Any]], skipped: list[str]) -> dict:
         if raw is None:
@@ -350,9 +526,22 @@ def build(
     }
     contributing = [b for b in by_source.values() if b["hours"] is not None]
     silent = [n for n, b in by_source.items() if b["hours"] is None]
+    if wired and apple_items is None:
+        by_source[APPLE_SOURCE] = _source_block(None, [], [])
+        silent.append(APPLE_SOURCE)
+    elif wired:
+        # no counted watch workout is the ordinary case, never a silent source
+        by_source[APPLE_SOURCE] = (
+            _source_block(apple_items, a_counted, a_skipped)
+            if a_raw
+            else {"status": "no_records", "hours": None, "sessions": 0, "by_modality": {}, "not_counted": a_skipped}
+        )
+        if a_raw:
+            contributing.append(by_source[APPLE_SOURCE])
 
-    total_hr = _hours(sum(c["seconds"] for c in s_counted + h_counted)) if contributing else None
-    by_modality = {m: _hours(sum(c["seconds"] for c in s_counted + h_counted if c["modality"] == m)) for m in MODALITIES}
+    every = s_counted + h_counted + a_counted
+    total_hr = _hours(sum(c["seconds"] for c in every)) if contributing else None
+    by_modality = {m: _hours(sum(c["seconds"] for c in every if c["modality"] == m)) for m in MODALITIES}
 
     honesty: list[str] = []
     for name in silent:
@@ -400,7 +589,11 @@ def build(
 
 
 def walking_minutes_for_day(
-    *, day: str, strava_items: list[dict[str, Any]] | None, hevy_workouts: list[dict[str, Any]] | None
+    *,
+    day: str,
+    strava_items: list[dict[str, Any]] | None,
+    hevy_workouts: list[dict[str, Any]] | None,
+    apple_items: Any = NOT_WIRED,
 ) -> dict[str, Any] | None:
     """The WALKING-modality minutes of ONE day, from the day rows a compute already holds (ADR-163).
 
@@ -410,7 +603,7 @@ def walking_minutes_for_day(
     modality and is not walking time). None when neither source has a record for the day: unknown,
     never zero minutes (ADR-104). A source with records but no counted walking reads 0.
     """
-    layer = build(window_start=day, window_end=day, strava_items=strava_items, hevy_workouts=hevy_workouts)
+    layer = build(window_start=day, window_end=day, strava_items=strava_items, hevy_workouts=hevy_workouts, apple_items=apple_items)
     if layer["total_hr"] is None:
         return None
     walking_hr = float(layer["by_modality"].get("walking") or 0.0)

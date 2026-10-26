@@ -591,6 +591,12 @@ _RETIRED_TRAINING_WRAPPER_CALLER_PY = (
     "def handle(data, profile):\n"
     "    return ai_calls." + _lit("call_training_", "coach_v2") + "(data, profile)\n"
 )
+# #5369 box 3: a consumer that adds Hevy cardio minutes to the wearable session minutes.
+_HEVY_CARDIO_SUMMED_PY = (
+    '"""census probe — a consumer summing Hevy cardio minutes into wearable minutes, which must never exist."""\n\n\n'
+    "def weekly_total(w):\n"
+    '    return {"total_exercise_min": w["session_minutes"] + w["hevy_cardio_minutes"]}\n'
+)
 _MAY_TRACKER_PUBLISHED_IMPORTER_PY = (
     '"""census probe — a published importer that must never exist."""\n\n'
     "from training import may_tracker\n\n\n"
@@ -1517,6 +1523,17 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         plants=(("lambdas/emails/_census_probe_5071.py", _RETIRED_TRAINING_WRAPPER_CALLER_PY),),
         track=False,  # the guard rglobs lambdas/ mcp/ deploy/ scripts/ cdk/ qa/ on disk
     ),
+    # #5369 box 3: no module adds Hevy cardio minutes to the wearable session minutes.
+    "structural::test_hevy_cardio_never_summed_5369.py": MutationSpec(
+        gate_id="structural::test_hevy_cardio_never_summed_5369.py",
+        target="tests/test_hevy_cardio_never_summed_5369.py",
+        detects=(
+            "a module (lambdas/web) adding `hevy_cardio_minutes` to `session_minutes` and serving it as "
+            "`total_exercise_min` — a Hevy block and the wearable's recording of it counted twice"
+        ),
+        plants=(("lambdas/web/_census_probe_5369.py", _HEVY_CARDIO_SUMMED_PY),),
+        track=False,  # the guard os.walks lambdas/ mcp/ on disk
+    ),
 }
 
 
@@ -1622,6 +1639,18 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "runtime (getattr by a built string), a re-created wrapper under another name, and the claude.ai synced copy of "
         "the coach-session skill outside the repo (scripts/check_synced_skill_drift.py owns that).",
         proved_on="2026-10-25",
+    ),
+    "structural::test_hevy_cardio_never_summed_5369.py": _proof(
+        "structural::test_hevy_cardio_never_summed_5369.py",
+        "ARMED 1/1 — baseline: 3 passed in 0.34s | mutated: 1 failed, 2 passed in 0.29s :: "
+        "test_no_module_adds_hevy_cardio_minutes_to_wearable_minutes | reverted: 3 passed in 0.24s",
+        "lambdas/ and mcp/ on disk (os.walk, every .py whose text names `hevy_cardio_min`, parsed): an `a + b` with a Hevy "
+        "cardio name on one side and `session_minutes` / `total_exercise_min` on the other, an assignment or `+=` into a "
+        "wearable name from a Hevy cardio value, or a dict entry / keyword keyed by a wearable name carrying one, fails and "
+        "names the file and line. STILL INVISIBLE, stated: the sum done through intermediate variables under other names "
+        "(`a = hevy_cardio_min; total = a + other`), a sum computed in the front end (site/ JS), and a sum performed by a "
+        "reader of the served JSON outside the repo.",
+        proved_on="2026-10-26",
     ),
     "structural::test_repo_walk_5273.py": _proof(
         "structural::test_repo_walk_5273.py",
