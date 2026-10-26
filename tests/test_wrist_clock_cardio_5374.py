@@ -22,7 +22,6 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "lambdas"))
 sys.path.insert(0, str(REPO))
 
-from health.adherence_calc import calculate_adherence  # noqa: E402
 from training import (
     cardio_menu as cm,  # noqa: E402
     cardio_note as cn,  # noqa: E402
@@ -265,34 +264,7 @@ def test_his_shape_counts_as_the_kind_it_was_for_the_weeks_placement():
     assert cm.kind_of_performed("cycling", "Level 9 for 30") == "easy"
 
 
-def test_adherence_grades_the_performed_shape_against_the_prescribed_one():
-    note, _ = _compose("intervals", "cycling", 60, {"last_level": 8})
-    ir = RoutineSpec(
-        routine_id="r-5374",
-        target_date=DAY,
-        archetype="upper",
-        exercises=[ExerciseBlock(movement_key="cycling", sets=[Set(duration_seconds=3600)], notes=note)],
-    )
-    ride = {"exercise_template_id": CYCLING_TID, "notes": OWNER_NOTE, "sets": [{"type": "normal", "duration_seconds": 3600}]}
-    out = calculate_adherence(ir, {"exercises": [ride]})
-    grade = out["as_prescribed_by_kind"]["cardio"]["shape"]["cycling"]
-    assert grade["status"] == "same_shape" and grade["minutes_delta"] == 0
-    assert grade["performed"]["top_level"] == 18 and grade["prescribed"]["top_level"] == 8 + cn.INTERVAL_LEVEL_STEP
-    assert grade["top_level_delta"] == 18 - (8 + cn.INTERVAL_LEVEL_STEP)
-    assert out["as_prescribed_by_kind"]["cardio"]["verdict"] == "unknown"  # the RPE half is still unread: never folded in
-    # absences are named
-    blank = calculate_adherence(ir, {"exercises": [{**ride, "notes": ""}]})
-    assert blank["as_prescribed_by_kind"]["cardio"]["shape"]["cycling"]["status"] == "performed_unread"
-    prose = RoutineSpec(
-        routine_id="r-5374b",
-        target_date=DAY,
-        archetype="upper",
-        exercises=[ExerciseBlock(movement_key="cycling", sets=[Set(duration_seconds=3600)], notes="Easy ride, RPE 6 max.")],
-    )
-    assert (
-        calculate_adherence(prose, {"exercises": [ride]})["as_prescribed_by_kind"]["cardio"]["shape"]["cycling"]["status"]
-        == "prescribed_unread"
-    )
+# the adherence grade of his 10-25 shape lives in tests/test_adherence_calc.py (the Hevy wire key is allowed there only)
 
 
 # ── box 5: the grid never changes the minutes ──────────────────────────────────────────
