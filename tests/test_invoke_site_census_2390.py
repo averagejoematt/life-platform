@@ -268,6 +268,14 @@ EXEMPTIONS: dict[str, dict[str, str]] = {
         "stayed behind in ai_calls and are still registered in SURFACES, so the extraction moved the transport, not the decision.",
     ),
     # — delegated: the generation is gated, at a surface another module owns —
+    "lambdas/intelligence/vendor_outage_breaker.py": _ex(
+        DELEGATED_GATED,
+        "the weekly analyzer's vendor-outage breaker (#5412): `call_guarded` relays retry_utils.call_anthropic_raw for "
+        "ai_expert_analyzer_lambda only, adding one backoff retry and a per-run trip that refuses later calls locally. Every "
+        "generation it carries is gated at ai_expert_analyzer_lambda.py::_gate_prose (registered in SURFACES, fail-closed), "
+        "so the seam here drives a generation gated there; the module knows nothing about what an expert narrative is.",
+        gated_by="lambdas/intelligence/ai_expert_analyzer_lambda.py::_gate_prose",
+    ),
     "lambdas/coach/telegram_worker_lambda.py": _ex(
         DELEGATED_GATED,
         "the Telegram transport for the coach chat (ADR-151). The turn runs through coach_chat.run_turn with the grounding closure from "
