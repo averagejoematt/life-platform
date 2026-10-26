@@ -12,6 +12,9 @@ platform's AI spend, in tokens or in dollars, anomalous TODAY, and is today a da
 anomaly was predicted?" — and the four raw alarms share one shielding mechanism (the
 genesis-window gauge and the composite pairs built on it), so splitting them across two
 files is what would be arbitrary.
+#5135 adds the one MONTHLY alarm in the family, `ai-dev-session-month-high` (the dev-session
+envelope, last in `add_token_alarms`): same question — is AI spend over its bar — asked of one
+caller class over its calendar month, and deliberately outside the genesis-window shielding.
 
 CONSTRUCT IDS ARE UNCHANGED, deliberately. Every construct below is created against the
 `scope` passed in — the stack itself — with the same construct id it had inside
@@ -144,6 +147,10 @@ AI_TOKENS_BUDGET_BAR = int(round(AI_SPEND_BUDGET_BAR_USD / _BUDGET.dearest_outpu
 
 AI_DAILY_SPEND_THRESHOLD_USD = max(AI_SPEND_VARIANCE_BAR_USD, AI_SPEND_BUDGET_BAR_USD)
 AI_TOKENS_PLATFORM_DAILY_THRESHOLD = max(AI_TOKENS_VARIANCE_BAR, AI_TOKENS_BUDGET_BAR)
+
+# #5135: the dev-session envelope's alarm bar — 80 % of the owner's $60 calendar month (ruling
+# 2026-10-26), read out of lambdas/ai/dev_session_cap.py, which owns both numbers and enforces the cap.
+DEV_SESSION_MONTH_ALARM_USD = _BUDGET.dev_session_month_alarm_usd()  # 48.0
 
 
 def add_token_alarms(scope, topic, digest) -> None:
@@ -374,3 +381,24 @@ def add_token_alarms(scope, topic, digest) -> None:
         alarm_rule=cloudwatch.AlarmRule.all_of(_ai_daily_spend_breach, _in_genesis_window),
     )
     ai_daily_spend_in_window.add_alarm_action(cw_actions.SnsAction(digest))
+
+    # #5135: the DEV-SESSION ENVELOPE, separate from the production daily-total alarms above.
+    # Those watch the whole platform's rolling 24 h; this watches one class's calendar month: laptop
+    # and agent AI (CallerClass=dev-session, the MCP Lambda's dev calls included) against the owner's
+    # $60 a month. CloudWatch cannot sum a calendar month, so the metric is the cost governor's
+    # `DevSessionSpendMTD` gauge (published every 8 h; a period of one governor cadence, Maximum).
+    # The cap in lambdas/ai/dev_session_cap.py refuses at $60 on its own; this tells the owner at
+    # $48 that the month is most of the way spent. Digest, not urgent: nothing a reader sees is at
+    # risk, and the cap is already holding the line. Missing data (governor down) is NOT_BREACHING;
+    # the governor has its own heartbeat and DLQ alarms. The gauge resets on the 1st, which clears it.
+    _token_alarm(
+        "AiDevSessionMonthHigh",
+        "ai-dev-session-month-high",
+        "LifePlatform/Budget",
+        "DevSessionSpendMTD",
+        28800,
+        "Maximum",
+        DEV_SESSION_MONTH_ALARM_USD,
+        GTE,
+        to_digest=True,
+    )

@@ -56,6 +56,8 @@ Runs every 8h (cron(0 0/8 * * ? *)). Sets SSM /life-platform/budget-tier
 Also persists the projection breakdown (mtd/projected/ai+non-ai daily burn) to
 SSM /life-platform/budget-breakdown every enforcement run so the daily brief can
 render a one-line headroom readout (#822 — a dev sprint alone can trip the tier).
+Publishes month-to-date dev-session spend (`DevSessionSpendMTD`, #5135) for the
+dev-session envelope's alarm; that envelope is enforced on the laptop, not here.
 Auto-resets to 0 at month rollover (estimate is month-to-date).
 
 SURGE MODE (ADR-133, #739): the base ceiling is calibrated for near-zero reader
@@ -1255,6 +1257,7 @@ def lambda_handler(event, context):
         # #2116: independent of OBSERVE_MODE/budget-tier enforcement — the
         # genesis-window gauge is a pure calendar fact, not a spend decision.
         _emit_token_alarm_window_gauge()
+        _episodic.publish_dev_session_month(_cw, CALLER_CLASS_DIMENSION, month_start, now)  # #5135: the envelope's alarm
 
         # Phase B ships in OBSERVE mode: emit metrics + log the computed tier, but
         # do NOT write SSM or alert — lets us validate the estimate vs the real
