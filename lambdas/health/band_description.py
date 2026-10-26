@@ -21,7 +21,6 @@ from __future__ import annotations
 import json
 import logging
 import time
-from datetime import date
 from typing import Any, Callable, Mapping, Optional
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -71,7 +70,11 @@ def band_moved(previous: Optional[Mapping[str, Any]], decision: Mapping[str, Any
 
 def render(low: int, high: int, week: str) -> str:
     """The description text for the band ``low``..``high`` kcal applying to the ISO-Monday ``week``."""
-    d = date.fromisoformat(week)
+    from common.pacific_time import parse_day_key  # noqa: PLC0415 — the calendar-day parse (#3741)
+
+    d = parse_day_key(week)
+    if d is None:
+        raise ValueError("week is not a YYYY-MM-DD day key")
     return TEMPLATE.format(low=low, high=high, month=d.strftime("%b"), day=d.day)
 
 
