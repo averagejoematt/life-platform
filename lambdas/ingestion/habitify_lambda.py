@@ -345,7 +345,16 @@ SUPPLEMENT_MAP = {
     "Omega 3": {"dose": 2000, "unit": "mg", "timing": "with_meal", "category": "supplement"},
     "Zinc Picolinate": {"dose": 30, "unit": "mg", "timing": "with_meal", "category": "mineral"},
     "Basic B Complex": {"dose": 1, "unit": "capsule", "timing": "with_meal", "category": "vitamin"},
-    "Creatine": {"dose": 5, "unit": "g", "timing": "with_meal", "category": "supplement"},
+    # #5376: `dose` is the BASELINE (the fixed dose before any change); `dose_changes` dates each later one — the owner
+    # raised creatine from 5 g to 10 g on 2026-10-26. The write resolves the dose by the day being ingested
+    # (`_dose_on`), so re-ingesting a pre-change day still writes 5 g.
+    "Creatine": {
+        "dose": 5,
+        "dose_changes": [{"from": "2026-10-26", "dose": 10}],
+        "unit": "g",
+        "timing": "with_meal",
+        "category": "supplement",
+    },
     "NAC": {"dose": 600, "unit": "mg", "timing": "with_meal", "category": "supplement"},
     "Inositol": {"dose": 2000, "unit": "mg", "timing": "with_meal", "category": "supplement"},
     # ── Evening batch (before bed — sleep stack) ──
@@ -994,8 +1003,25 @@ def _supplement_meta(name: str, habit_id, prior_by_key: dict, aliases=()) -> dic
     return None
 
 
-def _bridge_entries(item: dict, prior_bridge: list[dict]) -> list[dict]:
-    """The bridge's entries for this day, re-derived in full from the stored habit record."""
+def _dose_on(meta: dict, day: str | None):
+    """#5376: the dose in force on `day` (YYYY-MM-DD): the latest `dose_changes` entry whose `from` is on or before
+    the day, else the baseline `dose`. An unknown day reads the latest dose. ISO dates compare as strings."""
+    changes = sorted((c for c in meta.get("dose_changes") or [] if c.get("from")), key=lambda c: c["from"])
+    if not changes:
+        return meta["dose"]
+    if not day:
+        return changes[-1]["dose"]
+    dose = meta["dose"]
+    for c in changes:
+        if c["from"] <= day:
+            dose = c["dose"]
+    return dose
+
+
+def _bridge_entries(item: dict, prior_bridge: list[dict], date_str: str | None = None) -> list[dict]:
+    """The bridge's entries for this day, re-derived in full from the stored habit record. The dose is resolved by
+    the day being ingested (`date_str`, else the record's own `date`) — #5376."""
+    day = date_str or item.get("date")
     prior_by_key = {_bridge_key(e.get("habit_id"), e.get("name")): e for e in prior_bridge}
     entries: dict[str, dict] = {}
     for name, habit_id, aliases in _completed_habits(item):
@@ -1004,7 +1030,7 @@ def _bridge_entries(item: dict, prior_bridge: list[dict]) -> list[dict]:
         if meta is None or key in entries:
             continue
         entry = {f: meta[f] for f in _SUPPLEMENT_META_FIELDS}
-        entry["dose"] = Decimal(str(meta["dose"]))
+        entry["dose"] = Decimal(str(_dose_on(meta, day)))
         prior = prior_by_key.get(key) or {}
         entry.update(
             {"name": name, "logged_at": prior.get("logged_at") or datetime.now(timezone.utc).isoformat(), "source": "habitify_bridge"}
@@ -1041,7 +1067,7 @@ def supplement_bridge(items: list[dict], date_str: str) -> None:
     # #480/E-5: MERGE, don't clobber — the bridge owns only `source == habitify_bridge`.
     manual_entries = [e for e in stored if e.get("source") != "habitify_bridge"]
     prior_bridge = [e for e in stored if e.get("source") == "habitify_bridge"]
-    entries = _bridge_entries(items[0], prior_bridge)
+    entries = _bridge_entries(items[0], prior_bridge, date_str)
     if not entries and (not prior_bridge or not read_ok):
         logger.info("Supplement bridge: no supplements checked for %s", date_str)
         return
