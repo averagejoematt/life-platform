@@ -192,11 +192,6 @@ SUPPLEMENT_NUTRIENT_CONTENT: dict[str, Optional[dict[str, Any]]] = {
     "NAC": {"content": []},
     "Apigenin": {"content": []},
     "Theanine": {"content": []},
-    "Reishi": {"content": []},
-    "Lions Mane": {"content": []},
-    "Green Tea Phytosome": {"content": []},
-    "Cordyceps": {"content": []},
-    "Protein Supplement": {"content": []},
     # Content unknown to the platform — reported unconverted, never summed.
     "Multivitamin": {
         "content": None,
@@ -212,11 +207,6 @@ SUPPLEMENT_NUTRIENT_CONTENT: dict[str, Optional[dict[str, Any]]] = {
         "content": None,
         "reason": "'1 packet' — potassium/magnesium content is not on any record the platform holds",
         "may_contain": ["potassium_mg", "magnesium_mg"],
-    },
-    "Probiotics": {
-        "content": None,
-        "reason": "'1 capsule' — no nutrient content on the record (no tracked target)",
-        "may_contain": [],
     },
 }
 
