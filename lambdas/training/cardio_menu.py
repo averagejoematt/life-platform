@@ -330,12 +330,52 @@ def served_kinds(routines: list[Any] | None) -> dict[str, dict[str, str]]:
     return out
 
 
+def served_levels(routines: list[Any] | None) -> dict[str, dict[str, dict[str, Any]]]:
+    """Hevy routine id -> {machine key: the level that routine prescribed for its cardio block}. Pure over the routines.
+
+    #5076, box 2: he logs the menu's rides with an EMPTY note, so a level read from the note alone never moved off his
+    June calibration. The level is the one his block's composed line 1 printed (`cardio_note.LINE1_RE` `level`) — the
+    dose he was handed, never the placement tag's kind (a gated tempo is written as an easy block, and line 1 is what
+    he rode). Each entry is `{machine, kind, level, base_level}`: `kind` is the kind line 1 names
+    (`cardio_note.composed_kind`), `base_level` the easy-effort level the dose was built on — line 1's level, except a
+    tempo block, whose level IS the base plus `TEMPO_LEVEL_STEP` (`bike_dose`), so a performed tempo never ratchets the
+    next easy block up a level with no `raise` verdict behind it. A block whose line 1 carries no level (a treadmill
+    walk, or a ride drafted with no level on record) is left out: no level is ever invented."""
+    from training import cardio_note
+
+    out: dict[str, dict[str, dict[str, Any]]] = {}
+    for ir in routines or []:
+        hid = str(getattr(ir, "hevy_routine_id", None) or "")
+        if not hid:
+            continue
+        for ex in getattr(ir, "exercises", None) or []:
+            key = str(getattr(ex, "movement_key", "") or "")
+            if key not in cardio_note.MACHINES or key == TREADMILL:
+                continue
+            note = str(getattr(ex, "notes", "") or "")
+            m = cardio_note.LINE1_RE.match(note.strip().split("\n", 1)[0])
+            kind = cardio_note.composed_kind(note)
+            if not m or not m.group("level") or kind not in KINDS:
+                continue
+            level = int(m.group("level"))
+            base = level - TEMPO_LEVEL_STEP if kind == "tempo" else level
+            if base < 1:
+                continue
+            out.setdefault(hid, {})[key] = {"machine": key, "kind": kind, "level": level, "base_level": base}
+    return out
+
+
 def annotate_served(
-    cardio_index: dict[str, list[dict[str, Any]]] | None, served: dict[str, dict[str, str]], catalog: dict[str, Any] | None
+    cardio_index: dict[str, list[dict[str, Any]]] | None,
+    served: dict[str, dict[str, str]],
+    catalog: dict[str, Any] | None,
+    levels: dict[str, dict[str, dict[str, Any]]] | None = None,
 ) -> dict[str, list[dict[str, Any]]] | None:
     """A copy of `cardio_index` whose sessions carry `served_kind` — the kind the routine he performed prescribed for
-    that machine (`served_kinds`), matched on the session's `hevy_routine_id`. Sessions with no match are unchanged."""
-    if not cardio_index or not served:
+    that machine (`served_kinds`), matched on the session's `hevy_routine_id` — and `served_level`, the level it
+    prescribed (`served_levels`; read only by `cardio_progression.cardio_facts`, and only when his note is silent).
+    Sessions with no match are unchanged."""
+    if not cardio_index or not (served or levels):
         return cardio_index
     by_tid = machine_template_ids(catalog)
     out: dict[str, list[dict[str, Any]]] = {}
@@ -343,8 +383,11 @@ def annotate_served(
         key = by_tid.get(tid)
         rows = []
         for s in sessions or []:
-            kind = (served.get(str(s.get("hevy_routine_id") or "")) or {}).get(key or "")
-            rows.append({**s, "served_kind": kind} if kind else s)
+            hid = str(s.get("hevy_routine_id") or "")
+            kind = (served.get(hid) or {}).get(key or "")
+            rx = ((levels or {}).get(hid) or {}).get(key or "")
+            extra = {**({"served_kind": kind} if kind else {}), **({"served_level": dict(rx)} if rx else {})}
+            rows.append({**s, **extra} if extra else s)
         out[tid] = rows
     return out
 

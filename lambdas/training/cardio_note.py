@@ -237,11 +237,15 @@ def prescribed_level(facts: dict[str, Any] | None, verdict: dict[str, Any] | Non
 
 
 def _base_level(facts: dict[str, Any] | None) -> tuple[int | None, str]:
-    """(the base level, where it came from): the last ride's single level; failing that, the top of the span his own
+    """(the base level, where it came from): the last ride's single level (his note's, or — his note silent — the base
+    level of the routine he performed, `cardio_progression.prescribed_level_of`, #5076); failing that, the top of the span his own
     calibration note called easy; failing that (#5374), the lowest level of his last ride when it was a clock-shaped ride
     ("8/12 for 2 mins …" returns to 8) — never the shaped ride's top level, which the single-level reader used to take."""
     f = facts or {}
     if f.get("last_level") is not None:
+        if f.get("last_level_status") == "prescribed_level":
+            # #5076: his note was silent, so the level is the one the routine he performed prescribed — stated as that
+            return int(f["last_level"]), "the level his last ride's routine prescribed"
         return int(f["last_level"]), "last ride's level"
     for c in f.get("calibration") or []:
         anchor = (c.get("anchors") or [{}])[0]
