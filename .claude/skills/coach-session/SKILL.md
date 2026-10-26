@@ -165,6 +165,11 @@ program serves; argue with it out loud, never silently replace it.
   a machine, a level, a speed and an RPE or talk-test target. Progression is the same RPE at a
   higher level. Name what each block BUILDS. No reflexive "flush": legs get a progression slot,
   not perpetual recovery.
+- **A cardio prescription is a clock rule, not a machine program.** An iPad covers the console
+  and the watch does not alert, so he runs the block by glancing at the watch clock: state it as
+  the note's one rule line (e.g. "8/12 every 2 min for 20 · then +1 level every 2 min from 20 to
+  40"), changes on the 2/5/10-minute marks, at most three numbers to remember. Never "the hill
+  program" or a preset.
 - **Running** is in the plan behind the charter's run gate (`gated_movements`); the other gated
   movements likewise. Quote the gate state the engine serves.
 - **Equipment:** a full commercial club with standard equipment; the charter's

@@ -91,6 +91,18 @@ ANCHOR_LOADED_TYPES: dict[str, frozenset[str]] = {
 }
 
 
+#: Catalog keys RETIRED into another key (#5372): a stored routine IR pushed before the retirement still names the old key, and
+#: adherence reads it against the key it folded into. The old key is no longer in the catalog and is never programmed again.
+#: `farmers_carry` was the custom Hevy 'Farmers Carry' template (ce871c4e…) the B3 ruling (#5318) programmed and the owner never
+#: logged; he logs Hevy's standard 'Farmers Walk' (50C613D0, `farmers_walk`). The custom template stays on his Hevy account.
+RETIRED_KEYS: dict[str, str] = {"farmers_carry": "farmers_walk"}
+
+
+def canonical_key(key: str) -> str:
+    """`key` itself, or the key it was retired into (`RETIRED_KEYS`)."""
+    return RETIRED_KEYS.get(key, key)
+
+
 def is_reviewed(entry: dict[str, Any]) -> bool:
     return bool(entry.get("reviewed", True))
 

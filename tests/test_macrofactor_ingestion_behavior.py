@@ -1687,7 +1687,6 @@ UNKNOWN_CONTENT_LEDGER = {
     "Multivitamin": "2026-09-27 (#4245): retire when the label's per-nutrient amounts are recorded as content",
     "Basic B Complex": "2026-09-27 (#4245): retire when the label's per-nutrient amounts are recorded as content",
     "Electrolytes": "2026-09-27 (#4245): retire when the packet's potassium/magnesium amounts are recorded as content",
-    "Probiotics": "2026-09-27 (#4245): no tracked nutrient on any record — retire if it becomes content []",
 }
 
 

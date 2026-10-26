@@ -236,7 +236,8 @@ def test_a_shoulders_arms_day_on_fresh_legs_serves_the_incline_walk_with_its_dos
     lo, hi = tc.charter_value("cardio_menu.blocks.incline_treadmill_walk.rpe")
     assert (
         block.notes.split("\n")[0]
-        == f"Treadmill · {minutes} min · incline {lo_i:g}% at {float(lo_s)} mph walk · RPE {lo}–{hi}, full sentences"
+        == f"Treadmill · {minutes} min · incline {lo_i:g}% at {float(lo_s)} mph walk · {lo_i:g}% for {minutes} · check in every 10 min · "
+        f"RPE {lo}–{hi}, full sentences"
     )
     assert [s.duration_seconds for s in block.sets] == [minutes * 60]
     assert audit["incline_pct"] == lo_i and audit["mph"] == lo_s

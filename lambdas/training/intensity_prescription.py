@@ -378,6 +378,9 @@ def grade_sets(
       • rpe is None      → counted in `sets_rpe_absent`, kept OUT of the denominator.
                            An unlogged RPE is never evidence of compliance.
       • no working set carried an rpe → status "unreadable", pct None (never 100).
+      • #5372: the same, but every working set is a REPS-LESS type (a distance or timed set — a carry, a cardio block) → status
+        "rpe_absent": Hevy offers no RPE field on those set types, so "unreadable" would read as a fault in the read. Still
+        pct None, still out of the denominator (absence is absence); only the name is honest.
     """
     tol = float(tolerance_rpe or 0.0)
     working = [s for s in (sets or []) if is_working_set(s)]
@@ -421,7 +424,12 @@ def grade_sets(
         out["sets_graded"] = len(graded) + len(progressed)
         out["max_rpe"] = max([v for v, _c in graded] + progressed)
     if not graded:
-        out["status"] = "graded" if progressed else "unreadable"
+        # #5372: a distance or timed set (Hevy's no-RPE set types), every working set — a bare dict with no reps is not that
+        repsless = bool(working) and all(
+            not s.get("reps") and (s.get("distance_meters") or s.get("distance_m") or s.get("duration_seconds") or s.get("duration_sec"))
+            for s in working
+        )
+        out["status"] = "graded" if progressed else ("rpe_absent" if repsless else "unreadable")
         out["max_overage"] = 0.0 if progressed else None
         return out
 

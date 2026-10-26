@@ -15,15 +15,33 @@ flat? should I do intervals or climb a hill? Should I be pushing harder if I'm g
 
 THE NOTE (two lines at most)
 
-  line 1, one fixed grammar (`LINE1_RE`):
-      <machine> · <minutes> min · <dose> <flat | intervals a×b | hill | walk> · <effort rule>
+  line 1 — THE RULE LINE, one fixed grammar (`LINE1_RE`):
+      <machine> · <minutes> min · <dose> <flat | intervals a×b | hill | walk> · <clock rule> · <effort words>
       dose = "level <N> at <S> mph" (a bike; " at <S> mph" left out when no ride at that level is on
       record, "level <N> " left out only when no level is known at all) or "incline <I>% at <S> mph" /
       "incline <I>–<J>% at <S> mph" (the treadmill walk / its hill);
-      e.g. "Recumbent bike · 30 min · level 11 at 14.6 mph flat · RPE 4–5, full sentences"
-           "Treadmill · 30 min · incline 8% at 2.8 mph walk · RPE 4–6, full sentences"
-      The effort rule is the menu's RPE band and talk test (`cardio_menu.effort_words`) — never an HR
-      number while the 2026-10-10 constraint holds its HR half;
+      e.g. "Recumbent bike · 30 min · level 11 at 14.6 mph flat · level 11 for 30 · check in every 10 min · RPE 4–5,
+            full sentences"
+           "Recumbent bike · 30 min · level 10 at 12.3 mph hill · level 10 for 6 · then +1 level every 2 min from 6 to 14
+            · then -1 level every 2 min from 14 to 22 · then 10 from 22 to 30 · RPE 5–7, short phrases on the climbs"
+      The CLOCK RULE (#5374) is the block as he runs it from his wrist: an iPad covers the console, so nothing is set
+      up on the machine, and the watch does not alert, so every change is a minute he reads off the watch clock.
+      Its grammar — HOLD / ALT / RAMP / SPRINT clauses joined by " · then ", times in session-clock minutes — is
+      `training.wrist_clock`'s (`RULE_RE`, defined in that module's docstring and embedded in `LINE1_RE` as the
+      `clock` group). Every change point sits on the owner's 2/5/10-minute grid, every line asks him to remember at
+      most `wrist_clock.MAX_NUMBERS` machine numbers (owner amendment 2026-10-26), and the clock adds up to the
+      block's minutes exactly — the block's sets (and so `cardio_menu.movement_minutes`) are never touched.
+      The shapes, each dosed from the menu (`clock_shape`):
+        easy / the incline walk  one level the whole block, a talk-test check-in every `EASY_CHECK_IN_MINUTES`;
+        tempo                    one level held (the menu's tempo dose), the effort words name the talk test;
+        hills                    the base, then +step every `cardio_menu.HILL_STEP_MINUTES` up `HILL_CLIMB_STEPS`
+                                 steps (the treadmill: up to the top of the menu's incline band), the same back
+                                 down, the base to the end;
+        intervals                the base, then the menu's `efforts` × work-minutes at `INTERVAL_LEVEL_STEP` above it
+                                 every work+easy minutes, the base to the end.
+      The effort words are the menu's RPE band and talk test (`cardio_menu.effort_words`) — never an HR
+      number while the 2026-10-10 constraint holds its HR half. No line says "program" or "preset": nothing is
+      set up on the machine;
   line 2, the recovery answer, the dose's reason when it stepped (same RPE at a higher level / incline),
   then at most one sentence of why.
 
@@ -46,7 +64,9 @@ from __future__ import annotations
 import re
 from typing import Any
 
-CARDIO_NOTE_VERSION = "cardio-note@2.0.0"
+from training import wrist_clock
+
+CARDIO_NOTE_VERSION = "cardio-note@3.0.0"  # 3.0.0 = the clock rule on line 1 (#5374)
 
 # movement_key -> the machine as line 1 names it. `cycling` is the program's knee-sparing recumbent
 # (`recent_aerobic.cardio_pick`: "cycling (recumbent)").
@@ -67,21 +87,33 @@ GREEN_ADD_MINUTES = 5
 # PLATFORM-CHOSEN: each interval effort sits this many levels above the base, with the menu's easy block
 # at the base level between (the effort count and the minutes are the menu's, `cardio_menu.interval_set`).
 INTERVAL_LEVEL_STEP = 2
+# PLATFORM-CHOSEN (#5374): a bike / rower / elliptical hill climbs this many steps of `HILL_LEVEL_STEP` levels and comes
+# back down (the treadmill's climb is the menu's own incline band instead).
+HILL_CLIMB_STEPS = 4
+HILL_LEVEL_STEP = 1
+# PLATFORM-CHOSEN (#5374): an easy block's talk-test check-in, on the owner's 10-minute grid.
+EASY_CHECK_IN_MINUTES = 10
 LABELS = {
     "green_add_minutes": "platform-chosen",
     "interval_level_step": "platform-chosen",
+    "hill_climb_steps": "platform-chosen",
+    "hill_level_step": "platform-chosen",
+    "easy_check_in_minutes": "platform-chosen",
 }
 
 SHAPES = ("flat", "intervals", "hill", "walk")
 # kind -> line 1's shape word
 KIND_SHAPE = {"easy": "flat", "tempo": "flat", "intervals": "intervals", "hills": "hill", "incline_treadmill_walk": "walk"}
 
-# Line 1. The shape alternation is the grammar's own, so a fifth shape cannot slip in unnamed.
+# Line 1. The shape alternation is the grammar's own, so a fifth shape cannot slip in unnamed. The `clock` group is
+# `wrist_clock.RULE_PATTERN` (#5374); it is optional so a note composed before the clock rule still reads as composed.
 LINE1_RE = re.compile(
     r"^(?P<machine>[A-Z][A-Za-z ]+) · (?P<minutes>\d+) min · "
     r"(?:level (?P<level>\d+)(?: at (?P<mph>\d+(?:\.\d)?) mph)? "
     r"|incline (?P<incline>\d+(?:\.\d)?)(?:–(?P<incline_top>\d+(?:\.\d)?))?% at (?P<walk_mph>\d+(?:\.\d)?) mph )?"
-    r"(?P<shape>flat|intervals \d+×\d+|hill|walk) · (?P<effort>\S.*)$"
+    r"(?P<shape>flat|intervals \d+×\d+|hill|walk) · "
+    rf"(?:(?P<clock>{wrist_clock.RULE_PATTERN}) · )?"
+    r"(?P<effort>\S.*)$"
 )
 
 _INTERVAL_WORD = re.compile(r"\binterval|\b\d+\s*[x×]\s*\d+\b", re.IGNORECASE)
@@ -131,13 +163,31 @@ def strip_negated(note: str | None) -> str:
 
 
 def shape_of(note: str | None) -> str:
-    """The shape a performed ride's own note names. A note that names none is a flat ride."""
+    """The shape a performed ride's own note names. A note that names none is a flat ride.
+
+    #5374: his own clock grammar counts too ("8/12 for 2 mins for 20 mins" is intervals, "+1 level every 2 mins from
+    40 to 60" is a hill; a ride that mixes them takes the one with more minutes, `wrist_clock.family`)."""
     text = strip_negated(note)
     if _INTERVAL_WORD.search(text):
         return "intervals"
     if _HILL_WORD.search(text):
         return "hill"
+    clock = wrist_clock.parse_note(text)
+    if clock["status"] == "shaped":
+        return {"intervals": "intervals", "hills": "hill"}.get(clock["family"], "flat")
     return "flat"
+
+
+def clock_of(note: str | None) -> dict[str, Any] | None:
+    """The clock rule a composed note's line 1 carries, as its structured shape (`wrist_clock.parse_rule`), or None when
+    line 1 is not composed or predates the clock rule."""
+    m = LINE1_RE.match((note or "").strip().split("\n", 1)[0])
+    if not m or not m.group("clock"):
+        return None
+    shape = wrist_clock.parse_rule(m.group("clock"))
+    if shape is not None:
+        shape["total_min"] = int(m.group("minutes")) if shape.get("total_min") is None else shape["total_min"]
+    return shape
 
 
 def week_kinds(sessions_by_machine: dict[str, list[dict[str, Any]]] | None, week_start: str, target_date: str) -> list[str]:
@@ -157,6 +207,19 @@ def week_kinds(sessions_by_machine: dict[str, list[dict[str, Any]]] | None, week
     return [k for _, k in rows]
 
 
+def performed_shape(note_text: str | None, total_min: int | None = None) -> dict[str, Any]:
+    """A performed cardio block's own note as a structured clock shape (#5374; `training_notes.performed_shape`).
+
+    A composed note pasted back is read through its line-1 clock rule; anything else through his note grammar
+    (`wrist_clock.parse_note`). `total_min` (the block's logged duration) closes a clause with no end ("sprint 2
+    every 10"). The 10-25 note (verbatim, the test fixture) reads as three clauses over 60 minutes:
+        "8/12 for 2 mins for 20 mins / 8/14 for 2 mins for 20 mins / 8 level up every 2 mins from 40 to 60 to level 18"
+    -> alternate 8/12 every 2 min 0–20, alternate 8/14 every 2 min 20–40, +1 level every 2 min 40–60 from 8 to 18.
+    Deterministic, no model."""
+    composed = clock_of(note_text)
+    return composed if composed is not None else wrist_clock.parse_note(note_text, total_min)
+
+
 def prescribed_level(facts: dict[str, Any] | None, verdict: dict[str, Any] | None, *, constrained: bool) -> tuple[int | None, int | None]:
     """(today's level, the level to hold on a yellow/red day). (None, None) when no level is known.
 
@@ -164,20 +227,30 @@ def prescribed_level(facts: dict[str, Any] | None, verdict: dict[str, Any] | Non
     note called easy ("L9-10 is easy" -> 10). One level up only on a `raise` verdict (his own speed at
     the level clearing his own within-level spread, `cardio_progression.level_verdict`) and never
     while the "no push" gate holds."""
-    f = facts or {}
-    base = f.get("last_level")
-    if base is None:
-        for c in f.get("calibration") or []:
-            anchor = (c.get("anchors") or [{}])[0]
-            if str(anchor.get("verdict") or "").lower() == "easy" and anchor.get("level_high") is not None:
-                base = int(anchor["level_high"])
-                break
+    base = _base_level(facts)[0]
     if base is None:
         return None, None
     base = int(base)
     if not constrained and (verdict or {}).get("verdict") == "raise":
         return base + 1, base
     return base, base
+
+
+def _base_level(facts: dict[str, Any] | None) -> tuple[int | None, str]:
+    """(the base level, where it came from): the last ride's single level; failing that, the top of the span his own
+    calibration note called easy; failing that (#5374), the lowest level of his last ride when it was a clock-shaped ride
+    ("8/12 for 2 mins …" returns to 8) — never the shaped ride's top level, which the single-level reader used to take."""
+    f = facts or {}
+    if f.get("last_level") is not None:
+        return int(f["last_level"]), "last ride's level"
+    for c in f.get("calibration") or []:
+        anchor = (c.get("anchors") or [{}])[0]
+        if str(anchor.get("verdict") or "").lower() == "easy" and anchor.get("level_high") is not None:
+            return int(anchor["level_high"]), "his calibration note's easy span"
+    shaped = f.get("last_shape") or {}
+    if shaped.get("base_level") is not None:
+        return int(shaped["base_level"]), "the lowest level of his last (clock-shaped) ride"
+    return None, "no level on the record"
 
 
 def shape_label(kind: str) -> str:
@@ -195,29 +268,16 @@ def _fmt(v: float) -> str:
 
 
 def effort_rule(
-    kind: str, level: int | None, hr_ceiling_bpm: int | None = None, incline: float | None = None, minutes: int | None = None
+    kind: str, level: int | None = None, hr_ceiling_bpm: int | None = None, incline: float | None = None, minutes: int | None = None
 ) -> str:
-    """The effort rule: the menu's RPE band and talk test, plus the shape's own instruction.
-    `hr_ceiling_bpm` is the owner's redline CAP on the average (never a target), passed only when no
-    standing constraint forbids HR prescriptions."""
+    """The effort words: the menu's RPE band and talk test (tempo: under its label). The shape itself — the hard
+    minutes, the climb — is the clock rule's (`clock_shape`), never words here. `hr_ceiling_bpm` is the owner's
+    redline CAP on the average (never a target), passed only when no standing constraint forbids HR prescriptions.
+    `level` and `incline` are kept for callers; the clock rule carries them now."""
     from training import cardio_menu
 
     words = cardio_menu.effort_words(kind)
-    if kind == "intervals":
-        _n, work, easy = cardio_menu.interval_set()
-        hard = f"level {level + INTERVAL_LEVEL_STEP}" if level is not None else "a harder level"
-        band = cardio_menu.rpe_band("intervals")
-        rule = (
-            f"{work} min at {hard}, {easy} min easy between, RPE {band[0]} on the hard minutes"
-            if band
-            else f"{work} min at {hard}, {easy} min easy between"
-        )
-    elif kind == "hills" and incline is not None:
-        step = (cardio_menu.block("incline_treadmill_walk").get("step") or {}).get("incline_pct")
-        rule = f"{words}; up {_fmt(float(step or 1))}% every {cardio_menu.HILL_STEP_MINUTES} min, then back down"
-    elif kind == "hills":
-        rule = f"the hill program, {words}"
-    elif kind == "tempo":
+    if kind == "tempo":
         # the menu's label names its own minutes ("hard flat 40"); a block of another length is just "tempo"
         label = cardio_menu.block("tempo").get("label") if minutes == cardio_menu.own_minutes("tempo") else None
         rule = f"{label or 'tempo'}: {words}"
@@ -226,24 +286,75 @@ def effort_rule(
     return rule + (f", average HR ≤ {int(hr_ceiling_bpm)} bpm" if hr_ceiling_bpm else "")
 
 
-def dose_text(dose: dict[str, Any], kind: str) -> str:
-    """Line 1's dose words, with their trailing space (empty when no dose is known)."""
+def clock_shape(kind: str, minutes: int, dose: dict[str, Any], *, walk: bool) -> tuple[list[dict[str, Any]], str, int | None]:
+    """(the clauses, the unit, the check-in minutes) of the block's clock rule (#5374), dosed from the menu: the level (or
+    incline) is the dose's, the interval set and the incline band and step are the charter's
+    (`cardio_menu.interval_set`, `blocks.incline_treadmill_walk`), the step minutes are `cardio_menu.HILL_STEP_MINUTES`.
+    The clauses always add up to `minutes`. With no level on record the rule rides "base" (his own pick, by the RPE)."""
+    from training import cardio_menu
+
+    total = int(minutes)
+    if walk:
+        unit = "%"
+        base: Any = float(dose["incline_pct"]) if dose.get("incline_pct") is not None else "base"
+        base = wrist_clock.num(f"{base:g}") if isinstance(base, float) else base
+    else:
+        unit = "level"
+        base = dose.get("level") if dose.get("level") is not None else "base"
+    if kind == "hills":
+        every = int(cardio_menu.HILL_STEP_MINUTES)
+        if walk:
+            walk_block = cardio_menu.block("incline_treadmill_walk")
+            step = float((walk_block.get("step") or {}).get("incline_pct") or 1)
+            top = float(((walk_block.get("starting_dose") or {}).get("incline_pct") or [0, 0])[1])
+            steps = int(round((top - float(base)) / step)) if isinstance(base, (int, float)) and step > 0 else HILL_CLIMB_STEPS
+            step_v = wrist_clock.num(f"{step:g}")
+        else:
+            steps, step_v = HILL_CLIMB_STEPS, HILL_LEVEL_STEP
+        return wrist_clock.hill(base, step_v, steps, every, total), unit, None
+    if kind == "intervals" and not walk:
+        efforts, work, easy = cardio_menu.interval_set()
+        hard = base + INTERVAL_LEVEL_STEP if isinstance(base, int) else f"base+{INTERVAL_LEVEL_STEP}"
+        return wrist_clock.intervals(base, hard, efforts, work, easy, total), unit, None
+    check_in = EASY_CHECK_IN_MINUTES if kind in ("easy", "incline_treadmill_walk") else None
+    clauses, every_ = wrist_clock.steady(base, total, check_in)
+    return clauses, unit, every_
+
+
+def clock_rule(kind: str, minutes: int, dose: dict[str, Any], *, walk: bool) -> str:
+    """The block's clock rule as one line under `wrist_clock.RULE_RE`."""
+    clauses, unit, check_in = clock_shape(kind, minutes, dose, walk=walk)
+    return wrist_clock.render(clauses, unit, check_in)
+
+
+def dose_text(dose: dict[str, Any], kind: str, peak: float | None = None) -> str:
+    """Line 1's dose words, with their trailing space (empty when no dose is known). `peak` is the top of the clock rule's
+    climb on a treadmill hill (#5374: the band the rule actually climbs, so the two never disagree)."""
     if dose.get("incline_pct") is not None:
         inc = float(dose["incline_pct"])
         if kind == "hills":
-            from training import cardio_menu
+            if peak is None:
+                from training import cardio_menu
 
-            top = (cardio_menu.block("incline_treadmill_walk").get("starting_dose") or {}).get("incline_pct") or [inc, inc]
-            return f"incline {_fmt(inc)}–{_fmt(max(inc, float(top[1])))}% at {dose['mph']} mph "
+                top = (cardio_menu.block("incline_treadmill_walk").get("starting_dose") or {}).get("incline_pct") or [inc, inc]
+                peak = max(inc, float(top[1]))
+            if float(peak) > inc:
+                return f"incline {_fmt(inc)}–{_fmt(float(peak))}% at {dose['mph']} mph "
         return f"incline {_fmt(inc)}% at {dose['mph']} mph "
     if dose.get("level") is None:
         return ""
     return f"level {dose['level']}" + (f" at {dose['mph']} mph " if dose.get("mph") is not None else " ")
 
 
-def line1(machine: str, minutes: int, kind: str, dose: dict[str, Any], hr_ceiling_bpm: int | None = None) -> str:
-    rule = effort_rule(kind, dose.get("level"), hr_ceiling_bpm, dose.get("incline_pct"), int(minutes))
-    return f"{machine} · {int(minutes)} min · {dose_text(dose, kind)}{shape_label(kind)} · {rule}"
+def line1(machine: str, minutes: int, kind: str, dose: dict[str, Any], hr_ceiling_bpm: int | None = None, *, walk: bool = False) -> str:
+    """THE RULE LINE: machine · minutes · dose and shape · the clock rule · the effort words."""
+    words = effort_rule(kind, dose.get("level"), hr_ceiling_bpm, dose.get("incline_pct"), int(minutes))
+    clock = clock_rule(kind, int(minutes), dose, walk=walk)
+    peak = None
+    if walk and kind == "hills":
+        shape = wrist_clock.parse_rule(clock)
+        peak = (shape or {}).get("top_level")
+    return f"{machine} · {int(minutes)} min · {dose_text(dose, kind, peak)}{shape_label(kind)} · {clock} · {words}"
 
 
 def recovery_answer(
@@ -347,7 +458,8 @@ def compose(
         hold = f"level {dose['hold_level']}" if dose.get("hold_level") is not None else None
     # the owner's walking HR cap rides only an easy block, and never under the constraint's HR half
     cap = None if (constraint or kind in cardio_menu.HARD) else hr_ceiling_bpm
-    first = line1(machine, int(minutes), kind, dose, cap)
+    first = line1(machine, int(minutes), kind, dose, cap, walk=is_walk)
+    clock = clock_of(first)
     from training import recent_aerobic
 
     # #5076: a block off the default walk says why. A conditioning kind the menu never runs on the treadmill states
@@ -375,18 +487,15 @@ def compose(
         "mph": dose.get("mph"),
         "incline_pct": dose.get("incline_pct"),
         "dose_reason": dose.get("reason") or None,
-        "level_basis": (
-            dose.get("basis")
-            if is_walk
-            else (
-                "last ride's level"
-                if (facts or {}).get("last_level") is not None
-                else ("his calibration note's easy span" if dose.get("level") is not None else "no level on the record")
-            )
-        ),
+        "level_basis": dose.get("basis") if is_walk else _base_level(facts)[1],
         "verdict": _verdict_word(verdict, dose, is_walk),
         "rpe": list(cardio_menu.rpe_band(kind) or ()),
         "minutes": int(minutes),
+        # #5374: the clock rule as he runs it from his wrist, and its structure (adherence grades against it)
+        "clock_rule": m1.group("clock") if (m1 := LINE1_RE.match(first)) else None,
+        "clock": {k: (clock or {}).get(k) for k in ("family", "total_min", "change_points", "levels", "unit")} if clock else None,
+        "clock_off_grid": wrist_clock.off_grid(clock),
+        "clock_numbers": wrist_clock.numbers_to_remember(clock),
         "constraint": (constraint or {}).get("id"),
         "no_push_gate": gate,
         "recovery_band": recovery_band,
