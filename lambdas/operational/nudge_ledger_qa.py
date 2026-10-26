@@ -320,3 +320,71 @@ def check_checkin_pair_liveness(table, Check, tier, pt_now, *, lookback_days=STE
     else:
         c.ok(f"check-in pair row present for each of the last {len(days)} completed day(s)")
     return [c]
+
+
+# #5132: the morning check-in's dead-man. ``telegram-coach-worker`` stamps ``COACH#morning_checkin / EVAL#<Pacific day>``
+# on every weekday run (``coach.morning_checkin_ledger``): ``reason`` is ``sent`` or the skip that stood it down.
+MORNING_CHECKIN_LEDGER_PK = "COACH#morning_checkin"  # = coach.morning_checkin_ledger.LEDGER_PK (contract test)
+MORNING_CHECKIN_ARMED_ON = "2026-10-27"  # first Pacific day a stamp can exist on (the deploy follows the 10-26 first live send)
+MORNING_CHECKIN_LOOKBACK_DAYS = 14  # calendar days; enough weekdays to see a repeating skip across two weekends
+MORNING_SILENT_FAIL = 2  # consecutive completed weekdays with neither a send nor a sanctioned skip
+MORNING_REPEAT_WARN = 5  # consecutive completed weekdays with the SAME sanctioned skip and no send in between
+
+
+def check_morning_checkin_liveness(
+    table, Check, tier, pt_now, *, lookback_days=MORNING_CHECKIN_LOOKBACK_DAYS, armed_on=MORNING_CHECKIN_ARMED_ON
+):
+    """#5132: the weekday morning check-in must either send or stand down for a named reason.
+
+    Judged over COMPLETED Pacific weekdays (yesterday and earlier) on or after ``armed_on``; Saturday and Sunday
+    never count (the rule is MON-FRI and the worker stamps nothing on a weekend), so a Fri->Mon gap is two days
+    apart but ONE weekday apart. Per weekday the row's ``reason`` is:
+
+      * ``sent`` or a sanctioned skip (``dark``, ``quiet_hours``, ``silence_respected``, ``budget``, ``capped``,
+        ``held`` — ``coach.morning_checkin_ledger.SANCTIONED``): the rule ran and said why. Alive.
+      * anything else (``empty``, ``error:<class>``, an unknown token) or NO row: the rule did not run or did not
+        complete. Silent.
+
+    FAIL when the newest ``MORNING_SILENT_FAIL`` (2) completed weekdays are all silent. WARN when the newest
+    ``MORNING_REPEAT_WARN`` (5) completed weekdays carry the same sanctioned skip and no send: an alive rule that
+    never speaks is the 2026-10-01 ... 10-25 ``silence_respected`` latch, which nothing was reading. A single
+    silent weekday, or fewer completed weekdays than a rule needs, is OK — the check never judges thin evidence.
+    """
+    c = Check("morning_checkin:weekday_liveness", "Data Freshness", tier)
+    today = pt_now().date()
+    days = [today - timedelta(days=n) for n in range(1, lookback_days + 1)]
+    days = [d.isoformat() for d in days if d.weekday() < 5 and d.isoformat() >= armed_on]  # newest first
+    if not days:
+        c.ok(f"morning check-in pending: armed on {armed_on}, no completed weekday to judge yet")
+        return [c]
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(MORNING_CHECKIN_LEDGER_PK)
+            & Key("sk").between(f"{STEPS_EVAL_PREFIX}{min(days)}", f"{STEPS_EVAL_PREFIX}{max(days)}")
+        )
+        reasons = {str(r.get("sk"))[len(STEPS_EVAL_PREFIX) :]: str(r.get("reason") or "") for r in resp.get("Items") or []}
+    except Exception as exc:  # noqa: BLE001
+        c.fail(f"morning check-in ledger - DDB error: {exc}")
+        return [c]
+    from coach.morning_checkin_ledger import SANCTIONED, SENT
+
+    outcomes = [(d, reasons.get(d)) for d in days]  # (day, reason or None), newest first
+    silent = [d for d, r in outcomes if r not in SANCTIONED]
+    if len(days) >= MORNING_SILENT_FAIL and all(r not in SANCTIONED for _, r in outcomes[:MORNING_SILENT_FAIL]):
+        shown = ", ".join(f"{d}={r or 'no row'}" for d, r in outcomes[:MORNING_SILENT_FAIL])
+        c.fail(
+            f"morning check-in silent on the last {MORNING_SILENT_FAIL} weekdays with neither a send nor a sanctioned skip: {shown} "
+            "(#5132 - the 17:15Z worker run did not complete)"
+        )
+        return [c]
+    window = outcomes[:MORNING_REPEAT_WARN]
+    first = window[0][1]
+    if len(window) >= MORNING_REPEAT_WARN and first in SANCTIONED and first != SENT and all(r == first for _, r in window):
+        c.warn(
+            f"morning check-in has stood down as '{first}' on each of the last {MORNING_REPEAT_WARN} weekdays "
+            f"({window[-1][0]} .. {window[0][0]}) and sent nothing - the rule is alive but is not speaking"
+        )
+        return [c]
+    sent = sum(1 for _, r in outcomes if r == SENT)
+    c.ok(f"morning check-in accounted for on {len(days) - len(silent)} of the last {len(days)} completed weekday(s) ({sent} sent)")
+    return [c]
