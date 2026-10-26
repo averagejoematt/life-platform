@@ -197,6 +197,7 @@ def test_every_other_refusal_names_its_reason():
         wm.NO_FEEDING_CORE: _menu(no_protein),
         wm.NO_PLAN: wm.build({"days": []}, anchors_raw=ANCHORS),
         wm.NO_POLICY: _menu(read=lambda p: None if p == wm.POLICY_PATH else _cv(p)),
+        wm.FIXED_MEAL_UNREADABLE: _menu(fixed_meals_raw=[{"id": "t_fixed", "slot": "dinner", "kcal": "x", "days": ["Monday"]}]),
     }
     problems = [
         f"{code}: got {out.get('built')} / {out.get('reason_code')}"
