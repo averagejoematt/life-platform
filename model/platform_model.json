@@ -3846,6 +3846,13 @@
       "direction": "read",
       "lambda": "field-notes-generate",
       "module": "lambdas/intelligence/field_notes_lambda.py",
+      "partition": "hevy",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "field-notes-generate",
+      "module": "lambdas/intelligence/field_notes_lambda.py",
       "partition": "notion",
       "via": "pk"
     },
@@ -3946,6 +3953,13 @@
       "module": "lambdas/intelligence/journal_analyzer_lambda.py",
       "partition": "notion",
       "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/intelligence/labelled_facts.py",
+      "partition": "hevy",
+      "via": "seam"
     },
     {
       "direction": "read",
@@ -8190,7 +8204,7 @@
       "contracts_enrolled": 15,
       "contracts_known": 15,
       "contracts_ratchet": 15,
-      "edges": 792,
+      "edges": 794,
       "lambdas": 108,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
@@ -8205,8 +8219,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 395,
-        "sites_resolved": 997,
-        "sites_total": 1392
+        "sites_resolved": 1000,
+        "sites_total": 1395
       },
       "schedule_resolution": {
         "dynamic": 0,
