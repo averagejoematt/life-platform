@@ -215,5 +215,7 @@ He authors at night and trains the next morning with **zero chance to adjust.**
   bike is fine.
 - ACWR: strength load (Hevy) and cardio load (Strava) are tracked separately; read an ACWR
   alert in that siloed context.
+- How he records the gym (owner ruling 2026-10-26, #5370): lift = Hevy, with Hevy's watch app for HR; cardio = the
+  Hevy block as the plan + the watch Workout app for HR; mobility = the Hevy block + the pliability app. Echoes fold in code.
 - Never congratulate him on the 100 lb milestone: it is a goal, not an achievement.
 - Nothing medical leaves this chat: not in an issue, a commit, a routine title or site copy.
