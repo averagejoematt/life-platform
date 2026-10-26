@@ -702,7 +702,7 @@ def _progress_block(
     (never lowers) the working sets on a `step` / `floor_raise`, and writes the reason into the
     exercise note — the cue pass's channel, so the note says why the load moved or held. The reason
     leads the note (#5083): a cut of the visible note lands on the history cue behind it, never on it."""
-    from training import load_progression as lp
+    from training import load_progression as lp, logging_conventions as lc
     from training.load_ramp import _rep_range_of
 
     entry = (catalog.get("movements") or {}).get(block.movement_key) or {}
@@ -716,6 +716,7 @@ def _progress_block(
         exposure=str(block.rationale_tag).split(":")[-1] if ":" in str(block.rationale_tag or "") else None,
         re_entry_reason=floor.get("layoff_reason"),
         hold_reason=hold_reason,
+        load_convention=lc.load_convention_of(entry),  # #5373: the reason names a per-hand / total-carried load as such
     )
     prog["changes"] = lp.apply_to_sets(block.sets, prog)
     if prog["reason"] and (prog["changes"] or prog["basis"] != lp.BASIS_HOLD or current):

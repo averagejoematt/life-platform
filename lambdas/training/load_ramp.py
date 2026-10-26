@@ -893,6 +893,7 @@ def _exposure_progression(e: dict[str, Any], entry: dict[str, Any], sessions: li
     """`load_progression.next_prescription` for one planner exposure (#5052) — the same inputs the
     generator's `_progress_block` hands it, so the plan and the draft cannot disagree on the load."""
     from training import load_progression as lp
+    from training.logging_conventions import load_convention_of
 
     return lp.next_prescription(
         list(sessions),
@@ -901,6 +902,7 @@ def _exposure_progression(e: dict[str, Any], entry: dict[str, Any], sessions: li
         cls=lp.movement_class(entry),
         exposure=e.get("intensity"),
         re_entry_reason=ramped.get("layoff_reason"),
+        load_convention=load_convention_of(entry or {}),  # #5373: the same label the generator's note carries
     )
 
 

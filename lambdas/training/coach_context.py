@@ -44,7 +44,9 @@ from __future__ import annotations
 import json
 from typing import Any, Iterable, Optional
 
-CONTEXT_VERSION = "coach-context@1.7.0"  # 1.7.0 #5122: day_mode (the whole-day disruption mode + the lapse offer, owner channel); 1.6.0 #5126: response_protocol (the ONE early-warning owner, owner channel); 1.5.0 #5111: lab_followup (the next draw, owner channel); 1.4.0 #5200: the May tracker read on every caller path + not_supplied_reason; 1.3.0 #5111: lab_priorities (owner channel, seam only); 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
+from training.logging_conventions import CONVENTIONS_LINE  # #5373: the one line both conventions are stated in
+
+CONTEXT_VERSION = "coach-context@1.8.0"  # 1.8.0 #5373: logging_conventions (steps on a carry, per-hand vs total load); 1.7.0 #5122: day_mode (the whole-day disruption mode + the lapse offer, owner channel); 1.6.0 #5126: response_protocol (the ONE early-warning owner, owner channel); 1.5.0 #5111: lab_followup (the next draw, owner channel); 1.4.0 #5200: the May tracker read on every caller path + not_supplied_reason; 1.3.0 #5111: lab_priorities (owner channel, seam only); 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
 
 # ── the order contract, as data ───────────────────────────────────────────────────────────
 ORDER: tuple[str, ...] = ("pre_flight", "plan_next_session", "manage_hevy_routine draft")
@@ -69,6 +71,7 @@ SRC_BLOCK = "plan_next_session stage 1 (training.plan_engine.constraint_block)"
 SRC_TRACKER = "the May tracker (#5073)"
 SRC_MAY = "config/training_charter.json governing_goal.target_date (owner-only)"
 SRC_RUN_GATE = "training.run_onramp.gate_state (the May tracker's running_gate, #5090)"
+SRC_LOGGING = "training.logging_conventions.CONVENTIONS_LINE (the owner's rules, #5373)"
 
 NOT_SUPPLIED = "not_supplied"
 _VALUE_CHARS = 160  # one packet value in the text block is clipped here; the dict keeps it whole
@@ -340,6 +343,9 @@ def assemble(
         "response_protocol": None if published else response_protocol,  # #5126: coach.response_protocol.view (owner channel)
         "day_mode": None if published else day_mode,  # #5122: training.life_disruption.mode (owner channel)
         "not_supplied": sorted(k for k, s in sections.items() if s.get("state") == NOT_SUPPLIED),
+        # #5373: the owner's two Hevy logging conventions in one line, so no coach asks "what's in each hand" or reads a carry's
+        # step count as a distance. A rule, no value — safe on a published prompt too.
+        "logging_conventions": {"source": SRC_LOGGING, "line": CONVENTIONS_LINE},
     }
     out["not_supplied_reason"] = {k: sections[k].get("detail") for k in out["not_supplied"]}  # #5200: each absence says why
     out["text"] = render(out)
@@ -357,6 +363,7 @@ def summary(ctx: dict[str, Any]) -> dict[str, Any]:
         "may_tracker_week": ((ctx.get("sections") or {}).get("may_tracker") or {}).get("week_start"),
         "may_frame": (ctx.get("may_frame") or {}).get("line"),
         "run_gate": (ctx.get("run_gate") or {}).get("line"),
+        "logging_conventions": (ctx.get("logging_conventions") or {}).get("line"),  # #5373
         "lab_followup": (ctx.get("lab_followup") or {}).get("line"),
         "response_owner": (ctx.get("response_protocol") or {}).get("owner"),  # #5126
         "day_mode": (ctx.get("day_mode") or {}).get("scope"),  # #5122
@@ -462,6 +469,9 @@ def render(ctx: dict[str, Any]) -> str:
     """The text block for a prompt: every section headed with its source; absence stated."""
     s = ctx["sections"]
     parts: list[list[str]] = [_render_charter(s["charter"]), _render_panel(s["panel_synthesis"])]
+    lc = ctx.get("logging_conventions")
+    if lc and lc.get("line"):  # #5373: how he logs a carry and a dumbbell — before any number a coach reads
+        parts.append([f"LOGGING CONVENTIONS [{lc['source']}]", f"- {lc['line']}"])
     parts.append(_render_guidance(s["clinical_guidance"], ctx["published"]))
     pk = s["plan_packet"]
     parts.append(

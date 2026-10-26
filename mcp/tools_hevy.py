@@ -21,6 +21,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from common.pacific_time import pacific_now, pacific_weekday  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from training import logging_conventions  # #5373: steps on a carry, per-hand vs total-carried load, his stride
 from training.carry_line import carry_line  # #5372: a carry's own line — load and steps, outside the rep tonnage
 from training.legacy_workouts import LEGACY_WORKOUTS_PARTITION, day_workouts  # #4636: the ONE retired-shape reader
 
@@ -130,8 +131,22 @@ def _expand_legacy_aggregate(item: dict, source_label: str) -> list[dict]:
     return expanded
 
 
-def _slim_workout(item: dict, include_sets: bool = False) -> dict:
-    """Project a DDB workout item into a stable shape for callers."""
+def _carry_stride(day: str | None) -> dict | None:
+    """#5373: his stride for a carry's estimated distance — the median watch `walking_step_length_in` over the 14 completed days
+    before the workout's day (`logging_conventions.trailing_stride`). A failed read is `read_failed`: the line is steps only."""
+    if not day:
+        return None
+    start, end = logging_conventions.stride_window(str(day)[:10])
+    try:
+        rows = query_source_range("apple_health", start, end) or []
+    except Exception:  # noqa: BLE001 — a failed read is stated, never an invented stride
+        rows = None
+    return logging_conventions.trailing_stride(rows, str(day)[:10])
+
+
+def _slim_workout(item: dict, include_sets: bool = False, stride: dict | None = None) -> dict:
+    """Project a DDB workout item into a stable shape for callers. `stride` (#5373): his measured stride for a carry's
+    labelled estimated distance; None = steps only."""
     out = {
         "workout_uid": item.get("workout_uid"),
         "source": item.get("source"),
@@ -155,12 +170,16 @@ def _slim_workout(item: dict, include_sets: bool = False) -> dict:
         out["exercises"] = item.get("exercises", [])
         # #5372: a carry (the farmers walk) is reported on its own line — load as logged and the step count from the distance
         # field — and stays out of `total_volume_kg` (weight x reps; a carry has no reps). Never weight x distance.
+        # #5373: each carry set also renders as "N steps (~X yd, est. from unloaded stride)" (steps only with no measured stride),
+        # and the load is named `total_carried`; `logging_conventions.CONVENTIONS_LINE` states both conventions once.
         carries = []
         for ex in item.get("exercises") or []:
-            line = carry_line(ex.get("name") or ex.get("title") or "", ex.get("sets"))
+            line = carry_line(ex.get("name") or ex.get("title") or "", ex.get("sets"), template_id=ex.get("template_id"), stride=stride)
             if line:
                 carries.append({"name": ex.get("name") or ex.get("title"), "template_id": ex.get("template_id"), **line})
         out["carries"] = carries
+        if carries:
+            out["logging_conventions"] = logging_conventions.CONVENTIONS_LINE
         out["description"] = item.get("description", "")
         out["raw_ref"] = item.get("raw_ref")
     return out
@@ -286,5 +305,11 @@ def tool_get_workout_detail(args: dict) -> dict:
     items = query_source_range(source, start_date, end_date, include_pilot=True) or []
     for it in items:
         if it.get("source_workout_id") == source_id:
-            return {"workout": _slim_workout(it, include_sets=True)}
+            return {"workout": _slim_workout(it, include_sets=True, stride=_stride_if_carry(it))}
     return {"error": f"workout not found for uid {uid!r}"}
+
+
+def _stride_if_carry(item: dict) -> dict | None:
+    """The stride read only when the workout has a carry (#5373) — one apple_health read, never for a session without one."""
+    has_carry = any(carry_line(ex.get("name") or ex.get("title") or "", ex.get("sets")) for ex in item.get("exercises") or [])
+    return _carry_stride(item.get("date")) if has_carry else None

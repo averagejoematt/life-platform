@@ -32,7 +32,10 @@ WHAT IT DOES
          `reviewed: false` unless written;
        * every other logged id becomes a generated `provenance: hevy_history`,
          `reviewed: false` entry, rebuilt from scratch on each run.
-     Every entry gets `anchor_family` from `training.movement_catalog.anchor_family`.
+     Every entry gets `anchor_family` from `training.movement_catalog.anchor_family`, and the owner's
+     logging conventions (#5373 — `distance_unit_convention: steps`, `load_convention: total_carried |
+     per_hand`) from `training.logging_conventions.derive_conventions`, written only where the field
+     is absent, so a value a human writes on a kept entry wins.
 
 THE DERIVATION RULES (each stated with its reason)
 
@@ -77,6 +80,7 @@ from typing import Any, Iterable
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path[:0] = [os.path.join(REPO_ROOT, "lambdas"), REPO_ROOT]
 
+from training.logging_conventions import derive_conventions  # noqa: E402
 from training.movement_catalog import (  # noqa: E402
     PROVENANCE_COACH,
     PROVENANCE_CURATED,
@@ -414,6 +418,9 @@ def build_catalog(current: dict[str, Any], history: dict[str, Any], metadata: di
 
     ordered = dict(sorted(generated.items(), key=lambda kv: (-kv[1]["sessions"], kv[0])))
     movements = kept | ordered
+    for entry in movements.values():  # #5373: the owner's logging conventions — absent fields only, so a written value wins
+        for field, value in derive_conventions(entry).items():
+            entry.setdefault(field, value)
     tiers = Counter(int(v.get("skill_tier", 0)) for v in movements.values())
     families = Counter(v["anchor_family"] for v in movements.values() if v.get("anchor_family"))
     return {
@@ -455,6 +462,11 @@ def build_catalog(current: dict[str, Any], history: dict[str, Any], metadata: di
             "coach_added": "A never-trained exercise may be added as {title, hevy_template_id_hint, provenance: coach_added}; "
             "the builder fills absent fields from Hevy metadata and keeps every written field. See "
             "training/movement_catalog.py.",
+            "logging_conventions": "training/logging_conventions.derive_conventions (#5373, the owner's rules): "
+            "distance_unit_convention=steps on every Hevy short_distance_weight entry (he counts steps and types the count in "
+            "the yards field; no gym markings); load_convention=total_carried on a carry by title (carry/farmer/suitcase), "
+            "per_hand on a bilateral dumbbell exercise (one dumbbell's weight logged); absent = as logged. Written only where "
+            "absent, so a hand-written value wins.",
         },
         "movements": movements,
     }

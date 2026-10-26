@@ -167,7 +167,9 @@ def test_5317_mutation_control_the_literal_cue_reds_the_walk():
     and the walk names the 1-set press, the 2-set pulldowns and the 3- and 4-set accessories."""
     literal = {i: program_structure.EXPOSURES[i]["cue"] for i in program_structure.EXPOSURES}
     literal["carry"] = "CARRY: 2 carries of 40 s @ RPE 8–9"
-    with patch.object(program_structure, "exposure_cue", lambda intensity, sets: literal[intensity]):
+    with patch.object(
+        program_structure, "exposure_cue", lambda intensity, sets, **_kw: literal[intensity]
+    ):  # #5373: a carry passes stride=
         bad = _walk()
     assert any(f"{SA} machine_shoulder_press" in b or f"{SA} db_shoulder_press" in b for b in bad), bad
     assert any("lat_pulldown" in b for b in bad) and any("calf_raise_machine" in b for b in bad), bad

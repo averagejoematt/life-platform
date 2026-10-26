@@ -34,7 +34,8 @@ WHAT THIS MODULE IS
   `lambdas/training/`.
 * `window_days` / `window_weeks` — whole-day, inclusive window arithmetic (7 days = 1.0 week).
 
-Pure: no AWS, no clock. Input workouts are `mcp.strength_helpers.normalize_hevy_items` shape.
+Pure: no clock; the one read is the movement catalog behind `logging_conventions.load_convention_for` (#5373 — local
+`config/`, else its S3 twin; cached, fail-soft). Input workouts are `mcp.strength_helpers.normalize_hevy_items` shape.
 """
 
 from __future__ import annotations
@@ -45,6 +46,7 @@ from typing import Any, Iterable
 from common.pacific_time import parse_day_key
 
 from training.legacy_workouts import day_workouts  # #4636: the ONE reader of the retired per-day shape
+from training.logging_conventions import AS_LOGGED, load_convention_for, total_load  # #5373: per-hand vs total-carried load
 from training.template_muscle_overrides import muscle_override_for
 
 #: The stated fraction a named secondary muscle is credited per working set. 0.5 is the
@@ -55,6 +57,12 @@ SECONDARY_FRACTION = 0.5
 #: Set types that are NOT working sets. Hevy's set types are normal / warmup / failure /
 #: dropset; a failure set and a drop set are both hard sets, a warm-up is not.
 NON_WORKING_SET_TYPES = frozenset({"warmup", "warm_up", "warm-up"})
+
+#: What `volume_lbs` sums (#5373), echoed on every result so no reader takes it for the logged per-hand number.
+VOLUME_BASIS = (
+    "load x reps over working sets, as the TOTAL moved: a per-hand dumbbell load counts both hands (x 2); a carry's load is the "
+    "total carried and it has no reps, so it adds nothing (training.logging_conventions)"
+)
 
 #: The muscle vocabulary (matches `_VOLUME_LANDMARKS` in mcp/strength_helpers.py and the
 #: `template_muscle_overrides` labels).
@@ -342,9 +350,14 @@ def normalize_hevy_items(hevy_items: list) -> list[dict]:
         from training.carry_line import carry_line
 
         name = ex.get("name") or ex.get("exercise_name") or ""
-        line = carry_line(name, ex.get("sets"))  # #5372: a carry's own line — load and steps, outside the rep tonnage
+        tid = ex.get("template_id")
+        line = carry_line(name, ex.get("sets"), template_id=tid)  # #5372: a carry's own line — load and steps, outside the rep tonnage
+        # #5373: how the load was logged — `per_hand` (one dumbbell of two) or `total_carried` (a carry's sum) — so a reader
+        # never reads a per-hand 50 as a 50-lb total; absent when the logged load is the whole load (`as_logged`)
+        convention = load_convention_for(name, tid, ex.get("sets"))
         return {
             **({"carry": line} if line else {}),
+            **({"load_convention": convention} if convention != AS_LOGGED else {}),
             "name": name,
             # #3766: the stable Hevy template id and the freeform note, both additive. The
             # id is what lets a caller ask by template rather than by a fuzzy name; the note
@@ -381,6 +394,16 @@ def normalize_hevy_items(hevy_items: list) -> list[dict]:
     return out
 
 
+def session_tonnage_lbs(workout: dict[str, Any]) -> float:
+    """One normalised session's tonnage — every logged set's load x reps, in lb — as the TOTAL moved (#5373): a per-hand
+    dumbbell load counts both hands (the exercise's `load_convention` from `normalize_hevy_items`); a carry has no reps, so 0."""
+    return sum(
+        total_load(s.get("weight_lbs"), ex.get("load_convention") or AS_LOGGED) * int(s.get("reps") or 0)
+        for ex in workout.get("exercises") or []
+        for s in ex.get("sets") or []
+    )
+
+
 def working_sets_by_muscle(
     workouts: Iterable[dict[str, Any]], start_date: str | None = None, end_date: str | None = None
 ) -> dict[str, Any]:
@@ -395,7 +418,8 @@ def working_sets_by_muscle(
     Per working set of an exercise: the row's primary muscle gets 1.0, each secondary it
     NAMES gets its stated fraction. Returns:
       muscles[m] = {direct_sets (int), secondary_sets (float), total_sets (float), volume_lbs}
-        `volume_lbs` is PRIMARY-attributed tonnage only, so it is never double-counted.
+        `volume_lbs` is PRIMARY-attributed tonnage only, so it is never double-counted. It is the TOTAL load moved
+        (#5373): a per-hand dumbbell load counts both hands (`logging_conventions.total_load`).
       pattern_sets, warmup_sets_excluded, working_sets_counted, dates_counted,
       non_resistance (names excluded by design), unattributed (names this taxonomy does not know),
       exercise_sets (#5164: the counted working sets per logged exercise — name + template id).
@@ -440,7 +464,10 @@ def working_sets_by_muscle(
             exercise_sets[ex_key] = exercise_sets.get(ex_key, 0) + n
             primary = _row(attr["primary"])
             primary["direct_sets"] += n
-            primary["volume_lbs"] += sum(float(s.get("weight_lbs") or 0) * int(s.get("reps") or 0) for s in working)
+            # #5373: tonnage is a TOTAL — a per-hand dumbbell load counts both hands (x 2), a carry's total as logged (it has no
+            # reps, so it adds 0 here by construction)
+            convention = load_convention_for(ex.get("name") or "", ex.get("template_id"), sets)
+            primary["volume_lbs"] += sum(total_load(s.get("weight_lbs"), convention) * int(s.get("reps") or 0) for s in working)
             for m, frac in attr["secondary"].items():
                 _row(m)["secondary_sets"] += n * frac
             pattern_sets[attr["movement_pattern"]] = pattern_sets.get(attr["movement_pattern"], 0) + n
@@ -462,6 +489,7 @@ def working_sets_by_muscle(
         "dates_counted": sorted(dates),
         "non_resistance": [{"name": k, "sets": v} for k, v in sorted(non_resistance.items())],
         "unattributed": [{"name": k[0], "template_id": k[1] or None, "working_sets": v} for k, v in sorted(unattributed.items())],
+        "volume_basis": VOLUME_BASIS,
         # #5164: the same working sets, per logged exercise — what a movement-counted floor (side/rear delts) is summed
         # from (`volume_floors.logged_movement_sets`), so pressing cannot stand in for lateral/rear-delt work. Not a
         # second count: each entry is this loop's own `n`, keyed by exercise instead of credited to a muscle.

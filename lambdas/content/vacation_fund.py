@@ -14,7 +14,8 @@ Sources (additive, per the user's choice — see plan / ADR):
                             Strava already holds Zwift VirtualRides + Garmin auto-syncs
                             + outdoor walks/runs, so Garmin is NOT counted separately.
   - hevy (opt-in)           per-workout records; cardio distance at
-                            `exercises[].sets[].distance_m` (METERS).
+                            `exercises[].sets[].distance_m` (METERS) — except on a carry, whose
+                            distance field is the owner's step count (#5373) and is skipped.
   - macrofactor_export      legacy daily aggregate partition `macrofactor_workouts`;
                             `workouts[].exercises[].sets[].{distance_miles, distance_yards}`.
 
@@ -40,6 +41,7 @@ from common.constants import EXPERIMENT_START_DATE
 from common.repo_config import config_dir
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from training.legacy_workouts import LEGACY_WORKOUTS_PARTITION, day_workouts  # #4636: the ONE retired-shape reader
+from training.logging_conventions import is_step_count  # #5373: a carry's distance is a step count, never miles
 
 logger = logging.getLogger("vacation_fund")
 
@@ -176,10 +178,18 @@ def _strava_miles(start_date: str, end_date: str, included_sport_types):
     return round(total, 2), per_sport
 
 
+def _step_count(ex: dict[str, Any]) -> bool:
+    """#5373: a carry's distance field is the owner's STEP COUNT (`distance_unit_convention: steps`), never metres or yards —
+    it is not workout miles, so it is never summed into the fund (an estimate from his stride is not a measured distance)."""
+    return is_step_count(ex.get("name") or ex.get("title"), ex.get("template_id"), ex.get("sets"))
+
+
 def _hevy_miles(start_date: str, end_date: str) -> float:
     miles = 0.0
     for w in _query_range("hevy", start_date, end_date):
         for ex in w.get("exercises") or []:
+            if _step_count(ex):
+                continue
             for s in ex.get("sets") or []:
                 miles += _f(s.get("distance_m")) * _MI_PER_METER
     return round(miles, 2)
@@ -190,6 +200,8 @@ def _macrofactor_miles(start_date: str, end_date: str) -> float:
     for day in _query_range(_SOURCE_PARTITION["macrofactor_export"], start_date, end_date):
         for w in day_workouts(day):
             for ex in w.get("exercises") or []:
+                if _step_count(ex):  # #5373: the archive mirrors the same Hevy log — a carry's distance is steps there too
+                    continue
                 for s in ex.get("sets") or []:
                     if s.get("distance_miles") is not None:
                         miles += _f(s.get("distance_miles"))
