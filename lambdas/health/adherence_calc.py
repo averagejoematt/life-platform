@@ -511,7 +511,23 @@ def _as_prescribed_by_kind(movements: list[dict[str, Any]], muscle_of: dict[str,
             "intensity_status": rollup["status"],
             "movements": sorted(m["movement_key"] for m in mine),
         }
+        if kind == KIND_CARDIO:
+            # #5374: the performed clock shape against the prescribed one, per block — named facts beside the verdict,
+            # never folded into it (the verdict is still sets AND intensity)
+            out[kind]["shape"] = {m["movement_key"]: m["shape"] for m in mine if m.get("shape")}
     return out
+
+
+def _cardio_shape(prescribed_note: str, performed_exs: list[dict[str, Any]]) -> dict[str, Any]:
+    """#5374: `wrist_clock.grade` of the performed block's own note (`training_notes.performed_shape`) against the clock
+    rule the routine's note prescribed (`cardio_note.clock_of`). Pure over its inputs; every absence is a named status."""
+    from training import cardio_note, wrist_clock
+    from training.training_notes import performed_shape
+
+    note = " / ".join(str(ex.get("notes") or "").strip() for ex in performed_exs if str(ex.get("notes") or "").strip())
+    secs = sum(int(st.get("duration_seconds") or 0) for ex in performed_exs for st in ex.get("sets") or [])
+    performed = performed_shape(note, round(secs / 60) if secs else None) if note else None
+    return wrist_clock.grade(cardio_note.clock_of(prescribed_note), performed)
 
 
 def _session_verdict(by_kind: dict[str, Any], whole: dict[str, Any]) -> dict[str, Any]:
@@ -573,6 +589,7 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
                 "template_id": tid,
                 "sets": sets,
                 "working_sets": _working(ex.sets),
+                "notes": getattr(ex, "notes", "") or "",
                 "ceiling": ceiling,
                 "progression": _progression_for(ex.movement_key, ex.sets, catalog, alias_titles, limits),
             }
@@ -581,6 +598,7 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
             template_to_key[tid] = ex.movement_key
 
     performed_by_tid: dict[str, int] = {}
+    performed_exs_by_tid: dict[str, list[dict[str, Any]]] = {}  # #5374: the performed blocks, for their notes
     performed_sets_by_tid: dict[str, list[dict[str, Any]]] = {}
     performed_working_by_tid: dict[str, int] = {}
     for ex in performed.get("exercises", []):
@@ -590,6 +608,7 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
         tid = alias_to_canonical_tid.get(tid, tid)  # #3929 — resolved BEFORE missing/extra
         ex_sets = ex.get("sets", []) or []
         performed_by_tid[tid] = performed_by_tid.get(tid, 0) + len(ex_sets)
+        performed_exs_by_tid.setdefault(tid, []).append(ex)
         performed_sets_by_tid.setdefault(tid, []).extend(ex_sets)
         performed_working_by_tid[tid] = performed_working_by_tid.get(tid, 0) + _working(ex_sets)
 
@@ -609,6 +628,7 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
         )
         intensity["basis"] = p["ceiling"]["basis"]
         intensity["movement_class"] = p["progression"].get("movement_class")  # #5058: the ceiling-change proposal groups by it
+        kind = _kind_of(p["movement_key"], catalog, alias_titles)
         movements.append(
             {
                 "movement_key": p["movement_key"],
@@ -620,7 +640,8 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
                 "performed_working_sets": performed_working_by_tid.get(p["template_id"], 0),
                 "pct": pct,
                 "intensity": intensity,
-                "kind": _kind_of(p["movement_key"], catalog, alias_titles),  # #5058: lifting and cardio are graded apart
+                "kind": kind,  # #5058: lifting and cardio are graded apart
+                **({"shape": _cardio_shape(p["notes"], performed_exs_by_tid.get(p["template_id"], []))} if kind == KIND_CARDIO else {}),
             }
         )
         muscle = _catalog_entry_for(p["movement_key"], catalog).get("primary_muscle", "unknown")
