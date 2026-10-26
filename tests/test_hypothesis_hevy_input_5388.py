@@ -102,10 +102,27 @@ def test_the_series_steps_on_the_cut_over_day_and_a_value_is_never_a_mixture():
 
 
 def test_the_zone2_volume_moves_with_the_same_cut_over():
-    """Both trailing volumes come from ONE resolution of the week; the zone-2 record is amended too."""
+    """Both trailing volumes come from ONE resolution of the week; the zone-2 record is amended too.
+
+    #5390: a Hevy push carrying its own heart rate over a session that holds a lift (the fixture, the
+    2026-10-18+ wire) is the lift's heart-rate member with or without the Hevy rows, so that week reads
+    the same zone-2 volume either side of the cut-over. Over a session holding NO lift (the ride and the
+    mobility block only) the push is dropped as the echo once Hevy is read — its zones only re-measured
+    the blocks — and there the zone-2 volume moves with the cut-over."""
     with_h = wh._trailing_volumes(_data(), _days(CUT))[CUT]["zone2_7d_min"]
     without = wh._trailing_volumes(_data(with_hevy=False), _days(CUT))[CUT]["zone2_7d_min"]
-    assert with_h != without  # the push's own zones are dropped as the echo once Hevy is read
+    assert with_h == without, "the lift's own heart rate is kept either way (#5390)"
+    no_lift = {**copy.deepcopy(fx.HEVY), "exercises": copy.deepcopy(fx.HEVY["exercises"][2:])}
+
+    def blocks_only(with_hevy):
+        data = _data(with_hevy)
+        if with_hevy:
+            data["hevy"] = [no_lift]
+        return data
+
+    with_h = wh._trailing_volumes(blocks_only(True), _days(CUT))[CUT]["zone2_7d_min"]
+    without = wh._trailing_volumes(blocks_only(False), _days(CUT))[CUT]["zone2_7d_min"]
+    assert with_h != without  # the push's zones are dropped as the echo once Hevy is read
     assert {wh.CARDIO_7D, wh.ZONE2_7D} <= set(wh.SERIES_AMENDMENTS[0]["metrics"])
 
 

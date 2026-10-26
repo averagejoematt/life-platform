@@ -28,7 +28,7 @@ A gym day therefore produced up to four Strava activities for one visit. On 2026
 |---|---|---|
 | Outdoor walk, hike, ride | **the watch**, through Strava › Health › Automatic uploads | the device worn for the workout, with GPS and the watch's own heart-rate zones |
 | Gym cardio block (bike, treadmill) | **the watch** (the Workout app), same path | the protocol's heart-rate recorder for cardio (#5370). The Hevy block stays the plan of record |
-| Gym lift | **Hevy's push** (kept) | harmless to the readers that resolve a visit. They drop a Hevy-device activity as the Hevy session's echo (`common.activity_overlap.HEVY_DEVICE`; `training.workout_identity.is_hevy_echo` when the Hevy row is in hand). The Strava-activity counters still count it beside the ride (#5387). That is a code defect, not a reason to turn the push off |
+| Gym lift | **Hevy's push** (kept) | harmless to the readers that resolve a visit. They drop a Hevy-device activity as the Hevy session's echo (`common.activity_overlap.HEVY_DEVICE`; `training.workout_identity.is_hevy_echo` when the Hevy row is in hand), except that a push carrying its own heart rate over a session holding a lift is kept as the lift's heart-rate member, adding no part and no minute (#5390). The Strava-activity counters still count it beside the ride (#5387). That is a code defect, not a reason to turn the push off |
 | Anything WHOOP detects | **nobody**: WHOOP stops sharing | WHOOP's own API already gives the platform its workouts and zones, and its Strava copies were the echoes |
 
 **Connected apps.** None needs disconnecting. WHOOP stays connected so it can **import** from Strava, because WHOOP labels its strain from Strava activities. Only WHOOP's **share** direction goes off. Hevy stays connected for its push. Garmin's connection is moot since 10-17. If Garmin is still listed, disconnecting it removes a dormant uploader that could re-sync history (§4).
@@ -80,5 +80,5 @@ Two things to look for that would change the recommendation:
 The settings above reduce noise. They are not what keeps the numbers right. Every stored day before 2026-10-26 still holds WHOOP's copies, and an uploader can change behaviour in any app update. The read side stays the guarantee:
 
 - **`common.strava_read_seam`** folds same-sport copies: a start within 15 minutes, or, across two devices, 80% containment. It runs on every reader of the partition.
-- **`training.workout_identity`** folds every Strava, HealthKit and Whoop record into the Hevy session's parts and drops Hevy's own push as an echo (#5369).
+- **`training.workout_identity`** folds every Strava, HealthKit and Whoop record into the Hevy session's parts and drops Hevy's own push as an echo (#5369), unless the push carries its own heart rate and the session holds a lift: then it is the lift's heart-rate member (#5390).
 - **The readers that still count Strava activities directly** are the open defect, #5387. They are listed in the gym-workflow table, row 12.
