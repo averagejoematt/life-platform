@@ -502,6 +502,14 @@ def mcp_server() -> list[iam.PolicyStatement]:
             ],
         ),
         iam.PolicyStatement(
+            # #5099: the weekly titration leg (mcp/titration_leg.py, run by the warmer's nightly pre-draft on THIS role)
+            # rewrites the Habitify calorie-band habit's description when the band moves (health/band_description.py).
+            # Read-only here; the secret holds the v1 ingestion key and the v2 key, the leg reads the v2 field only.
+            sid="HabitifyBandDescription",
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/habitify")],
+        ),
+        iam.PolicyStatement(
             sid="HevySsmParams",
             # ADR-066: cron + add-load gates read from SSM.
             # #915: + experiment-cycle — coach check-in records are stamped with

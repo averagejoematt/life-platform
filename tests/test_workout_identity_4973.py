@@ -224,12 +224,17 @@ def test_a_different_family_never_merges():
 
 
 def test_two_records_from_one_source_are_never_one_identity():
-    """Two Strava walks over the same minutes are Strava's own de-dup problem (strava_read_seam), not
-    this resolver's to fold: each stays an identity, and only ONE of them joins the Apple walk."""
-    twin = dict(STRAVA_WALK, strava_id="16112233446", device_name="Garmin")
+    """Two Strava records over the same minutes are Strava's own de-dup problem (strava_read_seam), not
+    this resolver's clustering to fold: a pair the seam keeps (a Walk and a Hike — the seam folds the
+    same sport only) stays two identities, and only ONE of them joins the Apple walk. Since #5369 the
+    resolver reads Strava THROUGH the seam, so a same-sport twin from a second device is folded there."""
+    twin = dict(STRAVA_WALK, strava_id="16112233446", device_name="Garmin", sport_type="Hike", type="Hike")
     ids = wi.resolve_workout_identities(strava=[{"activities": [STRAVA_WALK, twin]}], apple=[APPLE_WALK])
     assert len(ids) == 2
     assert sorted(len(i["sources"]) for i in ids) == [1, 2]
+    same_sport = dict(STRAVA_WALK, strava_id="16112233446", device_name="Garmin")
+    ids = wi.resolve_workout_identities(strava=[{"activities": [STRAVA_WALK, same_sport]}], apple=[APPLE_WALK])
+    assert len(ids) == 1 and len(ids[0]["members"]["strava"]) == 1, "the seam folds a same-sport twin before clustering"
 
 
 def test_both_timestamp_frames_parse_to_the_same_instant():

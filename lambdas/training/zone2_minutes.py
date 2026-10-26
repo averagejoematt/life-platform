@@ -35,18 +35,31 @@ COUNTED ONCE
     always spends its minutes in some zone, zone 0 included.
   * Strava activities arrive through `strava_read_seam` (the caller's `_query_source` /
     `query_source` applies it), which already folds same-sport echoes inside the partition.
-  * ACROSS SOURCES — a Whoop workout, Whoop's own push of it to Strava, Hevy's push of the
-    lifting session that contains it and a Garmin copy are all the same minutes. Recordings are
-    grouped when one starts within `START_WINDOW_MIN` of the other or `CONTAINMENT_SHARE` of the
-    shorter's interval lies inside the other's (the seam's rule (b), without the same-sport
-    condition — Whoop names a session "Cross Training" that Strava names "WeightTraining"). Two
-    Whoop workouts are never grouped with each other (distinct ids from one device are distinct
-    sessions). Each group is counted ONCE, from ONE source: the first in `SOURCE_PRIORITY`
-    (Whoop, the device worn throughout and the one whose own band Strava re-zones when Whoop
-    pushes a workout) whose recordings measured at least `CONTAINMENT_SHARE` of the most any
-    source measured of the session (total seconds in any zone) — so Strava's zones count only
-    where no Whoop row measured the session, or a second device measured materially more of it. Inside one source the group's distinct recordings are summed;
-    Strava recordings that overlap each other count once (the largest).
+  * ACROSS SOURCES (#5369) — sessions are `training.workout_identity`'s identities, the ONE
+    cross-source workout rule: Hevy, Strava, the watch's `apple_workouts` and Whoop's workout rows,
+    same family (or a label naming none — Whoop's "activity" / "Cross Training") overlapping by
+    half the shorter interval, Hevy's own Strava push dropped as an echo of the Hevy session in
+    hand, a HealthKit workout Hevy or the pliability app wrote folded into that app's record. So a
+    gym visit is its PARTS — the lift, the ride, the mobility block — each once and each labelled
+    by what it was; before #5369 a zone2-local union-find (`_same_session` / `_groups`) chained the
+    whole visit into one session called WeightTraining and lost the ride. A timed Hevy part no
+    wearable recorded is an UNMEASURED session (its minutes stay in the visit, counted once — the
+    visit Hevy's own Strava push used to stand for); its cardio blocks are ALSO reported as
+    `hevy_cardio_minutes`, a separate bucket never added to anything (#5369 box 3's guard).
+    Each session's zones come from ONE source: the first in `SOURCE_PRIORITY` (Whoop, the device
+    worn throughout and the one whose own band Strava re-zones when Whoop pushes a workout) whose
+    recordings measured at least `CONTAINMENT_SHARE` of the most any source measured of the session
+    (total seconds in any zone) — so Strava's zones count only where no Whoop row measured the
+    session, or a second device measured materially more of it. Every Apple origin shares the
+    Apple slot (the HR is the watch's whichever app started the workout).
+  * TIME CLAIMED ONCE (#5369) — two parts of one visit can carry the same minutes (on 2026-10-25
+    Hevy's watch app and WHOOP labelled the last 23 minutes a lift while the pliability app
+    recorded them as mobility). A recording's zone seconds are scaled by the share of its interval
+    no earlier-claimed recording covers, tightest interval first (walking_volume's #4068 pro-rata
+    rule, `uncovered_seconds`) — inside a source's candidate and across the whole read — and
+    `overlap_minutes_removed` says how much a session gave up. A Hevy push that carries a seam
+    graft holds the folded wearable copy's zones over an interval it does not know, so it is
+    counted whole and claims nothing.
 
 Pure — no boto3, no I/O, no clock reads: every date comes from the caller.
 """
@@ -56,11 +69,13 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
-from common.activity_overlap import overlap_seconds
 from common.hr_zones import ZONE_KEYS, zone_seconds_from_bpm_bins
 from common.max_hr import DEFAULT_MAX_HR
 from common.pacific_time import pacific_date_of, parse_iso_utc
-from common.strava_read_seam import STRAVA_SOURCE
+from common.strava_read_seam import STRAVA_SOURCE, strava_read_seam
+
+from training import workout_identity
+from training.walking_volume import apple_workout_source, uncovered_seconds
 
 #: One sentence a surface can print — the recommended answer's words, unparaphrased.
 DEFINITION = "devices' own Zone 2 · minutes in zone · Hevy bike/elliptical/treadmill = cardio minutes, not Zone 2"
@@ -77,9 +92,13 @@ APPLE_WORKOUTS_FIELD = "apple_workouts"  # owner-only (privacy.field_tiers); nev
 # Zone 2 joins as the THIRD source — it counts only where no Whoop or Strava recording measured the
 # session (or it measured materially more of it), so no number served before the watch moves.
 SOURCE_PRIORITY = (WHOOP, STRAVA, APPLE)
-#: Same-session tests across recordings (the read seam's two thresholds).
-START_WINDOW_MIN = 15
+#: The source-choice share (`_choose`): a higher-priority source wins unless another measured
+#: materially more of the session. (START_WINDOW_MIN, the retired `_same_session`'s other
+#: threshold, went with it in #5369.)
 CONTAINMENT_SHARE = 0.8
+#: A session's sport label when no Strava member names it (Strava's own vocabulary, so a
+#: per-sport split reads one word per kind across sources).
+FAMILY_SPORT = {"cycling": "Ride", "walking": "Walk", "running": "Run", "strength": "WeightTraining", "mobility": "Mobility"}
 #: Zone keys every result carries; Whoop's zone 0 and anything below Strava's zone 1 is below_zone_1.
 #: Hevy exercise-name tokens that mark a steady-cardio block (moved verbatim from the
 #: training_overview handler's P0.4 fold, so the set of blocks reported is unchanged).
@@ -153,6 +172,7 @@ def whoop_recordings(whoop_rows: Optional[Iterable[Mapping[str, Any]]]) -> List[
         zones = _whoop_zones(row)
         rec = {
             "source": WHOOP,
+            "identity_source": WHOOP,
             "id": wid,
             "device": WHOOP,
             "date": pacific_date_of(row.get("start_time") or "") or _row_date(row),
@@ -184,6 +204,8 @@ def strava_recordings(strava_rows: Optional[Iterable[Mapping[str, Any]]]) -> Lis
             out.append(
                 {
                     "source": STRAVA,
+                    "identity_source": STRAVA,
+                    "graft": bool(act.get("hr_from_strava_id")),
                     "id": sid,
                     "device": str(act.get("device_name") or "").lower(),
                     "date": date,
@@ -222,7 +244,8 @@ def apple_recordings(apple_rows: Optional[Iterable[Mapping[str, Any]]], max_hr: 
             if zones is not None and sum(zones.values()) <= 0:
                 zones = None
             rec = {
-                "source": APPLE,
+                "source": APPLE,  # every origin shares the Apple slot in SOURCE_PRIORITY
+                "identity_source": apple_workout_source(dict(w)),  # the resolver's key: `apple_health/<origin>` for Hevy / pliability
                 "id": wid,
                 "device": APPLE,
                 "date": pacific_date_of(str(w.get("start") or "")) or _row_date(row),
@@ -259,49 +282,36 @@ def hevy_cardio_blocks(hevy_rows: Optional[Iterable[Mapping[str, Any]]]) -> List
 # ── counted once ──────────────────────────────────────────────────────────────
 
 
-def _same_session(a: Mapping[str, Any], b: Mapping[str, Any]) -> bool:
-    if a["source"] == b["source"] and a["source"] in (WHOOP, APPLE):
-        return False  # distinct workout ids from one device are distinct sessions
-    if a["source"] == b["source"] and a["device"] == b["device"]:
-        return False  # one device does not record one session twice (the seam already folded echoes)
-    if not (a["start"] and b["start"]):
-        return False
-    if abs((a["start"] - b["start"]).total_seconds()) <= START_WINDOW_MIN * 60:
-        return True
-    short, long_ = (a, b) if a["duration_s"] <= b["duration_s"] else (b, a)
-    if short["duration_s"] <= 0 or not long_["end"]:
-        return False
-    inside = overlap_seconds(short["start"], short["end"], [(long_["start"], long_["end"])])
-    return inside >= CONTAINMENT_SHARE * short["duration_s"]
+def _interval(m: Mapping[str, Any]) -> Optional[Tuple[datetime, datetime]]:
+    if m.get("graft") or not (m["start"] and m["end"]) or m["end"] <= m["start"]:
+        return None  # a grafted Hevy push holds another record's zones over an interval it does not know
+    return m["start"], m["end"]
 
 
-def _groups(recs: List[Dict[str, Any]], linked) -> List[List[Dict[str, Any]]]:
-    parent = list(range(len(recs)))
-
-    def find(i):
-        while parent[i] != i:
-            parent[i] = parent[parent[i]]
-            i = parent[i]
-        return i
-
-    for i in range(len(recs)):
-        for j in range(i + 1, len(recs)):
-            if linked(recs[i], recs[j]):
-                parent[find(i)] = find(j)
-    out: Dict[int, List[Dict[str, Any]]] = {}
-    for i, r in enumerate(recs):
-        out.setdefault(find(i), []).append(r)
-    return list(out.values())
+def _claim(recs: List[Dict[str, Any]], claimed: List[Tuple[datetime, datetime]]) -> Dict[int, float]:
+    """{id(rec): share of its zone seconds still unclaimed} — tightest interval first; each timed
+    recording then claims its interval (`claimed` is mutated). Untimed / grafted ones count whole."""
+    shares: Dict[int, float] = {}
+    for m in sorted(recs, key=lambda m: (_interval(m) is None, m["duration_s"], m["identity_source"], m["id"])):
+        iv = _interval(m)
+        if iv is None:
+            shares[id(m)] = 1.0
+            continue
+        span = (iv[1] - iv[0]).total_seconds()
+        shares[id(m)] = uncovered_seconds(iv[0], iv[1], claimed) / span
+        claimed.append(iv)
+    return shares
 
 
 def _source_candidate(members: List[Dict[str, Any]]) -> Optional[Tuple[float, Dict[str, float], List[Dict[str, Any]]]]:
-    """(measured seconds, zone seconds, recordings used) for one source's members of a group."""
+    """(measured seconds, zone seconds, recordings used) for one source's members of a session —
+    its recordings' zones summed, overlapping ones counted once (`_claim`, inside the source)."""
     measured = [m for m in members if m["zones"] is not None]
     if not measured:
         return None
-    used = [max(sub, key=lambda m: sum(m["zones"].values())) for sub in _groups(measured, _same_session)]
-    zones = {k: sum(m["zones"][k] for m in used) for k in ZONE_KEYS}
-    return sum(zones.values()), zones, used
+    share = _claim(measured, [])
+    zones = {k: sum(m["zones"][k] * share[id(m)] for m in measured) for k in ZONE_KEYS}
+    return sum(zones.values()), zones, [m for m in measured if share[id(m)] > 0]
 
 
 def _choose(cands: Mapping[str, Tuple[float, Dict[str, float], List[Dict[str, Any]]]]) -> Optional[str]:
@@ -315,35 +325,94 @@ def _choose(cands: Mapping[str, Tuple[float, Dict[str, float], List[Dict[str, An
     return next(s for s in SOURCE_PRIORITY if s in cands and cands[s][0] >= CONTAINMENT_SHARE * best)
 
 
-def counted_sessions(strava_rows, whoop_rows, apple_rows=None, max_hr: Optional[float] = None) -> List[Dict[str, Any]]:
-    """Every session once, with the zone minutes of the source that measured the most of it.
-    `apple_rows` (#4979/#5353): the apple_health day rows whose `apple_workouts` map carries the watch's
-    heart-rate bins, zoned at read time at `max_hr`."""
+def _sessions_by_identity(
+    strava_rows, whoop_rows, apple_rows, max_hr, hevy_rows
+) -> List[Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]]:
+    """[(identity or None, its wearable recordings)] — one entry per identity holding a recording,
+    plus each TIMED Hevy-only identity with none (an unmeasured part of a visit; an untimed Hevy row
+    cannot be placed and is left to `hevy_cardio_minutes`, as before #5369). A recording the resolver
+    could not key (no vendor id) stands alone."""
+    strava_rows = workout_identity.strava_without_echoes(strava_read_seam(STRAVA, list(strava_rows or [])), hevy_rows)
     recs = strava_recordings(strava_rows) + whoop_recordings(whoop_rows) + apple_recordings(apple_rows, max_hr)
-    sessions: List[Dict[str, Any]] = []
-    for group in _groups(recs, _same_session):
+    identities = workout_identity.resolve_workout_identities(apple=apple_rows, strava=strava_rows, hevy=hevy_rows, whoop=whoop_rows)
+    by_key = {(r["identity_source"], r["id"]): r for r in recs}
+    out: List[Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]] = []
+    placed: set = set()
+    for ident in identities:
+        members = [by_key[(src, i)] for src, ids in ident["members"].items() for i in ids if (src, i) in by_key]
+        members = [m for m in members if id(m) not in placed]
+        if members:
+            placed.update(id(m) for m in members)
+            out.append((ident, members))
+        elif ident["sources"] == ["hevy"] and not ident["untimed"]:
+            out.append((ident, []))
+    out.extend((None, [r]) for r in recs if id(r) not in placed)
+    return out
+
+
+def _sport(ident: Optional[Mapping[str, Any]], rep: Optional[Mapping[str, Any]], first: Optional[Mapping[str, Any]]) -> Any:
+    """Strava's word for the session when a Strava recording is in it; for a Hevy-anchored part with
+    none, its family in Strava's vocabulary (`FAMILY_SPORT` — "Ride", "Mobility"); otherwise the
+    earliest recording's own name, as before #5369."""
+    if rep:
+        return rep["sport"]
+    if ident and "hevy" in ident["sources"] and ident["family"] in FAMILY_SPORT:
+        return FAMILY_SPORT[ident["family"]]
+    return first["sport"] if first else (ident or {}).get("family")
+
+
+def counted_sessions(strava_rows, whoop_rows, apple_rows=None, max_hr: Optional[float] = None, hevy_rows=None) -> List[Dict[str, Any]]:
+    """Every session once, with the zone minutes of the source that measured the most of it.
+
+    Sessions are `training.workout_identity`'s identities (#5369). `apple_rows` (#4979/#5353): the
+    apple_health day rows whose `apple_workouts` map carries the watch's heart-rate bins, zoned at read
+    time at `max_hr`. `hevy_rows` (#5369): the Hevy workout rows over the same read — the routine
+    source that anchors a gym visit's parts and lets Hevy's own Strava push drop as its echo; without
+    them the wearables resolve among themselves."""
+    groups = _sessions_by_identity(strava_rows, whoop_rows, apple_rows, max_hr, hevy_rows)
+    chosen_by_group: List[Tuple[Optional[str], Dict[str, Any]]] = []
+    for _ident, group in groups:
         cands = {}
         for src in SOURCE_PRIORITY:
             c = _source_candidate([m for m in group if m["source"] == src])
             if c:
                 cands[src] = c
         chosen = _choose(cands)
-        first = min(group, key=lambda m: (m["start"] is None, m["start"].timestamp() if m["start"] else 0.0, m["date"]))
+        chosen_by_group.append((chosen, cands))
+    # TIME CLAIMED ONCE: every chosen recording across the read, tightest first.
+    used_all = [m for chosen, cands in chosen_by_group if chosen for m in cands[chosen][2]]
+    share = _claim(used_all, [])
+
+    sessions: List[Dict[str, Any]] = []
+    for (ident, group), (chosen, cands) in zip(groups, chosen_by_group):
+        first = min(group, key=lambda m: (m["start"] is None, m["start"].timestamp() if m["start"] else 0.0, m["date"])) if group else None
         strava_members = [m for m in group if m["source"] == STRAVA]
         rep = max(strava_members, key=lambda m: m["duration_s"]) if strava_members else None
-        zones_min = {k: round(cands[chosen][1][k] / 60.0, 2) for k in ZONE_KEYS} if chosen else None
+        family = ident["family"] if ident else None
+        used = cands[chosen][2] if chosen else []
+        zones = {k: sum(m["zones"][k] * share[id(m)] for m in used) for k in ZONE_KEYS} if chosen else None
+        whole = sum(sum(m["zones"].values()) for m in used)
+        measured = sum(zones.values()) if zones else 0.0
+        zones_min = {k: round(zones[k] / 60.0, 2) for k in ZONE_KEYS} if zones else None
+        hevy_ids = [f"hevy:{i}" for i in (ident or {}).get("members", {}).get("hevy", [])]
         sessions.append(
             {
-                "date": first["date"],
+                "date": first["date"] if first else pacific_date_of(str((ident or {}).get("start") or "")),
                 "source": chosen,
-                "ids": sorted(f"{m['source']}:{m['id']}" for m in group),
-                "used_ids": sorted(f"{m['source']}:{m['id']}" for m in cands[chosen][2]) if chosen else [],
-                "sport": (rep or first)["sport"],
+                "family": family,
+                "workout_identity": ident["workout_identity"] if ident else None,
+                "ids": sorted([f"{m['identity_source']}:{m['id']}" for m in group] + hevy_ids),
+                "used_ids": sorted(f"{m['identity_source']}:{m['id']}" for m in used),
+                "sport": _sport(ident, rep, first),
                 "strava_id": rep["id"] if rep else None,
-                "duration_minutes": round(max(m["duration_s"] for m in group) / 60.0, 1),
+                "duration_minutes": round(
+                    (ident["seconds"] if ident and ident["seconds"] else max((m["duration_s"] for m in group), default=0.0)) / 60.0,
+                    1,
+                ),
                 "zones_minutes": zones_min,
                 "zone_2_minutes": zones_min["zone_2"] if zones_min else None,
-                "measured_minutes": round(cands[chosen][0] / 60.0, 2) if chosen else 0.0,
+                "measured_minutes": round(measured / 60.0, 2) if chosen else 0.0,
+                "overlap_minutes_removed": round(max(0.0, whole - measured) / 60.0, 2) if chosen else 0.0,
             }
         )
     return sorted(sessions, key=lambda s: (s["date"], s["ids"]))

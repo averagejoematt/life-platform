@@ -176,6 +176,26 @@ RETIREMENTS = {
         "status": "planned",
         "record": "#5103 acceptance: 'The two 1500-prompted emails are retired or rewired'.",
     },
+    "zone2-same-session-union-find": {
+        "what": "the zone-2 reader's own cross-source session rule — `_same_session` / `_groups` in "
+        "`lambdas/training/zone2_minutes.py` (START_WINDOW_MIN=15 / CONTAINMENT_SHARE=0.8 union-find that chained a "
+        "whole gym visit into one session) — replaced by `training.workout_identity.resolve_workout_identities`",
+        "story": 5369,
+        "status": "planned",
+        "record": "#5369 ## Retires: 'The zone2-local `_same_session` / `_groups` rule (zone2_minutes.py:262, :278) once "
+        "routed through `workout_identity`'. Removed in the #5369 lane PR (Refs #5369); flips to retired with the PR "
+        "number and merge date when it lands on main.",
+    },
+    "farmers-carry-programmed-key": {
+        "what": "`farmers_carry` as a separate programmed catalog key (`config/movement_catalog.json`) — the custom Hevy 'Farmers Carry' "
+        "template (ce871c4e…) the B3 ruling programmed and the owner never logged. Folds into `farmers_walk` (Hevy's standard "
+        "'Farmers Walk', 50C613D0, the template he logs); `training.movement_catalog.RETIRED_KEYS` keeps a stored routine that still "
+        "names the old key readable. The custom template stays on his Hevy account (the platform never deletes templates).",
+        "story": 5372,
+        "status": "planned",
+        "record": "#5372 `## Retires`: '`farmers_carry` as a separate programmed key ... Folds into `farmers_walk`; the custom Hevy "
+        "template is left alone on the owner's account.' Flip to `retired` with the merged PR and its merge date.",
+    },
     # ── kept, with the reason (acceptance box 4: the legacy routine generator) ──
     "program-v04-revert-generator": {
         "what": "the frozen v0.4 plan (`lambdas/training/program_v04.py`, `program_v04.build_session` as the "

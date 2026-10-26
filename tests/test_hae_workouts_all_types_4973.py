@@ -278,9 +278,10 @@ def test_a_whoop_workout_healthkit_reexports_folds_into_the_watch_lift():
 
 def test_resolved_totals_count_every_stored_type_once():
     t = wi.identity_totals(_resolve_stored())
-    # strength (1) + walking (1) + the evening run (1) + flexibility (1)
+    # strength (1) + walking (1) + the evening run (1) + flexibility (1) — Flexibility is the
+    # `mobility` family since #5369 (the pliability app writes its sessions into HealthKit under it)
     assert t["sessions"] == 4
-    assert set(t["by_family"]) == {"strength", "walking", "running", "other:flexibility"}
+    assert set(t["by_family"]) == {"strength", "walking", "running", "mobility"}
 
 
 def test_a_row_seen_twice_is_one_member():

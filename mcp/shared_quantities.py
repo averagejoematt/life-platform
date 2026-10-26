@@ -111,6 +111,17 @@ def _genesis() -> str:
     return str(EXPERIMENT_START_DATE)
 
 
+def _read_apple(read: Callable[[str, str, str], list[dict[str, Any]]] | None, start: str, end: str) -> list[dict[str, Any]] | None:
+    """The apple_health day rows the watch backstop reads (#5369): one UTC day PAST `end`, because a
+    workout is filed under the UTC day of its start and a Pacific evening starts on the next one
+    (`walking_volume.apple_sessions` keeps the Pacific window). A read that RAISES is None —
+    unreadable, which makes the walking total a floor, never zero."""
+    try:
+        return (read or _core.query_source_range)("apple_health", start, shift_day_key(end, 1))
+    except Exception:  # noqa: BLE001 — unreadable is reported by the layer, never raised past it
+        return None
+
+
 def completed_end(day: str, today: str | None = None) -> str:
     """The last COMPLETED Pacific day on or before `day`: min(day, today - 1).
 
@@ -151,7 +162,13 @@ def walking_layer(
         except Exception:  # noqa: BLE001 — unreadable is reported by the layer, never raised past it
             return None
 
-    layer = walking_volume.build(window_start=start, window_end=end, strava_items=_read("strava"), hevy_workouts=_read("hevy"))
+    layer = walking_volume.build(
+        window_start=start,
+        window_end=end,
+        strava_items=_read("strava"),
+        hevy_workouts=_read("hevy"),
+        apple_items=_read_apple(read, start, end),  # #5369: the watch backstop
+    )
     layer["window"] = {"start": start, "end": end, "days": days}
     total = layer.get("total_hr")
     layer["hr_wk"] = round(float(total) * 7.0 / days, 2) if total is not None else None
@@ -166,6 +183,7 @@ def walking_layer_for_day(
     *,
     today: str | None = None,
     read: Callable[[str, str, str], list[dict[str, Any]]] | None = None,
+    with_apple: bool = True,
 ) -> dict[str, Any] | None:
     """THE walking definition over ONE Pacific day — the day a night-before debrief reviews
     (#4311). Same sources, same counting, same time de-dup as `walking_layer`; the window is
@@ -175,7 +193,8 @@ def walking_layer_for_day(
     only for an unparseable day key; a partition read that RAISES reaches the layer as
     None — unreadable, never zero hours. `read(source, start, end)` is the caller's
     partition reader (default `mcp.core.query_source_range`); the DEFINITION is not
-    injectable."""
+    injectable. `with_apple=False` is the caller that reads only Hevy and Strava itself (the
+    packet's `today` listing, `coach_packet_today`) — the watch backstop (#5369) is then not wired."""
     from common.pacific_time import parse_day_key
 
     if parse_day_key(day) is None:
@@ -187,7 +206,13 @@ def walking_layer_for_day(
         except Exception:  # noqa: BLE001 — unreadable is reported by the layer, never raised past it
             return None
 
-    layer = walking_volume.build(window_start=day, window_end=day, strava_items=_read("strava"), hevy_workouts=_read("hevy"))
+    layer = walking_volume.build(
+        window_start=day,
+        window_end=day,
+        strava_items=_read("strava"),
+        hevy_workouts=_read("hevy"),
+        apple_items=_read_apple(read, day, day) if with_apple else walking_volume.NOT_WIRED,
+    )
     layer["window"] = {"start": day, "end": day, "days": 1}
     layer["hr_wk"] = None
     layer["partial"] = str(day)[:10] >= (today or pacific_today())
@@ -223,7 +248,11 @@ def recent_aerobic_layer(
             return None
 
     block = recent_aerobic.build(
-        target_date=target_date, today=today or pacific_today(), strava_items=_read("strava"), hevy_workouts=_read("hevy")
+        target_date=target_date,
+        today=today or pacific_today(),
+        strava_items=_read("strava"),
+        hevy_workouts=_read("hevy"),
+        apple_items=_read_apple(read, w["start"], w["end"]),  # #5369: the watch backstop
     )
     block["definition"] = (
         SHARED_QUANTITIES_VERSION + ": the weekly walking sources and de-dup, per activity (see mcp/shared_quantities.py, #4387)"

@@ -1,5 +1,5 @@
 {
-  "_README": "TEMPLATE for the owner-only half of the training charter (#5087). Copy to config/training_charter.private.local.json (gitignored) and fill it, or put the same object in env TRAINING_CHARTER_PRIVATE_JSON, or at the owner-private S3 key config/coaching/training_charter.private.json. The repo is PUBLIC: no real value ever goes in a tracked file. lambdas/training/training_charter.py merges this over the public config/training_charter.json and reports private_loaded + private_keys; nothing under these keys is ever on the PUBLISHED_WHITELIST. anchor_foods (#5103) is the weekly menu's anchor-food table: one row per food with a stable id, the label and serving as the owner writes them, the label values per serving (kcal, protein_g, carb_g, fat_g, fibre_g), an optional max_per_day (replaces the charter's default per-food cap for that row), off_limits true to keep a food off the menu, and the package it is bought in (servings per package) for the grocery list; health.weekly_menu reads it. Optional food-quality tags (#5105, read by health.food_quality): fatty_fish true marks a fatty-fish food (the charter's nutrition.food_quality.fatty_fish weekly range counts its servings; the fibre per serving is the row's fibre_g), and nutrient_tags is a list of short words the lab-driven priorities row can name (the week's servings of those foods are reported beside it).",
+  "_README": "TEMPLATE for the owner-only half of the training charter (#5087). Copy to config/training_charter.private.local.json (gitignored) and fill it, or put the same object in env TRAINING_CHARTER_PRIVATE_JSON, or at the owner-private S3 key config/coaching/training_charter.private.json. The repo is PUBLIC: no real value ever goes in a tracked file. lambdas/training/training_charter.py merges this over the public config/training_charter.json and reports private_loaded + private_keys; nothing under these keys is ever on the PUBLISHED_WHITELIST. anchor_foods (#5103) is the weekly menu's anchor-food table: one row per food with a stable id, the label and serving as the owner writes them, the label values per serving (kcal, protein_g, carb_g, fat_g, fibre_g), an optional max_per_day (replaces the charter's default per-food cap for that row), off_limits true to keep a food off the menu, and the package it is bought in (servings per package) for the grocery list; health.weekly_menu reads it. Optional food-quality tags (#5105, read by health.food_quality): fatty_fish true marks a fatty-fish food (the charter's nutrition.food_quality.fatty_fish weekly range counts its servings; the fibre per serving is the row's fibre_g), and nutrient_tags is a list of short words the lab-driven priorities row can name (the week's servings of those foods are reported beside it). fixed_meals (#5103, owner ruling 2026-10-26) is the list of fixed feedings the weekly menu plans around (the meal-service dinner): one row per fixed feeding with a stable id, the label as the owner writes it, the slot it sits in (dinner = the day's last feeding, breakfast = its first), the label values (kcal, protein_g, carb_g, fat_g; fibre_g may stay null = unknown, counted as none), days = the weekday names it applies to (e.g. Monday ... Sunday), and source (free text, where the values were read); health.weekly_menu subtracts it from the day's band and floors, counts it as one feeding and fits the anchors into the rest. No key or an empty list = no fixed feeding; an unreadable row refuses the menu.",
   "target_picture": {
     "weight_band_lb": [null, null],
     "waist_in": null,
@@ -24,6 +24,20 @@
       "fatty_fish": null,
       "nutrient_tags": [],
       "package": {"label": null, "servings": null}
+    }
+  ],
+  "fixed_meals": [
+    {
+      "id": null,
+      "label": null,
+      "slot": null,
+      "kcal": null,
+      "protein_g": null,
+      "carb_g": null,
+      "fat_g": null,
+      "fibre_g": null,
+      "days": [],
+      "source": null
     }
   ]
 }

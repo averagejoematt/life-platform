@@ -81,7 +81,7 @@ def tool_get_zone2_breakdown(args):
     hevy_items = query_source("hevy", start_date, end_date)
     sessions = [
         s
-        for s in z2m.counted_sessions(strava_items, whoop_items, query_source("apple_health", start_date, end_date))
+        for s in z2m.counted_sessions(strava_items, whoop_items, query_source("apple_health", start_date, whoop_end), hevy_rows=hevy_items)
         if start_date <= s["date"] <= end_date
     ]
     if not sessions:

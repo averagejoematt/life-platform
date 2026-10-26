@@ -796,8 +796,10 @@ def test_expenditure_plus_date_plus_calories_identifies_the_daily_summary():
     assert mf.detect_csv_type(SUMMARY_HEADERS) == "daily_summary"
 
 
-def test_a_summary_export_missing_expenditure_is_not_a_summary():
-    assert mf.detect_csv_type(["Date", "Calories (kcal)"]) == "unknown"
+def test_a_summary_export_missing_expenditure_is_not_the_full_summary():
+    # #5097: it used to be `unknown` (the 2026-10-25 per-metric file was rejected on exactly
+    # this); it is now a PARTIAL summary that merges only its own columns.
+    assert mf.detect_csv_type(["Date", "Calories (kcal)"]) == "summary_partial"
 
 
 def test_the_nutrition_diary_wins_when_a_file_carries_both_markers():
@@ -1685,7 +1687,6 @@ UNKNOWN_CONTENT_LEDGER = {
     "Multivitamin": "2026-09-27 (#4245): retire when the label's per-nutrient amounts are recorded as content",
     "Basic B Complex": "2026-09-27 (#4245): retire when the label's per-nutrient amounts are recorded as content",
     "Electrolytes": "2026-09-27 (#4245): retire when the packet's potassium/magnesium amounts are recorded as content",
-    "Probiotics": "2026-09-27 (#4245): no tracked nutrient on any record — retire if it becomes content []",
 }
 
 

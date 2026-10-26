@@ -454,7 +454,7 @@ def render_history_cue(
     if facts.get("modality") == "cardio":
         from training.cardio_progression import level_verdict, render_cardio_cue
 
-        return render_cardio_cue(facts, level_verdict(facts.get("series"), facts.get("last_level")))
+        return render_cardio_cue(facts, level_verdict(facts.get("series"), facts.get("last_level"), facts.get("shaped")))
     weight = _round_weight(facts.get("last_top_weight_kg", 0))
     reps = facts.get("last_reps_list") or []
     if not weight or not reps:

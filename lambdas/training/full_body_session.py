@@ -71,11 +71,12 @@ def _blocks_from_prescription(
             continue
         mdef = catalog.get("movements", {}).get(key, {})
         sets_spec = e["sets"][:2] if top_plus_one else e["sets"]
-        # #5318: a carry set is timed (no rep range, no load — his first-exposure pick); every other set is a rep range
+        # #5318/#5372: a carry set is distance-typed (his step count in the distance field; no rep range, no load — his
+        # first-exposure pick); every other set is a rep range
         sets = [
             (
-                Set(type="normal", duration_seconds=int(sp["duration_seconds"]))
-                if sp.get("duration_seconds")
+                Set(type="normal", distance_meters=int(sp["distance_meters"]))
+                if sp.get("distance_meters")
                 else Set(type="normal", rep_range_start=sp["reps"][0], rep_range_end=sp["reps"][1])
             )
             for sp in sets_spec

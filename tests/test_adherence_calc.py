@@ -722,3 +722,41 @@ def test_5058_a_cardio_only_day_and_a_lifting_only_day_read_as_before():
     whole = adherence_calc._as_prescribed(lift_only["overall_pct"], lift_only["intensity_adherence"], lift_only["movements"])
     assert {k: lift_only["as_prescribed"][k] for k in ("verdict", "reasons")} == whole  # no cardio: the same verdict as before
     assert lift_only["as_prescribed"]["scope"] == "lifting" and lift_only["as_prescribed_by_kind"]["cardio"] is None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #5374: the performed clock shape (his own note grammar) graded against the composed note's clock rule, beside the
+# cardio verdict — never folded into it. His 10-25 note, verbatim, is the fixture.
+# ─────────────────────────────────────────────────────────────────────────────
+_OWNER_NOTE_5374 = "8/12 for 2 mins for 20 mins / 8/14 for 2 mins for 20 mins / 8 level up every 2 mins from 40 to 60 to level 18"
+
+
+def _ride_5374(notes):
+    return {"exercise_template_id": "D8F7F851", "notes": notes, "sets": [{"type": "normal", "duration_seconds": 3600}]}  # cycling
+
+
+def _ir_5374(notes):
+    return RoutineSpec(
+        routine_id="r-5374",
+        target_date="2026-10-26",
+        archetype="upper",
+        exercises=[ExerciseBlock(movement_key="cycling", sets=[Set(duration_seconds=3600)], notes=notes)],
+    )
+
+
+def test_5374_adherence_grades_the_performed_shape_against_the_prescribed_one():
+    from training import cardio_note
+
+    note, _ = cardio_note.compose(movement_key="cycling", minutes=60, target_date="2026-10-26", kind="intervals", facts={"last_level": 8})
+    out = calculate_adherence(_ir_5374(note), {"exercises": [_ride_5374(_OWNER_NOTE_5374)]})
+    grade = out["as_prescribed_by_kind"]["cardio"]["shape"]["cycling"]
+    hard = 8 + cardio_note.INTERVAL_LEVEL_STEP
+    assert grade["status"] == "same_shape" and grade["minutes_delta"] == 0
+    assert grade["performed"]["top_level"] == 18 and grade["prescribed"]["top_level"] == hard
+    assert grade["top_level_delta"] == 18 - hard
+    assert out["as_prescribed_by_kind"]["cardio"]["verdict"] == "unknown"  # the RPE half is still unread: never folded in
+    # every absence is named
+    blank = calculate_adherence(_ir_5374(note), {"exercises": [_ride_5374("")]})
+    assert blank["as_prescribed_by_kind"]["cardio"]["shape"]["cycling"]["status"] == "performed_unread"
+    prose = calculate_adherence(_ir_5374("Easy ride, RPE 6 max."), {"exercises": [_ride_5374(_OWNER_NOTE_5374)]})
+    assert prose["as_prescribed_by_kind"]["cardio"]["shape"]["cycling"]["status"] == "prescribed_unread"

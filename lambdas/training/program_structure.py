@@ -292,7 +292,7 @@ CORE_ANCHORS: tuple[str, ...] = ("bench", "row", "squat", "hinge")
 ACCESSORY_POOL: dict[str, list[str]] = {
     # #5069: face_pull (rear delts, 93 logged sessions) joins for the shoulders+arms day; #5318 (owner ruling B3, 2026-10-24):
     # the farmer's carry replaced the dumbbell shrug there (traps, grip and core)
-    "upper": ["cable_chest_fly", "cable_tricep_pushdown", "db_curl", "reverse_pec_deck", "db_lateral_raise", "face_pull", "farmers_carry"],
+    "upper": ["cable_chest_fly", "cable_tricep_pushdown", "db_curl", "reverse_pec_deck", "db_lateral_raise", "face_pull", "farmers_walk"],
     "lower": ["leg_press", "leg_curl", "calf_raise_machine", "machine_crunch", "machine_hip_thrust"],
 }
 """The pools, one per archetype, the block's accessories are chosen FROM at block start (v0.4's machines/cables, plus the
@@ -624,10 +624,11 @@ SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
         "anchors": [["overhead_press", "moderate"]],
         "anchor_sets": {"overhead_press": 1},
         # #5318 (owner ruling B3, 2026-10-24): the farmer's carry replaced the 2 dumbbell shrug sets (set-neutral) — traps,
-        # grip and core; Hevy's existing 'Farmers Carry' template (catalog `farmers_carry`), timed (`CARRY_EXPOSURE`)
-        "accessories": ["db_lateral_raise", "face_pull", "db_curl", "cable_tricep_pushdown", "farmers_carry"],
+        # grip and core. #5372: programmed as Hevy's standard 'Farmers Walk' template (catalog `farmers_walk`, 50C613D0, the one he
+        # actually logs — distance-typed, `CARRY_EXPOSURE`), not the never-logged custom 'Farmers Carry' B3 first named
+        "accessories": ["db_lateral_raise", "face_pull", "db_curl", "cable_tricep_pushdown", "farmers_walk"],
         "accessory_sets": {"db_lateral_raise": 3, "face_pull": 3},
-        "accessory_shapes": {"farmers_carry": "carry"},
+        "accessory_shapes": {"farmers_walk": "carry"},
         "accessory_rule": (
             "the aesthetic day's accessories ARE the session (owner ruling 5): five of them, not 2–3 — `ROTATION_RULE`'s per-session "
             "count binds the other roles; every one is still fixed for the block"
@@ -665,7 +666,7 @@ work. Every big redline muscle group sits inside its weekly band and each group'
 role for the block (`ROTATION_RULE`). `anchor_sets` overrides an exposure's set count for one pattern: vertical pull runs
 2 sets so back (row + pulldown, twice) sits at 10. `anchor_keys` pins a pattern's slot to named members (#5318, owner ruling
 B2: upper-volume's bench slot is the incline dumbbell press only; upper-heavy keeps the barbell bench, the strength anchor).
-`accessory_shapes` names a timed accessory (#5318, ruling B3: the shoulders+arms farmer's carry, `CARRY_EXPOSURE`). v0.4's four roles were unchanged (#4147) until #5162 moved the press
+`accessory_shapes` names a distance-dosed accessory (#5318, ruling B3: the shoulders+arms farmer's carry; #5372: distance-typed, `CARRY_EXPOSURE`). v0.4's four roles were unchanged (#4147) until #5162 moved the press
 off the two upper days; v0.3's are `program_v03.SESSION_TEMPLATES`."""
 
 SESSION_DISTRIBUTION_PROVENANCE: dict[str, Any] = {
@@ -936,7 +937,7 @@ def session_prescription_for_role(
             }
         )
     for k in tmpl["accessories"]:
-        # #5318: a carry slot is timed (`CARRY_EXPOSURE`), every other accessory is a rep range (`EXPOSURES['accessory']`)
+        # #5318: a carry slot is distance-dosed (`CARRY_EXPOSURE`, #5372), every other accessory is a rep range (`EXPOSURES['accessory']`)
         shape = (tmpl.get("accessory_shapes") or {}).get(k, "accessory")
         acc = CARRY_EXPOSURE if shape == "carry" else EXPOSURES["accessory"]
         n_acc = int((tmpl.get("accessory_sets") or {}).get(k, acc["sets"]))  # #5053: a floor slot may run more than 2 sets
