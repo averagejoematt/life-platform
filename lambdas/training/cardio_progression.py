@@ -394,6 +394,7 @@ def cardio_facts(
     for s in sessions:
         note = s.get("note") or ""
         lvl = structured_level(note)
+        rx = prescribed_level_of(s, lvl)
         spd = speed_mph(s.get("distance_m"), s.get("duration_sec"))
         anchors = _calibration_anchors(note)
         if anchors:
@@ -413,7 +414,12 @@ def cardio_facts(
                     "speed_mph": spd,
                 }
             )
-        if lvl["status"] != "ok":
+        if rx is not None and rx["kind"] != "easy":
+            # #5076: a prescribed tempo/intervals/hills ride is not speed at one easy-effort level (tempo rides a level up
+            # at a harder RPE; intervals and hills mix levels), so it never moves the hold/raise comparison
+            excluded["prescribed_not_easy"] = excluded.get("prescribed_not_easy", 0) + 1
+            continue
+        if lvl["status"] != "ok" and rx is None:
             excluded[lvl["status"]] = excluded.get(lvl["status"], 0) + 1
             continue
         if spd is None:
@@ -429,7 +435,9 @@ def cardio_facts(
         series.append(
             {
                 "date": s.get("date"),
-                "level": lvl["level"],
+                "level": lvl["level"] if rx is None else rx["base_level"],
+                # #5076: where the level came from — his note, or the routine he performed (his note was silent)
+                "level_source": "note" if rx is None else "prescription",
                 "speed_mph": spd,
                 "duration_sec": _num(s.get("duration_sec")),
                 "distance_m": _num(s.get("distance_m")),
@@ -442,6 +450,11 @@ def cardio_facts(
 
     last = sessions[0]
     last_level = structured_level(last.get("note") or "")
+    # #5076: his note wins (a logged level, or his clock shape); only a SILENT note takes the level the routine he
+    # performed prescribed, and it is stated as that (`prescribed_level`), never as a level he logged
+    last_rx = prescribed_level_of(last, last_level)
+    if last_rx is not None:
+        last_level = {**last_level, "level": last_rx["base_level"], "status": PRESCRIBED_STATUS}
     last_hr = join_whoop_hr(
         last.get("session_start"),
         last.get("session_end"),
@@ -460,6 +473,9 @@ def cardio_facts(
         "last_speed_mph": speed_mph(last.get("distance_m"), last.get("duration_sec")),
         "last_level": last_level["level"],
         "last_level_status": last_level["status"],
+        # #5076: the prescription a silent-note last ride was performed from ({machine, kind, level, base_level}); None
+        # when his note gave the level (or no routine was matched)
+        "last_prescription": last_rx,
         # #5374: the last ride's clock shape when it was one (its levels, never one of them as "the" level)
         "last_shape": (
             {k: last_level.get(k) for k in ("levels", "base_level", "top_level", "mean_level", "level_minutes", "shape")}
@@ -473,6 +489,40 @@ def cardio_facts(
         "excluded": excluded,
         "calibration": calibration,
         "version": CARDIO_PROGRESSION_VERSION,
+    }
+
+
+# #5076: the last ride's level came from the routine he performed (his note named none), not from his note
+PRESCRIBED_STATUS = "prescribed_level"
+# the note statuses that say nothing about the level: only these take the routine's prescription. A span, two levels
+# or a clock shape is HIS statement of the level, so the prescription never overrides it.
+SILENT_NOTE_STATUSES = ("no_note", "no_level_in_note")
+
+
+def prescribed_level_of(session: dict[str, Any], lvl: dict[str, Any]) -> dict[str, Any] | None:
+    """The prescription a performed ride is read at when his note is silent on the level, else None.
+
+    `session["served_level"]` is `cardio_menu.served_levels`' entry for the routine he performed (joined by
+    `cardio_cues.with_served_kinds`); `lvl` is `structured_level` of his note. None when his note names a level in
+    any form (`ok`, `level_range`, `multi_level_session`, `shaped_session` — his word wins), when no routine was
+    matched, or when his note names a different kind than the one served (he did not ride the prescription). An
+    absent prescription stays absent: no level is ever defaulted (ADR-104)."""
+    rx = session.get("served_level")
+    if lvl.get("status") not in SILENT_NOTE_STATUSES or not isinstance(rx, dict):
+        return None
+    base, kind, machine = rx.get("base_level"), rx.get("kind"), rx.get("machine")
+    if not isinstance(base, int) or isinstance(base, bool) or base < 1 or not kind or not machine:
+        return None
+    from training import cardio_menu
+
+    if cardio_menu.kind_of_performed(str(machine), session.get("note"), str(kind)) != kind:
+        return None
+    return {
+        "machine": machine,
+        "kind": kind,
+        "level": rx.get("level"),
+        "base_level": base,
+        "hevy_routine_id": session.get("hevy_routine_id"),
     }
 
 
@@ -641,7 +691,11 @@ def render_cardio_cue(facts: dict[str, Any], verdict: dict[str, Any] | None = No
 
     head = "Last: "
     shape = facts.get("last_shape") or {}
-    if facts.get("last_level") is not None:
+    rx = facts.get("last_prescription") if facts.get("last_level_status") == PRESCRIBED_STATUS else None
+    if rx:
+        # #5076: his note named no level; the level is the one his routine printed, and the cue says so
+        head += f"level {rx.get('level') or facts['last_level']} as prescribed, "
+    elif facts.get("last_level") is not None:
         head += f"level {facts['last_level']}, "
     elif shape.get("base_level") is not None:
         head += f"levels {shape['base_level']}–{shape['top_level']}, "  # #5374: a clock-shaped ride

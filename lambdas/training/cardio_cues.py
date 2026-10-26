@@ -23,7 +23,9 @@ SERVED_ROUTINE_LEAD_DAYS = 7
 def with_served_kinds(
     cardio_index: dict[str, list] | None, target_date: str, catalog: dict[str, Any] | None = None
 ) -> dict[str, list] | None:
-    """`cardio_index` with each recent ride's `served_kind`: the kind the routine he performed prescribed (#5076).
+    """`cardio_index` with each recent ride's `served_kind`: the kind the routine he performed prescribed (#5076),
+    and its `served_level`: the level that routine's block printed (`cardio_menu.served_levels`, the same read), which
+    `cardio_progression.cardio_facts` takes as the ride's level when his own note names none.
 
     He logs the menu's rides with an empty note, so the note alone read every performed tempo as easy and the week's
     conditioning never counted. This joins a ride's `hevy_routine_id` to the routine record
@@ -52,11 +54,13 @@ def with_served_kinds(
             catalog = _load_json("movement_catalog.json")
         first = parse_day_key(min(str(s["date"])[:10] for s in recent)) or day
         start = (first - timedelta(days=SERVED_ROUTINE_LEAD_DAYS)).isoformat()
-        served = cardio_menu.served_kinds(list_by_date_range(start, day.isoformat()))
+        routines = list_by_date_range(start, day.isoformat())
+        served = cardio_menu.served_kinds(routines)
+        levels = cardio_menu.served_levels(routines)
     except Exception as e:  # noqa: BLE001 — the placement then reads his notes alone
-        logger.warning(f"cardio cue: served-routine read failed ({type(e).__name__}: {e}); kinds read from his notes")
+        logger.warning(f"cardio cue: served-routine read failed ({type(e).__name__}: {e}); kinds and levels read from his notes")
         return cardio_index
-    return cardio_menu.annotate_served(cardio_index, served, catalog)
+    return cardio_menu.annotate_served(cardio_index, served, catalog, levels)
 
 
 def previous_of(spec: Any, target_date: str) -> dict[str, Any] | None:
