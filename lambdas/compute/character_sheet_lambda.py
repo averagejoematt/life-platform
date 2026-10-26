@@ -395,6 +395,15 @@ def assemble_data(yesterday_str):
     strava_7d_start = (dt - timedelta(days=6)).strftime("%Y-%m-%d")
     data["strava_7d"] = fetch_range("strava", strava_7d_start, yesterday_str)
 
+    # #5389: THE Zone 2 computation (`training.zone2_minutes`) reads the same trailing 7 dates
+    # `/api/zone2` serves, from every device that measured them: Whoop workout sub-rows and the Apple
+    # Watch's day rows are keyed by UTC day, so a Pacific-evening session lands on the NEXT key — read
+    # one day past the window (a session's date is its Pacific start, the window filter is the engine's).
+    z2_end = (dt + timedelta(days=1)).strftime("%Y-%m-%d")
+    data["whoop_7d"] = fetch_range("whoop", strava_7d_start, z2_end)
+    data["apple_7d"] = fetch_range("apple_health", strava_7d_start, z2_end)
+    data["hevy_7d"] = fetch_range("hevy", strava_7d_start, yesterday_str)
+
     # Strava 42d (progressive overload / CTL trend)
     strava_42d_start = (dt - timedelta(days=41)).strftime("%Y-%m-%d")
     data["strava_42d"] = fetch_range("strava", strava_42d_start, yesterday_str)
@@ -671,7 +680,17 @@ def collect_input_rows(data, history_records, challenge_items=None):
 
     for key in ("whoop", "macrofactor", "apple", "habit_scores", "flourishing", "engagement_state", "todoist", "labs_latest"):
         _add(data.get(key))
-    for key in ("journal_entries", "sleep_14d", "strava_7d", "strava_42d", "macrofactor_14d", "withings_30d"):
+    for key in (
+        "journal_entries",
+        "sleep_14d",
+        "strava_7d",
+        "strava_42d",
+        "macrofactor_14d",
+        "withings_30d",
+        "whoop_7d",
+        "apple_7d",
+        "hevy_7d",
+    ):
         for rec in data.get(key) or []:
             _add(rec)
     for rec in history_records or []:  # the 21-day EMA window of prior sheets
