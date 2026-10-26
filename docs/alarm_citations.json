@@ -1,9 +1,10 @@
 {
   "_comment": "Curated alarm-name -> citation registry read by scripts/check_alarm_citations.py (#1959). Every CloudWatch alarm that has been in ALARM >72h must have an entry here (exact AlarmName key) naming the incident row or issue that explains it, or the /wrap gate flags it by name. Since #2912 the same holds for an alarm that FIRED AND CLEARED within the last 72h (episode start and end both in-window, read from describe-alarm-history) — a flap between wraps is invisible to current-state duration by construction, so it needs an entry or an explicit --decoded line just like a standing red. Add an entry the same session a new long-red alarm (or flap) is triaged; remove/replace one once the underlying issue closes AND the alarm has actually cleared live. Since #2996 a citation that names a `#N` must name an issue that is still OPEN: the gate reads `gh issue view` for every currently-lit alarm's citation and flags a dead reference, because a citation string is not an owner (measured 2026-08-22: 4 of 7 entries pointed at closed issues, 3 of them on lit alarms). A citation with NO `#N` is never flagged by that check — a dated, self-clearing state is honestly cited in prose — but the 14-day `issueless_ancient_reds` rule still forces a `#N` past that tenure. PRUNE an entry when its alarm recovers. Since #3258 a citation may not assert a recurrence NEGATIVE (\"no recurrence since\", \"has not recurred\") unless the same note names how it was derived — the log group it was read from, or the query that read it (filter-log-events / describe-alarm-history / start-query). A recurrence-negative is unfalsifiable from the registry alone, and the measured instance hid a live recurrence for four days: this alarm's entry read \"fixed by #3066/PR#3075 …, no recurrence since\" while the identical finding fingerprint 539c6d sat in /aws/lambda/life-platform-qa-smoke inside the last 72h. Enforced offline against the committed file by tests/test_check_alarm_citations.py::test_the_live_registry_carries_no_underived_recurrence_negative (scripts/check_alarm_citations.py::unfalsifiable_negatives), so it runs on every PR rather than only at wrap. A POSITIVE claim needs no marker — it is checkable by looking.",
   "ai-canary-overall": {
-    "added": "2026-09-01",
-    "citation": "#3413 — POST /api/board_ask returns 504 to real readers. The canary's Monday 2026-08-31 run caught it ('board_grounded:status: no response (transport failure)', Sandbox.Timedout after 30.00s) and the alarm has been lit since 09:22 PT that day. REGRESSION, not a standing state: this alarm was OK from 2026-08-03 to 2026-08-31, 28 days green. Cause measured: board_quality_gate's QG_INVOKE_TIMEOUT_S caps the coach-quality-gate invoke at 10s while that lambda's AWS/Lambda Duration Maximum has been 11.5-17s EVERY day since at least 08-24, so the invoke is guaranteed to time out and burn ~11.4s of a 30s reader budget for a result that is then discarded (fail-open). Expiry: this clears on a subsequent canary run (Mon/Wed/Fri 16:20 UTC) once #3413 ships. PRUNE this entry once the alarm has been OK longer than the 72h flap window.",
-    "note": "Added 2026-09-01 (Session Q), while the alarm was still ~31h old and therefore BELOW the 72h citation bar — the gate was silent on it and would have stayed silent until 2026-09-03. Cited early on purpose: this is the #1959 'a new red hiding among the old ones' case, and it was a live public-surface regression across the launch itself. The 72h bar is a floor for when a citation becomes MANDATORY, not advice to wait. Found by reading the alarm board rather than by any gate escalating it."
+    "added": "2026-10-26",
+    "cause": "vendor transient during the Bedrock 503 episode",
+    "cause_observed": "2026-10-26 16:20Z ai-quality-canary run: ask_factual and ask_causal status 500, board_grounded and board_meta_pressure empty for physical_coach / sleep_coach. Alarm ALARM 16:21Z; Maximum OverallAlarm over 86400 s.",
+    "citation": "self-clearing vendor window, not a code defect: Bedrock Haiku 4.5 503 episode of 2026-10-26 (from ~13:00Z; text calls recovered ~16:17Z, image calls still failing 16:49Z; incident row 2026-10-26). The 86400 s period holds the 16:20Z datapoint until ~2026-10-27 16:21Z. Expiry: if the next canary run after 2026-10-27 16:00Z still reports a FAILING check, file a story naming that check."
   },
   "ai-daily-spend-high": {
     "added": "2026-10-18",
@@ -200,10 +201,10 @@
     "note": "Reader-facing alarm class (freshness), cited on first red per #3423."
   },
   "slo-ai-coaching-success": {
-    "added": "2026-10-20",
-    "cause": "vendor transient: Bedrock ServiceUnavailableException (503)",
-    "cause_observed": "6 AnthropicAPIFailure 2026-10-19 14:00-14:02Z, all ai-expert-analyzer request 65a7dbba (Monday cron): six experts each exhausted 3 attempts, retry_utils.py:280. Re-ALARM 2026-10-20 16:19Z is a CloudWatch look-back to the window starting 10-18T16:19Z, no new failures. Budget tier 2 does not count (budget-stop branches never emit). Predates the 10-20 nutrition merges.",
-    "citation": "self-clearing vendor transient (a Bedrock 503 burst the alarm correctly counts; the class closed issue 3830 recorded). Window: the six 2026-10-19 14:00-14:02Z failures leave the 24h evaluation by 2026-10-21 ~16:20Z. Expiry: if still ALARM after 2026-10-21 17:00Z, or any AnthropicAPIFailure appears after 2026-10-19 14:02Z, file a story 'slo-ai-coaching-success: one run's 503 burst crosses the daily threshold'. Prune 72 h after OK."
+    "added": "2026-10-26",
+    "cause": "vendor transient: Bedrock ServiceUnavailableException (503), second Monday running from the same run",
+    "cause_observed": "2026-10-26: 6 AnthropicAPIFailure at 14:00Z, all LambdaFunction=ai-expert-analyzer (Monday 14:00Z cron), the same shape as 2026-10-19. Alarm ALARM 14:02Z; Sum over 86400 s >= 3.",
+    "citation": "#5412 — one weekly analyzer run's Bedrock 503 burst lights the coaching SLO for 24 h. This episode: Bedrock Haiku 4.5 503 episode of 2026-10-26 (from ~13:00Z; text calls recovered ~16:17Z, image calls still failing 16:49Z; incident row 2026-10-26). Self-clears when the 14:00Z burst leaves the 24 h window (~2026-10-27 14:05Z). If still ALARM after 2026-10-27 15:00Z, a new AnthropicAPIFailure source exists; re-derive."
   },
   "ingest-consecutive-failures-strava": {
     "added": "2026-10-23",
@@ -220,7 +221,7 @@
     "cause_observed": "2026-10-25",
     "cause": "strava store-vs-vendor reconcile: three backdated walks Strava holds that the store lacks",
     "citation": "#5257 — three backdated Strava walks (created ~10-21, local clock +9 h) the store lacks; deleting the duplicates is an owner phone act (owner acts list, Session CE). Self-clears once they leave the 14-day reconcile window (~10-27/28) or are deleted.",
-    "note": "Read from the alarm's StateReason (3 missing, 2026-10-20 17:21Z datapoint) and #5257's evidence; a Session CE audit found two duplicates remain (20673636264, 20673636369)."
+    "note": "Read from the alarm's StateReason (3 missing, 2026-10-20 17:21Z datapoint) and #5257's evidence; a Session CE audit found two duplicates remain (20673636264, 20673636369). Resolved 2026-10-26 17:21Z: MissingActivityCount 0, alarm OK; #5257 closed with live proof. Prune 72 h after."
   },
   "ingestion-error-og-image-generator": {
     "added": "2026-10-25",
@@ -258,5 +259,11 @@
     "cause_observed": "2026-10-26",
     "cause": "one recurring reader-truth false positive on /api/coaches (finding e8f2c1, temporal_contradiction): the judge reads _meta.generated_at (UTC) as after Pacific today on every Pacific-evening run",
     "citation": "#5402 — ALARM 2026-10-25T05:31Z (the finding confirmed high on a second pass) → OK 2026-10-26T05:30Z; the same finding recurs nightly at WARN. The deterministic ruling + prompt line ship in PR #5404 (wave 5); this entry is pruned when #5402 closes on a Pacific-evening run with no e8f2c1-class finding."
+  },
+  "ingest-reconciliation-whoop": {
+    "added": "2026-10-26",
+    "cause": "same-day timing race, store vs vendor",
+    "cause_observed": "ALARM 2026-10-25 18:21Z (MissingActivityCount 1), OK 2026-10-26 18:21Z (0). Workout 6086653e was stored at 04:00Z on 10-26, after the 10-25 reconcile read the vendor.",
+    "citation": "self-cleared flap: a workout the reconcile saw at the vendor before the next ingest stored it; cleared at the following day's 18:21Z reconcile with no change. Prune 72 h after 2026-10-26 18:21Z."
   }
 }
