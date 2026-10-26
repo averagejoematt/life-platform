@@ -718,8 +718,8 @@ def _dashboard_ranges():
                 {
                     "sk": "DATE#2026-03-03",
                     "activities": [
-                        {"average_heartrate": 120, "moving_time_seconds": 3600},  # in zone 2
-                        {"average_heartrate": 150, "moving_time_seconds": 1800},  # above zone 2
+                        {"moving_time_seconds": 3600, "zone2_seconds": 3600},  # in zone 2 (the device's own zone)
+                        {"moving_time_seconds": 1800, "zone4_seconds": 1800},  # above zone 2
                     ],
                 }
             ],
@@ -822,7 +822,7 @@ def test_write_dashboard_json_zone2_counts_only_in_band_activities():
     ranges = _dashboard_ranges()
     s3, _, _ = _init(fetch_range=ranges)
     dash = _write_dashboard(s3)
-    # max_hr 184 -> band 110.4–128.8bpm. Only the 120bpm/3600s session qualifies.
+    # #5398: THE Zone 2 computation (the device's own zones), not an average-HR band: only the zone-2 hour counts.
     assert dash["zone2_min"] == 60
 
 
@@ -967,8 +967,8 @@ def _clinical_ranges():
                 {
                     "sk": "DATE#2026-03-02",
                     "activities": [
-                        {"sport_type": "Walk", "average_heartrate": 118, "moving_time_seconds": 1800},
-                        {"sport_type": "Walk", "average_heartrate": 160, "moving_time_seconds": 1800},
+                        {"sport_type": "Walk", "moving_time_seconds": 1800, "zone2_seconds": 1800},
+                        {"sport_type": "Walk", "moving_time_seconds": 1800, "zone4_seconds": 1800},
                     ],
                 },
                 {"sk": "DATE#2026-03-03", "activities": [{"sport_type": "WeightTraining", "moving_time_seconds": 2700}]},
@@ -1206,7 +1206,7 @@ def test_write_clinical_json_sleep_and_activity_summaries():
 
     activity = clinical["activity"]
     assert activity["avg_sessions_week"] == 0.8  # 3 sessions / 4 weeks
-    assert activity["avg_zone2_min"] == 8  # only the 118bpm/1800s walk is in band -> 30/4
+    assert activity["avg_zone2_min"] == 8  # only the walk with zone-2 seconds counts -> 30/4
     assert activity["avg_daily_steps"] == 10000
     assert activity["primary_types"] == ["Walk", "WeightTraining"]
     assert activity["tsb"] == 4.5

@@ -10,6 +10,7 @@ from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific
 from health import hr_regime  # #4999: THE dated HR regime markers
 from health.watch_views import cardio_fitness_view  # #4979: the Apple Watch view
 from training import (
+    session_count,  # #5398: THE session count
     training_load,  # #4075: the ONE load model (computed_metrics' TSB)
     zone2_minutes,  # #4627: THE Zone 2 computation
 )
@@ -253,6 +254,60 @@ def _zone2_by_iso_week(strava_items, start_date, end_date):
     return dict(out)
 
 
+_CARDIO_TYPES = {"run", "ride", "swim", "hike", "walk", "rowing", "elliptical", "virtualrun", "virtualride", "trailrun"}
+_STRENGTH_TYPES = {"weighttraining", "crossfit", "workout"}
+
+
+def _add_visits(weeks, visits, week_key, max_hr):
+    """Fold THE session count's visits into the per-ISO-week accumulators (#5398): a gym visit (Hevy's
+    whole-session push + the ride inside it) is ONE session whose parts each count once, with minutes claimed
+    once. This read counted every Strava activity, so a gym day was two sessions and the lift span plus the
+    ride in minutes. Parts under ten minutes are skipped, as the per-activity floor was."""
+    for visit in visits:
+        date = visit.get("date")
+        if not date:
+            continue
+        wk = week_key(date)
+        weeks[wk]["dates"].add(date)
+        if visit["seconds"] >= 600:
+            weeks[wk]["sessions"] += 1
+        for part in visit["parts"]:
+            duration_min = part["minutes"]
+            if part["seconds"] < 600:
+                continue
+            sport = (part["sport"] or "").lower().replace(" ", "")
+            hrs = [h for h in (_to_float(a.get("average_heartrate")) for a in part["activities"]) if h]
+            avg_hr = sum(hrs) / len(hrs) if hrs else None
+            weeks[wk]["total_minutes"] += duration_min
+            if sport in _CARDIO_TYPES:
+                weeks[wk]["cardio_sessions"] += 1
+                weeks[wk]["cardio_minutes"] += duration_min
+                if avg_hr:
+                    # The easy / moderate / hard split is an INTENSITY distribution by average HR. Zone 2 MINUTES
+                    # are not counted here: since #4627 they are THE shared computation (`training.zone2_minutes`,
+                    # folded in by the caller), so this view and get_zone2_breakdown cannot disagree (#2221).
+                    zone = classify_hr_zone(avg_hr, max_hr)
+                    if zone in ("below_zone_1", "zone_1", "zone_2"):
+                        weeks[wk]["easy_minutes"] += duration_min
+                    elif zone == "zone_3":
+                        # Seiler's "no man's land" — its OWN bucket (folding it into easy made middle_zone_pct 0.0
+                        # by construction, so the board note that warns about it could never fire).
+                        weeks[wk]["moderate_minutes"] += duration_min
+                    else:
+                        weeks[wk]["hard_minutes"] += duration_min
+            elif sport in _STRENGTH_TYPES:
+                weeks[wk]["strength_sessions"] += 1
+                weeks[wk]["strength_minutes"] += duration_min
+            weeks[wk]["activities"].append({"date": date, "sport": sport, "duration_min": round(duration_min, 1), "avg_hr": avg_hr})
+
+
+def _to_float(v):
+    try:
+        return None if v is None else float(v)
+    except (ValueError, TypeError):
+        return None
+
+
 def _get_training_periodization(args):
     """
     Training periodization analysis. Detects mesocycle phases, deload needs,
@@ -317,63 +372,10 @@ def _get_training_periodization(args):
         }
     )
 
-    cardio_types = {"run", "ride", "swim", "hike", "walk", "rowing", "elliptical", "virtualrun", "virtualride", "trailrun"}
-    strength_types = {"weighttraining", "crossfit", "workout"}
-
-    # Process Strava activities
     for item in strava_items:
-        date = item.get("date")
-        if not date:
-            continue
-        wk = _week_key(date)
-        weeks[wk]["dates"].add(date)
-        for act in item.get("activities") or []:
-            sport = (act.get("sport_type") or act.get("type") or "").lower().replace(" ", "")
-            elapsed = _sf(act.get("elapsed_time_seconds")) or 0
-            if elapsed < 600:
-                continue
-            duration_min = elapsed / 60
-            avg_hr = _sf(act.get("average_heartrate"))
-
-            weeks[wk]["sessions"] += 1
-            weeks[wk]["total_minutes"] += duration_min
-
-            is_cardio = sport in cardio_types
-            is_strength = sport in strength_types
-
-            if is_cardio:
-                weeks[wk]["cardio_sessions"] += 1
-                weeks[wk]["cardio_minutes"] += duration_min
-
-                if avg_hr:
-                    # The easy / moderate / hard split below is an INTENSITY distribution by
-                    # average HR. Zone 2 MINUTES are not counted here: since #4627 they are THE
-                    # shared computation (`training.zone2_minutes`, folded in after this loop),
-                    # so this view and get_zone2_breakdown cannot disagree (#2221's invariant).
-                    zone = classify_hr_zone(avg_hr, max_hr)
-                    if zone in ("below_zone_1", "zone_1", "zone_2"):
-                        weeks[wk]["easy_minutes"] += duration_min
-                    elif zone == "zone_3":
-                        # Seiler's "no man's land" — its OWN bucket. Folding it into
-                        # easy_minutes made middle_zone_pct 0.0 by construction and let a
-                        # week of pure Zone 3 report easy_pct 100.0 / "well_polarized",
-                        # so the board note that warns about exactly this could never fire.
-                        weeks[wk]["moderate_minutes"] += duration_min
-                    else:
-                        weeks[wk]["hard_minutes"] += duration_min
-
-            elif is_strength:
-                weeks[wk]["strength_sessions"] += 1
-                weeks[wk]["strength_minutes"] += duration_min
-
-            weeks[wk]["activities"].append(
-                {
-                    "date": date,
-                    "sport": sport,
-                    "duration_min": round(duration_min, 1),
-                    "avg_hr": avg_hr,
-                }
-            )
+        if item.get("date"):
+            weeks[_week_key(item["date"])]["dates"].add(item["date"])
+    _add_visits(weeks, session_count.visits(strava=strava_items, hevy=hevy_items), _week_key, max_hr)
 
     # Strength volume per week from Hevy (#4636): every logged set's load x reps, in lb — the same
     # all-sets tonnage the weekly digest's `ex_hevy_workouts` reports — as the TOTAL moved (#5373:

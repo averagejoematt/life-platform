@@ -60,6 +60,7 @@ from experiment import experiment_gates  # #1371: the ONE registry of arming thr
 from experiment.phase_filter import source_reads_cross_phase  # #3444/#2109: per-source cross-phase decision
 from health import glycemic  # #1406: deterministic glycemic-variability features (CV, no LLM)
 
+from compute import training_mins_series  # #5398: training_mins over THE session count, with its dated cut-over
 from compute.correlation_gloss import n_gate_gloss  # split out at the #1665 size ceiling (#1996)
 
 # OBS-1: Structured logger
@@ -245,6 +246,8 @@ def assemble_daily_series(start_date, end_date):
         # #1406: values-lived (PERMA fact layer, #1403) for the fulfillment↔adherence edge.
         "flourishing": fetch_range("flourishing", start_date, end_date),
     }
+    # #5398: the Hevy rows (the routine source, #5369) anchor a gym visit for THE session count behind training_mins
+    visit_mins = training_mins_series.visit_minutes_by_date(sources["strava"], fetch_range("hevy", start_date, end_date))
 
     # Build date-indexed lookup per source
     by_date = {}
@@ -288,10 +291,9 @@ def assemble_daily_series(start_date, end_date):
         if st:
             acts = st.get("activities", [])
             metrics["training_kj"] = sum(float(a.get("kilojoules") or 0) for a in acts)
-            metrics["training_mins"] = sum(float(a.get("moving_time_seconds") or 0) / 60 for a in acts)
         else:
             metrics["training_kj"] = None
-            metrics["training_mins"] = None
+        metrics["training_mins"] = training_mins_series.training_mins(d, st, visit_mins)  # #5398: dated cut-over, ADR-105
 
         # ── Nutrition ─────────────────────────────────────────────────────
         metrics["calories"] = safe_float(mf, "total_calories_kcal")
@@ -591,6 +593,8 @@ def store_correlations(week_key, correlations, start_date, end_date, computed_at
         "n_pairs": Decimal(str(len(correlations))),
         "correlations": _dec_correlations(correlations),
         "computed_at": computed_at,
+        # #5398 (ADR-105): a series that changed definition says so on the record that stores its correlations
+        "series_amendments": [dict(a) for a in training_mins_series.SERIES_AMENDMENTS],
     }
     # V2 P2.6 (2026-05-19): tag with run_id + computed_at
     try:

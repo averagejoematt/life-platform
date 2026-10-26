@@ -15,6 +15,7 @@ from common.journal_silence import public_body  # #5131: the one public-surface 
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.text_utils import truncate_at_word
 from content import chronicle_schema  # #4191 — the ONE envelope→body / stat-line→words derivation
+from training import session_count  # #5398: THE session count
 
 _HAS_CONFIDENCE = True
 
@@ -767,8 +768,15 @@ def build_weekly_signal_data(data, week_num):
     sleep_eff = float(sleep_data.get("sleep_efficiency_pct", 0) or whoop.get("sleep_efficiency_pct", 0) or 0)
 
     # Training
+    # #5398: THE session count (training.session_count) — one gym visit is one session, however many records hold it.
+    # `strava` is one day row or the {date: row} read; `hevy` (optional) the Hevy rows over the same days.
     activities = strava.get("activities") or []
-    training_sessions = len(activities) if isinstance(activities, list) else int(activities or 0)
+    if isinstance(activities, list):
+        rows = [strava] if "activities" in strava else list(strava.values())
+        hevy = data.get("hevy") or []
+        training_sessions = session_count.count(strava=rows, hevy=list(hevy.values()) if isinstance(hevy, dict) else hevy)["sessions"]
+    else:
+        training_sessions = int(activities or 0)
 
     # Habits
     habit_completed = int(habits.get("tier0_completed", 0) or 0)
