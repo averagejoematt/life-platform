@@ -587,8 +587,13 @@ def detect_csv_type(headers):
     # Reentry sweep (2026-05-03): MacroFactor changed default export to a daily-
     # summary format (one row per day with Calories/Protein/Fat/Carbs/Weight/
     # Expenditure). Pre-fix the Lambda silently rejected it as "unknown" — that's
-    # why MacroFactor data was 22-day stale. Detect by Expenditure + Date columns.
-    if "Expenditure" in headers and "Date" in headers and "Calories (kcal)" in headers:
+    # why MacroFactor data was 22-day stale. Detect by core macro columns; Expenditure
+    # is optional per 2026-10-26 format change (new app export omits it).
+    if (
+        "Date" in headers
+        and "Calories (kcal)" in headers
+        and any(macro in headers for macro in ("Protein (g)", "Fat (g)", "Carbs (g)"))
+    ):
         return "daily_summary"
     return "unknown"
 
