@@ -73,7 +73,15 @@ you do arm must have a bounded timeout that ESCALATES (re-enumerate + report), n
 silent until-loop: 'blocked' must be distinguishable from 'still waiting'.
 
 Decode before deciding: **reject any lease whose sha is already an ancestor of `main`** —
-approving it deploys a tree missing every later merge. The auto-filed wedge alert advises
+approving it deploys a tree missing every later merge.
+
+**Except the reconcile child (2026-10-26, #5384).** When the newer run's head commit is the
+bot's `chore(reconcile): … [skip-reconcile]` commit and its parent is the gated run's sha,
+the PARENT run owns the deploy: the child's Plan logs `deploy-base: this push is a reconcile
+commit and the run at its parent … ships this tree` and skips its own Deploy. **Approve the
+parent; let the child finish without deploying.** Rejecting the parent strands the merge
+(merged, green, nothing deployed — it happened on #5383 until a `gh run rerun` + approve).
+The ancestor-reject rule still holds for two real merges in a train. The auto-filed wedge alert advises
 *approve* with no ancestry check; do not follow it blindly. There is no machine half any
 more: the #3021 lease janitor was retired by #4256 (ADR-158 left only the additive-IAM
 deploy at the gate). The deploy dead-man (`scripts/check_deploy_deadman.py`) alarms on a

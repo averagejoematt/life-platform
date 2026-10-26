@@ -24,6 +24,8 @@ Last updated: 2026-10-17 Session BV Fable proofs-and-alarms run (#1332 gate; +1 
 
 | Date | Severity | Summary | Root Cause | TTD* | TTR* | Data Loss? |
 |------|----------|---------|------------|------|------|------------|
+| 2026-10-26 | **P3** (a merged wave undeployed ~20 min; nothing served was wrong — prod simply ran the previous code; loud only because the driver read the skipped Deploy job) | **PR #5383 (Session CH wave 1, 3ead5f4ee) merged green but did not deploy at first.** The bot's `[skip-reconcile]` commit e43171b26 minted a second CI/CD run; the driver rejected the merge run 40263440771 at the production gate as "an ancestor of main" (land skill §3); the reconcile run 40263503459 then completed green with Deploy skipped. | Two rules disagree: land §3's ancestor-reject vs #4250's reconcile deploy-base ("the run at its parent … ships this tree"), and `reject_deployment.sh` rejects any run it is given. Fix: `gh run rerun 40263440771` + approve (03:47Z), deployed + smoke + QA 04:25Z, 12 bundle symbols verified by content. Class tracker: #5384 (refuse that reject; dead-man names the shape). Procedure: land skill §3 reconcile carve-out (this wrap). | ~5 min (read the skipped Deploy job) | ~20 min to re-approve, ~60 min to live | No |
+| 2026-10-26 | **P4** (one owner export rejected safely; loud — two DLQ alarms fired) | **`life-platform-ingestion-dlq-messages` and `life-platform-dlq-depth-warning` went ALARM at 01:00Z.** The owner's MacroFactor *Granular Export* arrived as a single CSV holding one metric (Calories & Macros) with Excel-serial dates; `macrofactor-data-ingestion` raised `Unknown MacroFactor CSV format`, retried twice, and parked the S3 event in the ingestion DLQ (1 message). Nothing was overwritten; the file was archived under `raw/…/macrofactor/unknown/`. | The ingester only recognised the full daily-summary shape (Expenditure + Date + Calories) and had no per-metric or serial-date path; the first export after the owner was walked through it exposed both. Fix: #5379 (in #5383) — serial dates converted in every CSV, per-metric files merge as `summary_partial`, multi-sheet XLSX joined; deployed 04:25Z. Class tracker: #5097 (open until the owner's repeat export lands expenditure). Procedure: the export walk-through now names the order (calories file first). | ~0 min (alarm) | ~3.5 h to deployed fix; DLQ message discarded after the repeat export | No |
 | 2026-10-20 | **P3** (main's deploys stranded ~70 min; nothing served was wrong — the nutrition wave 2 Lambda code was simply not live; loud: Plan red on the first run) | **Main's `Plan deployments` went red at 04:05Z on the nutrition wave 2 merge (#5217, 94b69434f); Deploy skipped, so wave 2's code did not deploy.** The IAM additive gate (#2834) read LifePlatformServe as OWNER-REQUIRED: `new-iam-resource …TelegramEveningCheckinAllowEventRule…: AWS::Lambda::Permission`. | The driver held the explicit `DynamoDBEveningCheckinWrite` PolicyStatement out of the wave but treated the new EventBridge rule (#5106) as non-IAM; a rule that targets a Lambda creates an implicit `AWS::Lambda::Permission`, a resource-based policy the gate classes owner-required (CONVENTIONS §4d(2) already said so). PR checks do not run Plan, so the wave PR was green on 11 checks. Fix: #5219 moved the rule + its schedule row to owner PR #5218 (main Plan green 05:0xZ), then a `deploy_all=true` dispatch (run 39372328618) deployed the fleet; bundles verified by content. Class tracker: #5221 (a PR-time IAM gate). Procedure: CONVENTIONS §4d(2) pre-merge gate reflex + the wave-kit review step. | ~0 min (first Plan run) | ~70 min | No |
 | 2026-10-14 | **P3** (the week-6 chronicle never reached subscribers; nothing served was wrong; silent to the reader for 2 d 3 h, then loud) | **Week 6 (2026-10-13) was drafted by the legacy writer and never sent:** the `wednesday-chronicle` run at 2026-10-14T15:00Z had the desk's budget rejected twice on the open-ask follow-up class (#4914) and fell back to the legacy writer at 15:03:25Z; the draft was stored and the preview email sent at 15:04:40Z; the fix (PR #4916) merged 20:15Z and deployed 20:22Z, five hours after the run; nobody approved the legacy draft. The 48-hour sweep refused it at 2026-10-16T18:00:44Z (`CHRONICLE-AUTOPUBLISH-HELD Week 6 … no audit on record` — the #4694 audit gate, and its live proof) and `chronicle-delivery-heartbeat` went ALARM at 19:02Z. Found by Session BV's boot read of the alarm board on 2026-10-17, after both detectors had fired. | Verified: a desk-failure fallback produces a draft only an owner approval can publish (an unaudited draft never auto-publishes, by design — #4694), and no instrument showed the waiting draft to the sessions that booted inside the 48-hour review window (BU, 2026-10-15 19:32Z, had no line for it). The detectors fired after their windows as designed; the gap is the review window itself. Class tracker: the dated `## Backlog rows` line on #4531; procedure edit in the same commit as this row: `scripts/hooks/session_preflight.py` prints every chronicle `DATE#` draft awaiting approval with its age at SessionStart (`chronicle   DRAFT DATE#2026-10-13 (week 6) unapproved 2d12h — HELD by the 48-h sweep daily …`; UNVERIFIED on a failed read, never blank). The way out is the owner's (#4914): approve from the preview email or force the desk. | 2 d 3 h to the alarm (10-14 15:04Z → 10-16 18:01Z); to a session, the next boot after it (2026-10-17 02:55Z) | Open at 2026-10-17 — awaits the owner's approval or force; week 7 runs 2026-10-21 15:00Z | No — the draft is stored; week 6 is late, not lost. |
 | 2026-10-14 | **P3** (two merged site PRs unpublished for 23 h; nothing served was wrong, the site was stale; silent) | **Every `site-deploy.yml` run from 2026-10-14T19:21Z to 2026-10-15T18:07Z failed before publishing, and no session noticed for a day:** the #3515 proof-freshness guard red-flagged `site/coaching/index.html` because the baked `as of` stamp read 2026-10-05 while every coach read on the block was dated the same day. PR #4916 (#4914) and PR #4919 (#4586) merged into a site that would not publish. Found by Session BT's boot read of the last site-deploy conclusion (`gh run list --workflow site-deploy.yml`), not by any alarm. | Verified: the held weekly read (#4703 class — the grounding gate kept the prior record and its TTL removed it) left `weekly_priority.generated_at` empty, and `scripts/v4_proof.py::load_coaching_read` fell back to `_meta.generated_at`, the analyzer's last productive run (10-05); the guard worked as designed over a stale stamp. Fixed by PR #4924 (898bddd43): the block stamps its newest content date; the site-deploy workflow's `paths` exclude `scripts/`, so the fix needed a hand dispatch (run 38779463603, success 18:07:02Z — the first publish since 10-13). Class: a failed site-deploy is silent (second instance after #3878, 2026-09-16→19); the tracker is the dated `## Backlog rows` line on #3493 (a scheduled read of the newest run's conclusion, or the pre-flight accepted as the instrument); the procedure edits are in the same commit as this row (`scripts/hooks/session_preflight.py` prints the newest site-deploy conclusion at every boot; `docs/CONVENTIONS.md` §2 and `.claude/skills/land/SKILL.md` §4 carry the reflex). | ~23 h (the next session's boot read; no alarm fires on a site-deploy failure). | Code fixed and merged 2026-10-15 17:30Z; published 18:07:02Z by the dispatched run. | No — nothing stored changed; two merged site changes were simply not live for 23 h. |
@@ -291,7 +293,7 @@ Last updated: 2026-10-17 Session BV Fable proofs-and-alarms run (#1332 gate; +1 
 > that looks maintained and is three months stale is worse than one that is obviously old.
 
 <!-- INCIDENT-PATTERNS:DISTRIBUTION:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**Distribution — 245 dated rows, 210 post-June** (newest row 2026-10-20):
+**Distribution — 247 dated rows, 212 post-June** (newest row 2026-10-26):
 
 | month | rows |
 |---|---|
@@ -303,16 +305,16 @@ Last updated: 2026-10-17 Session BV Fable proofs-and-alarms run (#1332 gate; +1 
 | 2026-07 | 36 |
 | 2026-08 | 126 |
 | 2026-09 | 41 |
-| 2026-10 | 7 |
+| 2026-10 | 9 |
 
-**By severity:** P1 6 · P2 35 · P3 94 · P4 105 · Low 3 · Info 1 · DR drill 1.
+**By severity:** P1 6 · P2 35 · P3 95 · P4 106 · Low 3 · Info 1 · DR drill 1.
 
 **By root-cause class** (keyword-derived over Summary + Root Cause; a row may match more
 than one, and 31 match none):
 
 | n | class |
 |---|---|
-| 155 | deployment error |
+| 157 | deployment error |
 | 64 | stale config / literal drift |
 | 47 | QA-oracle false positive |
 | 43 | QA false positive — deploy-race (#2978) |
@@ -349,17 +351,17 @@ scored orthogonally (loud/silent × class) rather than as a tenth category.
 but modest*, and materially weaker than this axis was described as when filed:
 
 <!-- INCIDENT-PATTERNS:SILENCE:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**55 of 245 rows are silent.**
+**55 of 247 rows are silent.**
 
 | | silent | loud |
 |---|---|---|
-| rows | 55 | 190 |
-| TTD parseable | 42 | 130 |
+| rows | 55 | 192 |
+| TTD parseable | 42 | 132 |
 | median TTD | **29 min** | 20 min |
-| mean TTD | 1,743 min | 1,425 min |
+| mean TTD | 1,743 min | 1,403 min |
 | exceeded 1 day | 6 (14% of parsed) | 11 (8% of parsed) |
 
-Silent rows take **~1.4× longer to detect at the median** and are **~1.8× more likely to run past a day**. But the *means* are only 18% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (5 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **73 of 245 TTD cells (30%) state no parseable duration** — they are excluded rather than counted as zero.
+Silent rows take **~1.4× longer to detect at the median** and are **~1.8× more likely to run past a day**. But the *means* are only 20% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (5 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **73 of 247 TTD cells (30%) state no parseable duration** — they are excluded rather than counted as zero.
 <!-- INCIDENT-PATTERNS:SILENCE:END -->
 
 The durable finding is not the multiplier. It is that **38 failures in this corpus
@@ -370,7 +372,7 @@ by making a silent class loud.
 ### Pre-July frequencies are FLOORS, not counts
 
 <!-- INCIDENT-PATTERNS:FLOORS:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**April has zero rows, May has one and June has two**, against 36 in July, 126 in August, 41 in September and 7 in October. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
+**April has zero rows, May has one and June has two**, against 36 in July, 126 in August, 41 in September and 9 in October. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
 <!-- INCIDENT-PATTERNS:FLOORS:END -->
 
 ### Row-inclusion rule (extends #1332)
