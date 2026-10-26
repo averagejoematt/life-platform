@@ -1564,7 +1564,7 @@ def lambda_handler(event, context):
         if diary_hypothesis_result.get("registered"):
             pending_count += 1  # newly-seeded hypothesis starts "pending" — counts against the cap below
         # 3.6. #4979: the three watch-enabled hypotheses, pre-registered in code (same contract as 3.5).
-        watch_seed = watch_hypotheses.seed_watch_hypotheses(all_hypotheses, daily_rows, validate_hypothesis, store_hypothesis)
+        watch_seed = watch_hypotheses.seed_watch_hypotheses(all_hypotheses, daily_rows, validate_hypothesis, store_hypothesis, table=table)
         pending_count += len(watch_seed["registered"])
 
         # 4. Generate new hypotheses if room exists AND data is sufficient
